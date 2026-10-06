@@ -114,7 +114,7 @@ export interface DiscordTransport {
 }
 
 /** A refused or failed call, as the host receives it. */
-export class DiscordApiFailure extends Schema.TaggedError<DiscordApiFailure>()("DiscordApiFailure", {
+class DiscordApiFailure extends Schema.TaggedError<DiscordApiFailure>()("DiscordApiFailure", {
   status: Schema.Number,
   code: Schema.Literals([
     "unauthorized",

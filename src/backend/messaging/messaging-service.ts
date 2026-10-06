@@ -255,6 +255,8 @@ export class MessagingService {
     workspaceId: string,
   ): Effect.fn.Return<void, MessagingOperationFailed> {
     const record = this.#requireConnection(platform, workspaceId);
+    // A guild that removed the bot has no bot to reconnect to and no link: it must install it again.
+    if (platform === "discord" && record.lastErrorCode === "invalid_token") return yield* this.connectDiscordGuild();
     yield* this.#stopConnection(record.connectionId);
     this.#threads.store.updateConnection(record.connectionId, { enabled: true, lastErrorCode: null });
     const updated = this.#threads.store.connection(record.connectionId);
@@ -432,21 +434,25 @@ export class MessagingService {
     return true;
   }, Effect.uninterruptible).bind(this);
 
-  /** Stops the guild's connection and unlinks it. OpenBot stays in the guild until a guild admin removes it. */
+  /**
+   * Unlinks the guild, then stops its connection and forgets it. OpenBot stays in the guild until a
+   * guild admin removes it. When the unlink fails, nothing changes, so the user can try again: the
+   * guild stays linked to this host until the account service unlinks it.
+   */
   readonly disconnectDiscordGuild = Effect.fn("MessagingService.disconnectDiscordGuild")(function* (
     this: MessagingService,
     guildId: string,
   ) {
     const record = yield* messagingStep(() => this.#requireConnection("discord", guildId));
+    if (this.#discordConnect)
+      yield* this.#discordConnect
+        .unlink(guildId)
+        .pipe(Effect.mapError((failure) => new MessagingOperationFailed({ cause: failure.cause })));
     yield* this.#stopConnection(record.connectionId);
     yield* this.#credentials.clear(record.connectionId);
     yield* messagingStep(() =>
       this.#threads.store.updateConnection(record.connectionId, { enabled: false, lastErrorCode: null }),
     );
-    if (this.#discordConnect)
-      yield* this.#discordConnect
-        .unlink(guildId)
-        .pipe(Effect.catch((failure) => Effect.sync(() => this.#warn(failure.cause))));
     this.#ingress?.reconnect();
   }, Effect.uninterruptible).bind(this);
 

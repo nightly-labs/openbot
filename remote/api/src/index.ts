@@ -28,6 +28,7 @@ class ControlPlane extends Context.Service<
       hostId: string,
       guilds: import("@openbot/contracts/signal-protocol/discord-route").DiscordRouteGuild[],
     ): Effect.Effect<string[], ControlPlaneError>;
+    discordGuildRemoved(guildId: string): Effect.Effect<void, ControlPlaneError>;
   }
 >()("@openbot/remote-api/ControlPlane") {
   static layer = Layer.sync(ControlPlane, () => {
@@ -113,6 +114,18 @@ class ControlPlane extends Context.Service<
           releaseResponse,
         ),
       ),
+      discordGuildRemoved: Effect.fn("ControlPlane.discordGuildRemoved")((guildId) =>
+        Effect.acquireUseRelease(
+          ask("/v2/remote/discord-route/removed", { guildId }),
+          (response) =>
+            response.ok
+              ? Effect.void
+              : Effect.fail(
+                  new ControlPlaneError({ message: "The account service did not unlink the Discord guild." }),
+                ),
+          releaseResponse,
+        ),
+      ),
     });
   });
 }
@@ -152,7 +165,11 @@ const tlsPaths =
 
 const signalRuntime = ManagedRuntime.make(signal.dependencies);
 // The Discord bot's Gateway connection lives in this runtime. Disposal closes it.
-const discordRuntime = config.discord ? ManagedRuntime.make(DiscordGateway.layer(config.discord, signal)) : null;
+const discordRuntime = config.discord
+  ? ManagedRuntime.make(
+      DiscordGateway.layer(config.discord, signal, (guildId) => controlPlaneService.discordGuildRemoved(guildId)),
+    )
+  : null;
 const discord = discordRuntime ? await discordRuntime.runPromise(DiscordGateway) : null;
 if (!discord) {
   console.log("OpenBot Discord is off: DISCORD_BOT_TOKEN and DISCORD_APPLICATION_ID are not both set and valid.");

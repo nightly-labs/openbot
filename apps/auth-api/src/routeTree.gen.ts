@@ -91,6 +91,7 @@ import { Route as V1SkillsAdminSubmissionsRouteImport } from './routes/v1/skills
 import { Route as V2HostingBoatWebhookRouteImport } from './routes/v2/hosting/boat/webhook'
 import { Route as V2HostingClaimsRedeemRouteImport } from './routes/v2/hosting/claims/redeem'
 import { Route as V2HostingServersIndexRouteImport } from './routes/v2/hosting/servers/index'
+import { Route as V2RemoteDiscordRouteRemovedRouteImport } from './routes/v2/remote/discord-route/removed'
 import { Route as V2RemoteDiscordRouteValidateRouteImport } from './routes/v2/remote/discord-route/validate'
 import { Route as V2RemoteHostsIndexRouteImport } from './routes/v2/remote/hosts/index'
 import { Route as V2RemoteHostsRegisterRouteImport } from './routes/v2/remote/hosts/register'
@@ -550,6 +551,12 @@ const V2HostingServersIndexRoute = V2HostingServersIndexRouteImport.update({
   path: '/v2/hosting/servers/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const V2RemoteDiscordRouteRemovedRoute =
+  V2RemoteDiscordRouteRemovedRouteImport.update({
+    id: '/v2/remote/discord-route/removed',
+    path: '/v2/remote/discord-route/removed',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const V2RemoteDiscordRouteValidateRoute =
   V2RemoteDiscordRouteValidateRouteImport.update({
     id: '/v2/remote/discord-route/validate',
@@ -850,6 +857,7 @@ export interface FileRoutesByFullPath {
   '/v1/skills/admin/submissions': typeof V1SkillsAdminSubmissionsRouteWithChildren
   '/v2/hosting/boat/webhook': typeof V2HostingBoatWebhookRoute
   '/v2/hosting/claims/redeem': typeof V2HostingClaimsRedeemRoute
+  '/v2/remote/discord-route/removed': typeof V2RemoteDiscordRouteRemovedRoute
   '/v2/remote/discord-route/validate': typeof V2RemoteDiscordRouteValidateRoute
   '/v2/remote/hosts/register': typeof V2RemoteHostsRegisterRoute
   '/v2/remote/invites/$inviteId': typeof V2RemoteInvitesInviteIdRoute
@@ -972,6 +980,7 @@ export interface FileRoutesByTo {
   '/v1/skills/admin/submissions': typeof V1SkillsAdminSubmissionsRouteWithChildren
   '/v2/hosting/boat/webhook': typeof V2HostingBoatWebhookRoute
   '/v2/hosting/claims/redeem': typeof V2HostingClaimsRedeemRoute
+  '/v2/remote/discord-route/removed': typeof V2RemoteDiscordRouteRemovedRoute
   '/v2/remote/discord-route/validate': typeof V2RemoteDiscordRouteValidateRoute
   '/v2/remote/hosts/register': typeof V2RemoteHostsRegisterRoute
   '/v2/remote/invites/$inviteId': typeof V2RemoteInvitesInviteIdRoute
@@ -1095,6 +1104,7 @@ export interface FileRoutesById {
   '/v1/skills/admin/submissions': typeof V1SkillsAdminSubmissionsRouteWithChildren
   '/v2/hosting/boat/webhook': typeof V2HostingBoatWebhookRoute
   '/v2/hosting/claims/redeem': typeof V2HostingClaimsRedeemRoute
+  '/v2/remote/discord-route/removed': typeof V2RemoteDiscordRouteRemovedRoute
   '/v2/remote/discord-route/validate': typeof V2RemoteDiscordRouteValidateRoute
   '/v2/remote/hosts/register': typeof V2RemoteHostsRegisterRoute
   '/v2/remote/invites/$inviteId': typeof V2RemoteInvitesInviteIdRoute
@@ -1219,6 +1229,7 @@ export interface FileRouteTypes {
     | '/v1/skills/admin/submissions'
     | '/v2/hosting/boat/webhook'
     | '/v2/hosting/claims/redeem'
+    | '/v2/remote/discord-route/removed'
     | '/v2/remote/discord-route/validate'
     | '/v2/remote/hosts/register'
     | '/v2/remote/invites/$inviteId'
@@ -1341,6 +1352,7 @@ export interface FileRouteTypes {
     | '/v1/skills/admin/submissions'
     | '/v2/hosting/boat/webhook'
     | '/v2/hosting/claims/redeem'
+    | '/v2/remote/discord-route/removed'
     | '/v2/remote/discord-route/validate'
     | '/v2/remote/hosts/register'
     | '/v2/remote/invites/$inviteId'
@@ -1463,6 +1475,7 @@ export interface FileRouteTypes {
     | '/v1/skills/admin/submissions'
     | '/v2/hosting/boat/webhook'
     | '/v2/hosting/claims/redeem'
+    | '/v2/remote/discord-route/removed'
     | '/v2/remote/discord-route/validate'
     | '/v2/remote/hosts/register'
     | '/v2/remote/invites/$inviteId'
@@ -1577,6 +1590,7 @@ export interface RootRouteChildren {
   V1SkillsAdminSubmissionsRoute: typeof V1SkillsAdminSubmissionsRouteWithChildren
   V2HostingBoatWebhookRoute: typeof V2HostingBoatWebhookRoute
   V2HostingClaimsRedeemRoute: typeof V2HostingClaimsRedeemRoute
+  V2RemoteDiscordRouteRemovedRoute: typeof V2RemoteDiscordRouteRemovedRoute
   V2RemoteDiscordRouteValidateRoute: typeof V2RemoteDiscordRouteValidateRoute
   V2RemoteHostsRegisterRoute: typeof V2RemoteHostsRegisterRoute
   V2RemoteInvitesInviteIdRoute: typeof V2RemoteInvitesInviteIdRoute
@@ -2189,6 +2203,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof V2HostingServersIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/v2/remote/discord-route/removed': {
+      id: '/v2/remote/discord-route/removed'
+      path: '/v2/remote/discord-route/removed'
+      fullPath: '/v2/remote/discord-route/removed'
+      preLoaderRoute: typeof V2RemoteDiscordRouteRemovedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/v2/remote/discord-route/validate': {
       id: '/v2/remote/discord-route/validate'
       path: '/v2/remote/discord-route/validate'
@@ -2656,6 +2677,7 @@ const rootRouteChildren: RootRouteChildren = {
   V1SkillsAdminSubmissionsRoute: V1SkillsAdminSubmissionsRouteWithChildren,
   V2HostingBoatWebhookRoute: V2HostingBoatWebhookRoute,
   V2HostingClaimsRedeemRoute: V2HostingClaimsRedeemRoute,
+  V2RemoteDiscordRouteRemovedRoute: V2RemoteDiscordRouteRemovedRoute,
   V2RemoteDiscordRouteValidateRoute: V2RemoteDiscordRouteValidateRoute,
   V2RemoteHostsRegisterRoute: V2RemoteHostsRegisterRoute,
   V2RemoteInvitesInviteIdRoute: V2RemoteInvitesInviteIdRoute,

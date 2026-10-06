@@ -731,6 +731,20 @@ describe("RemoteControlPlane", () => {
     ).resolves.toEqual([]);
     await runApiEffect(controlPlane.disconnectDiscordGuild("host-1", registration.machineToken, "111"));
     expect(discordRevocations()).toHaveLength(1);
+    // Signal reports that the bot left a guild: the link goes without the host.
+    database
+      .prepare(
+        `INSERT INTO discord_guild_routes(guild_id, host_id, account_id, connected_at)
+         VALUES ('333', 'host-1', 'owner', 2)`,
+      )
+      .run();
+    await runApiEffect(controlPlane.removeDiscordGuild("333"));
+    expect(database.prepare("SELECT guild_id FROM discord_guild_routes WHERE guild_id = '333'").get()).toBeUndefined();
+    expect(discordRevocations().at(-1)).toEqual({
+      type: "discord-route-revoked",
+      guildId: "333",
+      through: expect.any(Number),
+    });
     expect(database.prepare("SELECT membership_id FROM remote_memberships WHERE user_id = 'owner'").get()).toEqual({
       membership_id: "host-1:owner",
     });

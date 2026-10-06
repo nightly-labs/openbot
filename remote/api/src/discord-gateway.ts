@@ -35,7 +35,7 @@ function transportError(error: unknown): DiscordTransportError {
 }
 
 /** The REST client of the bot, with Signal's deadline and no wait for a Discord rate limit. */
-export function makeDiscordRestTransport(rest: REST): DiscordTransport {
+function makeDiscordRestTransport(rest: REST): DiscordTransport {
   return {
     request: Effect.fn("DiscordRest.request")((input: DiscordRestRequest) =>
       Effect.tryPromise({
@@ -67,7 +67,12 @@ export class DiscordGateway extends Context.Service<DiscordGateway, { readonly a
   "@openbot/remote-api/DiscordGateway",
 ) {
   /** Connects the bot. The scope's finalizer closes the Gateway connection. */
-  static layer(config: DiscordBotConfig, signal: SignalService) {
+  /** `unlinkGuild` tells the account service that the bot left a guild. */
+  static layer(
+    config: DiscordBotConfig,
+    signal: SignalService,
+    unlinkGuild: (guildId: string) => Effect.Effect<void, { readonly message: string }>,
+  ) {
     return Layer.effect(
       DiscordGateway,
       Effect.gen(function* () {
@@ -84,6 +89,18 @@ export class DiscordGateway extends Context.Service<DiscordGateway, { readonly a
         const act = (action: DiscordAction) => {
           if (action.type === "deliver") {
             signal.deliverDiscord(action.guildId, action.delivery);
+            // The bot left the guild. The route goes now, and the account service unlinks the guild,
+            // also when its host is offline and does not receive the delivery above.
+            if (action.delivery.kind === "removed") {
+              signal.revokeDiscordRoute(action.guildId, Date.now());
+              run(
+                unlinkGuild(action.guildId).pipe(
+                  Effect.catch(() =>
+                    Effect.sync(() => console.error("OpenBot Discord could not unlink a removed guild.")),
+                  ),
+                ),
+              );
+            }
             return;
           }
           const call =

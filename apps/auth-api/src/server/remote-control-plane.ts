@@ -1679,6 +1679,29 @@ export class RemoteControlPlane {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
+  /**
+   * Unlinks a Discord guild that the bot left, whichever host it was linked to. Signal reports this
+   * from the Gateway, so the link goes also when that host is offline.
+   */
+
+  readonly removeDiscordGuild = Effect.fn("RemoteControlPlane.removeDiscordGuild")(
+    function* (this: RemoteControlPlane, guildId: string): Effect.fn.Return<void, RemoteFailure, RemoteDependencies> {
+      const dependencies = yield* RemoteDependencies;
+      const now = dependencies.now();
+      const [queued] = yield* remoteCall(() =>
+        dependencies.database.batch([
+          this.#authEventStatement({ type: "discord-route-revoked", guildId, through: now }, now, {
+            sql: "EXISTS (SELECT 1 FROM discord_guild_routes WHERE guild_id = ?)",
+            binds: [guildId],
+          }),
+          dependencies.database.prepare("DELETE FROM discord_guild_routes WHERE guild_id = ?").bind(guildId),
+        ]),
+      );
+      if (queued?.meta.changes) yield* this.#flushAuthEvents();
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
   /** Checks the credential that a host received when it registered. */
 
   readonly authenticateHost = Effect.fn("RemoteControlPlane.authenticateHost")(

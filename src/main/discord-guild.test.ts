@@ -26,6 +26,7 @@ import {
   waitFor,
 } from "../backend/agent-service-test-harness";
 import { runCauseEffect } from "../backend/effect-boundary";
+import { DiscordConnectFailed } from "../backend/messaging/discord/discord-connect";
 import { discordDriver } from "../backend/messaging/discord/discord-driver";
 import { type MessagingCredentials, MessagingService } from "../backend/messaging/messaging-service";
 import { SignalIngress } from "./signal-ingress";
@@ -191,6 +192,7 @@ describe.sequential("OpenBot Discord app end to end", () => {
     const credentials = new MemoryCredentials();
     const authorizations: Array<{ hostNonce: string; hostPublicKey: string }> = [];
     const unlinked: string[] = [];
+    let failUnlink = false;
     let routeTickets = 0;
     ingress = new SignalIngress({
       hostId: () => "host-1",
@@ -222,9 +224,11 @@ describe.sequential("OpenBot Discord app end to end", () => {
             return "https://discord.com/oauth2/authorize?client_id=333";
           }),
         unlink: (guildId) =>
-          Effect.sync(() => {
-            unlinked.push(guildId);
-          }),
+          failUnlink
+            ? Effect.fail(new DiscordConnectFailed({ cause: new Error("The account service is unreachable.") }))
+            : Effect.sync(() => {
+                unlinked.push(guildId);
+              }),
         openExternal: async () => undefined,
       },
     });
@@ -289,12 +293,23 @@ describe.sequential("OpenBot Discord app end to end", () => {
     await waitFor(() => connection()?.state === "invalid_token");
     expect(unlinked).toEqual([GUILD_ID]);
     expect(turns()).toHaveLength(3);
+    // Reconnect cannot bring a removed bot back: it starts the install again.
+    const installs = authorizations.length;
+    await runCauseEffect(messaging.reconnect("discord", GUILD_ID));
+    expect(authorizations).toHaveLength(installs + 1);
+    expect(connection()?.state).toBe("invalid_token");
 
     // Connected again, the guild keeps its conversations and its agent.
     await connect();
     await waitFor(() => connection()?.state === "connected");
     expect(started.service.messaging.store.links(orchestratorId)).toHaveLength(2);
     expect(connection()?.orchestratorAgentId).toBe(orchestratorId);
+
+    // A disconnect that cannot unlink changes nothing, so it can be tried again.
+    failUnlink = true;
+    await expect(runCauseEffect(messaging.disconnectDiscordGuild(GUILD_ID))).rejects.toThrow();
+    expect(connection()).toMatchObject({ workspaceId: GUILD_ID, credentials: "saved" });
+    failUnlink = false;
 
     // Disconnect forgets the guild and unlinks it.
     await runCauseEffect(messaging.disconnectDiscordGuild(GUILD_ID));
