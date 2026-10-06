@@ -1,5 +1,6 @@
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import type { AgentEvent, AgentSummary, ConversationSnapshot, QueueHold, QueueSnapshot } from "@openbot/contracts/ipc";
+import { isMailboxMessageCopy } from "../conversation-snapshots";
 import type { MailboxStore } from "../mailbox-store";
 import type { OpenBotDatabase } from "../openbot-database";
 import type { ConversationRuntime } from "./conversation-runtime";
@@ -59,8 +60,18 @@ export class MailboxSync {
 
   syncMailboxMessages(snapshot: ConversationSnapshot): void {
     if (this.#conversation.isExecutionThread(snapshot.threadId)) return;
+    const mailboxMessages = this.#mailbox.conversationMessages(snapshot.agentId);
+    const incomingMessageIds = new Set(
+      mailboxMessages.flatMap((message) =>
+        message.exchange?.direction === "incoming" ? [message.exchange.messageId] : [],
+      ),
+    );
+    for (let index = snapshot.messages.length - 1; index >= 0; index--) {
+      const message = snapshot.messages[index];
+      if (message && isMailboxMessageCopy(message, incomingMessageIds)) snapshot.messages.splice(index, 1);
+    }
     const indexes = new Map(snapshot.messages.map((message, index) => [message.id, index]));
-    for (const mailboxMessage of this.#mailbox.conversationMessages(snapshot.agentId)) {
+    for (const mailboxMessage of mailboxMessages) {
       const index = indexes.get(mailboxMessage.id);
       if (index !== undefined) snapshot.messages[index] = mailboxMessage;
       else {

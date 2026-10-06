@@ -248,8 +248,11 @@ export class BootRecovery {
             .request("thread/read", { ...params, includeTurns: true }, decodeThreadResponse)
             .pipe(Effect.mapError((failure) => new BootRecoveryFailed({ cause: failure.cause })));
           yield* recoveryStep(() => {
-            const imported = snapshotFromThread(agent.id, response.thread, (deliveryId) =>
-              this.#mailbox.getDelivery(deliveryId),
+            const imported = snapshotFromThread(
+              agent.id,
+              response.thread,
+              (deliveryId) => this.#mailbox.getDelivery(deliveryId),
+              (messageId) => this.#mailbox.deliveryForMessage(messageId, agent.id),
             );
             imported.threadId = publicThreadId;
             const current = this.#store.database.readConversation(agent.id, publicThreadId);

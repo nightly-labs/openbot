@@ -959,6 +959,14 @@ export class MailboxStore {
     return delivery ? this.#context(delivery) : null;
   }
 
+  /** The delivery of one message to one recipient. A message reaches each recipient once. */
+  deliveryForMessage(messageId: string, recipientAgentId: string): DeliveryContext | null {
+    const delivery = this.#state.deliveries.find(
+      (candidate) => candidate.messageId === messageId && candidate.recipientAgentId === recipientAgentId,
+    );
+    return delivery ? this.#context(delivery) : null;
+  }
+
   findDeliveryByTurn(turnId: string): DeliveryContext | null {
     const delivery = this.#state.deliveries.find((candidate) => candidate.turnId === turnId);
     return delivery ? this.#context(delivery) : null;

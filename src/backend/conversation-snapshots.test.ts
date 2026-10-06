@@ -1,6 +1,8 @@
 import type { ConversationMessage, ConversationSnapshot } from "@openbot/contracts/ipc";
 import { describe, expect, it } from "vitest";
-import { mergeProviderHistory, snapshotFromThread } from "./conversation-snapshots";
+import { combinedPromptInput, deliveryPromptInput } from "./agent/delivery-content";
+import { isMailboxMessageCopy, mergeProviderHistory, snapshotFromThread } from "./conversation-snapshots";
+import type { DeliveryContext } from "./mailbox-store";
 
 import { decodeThreadResponse } from "./protocol";
 
@@ -26,7 +28,14 @@ describe("provider conversation history", () => {
         ],
       },
     });
-    expect(snapshotFromThread("chief", decoded.thread, () => null).messages).toEqual([
+    expect(
+      snapshotFromThread(
+        "chief",
+        decoded.thread,
+        () => null,
+        () => null,
+      ).messages,
+    ).toEqual([
       expect.objectContaining({ id: "reasoning-1", itemType: "commentary", text: "First step.\n\nSecond step." }),
       expect.objectContaining({ id: "answer-1", itemType: "final_answer", text: "Done." }),
     ]);
@@ -252,6 +261,131 @@ describe("provider conversation history", () => {
     }
   });
 });
+
+describe("teammate messages in provider history", () => {
+  const agentNames = new Map([
+    ["builder", "Builder (QA)"],
+    ["tester", "Tester"],
+  ]);
+  const reply = teammateDelivery(
+    "delivery-1",
+    "message-1",
+    "builder",
+    "Status: done\nResult: Deployed.\nEvidence: none",
+    {
+      replyToMessageId: "request-1",
+    },
+  );
+  const note = teammateDelivery("delivery-2", "message-2", "tester", "The staging host moved.", {
+    expectsReply: false,
+  });
+  const promptText = (context: DeliveryContext) => {
+    const [item] = deliveryPromptInput(context, { agentNames, snapshot: snapshot([]), routineRun: null });
+    return item?.type === "text" ? item.text : "";
+  };
+
+  it("keeps the sender of a teammate message whose provider ID names no delivery", () => {
+    const found = snapshotFromThread(
+      "chief",
+      providerThread(promptText(reply)),
+      () => null,
+      (messageId) => (messageId === "message-1" ? reply : null),
+    );
+    expect(found.messages).toEqual([
+      expect.objectContaining({
+        id: "delivery-1",
+        author: "agent",
+        senderAgentId: "builder",
+        text: reply.delivery.text,
+      }),
+    ]);
+
+    const [combined] = combinedPromptInput(
+      [reply, note].map((context) =>
+        deliveryPromptInput(context, { agentNames, snapshot: snapshot([]), routineRun: null }),
+      ),
+      ["planner"],
+      agentNames,
+    );
+    const handoff = `Continue this OpenBot conversation.\n\n--- current message ---\n${combined?.type === "text" ? combined.text : ""}`;
+    const rebuilt = snapshotFromThread(
+      "chief",
+      providerThread(handoff),
+      () => null,
+      () => null,
+    );
+    expect(rebuilt.messages).toEqual([
+      expect.objectContaining({
+        id: "provider-1",
+        author: "agent",
+        senderAgentId: "builder",
+        replyToMessageId: "request-1",
+        text: reply.delivery.text,
+        exchange: expect.objectContaining({
+          direction: "incoming",
+          messageId: "message-1",
+          recipientAgentIds: ["chief"],
+        }),
+      }),
+      expect.objectContaining({
+        id: "provider-1:message-2",
+        author: "agent",
+        senderAgentId: "tester",
+        text: note.delivery.text,
+        exchange: expect.objectContaining({ messageId: "message-2", expectsReply: false }),
+      }),
+    ]);
+  });
+
+  it("finds a stored user copy of a teammate message that the mailbox holds", () => {
+    const copy = message("provider-1", "user", promptText(reply));
+    expect(isMailboxMessageCopy(copy, new Set(["message-1"]))).toBe(true);
+    expect(isMailboxMessageCopy(copy, new Set())).toBe(false);
+    expect(isMailboxMessageCopy(message("user-1", "user", reply.delivery.text), new Set(["message-1"]))).toBe(false);
+  });
+});
+
+function teammateDelivery(
+  id: string,
+  messageId: string,
+  senderAgentId: string,
+  text: string,
+  options: { replyToMessageId?: string; expectsReply?: false },
+): DeliveryContext {
+  return {
+    delivery: {
+      id,
+      messageId,
+      recipientAgentId: "chief",
+      sender: { kind: "agent", agentId: senderAgentId },
+      text,
+      attachments: [],
+      replyToMessageId: options.replyToMessageId ?? null,
+      status: "completed",
+      position: null,
+      turnId: "turn-1",
+      error: null,
+      createdAt: "2026-08-25T08:00:00.000Z",
+      ...(options.expectsReply === false ? { expectsReply: false } : {}),
+    },
+    managedAttachments: [],
+  };
+}
+
+function providerThread(text: string) {
+  return decodeThreadResponse({
+    thread: {
+      id: "thread-1",
+      turns: [
+        {
+          id: "provider-1",
+          status: "completed",
+          items: [{ id: "provider-1", type: "userMessage", clientId: "provider-1", content: [{ type: "text", text }] }],
+        },
+      ],
+    },
+  }).thread;
+}
 
 function snapshot(messages: ConversationMessage[]): ConversationSnapshot {
   return {
