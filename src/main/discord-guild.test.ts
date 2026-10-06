@@ -43,6 +43,8 @@ const APP_ID = "333";
 class FakeSignal {
   readonly hellos: DynamicRecord[] = [];
   readonly calls: DynamicRecord[] = [];
+  /** The guilds that the session says are routed to the host. */
+  routed = [GUILD_ID];
   #server: Server | null = null;
   #sockets: WebSocketServer | null = null;
   #socket: WebSocket | null = null;
@@ -90,7 +92,7 @@ class FakeSignal {
         socket.send(
           JSON.stringify({ type: "ready", version: 1, connectionId: null, resumeToken: "r", iceServers: [] }),
         );
-        socket.send(JSON.stringify({ type: "discord-session", version: 1, token: this.#session }));
+        socket.send(JSON.stringify({ type: "discord-session", version: 1, token: this.#session, guilds: this.routed }));
       });
     });
     await new Promise<void>((resolve) => this.#server?.listen(0, "127.0.0.1", resolve));
@@ -305,6 +307,13 @@ describe.sequential("OpenBot Discord app end to end", () => {
     expect(started.service.messaging.store.links(orchestratorId)).toHaveLength(2);
     expect(connection()?.orchestratorAgentId).toBe(orchestratorId);
 
+    // The guild was unlinked while this computer was off: the next session does not name it.
+    signal.routed = [];
+    ingress.reconnect();
+    await waitFor(() => connection()?.state === "invalid_token");
+    expect(unlinked).toEqual([GUILD_ID, GUILD_ID]);
+    signal.routed = [GUILD_ID];
+
     // A disconnect that cannot unlink changes nothing, so it can be tried again.
     failUnlink = true;
     await expect(runCauseEffect(messaging.disconnectDiscordGuild(GUILD_ID))).rejects.toThrow();
@@ -314,7 +323,7 @@ describe.sequential("OpenBot Discord app end to end", () => {
     // Disconnect forgets the guild and unlinks it.
     await runCauseEffect(messaging.disconnectDiscordGuild(GUILD_ID));
     expect(credentials.values.size).toBe(0);
-    expect(unlinked).toEqual([GUILD_ID, GUILD_ID]);
+    expect(unlinked).toEqual([GUILD_ID, GUILD_ID, GUILD_ID]);
     expect(messaging.discordOverview().connections).toEqual([]);
 
     mkdirSync(REPORT_DIR, { recursive: true });

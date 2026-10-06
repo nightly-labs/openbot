@@ -95,6 +95,7 @@ export class SignalIngress implements MessagingIngress {
   #apiUrl: string | null = null;
   #discordSession: DiscordSession | null = null;
   readonly #sessionListeners = new Set<(session: DiscordSession | null) => void>();
+  readonly #routeListeners = new Set<(guildIds: ReadonlySet<string>) => void>();
 
   constructor(options: SignalIngressOptions) {
     this.#options = options;
@@ -200,6 +201,11 @@ export class SignalIngress implements MessagingIngress {
     });
   });
 
+  onDiscordRoutes(listener: (guildIds: ReadonlySet<string>) => void): () => void {
+    this.#routeListeners.add(listener);
+    return () => this.#routeListeners.delete(listener);
+  }
+
   /**
    * The session of the open socket, at once or when Signal sends it. Null when nothing holds the
    * socket open, or when it closes: no session comes then.
@@ -225,6 +231,7 @@ export class SignalIngress implements MessagingIngress {
     this.#holders.clear();
     this.#close();
     this.#listeners.clear();
+    this.#routeListeners.clear();
     yield* Scope.close(this.#scope, Exit.void);
     yield* this.#runtime.disposeEffect;
   }, Effect.uninterruptible);
@@ -315,6 +322,8 @@ export class SignalIngress implements MessagingIngress {
       const session = { token: message.token, url };
       this.#discordSession = session;
       for (const listener of [...this.#sessionListeners]) listener(session);
+      const routes = new Set(message.guilds);
+      for (const listener of [...this.#routeListeners]) listener(routes);
       return;
     }
     if (message.type === "discord-delivery") {

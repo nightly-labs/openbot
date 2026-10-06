@@ -21,17 +21,25 @@ const OK: IngressAnswer = { status: 200 };
  */
 export class DiscordTransport implements MessagingTransport {
   readonly #ingress: MessagingIngress;
+  readonly #guildId: string;
   readonly #seen = new Set<string>();
   #sink: TransportSink | null = null;
   #release: (() => void) | null = null;
   #unsubscribe: (() => void) | null = null;
+  #unsubscribeRoutes: (() => void) | null = null;
 
-  constructor(ingress: MessagingIngress) {
+  constructor(ingress: MessagingIngress, guildId: string) {
     this.#ingress = ingress;
+    this.#guildId = guildId;
   }
 
   start(sink: TransportSink): void {
     this.#sink = sink;
+    // Before `acquire`, which can open the socket. The socket's route ticket is issued after this
+    // start, so a session without the guild means that it was unlinked or the bot left it.
+    this.#unsubscribeRoutes ??= this.#ingress.onDiscordRoutes((guildIds) => {
+      if (!guildIds.has(this.#guildId)) this.#sink?.state("invalid_token");
+    });
     this.#release ??= this.#ingress.acquire("discord");
     this.#unsubscribe ??= this.#ingress.onState((state) => this.#report(state));
     this.#report(this.#ingress.state());
@@ -45,6 +53,8 @@ export class DiscordTransport implements MessagingTransport {
       this.#sink = null;
       this.#unsubscribe?.();
       this.#unsubscribe = null;
+      this.#unsubscribeRoutes?.();
+      this.#unsubscribeRoutes = null;
       this.#release?.();
       this.#release = null;
     }),

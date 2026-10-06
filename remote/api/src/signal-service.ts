@@ -106,6 +106,14 @@ export interface SignalServiceOptions {
   discord?: boolean;
 }
 
+/** What the Discord Gateway knows of the bot's guilds. */
+export interface DiscordMembership {
+  /** Whether the bot is in the guild, or null before the Gateway has listed its guilds. */
+  isMember(guildId: string): boolean | null;
+  /** A route ticket names a guild that the bot left: the account service unlinks it. */
+  left(guildId: string): void;
+}
+
 /** One signed Slack request for a workspace. Signal passes it on and keeps nothing of it. */
 export interface SlackDelivery {
   kind: SlackDeliveryKind;
@@ -158,6 +166,8 @@ const INGRESS_RATE_FACTOR = 10;
 // Slack sends at most 30,000 events an hour for one app in one workspace.
 const SLACK_TEAM_RATE_FACTOR = 2;
 const DISCORD_SESSION_TOKEN_BYTES = 32;
+// How long after a link Signal waits for the Gateway to report the bot in the guild.
+const DISCORD_NEW_LINK_MILLISECONDS = 5 * 60_000;
 
 export class SignalService {
   readonly #tokens: RemoteTokenProvider;
@@ -180,6 +190,7 @@ export class SignalService {
   // The SHA-256 of each `discord-session` token to its socket. The token itself is not kept.
   readonly #discordSessions = new Map<string, string>();
   readonly #discordEnabled: boolean;
+  #discordMembership: DiscordMembership | null = null;
   readonly #pendingDeliveries = new Map<string, PendingDelivery>();
   readonly #slackLimits: SlackDeliveryLimits;
   readonly #connections = new Map<string, ActiveConnection>();
@@ -415,6 +426,11 @@ export class SignalService {
     if (floor > through) return;
     this.#slackRouteFloor.set(route, through + 1);
     this.#slackTeams.delete(route);
+  }
+
+  /** Set by the Discord Gateway when it starts, which is after this service. */
+  setDiscordMembership(membership: DiscordMembership | null): void {
+    this.#discordMembership = membership;
   }
 
   /** The account service unlinked a Discord guild, or moved it, after `through`'s link. */
@@ -681,12 +697,22 @@ export class SignalService {
             this.#slackRouteFloor.set(route, team.linkedAt);
             this.#slackTeams.set(route, socket.id);
           }
-          let heldGuilds = 0;
+          const heldGuilds: string[] = [];
           for (const guild of discordRoute.guilds) {
             if (guild.linkedAt < (this.#discordRouteFloor.get(guild.id) ?? 0)) continue;
+            // The bot left the guild while its unlink did not reach the account service, such as
+            // when the host was off and the request failed, or before Signal restarted. A new link
+            // can arrive before the Gateway reports that the bot joined, so it is not judged.
+            if (
+              this.#discordMembership?.isMember(guild.id) === false &&
+              Date.now() - guild.linkedAt > DISCORD_NEW_LINK_MILLISECONDS
+            ) {
+              this.#discordMembership.left(guild.id);
+              continue;
+            }
             this.#discordRouteFloor.set(guild.id, guild.linkedAt);
             this.#discordGuilds.set(guild.id, socket.id);
-            heldGuilds += 1;
+            heldGuilds.push(guild.id);
           }
           this.#send(socket, {
             type: "ready",
@@ -695,12 +721,13 @@ export class SignalService {
             resumeToken,
             iceServers: this.#tokens.iceServers(claims),
           });
-          // Without the bot token, Signal cannot make a Discord call: the socket gets no session.
-          if (this.#discordEnabled && heldGuilds > 0) {
+          // Without the bot token, Signal cannot make a Discord call: the socket gets no session. The
+          // session names the guilds routed here, so the host learns of a guild it lost while off.
+          if (this.#discordEnabled && message.discordRoute) {
             const token = randomBytes(DISCORD_SESSION_TOKEN_BYTES).toString("base64url");
             peer.discordSession = discordSessionKey(token);
             this.#discordSessions.set(peer.discordSession, socket.id);
-            this.#send(socket, { type: "discord-session", version: 1, token });
+            this.#send(socket, { type: "discord-session", version: 1, token, guilds: heldGuilds });
           }
           return;
         }

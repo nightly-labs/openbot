@@ -85,22 +85,33 @@ export class DiscordGateway extends Context.Service<DiscordGateway, { readonly a
         const transport = makeDiscordRestTransport(rest);
         const state = new DiscordState(config.applicationId);
         const run = yield* FiberSet.makeRuntime<never>();
+        // The guilds whose unlink is on its way, so that hosts that connect meanwhile do not repeat it.
+        const unlinking = new Set<string>();
+
+        /**
+         * Drops the route of a guild that the bot left and unlinks it in the account service. A failed
+         * unlink is tried again when a host presents the guild in a route ticket.
+         */
+        const left = (guildId: string) => {
+          signal.revokeDiscordRoute(guildId, Date.now());
+          if (unlinking.has(guildId)) return;
+          unlinking.add(guildId);
+          run(
+            unlinkGuild(guildId).pipe(
+              Effect.catch(() => Effect.sync(() => console.error("OpenBot Discord could not unlink a removed guild."))),
+              Effect.ensuring(Effect.sync(() => unlinking.delete(guildId))),
+            ),
+          );
+        };
+        signal.setDiscordMembership({ isMember: (guildId) => state.isMember(guildId), left });
+        yield* Effect.addFinalizer(() => Effect.sync(() => signal.setDiscordMembership(null)));
 
         const act = (action: DiscordAction) => {
           if (action.type === "deliver") {
             signal.deliverDiscord(action.guildId, action.delivery);
             // The bot left the guild. The route goes now, and the account service unlinks the guild,
             // also when its host is offline and does not receive the delivery above.
-            if (action.delivery.kind === "removed") {
-              signal.revokeDiscordRoute(action.guildId, Date.now());
-              run(
-                unlinkGuild(action.guildId).pipe(
-                  Effect.catch(() =>
-                    Effect.sync(() => console.error("OpenBot Discord could not unlink a removed guild.")),
-                  ),
-                ),
-              );
-            }
+            if (action.delivery.kind === "removed") left(action.guildId);
             return;
           }
           const call =

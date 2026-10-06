@@ -186,8 +186,10 @@ export type SignalServerMessage =
       bodyBase64: string;
     }
   // Sent to an `ingress` socket with a Discord route, after `ready`. The host sends `token` as the
-  // bearer of its calls to `DISCORD_API_PATH`. It is valid while this socket is open.
-  | { type: "discord-session"; version: SignalProtocolVersion; token: string }
+  // bearer of its calls to `DISCORD_API_PATH`. It is valid while this socket is open. `guilds` are
+  // the guilds routed to this socket: a guild of the host that is not in it was unlinked, or the bot
+  // left it.
+  | { type: "discord-session"; version: SignalProtocolVersion; token: string; guilds: string[] }
   // One Discord event of a guild routed to this `ingress` socket. Signal already acknowledged a button
   // press to Discord; nothing is answered.
   | { type: "discord-delivery"; version: SignalProtocolVersion; guildId: string; delivery: DiscordDelivery }

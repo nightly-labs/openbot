@@ -128,6 +128,8 @@ export class DiscordState {
   #botUserId: string | null = null;
   // Guild ID to name, for each guild that the bot is in.
   readonly #guilds = new Map<string, string>();
+  // Each guild that the bot is in, from READY on. Null before READY: then it is not known.
+  #memberGuilds: Set<string> | null = null;
   // Channel or thread ID to its guild and name.
   readonly #channels = new Map<string, { guildId: string; name: string }>();
   readonly #interactions = new Map<string, StoredInteraction>();
@@ -136,6 +138,11 @@ export class DiscordState {
 
   constructor(applicationId: string) {
     this.#configuredApplicationId = applicationId;
+  }
+
+  /** Whether the bot is in the guild, or null before READY. */
+  isMember(guildId: string): boolean | null {
+    return this.#memberGuilds ? this.#memberGuilds.has(guildId) : null;
   }
 
   get botUserId(): string | null {
@@ -168,11 +175,13 @@ export class DiscordState {
       case GatewayDispatchEvents.Ready:
         this.#botUserId = payload.d.user.id;
         this.#applicationId = payload.d.application.id;
+        this.#memberGuilds = new Set(payload.d.guilds.map((guild) => guild.id));
         return [];
       case GatewayDispatchEvents.GuildCreate:
       case GatewayDispatchEvents.GuildUpdate: {
         const guild = payload.d;
         this.#guilds.set(guild.id, guild.name);
+        this.#memberGuilds?.add(guild.id);
         if (payload.t === GatewayDispatchEvents.GuildCreate) {
           for (const channel of [...(payload.d.channels ?? []), ...(payload.d.threads ?? [])]) {
             this.#channels.set(channel.id, { guildId: guild.id, name: channel.name ?? "" });
@@ -279,6 +288,7 @@ export class DiscordState {
 
   #forgetGuild(guildId: string): void {
     this.#guilds.delete(guildId);
+    this.#memberGuilds?.delete(guildId);
     for (const [channelId, channel] of this.#channels) {
       if (channel.guildId === guildId) this.#channels.delete(channelId);
     }

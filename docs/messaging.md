@@ -74,7 +74,8 @@ A Discord server answers to one OpenBot server. Another account cannot connect a
 your server answers until you disconnect it. **Disconnect** unlinks the Discord server and removes it
 from this computer; the conversations stay in OpenBot. OpenBot stays a member of the Discord server
 until a Discord admin removes it. When a Discord admin removes OpenBot, Signal unlinks the server, also
-when this computer is off, and the row says that the token is not accepted. **Reconnect** then starts
+when this computer is off, and the row says that the token is not accepted (for a computer that was
+off, when it connects again). **Reconnect** then starts
 the install again. A **Disconnect** that cannot reach the account service changes nothing; try it
 again.
 

@@ -1727,6 +1727,12 @@ the token and does the platform work for the hosts:
   `openbot-discord-route`, `/v2/remote/hosts/:id/discord-route`, `discord-route-revoked`,
   `/v2/remote/discord-route/validate`). The socket asks for a route only for the platforms whose
   connections hold it.
+- **Removal.** When the bot leaves a guild, Signal drops its route and asks the account service to
+  unlink it (`/v2/remote/discord-route/removed`, signed), so an offline host does not keep it. A
+  route ticket that still names a guild the bot is not in, after a failed unlink or a Signal restart,
+  is not routed, and Signal asks for the unlink again. The `discord-session` frame lists the guilds
+  routed to the socket; a host connection whose guild is not listed stops, and **Reconnect** starts
+  the install again.
 - **Calls.** After `ready`, Signal sends the socket a `discord-session` token. The host's adapter
   (`discord-driver.ts`) sends typed operations (`DiscordApiRequest`: post, edit, delete, react, list
   messages, names, a private reply to a button press, upload) to `POST /v1/discord/api` with that

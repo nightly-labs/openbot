@@ -215,6 +215,11 @@ export interface MessagingIngress {
     decode: (value: unknown) => A,
     file?: DiscordUploadFile,
   ): Effect.Effect<A, MessagingAdapterError>;
+  /**
+   * Calls `listener` with the Discord guilds that Signal routes to the socket, each time Signal
+   * sends a session. A guild of this host that is not in it was unlinked, or the bot left it.
+   */
+  onDiscordRoutes(listener: (guildIds: ReadonlySet<string>) => void): () => void;
 }
 
 /** The bytes of one `upload` call. */

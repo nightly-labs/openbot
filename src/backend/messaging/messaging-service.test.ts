@@ -204,6 +204,7 @@ const onlineIngress: MessagingIngress = {
   handle: () => undefined,
   reconnect: () => undefined,
   discord: () => Effect.die(new Error("No Discord in this test.")),
+  onDiscordRoutes: () => () => undefined,
 };
 
 class MemoryCredentials implements MessagingCredentials {

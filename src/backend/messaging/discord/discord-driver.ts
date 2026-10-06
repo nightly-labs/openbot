@@ -336,9 +336,9 @@ export function discordDriver(options: { ingress?: MessagingIngress } = {}): Mes
       if (!options.ingress) throw new Error(sourceText("error.messaging.discordUnsupported"));
       return new DiscordAdapter(options.ingress, credentials, driverOptions);
     },
-    createTransport() {
+    createTransport(_credentials, identity) {
       if (!options.ingress) throw new Error(sourceText("error.messaging.discordUnsupported"));
-      return new DiscordTransport(options.ingress);
+      return new DiscordTransport(options.ingress, identity.workspaceId);
     },
   };
 }

@@ -480,6 +480,16 @@ describe("Discord route", () => {
     expect(refused.status).toBe(403);
     expect(await refused.json()).toEqual({ error: { code: "unknown_guild" } });
   });
+
+  it("does not route a guild that the bot left, and has the account service unlink it", async () => {
+    const { connect, signal } = await discordRoute();
+    const left: string[] = [];
+    signal.setDiscordMembership({ isMember: (guildId) => guildId === "100", left: (guildId) => left.push(guildId) });
+    const host = await connect("host", ["100", "200"]);
+    expect(JSON.parse(host.socket.messages.at(-1) ?? "{}")).toMatchObject({ guilds: ["100"] });
+    expect(left).toEqual(["200"]);
+    expect(signal.deliverDiscord("200", { kind: "removed" })).toBe(false);
+  });
 });
 
 async function discordRoute() {
