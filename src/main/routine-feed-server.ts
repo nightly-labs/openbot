@@ -135,7 +135,7 @@ export class RoutineFeedServer {
   }).bind(this);
 
   readonly stop = Effect.fn("RoutineFeedServer.stop")(function* (this: RoutineFeedServer) {
-    yield* this.#lock.withPermit(this.#close());
+    yield* this.#lock.withPermit(Effect.suspend(() => this.#close()));
   }).bind(this);
 
   #status(): RoutineFeed {
