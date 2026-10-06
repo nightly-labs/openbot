@@ -225,7 +225,10 @@ export class TeamApiServer {
   // Without the gate, two starts at once open two listeners and lose one, and a stop during a start
   // runs before the listener exists. A listener lost that way stays open for the previous account.
   start(): Effect.Effect<number, RemoteWorkflowError> {
-    return this.#lifecycle.start(() => this.#start());
+    // A dependency that throws while the listener starts is a failed start, so the host stops it.
+    return this.#lifecycle.start(() =>
+      this.#start().pipe(Effect.catchDefect((cause) => Effect.fail(new RemoteWorkflowError({ cause })))),
+    );
   }
 
   stop(): Effect.Effect<void, RemoteWorkflowError> {

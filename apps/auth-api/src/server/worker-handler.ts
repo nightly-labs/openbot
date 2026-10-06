@@ -85,14 +85,22 @@ export function createWorkerHandler(
         }
         return isDailyRetentionRun(now) ? yield* prune(bindings.DB, now) : null;
       });
+      // Each job runs to its end, so a failure of one does not cut another. The first failure still
+      // fails the run.
       const [retention, , sites] = await runApiEffect(
         Effect.all(
           [
-            hostingThenRetention,
-            deliverRemoteAuthEvents(bindings, now),
-            bindings.SITES ? new HostedSiteService(bindings.DB, bindings.SITES).cleanup(now) : Effect.succeed(null),
+            Effect.exit(hostingThenRetention),
+            Effect.exit(deliverRemoteAuthEvents(bindings, now)),
+            Effect.exit(
+              bindings.SITES ? new HostedSiteService(bindings.DB, bindings.SITES).cleanup(now) : Effect.succeed(null),
+            ),
           ],
           { concurrency: "unbounded" },
+        ).pipe(
+          Effect.flatMap(([retentionExit, deliveryExit, sitesExit]) =>
+            Effect.all([retentionExit, deliveryExit, sitesExit]),
+          ),
         ),
       );
       if (retention) log(retention);

@@ -1369,7 +1369,11 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       rejectConnection(state, new Error(message));
       yield* notify(connectionOffline(state, message, actions, code));
       // A revoked session or a host that broke the protocol starts again from a new session.
-      yield* notify(closePeer(actions.current.endSession, code === undefined));
+      // Uninterruptible as the other close: `dispose` must not stop the session end it started.
+      yield* Effect.forkIn(closePeer(actions.current.endSession, code === undefined).pipe(Effect.ignore), workScope, {
+        startImmediately: true,
+        uninterruptible: true,
+      });
     });
   }
 
