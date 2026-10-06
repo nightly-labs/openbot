@@ -1,4 +1,4 @@
-import { Effect, Result, Schema } from "effect";
+import { Effect, Schema } from "effect";
 
 export class AnalyticsOperationFailure extends Schema.TaggedError<AnalyticsOperationFailure>()(
   "AnalyticsOperationFailure",
@@ -13,10 +13,4 @@ export function analyticsIO<A>(operation: () => Promise<A>): Effect.Effect<A, An
 
 export function analyticsSync<A>(operation: () => A): Effect.Effect<A, AnalyticsOperationFailure> {
   return Effect.try({ try: operation, catch: (cause) => new AnalyticsOperationFailure({ cause }) });
-}
-
-export async function runAnalytics<A>(operation: Effect.Effect<A, AnalyticsOperationFailure>): Promise<A> {
-  const result = await Effect.runPromise(Effect.result(operation));
-  if (Result.isFailure(result)) throw result.failure.cause;
-  return result.success;
 }
