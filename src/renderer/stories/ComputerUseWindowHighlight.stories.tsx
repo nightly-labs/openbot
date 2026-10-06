@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import { createSignal, onSettled } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { ComputerUseAgentCursor } from "../src/features/computer-use/ComputerUseAgentCursor";
 import { ComputerUseWindowHighlight } from "../src/features/computer-use/ComputerUseWindowHighlight";
@@ -86,6 +87,41 @@ export const WithAgentCursor: Story = {
       <MockWindow>
         <ComputerUseWindowHighlight windowTitle="Notes" />
         <ComputerUseAgentCursor x={64} y={150} />
+      </MockWindow>
+    </main>
+  ),
+};
+
+/** Points an agent might click in the mock window: the title, the field, and the text. */
+const CURSOR_STOPS = [
+  { x: 64, y: 150 },
+  { x: 300, y: 14 },
+  { x: 120, y: 70 },
+  { x: 360, y: 160 },
+];
+
+/** Moves the cursor to the next stop every 1.5 seconds, so the motion can be judged. */
+function TravellingCursor() {
+  const [stop, setStop] = createSignal(0);
+  onSettled(() => {
+    const timer = setInterval(() => setStop((index) => (index + 1) % CURSOR_STOPS.length), 1500);
+    return () => clearInterval(timer);
+  });
+  const point = () => CURSOR_STOPS[stop()] ?? { x: 64, y: 150 };
+  return <ComputerUseAgentCursor x={point().x} y={point().y} />;
+}
+
+/**
+ * The cursor travelling between clicks with the driver's `adaptive` motion: a Fitts min-jerk glide
+ * at this distance. A move longer than 900 pixels swoops instead, which a story this size cannot
+ * show. With reduced motion on, the cursor jumps.
+ */
+export const AgentCursorMoving: Story = {
+  render: () => (
+    <main class="foundation-story">
+      <MockWindow>
+        <ComputerUseWindowHighlight windowTitle="Notes" />
+        <TravellingCursor />
       </MockWindow>
     </main>
   ),

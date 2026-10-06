@@ -212,7 +212,7 @@ provider CLIs, the driver is packaged rather than downloaded on demand, so the r
 the user installs nothing.
 
 ```bash
-bun run pin:cua-driver 0.28.2
+bun run pin:cua-driver 0.34.0
 ```
 
 The script downloads all three `-binary` release assets, hashes each shipped file, and refuses a
