@@ -2,9 +2,10 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { render, screen, waitFor } from "@solidjs/testing-library";
 import { Lexer } from "marked";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../../App";
 import { emitAgentEvent, installOpenbotStub } from "../../app-test-harness";
+import { SettingsModal } from "../../lazy-views";
 
 // Hard caps for one streamed reply, about 30% above the values measured when each cap was set. They
 // count work, not time, so the result is the same on every machine. A red test means a change made
@@ -54,6 +55,12 @@ vi.mock("@openbot/ui/features/conversation/DataTable", async (importOriginal) =>
       return actual.messageContentBlocks(...args);
     },
   };
+});
+
+// The app loads this view in the background. The test ends before that import does, and an import
+// after the environment closes fails the run.
+beforeAll(async () => {
+  await SettingsModal.preload();
 });
 
 beforeEach(() => {

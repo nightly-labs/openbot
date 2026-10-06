@@ -143,10 +143,11 @@ interface StreamedTokens {
 }
 
 /**
- * The tokens of a streaming body, which only grows. Each block before the last one of the previous
- * body is final, so only the last block and the new text are lexed again. A body that does not
- * extend the previous one, or a link reference definition, which changes how earlier blocks read,
- * lexes the whole body. The settled body is lexed whole, so a difference lasts one step at most.
+ * The tokens of a streaming body, which only grows. A block that has a blank line after it and a
+ * block after that is final, so only the text from that blank line is lexed again. Text with no
+ * blank line before it can still join the block before it, such as `#1234` after a paragraph line.
+ * A body that does not extend the previous one, or a link reference definition, which changes how
+ * earlier blocks read, lexes the whole body. The settled body is lexed whole.
  */
 function lexStreamingTokens(body: string, previous: StreamedTokens | undefined): TokensList {
   if (!previous || !body.startsWith(previous.body) || Object.keys(previous.tokens.links).length > 0) {
@@ -154,7 +155,7 @@ function lexStreamingTokens(body: string, previous: StreamedTokens | undefined):
   }
   let kept = previous.tokens.length - 1;
   while (kept > 0 && previous.tokens[kept]?.type === "space") kept -= 1;
-  while (kept > 0 && previous.tokens[kept - 1]?.type === "space") kept -= 1;
+  while (kept > 0 && previous.tokens[kept]?.type !== "space") kept -= 1;
   const settled = previous.tokens.slice(0, kept);
   const settledLength = settled.reduce((length, token) => length + token.raw.length, 0);
   // The lexer normalizes line endings, and then the sources no longer add up to the body.

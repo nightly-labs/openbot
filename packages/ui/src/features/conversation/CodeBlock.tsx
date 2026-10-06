@@ -306,20 +306,25 @@ function reusedCodeLines(code: string, highlightedLines: CodeLine[], current: Co
   });
 }
 
+// Languages that contain lines of a different language, such as script in HTML or a fence in
+// Markdown. Their lines have no type, so each one looks like a restart point.
+const EMBEDDING_LANGUAGES = new Set<ShjLanguage>(["html", "md", "leanpub-md"]);
+
 /**
  * Highlights `code`. With an earlier result for the start of the same code, the lines before a
  * restart point are kept and only the rest is tokenized.
  *
  * Text with no type can also come from a sub-language, such as script in HTML, so a restart point
- * can be false. Tokenizing starts before at least one complete line of the earlier result, and a
- * different token on those lines tokenizes the whole code instead.
+ * can be false. Tokenizing starts before at least one complete line of the earlier result. A
+ * different token on those lines, or a tail that ends in an open token, such as a string that a
+ * false restart point started, tokenizes the whole code instead.
  */
 async function highlightedCode(
   code: string,
   language: ShjLanguage,
   earlier: HighlightedCode | undefined,
 ): Promise<HighlightedCode> {
-  if (earlier && code.startsWith(earlier.code)) {
+  if (earlier && !EMBEDDING_LANGUAGES.has(language) && code.startsWith(earlier.code)) {
     const completeLines = earlier.lines.length - 1;
     const restart = earlier.restarts.lastIndexOf(true, completeLines - 1);
     if (restart > 0) {
@@ -327,7 +332,11 @@ async function highlightedCode(
       const start = kept.reduce((length, line) => length + (codeLineText(line)?.length ?? 0) + 1, 0);
       const rest = await tokenizedCode(code.slice(start), language);
       const overlap = earlier.lines.slice(restart, completeLines);
-      if (rest && overlap.every((line, index) => sameCodeLine(line, rest.lines[index] ?? []))) {
+      if (
+        rest &&
+        rest.restarts.at(-1) !== false &&
+        overlap.every((line, index) => sameCodeLine(line, rest.lines[index] ?? []))
+      ) {
         return {
           code,
           language,
