@@ -6,6 +6,7 @@ import { AgentTemplates } from "./agent-templates";
 import { AuthOperationError, AuthService, AuthServiceError } from "./auth-service";
 import { BillingError, type BillingService } from "./billing-service";
 import { D1AuthRepository } from "./d1-auth-repository";
+import { DiscordAppError, DiscordAppService } from "./discord-app";
 import { runApiEffect } from "./effect-runtime";
 import { createEmailCodeDelivery, createTeamInviteEmailDelivery } from "./email-delivery";
 import { GitHubInstallationTokens, GitHubInstallationTokensError } from "./github-installation-tokens";
@@ -303,6 +304,19 @@ export function requestSlackApp(): SlackAppService {
 
 export function slackAppErrorResponse(error: unknown): Response {
   if (error instanceof SlackAppError) return apiError(error.status, error.code, error.message);
+  return authErrorResponse(error);
+}
+
+export function requestDiscordApp(): DiscordAppService {
+  const bindings = requireWorkerBindings(env);
+  // The events are already in D1 and the cron redelivers them, so the answer does not wait.
+  return new DiscordAppService(bindings, {
+    flushAuthEvents: () => Effect.sync(() => schedule(deliverPendingRemoteAuthEvents(bindings, Date.now()))),
+  });
+}
+
+export function discordAppErrorResponse(error: unknown): Response {
+  if (error instanceof DiscordAppError) return apiError(error.status, error.code, error.message);
   return authErrorResponse(error);
 }
 

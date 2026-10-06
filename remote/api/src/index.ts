@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { Context, Effect, Layer, ManagedRuntime, Schema } from "effect";
 import { createRemoteApiApp, prometheusMetrics } from "./app";
 import { readRemoteApiConfig } from "./config";
+import { DiscordGateway } from "./discord-gateway";
 import { SignalService } from "./signal-service";
 import { RemoteTokenError, RemoteTokenService, signServiceRequest } from "./tokens";
 
@@ -13,6 +14,7 @@ class ControlPlaneError extends Schema.TaggedError<ControlPlaneError>()("Control
 
 const ResumeValidation = Schema.Struct({ valid: Schema.Boolean });
 const SlackValidation = Schema.Struct({ teams: Schema.Array(Schema.String) });
+const DiscordValidation = Schema.Struct({ guilds: Schema.Array(Schema.String) });
 
 class ControlPlane extends Context.Service<
   ControlPlane,
@@ -21,6 +23,10 @@ class ControlPlane extends Context.Service<
     validateSlackRoute(
       hostId: string,
       teams: import("@openbot/contracts/signal-protocol/slack-route").SlackRouteTeam[],
+    ): Effect.Effect<string[], ControlPlaneError>;
+    validateDiscordRoute(
+      hostId: string,
+      guilds: import("@openbot/contracts/signal-protocol/discord-route").DiscordRouteGuild[],
     ): Effect.Effect<string[], ControlPlaneError>;
   }
 >()("@openbot/remote-api/ControlPlane") {
@@ -89,6 +95,24 @@ class ControlPlane extends Context.Service<
           releaseResponse,
         ),
       ),
+      validateDiscordRoute: Effect.fn("ControlPlane.validateDiscordRoute")((hostId, guilds) =>
+        Effect.acquireUseRelease(
+          ask("/v2/remote/discord-route/validate", { hostId, guilds }),
+          (response) =>
+            Effect.gen(function* () {
+              if (!response.ok)
+                return yield* new ControlPlaneError({
+                  message: "The account service did not confirm the Discord route.",
+                });
+              const result = yield* readJson(response).pipe(
+                Effect.flatMap(Schema.decodeUnknownEffect(DiscordValidation)),
+                Effect.mapError(() => new ControlPlaneError({ message: "The account service response is invalid." })),
+              );
+              return [...result.guilds];
+            }),
+          releaseResponse,
+        ),
+      ),
     });
   });
 }
@@ -106,6 +130,10 @@ const tokens = new RemoteTokenService(
       controlPlaneService
         .validateSlackRoute(hostId, teams)
         .pipe(Effect.mapError((error) => new RemoteTokenError({ message: error.message }))),
+    validateDiscordRoute: (hostId, guilds) =>
+      controlPlaneService
+        .validateDiscordRoute(hostId, guilds)
+        .pipe(Effect.mapError((error) => new RemoteTokenError({ message: error.message }))),
   },
 );
 await controlPlane.runPromise(tokens.initialize());
@@ -114,6 +142,8 @@ const signal = new SignalService(
   config.maximumConnectionsPerUser,
   config.maximumConnectionsPerIp,
   config.maximumMessagesPerMinute,
+  undefined,
+  { discord: config.discord !== null },
 );
 const tlsPaths =
   config.tlsCertificatePath && config.tlsPrivateKeyPath
@@ -121,7 +151,13 @@ const tlsPaths =
     : undefined;
 
 const signalRuntime = ManagedRuntime.make(signal.dependencies);
-const app = createRemoteApiApp(config, signal, signalRuntime);
+// The Discord bot's Gateway connection lives in this runtime. Disposal closes it.
+const discordRuntime = config.discord ? ManagedRuntime.make(DiscordGateway.layer(config.discord, signal)) : null;
+const discord = discordRuntime ? await discordRuntime.runPromise(DiscordGateway) : null;
+if (!discord) {
+  console.log("OpenBot Discord is off: DISCORD_BOT_TOKEN and DISCORD_APPLICATION_ID are not both set and valid.");
+}
+const app = createRemoteApiApp(config, signal, signalRuntime, discord?.api ?? null);
 const listen = () =>
   app.listen({
     hostname: config.host,
@@ -217,6 +253,7 @@ const shutdown = () => {
       await app.stop(true);
     } finally {
       try {
+        await discordRuntime?.dispose();
         await signalRuntime.dispose();
         signal.close();
       } finally {

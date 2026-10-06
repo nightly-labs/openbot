@@ -326,7 +326,8 @@ Cloudflare processes account and configuration API requests. It does not carry T
 message, command, Remote Desktop media, or Remote Desktop input traffic. It forwards sealed iPhone
 Live Activity updates that it cannot read; see [iPhone Live Activity](#iphone-live-activity). For an
 agent's Slack app, it exchanges the Slack sign-in and serves the install page; see
-[Slack connections](#slack-connections). Cloudflare and the email provider can keep their own
+[Slack connections](#slack-connections). It does the same for the Discord app; see
+[Discord connections](#discord-connections). Cloudflare and the email provider can keep their own
 security, delivery, and network logs under their own policies. These provider logs are outside the
 OpenBot application database and its daily maintenance task.
 
@@ -403,8 +404,10 @@ media connection. ICE uses a direct peer-to-peer path when possible. If a direct
 Agents, conversations, queues, direct messages, attachments, browser data, prompts, approvals, and
 Remote Desktop data remain on the host. The central account service does not copy them into D1 or
 R2. The Signal service does not proxy them or write them to logs. The host does not need a public
-inbound port. The one thing Signal passes to a host is the Slack events of an agent's Slack app, in
-transit; see [Slack connections](#slack-connections).
+inbound port. The things Signal passes to a host are the Slack events of an agent's Slack app and
+the Discord mentions of the Discord app, in transit; see [Slack connections](#slack-connections) and
+[Discord connections](#discord-connections). For Discord, Signal also carries the host's answers to
+Discord.
 
 An owner or admin of a joined server can manage its host from their own computer, or from the
 browser client at `/app`. A provider API key, a custom endpoint key or header, the code that a
@@ -459,6 +462,7 @@ Network traffic can also occur when:
   conversation or file data;
 - a user opens an explicitly labeled external support or setup link;
 - a Slack workspace is connected. See [Slack connections](#slack-connections).
+- a Discord server is connected. See [Discord connections](#discord-connections).
 
 ## Slack connections
 
@@ -497,6 +501,44 @@ answers go from the computer to the Slack Web API directly.
 Anyone who can post in the Slack workspace, guests and Slack Connect members included, can give the
 agents work. The agents run on the host with the access the user gave them. A hosted server stays awake
 while a Slack connection is live.
+
+## Discord connections
+
+A member of a Discord server with the **Manage Server** permission installs the OpenBot Discord app in
+that server from OpenBot on their computer. The account service exchanges that install with Discord,
+because the app's secret lives there, and revokes the Discord sign-in token that it gets at once. It
+records which OpenBot computer answers the Discord server: the Discord server ID, the computer and the
+OpenBot account that connected it. It keeps no Discord token and no message.
+
+Discord has one bot token for every server, so only OpenBot's Signal service (`signal.openbot.run`)
+holds it. Unlike Slack, both directions go through Signal:
+
+- **To the computer.** Signal keeps the bot's connection to Discord. Discord sends it the messages of
+  the channels OpenBot can view, with text only for the messages that mention OpenBot. Signal passes
+  on only those messages and the presses of OpenBot's buttons: the message text, the author's ID and
+  name, the channel, the message it replies to, and the addresses of its files. The computer
+  downloads the files from Discord directly.
+- **From the computer.** The computer sends its posts, edits, reactions, files and name lookups to
+  Signal, which makes each call to Discord for it, only in the Discord servers linked to that
+  computer. To give context, the computer asks Signal for the earlier messages of a channel after the
+  first message of a conversation.
+
+Signal does not store or log a message, a file or a token; it keeps the server and channel names and
+IDs in memory to check each call. It answers a direct message to OpenBot with one fixed sentence and
+passes nothing on.
+
+- **Stored on the host.** The Discord server's name and ID, which agent is its Discord Orchestrator,
+  and one row per conversation that an agent answers, kept as a conversation of that agent with the
+  Discord display name of each author. Files people send are kept with the agent's attachments.
+  Disconnect removes the link and keeps the conversations; deleting an agent removes its
+  conversations.
+- **Given to the Discord Orchestrator.** As for Slack.
+- **Sent to Discord.** As for Slack: the answers, attached files of at most 10 MB, status posts,
+  reactions, and redacted approval requests. A post never pings anyone.
+
+Anyone who can post in a channel that OpenBot can view can give the agents work. The agents run on the
+host with the access the user gave them. A hosted server stays awake while a Discord connection is
+live.
 
 Plugin pages on openbot.run show each listing's own icon. The page asks `openbot.run` for that
 picture, and the website fetches it there from the address the plugin catalog holds, so reading a

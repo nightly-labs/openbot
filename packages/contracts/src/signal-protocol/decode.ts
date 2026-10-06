@@ -8,6 +8,7 @@
 // would push it into all three.
 
 import { isBoolean, isDynamicRecord, isNumber, isString } from "../runtime-values";
+import { decodeDiscordDelivery } from "./discord-api";
 import {
   type IceServer,
   SIGNAL_PROTOCOL_VERSION,
@@ -98,6 +99,15 @@ export function decodeSignalServerMessage(value: unknown): SignalServerMessage |
         retryNum: value.retryNum === null ? null : retryNumber(value.retryNum),
         retryReason: value.retryReason === null ? null : identifier(value.retryReason),
         bodyBase64: deliveryBody(value.bodyBase64),
+      };
+    case "discord-session":
+      return { type: kind, version, token: identifier(value.token) };
+    case "discord-delivery":
+      return {
+        type: kind,
+        version,
+        guildId: identifier(value.guildId),
+        delivery: decodeDiscordDelivery(value.delivery),
       };
     default:
       return null;

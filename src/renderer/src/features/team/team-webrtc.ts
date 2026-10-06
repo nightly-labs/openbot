@@ -200,8 +200,9 @@ function connectSignal(state: PeerState): void {
 }
 
 async function handleSignal(state: PeerState, message: SignalServerMessage): Promise<void> {
-  // Signal sends Slack deliveries only to the main process's `ingress` socket, never to this peer.
-  if (message.type === "slack-delivery") return;
+  // Signal sends Slack and Discord messages only to the main process's `ingress` socket, never to this peer.
+  if (message.type === "slack-delivery" || message.type === "discord-session" || message.type === "discord-delivery")
+    return;
   if (message.type === "account-profile-changed") {
     post({ type: "account-profile-changed", peerId: state.id });
     return;

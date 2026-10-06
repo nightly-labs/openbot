@@ -201,8 +201,13 @@ import type {
   TestMcpServerInput,
 } from "./ipc-mcp-servers";
 import type {
+  AddMessagingOrchestratorInput,
+  AddMessagingOrchestratorResult,
   AddSlackOrchestratorInput,
   AddSlackOrchestratorResult,
+  MessagingOverview,
+  MessagingWorkspaceInput,
+  SetMessagingEnabledInput,
   SetSlackEnabledInput,
   SlackOverview,
   SlackWorkspaceInput,
@@ -588,9 +593,10 @@ export const IPC_ENDPOINTS = {
       "provider-admin:delete-custom-provider",
     ),
   },
-  // The Slack workspaces where this computer's agents answer. Only the host's own desktop can use
-  // these: a connect opens a Slack page in this computer's browser, and the page returns to this
-  // computer's `openbot://` link. A token only travels towards the host; no result carries one.
+  // The Slack workspaces and Discord guilds where this computer's agents answer. Only the host's own
+  // desktop can use these: a connect opens a Slack or Discord page in this computer's browser, and
+  // the page returns to this computer's `openbot://` link. A token only travels towards the host; no
+  // result carries one.
   messaging: {
     getSlackOverview: request<undefined, SlackOverview>()("messaging:get-slack-overview"),
     connectSlackWorkspace: request<undefined, void>()("messaging:connect-slack-workspace"),
@@ -599,6 +605,14 @@ export const IPC_ENDPOINTS = {
     setSlackEnabled: request<SetSlackEnabledInput, void>()("messaging:set-slack-enabled"),
     addSlackOrchestrator: request<AddSlackOrchestratorInput, AddSlackOrchestratorResult>()(
       "messaging:add-slack-orchestrator",
+    ),
+    getDiscordOverview: request<undefined, MessagingOverview>()("messaging:get-discord-overview"),
+    connectDiscordGuild: request<undefined, void>()("messaging:connect-discord-guild"),
+    disconnectDiscordGuild: request<MessagingWorkspaceInput, void>()("messaging:disconnect-discord-guild"),
+    reconnectDiscordGuild: request<MessagingWorkspaceInput, void>()("messaging:reconnect-discord-guild"),
+    setDiscordEnabled: request<SetMessagingEnabledInput, void>()("messaging:set-discord-enabled"),
+    addDiscordOrchestrator: request<AddMessagingOrchestratorInput, AddMessagingOrchestratorResult>()(
+      "messaging:add-discord-orchestrator",
     ),
   },
   // The server name, logo and app update of one server's host. `host.updateIdentity` and `update`

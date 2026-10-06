@@ -1,27 +1,25 @@
-import type { GitHubConnectorStatus, OnePasswordConnectorStatus } from "@openbot/contracts/ipc";
+import type { GitHubConnectorStatus, MessagingPlatform, OnePasswordConnectorStatus } from "@openbot/contracts/ipc";
 import { Button, ChevronLeft } from "@openbot/ui";
 import type { AgentProfile } from "@openbot/ui/data";
 import { GitHubConnectorPanel } from "@openbot/ui/features/settings/GitHubConnectorPanel";
-import {
-  GitHubMark,
-  type IntegrationStatus,
-  OnePasswordMark,
-  SlackMark,
-} from "@openbot/ui/features/settings/IntegrationLayout";
+import { GitHubMark, type IntegrationStatus, OnePasswordMark } from "@openbot/ui/features/settings/IntegrationLayout";
 import { IntegrationsHub, type IntegrationsHubRow } from "@openbot/ui/features/settings/IntegrationsHub";
 import { OnePasswordConnectorPanel } from "@openbot/ui/features/settings/OnePasswordConnectorPanel";
 import {
+  MessagingMark,
+  messagingPlatformText,
   SlackIntegrationPanel,
   slackIntegrationState,
   slackOrchestrator,
 } from "@openbot/ui/features/settings/SlackIntegrationPanel";
 import { useText } from "@openbot/ui/text";
 import { createSignal, Match, onSettled, Show, Switch } from "solid-js";
+import type { DiscordConnectorController } from "./discord-connector";
 import { type GitHubConnectorController, githubPanelProps } from "./github-connector";
 import { type OnePasswordConnectorController, onePasswordPanelProps } from "./onepassword-connector";
 import type { SlackConnectorController } from "./slack-connector";
 
-type View = "hub" | "github" | "onepassword" | "slack";
+type View = "hub" | "github" | "onepassword" | MessagingPlatform;
 
 const GITHUB_STATUS = {
   disconnected: { status: "idle", label: "connector.github.statusNotSetUp" },
@@ -45,12 +43,22 @@ export function ConnectorsPanel(props: {
   github?: GitHubConnectorController | undefined;
   onePassword?: OnePasswordConnectorController | undefined;
   slack?: SlackConnectorController | undefined;
+  discord?: DiscordConnectorController | undefined;
   agents: AgentProfile[];
 }) {
   const { t } = useText();
   const [view, setView] = createSignal<View>("hub");
-  // The Slack state changes on its own and main sends no event, so it is read while the section shows.
+  // The Slack and Discord states change on their own and main sends no event, so they are read while
+  // the section shows.
   onSettled(() => props.slack?.watch());
+  onSettled(() => props.discord?.watch());
+  /** The Slack or Discord page on screen, when this computer has that integration. */
+  const openMessaging = () => {
+    const platform = view();
+    if (platform !== "slack" && platform !== "discord") return undefined;
+    const controller = platform === "discord" ? props.discord : props.slack;
+    return controller ? { platform, controller } : undefined;
+  };
 
   const githubRow = (github: GitHubConnectorController): IntegrationsHubRow => {
     const status = github.status();
@@ -86,33 +94,38 @@ export function ConnectorsPanel(props: {
       onOpen: () => setView("onepassword"),
     };
   };
-  const slackRow = (slack: SlackConnectorController): IntegrationsHubRow => {
-    const connections = slack.overview()?.connections ?? [];
-    const state = slackIntegrationState(connections, props.agents);
+  const messagingRow = (
+    platform: MessagingPlatform,
+    controller: SlackConnectorController | DiscordConnectorController,
+  ): IntegrationsHubRow => {
+    const text = messagingPlatformText(platform);
+    const connections = controller.overview()?.connections ?? [];
+    const state = slackIntegrationState(connections, props.agents, platform);
     const [connection] = connections;
     const orchestrator = connection ? slackOrchestrator(connection, props.agents) : null;
     const workspace = connection?.workspaceName;
     return {
-      id: "slack",
-      name: t("connector.slack.title"),
-      logo: <SlackMark />,
+      id: platform,
+      name: t(text.title),
+      logo: <MessagingMark platform={platform} />,
       status: state.status,
       statusLabel: t(state.label),
       summary:
         state.attention > 0
-          ? t("connector.slack.attentionTitle", { count: state.attention })
+          ? t(text.attentionTitle, { count: state.attention })
           : workspace === undefined
-            ? t("connector.slack.description")
+            ? t(text.description)
             : orchestrator
-              ? t("connector.slack.summaryConnected", { workspace })
-              : t("connector.slack.summaryNoAgent", { workspace }),
+              ? t(text.summaryConnected, { workspace })
+              : t(text.summaryNoAgent, { workspace }),
       agents: orchestrator ? [orchestrator] : [],
-      onOpen: () => setView("slack"),
+      onOpen: () => setView(platform),
     };
   };
   const rows = () => {
     const list: IntegrationsHubRow[] = [];
-    if (props.slack) list.push(slackRow(props.slack));
+    if (props.slack) list.push(messagingRow("slack", props.slack));
+    if (props.discord) list.push(messagingRow("discord", props.discord));
     if (props.github) list.push(githubRow(props.github));
     if (props.onePassword) list.push(onePasswordRow(props.onePassword));
     return list;
@@ -143,22 +156,23 @@ export function ConnectorsPanel(props: {
           </div>
         )}
       </Match>
-      <Match when={view() === "slack" && props.slack}>
-        {(slack) => (
+      <Match when={openMessaging()}>
+        {(open) => (
           <div class="integrations-hub">
             <Back />
-            <Show when={slack().overview()}>
+            <Show when={open().controller.overview()}>
               {(overview) => (
                 <SlackIntegrationPanel
+                  platform={open().platform}
                   agents={props.agents}
                   connections={overview().connections}
-                  busy={slack().busy()}
-                  models={slack().models()}
-                  onConnectWorkspace={slack().connectWorkspace}
-                  onDisconnectWorkspace={slack().disconnectWorkspace}
-                  onReconnect={slack().reconnect}
-                  onSetEnabled={slack().setEnabled}
-                  onAddOrchestrator={slack().addOrchestrator}
+                  busy={open().controller.busy()}
+                  models={open().controller.models()}
+                  onConnectWorkspace={open().controller.connectWorkspace}
+                  onDisconnectWorkspace={open().controller.disconnectWorkspace}
+                  onReconnect={open().controller.reconnect}
+                  onSetEnabled={open().controller.setEnabled}
+                  onAddOrchestrator={open().controller.addOrchestrator}
                 />
               )}
             </Show>

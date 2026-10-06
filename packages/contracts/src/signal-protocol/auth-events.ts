@@ -14,4 +14,7 @@ export type RemoteAuthEvent =
   // A Slack workspace was unlinked from an app or moved to another host. Signal drops that app's route
   // of the workspace when its link is from `through` (milliseconds) or before, and refuses route
   // tickets with such a link.
-  | { type: "slack-route-revoked"; appId: string; teamId: string; through: number };
+  | { type: "slack-route-revoked"; appId: string; teamId: string; through: number }
+  // A Discord guild was unlinked or moved to another host. Signal drops its route when its link is
+  // from `through` (milliseconds) or before, and refuses route tickets with such a link.
+  | { type: "discord-route-revoked"; guildId: string; through: number };

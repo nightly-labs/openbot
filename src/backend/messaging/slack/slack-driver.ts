@@ -359,6 +359,7 @@ export interface SlackDriverOptions {
 export function slackDriver(options: SlackDriverOptions = {}): MessagingDriver {
   return {
     platform: "slack",
+    requiredCredential: "botToken",
     createAdapter(credentials, driverOptions) {
       return new SlackAdapter(credentials.botToken ?? "", { ...driverOptions, origin: options.origin });
     },

@@ -29,6 +29,11 @@ export const messages = {
   // The name and title of the agent that OpenBot adds to answer in Slack. The user can rename it.
   "status.messaging.orchestratorName": "Slack Düzenleyicisi",
   "status.messaging.orchestratorTitle": "Slack'te yanıt verir ve ekibe sorar",
+  // The same texts for Discord. Discord users read the first one.
+  "status.messaging.discordNoAgent":
+    "Henüz burada yanıt verebilecek bir ajan yok. OpenBot'ta Discord Düzenleyicisini ekleyin.",
+  "status.messaging.discordOrchestratorName": "Discord Düzenleyicisi",
+  "status.messaging.discordOrchestratorTitle": "Discord'da yanıt verir ve ekibe sorar",
   // The sidebar section that OpenBot puts the Slack Orchestrator in. The user can rename it.
   "status.messaging.integrationsSection": "Entegrasyonlar",
   // The page a development Slack install ends on.

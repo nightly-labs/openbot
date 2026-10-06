@@ -513,6 +513,56 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
   ).bind(this);
 
   /**
+   * The Discord route ticket of this host: the guilds that the account service links to it, which
+   * Signal routes to its `ingress` socket.
+   */
+
+  readonly issueDiscordRoute = Effect.fn("CentralAuth.issueDiscordRoute")(
+    function* (
+      this: CentralAuthManager,
+      hostId: string,
+    ): Effect.fn.Return<string, CentralAuthOperationError, CentralAuthTransport> {
+      const machineToken = this.#teamHostTokens.get(hostId.toLowerCase());
+      if (!machineToken)
+        return yield* new CentralAuthOperationError({
+          cause: new Error(sourceText("error.auth.hostCredentialUnavailable")),
+        });
+      return yield* this.#requestEffect(
+        `/v2/remote/hosts/${encodeURIComponent(hostId)}/discord-route`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ machineToken }) },
+        (value) => requiredString(decodeRecord(value, "Discord route"), "ticket"),
+      );
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  /** Unlinks a Discord guild from this host, so Signal stops routing its events here. */
+
+  readonly unlinkDiscordGuild = Effect.fn("CentralAuth.unlinkDiscordGuild")(
+    function* (
+      this: CentralAuthManager,
+      hostId: string,
+      guildId: string,
+    ): Effect.fn.Return<void, CentralAuthOperationError, CentralAuthTransport> {
+      const machineToken = this.#teamHostTokens.get(hostId.toLowerCase());
+      if (!machineToken)
+        return yield* new CentralAuthOperationError({
+          cause: new Error(sourceText("error.auth.hostCredentialUnavailable")),
+        });
+      yield* this.#requestEffect(
+        `/v2/remote/hosts/${encodeURIComponent(hostId)}/discord-disconnect`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ machineToken, guildId }),
+        },
+        () => undefined,
+      );
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  /**
    * Sends one Live Activity update through the account service to Apple. The host sealed the
    * content with keys that only the phone has, so the service forwards bytes it cannot read.
    * Returns `gone` when Apple refused the token.

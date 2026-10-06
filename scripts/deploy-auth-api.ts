@@ -33,6 +33,9 @@ async function main(): Promise<void> {
   // Worker takes the development app's values from .env.shared, which dotenvx reads first.
   await putOptionalSecretSet("SLACK_CLIENT_ID", "SLACK_CLIENT_SECRET", "SLACK_STATE_SECRET");
   await putOptionalSecretSet("SLACK_ROUTE_PRIVATE_JWK", "SLACK_ROUTE_KEY_ID");
+  // Discord is optional too: without these, the Discord routes answer 503 discord_not_configured.
+  await putOptionalSecretSet("DISCORD_CLIENT_ID", "DISCORD_CLIENT_SECRET", "DISCORD_STATE_SECRET");
+  await putOptionalSecretSet("DISCORD_ROUTE_PRIVATE_JWK", "DISCORD_ROUTE_KEY_ID");
   if (cloudflareEnvironment === "test") {
     await putTestAllowList();
     // The key is in the encrypted .env.shared. Each developer who can decrypt it can create servers.

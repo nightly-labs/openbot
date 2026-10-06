@@ -228,7 +228,7 @@ let relaunchRequested = false;
  * and the sign-in waiting for that grant lives in this process. It is also never held: a grant is
  * answered by the sign-in that started it, and there is no such sign-in before the app is running.
  */
-type RendererDeepLink = Exclude<DeepLink, { kind: "mcp-auth" | "slack-workspace" }>;
+type RendererDeepLink = Exclude<DeepLink, { kind: "mcp-auth" | "slack-workspace" | "discord-guild" }>;
 
 // One link at a time, of whichever kind: a second replaces the first, because what a user opened
 // last is what they meant. `deepLinkReceiverReady` says a window has asked for it, which is what
@@ -695,6 +695,10 @@ function acceptDeepLink(link: DeepLink): void {
     receiveSlackSignIn(link);
     return;
   }
+  if (link.kind === "discord-guild") {
+    receiveDiscordSignIn(link);
+    return;
+  }
   pendingDeepLink = link;
   const window = windowHolder.current;
   if (!window || window.isDestroyed() || !deepLinkReceiverReady) return;
@@ -722,7 +726,9 @@ function takePendingDeepLink(kind: RendererDeepLink["kind"]): string | null {
 
 /** A link of a kind a renderer can be sent, or null for one it cannot - which includes no link. */
 function takeRendererDeepLink(link: DeepLink | null): RendererDeepLink | null {
-  return link && link.kind !== "mcp-auth" && link.kind !== "slack-workspace" ? link : null;
+  return link && link.kind !== "mcp-auth" && link.kind !== "slack-workspace" && link.kind !== "discord-guild"
+    ? link
+    : null;
 }
 
 /**
@@ -739,6 +745,23 @@ function receiveSlackSignIn(link: Extract<DeepLink, { kind: "slack-workspace" }>
     })
     .catch(() => {
       // The Slack settings show the connection's state. The error can quote Slack.
+    });
+}
+
+/**
+ * Hands a Discord install the sealed guild link it is waiting for. As with a Slack install, a link
+ * this run did not start does nothing and raises no window.
+ */
+function receiveDiscordSignIn(link: Extract<DeepLink, { kind: "discord-guild" }>): void {
+  const messaging = services?.messaging;
+  if (!messaging) return;
+  void Effect.runPromise(messaging.completeDiscordGuild(link.nonce, link.grant))
+    .then((accepted) => {
+      const window = windowHolder.current;
+      if (accepted && window && !window.isDestroyed()) showMainWindow(window);
+    })
+    .catch(() => {
+      // The Discord settings show the connection's state.
     });
 }
 

@@ -28,6 +28,10 @@ export const messages = {
   "status.messaging.filesSkipped": "Alguns arquivos não foram enviados: {names}.",
   "status.messaging.orchestratorName": "Orquestrador do Slack",
   "status.messaging.orchestratorTitle": "Responde no Slack e consulta a equipe",
+  "status.messaging.discordNoAgent":
+    "Nenhum agente pode responder aqui ainda. Adicione o Orquestrador do Discord no OpenBot.",
+  "status.messaging.discordOrchestratorName": "Orquestrador do Discord",
+  "status.messaging.discordOrchestratorTitle": "Responde no Discord e consulta a equipe",
   "status.messaging.integrationsSection": "Integrações",
   "status.messaging.signInReceived": "O OpenBot recebeu a instalação do Slack. Você pode fechar esta aba.",
   "status.messaging.signInUnknown":

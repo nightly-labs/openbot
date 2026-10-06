@@ -6,6 +6,9 @@
 // The one exception is Slack: the OpenBot Slack app posts every workspace's events to Signal.
 // Signal checks the Slack signature, reads only the workspace ID, and passes the request body to
 // the `ingress` socket of the host that the workspace is linked to, without storing or logging it.
+// Discord is the other: Signal holds the OpenBot Discord bot's Gateway connection, passes each
+// guild's mentions of OpenBot to the guild's host, and makes the host's Discord calls
+// (`./discord-api.ts`).
 //
 // Three parties speak this and none of them ships together: the service
 // (`remote/api/src/signal-service.ts`), the shared client that mobile and the future web client run
@@ -25,6 +28,7 @@
 // has only ever had one version. `version` on these frames is the socket protocol; the app protocol
 // negotiated on the data channels is a different number entirely.
 
+import type { DiscordDelivery } from "./discord-api";
 import type { RemoteMemberRole } from "./ticket";
 
 export const SIGNAL_PROTOCOL_VERSION = 1;
@@ -47,8 +51,8 @@ export const SIGNAL_TURN_CREDENTIAL_TTL_SECONDS = 60 * 60;
 export const SIGNAL_TURN_REFRESH_INTERVAL_MS = Math.floor(SIGNAL_TURN_CREDENTIAL_TTL_SECONDS * 0.75) * 1_000;
 
 // Which side of the relay a socket is. Only a host may set `multiplex`. An `ingress` socket belongs
-// to a host too, but it only receives Slack deliveries: Signal never attaches a client to it, so it
-// can stay open while the host is not published.
+// to a host too, but it only receives Slack and Discord deliveries: Signal never attaches a client
+// to it, so it can stay open while the host is not published.
 export type SignalPeer = "host" | "client" | "ingress";
 
 // The largest Slack request body Signal passes to a host. Signal refuses a larger one with 413.
@@ -121,6 +125,10 @@ export type SignalClientMessage =
       // `ingress` only: the Slack route ticket (`./slack-route.ts`) that names the Slack workspaces
       // whose requests this socket receives.
       slackRoute?: string;
+      // `ingress` only: the Discord route ticket (`./discord-route.ts`) that names the Discord guilds
+      // whose events this socket receives. An `ingress` socket has a Slack route, a Discord route or
+      // both.
+      discordRoute?: string;
     }
   // An `ingress` socket's answer to one `slack-delivery`. Signal returns it to Slack as the HTTP
   // response, so `body` is only the `url_verification` challenge or an interactivity reply.
@@ -177,4 +185,10 @@ export type SignalServerMessage =
       retryReason: string | null;
       bodyBase64: string;
     }
+  // Sent to an `ingress` socket with a Discord route, after `ready`. The host sends `token` as the
+  // bearer of its calls to `DISCORD_API_PATH`. It is valid while this socket is open.
+  | { type: "discord-session"; version: SignalProtocolVersion; token: string }
+  // One Discord event of a guild routed to this `ingress` socket. Signal already acknowledged a button
+  // press to Discord; nothing is answered.
+  | { type: "discord-delivery"; version: SignalProtocolVersion; guildId: string; delivery: DiscordDelivery }
   | SignalRelayMessage;

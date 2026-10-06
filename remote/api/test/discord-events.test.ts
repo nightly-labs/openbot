@@ -1,0 +1,65 @@
+import { describe, expect, it } from "vitest";
+import { type DiscordMessageData, normalizeGuildMessage } from "../src/discord-events";
+
+const BOT = "900";
+
+function message(overrides: Partial<DiscordMessageData> = {}): DiscordMessageData {
+  return {
+    id: "500",
+    channel_id: "110",
+    guild_id: "100",
+    content: `<@${BOT}> summarize <@!${BOT}> this for <@42>`,
+    timestamp: "2026-10-06T12:00:00.000Z",
+    author: { id: "42", username: "ada", global_name: "Ada", bot: false },
+    member: { nick: "Ada L." },
+    mentions: [{ id: BOT }],
+    attachments: [
+      { id: "1", filename: "a.png", content_type: "image/png", size: 10, url: "https://cdn.discordapp.com/a.png" },
+      { id: "2", filename: "b.png", size: 10, url: "https://example.com/b.png" },
+    ],
+    ...overrides,
+  };
+}
+
+describe("Discord message normalization", () => {
+  it("passes on a mention of the bot without the bot's mention", () => {
+    expect(normalizeGuildMessage(message(), BOT)).toEqual({
+      id: "500",
+      channelId: "110",
+      authorId: "42",
+      authorName: "Ada L.",
+      content: "summarize  this for <@42>",
+      replyTo: null,
+      attachments: [
+        { id: "1", filename: "a.png", contentType: "image/png", size: 10, url: "https://cdn.discordapp.com/a.png" },
+      ],
+      sentAt: "2026-10-06T12:00:00.000Z",
+    });
+  });
+
+  it("drops bots, webhooks and messages that do not mention the bot", () => {
+    expect(normalizeGuildMessage(message({ author: { id: "7", username: "other", bot: true } }), BOT)).toBeNull();
+    expect(normalizeGuildMessage(message({ webhook_id: "8" }), BOT)).toBeNull();
+    expect(normalizeGuildMessage(message({ mentions: [{ id: "42" }] }), BOT)).toBeNull();
+  });
+
+  it("names the conversation's root only for a reply to the bot", () => {
+    const toBot = normalizeGuildMessage(
+      message({
+        message_reference: { type: 0, message_id: "400" },
+        referenced_message: { id: "400", author: { id: BOT }, message_reference: { message_id: "300" } },
+      }),
+      BOT,
+    );
+    expect(toBot?.replyTo).toEqual({ messageId: "400", authorIsBot: true, rootId: "300" });
+
+    const toPerson = normalizeGuildMessage(
+      message({
+        message_reference: { type: 0, message_id: "401" },
+        referenced_message: { id: "401", author: { id: "43" }, message_reference: { message_id: "300" } },
+      }),
+      BOT,
+    );
+    expect(toPerson?.replyTo).toEqual({ messageId: "401", authorIsBot: false, rootId: null });
+  });
+});

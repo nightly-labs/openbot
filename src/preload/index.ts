@@ -136,7 +136,7 @@ import {
   decodeDynamicIslandPreference,
   decodeDynamicIslandPresentation,
 } from "./dynamic-island-decoding";
-import { decodeAddSlackOrchestratorReply, decodeSlackOverviewReply } from "./messaging-decoding";
+import { decodeAddOrchestratorReply, decodeMessagingOverviewReply } from "./messaging-decoding";
 import { decodeProviderRuntimeSnapshot } from "./provider-runtime";
 import {
   decodeAgentInstallation,
@@ -619,12 +619,18 @@ const openbotApi: OpenBotDesktopApi = {
     deleteCustomProvider: decodeCustomProviderResult,
   }),
   messaging: bridgeGroup(IPC_ENDPOINTS.messaging, {
-    getSlackOverview: decodeSlackOverviewReply,
+    getSlackOverview: decodeMessagingOverviewReply,
     connectSlackWorkspace: decodeVoid,
     disconnectSlackWorkspace: decodeVoid,
     reconnectSlackWorkspace: decodeVoid,
     setSlackEnabled: decodeVoid,
-    addSlackOrchestrator: decodeAddSlackOrchestratorReply,
+    addSlackOrchestrator: decodeAddOrchestratorReply,
+    getDiscordOverview: decodeMessagingOverviewReply,
+    connectDiscordGuild: decodeVoid,
+    disconnectDiscordGuild: decodeVoid,
+    reconnectDiscordGuild: decodeVoid,
+    setDiscordEnabled: decodeVoid,
+    addDiscordOrchestrator: decodeAddOrchestratorReply,
   }),
   hostAdmin: bridgeGroup(IPC_ENDPOINTS.hostAdmin, {
     updateIdentity: decodeServer,

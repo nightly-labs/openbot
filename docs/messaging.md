@@ -1,8 +1,9 @@
 # Messaging connections
 
-The agents of this computer can answer in an external chat platform. Slack is supported today. The
-design notes are in [ARCHITECTURE.md](ARCHITECTURE.md#messaging-connections), and the launch steps
-in [apps/slack-app/LAUNCH.md](../apps/slack-app/LAUNCH.md).
+The agents of this computer can answer in an external chat platform. Slack and Discord are supported
+today. The design notes are in [ARCHITECTURE.md](ARCHITECTURE.md#messaging-connections), the Slack
+launch steps in [apps/slack-app/LAUNCH.md](../apps/slack-app/LAUNCH.md), and the Discord app settings
+in [apps/discord-app/README.md](../apps/discord-app/README.md).
 
 ## Connect Slack
 
@@ -50,6 +51,48 @@ browser. A joined server shows no Slack page.
 - `stop` or `cancel` in the thread, or the **Stop** button, stops the request of the person who
   sends it.
 
+## Connect Discord
+
+A Discord server installs the one OpenBot Discord app. People mention @OpenBot in a channel, and the
+Discord Orchestrator, an agent that OpenBot adds, asks the right agent and answers. As for Slack, this
+needs an OpenBot account and a name for this computer (**Server settings**): Signal keeps the bot's
+Discord connection, passes the server's mentions to this computer, and makes OpenBot's Discord posts
+for it.
+
+1. Open **Server settings → Connectors → Discord**.
+2. Select **Connect Discord**, then **Connect in Discord**. Discord opens in the browser. Select the
+   Discord server, and select **Authorize**. You must have the **Manage Server** permission there. The
+   dialog continues by itself.
+3. Pick the model of the Discord Orchestrator, and select **Add agent**. It goes to the
+   **Integrations** sidebar section, as the Slack Orchestrator does.
+4. In Discord, mention @OpenBot in a channel.
+
+OpenBot sees each channel that its role can view. To keep OpenBot out of a channel, remove the view
+permission of its role there.
+
+A Discord server answers to one OpenBot server. Another account cannot connect a Discord server that
+your server answers until you disconnect it. **Disconnect** unlinks the Discord server and removes it
+from this computer; the conversations stay in OpenBot. OpenBot stays a member of the Discord server
+until a Discord admin removes it. When a Discord admin removes OpenBot, the row says that the token is
+not accepted, and Signal stops routing the server here.
+
+## What happens in Discord
+
+- A message that mentions @OpenBot starts a conversation. OpenBot replies to that message.
+- A reply to an OpenBot post continues the same conversation. The reply must keep the mention:
+  Discord's **@ ON** setting of a reply does this, and it is on by default. Without the mention,
+  Discord does not give the text to OpenBot.
+- A mention that replies to another person's message starts a new conversation.
+- A direct message to OpenBot gets one fixed answer: mention OpenBot in a server channel.
+- The rest works as in Slack: the Discord Orchestrator receives each new conversation, 👀 shows that
+  the message arrived, "Working on it…" is replaced by the answer, and ✅, ❌ or ⏹️ shows the end.
+  An approval has **Approve** and **Deny** buttons, and a status post has **Stop**. Only the person
+  who wrote the request can press them; another person gets a reply that only they see. A reply to
+  an OpenBot post with only `stop` or `cancel` stops the request of the person who sends it.
+- A post never pings anyone, also when it names a person.
+- An answer longer than 2,000 characters is sent in more than one post. A file larger than 10 MB is
+  not sent, and the conversation says which files were not sent.
+
 ## Test Slack locally
 
 Slack must reach Signal over public HTTPS. `bun run dev:slack` opens a `cloudflared` tunnel to the
@@ -89,6 +132,11 @@ The workspace row says what is wrong.
 
 ## Limits
 
+These limits are for Slack. Discord's are in [apps/discord-app/README.md](../apps/discord-app/README.md#limits-of-discord),
+and these also apply to Discord: the host must run, the queue limits, who can give work, and that a
+hosted server stays awake while a connection is live. Discord sends an event once: an event that
+arrives while this computer has no Signal connection is lost.
+
 - The host must run. Slack sends an event again after about 1 and 5 minutes when this computer does
   not answer, then drops it.
 - An agent runs one turn at a time. A Slack request waits behind the agent's own work and behind
@@ -117,11 +165,12 @@ core changes:
   author and place names, and mentions.
 - `createTransport` implements `MessagingTransport` and turns the platform's events into
   `InboundMessage` and `InboundAction` values. It must not need a public address on the host.
+- `requiredCredential` names the stored value without which a connection does not start.
 
 | Platform | Transport | Conversation key | Notes |
 | --- | --- | --- | --- |
 | Slack | The Events API through Signal | `thread_ts`, or the message `ts` that starts a thread | Implemented. |
-| Discord | Gateway WebSocket (`@discordjs/ws` style: heartbeat, resume) | The thread channel id, or the message id that starts a thread | Needs the Message Content intent. Reactions map directly. |
+| Discord | The Gateway in Signal (`@discordjs/ws`), which passes mentions to the host; calls go through Signal | The id of the first message of a reply chain | Implemented. No privileged intent. |
 | Telegram | Long polling with `getUpdates` and an offset | `message_thread_id` in a forum, else the chat id | No history API: store what the bot sees for context. |
 
 Then add the platform to `MESSAGING_PLATFORMS`, a page in Server settings → Connectors, and its i18n

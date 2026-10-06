@@ -44,6 +44,7 @@ import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, onCleanup, Show, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { ConnectorsPanel } from "../connectors/ConnectorsPanel";
+import type { DiscordConnectorController } from "../connectors/discord-connector";
 import type { GitHubConnectorController } from "../connectors/github-connector";
 import type { OnePasswordConnectorController } from "../connectors/onepassword-connector";
 import type { SlackConnectorController } from "../connectors/slack-connector";
@@ -141,14 +142,15 @@ export interface ServerSettingsModalProps {
   agentImport?: ServerImportOptions | undefined;
   /**
    * The Connectors section appears only when a caller supplies one of these: the GitHub connection
-   * and the Slack apps belong to this computer, so a remote server passes neither, and a build
+   * and the Slack and Discord apps belong to this computer, so a remote server passes neither, and a build
    * without a GitHub App passes no GitHub.
    */
   githubConnector?: GitHubConnectorController | undefined;
   /** This computer's 1Password connection. A remote server passes none. */
   onePasswordConnector?: OnePasswordConnectorController | undefined;
   slackConnector?: SlackConnectorController | undefined;
-  /** This computer's agents, for the Slack page. */
+  discordConnector?: DiscordConnectorController | undefined;
+  /** This computer's agents, for the Slack and Discord pages. */
   connectorAgents?: AgentProfile[] | undefined;
   /**
    * The Updates section appears only when a caller supplies this: a remote host with
@@ -553,7 +555,11 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                 <span>{t(sections.import.title)}</span>
               </Tabs.Trigger>
             </Show>
-            <Show when={props.githubConnector || props.onePasswordConnector || props.slackConnector}>
+            <Show
+              when={
+                props.githubConnector || props.onePasswordConnector || props.slackConnector || props.discordConnector
+              }
+            >
               <Tabs.Trigger class="settings-modal-nav-item" value="connectors">
                 <Plug aria-hidden="true" />
                 <span>{t(sections.connectors.title)}</span>
@@ -669,12 +675,15 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
             </Tabs.Content>
           )}
         </Show>
-        <Show when={props.githubConnector || props.onePasswordConnector || props.slackConnector}>
+        <Show
+          when={props.githubConnector || props.onePasswordConnector || props.slackConnector || props.discordConnector}
+        >
           <Tabs.Content value="connectors" class="settings-modal-tab-panel server-settings-panel" data-tab="connectors">
             <ConnectorsPanel
               github={props.githubConnector}
               onePassword={props.onePasswordConnector}
               slack={props.slackConnector}
+              discord={props.discordConnector}
               agents={props.connectorAgents ?? []}
             />
           </Tabs.Content>

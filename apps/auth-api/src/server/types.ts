@@ -47,6 +47,16 @@ export interface WorkerBindings {
   SLACK_STATE_SECRET?: string;
   /** Development only: the public HTTPS tunnel of a local API, which Slack can send the browser back to. */
   SLACK_DEV_PUBLIC_ORIGIN?: string;
+  /** Signs Discord route tickets. Its public key must also be in `REMOTE_TICKET_PUBLIC_JWKS`. */
+  DISCORD_ROUTE_PRIVATE_JWK?: string;
+  DISCORD_ROUTE_KEY_ID?: string;
+  /** The OpenBot Discord app, which every Discord server adds. Its bot token is only in Signal. */
+  DISCORD_CLIENT_ID?: string;
+  DISCORD_CLIENT_SECRET?: string;
+  /** Signs the OAuth `state` of the Discord install. At least 32 bytes. */
+  DISCORD_STATE_SECRET?: string;
+  /** Development only: the public origin of a local API, which Discord can send the browser back to. */
+  DISCORD_DEV_PUBLIC_ORIGIN?: string;
   /** A Stripe sandbox (`sk_test_`) key in development and test. */
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
