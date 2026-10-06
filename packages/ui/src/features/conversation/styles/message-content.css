@@ -151,8 +151,9 @@
   border-right: 1px solid var(--openbot-data-table-border);
   border-bottom: 1px solid var(--openbot-data-table-border);
   padding: var(--openbot-space-2) var(--openbot-space-3);
+  overflow-wrap: break-word;
   text-align: left;
-  white-space: nowrap;
+  vertical-align: top;
 }
 
 .message-markdown-table th {
@@ -832,7 +833,7 @@
 }
 
 .message-data-table {
-  width: max-content;
+  width: 100%;
   min-width: max(100%, calc(var(--message-data-table-columns) * 112px));
   overflow: hidden;
   border: 1px solid var(--openbot-data-table-outer-border);
@@ -861,8 +862,9 @@
   padding: 9px 12px;
   color: var(--openbot-data-table-text);
   font-weight: inherit;
+  overflow-wrap: break-word;
   text-align: left;
-  white-space: nowrap;
+  vertical-align: top;
 }
 
 .message-data-table thead th {
@@ -877,8 +879,10 @@
   border-right: 1px solid var(--openbot-data-table-border);
 }
 
-.message-data-table-cell-text {
-  white-space: nowrap;
+/* Links and code can be one long token. Break them inside the column, so they do not make the
+   table wider than the message. Plain words keep whole, so a short column does not split a word. */
+:is(.message-data-table, .message-markdown-table) :is(th, td) :is(a, code) {
+  overflow-wrap: anywhere;
 }
 
 .message-data-table [data-align="center"] {
@@ -1239,6 +1243,12 @@
   transition:
     background-color var(--openbot-duration-hover) ease,
     color var(--openbot-duration-hover) ease;
+}
+
+/* A table measures its columns before it knows their widths, so the percentage cap above does not
+   apply there, and a long path makes its column as wide as the path. A fixed cap keeps it short. */
+:is(.message-data-table, .message-markdown-table) .message-file-reference {
+  max-width: 240px;
 }
 
 :is(
