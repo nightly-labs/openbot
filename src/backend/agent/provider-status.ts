@@ -2,9 +2,19 @@ import type { ChildProcess } from "node:child_process";
 import type { AgentProviderStatus } from "@openbot/contracts/ipc";
 import { redactText } from "@openbot/logging";
 import { Effect, Schema } from "effect";
-import type { AgentProvider } from "../agent-client";
+import { type AgentProvider, RequestTimeoutError } from "../agent-client";
 import { CodexCliError } from "../cli";
 import { stopProcessTree } from "../windows-process-tree";
+import { TimeoutError } from "../with-timeout";
+
+/** The CLI did not answer in time: its `--version`, or a request of its start, such as `initialize`. */
+export function isProviderTimeout(error: unknown): boolean {
+  return (
+    (error instanceof CodexCliError && error.code === "timeout") ||
+    error instanceof TimeoutError ||
+    error instanceof RequestTimeoutError
+  );
+}
 
 export function setProviderStatus(
   statuses: AgentProviderStatus[],
