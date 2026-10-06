@@ -9,8 +9,8 @@ export function listenLoopback(server: Server, noPort: () => Error): Promise<num
   return new Promise<number>((resolve, reject) => {
     server.once("error", reject);
     // `127.0.0.1` and not `localhost`: a name resolves to whatever the machine says it resolves
-    // to, and this must be the loopback interface alone - a listener any other computer can reach
-    // is a listener that can be handed a grant.
+    // to, and this must be the loopback interface alone. These listeners take sign-in grants,
+    // tokens and team requests that no other computer may reach.
     server.listen(0, "127.0.0.1", () => {
       server.removeListener("error", reject);
       const address = server.address();
