@@ -391,8 +391,10 @@ export function createComputerUseHighlightWindow(bounds: Rectangle): BrowserWind
   window.setAlwaysOnTop(true, "floating");
   // The agent works wherever the user left the window, which can be another Space or another
   // application's full screen. One overlay on every Space is what lets the rim follow it there
-  // without a second window and without pulling the user out of the Space they are on.
-  window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  // without a second window and without pulling the user out of the Space they are on. The
+  // overlays are built again after each idle period, and without `skipTransformProcessType` each
+  // build would hide the Dock icon and every OpenBot window for a moment.
+  window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
   // Nothing on this surface may be pressed, and it covers another application's whole window, so
   // every event is handed straight on to the window below it.
   window.setIgnoreMouseEvents(true, { forward: true });

@@ -63,6 +63,7 @@ import { toAgentMessage, toAgentMessages } from "../../app-message-projection";
 import { playCompletionSoundForAgentEvent, unlockCompletionSound } from "../../completion-sound";
 import { isGlobalSearchShortcut } from "../../global-search-shortcut";
 import { LayoutProvider, useLayout } from "../../layout";
+import { AgentUsagePanel } from "../../lazy-views";
 import { PlatformProvider } from "../../platform";
 import { WorkspaceFrame } from "../../WorkspaceFrame";
 import {
@@ -95,7 +96,6 @@ import type { ServerHostedSitesOptions, ServerSettingsSection } from "../servers
 import type { HostUpdateCalls } from "../servers/ServerUpdatePanel";
 import { remoteAdminServer } from "../servers/server-capabilities";
 import { isReaderAuthor } from "../team/reader-identity";
-import { AgentUsagePanel } from "../usage/AgentUsagePanel";
 import type { UsagePort } from "../usage/usage-port";
 import { WebAgentSettings } from "./WebAgentSettings";
 import { WebConnectComputer } from "./WebConnectComputer";
@@ -1091,12 +1091,14 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
           usage={
             <Show when={server()}>
               {(target) => (
-                <AgentUsagePanel
-                  port={usageCalls}
-                  serverId={target().id}
-                  hostName={target().name}
-                  onBack={closeUsage}
-                />
+                <Loading>
+                  <AgentUsagePanel
+                    port={usageCalls}
+                    serverId={target().id}
+                    hostName={target().name}
+                    onBack={closeUsage}
+                  />
+                </Loading>
               )}
             </Show>
           }
