@@ -117,13 +117,13 @@ const LANGUAGE_LABELS: Partial<Record<ShjLanguage, string>> = {
 
 export function CodeBlock(props: {
   block: MessageCodeBlock;
-  streaming?: boolean;
+  streaming?: boolean | undefined;
   /** Buttons before Copy, such as the switch between a preview and its code. */
   actions?: JSX.Element;
   /** Buttons after Copy, such as the button that opens a larger view. */
   trailingActions?: JSX.Element;
   /** Places the code lines in a larger body, such as beside a rendered preview of the code. */
-  body?: (code: JSX.Element) => JSX.Element;
+  body?: ((code: JSX.Element) => JSX.Element) | undefined;
 }) {
   const { t } = useText();
   const [lines, setLines] = createSignal<CodeLine[]>(untrack(() => plainCodeLines(props.block.code)));
