@@ -96,6 +96,15 @@ jobs:
           echo "ANDROID_HOME=$ANDROID_HOME"
           fastlane --version
 
+      # The generated android/gradle.properties gives the Gradle daemon 512 MB of
+      # Metaspace, and release lint runs out of it. Gradle reads the Gradle user
+      # home file before the project file, so this value applies on the runner only.
+      - name: Give Gradle more memory
+        shell: bash
+        run: |
+          mkdir -p ~/.gradle
+          echo 'org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=2g -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8' >> ~/.gradle/gradle.properties
+
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
