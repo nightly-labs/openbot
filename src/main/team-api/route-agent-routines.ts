@@ -3,6 +3,7 @@
 // The bodies are parsed by the same `parseCreateRoutine` / `parseUpdateRoutine` the IPC handlers
 // use, so a routine created over the Team API cannot differ from one created in the app.
 
+import { runCauseEffect } from "../../backend/effect-boundary";
 import { parseCreateRoutine, parseListRoutineRuns, parseUpdateRoutine } from "../ipc/agent-inputs";
 import type { TeamApiAgents } from "./dependencies";
 import type { AgentRouteTarget, RouteOutcome, TeamApiRequestContext } from "./request-context";
@@ -40,11 +41,11 @@ export async function routeAgentRoutines(
       return json(200, agents.updateRoutine(parseUpdateRoutine({ ...body, agentId, routineId })));
     }
     if (method === "DELETE" && !routineAction) {
-      await agents.deleteRoutine({ agentId, routineId });
+      await runCauseEffect(agents.deleteRoutine({ agentId, routineId }));
       return empty(204);
     }
     if (method === "POST" && routineAction === "test") {
-      return json(201, await agents.testRoutine({ agentId, routineId }));
+      return json(201, await runCauseEffect(agents.testRoutine({ agentId, routineId })));
     }
     if (method === "GET" && routineAction === "runs") {
       const rawLimit = url.searchParams.get("limit");

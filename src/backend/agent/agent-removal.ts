@@ -1,6 +1,7 @@
 import type { AgentEvent, AgentSummary } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import type { Logger } from "@openbot/logging";
+import { Effect, Result, Schema } from "effect";
 import type { AgentStore } from "../agent-store";
 import type { ChannelService } from "../channel-service";
 import type { MailboxStore } from "../mailbox-store";
@@ -34,7 +35,10 @@ export interface AgentRemovalOptions {
   hostedSites: HostedSiteCoordinator;
   compaction: ContextCompaction;
   /** Runs `remove` with the agent's approvals revoked. The main process gives it. */
-  deleteWithRevokedApproval: (agentId: string, remove: () => Promise<void>) => Promise<void>;
+  deleteWithRevokedApproval: (
+    agentId: string,
+    remove: () => Effect.Effect<void, AgentRemovalFailed>,
+  ) => Effect.Effect<void, AgentRemovalFailed>;
   /** The agent service logger, so a deletion keeps the `agent-service` prefix it always had. */
   logger: Logger;
   hooks: AgentRemovalHooks;
@@ -90,73 +94,104 @@ export class AgentRemoval {
     return this.#deleting;
   }
 
-  async delete(agentId: string): Promise<void> {
-    if (this.#deleting.has(agentId)) throw new Error(sourceText("error.agent.deletionBusy"));
-    const agent = this.#store.list().find((candidate) => candidate.id === agentId);
-    const hasPendingWork = this.#mailbox.hasUnfinishedDelivery(agentId);
-    if (hasPendingWork || this.#conversation.workingSnapshot(agentId)?.activeTurnId) {
-      throw new Error(sourceText("error.agent.stopBeforeDelete"));
-    }
-
-    const { wasPending, release } = this.#duplication.releaseForDelete(agentId);
-    this.#deleting.add(agentId);
-    const releaseDeliveries = this.#mailbox.blockAgentDeliveries(agentId);
-    try {
-      this.#routines.arm();
-      await this.deleteData(agent ?? { id: agentId, threadId: null });
-      this.#channels.removeDeletedMembers(new Set(this.#store.list().map((candidate) => candidate.id)));
-      this.#duplication.forget(agentId);
-      if (!wasPending) this.#hooks.emit({ type: "agents-changed", agents: this.#hooks.listAgents() });
-    } finally {
-      release();
-      releaseDeliveries();
-      this.#deleting.delete(agentId);
-      this.#routines.arm();
-      if (this.#store.list().some((candidate) => candidate.id === agentId)) this.#drain.scheduleDrain(agentId);
-    }
-  }
-
-  async deleteData(agent: Pick<AgentSummary, "id" | "threadId">): Promise<void> {
-    try {
-      await this.#deleteWithRevokedApproval(agent.id, () => this.#removeAgentData(agent));
-    } catch {
-      throw new Error(sourceText("error.agent.deleteIncomplete"));
-    }
-  }
-
-  async #removeAgentData(agent: Pick<AgentSummary, "id" | "threadId">): Promise<void> {
-    const providerSessions = agent.threadId ? this.#store.database.listProviderSessions(agent.threadId) : [];
-    // An open session keeps a provider process in the workspace, which Windows then cannot remove.
-    await this.#threads.releaseAgentSessions(agent.id);
-    let stage = "provider-files";
-    try {
-      // Keep session records available if private file removal needs a retry.
-      for (const session of providerSessions) await this.#threads.deleteProviderSessionFiles(session.externalSessionId);
-      stage = "messaging";
-      await this.#messaging.deleteForAgent(agent.id);
-      stage = "mailbox";
-      await this.#mailbox.deleteAgentData(agent.id, this.#channels.store.allContextThreads());
-      stage = "agent-files-and-record";
-      await this.#store.deleteAgent(agent.id);
-    } catch {
-      // File-system errors can contain private paths. Log only the failed stage.
-      this.#logger.warn("Agent deletion failed.", { stage });
-      throw new Error(sourceText("error.agent.deleteIncomplete"));
-    }
-    await this.#closeBrowserTabs(agent);
-    this.#conversation.forgetAgent(agent.id);
-    this.#turn.forgetAgent(agent.id);
-    this.#drain.forgetAgent(agent.id);
-    this.#hostedSites.forgetAgent(agent.id);
-    if (agent.threadId) {
-      for (const session of providerSessions) {
-        this.#conversation.unbindThread(session.externalSessionId);
-        this.#conversation.unloadThread(session.externalSessionId);
-        this.#compaction.forgetThread(session.externalSessionId);
+  readonly delete = Effect.fn("AgentRemoval.delete")(function* (this: AgentRemoval, agentId: string) {
+    const agent = yield* removalStep(() => {
+      if (this.#deleting.has(agentId)) throw new Error(sourceText("error.agent.deletionBusy"));
+      const candidate = this.#store.list().find((entry) => entry.id === agentId);
+      if (this.#mailbox.hasUnfinishedDelivery(agentId) || this.#conversation.workingSnapshot(agentId)?.activeTurnId) {
+        throw new Error(sourceText("error.agent.stopBeforeDelete"));
       }
-    }
-    this.#compaction.forgetAgent(agent.id);
-  }
+      return candidate;
+    });
+    yield* Effect.acquireUseRelease(
+      removalStep(() => {
+        const gate = this.#duplication.releaseForDelete(agentId);
+        this.#deleting.add(agentId);
+        const releaseDeliveries = this.#mailbox.blockAgentDeliveries(agentId);
+        return { ...gate, releaseDeliveries };
+      }),
+      ({ wasPending }) =>
+        Effect.gen({ self: this }, function* () {
+          yield* removalStep(() => this.#routines.arm());
+          yield* this.deleteData(agent ?? { id: agentId, threadId: null });
+          yield* removalStep(() => {
+            this.#channels.removeDeletedMembers(new Set(this.#store.list().map((candidate) => candidate.id)));
+            this.#duplication.forget(agentId);
+            if (!wasPending) this.#hooks.emit({ type: "agents-changed", agents: this.#hooks.listAgents() });
+          });
+        }),
+      ({ release, releaseDeliveries }) =>
+        Effect.sync(() => {
+          release();
+          releaseDeliveries();
+          this.#deleting.delete(agentId);
+          this.#routines.arm();
+          if (this.#store.list().some((candidate) => candidate.id === agentId)) this.#drain.scheduleDrain(agentId);
+        }),
+    );
+  }, Effect.uninterruptible);
+
+  readonly deleteData = Effect.fn("AgentRemoval.deleteData")(function* (
+    this: AgentRemoval,
+    agent: Pick<AgentSummary, "id" | "threadId">,
+  ) {
+    // Approval revocation remains owned by the main-process gate. Its callback runs the
+    // complete ordered removal before the gate can restore an approval on failure.
+    yield* this.#deleteWithRevokedApproval(agent.id, () => this.#removeAgentDataEffect(agent)).pipe(
+      Effect.mapError(() => new AgentRemovalFailed({ cause: new Error(sourceText("error.agent.deleteIncomplete")) })),
+    );
+  }, Effect.uninterruptible);
+
+  readonly #removeAgentDataEffect = Effect.fn("AgentRemoval.removeData")(function* (
+    this: AgentRemoval,
+    agent: Pick<AgentSummary, "id" | "threadId">,
+  ) {
+    const providerSessions = yield* removalStep(() =>
+      agent.threadId ? this.#store.database.listProviderSessions(agent.threadId) : [],
+    );
+    // Keep provider session records until their private files have been removed.
+    yield* this.#threads.releaseAgentSessions(agent.id);
+    let stage = "provider-files";
+    yield* Effect.gen({ self: this }, function* () {
+      for (const session of providerSessions)
+        yield* this.#threads
+          .deleteProviderSessionFiles(session.externalSessionId)
+          .pipe(Effect.mapError((failure) => new AgentRemovalFailed({ cause: failure.cause })));
+      stage = "messaging";
+      yield* this.#messaging
+        .deleteForAgent(agent.id)
+        .pipe(Effect.mapError((failure) => new AgentRemovalFailed({ cause: failure.cause })));
+      stage = "mailbox";
+      yield* this.#mailbox
+        .deleteAgentData(agent.id, this.#channels.store.allContextThreads())
+        .pipe(Effect.mapError((failure) => new AgentRemovalFailed({ cause: failure.cause })));
+      stage = "agent-files-and-record";
+      yield* this.#store
+        .deleteAgent(agent.id)
+        .pipe(Effect.mapError((failure) => new AgentRemovalFailed({ cause: failure.cause })));
+    }).pipe(
+      Effect.mapError(() => {
+        // File-system errors can contain private paths. Log only the failed stage.
+        this.#logger.warn("Agent deletion failed.", { stage });
+        return new AgentRemovalFailed({ cause: new Error(sourceText("error.agent.deleteIncomplete")) });
+      }),
+    );
+    yield* this.#closeBrowserTabsEffect(agent);
+    yield* removalStep(() => {
+      this.#conversation.forgetAgent(agent.id);
+      this.#turn.forgetAgent(agent.id);
+      this.#drain.forgetAgent(agent.id);
+      this.#hostedSites.forgetAgent(agent.id);
+      if (agent.threadId) {
+        for (const session of providerSessions) {
+          this.#conversation.unbindThread(session.externalSessionId);
+          this.#conversation.unloadThread(session.externalSessionId);
+          this.#compaction.forgetThread(session.externalSessionId);
+        }
+      }
+      this.#compaction.forgetAgent(agent.id);
+    });
+  });
 
   /**
    * A deleted agent's tabs are reachable by nobody: no agent passes the host's owner check for them,
@@ -167,7 +202,10 @@ export class AgentRemoval {
    * closes -- including a legacy tab carrying only the thread id. Runs after the agent record is
    * already gone, so a failure here must not fail the deletion the user asked for.
    */
-  async #closeBrowserTabs(agent: Pick<AgentSummary, "id" | "threadId">): Promise<void> {
+  readonly #closeBrowserTabsEffect = Effect.fn("AgentRemoval.closeBrowserTabs")(function* (
+    this: AgentRemoval,
+    agent: Pick<AgentSummary, "id" | "threadId">,
+  ) {
     const owned = this.#browser
       .listTabs()
       .filter((tab) =>
@@ -177,13 +215,22 @@ export class AgentRemoval {
       );
     let closed = 0;
     for (const tab of owned) {
-      try {
-        await this.#browser.close(tab.id);
-        closed += 1;
-      } catch (error) {
-        this.#logger.warn("Could not close a deleted agent's browser tab.", { error });
-      }
+      const result = yield* Effect.result(
+        this.#browser
+          .close(tab.id)
+          .pipe(Effect.mapError((failure) => new AgentRemovalFailed({ cause: failure.cause }))),
+      );
+      if (Result.isSuccess(result)) closed += 1;
+      else this.#logger.warn("Could not close a deleted agent's browser tab.", { error: result.failure.cause });
     }
     if (closed > 0) this.#logger.info("Closed a deleted agent's browser tabs.", { agentId: agent.id, count: closed });
-  }
+  });
+}
+
+export class AgentRemovalFailed extends Schema.TaggedError<AgentRemovalFailed>()("AgentRemovalFailed", {
+  cause: Schema.Defect(),
+}) {}
+
+function removalStep<A>(run: () => A): Effect.Effect<A, AgentRemovalFailed> {
+  return Effect.try({ try: run, catch: (cause) => new AgentRemovalFailed({ cause }) });
 }

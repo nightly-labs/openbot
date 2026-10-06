@@ -1,13 +1,16 @@
 import { EventEmitter, once } from "node:events";
 import { isString } from "@openbot/contracts/runtime-values";
+import { Effect } from "effect";
 import { assert, describe, expect, it } from "vitest";
 import WebSocket from "ws";
+import { runCauseEffect } from "../backend/effect-boundary";
 import {
   decodeRemoteDesktopSignalBinary,
   decodeRemoteDesktopSignalControl,
   encodeRemoteDesktopSignalBinary,
   encodeRemoteDesktopSignalControl,
 } from "./remote-desktop-signal";
+import { RemoteWorkflowError, remoteCall } from "./remote-service-effects";
 import { RemoteViewerProxy } from "./remote-viewer-proxy";
 
 describe("RemoteViewerProxy", () => {
@@ -15,15 +18,18 @@ describe("RemoteViewerProxy", () => {
     const transport = new FakeTransport();
     const proxy = new RemoteViewerProxy({
       transport,
-      fetchResource: async () =>
-        new Response(
-          '<script>const session=/^\\/v1\\/remote-screen\\/sessions\\/([A-Za-z0-9-]+)/.exec(location.pathname);fetch("/v1/remote-screen/session")</script>',
-          {
-            headers: { "Content-Type": "text/html" },
-          },
+      fetchResource: () =>
+        Effect.sync(
+          () =>
+            new Response(
+              '<script>const session=/^\\/v1\\/remote-screen\\/sessions\\/([A-Za-z0-9-]+)/.exec(location.pathname);fetch("/v1/remote-screen/session")</script>',
+              {
+                headers: { "Content-Type": "text/html" },
+              },
+            ),
         ),
     });
-    const viewerUrl = await proxy.viewerUrl("host-1", "/v1/remote-screen/sessions/session-1/viewer");
+    const viewerUrl = await runCauseEffect(proxy.viewerUrl("host-1", "/v1/remote-screen/sessions/session-1/viewer"));
     expect(new URL(viewerUrl).hostname).toBe("127.0.0.1");
     const html = await (await fetch(viewerUrl)).text();
     const [localPrefix] = new URL(viewerUrl).pathname.split("/v1/");
@@ -49,13 +55,13 @@ describe("RemoteViewerProxy", () => {
     const tokenPath = viewer.pathname.split("/host-1/")[0];
     expect((await fetch(`${viewer.origin}${tokenPath}/%/x`)).status).toBe(404);
     socket.close();
-    await proxy.stop();
+    await runCauseEffect(proxy.stop());
   });
 
   it("closes only the affected viewer when desktop forwarding fails", async () => {
     const transport = new FailingFrameTransport();
-    const proxy = new RemoteViewerProxy({ transport, fetchResource: async () => new Response() });
-    const viewerUrl = await proxy.viewerUrl("host-1", "/v1/remote-screen/sessions/session-1/viewer");
+    const proxy = new RemoteViewerProxy({ transport, fetchResource: () => Effect.sync(() => new Response()) });
+    const viewerUrl = await runCauseEffect(proxy.viewerUrl("host-1", "/v1/remote-screen/sessions/session-1/viewer"));
     const socketUrl = new URL(viewerUrl);
     socketUrl.protocol = "ws:";
     socketUrl.pathname = socketUrl.pathname.replace(/\/viewer$/u, "/stream");
@@ -65,13 +71,13 @@ describe("RemoteViewerProxy", () => {
     socket.send("offer-text");
     const [code] = await once(socket, "close");
     expect(code).toBe(1011);
-    await proxy.stop();
+    await runCauseEffect(proxy.stop());
   });
 
   it("closes a viewer when its open desktop forwarding queue exceeds the limit", async () => {
     const transport = new SlowFrameTransport();
-    const proxy = new RemoteViewerProxy({ transport, fetchResource: async () => new Response() });
-    const viewerUrl = await proxy.viewerUrl("host-1", "/v1/remote-screen/sessions/session-1/viewer");
+    const proxy = new RemoteViewerProxy({ transport, fetchResource: () => Effect.sync(() => new Response()) });
+    const viewerUrl = await runCauseEffect(proxy.viewerUrl("host-1", "/v1/remote-screen/sessions/session-1/viewer"));
     const socketUrl = new URL(viewerUrl);
     socketUrl.protocol = "ws:";
     socketUrl.pathname = socketUrl.pathname.replace(/\/viewer$/u, "/stream");
@@ -84,31 +90,33 @@ describe("RemoteViewerProxy", () => {
     const [code] = await closed;
     expect(code).toBe(1009);
     transport.release();
-    await proxy.stop();
+    await runCauseEffect(proxy.stop());
   });
 });
 
 class FakeTransport extends EventEmitter {
-  async sendDesktop(hostId: string, data: string | ArrayBuffer): Promise<void> {
-    if (isString(data)) {
-      const control = decodeRemoteDesktopSignalControl(data);
-      if (control.type === "open") {
-        queueMicrotask(() =>
-          this.emit(
-            "desktopData",
-            hostId,
-            encodeRemoteDesktopSignalControl({ type: "opened", streamId: control.streamId }),
-          ),
-        );
-      } else if (control.type === "text") {
-        queueMicrotask(() => this.emit("desktopData", hostId, data));
+  sendDesktop(hostId: string, data: string | ArrayBuffer): Effect.Effect<void, RemoteWorkflowError> {
+    return Effect.gen({ self: this }, function* () {
+      if (isString(data)) {
+        const control = decodeRemoteDesktopSignalControl(data);
+        if (control.type === "open") {
+          queueMicrotask(() =>
+            this.emit(
+              "desktopData",
+              hostId,
+              encodeRemoteDesktopSignalControl({ type: "opened", streamId: control.streamId }),
+            ),
+          );
+        } else if (control.type === "text") {
+          queueMicrotask(() => this.emit("desktopData", hostId, data));
+        }
+        return;
       }
-      return;
-    }
-    const frame = decodeRemoteDesktopSignalBinary(data);
-    queueMicrotask(() =>
-      this.emit("desktopData", hostId, encodeRemoteDesktopSignalBinary(frame.streamId, frame.bytes)),
-    );
+      const frame = decodeRemoteDesktopSignalBinary(data);
+      queueMicrotask(() =>
+        this.emit("desktopData", hostId, encodeRemoteDesktopSignalBinary(frame.streamId, frame.bytes)),
+      );
+    });
   }
 }
 
@@ -117,12 +125,15 @@ class FailingFrameTransport extends FakeTransport {
     this.once("opened", resolve);
   });
 
-  override async sendDesktop(hostId: string, data: string | ArrayBuffer): Promise<void> {
-    if (isString(data) && decodeRemoteDesktopSignalControl(data).type === "text") {
-      throw new Error("The desktop channel closed.");
-    }
-    await super.sendDesktop(hostId, data);
-    if (isString(data) && decodeRemoteDesktopSignalControl(data).type === "open") this.emit("opened");
+  override sendDesktop(hostId: string, data: string | ArrayBuffer): Effect.Effect<void, RemoteWorkflowError> {
+    const send = super.sendDesktop(hostId, data);
+    return Effect.gen({ self: this }, function* () {
+      if (isString(data) && decodeRemoteDesktopSignalControl(data).type === "text") {
+        return yield* new RemoteWorkflowError({ cause: new Error("The desktop channel closed.") });
+      }
+      yield* send;
+      if (isString(data) && decodeRemoteDesktopSignalControl(data).type === "open") this.emit("opened");
+    });
   }
 }
 
@@ -142,9 +153,12 @@ class SlowFrameTransport extends FakeTransport {
     this.release = release;
   }
 
-  override async sendDesktop(hostId: string, data: string | ArrayBuffer): Promise<void> {
-    if (!isString(data)) await this.#blocked;
-    await super.sendDesktop(hostId, data);
-    if (isString(data) && decodeRemoteDesktopSignalControl(data).type === "open") this.emit("opened");
+  override sendDesktop(hostId: string, data: string | ArrayBuffer): Effect.Effect<void, RemoteWorkflowError> {
+    const send = super.sendDesktop(hostId, data);
+    return Effect.gen({ self: this }, function* () {
+      if (!isString(data)) yield* remoteCall(() => this.#blocked);
+      yield* send;
+      if (isString(data) && decodeRemoteDesktopSignalControl(data).type === "open") this.emit("opened");
+    });
   }
 }

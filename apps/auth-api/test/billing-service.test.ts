@@ -3,6 +3,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
 import { getServerEntitlement } from "../src/server/billing-entitlement";
 import { BillingService } from "../src/server/billing-service";
+import { runApiEffect } from "../src/server/effect-runtime";
 import { verifyStripeSignature } from "../src/server/stripe-client";
 import { migratedDatabase, sqliteD1 } from "./sqlite-d1";
 
@@ -28,9 +29,9 @@ describe("Stripe webhook signature", () => {
   const seconds = NOW / 1_000;
 
   it("accepts the signed body, and any v1 value during a secret rotation", async () => {
-    expect(await verifyStripeSignature(payload, sign(payload, seconds), WEBHOOK_SECRET, NOW)).toBe(true);
+    expect(await runApiEffect(verifyStripeSignature(payload, sign(payload, seconds), WEBHOOK_SECRET, NOW))).toBe(true);
     const rotated = `t=${seconds},v1=${"0".repeat(64)},v1=${hmac(payload, seconds, WEBHOOK_SECRET)}`;
-    expect(await verifyStripeSignature(payload, rotated, WEBHOOK_SECRET, NOW)).toBe(true);
+    expect(await runApiEffect(verifyStripeSignature(payload, rotated, WEBHOOK_SECRET, NOW))).toBe(true);
   });
 
   it.each([
@@ -40,7 +41,7 @@ describe("Stripe webhook signature", () => {
     ["no v1 value", payload, `t=${seconds},v0=${hmac(payload, seconds, WEBHOOK_SECRET)}`],
     ["no header", payload, null],
   ])("refuses %s", async (_name, body, header) => {
-    expect(await verifyStripeSignature(body, header, WEBHOOK_SECRET, NOW)).toBe(false);
+    expect(await runApiEffect(verifyStripeSignature(body, header, WEBHOOK_SECRET, NOW))).toBe(false);
   });
 });
 
@@ -61,7 +62,7 @@ describe("billing service", () => {
     await fixture.deliver("evt_1", "customer.subscription.created", { id: "sub_1" });
     await fixture.deliver("evt_2", "customer.subscription.created", { id: "sub_2" });
 
-    expect(await fixture.service.getState(user.id)).toEqual({
+    expect(await runApiEffect(fixture.service.getState(user.id))).toEqual({
       available: true,
       hasCustomer: true,
       servers: [
@@ -86,9 +87,12 @@ describe("billing service", () => {
     // Without the expand, Stripe omits `currency_options`.
     expect(fixture.stripe.lastSubscriptionExpand).toEqual(["items.data.price.currency_options"]);
     const d1 = sqliteD1(fixture.database);
-    expect(await getServerEntitlement(d1, "host-1", NOW)).toMatchObject({ plan: "standard", storageGb: 50 });
+    expect(await runApiEffect(getServerEntitlement(d1, "host-1", NOW))).toMatchObject({
+      plan: "standard",
+      storageGb: 50,
+    });
     // The metadata of this account names a server of another account: that server gets no plan.
-    expect(await getServerEntitlement(d1, "host-other", NOW)).toBeNull();
+    expect(await runApiEffect(getServerEntitlement(d1, "host-other", NOW))).toBeNull();
   });
 
   it("skips a subscription that names no account, and never moves a known customer", async () => {
@@ -98,7 +102,11 @@ describe("billing service", () => {
       metadata: {},
     });
     await fixture.deliver("evt_1", "customer.subscription.created", { id: "sub_1" });
-    expect(await fixture.service.getState(user.id)).toEqual({ available: true, hasCustomer: false, servers: [] });
+    expect(await runApiEffect(fixture.service.getState(user.id))).toEqual({
+      available: true,
+      hasCustomer: false,
+      servers: [],
+    });
 
     fixture.stripe.subscriptions.set("sub_1", subscription("sub_1", "active", "openbot_starter_month"));
     await fixture.deliver("evt_2", "customer.subscription.updated", { id: "sub_1" });
@@ -107,8 +115,10 @@ describe("billing service", () => {
       metadata: { openbot_user_id: "user-2" },
     });
     await fixture.deliver("evt_3", "customer.subscription.updated", { id: "sub_1" });
-    expect((await fixture.service.getState(user.id)).servers).toMatchObject([{ subscriptionId: "sub_1", plan: "pro" }]);
-    expect((await fixture.service.getState("user-2")).servers).toEqual([]);
+    expect((await runApiEffect(fixture.service.getState(user.id))).servers).toMatchObject([
+      { subscriptionId: "sub_1", plan: "pro" },
+    ]);
+    expect((await runApiEffect(fixture.service.getState("user-2"))).servers).toEqual([]);
   });
 
   it("writes the latest Stripe state, ignores a repeated event, and applies a failed event on retry", async () => {
@@ -119,7 +129,7 @@ describe("billing service", () => {
     // An old event that arrives late still writes the state that Stripe has now.
     fixture.stripe.subscriptions.set("sub_1", subscription("sub_1", "past_due", "openbot_starter_month"));
     await fixture.deliver("evt_0", "customer.subscription.updated", { id: "sub_1", status: "active" });
-    expect((await fixture.service.getState(user.id)).servers[0]?.status).toBe("past_due");
+    expect((await runApiEffect(fixture.service.getState(user.id))).servers[0]?.status).toBe("past_due");
 
     const reads = fixture.stripe.subscriptionReads;
     await fixture.deliver("evt_0", "customer.subscription.updated", { id: "sub_1" });
@@ -132,10 +142,12 @@ describe("billing service", () => {
     });
     fixture.stripe.failSubscriptionRead = false;
     await fixture.deliver("evt_2", "customer.subscription.deleted", { id: "sub_1" });
-    expect((await fixture.service.getState(user.id)).servers).toEqual([]);
+    expect((await runApiEffect(fixture.service.getState(user.id))).servers).toEqual([]);
 
     await expect(
-      fixture.service.handleWebhook(event("evt_3", "customer.subscription.deleted", { id: "sub_1" }), "t=1,v1=00"),
+      runApiEffect(
+        fixture.service.handleWebhook(event("evt_3", "customer.subscription.deleted", { id: "sub_1" }), "t=1,v1=00"),
+      ),
     ).rejects.toMatchObject({ status: 400 });
     expect(fixture.database.prepare("SELECT event_id FROM billing_webhook_events ORDER BY event_id").all()).toEqual([
       { event_id: "evt_0" },
@@ -146,18 +158,22 @@ describe("billing service", () => {
 
   it("opens the Portal on one plan only for a subscription of the same account", async () => {
     const fixture = setup();
-    await expect(fixture.service.createPortal(user.id, { flow: "manage" }, "web", ORIGIN)).rejects.toMatchObject({
+    await expect(
+      runApiEffect(fixture.service.createPortal(user.id, { flow: "manage" }, "web", ORIGIN)),
+    ).rejects.toMatchObject({
       status: 404,
     });
     fixture.stripe.subscriptions.set("sub_1", subscription("sub_1", "active", "openbot_standard_month", "host-1"));
     await fixture.deliver("evt_1", "customer.subscription.created", { id: "sub_1" });
 
-    await fixture.service.createPortal(user.id, { flow: "manage" }, "desktop", ORIGIN);
+    await runApiEffect(fixture.service.createPortal(user.id, { flow: "manage" }, "desktop", ORIGIN));
     expect(Object.fromEntries(fixture.stripe.lastPortal ?? [])).toEqual({
       customer: "cus_1",
       return_url: `${ORIGIN}/billing/return`,
     });
-    await fixture.service.createPortal(user.id, { flow: "cancel", subscriptionId: "sub_1" }, "web", ORIGIN);
+    await runApiEffect(
+      fixture.service.createPortal(user.id, { flow: "cancel", subscriptionId: "sub_1" }, "web", ORIGIN),
+    );
     expect(Object.fromEntries(fixture.stripe.lastPortal ?? [])).toEqual({
       customer: "cus_1",
       return_url: `${ORIGIN}/app?billing=portal`,
@@ -172,7 +188,7 @@ describe("billing service", () => {
     `);
     const portals = fixture.stripe.portalsCreated;
     await expect(
-      fixture.service.createPortal("user-2", { flow: "update", subscriptionId: "sub_1" }, "web", ORIGIN),
+      runApiEffect(fixture.service.createPortal("user-2", { flow: "update", subscriptionId: "sub_1" }, "web", ORIGIN)),
     ).rejects.toMatchObject({ status: 404, code: "no_subscription" });
     expect(fixture.stripe.portalsCreated).toBe(portals);
   });
@@ -191,10 +207,10 @@ describe("billing service", () => {
     const d1 = sqliteD1(fixture.database);
 
     insert("sub_canceled", "canceled", NOW + 1_000);
-    expect(await getServerEntitlement(d1, "host-1", NOW)).toBeNull();
+    expect(await runApiEffect(getServerEntitlement(d1, "host-1", NOW))).toBeNull();
     insert("sub_past_due", "past_due", NOW + 1_000);
-    expect(await getServerEntitlement(d1, "host-1", NOW)).toMatchObject({ plan: "pro", storageGb: 100 });
-    expect(await getServerEntitlement(d1, "host-1", NOW + 1_000)).toBeNull();
+    expect(await runApiEffect(getServerEntitlement(d1, "host-1", NOW))).toMatchObject({ plan: "pro", storageGb: 100 });
+    expect(await runApiEffect(getServerEntitlement(d1, "host-1", NOW + 1_000))).toBeNull();
   });
 });
 
@@ -222,7 +238,7 @@ function setup() {
     service,
     deliver: (id: string, type: string, object: EventObject) => {
       const payload = event(id, type, object);
-      return service.handleWebhook(payload, sign(payload, NOW / 1_000));
+      return runApiEffect(service.handleWebhook(payload, sign(payload, NOW / 1_000)));
     },
   };
 }

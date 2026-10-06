@@ -1,5 +1,7 @@
 import { sourceText } from "@openbot/i18n/source";
+import { Effect, Exit, Scope } from "effect";
 import type { HostMemory, HostMemoryLevel } from "../host-memory";
+import type { ProviderClientOperationError } from "../provider-client-effects";
 
 export interface MemoryHoldHooks {
   /** Tries each agent again. The memory is back, so a delivery that waited can start. */
@@ -10,7 +12,7 @@ export interface MemoryHoldHooks {
    */
   retryWaiting(): void;
   /** Closes the provider threads that have no turn. They open again from their session. */
-  releaseIdleThreads(): void;
+  releaseIdleThreads(): Effect.Effect<void, ProviderClientOperationError>;
   emitError(code: string, error: unknown, agentId?: string): void;
 }
 
@@ -29,6 +31,7 @@ export interface MemoryHoldOptions {
 export class MemoryHold {
   readonly #memory: HostMemory | null;
   readonly #hooks: MemoryHoldHooks;
+  #scope = Scope.makeUnsafe();
   readonly #told = new Set<string>();
   #level: HostMemoryLevel = "ok";
   #unsubscribe: (() => void) | null = null;
@@ -40,13 +43,17 @@ export class MemoryHold {
 
   start(): void {
     if (!this.#memory || this.#unsubscribe) return;
-    this.#unsubscribe = this.#memory.subscribe(() => this.#sampled());
+    this.#unsubscribe = this.#memory.subscribe(() =>
+      Effect.runFork(this.#sampled().pipe(Effect.forkIn(this.#scope, { startImmediately: true }))),
+    );
   }
 
-  dispose(): void {
+  readonly dispose = Effect.fn("MemoryHold.dispose")(function* (this: MemoryHold) {
     this.#unsubscribe?.();
     this.#unsubscribe = null;
-  }
+    yield* Scope.close(this.#scope, Exit.void);
+    this.#scope = Scope.makeUnsafe();
+  }).bind(this);
 
   mayDrain(_agentId: string): boolean {
     return (this.#memory?.level() ?? "ok") === "ok";
@@ -69,17 +76,24 @@ export class MemoryHold {
     return this.#memory?.turnLimit() ?? null;
   }
 
-  #sampled(): void {
+  readonly #sampled = Effect.fn("MemoryHold.sampled")(function* (this: MemoryHold) {
     this.#hooks.retryWaiting();
     const level = this.#memory?.level() ?? "ok";
     const previous = this.#level;
     this.#level = level;
-    if (level === "critical" && previous !== "critical") this.#hooks.releaseIdleThreads();
+    if (level === "critical" && previous !== "critical")
+      yield* this.#hooks
+        .releaseIdleThreads()
+        .pipe(
+          Effect.catch((failure) =>
+            Effect.sync(() => this.#hooks.emitError("idle_thread_release_failed", failure.cause)),
+          ),
+        );
     // By the held agents, not by the last level: a turn reservation can hold an agent between two
     // samples that both read "ok".
     if (level === "ok" && this.#told.size > 0) {
       this.#told.clear();
       this.#hooks.scheduleAll();
     }
-  }
+  });
 }

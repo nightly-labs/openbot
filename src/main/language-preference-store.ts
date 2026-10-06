@@ -1,7 +1,7 @@
-import { readFile } from "node:fs/promises";
 import { type AppLanguagePreference, DEFAULT_APP_LANGUAGE, isAppLanguage } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
-import { writeJsonFileAtomically } from "../backend/atomic-json-file";
+import { Effect } from "effect";
+import { readPreferenceFile, writePreferenceFile } from "./preference-file";
 
 const DEFAULT_PREFERENCE: AppLanguagePreference = { language: DEFAULT_APP_LANGUAGE };
 
@@ -17,22 +17,24 @@ const DEFAULT_PREFERENCE: AppLanguagePreference = { language: DEFAULT_APP_LANGUA
  * left unreadable by a restore from backup, say - would show the startup error box and quit. Losing
  * a language choice is a small fault; being unable to open the app at all is not.
  */
-export async function readLanguagePreference(path: string): Promise<AppLanguagePreference> {
-  try {
-    const parsed = JSON.parse(await readFile(path, "utf8"));
+
+export const readLanguagePreference = Effect.fn("readLanguagePreference")((path: string) =>
+  readPreferenceFile(path, (parsed): AppLanguagePreference => {
     if (!isDynamicRecord(parsed) || parsed.version !== 1 || !isAppLanguage(parsed.language)) {
       return { ...DEFAULT_PREFERENCE };
     }
     return { language: parsed.language };
-  } catch {
-    return { ...DEFAULT_PREFERENCE };
-  }
-}
+  }).pipe(
+    Effect.catch(() => {
+      return Effect.succeed({ ...DEFAULT_PREFERENCE });
+    }),
+  ),
+);
 
-export async function writeLanguagePreference(
+export const writeLanguagePreference = Effect.fn("LanguagePreference.write")(function* (
   path: string,
   preference: AppLanguagePreference,
-): Promise<AppLanguagePreference> {
-  await writeJsonFileAtomically(path, { version: 1, language: preference.language });
+) {
+  yield* writePreferenceFile(path, { version: 1, language: preference.language });
   return { language: preference.language };
-}
+});

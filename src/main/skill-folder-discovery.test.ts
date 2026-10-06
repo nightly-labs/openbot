@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AgentProviderId } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { listFolderSkills } from "./skill-folder-discovery";
 
 let root = "";
@@ -25,7 +26,7 @@ async function writeSkill(base: string, folder: string, slug: string, content: s
 }
 
 function list(provider: AgentProviderId, exclude: string[] = []) {
-  return listFolderSkills({ provider, workspacePath }, new Set(exclude));
+  return runCauseEffect(listFolderSkills({ provider, workspacePath }, new Set(exclude)));
 }
 
 describe("listFolderSkills", () => {

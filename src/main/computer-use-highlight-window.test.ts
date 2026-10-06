@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import type { Rectangle } from "electron";
 import { describe, expect, it, vi } from "vitest";
 import { ComputerUseHighlightController, type HighlightDisplay } from "./computer-use-highlight-window";
@@ -10,6 +11,7 @@ import {
   liveSession,
 } from "./computer-use-target-window";
 import type { ObservedAction } from "./cua-driver-action-tap";
+import { CuaDriverFailure } from "./cua-driver-effects";
 
 const DESKTOP = [{ id: 1, bounds: { x: 0, y: 0, width: 1920, height: 1080 } }];
 
@@ -48,7 +50,7 @@ function controllerWith(
     place,
     displays: () => displays,
     readPointer,
-    readTarget: async () => targets[Math.min(tick++, targets.length - 1)] ?? null,
+    readTarget: () => Effect.sync(() => targets[Math.min(tick++, targets.length - 1)] ?? null),
   });
   return { controller, windows, loadWindow, place };
 }
@@ -85,10 +87,10 @@ describe("ComputerUseHighlightController", () => {
       loadWindow: () => loading,
       place,
       displays: () => DESKTOP,
-      readTarget: async () => target(7, "Notes", { x: 0, y: 0, width: 800, height: 600 }),
+      readTarget: () => Effect.succeed(target(7, "Notes", { x: 0, y: 0, width: 800, height: 600 })),
     });
 
-    const tick = controller.refresh();
+    const tick = Effect.runPromise(controller.refresh());
     await vi.waitFor(() => expect(windows).toHaveLength(1));
     controller.stop();
     loaded();
@@ -107,8 +109,8 @@ describe("ComputerUseHighlightController", () => {
       target(7, "Notes", moved),
     ]);
 
-    await controller.refresh();
-    await controller.refresh();
+    await Effect.runPromise(controller.refresh());
+    await Effect.runPromise(controller.refresh());
 
     expect(windows).toHaveLength(1);
     expect(loadWindow).toHaveBeenCalledTimes(1);
@@ -147,7 +149,7 @@ describe("ComputerUseHighlightController", () => {
       displays,
     );
 
-    await controller.refresh();
+    await Effect.runPromise(controller.refresh());
 
     // The placement is in that overlay's own pixels, so a display with a negative origin has to be
     // taken off the target's position rather than sent on as a negative left edge.
@@ -171,7 +173,7 @@ describe("ComputerUseHighlightController", () => {
       () => ({ x: -1000, y: 200 }),
     );
 
-    await controller.refresh();
+    await Effect.runPromise(controller.refresh());
 
     expect(place).toHaveBeenCalledWith(windows[0], expect.objectContaining({ cursor: { x: 512, y: 298 } }));
   });
@@ -183,7 +185,7 @@ describe("ComputerUseHighlightController", () => {
       () => ({ x: 4000, y: 200 }),
     );
 
-    await controller.refresh();
+    await Effect.runPromise(controller.refresh());
 
     expect(place).toHaveBeenCalledWith(windows[0], expect.objectContaining({ cursor: null }));
   });
@@ -195,7 +197,7 @@ describe("ComputerUseHighlightController", () => {
       displays,
     );
 
-    await controller.refresh();
+    await Effect.runPromise(controller.refresh());
 
     expect(place).toHaveBeenCalledWith(
       windows[0],
@@ -215,7 +217,7 @@ describe("ComputerUseHighlightController", () => {
       () => ({ x: 600, y: 500 }),
     );
 
-    await controller.refresh();
+    await Effect.runPromise(controller.refresh());
 
     expect(windows).toHaveLength(2);
     expect(place).toHaveBeenCalledWith(
@@ -233,12 +235,12 @@ describe("ComputerUseHighlightController", () => {
       displays,
       () => pointer,
     );
-    await controller.refresh();
+    await Effect.runPromise(controller.refresh());
 
     displays.push({ id: 2, bounds: { x: -1512, y: 0, width: 1512, height: 982 } });
     pointer = { x: -1000, y: 300 };
     place.mockClear();
-    await controller.refresh();
+    await Effect.runPromise(controller.refresh());
 
     expect(place).toHaveBeenCalledWith(windows[0], expect.objectContaining({ cursor: null }));
     expect(place).toHaveBeenCalledWith(windows[1], expect.objectContaining({ cursor: { x: 512, y: 300 } }));
@@ -246,7 +248,7 @@ describe("ComputerUseHighlightController", () => {
     displays.pop();
     pointer = { x: 600, y: 500 };
     place.mockClear();
-    await controller.refresh();
+    await Effect.runPromise(controller.refresh());
 
     expect(windows[1]?.destroy).toHaveBeenCalledOnce();
     expect(place).toHaveBeenCalledWith(windows[0], expect.objectContaining({ cursor: { x: 600, y: 500 } }));
@@ -255,8 +257,8 @@ describe("ComputerUseHighlightController", () => {
   it("hides the rim when no agent holds the desktop", async () => {
     const { controller, windows } = controllerWith([target(7, "Notes", { x: 0, y: 0, width: 800, height: 600 }), null]);
 
-    await controller.refresh();
-    await controller.refresh();
+    await Effect.runPromise(controller.refresh());
+    await Effect.runPromise(controller.refresh());
 
     expect(windows[0]?.hide).toHaveBeenCalledTimes(1);
     expect(controller.visible).toBe(false);
@@ -268,12 +270,10 @@ describe("ComputerUseHighlightController", () => {
       loadWindow: async () => undefined,
       place: vi.fn(),
       displays: () => DESKTOP,
-      readTarget: async () => {
-        throw new Error("the daemon did not answer");
-      },
+      readTarget: () => Effect.fail(new CuaDriverFailure({ cause: new Error("the daemon did not answer") })),
     });
 
-    await expect(controller.refresh()).resolves.toBeUndefined();
+    await expect(Effect.runPromise(controller.refresh())).resolves.toBeUndefined();
     expect(controller.visible).toBe(false);
   });
 });

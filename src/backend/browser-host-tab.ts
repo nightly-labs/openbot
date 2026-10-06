@@ -1,7 +1,9 @@
 import type { BrowserEnvironment, BrowserPreview, BrowserTab } from "@openbot/contracts/ipc";
+import type { Deferred, Effect, Scope } from "effect";
 import { BrowserWindow, type WebContents, type WebContentsView, webContents } from "electron";
 import type { BrowserCdpEngine } from "./browser-cdp";
 import type { BrowserDiagnostics } from "./browser-diagnostics";
+import type { BrowserOperationError } from "./browser-effects";
 import { isPersistableBrowserUrl } from "./browser-state";
 
 /**
@@ -37,7 +39,8 @@ export interface BrowserHostTab {
   ownerThreadId: string | null;
   ownerAgentId: string | null;
   revision: number;
-  queue: Promise<unknown>;
+  queue: Deferred.Deferred<void>;
+  scope: Scope.Closeable;
   /** Operations queued or running on `queue`, so a preview can tell the agent is working on the tab. */
   pendingOperations: number;
   /** Main-frame documents the tab has loaded. A reload keeps the URL, so a saved preview checks this too. */
@@ -48,12 +51,14 @@ export interface BrowserHostTab {
    */
   preview?: (BrowserPreviewPage & { frame: BrowserPreview }) | undefined;
   /** The preview capture on `queue`, so preview requests for the same page share one capture. */
-  previewCapture?: (BrowserPreviewPage & { frame: Promise<BrowserPreview> }) | undefined;
+  previewCapture?:
+    | (BrowserPreviewPage & { frame: Deferred.Deferred<BrowserPreview, BrowserOperationError> })
+    | undefined;
   /**
    * The first load of a tab restored from disk, held back until the tab is shown or used. Each loaded
    * tab is a renderer process, and a restart would otherwise start one for every saved tab at once.
    */
-  pendingRestore?: (() => Promise<void>) | undefined;
+  pendingRestore?: (() => Effect.Effect<void, BrowserOperationError>) | undefined;
   /**
    * An idle agent tab whose page was unloaded to free its renderer's memory. The title and the last
    * preview frame stand in for the page until `pendingRestore` loads it again.
@@ -74,7 +79,7 @@ export interface BrowserHostTab {
   secret?: { origin: string; submitted: boolean; replaced: boolean; running: boolean } | undefined;
 }
 
-export type KeepQueueBlocked = (promise: Promise<unknown>) => void;
+export type KeepQueueBlocked = (work: Effect.Effect<unknown, BrowserOperationError>) => void;
 
 export function restoreWebContentsFocus(previous: WebContents | null, controlled: WebContents): void {
   const current = webContents.getFocusedWebContents();

@@ -1,4 +1,6 @@
 import { createFileRoute } from "@tanstack/solid-router";
+import { Effect } from "effect";
+import { runApiResponse } from "../../../../server/effect-runtime";
 import { readJsonObject } from "../../../../server/json-body";
 import {
   hostedServerErrorResponse,
@@ -12,15 +14,15 @@ import {
 export const Route = createFileRoute("/v2/hosting/claims/redeem")({
   server: {
     handlers: {
-      POST: async ({ request }) => {
-        try {
-          await requestAuthService().enforceHostedServerClaimRateLimit(requestSourceIp(request));
-          const body = await readJsonObject(request);
-          return json(await requestHostedServerService().redeemClaim(body.claim));
-        } catch (error) {
-          return hostedServerErrorResponse(error);
-        }
-      },
+      POST: ({ request }) =>
+        runApiResponse(
+          Effect.gen(function* () {
+            yield* requestAuthService().enforceHostedServerClaimRateLimit(requestSourceIp(request));
+            const body = yield* readJsonObject(request);
+            return json(yield* requestHostedServerService().redeemClaim(body.claim));
+          }),
+          hostedServerErrorResponse,
+        ),
     },
   },
 });

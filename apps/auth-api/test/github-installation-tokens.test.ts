@@ -1,5 +1,6 @@
 import { exportPKCS8, generateKeyPair, jwtVerify } from "jose";
 import { beforeAll, describe, expect, it } from "vitest";
+import { runApiEffect } from "../src/server/effect-runtime";
 import {
   type GitHubFetch,
   GitHubInstallationTokens,
@@ -77,7 +78,7 @@ describe("GitHub installation tokens", () => {
   it("gives a token for this app's installation, limited to the repositories where the user can push", async () => {
     const github = fakeGitHub();
 
-    const tokens = await service(github.fetch).issue(USER_TOKEN);
+    const tokens = await runApiEffect(service(github.fetch).issue(USER_TOKEN));
 
     expect(tokens).toEqual([
       {
@@ -109,16 +110,14 @@ describe("GitHub installation tokens", () => {
       }),
     });
 
-    await expect(service(github.fetch).issue(USER_TOKEN)).resolves.toEqual([]);
+    await expect(runApiEffect(service(github.fetch).issue(USER_TOKEN))).resolves.toEqual([]);
     expect(github.calls.some((call) => call.method === "POST")).toBe(false);
   });
 
   it("refuses a user token that GitHub refuses, and does not echo it", async () => {
     const github = fakeGitHub({ "GET /user/installations": new Response("Bad credentials", { status: 401 }) });
 
-    const error = await service(github.fetch)
-      .issue(USER_TOKEN)
-      .catch((caught: unknown) => caught);
+    const error = await runApiEffect(service(github.fetch).issue(USER_TOKEN)).catch((caught: unknown) => caught);
 
     expect(error).toBeInstanceOf(GitHubInstallationTokensError);
     expect(error).toMatchObject({ status: 401, code: "github_unauthorized" });
@@ -134,7 +133,10 @@ describe("GitHub installation tokens", () => {
       fetch: github.fetch,
     });
 
-    await expect(tokens.issue(USER_TOKEN)).rejects.toMatchObject({ status: 503, code: "github_app_unavailable" });
+    await expect(runApiEffect(tokens.issue(USER_TOKEN))).rejects.toMatchObject({
+      status: 503,
+      code: "github_app_unavailable",
+    });
     expect(github.calls).toEqual([]);
   });
 });

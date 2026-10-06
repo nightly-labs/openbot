@@ -1,6 +1,10 @@
 import type { AgentSummary, MarketplaceAgentDetail } from "@openbot/contracts/ipc";
+import { Effect } from "effect";
 import { describe, expect, it, vi } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { AgentMarketplaceService } from "./agent-marketplace-service";
+import { authDecode, type CentralAuthOperationError } from "./central-auth-effects";
+import { SkillMarketplaceFailure } from "./skill-marketplace-service";
 
 const intervalSchedule = { kind: "interval", amount: 1, unit: "days", anchorAt: "2026-01-01T00:00:00.000Z" } as const;
 
@@ -67,32 +71,38 @@ function service(overrides: { failSkill?: boolean } = {}) {
       },
     ]),
     resolveAvatar: vi.fn(() => null),
-    createAgentProfile: vi.fn(async () => agent),
-    updateAgent: vi.fn(async () => agent),
-    setAvatar: vi.fn(async () => agent),
+    createAgentProfile: vi.fn(() => Effect.sync(() => agent)),
+    updateAgent: vi.fn(() => Effect.sync(() => agent)),
+    setAvatar: vi.fn(() => Effect.sync(() => agent)),
     createRoutine: vi.fn(() => ({ id: "routine-marketplace-id" })),
-    deleteRoutine: vi.fn(async () => undefined),
+    deleteRoutine: vi.fn(() => Effect.sync(() => undefined)),
     setMarketplaceSource: vi.fn((_agentId, source) => ({ ...agent, marketplaceSource: source })),
-    deleteAgent: vi.fn(async () => undefined),
+    deleteAgent: vi.fn(() => Effect.sync(() => undefined)),
   };
   const skills = {
-    listPublishable: vi.fn(async () => detail.skills),
-    uninstall: vi.fn(async () => undefined),
+    listPublishable: vi.fn(() => Effect.sync(() => detail.skills)),
+    uninstall: vi.fn(() => Effect.sync(() => undefined)),
     installVersion: overrides.failSkill
-      ? vi.fn(async () => {
-          throw new Error("skill failed");
-        })
-      : vi.fn(async () => undefined),
+      ? vi.fn(() => Effect.fail(new SkillMarketplaceFailure({ cause: new Error("skill failed") })))
+      : vi.fn(() => Effect.sync(() => undefined)),
   };
   const auth = {
-    async requestAuthorized<T>(path: string, _init: RequestInit, decoder: (value: unknown) => T): Promise<T> {
-      return decoder(path.endsWith("/install") ? { installed: true } : detail);
+    requestAuthorized<T>(
+      path: string,
+      _init: RequestInit,
+      decoder: (value: unknown) => T,
+    ): Effect.Effect<T, CentralAuthOperationError> {
+      return authDecode(() => {
+        return decoder(path.endsWith("/install") ? { installed: true } : detail);
+      });
     },
     resolveApiUrl(value: string) {
       return value;
     },
-    async downloadAuthorized() {
-      return new Uint8Array();
+    downloadAuthorized() {
+      return authDecode(() => {
+        return new Uint8Array();
+      });
     },
   };
   return {
@@ -106,13 +116,15 @@ function service(overrides: { failSkill?: boolean } = {}) {
 describe("AgentMarketplaceService", () => {
   it("passes catalog categories and creator photos through the account API", async () => {
     const { marketplace, auth } = service();
-    const request = vi.spyOn(auth, "requestAuthorized").mockImplementation(async (_path, _init, decode) =>
-      decode({
-        agents: [{ ...detail, category: "research", creatorAvatarUrl: "/v1/avatars/owner" }],
-        nextCursor: null,
-      }),
+    const request = vi.spyOn(auth, "requestAuthorized").mockImplementation((_path, _init, decode) =>
+      Effect.sync(() =>
+        decode({
+          agents: [{ ...detail, category: "research", creatorAvatarUrl: "/v1/avatars/owner" }],
+          nextCursor: null,
+        }),
+      ),
     );
-    expect((await marketplace.list({ category: "research" })).agents[0]).toMatchObject({
+    expect((await runCauseEffect(marketplace.list({ category: "research" }))).agents[0]).toMatchObject({
       category: "research",
       creatorAvatarUrl: "/v1/avatars/owner",
     });
@@ -121,7 +133,7 @@ describe("AgentMarketplaceService", () => {
 
   it("publishes only the public profile, approved skills, and routine definitions", async () => {
     const { marketplace } = service();
-    const preview = await marketplace.preview(agent.id);
+    const preview = await runCauseEffect(marketplace.preview(agent.id));
 
     expect(preview).toEqual({
       agentId: agent.id,
@@ -142,7 +154,9 @@ describe("AgentMarketplaceService", () => {
 
   it("creates an independent agent and preserves active routines in the installer timezone", async () => {
     const { marketplace, agents, skills } = service();
-    await marketplace.install({ listingId: detail.id, timezone: "America/New_York", receiptId: "receipt-1" });
+    await runCauseEffect(
+      marketplace.install({ listingId: detail.id, timezone: "America/New_York", receiptId: "receipt-1" }),
+    );
 
     expect(agents.createAgentProfile).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -170,7 +184,7 @@ describe("AgentMarketplaceService", () => {
   it("removes a partially created agent when a dependency fails", async () => {
     const { marketplace, agents } = service({ failSkill: true });
     await expect(
-      marketplace.install({ listingId: detail.id, timezone: "Europe/Warsaw", receiptId: "receipt-2" }),
+      runCauseEffect(marketplace.install({ listingId: detail.id, timezone: "Europe/Warsaw", receiptId: "receipt-2" })),
     ).rejects.toThrow("skill failed");
     expect(agents.deleteAgent).toHaveBeenCalledWith(agent.id);
     expect(agents.createRoutine).not.toHaveBeenCalled();
@@ -190,12 +204,14 @@ describe("AgentMarketplaceService", () => {
     const { marketplace, agents, skills } = service();
     agents.listAgents.mockReturnValue([installed]);
 
-    const result = await marketplace.install({
-      listingId: detail.id,
-      agentId: agent.id,
-      timezone: "Europe/Warsaw",
-      receiptId: "receipt-update",
-    });
+    const result = await runCauseEffect(
+      marketplace.install({
+        listingId: detail.id,
+        agentId: agent.id,
+        timezone: "Europe/Warsaw",
+        receiptId: "receipt-update",
+      }),
+    );
 
     expect(agents.createAgentProfile).not.toHaveBeenCalled();
     expect(agents.updateAgent).toHaveBeenCalledWith(expect.objectContaining({ agentId: agent.id, name: detail.name }));

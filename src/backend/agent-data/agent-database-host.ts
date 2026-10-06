@@ -5,15 +5,14 @@
 // so `worker.terminate()` never resolves and `DatabaseSync` offers no `interrupt`. A process can be
 // sent SIGKILL. That is the whole argument for this file existing.
 //
-// RULE: every runtime import here is `node:*`. Repo shapes come in through `import type`, which both
-// Rollup and Node's type stripping erase. That keeps the built chunk standalone, lets the tests
-// spawn this source directly and drive the real host, and makes it impossible for Electron or the
-// `openbot.db` facade to be dragged in behind it.
+// Runtime imports are limited to node:* and Effect. Repository shapes remain type-only, so this
+// process cannot load Electron or the openbot.db facade. Effect does not replace process deadlines.
 
 import { existsSync } from "node:fs";
 import { basename } from "node:path";
 import { createInterface } from "node:readline";
 import { constants, DatabaseSync, type StatementSync } from "node:sqlite";
+import { Context, Effect, Layer, ManagedRuntime, Result, Schema } from "effect";
 import type {
   AgentDatabaseFailure,
   AgentDatabaseLimits,
@@ -181,12 +180,21 @@ function closePath(databasePath: string): void {
 }
 
 /** A failure that already carries the sentence a model should read. */
-class HostFailure extends Error {
-  readonly failure: AgentDatabaseFailure;
-
+class HostFailure extends Schema.TaggedError<HostFailure>()("AgentDatabaseHostFailure", {
+  kind: Schema.Literals(["sqlite", "not-authorized", "size-limit", "busy", "missing", "internal"]),
+  message: Schema.String,
+  sqliteCode: Schema.optional(Schema.Number),
+}) {
   constructor(kind: AgentDatabaseFailure["kind"], message: string, sqliteCode?: number) {
-    super(message);
-    this.failure = sqliteCode === undefined ? { kind, message } : { kind, message, sqliteCode };
+    super({ kind, message, ...(sqliteCode === undefined ? {} : { sqliteCode }) });
+  }
+
+  get failure(): AgentDatabaseFailure {
+    return {
+      kind: this.kind,
+      message: this.message,
+      ...(this.sqliteCode === undefined ? {} : { sqliteCode: this.sqliteCode }),
+    };
   }
 }
 
@@ -281,31 +289,64 @@ function redactFailure(failure: AgentDatabaseFailure, databasePath: string): Age
   return { ...failure, message: failure.message.replaceAll(databasePath, basename(databasePath)) };
 }
 
+function databaseCall<A>(request: AgentDatabaseStatement, operation: () => A): Effect.Effect<A, HostFailure> {
+  return Effect.try({
+    try: operation,
+    catch: (error) => {
+      const failure = toFailure(error, request.databasePath);
+      return new HostFailure(failure.kind, failure.message, failure.sqliteCode);
+    },
+  });
+}
+
+class AgentDatabaseHost extends Context.Service<
+  AgentDatabaseHost,
+  { execute(request: AgentDatabaseRequest): Effect.Effect<AgentDatabaseRows, HostFailure> }
+>()("openbot/agent-data/AgentDatabaseHost") {
+  static readonly layer = Layer.effect(
+    AgentDatabaseHost,
+    Effect.gen(function* () {
+      yield* Effect.addFinalizer(() => Effect.sync(closeEverything));
+      const execute = Effect.fn("AgentDatabaseHost.execute")(function* (request: AgentDatabaseRequest) {
+        if (request.kind === "close") {
+          yield* Effect.sync(() => closePath(request.databasePath));
+          return { columns: [], rows: [], truncated: false, changes: 0, lastInsertRowid: null };
+        }
+        // These Effects are synchronous. Do not yield asynchronous work while authorizer state is set.
+        return yield* Effect.acquireUseRelease(
+          Effect.sync(() => {
+            provisioning = request.provision;
+            protectedTables = new Set(request.protectedTables.map((table) => table.toLowerCase()));
+          }),
+          () =>
+            Effect.gen(function* () {
+              const database = yield* databaseCall(request, () => openDatabase(request));
+              const statement = yield* databaseCall(request, () => database.prepare(request.sql));
+              return yield* databaseCall(request, () =>
+                request.mode === "read"
+                  ? readRows(statement, request.parameters, request.limits)
+                  : runStatement(statement, request.parameters),
+              );
+            }),
+          () =>
+            Effect.sync(() => {
+              provisioning = false;
+              protectedTables = new Set();
+            }),
+        );
+      });
+      return AgentDatabaseHost.of({ execute });
+    }),
+  );
+}
+
+const runtime = ManagedRuntime.make(AgentDatabaseHost.layer);
+
 function handle(request: AgentDatabaseRequest): AgentDatabaseResponse {
-  if (request.kind === "close") {
-    closePath(request.databasePath);
-    return {
-      id: request.id,
-      ok: true,
-      result: { columns: [], rows: [], truncated: false, changes: 0, lastInsertRowid: null },
-    };
-  }
-  provisioning = request.provision;
-  protectedTables = new Set(request.protectedTables.map((table) => table.toLowerCase()));
-  try {
-    const database = openDatabase(request);
-    const statement = database.prepare(request.sql);
-    const result =
-      request.mode === "read"
-        ? readRows(statement, request.parameters, request.limits)
-        : runStatement(statement, request.parameters);
-    return { id: request.id, ok: true, result };
-  } catch (error) {
-    return { id: request.id, ok: false, failure: toFailure(error, request.databasePath) };
-  } finally {
-    provisioning = false;
-    protectedTables = new Set();
-  }
+  const result = runtime.runSync(Effect.result(AgentDatabaseHost.use((host) => host.execute(request))));
+  return Result.isFailure(result)
+    ? { id: request.id, ok: false, failure: result.failure.failure }
+    : { id: request.id, ok: true, result: result.success };
 }
 
 /**
@@ -365,7 +406,7 @@ if (parentPort) {
     accept(parsed, (response) => process.stdout.write(`${JSON.stringify(response)}\n`));
   });
   lines.on("close", () => {
-    closeEverything();
+    Effect.runSync(runtime.disposeEffect);
     process.exit(0);
   });
 }

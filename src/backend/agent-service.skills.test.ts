@@ -1,6 +1,8 @@
 import { skillConversationEvent } from "@openbot/contracts/ipc";
+import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LocalSkillTools } from "./agent/skill-tools";
+import { ToolOperationFailed } from "./agent/tool-operation";
 import type { AgentProvider } from "./agent-client";
 import type { AgentService } from "./agent-service";
 import {
@@ -14,6 +16,7 @@ import {
   waitFor,
   waitForQueue,
 } from "./agent-service-test-harness";
+import { runCauseEffect } from "./effect-boundary";
 
 let root: string;
 let service: AgentService | null = null;
@@ -32,14 +35,16 @@ describe.sequential("local skill provider tools", () => {
       process.env.OPENBOT_CLAUDE_PATH = await fakeClaudeCli();
       const { store, mailbox } = stores(root);
       const clients = new Map<AgentProvider, FakeAgentClient>();
-      const create = vi.fn<LocalSkillTools["create"]>().mockRejectedValue(new Error("validation test"));
+      const create = vi
+        .fn<LocalSkillTools["create"]>()
+        .mockReturnValue(Effect.fail(new ToolOperationFailed({ cause: new Error("validation test") })));
       const api: LocalSkillTools = {
         create,
         revise: vi.fn<LocalSkillTools["revise"]>(),
-        list: vi.fn<LocalSkillTools["list"]>().mockResolvedValue([]),
+        list: vi.fn<LocalSkillTools["list"]>().mockReturnValue(Effect.succeed([])),
         get: vi.fn<LocalSkillTools["get"]>(),
         install: vi.fn<LocalSkillTools["install"]>(),
-        listInstalled: vi.fn<LocalSkillTools["listInstalled"]>().mockResolvedValue([]),
+        listInstalled: vi.fn<LocalSkillTools["listInstalled"]>().mockReturnValue(Effect.succeed([])),
         setEnabled: vi.fn<LocalSkillTools["setEnabled"]>(),
         uninstall: vi.fn<LocalSkillTools["uninstall"]>(),
       };
@@ -57,14 +62,16 @@ describe.sequential("local skill provider tools", () => {
         preferredModel: null,
         localSkillTools: () => api,
       });
-      await service.initialize();
-      await store.getOrCreate("chief");
-      await service.updateAgent({
-        agentId: "chief",
-        provider,
-        model: provider === "codex" ? "gpt-5.6-luna" : "claude-sonnet-5",
-      });
-      await service.sendMessage({ agentId: "chief", text: "Create a skill for weekly summaries." });
+      await runCauseEffect(service.initialize());
+      await runCauseEffect(store.getOrCreate("chief"));
+      await runCauseEffect(
+        service.updateAgent({
+          agentId: "chief",
+          provider,
+          model: provider === "codex" ? "gpt-5.6-luna" : "claude-sonnet-5",
+        }),
+      );
+      await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Create a skill for weekly summaries." }));
       await waitFor(() => Boolean(store.activeProviderSession("chief")?.externalSessionId));
       const client = clients.get(provider);
       const threadId = store.activeProviderSession("chief")?.externalSessionId;
@@ -105,8 +112,8 @@ describe.sequential("local skill provider tools", () => {
         examplePrompt: "Use api_key=synthetic-example-secret",
       };
       const archivePath = "/local-skills/saved-revision/bundle.zip";
-      vi.mocked(api.get).mockResolvedValue({ ...skill, archivePath });
-      vi.mocked(api.list).mockResolvedValue([skill]);
+      vi.mocked(api.get).mockReturnValue(Effect.succeed({ ...skill, archivePath }));
+      vi.mocked(api.list).mockReturnValue(Effect.succeed([skill]));
       for (const tool of ["read_local_skill", "list_local_skills"]) {
         const response = await callOpenBotTool(
           client,
@@ -125,16 +132,18 @@ describe.sequential("local skill provider tools", () => {
         expect(serialized).toContain(skill.id);
       }
       expect(skill.instructions).toContain("synthetic-skill-secret");
-      create.mockResolvedValue(skill);
-      vi.mocked(api.revise).mockResolvedValue({ ...skill, version: 2 });
-      vi.mocked(api.install).mockResolvedValue({
-        skillId: skill.id,
-        slug: skill.slug,
-        name: skill.name,
-        installedVersion: 2,
-        availableVersion: 2,
-        state: "installed",
-      });
+      create.mockReturnValue(Effect.succeed(skill));
+      vi.mocked(api.revise).mockReturnValue(Effect.succeed({ ...skill, version: 2 }));
+      vi.mocked(api.install).mockReturnValue(
+        Effect.succeed({
+          skillId: skill.id,
+          slug: skill.slug,
+          name: skill.name,
+          installedVersion: 2,
+          availableVersion: 2,
+          state: "installed",
+        }),
+      );
       const created = await callOpenBotTool(client, threadId, "create_skill", { sourcePath: "draft" });
       expect(JSON.stringify(created.result)).not.toContain("data:image");
       const revised = await callOpenBotTool(client, threadId, "revise_skill", {
@@ -154,32 +163,36 @@ describe.sequential("local skill provider tools", () => {
         queue.deliveries.every((delivery) => delivery.status === "completed"),
       );
       const actor = { id: "human", name: "Alex" };
-      await service.channels.command(
-        {
-          type: "save",
-          channelId: "skills-channel",
-          operationId: "create",
-          draft: {
-            name: "Skills",
-            title: "",
-            instructions: "Test skills",
-            members: [{ agentId: "chief" }],
-            leadAgentId: "chief",
+      await runCauseEffect(
+        service.channels.command(
+          {
+            type: "save",
+            channelId: "skills-channel",
+            operationId: "create",
+            draft: {
+              name: "Skills",
+              title: "",
+              instructions: "Test skills",
+              members: [{ agentId: "chief" }],
+              leadAgentId: "chief",
+            },
           },
-        },
-        actor,
+          actor,
+        ),
       );
-      await service.channels.command(
-        {
-          type: "send",
-          channelId: "skills-channel",
-          operationId: "send",
-          text: "Create a skill",
-          recipientAgentId: "chief",
-          replyToMessageId: null,
-          attachmentDraftIds: [],
-        },
-        actor,
+      await runCauseEffect(
+        service.channels.command(
+          {
+            type: "send",
+            channelId: "skills-channel",
+            operationId: "send",
+            text: "Create a skill",
+            recipientAgentId: "chief",
+            replyToMessageId: null,
+            attachmentDraftIds: [],
+          },
+          actor,
+        ),
       );
       await waitFor(() => service?.channels.store.tasks("skills-channel")[0]?.state === "completed");
       const execution = service.channels.store.context("skills-channel", "chief");

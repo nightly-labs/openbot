@@ -2,6 +2,7 @@
 // haptics it sends back.
 
 import type { IpcMainInvokeEvent } from "electron";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import { type DynamicIslandWindowController, requireDynamicIslandSender } from "../dynamic-island-window";
 import {
   parseDynamicIslandAction,
@@ -34,7 +35,7 @@ export function dynamicIslandIpcHandlers({
         return dynamicIsland.preference;
       }),
       setPreference: authorizedHandler(fromMainRenderer, parseDynamicIslandPreference, (_event, preference) =>
-        dynamicIsland.setPreference(preference),
+        runCauseEffect(dynamicIsland.setPreference(preference)),
       ),
       publishPresentation: authorizedHandler(fromMainRenderer, parseDynamicIslandPresentation, (_event, presentation) =>
         dynamicIsland.publish(presentation),
@@ -48,7 +49,7 @@ export function dynamicIslandIpcHandlers({
         return dynamicIsland.presentation;
       }),
       performAction: authorizedHandler(fromOverlayRenderer, parseDynamicIslandAction, (_event, action) =>
-        dynamicIsland.performAction(action),
+        runCauseEffect(dynamicIsland.performAction(action)),
       ),
       performHaptic: eventHandler((event) => {
         fromOverlayRenderer(event);

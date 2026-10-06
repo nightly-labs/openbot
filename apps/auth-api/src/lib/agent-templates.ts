@@ -1,6 +1,7 @@
 import { isAgentTemplateId } from "@openbot/contracts/agent-template-links";
 import type { AgentTemplateDetail } from "@openbot/contracts/ipc";
 import { createServerFn } from "@tanstack/solid-start";
+import { runApiEffect } from "../server/effect-runtime";
 
 /**
  * Reads one template for its public page. The read runs on the Worker, because the page needs D1;
@@ -13,7 +14,7 @@ export const readAgentTemplate = createServerFn({ method: "GET" })
     if (!isAgentTemplateId(data)) return null;
     const { requestAgentTemplates } = await import("../server/request-auth");
     try {
-      return await requestAgentTemplates().get(data);
+      return await runApiEffect(requestAgentTemplates().get(data));
     } catch (error) {
       if (error instanceof Error && "status" in error && error.status === 404) return null;
       throw error;

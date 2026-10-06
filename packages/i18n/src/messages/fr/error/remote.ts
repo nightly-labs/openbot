@@ -113,7 +113,6 @@ export const messages = {
   "error.remote.desktopDidNotConnect": "L’ordinateur ne s’est pas connecté.",
   "error.remote.desktopRestarted": "L’ordinateur a redémarré. Reconnexion avec une nouvelle session authentifiée.",
   "error.remote.dataBeforeAuth": "L’hôte a envoyé des données avant l’authentification.",
-  "error.remote.attachmentDownloadFailed": "Le téléchargement de la pièce jointe a échoué.",
   "error.remote.eventStreamGap": "Le flux d’événements de l’hôte présente un trou.",
   "error.remote.malformedEvent": "L’hôte a renvoyé un événement mal formé.",
   "error.remote.desktopIdentityNotVerified": "Impossible de vérifier l’identité de l’ordinateur.",

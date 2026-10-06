@@ -11,7 +11,9 @@ import {
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
+import { Deferred, Effect, Schema } from "effect";
 import { runInLoginShell } from "./cli";
+import type { McpOperationError } from "./mcp-effects";
 import { getRecord } from "./protocol";
 
 const execFileAsync = promisify(execFile);
@@ -51,7 +53,7 @@ export type McpToolRuntimeSource = () => McpToolRuntimes;
  * Asked per configuration rather than per URL, so a listing that grows a second way in can answer
  * differently without this signature moving.
  */
-export type McpAuthorizationSource = (config: McpServerConfig) => Promise<string | null>;
+export type McpAuthorizationSource = (config: McpServerConfig) => Effect.Effect<string | null, McpOperationError>;
 
 /**
  * Why an enabled configuration was not given to a provider.
@@ -150,38 +152,22 @@ export function computerUseParam(params: unknown): boolean {
   return !isDynamicRecord(params) || params.computerUse !== false;
 }
 
-/**
- * The enabled configurations a provider can actually be given.
- *
- * Two jobs, both of which have to happen exactly once and before anything else reads the list:
- *
- * - A configuration that takes one of OpenBot's own bridge names is dropped. All four providers key
- *   MCP servers by name, so `openbot` here would displace the bridge the agent depends on.
- * - A stdio command is resolved to an absolute path. Claude and Codex spawn with no shell, so a bare
- *   `npx` fails in the provider even though a probe using the SDK's default environment succeeded.
- *   Resolving here, and probing the resolved value, keeps the panel's answer and the agent's answer
- *   the same. An unresolvable command is reported as failed rather than sent.
- */
-export async function usableMcpServers(
+export const usableMcpServers = Effect.fnUntraced(function* (
   configs: readonly McpServerConfig[],
   tools: McpToolRuntimes = NO_MCP_TOOL_RUNTIMES,
   authorization?: McpAuthorizationSource,
-): Promise<UsableMcpServer[]> {
+) {
   const candidates = configs.filter((config) => config.enabled && !isReservedMcpServerName(config.name));
-  return Promise.all(candidates.map((config) => usableMcpServer(config, tools, authorization)));
-}
+  return yield* Effect.forEach(candidates, (config) => usableMcpServer(config, tools, authorization), {
+    concurrency: "unbounded",
+  });
+});
 
-/**
- * One configuration made usable, whether or not it is enabled.
- *
- * A test answers for the configuration in front of the user, and a user may well test a server
- * before turning it on - so this one, unlike `usableMcpServers`, does not filter.
- */
-export async function usableMcpServer(
+export const usableMcpServer = Effect.fnUntraced(function* (
   config: McpServerConfig,
   tools: McpToolRuntimes = NO_MCP_TOOL_RUNTIMES,
   authorization?: McpAuthorizationSource,
-): Promise<UsableMcpServer> {
+): Effect.fn.Return<UsableMcpServer, McpShapeFailed> {
   // An http server starts no process, so it needs neither a command nor a `PATH`. It is the only
   // kind that can carry a sign-in, because a token travels in a header.
   if (config.transport !== "stdio") {
@@ -190,15 +176,17 @@ export async function usableMcpServer(
       command: "",
       workingDirectory: "",
       path: null,
-      authorization: (await authorization?.(config)) ?? null,
+      authorization: authorization
+        ? yield* authorization(config).pipe(Effect.mapError(({ cause }) => new McpShapeFailed({ cause })))
+        : null,
     };
   }
   // A `PATH` the configuration carries is the one the server runs with, so it is the one the command
   // is looked up in: `python` with a virtual environment's `PATH` names that interpreter, and the
   // absolute path a login shell answered with would silently be a different one.
   const configured = mcpEnvironment(config).PATH;
-  const path = appendToolRuntimes(configured ?? (await loginShellPath()), tools.binDirectories);
-  const command = (await resolveMcpCommand(config.command, path)) ?? tools.commandAliases[config.command.trim()];
+  const path = appendToolRuntimes(configured ?? (yield* loginShellPath()), tools.binDirectories);
+  const command = (yield* resolveMcpCommand(config.command, path)) ?? tools.commandAliases[config.command.trim()];
   if (!command)
     return {
       config,
@@ -212,7 +200,7 @@ export async function usableMcpServer(
     path,
     authorization: null,
   };
-}
+});
 
 /**
  * The managed directories after everything the machine already had, and `null` when there is
@@ -276,35 +264,31 @@ function shellWord(value: string): string {
  * login shell's own is used, because a packaged app starts with a restricted `PATH` - the same
  * reason `collectCandidates` in `cli.ts` uses a login shell.
  */
-export function resolveMcpCommand(command: string, path: string | null = null): Promise<string | null> {
+/** Share one lookup per command and PATH. A miss is removed so new installs can be found. */
+const resolvedCommands = new Map<string, Deferred.Deferred<string | null, McpShapeFailed>>();
+
+export const resolveMcpCommand = Effect.fn("McpShape.resolveCommand")(function* (
+  command: string,
+  path: string | null = null,
+) {
   const trimmed = expandHomePath(command);
-  if (!trimmed) return Promise.resolve(null);
-  if (isAbsolute(trimmed) || trimmed.startsWith(".")) return Promise.resolve(trimmed);
-  // The `PATH` belongs in the key: the same word looked up in two lists names two builds, which is
-  // the invariant the type comment above states.
+  if (!trimmed) return null;
+  if (isAbsolute(trimmed) || trimmed.startsWith(".")) return trimmed;
   const key = `${path ?? ""}\u0000${trimmed}`;
   const cached = resolvedCommands.get(key);
-  if (cached) return cached;
-  const pending = rememberMcpCommand(key, trimmed, path);
+  if (cached) return yield* Deferred.await(cached);
+  const pending = Deferred.makeUnsafe<string | null, McpShapeFailed>();
   resolvedCommands.set(key, pending);
-  return pending;
-}
-
-/**
- * Every command resolved in this run, so a thread start does not pay for a login shell per server.
- *
- * The promise is stored rather than the value, so two servers naming the same command in one
- * hand-off share one shell instead of racing two. A miss is forgotten again, because a user who
- * installs the tool that was missing must not have to restart the app to be believed.
- */
-const resolvedCommands = new Map<string, Promise<string | null>>();
-
-/** Drops a cached miss, and keeps every hit. */
-async function rememberMcpCommand(key: string, command: string, path: string | null): Promise<string | null> {
-  const resolved = await lookUpMcpCommand(command, path);
-  if (resolved === null) resolvedCommands.delete(key);
-  return resolved;
-}
+  return yield* lookUpMcpCommand(trimmed, path).pipe(
+    Effect.tap((value) =>
+      Effect.sync(() => {
+        if (value === null && resolvedCommands.get(key) === pending) resolvedCommands.delete(key);
+      }),
+    ),
+    Effect.onExit((exit) => Deferred.done(pending, exit)),
+    Effect.uninterruptible,
+  );
+});
 
 /**
  * Forgets what every command resolved to.
@@ -353,28 +337,31 @@ function windowsExtension(line: string): string {
   return dot > separator ? line.slice(dot).toLowerCase() : "";
 }
 
-async function lookUpMcpCommand(trimmed: string, path: string | null): Promise<string | null> {
-  try {
+const lookUpMcpCommand = Effect.fn("McpShape.lookUpCommand")(
+  function* (trimmed: string, path: string | null) {
     if (process.platform === "win32") {
-      const { stdout } = await execFileAsync("where.exe", [trimmed], {
-        timeout: 5_000,
-        maxBuffer: 64 * 1024,
-        ...(path === null ? {} : { env: { ...process.env, PATH: path } }),
-      });
+      const { stdout } = yield* mcpShapeIo(() =>
+        execFileAsync("where.exe", [trimmed], {
+          timeout: 5_000,
+          maxBuffer: 64 * 1024,
+          ...(path === null ? {} : { env: { ...process.env, PATH: path } }),
+        }),
+      );
       return pickWindowsExecutable(stdout, process.env.PATHEXT);
     }
     // The assignment goes inside the command, not into the shell's environment: a login shell reads
     // the user's profile first, and a profile that appends to `PATH` would undo an inherited one.
     const search = path === null ? "" : `PATH=${shellWord(path)} `;
-    const stdout = await runInLoginShell(`${search}command -v -- ${shellWord(trimmed)}`);
+    const stdout = yield* runInLoginShell(`${search}command -v -- ${shellWord(trimmed)}`).pipe(
+      Effect.mapError(({ cause }) => new McpShapeFailed({ cause })),
+    );
     // Only the last line: an interactive profile can print a greeting before the command runs. The
     // line is kept as `command -v` gave it - a relative `PATH` entry gives a relative path, and a
     // shell function, such as the `npx` of a lazy-loaded nvm, gives its bare name for spawn to find.
     return stdout.trim().split(/\r?\n/u).at(-1)?.trim() || null;
-  } catch {
-    return null;
-  }
-}
+  },
+  Effect.catch(() => Effect.succeed(null)),
+);
 
 /**
  * This user's own `PATH`, as their login shell builds it, or `null` when it cannot be read.
@@ -382,24 +369,28 @@ async function lookUpMcpCommand(trimmed: string, path: string | null): Promise<s
  * Read once per run and reused, because every hand-off and every test would otherwise start a login
  * shell of its own. Windows has no equivalent: `where.exe` runs against the process `PATH` already.
  */
-let loginShellPathOnce: Promise<string | null> | null = null;
+let loginShellPathOnce: Deferred.Deferred<string | null> | null = null;
 
-export function loginShellPath(): Promise<string | null> {
-  loginShellPathOnce ??= readLoginShellPath();
-  return loginShellPathOnce;
-}
+export const loginShellPath = Effect.fn("McpShape.loginShellPath")(function* () {
+  if (loginShellPathOnce) return yield* Deferred.await(loginShellPathOnce);
+  const pending = Deferred.makeUnsafe<string | null>();
+  loginShellPathOnce = pending;
+  return yield* readLoginShellPath().pipe(
+    Effect.onExit((exit) => Deferred.done(pending, exit)),
+    Effect.uninterruptible,
+  );
+});
 
-async function readLoginShellPath(): Promise<string | null> {
-  if (process.platform === "win32") return null;
-  try {
-    const stdout = await runInLoginShell('printf %s "$PATH"');
-    // `printf` writes no newline, so the value is the last line whatever the user's profile printed
-    // before it.
+const readLoginShellPath = Effect.fn("McpShape.readLoginShellPath")(
+  function* () {
+    if (process.platform === "win32") return null;
+    const stdout = yield* runInLoginShell('printf %s "$PATH"').pipe(
+      Effect.mapError(({ cause }) => new McpShapeFailed({ cause })),
+    );
     return stdout.split(/\r?\n/u).pop()?.trim() || null;
-  } catch {
-    return null;
-  }
-}
+  },
+  Effect.catch(() => Effect.succeed(null)),
+);
 
 /**
  * Whether testing this configuration is worth waiting for the managed tool runtimes.
@@ -408,11 +399,14 @@ async function readLoginShellPath(): Promise<string | null> {
  * an installed interpreter, an absolute path, the user's own `npx`. Only a command nothing on the
  * search list names may arrive with the download, so only that one waits for it.
  */
-export async function needsManagedRuntime(config: McpServerConfig, tools: McpToolRuntimes): Promise<boolean> {
+export const needsManagedRuntime = Effect.fn("McpShape.needsManagedRuntime")(function* (
+  config: McpServerConfig,
+  tools: McpToolRuntimes,
+) {
   if (config.transport !== "stdio") return false;
-  const resolved = await usableMcpServer(config, tools);
+  const resolved = yield* usableMcpServer(config, tools);
   return resolved.error !== undefined && resolved.reason === "command_not_found";
-}
+});
 
 /**
  * The environment a stdio MCP server is launched with, `PATH` included.
@@ -552,24 +546,13 @@ export type CodexMcpServer =
   | { command: string; args: string[]; env: Record<string, string> }
   | { url: string; http_headers: Record<string, string> };
 
-/**
- * The names Codex holds in `~/.codex/config.toml`, each turned off.
- *
- * Codex merges its own file into the thread configuration, so without this an agent's tools depend
- * on a file OpenBot's panel does not show, and two computers with the same OpenBot settings give
- * different tools. `profile-generation.ts` has swept these since the profile step existed; a normal
- * thread gets the same treatment, with OpenBot's own entries spread on top so a colliding name
- * resolves to the one the panel shows.
- *
- * The reader is passed in, because this module knows the payload shape and not the transport. An
- * empty record is the answer when the provider holds no configuration of its own.
- */
-export async function codexDisabledServers(
-  readConfig: () => Promise<DynamicRecord>,
-): Promise<Record<string, CodexDisabledMcpServer>> {
-  const configured = getRecord(getRecord(await readConfig(), "config"), "mcp_servers");
+export const codexDisabledServers = Effect.fn("McpShape.codexDisabledServers")(function* (
+  readConfig: () => Effect.Effect<DynamicRecord, McpShapeFailed>,
+) {
+  const config = yield* readConfig();
+  const configured = getRecord(getRecord(config, "config"), "mcp_servers");
   return Object.fromEntries(Object.keys(configured ?? {}).map((name) => [name, { enabled: false } as const]));
-}
+});
 
 /** A name Codex found in its own file and must not start. It carries no command; that is the point. */
 export interface CodexDisabledMcpServer {
@@ -671,4 +654,11 @@ export function mcpHandoffHeaders(server: ResolvedMcpServer): Record<string, str
   const named = Object.keys(headers).some((key) => key.toLowerCase() === "authorization");
   if (server.authorization && !named) headers.Authorization = `Bearer ${server.authorization}`;
   return headers;
+}
+
+export class McpShapeFailed extends Schema.TaggedError<McpShapeFailed>()("McpShapeFailed", {
+  cause: Schema.Defect(),
+}) {}
+function mcpShapeIo<A>(run: () => Promise<A>): Effect.Effect<A, McpShapeFailed> {
+  return Effect.tryPromise({ try: run, catch: (cause) => new McpShapeFailed({ cause }) });
 }
