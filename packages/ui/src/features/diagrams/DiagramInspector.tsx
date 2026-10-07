@@ -86,12 +86,12 @@ export function DiagramInspector(props: DiagramInspectorProps) {
               <Button
                 type="button"
                 variant="ghost"
-                size="icon-sm"
+                class="header-panel-toggle"
                 aria-label={t("diagram.inspector.back")}
                 title={t("diagram.inspector.back")}
                 onClick={() => props.onSelectNode(null)}
               >
-                <ChevronLeft aria-hidden="true" />
+                <ChevronLeft aria-hidden="true" class="size-[14px]" />
               </Button>
               <Show when={selectedAgent()}>
                 {(agent) => <AgentAvatar agent={agent()} class="diagram-inspector-avatar" motion="idle" />}
