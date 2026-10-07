@@ -86,6 +86,14 @@ class MemoryHistoryDatabase implements ProviderHistoryImportDatabase {
     for (const message of input.messages) this.imported.set(message.id, message);
   }
 
+  storeMessage(message: ConversationMessage): void {
+    this.connection
+      .prepare(
+        "INSERT INTO projection_thread_messages(thread_id, message_id, turn_id, message_json) VALUES (?, ?, ?, ?)",
+      )
+      .run("openbot-thread", message.id, message.turnId ?? null, JSON.stringify(message));
+  }
+
   close(): void {
     this.connection.close();
   }
@@ -124,6 +132,62 @@ describe("bounded provider history import", () => {
     expect(database.imported.get("turn-1:assistant")).toEqual(
       expect.objectContaining({ id: "turn-1:assistant", attachments: expect.any(Array) }),
     );
+    database.close();
+  });
+
+  it("keeps live Claude narration from duplicating across bounded pages", async () => {
+    const database = new MemoryHistoryDatabase();
+    database.connection.prepare("UPDATE projection_thread_messages SET message_json = ? WHERE message_id = ?").run(
+      JSON.stringify({
+        id: "turn-1:assistant",
+        turnId: "turn-1",
+        author: "assistant",
+        text: "Done.",
+        itemType: "agentMessage",
+        createdAt: "2026-09-01T12:00:00.000Z",
+        status: "completed",
+      }),
+      "turn-1:assistant",
+    );
+    database.storeMessage({
+      id: "turn-1:narration:0",
+      turnId: "turn-1",
+      author: "assistant",
+      text: "Plan.",
+      createdAt: "2026-09-01T12:00:00.000Z",
+      status: "completed",
+      itemType: "commentary",
+    });
+    const items = [
+      { id: "provider-narration", type: "agentMessage", phase: "commentary", text: "Plan." },
+      ...Array.from({ length: 49 }, (_, index) => ({
+        id: `provider-note-${index}`,
+        type: "agentMessage",
+        phase: "commentary",
+        text: `note-${index}`,
+      })),
+      { id: "provider-answer", type: "agentMessage", text: "Done." },
+    ];
+    const readHistory: ReadProviderHistory = (_request, consume) =>
+      Effect.as(consume({ turnId: "turn-1", status: "completed", items, complete: true }), undefined);
+
+    await Effect.runPromise(
+      importProviderHistory({
+        database,
+        readHistory,
+        sessionId: "session-narration",
+        provider: "claude",
+        externalSessionId: "external-1",
+        agentId: "chief",
+        publicThreadId: "openbot-thread",
+        findDelivery: () => null,
+        findMessageDelivery: () => null,
+      }),
+    );
+
+    expect(database.imported.has("provider-narration")).toBe(false);
+    expect(database.imported.has("turn-1:assistant")).toBe(true);
+    expect(database.imported.has("provider-answer")).toBe(false);
     database.close();
   });
 

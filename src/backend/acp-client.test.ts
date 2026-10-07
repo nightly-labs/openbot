@@ -876,6 +876,21 @@ describe("OpenCode ACP session loading", () => {
     expect(client.canReleaseProcess?.()).toBe(false);
   });
 
+  it("resumes a session when ACP advertises resume without load", async () => {
+    const fake = await createFakeOpencodeAgent();
+    vi.stubEnv("OPENBOT_FAKE_ACP_RESUME", "1");
+    const client = startOpencode(fake.cli, () => null, fake.envLog);
+    await runCauseEffect(client.request("initialize", {}, decodeRecordResponse));
+
+    await expect(
+      runCauseEffect(
+        client.request("thread/resume", { threadId: "ses_resume_only", cwd: fake.directory }, decodeRecordResponse),
+      ),
+    ).resolves.toEqual(expect.any(Object));
+    expect(client.canReleaseProcess?.()).toBe(true);
+    expect(await fake.readLoadedSessions()).toEqual([]);
+  });
+
   it("streams load replay through readHistory without publishing live updates", async () => {
     const fake = await createFakeOpencodeAgent();
     vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_SESSION", "1");

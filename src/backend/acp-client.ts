@@ -383,6 +383,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   #scope = Scope.makeUnsafe();
   #initialization: InitializeResponse | null = null;
   #models: AcpModel[] = [];
+  #lastTurnStartedAt = 0;
   #signedIn = false;
   #stopping = false;
   /**
@@ -812,7 +813,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             },
             (fragment) =>
               Effect.sync(() => {
-                const turn = turns.get(fragment.turnId) ?? { id: fragment.turnId, items: [] };
+                let turn = turns.get(fragment.turnId);
+                if (!turn) {
+                  turn = { id: fragment.turnId, items: [] };
+                  turns.set(fragment.turnId, turn);
+                }
                 if (fragment.status !== undefined) turn.status = fragment.status;
                 if (fragment.startedAt !== undefined) turn.startedAt = fragment.startedAt;
                 const ids = seenItems.get(fragment.turnId) ?? new Set<string>();
@@ -822,11 +827,18 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
                   turn.items.push(item);
                 }
                 seenItems.set(fragment.turnId, ids);
-                turns.set(fragment.turnId, turn);
                 return true;
               }),
           );
-          return yield* providerSync(() => decoder({ thread: { id: threadId, turns: [...turns.values()] } }));
+          return yield* providerSync(() =>
+            decoder({
+              thread: {
+                id: threadId,
+                // readHistory is newest-first; the released response is chronological.
+                turns: [...turns.values()].reverse(),
+              },
+            }),
+          );
         }
         // Keep the legacy endpoint's session warm for callers that use it as a metadata read. Full
         // history goes through `readHistory` and is retained only for this explicit response.
@@ -1142,7 +1154,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     resume: boolean,
   ): Effect.fn.Return<{ thread: { id: string } }, ProviderClientOperationError> {
     const requestedThreadId = getString(params, "threadId");
-    if (resume && requestedThreadId && !this.#loadsSessions) {
+    if (resume && requestedThreadId && !this.#supportsSessionResume && !this.#loadsSessions) {
       // Reported as a missing session, which is what it is for the caller: the agent cannot give
       // this session back, so the recovery that replaces it runs now rather than after a protocol
       // error the user would have to read.
@@ -1656,10 +1668,13 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       );
       return { turn: { id: turnId, status: "inProgress" }, turnId };
     }
+    const currentSecond = Date.now() / 1_000;
+    const startedAt = Math.max(currentSecond, this.#lastTurnStartedAt + 0.001);
+    this.#lastTurnStartedAt = startedAt;
     const turn: AcpTurn = {
       id: turnId,
       // History timestamps use provider seconds, not JavaScript milliseconds.
-      startedAt: Math.floor(Date.now() / 1_000),
+      startedAt,
       itemId: `${turnId}:assistant`,
       thoughtItemId: `${turnId}:thought`,
       text: "",

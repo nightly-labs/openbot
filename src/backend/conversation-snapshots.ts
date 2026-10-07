@@ -253,7 +253,7 @@ export function mergeConversationSnapshots(
   return merged;
 }
 
-export function mergeConversationMessages(
+function mergeConversationMessages(
   stored: readonly ConversationMessage[],
   live: readonly ConversationMessage[],
 ): ConversationMessage[] {

@@ -233,6 +233,14 @@ export class ConversationRuntime {
 
   setSnapshot(agentId: string, snapshot: ConversationSnapshot): void {
     if (snapshot.threadId && this.#forgottenExecutionThreads.has(snapshot.threadId)) return;
+    const current = this.#snapshots.get(agentId);
+    if (current?.activeTurnId && current.activeTurnId === snapshot.activeTurnId) {
+      const bounded = boundedConversationSnapshot(snapshot).snapshot;
+      copySnapshotContents(current, bounded);
+      this.#keepSnapshot(agentId, current);
+      this.#rememberRead(agentId);
+      return;
+    }
     if (snapshot.threadId && snapshot.threadId !== this.#store.list().find((agent) => agent.id === agentId)?.threadId)
       this.#setExecutionSnapshot(snapshot.threadId, snapshot);
     else {
@@ -245,8 +253,10 @@ export class ConversationRuntime {
     this.#evictedSnapshots.delete(agentId);
     this.#dropCachedSnapshot(agentId);
     const cached = boundedConversationSnapshot(snapshot);
-    this.#snapshots.set(agentId, cached.snapshot);
-    this.#cachedSnapshots.set(agentId, cached);
+    const current = this.#snapshots.get(agentId);
+    const retained = current === snapshot ? copySnapshotContents(snapshot, cached.snapshot) : cached.snapshot;
+    this.#snapshots.set(agentId, retained);
+    this.#cachedSnapshots.set(agentId, retained === cached.snapshot ? cached : { ...cached, snapshot: retained });
     this.#cachedSnapshotBytes += cached.bytes;
     this.#evictCachedSnapshots();
     this.#snapshotUsedAt.set(agentId, Date.now());
@@ -265,8 +275,13 @@ export class ConversationRuntime {
   #setExecutionSnapshot(threadId: string, snapshot: ConversationSnapshot): void {
     this.#dropCachedExecutionSnapshot(threadId);
     const cached = boundedConversationSnapshot(snapshot);
-    this.#executionSnapshots.set(threadId, cached.snapshot);
-    this.#cachedExecutionSnapshots.set(threadId, cached);
+    const current = this.#executionSnapshots.get(threadId);
+    const retained = current === snapshot ? copySnapshotContents(snapshot, cached.snapshot) : cached.snapshot;
+    this.#executionSnapshots.set(threadId, retained);
+    this.#cachedExecutionSnapshots.set(
+      threadId,
+      retained === cached.snapshot ? cached : { ...cached, snapshot: retained },
+    );
     this.#cachedSnapshotBytes += cached.bytes;
     this.#evictCachedSnapshots();
   }
@@ -331,7 +346,14 @@ export class ConversationRuntime {
         const cached = this.#cachedExecutionSnapshots.get(oldest.id);
         if (cached?.snapshot.activeTurnId) {
           if (!this.#trimCompletedCache(cached)) return;
-        } else this.#dropCachedExecutionSnapshot(oldest.id);
+        } else {
+          // Keep the execution-thread identity for routing, but release its message objects. The
+          // next ensureSnapshot call sees the empty projection and rebuilds the recent page from
+          // SQLite instead of retaining an evicted transcript through this strong map reference.
+          const snapshot = this.#executionSnapshots.get(oldest.id);
+          if (snapshot) snapshot.messages = [];
+          this.#dropCachedExecutionSnapshot(oldest.id);
+        }
       }
     }
   }
@@ -717,18 +739,25 @@ function boundedConversationSnapshot(snapshot: ConversationSnapshot): CachedSnap
   const activeMessages = snapshot.activeTurnId
     ? snapshot.messages.filter((message) => isActiveMessage(message, snapshot.activeTurnId))
     : [];
-  const completedMessages = snapshot.messages
-    .filter((message) => !activeMessages.includes(message))
-    .slice(-CONVERSATION_CACHE_MESSAGE_LIMIT);
+  const allCompletedMessages = snapshot.messages.filter((message) => !activeMessages.includes(message));
+  const completedMessages = allCompletedMessages.slice(-CONVERSATION_CACHE_MESSAGE_LIMIT);
   const completedSnapshot = { ...snapshot, messages: completedMessages };
   let completedBytes = conversationSnapshotBytes(completedSnapshot);
   while (completedMessages.length > 0 && completedBytes > CONVERSATION_CACHE_BYTES_LIMIT) {
     completedMessages.shift();
     completedBytes = conversationSnapshotBytes({ ...snapshot, messages: completedMessages });
   }
+  const retainedAllMessages =
+    completedMessages.length === allCompletedMessages.length &&
+    completedMessages.length + activeMessages.length === snapshot.messages.length;
   const retained = new Set([...completedMessages, ...activeMessages]);
-  const messages = structuredClone(snapshot.messages.filter((message) => retained.has(message)));
-  const bounded: ConversationSnapshot = { ...snapshot, messages };
+  const bounded: ConversationSnapshot = retainedAllMessages
+    ? snapshot
+    : {
+        ...snapshot,
+        messages: snapshot.messages.filter((message) => retained.has(message)),
+      };
+  const messages = bounded.messages;
   const retainedIds = new Set(messages.map((message) => message.id));
   return {
     snapshot: bounded,
@@ -770,6 +799,14 @@ function pageSnapshot(page: {
     revision: page.revision,
     messages: page.messages,
   };
+}
+
+function copySnapshotContents(target: ConversationSnapshot, source: ConversationSnapshot): ConversationSnapshot {
+  target.threadId = source.threadId;
+  target.activeTurnId = source.activeTurnId;
+  target.revision = source.revision;
+  target.messages = source.messages;
+  return target;
 }
 
 function conversationSnapshotBytes(snapshot: ConversationSnapshot): number {

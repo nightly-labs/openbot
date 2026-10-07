@@ -2,7 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import type { AgentProviderId, ConversationMessage } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import { mergeProviderHistoryMessages, messagesFromThreadItems, threadTurnBaseTime } from "./conversation-snapshots";
-import { decodeConversationMessageJson } from "./database/database-rows";
+import { databaseRow, decodeConversationMessageJson, requiredStringColumn } from "./database/database-rows";
 import type { DeliveryContext } from "./mailbox-store";
 import type { ThreadItem } from "./protocol";
 import { type ProviderClientOperationError, providerFailure, providerSync } from "./provider-client-effects";
@@ -62,7 +62,7 @@ export interface ProviderHistoryImportResult {
 }
 
 /** A bounded normalized page. It is never represented as a conversation snapshot. */
-export interface ProviderHistoryPartial {
+interface ProviderHistoryPartial {
   turnId: string;
   status?: string;
   startedAt?: number;
@@ -244,7 +244,33 @@ function readStoredTurnMessages(
   turnId: string,
   imported: readonly ConversationMessage[],
 ): ConversationMessage[] {
-  const ids = [`${turnId}:assistant`, ...imported.flatMap((message) => (message.id ? [message.id] : []))];
+  /*
+   * Claude's live stream publishes narration with IDs that differ from the IDs in its transcript.
+   * Read one identity separately so reconciliation can see that the turn already has narration.
+   * The query returns one ID only; message JSON is fetched only for this turn's candidate IDs
+   * below. Do not query all rows for a turn: a long tool-heavy turn is still a bounded import page,
+   * while the projection may contain many old records.
+   */
+  const identityRows = database.connection
+    .prepare(
+      `SELECT message_id FROM projection_thread_messages
+       WHERE thread_id = ? AND turn_id = ?
+         AND substr(message_id, 1, ?) = ?
+       LIMIT 1`,
+    )
+    .all(threadId, turnId, `${turnId}:narration:`.length, `${turnId}:narration:`);
+  const identityIds = identityRows.flatMap((row) => {
+    const value = databaseRow(row);
+    if (!value) return [];
+    return [requiredStringColumn(value, "message_id")];
+  });
+  const ids = [
+    ...new Set([
+      `${turnId}:assistant`,
+      ...identityIds,
+      ...imported.flatMap((message) => (message.id ? [message.id] : [])),
+    ]),
+  ];
   const placeholders = ids.map(() => "?").join(", ");
   const rows = database.connection
     .prepare(

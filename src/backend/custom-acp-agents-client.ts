@@ -323,7 +323,11 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
               },
               (fragment) =>
                 Effect.sync(() => {
-                  const turn = turns.get(fragment.turnId) ?? { id: fragment.turnId, items: [] };
+                  let turn = turns.get(fragment.turnId);
+                  if (!turn) {
+                    turn = { id: fragment.turnId, items: [] };
+                    turns.set(fragment.turnId, turn);
+                  }
                   if (fragment.status !== undefined) turn.status = fragment.status;
                   if (fragment.startedAt !== undefined) turn.startedAt = fragment.startedAt;
                   const ids = seenItems.get(fragment.turnId) ?? new Set<string>();
@@ -333,11 +337,18 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
                     turn.items.push(item);
                   }
                   seenItems.set(fragment.turnId, ids);
-                  turns.set(fragment.turnId, turn);
                   return true;
                 }),
             );
-            return yield* customStep(() => decoder({ thread: { id: threadId, turns: [...turns.values()] } }));
+            return yield* customStep(() =>
+              decoder({
+                thread: {
+                  id: threadId,
+                  // readHistory is newest-first; the released response is chronological.
+                  turns: [...turns.values()].reverse(),
+                },
+              }),
+            );
           }
           const agentId = sessionAgent(threadId);
           // A read has nothing to recover: a session of an agent that is gone has no turns to show.

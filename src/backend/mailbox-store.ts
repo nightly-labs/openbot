@@ -115,6 +115,10 @@ interface StoredDelivery {
   steerFallback?: QueueSteerFallback;
 }
 
+function isActiveDelivery(delivery: StoredDelivery): boolean {
+  return delivery.status === "queued" || delivery.status === "starting" || delivery.status === "running";
+}
+
 interface StoredState {
   version: 3;
   messages: StoredMessage[];
@@ -672,26 +676,38 @@ export class MailboxStore {
     options: { fromCreatedAt?: string; limit?: number } = {},
   ): ConversationMessage[] {
     const limit = Math.max(1, Math.min(options.limit ?? 100, 100));
-    const selectedStoredMessages: StoredMessage[] = [];
-    for (let index = this.#state.messages.length - 1; index >= 0 && selectedStoredMessages.length < limit; index -= 1) {
-      const message = this.#state.messages[index];
-      if (!message || message.channelId || message.messaging) continue;
-      if (options.fromCreatedAt && message.createdAt < options.fromCreatedAt) continue;
-      // A request the agent sent from a Slack thread belongs to that thread, not to its own chat.
-      // The teammate it went to still sees it.
-      if (message.messagingReturn && message.sender.kind === "agent" && message.sender.agentId === agentId) continue;
-      selectedStoredMessages.unshift(message);
-    }
-    const selectedMessageIds = new Set(selectedStoredMessages.map((message) => message.id));
-    const messages: ConversationMessage[] = [];
     const deliveriesByMessage = new Map<string, StoredDelivery[]>();
-    const positions = this.#queuedPositions();
     for (const delivery of this.#state.deliveries) {
-      if (!selectedMessageIds.has(delivery.messageId)) continue;
       const deliveries = deliveriesByMessage.get(delivery.messageId) ?? [];
       deliveries.push(delivery);
       deliveriesByMessage.set(delivery.messageId, deliveries);
     }
+    const selectedStoredMessages: StoredMessage[] = [];
+    let completedCount = 0;
+    for (let index = this.#state.messages.length - 1; index >= 0; index -= 1) {
+      const message = this.#state.messages[index];
+      if (!message || message.channelId || message.messaging) continue;
+      // A request the agent sent from a Slack thread belongs to that thread, not to its own chat.
+      // The teammate it went to still sees it.
+      if (message.messagingReturn && message.sender.kind === "agent" && message.sender.agentId === agentId) continue;
+      const deliveries = deliveriesByMessage.get(message.id) ?? [];
+      const ownMessage = message.sender.kind === "agent" && message.sender.agentId === agentId;
+      let relevant = ownMessage;
+      let active = false;
+      for (const delivery of deliveries) {
+        if (!ownMessage && delivery.recipientAgentId !== agentId) continue;
+        relevant = true;
+        if (isActiveDelivery(delivery)) active = true;
+      }
+      if (!relevant) continue;
+      if (!active && options.fromCreatedAt && message.createdAt < options.fromCreatedAt) continue;
+      if (!active && completedCount >= limit) continue;
+      selectedStoredMessages.push(message);
+      if (!active) completedCount += 1;
+    }
+    selectedStoredMessages.reverse();
+    const messages: ConversationMessage[] = [];
+    const positions = this.#queuedPositions();
     for (const message of selectedStoredMessages) {
       const deliveries = deliveriesByMessage.get(message.id) ?? [];
       if (message.sender.kind === "agent" && message.sender.agentId === agentId) {

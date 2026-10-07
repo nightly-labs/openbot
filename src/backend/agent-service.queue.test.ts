@@ -1179,6 +1179,22 @@ describe.sequential("AgentService: queue", () => {
     }
   });
 
+  it("does not replay a provider turn when its first running marker fails", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex");
+    service = createTestService({ store, mailbox, clientFactory: () => client });
+    vi.spyOn(mailbox, "markRunning").mockImplementationOnce(() =>
+      Effect.fail(new StoredStateFailure({ cause: new Error("Running marker write failed.") })),
+    );
+    await runCauseEffect(service.initialize());
+
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Run once" }));
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "completed");
+
+    expect(client.requests.filter((request) => request.method === "turn/start")).toHaveLength(1);
+    expect(service.listQueue("chief").deliveries[0]?.status).toBe("completed");
+  });
+
   it("queues FIFO instead of steering and continues draining after an interrupt", async () => {
     const { store, mailbox } = stores(root);
     service = createTestService({ store, mailbox });

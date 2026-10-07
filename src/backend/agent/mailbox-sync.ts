@@ -7,6 +7,7 @@ import type {
   QueueHold,
   QueueSnapshot,
 } from "@openbot/contracts/ipc";
+import { Effect, type Scope } from "effect";
 import { isMailboxMessageCopy } from "../conversation-snapshots";
 import type { MailboxStore } from "../mailbox-store";
 import type { OpenBotDatabase } from "../openbot-database";
@@ -26,6 +27,7 @@ export interface MailboxSyncOptions {
   mailbox: MailboxStore;
   conversation: ConversationRuntime;
   routines: RoutineScheduler;
+  scope: () => Scope.Scope;
   hooks: MailboxSyncHooks;
 }
 
@@ -43,6 +45,7 @@ export class MailboxSync {
   readonly #mailbox: MailboxStore;
   readonly #conversation: ConversationRuntime;
   readonly #routines: RoutineScheduler;
+  readonly #scope: () => Scope.Scope;
   readonly #hooks: MailboxSyncHooks;
 
   constructor(options: MailboxSyncOptions) {
@@ -50,6 +53,7 @@ export class MailboxSync {
     this.#mailbox = options.mailbox;
     this.#conversation = options.conversation;
     this.#routines = options.routines;
+    this.#scope = options.scope;
     this.#hooks = options.hooks;
   }
 
@@ -165,15 +169,39 @@ export class MailboxSync {
     }
   }
 
-  retryDeliveryReconciliation(agentId: string): void {
+  retryDeliveryReconciliation(agentId: string, turnId?: string, deliveryIds: readonly string[] = []): void {
     queueMicrotask(() => {
-      try {
-        this.emitQueue(agentId);
-        const snapshot = this.#conversation.snapshotToUpdate(agentId);
-        if (snapshot) this.#conversation.emitConversation(snapshot);
-      } catch (error) {
-        this.#hooks.emitError("delivery_reconciliation_pending", error, agentId);
-      }
+      Effect.runFork(
+        Effect.gen({ self: this }, function* () {
+          // A provider response can arrive before the mailbox writes complete. Associate every
+          // still-starting row with the confirmed turn before publishing the retry. This is safe:
+          // the turn id came from the provider, and it prevents a second drain from replaying it.
+          // Check the active marker again so a delayed retry cannot claim a new turn's rows.
+          const activeTurn = this.#conversation.workingSnapshot(agentId)?.activeTurnId;
+          if (turnId && activeTurn === turnId) {
+            const accepted = new Set(deliveryIds);
+            for (const deliveryId of accepted) {
+              const current = this.#mailbox.getDelivery(deliveryId)?.delivery;
+              if (current?.recipientAgentId !== agentId || current.status !== "starting" || current.turnId !== null)
+                continue;
+              yield* this.#mailbox.markRunning(deliveryId, turnId);
+            }
+          }
+          yield* Effect.sync(() => {
+            this.emitQueue(agentId);
+            const snapshot = this.#conversation.snapshotToUpdate(agentId);
+            if (snapshot) this.#conversation.emitConversation(snapshot);
+          });
+        })
+          .pipe(
+            Effect.catch((failure) =>
+              Effect.sync(() => {
+                this.#hooks.emitError("delivery_reconciliation_pending", failure, agentId);
+              }),
+            ),
+          )
+          .pipe(Effect.forkIn(this.#scope(), { startImmediately: true })),
+      );
     });
   }
 }
