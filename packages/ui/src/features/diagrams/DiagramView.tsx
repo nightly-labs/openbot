@@ -12,6 +12,7 @@ import { Badge, Button, PanelRight, Play, SlidingTabs, Workflow } from "@openbot
 import { createSignal, createStore, For, Show } from "solid-js";
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
+import { AgentAvatar } from "../agents/AgentAvatar";
 import { sidebarMessageTime } from "../sidebar/sidebar-filtering";
 import { DiagramBoard } from "./DiagramBoard";
 import { DiagramChatPanel } from "./DiagramChatPanel";
@@ -23,6 +24,8 @@ import { DIAGRAM_RUN_STATUS_KEY } from "./diagram-text";
 export interface DiagramViewProps {
   diagram: Diagram;
   agents: AgentProfile[];
+  /** The agent whose routines the diagram holds; its face replaces the diagram icon. */
+  owner?: AgentProfile | undefined;
   /** The day the routine week strips start on. Defaults to the time the view opens. */
   now?: string | undefined;
   editable?: boolean;
@@ -50,7 +53,8 @@ const ALL = "routine-lens:all";
 export function DiagramView(props: DiagramViewProps) {
   const { t, format } = useText();
   const [selectedNodeId, setSelectedNodeId] = createSignal<string | null>(null);
-  const [panels, setPanels] = createStore({ inspector: true, chat: true });
+  // The run panel opens when a card is picked, so the canvas starts with the whole width.
+  const [panels, setPanels] = createStore({ inspector: false, chat: true });
   const now = () => (props.now ? new Date(props.now) : new Date());
   const routines = () =>
     props.diagram.nodes.filter((node): node is Extract<DiagramNode, { kind: "routine" }> => node.kind === "routine");
@@ -78,9 +82,16 @@ export function DiagramView(props: DiagramViewProps) {
   return (
     <main class="diagram-view" aria-label={t("diagram.view.label", { name: props.diagram.name })}>
       <header class="diagram-view-header">
-        <span class="diagram-view-icon" aria-hidden="true">
-          <Workflow />
-        </span>
+        <Show
+          when={props.owner}
+          fallback={
+            <span class="diagram-view-icon" aria-hidden="true">
+              <Workflow />
+            </span>
+          }
+        >
+          {(owner) => <AgentAvatar agent={owner()} class="diagram-view-avatar" motion="idle" />}
+        </Show>
         <h1 class="diagram-view-title">{props.diagram.name}</h1>
         <Show when={routines().length > 1}>
           <SlidingTabs.Root

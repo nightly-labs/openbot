@@ -186,7 +186,6 @@
     "./features/settings/stores/mobile-connect-store": "./src/features/settings/stores/mobile-connect-store.ts",
     "./features/settings/stores/profile-store": "./src/features/settings/stores/profile-store.ts",
     "./features/settings/stores/updates-store": "./src/features/settings/stores/updates-store.ts",
-    "./features/diagrams/AgentRoutinesView": "./src/features/diagrams/AgentRoutinesView.tsx",
     "./features/diagrams/DiagramBoard": "./src/features/diagrams/DiagramBoard.tsx",
     "./features/diagrams/DiagramChatPanel": "./src/features/diagrams/DiagramChatPanel.tsx",
     "./features/diagrams/DiagramInspector": "./src/features/diagrams/DiagramInspector.tsx",

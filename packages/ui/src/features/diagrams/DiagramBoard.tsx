@@ -20,6 +20,7 @@ import {
   type DiagramConnectionProblem,
   diagramBounds,
   diagramConnectionProblem,
+  diagramEdgeCarries,
   diagramEdgeMidpoint,
   diagramEdgePath,
   diagramExecutionSteps,
@@ -30,7 +31,7 @@ import {
   diagramRoutinesReaching,
   diagramRunOf,
 } from "./diagram-graph";
-import type { Diagram, DiagramNode, DiagramPoint } from "./diagram-model";
+import type { Diagram, DiagramEdge, DiagramNode, DiagramPoint } from "./diagram-model";
 
 const MIN_SCALE = 0.25;
 const MAX_SCALE = 2;
@@ -372,8 +373,10 @@ export function DiagramBoard(props: DiagramBoardProps) {
     };
   });
 
-  const edgeState = (from: string, to: string) => {
-    if (dimmed(from) || dimmed(to)) return "dimmed";
+  const edgeState = (edge: DiagramEdge) => {
+    const focus = props.focusRoutineId;
+    if (dimmed(edge.from) || dimmed(edge.to) || (focus && !diagramEdgeCarries(edge, focus))) return "dimmed";
+    const to = edge.to;
     const status = stepRuns().get(to)?.status;
     if (status === "running") return "running";
     if (status === "succeeded" || status === "failed") return "delivered";
@@ -444,7 +447,12 @@ export function DiagramBoard(props: DiagramBoardProps) {
                       <g
                         class="diagram-edge"
                         data-diagram-edge={current().id}
-                        data-state={edgeState(current().from, current().to)}
+                        data-state={edgeState(current())}
+                        data-routine-color={
+                          current().routineId
+                            ? diagramRoutineColor(props.diagram.nodes, current().routineId ?? "")
+                            : undefined
+                        }
                         data-selected={interaction.selectedEdgeId === current().id ? "" : undefined}
                       >
                         <path class="diagram-edge-hit" d={path()} />

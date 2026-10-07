@@ -30,6 +30,11 @@
   color: var(--openbot-accent-text);
 }
 
+.diagram-view-avatar.agent-avatar {
+  width: 30px;
+  height: 30px;
+}
+
 .diagram-view-icon svg {
   width: var(--openbot-icon-md);
   height: var(--openbot-icon-md);
@@ -74,143 +79,6 @@
   width: min(360px, calc(100% - var(--openbot-space-8)));
   /* The folded panel keeps its box, so the canvas under it still takes the pointer. */
   pointer-events: none;
-}
-
-/* The routines of one agent: the list beside the canvas of the routine picked in it. */
-
-.agent-routines {
-  display: flex;
-  height: 100%;
-  min-width: 0;
-  min-height: 0;
-  flex: 1;
-}
-
-.agent-routines-list {
-  display: flex;
-  width: 300px;
-  min-height: 0;
-  flex: none;
-  flex-direction: column;
-  border-right: 1px solid var(--openbot-border);
-  background: var(--openbot-bg-surface);
-}
-
-.agent-routines-header {
-  display: flex;
-  min-height: 56px;
-  align-items: center;
-  gap: var(--openbot-space-2);
-  border-bottom: 1px solid var(--openbot-border);
-  padding: var(--openbot-space-2) var(--openbot-space-3);
-}
-
-.agent-routines-avatar.agent-avatar {
-  width: 30px;
-  height: 30px;
-}
-
-.agent-routines-heading {
-  display: grid;
-  min-width: 0;
-  flex: 1;
-}
-
-.agent-routines-kicker {
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
-}
-
-.agent-routines-name {
-  overflow: hidden;
-  margin: 0;
-  font-size: var(--openbot-text-lg);
-  font-weight: var(--openbot-weight-semibold);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.agent-routines-items {
-  display: grid;
-  align-content: start;
-  gap: var(--openbot-space-1);
-  overflow-y: auto;
-  margin: 0;
-  padding: var(--openbot-space-2);
-  list-style: none;
-}
-
-.agent-routines-item.ui-button {
-  display: grid;
-  width: 100%;
-  height: auto;
-  justify-items: start;
-  gap: var(--openbot-space-1);
-  border-radius: var(--openbot-radius-md);
-  padding: var(--openbot-space-2) var(--openbot-space-3);
-  text-align: left;
-}
-
-.agent-routines-item.ui-button[aria-pressed="true"] {
-  background: var(--diagram-routine-soft);
-  box-shadow: inset 0 0 0 1px var(--diagram-routine-color);
-}
-
-.agent-routines-item-top {
-  display: flex;
-  width: 100%;
-  align-items: center;
-  gap: var(--openbot-space-2);
-}
-
-.agent-routines-item-top svg {
-  width: var(--openbot-icon-xs);
-  height: var(--openbot-icon-xs);
-  flex: none;
-}
-
-.agent-routines-item-name {
-  overflow: hidden;
-  flex: 1;
-  font-size: var(--openbot-text-md);
-  font-weight: var(--openbot-weight-semibold);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.agent-routines-item-schedule {
-  color: var(--openbot-text-secondary);
-  font-size: var(--openbot-text-sm);
-}
-
-.agent-routines-item-meta {
-  display: flex;
-  width: 100%;
-  justify-content: space-between;
-  gap: var(--openbot-space-2);
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
-}
-
-.agent-routines-empty {
-  display: grid;
-  justify-items: center;
-  gap: var(--openbot-space-2);
-  padding: var(--openbot-space-6) var(--openbot-space-3);
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-md);
-  text-align: center;
-}
-
-.agent-routines-empty p {
-  margin: 0;
-}
-
-.agent-routines-canvas {
-  display: flex;
-  min-width: 0;
-  flex: 1;
-  background: var(--openbot-bg-canvas);
 }
 
 /* Canvas */
@@ -377,6 +245,12 @@
   stroke: var(--diagram-routine-color, var(--openbot-accent));
   stroke-dasharray: 6 6;
   animation: diagram-edge-flow 0.6s linear infinite;
+}
+
+/* A connection that belongs to one routine wears its colour, so its path reads as that routine's. */
+.diagram-edge[data-routine-color][data-state="idle"] .diagram-edge-line {
+  stroke: var(--diagram-routine-color);
+  opacity: 0.6;
 }
 
 .diagram-edge:hover .diagram-edge-line,

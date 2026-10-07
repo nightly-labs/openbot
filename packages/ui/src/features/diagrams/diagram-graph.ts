@@ -55,6 +55,11 @@ export function diagramRoutineReach(
   return { direct, nodes: steps.size, steps: Math.max(0, ...steps.values()) };
 }
 
+/** True when a run of `routineId` passes through the connection. */
+export function diagramEdgeCarries(edge: DiagramEdge, routineId: string): boolean {
+  return edge.routineId === undefined || edge.routineId === routineId;
+}
+
 /** The step each node runs in when this one routine fires. A node it does not reach is absent. */
 export function diagramRoutineSteps(edges: readonly DiagramEdge[], routineId: string): Map<string, number> {
   const depth = new Map<string, number>();
@@ -62,7 +67,8 @@ export function diagramRoutineSteps(edges: readonly DiagramEdge[], routineId: st
   for (let next = queue.shift(); next !== undefined; next = queue.shift()) {
     const current = depth.get(next) ?? 0;
     for (const edge of edges) {
-      if (edge.from !== next || (depth.get(edge.to) ?? 0) >= current + 1) continue;
+      if (edge.from !== next || !diagramEdgeCarries(edge, routineId)) continue;
+      if ((depth.get(edge.to) ?? 0) >= current + 1) continue;
       depth.set(edge.to, current + 1);
       queue.push(edge.to);
     }

@@ -43,6 +43,12 @@ export interface DiagramEdge {
   id: string;
   from: string;
   to: string;
+  /**
+   * The routine whose run uses this connection. Absent, every routine whose run reaches `from`
+   * passes on through it. An agent that works for several routines hands its work on only where
+   * the routine says so: a simple check by one agent stops at that agent.
+   */
+  routineId?: string;
 }
 
 export type DiagramStepStatus = "waiting" | "running" | "succeeded" | "failed" | "skipped";

@@ -7,7 +7,6 @@
 
 import type { ChannelSummary } from "@openbot/contracts/ipc";
 import type { AgentProfile } from "@openbot/ui/data";
-import { AgentRoutinesView } from "@openbot/ui/features/diagrams/AgentRoutinesView";
 import { DiagramView } from "@openbot/ui/features/diagrams/DiagramView";
 import { diagramRoutineSteps } from "@openbot/ui/features/diagrams/diagram-graph";
 import type {
@@ -20,7 +19,7 @@ import type {
 } from "@openbot/ui/features/diagrams/diagram-model";
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
 import type { SidebarView } from "@openbot/ui/features/sidebar/sidebar-types";
-import { createSignal, createStore, For, Match, onCleanup, Switch, snapshot, untrack } from "solid-js";
+import { createSignal, createStore, For, Match, onCleanup, Show, Switch, snapshot, untrack } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { defaultSidebarLayout } from "../src/features/sidebar/sidebar-sections";
@@ -186,7 +185,8 @@ const nodes: DiagramNode[] = [
 const edges = [
   { id: "edge-1", from: "node-routine", to: "node-research" },
   { id: "edge-2", from: "node-routine", to: "node-sales" },
-  { id: "edge-3", from: "node-research", to: "node-writer" },
+  // Research hands its findings to Writer only in the morning brief; its headline check stops at it.
+  { id: "edge-3", from: "node-research", to: "node-writer", routineId: "node-routine" },
   { id: "edge-4", from: "node-sales", to: "node-writer" },
   { id: "edge-5", from: "node-writer", to: "node-chief" },
   { id: "edge-6", from: "node-sweep", to: "node-sales" },
@@ -495,7 +495,12 @@ function nextId(prefix: string) {
 }
 
 /** A diagram in local state. Every canvas edit applies; a run and the assistant run on timers. */
-function InteractiveDiagram(props: { diagram: Diagram; assistant?: boolean; editable?: boolean }) {
+function InteractiveDiagram(props: {
+  diagram: Diagram;
+  owner?: AgentProfile | undefined;
+  assistant?: boolean;
+  editable?: boolean;
+}) {
   const [diagram, setDiagram] = createStore<Diagram>(structuredClone(untrack(() => props.diagram)));
   const [chat, setChat] = createStore({
     messages: structuredClone(assistantHistory),
@@ -596,6 +601,7 @@ function InteractiveDiagram(props: { diagram: Diagram; assistant?: boolean; edit
   return (
     <DiagramView
       diagram={diagram}
+      owner={props.owner}
       now={NOW}
       agents={agents}
       editable={props.editable}
@@ -681,56 +687,60 @@ function InteractiveDiagram(props: { diagram: Diagram; assistant?: boolean; edit
 
 /* The app's layout: the sidebar, and the open chat or its routines beside it. */
 
-/** One routine's diagram: the routine, every node its run reaches, and its last run. */
-function routineDiagram(base: Diagram, routineId: string): Diagram {
-  const keep = new Set([routineId, ...diagramRoutineSteps(base.edges, routineId).keys()]);
-  const routine = base.nodes.find((node) => node.id === routineId);
-  return {
-    id: `diagram-${routineId}`,
-    name: routine?.kind === "routine" ? routine.name : routineId,
-    nodes: base.nodes.filter((node) => keep.has(node.id)),
-    edges: base.edges.filter((edge) => keep.has(edge.from) && keep.has(edge.to)),
-    lastRuns: base.lastRuns.filter((run) => run.routineNodeId === routineId),
-    updatedAt: base.updatedAt,
-  };
-}
-
-/** Every routine in the stories, each as its own diagram. */
-const routineDiagrams: Diagram[] = [
-  ...["node-routine", "node-sweep", "node-friday"].map((id) => routineDiagram(succeededDiagram, id)),
-  headlineDiagram,
-];
-
-/** The routines whose run reaches an agent: the ones its routine list shows. */
-function routinesOf(agentId: string): Diagram[] {
-  return routineDiagrams.filter((diagram) =>
-    diagram.nodes.some((node) => node.kind === "agent" && node.agentId === agentId),
-  );
-}
+/**
+ * Every routine in the workspace on one canvas, the headline check included. Research is one node
+ * here, so its morning brief and its headline check meet on the same card.
+ */
+const headlineRoutine = headlineDiagram.nodes[0];
+const workspacePool: Diagram = {
+  ...succeededDiagram,
+  nodes: [...succeededDiagram.nodes, ...(headlineRoutine ? [{ ...headlineRoutine, position: { x: 0, y: -320 } }] : [])],
+  edges: [
+    ...succeededDiagram.edges,
+    {
+      id: "edge-headline-research",
+      from: "node-headline-check",
+      to: "node-research",
+      routineId: "node-headline-check",
+    },
+  ],
+  lastRuns: [
+    ...succeededDiagram.lastRuns,
+    ...headlineDiagram.lastRuns.map((run) => ({
+      ...run,
+      steps: run.steps.map((entry) => ({ ...entry, nodeId: "node-research" })),
+    })),
+  ],
+};
 
 /**
- * The list of one agent's routines beside the canvas of the one picked. Picking another routine
- * mounts its canvas fresh, so its camera fits it.
+ * One agent's canvas: every routine whose run reaches it, and every node those runs reach. An agent
+ * without routines still stands on its canvas, ready to be connected to one.
  */
-function StoryAgentRoutines(props: { agent?: AgentProfile; name: string; diagrams: Diagram[] }) {
-  const [picked, setPicked] = createSignal<string | null>(null);
-  const selected = () => props.diagrams.find((diagram) => diagram.id === picked()) ?? props.diagrams[0];
-  const selectedList = () => {
-    const diagram = selected();
-    return diagram ? [diagram] : [];
-  };
-  return (
-    <AgentRoutinesView
-      agent={props.agent}
-      name={props.name}
-      diagrams={props.diagrams}
-      selectedId={selected()?.id ?? null}
-      onSelect={setPicked}
-      onCreateRoutine={fn()}
-    >
-      <For each={selectedList()}>{(diagram) => <InteractiveDiagram diagram={diagram} />}</For>
-    </AgentRoutinesView>
+function agentDiagram(agent: AgentProfile): Diagram {
+  const pool = workspacePool;
+  const own = pool.nodes.filter((node) => node.kind === "agent" && node.agentId === agent.id).map((node) => node.id);
+  const routines = pool.nodes.filter(
+    (node) => node.kind === "routine" && own.some((id) => diagramRoutineSteps(pool.edges, node.id).has(id)),
   );
+  const routineIds = new Set(routines.map((node) => node.id));
+  const keep = new Set<string>(routineIds);
+  for (const routine of routines) for (const id of diagramRoutineSteps(pool.edges, routine.id).keys()) keep.add(id);
+  const nodes = pool.nodes.filter((node) => keep.has(node.id));
+  return {
+    id: `agent-${agent.id}`,
+    name: agent.name,
+    nodes:
+      nodes.length > 0
+        ? nodes
+        : [{ kind: "agent", id: `node-${agent.id}`, position: { x: 360, y: 0 }, agentId: agent.id, task: "" }],
+    edges: pool.edges.filter(
+      (edge) =>
+        keep.has(edge.from) && keep.has(edge.to) && (edge.routineId === undefined || routineIds.has(edge.routineId)),
+    ),
+    lastRuns: pool.lastRuns.filter((run) => routineIds.has(run.routineNodeId)),
+    updatedAt: pool.updatedAt,
+  };
 }
 
 const storyChannels: ChannelSummary[] = [
@@ -810,7 +820,7 @@ function SidebarWithViews(props: { initialView: SidebarView }) {
 
 /**
  * The sidebar is the same chat list in both views. On Agents the main area shows the open chat, as
- * it always has; on Routines it shows that agent's or channel's routines and the canvas of one.
+ * it always has; on Routines it shows the open agent's canvas: all its routines, with tabs to pick one.
  */
 function WorkspaceStage() {
   const [view, setView] = createSignal<SidebarView>("routines");
@@ -838,11 +848,12 @@ function WorkspaceStage() {
           <Match when={view() === "routines"}>
             <For each={routinesKey()}>
               {() => (
-                <StoryAgentRoutines
-                  agent={openAgent()}
-                  name={openAgent()?.name ?? openChannel()?.name ?? ""}
-                  diagrams={openAgent() ? routinesOf(openAgent()?.id ?? "") : []}
-                />
+                <Show
+                  when={openAgent()}
+                  fallback={<InteractiveDiagram diagram={{ ...emptyDiagram, name: openChannel()?.name ?? "" }} />}
+                >
+                  {(agent) => <InteractiveDiagram diagram={agentDiagram(agent())} owner={agent()} />}
+                </Show>
               )}
             </For>
           </Match>
@@ -873,24 +884,24 @@ type Story = StoryObj<typeof meta>;
 
 /**
  * The whole surface. On the Agents view the middle shows the open agent or channel chat; on the
- * Routines view it shows that chat's routines, with the picked one on the canvas.
+ * Routines view it shows the open agent's routines on one canvas, with tabs to pick one.
  */
 export const Workspace: Story = {};
 
-/** Sales Outbound is started by three routines; each opens on its own canvas. */
+/** Sales Outbound is started by three routines; the tabs over its canvas pick one. */
 export const AgentWithSeveralRoutines: Story = {
-  render: () => <StoryAgentRoutines agent={sales} name={sales.name} diagrams={routinesOf("sales")} />,
+  render: () => <InteractiveDiagram diagram={agentDiagram(sales)} owner={sales} />,
   decorators: [(Story) => <div style={{ display: "flex", height: "100vh" }}>{Story()}</div>],
 };
 
 /** Research has the morning brief, and a headline check it runs alone. */
 export const AgentWithSimpleRoutine: Story = {
-  render: () => <StoryAgentRoutines agent={research} name={research.name} diagrams={routinesOf("research")} />,
+  render: () => <InteractiveDiagram diagram={agentDiagram(research)} owner={research} />,
   decorators: [(Story) => <div style={{ display: "flex", height: "100vh" }}>{Story()}</div>],
 };
 
 export const AgentWithoutRoutines: Story = {
-  render: () => <StoryAgentRoutines agent={reviewer} name={reviewer.name} diagrams={[]} />,
+  render: () => <InteractiveDiagram diagram={agentDiagram(reviewer)} owner={reviewer} />,
   decorators: [(Story) => <div style={{ display: "flex", height: "100vh" }}>{Story()}</div>],
 };
 
