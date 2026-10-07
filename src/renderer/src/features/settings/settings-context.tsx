@@ -139,6 +139,16 @@ const Settings = createSimpleContext({
 
     function updateGeneralSettings(value: GeneralSettingsValue): void {
       const previous = generalSettings();
+      function persistField<Key extends keyof GeneralSettingsValue, Response>(
+        key: Key,
+        request: Promise<Response>,
+        read: (response: Response) => GeneralSettingsValue[Key],
+      ): void {
+        void request
+          .then((response) => setGeneralSettings((current) => ({ ...current, [key]: read(response) })))
+          .catch(() => setGeneralSettings((current) => ({ ...current, [key]: previous[key] })));
+      }
+
       const turboMode = turboModePending() ? previous.turboMode : value.turboMode;
       setGeneralSettings({ ...value, turboMode });
       if (previous.taskCompletionSound !== value.taskCompletionSound) {
@@ -186,54 +196,43 @@ const Settings = createSimpleContext({
       }
       if (previous.autoDownloadUpdates !== value.autoDownloadUpdates) {
         autoDownloadUpdatesChanged = true;
-        void settingsPort()
-          .update.setPreference({ autoDownload: value.autoDownloadUpdates })
-          .then((preference) =>
-            setGeneralSettings((current) => ({ ...current, autoDownloadUpdates: preference.autoDownload })),
-          )
-          .catch(() =>
-            setGeneralSettings((current) => ({ ...current, autoDownloadUpdates: previous.autoDownloadUpdates })),
-          );
+        persistField(
+          "autoDownloadUpdates",
+          settingsPort().update.setPreference({ autoDownload: value.autoDownloadUpdates }),
+          (preference) => preference.autoDownload,
+        );
       }
       if (previous.allowRemoteUpdates !== value.allowRemoteUpdates) {
         allowRemoteUpdatesChanged = true;
-        void settingsPort()
-          .update.setPreference({ allowRemoteUpdates: value.allowRemoteUpdates })
-          .then((preference) =>
-            setGeneralSettings((current) => ({ ...current, allowRemoteUpdates: preference.allowRemoteUpdates })),
-          )
-          .catch(() =>
-            setGeneralSettings((current) => ({ ...current, allowRemoteUpdates: previous.allowRemoteUpdates })),
-          );
+        persistField(
+          "allowRemoteUpdates",
+          settingsPort().update.setPreference({ allowRemoteUpdates: value.allowRemoteUpdates }),
+          (preference) => preference.allowRemoteUpdates,
+        );
       }
       if (previous.autoInstallUpdates !== value.autoInstallUpdates) {
         autoInstallUpdatesChanged = true;
-        void settingsPort()
-          .update.setPreference({ autoInstall: value.autoInstallUpdates })
-          .then((preference) =>
-            setGeneralSettings((current) => ({ ...current, autoInstallUpdates: preference.autoInstall })),
-          )
-          .catch(() =>
-            setGeneralSettings((current) => ({ ...current, autoInstallUpdates: previous.autoInstallUpdates })),
-          );
+        persistField(
+          "autoInstallUpdates",
+          settingsPort().update.setPreference({ autoInstall: value.autoInstallUpdates }),
+          (preference) => preference.autoInstall,
+        );
       }
       if (previous.desktopNotifications !== value.desktopNotifications) {
         desktopNotificationsChanged = true;
-        void settingsPort()
-          .notifications.setPreference({ desktopNotifications: value.desktopNotifications })
-          .then((preference) =>
-            setGeneralSettings((current) => ({ ...current, desktopNotifications: preference.desktopNotifications })),
-          )
-          .catch(() =>
-            setGeneralSettings((current) => ({ ...current, desktopNotifications: previous.desktopNotifications })),
-          );
+        persistField(
+          "desktopNotifications",
+          settingsPort().notifications.setPreference({ desktopNotifications: value.desktopNotifications }),
+          (preference) => preference.desktopNotifications,
+        );
       }
       if (previous.busyMessageMode !== value.busyMessageMode) {
         busyMessageModeChanged = true;
-        void settingsPort()
-          .setBusyMessageModePreference({ mode: value.busyMessageMode })
-          .then((preference) => setGeneralSettings((current) => ({ ...current, busyMessageMode: preference.mode })))
-          .catch(() => setGeneralSettings((current) => ({ ...current, busyMessageMode: previous.busyMessageMode })));
+        persistField(
+          "busyMessageMode",
+          settingsPort().setBusyMessageModePreference({ mode: value.busyMessageMode }),
+          (preference) => preference.mode,
+        );
       }
       if (
         previous.macBookNotch !== value.macBookNotch ||

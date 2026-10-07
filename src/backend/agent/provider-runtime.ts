@@ -1577,6 +1577,24 @@ export class ProviderRuntime implements ProviderPort {
     return error instanceof AgentProcessExitError ? error.withDetail(this.#redactMcp) : error;
   }
 
+  readonly #initializeProviderClient = Effect.fn("ProviderRuntime.initializeProviderClient")(function* (
+    client: AgentClient,
+    startTimeoutMs?: number,
+  ) {
+    yield* client
+      .request(
+        "initialize",
+        {
+          clientInfo: { name: "openbot", title: "OpenBot", version: "0.1.0" },
+          capabilities: { experimentalApi: true, mcpServerOpenaiFormElicitation: true },
+        },
+        decodeRecordResponse,
+        startTimeoutMs,
+      )
+      .pipe(toProviderOperationFailed);
+    yield* providerStep(() => client.notify("initialized"));
+  });
+
   readonly #authenticateClient = Effect.fn("ProviderRuntime.authenticateClient")(
     function* (
       this: ProviderRuntime,
@@ -1598,18 +1616,7 @@ export class ProviderRuntime implements ProviderPort {
               this.#bindClient(client);
               client.start();
             });
-            yield* client
-              .request(
-                "initialize",
-                {
-                  clientInfo: { name: "openbot", title: "OpenBot", version: "0.1.0" },
-                  capabilities: { experimentalApi: true, mcpServerOpenaiFormElicitation: true },
-                },
-                decodeRecordResponse,
-                startTimeoutMs,
-              )
-              .pipe(toProviderOperationFailed);
-            yield* providerStep(() => client.notify("initialized"));
+            yield* this.#initializeProviderClient(client, startTimeoutMs);
             const response = yield* client
               .request("account/read", { refreshToken: true }, decodeAccountReadResult)
               .pipe(toProviderOperationFailed);
@@ -1943,18 +1950,7 @@ export class ProviderRuntime implements ProviderPort {
             this.#bindClient(candidate);
             candidate.start();
           });
-          yield* candidate
-            .request(
-              "initialize",
-              {
-                clientInfo: { name: "openbot", title: "OpenBot", version: "0.1.0" },
-                capabilities: { experimentalApi: true, mcpServerOpenaiFormElicitation: true },
-              },
-              decodeRecordResponse,
-              options.startTimeoutMs,
-            )
-            .pipe(toProviderOperationFailed);
-          yield* providerStep(() => candidate.notify("initialized"));
+          yield* this.#initializeProviderClient(candidate, options.startTimeoutMs);
           logger.info("A provider answered initialize.", { provider, durationMs: stageMs() });
           stage = "account";
           stageStartedAt = performance.now();
