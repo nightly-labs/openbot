@@ -72,7 +72,8 @@ export function WorkspaceRoutineFlows(props: { port?: RoutineFlowsPort }) {
   const assistant = createRoutineFlowAssistant(port, agentId);
   let generation = 0;
   let reloadTimer: number | undefined;
-  const saveTimers = new Map<string, number>();
+  /** Moves waiting to be saved, by node: the timer, and the save it runs. */
+  const pendingSaves = new Map<string, { timer: number; save: () => void }>();
 
   const load = async (id: string) => {
     const current = ++generation;
@@ -127,7 +128,12 @@ export function WorkspaceRoutineFlows(props: { port?: RoutineFlowsPort }) {
       stopChanged();
       stopEvents();
       window.clearTimeout(reloadTimer);
-      for (const timer of saveTimers.values()) window.clearTimeout(timer);
+      // A move the user made just before leaving the canvas is saved now, not dropped.
+      for (const pending of pendingSaves.values()) {
+        window.clearTimeout(pending.timer);
+        pending.save();
+      }
+      pendingSaves.clear();
     };
   });
 
@@ -187,16 +193,14 @@ export function WorkspaceRoutineFlows(props: { port?: RoutineFlowsPort }) {
       : undefined;
 
   const savePosition = (canvasAgentId: string, nodeKey: string, point: DiagramPoint) => {
-    window.clearTimeout(saveTimers.get(nodeKey));
-    saveTimers.set(
-      nodeKey,
-      window.setTimeout(() => {
-        saveTimers.delete(nodeKey);
-        port()
-          .routineFlows.savePosition({ agentId: canvasAgentId, nodeKey, x: point.x, y: point.y }, "local")
-          .catch(failed(t("diagram.flows.saveFailed")));
-      }, SAVE_DELAY_MS),
-    );
+    window.clearTimeout(pendingSaves.get(nodeKey)?.timer);
+    const save = () => {
+      pendingSaves.delete(nodeKey);
+      port()
+        .routineFlows.savePosition({ agentId: canvasAgentId, nodeKey, x: point.x, y: point.y }, "local")
+        .catch(failed(t("diagram.flows.saveFailed")));
+    };
+    pendingSaves.set(nodeKey, { timer: window.setTimeout(save, SAVE_DELAY_MS), save });
   };
 
   return (

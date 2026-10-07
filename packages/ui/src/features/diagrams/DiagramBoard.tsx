@@ -242,8 +242,10 @@ export function DiagramBoard(props: DiagramBoardProps) {
     return problemFor(source, nodeId) ? "invalid" : "valid";
   };
   const tryConnect = (from: string, to: string) => {
-    const problem = problemFor(from, to);
     cancelConnection();
+    // A connection started on a card that has since been removed has nothing to start from.
+    if (!nodeById().has(from) || !nodeById().has(to)) return;
+    const problem = problemFor(from, to);
     if (problem) {
       announce(t(PROBLEM_KEY[problem]), "danger");
       return;
@@ -269,6 +271,7 @@ export function DiagramBoard(props: DiagramBoardProps) {
       return true;
     }
     if (props.selectedNodeId && nodeRemovable(props.selectedNodeId)) {
+      if (interaction.source === props.selectedNodeId) cancelConnection();
       props.onRemoveNode(props.selectedNodeId);
       return true;
     }
@@ -599,7 +602,10 @@ export function DiagramBoard(props: DiagramBoardProps) {
                       });
                       props.onSelectNode(node.id);
                     }}
-                    onRemove={() => props.onRemoveNode(node.id)}
+                    onRemove={() => {
+                      if (interaction.source === node.id) cancelConnection();
+                      props.onRemoveNode(node.id);
+                    }}
                     onOutputPort={() => {
                       if (suppressClick) return;
                       if (interaction.source === node.id) cancelConnection();
