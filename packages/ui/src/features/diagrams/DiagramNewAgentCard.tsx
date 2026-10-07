@@ -10,6 +10,7 @@ import type {
   AgentModelId,
   AgentModelOption,
   AgentProviderId,
+  AgentReasoningEffort,
   AgentStatus,
   CustomAgentSummary,
   CustomProviderSummary,
@@ -22,7 +23,7 @@ import { AgentAvatar } from "../agents/AgentAvatar";
 import { createFirstAgentDraft, type FirstAgentDraft } from "../agents/FirstAgentSetup";
 
 export type DiagramNewAgentDraft = Pick<FirstAgentDraft, "name" | "purpose" | "avatarSeed" | "avatarHue"> &
-  Partial<Pick<FirstAgentDraft, "provider" | "model">>;
+  Partial<Pick<FirstAgentDraft, "provider" | "model">> & { reasoningEffort?: AgentReasoningEffort };
 
 /** What the model picker of a new agent offers, and the model it starts on. */
 export interface DiagramModelChoice {
@@ -45,7 +46,14 @@ export function DiagramNewAgentCard(props: {
   const [name, setName] = createSignal("");
   const [purpose, setPurpose] = createSignal("");
   const [busy, setBusy] = createSignal(false);
-  const [model, setModel] = createSignal(props.models?.initial ?? null);
+  const [choice, setChoice] = createSignal(
+    props.models
+      ? {
+          ...props.models.initial,
+          reasoningEffort: defaultEffort(props.models, props.models.initial.provider, props.models.initial.model),
+        }
+      : null,
+  );
   let nameInput: HTMLInputElement | undefined;
   onSettled(() => nameInput?.focus());
   const create = () => {
@@ -57,7 +65,7 @@ export function DiagramNewAgentCard(props: {
         purpose: purpose().trim(),
         avatarSeed: face.avatarSeed,
         avatarHue: face.avatarHue,
-        ...(model() ?? {}),
+        ...(choice() ?? {}),
       })
       .catch(() => setBusy(false));
   };
@@ -102,19 +110,24 @@ export function DiagramNewAgentCard(props: {
       />
       <Show when={props.models}>
         {(models) => (
-          <Show when={model()}>
+          <Show when={choice()}>
             {(chosen) => (
               <ProviderModelPicker
-                variant="field"
                 ariaLabel={t("diagram.newAgent.model")}
                 provider={chosen().provider}
                 value={chosen().model}
+                reasoningEffort={chosen().reasoningEffort}
                 modelOptions={models().options}
                 agentStatus={models().status}
                 customProviders={models().customProviders}
                 customAgents={models().customAgents}
                 disabled={busy()}
-                onChange={(next, provider) => setModel({ provider, model: next })}
+                onChange={(next, provider) =>
+                  setChoice({ provider, model: next, reasoningEffort: defaultEffort(models(), provider, next) })
+                }
+                onReasoningEffortChange={(reasoningEffort) =>
+                  setChoice((current) => (current ? { ...current, reasoningEffort } : current))
+                }
               />
             )}
           </Show>
@@ -130,4 +143,13 @@ export function DiagramNewAgentCard(props: {
       </div>
     </form>
   );
+}
+
+/** The effort a model starts on, as a new chat on it would. */
+function defaultEffort(
+  models: DiagramModelChoice,
+  provider: AgentProviderId,
+  model: AgentModelId,
+): AgentReasoningEffort | undefined {
+  return models.options.find((option) => option.provider === provider && option.id === model)?.defaultReasoningEffort;
 }
