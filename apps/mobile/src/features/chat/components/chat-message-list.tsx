@@ -192,6 +192,8 @@ function exchangeLabel(exchange: AgentExchangeSummary, t: MobileTranslate) {
 
 interface ChatMessageListProps {
   target: ChatTarget;
+  /** Something covers the list, such as the voice mode, so screen readers skip it. */
+  accessibilityHidden?: boolean;
   activity?: MobileAgentActivity;
   activities?: MobileAgentActivity[];
   agents: MobileAgent[];
@@ -647,6 +649,7 @@ function TurnFailure({ reason }: { reason: string | undefined }) {
 export function ChatMessageList({
   upload,
   target,
+  accessibilityHidden = false,
   activity,
   activities,
   agents,
@@ -948,8 +951,10 @@ export function ChatMessageList({
   return (
     <Animated.View
       style={[{ flex: 1 }, historyState === "ready" ? motion.historyStyle : undefined]}
-      accessibilityElementsHidden={historyState === "ready" && !motion.historyVisible}
-      importantForAccessibility={historyState !== "ready" || motion.historyVisible ? "auto" : "no-hide-descendants"}
+      accessibilityElementsHidden={accessibilityHidden || (historyState === "ready" && !motion.historyVisible)}
+      importantForAccessibility={
+        !accessibilityHidden && (historyState !== "ready" || motion.historyVisible) ? "auto" : "no-hide-descendants"
+      }
     >
       <TailLayoutContext.Provider value={tailLayout}>
         <FlatList

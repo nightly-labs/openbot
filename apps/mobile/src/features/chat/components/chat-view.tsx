@@ -535,10 +535,14 @@ export function ChatView({
               liquidGlassAvailable={liquidGlassAvailable}
               topInset={insets.top}
               onBack={leaveConversation}
+              // The voice overlay covers the chat. It blocks touches, and this
+              // keeps screen readers on the transcript and the voice controls.
+              accessibilityHidden={voiceOpen}
             />
             <ChatMessageList
               agents={serverAgents}
               target={target}
+              accessibilityHidden={voiceOpen}
               motion={motion}
               sending={sending}
               keyboardOffset={keyboardOffset}
