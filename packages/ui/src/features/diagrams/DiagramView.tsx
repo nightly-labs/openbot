@@ -138,7 +138,7 @@ export function DiagramView(props: DiagramViewProps) {
   };
   return (
     <main class="diagram-view" aria-label={t("diagram.view.label", { name: props.diagram.name })}>
-      <header class="diagram-view-header">
+      <header class="window-drag diagram-view-header">
         <Show
           when={props.owner}
           fallback={

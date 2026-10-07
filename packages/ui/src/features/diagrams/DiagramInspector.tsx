@@ -80,7 +80,7 @@ export function DiagramInspector(props: DiagramInspectorProps) {
 
   return (
     <aside class="diagram-inspector" aria-label={t("diagram.inspector.label")}>
-      <header class="diagram-inspector-header">
+      <header class="window-drag diagram-inspector-header">
         <Show when={selected()} fallback={<h2 class="diagram-inspector-title">{t("diagram.inspector.label")}</h2>}>
           {(node) => (
             <>
