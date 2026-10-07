@@ -1,6 +1,7 @@
 import { AttachmentCards, AttachmentDownloadAll } from "@openbot/ui/features/conversation/AttachmentCards";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
+import { AUDIO_PREVIEW } from "./file-previews";
 import { STORY_ATTACHMENTS } from "./fixtures";
 
 const compactFile = {
@@ -81,6 +82,31 @@ export const DownloadingZip: Story = {
   render: (storyArgs) => (
     <div class="message-attachments-group">
       <AttachmentDownloadAll count={storyArgs.attachments.length} pending onDownload={fn()} />
+      <AttachmentCards {...storyArgs} />
+    </div>
+  ),
+};
+
+export const AudioTakes: Story = {
+  name: "Inline audio takes",
+  args: {
+    attachments: [1, 2, 3].map((take) => ({
+      id: `audio-take-${take}`,
+      name: `voice-over-${take}.mp3`,
+      size: AUDIO_PREVIEW.size,
+      kind: "file",
+      mimeType: AUDIO_PREVIEW.mimeType,
+      previewKind: "none",
+      previewUrl: `data:audio/mpeg;base64,${btoa(String.fromCharCode(...(AUDIO_PREVIEW.bytes ?? [])))}`,
+    })),
+  },
+};
+
+export const NarrowAudioTakes: Story = {
+  ...AudioTakes,
+  name: "Inline audio in a narrow layout",
+  render: (storyArgs) => (
+    <div style={{ width: "220px" }}>
       <AttachmentCards {...storyArgs} />
     </div>
   ),

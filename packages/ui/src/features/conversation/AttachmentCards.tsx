@@ -1,9 +1,11 @@
+import { attachmentMimeTypeForName, playableMediaKind } from "@openbot/contracts/attachment-files";
 import { type AttachmentSummary, canPreviewAttachment } from "@openbot/contracts/ipc";
 import { Button, Download, Spinner } from "@openbot/ui";
 import { createSignal, createUniqueId, For, Show } from "solid-js";
 import { useText } from "../../text";
 import { AnchoredTooltip } from "./AnchoredTooltip";
 import { attachmentReferenceTone } from "./AttachmentReference";
+import { MediaFilePreview } from "./MediaFilePreview";
 
 /**
  * The whole-list action, shaped like the account update island: a tinted bar
@@ -155,6 +157,15 @@ export function AttachmentCards(props: {
                 >
                   <AttachmentOpenIcon />
                 </Button>
+              </Show>
+              <Show when={attachment.previewUrl && !isMissing(attachment)}>
+                <MediaFilePreview
+                  kind={playableMediaKind(attachment.mimeType || attachmentMimeTypeForName(attachment.name))}
+                  src={attachment.previewUrl ?? ""}
+                  name={attachment.name}
+                  class="attachment-media-player"
+                  preload="none"
+                />
               </Show>
             </div>
           )}

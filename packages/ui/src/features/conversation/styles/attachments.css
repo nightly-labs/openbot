@@ -381,3 +381,15 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.message-attachments:has(.attachment-media-player) {
+  width: min(100%, 320px);
+}
+
+.attachment-media-player {
+  grid-column: 1 / -1;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  border-radius: var(--openbot-radius-md);
+}

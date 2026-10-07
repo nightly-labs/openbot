@@ -7,6 +7,8 @@ import { SpreadsheetFilePreview } from "@openbot/ui/features/conversation/Spread
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 
+import { MediaFilePreview } from "./MediaFilePreview";
+
 const PANEL_MIN = 220;
 const PANEL_MAX = 1600;
 const TEXT_LIMIT = 1_000_000;
@@ -290,17 +292,13 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
         <Show when={previewKind() === "pdf" && previewUrl()}>
           <iframe class="file-preview-pdf" title={title()} src={previewUrl() ?? ""} />
         </Show>
-        <Show when={previewKind() === "audio" && previewUrl()}>
-          <audio class="file-preview-audio" controls src={previewUrl() ?? ""}>
-            {/* A file on the user's computer carries no caption track. The empty element declares
-                that, which browsers ignore, and keeps the media-caption rule satisfied. */}
-            <track kind="captions" />
-          </audio>
-        </Show>
-        <Show when={previewKind() === "video" && previewUrl()}>
-          <video class="file-preview-video" controls src={previewUrl() ?? ""}>
-            <track kind="captions" />
-          </video>
+        <Show when={previewUrl()}>
+          <MediaFilePreview
+            kind={previewKind() === "audio" ? "audio" : previewKind() === "video" ? "video" : null}
+            src={previewUrl() ?? ""}
+            name={title()}
+            class={previewKind() === "audio" ? "file-preview-audio" : "file-preview-video"}
+          />
         </Show>
         <Show when={previewKind() === "spreadsheet"}>
           <SpreadsheetFilePreview class="file-preview-spreadsheet" bytes={file()?.bytes ?? null} />
