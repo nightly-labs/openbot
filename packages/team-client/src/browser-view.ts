@@ -34,7 +34,7 @@ interface View {
   /** Set once the stream close and the session delete are sent, or the host ended the stream. */
   released: boolean;
   frame: (frame: BrowserViewFrame) => void;
-  ended: () => void;
+  ended: (reason?: string) => void;
 }
 /** One browser tab view per client. All paths still pass the host's stream allowlist. */
 export function createRemoteBrowserView(
@@ -45,11 +45,11 @@ export function createRemoteBrowserView(
 ) {
   let view: View | null = null;
   let generation = 0;
-  function disconnect() {
+  function disconnect(reason?: string) {
     generation += 1;
     const current = view;
     view = null;
-    current?.ended();
+    current?.ended(reason);
   }
   /**
    * Closes one view's stream and host session. A view can be detached before its handle closes it:
@@ -80,7 +80,7 @@ export function createRemoteBrowserView(
   const open = Effect.fn("RemoteBrowserView.open")(function* (
     tabId: string,
     frame: (frame: BrowserViewFrame) => void,
-    ended: () => void,
+    ended: (reason?: string) => void,
   ): Effect.fn.Return<RemoteBrowserView, BrowserViewError> {
     yield* close().pipe(Effect.catch(() => Effect.void));
     const current = ++generation;
@@ -146,7 +146,14 @@ export function createRemoteBrowserView(
           if (control.type === "opened") current.ready = true;
           if (control.type === "close" || control.type === "error") {
             current.released = true;
-            disconnect();
+            disconnect(
+              control.type === "error"
+                ? control.message || sourceText("error.backend.browserViewFailed")
+                : control.reason ||
+                    (control.code !== undefined && control.code !== 1000
+                      ? sourceText("error.backend.browserViewFailed")
+                      : undefined),
+            );
             void runTeamEffect(requestHost("DELETE", TEAM_API_ROUTES.browser.viewSession(current.sessionId))).catch(
               () => undefined,
             );

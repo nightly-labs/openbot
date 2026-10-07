@@ -1,4 +1,5 @@
 import { sourceText } from "@openbot/i18n/source";
+import { redactText } from "@openbot/logging";
 import { Context, Deferred, Effect, Layer, Result } from "effect";
 import { recordRestartActivity } from "../backend/restart-activity";
 import { RemoteWorkflowError, remoteDecode } from "./remote-service-effects";
@@ -178,7 +179,8 @@ export class BrowserViewGateway {
       for (const session of [...this.#sessions.values()]) {
         yield* this.#closeSession(session, "The host stopped.");
       }
-      this.#webSockets.close();
+      // HostService reuses this gateway after a Team API restart. A noServer WebSocketServer
+      // owns no listener; closing it here would reject every later upgrade with HTTP 503.
       while (this.#operations.size > 0) {
         yield* Effect.all([...this.#operations].map(Deferred.await), { concurrency: "unbounded" });
       }
@@ -271,7 +273,7 @@ export class BrowserViewGateway {
     }).pipe(
       Effect.catch(({ cause: error }) =>
         Effect.gen({ self: this }, function* () {
-          client.close(1011, String(error instanceof Error ? error.message : error).slice(0, 120));
+          client.close(1011, redactText(String(error instanceof Error ? error.message : error)).slice(0, 120));
           yield* this.#detach(session, client);
         }),
       ),

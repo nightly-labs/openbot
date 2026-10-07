@@ -646,6 +646,46 @@ describe("browser workspace runtime", () => {
     expect(retry).toBeGreaterThan(reconnect);
     await runtime.dispose();
   });
+  it("reports the connection failure to an active browser view", async () => {
+    let onConnectionUpdate: RemoteTeamPeerActions["onConnectionUpdate"] | undefined;
+    peer.execute.mockImplementation(async (command) => ({
+      ok: true,
+      status: 200,
+      body:
+        command.path === "/v1/compatibility"
+          ? { appVersion: "0.1.0", protocol: { minimum: 1, maximum: 4 }, capabilities: ["browser-view"] }
+          : command.method === "POST"
+            ? { id: "view", tabId: "tab", streamPath: "/v1/browser/view/sessions/view/stream" }
+            : {},
+    }));
+    const runtime = createWebWorkspaceRuntime(
+      "one",
+      { connection: vi.fn(), event: vi.fn(), accountChanged: async () => {} },
+      vi.fn(),
+      {
+        createPeer: (actions: { current: RemoteTeamPeerActions }) => {
+          onConnectionUpdate = actions.current.onConnectionUpdate;
+          return peer;
+        },
+        acquireHostLock: async () => () => {},
+      },
+    );
+    await runtime.connect(host);
+    const onView = vi.fn();
+    const unsubscribe = runtime.browser.onLiveViewEvent(onView);
+    await runtime.browser.startLiveView("tab");
+    await onConnectionUpdate?.({ hostId: host.hostId, state: "offline", message: "desktop channel failed." });
+    expect(onView).toHaveBeenCalledWith({ type: "stopped", tabId: "tab", reason: "desktop channel failed." });
+    expect(onView).toHaveBeenCalledOnce();
+    await vi.waitFor(() =>
+      expect(peer.execute).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "request", method: "DELETE", path: "/v1/browser/view/sessions/view" }),
+      ),
+    );
+    unsubscribe();
+    await runtime.dispose();
+  });
+
   it("does not install a browser view that finishes after it was stopped", async () => {
     let resolveSession: ((value: unknown) => void) | undefined;
     peer.execute.mockImplementation(async (command) => {
