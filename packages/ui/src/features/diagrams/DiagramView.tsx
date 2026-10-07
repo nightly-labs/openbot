@@ -94,7 +94,7 @@ const ALL = "routine-lens:all";
 export function DiagramView(props: DiagramViewProps) {
   const { t, format } = useText();
   const [selectedNodeId, setSelectedNodeId] = createSignal<string | null>(null);
-  const [panels, setPanels] = createStore({ inspector: true, chat: true });
+  const [panels, setPanels] = createStore({ inspector: true, chat: false });
   const now = () => (props.now ? new Date(props.now) : new Date());
   const routines = () =>
     props.diagram.nodes.filter((node): node is Extract<DiagramNode, { kind: "routine" }> => node.kind === "routine");
