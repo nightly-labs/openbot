@@ -29,7 +29,8 @@ const SITE_POLICIES: readonly BrowserSitePolicy[] = [
   {
     hosts: ["canva.com"],
     identity: "scrubbed",
-    reason: "Server answers the product token with an update-your-browser page; measured with --canva-live.",
+    reason:
+      "Server answered the product token with an update-your-browser page; measured with --canva-live. The session now drops that token too; the row stays until the probe passes without it.",
   },
 ];
 

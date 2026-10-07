@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { BrowserBounds } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
 import { app, BrowserWindow, type WebContents, webContents } from "electron";
@@ -1373,7 +1374,8 @@ async function main(): Promise<void> {
     if (oversizedEnvironment.success || !toolError(oversizedEnvironment).includes("physical viewport")) {
       throw new Error("V2 environment accepted an unsafe physical pixel area.");
     }
-    await runCauseEffect(browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 1200, height: 800 } }));
+    const panelBounds = { x: 0, y: 0, width: 1200, height: 800 };
+    await runCauseEffect(browser.setVisible({ visible: true, bounds: panelBounds }));
     const restoredFill = await callBrowserTool(browser, "set_environment", { tabId: v2Tab.id, preset: "fill" });
     const restoredFillSnapshot = toolTextPayload(restoredFill);
     if (
@@ -1675,7 +1677,7 @@ async function main(): Promise<void> {
     if (xLive) await runXLiveProbe(browser);
     if (whatsappLive) await runWhatsAppLiveProbe(browser);
     if (canvaLive) await runCanvaLiveProbe(browser);
-    if (framerLive) await runFramerLiveProbe(browser);
+    if (framerLive) await runFramerLiveProbe(browser, panelBounds);
     await expectFailure(() => runCauseEffect(browser.act(tab.id, first.revision, { type: "click", ref: save.ref })));
 
     const current = await runCauseEffect(browser.snapshot(tab.id));
@@ -3129,10 +3131,10 @@ async function runCanvaLiveProbe(browser: BrowserHost): Promise<void> {
   process.stdout.write("BrowserHost: Canva presentations page loaded without a browser block.\n");
 }
 
-async function runFramerLiveProbe(browser: BrowserHost): Promise<void> {
+async function runFramerLiveProbe(browser: BrowserHost, panelBounds: BrowserBounds): Promise<void> {
   // An example.com address gets the same policy verdict as a real one and sends no mail to a
-  // person. The policy also refuses an exact 800x600 viewport, the headless default and this
-  // script's panel size, so the probe uses another size for the duration.
+  // person. The policy also refuses an exact 800x600 viewport, the headless default, so the probe
+  // uses another size for the duration and then restores the panel.
   await runCauseEffect(browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 760, height: 560 } }));
   const framerTab = await runCauseEffect(
     browser.open("https://framer.com/login/", "framer-live-smoke", "framer-live-smoke", true),
@@ -3177,7 +3179,7 @@ async function runFramerLiveProbe(browser: BrowserHost): Promise<void> {
     process.stdout.write("BrowserHost: Framer accepted the sign-in request.\n");
   } finally {
     await runCauseEffect(browser.close(framerTab.id));
-    await runCauseEffect(browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } }));
+    await runCauseEffect(browser.setVisible({ visible: true, bounds: panelBounds }));
   }
 }
 

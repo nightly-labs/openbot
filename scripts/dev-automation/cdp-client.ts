@@ -207,18 +207,25 @@ export async function findRendererPages<T extends RendererCandidate>(
   return confirmed;
 }
 
-async function describeTargets(port: number): Promise<string> {
+async function describeBrowser(port: number): Promise<{ targets: string; electron: boolean }> {
+  const version = await fetch(`http://127.0.0.1:${port}/json/version`, {
+    signal: AbortSignal.timeout(5_000),
+  });
+  if (!version.ok) throw new Error(`CDP answered ${version.status}.`);
+  const info = await version.json();
+  const userAgent = isDynamicRecord(info) && isString(info["User-Agent"]) ? info["User-Agent"] : "";
   const response = await fetch(`http://127.0.0.1:${port}/json/list`, {
     signal: AbortSignal.timeout(5_000),
   });
   if (!response.ok) throw new Error(`CDP answered ${response.status}.`);
   const payload = await response.json();
   if (!Array.isArray(payload)) throw new Error("CDP answered without a target list.");
-  return payload
+  const targets = payload
     .filter(isDynamicRecord)
     .filter((target) => target.type === "page")
     .map((target) => `- ${describeTarget(isString(target.url) ? target.url : "")}`)
     .join("\n");
+  return { targets, electron: userAgent.includes("Electron/") };
 }
 
 export interface ConnectOptions {
@@ -298,12 +305,14 @@ export async function matchPages<T extends { url: () => string }>(
 }
 
 export interface OpenDevBrowserOptions {
-  // The pid of the live registry record that owns the port, if any. An app
-  // window with the preload bridge proves the browser without further checks.
-  // The user agent cannot: the embedded browser removes the `OpenBot/` token
-  // from it, because Framer refuses sign-in with that token. A browser with no
-  // app window must prove the listening process descends from this pid, because
-  // liveness alone cannot tell a restarted instance from a squatter.
+  // The pid of the live registry record that owns the port, if any. An Electron
+  // browser with an app window that has the preload bridge proves itself without
+  // further checks; a page in another Chromium can define `window.openbot`, but
+  // that browser does not report `Electron/`. The `OpenBot/` token cannot prove
+  // it: the embedded browser removes that token because Framer refuses sign-in
+  // with it. Any other browser must prove the listening process descends from
+  // this pid, because liveness alone cannot tell a restarted instance from a
+  // squatter.
   ownerPid?: number | null;
 }
 
@@ -312,9 +321,9 @@ export async function openDevBrowser(
   logger: Logger,
   options: OpenDevBrowserOptions = {},
 ): Promise<Browser> {
-  let targets: string;
+  let described: { targets: string; electron: boolean };
   try {
-    targets = await describeTargets(port);
+    described = await describeBrowser(port);
   } catch (error) {
     if (error instanceof ForeignBrowserError) throw error;
     throw new Error(
@@ -324,7 +333,7 @@ export async function openDevBrowser(
     );
   }
   const browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
-  if ((await findRendererPages(devBrowserPages(browser))).length === 0) {
+  if (!described.electron || (await findRendererPages(devBrowserPages(browser))).length === 0) {
     // Closing a browser obtained through `connectOverCDP` closes the WebSocket
     // transport only, never the app, so a refusal below leaves nothing behind.
     const ownerPid = options.ownerPid ?? null;
@@ -334,8 +343,9 @@ export async function openDevBrowser(
         `Port ${port} does not belong to OpenBot. Pass --port=<OPENBOT_DEV_REMOTE_DEBUGGING_PORT> of the instance you mean to drive.`,
       );
     }
-    logger.info(`Port :${port} answers without an app window; the listener belongs to the recorded instance.`);
+    logger.info(`Port :${port} answers without an OpenBot app window; the listener belongs to the recorded instance.`);
   }
+  const targets = described.targets;
   logger.info(`CDP targets on :${port}`, targets || "(no pages yet)");
   return browser;
 }
