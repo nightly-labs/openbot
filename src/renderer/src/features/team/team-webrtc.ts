@@ -63,12 +63,19 @@ interface PeerState {
   turnRefreshTimer: number | null;
   iceRestartPending: boolean;
   iceRestarting: boolean;
+  iceRestarts: number;
   signalChain: Promise<void>;
   closed: boolean;
 }
 
 const peers = new Map<string, PeerState>();
 const dataChannelNames = ["rpc", "events", "files", "desktop"] as const;
+// Chromium keeps the sockets of every earlier ICE generation until the connection closes: one per
+// network interface, and one more per interface for TURN, for each restart. On a host with 10
+// interfaces, about 150 restarts reach the network service's limit of 3,000 sockets, and then no
+// device can connect until the app restarts. A connection that would restart once more than this is
+// dropped instead, and the client connects again on a new one.
+const maximumIceRestarts = 10;
 let mainPort: MessagePort;
 
 const receiveMainPort = (event: MessageEvent): void => {
@@ -121,6 +128,7 @@ async function handleCommand(command: BridgeCommand): Promise<void> {
         turnRefreshTimer: null,
         iceRestartPending: false,
         iceRestarting: false,
+        iceRestarts: 0,
         signalChain: Promise.resolve(),
         closed: false,
       };
@@ -358,6 +366,10 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
   if (message.channel !== "team" || message.connectionId !== state.connectionId) return;
   if (message.type === "offer") {
     const connection = state.peerConnection ?? createPeerConnection(state, state.iceServers);
+    if (restartsIce(connection, message.sdp) && ++state.iceRestarts > maximumIceRestarts) {
+      dropRestartedConnection(state);
+      return;
+    }
     await connection.setRemoteDescription({ type: "offer", sdp: message.sdp });
     const answer = await connection.createAnswer();
     await connection.setLocalDescription(answer);
@@ -388,6 +400,7 @@ function createPeerConnection(state: PeerState, iceServers: RTCIceServer[]): RTC
     iceTransportPolicy: state.iceTransportPolicy,
   });
   state.peerConnection = connection;
+  state.iceRestarts = 0;
   connection.onicecandidate = (event) => {
     if (!event.candidate || !state.connectionId) return;
     sendSignal(state, {
@@ -515,6 +528,7 @@ function waitForWritableChannel(channel: RTCDataChannel): Promise<void> {
 async function restartIce(state: PeerState): Promise<void> {
   const connection = state.peerConnection;
   if (!connection || !state.connectionId || state.role !== "client") return;
+  if (++state.iceRestarts > maximumIceRestarts) return dropRestartedConnection(state);
   connection.restartIce();
   const offer = await connection.createOffer({ iceRestart: true });
   await connection.setLocalDescription(offer);
@@ -547,6 +561,29 @@ async function retryPendingIceRestart(state: PeerState): Promise<void> {
   } finally {
     state.iceRestarting = false;
   }
+}
+
+/** Whether an offer for a connection that already has a remote description starts a new ICE generation. */
+function restartsIce(connection: RTCPeerConnection, offer: string): boolean {
+  const current = connection.remoteDescription?.sdp;
+  return current !== undefined && iceUfrag(current) !== iceUfrag(offer);
+}
+
+function iceUfrag(sdp: string): string | undefined {
+  return sdp.match(/^a=ice-ufrag:(\S+)$/mu)?.[1];
+}
+
+/**
+ * Closes a connection that has used up its ICE restarts. Signal tells the other end, which closes
+ * its own connection, and the client connects again with a new one.
+ */
+function dropRestartedConnection(state: PeerState): void {
+  if (state.signalHost) {
+    disconnect(state.id);
+    return;
+  }
+  disconnectPeerConnection(state);
+  post({ type: "peer-disconnected", peerId: state.id });
 }
 
 function requiredDescriptionSdp(description: RTCSessionDescriptionInit): string {
