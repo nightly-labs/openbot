@@ -6,6 +6,106 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-10-07
+
+### Added
+
+- Cursor and Cline agents on a joined server now show in the app and the browser client, and you can create them there. Before, they stayed on the host computer only.
+- An owner or admin can download Cursor and Cline on a joined server and sign them in from their own device. Cursor shows a sign-in page that signs the server in by itself, so a server with no screen can use your Cursor plan. Cline shows a device code.
+- Agents can show HTML pages and Mermaid diagrams in a reply. A code block marked `html` shows as a
+  rendered page, and a code block marked `mermaid` shows as a diagram. Use the Preview and Code
+  switch to see the source. Select the expand button to open the page or diagram in a larger
+  window, which grows out of the block. A page runs no scripts and loads nothing from the network.
+  Its links open in your browser.
+- A chat with three or more days of history shows a day rail on its right edge while you scroll. Each segment is one day, so you can see how long the chat is and where you are in it, also before older messages load: a top segment stands for them. Point at the rail to see the days, and click a day to go to it. This is in agent chats, team channels and direct messages on this computer; on a joined server the rail shows the loaded days.
+- Settings > General has a new "Steer agents while they work" switch. When it is on, a message sent to a busy ChatGPT or Claude agent joins the current work at the next step, and does not wait in the queue. The switch is off by default, so messages queue as before. It also applies to messages from teammates on a server that this computer runs.
+- Each agent has a "While working" setting in its settings panel. It uses the app default, or it always queues or always steers for that agent.
+- A message that cannot steer waits in the queue with a "Not steered" label and the reason. Grok, OpenCode, Gemini, Cursor, Cline and custom agents cannot steer a running turn. The message starts when the current turn ends.
+- A message that could not be sent stays in the chat with Retry, Edit and Dismiss. Retry does not send the message two times, also when the first attempt reached the server and only its answer was lost. A server on an older version cannot detect a repeated message, so for it the chat offers only Edit and Dismiss. If you quit or restart before such a message is sent, its text is back in the composer when you return; nothing sends it again on its own.
+- openbot.run has a new /providers section with one page for each coding agent that OpenBot runs:
+  Claude Code, Codex, Gemini, Grok, Cursor, OpenCode, Cline, and local models from Ollama or
+  LM Studio. Each page shows how to set the agent up in OpenBot, what OpenBot adds to it, the
+  vendor's own apps and where they run, and answers to common questions. The footer, the provider
+  tile on the home page and the matchup comparisons link to these pages.
+- openbot.run has a Markdown copy of each guide, news post, comparison and provider page, at the page URL with `.md` added. `/llms-full.txt` holds all of them in one file for AI assistants.
+- The openbot.run FAQ now says what the source license permits.
+- A folder chip, such as `research/eyeliner/`, now opens a folder view in the file panel. The view shows the files with their size and date. Select a file to open it, and select **Back** to go back to the folder.
+- The file panel can show the source of a Markdown file. It also has **Download file** for each file, and **Show file in Finder** on the desktop.
+- Add a calendar feed for routines in Server Settings > Routines. Apple Calendar (On My Mac) and other calendar apps that read the feed on this computer can subscribe to the next 30 days of runs of active routines, for all agents or for one agent. The private URL works only on this computer, and **New URL** stops the old one.
+- Connect a Discord server in **Server settings → Connectors → Discord**. People mention @OpenBot in a
+  channel, and the Discord Orchestrator agent asks the right agent and answers in the reply chain.
+  Replies to OpenBot continue the conversation. Approvals, **Stop**, reactions and files work as in
+  Slack.
+
+### Changed
+
+- The agent cursor in Computer Use now travels to each point with a smooth, curved move, as a
+  person moves a mouse. A long move across the screen takes a wider arc. Before, the cursor slid in
+  a straight line in a fixed short time. With reduced motion on, the cursor still jumps.
+- Computer Use now uses cua-driver 0.34.0.
+- "Use a skill" in the composer's add menu now opens the skill list. Before, it was always unavailable, and you had to know to type `$`.
+- The skill list shows skills whose name matches your text first, then skills that match only by description. When two skills have the same name, each row also shows its folder name.
+- A long reply that streams does less work for each new part. Only the end of the text is read
+  again, the code in a code block is colored one new line at a time, and lines that did not change
+  are not drawn again. The line that is still arriving has no color until it is complete. Before,
+  each new part read and colored the full reply again.
+- A message you send shows in the chat at once, marked as sending, and the composer stays free for the next one. Before, the composer waited until the server accepted the message. Several messages sent quickly reach the agent in the order you sent them.
+- In the web client, a send that fails no longer blocks the composer until you check the conversation. The message stays in the chat with its failure.
+- Use less CPU and memory while channel agents write replies. Before, OpenBot read the whole
+  conversation and the whole channel history again about ten times each second for each agent.
+- Close the Computer Use highlight windows one minute after no agent controls the computer. Before,
+  they used memory for as long as Computer Use was on.
+
+### Removed
+
+- The website no longer opens the Product Hunt launch dialog when a page loads. The Product Hunt
+  link above the landing page title stays.
+
+### Fixed
+
+- Explain an OpenCode model whose provider rejects its API key, such as a Google Gemma model, and
+  tell how to fix the key. Before, OpenBot showed only "Internal error: API key not valid".
+- The **Add member** menu in channel settings has a search field, and its list scrolls. Before, the menu had no search and did not scroll, so agents above or below the window edge could not be added.
+- Sign in and connect to teams on a company network that inspects TLS, such as Fortinet. OpenBot
+  now trusts the root certificates of the operating system, as a browser does.
+- Show which host a company firewall or proxy blocked when sign-in cannot reach the account service.
+  Before, OpenBot asked you to check that the API was running, and a proxy's block page could sign
+  you out.
+- Move the window by its title bar when the browser fills the window. Before, only the area under
+  the window buttons moved it. You can also move the window by the header of the browser sidebar.
+- Long text in chat tables now wraps inside its cell. Before, a table could become wider than the
+  message, and you had to scroll sideways to read it. Long links and code also break inside the
+  cell.
+- Put the cursor back in the message box when you come back to the OpenBot window. Before, you had
+  to click the message box again before you could type.
+- A queued message that you steered just as the agent finished its turn no longer shows as done when the agent never read it. It stays in the queue and starts next.
+- The request that an agent sends to another agent, and the result that comes back, no longer add to
+  the unread count of either agent. Before, an agent showed new messages in the sidebar when its chat
+  had no new message for you.
+- The skill list now says when the agent has no skills, when no skill matches, or when the skills did not load. Before, the list did not open.
+- Keep the message you did not send when you go to a different chat. Each agent chat and each
+  channel keeps its own draft. The draft text also stays after you restart OpenBot, for example to
+  install an update. Attached files stay only until you close OpenBot.
+- The Mobile tab of the changelog shows a new version only when you can install it from the store.
+  Before, it showed the version while the store still reviewed the build.
+- **Attach image** now shows PDFs, documents, and all other supported files. Before, on Windows, the file picker showed only images until you selected **All files**.
+- A teammate's reply could show in an agent's chat as your own message, with the full teammate prompt. It now shows as a message from the teammate, also for replies that earlier versions saved this way.
+- When the connection of an ACP agent to its model dropped and the agent tried again, its
+  "API Error" line was joined to the retried answer in one chat bubble. The line now shows as a
+  separate muted activity line.
+- When a file or folder does not exist, the error now names the path and the agent workspace. Before, a folder chip showed "Workspace path is not a file."
+- Type the phrase that an input method picks with Shift and a digit, such as an OpenVanilla
+  associated phrase. Before, the message box typed the punctuation of the key, such as "!".
+- A host that clients reconnect to many times no longer runs out of network sockets and becomes unreachable until a restart. After 10 ICE restarts, a remote connection is replaced with a new one.
+- Connect again to a joined server after the computer wakes from sleep. Before, the server could stay unavailable until you restarted OpenBot.
+- Sign in to Framer in the embedded browser. Before, Framer refused every sign-in with "Cannot log
+  you in" or "Verification failed", because the browser identity included the OpenBot name.
+
+### Security
+
+- The Windows installer and app are now signed by SYNTHETIFY LABS SPÓŁKA Z OGRANICZONĄ ODPOWIEDZIALNOŚCIĄ. Windows no longer shows "Unknown publisher" for them, and later updates install only when they have the same signature. Before, the Windows release was not signed.
+- The account service now checks the skills and agent marketplace admin token in constant time. Before, the check time could show how much of a guessed token was correct.
+
 ## [0.30.0] - 2026-10-05
 
 ### Added
