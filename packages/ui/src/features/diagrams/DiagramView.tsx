@@ -258,7 +258,6 @@ export function DiagramView(props: DiagramViewProps) {
             now={now()}
             onSelectNode={select}
             onFocusRoutine={setPicked}
-            onRunRoutine={props.onRunRoutine ? runRoutine : undefined}
           />
         </Show>
       </div>

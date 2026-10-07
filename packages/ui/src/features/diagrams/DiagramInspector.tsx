@@ -5,7 +5,7 @@
  * selected routine shows what it asks for, which agents it starts, when it fires and how it went.
  */
 
-import { Badge, Button, ChevronLeft, CopyButton, Play } from "@openbot/ui";
+import { Badge, Button, ChevronLeft, CopyButton } from "@openbot/ui";
 import { createMemo, For, Show } from "solid-js";
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
@@ -35,7 +35,6 @@ export interface DiagramInspectorProps {
   now: Date;
   onSelectNode: (nodeId: string | null) => void;
   onFocusRoutine: (routineId: string) => void;
-  onRunRoutine?: ((nodeId: string) => void) | undefined;
 }
 
 export function DiagramInspector(props: DiagramInspectorProps) {
@@ -188,7 +187,6 @@ export function DiagramInspector(props: DiagramInspectorProps) {
                   agents={props.agents}
                   now={props.now}
                   onSelectNode={props.onSelectNode}
-                  onRunRoutine={props.onRunRoutine}
                 />
               )}
             </Show>
@@ -314,7 +312,6 @@ function RoutineDetail(props: {
   agents: AgentProfile[];
   now: Date;
   onSelectNode: (nodeId: string | null) => void;
-  onRunRoutine?: ((nodeId: string) => void) | undefined;
 }) {
   const { t, format } = useText();
   const reach = createMemo(() => diagramRoutineReach(props.diagram.edges, props.routine.id));
@@ -433,13 +430,6 @@ function RoutineDetail(props: {
           </ol>
         </Show>
       </section>
-
-      <Show when={props.onRunRoutine}>
-        <Button type="button" variant="secondary" size="sm" onClick={() => props.onRunRoutine?.(props.routine.id)}>
-          <Play aria-hidden="true" />
-          {t("diagram.node.runNow")}
-        </Button>
-      </Show>
     </>
   );
 }
