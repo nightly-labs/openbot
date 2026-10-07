@@ -595,6 +595,7 @@ it("sends safe failures when the product analytics SDK cannot start", async () =
     () => reports,
   );
   try {
+    analytics.setUser(null);
     analytics.setEnabled(true);
     await expect(
       analytics.operation("message_send", { provider: "codex", model: "gpt-6" }, async () => {
@@ -615,5 +616,55 @@ it("sends safe failures when the product analytics SDK cannot start", async () =
     expect(sent).toHaveLength(1);
   } finally {
     await Effect.runPromise(reports.close());
+  }
+});
+
+it.each(["consent", "session"])("keeps saved mobile reports when %s loads first", async (first) => {
+  let stored: unknown = null;
+  const storage = {
+    read: () => Effect.succeed(stored),
+    write: (value: unknown) =>
+      Effect.sync(() => {
+        stored = value;
+      }),
+  };
+  const context = { surface: "mobile", platform: "ios", app_version: "1.2.0", event_schema_version: 2 } as const;
+  const previous = new ReportQueue(storage, () => Effect.succeed(false), context);
+  await Effect.runPromise(previous.configure(true, "account"));
+  await Effect.runPromise(
+    previous.record("client_operation_failed", {
+      operation: "turn",
+      source: "action",
+      severity: "error",
+      cause_code: "invalid_upload_request",
+    }),
+  );
+  await Effect.runPromise(previous.close());
+  const sent: Report[] = [];
+  const restarted = new ReportQueue(
+    storage,
+    (report) =>
+      Effect.sync(() => {
+        sent.push(report);
+        return true;
+      }),
+    context,
+  );
+  const analytics = new MobileAnalytics(
+    () => null,
+    () => restarted,
+  );
+  const user = { id: "account", email: "person@example.com" };
+  try {
+    if (first === "consent") analytics.setEnabled(true);
+    else analytics.setUser(user);
+    await Effect.runPromise(restarted.flush());
+    expect(sent).toEqual([]);
+    if (first === "consent") analytics.setUser(user);
+    else analytics.setEnabled(true);
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
+    expect(sent[0]).toMatchObject({ profileId: "account", properties: { cause_code: "invalid_upload_request" } });
+  } finally {
+    await Effect.runPromise(restarted.close());
   }
 });

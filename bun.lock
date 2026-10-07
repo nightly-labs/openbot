@@ -81,7 +81,6 @@
         "@kobalte/core": "catalog:",
         "@openbot/brand": "workspace:*",
         "@openbot/contracts": "workspace:*",
-        "@openbot/telemetry": "workspace:*",
         "@openbot/ui": "workspace:*",
         "@openpanel/web": "catalog:",
         "@paper-design/shaders": "catalog:",

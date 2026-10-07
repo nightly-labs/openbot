@@ -24,6 +24,7 @@ export class MobileAnalytics {
   private expiry: ReturnType<typeof setTimeout> | undefined;
   private enabled = false;
   private consentReady = false;
+  private userReady = false;
   private generation = 0;
   private consentGeneration = 0;
   private user: Pick<CentralAuthUser, "id" | "email"> | null = null;
@@ -41,7 +42,7 @@ export class MobileAnalytics {
     this.consentReady = true;
     this.enabled = enabled;
     const reports = this.createReports?.();
-    if (reports) Effect.runFork(reports.configure(enabled, this.user?.id ?? null));
+    if (reports && this.userReady) Effect.runFork(reports.configure(enabled, this.user?.id ?? null));
     this.consentGeneration += 1;
     this.generation += 1;
     if (!enabled) {
@@ -57,7 +58,8 @@ export class MobileAnalytics {
   setUser(user: Pick<CentralAuthUser, "id" | "email"> | null): void {
     const email = user ? normalizeEmailAddress(user.email) : null;
     const next = user && email ? { id: user.id, email } : null;
-    if (this.user?.id === next?.id && this.user?.email === next?.email) return;
+    if (this.userReady && this.user?.id === next?.id && this.user?.email === next?.email) return;
+    this.userReady = true;
     this.expireAnonymous();
     if (this.user) {
       this.generation += 1;
