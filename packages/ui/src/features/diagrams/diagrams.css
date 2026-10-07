@@ -910,17 +910,6 @@
   background: var(--openbot-bg-surface);
 }
 
-/* As the browser sidebar's collapse button. */
-.diagram-inspector-close.ui-button {
-  border-radius: var(--openbot-radius-sm);
-}
-
-.diagram-inspector-close.ui-button > svg {
-  width: var(--openbot-icon-sm);
-  height: var(--openbot-icon-sm);
-  stroke-width: var(--openbot-icon-stroke);
-}
-
 .diagram-inspector-header {
   display: flex;
   min-height: 52px;

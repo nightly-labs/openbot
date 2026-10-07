@@ -10,6 +10,7 @@
 
 import {
   Button,
+  ChevronRight,
   PanelRight,
   Play,
   Select,
@@ -155,23 +156,23 @@ export function DiagramView(props: DiagramViewProps) {
               </Button>
             )}
           </Show>
-          <Show when={!panels.inspector}>
-            <Button
-              type="button"
-              variant="ghost"
-              class="header-panel-toggle"
-              aria-label={t("diagram.inspector.label")}
-              aria-expanded="false"
-              title={t("diagram.inspector.label")}
-              onClick={() =>
-                setPanels((state) => {
-                  state.inspector = true;
-                })
-              }
-            >
-              <PanelRight aria-hidden="true" class="size-[14px]" />
-            </Button>
-          </Show>
+          <Button
+            type="button"
+            variant="ghost"
+            class="header-panel-toggle"
+            aria-label={t(panels.inspector ? "diagram.inspector.close" : "diagram.inspector.label")}
+            aria-expanded={panels.inspector ? "true" : "false"}
+            title={t(panels.inspector ? "diagram.inspector.close" : "diagram.inspector.label")}
+            onClick={() =>
+              setPanels((state) => {
+                state.inspector = !state.inspector;
+              })
+            }
+          >
+            <Show when={panels.inspector} fallback={<PanelRight aria-hidden="true" class="size-[14px]" />}>
+              <ChevronRight aria-hidden="true" class="size-[14px]" />
+            </Show>
+          </Button>
         </span>
       </header>
 
@@ -255,11 +256,6 @@ export function DiagramView(props: DiagramViewProps) {
             now={now()}
             onSelectNode={select}
             onFocusRoutine={setPicked}
-            onClose={() =>
-              setPanels((state) => {
-                state.inspector = false;
-              })
-            }
             onRunRoutine={props.onRunRoutine ? runRoutine : undefined}
           />
         </Show>

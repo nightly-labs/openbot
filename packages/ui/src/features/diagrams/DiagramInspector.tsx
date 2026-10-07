@@ -5,7 +5,7 @@
  * selected routine shows what it asks for, which agents it starts, when it fires and how it went.
  */
 
-import { Badge, Button, ChevronLeft, ChevronRight, CopyButton, Play } from "@openbot/ui";
+import { Badge, Button, ChevronLeft, CopyButton, Play } from "@openbot/ui";
 import { createMemo, For, Show } from "solid-js";
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
@@ -35,7 +35,6 @@ export interface DiagramInspectorProps {
   now: Date;
   onSelectNode: (nodeId: string | null) => void;
   onFocusRoutine: (routineId: string) => void;
-  onClose: () => void;
   onRunRoutine?: ((nodeId: string) => void) | undefined;
 }
 
@@ -104,17 +103,6 @@ export function DiagramInspector(props: DiagramInspectorProps) {
             </>
           )}
         </Show>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          class="diagram-inspector-close"
-          aria-label={t("diagram.inspector.close")}
-          title={t("diagram.inspector.close")}
-          onClick={() => props.onClose()}
-        >
-          <ChevronRight aria-hidden="true" />
-        </Button>
       </header>
 
       <div class="diagram-inspector-body">
