@@ -1,4 +1,4 @@
-import { open, readFile, rm } from "node:fs/promises";
+import { open, rm } from "node:fs/promises";
 import {
   DISCORD_LIST_MESSAGES_LIMIT,
   DISCORD_MESSAGE_TEXT_LIMIT,
@@ -36,6 +36,10 @@ const CHUNK_CHARACTERS = DISCORD_MESSAGE_TEXT_LIMIT - 40;
 /** How many pages of a channel the context reads after the conversation's first message. */
 const HISTORY_PAGES = 3;
 const RATE_LIMIT_NOTICE_MS = 5_000;
+/** Signal answers a rate limit at once. A call waits and tries again, as a Slack call does. */
+const RATE_LIMIT_RETRIES = 3;
+/** The longest wait for one retry. A longer limit fails the call. */
+const RATE_LIMIT_WAIT_LIMIT_MS = 60_000;
 const REDIRECT_LIMIT = 3;
 const CDN_HOSTS = new Set(["cdn.discordapp.com", "media.discordapp.net"]);
 
@@ -194,8 +198,9 @@ class DiscordAdapter implements MessagingAdapter {
     for (const file of files) {
       const attempt = yield* Effect.result(
         Effect.gen({ self: this }, function* () {
-          const bytes = yield* adapterIo(() => readFile(file.path));
-          if (bytes.byteLength > DISCORD_UPLOAD_BYTES_LIMIT || bytes.byteLength === 0) return false;
+          // An attachment can be ten times larger than Discord's limit: it is not read whole.
+          const bytes = yield* readAtMost(file.path, DISCORD_UPLOAD_BYTES_LIMIT);
+          if (bytes === null || bytes.byteLength === 0) return false;
           yield* this.#call(
             {
               op: "upload",
@@ -313,19 +318,18 @@ class DiscordAdapter implements MessagingAdapter {
     request: DiscordApiRequest,
     decode: (value: unknown) => A,
     file?: { bytes: Uint8Array; mimeType: string },
+    attempt = 0,
   ): Effect.Effect<A, MessagingAdapterError> {
     return this.#ingress.discord(request, decode, file).pipe(
-      Effect.tapError((failure) =>
-        Effect.sync(() => {
-          const error = failure.cause;
-          if (
-            error instanceof DiscordApiError &&
-            error.code === "rate_limited" &&
-            (error.retryAfterMs ?? 0) > RATE_LIMIT_NOTICE_MS
-          )
-            this.#rateLimited(new Date(Date.now() + (error.retryAfterMs ?? 0)).toISOString());
-        }),
-      ),
+      Effect.catch((failure) => {
+        const error = failure.cause;
+        if (!(error instanceof DiscordApiError) || error.code !== "rate_limited" || attempt >= RATE_LIMIT_RETRIES)
+          return Effect.fail(failure);
+        const waitMs = error.retryAfterMs ?? 1_000;
+        if (waitMs > RATE_LIMIT_WAIT_LIMIT_MS) return Effect.fail(failure);
+        if (waitMs > RATE_LIMIT_NOTICE_MS) this.#rateLimited(new Date(Date.now() + waitMs).toISOString());
+        return Effect.sleep(waitMs).pipe(Effect.andThen(this.#call(request, decode, file, attempt + 1)));
+      }),
     );
   }
 }
@@ -375,6 +379,29 @@ function trustedCdnUrl(value: string): boolean {
     return false;
   }
 }
+
+/** The bytes of a file, or null when it is larger than `limit`. It reads at most one byte more. */
+const readAtMost = Effect.fnUntraced(function* (path: string, limit: number) {
+  return yield* Effect.acquireUseRelease(
+    adapterIo(() => open(path, "r")),
+    (file) =>
+      adapterIo(async () => {
+        const { size } = await file.stat();
+        if (size > limit) return null;
+        // One byte more than the size, to see a file that grew since `stat`.
+        const buffer = Buffer.alloc(Math.min(size, limit) + 1);
+        let length = 0;
+        for (;;) {
+          const { bytesRead } = await file.read(buffer, length, buffer.length - length, null);
+          if (bytesRead === 0) break;
+          length += bytesRead;
+          if (length === buffer.length) return null;
+        }
+        return buffer.subarray(0, length);
+      }),
+    (file) => Effect.promise(() => file.close()),
+  );
+});
 
 /** Downloads one attachment from Discord's CDN, and refuses a file larger than `maxBytes`. */
 const downloadAttachment = Effect.fnUntraced(function* (url: string, destination: string, maxBytes: number) {

@@ -45,6 +45,9 @@ class FakeSignal {
   readonly calls: DynamicRecord[] = [];
   /** The guilds that the session says are routed to the host. */
   routed = [GUILD_ID];
+  /** Answers the next call of this operation with a Discord rate limit, as Signal does. */
+  rateLimitNext: string | null = null;
+  rateLimited = 0;
   #server: Server | null = null;
   #sockets: WebSocketServer | null = null;
   #socket: WebSocket | null = null;
@@ -66,6 +69,11 @@ class FakeSignal {
         return reply(401, { error: { code: "unauthorized" } });
       const call = JSON.parse(Buffer.concat(chunks).toString());
       if (!isDynamicRecord(call) || call.guildId !== GUILD_ID) return reply(403, { error: { code: "unknown_guild" } });
+      if (call.op === this.rateLimitNext) {
+        this.rateLimitNext = null;
+        this.rateLimited += 1;
+        return reply(429, { error: { code: "rate_limited", retryAfterMs: 20 } });
+      }
       this.calls.push(call);
       switch (call.op) {
         case "createMessage":
@@ -263,6 +271,8 @@ describe.sequential("OpenBot Discord app end to end", () => {
     expect(signal.hellos.every((hello) => hello.peer === "ingress" && hello.slackRoute === undefined)).toBe(true);
 
     // A mention runs the agent once, however often Signal passes it on. OpenBot replies to it.
+    // The status post is rate limited once: it waits, and arrives.
+    signal.rateLimitNext = "createMessage";
     signal.deliver(GUILD_ID, mention("1000"));
     signal.deliver(GUILD_ID, mention("1000"));
     await waitFor(() => signal.of("editMessage").length > 0);
@@ -270,6 +280,7 @@ describe.sequential("OpenBot Discord app end to end", () => {
     expect(turns()).toHaveLength(1);
     const status = signal.of("createMessage")[0];
     expect(status).toMatchObject({ channelId: CHANNEL_ID, replyTo: "1000" });
+    expect(signal.rateLimited).toBe(1);
     const statusId = "5001";
     await waitFor(() => signal.of("react").some((call) => call.emoji === "✅" && call.on === true));
     expect(signal.of("react").find((call) => call.emoji === "👀")).toMatchObject({ messageId: "1000", on: true });
@@ -334,6 +345,7 @@ describe.sequential("OpenBot Discord app end to end", () => {
           connected: true,
           routeTickets,
           turns: turns().length,
+          rateLimitedCallsRetried: signal.rateLimited,
           replyChainKept: true,
           removedUnlinked: true,
           conversationKept: true,

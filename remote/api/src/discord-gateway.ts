@@ -5,7 +5,7 @@
 import { DiscordAPIError, HTTPError, RateLimitError, REST, RequestMethod } from "@discordjs/rest";
 import { WebSocketManager, WebSocketShardEvents } from "@discordjs/ws";
 import { DISCORD_GATEWAY_INTENTS } from "@openbot/contracts/discord-app";
-import { Context, Effect, FiberSet, Layer } from "effect";
+import { Context, Effect, FiberSet, Layer, Schedule, Schema } from "effect";
 import type { DiscordBotConfig } from "./config";
 import {
   type DiscordApi,
@@ -18,6 +18,14 @@ import { DISCORD_DIRECT_MESSAGE_REPLY, type DiscordAction, DiscordState } from "
 import type { SignalService } from "./signal-service";
 
 const DISCORD_REQUEST_TIMEOUT_MILLISECONDS = 10_000;
+// A first connection that fails is tried again, after 5 seconds and then twice as long each time, at
+// most every 5 minutes, until Signal stops.
+const DISCORD_CONNECT_RETRY = Schedule.min([Schedule.exponential("5 seconds"), Schedule.spaced("5 minutes")]);
+
+class DiscordGatewayConnectError extends Schema.TaggedError<DiscordGatewayConnectError>()(
+  "DiscordGatewayConnectError",
+  {},
+) {}
 // How often Signal tells the account service which guilds the bot is in, so a link of a guild that
 // the bot left goes also when every unlink before it failed.
 const DISCORD_RECONCILE_INTERVAL = "30 minutes";
@@ -199,9 +207,12 @@ export class DiscordGateway extends Context.Service<DiscordGateway, { readonly a
             ),
         );
         // Signal starts without waiting for Discord; the library reconnects by itself after it connects.
+        // The fiber ends with the runtime, which stops the retries.
         run(
-          Effect.tryPromise({ try: () => manager.connect(), catch: () => undefined }).pipe(
-            Effect.catch(() => Effect.sync(() => console.error("OpenBot Discord Gateway could not connect."))),
+          Effect.tryPromise({ try: () => manager.connect(), catch: () => new DiscordGatewayConnectError() }).pipe(
+            Effect.tapError(() => Effect.sync(() => console.error("OpenBot Discord Gateway could not connect."))),
+            Effect.retry(DISCORD_CONNECT_RETRY),
+            Effect.ignore,
           ),
         );
         return DiscordGateway.of({ api: makeDiscordApi(transport, state) });
