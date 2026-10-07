@@ -98,8 +98,8 @@ export interface ChannelConversationProps {
   onSelectAgent: (agentId: string) => void;
   /** The host is this computer, so it keeps the routine settings that the released Team API drops. */
   localHost?: boolean;
-  /** The server id is used by the desktop event routine adapter for local hosts. */
-  serverId?: string;
+  /** The desktop server whose event API this window may manage, as for an agent: owner, admin or this computer. */
+  eventsServerId?: string | undefined;
 }
 
 export function ChannelConversation(props: ChannelConversationProps) {
@@ -149,12 +149,9 @@ export function ChannelConversation(props: ChannelConversationProps) {
     const id = channelId();
     const legacy = legacyRoutinesPort();
     if (!id || !legacy) return null;
-    const eventApi = runtime().eventRoutines;
-    return eventApi
-      ? eventRoutinesPort({ kind: "channel", id }, eventApi, legacy)
-      : props.localHost && props.serverId
-        ? eventRoutinesPort({ kind: "channel", id }, desktopEventRoutinesApi(props.serverId), legacy)
-        : legacy;
+    const serverId = props.eventsServerId;
+    const eventApi = runtime().eventRoutines ?? (serverId ? desktopEventRoutinesApi(serverId) : undefined);
+    return eventApi ? eventRoutinesPort({ kind: "channel", id }, eventApi, legacy) : legacy;
   });
   // The settings row reads both counts before either view opens, so it cannot take them from the
   // view that renders the list. It loads them here and follows the events those views follow.

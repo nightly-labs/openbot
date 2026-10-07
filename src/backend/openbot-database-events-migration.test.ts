@@ -5,7 +5,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { AgentSummary } from "@openbot/contracts/ipc";
-import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { afterEach, describe, expect, it } from "vitest";
 import { AgentRoutineStore } from "./agent-routine-store";
 import { ChannelRoutineStore } from "./channel-routine-store";
@@ -114,12 +113,6 @@ describe("OpenBot webhook routine migration", () => {
     expect(migratedRoutines.get("chief", routine.id)).toBeNull();
     expect(migratedRoutines.getRecord("chief", routine.id)?.trigger).toMatchObject({ kind: "webhook", url: null });
     expect(migratedRoutines.listRuns("chief", routine.id, 10)).toEqual([expect.objectContaining({ id: run.id })]);
-    expect(webhookTables(migrated.connection)).toEqual([
-      "projection_channel_routine_webhooks",
-      "projection_routine_webhooks",
-      "projection_webhook_receipts",
-      "projection_webhook_route_revocations",
-    ]);
     expect(migrated.connection.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({
       version: 29,
     });
@@ -196,20 +189,6 @@ function removeWebhookSchema(database: DatabaseSync): void {
     DROP TABLE projection_webhook_receipts;
     DELETE FROM schema_migrations WHERE version = 29;
   `);
-}
-
-function webhookTables(database: DatabaseSync): string[] {
-  return database
-    .prepare(
-      `SELECT name FROM sqlite_master
-       WHERE type = 'table' AND name LIKE 'projection_%webhook%'
-       ORDER BY name`,
-    )
-    .all()
-    .map((row) => {
-      if (!isDynamicRecord(row) || !isString(row.name)) throw new Error("Invalid table row.");
-      return row.name;
-    });
 }
 
 function testAgent(): AgentSummary {

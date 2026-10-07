@@ -20,7 +20,7 @@ import {
   MessagingAdapterError,
   type MessagingIngress,
 } from "../backend/messaging/messaging-types";
-import { RemoteWorkflowError, remoteDecode } from "./remote-service-effects";
+import { type RemoteWorkflowError, remoteDecode } from "./remote-service-effects";
 
 const logger = createOpenBotLogger("signal-ingress");
 
@@ -43,7 +43,7 @@ export interface SignalIngressOptions {
   /** The Discord route ticket: the guilds that the account service links to this host. */
   issueDiscordRoute(hostId: string): Effect.Effect<string, RemoteWorkflowError>;
   /** The generic webhook route ticket: route IDs registered by this host in account metadata. */
-  issueWebhookRoute?(hostId: string): Effect.Effect<string, RemoteWorkflowError>;
+  issueWebhookRoute(hostId: string): Effect.Effect<string, RemoteWorkflowError>;
 }
 
 class SignalIngressAccount extends Context.Service<
@@ -62,9 +62,7 @@ class SignalIngressAccount extends Context.Service<
         ticket: (hostId) => options.issueTicket(hostId),
         slackRoute: (hostId) => options.issueSlackRoute(hostId),
         discordRoute: (hostId) => options.issueDiscordRoute(hostId),
-        webhookRoute: (hostId) =>
-          options.issueWebhookRoute?.(hostId) ??
-          Effect.fail(new RemoteWorkflowError({ cause: new Error("Webhook routing is unavailable.") })),
+        webhookRoute: (hostId) => options.issueWebhookRoute(hostId),
       }),
     );
   }
@@ -76,7 +74,7 @@ interface DiscordSession {
   url: string;
 }
 
-interface WebhookIngressDelivery {
+export interface WebhookIngressDelivery {
   routeId: string;
   deliveryId: string;
   timestamp: string;
@@ -118,7 +116,6 @@ export class SignalIngress implements MessagingIngress {
   #webhookHolders = 0;
   #webhookHandler: WebhookIngressHandler | null = null;
   #webhookReady = false;
-  readonly #webhookReadyListeners = new Set<(ready: boolean) => void>();
   readonly #sessionListeners = new Set<(session: DiscordSession | null) => void>();
   readonly #routeListeners = new Set<(guildIds: ReadonlySet<string>) => void>();
 
@@ -187,11 +184,6 @@ export class SignalIngress implements MessagingIngress {
   /** True only after Signal confirms the webhook route ticket on this socket. */
   webhookReady(): boolean {
     return this.#webhookReady;
-  }
-
-  onWebhookReady(listener: (ready: boolean) => void): () => void {
-    this.#webhookReadyListeners.add(listener);
-    return () => this.#webhookReadyListeners.delete(listener);
   }
 
   /**
@@ -288,7 +280,6 @@ export class SignalIngress implements MessagingIngress {
     this.#routeListeners.clear();
     this.#webhookHandler = null;
     this.#webhookHolders = 0;
-    this.#webhookReadyListeners.clear();
     yield* Scope.close(this.#scope, Exit.void);
     yield* this.#runtime.disposeEffect;
   }, Effect.uninterruptible);
@@ -305,12 +296,25 @@ export class SignalIngress implements MessagingIngress {
     const slack = this.#holds("slack");
     const discord = this.#holds("discord");
     const webhooks = this.#webhookHolders > 0;
+    let webhookTicket: Effect.Effect<string | null, RemoteWorkflowError> = webhooks
+      ? account.webhookRoute(hostId)
+      : Effect.succeed(null);
+    // A failed webhook ticket must not stop Slack and Discord: the socket then connects without it.
+    if (webhooks && (slack || discord))
+      webhookTicket = webhookTicket.pipe(
+        Effect.catch(() =>
+          Effect.sync(() => {
+            logger.warn("The webhook route ticket is not available. Webhooks stay offline until a reconnect.");
+            return null;
+          }),
+        ),
+      );
     const issued = yield* Effect.all(
       [
         account.ticket(hostId),
         slack ? account.slackRoute(hostId) : Effect.succeed(null),
         discord ? account.discordRoute(hostId) : Effect.succeed(null),
-        webhooks ? account.webhookRoute(hostId) : Effect.succeed(null),
+        webhookTicket,
       ],
       { concurrency: "unbounded" },
     ).pipe(Effect.result);
@@ -345,7 +349,7 @@ export class SignalIngress implements MessagingIngress {
       this.#socket = null;
       this.#discordSession = null;
       this.#stopPing();
-      this.#setWebhookReady(false);
+      this.#webhookReady = false;
       if (this.#held() > 0 || this.#webhookHolders > 0) this.#wait("unavailable");
     });
     socket.on("error", () => {
@@ -373,7 +377,7 @@ export class SignalIngress implements MessagingIngress {
       return;
     }
     if (message.type === "webhook-ready") {
-      this.#setWebhookReady(true);
+      this.#webhookReady = true;
       return;
     }
     if (message.type === "error") {
@@ -471,7 +475,7 @@ export class SignalIngress implements MessagingIngress {
     const socket = this.#socket;
     this.#socket = null;
     this.#discordSession = null;
-    this.#setWebhookReady(false);
+    this.#webhookReady = false;
     if (this.#held() === 0 && this.#webhookHolders === 0)
       for (const listener of [...this.#sessionListeners]) listener(null);
     socket?.close(1000);
@@ -483,12 +487,6 @@ export class SignalIngress implements MessagingIngress {
     if (state === this.#state) return;
     this.#state = state;
     for (const listener of this.#listeners) listener(state);
-  }
-
-  #setWebhookReady(ready: boolean): void {
-    if (ready === this.#webhookReady) return;
-    this.#webhookReady = ready;
-    for (const listener of this.#webhookReadyListeners) listener(ready);
   }
 
   #clearRetry(): void {

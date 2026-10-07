@@ -51,6 +51,7 @@ const WEBHOOK_SCHEMA_SQL = `
   );
   CREATE INDEX IF NOT EXISTS webhook_receipts_recent
     ON projection_webhook_receipts(owner_kind, routine_id, received_at DESC, receipt_id);
+  CREATE INDEX IF NOT EXISTS webhook_receipts_received ON projection_webhook_receipts(received_at);
 `;
 
 // This is the frozen compatibility schema for every database that predates v8.

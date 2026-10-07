@@ -16,7 +16,7 @@ The flow is: signed request → route → routine → run.
 | Trigger, route ID, encrypted secret, URL | Host SQLite | `projection_routine_webhooks`, `projection_channel_routine_webhooks` |
 | Receipts (no body) | Host SQLite | `projection_webhook_receipts` |
 | Routes to revoke on the relay | Host SQLite | `projection_webhook_route_revocations` |
-| Route ID → host and owner account, link time | Account service D1 | `webhook_routes` |
+| Route ID → host and owner account, link time, revoke time | Account service D1 | `webhook_routes` |
 | Route ID → ingress socket | Signal memory | `SignalService` |
 
 Schema v29 (`src/backend/openbot-database-schema.ts`) only adds these tables. Existing routines and
@@ -44,29 +44,43 @@ A host has at most `WEBHOOK_ROUTES_LIMIT` (64) routes. Main and the account serv
 After a save, `HostEventsService.syncRoutes` registers each route that has no URL. The account
 service records the route for the host. `WebhookRelay` builds the URL from the Signal origin and
 `WEBHOOK_EVENTS_PATH` (`/v1/webhooks/<routeId>`). A failed call keeps the local state for the next
-sync and does not fail the save. At start and after an account change, the host registers all routes
-again.
+sync and does not fail the save. The save releases its write lock before the sync, so a slow network
+does not block other saves. At start and when the signed-in account changes, the host registers all
+routes again. A token refresh does not start a sync.
+
+`HostEventsRuntime` runs one sync at a time. Requests that arrive during a sync become one more sync.
+A routine change starts a sync. An agent or channel event starts one only when the owner is gone,
+because turns and messages also send these events. When the account service answers
+`webhook_route_conflict` (the ID is revoked or belongs to another host or account), the backend gives
+the routine a new route ID, keeps the secret, and registers the new ID. The URL changes.
 
 A routine delete, a change to `schedule`, and an agent or channel delete all call
 `revokeRoutineWebhooks`. It writes the route ID to `projection_webhook_route_revocations` and removes
-the trigger row in the same transaction. `syncRoutes` drains the queue: the account service deletes
-the route and sends `webhook-route-revoked` to Signal. A routine or owner delete also removes its
+the trigger row in the same transaction. `syncRoutes` drains the queue: the account service marks
+the route revoked and sends `webhook-route-revoked` to Signal. The account service never deletes a
+route row and never frees its ID, also not after a host or account delete: senders can still post to
+the old public URL, so the ID must never belong to another host. A routine or owner delete also removes its
 receipts. A change to `schedule` keeps them.
 
-The ingress socket presents a signed route ticket with the current routes
+The ingress socket presents a signed route ticket with the current routes, signed with the remote
+ticket key and the webhook route audience
 (`WEBHOOK_ROUTE_TTL_SECONDS`, 5 minutes). After a route change, the host opens a new socket to get a
 new ticket. Signal keeps revocations in memory. For 5 minutes after Signal starts, it confirms each
 ticket route with the account service. The host keeps the webhook ingress open while it has at least
-one route.
+one route. When Slack or Discord share the socket, a failed webhook ticket does not stop them: the
+socket connects without webhook routes, and webhooks stay offline until the next reconnect.
 
 ## Inbound request
 
 Signal (`remote/api/src/app.ts`) accepts `POST /v1/webhooks/:routeId`. It checks, in this order:
-route ID syntax (404), declared body size (413), `Content-Type: application/json` (415), rate limit
-by route and client address (429), body size (413), and header syntax (401). It then sends the exact
-bytes and the three header values to the host socket and waits for the status. It returns 503 when
-no socket holds the route, the host has too many pending requests, or the host does not answer in
-2.5 seconds. Signal has no queue and does not store or log the body.
+route ID syntax (404), declared body size (413), `Content-Type: application/json` (415), header
+syntax (401), a socket that holds the route (503), rate limit by route and client address (429), and
+body size (413). So an unknown route uses no rate-limit entry and Signal does not read its body.
+Signal then sends the exact bytes and the three header values to the host socket and waits for the
+status. It also returns 503 when the host has too many pending requests or does not answer in 2.5
+seconds. Slack and webhook deliveries share one pending budget for each host (16 requests, 128 KiB),
+which stays below the socket backpressure limit. Signal has no queue and does not store or log the
+body. The header patterns are in `packages/contracts/src/signal-protocol/webhook-route.ts`.
 
 The host (`HostEventsService.receive`) returns:
 
@@ -78,7 +92,7 @@ The host (`HostEventsService.receive`) returns:
 | 400 | Body is not UTF-8 JSON `{ type, occurredAt?, data? }` |
 | 202 | Run started, or ignored: `event-type`, `filter`, or `inactive` |
 | 200 | Duplicate delivery ID for this routine |
-| 503 | The agent is held or being deleted, the channel is archived or held, or the handler failed |
+| 503 | The host cannot decrypt the secret, the agent is held or being deleted, the channel is archived or held, or the handler failed |
 
 Verification comes before JSON decoding. The signature is
 `sha256=HMAC-SHA256(secret, "<timestamp>.<deliveryId>.<body>")`, compared in constant time. The
@@ -97,7 +111,8 @@ limits, and approval controls.
 - Remote hosts: the `events-v1` Team API capability, `EVENTS_ROUTES` in
   `packages/contracts/src/team-protocol/events-v1.ts`. All routes need a host administrator. The
   routes are status, routine list, save, delete, and test, `rotateSecret`, and activity. Activity is
-  the receipts of one routine.
+  the receipts of one routine. A failure with catalog text returns 400. Other failures return 500
+  with `error.team.requestFailed`, and the dispatcher logs them.
 - Released schedule-only routine views do not show webhook routines. Only a schedule routine writes
   a conversation event.
 - Desktop and web use the shared routine editor components in

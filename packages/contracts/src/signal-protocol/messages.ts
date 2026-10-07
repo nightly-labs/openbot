@@ -65,9 +65,6 @@ export const SLACK_DELIVERY_RESPONSE_BYTES_LIMIT = 4 * 1024;
 // The largest generic webhook body Signal passes to a host. Signal does not inspect or retain it.
 export const WEBHOOK_DELIVERY_BODY_BYTES_LIMIT = 64 * 1024;
 
-// Generic webhook handlers return only a status. Keep a small bound for future response metadata.
-export const WEBHOOK_DELIVERY_RESPONSE_BYTES_LIMIT = 4 * 1024;
-
 // The Slack request that a delivery carries. Slack sends events as JSON and button presses as a form.
 export type SlackDeliveryKind = "events" | "interactivity";
 
@@ -212,7 +209,7 @@ export type SignalServerMessage =
   // Sent after `ready` when the ingress hello carried a webhook route ticket. An older Signal
   // service ignores the optional hello field and never emits this frame, so the host can gate the
   // webhook feature on this acknowledgement.
-  | { type: "webhook-ready"; version: SignalProtocolVersion; routes: string[] }
+  | { type: "webhook-ready"; version: SignalProtocolVersion }
   // One Discord event of a guild routed to this `ingress` socket. Signal already acknowledged a button
   // press to Discord; nothing is answered.
   | { type: "discord-delivery"; version: SignalProtocolVersion; guildId: string; delivery: DiscordDelivery }

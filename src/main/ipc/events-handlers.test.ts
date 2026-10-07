@@ -34,7 +34,7 @@ function unusedEvents(): HostEventsApi {
 
 function setup(capable: boolean) {
   bound.clear();
-  const requests: { serverId: string; path: string; init?: RemoteRequestInit }[] = [];
+  const requests: { serverId: string; path: string; init?: RemoteRequestInit | undefined }[] = [];
   const remoteServers = {
     supportsCapability: (_serverId: string, capability: typeof EVENTS_CAPABILITY) =>
       capable && capability === EVENTS_CAPABILITY,

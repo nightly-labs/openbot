@@ -10,16 +10,21 @@ import type {
 } from "@openbot/contracts/ipc-events";
 import { isEventJsonValue } from "@openbot/contracts/ipc-events";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
-import { WEBHOOK_DELIVERY_BODY_BYTES_LIMIT } from "@openbot/contracts/signal-protocol/messages";
+import {
+  WEBHOOK_DELIVERY_BODY_BYTES_LIMIT,
+  type WebhookDeliveryStatus,
+} from "@openbot/contracts/signal-protocol/messages";
 import { WEBHOOK_ROUTES_LIMIT } from "@openbot/contracts/signal-protocol/webhook-route";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, registerSecretValue } from "@openbot/logging";
 import { Effect, Semaphore } from "effect";
+import { causeHelpers } from "../backend/effect-boundary";
 import type { RoutineRecords } from "../backend/routine-records";
 import type { OwnedRoutineRecord, RoutineRecordInput } from "../backend/routine-store";
 import { WEBHOOK_EVENT_TYPE_MAX_LENGTH } from "../backend/webhook-trigger";
-import { type HostEventsApi, HostEventsFailure } from "./host-events-api";
+import { type HostEventsApi, HostEventsFailure, WebhookRouteConflict } from "./host-events-api";
 import type { SecretCipher } from "./provider-credential-store";
+import type { WebhookIngressDelivery } from "./signal-ingress";
 import { verifyWebhookSignature } from "./webhook-security";
 
 const logger = createOpenBotLogger("host-events");
@@ -31,20 +36,9 @@ export interface HostWebhookRelay {
   setEnabled(enabled: boolean): void;
   /** Applies route changes to the open relay connection. */
   refresh(): void;
-  registerRoute(routeId: string): Effect.Effect<string, { readonly cause: unknown }>;
+  registerRoute(routeId: string): Effect.Effect<string, { readonly cause: unknown } | WebhookRouteConflict>;
   revokeRoute(routeId: string): Effect.Effect<void, { readonly cause: unknown }>;
 }
-
-export interface HostWebhookReceipt {
-  routeId: string;
-  deliveryId: string;
-  timestamp: string;
-  signature: string;
-  body: Uint8Array;
-}
-
-/** The relay status codes that a receipt can produce. A thrown failure becomes 503. */
-export type HostWebhookReceiptStatus = 200 | 202 | 400 | 401 | 404 | 413 | 503;
 
 export interface HostEventsServiceOptions {
   routines: RoutineRecords;
@@ -52,9 +46,7 @@ export interface HostEventsServiceOptions {
   relay: HostWebhookRelay;
 }
 
-function eventStep<A>(operation: () => A): Effect.Effect<A, HostEventsFailure> {
-  return Effect.try({ try: operation, catch: (cause) => new HostEventsFailure({ cause }) });
-}
+const { sync: eventStep, rewrap: toHostEventsFailure } = causeHelpers(HostEventsFailure);
 
 function eventFailure(message: string): HostEventsFailure {
   return new HostEventsFailure({ cause: new Error(message) });
@@ -106,7 +98,6 @@ function decodeWebhookBody(body: Uint8Array): DecodedWebhookBody | null {
  */
 export class HostEventsService implements HostEventsApi {
   readonly #options: HostEventsServiceOptions;
-  readonly #routines: RoutineRecords;
   /** Serializes routine writes, so the route limit check and the write are one step. */
   readonly #writes = Semaphore.makeUnsafe(1);
   /** Serializes relay calls, so a revoke and a register of one route cannot cross. */
@@ -114,65 +105,38 @@ export class HostEventsService implements HostEventsApi {
 
   constructor(options: HostEventsServiceOptions) {
     this.#options = options;
-    this.#routines = options.routines;
   }
 
-  readonly getStatus = Effect.fn("HostEvents.status")(function* (this: HostEventsService) {
-    return yield* Effect.succeed({ supported: true, connected: this.#options.relay.connected() });
-  }).bind(this);
+  getStatus() {
+    return Effect.sync(() => ({ supported: true, connected: this.#options.relay.connected() }));
+  }
 
   readonly listRoutines = Effect.fn("HostEvents.listRoutines")(function* (
     this: HostEventsService,
     input: ListEventRoutinesInput,
   ) {
     yield* this.#requireOwner(input.owner);
-    return yield* eventStep(() => this.#routines.list(input.owner).map((record) => eventRoutine(input.owner, record)));
+    return yield* eventStep(() =>
+      this.#options.routines.list(input.owner).map((record) => eventRoutine(input.owner, record)),
+    );
   }).bind(this);
 
-  readonly saveRoutine = Effect.fn("HostEvents.saveRoutine")(
-    function* (this: HostEventsService, input: SaveEventRoutineInput) {
-      const { owner, trigger } = input;
-      yield* this.#requireOwner(owner);
-      const existing = input.id ? yield* this.#requireRoutine({ owner, id: input.id }) : null;
-      let secret: string | null = null;
-      let recordTrigger: RoutineRecordInput["trigger"];
-      if (trigger.kind === "schedule") {
-        recordTrigger = { kind: "schedule", schedule: trigger.schedule };
-      } else {
-        let secretCiphertext: string | null = null;
-        if (existing?.trigger.kind !== "webhook") {
-          if ((yield* eventStep(() => this.#routines.routes.list())).length >= WEBHOOK_ROUTES_LIMIT) {
-            return yield* eventFailure(sourceText("error.backend.webhookRouteLimit", { limit: WEBHOOK_ROUTES_LIMIT }));
-          }
-          secret = newWebhookSecret();
-          secretCiphertext = yield* this.#encrypt(secret);
-        }
-        recordTrigger = { kind: "webhook", eventType: trigger.eventType, filters: trigger.filters, secretCiphertext };
-      }
-      const saved = yield* eventStep(() =>
-        this.#routines.save(owner, input.id, {
-          name: input.name,
-          instruction: input.instruction,
-          active: input.active,
-          timezone: input.timezone,
-          trigger: recordTrigger,
-          ...(input.limitPolicy === undefined ? {} : { limitPolicy: input.limitPolicy }),
-        }),
-      );
-      yield* this.syncRoutes({ all: false });
-      // The sync can add the URL. A save that the relay did not confirm keeps a null URL.
-      const current = yield* eventStep(() => this.#routines.get(owner, saved.id) ?? saved);
-      return { routine: eventRoutine(owner, current), secret };
-    },
-    (operation) => this.#writes.withPermit(operation),
-  ).bind(this);
+  readonly saveRoutine = Effect.fn("HostEvents.saveRoutine")(function* (
+    this: HostEventsService,
+    input: SaveEventRoutineInput,
+  ) {
+    const { saved, secret } = yield* this.#saveRecord(input);
+    // The relay sync runs after the write lock is released, so a slow relay does not block writes.
+    yield* this.syncRoutes({ all: false });
+    // The sync can add the URL. A save that the relay did not confirm keeps a null URL.
+    const current = yield* eventStep(() => this.#options.routines.get(input.owner, saved.id) ?? saved);
+    return { routine: eventRoutine(input.owner, current), secret };
+  }).bind(this);
 
+  /** Deletes the routine. The routine change event starts the sync that revokes its route. */
   readonly deleteRoutine = Effect.fn("HostEvents.deleteRoutine")(
     function* (this: HostEventsService, input: EventRoutineRef) {
-      yield* this.#routines
-        .delete(input.owner, input.id)
-        .pipe(Effect.mapError((failure) => new HostEventsFailure({ cause: failure.cause })));
-      yield* this.syncRoutes({ all: false });
+      yield* toHostEventsFailure(this.#options.routines.delete(input.owner, input.id));
     },
     (operation) => this.#writes.withPermit(operation),
   ).bind(this);
@@ -181,9 +145,7 @@ export class HostEventsService implements HostEventsApi {
     this: HostEventsService,
     input: EventRoutineRef,
   ) {
-    yield* this.#routines
-      .test(input.owner, input.id)
-      .pipe(Effect.mapError((failure) => new HostEventsFailure({ cause: failure.cause })));
+    yield* toHostEventsFailure(this.#options.routines.test(input.owner, input.id));
   }).bind(this);
 
   readonly rotateSecret = Effect.fn("HostEvents.rotateSecret")(
@@ -193,7 +155,7 @@ export class HostEventsService implements HostEventsApi {
         return yield* eventFailure(sourceText("error.backend.webhookSettingsInvalid"));
       const secret = newWebhookSecret();
       const secretCiphertext = yield* this.#encrypt(secret);
-      yield* eventStep(() => this.#routines.routes.rotateSecret(input.owner, input.id, secretCiphertext));
+      yield* eventStep(() => this.#options.routines.routes.rotateSecret(input.owner, input.id, secretCiphertext));
       return { secret };
     },
     (operation) => this.#writes.withPermit(operation),
@@ -205,37 +167,45 @@ export class HostEventsService implements HostEventsApi {
   ) {
     yield* this.#requireRoutine({ owner: input.owner, id: input.routineId });
     const limit = input.limit ?? DEFAULT_ACTIVITY_LIMIT;
-    return yield* eventStep(() => this.#routines.routes.listReceipts(input.owner.kind, input.routineId, limit));
+    return yield* eventStep(() => this.#options.routines.routes.listReceipts(input.owner.kind, input.routineId, limit));
   }).bind(this);
 
   /** Verifies one relayed request and starts its routine. The status goes back to the sender. */
   readonly receive = Effect.fn("HostEvents.receive")(function* (
     this: HostEventsService,
-    input: HostWebhookReceipt,
-  ): Effect.fn.Return<{ status: HostWebhookReceiptStatus }, HostEventsFailure> {
+    input: WebhookIngressDelivery,
+  ): Effect.fn.Return<{ status: WebhookDeliveryStatus }, HostEventsFailure> {
     if (input.body.byteLength > WEBHOOK_DELIVERY_BODY_BYTES_LIMIT) return { status: 413 };
-    const route = yield* eventStep(() => this.#routines.routes.find(input.routeId));
+    const route = yield* eventStep(() => this.#options.routines.routes.find(input.routeId));
     if (!route) return { status: 404 };
-    const authenticated = yield* Effect.result(
+    const secret = yield* Effect.result(
       eventStep(() => {
-        const secret = this.#options.cipher.decrypt(Buffer.from(route.secretCiphertext, "base64"));
-        registerSecretValue(secret);
-        verifyWebhookSignature(secret, input, input.signature);
+        const value = this.#options.cipher.decrypt(Buffer.from(route.secretCiphertext, "base64"));
+        registerSecretValue(value);
+        return value;
       }),
+    );
+    // The sender's request is not at fault, so it can retry when the host can read the secret again.
+    if (secret._tag === "Failure") {
+      logger.warn("A webhook signing secret could not be decrypted.");
+      return { status: 503 };
+    }
+    const authenticated = yield* Effect.result(
+      eventStep(() => verifyWebhookSignature(secret.success, input, input.signature)),
     );
     if (authenticated._tag === "Failure") return { status: 401 };
     const body = decodeWebhookBody(input.body);
     if (!body) return { status: 400 };
     const receivedAt = new Date().toISOString();
-    const result = yield* this.#routines
-      .receiveWebhook(route.owner, route.routineId, {
+    const result = yield* toHostEventsFailure(
+      this.#options.routines.receiveWebhook(route.owner, route.routineId, {
         deliveryId: input.deliveryId,
         eventType: body.type,
         data: body.data,
         occurredAt: body.occurredAt ?? receivedAt,
         receivedAt,
-      })
-      .pipe(Effect.mapError((failure) => new HostEventsFailure({ cause: failure.cause })));
+      }),
+    );
     switch (result.kind) {
       case "started":
       case "ignored":
@@ -257,7 +227,7 @@ export class HostEventsService implements HostEventsApi {
   readonly syncRoutes = Effect.fn("HostEvents.syncRoutes")(
     function* (this: HostEventsService, options: { all: boolean }) {
       const { relay } = this.#options;
-      const routes = this.#routines.routes;
+      const routes = this.#options.routines.routes;
       let failed = false;
       let changed = false;
       for (const routeId of yield* eventStep(() => routes.pendingRevocations())) {
@@ -272,19 +242,32 @@ export class HostEventsService implements HostEventsApi {
       const updatedOwners = new Map<string, EventRoutineOwner>();
       for (const route of current) {
         if (!options.all && route.url !== null) continue;
-        const registered = yield* Effect.result(relay.registerRoute(route.routeId));
+        const ownerKey = `${route.owner.kind}:${route.owner.id}`;
+        let { routeId, url } = route;
+        let registered = yield* Effect.result(relay.registerRoute(routeId));
+        if (registered._tag === "Failure" && registered.failure instanceof WebhookRouteConflict) {
+          // The relay keeps a refused route ID for good. A new ID gets a new URL, and the secret stays.
+          const replacement = yield* eventStep(() => routes.replaceRouteId(route.routeId));
+          if (replacement === null) continue;
+          routeId = replacement;
+          url = null;
+          updatedOwners.set(ownerKey, route.owner);
+          registered = yield* Effect.result(relay.registerRoute(routeId));
+        }
         if (registered._tag === "Failure") failed = true;
-        else {
+        else if (registered.success !== url) {
           changed = true;
-          if (registered.success === route.url) continue;
-          yield* eventStep(() => routes.setUrl(route.routeId, registered.success));
-          updatedOwners.set(`${route.owner.kind}:${route.owner.id}`, route.owner);
+          const registeredUrl = registered.success;
+          yield* eventStep(() => routes.setUrl(routeId, registeredUrl));
+          updatedOwners.set(ownerKey, route.owner);
         }
       }
-      relay.setEnabled(current.length > 0);
-      if (changed && current.length > 0) relay.refresh();
+      const enabled = current.length > 0;
+      // `refresh` reconnects only a held socket. `setEnabled(true)` opens a new one with the current routes.
+      if (changed && enabled) relay.refresh();
+      relay.setEnabled(enabled);
       // An open editor shows "URL pending" until it reloads the routine.
-      for (const owner of updatedOwners.values()) this.#routines.changed(owner);
+      for (const owner of updatedOwners.values()) this.#options.routines.changed(owner);
       if (failed) logger.warn("Some webhook routes are not ready. Local settings were retained.");
     },
     (operation) =>
@@ -297,11 +280,48 @@ export class HostEventsService implements HostEventsApi {
         ),
   ).bind(this);
 
+  /** Writes the routine under the write lock, so the route limit check and the write are one step. */
+  readonly #saveRecord = Effect.fn("HostEvents.saveRecord")(
+    function* (this: HostEventsService, input: SaveEventRoutineInput) {
+      const { owner, trigger } = input;
+      const routines = this.#options.routines;
+      yield* this.#requireOwner(owner);
+      const existing = input.id ? yield* this.#requireRoutine({ owner, id: input.id }) : null;
+      let secret: string | null = null;
+      let recordTrigger: RoutineRecordInput["trigger"];
+      if (trigger.kind === "schedule") {
+        recordTrigger = { kind: "schedule", schedule: trigger.schedule };
+      } else {
+        let secretCiphertext: string | null = null;
+        if (existing?.trigger.kind !== "webhook") {
+          if ((yield* eventStep(() => routines.routes.list())).length >= WEBHOOK_ROUTES_LIMIT) {
+            return yield* eventFailure(sourceText("error.backend.webhookRouteLimit", { limit: WEBHOOK_ROUTES_LIMIT }));
+          }
+          secret = newWebhookSecret();
+          secretCiphertext = yield* this.#encrypt(secret);
+        }
+        recordTrigger = { kind: "webhook", eventType: trigger.eventType, filters: trigger.filters, secretCiphertext };
+      }
+      const saved = yield* eventStep(() =>
+        routines.save(owner, input.id, {
+          name: input.name,
+          instruction: input.instruction,
+          active: input.active,
+          timezone: input.timezone,
+          trigger: recordTrigger,
+          ...(input.limitPolicy === undefined ? {} : { limitPolicy: input.limitPolicy }),
+        }),
+      );
+      return { saved, secret };
+    },
+    (operation) => this.#writes.withPermit(operation),
+  );
+
   readonly #requireOwner = Effect.fn("HostEvents.requireOwner")(function* (
     this: HostEventsService,
     owner: EventRoutineOwner,
   ) {
-    if (yield* eventStep(() => this.#routines.ownerExists(owner))) return;
+    if (yield* eventStep(() => this.#options.routines.ownerExists(owner))) return;
     return yield* eventFailure(
       sourceText(owner.kind === "agent" ? "error.storage.agentMissing" : "error.backend.channelNotFound"),
     );
@@ -311,7 +331,7 @@ export class HostEventsService implements HostEventsApi {
     this: HostEventsService,
     ref: EventRoutineRef,
   ) {
-    const routine = yield* eventStep(() => this.#routines.get(ref.owner, ref.id));
+    const routine = yield* eventStep(() => this.#options.routines.get(ref.owner, ref.id));
     if (routine) return routine;
     return yield* eventFailure(sourceText("error.backend.routineGone"));
   });

@@ -552,24 +552,20 @@
   gap: var(--openbot-space-1);
 }
 
-/* The end of a trigger row: the menu that changes the trigger. */
+/*
+ * The end of a trigger row: the menu that changes the trigger. It sits one padding from the end,
+ * as the icon does at the start. The menu button has the size of a chip, so the row stays as tall
+ * as an input.
+ */
 .routine-trigger-action {
   display: inline-flex;
   flex: 0 0 auto;
   align-self: center;
-  margin-left: auto;
+  margin-inline-start: calc(var(--openbot-space-1) * -1);
 }
 
 .routine-trigger-action:empty {
   display: none;
-}
-
-/*
- * In a trigger row the menu button has the size of a chip, so the row stays as tall as an
- * input. It sits one padding from the end, as the icon does at the start.
- */
-:is(.routine-trigger-row, .routine-trigger-card-header) .routine-trigger-action {
-  margin-inline-start: calc(var(--openbot-space-1) * -1);
 }
 
 :is(.routine-trigger-row, .routine-trigger-card-header) .routine-trigger-action .ui-button {
@@ -744,11 +740,6 @@ code.routine-webhook-secret {
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
   line-height: var(--openbot-leading-sm);
-}
-
-/* A JSON Pointer is longer than its value. */
-.routine-webhook-events .agent-routine-event-filter {
-  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr) auto;
 }
 
 .routine-webhook-add-filter {

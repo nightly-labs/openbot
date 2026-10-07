@@ -226,6 +226,11 @@ export class RoutineScheduler implements RoutineDueSource {
     return this.#routines.listRecords(agentId);
   }
 
+  /** Unchecked read of every trigger kind, for callers that already hold the agent. */
+  listRecordsFor(agentId: string): OwnedRoutineRecord[] {
+    return this.#routines.listRecords(agentId);
+  }
+
   getRecord(agentId: string, routineId: string): OwnedRoutineRecord | null {
     this.#conversation.requireKnownAgent(agentId);
     return this.#routines.getRecord(agentId, routineId);

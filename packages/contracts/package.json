@@ -15,6 +15,7 @@
     "./billing": "./src/billing.ts",
     "./discord-app": "./src/discord-app.ts",
     "./discord-guild-grant": "./src/discord-guild-grant.ts",
+    "./event-filter-value": "./src/event-filter-value.ts",
     "./chat-math": "./src/chat-math.ts",
     "./chat-preview": "./src/chat-preview.ts",
     "./chat-tag-references": "./src/chat-tag-references.ts",

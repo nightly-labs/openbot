@@ -149,7 +149,6 @@
     "src/renderer/src/features/channels/channel-timeline.ts": 2,
     "src/renderer/src/features/channels/ChannelConversation.tsx": 3,
     "src/renderer/src/features/channels/ChannelEditor.tsx": 1,
-    "src/renderer/src/features/conversation/AgentRoutinesSettings.tsx": 1,
     "src/renderer/src/features/conversation/AgentSettingsPanel.tsx": 2,
     "src/renderer/src/features/conversation/AgentSkillsModal.tsx": 2,
     "src/renderer/src/features/conversation/BrowserPreviewSidebar.tsx": 2,

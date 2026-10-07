@@ -12,17 +12,19 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin } from "./request-helpers";
 
+const EVENT_ROUTE_PATHS = new Set<string>(Object.values(EVENTS_ROUTES));
+
 export interface EventsRouteDependencies {
-  events?: HostEventsApi;
+  events?: HostEventsApi | undefined;
 }
 
 async function runEventsEffect<A>(operation: Effect.Effect<A, HostEventsFailure>): Promise<A> {
   try {
     return await Effect.runPromise(operation);
   } catch (error) {
-    if (error instanceof HostEventsFailure) {
-      throw new HttpError(400, hostEventsFailureMessage(error));
-    }
+    // An internal failure goes to the dispatcher, which logs it and returns a generic 500.
+    const message = error instanceof HostEventsFailure ? hostEventsFailureMessage(error) : null;
+    if (message !== null) throw new HttpError(400, message);
     throw error;
   }
 }
@@ -41,8 +43,7 @@ export async function routeEvents(
 ): Promise<RouteOutcome> {
   const { method, url, capabilities, member, request, json } = context;
   const path = url.pathname;
-  const isEventRoute = new Set<string>(Object.values(EVENTS_ROUTES)).has(path);
-  if (!isEventRoute || method !== "POST") return "unmatched";
+  if (!EVENT_ROUTE_PATHS.has(path) || method !== "POST") return "unmatched";
   if (!events || !capabilities.has(EVENTS_CAPABILITY)) {
     throw new HttpError(400, sourceText("error.backend.eventsUnavailable"));
   }

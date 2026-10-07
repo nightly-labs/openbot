@@ -6,15 +6,15 @@ import { createEffect, createSignal, For, Match, Show, Switch, untrack } from "s
 import { type TextValue, useText } from "../../text";
 
 /** The webhook activity of an event routine. Its ignored requests join the runs. */
-export interface RoutineHistoryActivity {
+interface RoutineHistoryActivity {
   api: { listActivity: (input: ListEventActivityInput) => Promise<EventActivity[]> };
   routine: EventRoutineRef;
 }
 
 interface RoutineRunHistoryProps {
   runs: RoutineRunFields[];
-  onOpenRun?: (messageId: string) => void;
-  activity?: RoutineHistoryActivity;
+  onOpenRun?: ((messageId: string) => void) | undefined;
+  activity?: RoutineHistoryActivity | undefined;
 }
 
 type HistoryEntry =
@@ -23,11 +23,6 @@ type HistoryEntry =
 
 const VISIBLE_ENTRIES = 10;
 const ACTIVITY_LIMIT = 50;
-
-/** A started request already shows as its run. The history adds only the requests that did not start a run. */
-function activityEntry(item: EventActivity): HistoryEntry | null {
-  return item.status === "ignored" ? { kind: "ignored", at: item.occurredAt, item } : null;
-}
 
 /**
  * Only an agent run names a message the user can jump to: its mailbox delivery. A channel run
@@ -57,7 +52,9 @@ export function RoutineRunHistory(props: RoutineRunHistoryProps) {
         routineId: source.routine.id,
         limit: ACTIVITY_LIMIT,
       });
-      if (current === request) setActivity(rows);
+      if (current !== request) return;
+      setActivity(rows);
+      setError(null);
     } catch (cause) {
       if (current === request) setError(errorMessage(cause, t("routine.history.activityFailed")));
     }
@@ -78,7 +75,10 @@ export function RoutineRunHistory(props: RoutineRunHistoryProps) {
   const entries = (): HistoryEntry[] =>
     [
       ...props.runs.map((run): HistoryEntry => ({ kind: "run", at: run.scheduledFor, run })),
-      ...activity().flatMap((item) => activityEntry(item) ?? []),
+      // A started request already shows as its run. The history adds only the requests that did not start a run.
+      ...activity()
+        .filter((item) => item.status === "ignored")
+        .map((item): HistoryEntry => ({ kind: "ignored", at: item.occurredAt, item })),
     ]
       .sort((left, right) => Date.parse(right.at) - Date.parse(left.at))
       .slice(0, VISIBLE_ENTRIES);
@@ -108,7 +108,10 @@ export function RoutineRunHistory(props: RoutineRunHistoryProps) {
                         <span>{formatRoutineRunTime(item().occurredAt, text)}</span>
                         <span class="agent-routine-run-note">{ignoredNote(item(), text)}</span>
                       </span>
-                      <RoutineRunStatus status="ignored" />
+                      {/* The note already says "Ignored", so the icon has no label of its own. */}
+                      <span class="agent-routine-run-icon agent-routine-run-icon-ignored" aria-hidden="true">
+                        <Minus />
+                      </span>
                     </div>
                   )}
                 </Match>
@@ -121,7 +124,7 @@ export function RoutineRunHistory(props: RoutineRunHistoryProps) {
   );
 }
 
-function RunRow(props: { run: RoutineRunFields; onOpenRun?: (messageId: string) => void }) {
+function RunRow(props: { run: RoutineRunFields; onOpenRun?: ((messageId: string) => void) | undefined }) {
   const text = useText();
   const { t } = text;
   const label = () =>
@@ -159,9 +162,7 @@ function ignoredNote(item: EventActivity, text: Pick<TextValue, "t">): string {
   return text.t(item.reason ? IGNORED_REASON_LABELS[item.reason] : "routine.history.ignored");
 }
 
-type HistoryStatus = RoutineRunFields["status"] | "ignored";
-
-function RoutineRunStatus(props: { status: HistoryStatus }) {
+function RoutineRunStatus(props: { status: RoutineRunFields["status"] }) {
   const { t } = useText();
   const label = () => t(RUN_STATUS_LABEL[props.status]);
   return (
@@ -185,9 +186,6 @@ function RoutineRunStatus(props: { status: HistoryStatus }) {
       </Show>
       <Show when={props.status === "interrupted" || props.status === "cancelled"}>
         <CirclePause aria-hidden="true" />
-      </Show>
-      <Show when={props.status === "ignored"}>
-        <Minus aria-hidden="true" />
       </Show>
     </span>
   );
@@ -226,5 +224,4 @@ const RUN_STATUS_LABEL = {
   failed: "routine.runStatus.failed",
   interrupted: "routine.runStatus.interrupted",
   cancelled: "routine.runStatus.cancelled",
-  ignored: "routine.history.ignored",
-} as const satisfies Record<HistoryStatus, AppTextKey>;
+} as const satisfies Record<RoutineRunFields["status"], AppTextKey>;

@@ -25,7 +25,7 @@ export interface ChannelsPort {
     ChannelMemoriesApi &
     ChannelRoutinesApi &
     Partial<Pick<OpenBotDesktopApi["agent"], "downloadAttachments">>;
-  eventRoutines?: EventRoutinesApi;
+  eventRoutines?: EventRoutinesApi | undefined;
   browser: Pick<OpenBotDesktopApi["browser"], "capturePreview">;
   openUrl: OpenBotDesktopApi["openUrl"];
   /** `browser` has no file manager to reveal a file in, so that action is hidden. */

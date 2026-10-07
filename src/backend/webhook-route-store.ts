@@ -1,31 +1,31 @@
 import { randomUUID } from "node:crypto";
-import type { EventActivity, EventRoutineOwner, WebhookReceiptReason } from "@openbot/contracts/ipc-events";
+import {
+  type EventActivity,
+  type EventRoutineOwner,
+  isEventActivity,
+  isEventRoutineOwner,
+  type WebhookReceiptReason,
+} from "@openbot/contracts/ipc-events";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { RoutineInputError } from "@openbot/team-client/routine-schedule";
-import {
-  databaseRows,
-  optionalStringColumn,
-  requiredNumberColumn,
-  requiredStringColumn,
-} from "./database/database-rows";
+import { databaseRows, optionalStringColumn, requiredStringColumn } from "./database/database-rows";
 import type { OpenBotDatabase } from "./openbot-database";
-import { ROUTINE_OWNER_TABLES, type RoutineOwnerKind } from "./webhook-trigger";
+import { ROUTINE_TABLES } from "./routine-tables";
 
 const RECEIPT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** What the main process needs to verify and route one inbound request. */
-export interface WebhookRoute {
+interface WebhookRoute {
   routeId: string;
   owner: EventRoutineOwner;
   routineId: string;
-  active: boolean;
   url: string | null;
   secretCiphertext: string;
 }
 
-export interface WebhookReceipt {
-  ownerKind: RoutineOwnerKind;
+interface WebhookReceipt {
+  ownerKind: EventRoutineOwner["kind"];
   routineId: string;
   deliveryId: string;
   eventType: string;
@@ -35,10 +35,10 @@ export interface WebhookReceipt {
   receivedAt: string;
 }
 
-const ROUTE_SELECT = Object.entries(ROUTINE_OWNER_TABLES)
-  .map(([kind, { routineTable, ownerColumn, webhookTable }]) => {
-    return `SELECT webhook.route_id, '${kind}' AS owner_kind, routine.${ownerColumn} AS owner_id, routine.routine_id,
-                   routine.active, webhook.url, webhook.secret_ciphertext
+const ROUTE_SELECT = Object.values(ROUTINE_TABLES)
+  .map(({ ownerKind, routineTable, ownerColumn, webhookTable }) => {
+    return `SELECT webhook.route_id, '${ownerKind}' AS owner_kind, routine.${ownerColumn} AS owner_id, routine.routine_id,
+                   webhook.url, webhook.secret_ciphertext
             FROM ${webhookTable} webhook JOIN ${routineTable} routine ON routine.routine_id = webhook.routine_id`;
   })
   .join(" UNION ALL ");
@@ -62,13 +62,29 @@ export class WebhookRouteStore {
 
   /** Saves the relay URL only while the route is still the routine's, so a late registration cannot win. */
   setUrl(routeId: string, url: string | null): void {
-    for (const { webhookTable } of Object.values(ROUTINE_OWNER_TABLES)) {
+    for (const { webhookTable } of Object.values(ROUTINE_TABLES)) {
       this.database.connection.prepare(`UPDATE ${webhookTable} SET url = ? WHERE route_id = ?`).run(url, routeId);
     }
   }
 
+  /**
+   * Gives a route a new random ID and no URL, after the relay refused the old ID for good: it was
+   * revoked, or another host or account owns it. The secret stays, so only the URL changes. No
+   * revocation is queued, because the relay refuses that too. Returns `null` when the route is gone.
+   */
+  replaceRouteId(routeId: string, now = new Date()): string | null {
+    const replacement = randomUUID();
+    for (const { webhookTable } of Object.values(ROUTINE_TABLES)) {
+      const replaced = this.database.connection
+        .prepare(`UPDATE ${webhookTable} SET route_id = ?, url = NULL, updated_at = ? WHERE route_id = ?`)
+        .run(replacement, now.toISOString(), routeId);
+      if (replaced.changes > 0) return replacement;
+    }
+    return null;
+  }
+
   rotateSecret(owner: EventRoutineOwner, routineId: string, secretCiphertext: string, now = new Date()): void {
-    const { routineTable, ownerColumn, webhookTable } = ROUTINE_OWNER_TABLES[owner.kind];
+    const { routineTable, ownerColumn, webhookTable } = ROUTINE_TABLES[owner.kind];
     const rotated = this.database.connection
       .prepare(
         `UPDATE ${webhookTable} SET secret_ciphertext = ?, updated_at = ?
@@ -92,39 +108,26 @@ export class WebhookRouteStore {
       .run(routeId);
   }
 
-  listReceipts(ownerKind: RoutineOwnerKind, routineId: string, limit: number): EventActivity[] {
+  listReceipts(ownerKind: EventRoutineOwner["kind"], routineId: string, limit: number): EventActivity[] {
     return databaseRows(
       this.database.connection
         .prepare(
-          `SELECT receipt_id, delivery_id, event_type, status, reason, run_id, received_at
+          `SELECT 'received' AS kind, receipt_id AS id, delivery_id AS deliveryId, event_type AS eventType, status,
+                  reason, run_id AS runId, received_at AS occurredAt
            FROM projection_webhook_receipts WHERE owner_kind = ? AND routine_id = ?
            ORDER BY received_at DESC, receipt_id LIMIT ?`,
         )
         .all(ownerKind, routineId, limit),
     ).map((row) => {
-      const status = requiredStringColumn(row, "status");
-      const reason = optionalStringColumn(row, "reason");
-      if (status !== "started" && status !== "ignored") throw new Error("The stored webhook receipt is invalid.");
-      if (reason !== null && reason !== "event-type" && reason !== "filter" && reason !== "inactive") {
-        throw new Error("The stored webhook receipt is invalid.");
-      }
-      return {
-        kind: "received",
-        id: requiredStringColumn(row, "receipt_id"),
-        deliveryId: requiredStringColumn(row, "delivery_id"),
-        eventType: requiredStringColumn(row, "event_type"),
-        status,
-        reason,
-        runId: optionalStringColumn(row, "run_id"),
-        occurredAt: requiredStringColumn(row, "received_at"),
-      };
+      if (!isEventActivity(row)) throw new Error("The stored webhook receipt is invalid.");
+      return row;
     });
   }
 }
 
 export function hasWebhookReceipt(
   db: OpenBotDatabase["connection"],
-  ownerKind: RoutineOwnerKind,
+  ownerKind: EventRoutineOwner["kind"],
   routineId: string,
   deliveryId: string,
 ): boolean {
@@ -135,32 +138,25 @@ export function hasWebhookReceipt(
   );
 }
 
-/**
- * Records one verified request in the caller's transaction. Returns false when the sender already
- * delivered this ID to this routine.
- */
-export function insertWebhookReceipt(db: OpenBotDatabase["connection"], receipt: WebhookReceipt): boolean {
+/** Records one verified request in the caller's transaction and drops receipts past retention. */
+export function insertWebhookReceipt(db: OpenBotDatabase["connection"], receipt: WebhookReceipt): void {
   db.prepare("DELETE FROM projection_webhook_receipts WHERE received_at < ?").run(
     new Date(Date.parse(receipt.receivedAt) - RECEIPT_RETENTION_MS).toISOString(),
   );
-  return (
-    db
-      .prepare(
-        `INSERT OR IGNORE INTO projection_webhook_receipts (
-           receipt_id, owner_kind, routine_id, delivery_id, event_type, status, reason, run_id, received_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .run(
-        randomUUID(),
-        receipt.ownerKind,
-        receipt.routineId,
-        receipt.deliveryId,
-        receipt.eventType,
-        receipt.status,
-        receipt.reason,
-        receipt.runId,
-        receipt.receivedAt,
-      ).changes > 0
+  db.prepare(
+    `INSERT INTO projection_webhook_receipts (
+       receipt_id, owner_kind, routine_id, delivery_id, event_type, status, reason, run_id, received_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    randomUUID(),
+    receipt.ownerKind,
+    receipt.routineId,
+    receipt.deliveryId,
+    receipt.eventType,
+    receipt.status,
+    receipt.reason,
+    receipt.runId,
+    receipt.receivedAt,
   );
 }
 
@@ -171,12 +167,12 @@ export function insertWebhookReceipt(db: OpenBotDatabase["connection"], receipt:
  */
 export function revokeRoutineWebhooks(
   db: OpenBotDatabase["connection"],
-  ownerKind: RoutineOwnerKind,
+  ownerKind: EventRoutineOwner["kind"],
   routineIds: readonly string[],
   options: { forget: boolean },
   now = new Date(),
 ): void {
-  const { webhookTable } = ROUTINE_OWNER_TABLES[ownerKind];
+  const { webhookTable } = ROUTINE_TABLES[ownerKind];
   const revoke = db.prepare(
     `INSERT OR IGNORE INTO projection_webhook_route_revocations (route_id, created_at)
      SELECT route_id, ? FROM ${webhookTable} WHERE routine_id = ?`,
@@ -192,13 +188,12 @@ export function revokeRoutineWebhooks(
 }
 
 function route(row: DynamicRecord): WebhookRoute {
-  const kind = requiredStringColumn(row, "owner_kind");
-  if (kind !== "agent" && kind !== "channel") throw new Error("The stored webhook route is invalid.");
+  const owner = { kind: row.owner_kind, id: row.owner_id };
+  if (!isEventRoutineOwner(owner)) throw new Error("The stored webhook route is invalid.");
   return {
     routeId: requiredStringColumn(row, "route_id"),
-    owner: { kind, id: requiredStringColumn(row, "owner_id") },
+    owner,
     routineId: requiredStringColumn(row, "routine_id"),
-    active: requiredNumberColumn(row, "active") === 1,
     url: optionalStringColumn(row, "url"),
     secretCiphertext: requiredStringColumn(row, "secret_ciphertext"),
   };

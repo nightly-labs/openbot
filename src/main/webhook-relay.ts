@@ -2,12 +2,12 @@ import { WEBHOOK_EVENTS_PATH } from "@openbot/contracts/signal-protocol/webhook-
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import type { CentralAuthOperationError } from "./central-auth-effects";
-import { HostEventsFailure } from "./host-events-api";
+import { HostEventsFailure, WebhookRouteConflict } from "./host-events-api";
 import type { HostWebhookRelay } from "./host-events-service";
 import type { SignalIngress } from "./signal-ingress";
 
 interface WebhookRelayAccount {
-  registerWebhookRoute(hostId: string, routeId: string): Effect.Effect<{ routeId: string }, CentralAuthOperationError>;
+  registerWebhookRoute(hostId: string, routeId: string): Effect.Effect<void, CentralAuthOperationError>;
   revokeWebhookRoute(hostId: string, routeId: string): Effect.Effect<void, CentralAuthOperationError>;
   issueRemoteHostTicket(hostId: string): Effect.Effect<{ signalUrl: string }, CentralAuthOperationError>;
 }
@@ -16,6 +16,12 @@ export interface WebhookRelayOptions {
   account: WebhookRelayAccount;
   ingress: SignalIngress;
   hostId(): string | null;
+}
+
+/** The account service keeps a revoked route ID, and one that another host or account owns, for good. */
+function isRouteConflict(failure: CentralAuthOperationError): boolean {
+  const { cause } = failure;
+  return cause instanceof Error && "code" in cause && cause.code === "webhook_route_conflict";
 }
 
 /** Owns route metadata calls and the ingress lease. Payloads never enter the account service. */
@@ -40,9 +46,12 @@ export class WebhookRelay implements HostWebhookRelay {
     }
   }
 
-  /** Opens a new socket, so Signal issues a route ticket with the current routes. */
+  /**
+   * Opens a new socket, so Signal issues a route ticket with the current routes. Without the hold,
+   * `setEnabled(true)` opens that socket, so a second reconnect here is not necessary.
+   */
   refresh(): void {
-    this.#options.ingress.reconnect();
+    if (this.#release) this.#options.ingress.reconnect();
   }
 
   stop(): void {
@@ -52,7 +61,9 @@ export class WebhookRelay implements HostWebhookRelay {
 
   readonly registerRoute = Effect.fn("WebhookRelay.registerRoute")(function* (this: WebhookRelay, routeId: string) {
     const hostId = yield* this.#host();
-    yield* this.#options.account.registerWebhookRoute(hostId, routeId);
+    yield* this.#options.account
+      .registerWebhookRoute(hostId, routeId)
+      .pipe(Effect.mapError((failure) => (isRouteConflict(failure) ? new WebhookRouteConflict() : failure)));
     if (this.#publicOrigin?.hostId !== hostId) {
       const ticket = yield* this.#options.account.issueRemoteHostTicket(hostId);
       const url = new URL(ticket.signalUrl);

@@ -14,6 +14,7 @@ import {
   stores,
   waitFor,
 } from "../backend/agent-service-test-harness";
+import { WebhookRouteConflict } from "./host-events-api";
 import { HostEventsService } from "./host-events-service";
 import { createWebhookSignature } from "./webhook-security";
 
@@ -24,14 +25,22 @@ import { createWebhookSignature } from "./webhook-security";
 // - The old secret still works after regeneration: "shows the secret once".
 // - A deleted or switched routine keeps a live public route, also when Signal is offline:
 //   "revokes the route of a deleted routine".
+// - A route ID that the relay refuses for good keeps the URL empty forever: "replaces a refused route ID".
+// - A secret that the host cannot decrypt answers 401, so the sender stops a retry that can succeed:
+//   "rejects changed bytes and stale timestamps".
+let decryptFails = false;
 const cipher = {
   encrypt: (value: string) => Buffer.from([...value].reverse().join("")),
-  decrypt: (value: Buffer) => [...value.toString()].reverse().join(""),
+  decrypt: (value: Buffer) => {
+    if (decryptFails) throw new Error("The keychain is locked.");
+    return [...value.toString()].reverse().join("");
+  },
 };
 let root: string | null = null;
 let agentService: AgentService | null = null;
 
 afterEach(async () => {
+  decryptFails = false;
   if (root) await stopAgentTestFixture(root, agentService);
   root = null;
   agentService = null;
@@ -44,11 +53,13 @@ function fakeRelay() {
     registered,
     revoked,
     offline: false,
+    conflicts: new Set<string>(),
     connected: () => true,
     setEnabled: (_enabled: boolean) => undefined,
     refresh: () => undefined,
-    registerRoute: (routeId: string): Effect.Effect<string, { readonly cause: unknown }> => {
+    registerRoute: (routeId: string): Effect.Effect<string, { readonly cause: unknown } | WebhookRouteConflict> => {
       if (relay.offline) return Effect.fail({ cause: new Error("offline") });
+      if (relay.conflicts.has(routeId)) return Effect.fail(new WebhookRouteConflict());
       relay.registered.push(routeId);
       return Effect.succeed(`https://signal.example/v1/webhooks/${routeId}`);
     },
@@ -122,6 +133,8 @@ describe("HostEventsService receipt boundary", () => {
     };
     expect(await Effect.runPromise(events.receive(stale))).toEqual({ status: 401 });
     expect(await Effect.runPromise(events.receive({ ...receipt, routeId: "unknown-route" }))).toEqual({ status: 404 });
+    decryptFails = true;
+    expect(await Effect.runPromise(events.receive(receipt))).toEqual({ status: 503 });
     expect(database.connection.prepare("SELECT receipt_id FROM projection_webhook_receipts").all()).toEqual([]);
     expect(runs()).toEqual([]);
   });
@@ -197,6 +210,24 @@ describe("HostEventsService receipt boundary", () => {
     relay.offline = false;
     await Effect.runPromise(events.syncRoutes({ all: false }));
     expect(relay.revoked).toEqual([routeId, secondRoute]);
+  });
+});
+
+describe("HostEventsService route sync", () => {
+  it("replaces a refused route ID, keeps the secret, and does not revoke the old ID", async () => {
+    const { events, relay, owner, saved, secret, routeId } = await fixture();
+    relay.conflicts.add(routeId);
+    await Effect.runPromise(events.syncRoutes({ all: true }));
+    const newRoute = relay.registered.at(-1);
+    if (!newRoute || newRoute === routeId) throw new Error("No new route was registered.");
+    const [listed] = await Effect.runPromise(events.listRoutines({ owner }));
+    expect(listed?.trigger).toMatchObject({ url: `https://signal.example/v1/webhooks/${newRoute}` });
+    expect(relay.revoked).toEqual([]);
+    expect(await Effect.runPromise(events.receive(signed(routeId, secret, "build-1", BUILD)))).toEqual({ status: 404 });
+    expect(await Effect.runPromise(events.receive(signed(newRoute, secret, "build-1", BUILD)))).toEqual({
+      status: 202,
+    });
+    expect(listed?.id).toBe(saved.routine.id);
   });
 });
 

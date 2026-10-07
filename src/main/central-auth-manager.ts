@@ -492,9 +492,9 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       this: CentralAuthManager,
       hostId: string,
       routeId: string,
-    ): Effect.fn.Return<{ routeId: string }, CentralAuthOperationError, CentralAuthTransport> {
+    ): Effect.fn.Return<void, CentralAuthOperationError, CentralAuthTransport> {
       const machineToken = yield* this.#hostMachineToken(hostId);
-      const result = yield* this.#requestEffect(
+      yield* this.#requestEffect(
         `/v2/remote/hosts/${encodeURIComponent(hostId)}/webhook-routes`,
         {
           method: "POST",
@@ -502,11 +502,9 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
           body: JSON.stringify({ machineToken, routeId }),
         },
         (value) => {
-          const record = decodeRecord(value, "Webhook route");
-          return { routeId: requiredString(record, "routeId") };
+          requiredString(decodeRecord(value, "Webhook route"), "routeId");
         },
       );
-      return result;
     },
     (operation) => this.#owned(operation),
   ).bind(this);

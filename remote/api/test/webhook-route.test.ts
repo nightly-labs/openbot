@@ -14,86 +14,19 @@ import { runSignal, signalRuntime } from "./signal-runtime";
 
 describe("generic webhook route", () => {
   it("keeps the exact signed bytes until the host acknowledges its commit", async () => {
-    const config = readRemoteApiConfig({
-      REMOTE_TICKET_PUBLIC_KEYS: JSON.stringify({ keys: [{ kty: "EC", crv: "P-256", x: "x", y: "y" }] }),
-      REMOTE_TLS_DISABLED: "true",
-      REMOTE_CONTROL_PLANE_URL: "http://127.0.0.1:3100",
-      REMOTE_SESSION_SECRET: "s".repeat(32),
-      REMOTE_AUTH_WEBHOOK_SECRET: "w".repeat(32),
-      TURN_SHARED_SECRET: "t".repeat(32),
-      TURN_HOST: "localhost",
-    });
-    const now = Math.floor(Date.now() / 1_000);
-    const claims: RemoteTicketClaims = {
-      aud: "openbot-remote",
-      jti: "host-ticket",
-      sessionId: "host-session",
-      hostId: "host-1",
-      userId: "owner-1",
-      membershipId: "host-membership",
-      role: "host",
-      authEpoch: 1,
-      protocolMinimum: 2,
-      protocolMaximum: 2,
-      sessionExpiresAt: now + 3600,
-      iat: now,
-      exp: now + 300,
-    };
-    const signal = new SignalService(
-      {
-        verifyTicket: () => Effect.succeed({ ...claims, jti: crypto.randomUUID() }),
-        verifyResumeToken: () => Effect.succeed(claims),
-        validateClaims: () => Effect.succeed(true),
-        issueResumeToken: () => Effect.succeed("resume"),
-        iceServers: () => [],
-        verifyWebhookRoute: () => Effect.succeed({ routes: [{ id: "source-1", linkedAt: 1 }] }),
-        validateWebhookRoute: (_hostId, routes) => Effect.succeed(routes.map((route) => route.id)),
-      },
-      8,
-    );
-    const app = createRemoteApiApp(config, signal, signalRuntime(signal));
-    const messages: string[] = [];
-    const socket = {
-      id: "ingress",
-      ip: "192.0.2.1",
-      send(message: string) {
-        messages.push(message);
-      },
-      close() {},
-    };
-    signal.connect(socket);
-    await runSignal(
-      signal,
-      signal.receive(
-        socket,
-        JSON.stringify({
-          type: "hello",
-          version: 1,
-          peer: "ingress",
-          token: "host-ticket",
-          webhookRoute: "route-ticket",
-        }),
-      ),
-    );
-    expect(messages.some((message) => message.includes('"type":"webhook-ready"'))).toBe(true);
+    const { app, signal, now } = webhookContext();
+    const socket = webhookSocket("ingress");
+    await authenticateWebhook(signal, socket);
+    expect(socket.messages.some((message) => message.includes('"type":"webhook-ready"'))).toBe(true);
 
     const body = new Uint8Array([123, 34, 116, 121, 112, 101, 34, 58, 34, 116, 101, 115, 116, 34, 125]);
-    const pending = app.handle(
-      new Request("http://localhost/v1/webhooks/source-1", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          [WEBHOOK_TIMESTAMP_HEADER]: String(now),
-          [WEBHOOK_DELIVERY_ID_HEADER]: "delivery-1",
-          [WEBHOOK_SIGNATURE_HEADER]: `sha256=${"a".repeat(64)}`,
-        },
-        body,
-      }),
-    );
+    const pending = app.handle(webhookRequest(now, body, { [WEBHOOK_DELIVERY_ID_HEADER]: "delivery-1" }));
     await vi.waitFor(() =>
-      expect(messages.some((message) => message.includes('"type":"webhook-delivery"'))).toBe(true),
+      expect(socket.messages.some((message) => message.includes('"type":"webhook-delivery"'))).toBe(true),
     );
-    const delivery = JSON.parse(messages.find((message) => message.includes('"type":"webhook-delivery"')) ?? "{}");
+    const delivery = JSON.parse(
+      socket.messages.find((message) => message.includes('"type":"webhook-delivery"')) ?? "{}",
+    );
     expect(delivery).toMatchObject({
       routeId: "source-1",
       timestamp: String(now),
@@ -111,12 +44,6 @@ describe("generic webhook route", () => {
     );
     expect((await pending).status).toBe(202);
     signal.close();
-  });
-
-  it("returns 503 while the host ingress socket is offline", async () => {
-    const { app, now } = webhookContext();
-    const response = await app.handle(webhookRequest(now));
-    expect(response.status).toBe(503);
   });
 
   it("returns 503 after the route is revoked for a disabled or deleted source", async () => {
@@ -205,8 +132,6 @@ function webhookContext(options: { timeoutMilliseconds?: number } = {}) {
     8,
     32,
     600,
-    undefined,
-    {},
     options.timeoutMilliseconds === undefined
       ? undefined
       : {

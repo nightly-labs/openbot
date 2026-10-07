@@ -45,7 +45,7 @@ export interface ConversationRuntime {
         skills: AgentSkillCalls;
         sharedTables: SharedTableCalls;
         agentTemplates: AgentTemplatePublishCalls;
-        eventRoutines?: EventRoutinesApi;
+        eventRoutines?: EventRoutinesApi | undefined;
       }
     | undefined;
 }

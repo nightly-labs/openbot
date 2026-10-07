@@ -64,7 +64,7 @@ describe("Team API events-v1", () => {
     expect(await ownerResponse.json()).toEqual({ supported: true, connected: true });
   });
 
-  it("maps event failures to safe localized 400 responses", async () => {
+  it("answers 400 with catalog text and 500 for an internal event failure", async () => {
     const fixture = await createTeamApiFixture("events-failure", { configure: true });
     const expected = sourceText("error.backend.webhookRouteUnavailable");
     let cause: Error = new Error(expected);
@@ -94,12 +94,9 @@ describe("Team API events-v1", () => {
       headers,
       body: JSON.stringify({ id: "routine-1", owner: { kind: "agent", id: "chief" } }),
     });
-    expect(privateFailure.status).toBe(400);
+    expect(privateFailure.status).toBe(500);
     const body = await privateFailure.json();
-    expect(body).toEqual({ error: sourceText("error.backend.webhookSettingsInvalid") });
+    expect(body).toEqual({ error: sourceText("error.team.requestFailed") });
     expect(JSON.stringify(body)).not.toContain(privateValue);
-
-    const failure = new HostEventsFailure({ cause: new Error(expected) });
-    await expect(Effect.runPromise(Effect.fail(failure))).rejects.toBeInstanceOf(HostEventsFailure);
   });
 });

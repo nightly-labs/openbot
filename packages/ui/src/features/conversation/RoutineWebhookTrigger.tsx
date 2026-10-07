@@ -1,4 +1,8 @@
-import { type EventFilter, isEventFilterPointer } from "@openbot/contracts/ipc-events";
+import {
+  type EventFilterDraft,
+  eventFilterPointerValid,
+  MASKED_WEBHOOK_SECRET,
+} from "@openbot/contracts/event-filter-value";
 import {
   Button,
   ChevronDown,
@@ -15,14 +19,8 @@ import {
   X,
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, createUniqueId, For, onSettled, Show } from "solid-js";
 import { useText } from "../../text";
-
-/** A filter row while the user edits it. The value stays text until the routine is saved. */
-export interface RoutineWebhookFilterDraft {
-  pointer: string;
-  value: string;
-}
 
 export interface RoutineWebhookTriggerProps {
   /** The URL the host made. Null until the relay registers the route. */
@@ -32,20 +30,17 @@ export interface RoutineWebhookTriggerProps {
   /** The relay connection of the host. Null when it is not known. */
   connected: boolean | null;
   eventType: string;
-  filters: RoutineWebhookFilterDraft[];
+  filters: EventFilterDraft[];
   onEventTypeChange: (eventType: string) => void;
-  onFiltersChange: (filters: RoutineWebhookFilterDraft[]) => void;
+  onFiltersChange: (filters: EventFilterDraft[]) => void;
   /** The signing secret that the host returned once. Null when there is nothing to show. */
   secret: string | null;
   onSecretDismiss: () => void;
-  /** Makes a new secret. The parent shows it through `secret`. Left out, the action is hidden. */
-  onRegenerateSecret?: () => Promise<void>;
+  /** Makes a new secret. The parent shows it through `secret`. */
+  onRegenerateSecret: () => Promise<void>;
   /** A control at the end of the header, such as the menu that changes the trigger. */
   menu?: JSX.Element;
 }
-
-/** The host never returns a saved secret, so the row shows its prefix and a mask. */
-const MASKED_SECRET = "whsec_••••••••••••";
 
 /**
  * The webhook trigger as one card: what starts the routine, the endpoint, the signing secret
@@ -55,6 +50,9 @@ export function RoutineWebhookTrigger(props: RoutineWebhookTriggerProps) {
   const { t, errorMessage } = useText();
   const [eventsOpen, setEventsOpen] = createSignal(false);
   const [confirm, setConfirm] = createSignal<{ pending: boolean; error: string | null } | null>(null);
+  const eventTypeLabelId = createUniqueId();
+  const eventTypeHintId = createUniqueId();
+  let eventTypeInput: HTMLInputElement | undefined;
 
   // Most webhooks need no filter, so the card hides the events row until the user sets one.
   const filtered = () => props.eventType.trim() !== "" || props.filters.length > 0;
@@ -64,18 +62,17 @@ export function RoutineWebhookTrigger(props: RoutineWebhookTriggerProps) {
     return parts.join(" · ");
   };
 
-  function updateFilter(index: number, change: Partial<RoutineWebhookFilterDraft>): void {
+  function updateFilter(index: number, change: Partial<EventFilterDraft>): void {
     props.onFiltersChange(
       props.filters.map((filter, itemIndex) => (itemIndex === index ? { ...filter, ...change } : filter)),
     );
   }
 
   async function regenerate(): Promise<void> {
-    const action = props.onRegenerateSecret;
-    if (!action || confirm()?.pending) return;
+    if (confirm()?.pending) return;
     setConfirm({ pending: true, error: null });
     try {
-      await action();
+      await props.onRegenerateSecret();
       setConfirm(null);
     } catch (cause) {
       setConfirm({ pending: false, error: errorMessage(cause, t("routine.webhook.regenerateFailed")) });
@@ -139,18 +136,16 @@ export function RoutineWebhookTrigger(props: RoutineWebhookTriggerProps) {
             fallback={
               <>
                 <code class="routine-webhook-value" aria-hidden="true">
-                  {MASKED_SECRET}
+                  {MASKED_WEBHOOK_SECRET}
                 </code>
                 <span class="sr-only">{t("routine.webhook.secretHidden")}</span>
-                <Show when={props.onRegenerateSecret}>
-                  <IconButton
-                    variant="ghost"
-                    label={t("routine.webhook.regenerateSecret")}
-                    onClick={() => setConfirm({ pending: false, error: null })}
-                  >
-                    <RefreshCw aria-hidden="true" />
-                  </IconButton>
-                </Show>
+                <IconButton
+                  variant="ghost"
+                  label={t("routine.webhook.regenerateSecret")}
+                  onClick={() => setConfirm({ pending: false, error: null })}
+                >
+                  <RefreshCw aria-hidden="true" />
+                </IconButton>
               </>
             }
           >
@@ -189,7 +184,11 @@ export function RoutineWebhookTrigger(props: RoutineWebhookTriggerProps) {
             variant="ghost"
             size="sm"
             class="routine-webhook-filter-link"
-            onClick={() => setEventsOpen(true)}
+            onClick={() => {
+              setEventsOpen(true);
+              // The link leaves the page, so focus goes to the first field it opened.
+              onSettled(() => eventTypeInput?.focus());
+            }}
           >
             <SlidersHorizontal aria-hidden="true" />
             {t("routine.webhook.filterEvents")}
@@ -211,44 +210,46 @@ export function RoutineWebhookTrigger(props: RoutineWebhookTriggerProps) {
         </Button>
         <Show when={eventsOpen()}>
           <div class="routine-webhook-events">
-            <label class="settings-field">
-              <span>{t("routine.webhook.eventType")}</span>
+            <div class="settings-field">
+              <span id={eventTypeLabelId}>{t("routine.webhook.eventType")}</span>
               <Input
+                ref={(element) => (eventTypeInput = element)}
                 size="sm"
+                aria-labelledby={eventTypeLabelId}
+                aria-describedby={eventTypeHintId}
                 value={props.eventType}
                 placeholder={t("routine.webhook.eventTypePlaceholder")}
                 onValueChange={props.onEventTypeChange}
               />
-              <Text variant="caption" tone="muted">
+              <Text id={eventTypeHintId} variant="caption" tone="muted">
                 {t("routine.webhook.eventTypeHint")}
               </Text>
-            </label>
+            </div>
             <div class="settings-field">
               <span>{t("routine.webhook.filters")}</span>
-              <For each={props.filters}>
+              {/* Not keyed: each keystroke makes a new row object, and a keyed row would remount and lose focus. */}
+              <For each={props.filters} keyed={false}>
                 {(filter, index) => (
                   <div class="agent-routine-event-filter">
                     <Input
                       size="sm"
                       aria-label={t("routine.webhook.filterPointer")}
-                      value={filter.pointer}
+                      value={filter().pointer}
                       placeholder={t("routine.webhook.filterPointerPlaceholder")}
-                      invalid={!isEventFilterPointer(filter.pointer)}
-                      onValueChange={(pointer) => updateFilter(index(), { pointer })}
+                      invalid={!eventFilterPointerValid(filter().pointer)}
+                      onValueChange={(pointer) => updateFilter(index, { pointer })}
                     />
                     <Input
                       size="sm"
                       aria-label={t("routine.webhook.filterValue")}
-                      value={filter.value}
+                      value={filter().value}
                       placeholder={t("routine.webhook.filterValue")}
-                      onValueChange={(value) => updateFilter(index(), { value })}
+                      onValueChange={(value) => updateFilter(index, { value })}
                     />
                     <IconButton
                       variant="ghost"
                       label={t("routine.webhook.removeFilter")}
-                      onClick={() =>
-                        props.onFiltersChange(props.filters.filter((_, itemIndex) => itemIndex !== index()))
-                      }
+                      onClick={() => props.onFiltersChange(props.filters.filter((_, itemIndex) => itemIndex !== index))}
                     >
                       <X aria-hidden="true" />
                     </IconButton>
@@ -288,26 +289,4 @@ export function RoutineWebhookTrigger(props: RoutineWebhookTriggerProps) {
       />
     </div>
   );
-}
-
-/** Reads a typed value: `true`, `false`, `null` and numbers match as JSON values. Other text is a string. */
-export function routineWebhookFilterValue(raw: string): EventFilter["value"] {
-  const value = raw.trim();
-  if (value === "null") return null;
-  if (value === "true") return true;
-  if (value === "false") return false;
-  if (value !== "" && Number.isFinite(Number(value))) return Number(value);
-  return raw;
-}
-
-export function routineWebhookFilterDraft(filter: EventFilter): RoutineWebhookFilterDraft {
-  return { pointer: filter.pointer, value: filter.value === null ? "null" : String(filter.value) };
-}
-
-export function routineWebhookFilters(filters: readonly RoutineWebhookFilterDraft[]): EventFilter[] {
-  return filters.map((filter) => ({ pointer: filter.pointer, value: routineWebhookFilterValue(filter.value) }));
-}
-
-export function routineWebhookFiltersValid(filters: readonly RoutineWebhookFilterDraft[]): boolean {
-  return filters.every((filter) => isEventFilterPointer(filter.pointer));
 }

@@ -1,10 +1,4 @@
-import type {
-  EventEnvelope,
-  EventFilter,
-  EventJsonValue,
-  EventScalar,
-  WebhookReceiptReason,
-} from "@openbot/contracts/ipc-events";
+import type { EventEnvelope, EventFilter, EventJsonValue, WebhookReceiptReason } from "@openbot/contracts/ipc-events";
 import { isEventFilter } from "@openbot/contracts/ipc-events";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
@@ -17,8 +11,7 @@ const WEBHOOK_FILTERS_LIMIT = 128;
 export function validateWebhookTrigger(eventType: string | null, filters: readonly EventFilter[]): void {
   if (
     (eventType !== null && (eventType.trim().length === 0 || eventType.length > WEBHOOK_EVENT_TYPE_MAX_LENGTH)) ||
-    filters.length > WEBHOOK_FILTERS_LIMIT ||
-    !filters.every(isEventFilter)
+    filters.length > WEBHOOK_FILTERS_LIMIT
   ) {
     throw new RoutineInputError(sourceText("error.backend.webhookSettingsInvalid"));
   }
@@ -30,9 +23,7 @@ export function webhookMismatch(
   event: { type: string; data: EventJsonValue },
 ): Exclude<WebhookReceiptReason, "inactive"> | null {
   if (trigger.eventType !== null && trigger.eventType !== event.type) return "event-type";
-  return trigger.filters.every((filter) => scalarEqual(readPointer(event.data, filter.pointer), filter.value))
-    ? null
-    : "filter";
+  return trigger.filters.every((filter) => readPointer(event.data, filter.pointer) === filter.value) ? null : "filter";
 }
 
 /**
@@ -74,29 +65,3 @@ function readPointer(value: EventJsonValue, pointer: string): EventJsonValue | u
   }
   return current;
 }
-
-function scalarEqual(left: EventJsonValue | undefined, right: EventScalar): boolean {
-  return (
-    (left === null ||
-      typeof left === "string" ||
-      typeof left === "boolean" ||
-      (typeof left === "number" && Number.isFinite(left))) &&
-    left === right
-  );
-}
-
-export type RoutineOwnerKind = "agent" | "channel";
-
-/** The tables that hold each owner's routines and their webhook triggers. */
-export const ROUTINE_OWNER_TABLES = {
-  agent: {
-    routineTable: "projection_agent_routines",
-    ownerColumn: "agent_id",
-    webhookTable: "projection_routine_webhooks",
-  },
-  channel: {
-    routineTable: "projection_channel_routines",
-    ownerColumn: "channel_id",
-    webhookTable: "projection_channel_routine_webhooks",
-  },
-} as const satisfies Record<RoutineOwnerKind, { routineTable: string; ownerColumn: string; webhookTable: string }>;

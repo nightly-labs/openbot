@@ -59,28 +59,13 @@ export function agentRoutinesPort(agentId: string, automation = false, localHost
     limitPolicy: localHost,
     list: () => window.openbot.agent.listRoutines(agentId),
     listRuns: (routineId, limit) => window.openbot.agent.listRoutineRuns({ agentId, routineId, limit }),
-    save: async ({ routineId, name, instruction, active, timezone, schedule, limitPolicy }) => {
+    save: ({ routineId, name, instruction, active, timezone, schedule, limitPolicy }) => {
       const policy = localHost && limitPolicy ? { limitPolicy } : {};
-      const routine = routineId
-        ? await window.openbot.agent.updateRoutine({
-            agentId,
-            routineId,
-            name,
-            instruction,
-            active,
-            schedule,
-            ...policy,
-          })
-        : await window.openbot.agent.createRoutine({
-            agentId,
-            name,
-            instruction,
-            active,
-            timezone,
-            schedule,
-            ...policy,
-          });
-      return { routine, secret: null };
+      return (
+        routineId
+          ? window.openbot.agent.updateRoutine({ agentId, routineId, name, instruction, active, schedule, ...policy })
+          : window.openbot.agent.createRoutine({ agentId, name, instruction, active, timezone, schedule, ...policy })
+      ).then((routine) => ({ routine, secret: null }));
     },
     remove: (routineId) => window.openbot.agent.deleteRoutine({ agentId, routineId }),
     test: async (routineId) => {
@@ -119,12 +104,13 @@ export function channelRoutinesPort(
     limitPolicy: localHost,
     list: () => api.listChannelRoutines(channelId),
     listRuns: (routineId, limit) => api.listChannelRoutineRuns({ channelId, routineId, limit }),
-    save: async ({ routineId, name, instruction, active, timezone, schedule, limitPolicy }) => {
+    save: ({ routineId, name, instruction, active, timezone, schedule, limitPolicy }) => {
       const policy = localHost && limitPolicy ? { limitPolicy } : {};
-      const routine = routineId
-        ? await api.updateChannelRoutine({ channelId, routineId, name, instruction, active, schedule, ...policy })
-        : await api.createChannelRoutine({ channelId, name, instruction, active, timezone, schedule, ...policy });
-      return { routine, secret: null };
+      return (
+        routineId
+          ? api.updateChannelRoutine({ channelId, routineId, name, instruction, active, schedule, ...policy })
+          : api.createChannelRoutine({ channelId, name, instruction, active, timezone, schedule, ...policy })
+      ).then((routine) => ({ routine, secret: null }));
     },
     remove: (routineId) => api.deleteChannelRoutine({ channelId, routineId }),
     test: async (routineId) => {
@@ -155,7 +141,7 @@ export function eventRoutinesPort(
     ownerNoun: owner.kind,
     limitPolicy: true,
     list: () => api.listRoutines({ owner }),
-    listRuns: (routineId, limit) => legacy.listRuns(routineId, limit),
+    listRuns: legacy.listRuns,
     events: { owner, api },
     save: ({ routineId, name, instruction, active, timezone, schedule, trigger, limitPolicy }) =>
       api.saveRoutine({
@@ -171,6 +157,6 @@ export function eventRoutinesPort(
     remove: (routineId) => api.deleteRoutine({ id: routineId, owner }),
     test: (routineId) => api.testRoutine({ id: routineId, owner }),
     ...(runCommand ? { runCommand } : {}),
-    subscribe: (reload) => legacy.subscribe(reload),
+    subscribe: legacy.subscribe,
   };
 }

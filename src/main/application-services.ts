@@ -1338,7 +1338,7 @@ export async function createApplicationServices({
     cipher: secretCipher,
     relay: webhookRelay,
   });
-  const eventsRuntime = new HostEventsRuntime({ service: events });
+  const eventsRuntime = new HostEventsRuntime(events);
   signalIngress.handleWebhooks((input) => events.receive(input));
   teardown.push(TEARDOWN_ORDER.hostEvents, "the event service", async () => {
     webhookRelay.stop();

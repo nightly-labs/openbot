@@ -65,7 +65,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     skills: { count: 0, open: false, reopenAfterMarketplace: false },
   });
   const memoriesPort = createMemo(() => agentMemoriesPort(props.agent.id, props.agent.name));
-  const eventRoutinesApi = () => props.eventRoutines ?? props.adminCalls?.eventRoutines;
   const legacyRoutinesPort = createMemo(() =>
     agentRoutinesPort(
       props.agent.id,
@@ -75,7 +74,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     ),
   );
   const routinesPort = createMemo(() => {
-    const eventApi = eventRoutinesApi();
+    const eventApi = props.eventRoutines ?? props.adminCalls?.eventRoutines;
     return eventApi
       ? eventRoutinesPort({ kind: "agent", id: props.agent.id }, eventApi, legacyRoutinesPort())
       : legacyRoutinesPort();

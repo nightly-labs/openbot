@@ -33,7 +33,7 @@ export function createWebChannelsPort(
   remote: WebWorkspaceRuntime,
   onHostEvent: (listener: (event: AgentEvent | TeamRealtimeEvent) => void) => () => void,
   hostId: () => string,
-  eventsEnabled?: () => boolean,
+  eventsEnabled: () => boolean,
 ): ChannelsPort {
   const files = createWebAttachmentFiles(remote);
   const channels = remote.channels;
@@ -81,7 +81,7 @@ export function createWebChannelsPort(
       respondToBrowserSecret: (input) => remote.respondToBrowserSecret?.(input) ?? unavailable(),
     },
     get eventRoutines() {
-      return eventsEnabled?.() === false ? undefined : eventRoutines;
+      return eventsEnabled() ? eventRoutines : undefined;
     },
     browser: { capturePreview: remote.browserPreview ?? unavailable },
     openUrl: openWebLink,

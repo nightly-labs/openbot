@@ -5,7 +5,7 @@ import { useText } from "../../text";
 import type { RoutineDraftKind, RoutineDraftKindOption } from "./routine-schedule-draft";
 
 /** What starts a routine: a schedule frequency, or a request to its webhook. */
-export type RoutineTriggerChoice = RoutineDraftKind | "webhook";
+type RoutineTriggerChoice = RoutineDraftKind | "webhook";
 
 const KIND_DESCRIPTIONS = {
   once: "routine.trigger.onceDescription",
@@ -17,12 +17,10 @@ const KIND_DESCRIPTIONS = {
   custom: "routine.trigger.customDescription",
 } as const satisfies Record<RoutineDraftKind, AppTextKey>;
 
-export interface RoutineTriggerMenuProps {
+interface RoutineTriggerMenuProps {
   value: RoutineTriggerChoice;
   /** The schedule frequencies the menu offers. */
   kinds: RoutineDraftKindOption[];
-  /** False hides the webhook choice, for a host that cannot receive webhooks. */
-  webhook: boolean;
   onSelect: (choice: RoutineTriggerChoice) => void;
 }
 
@@ -61,49 +59,39 @@ export function RoutineTriggerMenu(props: RoutineTriggerMenuProps) {
                   selected={props.value === kind().value}
                   title={t(kind().label)}
                   description={t(KIND_DESCRIPTIONS[kind().value])}
-                  icon="schedule"
                 />
               )}
             </For>
           </DropdownMenu.RadioGroup>
-          <Show when={props.webhook}>
-            <DropdownMenu.Separator />
-            <span class="ui-menu-label" aria-hidden="true">
-              {t("routine.trigger.groupAdvanced")}
-            </span>
-            <DropdownMenu.RadioGroup
-              aria-label={t("routine.trigger.groupAdvanced")}
-              value={props.value === "webhook" ? "webhook" : ""}
-              onChange={(value: string) => {
-                if (value === "webhook") props.onSelect(value);
-              }}
-            >
-              <TriggerItem
-                value="webhook"
-                selected={props.value === "webhook"}
-                title={t("routine.settings.triggerWebhook")}
-                description={t("routine.trigger.webhookDescription")}
-                icon="webhook"
-              />
-            </DropdownMenu.RadioGroup>
-          </Show>
+          <DropdownMenu.Separator />
+          <span class="ui-menu-label" aria-hidden="true">
+            {t("routine.trigger.groupAdvanced")}
+          </span>
+          <DropdownMenu.RadioGroup
+            aria-label={t("routine.trigger.groupAdvanced")}
+            value={props.value === "webhook" ? "webhook" : ""}
+            onChange={(value: string) => {
+              if (value === "webhook") props.onSelect(value);
+            }}
+          >
+            <TriggerItem
+              value="webhook"
+              selected={props.value === "webhook"}
+              title={t("routine.settings.triggerWebhook")}
+              description={t("routine.trigger.webhookDescription")}
+            />
+          </DropdownMenu.RadioGroup>
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
   );
 }
 
-function TriggerItem(props: {
-  value: RoutineTriggerChoice;
-  selected: boolean;
-  title: string;
-  description: string;
-  icon: "schedule" | "webhook";
-}) {
+function TriggerItem(props: { value: RoutineTriggerChoice; selected: boolean; title: string; description: string }) {
   return (
     <DropdownMenu.RadioItem value={props.value} class="routine-trigger-menu-item">
       <span class="routine-trigger-icon" aria-hidden="true">
-        <Show when={props.icon === "webhook"} fallback={<AlarmClock />}>
+        <Show when={props.value === "webhook"} fallback={<AlarmClock />}>
           <Webhook />
         </Show>
       </span>

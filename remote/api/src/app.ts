@@ -13,9 +13,13 @@ import {
 import { SLACK_EVENTS_PATH } from "@openbot/contracts/signal-protocol/slack-route";
 import {
   WEBHOOK_DELIVERY_ID_HEADER,
+  WEBHOOK_DELIVERY_ID_PATTERN,
   WEBHOOK_EVENTS_PATH,
+  WEBHOOK_ROUTE_ID_PATTERN,
   WEBHOOK_SIGNATURE_HEADER,
+  WEBHOOK_SIGNATURE_PATTERN,
   WEBHOOK_TIMESTAMP_HEADER,
+  WEBHOOK_TIMESTAMP_PATTERN,
 } from "@openbot/contracts/signal-protocol/webhook-route";
 import { Effect, type ManagedRuntime, Result } from "effect";
 import { Elysia } from "elysia";
@@ -160,18 +164,30 @@ export function createRemoteApiApp(
       { parse: "none" },
     )
     // The host authenticates each generic webhook request with the secret of its webhook routine. Signal
-    // only bounds the body, limits ingress and relays the exact bytes plus signed header values.
+    // only bounds the body, limits ingress and relays the exact bytes plus signed header values. It
+    // checks the headers and that a host holds the route before it spends a rate window or reads the body.
     .post(
       `${WEBHOOK_EVENTS_PATH}/:routeId`,
       async ({ request, params, server }) => {
         const routeId = params.routeId;
-        if (!/^[A-Za-z0-9_-]{1,128}$/u.test(routeId)) return webhookResponse(404);
+        if (!WEBHOOK_ROUTE_ID_PATTERN.test(routeId)) return webhookResponse(404);
         const declaredLength = Number(request.headers.get("content-length") ?? "0");
         if (!Number.isFinite(declaredLength) || declaredLength > WEBHOOK_DELIVERY_BODY_BYTES_LIMIT) {
           return webhookResponse(413);
         }
         const mediaType = request.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();
         if (mediaType !== "application/json") return webhookResponse(415);
+        const timestamp = request.headers.get(WEBHOOK_TIMESTAMP_HEADER) ?? "";
+        const deliveryId = request.headers.get(WEBHOOK_DELIVERY_ID_HEADER) ?? "";
+        const signature = request.headers.get(WEBHOOK_SIGNATURE_HEADER) ?? "";
+        if (
+          !WEBHOOK_TIMESTAMP_PATTERN.test(timestamp) ||
+          !WEBHOOK_DELIVERY_ID_PATTERN.test(deliveryId) ||
+          !WEBHOOK_SIGNATURE_PATTERN.test(signature)
+        ) {
+          return webhookResponse(401);
+        }
+        if (!signal.holdsWebhookRoute(routeId)) return webhookResponse(503);
         const address = signalClientIp(
           server?.requestIP(request)?.address,
           request.headers.get("x-forwarded-for"),
@@ -180,16 +196,6 @@ export function createRemoteApiApp(
         if (!signal.acceptWebhookRequest(`${routeId}:${address}`)) return webhookResponse(429);
         const body = await readBounded(request, WEBHOOK_DELIVERY_BODY_BYTES_LIMIT);
         if (!body) return webhookResponse(413);
-        const timestamp = request.headers.get(WEBHOOK_TIMESTAMP_HEADER) ?? "";
-        const deliveryId = request.headers.get(WEBHOOK_DELIVERY_ID_HEADER) ?? "";
-        const signature = request.headers.get(WEBHOOK_SIGNATURE_HEADER) ?? "";
-        if (
-          !/^[0-9]{1,12}$/u.test(timestamp) ||
-          !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/u.test(deliveryId) ||
-          !/^sha256=[A-Fa-f0-9]{64}$/u.test(signature)
-        ) {
-          return webhookResponse(401);
-        }
         const result = await runtime.runPromise(
           signal.deliverWebhook(routeId, { timestamp, deliveryId, signature, body }),
           { signal: request.signal },

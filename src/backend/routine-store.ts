@@ -8,7 +8,7 @@ import type {
   RoutineSchedule,
 } from "@openbot/contracts/ipc";
 import { isRoutineSchedule, ROUTINE_LIMIT_POLICIES } from "@openbot/contracts/ipc";
-import type { EventFilter, EventJsonValue } from "@openbot/contracts/ipc-events";
+import type { EventFilter, EventJsonValue, EventRoutineOwner } from "@openbot/contracts/ipc-events";
 import { type DynamicRecord, isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import {
@@ -25,13 +25,7 @@ import {
 } from "./database/database-rows";
 import type { OpenBotDatabase } from "./openbot-database";
 import { hasWebhookReceipt, insertWebhookReceipt, revokeRoutineWebhooks } from "./webhook-route-store";
-import {
-  parseEventFilters,
-  type RoutineOwnerKind,
-  validateWebhookTrigger,
-  webhookMismatch,
-  webhookRunInstruction,
-} from "./webhook-trigger";
+import { parseEventFilters, validateWebhookTrigger, webhookMismatch, webhookRunInstruction } from "./webhook-trigger";
 
 /**
  * Three table names, one owner column and one handle column are the whole difference between an
@@ -44,7 +38,7 @@ import {
  * up by that query.
  */
 export interface RoutineTables {
-  ownerKind: RoutineOwnerKind;
+  ownerKind: EventRoutineOwner["kind"];
   routineTable: string;
   triggerTable: string;
   webhookTable: string;
@@ -124,7 +118,7 @@ export interface RoutineRecordInput {
   limitPolicy?: RoutineLimitPolicy;
   trigger:
     | { kind: "schedule"; schedule: RoutineSchedule }
-    /** A null secret keeps the stored one. A new webhook trigger needs one. */
+    /** A null secret keeps the stored one. */
     | { kind: "webhook"; eventType: string | null; filters: EventFilter[]; secretCiphertext: string | null };
 }
 
@@ -342,11 +336,9 @@ export class RoutineStore {
       validateRoutineSchedule(schedule, input.timezone);
     } else {
       validateWebhookTrigger(trigger.eventType, trigger.filters);
-      if (current?.trigger.kind !== "webhook" && trigger.secretCiphertext === null) {
-        throw new Error("A new webhook trigger needs a secret.");
-      }
     }
     const id = current?.id ?? randomUUID();
+    const limitPolicy = input.limitPolicy ?? current?.limitPolicy ?? "wait";
     const timestamp = now.toISOString();
     const { commandPrefix, eventPrefix, routineAggregate, routineTable, triggerTable, webhookTable, ownerColumn } =
       this.tables;
@@ -367,7 +359,7 @@ export class RoutineStore {
             instruction: input.instruction,
             active: input.active,
             timezone: input.timezone,
-            limitPolicy: input.limitPolicy ?? "wait",
+            limitPolicy,
             trigger: eventTrigger,
           },
         },
@@ -390,7 +382,7 @@ export class RoutineStore {
           input.instruction.trim(),
           input.active ? 1 : 0,
           input.timezone,
-          input.limitPolicy ?? current?.limitPolicy ?? "wait",
+          limitPolicy,
           current?.createdAt ?? timestamp,
           timestamp,
           sequence,
@@ -474,9 +466,8 @@ export class RoutineStore {
       ? webhookMismatch(routine.trigger, { type: event.eventType, data: event.data })
       : "inactive";
     if (reason) {
-      return insertWebhookReceipt(db, { ...receipt, status: "ignored", reason, runId: null })
-        ? { kind: "ignored", reason }
-        : { kind: "duplicate" };
+      insertWebhookReceipt(db, { ...receipt, status: "ignored", reason, runId: null });
+      return { kind: "ignored", reason };
     }
     const runId = randomUUID();
     const instruction = webhookRunInstruction(routine.instruction, {
@@ -802,60 +793,22 @@ export class RoutineStore {
   }
 
   #routine(row: DynamicRecord): OwnedRoutine {
-    const routineId = requiredStringColumn(row, "routine_id");
-    const limitPolicy = requiredStringColumn(row, "limit_policy");
-    if (!isOneOf(ROUTINE_LIMIT_POLICIES, limitPolicy)) throw new Error("The stored routine limit policy is invalid.");
-    return {
-      id: routineId,
-      ownerId: requiredStringColumn(row, this.tables.ownerColumn),
-      name: requiredStringColumn(row, "name"),
-      instruction: requiredStringColumn(row, "instruction"),
-      active: requiredNumberColumn(row, "active") === 1,
-      timezone: requiredStringColumn(row, "timezone"),
-      trigger: (() => {
-        const trigger = this.database.connection
-          .prepare(
-            `SELECT trigger_id, routine_id, schedule_json, next_run_at, created_at, updated_at
-             FROM ${this.tables.triggerTable} WHERE routine_id = ?`,
-          )
-          .get(routineId);
-        if (!isDynamicRecord(trigger)) throw new Error("The routine trigger projection could not be read.");
-        return {
-          id: requiredStringColumn(trigger, "trigger_id"),
-          routineId,
-          schedule: scheduleColumn(trigger),
-          nextRunAt: requiredStringColumn(trigger, "next_run_at"),
-          createdAt: requiredStringColumn(trigger, "created_at"),
-          updatedAt: requiredStringColumn(trigger, "updated_at"),
-        };
-      })(),
-      limitPolicy,
-      createdAt: requiredStringColumn(row, "created_at"),
-      updatedAt: requiredStringColumn(row, "updated_at"),
-    };
+    const fields = this.#fields(row);
+    return { ...fields, trigger: this.#scheduleTrigger(fields.id) };
   }
 
   #record(row: DynamicRecord): OwnedRoutineRecord {
-    const routineId = requiredStringColumn(row, "routine_id");
+    const fields = this.#fields(row);
     const webhook = this.database.connection
       .prepare(
         `SELECT route_id, url, event_type, filters_json, created_at, updated_at
          FROM ${this.tables.webhookTable} WHERE routine_id = ?`,
       )
-      .get(routineId);
-    if (!isDynamicRecord(webhook)) {
-      const routine = this.#routine(row);
-      return { ...routine, trigger: { kind: "schedule", ...routine.trigger } };
-    }
-    const limitPolicy = requiredStringColumn(row, "limit_policy");
-    if (!isOneOf(ROUTINE_LIMIT_POLICIES, limitPolicy)) throw new Error("The stored routine limit policy is invalid.");
+      .get(fields.id);
+    if (!isDynamicRecord(webhook))
+      return { ...fields, trigger: { kind: "schedule", ...this.#scheduleTrigger(fields.id) } };
     return {
-      id: routineId,
-      ownerId: requiredStringColumn(row, this.tables.ownerColumn),
-      name: requiredStringColumn(row, "name"),
-      instruction: requiredStringColumn(row, "instruction"),
-      active: requiredNumberColumn(row, "active") === 1,
-      timezone: requiredStringColumn(row, "timezone"),
+      ...fields,
       trigger: {
         kind: "webhook",
         routeId: requiredStringColumn(webhook, "route_id"),
@@ -865,9 +818,40 @@ export class RoutineStore {
         createdAt: requiredStringColumn(webhook, "created_at"),
         updatedAt: requiredStringColumn(webhook, "updated_at"),
       },
+    };
+  }
+
+  #fields(row: DynamicRecord): Omit<OwnedRoutine, "trigger"> {
+    const limitPolicy = requiredStringColumn(row, "limit_policy");
+    if (!isOneOf(ROUTINE_LIMIT_POLICIES, limitPolicy)) throw new Error("The stored routine limit policy is invalid.");
+    return {
+      id: requiredStringColumn(row, "routine_id"),
+      ownerId: requiredStringColumn(row, this.tables.ownerColumn),
+      name: requiredStringColumn(row, "name"),
+      instruction: requiredStringColumn(row, "instruction"),
+      active: requiredNumberColumn(row, "active") === 1,
+      timezone: requiredStringColumn(row, "timezone"),
       limitPolicy,
       createdAt: requiredStringColumn(row, "created_at"),
       updatedAt: requiredStringColumn(row, "updated_at"),
+    };
+  }
+
+  #scheduleTrigger(routineId: string): OwnedRoutine["trigger"] {
+    const trigger = this.database.connection
+      .prepare(
+        `SELECT trigger_id, schedule_json, next_run_at, created_at, updated_at
+         FROM ${this.tables.triggerTable} WHERE routine_id = ?`,
+      )
+      .get(routineId);
+    if (!isDynamicRecord(trigger)) throw new Error("The routine trigger projection could not be read.");
+    return {
+      id: requiredStringColumn(trigger, "trigger_id"),
+      routineId,
+      schedule: scheduleColumn(trigger),
+      nextRunAt: requiredStringColumn(trigger, "next_run_at"),
+      createdAt: requiredStringColumn(trigger, "created_at"),
+      updatedAt: requiredStringColumn(trigger, "updated_at"),
     };
   }
 

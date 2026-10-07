@@ -44,7 +44,6 @@ export class RoutineRecords {
     this.routes = new WebhookRouteStore(options.database);
   }
 
-  /** Whether the agent or channel that owns the routines still exists. */
   ownerExists(owner: EventRoutineOwner): boolean {
     return owner.kind === "agent" ? this.#options.agentExists(owner.id) : this.#options.channelExists(owner.id);
   }
@@ -83,13 +82,11 @@ export class RoutineRecords {
   }
 
   test(owner: EventRoutineOwner, routineId: string): Effect.Effect<void, RoutineRecordFailed> {
-    return owner.kind === "agent"
-      ? Effect.asVoid(this.#options.agentRoutines.test({ agentId: owner.id, routineId })).pipe(
-          Effect.mapError(failed("test")),
-        )
-      : Effect.asVoid(this.#options.channelRoutines.test({ channelId: owner.id, routineId })).pipe(
-          Effect.mapError(failed("test")),
-        );
+    const run: Effect.Effect<unknown, { readonly cause: unknown }> =
+      owner.kind === "agent"
+        ? this.#options.agentRoutines.test({ agentId: owner.id, routineId })
+        : this.#options.channelRoutines.test({ channelId: owner.id, routineId });
+    return Effect.mapError(Effect.asVoid(run), failed("test"));
   }
 
   /**

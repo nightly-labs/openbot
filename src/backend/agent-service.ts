@@ -2457,7 +2457,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       }
       const skipped = new Set(
         this.#routines
-          .listFor(agentId)
+          .listRecordsFor(agentId)
           .filter((routine) => routine.limitPolicy === "skip")
           .map((routine) => routine.id),
       );

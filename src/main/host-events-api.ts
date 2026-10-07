@@ -9,7 +9,7 @@ import type {
   SaveEventRoutineResult,
   WebhookSecret,
 } from "@openbot/contracts/ipc-events";
-import { matchingSourceKeys, sourceText } from "@openbot/i18n/source";
+import { matchingSourceKeys } from "@openbot/i18n/source";
 import { type Effect, Schema } from "effect";
 
 /** The safe error boundary shared by local and Team API event management. */
@@ -17,11 +17,19 @@ export class HostEventsFailure extends Schema.TaggedError<HostEventsFailure>()("
   cause: Schema.Defect(),
 }) {}
 
-/** Returns only catalog text. The wrapped cause can contain private backend details. */
-export function hostEventsFailureMessage(failure: HostEventsFailure): string {
+/**
+ * The relay refuses a route ID for good: it was revoked, or another host or account owns it. The
+ * routine then needs a new route ID.
+ */
+export class WebhookRouteConflict extends Schema.TaggedError<WebhookRouteConflict>()("WebhookRouteConflict", {}) {}
+
+/**
+ * Returns the catalog text that the user can act on, or `null` for an internal failure. The wrapped
+ * cause can contain private backend details.
+ */
+export function hostEventsFailureMessage(failure: HostEventsFailure): string | null {
   const cause = failure.cause;
-  if (cause instanceof Error && matchingSourceKeys(cause.message).length > 0) return cause.message;
-  return sourceText("error.backend.webhookSettingsInvalid");
+  return cause instanceof Error && matchingSourceKeys(cause.message).length > 0 ? cause.message : null;
 }
 
 /** Webhook routines and their received deliveries. Every operation except the status is scoped to one routine owner. */

@@ -343,7 +343,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
               onOpenRoutineRun={props.onOpenSearchMessage ? openRoutineRunMessage : undefined}
               files={agentFiles(props.server, agent().id)}
               eventRoutines={
-                !props.runtime && serverCanAdminister(props.server, "events-v1") && props.server
+                !props.runtime && serverCanAdminister(props.server, "events-v1")
                   ? desktopEventRoutinesApi(props.server.id)
                   : undefined
               }

@@ -22,6 +22,7 @@ import {
 } from "@openbot/contracts/signal-protocol/ticket";
 import {
   WEBHOOK_ROUTE_AUDIENCE,
+  WEBHOOK_ROUTE_ID_PATTERN,
   WEBHOOK_ROUTE_TTL_SECONDS,
   WEBHOOK_ROUTES_LIMIT,
   type WebhookRoute,
@@ -212,6 +213,26 @@ export class RemoteTicketSigner {
     );
     return { ticket, expiresAt: expiresAt * 1_000 };
   }).bind(this);
+
+  /**
+   * Signs the opaque webhook route IDs linked to one host with the published remote ticket key.
+   * The audience and claims differ from host and member tickets, so no other deployment secret is needed.
+   */
+  readonly issueWebhookRoute = Effect.fn("RemoteTicketSigner.issueWebhookRoute")(function* (
+    this: RemoteTicketSigner,
+    input: { hostId: string; routes: WebhookRoute[]; now: number },
+  ) {
+    const signingKey = yield* this.#signingKey();
+    const issuedAt = Math.floor(input.now / 1_000);
+    return yield* remoteCall(() =>
+      new SignJWT({ hid: input.hostId, routes: input.routes })
+        .setProtectedHeader({ alg: "ES256", typ: "JWT", kid: this.#keyId })
+        .setIssuedAt(issuedAt)
+        .setExpirationTime(issuedAt + WEBHOOK_ROUTE_TTL_SECONDS)
+        .setAudience(WEBHOOK_ROUTE_AUDIENCE)
+        .sign(signingKey),
+    );
+  }).bind(this);
 }
 
 /**
@@ -277,36 +298,6 @@ class DiscordRouteSigner {
   }).bind(this);
 }
 
-/** Signs the opaque webhook route IDs linked to one host. */
-class WebhookRouteSigner {
-  readonly #keyId: string;
-  readonly #privateJwk: JWK;
-  #key: Awaited<ReturnType<typeof importJWK>> | null = null;
-
-  constructor(config: TicketSignerConfig) {
-    this.#keyId = requiredIdentifier(config.keyId, "webhook route key ID");
-    parseJwks(config.publicJwks, this.#keyId);
-    this.#privateJwk = parseJwk(config.privateJwk);
-  }
-
-  readonly issue = Effect.fn("WebhookRouteSigner.issue")(function* (
-    this: WebhookRouteSigner,
-    input: { hostId: string; routes: WebhookRoute[]; now: number },
-  ) {
-    this.#key ??= yield* remoteCall(() => importJWK(this.#privateJwk, "ES256"));
-    const key = this.#key;
-    const issuedAt = Math.floor(input.now / 1_000);
-    return yield* remoteCall(() =>
-      new SignJWT({ hid: input.hostId, routes: input.routes })
-        .setProtectedHeader({ alg: "ES256", typ: "JWT", kid: this.#keyId })
-        .setIssuedAt(issuedAt)
-        .setExpirationTime(issuedAt + WEBHOOK_ROUTE_TTL_SECONDS)
-        .setAudience(WEBHOOK_ROUTE_AUDIENCE)
-        .sign(key),
-    );
-  }).bind(this);
-}
-
 /** One signer for each key: the JWKS parse and the key import are too costly for every request. */
 const ticketSigners = new Map<string, { config: TicketSignerConfig; signer: RemoteTicketSigner }>();
 
@@ -332,7 +323,6 @@ class RemoteDependencies extends Context.Service<
     signer: RemoteTicketSigner;
     slackRouteSigner: SlackRouteSigner | null;
     discordRouteSigner: DiscordRouteSigner | null;
-    webhookRouteSigner: WebhookRouteSigner | null;
     now: () => number;
     schedule: ((delivery: Effect.Effect<void, RemoteFailure>) => void) | null;
     fetch: RemoteFetch;
@@ -392,13 +382,6 @@ export class RemoteControlPlane {
             keyId: bindings.DISCORD_ROUTE_KEY_ID,
           })
         : null;
-    // Reuse the published remote ticket key. The webhook route has its own audience and claims,
-    // so it remains separate from host and member tickets without another deployment secret.
-    const webhookRouteSigner = new WebhookRouteSigner({
-      privateJwk: bindings.REMOTE_TICKET_PRIVATE_JWK,
-      publicJwks: bindings.REMOTE_TICKET_PUBLIC_JWKS,
-      keyId: bindings.REMOTE_TICKET_KEY_ID,
-    });
     const webhookUrl = bindings.REMOTE_AUTH_WEBHOOK_URL?.trim() || null;
     const webhookSecret = bindings.REMOTE_AUTH_WEBHOOK_SECRET?.trim() || null;
     const fetcher: RemoteFetch = options.fetch ?? ((input, init) => fetch(input, init));
@@ -409,7 +392,6 @@ export class RemoteControlPlane {
       signer: this.#signer,
       slackRouteSigner,
       discordRouteSigner,
-      webhookRouteSigner,
       now,
       schedule,
       fetch: fetcher,
@@ -1519,6 +1501,12 @@ export class RemoteControlPlane {
           dependencies.database
             .prepare("UPDATE hosted_sites SET server_id = NULL WHERE server_id = ? AND user_id = ?")
             .bind(hostId, ownerUserId),
+          // Keep the route IDs as tombstones: their public URLs must not move to another host.
+          dependencies.database
+            .prepare(
+              "UPDATE webhook_routes SET revoked_at = ? WHERE host_id = ? AND account_id = ? AND revoked_at IS NULL",
+            )
+            .bind(now, hostId, ownerUserId),
           dependencies.database
             .prepare("DELETE FROM remote_hosts WHERE host_id = ? AND owner_user_id = ?")
             .bind(hostId, ownerUserId),
@@ -1607,7 +1595,10 @@ export class RemoteControlPlane {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
-  /** Registers one opaque webhook route ID for the authenticated host. */
+  /**
+   * Registers one opaque webhook route ID for the authenticated host. A route ID is never freed:
+   * senders can still post to a revoked or deleted host's URL, so only the live owner may register it.
+   */
   readonly registerWebhookRoute = Effect.fn("RemoteControlPlane.registerWebhookRoute")(
     function* (
       this: RemoteControlPlane,
@@ -1617,7 +1608,7 @@ export class RemoteControlPlane {
     ): Effect.fn.Return<{ routeId: string }, RemoteFailure, RemoteDependencies> {
       const dependencies = yield* RemoteDependencies;
       const validRouteId = yield* remoteValidate(() => requiredText(routeId, 128, "webhook route ID"));
-      if (!/^[A-Za-z0-9_-]+$/u.test(validRouteId))
+      if (!WEBHOOK_ROUTE_ID_PATTERN.test(validRouteId))
         return yield* new RemoteControlPlaneError(400, "invalid_webhook_route", "The webhook route is invalid.");
       const host = yield* this.authenticateHost(hostId, machineToken);
       const now = dependencies.now();
@@ -1626,7 +1617,7 @@ export class RemoteControlPlane {
           .prepare(
             `INSERT INTO webhook_routes (route_id, host_id, account_id, connected_at)
              SELECT ?, ?, ?, ?
-             WHERE (SELECT COUNT(*) FROM webhook_routes WHERE host_id = ?) < ?
+             WHERE (SELECT COUNT(*) FROM webhook_routes WHERE host_id = ? AND revoked_at IS NULL) < ?
              ON CONFLICT(route_id) DO NOTHING`,
           )
           .bind(validRouteId, hostId, host.owner_user_id, now, hostId, WEBHOOK_ROUTES_LIMIT)
@@ -1635,12 +1626,13 @@ export class RemoteControlPlane {
       if (inserted.meta.changes) return { routeId: validRouteId };
       const existing = yield* remoteCall(() =>
         dependencies.database
-          .prepare("SELECT host_id, account_id FROM webhook_routes WHERE route_id = ?")
+          .prepare("SELECT host_id, account_id, revoked_at FROM webhook_routes WHERE route_id = ?")
           .bind(validRouteId)
-          .first<{ host_id: string; account_id: string }>(),
+          .first<{ host_id: string; account_id: string; revoked_at: number | null }>(),
       );
       if (existing) {
-        if (existing.host_id !== hostId || existing.account_id !== host.owner_user_id)
+        // A host ID is free again after its host is deleted, so the account must match as well.
+        if (existing.revoked_at !== null || existing.host_id !== hostId || existing.account_id !== host.owner_user_id)
           return yield* new RemoteControlPlaneError(
             409,
             "webhook_route_conflict",
@@ -1665,28 +1657,27 @@ export class RemoteControlPlane {
       machineToken: string,
     ): Effect.fn.Return<{ ticket: string; routes: string[] }, RemoteFailure, RemoteDependencies> {
       const dependencies = yield* RemoteDependencies;
-      const signer = dependencies.webhookRouteSigner;
-      if (!signer)
-        return yield* new RemoteControlPlaneError(503, "webhook_not_configured", "Webhook routing is not configured.");
-      yield* this.authenticateHost(hostId, machineToken);
+      const host = yield* this.authenticateHost(hostId, machineToken);
       const rows = yield* remoteCall(() =>
         dependencies.database
           .prepare(
-            "SELECT route_id, connected_at FROM webhook_routes WHERE host_id = ? ORDER BY connected_at DESC LIMIT ?",
+            `SELECT route_id, connected_at FROM webhook_routes
+             WHERE host_id = ? AND account_id = ? AND revoked_at IS NULL
+             ORDER BY connected_at DESC LIMIT ?`,
           )
-          .bind(hostId, WEBHOOK_ROUTES_LIMIT)
+          .bind(hostId, host.owner_user_id, WEBHOOK_ROUTES_LIMIT)
           .all<{ route_id: string; connected_at: number }>(),
       );
       const routes = rows.results.map((row) => ({ id: row.route_id, linkedAt: row.connected_at }));
       return {
-        ticket: yield* signer.issue({ hostId, routes, now: dependencies.now() }),
+        ticket: yield* dependencies.signer.issueWebhookRoute({ hostId, routes, now: dependencies.now() }),
         routes: routes.map((route) => route.id),
       };
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
-  /** The route IDs in a ticket that D1 still links to the same host and link time. */
+  /** The route IDs in a ticket that D1 still links, live, to the same host, owner and link time. */
   readonly validateWebhookRoute = Effect.fn("RemoteControlPlane.validateWebhookRoute")(
     function* (
       this: RemoteControlPlane,
@@ -1696,7 +1687,11 @@ export class RemoteControlPlane {
       if (input.routes.length === 0) return [];
       const rows = yield* remoteCall(() =>
         dependencies.database
-          .prepare("SELECT route_id, connected_at FROM webhook_routes WHERE host_id = ?")
+          .prepare(
+            `SELECT route.route_id, route.connected_at FROM webhook_routes route
+             JOIN remote_hosts host ON host.host_id = route.host_id AND host.owner_user_id = route.account_id
+             WHERE route.host_id = ? AND route.revoked_at IS NULL`,
+          )
           .bind(input.hostId)
           .all<{ route_id: string; connected_at: number }>(),
       );
@@ -1706,7 +1701,10 @@ export class RemoteControlPlane {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
-  /** Removes one webhook route after the host deleted its webhook routine or switched it to a schedule. */
+  /**
+   * Revokes one webhook route after the host deleted its webhook routine or switched it to a schedule.
+   * The row stays as a tombstone so that no other host can register the same public URL.
+   */
   readonly disconnectWebhookRoute = Effect.fn("RemoteControlPlane.disconnectWebhookRoute")(
     function* (
       this: RemoteControlPlane,
@@ -1721,12 +1719,14 @@ export class RemoteControlPlane {
       const [removed] = yield* remoteCall(() =>
         dependencies.database.batch([
           this.#authEventStatement({ type: "webhook-route-revoked", routeId: validRouteId, through: now }, now, {
-            sql: "EXISTS (SELECT 1 FROM webhook_routes WHERE route_id = ? AND host_id = ?)",
+            sql: "EXISTS (SELECT 1 FROM webhook_routes WHERE route_id = ? AND host_id = ? AND revoked_at IS NULL)",
             binds: [validRouteId, hostId],
           }),
           dependencies.database
-            .prepare("DELETE FROM webhook_routes WHERE route_id = ? AND host_id = ?")
-            .bind(validRouteId, hostId),
+            .prepare(
+              "UPDATE webhook_routes SET revoked_at = ? WHERE route_id = ? AND host_id = ? AND revoked_at IS NULL",
+            )
+            .bind(now, validRouteId, hostId),
         ]),
       );
       if (removed?.meta.changes) yield* this.#flushAuthEvents();

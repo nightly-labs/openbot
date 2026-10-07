@@ -126,7 +126,7 @@ export interface EventActivity {
   occurredAt: string;
 }
 
-export function isEventStatus(value: unknown): value is EventStatus {
+function isEventStatus(value: unknown): value is EventStatus {
   return isDynamicRecord(value) && typeof value.supported === "boolean" && typeof value.connected === "boolean";
 }
 
@@ -180,7 +180,7 @@ export function isEventRoutineOwner(value: unknown): value is EventRoutineOwner 
   return isDynamicRecord(value) && (value.kind === "agent" || value.kind === "channel") && isString(value.id);
 }
 
-export function isRoutineWebhookTriggerInput(value: unknown): value is RoutineWebhookTriggerInput {
+function isRoutineWebhookTriggerInput(value: unknown): value is RoutineWebhookTriggerInput {
   return (
     isDynamicRecord(value) &&
     value.kind === "webhook" &&
@@ -190,7 +190,7 @@ export function isRoutineWebhookTriggerInput(value: unknown): value is RoutineWe
   );
 }
 
-export function isRoutineScheduleTrigger(value: unknown): value is RoutineScheduleTrigger {
+function isRoutineScheduleTrigger(value: unknown): value is RoutineScheduleTrigger {
   return isDynamicRecord(value) && value.kind === "schedule" && isRoutineSchedule(value.schedule);
 }
 
@@ -205,7 +205,7 @@ function isEventRoutineTrigger(value: unknown): value is EventRoutineTrigger {
   );
 }
 
-export function isEventRoutine(value: unknown): value is EventRoutine {
+function isEventRoutine(value: unknown): value is EventRoutine {
   return (
     isDynamicRecord(value) &&
     isString(value.id) &&
@@ -221,25 +221,12 @@ export function isEventRoutine(value: unknown): value is EventRoutine {
   );
 }
 
-export function isSaveEventRoutineResult(value: unknown): value is SaveEventRoutineResult {
+function isSaveEventRoutineResult(value: unknown): value is SaveEventRoutineResult {
   return isDynamicRecord(value) && isEventRoutine(value.routine) && isNullableString(value.secret);
 }
 
-export function isWebhookSecret(value: unknown): value is WebhookSecret {
+function isWebhookSecret(value: unknown): value is WebhookSecret {
   return isDynamicRecord(value) && isString(value.secret) && value.secret.length > 0;
-}
-
-export function isEventEnvelope(value: unknown): value is EventEnvelope {
-  return (
-    isDynamicRecord(value) &&
-    value.version === 1 &&
-    isString(value.id) &&
-    isString(value.routineId) &&
-    isString(value.type) &&
-    isTimestamp(value.occurredAt) &&
-    isTimestamp(value.receivedAt) &&
-    isEventJsonValue(value.data)
-  );
 }
 
 function isDeliveryId(value: unknown): value is string {

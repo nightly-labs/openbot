@@ -913,20 +913,35 @@ if (!hasSingleInstanceLock) {
       setIpcCallObserver((call) => trace.record({ kind: "ipc", ...call }));
       service.on("event", (event) => trace.observeAgentEvent(event));
       service.on("event", (event) => forwardAgentEvent("local", event));
+      // A routine or its owner can be deleted outside the events API. Its route is then revoked here.
+      // Turns and channel messages also send these events, so only a deleted owner starts a sync.
+      let webhookAgentIds = new Set(service.listAgents().map((agent) => agent.id));
       const onRoutineEvent = (event: AgentEvent): void => {
         switch (event.type) {
           case "routines-changed":
           case "channel-routines-changed":
-          case "agents-changed":
+            built.eventsRuntime.syncRoutes({ all: false });
+            return;
+          case "agents-changed": {
+            const previous = webhookAgentIds;
+            webhookAgentIds = new Set(event.agents.map((agent) => agent.id));
+            if ([...previous].some((id) => !webhookAgentIds.has(id))) built.eventsRuntime.syncRoutes({ all: false });
+            return;
+          }
           case "channels-changed":
-            break;
-          default:
+            if (!service.routineRecords.ownerExists({ kind: "channel", id: event.channelId }))
+              built.eventsRuntime.syncRoutes({ all: false });
             return;
         }
-        // A routine or its owner can be deleted outside the events API. Its route is then revoked here.
-        built.eventsRuntime.syncRoutes({ all: false });
       };
-      const refreshWebhookRoutes = (): void => built.eventsRuntime.syncRoutes({ all: true });
+      // Routes belong to the signed-in account. A token refresh does not change them.
+      let webhookPrincipalId = centralAuthPrincipalId(built.centralAuth.getState());
+      const refreshWebhookRoutes = (state: CentralAuthState): void => {
+        const principalId = centralAuthPrincipalId(state);
+        if (principalId === webhookPrincipalId) return;
+        webhookPrincipalId = principalId;
+        if (principalId !== null) built.eventsRuntime.syncRoutes({ all: true });
+      };
       service.on("event", onRoutineEvent);
       built.centralAuth.on("changed", refreshWebhookRoutes);
       teardown.push(0, "event service listeners", () => {

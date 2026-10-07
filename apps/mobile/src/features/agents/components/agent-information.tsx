@@ -16,6 +16,7 @@ import { AgentSkills, CreateSkillAction } from "./agent-skills";
 import { AgentUsageReport } from "./agent-usage-report";
 import { UsageLoading } from "./usage-motion";
 import { UsageRangePicker } from "./usage-range-picker";
+import { useEventRoutines } from "./use-event-routines";
 
 type ListKind = "usage" | "memories" | "routines" | "skills" | "files";
 type RecordKind = "memory" | "routine";
@@ -112,21 +113,13 @@ export function AgentInformation({
     queryKey: [...key, "routines"],
     queryFn: () => workspace.loadAgentRoutines(agent.id, agent.serverId),
   });
-  const eventsEnabled =
-    available &&
-    (section === "routines" || section === "routine") &&
-    (role === "owner" || role === "admin") &&
-    workspace.canManageEvents(agent.serverId);
-  const eventRoutines = useQuery({
-    ...options,
-    enabled: eventsEnabled,
-    queryKey: [...key, "event-routines"],
-    queryFn: () => workspace.listEventRoutines({ kind: "agent", id: agent.id }, agent.serverId),
-  });
-  const allRoutines = [
-    ...(routines.data ?? []),
-    ...(eventRoutines.data ?? []).filter((routine) => routine.trigger.kind === "webhook"),
-  ];
+  const { eventsEnabled, eventRoutines, webhookRoutines } = useEventRoutines(
+    { kind: "agent", id: agent.id },
+    agent.serverId,
+    available && (section === "routines" || section === "routine"),
+    key,
+  );
+  const allRoutines = [...(routines.data ?? []), ...webhookRoutines];
   // An owner or admin reads the admin list, which has the enabled state, and can change it.
   const manageSkills = workspace.canManageAgentSkills(agent.serverId);
   const skillsKey = [...key, "skills", manageSkills];

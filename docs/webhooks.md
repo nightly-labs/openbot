@@ -23,6 +23,9 @@ stops working immediately. A secret has the format `whsec_<43 base64url characte
 When you change the routine to **Schedule**, or delete the routine, its URL stops working. If you
 change it back to **Webhook**, the routine gets a new URL and a new secret.
 
+The URL also changes when you sign in to a different OpenBot account on the host. The secret stays
+the same. Copy the new URL into the sending service.
+
 ## Send a request
 
 Send a `POST` request with `Content-Type: application/json` to the routine URL. The body has this
@@ -105,7 +108,7 @@ if (response.status !== 200 && response.status !== 202) {
 | `413` | The body is larger than 64 KiB. | No |
 | `415` | `Content-Type` is not `application/json`. | No |
 | `429` | Too many requests to this route from your address. | Yes, later |
-| `503` | The host is offline, busy, or did not answer in 2.5 seconds. The relay does not know the route, or the agent or channel cannot take a run now. | Yes, later |
+| `503` | The host is offline, busy, or did not answer in 2.5 seconds. The relay does not know the route, the host cannot read the secret, or the agent or channel cannot take a run now. | Yes, later |
 
 A `202` response does not mean that the run is complete. Look at the routine history for the run
 result. The relay does not keep requests while the host is offline. If you do not retry, the event

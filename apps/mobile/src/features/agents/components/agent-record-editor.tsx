@@ -1,4 +1,5 @@
 import { Host, Switch } from "@expo/ui";
+import { eventFilterDraftsValid, eventFiltersFromDrafts } from "@openbot/contracts/event-filter-value";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type CreateRoutineInput,
@@ -36,13 +37,7 @@ import { useText } from "@/shared/lib/text";
 import { RoutineScheduleFields } from "./routine-schedule-fields";
 import { type RoutineTriggerChoice, RoutineTriggerPicker } from "./routine-trigger-picker";
 import { RoutineWebhookActivity } from "./routine-webhook-activity";
-import {
-  eventFilters,
-  type FilterDraft,
-  filterDrafts,
-  filtersValid,
-  RoutineWebhookTrigger,
-} from "./routine-webhook-trigger";
+import { type FilterDraft, filterDrafts, RoutineWebhookTrigger } from "./routine-webhook-trigger";
 
 const DEFAULT_SCHEDULE: RoutineSchedule = { kind: "daily", time: "09:00" };
 
@@ -308,7 +303,7 @@ export function RoutineEditor({
     trigger,
     schedule: edits.schedule ?? savedSchedule,
     eventType,
-    filters: eventFilters(filters),
+    filters: eventFiltersFromDrafts(filters),
     timezone,
   });
   const nameChanged = name.trim() !== (routine?.name ?? "");
@@ -320,7 +315,8 @@ export function RoutineEditor({
   const webhookChanged =
     trigger !== savedTrigger ||
     (trigger === "webhook" &&
-      (eventType.trim() !== savedEventType || JSON.stringify(eventFilters(filters)) !== JSON.stringify(savedFilters)));
+      (eventType.trim() !== savedEventType ||
+        JSON.stringify(eventFiltersFromDrafts(filters)) !== JSON.stringify(savedFilters)));
   const dirty = routine
     ? nameChanged || instructionChanged || scheduleChanged || webhookChanged
     : draft !==
@@ -340,7 +336,7 @@ export function RoutineEditor({
   }, [finished]);
   const disabled = !available || action.pending || (!routine && savedDraft !== null);
   const validTrigger =
-    trigger === "webhook" ? filtersValid(filters) : scheduleProblem === null && isRoutineSchedule(schedule);
+    trigger === "webhook" ? eventFilterDraftsValid(filters) : scheduleProblem === null && isRoutineSchedule(schedule);
   async function save() {
     if (webhookRoutine || trigger === "webhook") {
       const input: SaveEventRoutineInput = {
@@ -352,7 +348,7 @@ export function RoutineEditor({
         timezone,
         trigger:
           trigger === "webhook"
-            ? { kind: "webhook", eventType: eventType.trim() || null, filters: eventFilters(filters) }
+            ? { kind: "webhook", eventType: eventType.trim() || null, filters: eventFiltersFromDrafts(filters) }
             : { kind: "schedule", schedule },
         ...(routine?.limitPolicy ? { limitPolicy: routine.limitPolicy } : {}),
       };

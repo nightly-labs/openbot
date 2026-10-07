@@ -848,6 +848,8 @@ const openbotApi: OpenBotDesktopApi = {
     createInvite: decodeInviteSummary,
     event: decodeHostStatus,
   }),
+  // The shared strict contract decoders, as MCP does: main decodes a remote answer with the same
+  // decoder before it reaches this point.
   events: bridgeGroup(IPC_ENDPOINTS.events, {
     getStatus: decodeEventStatus,
     listRoutines: decodeEventRoutines,

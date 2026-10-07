@@ -346,10 +346,10 @@
   line-height: var(--openbot-leading-md);
 }
 
-/* A pointer and value row in the webhook filters. */
+/* A pointer and value row in the webhook filters. A JSON Pointer is longer than its value. */
 .agent-routine-event-filter {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr) auto;
   align-items: center;
   gap: var(--openbot-space-2);
 }

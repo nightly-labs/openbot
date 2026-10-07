@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { MemoryEditor, RoutineEditor } from "@/features/agents/components/agent-record-editor";
+import { useEventRoutines } from "@/features/agents/components/use-event-routines";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { useChannels } from "@/features/channels/components/use-channels";
 import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
@@ -16,8 +17,7 @@ export function ChannelRecordsScreen({ section }: { section: "memories" | "memor
     recordId?: string;
   }>();
   const { session, sessionScope } = useMobileSession();
-  const workspace = useMobileWorkspace();
-  const { servers } = workspace;
+  const { servers } = useMobileWorkspace();
   const { store, channels } = useChannels(serverId);
   const available =
     servers.some((server) => server.id === serverId && server.state === "online") &&
@@ -37,18 +37,12 @@ export function ChannelRecordsScreen({ section }: { section: "memories" | "memor
     queryKey: [...key, "routines"],
     queryFn: () => store.routines(serverId, channelId),
   });
-  const server = servers.find((candidate) => candidate.id === serverId);
-  const eventsEnabled =
-    available &&
-    !memorySection &&
-    (server?.role === "owner" || server?.role === "admin") &&
-    workspace.canManageEvents(serverId);
-  const eventRoutines = useQuery({
-    ...options,
-    enabled: eventsEnabled,
-    queryKey: [...key, "event-routines"],
-    queryFn: () => workspace.listEventRoutines({ kind: "channel", id: channelId }, serverId),
-  });
+  const { eventsEnabled, eventRoutines, webhookRoutines } = useEventRoutines(
+    { kind: "channel", id: channelId },
+    serverId,
+    available && !memorySection,
+    key,
+  );
   const query = memorySection ? memories : routines;
   const recordsPending = query.isPending || (eventsEnabled && eventRoutines.isPending);
   const recordsError = query.isError || (eventsEnabled && eventRoutines.isError);
@@ -56,10 +50,7 @@ export function ChannelRecordsScreen({ section }: { section: "memories" | "memor
   const memory = memories.data?.find((item) => item.id === recordId);
   const routine = routines.data?.find((item) => item.id === recordId);
   const eventRoutine = eventRoutines.data?.find((item) => item.id === recordId);
-  const allRoutines = [
-    ...(routines.data ?? []),
-    ...(eventRoutines.data ?? []).filter((routine) => routine.trigger.kind === "webhook"),
-  ];
+  const allRoutines = [...(routines.data ?? []), ...webhookRoutines];
   return (
     <SettingsContent>
       {!available ? <Typography.Paragraph>{t("mobile.channel.records.connect")}</Typography.Paragraph> : null}

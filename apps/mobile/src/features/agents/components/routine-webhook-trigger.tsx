@@ -1,4 +1,10 @@
-import { type EventFilter, type EventScalar, isEventFilterPointer } from "@openbot/contracts/ipc-events";
+import {
+  type EventFilterDraft,
+  eventFilterDraft,
+  eventFilterPointerValid,
+  MASKED_WEBHOOK_SECRET,
+} from "@openbot/contracts/event-filter-value";
+import type { EventFilter } from "@openbot/contracts/ipc-events";
 import * as Clipboard from "expo-clipboard";
 import { Button, Typography } from "heroui-native";
 import { Check, ChevronDown, ChevronRight, Copy, RefreshCw } from "lucide-react-native";
@@ -11,10 +17,8 @@ import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
 /** A filter row in the form. The ID keeps the row and its inputs mounted while the user types. */
-export interface FilterDraft {
+export interface FilterDraft extends EventFilterDraft {
   id: string;
-  pointer: string;
-  value: string;
 }
 
 let nextFilterId = 0;
@@ -24,55 +28,10 @@ function newFilterDraft(): FilterDraft {
   return { id: `new-${nextFilterId}`, pointer: "", value: "" };
 }
 
-function isScalar(value: unknown): value is EventScalar {
-  return (
-    value === null ||
-    typeof value === "string" ||
-    typeof value === "boolean" ||
-    (typeof value === "number" && Number.isFinite(value))
-  );
-}
-
-/** The scalar that the text is as JSON, or undefined when the text is not a JSON scalar. */
-function parseScalar(text: string): EventScalar | undefined {
-  try {
-    const parsed = JSON.parse(text);
-    return isScalar(parsed) ? parsed : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-/** Text that reads back as the same value: a string that is also a JSON scalar gets quotes. */
-function filterValueText(value: EventScalar): string {
-  if (typeof value === "string") return parseScalar(value) === undefined ? value : JSON.stringify(value);
-  return JSON.stringify(value);
-}
-
-function filterValue(text: string): EventScalar {
-  const parsed = parseScalar(text.trim());
-  return parsed === undefined ? text : parsed;
-}
-
 /** Saved filters get IDs from their position, so the rows stay mounted until the user edits them. */
 export function filterDrafts(filters: readonly EventFilter[]): FilterDraft[] {
-  return filters.map((filter, index) => ({
-    id: `saved-${index}`,
-    pointer: filter.pointer,
-    value: filterValueText(filter.value),
-  }));
+  return filters.map((filter, index) => ({ id: `saved-${index}`, ...eventFilterDraft(filter) }));
 }
-
-export function eventFilters(drafts: readonly FilterDraft[]): EventFilter[] {
-  return drafts.map((draft) => ({ pointer: draft.pointer.trim(), value: filterValue(draft.value) }));
-}
-
-export function filtersValid(drafts: readonly FilterDraft[]): boolean {
-  return drafts.every((draft) => isEventFilterPointer(draft.pointer.trim()));
-}
-
-/** The host never returns a saved secret, so the row shows its prefix and a mask. */
-const MASKED_SECRET = "whsec_••••••••••••";
 
 function useCopy() {
   const { t } = useText();
@@ -250,7 +209,7 @@ export function RoutineWebhookTrigger({
               className="font-mono text-grouped-secondary"
               accessibilityLabel={t("mobile.agent.webhook.secretHidden")}
             >
-              {MASKED_SECRET}
+              {MASKED_WEBHOOK_SECRET}
             </Typography.Paragraph>
           )}
         </ValueRow>
@@ -306,7 +265,7 @@ export function RoutineWebhookTrigger({
                 appearance="soft"
                 label={t("mobile.agent.record.eventFilterPointer")}
                 hint={
-                  isEventFilterPointer(filter.pointer.trim())
+                  eventFilterPointerValid(filter.pointer)
                     ? undefined
                     : t("mobile.agent.record.eventFilterPointerInvalid")
                 }

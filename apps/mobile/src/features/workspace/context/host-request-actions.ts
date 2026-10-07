@@ -106,6 +106,11 @@ type HostRequestActions = Pick<
   | "downloadAttachment"
 >;
 
+/** Runs a Team API request. A failure rejects with the error of the host, not its Effect wrapper. */
+function runTeamRequest<A>(operation: Effect.Effect<A, { readonly cause: unknown }>): Promise<A> {
+  return runTeamEffect(operation.pipe(Effect.mapError((error) => error.cause)));
+}
+
 /** Workspace actions that only send host requests and read advertised capabilities. */
 export function createHostRequestActions({
   request,
@@ -136,20 +141,13 @@ export function createHostRequestActions({
     return teamApi(serverId);
   }
   return {
-    listEventRoutines: (owner, serverId) =>
-      runTeamEffect(listEventRoutines(eventsAdmin(serverId), { owner }).pipe(Effect.mapError((error) => error.cause))),
-    saveEventRoutine: (input, serverId) =>
-      runTeamEffect(saveEventRoutine(eventsAdmin(serverId), input).pipe(Effect.mapError((error) => error.cause))),
-    deleteEventRoutine: (input, serverId) =>
-      runTeamEffect(deleteEventRoutine(eventsAdmin(serverId), input).pipe(Effect.mapError((error) => error.cause))),
-    testEventRoutine: (input, serverId) =>
-      runTeamEffect(testEventRoutine(eventsAdmin(serverId), input).pipe(Effect.mapError((error) => error.cause))),
+    listEventRoutines: (owner, serverId) => runTeamRequest(listEventRoutines(eventsAdmin(serverId), { owner })),
+    saveEventRoutine: (input, serverId) => runTeamRequest(saveEventRoutine(eventsAdmin(serverId), input)),
+    deleteEventRoutine: (input, serverId) => runTeamRequest(deleteEventRoutine(eventsAdmin(serverId), input)),
+    testEventRoutine: (input, serverId) => runTeamRequest(testEventRoutine(eventsAdmin(serverId), input)),
     rotateEventRoutineSecret: (input, serverId) =>
-      runTeamEffect(
-        rotateEventRoutineSecret(eventsAdmin(serverId), input).pipe(Effect.mapError((error) => error.cause)),
-      ),
-    listEventActivity: (input, serverId) =>
-      runTeamEffect(listEventActivity(eventsAdmin(serverId), input).pipe(Effect.mapError((error) => error.cause))),
+      runTeamRequest(rotateEventRoutineSecret(eventsAdmin(serverId), input)),
+    listEventActivity: (input, serverId) => runTeamRequest(listEventActivity(eventsAdmin(serverId), input)),
     saveAgentMemory: async (agentId, text, serverId, memoryId) => {
       await saveAgentRecord(queryClient, ["agent-info", ...queryScope, serverId, agentId, "memories"], () =>
         request(
@@ -256,7 +254,7 @@ export function createHostRequestActions({
         serverId,
       ),
     loadRoutineCalendar: (input, serverId) =>
-      runTeamEffect(
+      runTeamRequest(
         buildRoutineCalendar(
           { from: new Date(input.from), to: new Date(input.to) },
           new Date(),
@@ -264,14 +262,10 @@ export function createHostRequestActions({
             teamApi(serverId),
             capabilities.get(serverId)?.includes(CHANNEL_CHATS_CAPABILITY) ?? false,
           ),
-        ).pipe(Effect.mapError((error) => error.cause)),
-      ),
-    loadHostAnalytics: (input, serverId) =>
-      runTeamEffect(
-        readHostAnalytics(teamApi(serverId), capabilities.get(serverId) ?? [], input).pipe(
-          Effect.mapError((error) => error.cause),
         ),
       ),
+    loadHostAnalytics: (input, serverId) =>
+      runTeamRequest(readHostAnalytics(teamApi(serverId), capabilities.get(serverId) ?? [], input)),
     searchMessages: (query, serverId, cursor) =>
       request(
         "GET",
@@ -283,18 +277,13 @@ export function createHostRequestActions({
       ),
     // A host too old to know the route answers 404, so ask its advertised capabilities first.
     loadAgentSkills: async (agentId, serverId, manage = false) => {
-      if (manage)
-        return runTeamEffect(
-          listAgentSkills(skillsAdmin(serverId), agentId).pipe(Effect.mapError((error) => error.cause)),
-        );
+      if (manage) return runTeamRequest(listAgentSkills(skillsAdmin(serverId), agentId));
       return capabilities.get(serverId)?.includes(TEAM_SEMANTIC_TAGS_CAPABILITY)
         ? request("GET", TEAM_API_ROUTES.agent.skills(agentId), decodeInstalledSkills, undefined, serverId)
         : null;
     },
-    setAgentSkillEnabled: async (input, serverId) =>
-      runTeamEffect(setAgentSkillEnabled(skillsAdmin(serverId), input).pipe(Effect.mapError((error) => error.cause))),
-    uninstallAgentSkill: async (input, serverId) =>
-      runTeamEffect(uninstallAgentSkill(skillsAdmin(serverId), input).pipe(Effect.mapError((error) => error.cause))),
+    setAgentSkillEnabled: async (input, serverId) => runTeamRequest(setAgentSkillEnabled(skillsAdmin(serverId), input)),
+    uninstallAgentSkill: async (input, serverId) => runTeamRequest(uninstallAgentSkill(skillsAdmin(serverId), input)),
     loadAgentStorage: async (agentId, serverId, force = false) => {
       if (!capabilities.get(serverId)?.includes(STORAGE_CAPABILITY)) return null;
       const input = { scope: "agent" as const, agentId, ...(force ? { force: true } : {}) };
@@ -322,9 +311,7 @@ export function createHostRequestActions({
       // A host too old to know the route answers 404, so refuse before the request.
       if (!capabilities.get(serverId)?.includes(AGENT_INSTALL_CAPABILITY))
         return Promise.reject(new Error(currentText().t("mobile.link.template.error.unsupported")));
-      return runTeamEffect(
-        installAgentTemplate(teamApi(serverId), input).pipe(Effect.mapError((error) => error.cause)),
-      );
+      return runTeamRequest(installAgentTemplate(teamApi(serverId), input));
     },
     loadAgentAvatar: (agentId, avatarUrl, serverId) => requestAgentAvatar(request, agentId, avatarUrl, serverId),
     duplicateAgent: async (agentId) => {
