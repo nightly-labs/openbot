@@ -565,6 +565,20 @@
 }
 
 /*
+ * In the schedule row the menu button has the size of a chip, so the row stays as tall as an
+ * input. It sits one padding from the end, as the icon does at the start.
+ */
+.routine-trigger-row .routine-trigger-action {
+  margin-inline-start: calc(var(--openbot-space-1) * -1);
+}
+
+.routine-trigger-row .routine-trigger-action .ui-button {
+  width: var(--openbot-control-sm);
+  height: var(--openbot-control-sm);
+  border-radius: var(--openbot-radius-xs);
+}
+
+/*
  * The webhook trigger: a header with the size of the schedule row, then one row for each value.
  * The rows start under the header title, and their actions share one column with the menu button.
  */
