@@ -126,8 +126,10 @@ export function DiagramView(props: DiagramViewProps) {
       status: diagramRunOf(props.diagram, routine.id)?.status,
     })),
   ];
+  /** A routine also takes the focus, as picking it in the routine select does. */
   const select = (nodeId: string | null) => {
     setSelectedNodeId(nodeId);
+    if (nodeId && routines().some((node) => node.id === nodeId)) setPicked(nodeId);
     if (nodeId)
       setPanels((state) => {
         state.inspector = true;
