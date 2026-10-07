@@ -413,6 +413,8 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   #exchangingCode = false;
   /** Issuer selected by the SDK for this auth attempt, captured before credentials are read. */
   #activeIssuer: string | undefined;
+  /** Full discovery for this attempt, including custom protected-resource metadata. */
+  #discoveryState: OAuthDiscoveryState | undefined;
   /** Set when the SDK is told to register, and cleared when it saves what it registered. */
   #registrationPending = false;
 
@@ -573,6 +575,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     return runCauseEffect(
       Effect.gen({ self: this }, function* () {
         this.#activeIssuer = discovery.authorizationServerUrl;
+        this.#discoveryState = discovery;
         // A pre-1.31 record has no safe issuer when its discovery state is absent. Do not let a
         // malicious resource install its authorization server as the binding for that record.
         // When old discovery exists, keep it until the old credentials have been stamped.
@@ -592,7 +595,9 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   }
 
   discoveryState(): OAuthDiscoveryState | undefined {
-    const discovery = this.#record().discovery;
+    const stored = this.#record().discovery;
+    const discovery = this.#discoveryState ?? stored;
+    this.#discoveryState = discovery;
     this.#activeIssuer = discovery?.authorizationServerUrl;
     return discovery;
   }
@@ -617,7 +622,11 @@ class McpOAuthClientProvider implements OAuthClientProvider {
       Effect.gen({ self: this }, function* () {
         if (scope === "verifier" || scope === "discovery") {
           if (scope === "verifier") this.#codeVerifier = null;
-          else yield* this.#save({ discovery: undefined });
+          else {
+            this.#discoveryState = undefined;
+            this.#activeIssuer = undefined;
+            yield* this.#save({ discovery: undefined });
+          }
           return;
         }
         if (scope === "all") {
@@ -656,7 +665,14 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     part: Partial<McpOAuthRecord>,
   ): Effect.fn.Return<void, McpOperationError> {
     const record = yield* mcpSync(() => this.#record());
-    yield* this.#options.storage.write(this.#options.resource, { ...record, ...part });
+    const next = { ...record, ...part };
+    if (!("discovery" in part) && this.#discoveryState && !hasUnboundCredentials(next)) {
+      next.discovery = {
+        authorizationServerUrl: this.#discoveryState.authorizationServerUrl,
+        resourceMetadataUrl: this.#discoveryState.resourceMetadataUrl,
+      };
+    }
+    yield* this.#options.storage.write(this.#options.resource, next);
   });
 }
 

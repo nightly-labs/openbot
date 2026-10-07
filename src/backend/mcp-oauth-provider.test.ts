@@ -526,12 +526,22 @@ describe("signing in to an http MCP server", () => {
     expect(result.error).toContain("The sign-in address is not a web page.");
   });
 
-  it("reuses the authorization server the sign-in discovered", async () => {
+  it("retains custom discovery while migrating an issuerless legacy sign-in", async () => {
     const server = await fakeServer({
       advertisedPrmPath: "/custom-prm",
       defaultAuthorizationServers: ["http://127.0.0.1:9/"],
     });
     const storage = memoryStorage();
+    storage.records.set(server.url, {
+      client: { client_id: "old-client", client_secret: "old-secret", redirect_uris: ["openbot://mcp-auth"] },
+      tokens: {
+        access_token: "old-access-token",
+        token_type: "Bearer",
+        expires_in: 3600,
+        refresh_token: "old-refresh-token",
+      },
+      obtainedAt: Date.now() - 7_200_000,
+    });
     const oauth = createOAuth({
       storage,
       redirectUrl: "openbot://mcp-auth",
@@ -546,11 +556,20 @@ describe("signing in to an http MCP server", () => {
       error: null,
     });
 
-    // ...then the stored access token is replaced with one the server rejects, and aged out, so
-    // the next probe must refresh through the same authorization server. Default discovery names
-    // a dead server; without the retained state the refresh fails and the tools stay missing.
+    // The legacy refresh token and client secret were never offered to the authorization server
+    // discovered through the custom PRM. The code exchange minted a new, issuer-bound pair.
+    expect(server.tokenRequests.every((form) => form.get("refresh_token") !== "old-refresh-token")).toBe(true);
+    expect(server.tokenRequests.every((form) => form.get("client_secret") !== "old-secret")).toBe(true);
     const record = storage.read(server.url);
     if (!record?.tokens) throw new Error("The sign-in stored no tokens.");
+    expect(record.discovery?.authorizationServerUrl).toBe(server.base);
+    expect(record.discovery?.resourceMetadataUrl).toBe(`${server.base}/custom-prm`);
+    expect(record.client?.issuer).toBe(server.base);
+    expect(record.tokens.issuer).toBe(server.base);
+
+    // The stored access token is replaced with one the server rejects, and aged out, so the next
+    // probe must refresh through the retained authorization server. Default discovery names a
+    // dead server; without the in-memory hand-off and post-bind persistence the refresh fails.
     storage.records.set(server.url, {
       ...record,
       tokens: { ...record.tokens, access_token: "rotated-away" },
