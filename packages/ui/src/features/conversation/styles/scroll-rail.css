@@ -2,16 +2,16 @@
  * Where the reader is in a long chat, on the right edge of the transcript. The public site's reading
  * progress draws the same rail for its articles.
  *
- * One segment per day, as long as the day. The part the reader has passed is OpenBot's lilac, and the
- * segment they are in glows at the point they have reached. Pointing at the rail brings in the day
- * titles through a blur, over a scrim with no edge.
+ * One segment per day, as long as the day. The part the reader has passed fills in a muted neutral,
+ * and the segment they are in glows at the point they have reached. Pointing at the rail brings in the
+ * day titles through a blur, over a scrim with no edge.
  *
  * The anchor sticks to the top of the scroll container with the viewport's height, and its negative
  * margin gives that height back, so the transcript under it does not move.
  */
 .chat-scroll-rail {
-  /* A muted neutral with a trace of the logo lilac: the full lilac pulls the eye while the reader reads. */
-  --chat-scroll-rail-accent: color-mix(in srgb, var(--openbot-logo-production) 25%, var(--openbot-text-muted));
+  /* A muted neutral: a colour pulls the eye while the reader reads. */
+  --chat-scroll-rail-accent: var(--openbot-text-muted);
   --chat-scroll-rail-track: color-mix(in srgb, var(--openbot-text-primary) 10%, transparent);
   --chat-scroll-rail-glow: color-mix(in srgb, var(--chat-scroll-rail-accent) 60%, transparent);
   --chat-scroll-rail-ease: var(--openbot-ease-out);
@@ -91,24 +91,35 @@
   transition: opacity var(--openbot-duration-slow) ease;
 }
 
+/* The digits of the current section lift in and sharpen, as in the task list. */
 .chat-scroll-rail-count {
-  color: var(--openbot-logo-production);
+  --digit-dur: var(--openbot-duration-overlay);
+  --digit-distance: var(--openbot-space-1);
+  --digit-blur: var(--openbot-space-0-5);
+  --digit-ease: var(--openbot-ease-out);
+
+  color: var(--chat-scroll-rail-accent);
   font-variant-numeric: tabular-nums;
 }
 
-/* Each day keeps room for its title. A chat with more days than the rail holds scrolls the list
-   inside the rail, so every day stays in reach; the list keeps the current day in view. */
-.chat-scroll-rail-list {
+/* Each day keeps room for its title. A chat with more days than the rail holds scrolls the track
+   inside the rail, so every day stays in reach; the track keeps the current day in view. The reading
+   head scrolls with the list. */
+.chat-scroll-rail-track {
   position: relative;
   flex: 1;
   min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.chat-scroll-rail-list {
+  min-height: 100%;
   display: flex;
   flex-direction: column;
   margin: 0;
   padding: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: none;
   list-style: none;
 }
 
@@ -219,11 +230,11 @@
   box-shadow: 0 0 10px var(--chat-scroll-rail-glow);
 }
 
-/* The reading head: where the reader is inside the current day. */
-.chat-scroll-rail-item[data-state="active"] .chat-scroll-rail-bar::after {
-  content: "";
+/* The reading head: where the reader is inside the current day. One head for the whole list, so it
+   runs from day to day with the place. */
+.chat-scroll-rail-head {
   position: absolute;
-  top: calc((100% - var(--openbot-space-1)) * var(--chat-scroll-rail-fill, 0));
+  top: 0;
   right: 3px;
   width: 6px;
   height: 6px;
@@ -232,7 +243,15 @@
   box-shadow:
     0 0 0 3px color-mix(in srgb, var(--chat-scroll-rail-accent) 18%, transparent),
     0 0 12px var(--chat-scroll-rail-glow);
-  transform: translateY(-50%);
+  pointer-events: none;
+  transform: translateY(
+    calc(
+      var(--chat-scroll-rail-head-top) +
+      (var(--chat-scroll-rail-head-length) - var(--openbot-space-1)) *
+      var(--chat-scroll-rail-fill, 0) -
+      50%
+    )
+  );
 }
 
 .chat-scroll-rail-nav:hover .chat-scroll-rail-surface,
