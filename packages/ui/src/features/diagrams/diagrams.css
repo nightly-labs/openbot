@@ -65,15 +65,6 @@
   white-space: nowrap;
 }
 
-.diagram-view-run {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--openbot-space-1-5);
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-md);
-  white-space: nowrap;
-}
-
 .diagram-view-actions {
   display: flex;
   align-items: center;

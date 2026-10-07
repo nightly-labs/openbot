@@ -9,7 +9,6 @@
  */
 
 import {
-  Badge,
   Button,
   PanelRight,
   Play,
@@ -24,7 +23,6 @@ import { createSignal, createStore, Show } from "solid-js";
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
-import { sidebarMessageTime } from "../sidebar/sidebar-filtering";
 import { DiagramBoard } from "./DiagramBoard";
 import { DiagramChatPanel } from "./DiagramChatPanel";
 import { DiagramInspector } from "./DiagramInspector";
@@ -32,7 +30,6 @@ import { DiagramStepIcon } from "./DiagramNodeCard";
 import { diagramRunStepStatus } from "./DiagramRoutineVisuals";
 import { diagramLatestRun, diagramRoutineColor, diagramRunOf } from "./diagram-graph";
 import type { Diagram, DiagramChatMessage, DiagramNode, DiagramPoint, DiagramRunStatus } from "./diagram-model";
-import { DIAGRAM_RUN_STATUS_KEY } from "./diagram-text";
 
 export interface DiagramViewProps {
   diagram: Diagram;
@@ -99,7 +96,7 @@ function RoutineOptionLabel(props: { option: RoutineOption }) {
 const ALL = "routine-lens:all";
 
 export function DiagramView(props: DiagramViewProps) {
-  const { t, format } = useText();
+  const { t } = useText();
   const [selectedNodeId, setSelectedNodeId] = createSignal<string | null>(null);
   const [panels, setPanels] = createStore({ inspector: true, chat: false });
   const now = () => (props.now ? new Date(props.now) : new Date());
@@ -113,7 +110,6 @@ export function DiagramView(props: DiagramViewProps) {
     if (choice && routines().some((node) => node.id === choice)) return choice;
     return diagramLatestRun(props.diagram)?.routineNodeId ?? null;
   };
-  const focusedRun = () => diagramRunOf(props.diagram, focusRoutineId());
   const runRoutine = (routineId: string) => {
     setPicked(routineId);
     props.onRunRoutine?.(routineId);
@@ -150,24 +146,6 @@ export function DiagramView(props: DiagramViewProps) {
           {(owner) => <AgentAvatar agent={owner()} class="diagram-view-avatar" motion="idle" />}
         </Show>
         <h1 class="diagram-view-title">{props.diagram.name}</h1>
-        <Show when={focusedRun()} fallback={<span class="diagram-view-run">{t("diagram.run.none")}</span>}>
-          {(run) => (
-            <span class="diagram-view-run">
-              <Badge
-                variant={
-                  run().status === "failed"
-                    ? "destructive-light"
-                    : run().status === "succeeded"
-                      ? "success-light"
-                      : "secondary"
-                }
-              >
-                {t(DIAGRAM_RUN_STATUS_KEY[run().status])}
-              </Badge>
-              {t("diagram.run.last", { time: sidebarMessageTime(run().startedAt, format) })}
-            </span>
-          )}
-        </Show>
         <span class="diagram-view-actions">
           <Show when={props.onRunRoutine && runTarget()}>
             {(routineId) => (

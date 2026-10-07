@@ -44,7 +44,6 @@ export const messages = defineMessages("diagram", {
   "diagram.run.succeeded": "Succeeded",
   "diagram.run.failed": "Failed",
   "diagram.run.cancelled": "Cancelled",
-  "diagram.run.none": "No runs yet",
   "diagram.run.last": "Last run {time}",
   "diagram.run.manual": "Started by hand",
   "diagram.run.scheduled": "Started by {routine}",
