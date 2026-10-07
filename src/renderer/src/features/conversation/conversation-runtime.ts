@@ -3,7 +3,7 @@ import type { AgentSkillCalls } from "../../skills-port";
 import type { AgentTemplatePublishCalls } from "../agent-templates/agent-templates-port";
 import type { SharedTableCalls } from "./conversation-port";
 import type { ConversationProps } from "./conversation-types";
-import type { EventRoutinesApi } from "./routines-port";
+import type { EventRoutinesApi } from "./routine-webhooks-api";
 
 export interface ConversationRuntime {
   agent: Pick<

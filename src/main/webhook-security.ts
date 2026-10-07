@@ -1,22 +1,15 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { isIP } from "node:net";
-import {
-  WEBHOOK_DELIVERY_ID_HEADER,
-  WEBHOOK_SIGNATURE_HEADER,
-  WEBHOOK_TIMESTAMP_HEADER,
-} from "@openbot/contracts/signal-protocol/webhook-route";
+import { WEBHOOK_DELIVERY_BODY_BYTES_LIMIT } from "@openbot/contracts/signal-protocol/messages";
 import { Schema } from "effect";
 
-/** Maximum signed payload size. The inbound relay has a separate, smaller limit. */
-export const WEBHOOK_MAX_BODY_BYTES = 256 * 1024;
 /** Signatures outside this clock window are replays, even if the secret is valid. */
-export const WEBHOOK_MAX_CLOCK_SKEW_MS = 5 * 60 * 1000;
+const WEBHOOK_MAX_CLOCK_SKEW_MS = 5 * 60 * 1000;
 /** Keep header values bounded before they reach HMAC or a request parser. */
-export const WEBHOOK_MAX_TIMESTAMP_BYTES = 32;
-export const WEBHOOK_MAX_DELIVERY_ID_BYTES = 256;
-export const WEBHOOK_MAX_SIGNATURE_BYTES = 160;
-
-export { WEBHOOK_DELIVERY_ID_HEADER, WEBHOOK_SIGNATURE_HEADER, WEBHOOK_TIMESTAMP_HEADER };
+const WEBHOOK_MAX_TIMESTAMP_BYTES = 32;
+const WEBHOOK_MAX_SIGNATURE_BYTES = 160;
+/** The relay applies the same rule, so a delivery ID that it forwards always passes here. */
+const WEBHOOK_DELIVERY_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/;
 
 export type WebhookSecurityFailureCode =
   | "body_too_large"
@@ -43,20 +36,12 @@ export class WebhookSecurityError extends Schema.TaggedError<WebhookSecurityErro
 export interface WebhookSignatureInput {
   /** Unix time in seconds, encoded as an ASCII decimal string. */
   timestamp: string;
-  /** A source-scoped delivery ID. It is also the deduplication key. */
+  /** A route-scoped delivery ID. It is also the deduplication key. */
   deliveryId: string;
   /** The exact bytes received on the wire. */
   body: Uint8Array;
   /** Unix time in milliseconds. Defaults to Date.now(). */
   nowMs?: number;
-  /** Maximum body size. The default is WEBHOOK_MAX_BODY_BYTES. */
-  maxBodyBytes?: number;
-}
-
-export interface WebhookSignatureHeaders {
-  timestamp: string;
-  deliveryId: string;
-  signature: string;
 }
 
 function fail(code: WebhookSecurityFailureCode): never {
@@ -69,10 +54,9 @@ function secretBytes(secret: string | Uint8Array): Buffer {
   return bytes;
 }
 
-function validateBody(body: Uint8Array, maxBodyBytes: number): Buffer {
-  if (!Number.isSafeInteger(maxBodyBytes) || maxBodyBytes < 1) fail("invalid_body");
+function validateBody(body: Uint8Array): Buffer {
   if (!(body instanceof Uint8Array)) fail("invalid_body");
-  if (body.byteLength > maxBodyBytes) fail("body_too_large");
+  if (body.byteLength > WEBHOOK_DELIVERY_BODY_BYTES_LIMIT) fail("body_too_large");
   return Buffer.from(body);
 }
 
@@ -95,21 +79,15 @@ function validateTimestamp(timestamp: string, nowMs: number): number {
 }
 
 function validateDeliveryId(deliveryId: string): void {
-  if (
-    typeof deliveryId !== "string" ||
-    deliveryId.length === 0 ||
-    Buffer.byteLength(deliveryId, "utf8") > WEBHOOK_MAX_DELIVERY_ID_BYTES ||
-    // Header values are deliberately narrower than arbitrary UTF-8. This also excludes CR/LF.
-    !/^[A-Za-z0-9][A-Za-z0-9._:-]*$/.test(deliveryId)
-  )
-    fail("invalid_delivery_id");
+  // Header values are deliberately narrower than arbitrary UTF-8. This also excludes CR/LF.
+  if (typeof deliveryId !== "string" || !WEBHOOK_DELIVERY_ID_PATTERN.test(deliveryId)) fail("invalid_delivery_id");
 }
 
 /** The exact bytes covered by both inbound and outbound signatures. */
-export function webhookSigningBytes(timestamp: string, deliveryId: string, body: Uint8Array): Buffer {
+function webhookSigningBytes(timestamp: string, deliveryId: string, body: Uint8Array): Buffer {
   validateTimestampSyntax(timestamp);
   validateDeliveryId(deliveryId);
-  const bytes = validateBody(body, WEBHOOK_MAX_BODY_BYTES);
+  const bytes = validateBody(body);
   return Buffer.concat([
     Buffer.from(timestamp, "ascii"),
     Buffer.from("."),
@@ -133,7 +111,7 @@ export function createWebhookSignature(
 /**
  * Checks timestamp freshness, input bounds, and the HMAC in constant time.
  *
- * The caller should deduplicate `(sourceId, deliveryId)` after this check and before dispatch.
+ * The caller should deduplicate `(routine, deliveryId)` after this check and before a run starts.
  */
 export function verifyWebhookSignature(
   secret: string | Uint8Array,
@@ -141,7 +119,7 @@ export function verifyWebhookSignature(
   signature: string,
 ): void {
   const nowMs = input.nowMs ?? Date.now();
-  const body = validateBody(input.body, input.maxBodyBytes ?? WEBHOOK_MAX_BODY_BYTES);
+  const body = validateBody(input.body);
   validateTimestamp(input.timestamp, nowMs);
   validateDeliveryId(input.deliveryId);
   if (
@@ -156,21 +134,6 @@ export function verifyWebhookSignature(
   // timingSafeEqual throws for unequal lengths. The length check keeps this a safe constant-time
   // comparison for valid-length values, while malformed values have already taken the same path.
   if (expected.length !== supplied.length || !timingSafeEqual(expected, supplied)) fail("invalid_signature");
-}
-
-/** Parses the three required headers without returning attacker-controlled arrays or values. */
-export function parseWebhookSignatureHeaders(
-  headers: Record<string, string | string[] | undefined>,
-): WebhookSignatureHeaders {
-  const value = (name: string): string => {
-    const raw = headers[name] ?? headers[name.toLowerCase()];
-    if (Array.isArray(raw) || typeof raw !== "string") fail("invalid_signature");
-    return raw;
-  };
-  const timestamp = value(WEBHOOK_TIMESTAMP_HEADER);
-  const deliveryId = value(WEBHOOK_DELIVERY_ID_HEADER);
-  const signature = value(WEBHOOK_SIGNATURE_HEADER);
-  return { timestamp, deliveryId, signature };
 }
 
 function parseIpv4(value: string): Uint8Array | null {

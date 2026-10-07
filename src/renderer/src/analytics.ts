@@ -370,6 +370,7 @@ const ROUTINE_TRIGGER_TYPES = new Set([
   "interval",
   "advanced",
   "custom",
+  "webhook",
 ]);
 
 const UPDATE_PHASES = new Set([

@@ -9,75 +9,56 @@ import { MESSAGING_SCHEMA_SQL } from "./messaging/messaging-schema";
 
 const BASELINE_SCHEMA_VERSION = 8;
 
-/** Durable local state for external events and outbound webhook delivery. */
-const EVENTS_SCHEMA_SQL = `
-  CREATE TABLE IF NOT EXISTS projection_event_sources (
-    source_id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    active INTEGER NOT NULL CHECK(active IN (0, 1)),
+/** Webhook triggers, received deliveries and outbound notifications for routines. */
+const WEBHOOK_SCHEMA_SQL = `
+  CREATE TABLE IF NOT EXISTS projection_routine_webhooks (
+    routine_id TEXT PRIMARY KEY REFERENCES projection_agent_routines(routine_id) ON DELETE CASCADE,
+    route_id TEXT NOT NULL UNIQUE,
+    event_type TEXT,
+    filters_json TEXT NOT NULL CHECK(json_valid(filters_json)),
+    secret_ciphertext TEXT NOT NULL,
     url TEXT,
-    secret_ciphertext TEXT,
     created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
+    updated_at TEXT NOT NULL,
+    last_event_sequence INTEGER NOT NULL
   );
-  CREATE INDEX IF NOT EXISTS event_sources_active
-    ON projection_event_sources(active, updated_at DESC, source_id);
-  CREATE TABLE IF NOT EXISTS projection_event_receipts (
-    event_id TEXT PRIMARY KEY,
-    source_id TEXT NOT NULL,
+  CREATE TABLE IF NOT EXISTS projection_channel_routine_webhooks (
+    routine_id TEXT PRIMARY KEY REFERENCES projection_channel_routines(routine_id) ON DELETE CASCADE,
+    route_id TEXT NOT NULL UNIQUE,
+    event_type TEXT,
+    filters_json TEXT NOT NULL CHECK(json_valid(filters_json)),
+    secret_ciphertext TEXT NOT NULL,
+    url TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    last_event_sequence INTEGER NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS projection_webhook_route_revocations (
+    route_id TEXT PRIMARY KEY,
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS projection_webhook_receipts (
+    receipt_id TEXT PRIMARY KEY,
+    owner_kind TEXT NOT NULL CHECK(owner_kind IN ('agent', 'channel')),
+    routine_id TEXT NOT NULL,
     delivery_id TEXT NOT NULL,
     event_type TEXT NOT NULL,
-    occurred_at TEXT NOT NULL,
-    received_at TEXT NOT NULL,
-    data_json TEXT NOT NULL CHECK(json_valid(data_json)),
-    created_at TEXT NOT NULL,
-    UNIQUE(source_id, delivery_id)
-  );
-  CREATE INDEX IF NOT EXISTS event_receipts_source
-    ON projection_event_receipts(source_id, received_at DESC, event_id);
-  CREATE TABLE IF NOT EXISTS projection_event_routine_triggers (
-    trigger_id TEXT PRIMARY KEY,
-    routine_id TEXT NOT NULL,
-    owner_kind TEXT NOT NULL CHECK(owner_kind IN ('agent', 'channel')),
-    owner_id TEXT NOT NULL,
-    name TEXT NOT NULL,
-    instruction TEXT NOT NULL,
-    timezone TEXT NOT NULL,
-    limit_policy TEXT NOT NULL DEFAULT 'wait' CHECK(limit_policy IN ('wait', 'skip')),
-    source_id TEXT NOT NULL,
-    event_type TEXT NOT NULL,
-    filters_json TEXT NOT NULL CHECK(json_valid(filters_json)),
-    active INTEGER NOT NULL CHECK(active IN (0, 1)),
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    UNIQUE(routine_id)
-  );
-  CREATE INDEX IF NOT EXISTS event_routine_triggers_match
-    ON projection_event_routine_triggers(source_id, event_type, active, trigger_id);
-  CREATE TABLE IF NOT EXISTS projection_event_dispatches (
-    dispatch_id TEXT PRIMARY KEY,
-    event_id TEXT NOT NULL,
-    trigger_id TEXT NOT NULL,
-    routine_id TEXT NOT NULL,
-    owner_kind TEXT NOT NULL CHECK(owner_kind IN ('agent', 'channel')),
-    owner_id TEXT NOT NULL,
-    status TEXT NOT NULL CHECK(status IN ('pending', 'claimed', 'completed', 'failed')),
+    status TEXT NOT NULL CHECK(status IN ('started', 'ignored')),
+    reason TEXT CHECK(reason IS NULL OR reason IN ('event-type', 'filter', 'inactive')),
     run_id TEXT,
-    error TEXT,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    UNIQUE(event_id, trigger_id)
+    received_at TEXT NOT NULL,
+    UNIQUE(owner_kind, routine_id, delivery_id)
   );
-  CREATE INDEX IF NOT EXISTS event_dispatches_pending
-    ON projection_event_dispatches(status, created_at, dispatch_id);
+  CREATE INDEX IF NOT EXISTS webhook_receipts_recent
+    ON projection_webhook_receipts(owner_kind, routine_id, received_at DESC, receipt_id);
   CREATE TABLE IF NOT EXISTS projection_webhook_destinations (
     destination_id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
+    owner_kind TEXT NOT NULL CHECK(owner_kind IN ('agent', 'channel')),
+    routine_id TEXT NOT NULL,
     active INTEGER NOT NULL CHECK(active IN (0, 1)),
     url TEXT NOT NULL,
     method TEXT NOT NULL CHECK(method IN ('POST', 'PUT', 'PATCH')),
     event_types_json TEXT NOT NULL CHECK(json_valid(event_types_json)),
-    routine_ids_json TEXT NOT NULL CHECK(json_valid(routine_ids_json)),
     payload_template_json TEXT CHECK(payload_template_json IS NULL OR json_valid(payload_template_json)),
     secret_ciphertext TEXT,
     headers_ciphertext TEXT,
@@ -85,16 +66,20 @@ const EVENTS_SCHEMA_SQL = `
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );
-  CREATE INDEX IF NOT EXISTS webhook_destinations_active
-    ON projection_webhook_destinations(active, updated_at DESC, destination_id);
+  CREATE INDEX IF NOT EXISTS webhook_destinations_routine
+    ON projection_webhook_destinations(owner_kind, routine_id, created_at, destination_id);
   CREATE TABLE IF NOT EXISTS projection_webhook_deliveries (
     delivery_id TEXT PRIMARY KEY,
-    destination_id TEXT NOT NULL,
+    destination_id TEXT NOT NULL REFERENCES projection_webhook_destinations(destination_id) ON DELETE CASCADE,
+    owner_kind TEXT NOT NULL CHECK(owner_kind IN ('agent', 'channel')),
+    routine_id TEXT NOT NULL,
+    run_id TEXT NOT NULL,
     event_id TEXT NOT NULL,
     event_type TEXT NOT NULL,
     payload_json TEXT NOT NULL CHECK(json_valid(payload_json)),
     attempt INTEGER NOT NULL CHECK(attempt >= 0),
     next_attempt_at TEXT NOT NULL,
+    window_started_at TEXT NOT NULL,
     status TEXT NOT NULL CHECK(status IN ('queued', 'sending', 'succeeded', 'failed')),
     last_status_code INTEGER,
     last_error TEXT,
@@ -103,22 +88,8 @@ const EVENTS_SCHEMA_SQL = `
   );
   CREATE INDEX IF NOT EXISTS webhook_deliveries_pending
     ON projection_webhook_deliveries(status, next_attempt_at, delivery_id);
-  CREATE TABLE IF NOT EXISTS projection_event_activity (
-    activity_id TEXT PRIMARY KEY,
-    kind TEXT NOT NULL CHECK(kind IN ('received', 'routine-run', 'delivery')),
-    status TEXT NOT NULL CHECK(status IN ('accepted', 'duplicate', 'queued', 'running', 'needs-attention', 'succeeded', 'failed')),
-    event_id TEXT,
-    source_id TEXT,
-    routine_id TEXT,
-    run_id TEXT,
-    destination_id TEXT,
-    delivery_id TEXT,
-    occurred_at TEXT NOT NULL,
-    summary TEXT NOT NULL,
-    created_at TEXT NOT NULL
-  );
-  CREATE INDEX IF NOT EXISTS event_activity_recent
-    ON projection_event_activity(created_at DESC, activity_id);
+  CREATE INDEX IF NOT EXISTS webhook_deliveries_routine
+    ON projection_webhook_deliveries(owner_kind, routine_id, updated_at DESC, delivery_id);
 `;
 
 // This is the frozen compatibility schema for every database that predates v8.
@@ -528,7 +499,7 @@ const LATEST_SCHEMA_SQL =
   ) +
   MCP_SERVERS_SCHEMA_SQL +
   MESSAGING_SCHEMA_SQL +
-  EVENTS_SCHEMA_SQL;
+  WEBHOOK_SCHEMA_SQL;
 
 /** The end of a routine table with the migration 27 column after its last one. */
 function withRoutineLimitPolicy(tableEnd: string): string {
@@ -673,8 +644,8 @@ const MIGRATIONS: readonly OpenBotMigration[] = [
   },
   {
     version: 29,
-    // Event and webhook state is additive. Existing routines, conversations and receipts remain untouched.
-    up: (db) => db.exec(EVENTS_SCHEMA_SQL),
+    // Only creates tables, so no foreign-key pause and no vacuum. Existing routines and runs stay as they are.
+    up: (db) => db.exec(WEBHOOK_SCHEMA_SQL),
   },
 ];
 

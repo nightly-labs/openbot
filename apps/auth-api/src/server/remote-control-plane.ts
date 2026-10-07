@@ -1607,7 +1607,7 @@ export class RemoteControlPlane {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
-  /** Registers one opaque webhook source ID for the authenticated host. */
+  /** Registers one opaque webhook route ID for the authenticated host. */
   readonly registerWebhookRoute = Effect.fn("RemoteControlPlane.registerWebhookRoute")(
     function* (
       this: RemoteControlPlane,
@@ -1651,7 +1651,7 @@ export class RemoteControlPlane {
       return yield* new RemoteControlPlaneError(
         409,
         "webhook_route_limit",
-        "This host has reached its webhook source limit.",
+        "This host has reached its webhook route limit.",
       );
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
@@ -1706,7 +1706,7 @@ export class RemoteControlPlane {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
-  /** Removes one webhook route after the host disabled or deleted its local source. */
+  /** Removes one webhook route after the host deleted its webhook routine or switched it to a schedule. */
   readonly disconnectWebhookRoute = Effect.fn("RemoteControlPlane.disconnectWebhookRoute")(
     function* (
       this: RemoteControlPlane,

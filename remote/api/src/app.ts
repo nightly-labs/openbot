@@ -159,7 +159,7 @@ export function createRemoteApiApp(
       },
       { parse: "none" },
     )
-    // Generic webhook requests are authenticated by the host with its local source secret. Signal
+    // The host authenticates each generic webhook request with the secret of its webhook routine. Signal
     // only bounds the body, limits ingress and relays the exact bytes plus signed header values.
     .post(
       `${WEBHOOK_EVENTS_PATH}/:routeId`,

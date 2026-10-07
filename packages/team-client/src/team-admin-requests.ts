@@ -65,26 +65,27 @@ import {
 } from "@openbot/contracts/ipc";
 import { guardedListDecoder } from "@openbot/contracts/ipc-decoding";
 import {
-  type DeleteEventRoutineInput,
   decodeEventActivity,
-  decodeEventRoutine,
   decodeEventRoutines,
-  decodeEventSource,
-  decodeEventSources,
   decodeEventStatus,
+  decodeSaveEventRoutineResult,
   decodeWebhookDestination,
   decodeWebhookDestinations,
+  decodeWebhookSecret,
   type EventActivity,
   type EventRoutine,
-  type EventRoutineOwner,
-  type EventSource,
+  type EventRoutineRef,
   type EventStatus,
   type ListEventActivityInput,
+  type ListEventRoutinesInput,
+  type ListWebhookDestinationsInput,
   type SaveEventRoutineInput,
-  type SaveEventSourceInput,
+  type SaveEventRoutineResult,
   type SaveWebhookDestinationInput,
-  type TestEventRoutineInput,
+  type WebhookDeliveryRef,
   type WebhookDestination,
+  type WebhookDestinationRef,
+  type WebhookSecret,
 } from "@openbot/contracts/ipc-events";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/agent-admin-v1";
@@ -274,78 +275,75 @@ export function getEventStatus(request: TeamApiRequest): Effect.Effect<EventStat
   return adminCall(() => request("POST", EVENTS_ROUTES.status, decodeEventStatus, {}));
 }
 
-export function listEventSources(request: TeamApiRequest): Effect.Effect<EventSource[], TeamAdminRequestError> {
-  return adminCall(() => request("POST", EVENTS_ROUTES.listSources, decodeEventSources, {}));
-}
-
-export function saveEventSource(
+export function listEventRoutines(
   request: TeamApiRequest,
-  input: SaveEventSourceInput,
-): Effect.Effect<EventSource, TeamAdminRequestError> {
-  return adminCall(() => request("POST", EVENTS_ROUTES.saveSource, decodeEventSource, { ...input }));
+  input: ListEventRoutinesInput,
+): Effect.Effect<EventRoutine[], TeamAdminRequestError> {
+  return adminCall(() => request("POST", EVENTS_ROUTES.listRoutines, decodeEventRoutines, eventBody(input)));
 }
 
-export function deleteEventSource(request: TeamApiRequest, id: string): Effect.Effect<void, TeamAdminRequestError> {
-  return adminCall(() => request("POST", EVENTS_ROUTES.deleteSource, ignoreResponse, { id }));
+/** The result has the new signing secret only when the routine became a webhook routine. */
+export function saveEventRoutine(
+  request: TeamApiRequest,
+  input: SaveEventRoutineInput,
+): Effect.Effect<SaveEventRoutineResult, TeamAdminRequestError> {
+  return adminCall(() => request("POST", EVENTS_ROUTES.saveRoutine, decodeSaveEventRoutineResult, eventBody(input)));
+}
+
+export function deleteEventRoutine(
+  request: TeamApiRequest,
+  input: EventRoutineRef,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", EVENTS_ROUTES.deleteRoutine, ignoreResponse, eventBody(input)));
+}
+
+export function testEventRoutine(
+  request: TeamApiRequest,
+  input: EventRoutineRef,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", EVENTS_ROUTES.testRoutine, ignoreResponse, eventBody(input)));
+}
+
+export function rotateEventRoutineSecret(
+  request: TeamApiRequest,
+  input: EventRoutineRef,
+): Effect.Effect<WebhookSecret, TeamAdminRequestError> {
+  return adminCall(() => request("POST", EVENTS_ROUTES.rotateSecret, decodeWebhookSecret, eventBody(input)));
 }
 
 export function listWebhookDestinations(
   request: TeamApiRequest,
+  input: ListWebhookDestinationsInput,
 ): Effect.Effect<WebhookDestination[], TeamAdminRequestError> {
-  return adminCall(() => request("POST", EVENTS_ROUTES.listDestinations, decodeWebhookDestinations, {}));
+  return adminCall(() => request("POST", EVENTS_ROUTES.listDestinations, decodeWebhookDestinations, eventBody(input)));
 }
 
 export function saveWebhookDestination(
   request: TeamApiRequest,
   input: SaveWebhookDestinationInput,
 ): Effect.Effect<WebhookDestination, TeamAdminRequestError> {
-  return adminCall(() => request("POST", EVENTS_ROUTES.saveDestination, decodeWebhookDestination, { ...input }));
+  return adminCall(() => request("POST", EVENTS_ROUTES.saveDestination, decodeWebhookDestination, eventBody(input)));
 }
 
 export function deleteWebhookDestination(
   request: TeamApiRequest,
-  id: string,
+  input: WebhookDestinationRef,
 ): Effect.Effect<void, TeamAdminRequestError> {
-  return adminCall(() => request("POST", EVENTS_ROUTES.deleteDestination, ignoreResponse, { id }));
+  return adminCall(() => request("POST", EVENTS_ROUTES.deleteDestination, ignoreResponse, eventBody(input)));
 }
 
 export function listEventActivity(
   request: TeamApiRequest,
-  input: ListEventActivityInput = {},
+  input: ListEventActivityInput,
 ): Effect.Effect<EventActivity[], TeamAdminRequestError> {
-  return adminCall(() => request("POST", EVENTS_ROUTES.listActivity, decodeEventActivity, { ...input }));
+  return adminCall(() => request("POST", EVENTS_ROUTES.listActivity, decodeEventActivity, eventBody(input)));
 }
 
-export function retryEventDelivery(request: TeamApiRequest, id: string): Effect.Effect<void, TeamAdminRequestError> {
-  return adminCall(() => request("POST", EVENTS_ROUTES.retryDelivery, ignoreResponse, { id }));
-}
-
-export function listEventRoutines(
+export function retryEventDelivery(
   request: TeamApiRequest,
-  owner: EventRoutineOwner,
-): Effect.Effect<EventRoutine[], TeamAdminRequestError> {
-  return adminCall(() => request("POST", EVENTS_ROUTES.listRoutines, decodeEventRoutines, { owner }));
-}
-
-export function saveEventRoutine(
-  request: TeamApiRequest,
-  input: SaveEventRoutineInput,
-): Effect.Effect<EventRoutine, TeamAdminRequestError> {
-  return adminCall(() => request("POST", EVENTS_ROUTES.saveRoutine, decodeEventRoutine, eventBody(input)));
-}
-
-export function deleteEventRoutine(
-  request: TeamApiRequest,
-  input: DeleteEventRoutineInput,
+  input: WebhookDeliveryRef,
 ): Effect.Effect<void, TeamAdminRequestError> {
-  return adminCall(() => request("POST", EVENTS_ROUTES.deleteRoutine, ignoreResponse, { ...input }));
-}
-
-export function testEventRoutine(
-  request: TeamApiRequest,
-  input: TestEventRoutineInput,
-): Effect.Effect<void, TeamAdminRequestError> {
-  return adminCall(() => request("POST", EVENTS_ROUTES.testRoutine, ignoreResponse, { ...input }));
+  return adminCall(() => request("POST", EVENTS_ROUTES.retryDelivery, ignoreResponse, eventBody(input)));
 }
 
 /** An absent field stays unchanged; a `null` logo removes it. */

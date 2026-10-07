@@ -265,7 +265,7 @@ describe("AgentRoutinesSettings", () => {
     await waitFor(() => expect(updateRoutine).toHaveBeenCalledWith(expect.objectContaining({ active: false })));
     expect(screen.getByText("Paused", { selector: "label" })).toBeInTheDocument();
 
-    await fireEvent.click(screen.getByRole("button", { name: "Test run" }));
+    await fireEvent.click(await screen.findByRole("button", { name: "Test run" }));
     await waitFor(() => expect(testRoutine).toHaveBeenCalledWith({ agentId: "chief", routineId: "routine-1" }));
 
     await fireEvent.click(screen.getByRole("button", { name: "Delete" }));

@@ -17,7 +17,8 @@ import { AgentSkillsModal, type AgentSkillsMode, assignedSkillCount } from "./Ag
 import { conversationPort, type SharedTableCalls } from "./conversation-port";
 import type { ConversationRuntime } from "./conversation-runtime";
 import { agentMemoriesPort } from "./memories-port";
-import { agentRoutinesPort, type EventRoutinesApi, eventRoutinesPort } from "./routines-port";
+import type { EventRoutinesApi } from "./routine-webhooks-api";
+import { agentRoutinesPort, eventRoutinesPort } from "./routines-port";
 import { SharedTablesModal } from "./SharedTablesModal";
 
 interface AgentSettingsPanelProps

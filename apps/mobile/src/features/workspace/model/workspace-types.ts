@@ -39,13 +39,16 @@ import type {
   EventActivity,
   EventRoutine,
   EventRoutineOwner,
-  EventSource,
-  EventStatus,
+  EventRoutineRef,
   ListEventActivityInput,
+  ListWebhookDestinationsInput,
   SaveEventRoutineInput,
-  SaveEventSourceInput,
+  SaveEventRoutineResult,
   SaveWebhookDestinationInput,
+  WebhookDeliveryRef,
   WebhookDestination,
+  WebhookDestinationRef,
+  WebhookSecret,
 } from "@openbot/contracts/ipc-events";
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import type { RemoteRecoveryStatus, RemoteTeamDirectoryClient } from "@openbot/team-client";
@@ -166,19 +169,17 @@ export interface MobileWorkspaceContextValue {
   testAgentRoutine: (agentId: string, routineId: string, serverId: string) => Promise<void>;
   /** Event administration is available only to owners and admins on hosts with events-v1. */
   canManageEvents: (serverId: string) => boolean;
-  getEventStatus: (serverId: string) => Promise<EventStatus>;
-  listEventSources: (serverId: string) => Promise<EventSource[]>;
-  saveEventSource: (input: SaveEventSourceInput, serverId: string) => Promise<EventSource>;
-  deleteEventSource: (id: string, serverId: string) => Promise<void>;
-  listWebhookDestinations: (serverId: string) => Promise<WebhookDestination[]>;
-  saveWebhookDestination: (input: SaveWebhookDestinationInput, serverId: string) => Promise<WebhookDestination>;
-  deleteWebhookDestination: (id: string, serverId: string) => Promise<void>;
-  listEventActivity: (input: ListEventActivityInput, serverId: string) => Promise<EventActivity[]>;
-  retryEventDelivery: (id: string, serverId: string) => Promise<void>;
   listEventRoutines: (owner: EventRoutineOwner, serverId: string) => Promise<EventRoutine[]>;
-  saveEventRoutine: (input: SaveEventRoutineInput, serverId: string) => Promise<EventRoutine>;
-  deleteEventRoutine: (input: { id: string; owner: EventRoutineOwner }, serverId: string) => Promise<void>;
-  testEventRoutine: (input: { id: string; owner: EventRoutineOwner }, serverId: string) => Promise<void>;
+  /** The result has the signing secret only when the save made a new webhook trigger. */
+  saveEventRoutine: (input: SaveEventRoutineInput, serverId: string) => Promise<SaveEventRoutineResult>;
+  deleteEventRoutine: (input: EventRoutineRef, serverId: string) => Promise<void>;
+  testEventRoutine: (input: EventRoutineRef, serverId: string) => Promise<void>;
+  rotateEventRoutineSecret: (input: EventRoutineRef, serverId: string) => Promise<WebhookSecret>;
+  listWebhookDestinations: (input: ListWebhookDestinationsInput, serverId: string) => Promise<WebhookDestination[]>;
+  saveWebhookDestination: (input: SaveWebhookDestinationInput, serverId: string) => Promise<WebhookDestination>;
+  deleteWebhookDestination: (input: WebhookDestinationRef, serverId: string) => Promise<void>;
+  listEventActivity: (input: ListEventActivityInput, serverId: string) => Promise<EventActivity[]>;
+  retryEventDelivery: (input: WebhookDeliveryRef, serverId: string) => Promise<void>;
   loadAgentModels: (serverId: string) => Promise<AgentModelOption[]>;
   loadAgentMemories: (agentId: string, serverId: string) => Promise<AgentMemory[]>;
   loadAgentRoutines: (agentId: string, serverId: string) => Promise<Routine[]>;

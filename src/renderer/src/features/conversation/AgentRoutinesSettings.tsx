@@ -5,14 +5,17 @@ import {
   type RoutineRunFields,
   type RoutineSchedule,
 } from "@openbot/contracts/ipc";
-import type { EventFilter, EventRoutine, EventRoutineTrigger, EventSource } from "@openbot/contracts/ipc-events";
+import type { EventRoutine, RoutineWebhookTriggerInput } from "@openbot/contracts/ipc-events";
 import type { AppTextKey } from "@openbot/i18n";
 import {
   Button,
+  ChevronDown,
+  ChevronRight,
   CirclePause,
   Clock3,
   ConfirmDialog,
   Input,
+  Link,
   Plus,
   Select,
   SelectContent,
@@ -20,17 +23,22 @@ import {
   SelectTrigger,
   SelectValue,
   Switch,
-  Text,
   Textarea,
   toast,
-  X,
 } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
 import { SettingsBackIcon, SettingsForwardIcon } from "@openbot/ui/components/SettingsPanel";
 import { RoutineRunHistory } from "@openbot/ui/features/conversation/RoutineRunHistory";
 import { RoutineSchedulePicker } from "@openbot/ui/features/conversation/RoutineSchedulePicker";
+import { RoutineWebhookActivity } from "@openbot/ui/features/conversation/RoutineWebhookActivity";
 import { RoutineWebhookNotifications } from "@openbot/ui/features/conversation/RoutineWebhookNotifications";
-import { RoutineWebhookSource } from "@openbot/ui/features/conversation/RoutineWebhookSource";
+import {
+  type RoutineWebhookFilterDraft,
+  RoutineWebhookTrigger,
+  routineWebhookFilterDraft,
+  routineWebhookFilters,
+  routineWebhookFiltersValid,
+} from "@openbot/ui/features/conversation/RoutineWebhookTrigger";
 import {
   ROUTINE_EVERY_DAY,
   type RoutineScheduleDraft,
@@ -44,7 +52,8 @@ import {
 } from "@openbot/ui/features/conversation/routine-schedule-saved";
 import { type RoutineText, routineScheduleSummary } from "@openbot/ui/features/conversation/routine-schedule-ui";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createSignal, For, onCleanup, Show, untrack } from "solid-js";
+import type { JSX } from "@solidjs/web";
+import { createEffect, createSignal, createStore, For, onCleanup, Show, untrack } from "solid-js";
 import { type DesktopAnalyticsScope, desktopAnalytics } from "../../analytics";
 import { writeClipboardText } from "../../clipboard";
 import type { RoutineEditorRecord, RoutinesPort } from "./routines-port";
@@ -70,10 +79,16 @@ interface RoutineDraft {
   schedule: RoutineSchedule;
   scheduleDraft: RoutineScheduleDraft;
   limitPolicy: RoutineLimitPolicy;
-  triggerKind: "schedule" | "event";
-  eventSourceId: string;
+  triggerKind: "schedule" | "webhook";
   eventType: string;
-  eventFilters: EventFilter[];
+  eventFilters: RoutineWebhookFilterDraft[];
+}
+
+interface WebhookEditorState {
+  secret: string | null;
+  connected: boolean | null;
+  notificationsOpen: boolean;
+  activityOpen: boolean;
 }
 
 const LIMIT_POLICY_LABELS = {
@@ -100,8 +115,13 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
   const [routines, setRoutines] = createSignal<RoutineEditorRecord[]>([]);
   const [draft, setDraft] = createSignal<RoutineDraft | null>(null);
   const [runs, setRuns] = createSignal<RoutineRunFields[]>([]);
-  const [notificationsOpen, setNotificationsOpen] = createSignal(false);
-  const [eventSources, setEventSources] = createSignal<EventSource[]>([]);
+  // Webhook state that is not part of the saved routine. `secret` is the one-time reveal after a save or a regeneration.
+  const [webhook, setWebhook] = createStore<WebhookEditorState>({
+    secret: null,
+    connected: null,
+    notificationsOpen: false,
+    activityOpen: false,
+  });
   const [loading, setLoading] = createSignal(true);
   const [routinesLoaded, setRoutinesLoaded] = createSignal(false);
   const [saving, setSaving] = createSignal(false);
@@ -162,7 +182,6 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
   createEffect(
     () => props.port.ownerId,
     () => {
-      setNotificationsOpen(false);
       closeEditor();
       setLoading(true);
       setRoutinesLoaded(false);
@@ -171,19 +190,20 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
   );
 
   createEffect(
-    () => Boolean(props.port.eventSources) && draft()?.triggerKind === "event",
-    (visible) => {
-      if (!visible) return;
-      void props.port
-        .eventSources?.()
-        .then(setEventSources, (cause) => setError(errorMessage(cause, t("server.events.loadFailed"))));
-    },
-  );
-
-  createEffect(
-    () => draft()?.id,
-    () => {
-      setNotificationsOpen(false);
+    () => (draft()?.triggerKind === "webhook" ? props.port.events?.api : undefined),
+    (api) => {
+      if (!api) return;
+      // The status only explains a missing URL, so a failed check leaves the connection unknown.
+      void api.getStatus().then(
+        (status) =>
+          setWebhook((state) => {
+            state.connected = status.connected;
+          }),
+        () =>
+          setWebhook((state) => {
+            state.connected = null;
+          }),
+      );
     },
   );
 
@@ -222,9 +242,9 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     setDraft((current) => {
       if (current?.id !== routine.id) return current;
       const scheduleEdited = JSON.stringify(current.schedule) !== JSON.stringify(routineScheduleOf(base));
-      const eventEdited =
-        current.triggerKind === "event" &&
-        JSON.stringify(eventTriggerOf(current)) !== JSON.stringify(eventTriggerOf(base));
+      const webhookEdited =
+        current.triggerKind === "webhook" &&
+        JSON.stringify(webhookTriggerOf(current)) !== JSON.stringify(webhookTriggerOf(base));
       return {
         ...current,
         name: current.name === base.name ? routine.name : current.name,
@@ -232,16 +252,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
         active: current.active === base.active ? routine.active : current.active,
         limitPolicy:
           current.limitPolicy === (base.limitPolicy ?? "wait") ? (routine.limitPolicy ?? "wait") : current.limitPolicy,
-        ...(scheduleEdited || eventEdited
-          ? {}
-          : {
-              schedule: structuredClone(routineScheduleOf(routine)),
-              scheduleDraft: routineScheduleToDraft(routineScheduleOf(routine)),
-              triggerKind: routineTriggerKind(routine),
-              eventSourceId: eventTriggerOf(routine)?.sourceId ?? "",
-              eventType: eventTriggerOf(routine)?.eventType ?? "",
-              eventFilters: structuredClone(eventTriggerOf(routine)?.filters ?? []),
-            }),
+        ...(scheduleEdited || webhookEdited ? {} : triggerDraftOf(routine)),
       };
     });
   }
@@ -257,14 +268,10 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       name: routine.name,
       instruction: routine.instruction,
       active: routine.active,
-      schedule: structuredClone(routineScheduleOf(routine)),
-      scheduleDraft: routineScheduleToDraft(routineScheduleOf(routine)),
       limitPolicy: routine.limitPolicy ?? "wait",
-      triggerKind: routineTriggerKind(routine),
-      eventSourceId: eventTriggerOf(routine)?.sourceId ?? "",
-      eventType: eventTriggerOf(routine)?.eventType ?? "",
-      eventFilters: structuredClone(eventTriggerOf(routine)?.filters ?? []),
+      ...triggerDraftOf(routine),
     });
+    resetWebhookState();
     void loadRuns(routine.id);
   }
 
@@ -284,9 +291,17 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       scheduleDraft: NEW_ROUTINE_SCHEDULE,
       limitPolicy: "wait",
       triggerKind: "schedule",
-      eventSourceId: "",
       eventType: "",
       eventFilters: [],
+    });
+    resetWebhookState();
+  }
+
+  function resetWebhookState(): void {
+    setWebhook((state) => {
+      state.secret = null;
+      state.notificationsOpen = false;
+      state.activityOpen = false;
     });
   }
 
@@ -299,6 +314,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     setDirty(false);
     setConfirmDelete(false);
     setPendingExit(null);
+    resetWebhookState();
   }
 
   function requestRoutineSelection(request: RoutineSelectionRequest, routine: RoutineEditorRecord | null): void {
@@ -368,7 +384,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
 
   async function saveDraft(): Promise<void> {
     const current = draft();
-    if (!current || !dirty() || !validDraft(current, eventSources()) || saving()) return;
+    if (!current || !dirty() || !validDraft(current) || saving()) return;
     const savingRevision = draftRevision;
     setSaving(true);
     setError(null);
@@ -376,24 +392,17 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     const action = current.id ? "update" : "create";
     const analytics = desktopAnalytics.scope();
     try {
-      const saved = await props.port.save({
+      const result = await props.port.save({
         routineId: current.id,
         name: current.name.trim(),
         instruction: current.instruction.trim(),
         active: current.active,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
         schedule: current.schedule,
-        trigger:
-          current.triggerKind === "event"
-            ? {
-                kind: "event",
-                sourceId: current.eventSourceId,
-                eventType: current.eventType.trim(),
-                filters: current.eventFilters,
-              }
-            : { kind: "schedule", schedule: current.schedule },
+        trigger: webhookTriggerOf(current) ?? { kind: "schedule", schedule: current.schedule },
         limitPolicy: current.limitPolicy,
       });
+      const saved = result.routine;
       setRoutines((items) => {
         const next = [saved, ...items.filter((routine) => routine.id !== saved.id)];
         props.onCountChange(next.length);
@@ -403,9 +412,15 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       if (draft()?.id === current.id) draftBase = saved;
       if (draftRevision === savingRevision) setDirty(false);
       if (!current.id) void loadRuns(saved.id);
-      trackRoutineAction(analytics, action, current.schedule, startedAt, "succeeded");
+      if (result.secret && draft()?.id === saved.id) {
+        const secret = result.secret;
+        setWebhook((state) => {
+          state.secret = secret;
+        });
+      }
+      trackRoutineAction(analytics, action, current, startedAt, "succeeded");
     } catch (caught) {
-      trackRoutineAction(analytics, action, current.schedule, startedAt, "failed");
+      trackRoutineAction(analytics, action, current, startedAt, "failed");
       setError(errorMessage(caught, t("routine.settings.saveFailed")));
     } finally {
       setSaving(false);
@@ -428,9 +443,9 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
         return next;
       });
       closeEditor();
-      trackRoutineAction(analytics, "delete", current.schedule, startedAt, "succeeded");
+      trackRoutineAction(analytics, "delete", current, startedAt, "succeeded");
     } catch (caught) {
-      trackRoutineAction(analytics, "delete", current.schedule, startedAt, "failed");
+      trackRoutineAction(analytics, "delete", current, startedAt, "failed");
       setError(errorMessage(caught, t("routine.settings.deleteFailed")));
     }
   }
@@ -444,15 +459,41 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     const analytics = desktopAnalytics.scope();
     try {
       await props.port.test(current.id);
-      trackRoutineAction(analytics, "test", current.schedule, startedAt, "succeeded");
+      trackRoutineAction(analytics, "test", current, startedAt, "succeeded");
       await loadRuns(current.id);
     } catch (caught) {
-      trackRoutineAction(analytics, "test", current.schedule, startedAt, "failed");
+      trackRoutineAction(analytics, "test", current, startedAt, "failed");
       setError(errorMessage(caught, t("routine.settings.testFailed")));
     } finally {
       setTesting(false);
     }
   }
+
+  async function regenerateSecret(): Promise<void> {
+    const events = props.port.events;
+    const id = draft()?.id;
+    if (!events || !id) return;
+    const { secret } = await events.api.rotateSecret({ id, owner: events.owner });
+    if (draft()?.id !== id) return;
+    setWebhook((state) => {
+      state.secret = secret;
+    });
+  }
+
+  /** The saved record of the open draft. Its trigger, not the draft, says whether a URL and a secret exist. */
+  const savedRoutine = () => {
+    const id = draft()?.id;
+    return id ? routines().find((routine) => routine.id === id) : undefined;
+  };
+  const savedWebhook = () => {
+    const routine = savedRoutine();
+    return routine && isEventRoutine(routine) && routine.trigger.kind === "webhook" ? routine.trigger : null;
+  };
+  const routineRef = () => {
+    const events = props.port.events;
+    const id = draft()?.id;
+    return events && id ? { api: events.api, routine: { id, owner: events.owner } } : null;
+  };
 
   async function copyRunCommand(): Promise<void> {
     const routineId = draft()?.id;
@@ -534,7 +575,12 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                             }
                           >
                             <Show when={routine.active} fallback={<CirclePause aria-hidden="true" />}>
-                              <Clock3 aria-hidden="true" />
+                              <Show
+                                when={routineTriggerKind(routine) === "webhook"}
+                                fallback={<Clock3 aria-hidden="true" />}
+                              >
+                                <Link aria-hidden="true" />
+                              </Show>
                             </Show>
                           </span>
                           <span>
@@ -596,7 +642,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                             type="button"
                             size="sm"
                             class="agent-routine-test"
-                            disabled={!current().id || testing() || !validDraft(current(), eventSources())}
+                            disabled={!current().id || testing() || !validDraft(current())}
                             loading={testing()}
                             loadingLabel={t("routine.settings.starting")}
                             onClick={() => void testRun()}
@@ -609,7 +655,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                       <Button
                         type="button"
                         size="sm"
-                        disabled={saving() || !validDraft(current(), eventSources())}
+                        disabled={saving() || !validDraft(current())}
                         loading={saving()}
                         loadingLabel={t("common.saving")}
                         onClick={() => void saveDraft()}
@@ -632,9 +678,9 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
               </label>
               <section class="agent-routine-when" aria-labelledby="agent-routine-when-heading">
                 <h3 id="agent-routine-when-heading">{t("routine.settings.whenToRun")}</h3>
-                <Show when={props.port.eventSources}>
+                <Show when={props.port.events}>
                   <div class="agent-routine-trigger-choice">
-                    <For each={["schedule", "event"] as const}>
+                    <For each={["schedule", "webhook"] as const}>
                       {(kind) => (
                         <Button
                           type="button"
@@ -643,7 +689,9 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                           aria-pressed={current().triggerKind === kind ? "true" : "false"}
                           onClick={() => changeDraft((value) => ({ ...value, triggerKind: kind }))}
                         >
-                          {t(kind === "event" ? "routine.settings.triggerEvent" : "routine.settings.triggerSchedule")}
+                          {t(
+                            kind === "webhook" ? "routine.settings.triggerWebhook" : "routine.settings.triggerSchedule",
+                          )}
                         </Button>
                       )}
                     </For>
@@ -652,21 +700,22 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                 <Show
                   when={current().triggerKind === "schedule"}
                   fallback={
-                    <div class="agent-routine-event-trigger">
-                      <Show when={props.port.webhooks}>
-                        {(api) => (
-                          <RoutineWebhookSource
-                            api={api()}
-                            sources={eventSources()}
-                            sourceId={current().eventSourceId}
-                            name={current().name}
-                            onChange={(eventSourceId) => changeDraft((value) => ({ ...value, eventSourceId }))}
-                            onSourcesChange={setEventSources}
-                          />
-                        )}
-                      </Show>
-                      <EventTriggerFields draft={current()} onChange={changeDraft} />
-                    </div>
+                    <RoutineWebhookTrigger
+                      url={savedWebhook()?.url ?? null}
+                      saved={savedWebhook() !== null}
+                      connected={webhook.connected}
+                      eventType={current().eventType}
+                      filters={current().eventFilters}
+                      onEventTypeChange={(eventType) => changeDraft((value) => ({ ...value, eventType }))}
+                      onFiltersChange={(eventFilters) => changeDraft((value) => ({ ...value, eventFilters }))}
+                      secret={webhook.secret}
+                      onSecretDismiss={() =>
+                        setWebhook((state) => {
+                          state.secret = null;
+                        })
+                      }
+                      onRegenerateSecret={props.port.events ? regenerateSecret : undefined}
+                    />
                   }
                 >
                   <RoutineSchedulePicker
@@ -718,29 +767,33 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                 </div>
               </Show>
 
-              <Show when={props.port.webhooks && current().id}>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  class="agent-routine-disclosure"
-                  aria-expanded={notificationsOpen() ? "true" : "false"}
-                  onClick={() => setNotificationsOpen((value) => !value)}
-                >
-                  {t("routine.settings.notifications")}
-                </Button>
-                <Show when={notificationsOpen()}>
-                  <Show when={props.port.webhooks}>
-                    {(api) => (
-                      <RoutineWebhookNotifications
-                        api={api()}
-                        canManage={true}
-                        routineId={current().id ?? ""}
-                        sourceId={current().eventSourceId}
-                      />
-                    )}
-                  </Show>
-                </Show>
+              <Show when={routineRef()}>
+                {(ref) => (
+                  <>
+                    <RoutineDisclosure
+                      label={t("routine.settings.notifications")}
+                      open={webhook.notificationsOpen}
+                      onToggle={() =>
+                        setWebhook((state) => {
+                          state.notificationsOpen = !state.notificationsOpen;
+                        })
+                      }
+                    >
+                      <RoutineWebhookNotifications api={ref().api} routine={ref().routine} />
+                    </RoutineDisclosure>
+                    <RoutineDisclosure
+                      label={t("routine.settings.activity")}
+                      open={webhook.activityOpen}
+                      onToggle={() =>
+                        setWebhook((state) => {
+                          state.activityOpen = !state.activityOpen;
+                        })
+                      }
+                    >
+                      <RoutineWebhookActivity api={ref().api} routine={ref().routine} />
+                    </RoutineDisclosure>
+                  </>
+                )}
               </Show>
               <RoutineRunHistory runs={runs()} onOpenRun={props.onOpenRun ? requestOpenRun : undefined} />
             </div>
@@ -773,9 +826,13 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
  * as an interval, keeps its own summary: "Every 15 minutes", not the cron text.
  */
 function routineListSummary(routine: RoutineEditorRecord, text: RoutineText): string {
+  if (isEventRoutine(routine) && routine.trigger.kind === "webhook") {
+    const eventType = routine.trigger.eventType;
+    return eventType
+      ? text.t("routine.settings.webhookSummary", { eventType })
+      : text.t("routine.settings.webhookSummaryAny");
+  }
   const schedule = routineScheduleOf(routine);
-  const event = eventTriggerOf(routine);
-  if (event) return text.t("routine.settings.eventSummary", { eventType: event.eventType });
   const draft = routineScheduleToDraft(schedule);
   if (draft.kind === "custom") return routineScheduleSummary(schedule, false, text);
   return routineDraftSummary(draft, text);
@@ -785,8 +842,8 @@ function isEventRoutine(routine: RoutineEditorRecord): routine is EventRoutine {
   return "owner" in routine;
 }
 
-function routineTriggerKind(routine: RoutineEditorRecord): "schedule" | "event" {
-  return isEventRoutine(routine) ? (routine.trigger.kind === "event" ? "event" : "schedule") : "schedule";
+function routineTriggerKind(routine: RoutineEditorRecord): RoutineDraft["triggerKind"] {
+  return isEventRoutine(routine) && routine.trigger.kind === "webhook" ? "webhook" : "schedule";
 }
 
 function routineScheduleOf(routine: RoutineEditorRecord): RoutineSchedule {
@@ -796,132 +853,60 @@ function routineScheduleOf(routine: RoutineEditorRecord): RoutineSchedule {
   return routine.trigger.schedule;
 }
 
-function eventTriggerOf(routine: RoutineEditorRecord | RoutineDraft): EventRoutineTrigger | null {
-  if ("triggerKind" in routine) {
-    return routine.triggerKind === "event"
-      ? { kind: "event", sourceId: routine.eventSourceId, eventType: routine.eventType, filters: routine.eventFilters }
-      : null;
-  }
-  if (!isEventRoutine(routine) || routine.trigger.kind !== "event") return null;
-  return routine.trigger;
+/** The trigger fields of a draft that opens `routine`. */
+function triggerDraftOf(
+  routine: RoutineEditorRecord,
+): Pick<RoutineDraft, "schedule" | "scheduleDraft" | "triggerKind" | "eventType" | "eventFilters"> {
+  const trigger = isEventRoutine(routine) && routine.trigger.kind === "webhook" ? routine.trigger : null;
+  return {
+    schedule: structuredClone(routineScheduleOf(routine)),
+    scheduleDraft: routineScheduleToDraft(routineScheduleOf(routine)),
+    triggerKind: routineTriggerKind(routine),
+    eventType: trigger?.eventType ?? "",
+    eventFilters: trigger?.filters.map(routineWebhookFilterDraft) ?? [],
+  };
 }
 
-function EventTriggerFields(props: {
-  draft: RoutineDraft;
-  onChange: (change: (current: RoutineDraft) => RoutineDraft) => void;
-}) {
-  const { t } = useText();
-  const [filtersOpen, setFiltersOpen] = createSignal(false);
+/** The webhook trigger that a save sends, or that a saved routine has. The host-made URL is not part of it. */
+function webhookTriggerOf(routine: RoutineEditorRecord | RoutineDraft): RoutineWebhookTriggerInput | null {
+  if ("triggerKind" in routine) {
+    return routine.triggerKind === "webhook"
+      ? {
+          kind: "webhook",
+          eventType: routine.eventType.trim() || null,
+          filters: routineWebhookFilters(routine.eventFilters),
+        }
+      : null;
+  }
+  if (!isEventRoutine(routine) || routine.trigger.kind !== "webhook") return null;
+  return { kind: "webhook", eventType: routine.trigger.eventType, filters: routine.trigger.filters };
+}
+
+function RoutineDisclosure(props: { label: string; open: boolean; onToggle: () => void; children: JSX.Element }) {
   return (
-    <div class="agent-routine-event-trigger">
-      <label class="settings-field">
-        <span>{t("routine.settings.eventType")}</span>
-        <Input
-          value={props.draft.eventType}
-          placeholder={t("routine.settings.eventTypePlaceholder")}
-          onValueChange={(eventType) => props.onChange((value) => ({ ...value, eventType }))}
-        />
-      </label>
+    <section class="agent-routine-section">
       <Button
         type="button"
-        size="sm"
         variant="ghost"
+        size="sm"
         class="agent-routine-disclosure"
-        aria-expanded={filtersOpen() || props.draft.eventFilters.length > 0 ? "true" : "false"}
-        onClick={() => setFiltersOpen((value) => !value)}
+        aria-expanded={props.open ? "true" : "false"}
+        onClick={props.onToggle}
       >
-        {t("routine.settings.eventFilters")}
+        <Show when={props.open} fallback={<ChevronRight aria-hidden="true" />}>
+          <ChevronDown aria-hidden="true" />
+        </Show>
+        {props.label}
       </Button>
-      <Show when={filtersOpen() || props.draft.eventFilters.length > 0}>
-        <div class="settings-field">
-          <Text variant="caption" tone="muted">
-            {t("routine.settings.eventFiltersHint")}
-          </Text>
-          <For each={props.draft.eventFilters}>
-            {(filter, index) => (
-              <div class="agent-routine-event-filter">
-                <Input
-                  aria-label={t("routine.settings.filterPointer")}
-                  value={filter.pointer}
-                  placeholder={t("routine.settings.filterPointer")}
-                  onValueChange={(pointer) =>
-                    props.onChange((value) => ({
-                      ...value,
-                      eventFilters: value.eventFilters.map((item, itemIndex) =>
-                        itemIndex === index() ? { ...item, pointer } : item,
-                      ),
-                    }))
-                  }
-                />
-                <Input
-                  aria-label={t("routine.settings.filterValue")}
-                  value={filter.value === null ? "null" : String(filter.value)}
-                  placeholder={t("routine.settings.filterValue")}
-                  onValueChange={(raw) =>
-                    props.onChange((value) => ({
-                      ...value,
-                      eventFilters: value.eventFilters.map((item, itemIndex) =>
-                        itemIndex === index() ? { ...item, value: parseEventScalar(raw) } : item,
-                      ),
-                    }))
-                  }
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  aria-label={t("routine.settings.removeFilter")}
-                  onClick={() =>
-                    props.onChange((value) => ({
-                      ...value,
-                      eventFilters: value.eventFilters.filter((_, itemIndex) => itemIndex !== index()),
-                    }))
-                  }
-                >
-                  <X aria-hidden="true" />
-                </Button>
-              </div>
-            )}
-          </For>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={() =>
-              props.onChange((value) => ({
-                ...value,
-                eventFilters: [...value.eventFilters, { pointer: "", value: "" }],
-              }))
-            }
-          >
-            {t("routine.settings.addFilter")}
-          </Button>
-        </div>
-      </Show>
-    </div>
+      <Show when={props.open}>{props.children}</Show>
+    </section>
   );
 }
 
-function validDraft(draft: RoutineDraft, sources: EventSource[] = []): boolean {
+function validDraft(draft: RoutineDraft): boolean {
   if (!draft.name.trim() || !draft.instruction.trim()) return false;
-  if (draft.triggerKind === "event") {
-    return Boolean(
-      draft.eventSourceId.trim() &&
-        sources.some((source) => source.id === draft.eventSourceId) &&
-        draft.eventType.trim() &&
-        draft.eventFilters.every((filter) => filter.pointer === "" || filter.pointer.startsWith("/")),
-    );
-  }
+  if (draft.triggerKind === "webhook") return routineWebhookFiltersValid(draft.eventFilters);
   return routineDraftProblem(draft.scheduleDraft) === null;
-}
-
-function parseEventScalar(raw: string): EventFilter["value"] {
-  const value = raw.trim();
-  if (value === "null") return null;
-  if (value === "true") return true;
-  if (value === "false") return false;
-  if (value !== "" && Number.isFinite(Number(value))) return Number(value);
-  return raw;
 }
 
 function isBlankNewDraft(draft: RoutineDraft): boolean {
@@ -931,13 +916,13 @@ function isBlankNewDraft(draft: RoutineDraft): boolean {
 function trackRoutineAction(
   analytics: DesktopAnalyticsScope,
   action: "create" | "update" | "delete" | "test",
-  schedule: RoutineSchedule,
+  routine: Pick<RoutineDraft, "triggerKind" | "schedule">,
   startedAt: number,
   result: "succeeded" | "failed",
 ): void {
   analytics.track("routine_action", {
     action,
-    trigger_type: schedule.kind,
+    trigger_type: routine.triggerKind === "webhook" ? "webhook" : routine.schedule.kind,
     duration_ms: Math.max(0, Math.round(performance.now() - startedAt)),
     result,
     ...(result === "failed" ? { failure_code: `${action}_failed` } : {}),

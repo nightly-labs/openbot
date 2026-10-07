@@ -195,6 +195,10 @@ The service stores:
   end, and expiration times;
 - the current account avatar file and its content type when the user uploads an avatar.
 - optional host logo files and their content types when the owner uploads a logo.
+- webhook routes: for each webhook routine of a host, the opaque route ID, the host ID, the owner
+  account ID, and the link time. The service deletes a route when the routine stops using it, and
+  when the host or the account is deleted. It does not store the routine, the secret, or request
+  bodies.
 - published agent templates: the agent name, title, instructions, avatar, routine names, schedules
   and instructions, marketplace skill references, the `SKILL.md` text of local skills, the local
   agent ID, a share card image made from these fields, and creation and update times. Anyone
@@ -404,9 +408,10 @@ media connection. ICE uses a direct peer-to-peer path when possible. If a direct
 Agents, conversations, queues, direct messages, attachments, browser data, prompts, approvals, and
 Remote Desktop data remain on the host. The central account service does not copy them into D1 or
 R2. The Signal service does not proxy them or write them to logs. The host does not need a public
-inbound port. The things Signal passes to a host are the Slack events of an agent's Slack app and
-the Discord mentions of the Discord app, in transit; see [Slack connections](#slack-connections) and
-[Discord connections](#discord-connections). For Discord, Signal also carries the host's answers to
+inbound port. The things Signal passes to a host are the Slack events of an agent's Slack app, the
+Discord mentions of the Discord app, and the requests to webhook routines, in transit; see
+[Slack connections](#slack-connections), [Discord connections](#discord-connections), and
+[Webhook routines](#webhook-routines). For Discord, Signal also carries the host's answers to
 Discord.
 
 An owner or admin of a joined server can manage its host from their own computer, or from the
@@ -464,27 +469,35 @@ Network traffic can also occur when:
 - a Slack workspace is connected. See [Slack connections](#slack-connections).
 - a Discord server is connected. See [Discord connections](#discord-connections).
 
-## Webhooks and event routines
+## Webhook routines
 
-An administrator can configure public webhook sources and outbound webhook destinations for a
-host. The host stores the source settings, accepted events, routine run links, and delivery history
-in its local SQLite database. Signing secrets and custom header values are encrypted with the
-operating system's secret storage. Management screens do not return saved secrets.
+An administrator can give a routine a webhook trigger. The routine then gets a public URL and a
+signing secret. An administrator can also add HTTPS destinations to a routine, which receive
+notifications about its runs. The host stores the trigger, the encrypted secret, the destinations,
+and the delivery history in its local SQLite database. Signing secrets and custom header values are
+encrypted with the operating system's secret storage. The secret of a webhook routine is shown one
+time. Management screens do not return saved secrets.
 
-Inbound requests pass through OpenBot's Signal service to the connected host. The account service
-keeps route and authorization metadata. Neither cloud service stores or logs request bodies.
-The host verifies the request signature before it accepts the event. If the host is offline, the
-sender receives an error and must retry. There is no cloud event queue.
+Requests to a webhook routine pass through OpenBot's Signal service to the connected host. Signal
+uses the sender's IP address in memory for rate limits. The account service keeps only the route
+metadata above. Neither cloud service stores or logs request bodies. The host verifies the request
+signature before it accepts the event. If the host is offline, the sender receives an error and
+must retry. There is no cloud event queue.
 
-The host can send routine run notifications to administrator-selected HTTPS destinations. These
-notifications contain routine and run IDs, routine names, status, and times. They do not contain
-instructions, conversation content, result text, or raw errors. The destination receives the host's
-network address and the configured request headers. Failed deliveries can be retried, so a
-destination can receive the same notification more than once.
+The host keeps a receipt of each request for 7 days, to ignore a repeated delivery. A receipt has
+the delivery ID, the event type, the result, and the run ID, but not the request body. The event is
+added to the run instruction, which the host stores with the run. Event data can reach the
+routine's model provider, as other routine input does.
 
-Event data passed to a routine can reach the routine's selected model provider, as other routine
-input does. Disable a source to stop new receipts, or disable a destination to stop new outbound
-attempts. Disabling does not erase existing local history.
+The host can send run notifications to the destinations. These notifications contain routine, run,
+and event IDs, the routine name, the status, and times. They do not contain instructions,
+conversation content, result text, or raw errors. The destination receives the host's network
+address and the configured request headers. A failed delivery can be retried, so a destination can
+receive the same notification more than once. The host deletes completed and failed deliveries
+after 30 days.
+
+Change a routine to a schedule, or delete it, to stop its URL. Turn off a destination to stop new
+notifications. Deleting a routine deletes its receipts, destinations, and delivery history.
 
 ## Slack connections
 

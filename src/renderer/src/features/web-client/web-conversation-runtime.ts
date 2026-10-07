@@ -1,26 +1,15 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AgentEvent, AttachmentImportEvent, AttachmentSummary, TeamRealtimeEvent } from "@openbot/contracts/ipc";
-import type {
-  DeleteEventRoutineInput,
-  EventRoutineOwner,
-  SaveEventRoutineInput,
-  TestEventRoutineInput,
-} from "@openbot/contracts/ipc-events";
 import { runTeamEffect } from "@openbot/team-client";
 import {
-  deleteEventRoutine,
   deleteSharedTable,
   installAgentSkill,
   listAgentSkills,
-  listEventRoutines,
-  listEventSources,
   listMcpServers,
   listSharedTables,
   previewAgentTemplate,
   publishAgentTemplate,
-  saveEventRoutine,
   setAgentSkillEnabled,
-  testEventRoutine,
   uninstallAgentSkill,
   unpublishAgentTemplate,
 } from "@openbot/team-client/team-admin-requests";
@@ -29,7 +18,7 @@ import { currentText } from "@openbot/ui/text";
 import { Effect } from "effect";
 import { onCleanup } from "solid-js";
 import type { ConversationRuntime } from "../conversation/conversation-runtime";
-import { webEventsApi } from "../conversation/routine-webhooks-api";
+import { webEventRoutinesApi } from "../conversation/routine-webhooks-api";
 import { createWebAttachmentFiles, openWebLink } from "./web-attachments";
 import type { WebWorkspaceRuntime } from "./web-runtime";
 
@@ -42,18 +31,8 @@ function webHostAdmin(
   onHostEvent?: HostEvents,
   eventsEnabled?: () => boolean,
 ): NonNullable<ConversationRuntime["admin"]> {
-  const eventRoutines = {
-    webhooks: webEventsApi((...args) => request()(...args)),
-    listSources: () => runTeamEffect(listEventSources(request()).pipe(Effect.mapError((error) => error.cause))),
-    listRoutines: ({ owner }: { owner: EventRoutineOwner }) =>
-      runTeamEffect(listEventRoutines(request(), owner).pipe(Effect.mapError((error) => error.cause))),
-    saveRoutine: (input: SaveEventRoutineInput) =>
-      runTeamEffect(saveEventRoutine(request(), input).pipe(Effect.mapError((error) => error.cause))),
-    deleteRoutine: (input: DeleteEventRoutineInput) =>
-      runTeamEffect(deleteEventRoutine(request(), input).pipe(Effect.mapError((error) => error.cause))),
-    testRoutine: (input: TestEventRoutineInput) =>
-      runTeamEffect(testEventRoutine(request(), input).pipe(Effect.mapError((error) => error.cause))),
-  };
+  // `request()` names the connected host at call time, so a host switch reaches the new host.
+  const eventRoutines = webEventRoutinesApi((...args) => request()(...args));
   return {
     skills: {
       listInstalled: (agentId) =>

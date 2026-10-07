@@ -4,7 +4,8 @@ import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { AgentRoutinesSettings } from "../src/features/conversation/AgentRoutinesSettings";
 import AgentSettingsPanel from "../src/features/conversation/AgentSettingsPanel";
-import { agentRoutinesPort } from "../src/features/conversation/routines-port";
+import { desktopEventRoutinesApi } from "../src/features/conversation/routine-webhooks-api";
+import { agentRoutinesPort, eventRoutinesPort } from "../src/features/conversation/routines-port";
 import { STORY_AGENT, STORY_AGENT_STATUS, STORY_MODELS } from "./fixtures";
 import { createMockOpenBot } from "./mock-openbot";
 
@@ -66,6 +67,59 @@ function RoutinesStory(props: { routines?: Routine[]; runs?: RoutineRun[] }) {
   return (
     <main style={{ width: "380px", height: "720px", overflow: "auto", background: "var(--openbot-bg-canvas)" }}>
       <AgentRoutinesSettings port={agentRoutinesPort("chief")} onCountChange={fn()} onBack={fn()} onClose={fn()} />
+    </main>
+  );
+}
+
+/** A routine that a webhook starts, with one notification destination, on the preview host. */
+function WebhookRoutineStory() {
+  const previousApi = window.openbot;
+  const mock = createMockOpenBot({ routines: { chief: [] } });
+  window.openbot = mock.api;
+  const owner = { kind: "agent", id: "chief" } as const;
+  const api = desktopEventRoutinesApi("story-server");
+  const seeded = api
+    .saveRoutine({
+      owner,
+      name: "Deploy review",
+      instruction: "Check the new production deployment and report regressions.",
+      active: true,
+      timezone: "Europe/Warsaw",
+      trigger: {
+        kind: "webhook",
+        eventType: "deployment.created",
+        filters: [{ pointer: "/deployment/environment", value: "production" }],
+      },
+    })
+    .then(({ routine }) =>
+      api.saveDestination({
+        owner,
+        routineId: routine.id,
+        active: true,
+        url: "https://hooks.example.test/status",
+        method: "POST",
+        eventTypes: ["routine.run.succeeded", "routine.run.failed"],
+        payloadTemplate: null,
+      }),
+    );
+  const port = eventRoutinesPort(
+    owner,
+    {
+      ...api,
+      listRoutines: async (input) => {
+        await seeded;
+        return api.listRoutines(input);
+      },
+    },
+    agentRoutinesPort("chief"),
+  );
+  onCleanup(() => {
+    mock.dispose();
+    window.openbot = previousApi;
+  });
+  return (
+    <main style={{ width: "380px", height: "720px", overflow: "auto", background: "var(--openbot-bg-canvas)" }}>
+      <AgentRoutinesSettings port={port} onCountChange={fn()} onBack={fn()} onClose={fn()} />
     </main>
   );
 }
@@ -168,6 +222,10 @@ export const RunHistoryStatuses: Story = {
       }))}
     />
   ),
+};
+
+export const WebhookRoutine: Story = {
+  render: () => <WebhookRoutineStory />,
 };
 
 export const FullSidePanel: Story = {

@@ -1,6 +1,7 @@
 import type { AttachmentSummary, FilePreview, OpenBotDesktopApi } from "@openbot/contracts/ipc";
 import type { ChannelMemoriesApi } from "../conversation/memories-port";
-import type { ChannelRoutinesApi, EventRoutinesApi } from "../conversation/routines-port";
+import type { EventRoutinesApi } from "../conversation/routine-webhooks-api";
+import type { ChannelRoutinesApi } from "../conversation/routines-port";
 
 /**
  * What the channels domain reaches on its host: channel pages, commands, memories, routines,

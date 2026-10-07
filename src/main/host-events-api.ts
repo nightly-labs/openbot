@@ -1,13 +1,18 @@
 import type {
   EventActivity,
   EventRoutine,
-  EventRoutineOwner,
-  EventSource,
+  EventRoutineRef,
   EventStatus,
+  ListEventActivityInput,
+  ListEventRoutinesInput,
+  ListWebhookDestinationsInput,
   SaveEventRoutineInput,
-  SaveEventSourceInput,
+  SaveEventRoutineResult,
   SaveWebhookDestinationInput,
+  WebhookDeliveryRef,
   WebhookDestination,
+  WebhookDestinationRef,
+  WebhookSecret,
 } from "@openbot/contracts/ipc-events";
 import { matchingSourceKeys, sourceText } from "@openbot/i18n/source";
 import { type Effect, Schema } from "effect";
@@ -24,18 +29,17 @@ export function hostEventsFailureMessage(failure: HostEventsFailure): string {
   return sourceText("error.backend.webhookSettingsInvalid");
 }
 
+/** Webhook routines and their notifications. Every operation except the status is scoped to one routine owner. */
 export interface HostEventsApi {
   getStatus(): Effect.Effect<EventStatus, HostEventsFailure>;
-  listSources(): Effect.Effect<EventSource[], HostEventsFailure>;
-  saveSource(input: SaveEventSourceInput): Effect.Effect<EventSource, HostEventsFailure>;
-  deleteSource(input: { id: string }): Effect.Effect<void, HostEventsFailure>;
-  listDestinations(): Effect.Effect<WebhookDestination[], HostEventsFailure>;
+  listRoutines(input: ListEventRoutinesInput): Effect.Effect<EventRoutine[], HostEventsFailure>;
+  saveRoutine(input: SaveEventRoutineInput): Effect.Effect<SaveEventRoutineResult, HostEventsFailure>;
+  deleteRoutine(input: EventRoutineRef): Effect.Effect<void, HostEventsFailure>;
+  testRoutine(input: EventRoutineRef): Effect.Effect<void, HostEventsFailure>;
+  rotateSecret(input: EventRoutineRef): Effect.Effect<WebhookSecret, HostEventsFailure>;
+  listDestinations(input: ListWebhookDestinationsInput): Effect.Effect<WebhookDestination[], HostEventsFailure>;
   saveDestination(input: SaveWebhookDestinationInput): Effect.Effect<WebhookDestination, HostEventsFailure>;
-  deleteDestination(input: { id: string }): Effect.Effect<void, HostEventsFailure>;
-  listActivity(input?: { limit?: number }): Effect.Effect<EventActivity[], HostEventsFailure>;
-  retryDelivery(input: { id: string }): Effect.Effect<void, HostEventsFailure>;
-  listRoutines(input: { owner: EventRoutineOwner }): Effect.Effect<EventRoutine[], HostEventsFailure>;
-  saveRoutine(input: SaveEventRoutineInput): Effect.Effect<EventRoutine, HostEventsFailure>;
-  deleteRoutine(input: { id: string; owner: EventRoutineOwner }): Effect.Effect<void, HostEventsFailure>;
-  testRoutine(input: { id: string; owner: EventRoutineOwner }): Effect.Effect<void, HostEventsFailure>;
+  deleteDestination(input: WebhookDestinationRef): Effect.Effect<void, HostEventsFailure>;
+  listActivity(input: ListEventActivityInput): Effect.Effect<EventActivity[], HostEventsFailure>;
+  retryDelivery(input: WebhookDeliveryRef): Effect.Effect<void, HostEventsFailure>;
 }

@@ -1,19 +1,21 @@
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect, Exit, Scope } from "effect";
-import type { EventStore } from "../backend/event-store";
+import type { WebhookDestinationStore } from "../backend/webhook-destination-store";
 import type { HostEventsService } from "./host-events-service";
 import type { WebhookDeliveryWorker } from "./webhook-delivery";
 
 const logger = createOpenBotLogger("host-events");
 const MAX_TIMER_DELAY = 2_147_000_000;
+/** A failed local write must not cause an immediate timer loop on the same due row. */
+const FAILED_DRAIN_DELAY_MS = 10_000;
 
 export interface HostEventsRuntimeOptions {
   service: HostEventsService;
-  store: EventStore;
+  destinations: Pick<WebhookDestinationStore, "resumeSending" | "nextDeliveryAt">;
   delivery: WebhookDeliveryWorker;
 }
 
-/** Owns one wake timer and all in-flight event dispatch and outbound requests for this host. */
+/** Owns one wake timer, the outbound requests and the background route syncs of this host. */
 export class HostEventsRuntime {
   readonly #options: HostEventsRuntimeOptions;
   readonly #scope = Scope.makeUnsafe();
@@ -22,7 +24,6 @@ export class HostEventsRuntime {
   #busy = false;
   #requested = false;
   #retryNotBefore = 0;
-  #syncingRoutes = false;
 
   constructor(options: HostEventsRuntimeOptions) {
     this.#options = options;
@@ -31,14 +32,14 @@ export class HostEventsRuntime {
   readonly start = Effect.fn("HostEventsRuntime.start")(function* (this: HostEventsRuntime) {
     if (this.#running) return;
     yield* Effect.sync(() => {
-      this.#options.store.resumeClaimedDispatches();
-      this.#options.store.resumeSendingDeliveries();
+      this.#options.destinations.resumeSending();
       this.#running = true;
       this.wake();
     });
+    this.syncRoutes({ all: true });
   }).bind(this);
 
-  /** Called by receipt acceptance, routine changes, and destination changes. */
+  /** Called after a receipt starts a run, and after a destination, delivery or routine change. */
   wake(): void {
     if (!this.#running) return;
     this.#requested = true;
@@ -51,21 +52,14 @@ export class HostEventsRuntime {
     this.#timer.unref();
   }
 
-  syncRoutes(): void {
-    if (!this.#running || this.#syncingRoutes) return;
-    this.#syncingRoutes = true;
+  /**
+   * Revokes deleted routes and registers new ones. `all` registers every route again, for example
+   * after the account or the host ID changed.
+   */
+  syncRoutes(options: { all: boolean }): void {
+    if (!this.#running) return;
     Effect.runFork(
-      this.#options.service.syncRoutes().pipe(
-        Effect.catch(() =>
-          Effect.sync(() => logger.warn("Webhook routes are not ready. Local settings were retained.")),
-        ),
-        Effect.ensuring(
-          Effect.sync(() => {
-            this.#syncingRoutes = false;
-          }),
-        ),
-        Effect.forkIn(this.#scope, { startImmediately: true }),
-      ),
+      this.#options.service.syncRoutes(options).pipe(Effect.forkIn(this.#scope, { startImmediately: true })),
     );
   }
 
@@ -82,17 +76,14 @@ export class HostEventsRuntime {
     yield* Effect.gen({ self: this }, function* () {
       do {
         this.#requested = false;
-        const dispatch = yield* Effect.result(this.#options.service.dispatch());
         yield* this.#options.delivery.runDue();
-        if (dispatch._tag === "Failure") return yield* dispatch.failure;
         this.#retryNotBefore = 0;
       } while (this.#running && this.#requested);
     }).pipe(
       Effect.catch(() =>
         Effect.sync(() => {
-          // A failed local write must not cause an immediate timer loop on the same due row.
-          this.#retryNotBefore = Date.now() + 10_000;
-          logger.warn("An event operation failed. Its local state is retained.");
+          this.#retryNotBefore = Date.now() + FAILED_DRAIN_DELAY_MS;
+          logger.warn("A webhook delivery could not be saved. Its local state is retained.");
         }),
       ),
       Effect.ensuring(
@@ -106,18 +97,16 @@ export class HostEventsRuntime {
 
   #arm(): void {
     if (!this.#running || this.#busy) return;
-    const next = this.#options.store.nextDeliveryAt();
-    if (!next && this.#retryNotBefore === 0) return;
+    const next = this.#options.destinations.nextDeliveryAt();
+    const due = this.#retryNotBefore || (next ? Date.parse(next) : 0);
+    if (!due) return;
     if (this.#timer) clearTimeout(this.#timer);
     this.#timer = setTimeout(
       () => {
         this.#timer = null;
         this.wake();
       },
-      Math.max(
-        0,
-        Math.min(MAX_TIMER_DELAY, (this.#retryNotBefore || (next ? new Date(next).getTime() : 0)) - Date.now()),
-      ),
+      Math.max(0, Math.min(MAX_TIMER_DELAY, due - Date.now())),
     );
     this.#timer.unref();
   }

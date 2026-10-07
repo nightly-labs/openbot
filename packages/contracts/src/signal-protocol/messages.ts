@@ -138,7 +138,7 @@ export type SignalClientMessage =
       // both.
       discordRoute?: string;
       // `ingress` only: the generic webhook route ticket (`./webhook-route.ts`) that names the
-      // opaque webhook sources whose requests this socket receives.
+      // opaque webhook routes whose requests this socket receives.
       webhookRoute?: string;
     }
   // An `ingress` socket's answer to one `slack-delivery`. Signal returns it to Slack as the HTTP

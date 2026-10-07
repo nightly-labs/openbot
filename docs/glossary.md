@@ -38,12 +38,19 @@ table, IPC channel or product string, or when a term in the code disagrees with 
 - **thread**: durable `projection_threads` record. **conversation**: its read projection, with no
   separate table. **provider session**: private CLI resume state (`projection_provider_sessions`).
   **team session**: authenticated remote connection. **turn**: one exchange in a thread.
-- **routine**: a saved instruction for an agent or channel, with one schedule or event trigger.
-  Scheduled agent routines use `projection_agent_routines`. This is not Claude Code `/schedule`.
-- **event source**: a configured input that supplies verified events to the host. A webhook is one
-  source type. An **event trigger** selects a source, event type, and optional data filters.
-- **webhook destination**: an HTTPS endpoint that receives selected routine status notifications.
-  A **delivery** is one notification, including its retry attempts.
+- **routine**: a saved instruction for an agent or channel, with one schedule or webhook trigger
+  (`EventRoutineTrigger`). Agent routines use `projection_agent_routines`. This is not Claude Code
+  `/schedule`.
+- **webhook routine**: a routine with a webhook trigger (`RoutineWebhookTrigger`). A signed request
+  to its URL starts a run. The trigger can require one event type and data filters
+  (`projection_routine_webhooks`, `projection_channel_routine_webhooks`). There is no shared event
+  source.
+- **webhook route**: the opaque route ID of one webhook routine, and the public Signal URL that
+  contains it (`WebhookRouteStore`, D1 `webhook_routes`). A **receipt** records one received
+  delivery ID for deduplication.
+- **webhook destination**: an HTTPS endpoint of one routine that receives selected run status
+  notifications (`projection_webhook_destinations`). A **delivery** is one notification, including
+  its retry attempts (`projection_webhook_deliveries`).
 - **shared table**: a table an agent created in the one file every agent shares
   (`~/OpenBot/Shared/Data/agent-data.db`, `SharedTable`, `AgentTables`). `openbot.db` is the
   application's database and holds none of these. **owner**: the agent whose id

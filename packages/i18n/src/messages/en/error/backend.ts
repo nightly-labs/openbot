@@ -2,10 +2,10 @@ import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.backend", {
   "error.backend.eventsUnavailable": "Events are not available on this host.",
-  "error.backend.eventSourceMissing": "This event source no longer exists.",
   "error.backend.webhookSecretRequired": "Enter a signing secret with at least 32 characters.",
-  "error.backend.webhookSourceLimit": "A host can have at most {limit} active webhook sources.",
+  "error.backend.webhookRouteLimit": "A host can have at most {limit} webhook routines.",
   "error.backend.webhookDestinationMissing": "This webhook destination no longer exists.",
+  "error.backend.webhookDeliveryNotRetryable": "Only a failed delivery to an active destination can be sent again.",
   "error.backend.webhookSettingsInvalid": "Check the webhook settings and try again.",
   "error.backend.webhookRouteUnavailable":
     "The public webhook route is not ready. Check the host connection and try again.",

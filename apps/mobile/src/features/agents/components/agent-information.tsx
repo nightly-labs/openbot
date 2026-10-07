@@ -125,7 +125,7 @@ export function AgentInformation({
   });
   const allRoutines = [
     ...(routines.data ?? []),
-    ...(eventRoutines.data ?? []).filter((routine) => routine.trigger.kind === "event"),
+    ...(eventRoutines.data ?? []).filter((routine) => routine.trigger.kind === "webhook"),
   ];
   // An owner or admin reads the admin list, which has the enabled state, and can change it.
   const manageSkills = workspace.canManageAgentSkills(agent.serverId);

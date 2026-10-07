@@ -8,6 +8,7 @@ import type {
   RoutineSchedule,
 } from "@openbot/contracts/ipc";
 import { isRoutineSchedule, ROUTINE_LIMIT_POLICIES } from "@openbot/contracts/ipc";
+import type { EventFilter, EventJsonValue, RoutineRunNotification } from "@openbot/contracts/ipc-events";
 import { type DynamicRecord, isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import {
@@ -22,8 +23,16 @@ import {
   requiredNumberColumn,
   requiredStringColumn,
 } from "./database/database-rows";
-import { EventStore } from "./event-store";
 import type { OpenBotDatabase } from "./openbot-database";
+import { enqueueRunNotification } from "./webhook-destination-store";
+import { hasWebhookReceipt, insertWebhookReceipt, revokeRoutineWebhooks } from "./webhook-route-store";
+import {
+  parseEventFilters,
+  type RoutineOwnerKind,
+  validateWebhookTrigger,
+  webhookMismatch,
+  webhookRunInstruction,
+} from "./webhook-trigger";
 
 /**
  * Three table names, one owner column and one handle column are the whole difference between an
@@ -36,8 +45,10 @@ import type { OpenBotDatabase } from "./openbot-database";
  * up by that query.
  */
 export interface RoutineTables {
+  ownerKind: RoutineOwnerKind;
   routineTable: string;
   triggerTable: string;
+  webhookTable: string;
   runTable: string;
   ownerColumn: "agent_id" | "channel_id";
   handleColumn: "delivery_id" | "request_message_id";
@@ -85,17 +96,64 @@ export interface RoutineUpdateFields {
   limitPolicy?: RoutineLimitPolicy;
 }
 
+export interface RoutineWebhookFields {
+  routeId: string;
+  url: string | null;
+  eventType: string | null;
+  filters: EventFilter[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 /**
- * Owner-agnostic on purpose: every method takes an `ownerId` and returns `Owned*` rows. The two
- * subclasses re-name the owner and the handle, so `AgentRoutineStore` keeps the public signatures
- * its callers already use.
+ * A routine starts from a schedule trigger row or from a webhook row, never both. The released
+ * routine API reads only the schedule kind; `listRecords` and `getRecord` read both.
  */
+export type RoutineRecordTrigger =
+  | ({ kind: "schedule" } & OwnedRoutine["trigger"])
+  | ({ kind: "webhook" } & RoutineWebhookFields);
+
+export interface OwnedRoutineRecord extends Omit<OwnedRoutine, "trigger"> {
+  trigger: RoutineRecordTrigger;
+}
+
+export interface RoutineRecordInput {
+  name: string;
+  instruction: string;
+  active: boolean;
+  timezone: string;
+  limitPolicy?: RoutineLimitPolicy;
+  trigger:
+    | { kind: "schedule"; schedule: RoutineSchedule }
+    /** A null secret keeps the stored one. A new webhook trigger needs one. */
+    | { kind: "webhook"; eventType: string | null; filters: EventFilter[]; secretCiphertext: string | null };
+}
+
+export interface ReceivedWebhookEvent {
+  deliveryId: string;
+  eventType: string;
+  data: EventJsonValue;
+  occurredAt: string;
+  receivedAt: string;
+}
+
+export type WebhookReceiveResult<Run = OwnedRoutineRun> =
+  | { kind: "started"; run: Run }
+  | { kind: "ignored"; reason: "event-type" | "filter" | "inactive" }
+  | { kind: "duplicate" }
+  | { kind: "gone" };
+
 /** The time from a hold of the routines to the restart that the hold waited for. */
 export interface RoutineHoldWindow {
   since: Date;
   until: Date;
 }
 
+/**
+ * Owner-agnostic on purpose: every method takes an `ownerId` and returns `Owned*` rows. The two
+ * subclasses re-name the owner and the handle, so `AgentRoutineStore` keeps the public signatures
+ * its callers already use.
+ */
 export class RoutineStore {
   constructor(
     protected readonly database: OpenBotDatabase,
@@ -117,177 +175,55 @@ export class RoutineStore {
       this.database.connection
         .prepare(
           `SELECT ${this.routineColumns}
-           FROM ${this.tables.routineTable} routine
-           WHERE routine.${this.tables.ownerColumn} = ?
-             AND NOT EXISTS (
-               SELECT 1 FROM projection_event_routine_triggers event_trigger
-               WHERE event_trigger.routine_id = routine.routine_id
-             )
-             AND EXISTS (
-               SELECT 1 FROM ${this.tables.triggerTable} schedule_trigger
-               WHERE schedule_trigger.routine_id = routine.routine_id
-             )
+           FROM ${this.tables.routineTable} WHERE ${this.tables.ownerColumn} = ? AND ${this.#hasSchedule}
            ORDER BY updated_at DESC, routine_id`,
         )
         .all(ownerId),
     ).map((row) => this.#routine(row));
   }
 
-  protected getRoutine(ownerId: string, routineId: string): OwnedRoutine | null {
-    return this.getRoutineIncludingEvent(ownerId, routineId, false);
+  /** Routines of every trigger kind. */
+  listRecords(ownerId: string): OwnedRoutineRecord[] {
+    return databaseRows(
+      this.database.connection
+        .prepare(
+          `SELECT ${this.routineColumns}
+           FROM ${this.tables.routineTable} WHERE ${this.tables.ownerColumn} = ?
+           ORDER BY updated_at DESC, routine_id`,
+        )
+        .all(ownerId),
+    ).map((row) => this.#record(row));
   }
 
-  protected getRoutineIncludingEvent(ownerId: string, routineId: string, includeEvent = true): OwnedRoutine | null {
+  getRecord(ownerId: string, routineId: string): OwnedRoutineRecord | null {
     const row = this.database.connection
       .prepare(
         `SELECT ${this.routineColumns}
-         FROM ${this.tables.routineTable} routine
-         WHERE routine.routine_id = ? AND routine.${this.tables.ownerColumn} = ?
-           AND (? = 1 OR NOT EXISTS (
-             SELECT 1 FROM projection_event_routine_triggers event_trigger
-             WHERE event_trigger.routine_id = routine.routine_id
-           ))
-           AND (? = 1 OR EXISTS (
-             SELECT 1 FROM ${this.tables.triggerTable} schedule_trigger
-             WHERE schedule_trigger.routine_id = routine.routine_id
-           ))`,
+         FROM ${this.tables.routineTable} WHERE routine_id = ? AND ${this.tables.ownerColumn} = ?`,
       )
-      .get(routineId, ownerId, includeEvent ? 1 : 0, includeEvent ? 1 : 0);
+      .get(routineId, ownerId);
+    return isDynamicRecord(row) ? this.#record(row) : null;
+  }
+
+  /** The released routine API sees only routines that a schedule starts. */
+  get #hasSchedule(): string {
+    return `EXISTS (SELECT 1 FROM ${this.tables.triggerTable} WHERE routine_id = ${this.tables.routineTable}.routine_id)`;
+  }
+
+  protected getRoutine(ownerId: string, routineId: string): OwnedRoutine | null {
+    const row = this.database.connection
+      .prepare(
+        `SELECT ${this.routineColumns}
+         FROM ${this.tables.routineTable}
+         WHERE routine_id = ? AND ${this.tables.ownerColumn} = ? AND ${this.#hasSchedule}`,
+      )
+      .get(routineId, ownerId);
     return isDynamicRecord(row) ? this.#routine(row) : null;
-  }
-
-  protected ensureRoutineRecord(
-    ownerId: string,
-    input: { id: string; name: string; instruction: string; timezone: string; limitPolicy?: RoutineLimitPolicy },
-    now = new Date(),
-  ): void {
-    const current = this.database.connection
-      .prepare(
-        `SELECT routine_id FROM ${this.tables.routineTable} WHERE routine_id = ? AND ${this.tables.ownerColumn} = ?`,
-      )
-      .get(input.id, ownerId);
-    const updatedAt = now.toISOString();
-    this.database.dispatch(
-      `${this.tables.commandPrefix}:event-sync:${input.id}:${updatedAt}`,
-      [
-        {
-          aggregateType: this.tables.routineAggregate,
-          aggregateId: input.id,
-          eventType: `${this.tables.eventPrefix}.event-synced`,
-          payload: { ownerId },
-        },
-      ],
-      (db, sequences) => {
-        const sequence = sequences[0] ?? 0;
-        if (!isDynamicRecord(current)) {
-          db.prepare(
-            `INSERT INTO ${this.tables.routineTable}
-               (routine_id, ${this.tables.ownerColumn}, name, instruction, active, timezone, limit_policy, created_at, updated_at, last_event_sequence)
-             VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?)`,
-          ).run(
-            input.id,
-            ownerId,
-            input.name.trim(),
-            input.instruction.trim(),
-            input.timezone,
-            input.limitPolicy ?? "wait",
-            updatedAt,
-            updatedAt,
-            sequence,
-          );
-        } else {
-          db.prepare(
-            `UPDATE ${this.tables.routineTable}
-             SET name = ?, instruction = ?, active = 0, timezone = ?, limit_policy = ?, updated_at = ?, last_event_sequence = ?
-             WHERE routine_id = ? AND ${this.tables.ownerColumn} = ?`,
-          ).run(
-            input.name.trim(),
-            input.instruction.trim(),
-            input.timezone,
-            input.limitPolicy ?? "wait",
-            updatedAt,
-            sequence,
-            input.id,
-            ownerId,
-          );
-        }
-        return null;
-      },
-    );
-  }
-
-  /** Converts an event routine shadow row into a schedule row with the same routine id. */
-  protected convertEventRoutineToScheduleRow(
-    ownerId: string,
-    input: {
-      routineId: string;
-      name: string;
-      instruction: string;
-      active: boolean;
-      timezone: string;
-      schedule: RoutineSchedule;
-      limitPolicy?: RoutineLimitPolicy;
-      createdAt?: string;
-    },
-    now = new Date(),
-  ): OwnedRoutine {
-    this.#validateInput(input.name, input.instruction, input.timezone, input.schedule);
-    const schedule = normalizeRoutineSchedule(input.schedule, now);
-    const current = this.database.connection
-      .prepare(
-        `SELECT routine_id, ${this.tables.ownerColumn}, created_at FROM ${this.tables.routineTable}
-         WHERE routine_id = ?`,
-      )
-      .get(input.routineId);
-    if (isDynamicRecord(current) && current[this.tables.ownerColumn] !== ownerId) {
-      throw new RoutineInputError(sourceText("error.backend.routineGone"));
-    }
-    const timestamp = now.toISOString();
-    const createdAt =
-      isDynamicRecord(current) && isString(current.created_at) ? current.created_at : (input.createdAt ?? timestamp);
-    const { commandPrefix, eventPrefix, routineAggregate, routineTable, triggerTable, ownerColumn } = this.tables;
-    return this.database.dispatch(
-      `${commandPrefix}:event-to-schedule:${input.routineId}:${randomUUID()}`,
-      [
-        {
-          aggregateType: routineAggregate,
-          aggregateId: input.routineId,
-          eventType: `${eventPrefix}.event-converted-to-schedule`,
-          payload: { ownerId, ...input },
-        },
-      ],
-      (db, sequences) => {
-        const sequence = sequences[0] ?? 0;
-        db.prepare(
-          `INSERT INTO ${routineTable}
-             (routine_id, ${ownerColumn}, name, instruction, active, timezone, limit_policy, created_at, updated_at, last_event_sequence)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-           ON CONFLICT(routine_id) DO UPDATE SET
-             ${ownerColumn} = excluded.${ownerColumn}, name = excluded.name, instruction = excluded.instruction,
-             active = excluded.active, timezone = excluded.timezone, limit_policy = excluded.limit_policy,
-             updated_at = excluded.updated_at, last_event_sequence = excluded.last_event_sequence`,
-        ).run(
-          input.routineId,
-          ownerId,
-          input.name.trim(),
-          input.instruction.trim(),
-          input.active ? 1 : 0,
-          input.timezone,
-          input.limitPolicy ?? "wait",
-          createdAt,
-          timestamp,
-          sequence,
-        );
-        db.prepare(`DELETE FROM ${triggerTable} WHERE routine_id = ?`).run(input.routineId);
-        this.#insertTrigger(db, input.routineId, input.timezone, schedule, timestamp, sequence, now);
-        return this.#requireIncludingEvent(input.routineId, ownerId);
-      },
-    );
   }
 
   protected createRoutine(ownerId: string, input: RoutineInputFields, now = new Date()): OwnedRoutine {
     this.#validateInput(input.name, input.instruction, input.timezone, input.schedule);
-    if (this.listRoutines(ownerId).length >= this.tables.limit) throw new RoutineInputError(this.tables.limitMessage);
+    this.#assertBelowLimit(ownerId);
     const routineId = randomUUID();
     const createdAt = now.toISOString();
     const schedule = normalizeRoutineSchedule(input.schedule, now);
@@ -386,8 +322,194 @@ export class RoutineStore {
     );
   }
 
+  /**
+   * Creates or replaces a routine of either trigger kind. A changed trigger kind keeps the routine
+   * ID and its runs. Leaving the webhook kind revokes the public route in the same transaction.
+   */
+  saveRecord(
+    ownerId: string,
+    routineId: string | undefined,
+    input: RoutineRecordInput,
+    now = new Date(),
+  ): OwnedRoutineRecord {
+    this.#validateFields(input.name, input.instruction);
+    const current = routineId === undefined ? null : this.getRecord(ownerId, routineId);
+    if (routineId !== undefined && !current) throw new RoutineInputError(sourceText("error.backend.routineGone"));
+    if (!current) this.#assertBelowLimit(ownerId);
+    const trigger = input.trigger;
+    let schedule: RoutineSchedule | null = null;
+    if (trigger.kind === "schedule") {
+      schedule = normalizeRoutineSchedule(trigger.schedule, now);
+      validateRoutineSchedule(schedule, input.timezone);
+    } else {
+      validateWebhookTrigger(trigger.eventType, trigger.filters);
+      if (current?.trigger.kind !== "webhook" && trigger.secretCiphertext === null) {
+        throw new Error("A new webhook trigger needs a secret.");
+      }
+    }
+    const id = current?.id ?? randomUUID();
+    const timestamp = now.toISOString();
+    const { commandPrefix, eventPrefix, routineAggregate, routineTable, triggerTable, webhookTable, ownerColumn } =
+      this.tables;
+    const eventTrigger =
+      trigger.kind === "schedule"
+        ? { kind: "schedule", schedule }
+        : { kind: "webhook", eventType: trigger.eventType, filters: trigger.filters };
+    return this.database.dispatch(
+      `${commandPrefix}:${current ? "update" : "create"}:${id}:${randomUUID()}`,
+      [
+        {
+          aggregateType: routineAggregate,
+          aggregateId: id,
+          eventType: `${eventPrefix}.${current ? "updated" : "created"}`,
+          payload: {
+            ownerId,
+            name: input.name,
+            instruction: input.instruction,
+            active: input.active,
+            timezone: input.timezone,
+            limitPolicy: input.limitPolicy ?? "wait",
+            trigger: eventTrigger,
+          },
+        },
+      ],
+      (db, sequences) => {
+        const sequence = sequences[0] ?? 0;
+        db.prepare(
+          `INSERT INTO ${routineTable} (
+             routine_id, ${ownerColumn}, name, instruction, active, timezone, limit_policy, created_at, updated_at,
+             last_event_sequence
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(routine_id) DO UPDATE SET
+             name = excluded.name, instruction = excluded.instruction, active = excluded.active,
+             timezone = excluded.timezone, limit_policy = excluded.limit_policy, updated_at = excluded.updated_at,
+             last_event_sequence = excluded.last_event_sequence`,
+        ).run(
+          id,
+          ownerId,
+          input.name.trim(),
+          input.instruction.trim(),
+          input.active ? 1 : 0,
+          input.timezone,
+          input.limitPolicy ?? current?.limitPolicy ?? "wait",
+          current?.createdAt ?? timestamp,
+          timestamp,
+          sequence,
+        );
+        if (schedule) {
+          if (current?.trigger.kind === "webhook") {
+            revokeRoutineWebhooks(db, this.tables.ownerKind, [id], { forget: false }, now);
+          }
+          const unchanged =
+            current?.trigger.kind === "schedule" &&
+            current.timezone === input.timezone &&
+            JSON.stringify(current.trigger.schedule) === JSON.stringify(schedule);
+          if (unchanged && !current.active && input.active) {
+            db.prepare(
+              `UPDATE ${triggerTable} SET next_run_at = ?, updated_at = ?, last_event_sequence = ?
+               WHERE routine_id = ?`,
+            ).run(nextRoutineOccurrence(schedule, input.timezone, now).toISOString(), timestamp, sequence, id);
+          } else if (!unchanged) {
+            db.prepare(`DELETE FROM ${triggerTable} WHERE routine_id = ?`).run(id);
+            this.#insertTrigger(db, id, input.timezone, schedule, timestamp, sequence, now);
+          }
+        } else if (trigger.kind === "webhook") {
+          if (current?.trigger.kind === "webhook") {
+            db.prepare(
+              `UPDATE ${webhookTable}
+               SET event_type = ?, filters_json = ?, secret_ciphertext = COALESCE(?, secret_ciphertext),
+                   updated_at = ?, last_event_sequence = ?
+               WHERE routine_id = ?`,
+            ).run(
+              trigger.eventType,
+              JSON.stringify(trigger.filters),
+              trigger.secretCiphertext,
+              timestamp,
+              sequence,
+              id,
+            );
+          } else {
+            db.prepare(`DELETE FROM ${triggerTable} WHERE routine_id = ?`).run(id);
+            db.prepare(
+              `INSERT INTO ${webhookTable} (
+                 routine_id, route_id, event_type, filters_json, secret_ciphertext, url, created_at, updated_at,
+                 last_event_sequence
+               ) VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?)`,
+            ).run(
+              id,
+              randomUUID(),
+              trigger.eventType,
+              JSON.stringify(trigger.filters),
+              trigger.secretCiphertext,
+              timestamp,
+              timestamp,
+              sequence,
+            );
+          }
+        }
+        const saved = this.getRecord(ownerId, id);
+        if (!saved) throw new Error("The routine projection could not be read.");
+        return saved;
+      },
+    );
+  }
+
+  /**
+   * Records one verified webhook request and, when it matches, creates the run in the same
+   * transaction. The caller starts the run after the commit; a crash before that leaves a run that
+   * `pendingRunRows` resumes. The event stays in the run instruction only, as framed data.
+   */
+  protected receiveWebhookRow(ownerId: string, routineId: string, event: ReceivedWebhookEvent): WebhookReceiveResult {
+    const routine = this.getRecord(ownerId, routineId);
+    if (routine?.trigger.kind !== "webhook") return { kind: "gone" };
+    const db = this.database.connection;
+    if (hasWebhookReceipt(db, this.tables.ownerKind, routineId, event.deliveryId)) return { kind: "duplicate" };
+    const receipt = {
+      ownerKind: this.tables.ownerKind,
+      routineId,
+      deliveryId: event.deliveryId,
+      eventType: event.eventType,
+      receivedAt: event.receivedAt,
+    };
+    const reason = routine.active
+      ? webhookMismatch(routine.trigger, { type: event.eventType, data: event.data })
+      : "inactive";
+    if (reason) {
+      return insertWebhookReceipt(db, { ...receipt, status: "ignored", reason, runId: null })
+        ? { kind: "ignored", reason }
+        : { kind: "duplicate" };
+    }
+    const runId = randomUUID();
+    const instruction = webhookRunInstruction(routine.instruction, {
+      version: 1,
+      id: event.deliveryId,
+      routineId,
+      type: event.eventType,
+      occurredAt: event.occurredAt,
+      receivedAt: event.receivedAt,
+      data: event.data,
+    });
+    const { commandPrefix, eventPrefix, runAggregate } = this.tables;
+    return this.database.dispatch(
+      `${commandPrefix}-run:webhook:${routineId}:${randomUUID()}`,
+      [
+        {
+          aggregateType: runAggregate,
+          aggregateId: routineId,
+          eventType: `${eventPrefix}.run-created`,
+          payload: { runId, triggerId: null, kind: "manual", scheduledFor: event.receivedAt },
+        },
+      ],
+      (db, sequences): WebhookReceiveResult => {
+        insertWebhookReceipt(db, { ...receipt, status: "started", reason: null, runId });
+        this.#insertRun(db, runId, { ...routine, instruction }, null, "manual", event.receivedAt, sequences[0] ?? 0);
+        return { kind: "started", run: this.#requireRun(runId) };
+      },
+    );
+  }
+
   delete(ownerId: string, routineId: string): void {
-    if (!this.getRoutine(ownerId, routineId)) throw new RoutineInputError(sourceText("error.backend.routineGone"));
+    if (!this.getRecord(ownerId, routineId)) throw new RoutineInputError(sourceText("error.backend.routineGone"));
     const { commandPrefix, eventPrefix, routineAggregate, routineTable, ownerColumn } = this.tables;
     this.database.dispatch(
       `${commandPrefix}:delete:${routineId}:${randomUUID()}`,
@@ -400,27 +522,7 @@ export class RoutineStore {
         },
       ],
       (db) => {
-        db.prepare(`DELETE FROM ${routineTable} WHERE routine_id = ? AND ${ownerColumn} = ?`).run(routineId, ownerId);
-        return null;
-      },
-    );
-  }
-
-  /** Deletes an event routine's shadow projection while retaining its run history. */
-  protected deleteEventRoutineProjection(ownerId: string, routineId: string): void {
-    const { commandPrefix, eventPrefix, routineAggregate, routineTable, triggerTable, ownerColumn } = this.tables;
-    this.database.dispatch(
-      `${commandPrefix}:event-delete:${routineId}:${randomUUID()}`,
-      [
-        {
-          aggregateType: routineAggregate,
-          aggregateId: routineId,
-          eventType: `${eventPrefix}.deleted`,
-          payload: { ownerId },
-        },
-      ],
-      (db) => {
-        db.prepare(`DELETE FROM ${triggerTable} WHERE routine_id = ?`).run(routineId);
+        revokeRoutineWebhooks(db, this.tables.ownerKind, [routineId], { forget: true });
         db.prepare(`DELETE FROM ${routineTable} WHERE routine_id = ? AND ${ownerColumn} = ?`).run(routineId, ownerId);
         return null;
       },
@@ -539,10 +641,6 @@ export class RoutineStore {
            FROM ${triggerTable} trigger
            JOIN ${routineTable} routine ON routine.routine_id = trigger.routine_id
            WHERE routine.active = 1 AND trigger.next_run_at <= ?
-             AND NOT EXISTS (
-               SELECT 1 FROM projection_event_routine_triggers event_trigger
-               WHERE event_trigger.routine_id = routine.routine_id
-             )
            ORDER BY trigger.next_run_at, trigger.trigger_id`,
         )
         .all(now.toISOString()),
@@ -565,10 +663,6 @@ export class RoutineStore {
            FROM ${triggerTable} trigger
            JOIN ${routineTable} routine ON routine.routine_id = trigger.routine_id
            WHERE routine.active = 1
-             AND NOT EXISTS (
-               SELECT 1 FROM projection_event_routine_triggers event_trigger
-               WHERE event_trigger.routine_id = routine.routine_id
-             )
            ORDER BY trigger.next_run_at, trigger.trigger_id`,
         )
         .all(),
@@ -612,21 +706,16 @@ export class RoutineStore {
   }
 
   protected createRunRow(
-    routine: OwnedRoutine,
+    routine: RunSource,
     triggerId: string | null,
     kind: OwnedRoutineRun["kind"],
     scheduledFor: string,
-    runId: string = randomUUID(),
   ): OwnedRoutineRun {
-    const { commandPrefix, eventPrefix, runAggregate, runTable, ownerColumn, handleColumn } = this.tables;
-    const existing = this.database.connection
-      .prepare(`SELECT ${this.runColumns} FROM ${runTable} WHERE run_id = ?`)
-      .get(runId);
-    if (isDynamicRecord(existing)) return this.#run(existing);
+    const { commandPrefix, eventPrefix, runAggregate } = this.tables;
     const commandId = triggerId
       ? `${commandPrefix}-run:scheduled:${triggerId}:${scheduledFor}`
       : `${commandPrefix}-run:manual:${routine.id}:${randomUUID()}`;
-    const createdAt = new Date().toISOString();
+    const runId = randomUUID();
     return this.database.dispatch(
       commandId,
       [
@@ -638,26 +727,40 @@ export class RoutineStore {
         },
       ],
       (db, sequences) => {
-        db.prepare(
-          `INSERT INTO ${runTable} (
-             run_id, routine_id, ${ownerColumn}, trigger_id, run_kind, scheduled_for, routine_name, instruction,
-             ${handleColumn}, status, error, created_at, updated_at, last_event_sequence
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, 'queued', NULL, ?, ?, ?)`,
-        ).run(
-          runId,
-          routine.id,
-          routine.ownerId,
-          triggerId,
-          kind,
-          scheduledFor,
-          routine.name,
-          routine.instruction,
-          createdAt,
-          createdAt,
-          sequences[0] ?? 0,
-        );
+        this.#insertRun(db, runId, routine, triggerId, kind, scheduledFor, sequences[0] ?? 0);
         return this.#requireRun(runId);
       },
+    );
+  }
+
+  #insertRun(
+    db: OpenBotDatabase["connection"],
+    runId: string,
+    routine: RunSource,
+    triggerId: string | null,
+    kind: OwnedRoutineRun["kind"],
+    scheduledFor: string,
+    sequence: number,
+  ): void {
+    const { runTable, ownerColumn, handleColumn } = this.tables;
+    const createdAt = new Date().toISOString();
+    db.prepare(
+      `INSERT INTO ${runTable} (
+         run_id, routine_id, ${ownerColumn}, trigger_id, run_kind, scheduled_for, routine_name, instruction,
+         ${handleColumn}, status, error, created_at, updated_at, last_event_sequence
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, 'queued', NULL, ?, ?, ?)`,
+    ).run(
+      runId,
+      routine.id,
+      routine.ownerId,
+      triggerId,
+      kind,
+      scheduledFor,
+      routine.name,
+      routine.instruction,
+      createdAt,
+      createdAt,
+      sequence,
     );
   }
 
@@ -693,17 +796,7 @@ export class RoutineStore {
     return databaseRows(
       this.database.connection
         .prepare(
-          `SELECT ${this.routineColumns}
-           FROM ${this.tables.routineTable} routine
-           WHERE routine.active = 1
-             AND NOT EXISTS (
-               SELECT 1 FROM projection_event_routine_triggers event_trigger
-               WHERE event_trigger.routine_id = routine.routine_id
-             )
-             AND EXISTS (
-               SELECT 1 FROM ${this.tables.triggerTable} schedule_trigger
-               WHERE schedule_trigger.routine_id = routine.routine_id
-             )`,
+          `SELECT ${this.routineColumns} FROM ${this.tables.routineTable} WHERE active = 1 AND ${this.#hasSchedule}`,
         )
         .all(),
     ).map((row) => this.#routine(row));
@@ -743,6 +836,52 @@ export class RoutineStore {
     };
   }
 
+  #record(row: DynamicRecord): OwnedRoutineRecord {
+    const routineId = requiredStringColumn(row, "routine_id");
+    const webhook = this.database.connection
+      .prepare(
+        `SELECT route_id, url, event_type, filters_json, created_at, updated_at
+         FROM ${this.tables.webhookTable} WHERE routine_id = ?`,
+      )
+      .get(routineId);
+    if (!isDynamicRecord(webhook)) {
+      const routine = this.#routine(row);
+      return { ...routine, trigger: { kind: "schedule", ...routine.trigger } };
+    }
+    const limitPolicy = requiredStringColumn(row, "limit_policy");
+    if (!isOneOf(ROUTINE_LIMIT_POLICIES, limitPolicy)) throw new Error("The stored routine limit policy is invalid.");
+    return {
+      id: routineId,
+      ownerId: requiredStringColumn(row, this.tables.ownerColumn),
+      name: requiredStringColumn(row, "name"),
+      instruction: requiredStringColumn(row, "instruction"),
+      active: requiredNumberColumn(row, "active") === 1,
+      timezone: requiredStringColumn(row, "timezone"),
+      trigger: {
+        kind: "webhook",
+        routeId: requiredStringColumn(webhook, "route_id"),
+        url: optionalStringColumn(webhook, "url"),
+        eventType: optionalStringColumn(webhook, "event_type"),
+        filters: parseEventFilters(requiredStringColumn(webhook, "filters_json")),
+        createdAt: requiredStringColumn(webhook, "created_at"),
+        updatedAt: requiredStringColumn(webhook, "updated_at"),
+      },
+      limitPolicy,
+      createdAt: requiredStringColumn(row, "created_at"),
+      updatedAt: requiredStringColumn(row, "updated_at"),
+    };
+  }
+
+  /** The limit counts routines of every trigger kind. */
+  #assertBelowLimit(ownerId: string): void {
+    const row = this.database.connection
+      .prepare(`SELECT COUNT(*) AS count FROM ${this.tables.routineTable} WHERE ${this.tables.ownerColumn} = ?`)
+      .get(ownerId);
+    if (isDynamicRecord(row) && requiredNumberColumn(row, "count") >= this.tables.limit) {
+      throw new RoutineInputError(this.tables.limitMessage);
+    }
+  }
+
   #run(row: DynamicRecord): OwnedRoutineRun {
     const status = requiredStringColumn(row, "status");
     if (!isRoutineRunStatus(status)) throw new Error("The stored routine run status is invalid.");
@@ -771,12 +910,6 @@ export class RoutineStore {
     return routine;
   }
 
-  #requireIncludingEvent(routineId: string, ownerId: string): OwnedRoutine {
-    const routine = this.getRoutineIncludingEvent(ownerId, routineId, true);
-    if (!routine) throw new Error("The routine projection could not be read.");
-    return routine;
-  }
-
   #requireRun(runId: string): OwnedRoutineRun {
     const row = this.database.connection
       .prepare(`SELECT ${this.runColumns} FROM ${this.tables.runTable} WHERE run_id = ?`)
@@ -791,22 +924,15 @@ export class RoutineStore {
     mutate: (db: OpenBotDatabase["connection"], sequence: number, now: string) => void,
   ): OwnedRoutineRun {
     const current = this.#requireRun(runId);
-    const transitionEventId = randomUUID();
+    const transitionId = randomUUID();
     return this.database.dispatch(
-      `${this.tables.commandPrefix}-run:update:${runId}:${randomUUID()}`,
+      `${this.tables.commandPrefix}-run:update:${runId}:${transitionId}`,
       [{ aggregateType: this.tables.runAggregate, aggregateId: current.routineId, eventType, payload: { runId } }],
       (db, sequences) => {
         mutate(db, sequences[0] ?? 0, new Date().toISOString());
         const updated = this.#requireRun(runId);
-        const notification = routineRunNotification(updated, transitionEventId);
-        if (notification && current.status !== updated.status) {
-          const sourceEvent = db
-            .prepare("SELECT event_id FROM projection_event_dispatches WHERE run_id = ?")
-            .get(updated.id);
-          const sourceEventId =
-            isDynamicRecord(sourceEvent) && isString(sourceEvent.event_id) ? sourceEvent.event_id : null;
-          new EventStore(this.database).recordRoutineRunTransitionInTransaction(db, notification, sourceEventId);
-        }
+        const notification = updated.status === current.status ? null : runNotification(updated, transitionId);
+        if (notification) enqueueRunNotification(db, this.tables.ownerKind, notification);
         return updated;
       },
     );
@@ -837,6 +963,11 @@ export class RoutineStore {
   }
 
   #validateInput(name: string, instruction: string, timezone: string, schedule: RoutineSchedule): void {
+    this.#validateFields(name, instruction);
+    validateRoutineSchedule(schedule, timezone);
+  }
+
+  #validateFields(name: string, instruction: string): void {
     const normalizedName = name.trim();
     const normalizedInstruction = instruction.trim();
     if (!normalizedName) throw new RoutineInputError(sourceText("error.backend.routineNameRequired"));
@@ -845,55 +976,29 @@ export class RoutineStore {
     if (!normalizedInstruction) throw new RoutineInputError(sourceText("error.backend.routineInstructionRequired"));
     if (instruction.length > INPUT_LIMITS.routineInstruction)
       throw new RoutineInputError(sourceText("error.backend.routineInstructionTooLong"));
-    validateRoutineSchedule(schedule, timezone);
   }
 }
 
-function routineRunNotification(
-  run: OwnedRoutineRun,
-  eventId: string,
-): import("@openbot/contracts/ipc-events").RoutineRunNotification | null {
+type RunSource = Pick<OwnedRoutine, "id" | "ownerId" | "name" | "instruction">;
+
+/** The outbound event for a run status change, or null for a status that sends none. */
+function runNotification(run: OwnedRoutineRun, eventId: string): RoutineRunNotification | null {
+  const base = {
+    eventId,
+    runId: run.id,
+    routineId: run.routineId,
+    routineName: run.routineName,
+    occurredAt: run.updatedAt,
+  };
   switch (run.status) {
     case "running":
-      return {
-        eventId,
-        eventType: "routine.run.started",
-        runId: run.id,
-        routineId: run.routineId,
-        routineName: run.routineName,
-        status: "started",
-        occurredAt: run.updatedAt,
-      };
+      return { ...base, eventType: "routine.run.started", status: "started" };
     case "succeeded":
-      return {
-        eventId,
-        eventType: "routine.run.succeeded",
-        runId: run.id,
-        routineId: run.routineId,
-        routineName: run.routineName,
-        status: "succeeded",
-        occurredAt: run.updatedAt,
-      };
+      return { ...base, eventType: "routine.run.succeeded", status: "succeeded" };
     case "failed":
-      return {
-        eventId,
-        eventType: "routine.run.failed",
-        runId: run.id,
-        routineId: run.routineId,
-        routineName: run.routineName,
-        status: "failed",
-        occurredAt: run.updatedAt,
-      };
+      return { ...base, eventType: "routine.run.failed", status: "failed" };
     case "needs-attention":
-      return {
-        eventId,
-        eventType: "routine.run.needs_attention",
-        runId: run.id,
-        routineId: run.routineId,
-        routineName: run.routineName,
-        status: "needs-attention",
-        occurredAt: run.updatedAt,
-      };
+      return { ...base, eventType: "routine.run.needs_attention", status: "needs-attention" };
     default:
       return null;
   }

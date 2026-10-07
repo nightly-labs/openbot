@@ -1,6 +1,6 @@
 ### Added
 
-- Add signed inbound webhooks and event triggers for teammate and group routines.
-- Add outbound routine status webhooks with delivery history and retries.
-- Configure webhook sources directly in the routine editor. Keep notifications and activity with each routine.
-  Event data stays on the host. Public requests require the host to be online.
+- Add a webhook trigger to teammate and group routines. Set **When to run** to **Webhook**, and the routine gets its own URL and signing secret. A signed request to the URL starts the routine. You can limit the routine to one event type and to data filters.
+- You see the signing secret of a webhook routine one time when you save it, and you can make a new secret. When you change the routine to a schedule or delete it, its URL stops working.
+- Add notifications to a routine: OpenBot sends a request to your HTTPS URL when a run starts, succeeds, fails, or needs attention. You can add a signing secret and secret headers. OpenBot tries again after a temporary failure, and you can send a failed notification again from the routine.
+- Each routine shows the events that it received and the notifications that it sent. Event data stays on the host computer. The host must be online to receive webhook requests.

@@ -86,7 +86,6 @@ import {
   type QueueSteerFallback,
   workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
-import type { EventEnvelope, EventRoutine, EventRoutineOwner } from "@openbot/contracts/ipc-events";
 import { ContextResetBusyError } from "@openbot/contracts/team-protocol/context-reset-v1";
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { sourceText } from "@openbot/i18n/source";
@@ -152,7 +151,6 @@ import { ChannelService } from "./channel-service";
 import type { BundledProviderExecutables } from "./cli";
 import type { ConversationMarkerExclusions } from "./conversation-read-store";
 import type { ProviderSession } from "./database/provider-sessions";
-import { EventRoutineScheduler } from "./event-routine-scheduler";
 import type { HostMemory } from "./host-memory";
 import type { MailboxStore } from "./mailbox-store";
 import { toMcpOperationError } from "./mcp-effects";
@@ -162,6 +160,7 @@ import type { PasswordVault } from "./password-vault";
 import { decodeRecordResponse } from "./protocol";
 import { NO_PROVIDER_CREDENTIALS, type ProviderClientContext } from "./provider-drivers";
 import { recordAgentRestartActivity } from "./restart-activity";
+import { RoutineRecords } from "./routine-records";
 import type { RoutineHoldWindow } from "./routine-store";
 import { RoutineTimer } from "./routine-timer";
 import type { SidebarLayoutStore } from "./sidebar-layout-store";
@@ -278,7 +277,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #routines: RoutineScheduler;
   readonly #routineTimer: RoutineTimer;
   readonly #channelRoutines: ChannelRoutineScheduler;
-  readonly eventRoutines: EventRoutineScheduler;
+  /** Agent and channel routines of every trigger kind, with their webhook routes and notifications. */
+  readonly routineRecords: RoutineRecords;
   readonly #mcp: McpGateway;
   readonly #providers: ProviderRuntime;
   readonly #endpoints: CustomEndpoints;
@@ -815,166 +815,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         },
       },
     });
-    this.eventRoutines = new EventRoutineScheduler({
+    this.routineRecords = new RoutineRecords({
       database: store.database,
-      queues: {
-        agent: {
-          run: (input) =>
-            this.runRoutineFromEvent({
-              routine: input.routine,
-              payload: eventPayload(input.envelope),
-              runId: input.runId,
-            }).pipe(Effect.map((run) => ({ runId: run.id }))),
-          test: (input) =>
-            this.runRoutineFromEvent({
-              routine: input.routine,
-              payload: eventPayload(input.envelope),
-              runId: input.runId,
-            }).pipe(Effect.map((run) => ({ runId: run.id }))),
-        },
-        channel: {
-          run: (input) =>
-            this.runChannelRoutineFromEvent({
-              routine: input.routine,
-              payload: eventPayload(input.envelope),
-              runId: input.runId,
-            }).pipe(Effect.map((run) => ({ runId: run.id }))),
-          test: (input) =>
-            this.runChannelRoutineFromEvent({
-              routine: input.routine,
-              payload: eventPayload(input.envelope),
-              runId: input.runId,
-            }).pipe(Effect.map((run) => ({ runId: run.id }))),
-        },
-      },
-      scheduled: {
-        list: (owner) =>
-          owner.kind === "agent"
-            ? this.listRoutines(owner.id).map((routine) => toEventRoutine(owner, routine))
-            : this.listChannelRoutines(owner.id).map((routine) => toEventRoutine(owner, routine)),
-        save: (input) =>
-          Effect.try({
-            try: () => {
-              if (input.trigger.kind !== "schedule") throw new Error("A schedule trigger is required.");
-              if (input.owner.kind === "agent") {
-                const eventRoutine = input.id ? this.eventRoutines.store.getEventRoutine(input.id) : null;
-                if (eventRoutine) {
-                  const routine = this.#routines.convertEventRoutineToSchedule({
-                    agentId: input.owner.id,
-                    routineId: eventRoutine.id,
-                    name: input.name,
-                    instruction: input.instruction,
-                    active: input.active,
-                    timezone: input.timezone,
-                    schedule: input.trigger.schedule,
-                    limitPolicy: input.limitPolicy,
-                    createdAt: eventRoutine.createdAt,
-                  });
-                  return toEventRoutine(input.owner, routine);
-                }
-                const routine = input.id
-                  ? this.updateRoutine({
-                      agentId: input.owner.id,
-                      routineId: input.id,
-                      name: input.name,
-                      instruction: input.instruction,
-                      active: input.active,
-                      schedule: input.trigger.schedule,
-                      limitPolicy: input.limitPolicy,
-                    })
-                  : this.createRoutine({
-                      agentId: input.owner.id,
-                      name: input.name,
-                      instruction: input.instruction,
-                      active: input.active,
-                      timezone: input.timezone,
-                      schedule: input.trigger.schedule,
-                      limitPolicy: input.limitPolicy,
-                    });
-                return toEventRoutine(input.owner, routine);
-              }
-              const eventRoutine = input.id ? this.eventRoutines.store.getEventRoutine(input.id) : null;
-              if (eventRoutine) {
-                const routine = this.#channelRoutines.convertEventRoutineToSchedule({
-                  channelId: input.owner.id,
-                  routineId: eventRoutine.id,
-                  name: input.name,
-                  instruction: input.instruction,
-                  active: input.active,
-                  timezone: input.timezone,
-                  schedule: input.trigger.schedule,
-                  limitPolicy: input.limitPolicy,
-                  createdAt: eventRoutine.createdAt,
-                });
-                return toEventRoutine(input.owner, routine);
-              }
-              const routine = input.id
-                ? this.updateChannelRoutine({
-                    channelId: input.owner.id,
-                    routineId: input.id,
-                    name: input.name,
-                    instruction: input.instruction,
-                    active: input.active,
-                    schedule: input.trigger.schedule,
-                    limitPolicy: input.limitPolicy,
-                  })
-                : this.createChannelRoutine({
-                    channelId: input.owner.id,
-                    name: input.name,
-                    instruction: input.instruction,
-                    active: input.active,
-                    timezone: input.timezone,
-                    schedule: input.trigger.schedule,
-                    limitPolicy: input.limitPolicy,
-                  });
-              return toEventRoutine(input.owner, routine);
-            },
-            catch: (cause) => ({ cause }),
-          }),
-        deactivate: (input) =>
-          Effect.try({
-            try: () => {
-              if (input.owner.kind === "agent") {
-                this.#routines.deactivateEventRoutine(input.owner.id, input.id);
-              } else {
-                this.#channelRoutines.deactivateEventRoutine(input.owner.id, input.id);
-              }
-            },
-            catch: (cause) => ({ cause }),
-          }),
-        deleteEvent: (input) =>
-          input.owner.kind === "agent"
-            ? this.#routines
-                .deleteEventRoutine({ agentId: input.owner.id, routineId: input.id })
-                .pipe(Effect.mapError((failure) => ({ cause: failure.cause })))
-            : Effect.try({
-                try: () => this.#channelRoutines.deleteEventRoutine({ channelId: input.owner.id, routineId: input.id }),
-                catch: (cause) => ({ cause }),
-              }),
-        delete: (input) =>
-          input.owner.kind === "agent"
-            ? this.deleteRoutine({ agentId: input.owner.id, routineId: input.id }).pipe(
-                Effect.mapError((failure) => ({ cause: failure.cause })),
-              )
-            : Effect.try({
-                try: () => this.deleteChannelRoutine({ channelId: input.owner.id, routineId: input.id }),
-                catch: (cause) => ({ cause }),
-              }),
-        test: (input) =>
-          input.owner.kind === "agent"
-            ? this.testRoutine({ agentId: input.owner.id, routineId: input.id }).pipe(
-                Effect.asVoid,
-                Effect.mapError((failure) => ({ cause: failure.cause })),
-              )
-            : this.testChannelRoutine({ channelId: input.owner.id, routineId: input.id }).pipe(
-                Effect.asVoid,
-                Effect.mapError((failure) => ({ cause: failure.cause })),
-              ),
-      },
-      ownerExists: (owner) =>
-        owner.kind === "agent"
-          ? this.listAgents().some((agent) => agent.id === owner.id)
-          : this.channels.store.exists(owner.id),
+      agentRoutines: this.#routines,
+      channelRoutines: this.#channelRoutines,
+      agentExists: (agentId) => this.listAgents().some((agent) => agent.id === agentId),
+      channelExists: (channelId) => this.channels.store.exists(channelId),
+      channelRoutinesChanged: (channelId) => this.#emit({ type: "channel-routines-changed", channelId }),
     });
     this.messaging = new MessagingThreads(store.database, mailbox, {
       schedule: (agentId) => this.#drain.scheduleDrain(agentId),
@@ -1360,20 +1207,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
   }).bind(this);
 
-  /** Starts an event routine without the local automation permission gate. */
-  readonly runRoutineFromEvent = Effect.fn("AgentService.runRoutineFromEvent")(function* (
-    this: AgentService,
-    input: { routine: EventRoutine; payload: string; runId: string },
-  ) {
-    return yield* this.#routines
-      .runWithEventRoutine(input)
-      .pipe(
-        Effect.mapError(
-          (failure) => new AgentLifecycleFailed({ operation: "run routine from event", cause: failure.cause }),
-        ),
-      );
-  }).bind(this);
-
   /** The command the user copies to run a routine from a local script. */
   automationRunCommand(input: TestRoutineInput): string {
     this.#requireAutomationAllowed(input.agentId);
@@ -1443,20 +1276,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         ),
       );
   }
-
-  /** Starts a channel event routine with marked external input. */
-  readonly runChannelRoutineFromEvent = Effect.fn("AgentService.runChannelRoutineFromEvent")(function* (
-    this: AgentService,
-    input: { routine: EventRoutine; payload: string; runId: string },
-  ) {
-    return yield* this.#channelRoutines
-      .runWithEventRoutine(input)
-      .pipe(
-        Effect.mapError(
-          (failure) => new AgentLifecycleFailed({ operation: "run channel routine from event", cause: failure.cause }),
-        ),
-      );
-  }).bind(this);
 
   listChannelRoutineRuns(input: ListChannelRoutineRunsInput): ChannelRoutineRun[] {
     return this.#channelRoutines.listRuns(input);
@@ -3065,35 +2884,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     }
     this.#conversation.forgetExecutionThread(threadId);
   }, Effect.uninterruptible);
-}
-
-function eventPayload(envelope: EventEnvelope | null): string {
-  return envelope
-    ? JSON.stringify({
-        version: envelope.version,
-        id: envelope.id,
-        sourceId: envelope.sourceId,
-        type: envelope.type,
-        occurredAt: envelope.occurredAt,
-        receivedAt: envelope.receivedAt,
-        data: envelope.data,
-      })
-    : "";
-}
-
-function toEventRoutine(owner: EventRoutineOwner, routine: Routine | ChannelRoutine): EventRoutine {
-  return {
-    id: routine.id,
-    owner,
-    name: routine.name,
-    instruction: routine.instruction,
-    active: routine.active,
-    timezone: routine.timezone,
-    trigger: { kind: "schedule", schedule: routine.trigger.schedule },
-    ...(routine.limitPolicy === undefined ? {} : { limitPolicy: routine.limitPolicy }),
-    createdAt: routine.createdAt,
-    updatedAt: routine.updatedAt,
-  };
 }
 
 export class AgentLifecycleFailed extends Schema.TaggedError<AgentLifecycleFailed>()("AgentLifecycleFailed", {

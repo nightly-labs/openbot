@@ -83,7 +83,7 @@ export function RoutineChatCard(props: RoutineChatCardProps) {
     // Read when the save starts, so it keeps a rename or a pause that an earlier save loaded.
     const current = routine();
     try {
-      const saved = await agentRoutinesPort(props.agentId).save({
+      const { routine: saved } = await agentRoutinesPort(props.agentId).save({
         routineId: current.id,
         name: current.name,
         instruction: current.instruction,

@@ -1,135 +1,122 @@
 import {
-  type DeleteEventRoutineInput,
   EVENT_DELIVERY_ID_MAX_LENGTH,
-  type EventDeliveryIdInput,
-  type EventResourceIdInput,
   type EventRoutineOwner,
+  type EventRoutineRef,
   isEventJsonValue,
   isEventRoutineTriggerInput,
+  isRoutineRunEventType,
   type ListEventActivityInput,
   type ListEventRoutinesInput,
+  type ListWebhookDestinationsInput,
   type SaveEventRoutineInput,
-  type SaveEventSourceInput,
   type SaveWebhookDestinationInput,
+  type WebhookDeliveryRef,
+  type WebhookDestinationRef,
 } from "@openbot/contracts/ipc-events";
-import { isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
+
+// Each parser decodes an untrusted renderer or Team API body. A failure has only catalog text.
 
 const invalidEventInput = () => new Error(sourceText("error.backend.webhookSettingsInvalid"));
 
-export function requiredEventString(value: unknown, _field: string, maximum: number): string {
-  if (typeof value !== "string" || value.trim().length === 0 || value.length > maximum) {
-    throw invalidEventInput();
-  }
+function requiredString(value: unknown, maximum: number): string {
+  if (typeof value !== "string" || value.trim().length === 0 || value.length > maximum) throw invalidEventInput();
   return value;
 }
 
-function eventBoolean(value: unknown, _field: string): boolean {
+function requiredBoolean(value: unknown): boolean {
   if (typeof value !== "boolean") throw invalidEventInput();
   return value;
 }
 
-export function parseEventRoutineOwner(value: unknown): EventRoutineOwner {
-  if (!isDynamicRecord(value) || (value.kind !== "agent" && value.kind !== "channel")) {
+function record(value: unknown): DynamicRecord {
+  if (!isDynamicRecord(value)) throw invalidEventInput();
+  return value;
+}
+
+function owner(value: unknown): EventRoutineOwner {
+  const input = record(value);
+  if (input.kind !== "agent" && input.kind !== "channel") throw invalidEventInput();
+  return { kind: input.kind, id: requiredString(input.id, 128) };
+}
+
+function routineScope(value: unknown): { owner: EventRoutineOwner; routineId: string } {
+  const input = record(value);
+  return { owner: owner(input.owner), routineId: requiredString(input.routineId, 128) };
+}
+
+export function parseListEventRoutines(value: unknown): ListEventRoutinesInput {
+  return { owner: owner(record(value).owner) };
+}
+
+export function parseEventRoutineRef(value: unknown): EventRoutineRef {
+  const input = record(value);
+  return { id: requiredString(input.id, 128), owner: owner(input.owner) };
+}
+
+export function parseSaveEventRoutine(value: unknown): SaveEventRoutineInput {
+  const input = record(value);
+  if (!isEventRoutineTriggerInput(input.trigger)) throw invalidEventInput();
+  if (input.limitPolicy !== undefined && input.limitPolicy !== "wait" && input.limitPolicy !== "skip") {
     throw invalidEventInput();
   }
-  return { kind: value.kind, id: requiredEventString(value.id, "owner id", 128) };
-}
-
-export function parseEventResourceId(value: unknown): EventResourceIdInput {
-  if (!isDynamicRecord(value)) throw invalidEventInput();
-  return { id: requiredEventString(value.id, "resource id", 128) };
-}
-
-export function parseEventDeliveryId(value: unknown): EventDeliveryIdInput {
-  if (!isDynamicRecord(value)) throw invalidEventInput();
-  return { id: requiredEventString(value.id, "delivery id", EVENT_DELIVERY_ID_MAX_LENGTH) };
-}
-
-export function parseSaveEventSource(value: unknown): SaveEventSourceInput {
-  if (!isDynamicRecord(value)) throw invalidEventInput();
   return {
-    ...(value.id === undefined ? {} : { id: requiredEventString(value.id, "source id", 128) }),
-    name: requiredEventString(value.name, "source name", 256),
-    active: eventBoolean(value.active, "source active"),
-    ...(value.secret === undefined ? {} : { secret: requiredEventString(value.secret, "source secret", 1_024) }),
+    ...(input.id === undefined ? {} : { id: requiredString(input.id, 128) }),
+    owner: owner(input.owner),
+    name: requiredString(input.name, 256),
+    instruction: requiredString(input.instruction, 100_000),
+    active: requiredBoolean(input.active),
+    timezone: requiredString(input.timezone, 128),
+    trigger: input.trigger,
+    ...(input.limitPolicy === undefined ? {} : { limitPolicy: input.limitPolicy }),
   };
 }
 
+export const parseListWebhookDestinations: (value: unknown) => ListWebhookDestinationsInput = routineScope;
+
+export function parseWebhookDestinationRef(value: unknown): WebhookDestinationRef {
+  return { ...routineScope(value), id: requiredString(record(value).id, 128) };
+}
+
+export function parseWebhookDeliveryRef(value: unknown): WebhookDeliveryRef {
+  return { ...routineScope(value), id: requiredString(record(value).id, EVENT_DELIVERY_ID_MAX_LENGTH) };
+}
+
 export function parseSaveWebhookDestination(value: unknown): SaveWebhookDestinationInput {
-  if (!isDynamicRecord(value)) throw invalidEventInput();
-  if (value.method !== "POST" && value.method !== "PUT" && value.method !== "PATCH") {
-    throw invalidEventInput();
-  }
-  if (!Array.isArray(value.eventTypes) || !value.eventTypes.every((item) => typeof item === "string")) {
-    throw invalidEventInput();
-  }
-  if (!Array.isArray(value.routineIds) || !value.routineIds.every((item) => typeof item === "string")) {
-    throw invalidEventInput();
-  }
+  const input = record(value);
+  if (input.method !== "POST" && input.method !== "PUT" && input.method !== "PATCH") throw invalidEventInput();
+  if (!Array.isArray(input.eventTypes) || !input.eventTypes.every(isRoutineRunEventType)) throw invalidEventInput();
+  if (input.payloadTemplate !== null && !isEventJsonValue(input.payloadTemplate)) throw invalidEventInput();
   let headers: Record<string, string> | undefined;
-  if (value.headers !== undefined) {
-    if (!isDynamicRecord(value.headers)) throw invalidEventInput();
+  if (input.headers !== undefined) {
     headers = {};
-    for (const [name, headerValue] of Object.entries(value.headers)) {
-      headers[name] = requiredEventString(headerValue, "header", 8_192);
+    for (const [name, headerValue] of Object.entries(record(input.headers))) {
+      headers[name] = requiredString(headerValue, 8_192);
     }
   }
-  if (value.payloadTemplate !== null && !isEventJsonValue(value.payloadTemplate)) {
+  if (input.secret !== undefined && (typeof input.secret !== "string" || input.secret.length > 1_024)) {
     throw invalidEventInput();
   }
   return {
-    ...(value.id === undefined ? {} : { id: requiredEventString(value.id, "destination id", 128) }),
-    name: requiredEventString(value.name, "destination name", 256),
-    active: eventBoolean(value.active, "destination active"),
-    url: requiredEventString(value.url, "destination URL", 2_048),
-    method: value.method,
-    eventTypes: value.eventTypes.map((item) => requiredEventString(item, "event type", 256)),
-    routineIds: value.routineIds.map((item) => requiredEventString(item, "routine id", 128)),
-    payloadTemplate: value.payloadTemplate === null ? null : value.payloadTemplate,
-    ...(value.secret === undefined ? {} : { secret: requiredEventString(value.secret, "destination secret", 1_024) }),
+    ...(input.id === undefined ? {} : { id: requiredString(input.id, 128) }),
+    ...routineScope(input),
+    active: requiredBoolean(input.active),
+    url: requiredString(input.url, 2_048),
+    method: input.method,
+    eventTypes: input.eventTypes,
+    payloadTemplate: input.payloadTemplate,
+    ...(input.secret === undefined ? {} : { secret: input.secret }),
     ...(headers === undefined ? {} : { headers }),
   };
 }
 
-export function parseSaveEventRoutine(value: unknown): SaveEventRoutineInput {
-  if (!isDynamicRecord(value) || !isEventRoutineTriggerInput(value.trigger)) throw invalidEventInput();
-  if (value.limitPolicy !== undefined && value.limitPolicy !== "wait" && value.limitPolicy !== "skip") {
-    throw invalidEventInput();
-  }
-  return {
-    ...(value.id === undefined ? {} : { id: requiredEventString(value.id, "routine id", 128) }),
-    owner: parseEventRoutineOwner(value.owner),
-    name: requiredEventString(value.name, "routine name", 256),
-    instruction: requiredEventString(value.instruction, "routine instruction", 100_000),
-    active: eventBoolean(value.active, "routine active"),
-    timezone: requiredEventString(value.timezone, "routine timezone", 128),
-    trigger: value.trigger,
-    ...(value.limitPolicy === undefined ? {} : { limitPolicy: value.limitPolicy }),
-  };
-}
-
 export function parseListEventActivity(value: unknown): ListEventActivityInput {
-  if (value === undefined || value === null) return {};
-  if (!isDynamicRecord(value)) throw invalidEventInput();
-  if (value.limit === undefined) return {};
-  if (
-    typeof value.limit !== "number" ||
-    !Number.isSafeInteger(value.limit) ||
-    value.limit < 1 ||
-    value.limit > 10_000
-  ) {
+  const input = record(value);
+  const scope = routineScope(input);
+  if (input.limit === undefined) return scope;
+  if (typeof input.limit !== "number" || !Number.isSafeInteger(input.limit) || input.limit < 1 || input.limit > 500) {
     throw invalidEventInput();
   }
-  return { limit: value.limit };
-}
-
-export function parseListEventRoutines(value: unknown): ListEventRoutinesInput {
-  if (!isDynamicRecord(value)) throw invalidEventInput();
-  return { owner: parseEventRoutineOwner(value.owner) };
-}
-
-export function parseEventRoutineAction(value: unknown): DeleteEventRoutineInput {
-  if (!isDynamicRecord(value)) throw invalidEventInput();
-  return { id: requiredEventString(value.id, "routine id", 128), owner: parseEventRoutineOwner(value.owner) };
+  return { ...scope, limit: input.limit };
 }

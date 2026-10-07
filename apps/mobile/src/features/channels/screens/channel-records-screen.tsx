@@ -58,7 +58,7 @@ export function ChannelRecordsScreen({ section }: { section: "memories" | "memor
   const eventRoutine = eventRoutines.data?.find((item) => item.id === recordId);
   const allRoutines = [
     ...(routines.data ?? []),
-    ...(eventRoutines.data ?? []).filter((routine) => routine.trigger.kind === "event"),
+    ...(eventRoutines.data ?? []).filter((routine) => routine.trigger.kind === "webhook"),
   ];
   return (
     <SettingsContent>
@@ -98,11 +98,6 @@ export function ChannelRecordsScreen({ section }: { section: "memories" | "memor
             update: (input) => store.updateRoutine(serverId, { ...input, channelId }),
             delete: (id) => store.deleteRoutine(serverId, channelId, id),
             test: (id) => store.testRoutine(serverId, channelId, id),
-            saveEvent: async (input) => {
-              await workspace.saveEventRoutine(input, serverId);
-            },
-            deleteEvent: (input) => workspace.deleteEventRoutine(input, serverId),
-            testEvent: (input) => workspace.testEventRoutine(input, serverId),
           }}
         />
       ) : (

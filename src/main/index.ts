@@ -914,9 +914,21 @@ if (!hasSingleInstanceLock) {
       service.on("event", (event) => trace.observeAgentEvent(event));
       service.on("event", (event) => forwardAgentEvent("local", event));
       const onRoutineEvent = (event: AgentEvent): void => {
-        if (event.type === "routines-changed" || event.type === "channel-routines-changed") built.eventsRuntime.wake();
+        switch (event.type) {
+          case "routines-changed":
+          case "channel-routines-changed":
+            built.eventsRuntime.wake();
+            break;
+          case "agents-changed":
+          case "channels-changed":
+            break;
+          default:
+            return;
+        }
+        // A routine or its owner can be deleted outside the events API. Its route is then revoked here.
+        built.eventsRuntime.syncRoutes({ all: false });
       };
-      const refreshWebhookRoutes = (): void => built.eventsRuntime.syncRoutes();
+      const refreshWebhookRoutes = (): void => built.eventsRuntime.syncRoutes({ all: true });
       service.on("event", onRoutineEvent);
       built.centralAuth.on("changed", refreshWebhookRoutes);
       teardown.push(0, "event service listeners", () => {

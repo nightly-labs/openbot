@@ -60,7 +60,6 @@ import { AgentLifecycleFailed, AgentService } from "../backend/agent-service";
 import { AgentStore } from "../backend/agent-store";
 import { BrowserHost } from "../backend/browser-host";
 import { runCauseEffect } from "../backend/effect-boundary";
-import { EventStore } from "../backend/event-store";
 import { MailboxStore } from "../backend/mailbox-store";
 import { McpOAuth } from "../backend/mcp-oauth-provider";
 import { discordDriver } from "../backend/messaging/discord/discord-driver";
@@ -1330,7 +1329,6 @@ export async function createApplicationServices({
   await runCauseEffect(teamStore.initialize());
   ingressHostId = () => teamStore.getIdentity()?.serverId ?? null;
   signalIngress.reconnect();
-  const eventStore = new EventStore(store.database);
   const webhookRelay = new WebhookRelay({
     account: centralAuth,
     ingress: signalIngress,
@@ -1338,17 +1336,21 @@ export async function createApplicationServices({
   });
   let eventRuntime: HostEventsRuntime | null = null;
   const events = new HostEventsService({
-    database: store.database,
+    routines: service.routineRecords,
     cipher: secretCipher,
-    routines: service.eventRoutines,
     relay: webhookRelay,
-    wake: () => {
-      webhookRelay.setEnabled(eventStore.listSources().some((source) => source.active));
-      eventRuntime?.wake();
-    },
+    wake: () => eventRuntime?.wake(),
   });
-  const webhookDelivery = new WebhookDeliveryWorker({ store: eventStore, cipher: secretCipher, maxBatch: 1 });
-  const eventsRuntime = new HostEventsRuntime({ service: events, store: eventStore, delivery: webhookDelivery });
+  const webhookDelivery = new WebhookDeliveryWorker({
+    store: service.routineRecords.destinations,
+    cipher: secretCipher,
+    maxBatch: 1,
+  });
+  const eventsRuntime = new HostEventsRuntime({
+    service: events,
+    destinations: service.routineRecords.destinations,
+    delivery: webhookDelivery,
+  });
   eventRuntime = eventsRuntime;
   signalIngress.handleWebhooks((input) => events.receive(input));
   teardown.push(TEARDOWN_ORDER.hostEvents, "the event service", async () => {
@@ -1789,8 +1791,6 @@ export async function createApplicationServices({
       yield* Fiber.join(computerUseWarmUp);
       yield* service.initialize({ heldRoutines: takeRoutineHold(routineHoldFile, (message) => logger.warn(message)) });
       yield* eventsRuntime.start();
-      webhookRelay.setEnabled(eventStore.listSources().some((source) => source.active));
-      eventsRuntime.syncRoutes();
       yield* automation.sync();
     }),
   );

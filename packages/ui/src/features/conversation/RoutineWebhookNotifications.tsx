@@ -1,15 +1,23 @@
-import type {
-  EventActivity,
-  EventSource,
-  EventStatus,
-  SaveEventSourceInput,
-  SaveWebhookDestinationInput,
-  WebhookDestination,
-  WebhookMethod,
+import {
+  type EventActivity,
+  type EventRoutineRef,
+  type EventStatus,
+  isEventJsonValue,
+  type ListEventActivityInput,
+  type ListWebhookDestinationsInput,
+  ROUTINE_RUN_EVENT_TYPES,
+  type RoutineRunEventType,
+  type SaveWebhookDestinationInput,
+  type WebhookDeliveryRef,
+  type WebhookDestination,
+  type WebhookDestinationRef,
+  type WebhookMethod,
+  type WebhookSecret,
 } from "@openbot/contracts/ipc-events";
 import {
   Badge,
   Button,
+  Checkbox,
   ConfirmDialog,
   Input,
   Item,
@@ -19,13 +27,11 @@ import {
   ItemGroup,
   ItemTitle,
   Plus,
-  RefreshCw,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-  SettingsSection,
   Switch,
   Text,
   Textarea,
@@ -33,313 +39,241 @@ import {
   toast,
   X,
 } from "@openbot/ui";
-import type { JSX } from "@solidjs/web";
-import { createEffect, createSignal, For, Show, untrack } from "solid-js";
+import { createEffect, createSignal, createUniqueId, For, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 
+/** The webhook operations of one host. Every list and action names its routine. */
 export interface RoutineWebhooksApi {
   getStatus: () => Promise<EventStatus>;
-  listSources: () => Promise<EventSource[]>;
-  saveSource: (input: SaveEventSourceInput) => Promise<EventSource>;
-  deleteSource: (input: { id: string }) => Promise<void>;
-  listDestinations: () => Promise<WebhookDestination[]>;
+  rotateSecret: (input: EventRoutineRef) => Promise<WebhookSecret>;
+  listDestinations: (input: ListWebhookDestinationsInput) => Promise<WebhookDestination[]>;
   saveDestination: (input: SaveWebhookDestinationInput) => Promise<WebhookDestination>;
-  deleteDestination: (input: { id: string }) => Promise<void>;
-  listActivity: (input?: { limit?: number }) => Promise<EventActivity[]>;
-  retryDelivery: (input: { id: string }) => Promise<void>;
+  deleteDestination: (input: WebhookDestinationRef) => Promise<void>;
+  listActivity: (input: ListEventActivityInput) => Promise<EventActivity[]>;
+  retryDelivery: (input: WebhookDeliveryRef) => Promise<void>;
 }
 
 export interface RoutineWebhookNotificationsProps {
   api: RoutineWebhooksApi;
-  canManage: boolean;
-  busy?: boolean;
-  routineId: string;
-  sourceId?: string;
+  routine: EventRoutineRef;
+  disabled?: boolean;
 }
 
-type Panel = "destinations" | "activity";
 type HeaderDraft = { name: string; value: string };
 type DestinationDraft = {
   id?: string;
-  name: string;
   active: boolean;
   url: string;
   method: WebhookMethod;
-  eventTypes: string;
-  routineIds: string;
+  eventTypes: RoutineRunEventType[];
   payloadTemplate: string;
-  headers: HeaderDraft[];
-  headersTouched: boolean;
+  hasSecret: boolean;
   secret: string;
+  removeSecret: boolean;
+  headerNames: string[];
+  /** True when the save sends `headers`. A saved destination keeps its headers until the user replaces them. */
+  replaceHeaders: boolean;
+  headers: HeaderDraft[];
 };
 
+const METHODS: WebhookMethod[] = ["POST", "PUT", "PATCH"];
+/** The host signs with HMAC-SHA256 and asks for at least this many characters. */
+const SECRET_MIN_LENGTH = 32;
+const TEMPLATE_FIELDS = ["routineName", "status", "eventType", "runId", "routineId", "occurredAt", "id"];
+const PAYLOAD_TEMPLATE_EXAMPLE = '{ "text": "{{routineName}}: {{status}}" }';
+
+export const ROUTINE_RUN_EVENT_LABELS = {
+  "routine.run.started": "routine.notifications.eventType.started",
+  "routine.run.succeeded": "routine.notifications.eventType.succeeded",
+  "routine.run.failed": "routine.notifications.eventType.failed",
+  "routine.run.needs_attention": "routine.notifications.eventType.needsAttention",
+} as const satisfies Record<RoutineRunEventType, string>;
+
 const EMPTY_DESTINATION: DestinationDraft = {
-  name: "",
   active: true,
   url: "",
   method: "POST",
-  eventTypes: "routine.run.started, routine.run.succeeded, routine.run.failed, routine.run.needs_attention",
-  routineIds: "",
+  eventTypes: [...ROUTINE_RUN_EVENT_TYPES],
   payloadTemplate: "",
-  headers: [],
-  headersTouched: false,
+  hasSecret: false,
   secret: "",
+  removeSecret: false,
+  headerNames: [],
+  replaceHeaders: true,
+  headers: [],
 };
-
-const ACTIVITY_KIND_LABELS = {
-  received: "server.events.received",
-  "routine-run": "server.events.routineRun",
-  delivery: "server.events.delivery",
-} as const;
-const ACTIVITY_STATUS_LABELS = {
-  accepted: "server.events.status.accepted",
-  duplicate: "server.events.status.duplicate",
-  queued: "server.events.status.queued",
-  running: "server.events.status.running",
-  "needs-attention": "routine.runStatus.needsAttention",
-  succeeded: "server.events.status.succeeded",
-  failed: "server.events.status.failed",
-} as const;
 
 export function RoutineWebhookNotifications(props: RoutineWebhookNotificationsProps) {
   const { t, errorMessage, format } = useText();
-  const [panel, setPanel] = createSignal<Panel>("destinations");
+  const formId = `routine-notification-${createUniqueId()}`;
   const [destinations, setDestinations] = createSignal<WebhookDestination[]>([]);
-  const [activity, setActivity] = createSignal<EventActivity[]>([]);
-  const [destinationDraft, setDestinationDraft] = createSignal<DestinationDraft | null>(null);
-  const [pendingDelete, setPendingDelete] = createSignal<{
-    kind: "destination";
-    id: string;
-    name: string;
-  } | null>(null);
   const [loading, setLoading] = createSignal(false);
+  const [draft, setDraft] = createSignal<DestinationDraft | null>(null);
+  const [options, setOptions] = createSignal(false);
   const [saving, setSaving] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
-  const [activityFilter, setActivityFilter] = createSignal<string | null>(null);
-  const [advanced, setAdvanced] = createSignal(false);
+  const [pendingDelete, setPendingDelete] = createSignal<WebhookDestination | null>(null);
+  const [deleteError, setDeleteError] = createSignal<string | null>(null);
 
-  async function loadDestinations(): Promise<void> {
+  async function load(): Promise<void> {
+    const routine = props.routine;
     setLoading(true);
     try {
-      setDestinations(await props.api.listDestinations());
+      const rows = await props.api.listDestinations({ owner: routine.owner, routineId: routine.id });
+      if (props.routine.id === routine.id) setDestinations(rows);
     } catch (cause) {
-      setError(errorMessage(cause, t("server.events.loadFailed")));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function loadActivity(): Promise<void> {
-    setLoading(true);
-    try {
-      setActivity(await props.api.listActivity({ limit: 100 }));
-    } catch (cause) {
-      setError(errorMessage(cause, t("server.events.loadFailed")));
+      setError(errorMessage(cause, t("routine.notifications.loadFailed")));
     } finally {
       setLoading(false);
     }
   }
 
   createEffect(
-    () => panel(),
-    (current) => {
-      setError(null);
-      if (current === "destinations") void untrack(loadDestinations);
-      if (current === "activity") void untrack(loadActivity);
-    },
-  );
-
-  createEffect(
-    () => props.routineId,
+    () => props.routine.id,
     () => {
-      setDestinationDraft(null);
+      setDraft(null);
       setPendingDelete(null);
-      setActivityFilter(null);
-      setPanel("destinations");
+      setError(null);
+      setDestinations([]);
+      void untrack(load);
     },
   );
 
-  function editDestination(destination?: WebhookDestination): void {
+  function update(change: Partial<DestinationDraft>): void {
+    setDraft((value) => value && { ...value, ...change });
+  }
+
+  function edit(destination?: WebhookDestination): void {
     setError(null);
-    setDestinationDraft(
+    setOptions(false);
+    setDraft(
       destination
         ? {
             id: destination.id,
-            name: destination.name,
             active: destination.active,
             url: destination.url,
             method: destination.method,
-            eventTypes: destination.eventTypes.join(", "),
-            routineIds: destination.routineIds.join(", "),
-            payloadTemplate: destination.payloadTemplate ? JSON.stringify(destination.payloadTemplate, null, 2) : "",
-            // Header values are write-only. Keep this empty when editing so a save preserves
-            // existing headers instead of clearing them.
-            headers: destination.headerNames.map((name) => ({ name, value: "" })),
-            headersTouched: false,
+            eventTypes: [...destination.eventTypes],
+            // `false`, `0` and `""` are valid templates, so only `null` means no template.
+            payloadTemplate:
+              destination.payloadTemplate === null ? "" : JSON.stringify(destination.payloadTemplate, null, 2),
+            hasSecret: destination.hasSecret,
             secret: "",
+            removeSecret: false,
+            headerNames: destination.headerNames,
+            replaceHeaders: false,
+            headers: [],
           }
-        : { ...EMPTY_DESTINATION, routineIds: props.routineId },
+        : { ...EMPTY_DESTINATION, eventTypes: [...EMPTY_DESTINATION.eventTypes] },
     );
   }
 
-  async function saveDestination(): Promise<void> {
-    const draft = destinationDraft();
-    if (!draft?.name.trim() || !draft.url.trim() || saving() || !secretIsValid(draft)) {
-      if (draft && !secretIsValid(draft)) setError(t("error.backend.webhookSecretRequired"));
-      return;
-    }
-    setSaving(true);
-    setError(null);
-    try {
-      let payloadTemplate = null;
-      if (draft.payloadTemplate.trim()) {
-        const parsed = JSON.parse(draft.payloadTemplate);
-        if (!isEventJsonValue(parsed)) throw new Error(t("server.events.saveFailed"));
-        payloadTemplate = parsed;
+  function toggleEventType(eventType: RoutineRunEventType, checked: boolean): void {
+    setDraft(
+      (value) =>
+        value && {
+          ...value,
+          eventTypes: checked
+            ? ROUTINE_RUN_EVENT_TYPES.filter((item) => item === eventType || value.eventTypes.includes(item))
+            : value.eventTypes.filter((item) => item !== eventType),
+        },
+    );
+  }
+
+  function updateHeader(index: number, change: Partial<HeaderDraft>): void {
+    setDraft(
+      (value) =>
+        value && {
+          ...value,
+          headers: value.headers.map((header, itemIndex) => (itemIndex === index ? { ...header, ...change } : header)),
+        },
+    );
+  }
+
+  const urlValid = (value: DestinationDraft) => value.url.trim().startsWith("https://");
+  const secretValid = (value: DestinationDraft) =>
+    value.removeSecret || value.secret.length === 0 || value.secret.length >= SECRET_MIN_LENGTH;
+  const headersValid = (value: DestinationDraft) =>
+    !value.replaceHeaders || value.headers.every((header) => header.name.trim() && header.value);
+  const draftValid = (value: DestinationDraft) =>
+    urlValid(value) && value.eventTypes.length > 0 && secretValid(value) && headersValid(value);
+
+  async function save(): Promise<void> {
+    const value = draft();
+    if (!value || saving() || !draftValid(value)) return;
+    let payloadTemplate: SaveWebhookDestinationInput["payloadTemplate"] = null;
+    if (value.payloadTemplate.trim()) {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(value.payloadTemplate);
+      } catch {
+        parsed = undefined;
       }
-      const input: SaveWebhookDestinationInput = {
-        ...(draft.id ? { id: draft.id } : {}),
-        name: draft.name.trim(),
-        active: draft.active,
-        url: draft.url.trim(),
-        method: draft.method,
-        eventTypes: splitList(draft.eventTypes),
-        routineIds: splitList(draft.routineIds),
-        payloadTemplate,
-        ...(draft.headersTouched
-          ? {
-              headers: Object.fromEntries(
-                draft.headers
-                  .map(({ name, value }) => [name.trim(), value])
-                  .filter(([name, value]) => Boolean(name && value)),
-              ),
-            }
-          : {}),
-        ...(draft.secret.trim() ? { secret: draft.secret } : {}),
-      };
+      if (parsed === undefined || !isEventJsonValue(parsed)) {
+        setError(t("routine.notifications.payloadTemplateInvalid"));
+        return;
+      }
+      payloadTemplate = parsed;
+    }
+    const secret = value.removeSecret ? "" : value.secret || undefined;
+    const headers =
+      value.replaceHeaders && (value.id || value.headers.length > 0)
+        ? Object.fromEntries(value.headers.map((header) => [header.name.trim(), header.value]))
+        : undefined;
+    const input: SaveWebhookDestinationInput = {
+      ...(value.id ? { id: value.id } : {}),
+      owner: props.routine.owner,
+      routineId: props.routine.id,
+      active: value.active,
+      url: value.url.trim(),
+      method: value.method,
+      eventTypes: value.eventTypes,
+      payloadTemplate,
+      ...(secret === undefined ? {} : { secret }),
+      ...(headers === undefined ? {} : { headers }),
+    };
+    setSaving(true);
+    setError(null);
+    try {
       await props.api.saveDestination(input);
-      setDestinationDraft(null);
-      toast.success(draft.id ? t("server.events.destinationUpdated") : t("server.events.destinationCreated"));
-      await loadDestinations();
+      setDraft(null);
+      toast.success(t(value.id ? "routine.notifications.updated" : "routine.notifications.created"));
+      await load();
     } catch (cause) {
-      setError(errorMessage(cause, t("server.events.saveFailed")));
+      setError(errorMessage(cause, t("routine.notifications.saveFailed")));
     } finally {
       setSaving(false);
     }
   }
 
-  async function deletePending(): Promise<void> {
-    const pending = pendingDelete();
-    if (!pending || saving()) return;
-    setSaving(true);
-    setError(null);
+  async function confirmDelete(): Promise<void> {
+    const destination = pendingDelete();
+    if (!destination) return;
+    setDeleteError(null);
     try {
-      await props.api.deleteDestination({ id: pending.id });
-      await loadDestinations();
-      if (destinationDraft()?.id === pending.id) setDestinationDraft(null);
-      toast.success(t("server.events.destinationDeleted"));
+      await props.api.deleteDestination({
+        id: destination.id,
+        owner: props.routine.owner,
+        routineId: props.routine.id,
+      });
+      if (draft()?.id === destination.id) setDraft(null);
       setPendingDelete(null);
+      toast.success(t("routine.notifications.deleted"));
+      await load();
     } catch (cause) {
-      setError(errorMessage(cause, t("server.events.deleteFailed")));
-    } finally {
-      setSaving(false);
+      setDeleteError(errorMessage(cause, t("routine.notifications.deleteFailed")));
     }
   }
 
-  async function retryDelivery(item: EventActivity): Promise<void> {
-    if (!item.deliveryId || saving()) return;
-    setSaving(true);
-    setError(null);
-    try {
-      await props.api.retryDelivery({ id: item.deliveryId });
-      await loadActivity();
-    } catch (cause) {
-      setError(errorMessage(cause, t("server.events.retryFailed")));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  const destinationRows = () =>
-    destinations().filter((item) => item.routineIds.length === 0 || item.routineIds.includes(props.routineId));
-  const activityRows = () => {
-    const filter = activityFilter();
-    const relevant = activity().filter(
-      (item) => item.routineId === props.routineId || (item.kind === "received" && item.sourceId === props.sourceId),
-    );
-    if (!filter) return relevant;
-    return relevant.filter((item) =>
-      [item.eventId, item.sourceId, item.routineId, item.runId, item.destinationId, item.deliveryId].includes(filter),
-    );
-  };
-  const canEdit = () => props.canManage && !props.busy && !saving();
-
-  function activitySummary(item: EventActivity): string {
-    switch (item.summary) {
-      case "event.duplicate":
-        return t("server.events.summary.eventDuplicate");
-      case "event.received":
-        return t("server.events.summary.eventReceived");
-      case "webhook.queued":
-        return t("server.events.summary.webhookQueued");
-      case "webhook.retrying":
-        return t("server.events.summary.webhookRetrying");
-      case "webhook.retry":
-        return t("server.events.summary.webhookRetry");
-      case "webhook.delivered":
-        return t("server.events.summary.webhookDelivered");
-      case "webhook.failed":
-        return t("server.events.summary.webhookFailed");
-      default:
-        if (item.summary.startsWith("routine.run.")) {
-          const status = item.summary.slice("routine.run.".length);
-          const labels: Record<string, string> = {
-            queued: t("server.events.status.queued"),
-            running: t("server.events.status.running"),
-            started: t("server.events.status.running"),
-            succeeded: t("server.events.status.succeeded"),
-            failed: t("server.events.status.failed"),
-            needs_attention: t("routine.runStatus.needsAttention"),
-            "needs-attention": t("routine.runStatus.needsAttention"),
-          };
-          return t("server.events.summary.routineRun", { status: labels[status] ?? status });
-        }
-        return t("server.events.summary.eventReceived");
-    }
-  }
-
-  function relatedButton(label: string, id: string | null): JSX.Element {
-    return (
-      <Show when={id}>
-        {(value) => (
-          <Button type="button" size="sm" variant="link" onClick={() => setActivityFilter(value())}>
-            {label}: {value()}
-          </Button>
-        )}
-      </Show>
-    );
-  }
+  const eventTypeList = (eventTypes: readonly RoutineRunEventType[]) =>
+    format.list(eventTypes.map((eventType) => t(ROUTINE_RUN_EVENT_LABELS[eventType])));
+  const locked = () => Boolean(props.disabled) || saving();
 
   return (
-    <div class="server-events-settings">
-      <div class="server-events-tabs">
-        <Button
-          type="button"
-          variant={panel() === "destinations" ? "secondary" : "ghost"}
-          aria-pressed={panel() === "destinations" ? "true" : "false"}
-          onClick={() => setPanel("destinations")}
-        >
-          {t("server.events.destinations")}
-        </Button>
-        <Button
-          type="button"
-          variant={panel() === "activity" ? "secondary" : "ghost"}
-          aria-pressed={panel() === "activity" ? "true" : "false"}
-          onClick={() => setPanel("activity")}
-        >
-          {t("server.events.activity")}
-        </Button>
-      </div>
+    <div class="agent-routine-notifications">
+      <Text variant="caption" tone="muted">
+        {t("routine.notifications.description")}
+      </Text>
 
       <Show when={error()}>
         {(message) => (
@@ -349,370 +283,325 @@ export function RoutineWebhookNotifications(props: RoutineWebhookNotificationsPr
         )}
       </Show>
 
-      <Show when={panel() === "destinations"}>
-        <SettingsSection
-          title={t("server.events.destinationTitle")}
-          description={t("server.events.destinationDescription")}
-        >
-          <div class="server-events-toolbar">
-            <Button type="button" size="sm" disabled={!canEdit()} onClick={() => editDestination()}>
-              <Plus aria-hidden="true" />
-              {t("server.events.createDestination")}
-            </Button>
-          </div>
-          <Show
-            when={!loading() || destinationRows().length > 0}
-            fallback={<Text tone="muted">{t("common.loading")}</Text>}
-          >
-            <Show
-              when={destinationRows().length > 0}
-              fallback={<Text tone="muted">{t("server.events.emptyDestinations")}</Text>}
-            >
-              <ItemGroup class="settings-modal-card server-events-list" surface="subtle">
-                <For each={destinationRows()}>
-                  {(destination) => (
-                    <Item size="spacious">
-                      <ItemContent>
-                        <ItemTitle>{destination.name}</ItemTitle>
-                        <ItemDescription>
-                          <Badge variant={destination.active ? "success-light" : "secondary"}>
-                            {t(destination.active ? "server.events.status.active" : "server.events.status.paused")}
-                          </Badge>
-                          <span>
-                            {destination.method} · {destination.url}
-                          </span>
-                          <Show when={destination.headerNames.length > 0}>
-                            <span>
-                              {t("server.events.headersStored", { names: destination.headerNames.join(", ") })}
-                            </span>
-                          </Show>
-                        </ItemDescription>
-                      </ItemContent>
-                      <ItemActions>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={!canEdit()}
-                          onClick={() => editDestination(destination)}
-                        >
-                          {t("server.events.edit")}
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="destructive-ghost"
-                          disabled={!canEdit()}
-                          aria-label={t("server.events.deleteLabel", { name: destination.name })}
-                          onClick={() =>
-                            setPendingDelete({ kind: "destination", id: destination.id, name: destination.name })
-                          }
-                        >
-                          <Trash2 aria-hidden="true" />
-                          {t("server.events.delete")}
-                        </Button>
-                      </ItemActions>
-                    </Item>
-                  )}
-                </For>
-              </ItemGroup>
+      <Show
+        when={!loading() || destinations().length > 0}
+        fallback={
+          <Text variant="caption" tone="muted">
+            {t("common.loading")}
+          </Text>
+        }
+      >
+        <Show
+          when={destinations().length > 0}
+          fallback={
+            <Show when={!draft()}>
+              <Text variant="caption" tone="muted">
+                {t("routine.notifications.empty")}
+              </Text>
             </Show>
-          </Show>
-          <Show when={destinationDraft()}>
-            {(draft) => (
-              <form
-                class="server-events-form"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void saveDestination();
-                }}
-              >
-                <div class="server-events-form-header">
-                  <Text variant="body">
-                    {draft().id ? t("server.events.edit") : t("server.events.createDestination")}
+          }
+        >
+          <ItemGroup class="agent-routine-webhook-list" surface="subtle">
+            <For each={destinations()}>
+              {(destination) => (
+                <Item size="compact">
+                  <ItemContent>
+                    <ItemTitle class="agent-routine-webhook-url">{destination.url}</ItemTitle>
+                    <ItemDescription>
+                      {destination.method} · {eventTypeList(destination.eventTypes)}
+                    </ItemDescription>
+                  </ItemContent>
+                  <ItemActions>
+                    <Show when={!destination.active}>
+                      <Badge variant="secondary">{t("routine.settings.paused")}</Badge>
+                    </Show>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      disabled={locked()}
+                      onClick={() => edit(destination)}
+                    >
+                      {t("common.edit")}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="icon-sm"
+                      variant="destructive-ghost"
+                      disabled={locked()}
+                      aria-label={t("routine.notifications.deleteLabel", { url: destination.url })}
+                      onClick={() => {
+                        setDeleteError(null);
+                        setPendingDelete(destination);
+                      }}
+                    >
+                      <Trash2 aria-hidden="true" />
+                    </Button>
+                  </ItemActions>
+                </Item>
+              )}
+            </For>
+          </ItemGroup>
+        </Show>
+      </Show>
+
+      <Show
+        when={draft()}
+        fallback={
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            class="agent-routine-disclosure"
+            disabled={locked()}
+            onClick={() => edit()}
+          >
+            <Plus aria-hidden="true" />
+            {t("routine.notifications.add")}
+          </Button>
+        }
+      >
+        {(current) => (
+          <form
+            class="agent-routine-webhook-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void save();
+            }}
+          >
+            <label class="settings-field">
+              <span>{t("routine.notifications.url")}</span>
+              <Input
+                type="url"
+                value={current().url}
+                placeholder={t("routine.notifications.urlPlaceholder")}
+                invalid={current().url.trim() !== "" && !urlValid(current())}
+                onValueChange={(url) => update({ url })}
+              />
+              <Text variant="caption" tone="muted">
+                {t("routine.notifications.urlHint")}
+              </Text>
+            </label>
+
+            <fieldset class="agent-routine-webhook-events">
+              <legend>{t("routine.notifications.eventTypes")}</legend>
+              <For each={ROUTINE_RUN_EVENT_TYPES}>
+                {(eventType) => (
+                  <label class="agent-routine-webhook-check" for={`${formId}-${eventType}`}>
+                    <Checkbox
+                      id={`${formId}-${eventType}`}
+                      checked={current().eventTypes.includes(eventType)}
+                      onChange={(event) => toggleEventType(eventType, event.currentTarget.checked)}
+                    />
+                    <span>{t(ROUTINE_RUN_EVENT_LABELS[eventType])}</span>
+                  </label>
+                )}
+              </For>
+            </fieldset>
+
+            <div class="agent-routine-webhook-check">
+              <Switch
+                aria-label={t("routine.notifications.active")}
+                checked={current().active}
+                onChange={(active) => update({ active })}
+              />
+              <span>{t("routine.notifications.active")}</span>
+            </div>
+
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              class="agent-routine-disclosure"
+              aria-expanded={options() ? "true" : "false"}
+              onClick={() => setOptions((open) => !open)}
+            >
+              {t("routine.notifications.options")}
+            </Button>
+
+            <Show when={options()}>
+              <div class="agent-routine-webhook-options">
+                <div class="settings-field">
+                  <span>{t("routine.notifications.method")}</span>
+                  <Select<WebhookMethod>
+                    options={METHODS}
+                    value={current().method}
+                    onChange={(method) => method && update({ method })}
+                    itemComponent={(item) => <SelectItem item={item.item}>{item.item.rawValue}</SelectItem>}
+                  >
+                    <SelectTrigger aria-label={t("routine.notifications.method")}>
+                      <SelectValue<WebhookMethod>>{(state) => state.selectedOption()}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent />
+                  </Select>
+                </div>
+
+                <div class="settings-field">
+                  <span>{t("routine.notifications.secret")}</span>
+                  <Show
+                    when={!current().removeSecret}
+                    fallback={
+                      <Text variant="caption" tone="muted">
+                        {t("routine.notifications.secretRemoved")}
+                      </Text>
+                    }
+                  >
+                    <Input
+                      type="password"
+                      autocomplete="new-password"
+                      value={current().secret}
+                      placeholder={t(
+                        current().hasSecret
+                          ? "routine.notifications.secretReplacePlaceholder"
+                          : "routine.notifications.secretPlaceholder",
+                      )}
+                      invalid={!secretValid(current())}
+                      onValueChange={(secret) => update({ secret })}
+                    />
+                  </Show>
+                  <Text variant="caption" tone={secretValid(current()) ? "muted" : "danger"}>
+                    {t("routine.notifications.secretHint", { min: SECRET_MIN_LENGTH })}
                   </Text>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setDestinationDraft(null)}>
-                    {t("server.events.cancelEdit")}
-                  </Button>
+                  <Show when={current().hasSecret}>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      class="agent-routine-disclosure"
+                      onClick={() => update({ removeSecret: !current().removeSecret, secret: "" })}
+                    >
+                      {t(
+                        current().removeSecret
+                          ? "routine.notifications.keepSecret"
+                          : "routine.notifications.removeSecret",
+                      )}
+                    </Button>
+                  </Show>
                 </div>
-                <label class="settings-field">
-                  <span>{t("server.events.name")}</span>
-                  <Input
-                    value={draft().name}
-                    placeholder={t("server.events.namePlaceholder")}
-                    onValueChange={(name) => setDestinationDraft((value) => value && { ...value, name })}
-                  />
-                </label>
+
                 <div class="settings-field">
-                  <span>{t("server.events.url")}</span>
-                  <Input
-                    type="url"
-                    value={draft().url}
-                    placeholder={t("server.events.urlPlaceholder")}
-                    onValueChange={(url) => setDestinationDraft((value) => value && { ...value, url })}
-                  />
-                </div>
-                <div class="settings-field">
-                  <span>{t("server.events.secret")}</span>
-                  <Input
-                    type="password"
-                    value={draft().secret}
-                    placeholder={t("server.events.secretPlaceholder")}
-                    autocomplete="new-password"
-                    onValueChange={(secret) => setDestinationDraft((value) => value && { ...value, secret })}
-                  />
-                </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  aria-expanded={advanced() ? "true" : "false"}
-                  onClick={() => setAdvanced((value) => !value)}
-                >
-                  {t("routine.settings.deliveryOptions")}
-                </Button>
-                <Show when={advanced()}>
-                  <div class="server-events-form-grid">
-                    <div class="settings-field">
-                      <span>{t("server.events.method")}</span>
-                      <Select<WebhookMethod>
-                        options={["POST", "PUT", "PATCH"]}
-                        value={draft().method}
-                        onChange={(method) => method && setDestinationDraft((value) => value && { ...value, method })}
-                        itemComponent={(item) => <SelectItem item={item.item}>{item.item.rawValue}</SelectItem>}
-                      >
-                        <SelectTrigger aria-label={t("server.events.method")}>
-                          <SelectValue<WebhookMethod>>{(state) => state.selectedOption()}</SelectValue>
-                        </SelectTrigger>
-                        <SelectContent />
-                      </Select>
-                    </div>
-                    <div class="settings-field">
-                      <span>{t("server.events.eventTypes")}</span>
-                      <Input
-                        value={draft().eventTypes}
-                        placeholder={t("server.events.eventTypesPlaceholder")}
-                        onValueChange={(eventTypes) =>
-                          setDestinationDraft((value) => value && { ...value, eventTypes })
-                        }
-                      />
-                    </div>
-                  </div>
-                  <div class="settings-field">
-                    <span>{t("server.events.headers")}</span>
-                    <Text variant="caption" tone="muted">
-                      {t("server.events.headersHint")}
-                    </Text>
-                    <div class="server-events-headers">
-                      <For each={draft().headers}>
-                        {(header, index) => (
-                          <div class="server-events-header-row">
-                            <Input
-                              value={header.name}
-                              placeholder={t("server.events.headerNamePlaceholder")}
-                              aria-label={t("server.events.headerName")}
-                              onValueChange={(name) =>
-                                setDestinationDraft(
-                                  (value) =>
-                                    value && {
-                                      ...value,
-                                      headers: value.headers.map((item, itemIndex) =>
-                                        itemIndex === index() ? { ...item, name } : item,
-                                      ),
-                                      headersTouched: true,
-                                    },
-                                )
-                              }
-                            />
-                            <Input
-                              type="password"
-                              value={header.value}
-                              placeholder={t("server.events.headerValuePlaceholder")}
-                              aria-label={t("server.events.headerValue")}
-                              autocomplete="new-password"
-                              onValueChange={(headerValue) =>
-                                setDestinationDraft(
-                                  (value) =>
-                                    value && {
-                                      ...value,
-                                      headers: value.headers.map((item, itemIndex) =>
-                                        itemIndex === index() ? { ...item, value: headerValue } : item,
-                                      ),
-                                      headersTouched: true,
-                                    },
-                                )
-                              }
-                            />
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              aria-label={t("server.events.removeHeader")}
-                              onClick={() =>
-                                setDestinationDraft(
-                                  (value) =>
-                                    value && {
-                                      ...value,
-                                      headers: value.headers.filter((_, itemIndex) => itemIndex !== index()),
-                                      headersTouched: true,
-                                    },
-                                )
-                              }
-                            >
-                              <X aria-hidden="true" />
-                            </Button>
-                          </div>
-                        )}
-                      </For>
-                    </div>
+                  <span>{t("routine.notifications.headers")}</span>
+                  <Text variant="caption" tone="muted">
+                    {t("routine.notifications.headersHint")}
+                  </Text>
+                  <Show
+                    when={current().replaceHeaders}
+                    fallback={
+                      <>
+                        <Show when={current().headerNames.length > 0}>
+                          <Text variant="caption">
+                            {t("routine.notifications.headersStored", { names: format.list(current().headerNames) })}
+                          </Text>
+                        </Show>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          class="agent-routine-disclosure"
+                          onClick={() => update({ replaceHeaders: true, headers: [] })}
+                        >
+                          {t("routine.notifications.replaceHeaders")}
+                        </Button>
+                      </>
+                    }
+                  >
+                    <For each={current().headers}>
+                      {(header, index) => (
+                        <div class="agent-routine-event-filter">
+                          <Input
+                            value={header.name}
+                            placeholder={t("routine.notifications.headerNamePlaceholder")}
+                            aria-label={t("routine.notifications.headerName")}
+                            invalid={!header.name.trim() && Boolean(header.value)}
+                            onValueChange={(name) => updateHeader(index(), { name })}
+                          />
+                          <Input
+                            type="password"
+                            autocomplete="new-password"
+                            value={header.value}
+                            placeholder={t("routine.notifications.headerValuePlaceholder")}
+                            aria-label={t("routine.notifications.headerValue")}
+                            onValueChange={(value) => updateHeader(index(), { value })}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label={t("routine.notifications.removeHeader")}
+                            onClick={() =>
+                              setDraft(
+                                (value) =>
+                                  value && {
+                                    ...value,
+                                    headers: value.headers.filter((_, itemIndex) => itemIndex !== index()),
+                                  },
+                              )
+                            }
+                          >
+                            <X aria-hidden="true" />
+                          </Button>
+                        </div>
+                      )}
+                    </For>
                     <Button
                       type="button"
                       variant="secondary"
                       size="sm"
+                      class="agent-routine-disclosure"
                       onClick={() =>
-                        setDestinationDraft(
-                          (value) =>
-                            value && {
-                              ...value,
-                              headers: [...value.headers, { name: "", value: "" }],
-                              headersTouched: true,
-                            },
-                        )
+                        setDraft((value) => value && { ...value, headers: [...value.headers, { name: "", value: "" }] })
                       }
                     >
                       <Plus aria-hidden="true" />
-                      {t("server.events.addHeader")}
+                      {t("routine.notifications.addHeader")}
                     </Button>
-                  </div>
-                  <div class="settings-field">
-                    <span>{t("server.events.payloadTemplate")}</span>
-                    <Textarea
-                      value={draft().payloadTemplate}
-                      placeholder={t("server.events.payloadTemplatePlaceholder")}
-                      onValueChange={(payloadTemplate) =>
-                        setDestinationDraft((value) => value && { ...value, payloadTemplate })
-                      }
-                    />
-                    <Text variant="caption" tone="muted">
-                      {t("server.events.payloadTemplateHint")}
-                    </Text>
-                  </div>
-                </Show>
-                <div class="server-events-switch">
-                  <Switch
-                    aria-label={t("server.events.destinationActive")}
-                    checked={draft().active}
-                    onChange={(active) => setDestinationDraft((value) => value && { ...value, active })}
-                  />
-                  <span>{t("server.events.destinationActive")}</span>
+                  </Show>
                 </div>
-                <Button
-                  type="submit"
-                  size="sm"
-                  disabled={!canEdit() || !draft().name.trim() || !draft().url.trim() || !secretIsValid(draft())}
-                  loading={saving()}
-                  loadingLabel={t("common.saving")}
-                >
-                  {t("server.events.save")}
-                </Button>
-              </form>
-            )}
-          </Show>
-        </SettingsSection>
-      </Show>
 
-      <Show when={panel() === "activity"}>
-        <SettingsSection title={t("server.events.activityTitle")} description={t("server.events.activityDescription")}>
-          <div class="server-events-toolbar">
-            <Button type="button" size="sm" variant="ghost" disabled={loading()} onClick={() => void loadActivity()}>
-              <RefreshCw aria-hidden="true" />
-              {t("common.retry")}
-            </Button>
-            <Show when={activityFilter()}>
-              <Button type="button" size="sm" variant="ghost" onClick={() => setActivityFilter(null)}>
-                {t("server.events.clearFilter")}
+                <label class="settings-field">
+                  <span>{t("routine.notifications.payloadTemplate")}</span>
+                  <Textarea
+                    value={current().payloadTemplate}
+                    placeholder={PAYLOAD_TEMPLATE_EXAMPLE}
+                    onValueChange={(payloadTemplate) => update({ payloadTemplate })}
+                  />
+                  <Text variant="caption" tone="muted">
+                    {t("routine.notifications.payloadTemplateHint", {
+                      fields: TEMPLATE_FIELDS.map((field) => `{{${field}}}`).join(", "),
+                    })}
+                  </Text>
+                </label>
+              </div>
+            </Show>
+
+            <div class="agent-routine-webhook-form-actions">
+              <Button type="button" size="sm" variant="ghost" disabled={saving()} onClick={() => setDraft(null)}>
+                {t("common.cancel")}
               </Button>
-            </Show>
-          </div>
-          <Show
-            when={!loading() || activityRows().length > 0}
-            fallback={<Text tone="muted">{t("common.loading")}</Text>}
-          >
-            <Show
-              when={activityRows().length > 0}
-              fallback={<Text tone="muted">{t("server.events.emptyActivity")}</Text>}
-            >
-              <ItemGroup class="settings-modal-card server-events-list" surface="subtle">
-                <For each={activityRows()}>
-                  {(item) => (
-                    <Item>
-                      <ItemContent>
-                        <ItemTitle>{t(ACTIVITY_KIND_LABELS[item.kind])}</ItemTitle>
-                        <ItemDescription>{activitySummary(item)}</ItemDescription>
-                        <div class="server-events-related">
-                          {relatedButton(t("server.events.relatedEvent"), item.eventId)}
-                          {relatedButton(t("server.events.relatedRoutine"), item.routineId)}
-                          {relatedButton(t("server.events.relatedRun"), item.runId)}
-                          {relatedButton(t("server.events.relatedDestination"), item.destinationId)}
-                          {relatedButton(t("server.events.relatedDelivery"), item.deliveryId)}
-                        </div>
-                        <Text variant="caption" tone="muted">
-                          {t(ACTIVITY_STATUS_LABELS[item.status])} ·{" "}
-                          {format.date(new Date(item.occurredAt), { dateStyle: "medium", timeStyle: "short" })}
-                        </Text>
-                      </ItemContent>
-                      <ItemActions>
-                        <Show when={item.kind === "delivery" && item.status === "failed" && item.deliveryId}>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            disabled={!canEdit()}
-                            onClick={() => void retryDelivery(item)}
-                          >
-                            {t("server.events.retry")}
-                          </Button>
-                        </Show>
-                      </ItemActions>
-                    </Item>
-                  )}
-                </For>
-              </ItemGroup>
-            </Show>
-          </Show>
-        </SettingsSection>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={locked() || !draftValid(current())}
+                loading={saving()}
+                loadingLabel={t("common.saving")}
+              >
+                {t("common.save")}
+              </Button>
+            </div>
+          </form>
+        )}
       </Show>
 
       <ConfirmDialog
         open={pendingDelete() !== null}
-        title={t("server.events.deleteDestinationTitle")}
-        description={t("server.events.deleteDescription")}
-        confirmLabel={t("server.events.confirmDelete")}
-        cancelLabel={t("server.events.cancel")}
-        pending={saving()}
+        title={t("routine.notifications.deleteTitle")}
+        description={t("routine.notifications.deleteDescription", { url: pendingDelete()?.url ?? "" })}
+        confirmLabel={t("common.delete")}
+        cancelLabel={t("common.cancel")}
+        error={deleteError() ?? undefined}
         onCancel={() => setPendingDelete(null)}
-        onConfirm={() => void deletePending()}
+        onConfirm={confirmDelete}
       />
     </div>
   );
-}
-
-function secretIsValid(value: { id?: string; secret: string }): boolean {
-  const length = value.secret.trim().length;
-  return value.id ? length === 0 || length >= 32 : length >= 32;
-}
-
-function splitList(value: string): string[] {
-  return value
-    .split(",")
-    .map((part) => part.trim())
-    .filter(Boolean);
-}
-
-function isEventJsonValue(value: unknown): value is SaveWebhookDestinationInput["payloadTemplate"] {
-  if (value === null || typeof value === "string" || typeof value === "boolean") return true;
-  if (typeof value === "number") return Number.isFinite(value);
-  if (Array.isArray(value)) return value.every(isEventJsonValue);
-  if (!value || typeof value !== "object") return false;
-  return Object.values(value).every(isEventJsonValue);
 }

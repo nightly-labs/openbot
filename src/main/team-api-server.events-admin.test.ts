@@ -13,9 +13,6 @@ function unusedEvents(): HostEventsApi {
   const unused = () => Effect.fail(new HostEventsFailure({ cause: new Error("unused in this test") }));
   return {
     getStatus: () => Effect.succeed({ supported: true, connected: true }),
-    listSources: unused,
-    saveSource: unused,
-    deleteSource: unused,
     listDestinations: unused,
     saveDestination: unused,
     deleteDestination: unused,
@@ -25,6 +22,7 @@ function unusedEvents(): HostEventsApi {
     saveRoutine: unused,
     deleteRoutine: unused,
     testRoutine: unused,
+    rotateSecret: unused,
   };
 }
 
@@ -56,7 +54,7 @@ describe("Team API events-v1", () => {
         instruction: "Run it",
         active: true,
         timezone: "UTC",
-        trigger: { kind: "event", sourceId: "source-1", eventType: "example.received", filters: [] },
+        trigger: { kind: "webhook", eventType: "example.received", filters: [] },
       }),
     });
     expect(unavailable.status).toBe(400);
@@ -72,11 +70,11 @@ describe("Team API events-v1", () => {
 
   it("maps event failures to safe localized 400 responses", async () => {
     const fixture = await createTeamApiFixture("events-failure", { configure: true });
-    const expected = sourceText("error.backend.eventSourceMissing");
+    const expected = sourceText("error.backend.webhookRouteUnavailable");
     let cause: Error = new Error(expected);
     const events: HostEventsApi = {
       ...unusedEvents(),
-      saveSource: () => Effect.fail(new HostEventsFailure({ cause })),
+      rotateSecret: () => Effect.fail(new HostEventsFailure({ cause })),
     };
     const { base } = await fixture.start({ events });
     const ownerToken = await fixture.signIn();
@@ -85,20 +83,20 @@ describe("Team API events-v1", () => {
       Authorization: `Bearer ${ownerToken}`,
       "OpenBot-Capabilities": EVENTS_CAPABILITY,
     };
-    const localized = await fetch(`${base}${EVENTS_ROUTES.saveSource}`, {
+    const localized = await fetch(`${base}${EVENTS_ROUTES.rotateSecret}`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ name: "Webhook", active: true }),
+      body: JSON.stringify({ id: "routine-1", owner: { kind: "agent", id: "chief" } }),
     });
     expect(localized.status).toBe(400);
     expect(await localized.json()).toEqual({ error: expected });
 
     const privateValue = "secret-value-that-must-not-cross-the-api";
     cause = new Error(`database failure: ${privateValue}`);
-    const privateFailure = await fetch(`${base}${EVENTS_ROUTES.saveSource}`, {
+    const privateFailure = await fetch(`${base}${EVENTS_ROUTES.rotateSecret}`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ name: "Webhook", active: true }),
+      body: JSON.stringify({ id: "routine-1", owner: { kind: "agent", id: "chief" } }),
     });
     expect(privateFailure.status).toBe(400);
     const body = await privateFailure.json();

@@ -2,15 +2,15 @@ import { Host, Switch } from "@expo/ui";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type CreateRoutineInput,
-  type EventFilter,
   type EventRoutine,
-  type EventRoutineTrigger,
   type EventRoutineTriggerInput,
   isRoutineSchedule,
   type MemoryEntry,
   type RoutineFields,
   type RoutineSchedule,
+  type SaveEventRoutineInput,
   type UpdateRoutineInput,
+  type RoutineWebhookTrigger as WebhookTriggerFields,
 } from "@openbot/contracts/ipc";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import {
@@ -19,7 +19,7 @@ import {
   routineScheduleFromDraft,
   routineScheduleToDraft,
 } from "@openbot/team-client/routine-schedule-draft";
-import { type QueryKey, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type QueryKey, useQueryClient } from "@tanstack/react-query";
 import { router, useNavigation } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
@@ -35,25 +35,21 @@ import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { RoutineScheduleFields } from "./routine-schedule-fields";
 import { RoutineWebhookNotifications } from "./routine-webhook-notifications";
-import { RoutineWebhookSource } from "./routine-webhook-source";
+import {
+  eventFilters,
+  type FilterDraft,
+  filterDrafts,
+  filtersValid,
+  RoutineWebhookTrigger,
+} from "./routine-webhook-trigger";
 
 const DEFAULT_SCHEDULE: RoutineSchedule = { kind: "daily", time: "09:00" };
 
 type RoutineRecord = RoutineFields | EventRoutine;
+type WebhookRoutine = EventRoutine & { trigger: WebhookTriggerFields };
 
-function eventFilterValue(text: string): EventFilter["value"] {
-  const trimmed = text.trim();
-  if (trimmed === "null") return null;
-  if (trimmed === "true") return true;
-  if (trimmed === "false") return false;
-  if (/^-?(?:0|[1-9]\d*)(?:\.\d+)?$/.test(trimmed)) return Number(trimmed);
-  return text;
-}
-
-function isEventRoutineRecord(
-  routine: RoutineRecord | undefined,
-): routine is EventRoutine & { trigger: EventRoutineTrigger } {
-  return Boolean(routine && "owner" in routine && routine.trigger.kind === "event");
+function isWebhookRoutine(routine: RoutineRecord | null | undefined): routine is WebhookRoutine {
+  return Boolean(routine && "owner" in routine && routine.trigger.kind === "webhook");
 }
 
 function useRecordDraftGuard(dirty: boolean, pending: boolean) {
@@ -197,6 +193,10 @@ export function MemoryEditor({
   );
 }
 
+function webhookTriggerInput(trigger: WebhookTriggerFields): EventRoutineTriggerInput {
+  return { kind: "webhook", eventType: trigger.eventType, filters: trigger.filters };
+}
+
 export function RoutineEditor({
   agent,
   routine,
@@ -211,17 +211,6 @@ export function RoutineEditor({
     update(input: Omit<UpdateRoutineInput, "agentId">): Promise<void>;
     delete(id: string): Promise<void>;
     test(id: string): Promise<void>;
-    saveEvent(input: {
-      id?: string;
-      owner: { kind: "agent" | "channel"; id: string };
-      name: string;
-      instruction: string;
-      active: boolean;
-      timezone: string;
-      trigger: EventRoutineTriggerInput;
-    }): Promise<void>;
-    deleteEvent(input: { id: string; owner: { kind: "agent" | "channel"; id: string } }): Promise<void>;
-    testEvent(input: { id: string; owner: { kind: "agent" | "channel"; id: string } }): Promise<void>;
     queryKey: QueryKey;
   };
 }) {
@@ -230,8 +219,16 @@ export function RoutineEditor({
   const action = useRecordAction(port?.queryKey);
   const toggle = useRecordAction(port?.queryKey);
   const testRun = useRecordAction(port?.queryKey, "mobile.agent.record.testFailed");
+  const rotate = useRecordAction(port?.queryKey, "mobile.agent.webhook.rotateFailed");
   const [testStarted, setTestStarted] = useState(false);
   const [activeOverride, setActiveOverride] = useState<boolean | null>(null);
+  // The host returns a signing secret one time: from the save that makes a webhook trigger, or from a rotation.
+  const [secret, setSecret] = useState<string | null>(null);
+  // A new webhook routine stays open after its save, so the user can copy its URL and secret.
+  const [created, setCreated] = useState<WebhookRoutine | null>(null);
+  const keepOpen = useRef(false);
+  const eventOwner = { kind: port ? "channel" : "agent", id: agent.id } as const;
+  const webhookRoutine = isWebhookRoutine(routine) ? routine : undefined;
   useEffect(() => {
     if (routine?.active === activeOverride) setActiveOverride(null);
   }, [routine?.active, activeOverride]);
@@ -240,19 +237,21 @@ export function RoutineEditor({
     setActiveOverride(active);
     void toggle.run(async () => {
       try {
-        if (eventRoutine) {
-          const input = {
-            id: eventRoutine.id,
-            owner: eventOwner,
-            name: eventRoutine.name,
-            instruction: eventRoutine.instruction,
-            active,
-            timezone: eventRoutine.timezone,
-            trigger: eventRoutine.trigger,
-          };
-          if (port) await port.saveEvent(input);
-          else await workspace.saveEventRoutine(input, agent.serverId);
-        } else if (port) await port.update({ routineId: routine.id, active });
+        if (webhookRoutine)
+          await workspace.saveEventRoutine(
+            {
+              id: webhookRoutine.id,
+              owner: eventOwner,
+              name: webhookRoutine.name,
+              instruction: webhookRoutine.instruction,
+              active,
+              timezone: webhookRoutine.timezone,
+              trigger: webhookTriggerInput(webhookRoutine.trigger),
+              ...(webhookRoutine.limitPolicy ? { limitPolicy: webhookRoutine.limitPolicy } : {}),
+            },
+            agent.serverId,
+          );
+        else if (port) await port.update({ routineId: routine.id, active });
         else await workspace.updateAgentRoutine({ agentId: agent.id, routineId: routine.id, active }, agent.serverId);
       } catch (cause) {
         setActiveOverride(null);
@@ -267,28 +266,20 @@ export function RoutineEditor({
     name?: string;
     instruction?: string;
     schedule?: RoutineScheduleDraft;
-    trigger?: "schedule" | "event";
-    sourceId?: string;
+    trigger?: "schedule" | "webhook";
     eventType?: string;
-    filters?: EventFilter[];
+    filters?: FilterDraft[];
   }>({});
   const name = edits.name ?? routine?.name ?? "";
   const instruction = edits.instruction ?? routine?.instruction ?? "";
-  const eventRoutine = isEventRoutineRecord(routine) ? routine : undefined;
   const savedSchedule = routine && "schedule" in routine.trigger ? routine.trigger.schedule : DEFAULT_SCHEDULE;
-  const savedTrigger = eventRoutine ? "event" : "schedule";
+  const savedTrigger = webhookRoutine ? "webhook" : "schedule";
   const trigger = edits.trigger ?? savedTrigger;
-  const eventSourceId = edits.sourceId ?? eventRoutine?.trigger.sourceId ?? "";
-  const eventType = edits.eventType ?? eventRoutine?.trigger.eventType ?? "";
-  const filters = edits.filters ?? eventRoutine?.trigger.filters ?? [];
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const savedEventType = webhookRoutine?.trigger.eventType ?? "";
+  const savedFilters = webhookRoutine?.trigger.filters ?? [];
+  const eventType = edits.eventType ?? savedEventType;
+  const filters = edits.filters ?? filterDrafts(savedFilters);
   const eventsSupported = workspace.canManageEvents(agent.serverId);
-  const events = useQuery({
-    queryKey: ["event-sources", agent.serverId],
-    enabled: available && eventsSupported,
-    queryFn: () => workspace.listEventSources(agent.serverId),
-    staleTime: 30_000,
-  });
   // The form edits a draft; an untouched schedule saves as it is, so a kind the form cannot show stays.
   const scheduleDraft = edits.schedule ?? routineScheduleToDraft(savedSchedule);
   const scheduleProblem = routineDraftProblemCode(scheduleDraft);
@@ -296,8 +287,9 @@ export function RoutineEditor({
   const setName = (name: string) => setEdits((current) => ({ ...current, name }));
   const setInstruction = (instruction: string) => setEdits((current) => ({ ...current, instruction }));
   const setSchedule = (schedule: RoutineScheduleDraft) => setEdits((current) => ({ ...current, schedule }));
-  const setTrigger = (trigger: "schedule" | "event") => setEdits((current) => ({ ...current, trigger }));
-  const setFilters = (filters: EventFilter[]) => setEdits((current) => ({ ...current, filters }));
+  const setTrigger = (trigger: "schedule" | "webhook") => setEdits((current) => ({ ...current, trigger }));
+  const setEventType = (eventType: string) => setEdits((current) => ({ ...current, eventType }));
+  const setFilters = (filters: FilterDraft[]) => setEdits((current) => ({ ...current, filters }));
   const [timezone, setTimezone] = useState(routine?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone);
   const initialTimezone = useRef(timezone);
   const draft = JSON.stringify({
@@ -305,9 +297,8 @@ export function RoutineEditor({
     instruction,
     trigger,
     schedule: edits.schedule ?? savedSchedule,
-    eventSourceId,
     eventType,
-    filters,
+    filters: eventFilters(filters),
     timezone,
   });
   const nameChanged = name.trim() !== (routine?.name ?? "");
@@ -316,13 +307,12 @@ export function RoutineEditor({
     trigger === "schedule" &&
     edits.schedule !== undefined &&
     (scheduleProblem !== null || JSON.stringify(schedule) !== JSON.stringify(savedSchedule));
-  const eventChanged =
+  const webhookChanged =
     trigger !== savedTrigger ||
-    eventSourceId !== (eventRoutine?.trigger.sourceId ?? "") ||
-    eventType !== (eventRoutine?.trigger.eventType ?? "") ||
-    JSON.stringify(filters) !== JSON.stringify(eventRoutine?.trigger.filters ?? []);
+    (trigger === "webhook" &&
+      (eventType.trim() !== savedEventType || JSON.stringify(eventFilters(filters)) !== JSON.stringify(savedFilters)));
   const dirty = routine
-    ? nameChanged || instructionChanged || scheduleChanged || eventChanged
+    ? nameChanged || instructionChanged || scheduleChanged || webhookChanged
     : draft !==
       (savedDraft ??
         JSON.stringify({
@@ -330,7 +320,6 @@ export function RoutineEditor({
           instruction: "",
           trigger: "schedule",
           schedule: DEFAULT_SCHEDULE,
-          eventSourceId: "",
           eventType: "",
           filters: [],
           timezone: initialTimezone.current,
@@ -340,30 +329,30 @@ export function RoutineEditor({
     if (finished) router.back();
   }, [finished]);
   const disabled = !available || action.pending || (!routine && savedDraft !== null);
-  const validTime =
-    trigger === "event"
-      ? Boolean(eventSourceId.trim() && eventType.trim())
-      : scheduleProblem === null && isRoutineSchedule(schedule);
-  const eventOwner = { kind: port ? "channel" : "agent", id: agent.id } as const;
-  const eventTrigger: EventRoutineTrigger = {
-    kind: "event",
-    sourceId: eventSourceId.trim(),
-    eventType: eventType.trim(),
-    filters,
-  };
+  const validTrigger =
+    trigger === "webhook" ? filtersValid(filters) : scheduleProblem === null && isRoutineSchedule(schedule);
   async function save() {
-    if (eventRoutine || trigger === "event") {
-      const input = {
+    if (webhookRoutine || trigger === "webhook") {
+      const input: SaveEventRoutineInput = {
         ...(routine ? { id: routine.id } : {}),
         owner: eventOwner,
         name: name.trim(),
         instruction: instruction.trim(),
         active: routine?.active ?? true,
         timezone,
-        trigger: trigger === "event" ? eventTrigger : { kind: "schedule" as const, schedule },
+        trigger:
+          trigger === "webhook"
+            ? { kind: "webhook", eventType: eventType.trim() || null, filters: eventFilters(filters) }
+            : { kind: "schedule", schedule },
+        ...(routine?.limitPolicy ? { limitPolicy: routine.limitPolicy } : {}),
       };
-      if (port) await port.saveEvent(input);
-      else await workspace.saveEventRoutine(input, agent.serverId);
+      const result = await workspace.saveEventRoutine(input, agent.serverId);
+      // A save that removes the webhook trigger also ends the secret that this screen shows.
+      if (result.secret || result.routine.trigger.kind === "schedule") setSecret(result.secret);
+      if (!routine && isWebhookRoutine(result.routine)) {
+        keepOpen.current = true;
+        setCreated(result.routine);
+      }
       return;
     }
     if (port) {
@@ -394,6 +383,9 @@ export function RoutineEditor({
         agent.serverId,
       );
   }
+  const shownWebhook = webhookRoutine ?? created ?? undefined;
+  // The URL and the secret belong to the saved trigger. An unsaved switch to a webhook has neither yet.
+  const savedWebhook = trigger === "webhook" && shownWebhook ? shownWebhook : undefined;
   return (
     <View className="gap-5">
       <SheetFormField
@@ -427,8 +419,8 @@ export function RoutineEditor({
               value={trigger}
               options={[
                 { value: "schedule" as const, label: t("mobile.agent.record.trigger.schedule") },
-                ...(eventRoutine || eventsSupported
-                  ? [{ value: "event" as const, label: t("mobile.agent.record.trigger.event") }]
+                ...(webhookRoutine || eventsSupported
+                  ? [{ value: "webhook" as const, label: t("mobile.agent.record.trigger.webhook") }]
                   : []),
               ]}
               enabled={!disabled}
@@ -460,107 +452,29 @@ export function RoutineEditor({
           }
         />
       ) : (
-        <SettingsSection title={t("mobile.agent.record.trigger.event")}>
-          <SettingsRow
-            trailing={
-              <SettingsPicker
-                label={t("mobile.agent.record.eventSource")}
-                value={eventSourceId}
-                options={[
-                  { value: "", label: t("mobile.agent.record.eventSourcePlaceholder") },
-                  ...(events.data ?? []).map((source) => ({ value: source.id, label: source.name })),
-                ]}
-                enabled={!disabled && !events.isPending}
-                dark={theme === "dark"}
-                onChange={(value) => setEdits((current) => ({ ...current, sourceId: value }))}
-              />
-            }
-          >
-            <Typography.Paragraph>{t("mobile.agent.record.eventSource")}</Typography.Paragraph>
-          </SettingsRow>
-          <RoutineWebhookSource
-            key={eventSourceId}
-            serverId={agent.serverId}
-            source={(events.data ?? []).find((source) => source.id === eventSourceId)}
-            name={name}
-            onChange={(sourceId) => setEdits((current) => ({ ...current, sourceId }))}
-          />
-          <View className="p-4">
-            <SheetFormField
-              appearance="soft"
-              label={t("mobile.agent.record.eventType")}
-              placeholder={t("mobile.agent.record.eventTypePlaceholder")}
-              value={eventType}
-              editable={!disabled}
-              onChangeText={(value) => setEdits((current) => ({ ...current, eventType: value }))}
-            />
-          </View>
-          <SettingsRow
-            disclosure={false}
-            disabled={disabled}
-            onPress={() => setFilters([...filters, { pointer: "", value: "" }])}
-          >
-            <Typography.Paragraph className="text-accent">
-              {t("mobile.agent.record.addEventFilter")}
-            </Typography.Paragraph>
-          </SettingsRow>
-          {filters.map((filter, index) => (
-            <View key={`${filter.pointer}\u0000${String(filter.value)}`} className="gap-2 p-4">
-              <SheetFormField
-                appearance="soft"
-                label={t("mobile.agent.record.eventFilterPointer")}
-                value={filter.pointer}
-                editable={!disabled}
-                onChangeText={(pointer) =>
-                  setFilters(filters.map((item, itemIndex) => (itemIndex === index ? { ...item, pointer } : item)))
-                }
-              />
-              <SheetFormField
-                appearance="soft"
-                label={t("mobile.agent.record.eventFilterValue")}
-                value={filter.value === null ? "null" : String(filter.value)}
-                editable={!disabled}
-                onChangeText={(text) =>
-                  setFilters(
-                    filters.map((item, itemIndex) =>
-                      itemIndex === index
-                        ? {
-                            ...item,
-                            value: eventFilterValue(text),
-                          }
-                        : item,
-                    ),
-                  )
-                }
-              />
-              <SettingsRow
-                disclosure={false}
-                disabled={disabled}
-                onPress={() => setFilters(filters.filter((_, itemIndex) => itemIndex !== index))}
-              >
-                <Typography.Paragraph className="text-danger-text">
-                  {t("mobile.agent.record.removeEventFilter")}
-                </Typography.Paragraph>
-              </SettingsRow>
-            </View>
-          ))}
-        </SettingsSection>
+        <RoutineWebhookTrigger
+          url={savedWebhook ? savedWebhook.trigger.url : undefined}
+          secret={secret}
+          eventType={eventType}
+          filters={filters}
+          disabled={disabled}
+          rotatePending={rotate.pending}
+          onEventTypeChange={setEventType}
+          onFiltersChange={setFilters}
+          onRotate={
+            webhookRoutine && eventsSupported
+              ? () =>
+                  void rotate.run(async () => {
+                    const rotated = await workspace.rotateEventRoutineSecret(
+                      { id: webhookRoutine.id, owner: eventOwner },
+                      agent.serverId,
+                    );
+                    setSecret(rotated.secret);
+                  })
+              : undefined
+          }
+        />
       )}
-      {eventsSupported && routine ? (
-        <>
-          <SettingsRow disclosure={false} onPress={() => setNotificationsOpen((value) => !value)}>
-            <Typography.Paragraph>{t("mobile.agent.record.webhookNotifications")}</Typography.Paragraph>
-          </SettingsRow>
-          {notificationsOpen ? (
-            <RoutineWebhookNotifications
-              key={routine.id}
-              serverId={agent.serverId}
-              routineId={routine.id}
-              sourceId={eventSourceId}
-            />
-          ) : null}
-        </>
-      ) : null}
       {trigger === "schedule" &&
       routine &&
       "schedule" in routine.trigger &&
@@ -580,13 +494,13 @@ export function RoutineEditor({
       ) : null}
       <SheetSaveAction
         dirty={dirty}
-        canSave={!disabled && Boolean(name.trim() && instruction.trim() && timezone.trim()) && validTime}
+        canSave={!disabled && Boolean(name.trim() && instruction.trim() && timezone.trim()) && validTrigger}
         pending={action.pending}
         onSave={() =>
           void action.run(save, () => {
             setSavedDraft(draft);
             if (routine) setEdits({});
-            else setFinished(true);
+            else if (!keepOpen.current) setFinished(true);
           })
         }
       />
@@ -613,10 +527,8 @@ export function RoutineEditor({
               setTestStarted(false);
               void testRun.run(
                 () =>
-                  eventRoutine
-                    ? port
-                      ? port.testEvent({ id: eventRoutine.id, owner: eventOwner })
-                      : workspace.testEventRoutine({ id: eventRoutine.id, owner: eventOwner }, agent.serverId)
+                  webhookRoutine
+                    ? workspace.testEventRoutine({ id: webhookRoutine.id, owner: eventOwner }, agent.serverId)
                     : port
                       ? port.test(routine.id)
                       : workspace.testAgentRoutine(agent.id, routine.id, agent.serverId),
@@ -640,10 +552,8 @@ export function RoutineEditor({
                   onPress: () =>
                     void action.run(
                       () =>
-                        eventRoutine
-                          ? port
-                            ? port.deleteEvent({ id: eventRoutine.id, owner: eventOwner })
-                            : workspace.deleteEventRoutine({ id: eventRoutine.id, owner: eventOwner }, agent.serverId)
+                        webhookRoutine
+                          ? workspace.deleteEventRoutine({ id: webhookRoutine.id, owner: eventOwner }, agent.serverId)
                           : port
                             ? port.delete(routine.id)
                             : workspace.deleteAgentRoutine(agent.id, routine.id, agent.serverId),
@@ -669,6 +579,11 @@ export function RoutineEditor({
           {testRun.error}
         </Typography.Paragraph>
       ) : null}
+      {rotate.error ? (
+        <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
+          {rotate.error}
+        </Typography.Paragraph>
+      ) : null}
       {toggle.error ? (
         <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
           {toggle.error}
@@ -678,6 +593,14 @@ export function RoutineEditor({
         <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
           {action.error}
         </Typography.Paragraph>
+      ) : null}
+      {eventsSupported && routine ? (
+        <RoutineWebhookNotifications
+          key={routine.id}
+          serverId={agent.serverId}
+          owner={eventOwner}
+          routineId={routine.id}
+        />
       ) : null}
     </View>
   );

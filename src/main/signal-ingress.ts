@@ -77,7 +77,7 @@ interface DiscordSession {
 }
 
 export interface WebhookIngressDelivery {
-  sourceId: string;
+  routeId: string;
   deliveryId: string;
   timestamp: string;
   signature: string;
@@ -142,7 +142,7 @@ export class SignalIngress implements MessagingIngress {
     };
   }
 
-  /** Keeps the ingress relay open while host webhook sources are enabled. */
+  /** Keeps the ingress relay open while host webhook routes are enabled. */
   acquireWebhooks(): () => void {
     this.#webhookHolders += 1;
     if (this.#held() === 0 && this.#webhookHolders === 1) this.#run(this.#open());
@@ -404,7 +404,7 @@ export class SignalIngress implements MessagingIngress {
       const handler = this.#webhookHandler;
       const answer = handler
         ? yield* handler({
-            sourceId: message.routeId,
+            routeId: message.routeId,
             deliveryId: message.deliveryId,
             timestamp: message.timestamp,
             signature: message.signature,

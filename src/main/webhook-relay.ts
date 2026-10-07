@@ -40,14 +40,19 @@ export class WebhookRelay implements HostWebhookRelay {
     }
   }
 
+  /** Opens a new socket, so Signal issues a route ticket with the current routes. */
+  refresh(): void {
+    this.#options.ingress.reconnect();
+  }
+
   stop(): void {
     this.setEnabled(false);
     this.#options.ingress.handleWebhooks(null);
   }
 
-  readonly registerSource = Effect.fn("WebhookRelay.registerSource")(function* (this: WebhookRelay, sourceId: string) {
+  readonly registerRoute = Effect.fn("WebhookRelay.registerRoute")(function* (this: WebhookRelay, routeId: string) {
     const hostId = yield* this.#host();
-    yield* this.#options.account.registerWebhookRoute(hostId, sourceId);
+    yield* this.#options.account.registerWebhookRoute(hostId, routeId);
     if (this.#publicOrigin?.hostId !== hostId) {
       const ticket = yield* this.#options.account.issueRemoteHostTicket(hostId);
       const url = new URL(ticket.signalUrl);
@@ -57,15 +62,12 @@ export class WebhookRelay implements HostWebhookRelay {
       url.hash = "";
       this.#publicOrigin = { hostId, url: url.toString() };
     }
-    this.setEnabled(true);
-    this.#options.ingress.reconnect();
-    return `${this.#publicOrigin.url}/${encodeURIComponent(sourceId)}`;
+    return `${this.#publicOrigin.url}/${encodeURIComponent(routeId)}`;
   }).bind(this);
 
-  readonly revokeSource = Effect.fn("WebhookRelay.revokeSource")(function* (this: WebhookRelay, sourceId: string) {
+  readonly revokeRoute = Effect.fn("WebhookRelay.revokeRoute")(function* (this: WebhookRelay, routeId: string) {
     const hostId = yield* this.#host();
-    yield* this.#options.account.revokeWebhookRoute(hostId, sourceId);
-    this.#options.ingress.reconnect();
+    yield* this.#options.account.revokeWebhookRoute(hostId, routeId);
   }).bind(this);
 
   readonly #host = Effect.fn("WebhookRelay.host")(function* (this: WebhookRelay) {

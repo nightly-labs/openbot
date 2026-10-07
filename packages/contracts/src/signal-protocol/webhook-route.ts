@@ -1,5 +1,5 @@
 // A generic webhook route: Signal maps one opaque public route ID to the host that registered it.
-// The route ID and link time come from the host's local source configuration. The account service
+// The host makes the route ID when a routine gets a webhook trigger. The account service
 // stores only that ownership metadata and signs it into the short-lived ingress ticket.
 
 export const WEBHOOK_ROUTE_AUDIENCE = "openbot-webhook-route";
@@ -13,11 +13,11 @@ export const WEBHOOK_DELIVERY_ID_HEADER = "x-openbot-delivery-id";
 export const WEBHOOK_SIGNATURE_HEADER = "x-openbot-signature";
 
 // Signal checks this when an ingress socket connects. The host asks for a fresh ticket on every
-// connection, so disabling or deleting a route takes effect when the socket reconnects as well as
+// connection, so deleting a route takes effect when the socket reconnects as well as
 // through the revocation event.
 export const WEBHOOK_ROUTE_TTL_SECONDS = 5 * 60;
 
-// One host may register many sources, but the route ticket must stay bounded.
+// One host may register many webhook routines, but the route ticket must stay bounded.
 export const WEBHOOK_ROUTES_LIMIT = 64;
 
 export interface WebhookRouteClaims {

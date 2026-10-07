@@ -1,11 +1,7 @@
+import { createHmac } from "node:crypto";
+import { WEBHOOK_DELIVERY_BODY_BYTES_LIMIT } from "@openbot/contracts/signal-protocol/messages";
 import { describe, expect, it } from "vitest";
-import {
-  createWebhookSignature,
-  isPublicIpAddress,
-  verifyWebhookSignature,
-  WEBHOOK_MAX_BODY_BYTES,
-  webhookSigningBytes,
-} from "./webhook-security";
+import { createWebhookSignature, isPublicIpAddress, verifyWebhookSignature } from "./webhook-security";
 
 const NOW = Date.parse("2026-10-07T12:00:00.000Z");
 const SECRET = "webhook-signing-secret-for-tests-0123456789";
@@ -19,8 +15,9 @@ describe("webhook signatures", () => {
     expect(() =>
       verifyWebhookSignature(SECRET, { timestamp, deliveryId: "delivery-1", body: BODY, nowMs: NOW }, signature),
     ).not.toThrow();
-    expect(webhookSigningBytes(timestamp, "delivery-1", BODY).toString()).toBe(
-      `${timestamp}.delivery-1.${BODY.toString()}`,
+    // The documented contract: HMAC-SHA256 over `timestamp.deliveryId.body`.
+    expect(signature).toBe(
+      `sha256=${createHmac("sha256", SECRET).update(`${timestamp}.delivery-1.${BODY.toString()}`).digest("hex")}`,
     );
 
     expect(() =>
@@ -48,7 +45,7 @@ describe("webhook signatures", () => {
     expect(() =>
       verifyWebhookSignature(
         SECRET,
-        { timestamp, deliveryId: "delivery-1", body: Buffer.alloc(WEBHOOK_MAX_BODY_BYTES + 1), nowMs: NOW },
+        { timestamp, deliveryId: "delivery-1", body: Buffer.alloc(WEBHOOK_DELIVERY_BODY_BYTES_LIMIT + 1), nowMs: NOW },
         signature,
       ),
     ).toThrowError(expect.objectContaining({ code: "body_too_large" }));

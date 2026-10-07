@@ -19,7 +19,7 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
-describe("OpenBot event and webhook migration", () => {
+describe("OpenBot webhook routine migration", () => {
   it("preserves scheduled routines and runs while upgrading a version 28 database", async () => {
     const { database, routineStore } = await createDatabase();
     const agent = testAgent();
@@ -68,7 +68,7 @@ describe("OpenBot event and webhook migration", () => {
     database.close();
 
     const legacy = new DatabaseSync(path);
-    removeEventSchema(legacy);
+    removeWebhookSchema(legacy);
     legacy.close();
 
     const migrated = new OpenBotDatabase(root);
@@ -103,14 +103,24 @@ describe("OpenBot event and webhook migration", () => {
         scheduledFor: "2026-10-01T10:00:00.000Z",
       }),
     ]);
-    expect(eventTables(migrated.connection)).toEqual([
-      "projection_event_activity",
-      "projection_event_dispatches",
-      "projection_event_receipts",
-      "projection_event_routine_triggers",
-      "projection_event_sources",
+    // A routine from the old schema can switch to a webhook trigger and keep its runs.
+    migratedRoutines.saveRecord("chief", routine.id, {
+      name: routine.name,
+      instruction: routine.instruction,
+      active: true,
+      timezone: "UTC",
+      trigger: { kind: "webhook", eventType: null, filters: [], secretCiphertext: "ciphertext" },
+    });
+    expect(migratedRoutines.get("chief", routine.id)).toBeNull();
+    expect(migratedRoutines.getRecord("chief", routine.id)?.trigger).toMatchObject({ kind: "webhook", url: null });
+    expect(migratedRoutines.listRuns("chief", routine.id, 10)).toEqual([expect.objectContaining({ id: run.id })]);
+    expect(webhookTables(migrated.connection)).toEqual([
+      "projection_channel_routine_webhooks",
+      "projection_routine_webhooks",
       "projection_webhook_deliveries",
       "projection_webhook_destinations",
+      "projection_webhook_receipts",
+      "projection_webhook_route_revocations",
     ]);
     expect(migrated.connection.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({
       version: 29,
@@ -120,7 +130,7 @@ describe("OpenBot event and webhook migration", () => {
     migrated.close();
   });
 
-  it("rolls back the event migration and retries without losing scheduled data", async () => {
+  it("rolls back the webhook migration and retries without losing scheduled data", async () => {
     const { database, routineStore } = await createDatabase();
     database.replaceAgents("migration-event-rollback", [testAgent()], "agents.imported");
     const routine = routineStore.create({
@@ -136,10 +146,10 @@ describe("OpenBot event and webhook migration", () => {
     database.close();
 
     const legacy = new DatabaseSync(path);
-    removeEventSchema(legacy);
-    // Migration 29 creates this index after creating its tables. A table with the same name
+    removeWebhookSchema(legacy);
+    // Migration 29 creates this index after creating its first tables. A table with the same name
     // makes the migration fail after its first DDL statement, which exercises transaction rollback.
-    legacy.exec("CREATE TABLE event_sources_active (conflict TEXT)");
+    legacy.exec("CREATE TABLE webhook_receipts_recent (conflict TEXT)");
     legacy.close();
 
     const failed = new OpenBotDatabase(root);
@@ -151,9 +161,9 @@ describe("OpenBot event and webhook migration", () => {
     expect(
       rolledBack
         .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?")
-        .get("projection_event_sources"),
+        .get("projection_routine_webhooks"),
     ).toBeUndefined();
-    rolledBack.exec("DROP TABLE event_sources_active");
+    rolledBack.exec("DROP TABLE webhook_receipts_recent");
     rolledBack.close();
 
     const retried = new OpenBotDatabase(root);
@@ -180,24 +190,23 @@ async function createDatabase(): Promise<{ database: OpenBotDatabase; routineSto
   return { database, routineStore: new AgentRoutineStore(database) };
 }
 
-function removeEventSchema(database: DatabaseSync): void {
+function removeWebhookSchema(database: DatabaseSync): void {
   database.exec(`
-    DROP TABLE projection_event_activity;
-    DROP TABLE projection_event_dispatches;
-    DROP TABLE projection_event_receipts;
-    DROP TABLE projection_event_routine_triggers;
-    DROP TABLE projection_event_sources;
+    DROP TABLE projection_routine_webhooks;
+    DROP TABLE projection_channel_routine_webhooks;
+    DROP TABLE projection_webhook_route_revocations;
+    DROP TABLE projection_webhook_receipts;
     DROP TABLE projection_webhook_deliveries;
     DROP TABLE projection_webhook_destinations;
     DELETE FROM schema_migrations WHERE version = 29;
   `);
 }
 
-function eventTables(database: DatabaseSync): string[] {
+function webhookTables(database: DatabaseSync): string[] {
   return database
     .prepare(
       `SELECT name FROM sqlite_master
-       WHERE type = 'table' AND (name LIKE 'projection_event_%' OR name LIKE 'projection_webhook_%')
+       WHERE type = 'table' AND name LIKE 'projection_%webhook%'
        ORDER BY name`,
     )
     .all()

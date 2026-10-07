@@ -1,17 +1,8 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AgentEvent, AttachmentSummary, TeamRealtimeEvent } from "@openbot/contracts/ipc";
-import { runTeamEffect } from "@openbot/team-client";
-import {
-  deleteEventRoutine,
-  listEventRoutines,
-  listEventSources,
-  saveEventRoutine,
-  testEventRoutine,
-} from "@openbot/team-client/team-admin-requests";
 import { currentText } from "@openbot/ui/text";
 import type { ChannelsPort } from "../channels/channels-port";
-import { webEventsApi } from "../conversation/routine-webhooks-api";
-import type { EventRoutinesApi } from "../conversation/routines-port";
+import { webEventRoutinesApi } from "../conversation/routine-webhooks-api";
 import { createWebAttachmentFiles, openWebLink } from "./web-attachments";
 import type { WebWorkspaceRuntime } from "./web-runtime";
 
@@ -47,16 +38,7 @@ export function createWebChannelsPort(
   const files = createWebAttachmentFiles(remote);
   const channels = remote.channels;
   const admin = remote.admin;
-  const eventRoutines: EventRoutinesApi | undefined = admin
-    ? {
-        webhooks: webEventsApi(admin.request),
-        listSources: () => runTeamEffect(listEventSources(admin.request)),
-        listRoutines: ({ owner }) => runTeamEffect(listEventRoutines(admin.request, owner)),
-        saveRoutine: (input) => runTeamEffect(saveEventRoutine(admin.request, input)),
-        deleteRoutine: (input) => runTeamEffect(deleteEventRoutine(admin.request, input)),
-        testRoutine: (input) => runTeamEffect(testEventRoutine(admin.request, input)),
-      }
-    : undefined;
+  const eventRoutines = admin ? webEventRoutinesApi(admin.request) : undefined;
   async function importAttachments(chosen: File[]): Promise<AttachmentSummary[]> {
     if (chosen.length > INPUT_LIMITS.attachments)
       throw new Error(currentText().t("webClient.error.attachmentLimit", { limit: INPUT_LIMITS.attachments }));

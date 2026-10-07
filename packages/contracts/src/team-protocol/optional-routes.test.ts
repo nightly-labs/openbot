@@ -63,68 +63,90 @@ describe("agent-admin-v1", () => {
 });
 
 describe("events-v1", () => {
-  const source = {
-    id: "source-1",
-    name: "Webhook",
+  const owner = { kind: "agent", id: "chief" } as const;
+  const routine = {
+    id: "routine-1",
+    owner,
+    name: "Deploy",
+    instruction: "Check the deploy",
     active: true,
-    url: "https://signal.example/events/source-1",
+    timezone: "UTC",
+    trigger: { kind: "webhook", url: "https://signal.example/hooks/route-1", eventType: null, filters: [] },
+    createdAt: "2026-10-07T10:00:00.000Z",
+    updatedAt: "2026-10-07T10:00:00.000Z",
+  };
+  const destination = {
+    id: "destination-1",
+    routineId: "routine-1",
+    active: true,
+    url: "https://example.com/hook",
+    method: "POST",
+    eventTypes: ["routine.run.succeeded"],
+    payloadTemplate: null,
+    hasSecret: true,
+    headerNames: ["Authorization"],
     createdAt: "2026-10-07T10:00:00.000Z",
     updatedAt: "2026-10-07T10:00:00.000Z",
   };
 
-  it("accepts write secrets but never returns them", () => {
-    expect(codec(EVENTS_ROUTES.saveSource).request({ name: "Webhook", active: true, secret: "masked-secret" })).toEqual(
-      {
-        name: "Webhook",
-        active: true,
-        secret: "masked-secret",
-      },
-    );
-    expect(codec(EVENTS_ROUTES.listSources).response(200, [{ ...source, secret: "raw-secret" }])).toEqual([source]);
-    expect(codec(EVENTS_ROUTES.listActivity).request({ limit: 25 })).toEqual({ limit: 25 });
-    expect(codec(EVENTS_ROUTES.listRoutines).request({ owner: { kind: "agent", id: "chief" } })).toEqual({
-      owner: { kind: "agent", id: "chief" },
-    });
+  it("accepts write secrets but never returns stored ones", () => {
     expect(
-      codec(EVENTS_ROUTES.deleteRoutine).request({ id: "routine-1", owner: { kind: "channel", id: "general" } }),
-    ).toEqual({ id: "routine-1", owner: { kind: "channel", id: "general" } });
-  });
-
-  it("bounds event payloads and rejects malformed event routes", () => {
-    expect(() => codec(EVENTS_ROUTES.saveSource).request({ name: 123, active: true, secret: "secret" })).toThrow();
-    expect(() =>
       codec(EVENTS_ROUTES.saveDestination).request({
-        name: "Webhook",
+        owner,
+        routineId: "routine-1",
         active: true,
         url: "https://example.com/hook",
         method: "POST",
         eventTypes: ["routine.run.succeeded"],
-        routineIds: [],
+        payloadTemplate: null,
+        secret: "masked-secret",
+        headers: { Authorization: "Bearer masked" },
+      }),
+    ).toMatchObject({ secret: "masked-secret", headers: { Authorization: "Bearer masked" } });
+    expect(
+      codec(EVENTS_ROUTES.listDestinations).response(200, [{ ...destination, secret: "raw", headers: { a: "b" } }]),
+    ).toEqual([destination]);
+    expect(
+      codec(EVENTS_ROUTES.listRoutines).response(200, [
+        { ...routine, trigger: { ...routine.trigger, secret: "raw-secret" } },
+      ]),
+    ).toEqual([routine]);
+    expect(codec(EVENTS_ROUTES.saveRoutine).response(200, { routine, secret: "shown-once" })).toEqual({
+      routine,
+      secret: "shown-once",
+    });
+    expect(codec(EVENTS_ROUTES.rotateSecret).request({ id: "routine-1", owner })).toEqual({ id: "routine-1", owner });
+  });
+
+  it("bounds event payloads and rejects malformed event routes", () => {
+    expect(() =>
+      codec(EVENTS_ROUTES.saveDestination).request({
+        owner,
+        routineId: "routine-1",
+        active: true,
+        url: "https://example.com/hook",
+        method: "POST",
+        eventTypes: ["routine.run.succeeded"],
         payloadTemplate: null,
         headers: { Authorization: 123 },
       }),
     ).toThrow();
-    expect(() => codec(EVENTS_ROUTES.deleteSource).request({})).toThrow();
+    expect(() => codec(EVENTS_ROUTES.listActivity).request({ owner })).toThrow();
     expect(() =>
       codec(EVENTS_ROUTES.saveRoutine).request({
-        owner: { kind: "agent", id: "chief" },
+        owner,
         name: "Routine",
         instruction: "Run it",
         active: true,
         timezone: "UTC",
-        trigger: {
-          kind: "event",
-          sourceId: "source-1",
-          eventType: "example.received",
-          filters: [{ pointer: "/data/~2key", value: "value" }],
-        },
+        trigger: { kind: "webhook", eventType: "example.received", filters: [{ pointer: "/data/~2key", value: "v" }] },
       }),
     ).toThrow();
     let nested: unknown = "value";
     for (let index = 0; index < 34; index += 1) nested = { nested };
     expect(() =>
       codec(EVENTS_ROUTES.saveRoutine).request({
-        owner: { kind: "agent", id: "chief" },
+        owner,
         name: "Routine",
         instruction: "Run it",
         active: true,
@@ -134,12 +156,12 @@ describe("events-v1", () => {
     ).toThrow();
     expect(() =>
       codec(EVENTS_ROUTES.saveDestination).request({
-        name: "Webhook",
+        owner,
+        routineId: "routine-1",
         active: true,
         url: "https://example.com/hook",
         method: "POST",
         eventTypes: ["routine.run.succeeded"],
-        routineIds: [],
         payloadTemplate: new Array(10_001).fill(null),
       }),
     ).toThrow();
@@ -148,24 +170,24 @@ describe("events-v1", () => {
 
   it("allows the wider delivery identifier bound without widening generic identifiers", () => {
     const activity = {
-      id: "activity-1",
       kind: "delivery",
-      status: "queued",
-      eventId: null,
-      sourceId: null,
-      routineId: null,
-      runId: null,
-      destinationId: null,
-      deliveryId: "d".repeat(512),
+      id: "d".repeat(512),
+      destinationId: "destination-1",
+      eventType: "routine.run.failed",
+      status: "failed",
+      attempt: 3,
+      statusCode: 500,
+      runId: "run-1",
       occurredAt: "2026-10-07T10:00:00.000Z",
-      summary: "webhook.queued",
     };
     expect(codec(EVENTS_ROUTES.listActivity).response(200, [activity])).toEqual([activity]);
-    expect(() =>
-      codec(EVENTS_ROUTES.listActivity).response(200, [{ ...activity, deliveryId: "d".repeat(513) }]),
-    ).toThrow();
-    expect(() => codec(EVENTS_ROUTES.retryDelivery).request({ id: "" })).toThrow();
-    expect(codec(EVENTS_ROUTES.retryDelivery).request({ id: "d".repeat(512) })).toEqual({ id: "d".repeat(512) });
+    expect(() => codec(EVENTS_ROUTES.listActivity).response(200, [{ ...activity, id: "d".repeat(513) }])).toThrow();
+    const scope = { owner, routineId: "routine-1" };
+    expect(() => codec(EVENTS_ROUTES.retryDelivery).request({ ...scope, id: "" })).toThrow();
+    expect(codec(EVENTS_ROUTES.retryDelivery).request({ ...scope, id: "d".repeat(512) })).toEqual({
+      ...scope,
+      id: "d".repeat(512),
+    });
   });
 });
 

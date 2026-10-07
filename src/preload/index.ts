@@ -34,6 +34,15 @@ import {
   type ServerSummary,
   type Untyped,
 } from "@openbot/contracts/ipc";
+import {
+  decodeEventActivity,
+  decodeEventRoutines,
+  decodeEventStatus,
+  decodeSaveEventRoutineResult,
+  decodeWebhookDestination,
+  decodeWebhookDestinations,
+  decodeWebhookSecret,
+} from "@openbot/contracts/ipc-events";
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import {
   decodeAccountUsageFromMain,
@@ -138,17 +147,6 @@ import {
   decodeDynamicIslandPreference,
   decodeDynamicIslandPresentation,
 } from "./dynamic-island-decoding";
-import {
-  decodeEventActivity,
-  decodeEventDestination,
-  decodeEventDestinations,
-  decodeEventRoutine,
-  decodeEventRoutines,
-  decodeEventSource,
-  decodeEventSources,
-  decodeEventStatus,
-  decodeVoid as decodeEventsVoid,
-} from "./events-decoding";
 import { decodeAddOrchestratorReply, decodeMessagingOverviewReply } from "./messaging-decoding";
 import { decodeProviderRuntimeSnapshot } from "./provider-runtime";
 import {
@@ -854,18 +852,16 @@ const openbotApi: OpenBotDesktopApi = {
   }),
   events: bridgeGroup(IPC_ENDPOINTS.events, {
     getStatus: decodeEventStatus,
-    listSources: decodeEventSources,
-    saveSource: decodeEventSource,
-    deleteSource: decodeEventsVoid,
-    listDestinations: decodeEventDestinations,
-    saveDestination: decodeEventDestination,
-    deleteDestination: decodeEventsVoid,
-    listActivity: decodeEventActivity,
-    retryDelivery: decodeEventsVoid,
     listRoutines: decodeEventRoutines,
-    saveRoutine: decodeEventRoutine,
-    deleteRoutine: decodeEventsVoid,
-    testRoutine: decodeEventsVoid,
+    saveRoutine: decodeSaveEventRoutineResult,
+    deleteRoutine: decodeVoid,
+    testRoutine: decodeVoid,
+    rotateSecret: decodeWebhookSecret,
+    listDestinations: decodeWebhookDestinations,
+    saveDestination: decodeWebhookDestination,
+    deleteDestination: decodeVoid,
+    listActivity: decodeEventActivity,
+    retryDelivery: decodeVoid,
   }),
   // The shared contract decoder, as MCP does: it already bounds every row, and a remote answer was
   // decoded in main before it reached this point.

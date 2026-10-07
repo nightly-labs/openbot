@@ -175,20 +175,20 @@ import type {
   SetDynamicIslandPreferenceInput,
 } from "./ipc-dynamic-island";
 import type {
-  DeleteEventRoutineInput,
   EventActivity,
-  EventDeliveryIdInput,
-  EventResourceIdInput,
   EventRoutine,
-  EventSource,
+  EventRoutineRef,
   EventStatus,
   ListEventActivityInput,
   ListEventRoutinesInput,
+  ListWebhookDestinationsInput,
   SaveEventRoutineInput,
-  SaveEventSourceInput,
+  SaveEventRoutineResult,
   SaveWebhookDestinationInput,
-  TestEventRoutineInput,
+  WebhookDeliveryRef,
   WebhookDestination,
+  WebhookDestinationRef,
+  WebhookSecret,
 } from "./ipc-events";
 import type { GitHubConnectorRepositories, GitHubConnectorStatus } from "./ipc-github-connector";
 import type { HostAnalytics, HostAnalyticsInput } from "./ipc-host-analytics";
@@ -1031,21 +1031,22 @@ export const IPC_ENDPOINTS = {
   },
   events: {
     getStatus: scopedQuery<EventStatus, "required">()("events:get-status"),
-    listSources: scopedQuery<EventSource[], "required">()("events:list-sources"),
-    saveSource: scopedRequest<SaveEventSourceInput, EventSource, "required">()("events:save-source"),
-    deleteSource: scopedRequest<EventResourceIdInput, void, "required">()("events:delete-source"),
-    listDestinations: scopedQuery<WebhookDestination[], "required">()("events:list-destinations"),
+    listRoutines: scopedRequest<ListEventRoutinesInput, EventRoutine[], "required">()("events:list-routines"),
+    saveRoutine: scopedRequest<SaveEventRoutineInput, SaveEventRoutineResult, "required">()("events:save-routine"),
+    deleteRoutine: scopedRequest<EventRoutineRef, void, "required">()("events:delete-routine"),
+    testRoutine: scopedRequest<EventRoutineRef, void, "required">()("events:test-routine"),
+    rotateSecret: scopedRequest<EventRoutineRef, WebhookSecret, "required">()("events:rotate-secret"),
+    listDestinations: scopedRequest<ListWebhookDestinationsInput, WebhookDestination[], "required">()(
+      "events:list-destinations",
+    ),
     saveDestination: scopedRequest<SaveWebhookDestinationInput, WebhookDestination, "required">()(
       "events:save-destination",
     ),
-    deleteDestination: scopedRequest<EventResourceIdInput, void, "required">()("events:delete-destination"),
+    deleteDestination: scopedRequest<WebhookDestinationRef, void, "required">()("events:delete-destination"),
     listActivity: scopedRequest<ListEventActivityInput, EventActivity[], "required">()("events:list-activity"),
-    retryDelivery: scopedRequest<EventDeliveryIdInput, void, "required">()("events:retry-delivery"),
-    listRoutines: scopedRequest<ListEventRoutinesInput, EventRoutine[], "required">()("events:list-routines"),
-    saveRoutine: scopedRequest<SaveEventRoutineInput, EventRoutine, "required">()("events:save-routine"),
-    deleteRoutine: scopedRequest<DeleteEventRoutineInput, void, "required">()("events:delete-routine"),
-    testRoutine: scopedRequest<TestEventRoutineInput, void, "required">()("events:test-routine"),
+    retryDelivery: scopedRequest<WebhookDeliveryRef, void, "required">()("events:retry-delivery"),
   },
+
   remoteDesktop: {
     checkSetup: request<string, RemoteDesktopSetupStatus>()("remote-desktop:check-setup"),
     openSetup: request<RemoteDesktopSetupAction, void>()("remote-desktop:open-setup"),

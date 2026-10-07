@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   CreateRoutineInput,
@@ -7,16 +6,16 @@ import type {
   RoutineRunStatus,
   UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
-import type { EventRoutine } from "@openbot/contracts/ipc-events";
-import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import type { OpenBotDatabase } from "./openbot-database";
 import {
   type DueRoutine,
   type OwnedRoutine,
   type OwnedRoutineRun,
+  type ReceivedWebhookEvent,
   RoutineStore,
   type RoutineTables,
+  type WebhookReceiveResult,
 } from "./routine-store";
 
 export interface DueRoutineTrigger {
@@ -27,8 +26,10 @@ export interface DueRoutineTrigger {
 }
 
 const AGENT_ROUTINE_TABLES: RoutineTables = {
+  ownerKind: "agent",
   routineTable: "projection_agent_routines",
   triggerTable: "projection_routine_triggers",
+  webhookTable: "projection_routine_webhooks",
   runTable: "projection_routine_runs",
   ownerColumn: "agent_id",
   handleColumn: "delivery_id",
@@ -58,16 +59,6 @@ export class AgentRoutineStore extends RoutineStore {
   get(agentId: string, routineId: string): Routine | null {
     const routine = this.getRoutine(agentId, routineId);
     return routine ? toRoutine(routine) : null;
-  }
-
-  hasEventRoutine(agentId: string, routineId: string): boolean {
-    const row = this.database.connection
-      .prepare(
-        `SELECT routine_id FROM projection_event_routine_triggers
-         WHERE routine_id = ? AND owner_kind = 'agent' AND owner_id = ?`,
-      )
-      .get(routineId, agentId);
-    return isDynamicRecord(row);
   }
 
   duplicate(sourceAgentId: string, targetAgentId: string, now = new Date()): Map<string, Routine> {
@@ -124,77 +115,17 @@ export class AgentRoutineStore extends RoutineStore {
   }
 
   createRun(
-    routine: Routine,
+    routine: Pick<Routine, "id" | "agentId" | "name" | "instruction">,
     triggerId: string | null,
     kind: RoutineRun["kind"],
     scheduledFor: string,
-    runId?: string,
   ): RoutineRun {
-    return toRun(this.createRunRow(toOwnedRoutine(routine), triggerId, kind, scheduledFor, runId ?? randomUUID()));
+    return toRun(this.createRunRow(runSource(routine), triggerId, kind, scheduledFor));
   }
 
-  ensureEventRoutine(routine: EventRoutine): Routine {
-    if (routine.owner.kind !== "agent") throw new Error("The event routine owner is invalid.");
-    this.ensureRoutineRecord(routine.owner.id, {
-      id: routine.id,
-      name: routine.name,
-      instruction: routine.instruction,
-      timezone: routine.timezone,
-      ...(routine.limitPolicy === undefined ? {} : { limitPolicy: routine.limitPolicy }),
-    });
-    const trigger: Routine["trigger"] = {
-      id: `event:${routine.id}`,
-      routineId: routine.id,
-      schedule: { kind: "custom", expression: "0 0 1 1 *" },
-      nextRunAt: "9999-12-31T23:59:59.999Z",
-      createdAt: routine.createdAt,
-      updatedAt: routine.updatedAt,
-    };
-    return {
-      id: routine.id,
-      agentId: routine.owner.id,
-      name: routine.name,
-      instruction: routine.instruction,
-      active: false,
-      timezone: routine.timezone,
-      trigger,
-      ...(routine.limitPolicy === undefined ? {} : { limitPolicy: routine.limitPolicy }),
-      createdAt: routine.createdAt,
-      updatedAt: routine.updatedAt,
-    };
-  }
-
-  convertEventRoutineToSchedule(input: {
-    agentId: string;
-    routineId: string;
-    name: string;
-    instruction: string;
-    active: boolean;
-    timezone: string;
-    schedule: Routine["trigger"]["schedule"];
-    limitPolicy?: Routine["limitPolicy"];
-    createdAt?: string;
-  }): Routine {
-    return toRoutine(this.convertEventRoutineToScheduleRow(input.agentId, input));
-  }
-
-  deactivateEventRoutine(agentId: string, routineId: string): void {
-    this.database.connection
-      .prepare("UPDATE projection_agent_routines SET active = 0, updated_at = ? WHERE agent_id = ? AND routine_id = ?")
-      .run(new Date().toISOString(), agentId, routineId);
-  }
-
-  eventLimitPolicy(agentId: string, routineId: string): Routine["limitPolicy"] {
-    const row = this.database.connection
-      .prepare("SELECT limit_policy FROM projection_agent_routines WHERE agent_id = ? AND routine_id = ?")
-      .get(agentId, routineId);
-    return isDynamicRecord(row) && (row.limit_policy === "wait" || row.limit_policy === "skip")
-      ? row.limit_policy
-      : undefined;
-  }
-
-  deleteEventRoutine(agentId: string, routineId: string): void {
-    this.deleteEventRoutineProjection(agentId, routineId);
+  receiveWebhook(agentId: string, routineId: string, event: ReceivedWebhookEvent): WebhookReceiveResult<RoutineRun> {
+    const result = this.receiveWebhookRow(agentId, routineId, event);
+    return result.kind === "started" ? { kind: "started", run: toRun(result.run) } : result;
   }
 
   attachDelivery(runId: string, deliveryId: string): RoutineRun {
@@ -215,8 +146,8 @@ function toRoutine({ ownerId, ...fields }: OwnedRoutine): Routine {
   return { ...fields, agentId: ownerId };
 }
 
-function toOwnedRoutine({ agentId, ...fields }: Routine): OwnedRoutine {
-  return { ...fields, ownerId: agentId };
+function runSource({ id, agentId, name, instruction }: Pick<Routine, "id" | "agentId" | "name" | "instruction">) {
+  return { id, ownerId: agentId, name, instruction };
 }
 
 function toRun({ ownerId, handleId, ...fields }: OwnedRoutineRun): RoutineRun {
