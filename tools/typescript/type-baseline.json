@@ -96,7 +96,6 @@
     "src/backend/mailbox-store.test.ts": 1,
     "src/backend/mailbox-store.ts": 9,
     "src/backend/mcp-oauth-provider.test.ts": 1,
-    "src/backend/mcp-oauth-provider.ts": 1,
     "src/backend/mcp-probe.ts": 1,
     "src/backend/memory-store.ts": 1,
     "src/backend/protocol.ts": 4,
