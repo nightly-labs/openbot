@@ -8,11 +8,17 @@
 import { type RoutineFlowCanvas, type RoutineFlowLink, routineFlowAgentKey } from "@openbot/contracts/ipc";
 import { toast } from "@openbot/ui";
 import type { AgentProfile } from "@openbot/ui/data";
+import type { DiagramModelChoice } from "@openbot/ui/features/diagrams/DiagramNewAgentCard";
 import { DiagramView } from "@openbot/ui/features/diagrams/DiagramView";
 import type { DiagramPoint } from "@openbot/ui/features/diagrams/diagram-model";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createStore, onSettled, Show } from "solid-js";
+import { useAgentActions } from "../agents/agent-actions";
+import { resolveCreationModel } from "../agents/agent-creation-model";
 import { useAgents } from "../agents/agents-context";
+import { useCustomAgents } from "../custom-agents/custom-agents-context";
+import { useCustomProviders } from "../custom-providers/custom-providers-context";
+import { useSetup } from "../onboarding/onboarding-context";
 import { useServers } from "../servers/servers-context";
 import { createRoutineFlowAssistant } from "./routine-flow-assistant";
 import { agentIdOfNode, isRoutineStartEdge, routineFlowDiagram, routineIdOfNode } from "./routine-flow-diagram";
@@ -36,7 +42,23 @@ interface RoutineFlowState {
 
 export function WorkspaceRoutineFlows(props: { port?: RoutineFlowsPort }) {
   const { t, errorMessage } = useText();
-  const { activeAgent, agentList } = useAgents();
+  const { activeAgent, agentList, modelOptions, agentStatus, serverSetupChoice } = useAgents();
+  const { setupState } = useSetup();
+  const { customProviders } = useCustomProviders();
+  const { customAgents } = useCustomAgents();
+  /** A new agent starts on the model the agent form would pick, and the user can change it. */
+  const newAgentModels = createMemo((): DiagramModelChoice | undefined => {
+    const initial = resolveCreationModel(serverSetupChoice() ?? setupState(), modelOptions());
+    return initial
+      ? {
+          options: modelOptions(),
+          status: agentStatus(),
+          initial,
+          customProviders: customProviders(),
+          customAgents: customAgents(),
+        }
+      : undefined;
+  });
   const { activeServerId } = useServers();
   const port = () => props.port ?? routineFlowsPort();
   const local = () => activeServerId() === "local";
@@ -125,6 +147,29 @@ export function WorkspaceRoutineFlows(props: { port?: RoutineFlowsPort }) {
   });
   /** An agent with routines of its own stays: removing it would remove the routine, which belongs to settings. */
   const owners = createMemo(() => new Set(state.canvas?.routines.map((entry) => entry.routine.agentId) ?? []));
+  const onCanvas = createMemo(
+    () => new Set(diagram()?.nodes.flatMap((node) => (node.kind === "agent" ? [node.agentId] : [])) ?? []),
+  );
+  const { createAgentInPlace } = useAgentActions();
+
+  /** Puts an agent on the canvas at once, and takes it off again when the host does not save it. */
+  const placeAgent = (canvasAgentId: string, placed: string, position: DiagramPoint) => {
+    const key = routineFlowAgentKey(placed);
+    setState((draft) => {
+      draft.moved[key] = position;
+      if (draft.canvas && !draft.canvas.placedAgentIds.includes(placed)) draft.canvas.placedAgentIds.push(placed);
+    });
+    port()
+      .routineFlows.savePosition({ agentId: canvasAgentId, nodeKey: key, x: position.x, y: position.y }, "local")
+      .then(() => load(canvasAgentId))
+      .catch((error) => {
+        setState((draft) => {
+          delete draft.moved[key];
+          if (draft.canvas) draft.canvas.placedAgentIds = draft.canvas.placedAgentIds.filter((id) => id !== placed);
+        });
+        failed(t("diagram.flows.saveFailed"))(error);
+      });
+  };
 
   /** The open agent edits its own canvas from the chat panel. */
   const assistantOf = (agent: AgentProfile | undefined) =>
@@ -251,6 +296,18 @@ export function WorkspaceRoutineFlows(props: { port?: RoutineFlowsPort }) {
                   return id !== null && id !== canvasAgentId && !owners().has(id);
                 }}
                 canRemoveEdge={(edgeId) => !isRoutineStartEdge(edgeId) && !edgeId.startsWith(PENDING_LINK_PREFIX)}
+                addableAgents={agentList().filter((agent) => !onCanvas().has(agent.id))}
+                onPlaceAgent={(placed, position) => placeAgent(canvasAgentId, placed, position)}
+                newAgentModels={newAgentModels()}
+                onCreateAgent={async (draft, position) => {
+                  try {
+                    const created = await createAgentInPlace(draft);
+                    placeAgent(canvasAgentId, created.id, position);
+                  } catch (error) {
+                    toast.error(errorMessage(error, t("agent.error.createFailed")));
+                    throw error;
+                  }
+                }}
                 onEditTask={(nodeId, routineNodeId, task) => {
                   const editedAgentId = agentIdOfNode(nodeId);
                   const routineId = routineIdOfNode(routineNodeId);

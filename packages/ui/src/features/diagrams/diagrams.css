@@ -174,6 +174,68 @@
   margin: 0;
 }
 
+/* The right-click menu's trigger wraps the viewport without a box of its own. */
+.diagram-board-menu-area {
+  display: contents;
+}
+
+.diagram-canvas-menu-avatar.agent-avatar {
+  width: 20px;
+  height: 20px;
+  grid-template: 100% / 100%;
+}
+
+.diagram-canvas-menu-agent {
+  display: grid;
+  min-width: 0;
+}
+
+.diagram-canvas-menu-agent small {
+  overflow: hidden;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A new agent, asked for at the spot the user right-clicked and kept inside the canvas. */
+.diagram-new-agent {
+  position: absolute;
+  top: clamp(var(--openbot-space-2), var(--diagram-new-agent-y), calc(100% - 196px));
+  left: clamp(var(--openbot-space-2), var(--diagram-new-agent-x), calc(100% - 288px));
+  z-index: 3;
+  display: grid;
+  width: 280px;
+  gap: var(--openbot-space-2);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-overlay);
+  box-shadow:
+    0 0 0 1px var(--openbot-border),
+    var(--openbot-shadow-overlay);
+  backdrop-filter: blur(16px);
+  padding: var(--openbot-space-3);
+  font-size: var(--openbot-text-sm);
+}
+
+.diagram-new-agent-header {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.diagram-new-agent-avatar.agent-avatar {
+  width: 24px;
+  height: 24px;
+  grid-template: 100% / 100%;
+}
+
+.diagram-new-agent-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--openbot-space-1);
+}
+
 /* Zoom in, zoom out and fit, as a column of separate square buttons. */
 .diagram-board-zoom {
   position: absolute;

@@ -191,6 +191,7 @@
     "./features/diagrams/DiagramBoard": "./src/features/diagrams/DiagramBoard.tsx",
     "./features/diagrams/DiagramChatPanel": "./src/features/diagrams/DiagramChatPanel.tsx",
     "./features/diagrams/DiagramInspector": "./src/features/diagrams/DiagramInspector.tsx",
+    "./features/diagrams/DiagramNewAgentCard": "./src/features/diagrams/DiagramNewAgentCard.tsx",
     "./features/diagrams/DiagramNodeCard": "./src/features/diagrams/DiagramNodeCard.tsx",
     "./features/diagrams/DiagramView": "./src/features/diagrams/DiagramView.tsx",
     "./features/diagrams/diagram-graph": "./src/features/diagrams/diagram-graph.ts",

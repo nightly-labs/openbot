@@ -9,12 +9,14 @@
  * every edit goes out through a callback, so the caller decides what an edit does.
  */
 
-import { Button, Minus, Plus, Scan } from "@openbot/ui";
+import { Button, ContextMenu, Minus, Plus, Scan } from "@openbot/ui";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
-import { createMemo, createStore, For, onSettled, Show } from "solid-js";
+import { createMemo, createSignal, createStore, For, onSettled, Show } from "solid-js";
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
+import { DiagramCanvasMenu } from "./DiagramCanvasMenu";
+import { type DiagramModelChoice, DiagramNewAgentCard, type DiagramNewAgentDraft } from "./DiagramNewAgentCard";
 import { DiagramNodeCard, type DiagramPortTarget } from "./DiagramNodeCard";
 import {
   type DiagramConnectionProblem,
@@ -91,6 +93,13 @@ export interface DiagramBoardProps {
   /** Whether a node or a connection may be removed. Everything may, when absent. */
   canRemoveNode?: ((nodeId: string) => boolean) | undefined;
   canRemoveEdge?: ((edgeId: string) => boolean) | undefined;
+  /** Agents the right-click menu offers to place where the user clicked. With it, the canvas has that menu. */
+  addableAgents?: readonly AgentProfile[] | undefined;
+  onPlaceAgent?: ((agentId: string, position: DiagramPoint) => void) | undefined;
+  /** Creates an agent and places it. With it, the menu also offers a new agent. */
+  onCreateAgent?: ((draft: DiagramNewAgentDraft, position: DiagramPoint) => Promise<void>) | undefined;
+  /** The models a new agent may run on. Without it, the host picks the model. */
+  newAgentModels?: DiagramModelChoice | undefined;
   /** Panels that float over the canvas, such as the assistant. */
   children?: JSX.Element;
 }
@@ -159,6 +168,14 @@ export function DiagramBoard(props: DiagramBoardProps) {
     x: (point.x - camera.x) / camera.scale,
     y: (point.y - camera.y) / camera.scale,
   });
+  const snapped = (point: DiagramPoint): DiagramPoint => ({
+    x: Math.round(point.x / SNAP) * SNAP,
+    y: Math.round(point.y / SNAP) * SNAP,
+  });
+  /** Where the canvas was right-clicked, on screen and in the diagram; the menu adds an agent there. */
+  let menuPoint: { screen: DiagramPoint; world: DiagramPoint } | null = null;
+  const [newAgentAt, setNewAgentAt] = createSignal<{ screen: DiagramPoint; world: DiagramPoint } | null>(null);
+  const canAddAgents = () => editable() && Boolean(props.onPlaceAgent);
   const clampScale = (scale: number) => Math.min(Math.max(scale, MIN_SCALE), MAX_SCALE);
   const moveCamera = (next: { x: number; y: number; scale: number }, animate: boolean, byUser = true) => {
     cameraMoved ||= byUser;
@@ -407,184 +424,232 @@ export function DiagramBoard(props: DiagramBoardProps) {
 
   return (
     <div class="diagram-board">
-      <div
-        ref={(element) => (viewport = element)}
-        class="diagram-board-viewport"
-        style={{
-          "--diagram-grid-size": `${GRID * camera.scale}px`,
-          "--diagram-grid-x": `${camera.x}px`,
-          "--diagram-grid-y": `${camera.y}px`,
-        }}
-        data-connecting={interaction.source ? "" : undefined}
-        data-dragging={interaction.dragging ? "" : undefined}
-        // The canvas takes the arrow keys, so a screen reader passes them through to it.
-        role="application"
-        aria-label={t("diagram.board.label", { name: props.diagram.name })}
-        tabindex="0"
-        onKeyDown={(event: KeyboardEvent) => {
-          if (event.target instanceof HTMLElement && event.target.closest("[data-diagram-overlay]")) return;
-          const step = {
-            ArrowLeft: [KEY_STEP, 0],
-            ArrowRight: [-KEY_STEP, 0],
-            ArrowUp: [0, KEY_STEP],
-            ArrowDown: [0, -KEY_STEP],
-          }[event.key];
-          if (step)
-            moveCamera({ x: camera.x + (step[0] ?? 0), y: camera.y + (step[1] ?? 0), scale: camera.scale }, true);
-          else if (event.key === "+" || event.key === "=") zoomBy(ZOOM_STEP);
-          else if (event.key === "-") zoomBy(1 / ZOOM_STEP);
-          else if (event.key === "0") fitView(true);
-          else if (event.key === "Escape" && interaction.source) cancelConnection();
-          else if ((event.key === "Delete" || event.key === "Backspace") && editable()) {
-            if (!removeSelection()) return;
-          } else return;
-          event.preventDefault();
-        }}
-      >
-        <div
-          class="diagram-board-world"
-          data-settling={camera.settling ? "" : undefined}
-          data-routine-color={
-            props.focusRoutineId ? diagramRoutineColor(props.diagram.nodes, props.focusRoutineId) : undefined
-          }
-          style={{ transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.scale})` }}
+      {/* A right-click anywhere on the canvas opens the menu that adds an agent at that spot. */}
+      <ContextMenu.Root>
+        <ContextMenu.Trigger
+          as="div"
+          class="diagram-board-menu-area"
+          disabled={!canAddAgents()}
+          onContextMenu={(event: MouseEvent) => {
+            const screen = local(event);
+            menuPoint = { screen, world: toWorld(screen) };
+            // The menu gives focus back to what had it when it opened. The canvas lets it go, so a
+            // new agent's card keeps the focus it takes; placing an agent focuses the canvas itself.
+            if (document.activeElement instanceof HTMLElement && viewport?.contains(document.activeElement))
+              document.activeElement.blur();
+          }}
         >
-          <svg class="diagram-edges" aria-hidden="true">
-            <For each={props.diagram.edges}>
-              {(edge) => (
-                <Show when={nodeById().get(edge.from) && nodeById().get(edge.to) ? edge : undefined}>
-                  {(current) => {
-                    const path = () => {
-                      const from = nodeById().get(current().from);
-                      const to = nodeById().get(current().to);
-                      return from && to ? diagramEdgePath(diagramOutputPort(from), diagramInputPort(to)) : "";
-                    };
-                    return (
-                      <g
-                        class="diagram-edge"
-                        data-diagram-edge={current().id}
-                        data-state={edgeState(current())}
-                        data-routine-color={
-                          current().routineId
-                            ? diagramRoutineColor(props.diagram.nodes, current().routineId ?? "")
-                            : undefined
-                        }
-                        data-selected={interaction.selectedEdgeId === current().id ? "" : undefined}
-                      >
-                        <path class="diagram-edge-hit" d={path()} />
-                        <path class="diagram-edge-line" d={path()} />
-                      </g>
-                    );
-                  }}
-                </Show>
-              )}
-            </For>
-            <Show when={draftPath()}>
-              {(path) => (
-                <path
-                  class="diagram-edge-draft"
-                  data-target={interaction.hoverTarget ? inputTarget(interaction.hoverTarget) : "none"}
-                  d={path()}
-                />
-              )}
-            </Show>
-          </svg>
-
-          {/* An edge is a thin line, so the button that selects it sits on its midpoint, where a
-              pointer and the keyboard can both reach it. */}
-          <For each={props.diagram.edges}>
-            {(edge) => {
-              const ends = () => {
-                const from = nodeById().get(edge.from);
-                const to = nodeById().get(edge.to);
-                return from && to ? { from, to } : undefined;
-              };
-              return (
-                <Show when={ends()}>
-                  {(pair) => {
-                    const midpoint = () =>
-                      diagramEdgeMidpoint(diagramOutputPort(pair().from), diagramInputPort(pair().to));
-                    return (
-                      <Show when={edgeRemovable(edge.id)}>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-xs"
-                          class="diagram-edge-remove"
-                          data-diagram-control=""
-                          data-selected={interaction.selectedEdgeId === edge.id ? "" : undefined}
-                          style={{ "--diagram-edge-x": `${midpoint().x}px`, "--diagram-edge-y": `${midpoint().y}px` }}
-                          aria-label={t("diagram.edge.remove", {
-                            from: nodeName(pair().from),
-                            to: nodeName(pair().to),
-                          })}
-                          onClick={() => {
-                            props.onRemoveEdge(edge.id);
-                            setInteraction((state) => {
-                              state.selectedEdgeId = null;
-                            });
-                          }}
-                        >
-                          <Minus aria-hidden="true" />
-                        </Button>
-                      </Show>
-                    );
-                  }}
-                </Show>
-              );
+          <div
+            ref={(element) => (viewport = element)}
+            class="diagram-board-viewport"
+            style={{
+              "--diagram-grid-size": `${GRID * camera.scale}px`,
+              "--diagram-grid-x": `${camera.x}px`,
+              "--diagram-grid-y": `${camera.y}px`,
             }}
-          </For>
+            data-connecting={interaction.source ? "" : undefined}
+            data-dragging={interaction.dragging ? "" : undefined}
+            // The canvas takes the arrow keys, so a screen reader passes them through to it.
+            role="application"
+            aria-label={t("diagram.board.label", { name: props.diagram.name })}
+            tabindex="0"
+            onKeyDown={(event: KeyboardEvent) => {
+              if (event.target instanceof HTMLElement && event.target.closest("[data-diagram-overlay]")) return;
+              const step = {
+                ArrowLeft: [KEY_STEP, 0],
+                ArrowRight: [-KEY_STEP, 0],
+                ArrowUp: [0, KEY_STEP],
+                ArrowDown: [0, -KEY_STEP],
+              }[event.key];
+              if (step)
+                moveCamera({ x: camera.x + (step[0] ?? 0), y: camera.y + (step[1] ?? 0), scale: camera.scale }, true);
+              else if (event.key === "+" || event.key === "=") zoomBy(ZOOM_STEP);
+              else if (event.key === "-") zoomBy(1 / ZOOM_STEP);
+              else if (event.key === "0") fitView(true);
+              else if (event.key === "Escape" && interaction.source) cancelConnection();
+              else if ((event.key === "Delete" || event.key === "Backspace") && editable()) {
+                if (!removeSelection()) return;
+              } else return;
+              event.preventDefault();
+            }}
+          >
+            <div
+              class="diagram-board-world"
+              data-settling={camera.settling ? "" : undefined}
+              data-routine-color={
+                props.focusRoutineId ? diagramRoutineColor(props.diagram.nodes, props.focusRoutineId) : undefined
+              }
+              style={{ transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.scale})` }}
+            >
+              <svg class="diagram-edges" aria-hidden="true">
+                <For each={props.diagram.edges}>
+                  {(edge) => (
+                    <Show when={nodeById().get(edge.from) && nodeById().get(edge.to) ? edge : undefined}>
+                      {(current) => {
+                        const path = () => {
+                          const from = nodeById().get(current().from);
+                          const to = nodeById().get(current().to);
+                          return from && to ? diagramEdgePath(diagramOutputPort(from), diagramInputPort(to)) : "";
+                        };
+                        return (
+                          <g
+                            class="diagram-edge"
+                            data-diagram-edge={current().id}
+                            data-state={edgeState(current())}
+                            data-routine-color={
+                              current().routineId
+                                ? diagramRoutineColor(props.diagram.nodes, current().routineId ?? "")
+                                : undefined
+                            }
+                            data-selected={interaction.selectedEdgeId === current().id ? "" : undefined}
+                          >
+                            <path class="diagram-edge-hit" d={path()} />
+                            <path class="diagram-edge-line" d={path()} />
+                          </g>
+                        );
+                      }}
+                    </Show>
+                  )}
+                </For>
+                <Show when={draftPath()}>
+                  {(path) => (
+                    <path
+                      class="diagram-edge-draft"
+                      data-target={interaction.hoverTarget ? inputTarget(interaction.hoverTarget) : "none"}
+                      d={path()}
+                    />
+                  )}
+                </Show>
+              </svg>
 
-          <For each={props.diagram.nodes}>
-            {(node) => (
-              <DiagramNodeCard
-                node={node}
-                name={nodeName(node)}
-                agent={node.kind === "agent" ? agentById().get(node.agentId) : undefined}
-                step={steps().get(node.id)}
-                unreachable={node.kind === "agent" && !reachable().has(node.id)}
-                dimmed={dimmed(node.id)}
-                routineColor={node.kind === "routine" ? diagramRoutineColor(props.diagram.nodes, node.id) : undefined}
-                routines={node.kind === "agent" ? routineChips(node.id) : []}
-                focusRoutineId={props.focusRoutineId}
-                onFocusRoutine={props.onFocusRoutine}
-                stepRun={stepRuns().get(node.id)}
-                selected={props.selectedNodeId === node.id}
-                connectable={connectable()}
-                removable={nodeRemovable(node.id)}
-                connecting={interaction.source === node.id}
-                inputTarget={inputTarget(node.id)}
-                firing={diagramRunOf(props.diagram, node.id)?.status === "running"}
-                onSelect={() => {
-                  if (suppressClick) return;
-                  setInteraction((state) => {
-                    state.selectedEdgeId = null;
-                  });
-                  props.onSelectNode(node.id);
+              {/* An edge is a thin line, so the button that selects it sits on its midpoint, where a
+              pointer and the keyboard can both reach it. */}
+              <For each={props.diagram.edges}>
+                {(edge) => {
+                  const ends = () => {
+                    const from = nodeById().get(edge.from);
+                    const to = nodeById().get(edge.to);
+                    return from && to ? { from, to } : undefined;
+                  };
+                  return (
+                    <Show when={ends()}>
+                      {(pair) => {
+                        const midpoint = () =>
+                          diagramEdgeMidpoint(diagramOutputPort(pair().from), diagramInputPort(pair().to));
+                        return (
+                          <Show when={edgeRemovable(edge.id)}>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-xs"
+                              class="diagram-edge-remove"
+                              data-diagram-control=""
+                              data-selected={interaction.selectedEdgeId === edge.id ? "" : undefined}
+                              style={{
+                                "--diagram-edge-x": `${midpoint().x}px`,
+                                "--diagram-edge-y": `${midpoint().y}px`,
+                              }}
+                              aria-label={t("diagram.edge.remove", {
+                                from: nodeName(pair().from),
+                                to: nodeName(pair().to),
+                              })}
+                              onClick={() => {
+                                props.onRemoveEdge(edge.id);
+                                setInteraction((state) => {
+                                  state.selectedEdgeId = null;
+                                });
+                              }}
+                            >
+                              <Minus aria-hidden="true" />
+                            </Button>
+                          </Show>
+                        );
+                      }}
+                    </Show>
+                  );
                 }}
-                onRemove={() => props.onRemoveNode(node.id)}
-                onOutputPort={() => {
-                  if (suppressClick) return;
-                  if (interaction.source === node.id) cancelConnection();
-                  else startConnection(node.id);
-                }}
-                onInputPort={() => {
-                  const source = interaction.source;
-                  if (source) tryConnect(source, node.id);
-                }}
-                onRunRoutine={props.onRunRoutine ? () => props.onRunRoutine?.(node.id) : undefined}
-              />
-            )}
-          </For>
-        </div>
+              </For>
 
-        <Show when={props.diagram.nodes.length === 0}>
-          <div class="diagram-board-empty">
-            <strong>{t("diagram.board.emptyTitle")}</strong>
-            <p>{t("diagram.board.emptyBody")}</p>
+              <For each={props.diagram.nodes}>
+                {(node) => (
+                  <DiagramNodeCard
+                    node={node}
+                    name={nodeName(node)}
+                    agent={node.kind === "agent" ? agentById().get(node.agentId) : undefined}
+                    step={steps().get(node.id)}
+                    unreachable={node.kind === "agent" && !reachable().has(node.id)}
+                    dimmed={dimmed(node.id)}
+                    routineColor={
+                      node.kind === "routine" ? diagramRoutineColor(props.diagram.nodes, node.id) : undefined
+                    }
+                    routines={node.kind === "agent" ? routineChips(node.id) : []}
+                    focusRoutineId={props.focusRoutineId}
+                    onFocusRoutine={props.onFocusRoutine}
+                    stepRun={stepRuns().get(node.id)}
+                    selected={props.selectedNodeId === node.id}
+                    connectable={connectable()}
+                    removable={nodeRemovable(node.id)}
+                    connecting={interaction.source === node.id}
+                    inputTarget={inputTarget(node.id)}
+                    firing={diagramRunOf(props.diagram, node.id)?.status === "running"}
+                    onSelect={() => {
+                      if (suppressClick) return;
+                      setInteraction((state) => {
+                        state.selectedEdgeId = null;
+                      });
+                      props.onSelectNode(node.id);
+                    }}
+                    onRemove={() => props.onRemoveNode(node.id)}
+                    onOutputPort={() => {
+                      if (suppressClick) return;
+                      if (interaction.source === node.id) cancelConnection();
+                      else startConnection(node.id);
+                    }}
+                    onInputPort={() => {
+                      const source = interaction.source;
+                      if (source) tryConnect(source, node.id);
+                    }}
+                    onRunRoutine={props.onRunRoutine ? () => props.onRunRoutine?.(node.id) : undefined}
+                  />
+                )}
+              </For>
+            </div>
+
+            <Show when={props.diagram.nodes.length === 0}>
+              <div class="diagram-board-empty">
+                <strong>{t("diagram.board.emptyTitle")}</strong>
+                <p>{t("diagram.board.emptyBody")}</p>
+              </div>
+            </Show>
           </div>
+        </ContextMenu.Trigger>
+        <Show when={props.onPlaceAgent}>
+          {(place) => (
+            <DiagramCanvasMenu
+              addableAgents={props.addableAgents ?? []}
+              onPlaceAgent={(agentId) => {
+                if (menuPoint) place()(agentId, snapped(menuPoint.world));
+                viewport?.focus();
+              }}
+              onNewAgent={props.onCreateAgent ? () => setNewAgentAt(menuPoint) : undefined}
+            />
+          )}
         </Show>
-      </div>
+      </ContextMenu.Root>
+
+      <Show when={newAgentAt()}>
+        {(at) => (
+          <DiagramNewAgentCard
+            at={at().screen}
+            models={props.newAgentModels}
+            onCreate={async (draft) => {
+              await props.onCreateAgent?.(draft, snapped(at().world));
+              setNewAgentAt(null);
+            }}
+            onCancel={() => setNewAgentAt(null)}
+          />
+        )}
+      </Show>
 
       <div class="diagram-board-zoom" role="toolbar" aria-label={t("diagram.zoom.label")} data-diagram-overlay="">
         <Button

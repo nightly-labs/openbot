@@ -27,6 +27,7 @@ import { AgentAvatar } from "../agents/AgentAvatar";
 import { DiagramBoard } from "./DiagramBoard";
 import { DiagramChatPanel } from "./DiagramChatPanel";
 import { DiagramInspector } from "./DiagramInspector";
+import type { DiagramModelChoice, DiagramNewAgentDraft } from "./DiagramNewAgentCard";
 import { DiagramStepIcon } from "./DiagramNodeCard";
 import { diagramRunStepStatus } from "./DiagramRoutineVisuals";
 import { diagramLatestRun, diagramRoutineColor, diagramRunOf } from "./diagram-graph";
@@ -60,6 +61,12 @@ export interface DiagramViewProps {
   canRemoveNode?: ((nodeId: string) => boolean) | undefined;
   canRemoveEdge?: ((edgeId: string) => boolean) | undefined;
   onRunRoutine?: ((nodeId: string) => void) | undefined;
+  /** Agents the canvas's right-click menu offers to place where the user clicked. */
+  addableAgents?: readonly AgentProfile[] | undefined;
+  onPlaceAgent?: ((agentId: string, position: DiagramPoint) => void) | undefined;
+  /** Creates an agent from the right-click menu and places it. */
+  onCreateAgent?: ((draft: DiagramNewAgentDraft, position: DiagramPoint) => Promise<void>) | undefined;
+  newAgentModels?: DiagramModelChoice | undefined;
   /** Saves what an agent does in one routine, from the panel. Without it, tasks are read-only. */
   onEditTask?: ((nodeId: string, routineId: string, task: string) => void) | undefined;
 }
@@ -197,6 +204,10 @@ export function DiagramView(props: DiagramViewProps) {
           canRemoveNode={props.canRemoveNode}
           canRemoveEdge={props.canRemoveEdge}
           onRunRoutine={props.onRunRoutine ? runRoutine : undefined}
+          addableAgents={props.addableAgents}
+          onPlaceAgent={props.onPlaceAgent}
+          onCreateAgent={props.onCreateAgent}
+          newAgentModels={props.newAgentModels}
         >
           <Show when={routines().length > 1}>
             <div class="diagram-view-lens-bar" data-diagram-overlay="">
