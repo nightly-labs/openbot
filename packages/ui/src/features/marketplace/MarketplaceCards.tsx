@@ -161,8 +161,8 @@ export function AppAction(props: {
       model().github?.().onConnect();
       return;
     }
-    /* 1Password can ask for an account or a token. Its page owns those choices. */
-    if (app.kind === "onepassword") {
+    /* Password managers need setup input. Their pages own those choices. */
+    if (app.kind === "onepassword" || app.kind === "bitwarden") {
       props.scope.nav.go({ kind: "app", id: app.id });
       return;
     }
