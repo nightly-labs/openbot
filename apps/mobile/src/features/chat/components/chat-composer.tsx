@@ -137,8 +137,8 @@ interface ChatComposerProps {
   handoffFocusVersion?: number;
   onCancelReply: () => void;
   voice: VoiceMode;
-  /** The agent's colour for the filled voice controls, and the glyph colour on it. */
-  voiceAccent: { fill: string; glyph: string };
+  /** The agent's colour for the filled voice controls, the glyph colour on it, and the glass tint. */
+  voiceAccent: { fill: string; glyph: string; tint: string };
 }
 
 /** Bars that follow the microphone level, drawn in the listening voice button. */
@@ -380,17 +380,19 @@ export function ChatComposer({
   }, [listening, voiceFill]);
   const voiceFillStyle = useAnimatedStyle(() => ({ opacity: voiceFill.get() * morph.get() }));
   // Cancel and Send start behind the round button and come out of its sides.
+  // At half size the round button covers them, so glass needs no fade: iOS
+  // does not draw a glass effect under a parent with an opacity below 1.
   const cancelSideStyle = useAnimatedStyle(() => {
     const open = voice.split.get();
     return {
-      opacity: interpolate(open, [0, 0.5], [0, 1], Extrapolation.CLAMP),
+      opacity: liquidGlassAvailable ? 1 : interpolate(open, [0, 0.5], [0, 1], Extrapolation.CLAMP),
       transform: [{ translateX: -VOICE_SIDE_OFFSET * open }, { scale: 0.5 + 0.5 * open }],
     };
   });
   const sendSideStyle = useAnimatedStyle(() => {
     const open = voice.split.get();
     return {
-      opacity: interpolate(open, [0, 0.5], [0, 1], Extrapolation.CLAMP),
+      opacity: liquidGlassAvailable ? 1 : interpolate(open, [0, 0.5], [0, 1], Extrapolation.CLAMP),
       transform: [{ translateX: VOICE_SIDE_OFFSET * open }, { scale: 0.5 + 0.5 * open }],
     };
   });
@@ -711,26 +713,59 @@ export function ChatComposer({
               </GlassView>
             </Animated.View>
             <Animated.View style={[{ position: "absolute" }, sendSideStyle]}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={sendLabel ?? t("mobile.chat.composer.send")}
-                accessibilityState={{ disabled: !voice.canSend }}
-                disabled={!voice.canSend}
-                className="items-center justify-center rounded-full"
-                style={{
-                  width: VOICE_SIDE_SIZE,
-                  height: VOICE_SIDE_SIZE,
-                  backgroundColor: voiceAccent.fill,
-                  opacity: voice.canSend ? 1 : 0.45,
-                }}
-                onPress={voice.send}
-              >
-                {sending ? (
-                  <Spinner size="sm" color={voiceAccent.glyph} />
-                ) : (
-                  <ArrowUp color={voiceAccent.glyph} size={24} strokeWidth={2.2} />
-                )}
-              </Pressable>
+              {liquidGlassAvailable ? (
+                // Glass in the agent's colour. Without a send to make it is
+                // plain glass, and only the glyph dims: an opacity on the glass
+                // would stop iOS from drawing it.
+                <GlassView
+                  glassEffectStyle="regular"
+                  tintColor={voice.canSend ? voiceAccent.tint : undefined}
+                  style={{
+                    width: VOICE_SIDE_SIZE,
+                    height: VOICE_SIDE_SIZE,
+                    borderRadius: VOICE_SIDE_SIZE / 2,
+                    overflow: "hidden",
+                  }}
+                >
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={sendLabel ?? t("mobile.chat.composer.send")}
+                    accessibilityState={{ disabled: !voice.canSend }}
+                    disabled={!voice.canSend}
+                    className="flex-1 items-center justify-center"
+                    onPress={voice.send}
+                  >
+                    {/* The tint lets the glass and the glow through, so the glyph
+                        takes the text colour, like Cancel and Continue. */}
+                    {sending ? (
+                      <Spinner size="sm" color={String(foreground)} />
+                    ) : (
+                      <ArrowUp color={String(voice.canSend ? foreground : muted)} size={24} strokeWidth={2.2} />
+                    )}
+                  </Pressable>
+                </GlassView>
+              ) : (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={sendLabel ?? t("mobile.chat.composer.send")}
+                  accessibilityState={{ disabled: !voice.canSend }}
+                  disabled={!voice.canSend}
+                  className="items-center justify-center rounded-full"
+                  style={{
+                    width: VOICE_SIDE_SIZE,
+                    height: VOICE_SIDE_SIZE,
+                    backgroundColor: voiceAccent.fill,
+                    opacity: voice.canSend ? 1 : 0.45,
+                  }}
+                  onPress={voice.send}
+                >
+                  {sending ? (
+                    <Spinner size="sm" color={voiceAccent.glyph} />
+                  ) : (
+                    <ArrowUp color={voiceAccent.glyph} size={24} strokeWidth={2.2} />
+                  )}
+                </Pressable>
+              )}
             </Animated.View>
           </View>
         ) : null}

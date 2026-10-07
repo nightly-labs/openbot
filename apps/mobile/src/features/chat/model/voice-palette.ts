@@ -75,16 +75,21 @@ function luminance(color: VoiceRgb): number {
   return 0.2126 * (r ?? 0) + 0.7152 * (g ?? 0) + 0.0722 * (b ?? 0);
 }
 
+// An opaque tint makes Liquid Glass read as a flat fill.
+const GLASS_TINT_ALPHA = 0.55;
+
 /**
- * The palette's main colour for the filled voice controls, and the glyph colour
- * with the higher contrast on it: a yellow agent gets a dark glyph.
+ * The palette's main colour for the filled voice controls, the glyph colour
+ * with the higher contrast on it (a yellow agent gets a dark glyph), and the
+ * same colour as a see-through tint for Liquid Glass.
  */
-export function voiceAccent(palette: VoicePalette): { fill: string; glyph: string } {
+export function voiceAccent(palette: VoicePalette): { fill: string; glyph: string; tint: string } {
   const color = palette[1];
   const [r, g, b] = color.map((channel) => Math.round(channel * 255));
   const light = luminance(color);
   return {
     fill: `rgb(${r}, ${g}, ${b})`,
+    tint: `rgba(${r}, ${g}, ${b}, ${GLASS_TINT_ALPHA})`,
     glyph: (light + 0.05) / 0.05 > 1.05 / (light + 0.05) ? "#000000" : "#ffffff",
   };
 }
