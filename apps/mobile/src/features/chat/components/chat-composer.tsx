@@ -380,19 +380,25 @@ export function ChatComposer({
   }, [listening, voiceFill]);
   const voiceFillStyle = useAnimatedStyle(() => ({ opacity: voiceFill.get() * morph.get() }));
   // Cancel and Send start behind the round button and come out of its sides.
-  // At half size the round button covers them, so glass needs no fade: iOS
-  // does not draw a glass effect under a parent with an opacity below 1.
+  // Glass does not fade: iOS does not draw a glass effect under a parent with
+  // an opacity below 1. The round button is glass too, so the two show through
+  // it, and they are hidden while they are fully in.
+  const sideOpacity = (open: number) => {
+    "worklet";
+    if (liquidGlassAvailable) return open > 0 ? 1 : 0;
+    return interpolate(open, [0, 0.5], [0, 1], Extrapolation.CLAMP);
+  };
   const cancelSideStyle = useAnimatedStyle(() => {
     const open = voice.split.get();
     return {
-      opacity: liquidGlassAvailable ? 1 : interpolate(open, [0, 0.5], [0, 1], Extrapolation.CLAMP),
+      opacity: sideOpacity(open),
       transform: [{ translateX: -VOICE_SIDE_OFFSET * open }, { scale: 0.5 + 0.5 * open }],
     };
   });
   const sendSideStyle = useAnimatedStyle(() => {
     const open = voice.split.get();
     return {
-      opacity: liquidGlassAvailable ? 1 : interpolate(open, [0, 0.5], [0, 1], Extrapolation.CLAMP),
+      opacity: sideOpacity(open),
       transform: [{ translateX: VOICE_SIDE_OFFSET * open }, { scale: 0.5 + 0.5 * open }],
     };
   });
