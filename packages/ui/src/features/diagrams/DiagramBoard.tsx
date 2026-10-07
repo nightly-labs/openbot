@@ -9,7 +9,7 @@
  * every edit goes out through a callback, so the caller decides what an edit does.
  */
 
-import { Button, buttonVariants, DropdownMenu, Maximize2, Minus, Plus } from "@openbot/ui";
+import { Button, buttonVariants, DropdownMenu, Minus, Plus, Scan } from "@openbot/ui";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
 import { createMemo, createStore, For, onSettled, Show } from "solid-js";
@@ -632,7 +632,17 @@ export function DiagramBoard(props: DiagramBoardProps) {
       <div class="diagram-board-zoom" role="toolbar" aria-label={t("diagram.zoom.label")} data-diagram-overlay="">
         <Button
           type="button"
-          variant="ghost"
+          variant="outline"
+          size="icon-sm"
+          aria-label={t("diagram.zoom.in")}
+          title={t("diagram.zoom.in")}
+          onClick={() => zoomBy(ZOOM_STEP)}
+        >
+          <Plus aria-hidden="true" />
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
           size="icon-sm"
           aria-label={t("diagram.zoom.out")}
           title={t("diagram.zoom.out")}
@@ -642,25 +652,13 @@ export function DiagramBoard(props: DiagramBoardProps) {
         </Button>
         <Button
           type="button"
-          variant="ghost"
-          size="sm"
-          class="diagram-board-zoom-level"
+          variant="outline"
+          size="icon-sm"
           aria-label={t("diagram.zoom.fit", { zoom: format.percent(camera.scale, { maximumFractionDigits: 0 }) })}
           title={t("diagram.zoom.fit", { zoom: format.percent(camera.scale, { maximumFractionDigits: 0 }) })}
           onClick={() => fitView(true)}
         >
-          <Maximize2 aria-hidden="true" />
-          {format.percent(camera.scale, { maximumFractionDigits: 0 })}
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          aria-label={t("diagram.zoom.in")}
-          title={t("diagram.zoom.in")}
-          onClick={() => zoomBy(ZOOM_STEP)}
-        >
-          <Plus aria-hidden="true" />
+          <Scan aria-hidden="true" />
         </Button>
       </div>
 

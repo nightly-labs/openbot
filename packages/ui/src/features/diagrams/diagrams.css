@@ -152,8 +152,7 @@
   margin: 0;
 }
 
-.diagram-board-tools,
-.diagram-board-zoom {
+.diagram-board-tools {
   position: absolute;
   z-index: 2;
   display: flex;
@@ -172,19 +171,25 @@
   left: var(--openbot-space-4);
 }
 
+/* Zoom in, zoom out and fit, as a column of separate square buttons. */
 .diagram-board-zoom {
+  position: absolute;
   right: var(--openbot-space-4);
   bottom: var(--openbot-space-4);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-1-5);
 }
 
-.diagram-board-tools .ui-button,
 .diagram-board-zoom .ui-button {
-  border-radius: var(--openbot-radius-pill);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-overlay);
+  box-shadow: var(--openbot-shadow-raised);
 }
 
-.diagram-board-zoom-level {
-  min-width: 72px;
-  font-variant-numeric: tabular-nums;
+.diagram-board-tools .ui-button {
+  border-radius: var(--openbot-radius-pill);
 }
 
 /* Below the routine picker, which holds the top centre of the canvas. */

@@ -90,6 +90,7 @@ export { default as Plus } from "lucide-solid/icons/plus";
 export { default as Puzzle } from "lucide-solid/icons/puzzle";
 export { default as RefreshCw } from "lucide-solid/icons/refresh-cw";
 export { default as RotateCcw } from "lucide-solid/icons/rotate-ccw";
+export { default as Scan } from "lucide-solid/icons/scan";
 export { default as ScanLine } from "lucide-solid/icons/scan-line";
 export { default as Search } from "lucide-solid/icons/search";
 export { default as Server } from "lucide-solid/icons/server";
