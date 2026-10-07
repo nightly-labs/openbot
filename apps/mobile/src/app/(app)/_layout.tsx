@@ -75,6 +75,8 @@ function AuthenticatedStack() {
           headerShadowVisible: false,
           headerTransparent: isIOS,
           sheetExpandsWhenScrolledToEdge: false,
+          // iOS rounds a sheet by default. Android uses 0, so it gets the Material 3 sheet corner.
+          ...(isAndroid && { sheetCornerRadius: 28 }),
         }}
       >
         <Stack.Screen name="connected" options={{ animation: "fade", gestureEnabled: false, title: "" }} />
