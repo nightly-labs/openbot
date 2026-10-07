@@ -18,6 +18,7 @@ import Animated, {
 } from "react-native-reanimated";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { useCSSVariable } from "uniwind";
+import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
 import { isIOS } from "@/shared/lib/platform";
 import type { VoicePalette } from "../model/voice-palette";
 import type { VoiceMode } from "./use-voice-mode";
@@ -237,6 +238,7 @@ export function VoiceOverlay({
   const veil = blurred ? VEIL.blurred : VEIL.plain;
   const veilStyle = useAnimatedStyle(() => ({ opacity: presence.get() * veil }));
   const topVeilStyle = useAnimatedStyle(() => ({ opacity: presence.get() * TOP_VEIL }));
+  const edgeStyle = useAnimatedStyle(() => ({ opacity: presence.get() }));
   // Send carries the words down into the chat; cancel lets them fall away in place.
   const transcriptStyle = useAnimatedStyle(() => {
     const shown = presence.get();
@@ -281,6 +283,14 @@ export function VoiceOverlay({
           topInset={topInset}
           bottomInset={controlsHeight}
         />
+      </Animated.View>
+      {/* A long transcript scrolls up under the status bar. The chat header's
+          top edge keeps the words from mixing with the time and the icons. */}
+      <Animated.View
+        pointerEvents="none"
+        style={[{ position: "absolute", top: 0, left: 0, right: 0, height: topInset + TRANSCRIPT_TOP }, edgeStyle]}
+      >
+        <SheetScrollEdgeEffect style={StyleSheet.absoluteFill} />
       </Animated.View>
     </View>
   );
