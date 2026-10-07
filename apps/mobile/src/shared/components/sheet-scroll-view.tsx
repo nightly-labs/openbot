@@ -38,7 +38,9 @@ export function SheetScrollView({
   const headerHeight = useContext(HeaderHeightContext) ?? 0;
   const headerShown = useContext(HeaderShownContext);
   const nativeHeader = isIOS && headerShown && !header;
-  const showCustomEdge = scrollEdgeEffect && !nativeHeader;
+  const stickyEdge = scrollEdgeEffect && !nativeHeader;
+  // Android draws no blur at the sheet edge. A sticky header gets the opaque sheet color instead.
+  const showCustomEdge = stickyEdge && isIOS;
   // Android: the sheet finds its scroll view only when it lays out, so nested scrolling is on from
   // the first render. A drag that starts on the list then goes to the list, and at the top of the list
   // a downward drag moves the sheet. A list that cannot scroll never takes the drag, so the content is
@@ -71,9 +73,12 @@ export function SheetScrollView({
         keyboardDismissMode={keyboardDismissMode}
         keyboardShouldPersistTaps={keyboardShouldPersistTaps}
         showsVerticalScrollIndicator={showsVerticalScrollIndicator}
-        stickyHeaderIndices={showCustomEdge ? [0] : undefined}
+        stickyHeaderIndices={stickyEdge ? [0] : undefined}
       >
-        <View className="z-10" style={header ? undefined : { height: 1, marginBottom: -1 }}>
+        <View
+          className={isAndroid && stickyEdge && header ? "z-10 bg-sheet" : "z-10"}
+          style={header ? undefined : { height: 1, marginBottom: -1 }}
+        >
           {showCustomEdge ? (
             <SheetScrollEdgeEffect
               surface="sheet"
