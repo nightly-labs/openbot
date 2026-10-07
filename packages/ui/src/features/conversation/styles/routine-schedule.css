@@ -565,26 +565,25 @@
 }
 
 /*
- * In the schedule row the menu button has the size of a chip, so the row stays as tall as an
+ * In a trigger row the menu button has the size of a chip, so the row stays as tall as an
  * input. It sits one padding from the end, as the icon does at the start.
  */
-.routine-trigger-row .routine-trigger-action {
+:is(.routine-trigger-row, .routine-trigger-card-header) .routine-trigger-action {
   margin-inline-start: calc(var(--openbot-space-1) * -1);
 }
 
-.routine-trigger-row .routine-trigger-action .ui-button {
+:is(.routine-trigger-row, .routine-trigger-card-header) .routine-trigger-action .ui-button {
   width: var(--openbot-control-sm);
   height: var(--openbot-control-sm);
   border-radius: var(--openbot-radius-xs);
 }
 
 /*
- * The webhook trigger: a header with the size of the schedule row, then one row for each value.
- * The rows start under the header title, and their actions share one column with the menu button.
+ * The webhook trigger: a header with the size of the schedule row, then one full-width row for
+ * each value. The row text starts where input text starts, and the row actions share one column
+ * with the menu button.
  */
 .routine-trigger-card {
-  --routine-card-inset: calc(var(--openbot-space-1) + var(--openbot-control-md) + var(--openbot-space-2));
-
   display: grid;
   min-width: 0;
   border: 1px solid var(--openbot-border-strong);
@@ -600,7 +599,7 @@
   padding: var(--openbot-space-1);
 }
 
-.routine-trigger-menu .routine-trigger-icon {
+:is(.routine-trigger-card-header, .routine-trigger-menu) .routine-trigger-icon {
   width: var(--openbot-control-sm);
   height: var(--openbot-control-sm);
 }
@@ -615,15 +614,16 @@
 
 .routine-webhook-field {
   display: grid;
-  min-height: var(--openbot-control-md);
-  grid-template-columns: minmax(84px, auto) minmax(0, 1fr) var(--openbot-control-md);
+  /* An action, the row padding and the top border, so a row without an action has the same height. */
+  min-height: calc(var(--openbot-control-sm) + var(--openbot-space-2) + 1px);
+  grid-template-columns: minmax(84px, auto) minmax(0, 1fr) var(--openbot-control-sm);
   align-items: center;
   gap: var(--openbot-space-3);
   border: 0;
   border-top: 1px solid var(--openbot-border);
-  margin: 0 0 0 var(--routine-card-inset);
+  margin: 0;
   background: none;
-  padding: var(--openbot-space-1) var(--openbot-space-1) var(--openbot-space-1) 0;
+  padding: var(--openbot-space-1) var(--openbot-space-1) var(--openbot-space-1) var(--openbot-space-3);
   color: inherit;
   font: inherit;
   text-align: left;
@@ -662,13 +662,18 @@ code.routine-webhook-secret {
   justify-self: center;
 }
 
+.routine-webhook-field > .ui-icon-button {
+  width: var(--openbot-control-sm);
+  height: var(--openbot-control-sm);
+}
+
 /* The Events row is a ghost Button; two classes keep the row layout over the button styles. */
 .routine-webhook-field.routine-webhook-events-toggle {
   width: auto;
   min-width: 0;
   height: auto;
   justify-content: stretch;
-  border-radius: 0 0 calc(var(--openbot-radius-md) - 1px) 0;
+  border-radius: 0 0 calc(var(--openbot-radius-md) - 1px) calc(var(--openbot-radius-md) - 1px);
   color: inherit;
   font: inherit;
   text-align: start;
@@ -701,8 +706,7 @@ code.routine-webhook-secret {
 }
 
 .routine-webhook-note {
-  margin-left: var(--routine-card-inset);
-  padding: 0 var(--openbot-space-3) var(--openbot-space-2) 0;
+  padding: 0 var(--openbot-space-3) var(--openbot-space-2);
 }
 
 .routine-trigger-card-header + .routine-webhook-note {
@@ -721,8 +725,7 @@ code.routine-webhook-secret {
   display: grid;
   gap: var(--openbot-space-3);
   border-top: 1px solid var(--openbot-border);
-  margin-left: var(--routine-card-inset);
-  padding: var(--openbot-space-3) var(--openbot-space-3) var(--openbot-space-3) 0;
+  padding: var(--openbot-space-3);
 }
 
 .routine-webhook-events .settings-field {
@@ -751,12 +754,15 @@ code.routine-webhook-secret {
   justify-self: start;
   margin-left: calc(var(--openbot-space-2) * -1);
   padding-inline: var(--openbot-space-2);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-md);
+  font-weight: inherit;
 }
 
 /* A quiet link under the rows. Its text starts under the row labels. */
 .routine-webhook-filter-link {
   justify-self: start;
-  margin: 0 0 var(--openbot-space-1) calc(var(--routine-card-inset) - var(--openbot-space-2));
+  margin: 0 0 var(--openbot-space-1) var(--openbot-space-1);
   padding-inline: var(--openbot-space-2);
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-sm);
