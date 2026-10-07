@@ -260,6 +260,7 @@ export function ChatView({
   // message. Leaving the chat or losing the server stops listening and keeps it.
   const voice = useVoiceMode({
     enabled: isFocused && serverOnline && canSend && !readOnly,
+    focused: isFocused,
     sendable: serverOnline && canSend && !sending && !pendingMessage,
     onSend: sendMessage,
   });

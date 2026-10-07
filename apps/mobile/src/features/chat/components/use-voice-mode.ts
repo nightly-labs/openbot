@@ -55,11 +55,14 @@ function timing(value: number, duration: number) {
  */
 export function useVoiceMode({
   enabled,
+  focused,
   sendable,
   onSend,
 }: {
   /** False stops listening and keeps the text, for example when the chat goes offline. */
   enabled: boolean;
+  /** The chat is the screen in front. Only then does Android back belong to the voice mode. */
+  focused: boolean;
   /** The composer could send now: online, and no other send in progress. */
   sendable: boolean;
   onSend: (text: string) => void;
@@ -199,14 +202,16 @@ export function useVoiceMode({
     if (stageRef.current === "listening") stop();
     else cancel();
   }, [stop, cancel]);
+  // Only while the chat is in front: a screen opened above it, such as the
+  // queue, must go back normally and leave the transcript for review.
   useEffect(() => {
-    if (stage === "closed") return;
+    if (stage === "closed" || !focused) return;
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
       back();
       return true;
     });
     return () => subscription.remove();
-  }, [stage, back]);
+  }, [stage, focused, back]);
 
   return {
     available: dictation.available,
