@@ -197,6 +197,9 @@ export function useVoiceDictation({
           current.fallback = "pending";
           return;
         }
+        // The user stopped it. Android reports its own stop as a "client" error,
+        // and with nothing said any error there loses nothing. No message.
+        if (phaseRef.current === "stopping" && (!current.heard || event.error === "client")) return;
         const notice = dictationNotice(event.error);
         if (notice) showNotice(notice);
       }),
