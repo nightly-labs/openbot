@@ -20,8 +20,8 @@ import type { SidebarPinnedItem } from "./sidebar-pins";
  * Reading them from the entry component made the pure logic depend on the whole
  * view to borrow a name.
  */
-/** What the list under the search shows. `agents` is the full chat list, channels included. */
-export type SidebarView = "agents" | "channels" | "diagrams";
+/** What the list under the search shows: the chat list (agents and channels) or the diagrams. */
+export type SidebarView = "agents" | "diagrams";
 
 export interface SidebarProps {
   /** The switch over the list is shown only when the caller handles `onViewChange`. */

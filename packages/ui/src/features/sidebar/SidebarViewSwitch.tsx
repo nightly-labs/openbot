@@ -1,11 +1,11 @@
-/** The switch over the list: every chat, only channels, or the diagrams. */
+/** The switch over the list: the chats, or the diagrams that show how routines start agents. */
 
-import { Bot, Hash, SlidingTabs, Workflow } from "@openbot/ui";
+import { Bot, SlidingTabs, Workflow } from "@openbot/ui";
 import { useText } from "../../text";
 import { useSidebarScope } from "./sidebar-scope";
 import type { SidebarView } from "./sidebar-types";
 
-const VIEWS = ["agents", "channels", "diagrams"] as const satisfies readonly SidebarView[];
+const VIEWS = ["agents", "diagrams"] as const satisfies readonly SidebarView[];
 
 function isSidebarView(value: string): value is SidebarView {
   return VIEWS.some((view) => view === value);
@@ -26,10 +26,6 @@ export function SidebarViewSwitch() {
           <SlidingTabs.Trigger value="agents" class="sidebar-view-tab">
             <Bot aria-hidden="true" />
             {t("sidebar.view.agents")}
-          </SlidingTabs.Trigger>
-          <SlidingTabs.Trigger value="channels" class="sidebar-view-tab">
-            <Hash aria-hidden="true" />
-            {t("sidebar.view.channels")}
           </SlidingTabs.Trigger>
           <SlidingTabs.Trigger value="diagrams" class="sidebar-view-tab">
             <Workflow aria-hidden="true" />

@@ -15,16 +15,14 @@ export function SidebarEmptyState() {
   const { t } = useText();
   return (
     <Show
-      when={!query().trim() && props.view !== "channels" && props.emptyAction}
+      when={!query().trim() && props.emptyAction}
       fallback={
         <p class="empty-search">
           {query().trim()
             ? t("sidebar.empty.noMatches")
-            : props.view === "channels"
-              ? t("sidebar.empty.noChannels")
-              : props.agents.length
-                ? t("sidebar.empty.noMatches")
-                : t("sidebar.empty.noAgents")}
+            : props.agents.length
+              ? t("sidebar.empty.noMatches")
+              : t("sidebar.empty.noAgents")}
         </p>
       }
     >

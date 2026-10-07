@@ -704,7 +704,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * The whole surface. On the Agents and Channels views the middle shows the open chat; on the
+ * The whole surface. On the Agents view the middle shows the open agent or channel chat; on the
  * Diagrams view it shows the selected diagram.
  */
 export const Workspace: Story = {};
@@ -741,5 +741,4 @@ export const ReadOnly: Story = {
 };
 
 export const SidebarAgentsView: Story = { render: () => <SidebarWithViews initialView="agents" /> };
-export const SidebarChannelsView: Story = { render: () => <SidebarWithViews initialView="channels" /> };
 export const SidebarDiagramsView: Story = { render: () => <SidebarWithViews initialView="diagrams" /> };
