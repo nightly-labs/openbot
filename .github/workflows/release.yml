@@ -1061,7 +1061,8 @@ jobs:
             docker rmi openbot:release
           done
           docker buildx imagetools create \
-            --tag "$IMAGE:$RELEASE_VERSION" --tag "$IMAGE:latest" --tag "$IMAGE:sha-${GITHUB_SHA::7}" \
+            --tag "$IMAGE:$RELEASE_VERSION" --tag "$IMAGE:v$RELEASE_VERSION" \
+            --tag "$IMAGE:latest" --tag "$IMAGE:sha-${GITHUB_SHA::7}" \
             "$IMAGE:$RELEASE_VERSION-amd64" "$IMAGE:$RELEASE_VERSION-arm64"
           digest=$(docker buildx imagetools inspect "$IMAGE:$RELEASE_VERSION" --format '{{json .Manifest}}' | jq -r .digest)
           [[ $digest =~ ^sha256:[0-9a-f]{64}$ ]]
@@ -1074,3 +1075,19 @@ jobs:
           subject-name: ${{ env.IMAGE }}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
+
+      # An authenticated push can succeed while the package is still private.
+      - name: Verify anonymous Docker image access
+        shell: bash
+        run: |
+          set -euo pipefail
+          anonymous_config=$(mktemp -d)
+          trap 'rm -rf "$anonymous_config"' EXIT
+          for tag in "$RELEASE_VERSION" "v$RELEASE_VERSION" latest; do
+            if ! docker --config "$anonymous_config" manifest inspect "$IMAGE:$tag" > "$anonymous_config/manifest.json"; then
+              echo "::error::Cannot read $IMAGE:$tag without authentication. Check the GHCR package visibility and set it to Public. See docs/RELEASING.md."
+              exit 1
+            fi
+            jq -e '[.manifests[].platform | select(.os == "linux") | .architecture] | sort == ["amd64", "arm64"]' \
+              "$anonymous_config/manifest.json" >/dev/null
+          done
