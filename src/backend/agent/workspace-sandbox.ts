@@ -1,7 +1,8 @@
 import { tmpdir } from "node:os";
 import { type AgentSummary, workspaceAccessEnforced } from "@openbot/contracts/ipc";
+import { effectiveWorkingDirectory } from "./working-directory";
 
-type SandboxedAgent = Pick<AgentSummary, "access" | "provider" | "workspacePath">;
+type SandboxedAgent = Pick<AgentSummary, "access" | "provider" | "workspacePath" | "workingDirectory">;
 
 /**
  * The sandbox mode sent with each thread. A `workspace` agent can write only in its workspace, the
@@ -18,8 +19,11 @@ export function codexSandboxMode(agent: SandboxedAgent): "workspace-write" | "da
 }
 
 /** The folders a Workspace only agent may write, besides the temporary folders. */
-export function workspaceWritableRoots(agent: Pick<AgentSummary, "workspacePath">, sharedRoot: string) {
-  return [agent.workspacePath, sharedRoot];
+export function workspaceWritableRoots(
+  agent: Pick<AgentSummary, "workspacePath" | "workingDirectory">,
+  sharedRoot: string,
+) {
+  return [...new Set([effectiveWorkingDirectory(agent), agent.workspacePath, sharedRoot])];
 }
 
 export type CodexSandboxPolicy =

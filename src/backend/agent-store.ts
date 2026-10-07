@@ -567,7 +567,7 @@ export class AgentStore {
 
   updateAgent = Effect.fn("AgentStore.updateAgent")(function* (
     this: AgentStore,
-    input: UpdateAgentInput,
+    input: UpdateAgentInput & { workingDirectory?: string | null },
     initiatingAgentId?: string,
   ): Effect.fn.Return<AgentSummary, StoredStateFailure> {
     try {
@@ -582,6 +582,8 @@ export class AgentStore {
       if (input.description !== undefined) {
         next.description = limitedText(input.description, "Agent description", INPUT_LIMITS.agentDescription);
       }
+      if (input.workingDirectory === null) delete next.workingDirectory;
+      else if (input.workingDirectory !== undefined) next.workingDirectory = input.workingDirectory;
       if (input.notifications !== undefined) next.notifications = input.notifications;
       // Checked here and not only in the IPC decoder, because the caller closest to the data is not a
       // user: `AgentService` writes the provider, model and effort straight out of `listModels()`, which
@@ -643,11 +645,31 @@ export class AgentStore {
       Object.assign(agent, next);
       // A copy cannot remove a field, and `null` above returned the agent to the app default.
       if (next.busyMessageMode === undefined) delete agent.busyMessageMode;
+      if (next.workingDirectory === undefined) delete agent.workingDirectory;
       try {
-        this.#persist(modelChange ? "agent.model-changed" : "agent.updated", modelChange);
+        if (input.workingDirectory !== undefined) {
+          this.#database.dispatch(
+            `working-directory:${randomUUID()}`,
+            [
+              {
+                aggregateType: "agents",
+                aggregateId: agent.id,
+                eventType: "agent.working-directory-changed",
+                payload: { agentId: agent.id },
+              },
+            ],
+            () => {
+              this.#persist("agent.updated");
+              for (const threadId of this.#database.activeProviderSessionThreads(agent.id))
+                this.#database.deactivateProviderSessions(threadId);
+              return null;
+            },
+          );
+        } else this.#persist(modelChange ? "agent.model-changed" : "agent.updated", modelChange);
       } catch (error) {
         Object.assign(agent, previous);
         if (previous.busyMessageMode === undefined) delete agent.busyMessageMode;
+        if (previous.workingDirectory === undefined) delete agent.workingDirectory;
         throw error;
       }
       return { ...agent };
@@ -1630,6 +1652,11 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
   const id = value.id;
   if (!isString(id) || !isValidAgentId(id)) return { unreadable: "id", id: null };
   if (!isString(value.workspacePath)) return { unreadable: "workspacePath", id };
+  if (
+    value.workingDirectory !== undefined &&
+    (!isString(value.workingDirectory) || !isAbsolute(value.workingDirectory))
+  )
+    return { unreadable: "workingDirectory", id };
   if (value.threadId !== null && !isString(value.threadId)) return { unreadable: "threadId", id };
 
   const repaired: string[] = [];
@@ -1679,6 +1706,7 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
       : reset("reasoningEffort", DEFAULT_REASONING_EFFORT),
     threadId: value.threadId,
     workspacePath: value.workspacePath,
+    ...(value.workingDirectory === undefined ? {} : { workingDirectory: value.workingDirectory }),
     preview: isString(value.preview) ? value.preview : reset("preview", NEW_AGENT_PREVIEW),
     updatedAt: isString(value.updatedAt) || value.updatedAt === null ? value.updatedAt : reset("updatedAt", null),
     avatarSeed: isAvatarSeed(value.avatarSeed) ? value.avatarSeed : reset("avatarSeed", id),

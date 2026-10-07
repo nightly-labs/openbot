@@ -92,6 +92,8 @@ export interface AgentSummary {
   busyMessageMode?: BusyMessageMode;
   threadId: string | null;
   workspacePath: string;
+  /** Local host setting; absent uses the managed workspace. Not part of released Team summaries. */
+  workingDirectory?: string;
   preview: string;
   updatedAt: string | null;
   avatarSeed: string;
@@ -123,6 +125,7 @@ export function isAgentSummary(value: unknown): value is AgentSummary {
     (value.busyMessageMode === undefined || isBusyMessageMode(value.busyMessageMode)) &&
     (value.threadId === null || isIdentifier(value.threadId)) &&
     isBoundedString(value.workspacePath, INPUT_LIMITS.path) &&
+    (value.workingDirectory === undefined || isBoundedString(value.workingDirectory, INPUT_LIMITS.path)) &&
     isBoundedString(value.preview, INPUT_LIMITS.messageText) &&
     (value.updatedAt === null || isBoundedString(value.updatedAt, 160)) &&
     isAvatarSeed(value.avatarSeed) &&

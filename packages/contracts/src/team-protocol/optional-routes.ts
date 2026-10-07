@@ -7,6 +7,7 @@ import { AGENT_IMPORT_CODECS } from "./agent-import-v1";
 import { AGENT_INSTALL_CODECS } from "./agent-install-v1";
 import { AGENT_PUBLISH_CODECS } from "./agent-publish-v1";
 import { AGENT_UPDATE_CODECS } from "./agent-update-v1";
+import { AGENT_WORKING_DIRECTORY_CODECS } from "./agent-working-directory-v1";
 import { CONTEXT_RESET_CODECS } from "./context-reset-v1";
 import { HOST_ADMIN_CODECS } from "./host-admin-v1";
 import { HOST_UPDATE_CODECS } from "./host-update-v1";
@@ -24,6 +25,7 @@ export type { OptionalRouteCodec } from "./admin-wire";
 
 const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...AGENT_ADMIN_CODECS,
+  ...AGENT_WORKING_DIRECTORY_CODECS,
   ...SKILLS_ADMIN_CODECS,
   ...SHARED_TABLES_CODECS,
   ...AGENT_INSTALL_CODECS,

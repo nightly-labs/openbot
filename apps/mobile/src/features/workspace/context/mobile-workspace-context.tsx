@@ -783,10 +783,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       }
       if (event.type === "agents-changed") {
         replaceServerAgents(serverId, event.agents);
-        // Access and auto-approve are not in the agent summary; the host sends this event when either changes.
+        // Administration settings are read separately from the frozen agent summary.
         void queryClient.invalidateQueries({
           queryKey: ["agent-info", session.apiUrl, session.user.id, sessionScope, serverId],
-          predicate: (query) => query.queryKey.at(-1) === "admin",
+          predicate: (query) => ["admin", "working-directory"].includes(String(query.queryKey.at(-1))),
         });
       } else if (event.type === "conversation") {
         const knownIds = serverAgentIds.current.get(serverId) ?? new Set<string>();

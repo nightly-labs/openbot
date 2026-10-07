@@ -73,6 +73,7 @@ import { storageIpcHandlers } from "./ipc/storage-handlers";
 import { teamIpcHandlers } from "./ipc/team-handlers";
 import { updateIpcHandlers } from "./ipc/update-handlers";
 import { voiceIpcHandlers } from "./ipc/voice-handlers";
+import { workingDirectoryIpcHandlers } from "./ipc/working-directory-handlers";
 import { installLinuxDesktopEntry } from "./linux-desktop-entry";
 import { MacHapticFeedback } from "./mac-haptic-feedback";
 import {
@@ -431,6 +432,7 @@ function registerIpcHandlers({
   idleRestart,
   approvalAutomation,
   agentAdminSettings,
+  agentWorkingDirectory,
   language,
   logoColor,
   notificationPreference,
@@ -544,6 +546,7 @@ function registerIpcHandlers({
     ...routineIpcHandlers({ service, remoteServers }),
     ...channelMemoryIpcHandlers({ service, remoteServers }),
     ...channelRoutineIpcHandlers({ service, remoteServers }),
+    ...workingDirectoryIpcHandlers(agentWorkingDirectory, remoteServers),
     ...agentAdminIpcHandlers({
       settings: agentAdminSettings,
       skills,

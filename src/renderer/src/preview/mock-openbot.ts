@@ -219,6 +219,7 @@ function mockWorkspaceDirectory(path: string): WorkspaceDirectory {
 const MOCK_MCP_TOOL_COUNTS: Record<string, number> = { "Local SQLite": 12, Linear: 1, Figma: 6 };
 
 export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBotControls {
+  const workingDirectories = new Map<string, string>();
   const appInfo = clone(options.appInfo ?? STORY_APP_INFO);
   let setupState = clone<AppSetupState>(
     options.setupState ?? { completed: true, preferredProvider: "codex", preferredModel: null },
@@ -969,6 +970,28 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       listAgents: async () => clone(agents),
       listInstalledSkills: async (agentId) => clone(readInstalledSkills(agentId)),
       ...mockChannels,
+      getWorkingDirectory: async (agentId) => ({
+        workingDirectory: workingDirectories.get(agentId) ?? null,
+        effectivePath: workingDirectories.get(agentId) ?? `/OpenBot/Agents/${agentId}`,
+        busy: false,
+      }),
+      setWorkingDirectory: async ({ agentId, path }) => {
+        if (path === null) workingDirectories.delete(agentId);
+        else workingDirectories.set(agentId, path);
+        agents = agents.map((agent) =>
+          agent.id === agentId ? { ...agent, updatedAt: new Date().toISOString() } : agent,
+        );
+        emitAgentEvent({ type: "agents-changed", agents });
+        return { workingDirectory: path, effectivePath: path ?? `/OpenBot/Agents/${agentId}`, busy: false };
+      },
+      browseWorkingDirectory: async ({ path }) => ({
+        path: path ?? "/Projects",
+        parentPath: "/",
+        roots: [{ name: "Projects", path: "/Projects" }],
+        entries: [{ name: "example", path: "/Projects/example" }],
+        nextOffset: null,
+      }),
+      chooseWorkingDirectory: async () => "/Projects/example",
       getAgentAdminSettings: async (agentId) => {
         const agent = agents.find((candidate) => candidate.id === agentId);
         if (!agent) throw new Error("Agent not found");

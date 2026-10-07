@@ -4,6 +4,7 @@ import {
   agentProviderDescriptor,
   type ServerSummary,
 } from "@openbot/contracts/ipc";
+import { AGENT_WORKING_DIRECTORY_CAPABILITY } from "@openbot/contracts/team-protocol/agent-working-directory-v1";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { PROVIDERS_SIGN_IN_V3_PROVIDERS } from "@openbot/contracts/team-protocol/providers-v3";
 import { PROVIDERS_V4_SIGN_IN_PROVIDERS } from "@openbot/contracts/team-protocol/providers-v4";
@@ -40,7 +41,8 @@ export function serverSupportsCapability(
       capability === "host-admin-v1" ||
       capability === "host-update-v1" ||
       capability === "context-reset-v1" ||
-      capability === "agent-import-v1") &&
+      capability === "agent-import-v1" ||
+      capability === AGENT_WORKING_DIRECTORY_CAPABILITY) &&
     server?.kind === "remote"
   ) {
     return server.compatibility?.capabilities.includes(capability) === true;

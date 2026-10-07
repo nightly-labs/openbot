@@ -6,6 +6,7 @@ import { ArrowLeft, TriangleAlert } from "lucide-react-native";
 import { useMemo } from "react";
 import { Pressable, View, type ViewStyle } from "react-native";
 import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
+import { AgentWorkingDirectory } from "@/features/agents/components/agent-working-directory";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { ChannelAvatar } from "@/features/channels/components/channel-avatar";
 import { ChatGlassIconButton } from "@/features/chat/components/chat-glass-icon-button";
@@ -42,7 +43,12 @@ export function ChatHeader({
 }: ChatHeaderProps) {
   const warning = useThemeColor("warning");
   const { t } = useText();
-  const { servers } = useMobileWorkspace();
+  const { servers, agents } = useMobileWorkspace();
+  const directoryAgent =
+    target.kind === "agent"
+      ? agents.find((agent) => agent.id === target.id && agent.serverId === target.serverId)
+      : undefined;
+  const directoryServer = servers.find((server) => server.id === target.serverId);
   const disconnected = !servers.some((server) => server.id === target.serverId && server.state === "online");
   const members = useMemo(
     () => new Map(target.kind === "channel" ? target.members.map((member) => [member.id, member]) : []),
@@ -129,10 +135,21 @@ export function ChatHeader({
                 </AgentPinAvatar>
               </Link.AppleZoomTarget>
             )}
-            <Typography.Paragraph className="min-w-0 shrink" weight="semibold" numberOfLines={1}>
-              {target.name}
-            </Typography.Paragraph>
+            <View className="min-w-0 shrink">
+              <Typography.Paragraph weight="semibold" numberOfLines={1}>
+                {target.name}
+              </Typography.Paragraph>
+            </View>
           </Pressable>
+          {directoryAgent ? (
+            <AgentWorkingDirectory
+              key={`${target.serverId}:${target.id}`}
+              agent={directoryAgent}
+              server={directoryServer}
+              available={!disconnected}
+              compact
+            />
+          ) : null}
         </GlassView>
 
         <View className="flex-1" />

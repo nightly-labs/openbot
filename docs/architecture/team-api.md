@@ -201,3 +201,29 @@ Capabilities describe additive behavior. The client sends its capability list wh
 Team API failures use a JSON error envelope with `error` and a stable `code`. Compatibility codes are `client_update_required`, `host_update_required`, and `protocol_error`. Authentication and network failures are projected to `authentication_required` and `network_unavailable` in the desktop connection state. A confirmed compatibility or protocol error stops data-plane requests and automatic reconnect until the user selects `Retry`, restarts, or updates.
 
 Protocol support has no fixed time or release limit. Removal is an exceptional architecture decision. It requires a security issue, data-loss risk, semantics that cannot be kept, or technical cost that cannot be contained in an adapter. The decision must also include a changelog entry, update instructions, tests for old-client/new-host and new-client/old-host directions, and clear blocking UI.
+
+## Agent working directories
+
+The optional `agent-working-directory-v1` capability provides read, browse, and update operations
+under `/v1/admin/agents/working-directory`. It does not change released agent summaries or
+`agent-admin-v1`. A client without the capability cannot use these routes. An older host causes
+clients to hide the controls.
+
+### Threat model
+
+Remote owners and admins can list directory names anywhere the host account can read. This
+reveals host paths and directory names. Members cannot use any of these operations. Each request
+checks the role and agent visibility before reading host files. The browse operation returns one
+level, at most 100 directory entries per page, and never file contents. Links are resolved before
+selection. A request cannot create, move, or remove files. Update validates the folder and passes
+through the same agent service as local changes.
+
+Listings travel through the existing authenticated host connection. Cloudflare does not store
+them. Responses must not be added to analytics or diagnostic logs. Expected I/O errors contain
+catalog text only. The selected path is a host setting, not a permission grant to other clients.
+The browse offset counts raw directory entries, including files and hidden entries. The host accepts
+offsets through 100,000, reads at most 1,000 raw entries after each requested offset, and returns
+at most 100 directory entries. Files count toward the offset and scan limit but never appear in the
+response. The host stops returning `nextOffset` at the 100,000-entry cap. A path entered directly
+is resolved and checked on the host; an invalid or unavailable path returns an error and does not
+fall back to the managed workspace.

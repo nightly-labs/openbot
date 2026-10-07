@@ -269,3 +269,26 @@ like a plugin link, the link itself installs nothing. The page's fallback line a
 page links `/app` with the four invitation fields, and a plugin page links `/app?plugin=<slug>`. The
 browser client removes these fields after it reads them and opens the join dialog or the marketplace
 listing. It never joins or installs without a press.
+
+## Working directory
+
+`workspacePath` remains the managed OpenBot folder. An optional `workingDirectory` in the
+SQLite agent JSON selects an existing local folder for provider sessions and turns. An absent
+value uses the managed folder. This needs no SQL schema migration. Agent events preserve the
+setting during replay. Duplication, templates, marketplace exports, and imports do not copy it.
+
+The host resolves and checks a selected directory. It checks the directory again before execution.
+A missing directory stops the turn; it does not select another folder. The service holds new turns
+while a change is in progress and refuses a change when work is pending. The store commits the
+setting and invalidates provider sessions in one transaction. The public thread and conversation
+remain. Provider work steps are saved for the next session's handoff.
+
+The managed folder still owns skills, attachments, and cleanup. Changing or clearing the selected
+folder does not move files. Removing an agent never removes an external working directory. Agents
+must copy files into their managed workspace before sending them as attachments. The released
+workspace file APIs still refer to the managed workspace.
+
+Workspace only permits writes to the selected folder in addition to the existing managed,
+Shared, and temporary roots. Full access and Shared access keep their existing behavior. Directory
+selection does not limit reads or provide isolation. Git operations still follow the provider's
+Access mode, including any required approval for Git metadata outside a selected worktree.

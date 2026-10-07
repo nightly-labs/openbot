@@ -2,7 +2,9 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AgentEvent, AttachmentImportEvent, AttachmentSummary, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 import { runTeamEffect } from "@openbot/team-client";
 import {
+  browseWorkingDirectory,
   deleteSharedTable,
+  getWorkingDirectory,
   installAgentSkill,
   listAgentSkills,
   listMcpServers,
@@ -10,6 +12,7 @@ import {
   previewAgentTemplate,
   publishAgentTemplate,
   setAgentSkillEnabled,
+  setWorkingDirectory,
   uninstallAgentSkill,
   unpublishAgentTemplate,
 } from "@openbot/team-client/team-admin-requests";
@@ -30,6 +33,14 @@ function webHostAdmin(
   onHostEvent?: HostEvents,
 ): NonNullable<ConversationRuntime["admin"]> {
   return {
+    workingDirectory: {
+      getWorkingDirectory: (agentId) =>
+        runTeamEffect(getWorkingDirectory(request(), agentId).pipe(Effect.mapError((error) => error.cause))),
+      setWorkingDirectory: (input) =>
+        runTeamEffect(setWorkingDirectory(request(), input).pipe(Effect.mapError((error) => error.cause))),
+      browseWorkingDirectory: (input) =>
+        runTeamEffect(browseWorkingDirectory(request(), input).pipe(Effect.mapError((error) => error.cause))),
+    },
     skills: {
       listInstalled: (agentId) =>
         runTeamEffect(listAgentSkills(request(), agentId).pipe(Effect.mapError((error) => error.cause))),

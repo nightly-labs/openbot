@@ -104,6 +104,7 @@ export interface AgentSettingsPanelProps {
   onResizeEnd: (width: number) => void;
   /** Application-owned navigation and detail surfaces, in the existing panel layout. */
   links?: JSX.Element;
+  workingDirectory?: JSX.Element;
   detailOpen?: boolean;
   children?: JSX.Element;
   onUpdateAgent: (agentId: string, updates: Omit<UpdateAgentInput, "agentId">) => Promise<void>;
@@ -965,14 +966,21 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   <SelectContent />
                 </Select>
               </Show>
-              <div class="agent-settings-runtime-path">
-                <span class="agent-settings-runtime-label">{t("agentSettings.runtime.workingDirectory")}</span>
-                <span>
-                  {props.agent.workspacePath
-                    ? breakablePath(props.agent.workspacePath)
-                    : t("agentSettings.runtime.notAvailable")}
-                </span>
-              </div>
+              <Show
+                when={props.workingDirectory}
+                fallback={
+                  <div class="agent-settings-runtime-path">
+                    <span class="agent-settings-runtime-label">{t("agentSettings.runtime.workingDirectory")}</span>
+                    <span>
+                      {props.agent.workspacePath
+                        ? breakablePath(props.agent.workspacePath)
+                        : t("agentSettings.runtime.notAvailable")}
+                    </span>
+                  </div>
+                }
+              >
+                {props.workingDirectory}
+              </Show>
             </div>
             <Text as="p" class="agent-settings-runtime-note" variant="caption" tone="muted">
               <Show

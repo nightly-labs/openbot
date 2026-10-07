@@ -4,6 +4,7 @@ import { AGENT_IMPORT_ROUTES } from "./agent-import-v1";
 import { AGENT_INSTALL_ROUTES } from "./agent-install-v1";
 import { AGENT_PUBLISH_ROUTES } from "./agent-publish-v1";
 import { AGENT_UPDATE_ROUTES } from "./agent-update-v1";
+import { AGENT_WORKING_DIRECTORY_ROUTES } from "./agent-working-directory-v1";
 import { CONTEXT_RESET_ROUTES } from "./context-reset-v1";
 import { HOST_ADMIN_ROUTES } from "./host-admin-v1";
 import { HOST_UPDATE_ROUTES, hostRestartEvent } from "./host-update-v1";
@@ -58,6 +59,42 @@ describe("agent-admin-v1", () => {
     expect(() => codec(AGENT_ADMIN_ROUTES.update).request({ agentId: "chief", access: "root" })).toThrow();
     expect(() => codec(AGENT_ADMIN_ROUTES.update).response(200, { ...settings, access: "root" })).toThrow();
     expect(() => codec(AGENT_ADMIN_ROUTES.update).response(200, { access: "full" })).toThrow();
+  });
+});
+
+describe("agent-working-directory-v1", () => {
+  it("rejects NUL bytes in path fields", () => {
+    const invalidPath = "/tmp/\0repository";
+    expect(() =>
+      codec(AGENT_WORKING_DIRECTORY_ROUTES.update).request({ agentId: "chief", path: invalidPath }),
+    ).toThrow();
+    expect(() =>
+      codec(AGENT_WORKING_DIRECTORY_ROUTES.settings).response(200, {
+        workingDirectory: invalidPath,
+        effectivePath: "/tmp/repository",
+        busy: false,
+      }),
+    ).toThrow();
+  });
+
+  it("bounds raw directory offsets", () => {
+    expect(() =>
+      codec(AGENT_WORKING_DIRECTORY_ROUTES.browse).request({
+        agentId: "chief",
+        path: "/tmp/repository",
+        showHidden: false,
+        offset: 100_001,
+      }),
+    ).toThrow();
+    expect(() =>
+      codec(AGENT_WORKING_DIRECTORY_ROUTES.browse).response(200, {
+        path: "/tmp/repository",
+        parentPath: "/tmp",
+        roots: [],
+        entries: [],
+        nextOffset: 100_001,
+      }),
+    ).toThrow();
   });
 });
 

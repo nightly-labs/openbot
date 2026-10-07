@@ -160,3 +160,11 @@ describe("installing an agent template", () => {
     expect(createAgentProfile).not.toHaveBeenCalled();
   });
 });
+
+it("omits an external working directory from template and marketplace snapshots", async () => {
+  const { templates } = service("Drafts product writing.");
+  const snapshot = await runCauseEffect(templates.snapshot({ ...agent, workingDirectory: "/private/repository" }));
+  expect(JSON.stringify(snapshot)).not.toContain("/private/repository");
+  expect(snapshot).not.toHaveProperty("workingDirectory");
+  expect(snapshot).not.toHaveProperty("workspacePath");
+});

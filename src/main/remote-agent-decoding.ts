@@ -1,4 +1,10 @@
-import { decodeAgentAnalytics, decodeHostAnalytics, decodeInstalledSkills } from "@openbot/contracts/ipc";
+import {
+  decodeAgentAnalytics,
+  decodeHostAnalytics,
+  decodeInstalledSkills,
+  isHostDirectory,
+  isWorkingDirectorySettings,
+} from "@openbot/contracts/ipc";
 // Agent-shaped wire payloads: summaries, status, models, skills, memories, routines, queue.
 // See `remote-host-decoding.ts` for why the `FromHost` suffix exists and must not be merged away.
 
@@ -187,3 +193,9 @@ export function decodeAgentAnalyticsFromHost(value: unknown) {
 export function decodeHostAnalyticsFromHost(value: unknown) {
   return decodeHostAnalytics(value);
 }
+
+export const decodeHostDirectoryFromHost = guardedDecoder(isHostDirectory, "host directory");
+export const decodeWorkingDirectorySettingsFromHost = guardedDecoder(
+  isWorkingDirectorySettings,
+  "working directory settings",
+);

@@ -27,6 +27,7 @@ import { isMissingProviderSessionError, isRequestTimeout, providerForAgent } fro
 import type { ThreadLifecycle } from "./thread-lifecycle";
 import { TurnSlots } from "./turn-slots";
 import type { UsageLimitGate } from "./usage-limit-gate";
+import { effectiveWorkingDirectory, validateWorkingDirectory } from "./working-directory";
 import { codexSandboxPolicy, workspaceWritableRoots } from "./workspace-sandbox";
 
 /** Shown to the user when a message names a model of an endpoint that was taken out. */
@@ -151,6 +152,7 @@ export class DrainScheduler {
   /** The clauses of this agent's own state. `#heldByMachine` adds the memory and the turn slots. */
   mayDrain(agentId: string): boolean {
     return (
+      !this.#threads.directoryChanges.has(agentId) &&
       !this.#conversation.workingSnapshot(agentId)?.activeTurnId &&
       (this.#channels?.mayDrain(agentId) ?? true) &&
       this.#profileSave.mayDrain(agentId) &&
@@ -455,6 +457,8 @@ export class DrainScheduler {
           // between, and an endpoint removed during that wait finds the process still running. The
           // retry below calls this as well, so the recovered thread is checked too.
           yield* drainStep(requireServedModel);
+          if (agent.workingDirectory)
+            yield* validateWorkingDirectory(agent.workingDirectory).pipe(toDeliveryStartFailed);
           return yield* this.#threads
             .requestWithArchivedThreadRecovery(
               agent,
@@ -470,7 +474,8 @@ export class DrainScheduler {
                 answerOptional:
                   delivery.sender.kind === "agent" && delivery.expectsReply === false && !delivery.replyToMessageId,
                 input: inputForThread(providerThreadId),
-                cwd: agent.workspacePath,
+                cwd: effectiveWorkingDirectory(agent),
+                managedWorkspace: agent.workspacePath,
                 runtimeWorkspaceRoots: workspaceWritableRoots(agent, this.#store.sharedRoot),
                 approvalPolicy: "on-request",
                 sandboxPolicy: codexSandboxPolicy(agent, this.#store.sharedRoot),

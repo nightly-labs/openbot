@@ -1,3 +1,9 @@
+import type {
+  BrowseWorkingDirectoryInput,
+  HostDirectory,
+  SetWorkingDirectoryInput,
+  WorkingDirectorySettings,
+} from "./ipc-working-directory";
 // The one channel list. Each endpoint holds its wire value, the group it belongs to, and whether it
 // is a request the renderer invokes or an event the main process sends. That is what lets a
 // registrar bind its handlers as an object keyed by endpoint, so a channel with no handler, and a
@@ -932,6 +938,12 @@ export const IPC_ENDPOINTS = {
   },
   // Access and auto-approve of one agent, read and written on the computer that runs it. A joined
   // server answers only an owner or admin, and only when it advertises `agent-admin-v1`.
+  workingDirectory: {
+    getWorkingDirectory: scopedRequest<string, WorkingDirectorySettings>()("agent:directory:read"),
+    setWorkingDirectory: scopedRequest<SetWorkingDirectoryInput, WorkingDirectorySettings>()("agent:directory:set"),
+    browseWorkingDirectory: scopedRequest<BrowseWorkingDirectoryInput, HostDirectory>()("agent:directory:browse"),
+    chooseWorkingDirectory: request<string, string | null>()("agent:directory:choose"),
+  },
   agentAdmin: {
     getAgentAdminSettings: scopedRequest<string, AgentAdminSettings>()("agent:admin:get-settings"),
     updateAgentAdminSettings: scopedRequest<UpdateAgentAdminSettingsInput, AgentAdminSettings>()(
@@ -1081,6 +1093,7 @@ export const IPC_GROUP_PATHS = {
   browserInput: "browser",
   servers: "servers",
   agentAdmin: "agent",
+  workingDirectory: "agent",
   mcpServers: "agent",
   storage: "storage",
   agentImport: "agentImport",

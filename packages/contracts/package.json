@@ -75,6 +75,7 @@
     "./team-protocol/optional-events": "./src/team-protocol/optional-events.ts",
     "./team-protocol/mcp-v1": "./src/team-protocol/mcp-v1.ts",
     "./team-protocol/storage-v1": "./src/team-protocol/storage-v1.ts",
+    "./team-protocol/agent-working-directory-v1": "./src/team-protocol/agent-working-directory-v1.ts",
     "./team-protocol/agent-admin-v1": "./src/team-protocol/agent-admin-v1.ts",
     "./team-protocol/agent-import-v1": "./src/team-protocol/agent-import-v1.ts",
     "./team-protocol/agent-install-v1": "./src/team-protocol/agent-install-v1.ts",

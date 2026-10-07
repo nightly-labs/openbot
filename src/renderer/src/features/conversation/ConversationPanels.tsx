@@ -1,4 +1,5 @@
 import type { ServerSummary } from "@openbot/contracts/ipc";
+import { WorkingDirectorySettings } from "@openbot/ui/features/conversation/WorkingDirectorySettings";
 import { useText } from "@openbot/ui/text";
 import { actionToast } from "../../action-toast";
 import { createSettingsPanelWidth, saveSettingsPanelWidth } from "../../components/settings-panel-width";
@@ -9,6 +10,7 @@ import { serverCanAdminister, serverSupportsCapability } from "../servers/server
 import { htmlAttachmentPageUrl } from "./chat-visual-url";
 import { useConversationController } from "./conversation-controller-context";
 import { useConversationViewScope } from "./conversation-scope";
+import { workingDirectoryCalls } from "./working-directory-calls";
 
 const SETTINGS_PANEL_MIN = 180;
 const SETTINGS_PANEL_MAX = 1600;
@@ -19,7 +21,7 @@ const CONVERSATION_PANEL_MIN = 96;
 const loadAgentSettingsPanel = () => import("./AgentSettingsPanel");
 
 import { Portal } from "@solidjs/web";
-import { createEffect, Loading, lazy, onSettled, Show } from "solid-js";
+import { createEffect, createMemo, Loading, lazy, onSettled, Show } from "solid-js";
 import { conversationPort } from "./conversation-port";
 
 /** @internal Stable HMR boundary for conversation panels. */
@@ -127,6 +129,20 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
   createEffect(browserSidebarOpen, (open, previous) => {
     if (open && previous === false) onSettled(() => browserPreviewTrigger?.focus());
   });
+  const directoryCalls = createMemo(() => workingDirectoryCalls(props.server, props.runtime));
+  const workingDirectoryFor = (agent: () => NonNullable<typeof props.agent>) => {
+    const calls = directoryCalls();
+    if (!calls) return undefined;
+    return (
+      <WorkingDirectorySettings
+        agentId={agent().id}
+        revision={agent().updatedAt}
+        hostName={props.server?.name ?? ""}
+        working={agentActivity() === "Working"}
+        calls={calls}
+      />
+    );
+  };
   return (
     <>
       <Show when={filePreviewOpen() && sidebarFilePreview()}>
@@ -259,6 +275,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
         {(agent) => (
           <Loading>
             <AgentSettingsPanel
+              workingDirectory={workingDirectoryFor(agent)}
               remoteClient={Boolean(props.runtime)}
               adminCalls={props.runtime?.admin}
               skillsMarketplaceOpen={props.skillsMarketplaceOpen}

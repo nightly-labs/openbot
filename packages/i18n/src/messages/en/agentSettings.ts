@@ -1,6 +1,16 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("agentSettings", {
+  "agentSettings.directory.choose": "Choose folder",
+  "agentSettings.directory.default": "Use default folder",
+  "agentSettings.directory.path": "Host folder path",
+  "agentSettings.directory.open": "Open path",
+  "agentSettings.directory.parent": "Parent folder",
+  "agentSettings.directory.hidden": "Show hidden folders",
+  "agentSettings.directory.more": "Next page",
+  "agentSettings.directory.use": "Use this folder",
+  "agentSettings.directory.cancel": "Cancel",
+  "agentSettings.directory.failed": "Could not read or change the working directory.",
   "agentSettings.label": "Agent settings",
   "agentSettings.title": "Settings",
   "agentSettings.backToDetails": "Back to details",
@@ -50,8 +60,7 @@ export const messages = defineMessages("agentSettings", {
   "agentSettings.runtime.busyMessageLabel": "Messages while the agent works",
   "agentSettings.runtime.workingDirectory": "Working directory",
   "agentSettings.runtime.notAvailable": "Not available yet",
-  "agentSettings.runtime.fullAccessNote":
-    "The agent runs with full computer access from its workspace and the shared folder.",
+  "agentSettings.runtime.fullAccessNote": "The agent runs with full computer access from its working directory.",
   "agentSettings.runtime.claudeApprovalNote":
     "Claude acts without asking for approval, except for questions it puts to you.",
   "agentSettings.runtime.providerApprovalNote":
@@ -95,7 +104,7 @@ export const messages = defineMessages("agentSettings", {
   "agentSettings.links.routines": "Routines",
   "agentSettings.links.routinesCount": { one: "{count} configured", other: "{count} configured" },
   "agentSettings.runtime.workspaceNote":
-    "Workspace only limits writes to this agent's workspace, the shared folder and the temporary folders. Reads and network stay available.",
+    "Workspace only limits writes to the selected working directory, the managed OpenBot workspace, the shared folder and the temporary folders. Reads and network stay available.",
   "agentSettings.runtime.workspaceEnforcedCommand":
     "A command that must write outside asks you first, also when Auto approve is on.",
   "agentSettings.runtime.workspaceEnforcedClaude":

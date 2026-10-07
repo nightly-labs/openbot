@@ -45,6 +45,7 @@ import {
   decodeAutomationRunCommand,
   decodeDuplicateAgentResultFromMain,
   decodeHostAnalyticsFromMain,
+  decodeHostDirectoryFromMain,
   decodeMemories,
   decodeMemory,
   decodeProviderApiKeyState,
@@ -57,6 +58,7 @@ import {
   decodeRoutines,
   decodeSidebarLayout,
   decodeTables,
+  decodeWorkingDirectorySettingsFromMain,
 } from "./agent-decoding";
 import { decodeScopedAgentEvent } from "./agent-event-decoding";
 import {
@@ -722,6 +724,15 @@ const openbotApi: OpenBotDesktopApi = {
       removeMcpServer: decodeMcpServerConfigs,
       setMcpServerEnabled: decodeMcpServerConfigs,
       testMcpServer: decodeMcpTestResult,
+    }),
+    ...bridgeGroup(IPC_ENDPOINTS.workingDirectory, {
+      getWorkingDirectory: decodeWorkingDirectorySettingsFromMain,
+      setWorkingDirectory: decodeWorkingDirectorySettingsFromMain,
+      browseWorkingDirectory: decodeHostDirectoryFromMain,
+      chooseWorkingDirectory: (value) => {
+        if (value !== null && typeof value !== "string") throw new Error("Invalid directory selection.");
+        return value;
+      },
     }),
     ...bridgeGroup(IPC_ENDPOINTS.agentAdmin, {
       getAgentAdminSettings: decodeAgentAdminSettings,

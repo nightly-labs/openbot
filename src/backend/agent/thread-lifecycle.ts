@@ -59,6 +59,7 @@ import {
   renderTurnSteps,
 } from "./handoff-tool-steps";
 import { isArchivedThreadError, isMissingProviderSessionError } from "./thread-items";
+import { effectiveWorkingDirectory, validateWorkingDirectory } from "./working-directory";
 import { codexSandboxConfig, codexSandboxMode, workspaceWritableRoots } from "./workspace-sandbox";
 
 /**
@@ -304,12 +305,15 @@ export class ThreadLifecycle {
     this.#pendingStarts.clear();
   }
 
+  readonly directoryChanges = new Set<string>();
+
   readonly ensureThread = Effect.fn("ThreadLifecycle.ensureThread")(function* (
     this: ThreadLifecycle,
     agent: AgentSummary,
     client: AgentClient,
     executionThreadId?: string,
   ) {
+    if (agent.workingDirectory) yield* validateWorkingDirectory(agent.workingDirectory).pipe(toThreadOperationFailed);
     const publicThreadId =
       executionThreadId ?? (yield* this.#store.ensureThreadId(agent.id).pipe(toThreadOperationFailed));
     if (executionThreadId) this.#conversation.registerExecutionThread(agent.id, executionThreadId);
@@ -412,7 +416,8 @@ export class ThreadLifecycle {
           ...config,
           model: agent.model,
           effort: agent.reasoningEffort,
-          cwd: agent.workspacePath,
+          cwd: effectiveWorkingDirectory(agent),
+          managedWorkspace: agent.workspacePath,
           runtimeWorkspaceRoots: workspaceWritableRoots(agent, this.#store.sharedRoot),
           approvalPolicy: "on-request",
           sandbox: codexSandboxMode(agent),
@@ -704,7 +709,8 @@ export class ThreadLifecycle {
       threadId: externalThreadId,
       model: agent.model,
       effort: agent.reasoningEffort,
-      cwd: agent.workspacePath,
+      cwd: effectiveWorkingDirectory(agent),
+      managedWorkspace: agent.workspacePath,
       runtimeWorkspaceRoots: workspaceWritableRoots(agent, this.#store.sharedRoot),
       approvalPolicy: "on-request",
       sandbox: codexSandboxMode(agent),
@@ -877,6 +883,13 @@ export class ThreadLifecycle {
   ) {
     const sessions = this.#store.database.listProviderSessions(threadId).filter((one) => one.state === "active");
     this.#store.database.deactivateProviderSessions(threadId);
+    yield* this.releaseRetiredSessions(sessions);
+  }, Effect.uninterruptible);
+
+  readonly releaseRetiredSessions = Effect.fn("ThreadLifecycle.releaseRetiredSessions")(function* (
+    this: ThreadLifecycle,
+    sessions: readonly ProviderSession[],
+  ) {
     for (const session of sessions) {
       // The client first, while the routing entry below still names it. Dropping the entry alone
       // would leave the old session open inside the client with the MCP servers it spawned, so each
@@ -887,7 +900,7 @@ export class ThreadLifecycle {
       this.#compaction.forgetThread(session.externalSessionId);
       this.#pendingHandoffs.delete(session.externalSessionId);
     }
-  }, Effect.uninterruptible);
+  }, Effect.uninterruptible).bind(this);
 
   /**
    * Tells the client to close one provider session, and does not wait for it. The callers are the

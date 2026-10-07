@@ -1,10 +1,12 @@
 import { ConversationHeader as SharedConversationHeader } from "@openbot/ui/features/conversation/ConversationHeader";
+import { WorkingDirectoryLabel } from "@openbot/ui/features/conversation/WorkingDirectoryLabel";
 import { useConversationViewScope } from "./conversation-scope";
+import { workingDirectoryCalls } from "./working-directory-calls";
 
 const loadAgentSettingsPanel = () => import("./AgentSettingsPanel");
 
 import { useText } from "@openbot/ui/text";
-import { createMemo } from "solid-js";
+import { createMemo, Show } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { agentTemplatesPort } from "../agent-templates/agent-templates-port";
 import { createPublishAgent } from "../agent-templates/PublishAgent";
@@ -31,6 +33,7 @@ export function ConversationHeader() {
     filesOpen,
     toggleFilesPanel,
   } = useConversationViewScope();
+  const directory = createMemo(() => workingDirectoryCalls(props.server, props.runtime));
   const changeAutoApprove = createMemo(() => {
     const save = props.onSetAgentAutoApprove;
     const name = props.agent?.name ?? t("conversation.header.thisAgent");
@@ -57,6 +60,22 @@ export function ConversationHeader() {
   return (
     <>
       <SharedConversationHeader
+        workingDirectory={
+          <Show when={directory() && props.agent}>
+            {(agent) => (
+              <Show when={directory()}>
+                {(calls) => (
+                  <WorkingDirectoryLabel
+                    agentId={agent().id}
+                    revision={props.agent?.updatedAt}
+                    calls={calls()}
+                    onOpen={() => setActiveRightPanel("settings")}
+                  />
+                )}
+              </Show>
+            )}
+          </Show>
+        }
         agent={props.agent}
         onSettingsIntent={() => void loadAgentSettingsPanel()}
         onOpenSettings={() => setActiveRightPanel("settings")}

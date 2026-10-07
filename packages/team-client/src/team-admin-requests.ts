@@ -1,3 +1,10 @@
+import {
+  type BrowseWorkingDirectoryInput,
+  decodeHostDirectory,
+  decodeWorkingDirectorySettings,
+  type SetWorkingDirectoryInput,
+} from "@openbot/contracts/ipc";
+import { AGENT_WORKING_DIRECTORY_ROUTES } from "@openbot/contracts/team-protocol/agent-working-directory-v1";
 // Admin requests to one host: agent settings and skills, shared tables, agent share links, the server name and logo,
 // the app update, MCP servers, storage, hosted sites and providers.
 //
@@ -483,4 +490,18 @@ export function deleteCustomProvider(
   return adminCall(() =>
     request("POST", PROVIDERS_ADMIN_ROUTES.customDelete, decodeCustomProviderResult, { id: input.id }),
   );
+}
+
+export function getWorkingDirectory(request: TeamApiRequest, agentId: string) {
+  return adminCall(() =>
+    request("POST", AGENT_WORKING_DIRECTORY_ROUTES.settings, decodeWorkingDirectorySettings, { agentId }),
+  );
+}
+export function setWorkingDirectory(request: TeamApiRequest, input: SetWorkingDirectoryInput) {
+  return adminCall(() =>
+    request("POST", AGENT_WORKING_DIRECTORY_ROUTES.update, decodeWorkingDirectorySettings, { ...input }),
+  );
+}
+export function browseWorkingDirectory(request: TeamApiRequest, input: BrowseWorkingDirectoryInput) {
+  return adminCall(() => request("POST", AGENT_WORKING_DIRECTORY_ROUTES.browse, decodeHostDirectory, { ...input }));
 }

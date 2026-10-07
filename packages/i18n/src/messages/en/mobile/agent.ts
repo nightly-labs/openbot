@@ -1,6 +1,19 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("mobile.agent", {
+  "mobile.agent.directory.title": "Working directory",
+  "mobile.agent.directory.choose": "Choose folder",
+  "mobile.agent.directory.default": "Use default folder",
+  "mobile.agent.directory.path": "Host folder path",
+  "mobile.agent.directory.open": "Open path",
+  "mobile.agent.directory.parent": "Parent folder",
+  "mobile.agent.directory.hidden": "Show hidden folders",
+  "mobile.agent.directory.hideHidden": "Hide hidden folders",
+  "mobile.agent.directory.more": "Next page",
+  "mobile.agent.directory.use": "Use this folder",
+  "mobile.agent.directory.cancel": "Cancel",
+  "mobile.agent.directory.failed": "Could not read or change the working directory.",
+  "mobile.agent.directory.unsupported": "This host does not support working directory settings.",
   "mobile.agent.pin.pin": "Pin",
   "mobile.agent.pin.unpin": "Unpin",
   "mobile.agent.pin.pinNamed": "Pin {name}",

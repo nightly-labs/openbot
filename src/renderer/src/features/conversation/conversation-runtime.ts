@@ -1,4 +1,5 @@
 import type { AttachmentSummary, FilePreview, OpenBotDesktopApi } from "@openbot/contracts/ipc";
+import type { WorkingDirectoryCalls } from "@openbot/ui/features/conversation/WorkingDirectorySettings";
 import type { AgentSkillCalls } from "../../skills-port";
 import type { AgentTemplatePublishCalls } from "../agent-templates/agent-templates-port";
 import type { SharedTableCalls } from "./conversation-port";
@@ -40,7 +41,12 @@ export interface ConversationRuntime {
   cancelImportFiles?: () => Promise<void>;
   /** The host admin calls of a client without the desktop port. Absent, skills, tables and publishing are hidden. */
   admin?:
-    | { skills: AgentSkillCalls; sharedTables: SharedTableCalls; agentTemplates: AgentTemplatePublishCalls }
+    | {
+        workingDirectory?: WorkingDirectoryCalls;
+        skills: AgentSkillCalls;
+        sharedTables: SharedTableCalls;
+        agentTemplates: AgentTemplatePublishCalls;
+      }
     | undefined;
 }
 

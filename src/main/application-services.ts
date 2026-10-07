@@ -8,6 +8,7 @@ import { DiscordConnectFailed, toDiscordConnectFailed } from "../backend/messagi
 import { SlackConnectFailed, toSlackConnectFailed } from "../backend/messaging/slack/slack-connect";
 import { type AgentAdminSettingsService, createAgentAdminSettings } from "./agent-admin-settings";
 import { spawnAgentDatabaseHost } from "./agent-database-host-process";
+import { AgentWorkingDirectory } from "./agent-working-directory";
 import { LocalSkillLibrary } from "./local-skill-library";
 import { localSkillTools } from "./local-skill-tools";
 import { MAC_PERMISSION_URLS } from "./mac-permission-urls";
@@ -344,6 +345,7 @@ export interface ApplicationServices {
   updatePreferenceFile: string;
   approvalAutomation: ApprovalAutomation;
   agentAdminSettings: AgentAdminSettingsService;
+  agentWorkingDirectory: AgentWorkingDirectory;
   language: LanguageService;
   logoColor: LogoColorService;
   notificationPreference: NotificationPreferenceStore;
@@ -1376,6 +1378,7 @@ export async function createApplicationServices({
       overrideRoot: process.env.OPENBOT_REMOTE_DESKTOP_RUNTIME_PATH,
     }),
   );
+  const agentWorkingDirectory = new AgentWorkingDirectory(service);
   const agentAdminSettings = createAgentAdminSettings({ agents: service, approvalAutomation });
   const customProviderChanges = createCustomProviderChanges({ service, customProviders });
   const customAgentChanges = createCustomAgentChanges({ service, customAgents });
@@ -1419,6 +1422,7 @@ export async function createApplicationServices({
     // Each member present advertises its admin capability. Every admin route requires an owner or admin.
     admin: {
       agents: agentAdminSettings,
+      workingDirectory: agentWorkingDirectory,
       skills,
       sharedTables: service,
       marketplaceAgents,
@@ -1932,6 +1936,7 @@ export async function createApplicationServices({
     updatePreferenceFile,
     approvalAutomation,
     agentAdminSettings,
+    agentWorkingDirectory,
     language,
     logoColor,
     notificationPreference,

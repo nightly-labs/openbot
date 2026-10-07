@@ -689,6 +689,10 @@ export function installOpenbotStub(): void {
       onEvent: vi.fn(authBridge.subscribe),
     }),
     agent: {
+      getWorkingDirectory: vi.fn().mockRejectedValue(new Error("Not supported.")),
+      setWorkingDirectory: vi.fn().mockRejectedValue(new Error("Not supported.")),
+      browseWorkingDirectory: vi.fn().mockRejectedValue(new Error("Not supported.")),
+      chooseWorkingDirectory: vi.fn().mockResolvedValue(null),
       ...createMockChannels(
         (event) => emitAgentEvent?.(event),
         (agentId) => AGENTS.find((agent) => agent.id === agentId)?.name ?? agentId,

@@ -12,6 +12,7 @@ import { AgentAppearancePicker } from "@/features/agents/components/agent-appear
 import { AgentInformation } from "@/features/agents/components/agent-information";
 import { type AgentPhotoDraft, AgentPhotoPicker } from "@/features/agents/components/agent-photo-picker";
 import { AgentRuntimeFields } from "@/features/agents/components/agent-runtime-fields";
+import { AgentWorkingDirectory } from "@/features/agents/components/agent-working-directory";
 import { BloubAvatarPreview } from "@/features/agents/components/bloub-avatar";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import {
@@ -284,6 +285,14 @@ function AgentForm({
           model={edits.model ?? agent.model}
           reasoningEffort={edits.reasoningEffort ?? agent.reasoningEffort}
           onChange={change}
+        />
+      ) : null}
+      {page === "runtime" ? (
+        <AgentWorkingDirectory
+          key={`${agent.serverId}:${agent.id}`}
+          agent={agent}
+          server={host}
+          available={available}
         />
       ) : null}
       {page === "runtime" ? <AgentAccessFields agent={agent} server={host} available={available} /> : null}

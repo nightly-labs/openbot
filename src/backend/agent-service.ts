@@ -142,6 +142,7 @@ import { ThreadLifecycle, ThreadOperationFailed } from "./agent/thread-lifecycle
 import { toToolOperationFailed } from "./agent/tool-operation";
 import { type AgentBrowserHost, TurnLifecycle } from "./agent/turn-lifecycle";
 import { toUsageReadFailed, UsageLimitGate } from "./agent/usage-limit-gate";
+import { validateWorkingDirectory } from "./agent/working-directory";
 import type { AgentProvider } from "./agent-client";
 import type { AgentTables } from "./agent-data/agent-tables";
 import type { AgentStore } from "./agent-store";
@@ -1810,6 +1811,77 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#emit({ type: "agents-changed", agents: this.listAgents() });
     return agent;
   }).bind(this);
+
+  workingDirectoryBusy(agentId: string): boolean {
+    const agent = this.listAgents().find((candidate) => candidate.id === agentId);
+    return (
+      !agent ||
+      this.#mailbox.hasUnfinishedDelivery(agentId) ||
+      this.#threads.providerContextBusy(agent) ||
+      this.#threads.directoryChanges.has(agentId)
+    );
+  }
+
+  readonly setWorkingDirectory = Effect.fn("AgentService.setWorkingDirectory")(function* (
+    this: AgentService,
+    agentId: string,
+    path: string | null,
+  ) {
+    const requireIdle = () => {
+      if (this.workingDirectoryBusy(agentId)) throw new Error(sourceText("error.agent.workingDirectoryBusy"));
+    };
+    yield* lifecycleStep("validate working directory", requireIdle);
+    const resolved =
+      path === null
+        ? null
+        : yield* validateWorkingDirectory(path).pipe(
+            Effect.mapError(
+              (failure) => new AgentLifecycleFailed({ operation: "working directory", cause: failure.cause }),
+            ),
+          );
+    yield* lifecycleStep("validate working directory", () => {
+      requireIdle();
+      this.#threads.directoryChanges.add(agentId);
+    });
+    return yield* Effect.gen({ self: this }, function* () {
+      const previous = this.listAgents().find((agent) => agent.id === agentId);
+      if (!previous) throw new Error(sourceText("error.agent.gone"));
+      const target = resolved === previous.workspacePath ? null : resolved;
+      if ((previous.workingDirectory ?? null) === target) return previous;
+      // Preserve provider work steps before closing the sessions. The queue stays held across I/O.
+      const sessions = this.#store.database
+        .activeProviderSessionThreads(agentId)
+        .flatMap((threadId) =>
+          this.#store.database.listProviderSessions(threadId).filter((session) => session.state === "active"),
+        );
+      for (const session of sessions) {
+        const steps = yield* this.#threads.readWorkSteps(session);
+        if (steps !== null) yield* this.#threads.saveWorkSteps(session, steps);
+      }
+      yield* lifecycleStep("validate working directory", () => {
+        if (this.#mailbox.hasUnfinishedDelivery(agentId) || this.#threads.providerContextBusy(previous))
+          throw new Error(sourceText("error.agent.workingDirectoryBusy"));
+      });
+      const agent = yield* this.#store
+        .updateAgent({ agentId, workingDirectory: target })
+        .pipe(
+          Effect.mapError(
+            (failure) => new AgentLifecycleFailed({ operation: "working directory", cause: failure.cause }),
+          ),
+        );
+      // The store commits the setting and session invalidation in one transaction.
+      yield* this.#threads.releaseRetiredSessions(sessions);
+      this.#emit({ type: "agents-changed", agents: this.listAgents() });
+      return agent;
+    }).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          this.#threads.directoryChanges.delete(agentId);
+          this.#drain.scheduleDrain(agentId);
+        }),
+      ),
+    );
+  }, Effect.uninterruptible).bind(this);
 
   refreshAgentRuntime(agentId: string): Effect.Effect<void, AgentLifecycleFailed> {
     return this.#threads.refreshAgentRuntime(agentId);

@@ -23,6 +23,7 @@ import {
   type TeamRealtimeEvent,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { AGENT_WORKING_DIRECTORY_CAPABILITY } from "@openbot/contracts/team-protocol/agent-working-directory-v1";
 import {
   AGENT_ADMIN_CAPABILITY,
   AGENT_IMPORT_CAPABILITY,
@@ -112,6 +113,7 @@ import { routeAgentAdmin } from "./team-api/route-agent-admin";
 import { routeAgentImport } from "./team-api/route-agent-import";
 import { routeAgentInstall } from "./team-api/route-agent-install";
 import { routeAgentPublish } from "./team-api/route-agent-publish";
+import { routeAgentWorkingDirectory } from "./team-api/route-agent-working-directory";
 import { routeAgents } from "./team-api/route-agents";
 import { routeBrowser } from "./team-api/route-browser";
 import { routeChannels } from "./team-api/route-channels";
@@ -664,6 +666,7 @@ export class TeamApiServer {
         return;
       if ((await routeStorage(context, this.#options.storage)) === "handled") return;
       if ((await routeHostedSites(context, this.#options.hostedSites)) === "handled") return;
+      if ((await routeAgentWorkingDirectory(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentAdmin(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeSkillsAdmin(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeSharedTables(context, this.#options.admin)) === "handled") return;
@@ -1299,6 +1302,8 @@ export class TeamApiServer {
         if (capability === MCP_SERVERS_CAPABILITY) return this.#options.mcpServers !== undefined;
         if (capability === STORAGE_CAPABILITY) return this.#options.storage !== undefined;
         if (capability === HOSTED_SITES_CAPABILITY) return this.#options.hostedSites !== undefined;
+        if (capability === AGENT_WORKING_DIRECTORY_CAPABILITY)
+          return this.#options.admin?.workingDirectory !== undefined;
         if (capability === AGENT_ADMIN_CAPABILITY) return this.#options.admin?.agents !== undefined;
         if (capability === SKILLS_ADMIN_CAPABILITY) return this.#options.admin?.skills !== undefined;
         if (capability === SKILLS_EVENTS_CAPABILITY) return this.#options.skills !== undefined;

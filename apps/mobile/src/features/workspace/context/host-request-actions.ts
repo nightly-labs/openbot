@@ -6,8 +6,10 @@ import {
   decodeChannelRoutineRuns,
   decodeChannelRoutines,
   decodeChannelSummaries,
+  decodeHostDirectory,
   decodeInstalledSkills,
   decodeStorageUsage,
+  decodeWorkingDirectorySettings,
   isAgentMemory,
   isAgentModelOption,
   isQueueSnapshot,
@@ -20,6 +22,10 @@ import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_ADMIN_CAPABILITY, AGENT_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/agent-admin-v1";
 import { AGENT_INSTALL_CAPABILITY } from "@openbot/contracts/team-protocol/agent-install-v1";
+import {
+  AGENT_WORKING_DIRECTORY_CAPABILITY,
+  AGENT_WORKING_DIRECTORY_ROUTES as directoryRoutes,
+} from "@openbot/contracts/team-protocol/agent-working-directory-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import {
   TEAM_EML_ATTACHMENTS_CAPABILITY,
@@ -78,6 +84,9 @@ type HostRequestActions = Pick<
   | "setAgentSkillEnabled"
   | "uninstallAgentSkill"
   | "loadAgentStorage"
+  | "loadWorkingDirectory"
+  | "setWorkingDirectory"
+  | "browseWorkingDirectory"
   | "loadAgentAdminSettings"
   | "updateAgentAdminSettings"
   | "deleteStoredFile"
@@ -269,6 +278,20 @@ export function createHostRequestActions({
         await request("POST", STORAGE_ROUTES.usage, decodeStorageUsage, input, serverId),
         input,
       );
+    },
+    loadWorkingDirectory: async (agentId, serverId) =>
+      capabilities.get(serverId)?.includes(AGENT_WORKING_DIRECTORY_CAPABILITY)
+        ? request("POST", directoryRoutes.settings, decodeWorkingDirectorySettings, { agentId }, serverId)
+        : null,
+    setWorkingDirectory: async (input, serverId) => {
+      if (!capabilities.get(serverId)?.includes(AGENT_WORKING_DIRECTORY_CAPABILITY))
+        throw new Error(currentText().t("mobile.agent.directory.unsupported"));
+      return request("POST", directoryRoutes.update, decodeWorkingDirectorySettings, { ...input }, serverId);
+    },
+    browseWorkingDirectory: async (input, serverId) => {
+      if (!capabilities.get(serverId)?.includes(AGENT_WORKING_DIRECTORY_CAPABILITY))
+        throw new Error(currentText().t("mobile.agent.directory.unsupported"));
+      return request("POST", directoryRoutes.browse, decodeHostDirectory, { ...input }, serverId);
     },
     loadAgentAdminSettings: async (agentId, serverId) =>
       capabilities.get(serverId)?.includes(AGENT_ADMIN_CAPABILITY)

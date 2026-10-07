@@ -1,3 +1,4 @@
+import { sourceText } from "@openbot/i18n/source";
 import type { RemoteTeamPeerActions } from "@openbot/team-client/remote-peer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { STORY_AGENT_SUMMARIES } from "../../preview/fixtures";
@@ -47,6 +48,19 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("browser workspace runtime", () => {
+  // Failure modes: hide the actionable directory refusal, or expose an arbitrary transport cause.
+  it("shows fixed directory refusals without exposing private transport errors", async () => {
+    const runtime = create();
+    await runtime.connect(host);
+    if (!runtime.admin) throw new Error("Runtime admin is unavailable.");
+    const request = () => runtime.admin?.request("POST", "/v1/admin/agents/working-directory/browse", () => null, {});
+    peer.execute.mockResolvedValue({ ok: false, error: sourceText("error.agent.workingDirectoryUnavailable") });
+    await expect(request()).rejects.toThrow(sourceText("error.agent.workingDirectoryUnavailable"));
+    peer.execute.mockResolvedValue({ ok: false, error: "private host I/O cause" });
+    await expect(request()).rejects.toThrow("The host could not complete this request. Refresh before trying again.");
+    await runtime.dispose();
+  });
+
   it("reads the host sidebar layout and validates account usage", async () => {
     peer.execute.mockImplementation(async (command) => ({
       ok: true,

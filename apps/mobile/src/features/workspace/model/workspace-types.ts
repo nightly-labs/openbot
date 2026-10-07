@@ -11,6 +11,7 @@ import type {
   AgentReasoningEffort,
   AvatarHue,
   AvatarImageInput,
+  BrowseWorkingDirectoryInput,
   ConversationSearchPage,
   ConversationSnapshot,
   CreateAgentInput,
@@ -18,6 +19,7 @@ import type {
   DraftAttachment,
   HostAnalytics,
   HostAnalyticsInput,
+  HostDirectory,
   InstallAgentTemplateInput,
   InstalledSkill,
   QueueSnapshot,
@@ -27,6 +29,7 @@ import type {
   RoutineCalendar,
   RoutineCalendarInput,
   SetEnabledSkillInput,
+  SetWorkingDirectoryInput,
   SidebarLayoutAction,
   SidebarLayoutSnapshot,
   StorageUsage,
@@ -34,6 +37,7 @@ import type {
   UpdateAgentAdminSettingsInput,
   UpdateAgentInput,
   UpdateRoutineInput,
+  WorkingDirectorySettings,
 } from "@openbot/contracts/ipc";
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import type { RemoteRecoveryStatus, RemoteTeamDirectoryClient } from "@openbot/team-client";
@@ -174,6 +178,9 @@ export interface MobileWorkspaceContextValue {
   /** Null when the host does not advertise `storage-v1`. */
   loadAgentStorage: (agentId: string, serverId: string, force?: boolean) => Promise<StorageUsage | null>;
   /** Null when the host does not advertise `agent-admin-v1`. Owners and admins only; the host refuses a member. */
+  loadWorkingDirectory: (agentId: string, serverId: string) => Promise<WorkingDirectorySettings | null>;
+  setWorkingDirectory: (input: SetWorkingDirectoryInput, serverId: string) => Promise<WorkingDirectorySettings>;
+  browseWorkingDirectory: (input: BrowseWorkingDirectoryInput, serverId: string) => Promise<HostDirectory>;
   loadAgentAdminSettings: (agentId: string, serverId: string) => Promise<AgentAdminSettings | null>;
   /** Owners and admins only; the host refuses a member. Resolves with the settings the host saved. */
   updateAgentAdminSettings: (input: UpdateAgentAdminSettingsInput, serverId: string) => Promise<AgentAdminSettings>;

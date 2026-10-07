@@ -1,3 +1,4 @@
+import { isHostDirectory, isWorkingDirectorySettings } from "@openbot/contracts/ipc";
 // What main answers for agents: provider status, models, the agents themselves, memories, routines,
 // shared tables and the sidebar layout.
 //
@@ -149,3 +150,9 @@ export function decodeAgentAnalyticsFromMain(value: unknown) {
 export function decodeHostAnalyticsFromMain(value: unknown) {
   return decodeOptionalHostAnalytics(value);
 }
+
+export const decodeHostDirectoryFromMain = guardedDecoder(isHostDirectory, "host directory response");
+export const decodeWorkingDirectorySettingsFromMain = guardedDecoder(
+  isWorkingDirectorySettings,
+  "working directory settings response",
+);

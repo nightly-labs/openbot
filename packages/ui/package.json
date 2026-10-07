@@ -294,6 +294,8 @@
     "./features/conversation/conversation.css": "./src/features/conversation/conversation.css",
     "./features/files/files.css": "./src/features/files/files.css",
     "./features/import/agent-import.css": "./src/features/import/agent-import.css",
+    "./features/conversation/WorkingDirectorySettings": "./src/features/conversation/WorkingDirectorySettings.tsx",
+    "./features/conversation/WorkingDirectoryLabel": "./src/features/conversation/WorkingDirectoryLabel.tsx",
     "./features/conversation/AgentSettingsPanel": "./src/features/conversation/AgentSettingsPanel.tsx",
     "./features/conversation/ConversationHeader": "./src/features/conversation/ConversationHeader.tsx"
   },

@@ -3,16 +3,19 @@ import {
   type AgentAnalytics,
   type AgentMemory,
   analyticsRange,
+  type BrowseWorkingDirectoryInput,
   CHANNEL_CHATS_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
   type ChannelSummary,
   type ChannelTask,
   type CreateAgentInput,
   emptyAnalyticsTotals,
+  type HostDirectory,
   type InstalledSkill,
   parseChannelCommand,
   type Routine,
   type SetEnabledSkillInput,
+  type SetWorkingDirectoryInput,
   type SidebarLayoutAction,
   type SidebarLayoutSnapshot,
   SKILL_CREATION_REQUEST,
@@ -20,6 +23,7 @@ import {
   type UninstallSkillInput,
   type UpdateAgentAdminSettingsInput,
   type UpdateAgentInput,
+  type WorkingDirectorySettings,
 } from "@openbot/contracts/ipc";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
@@ -243,6 +247,12 @@ const workspace = {
     async () => null,
   ),
   deleteStoredFile: vi.fn(async () => {}),
+  loadWorkingDirectory: vi.fn<(agentId: string, serverId: string) => Promise<WorkingDirectorySettings | null>>(
+    async () => null,
+  ),
+  setWorkingDirectory:
+    vi.fn<(input: SetWorkingDirectoryInput, serverId: string) => Promise<WorkingDirectorySettings>>(),
+  browseWorkingDirectory: vi.fn<(input: BrowseWorkingDirectoryInput, serverId: string) => Promise<HostDirectory>>(),
   loadAgentAdminSettings: vi.fn<(agentId: string, serverId: string) => Promise<AgentAdminSettings | null>>(
     async () => null,
   ),
@@ -414,8 +424,11 @@ vi.mock("@/shared/components/sheet-scroll-view", () => ({
 }));
 vi.mock("@/features/settings/components/settings-content", () => ({
   SettingsNote: ({ children }: PropsWithChildren) => <p>{children}</p>,
-  SettingsSection: ({ title, children }: PropsWithChildren<{ title: string }>) => (
-    <section aria-label={title}>{children}</section>
+  SettingsSection: ({ title, children, footer }: PropsWithChildren<{ title: string; footer?: string }>) => (
+    <section aria-label={title}>
+      {children}
+      {footer ? <p>{footer}</p> : null}
+    </section>
   ),
   SettingsRow: ({
     children,
@@ -674,6 +687,9 @@ beforeEach(() => {
   workspace.uninstallAgentSkill.mockReset();
   workspace.loadAgentStorage.mockReset().mockResolvedValue(null);
   workspace.deleteStoredFile.mockReset().mockResolvedValue();
+  workspace.loadWorkingDirectory.mockReset().mockResolvedValue(null);
+  workspace.setWorkingDirectory.mockReset();
+  workspace.browseWorkingDirectory.mockReset();
   workspace.loadAgentAdminSettings.mockReset().mockResolvedValue(null);
   workspace.updateAgentAdminSettings.mockReset();
   mocks.shareFile.mockClear();
@@ -709,7 +725,7 @@ it.each([true, false])("keeps the native Info action available with haptics enab
   }
   await act(() =>
     root.render(
-      <>
+      <QueryClientProvider client={client}>
         <ChatHeader
           target={{ ...original, kind: "agent" }}
           fallbackBackground="white"
@@ -719,7 +735,7 @@ it.each([true, false])("keeps the native Info action available with haptics enab
           onBack={() => {}}
         />
         <Menu />
-      </>,
+      </QueryClientProvider>,
     ),
   );
   await act(() => fireEvent.click(screen.getByText("Travel")));
@@ -2140,4 +2156,41 @@ it("keeps a failed submenu move available for retry", async () => {
   expect(mocks.alert).toHaveBeenCalledWith("Could not move chat", "Move failed");
   await click("Agents");
   expect(workspace.mutateSidebarLayout).toHaveBeenCalledTimes(2);
+});
+
+// Failure modes: members see host paths; a failed save replaces the displayed folder.
+it.each(["owner", "admin", "member"] as const)("limits directory controls for role %s", async (role) => {
+  workspace.servers = [{ ...host, role }];
+  workspace.loadWorkingDirectory.mockResolvedValue({ workingDirectory: null, effectivePath: "/managed", busy: false });
+  await renderSheet("runtime");
+  if (role === "member") {
+    expect(workspace.loadWorkingDirectory).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "Choose folder" })).toBeNull();
+  } else {
+    await waitFor(() => expect(screen.getByRole("button", { name: "Choose folder" })).toBeTruthy());
+    expect(workspace.loadWorkingDirectory).toHaveBeenCalledWith(original.id, host.id);
+  }
+});
+
+it("keeps the current mobile folder when the host refuses a save", async () => {
+  workspace.servers = [{ ...host, role: "admin" }];
+  workspace.loadWorkingDirectory.mockResolvedValue({ workingDirectory: null, effectivePath: "/managed", busy: false });
+  workspace.browseWorkingDirectory.mockResolvedValue({
+    path: "/repository",
+    parentPath: "/",
+    roots: [],
+    entries: [],
+    nextOffset: null,
+  });
+  workspace.setWorkingDirectory.mockRejectedValue(new Error("The folder is unavailable."));
+  await renderSheet("runtime");
+  await waitFor(() => expect(screen.getByRole("button", { name: "Choose folder" })).toBeTruthy());
+  await click("Choose folder");
+  await waitFor(() => expect(screen.getByRole("button", { name: /Use this folder/ })).toBeTruthy());
+  await click("Use this folder");
+  await waitFor(() =>
+    expect(workspace.setWorkingDirectory).toHaveBeenCalledWith({ agentId: original.id, path: "/repository" }, host.id),
+  );
+  expect(screen.getByText("/managed")).toBeTruthy();
+  expect(screen.getByText("The folder is unavailable.")).toBeTruthy();
 });

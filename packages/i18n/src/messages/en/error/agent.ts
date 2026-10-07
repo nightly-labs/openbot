@@ -1,6 +1,10 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.agent", {
+  "error.agent.workingDirectoryUnavailable":
+    "The working directory is unavailable. Choose an existing folder with read and write access.",
+  "error.agent.workingDirectoryBusy": "Wait until the agent has no pending work before changing its working directory.",
+  "error.agent.workingDirectoryUnsupported": "This host does not support working directory settings.",
   // Agent errors that the main process and the backend send.
   "error.agent.approvalWhileDeleting": "Cannot grant approval while the agent is being deleted.",
   "error.agent.accessLocalOnly": "Agent access can only be changed on the computer that runs the agent.",

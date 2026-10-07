@@ -847,3 +847,12 @@ automatically, and the tab's back/forward history is cleared after replacement t
 the sensitive document. The destination site receives the value and controls its own processing.
 This protection does not isolate credentials from the operating system or agents with unrestricted
 machine access. Values pasted into ordinary chat are not covered by secure handoff.
+
+### Agent working directories
+
+An agent can use an existing folder on its host computer. The selected path is stored in that
+computer's local database. It does not move repository files to OpenBot's managed folder or to
+Cloudflare. Remote owners and admins can browse host directory names and select a folder through
+the existing host connection. Folder listings contain paths and directory names, not file contents.
+OpenBot does not add these listings to analytics or diagnostic logs. Ordinary members cannot use
+the folder browser. Selecting a working directory does not restrict the agent's read access.

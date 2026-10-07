@@ -3,6 +3,7 @@ import type { ChannelService } from "../../backend/channel-service";
 import type { AgentAdminSettingsService } from "../agent-admin-settings";
 import type { AgentMarketplaceService } from "../agent-marketplace-service";
 import type { AgentTemplateService } from "../agent-template-service";
+import type { AgentWorkingDirectory } from "../agent-working-directory";
 import type { PeerCustomProviderChanges } from "../custom-provider-changes";
 import type { HostService } from "../host-service";
 import type { ProviderCredentialStore } from "../provider-credential-store";
@@ -141,6 +142,7 @@ export type TeamApiAgentImport = Pick<AgentImportService, "stageUpload" | "apply
  * `#protocolSupport` advertises its capability on; every route behind it requires an owner or admin.
  */
 export interface TeamApiAdmin {
+  workingDirectory?: AgentWorkingDirectory;
   /** `agent-admin-v1`: access and auto-approve of one agent. */
   agents?: AgentAdminSettingsService;
   /** `skills-admin-v1`: list, install, remove and enable the skills of one agent. */

@@ -1145,3 +1145,21 @@
   font-size: var(--openbot-text-sm);
   line-height: 15px;
 }
+
+.agent-working-directory,
+.agent-working-directory-browser {
+  display: grid;
+  gap: var(--openbot-space-2);
+  min-width: 0;
+  padding-block: var(--openbot-space-2);
+  overflow-wrap: anywhere;
+}
+.agent-working-directory p {
+  margin: 0;
+  user-select: text;
+}
+.agent-working-directory-browser > button {
+  justify-content: flex-start;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}

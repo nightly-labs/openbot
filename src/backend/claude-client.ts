@@ -97,6 +97,7 @@ interface ClientEvents {
 
 interface ThreadConfig {
   cwd: string;
+  managedWorkspace: string;
   model?: string;
   effort?: string;
   developerInstructions: string;
@@ -646,7 +647,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         );
     const stateDirectory = this.#stateDirectory;
     const skillPlugin =
-      config.workspaceOnly && stateDirectory ? yield* claudeWorkspaceSkillPlugin(stateDirectory, config.cwd) : null;
+      (config.workspaceOnly || config.managedWorkspace !== config.cwd) && stateDirectory
+        ? yield* claudeWorkspaceSkillPlugin(stateDirectory, config.managedWorkspace)
+        : null;
     // `stop()` may have run during the await: a query created now would outlive the client.
     if (!this.#running) return yield* providerFailure(new Error("Claude Agent SDK is not running."));
     if (handoff) this.#reportMcpDrops?.(this.provider, handoff.dropped);
@@ -1539,6 +1542,7 @@ function readThreadConfig(params: unknown): ThreadConfig {
   const cwd = requiredString(params, "cwd");
   return {
     cwd,
+    managedWorkspace: getString(params, "managedWorkspace") ?? cwd,
     model: getString(params, "model") ?? undefined,
     effort: getString(params, "effort") ?? undefined,
     developerInstructions: getString(params, "developerInstructions") ?? "",

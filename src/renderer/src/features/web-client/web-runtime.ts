@@ -74,6 +74,7 @@ import {
   WORKSPACE_DIRECTORY_CAPABILITY,
   WORKSPACE_DIRECTORY_ROUTES,
 } from "@openbot/contracts/team-protocol/workspace-directory-v1";
+import { sourceText } from "@openbot/i18n/source";
 import { runTeamEffect } from "@openbot/team-client";
 import { createRemoteBrowserView, type RemoteBrowserView } from "@openbot/team-client/browser-view";
 import {
@@ -389,7 +390,9 @@ export function createWebWorkspaceRuntime(
     const result = await peer.execute({ id: crypto.randomUUID(), type: "request", method, path, body, upload });
     if (disposed || generation !== current) throw new Error(currentText().t("webClient.error.hostChanged"));
     if (!result.ok || (result.status ?? 500) >= 400)
-      throw new Error(hostRefusal(result.status, result.body) ?? currentText().t("webClient.error.requestIncomplete"));
+      throw new Error(
+        hostRefusal(result.status, result.body, result.error) ?? currentText().t("webClient.error.requestIncomplete"),
+      );
     return result.body;
   }
   // The shared Team API requests decode their own responses. A declaration, like `request`, so the
@@ -917,7 +920,15 @@ function decodeWebFile(value: unknown): WebFile {
 }
 
 /** The host's own reason for a refusal. It redacts it; a server failure keeps the generic text. */
-function hostRefusal(status: number | undefined, body: unknown): string | null {
+function hostRefusal(status: number | undefined, body: unknown, transportError?: string): string | null {
+  // WebRTC failures carry no HTTP status. Only these fixed directory messages are public here.
+  for (const key of [
+    "error.agent.workingDirectoryUnavailable",
+    "error.agent.workingDirectoryBusy",
+    "error.agent.workingDirectoryUnsupported",
+  ] as const) {
+    if (transportError === sourceText(key)) return currentText().t(key);
+  }
   if (status === undefined || status < 400 || status >= 500) return null;
   if (!isDynamicRecord(body) || !isString(body.error) || !body.error.trim()) return null;
   const text = body.error.trim();
