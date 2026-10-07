@@ -1,6 +1,7 @@
 import type { AddedAgent, McpServerConfig, ServerSummary } from "@openbot/contracts/ipc";
 import { MCP_SERVERS_CAPABILITY } from "@openbot/contracts/ipc";
 import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-update-v1";
+import type { BitwardenConnectorPanelProps } from "@openbot/ui/features/settings/BitwardenConnectorPanel";
 import type { ComponentProps } from "@solidjs/web";
 import { createMemo, Loading, omit, Show } from "solid-js";
 import type { AgentTemplateInstallCalls } from "./features/agent-templates/agent-templates-port";
@@ -73,6 +74,7 @@ export function MarketplaceOverlay(props: {
   githubConnector?: GitHubConnectorController | undefined;
   /** This computer's 1Password connection. Absent in the web client and on a joined server. */
   onePasswordConnector?: OnePasswordConnectorController | undefined;
+  bitwardenConnector?: BitwardenConnectorPanelProps | undefined;
   /** What the dialog calls. Absent: this computer's bridge. */
   calls?: MarketplaceCalls | undefined;
 }) {
@@ -104,6 +106,7 @@ export function MarketplaceOverlay(props: {
           calls={props.calls}
           githubConnector={props.githubConnector}
           onePasswordConnector={props.onePasswordConnector}
+          bitwardenConnector={props.bitwardenConnector}
           agents={manage() ? props.agents : []}
           activeAgentId={manage() ? props.activeAgentId : ""}
           hostServerId={remoteAdminServer(props.server, "skills-admin-v1")?.id}

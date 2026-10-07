@@ -188,9 +188,12 @@ export function createConversationViewScope(props: ConversationProps) {
     hideBrowserPanel,
     previewAttachment,
     attachmentAction,
-    downloadAttachments,
     openSharedFile,
     openWorkspaceFile,
+    openWorkspaceFolder,
+    openWorkspaceFolderEntry,
+    sidebarFileBack,
+    openSidebarFileBack,
     openSidebarFileExternally,
     downloadSidebarFile,
     revealSidebarFile,
@@ -283,8 +286,7 @@ export function createConversationViewScope(props: ConversationProps) {
     if (browserTabs().length === 0) void openBrowserAddress();
   }
   const viewIsMounted = createScopeGuard();
-  let imageAttachmentPicker: HTMLInputElement | undefined;
-  let contextAttachmentPicker: HTMLInputElement | undefined;
+  let attachmentPicker: HTMLInputElement | undefined;
   const currentPendingSends = createMemo(() => pendingSends.list(currentTarget()));
   // The host rows on screen: a sent message hands over to its row in the transcript or the queue.
   // Built only while a send waits for its row, so a streaming reply does not rebuild it for nothing.
@@ -471,8 +473,7 @@ export function createConversationViewScope(props: ConversationProps) {
       stickToLatest = value;
     },
     pendingSends,
-    imageAttachmentPicker: () => imageAttachmentPicker,
-    contextAttachmentPicker: () => contextAttachmentPicker,
+    attachmentPicker: () => attachmentPicker,
   });
   const {
     updateTeamTyping,
@@ -630,7 +631,7 @@ export function createConversationViewScope(props: ConversationProps) {
         return;
       }
       if (currentEditingDeliveryId()) {
-        cancelQueuedMessageEdit();
+        void cancelQueuedMessageEdit();
         return;
       }
       setOpenReactionMessageId(null);
@@ -1071,11 +1072,8 @@ export function createConversationViewScope(props: ConversationProps) {
   const setBrowserSurfaceElement = (element: HTMLDivElement | undefined) => {
     setBrowserSurface(element);
   };
-  const setImageAttachmentPickerElement = (element: HTMLInputElement) => {
-    imageAttachmentPicker = element;
-  };
-  const setContextAttachmentPickerElement = (element: HTMLInputElement) => {
-    contextAttachmentPicker = element;
+  const setAttachmentPickerElement = (element: HTMLInputElement) => {
+    attachmentPicker = element;
   };
 
   return {
@@ -1084,8 +1082,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setBrowserSurfaceElement,
     setChatSearchInputElement,
     setConversationPanelElement,
-    setContextAttachmentPickerElement,
-    setImageAttachmentPickerElement,
+    setAttachmentPickerElement,
     setScrollElement,
     setStickToLatest,
     setUnreadMessagesDividerElement,
@@ -1104,7 +1101,6 @@ export function createConversationViewScope(props: ConversationProps) {
     agentActivitySpaceReserved,
     activateBrowserTab,
     attachmentAction,
-    downloadAttachments,
     attachmentBusy,
     browserAddress,
     browserSidebarOpen,
@@ -1175,6 +1171,10 @@ export function createConversationViewScope(props: ConversationProps) {
     downloadSidebarFile,
     revealSidebarFile,
     openWorkspaceFile,
+    openWorkspaceFolder,
+    openWorkspaceFolderEntry,
+    sidebarFileBack,
+    openSidebarFileBack,
     awaitingReplies,
     pendingSendFor,
     retryPendingSend,

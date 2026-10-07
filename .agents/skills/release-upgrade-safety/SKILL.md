@@ -23,8 +23,9 @@ This runs *before* `docs/RELEASING.md`, which stays authoritative for the publis
   Run the narrowest test file named by a gate and lint the changed files. Do not run the repo-wide
   `bun run lint` or `bun run typecheck`: the pre-commit hook and CI run them.
 - **If gate C or D fired, confirm the mobile typecheck passed.** `apps/mobile` depends on
-  `@openbot/contracts`, which is exactly what those two gates change. `bun run typecheck` includes
-  `typecheck:mobile`, so the pre-commit hook and the CI Surfaces job cover it.
+  `@openbot/contracts`, which is exactly what those two gates change. The pre-commit hook runs
+  `typecheck:mobile` when a commit stages a file that mobile can see, such as one in
+  `packages/contracts`, and the CI Surfaces job runs it on each pull request.
 - It never runs `bun run dev:seed` or `dev:reset` — both destroy the developer's own profile — and
   never `pkill -f`, which kills other sessions' work mid-write.
 

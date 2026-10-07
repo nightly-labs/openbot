@@ -1,7 +1,11 @@
 import { open, rm } from "node:fs/promises";
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { Effect, Schema } from "effect";
+import { causeHelpers } from "../../effect-boundary";
 import { MessagingAdapterError, MessagingConnectionError } from "../messaging-types";
+
+// These operations deliberately have no tracing span: provider payloads and URLs can contain secrets.
+const { io: slackIo } = causeHelpers(MessagingAdapterError);
 
 const SLACK_API_ORIGIN = "https://slack.com";
 
@@ -232,11 +236,6 @@ export class SlackWebApi {
     if (this.#origin !== SLACK_API_ORIGIN) return url.origin === new URL(this.#origin).origin;
     return url.protocol === "https:" && (url.hostname === "slack.com" || url.hostname.endsWith(".slack.com"));
   }
-}
-
-// These operations deliberately have no tracing span: provider payloads and URLs can contain secrets.
-function slackIo<A>(run: () => Promise<A>): Effect.Effect<A, MessagingAdapterError> {
-  return Effect.tryPromise({ try: run, catch: (cause) => new MessagingAdapterError({ cause }) });
 }
 
 function slackFailure(cause: Error): Effect.Effect<never, MessagingAdapterError> {

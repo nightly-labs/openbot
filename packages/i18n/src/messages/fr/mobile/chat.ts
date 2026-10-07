@@ -131,6 +131,8 @@ export const messages = {
   "mobile.chat.composer.messageAgent": "Message à {name}",
   "mobile.chat.composer.pasteFailed": "Impossible de joindre le texte collé",
   "mobile.chat.composer.cancelDictation": "Annuler la dictée",
+  "mobile.chat.voice.listening": "Écoute…",
+  "mobile.chat.voice.continue": "Continuer la dictée",
   "mobile.chat.composer.addAttachment": "Ajouter une pièce jointe",
   "mobile.chat.composer.ask": "Demander à {name}",
   "mobile.chat.composer.stopFailed": "Impossible d’arrêter l’agent. Il a peut-être déjà terminé.",

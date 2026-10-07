@@ -157,6 +157,7 @@ export const messages = {
   "chat.table.data": "Veri tablosu",
   "chat.file.openShared": "Paylaşılan dosyayı aç {name}",
   "chat.file.openWorkspace": "Çalışma alanı dosyasını aç {name}",
+  "chat.file.openWorkspaceFolder": "Çalışma alanı klasörünü aç {name}",
   "chat.file.openAttached": "Ekli dosyayı aç {name}",
   "chat.tag.unavailableAgent": "Kullanılamayan ajan",
   "chat.tag.unavailableSkill": "Kullanılamayan beceri",

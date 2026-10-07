@@ -1,5 +1,5 @@
 import { Effect, Semaphore } from "effect";
-import { ProviderRuntimeFailure, runtimeSync } from "./provider-runtime-effects";
+import { ProviderRuntimeFailure, runtimeSync, toProviderRuntimeFailure } from "./provider-runtime-effects";
 // The user's own ACP agents: list, save, remove and check. This computer only: no Team API route
 // reaches these, because an agent is a command that runs here.
 //
@@ -67,12 +67,10 @@ export function createCustomAgentChanges({
                   ),
                 ),
             )
-            .pipe(Effect.mapError((error) => new ProviderRuntimeFailure({ cause: error.cause })));
+            .pipe(toProviderRuntimeFailure);
           return {
             agents: yield* customAgents.list(),
-            restart: yield* service
-              .reloadCustomAgents()
-              .pipe(Effect.mapError((error) => new ProviderRuntimeFailure({ cause: error.cause }))),
+            restart: yield* service.reloadCustomAgents().pipe(toProviderRuntimeFailure),
           };
         })().pipe(Effect.uninterruptible),
       ),
@@ -96,12 +94,10 @@ export function createCustomAgentChanges({
                   ),
                 ),
             )
-            .pipe(Effect.mapError((error) => new ProviderRuntimeFailure({ cause: error.cause })));
+            .pipe(toProviderRuntimeFailure);
           return {
             agents: yield* customAgents.list(),
-            restart: yield* service
-              .reloadCustomAgents()
-              .pipe(Effect.mapError((error) => new ProviderRuntimeFailure({ cause: error.cause }))),
+            restart: yield* service.reloadCustomAgents().pipe(toProviderRuntimeFailure),
           };
         })().pipe(Effect.uninterruptible),
       ),
@@ -109,17 +105,13 @@ export function createCustomAgentChanges({
       Effect.fn("CustomAgentChanges.check")(function* () {
         yield* runtimeSync(() => assertAgentArgs(input.args));
         const env = yield* runtimeSync(() => customAgents.checkEnv(input.env, input.savedAgentId));
-        const executable = yield* resolve(input.command).pipe(
-          Effect.mapError((error) => new ProviderRuntimeFailure({ cause: error.cause })),
-        );
+        const executable = yield* resolve(input.command).pipe(toProviderRuntimeFailure);
         if (!executable)
           return yield* new ProviderRuntimeFailure({
             cause: new Error(sourceText("error.provider.customAgentNotFound", { command: input.command })),
           });
         yield* runtimeSync(() => assertWindowsScriptArgs(executable, input.args));
-        return yield* check({ executable, args: input.args, env }).pipe(
-          Effect.mapError((error) => new ProviderRuntimeFailure({ cause: error.cause })),
-        );
+        return yield* check({ executable, args: input.args, env }).pipe(toProviderRuntimeFailure);
       })().pipe(Effect.uninterruptible),
   };
 }

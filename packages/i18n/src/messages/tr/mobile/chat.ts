@@ -128,6 +128,8 @@ export const messages = {
   "mobile.chat.composer.messageAgent": "{name} ajanına mesaj gönder",
   "mobile.chat.composer.pasteFailed": "Yapıştırılan metin eklenemedi",
   "mobile.chat.composer.cancelDictation": "Dikteyi iptal et",
+  "mobile.chat.voice.listening": "Dinleniyor…",
+  "mobile.chat.voice.continue": "Dikteye devam et",
   "mobile.chat.composer.addAttachment": "Ek ekle",
   "mobile.chat.composer.ask": "{name} ajanına sor",
   "mobile.chat.composer.stopFailed": "Ajan durdurulamadı. Zaten bitmiş olabilir.",

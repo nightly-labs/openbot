@@ -1,4 +1,5 @@
 import { Context, Effect, Layer, Schema } from "effect";
+import { causeHelpers } from "../backend/effect-boundary";
 import type { CentralAuthOperationError } from "./central-auth-effects";
 
 export interface AccountRequestClient {
@@ -13,6 +14,8 @@ export interface AccountRequestClient {
 class AccountRequestFailure extends Schema.TaggedError<AccountRequestFailure>()("AccountRequestFailure", {
   cause: Schema.Defect(),
 }) {}
+
+const { rewrap: toAccountRequestFailure } = causeHelpers(AccountRequestFailure);
 class AccountPageFailure extends Schema.TaggedError<AccountPageFailure>()("AccountPageFailure", {
   cause: Schema.Defect(),
 }) {}
@@ -36,9 +39,7 @@ export class AccountServicePlatform extends Context.Service<
       AccountServicePlatform,
       AccountServicePlatform.of({
         request: <T>(path: string, init: RequestInit, decode: (value: unknown) => T, timeoutMs?: number) =>
-          auth
-            .requestAuthorized(path, init, decode, timeoutMs)
-            .pipe(Effect.mapError((error) => new AccountRequestFailure({ cause: error.cause }))),
+          auth.requestAuthorized(path, init, decode, timeoutMs).pipe(toAccountRequestFailure),
         openPage: (url) =>
           Effect.tryPromise({ try: () => openExternal(url), catch: (cause) => new AccountPageFailure({ cause }) }),
       }),

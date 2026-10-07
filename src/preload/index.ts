@@ -20,6 +20,7 @@ import {
   decodeMcpTestResult,
   decodeOptionalStorageUsage,
   decodeSaveAgentProfileResult,
+  decodeWorkspaceDirectory,
   type EventEndpoint,
   type GroupApi,
   groupApiMethodName,
@@ -50,6 +51,7 @@ import {
   decodeProviderCodeLoginStart,
   decodeRoutine,
   decodeRoutineCalendar,
+  decodeRoutineFeed,
   decodeRoutineRun,
   decodeRoutineRuns,
   decodeRoutines,
@@ -67,6 +69,7 @@ import {
   decodeApprovalAutomationPreference,
   decodeAppSetupState,
   decodeBillingState,
+  decodeBitwardenConnectorStatus,
   decodeBusyMessageModePreference,
   decodeCentralAuthState,
   decodeCustomAgentCheckResult,
@@ -136,7 +139,7 @@ import {
   decodeDynamicIslandPreference,
   decodeDynamicIslandPresentation,
 } from "./dynamic-island-decoding";
-import { decodeAddSlackOrchestratorReply, decodeSlackOverviewReply } from "./messaging-decoding";
+import { decodeAddOrchestratorReply, decodeMessagingOverviewReply } from "./messaging-decoding";
 import { decodeProviderRuntimeSnapshot } from "./provider-runtime";
 import { decodeRoutineFlowCanvas, decodeRoutineFlowLink, decodeRoutineFlowsChanged } from "./routine-flow-decoding";
 import {
@@ -570,6 +573,12 @@ const openbotApi: OpenBotDesktopApi = {
     openInstall: decodeVoid,
     changed: decodeGitHubConnectorStatus,
   }),
+  bitwardenConnector: bridgeGroup(IPC_ENDPOINTS.bitwardenConnector, {
+    status: decodeBitwardenConnectorStatus,
+    connect: decodeBitwardenConnectorStatus,
+    disconnect: decodeBitwardenConnectorStatus,
+    changed: decodeBitwardenConnectorStatus,
+  }),
   onePasswordConnector: bridgeGroup(IPC_ENDPOINTS.onePasswordConnector, {
     status: decodeOnePasswordConnectorStatus,
     checkSetup: decodeOnePasswordConnectorStatus,
@@ -580,6 +589,11 @@ const openbotApi: OpenBotDesktopApi = {
     cancel: decodeOnePasswordConnectorStatus,
     disconnect: decodeOnePasswordConnectorStatus,
     changed: decodeOnePasswordConnectorStatus,
+  }),
+  routineFeed: bridgeGroup(IPC_ENDPOINTS.routineFeed, {
+    get: decodeRoutineFeed,
+    create: decodeRoutineFeed,
+    remove: decodeRoutineFeed,
   }),
   billing: bridgeGroup(IPC_ENDPOINTS.billing, {
     getState: decodeBillingState,
@@ -628,12 +642,18 @@ const openbotApi: OpenBotDesktopApi = {
     deleteCustomProvider: decodeCustomProviderResult,
   }),
   messaging: bridgeGroup(IPC_ENDPOINTS.messaging, {
-    getSlackOverview: decodeSlackOverviewReply,
+    getSlackOverview: decodeMessagingOverviewReply,
     connectSlackWorkspace: decodeVoid,
     disconnectSlackWorkspace: decodeVoid,
     reconnectSlackWorkspace: decodeVoid,
     setSlackEnabled: decodeVoid,
-    addSlackOrchestrator: decodeAddSlackOrchestratorReply,
+    addSlackOrchestrator: decodeAddOrchestratorReply,
+    getDiscordOverview: decodeMessagingOverviewReply,
+    connectDiscordGuild: decodeVoid,
+    disconnectDiscordGuild: decodeVoid,
+    reconnectDiscordGuild: decodeVoid,
+    setDiscordEnabled: decodeVoid,
+    addDiscordOrchestrator: decodeAddOrchestratorReply,
   }),
   hostAdmin: bridgeGroup(IPC_ENDPOINTS.hostAdmin, {
     updateIdentity: decodeServer,
@@ -731,6 +751,7 @@ const openbotApi: OpenBotDesktopApi = {
       openWorkspaceFile: decodeVoid,
       previewSharedFile: decodeFilePreview,
       previewWorkspaceFile: decodeFilePreview,
+      listWorkspaceDirectory: decodeWorkspaceDirectory,
     }),
     onAttachmentImport: (listener) => {
       attachmentImportListeners.add(listener);

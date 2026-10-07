@@ -1,4 +1,4 @@
-import { IMAGE_ATTACHMENT_ACCEPT, supportedAttachmentExtensions } from "@openbot/contracts/attachment-files";
+import { supportedAttachmentExtensions } from "@openbot/contracts/attachment-files";
 import { accountUsageCoversModel, canPreviewAttachment } from "@openbot/contracts/ipc";
 import {
   TEAM_EML_ATTACHMENTS_CAPABILITY,
@@ -62,8 +62,7 @@ export function ConversationComposer() {
     reorderPresentedQueue,
     replyTarget,
     setComposerFocusRequest,
-    setContextAttachmentPickerElement,
-    setImageAttachmentPickerElement,
+    setAttachmentPickerElement,
     setShowComposerActions,
     showComposerActions,
     startVoiceRecording,
@@ -329,20 +328,7 @@ export function ConversationComposer() {
           </div>
           <div class="composer-toolbar">
             <Input
-              ref={setImageAttachmentPickerElement}
-              type="file"
-              accept={IMAGE_ATTACHMENT_ACCEPT}
-              multiple
-              hidden
-              tabindex={-1}
-              data-openbot-attachment-picker={props.runtime ? undefined : "true"}
-              onChange={(event) => {
-                if (props.runtime?.importFiles)
-                  void props.runtime.importFiles(Array.from(event.currentTarget.files ?? []));
-              }}
-            />
-            <Input
-              ref={setContextAttachmentPickerElement}
+              ref={setAttachmentPickerElement}
               type="file"
               accept={attachmentAccept()}
               multiple
@@ -386,9 +372,9 @@ export function ConversationComposer() {
                   <DropdownMenu.Item
                     disabled={attachmentBusy()}
                     onPointerDown={(event) => {
-                      if (event.button === 0) openAttachmentPicker("images");
+                      if (event.button === 0) openAttachmentPicker();
                     }}
-                    onKeyDown={(event) => openAttachmentPickerFromKey(event, "images")}
+                    onKeyDown={(event) => openAttachmentPickerFromKey(event)}
                   >
                     <Image aria-hidden="true" />
                     <span>{t("composer.add.image")}</span>
@@ -407,9 +393,9 @@ export function ConversationComposer() {
                   <DropdownMenu.Item
                     disabled={attachmentBusy()}
                     onPointerDown={(event) => {
-                      if (event.button === 0) openAttachmentPicker("all");
+                      if (event.button === 0) openAttachmentPicker();
                     }}
-                    onKeyDown={(event) => openAttachmentPickerFromKey(event, "all")}
+                    onKeyDown={(event) => openAttachmentPickerFromKey(event)}
                   >
                     <File aria-hidden="true" />
                     <span>{t("composer.add.context")}</span>

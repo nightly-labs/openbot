@@ -9,6 +9,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { Effect, Exit, Schema, Semaphore } from "effect";
 import type { AgentProvider } from "../agent-client";
 import { type AgentStore, DEFAULT_AGENT_PROVIDER } from "../agent-store";
+import { causeHelpers } from "../effect-boundary";
 import type { MailboxStore } from "../mailbox-store";
 import type { ConversationRuntime } from "./conversation-runtime";
 import { type ProviderPreference, startingModel } from "./model-choice";
@@ -250,7 +251,7 @@ export class CustomEndpoints {
           model: fallback.id,
           reasoningEffort: fallback.defaultReasoningEffort,
         })
-        .pipe(Effect.mapError((failure) => new EndpointChangeFailed({ cause: failure.cause })));
+        .pipe(toEndpointChangeFailed);
     }
   }, Effect.uninterruptible);
 
@@ -349,7 +350,7 @@ export class CustomEndpoints {
                 model: fallback.id,
                 reasoningEffort: fallback.defaultReasoningEffort,
               })
-              .pipe(Effect.mapError((failure) => new EndpointChangeFailed({ cause: failure.cause })));
+              .pipe(toEndpointChangeFailed);
           }
         }
         return yield* Effect.suspend(persist);
@@ -439,7 +440,7 @@ export class CustomEndpoints {
           model: fallback.id,
           reasoningEffort: fallback.defaultReasoningEffort,
         })
-        .pipe(Effect.mapError((failure) => new EndpointChangeFailed({ cause: failure.cause })));
+        .pipe(toEndpointChangeFailed);
     }
   }, Effect.uninterruptible);
 
@@ -479,7 +480,7 @@ export class CustomEndpoints {
           model: fallback.id,
           reasoningEffort: fallback.defaultReasoningEffort,
         })
-        .pipe(Effect.mapError((failure) => new EndpointChangeFailed({ cause: failure.cause })))
+        .pipe(toEndpointChangeFailed)
         .pipe(
           Effect.catch((failure) =>
             Effect.sync(() => this.#hooks.emitError("agent_model_fallback_failed", failure.cause, agent.id)),
@@ -514,3 +515,5 @@ function sameCustomAgent(model: string, agentModel: string): boolean {
 export class EndpointChangeFailed extends Schema.TaggedError<EndpointChangeFailed>()("EndpointChangeFailed", {
   cause: Schema.Defect(),
 }) {}
+
+export const { rewrap: toEndpointChangeFailed } = causeHelpers(EndpointChangeFailed);

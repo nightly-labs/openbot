@@ -76,8 +76,8 @@ export function OpenBot101() {
 
       <h2>Install it, then connect a provider</h2>
       <p>
-        OpenBot runs on macOS 13 or newer on Apple silicon or Intel, Windows 10 or newer on x64, and x64 Linux as an
-        AppImage. Grab the installer from{" "}
+        OpenBot runs on macOS 13 or newer on Apple silicon or Intel, Windows 10 or newer on x64, and x64 or arm64 Linux
+        as an AppImage. Grab the installer from{" "}
         <a href={OPENBOT_LINKS.releases} target="_blank" rel={EXTERNAL_LINK_REL}>
           GitHub Releases
         </a>
@@ -180,7 +180,7 @@ export function OpenBot101() {
       </p>
       <p>
         Cloudflare holds accounts, avatars, host configuration, memberships, invitations and logical session records. It
-        does not carry chats, files or commands. An account is optional. OpenBot works without one.
+        does not carry chats, files or commands.
       </p>
 
       <h2>What is next</h2>

@@ -2,6 +2,7 @@ import type { AgentEvent, ConversationMessage } from "@openbot/contracts/ipc";
 import { CONVERSATION_PLAN_ITEM_TYPE, MESSAGING_LIMITS } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Schema, type Scope } from "effect";
+import { causeHelpers } from "../effect-boundary";
 import type { DeliveryContext, MailboxStore, MessagingOrigin } from "../mailbox-store";
 import type { OpenBotDatabase } from "../openbot-database";
 import { type MessagingContextMessage, messagingPromptText } from "./messaging-prompt";
@@ -187,7 +188,7 @@ export class MessagingThreads {
         sourcePaths: input.sourcePaths,
         idempotencyKey: input.idempotencyKey,
       })
-      .pipe(Effect.mapError((error) => new MessagingThreadFailed({ cause: error.cause })));
+      .pipe(toMessagingThreadFailed);
     const deliveryId = receipt.deliveries[0]?.id;
     if (!deliveryId)
       return yield* new MessagingThreadFailed({
@@ -341,16 +342,12 @@ export class MessagingThreads {
       const origin = this.#mailbox.messagingOrigin(context.delivery.id);
       if (!origin || origin.authorId !== authorId) continue;
       if (context.delivery.status === "queued") {
-        yield* this.#mailbox
-          .cancel(link.agentId, context.delivery.id)
-          .pipe(Effect.mapError((error) => new MessagingThreadFailed({ cause: error.cause })));
+        yield* this.#mailbox.cancel(link.agentId, context.delivery.id).pipe(toMessagingThreadFailed);
         this.#publish({ type: "cancelled", link, origin });
         stopped = true;
       } else if (context.delivery.status === "running" && context.delivery.turnId) {
         const turnId = context.delivery.turnId;
-        yield* this.#hooks
-          .interrupt(link.agentId, turnId, link.threadId)
-          .pipe(Effect.mapError((error) => new MessagingThreadFailed({ cause: error.cause })));
+        yield* this.#hooks.interrupt(link.agentId, turnId, link.threadId).pipe(toMessagingThreadFailed);
         stopped = true;
       }
     }
@@ -368,9 +365,7 @@ export class MessagingThreads {
     agentId: string,
   ): Effect.fn.Return<void, MessagingThreadFailed> {
     for (const threadId of this.store.threadIdsForAgent(agentId))
-      yield* this.#hooks
-        .forgetThread(threadId)
-        .pipe(Effect.mapError((error) => new MessagingThreadFailed({ cause: error.cause })));
+      yield* this.#hooks.forgetThread(threadId).pipe(toMessagingThreadFailed);
     yield* threadsStep(() => this.store.deleteForAgent(agentId));
   });
 
@@ -388,9 +383,7 @@ export class MessagingThreads {
     for (const message of messages) {
       if (message.author === "user") continue;
       for (const attachment of message.attachments ?? []) {
-        const resolved = yield* this.#mailbox
-          .resolveAttachment(attachment.id)
-          .pipe(Effect.mapError((error) => new MessagingThreadFailed({ cause: error.cause })));
+        const resolved = yield* this.#mailbox.resolveAttachment(attachment.id).pipe(toMessagingThreadFailed);
         if (resolved) files.push(resolved);
       }
     }
@@ -432,6 +425,6 @@ export class MessagingThreadFailed extends Schema.TaggedError<MessagingThreadFai
   cause: Schema.Defect(),
 }) {}
 
-function threadsStep<A>(run: () => A): Effect.Effect<A, MessagingThreadFailed> {
-  return Effect.try({ try: run, catch: (cause) => new MessagingThreadFailed({ cause }) });
-}
+const { sync: threadsStep, rewrap: toMessagingThreadFailed } = causeHelpers(MessagingThreadFailed);
+
+export { toMessagingThreadFailed };

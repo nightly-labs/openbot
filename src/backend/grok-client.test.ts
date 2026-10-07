@@ -3,12 +3,12 @@ import { AcpAgentClient } from "./acp-client";
 import { NO_PROVIDER_CREDENTIALS, requireProviderDriver } from "./provider-drivers";
 // @vitest-environment node
 
-import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { runCauseEffect } from "./effect-boundary";
 import { GrokAgentClient } from "./grok-client";
 import {
@@ -23,16 +23,29 @@ import {
 } from "./protocol";
 
 let root: string;
+/**
+ * The fake agent, written once for this file and not once for each test. macOS checks an executable
+ * the first time it runs from a new path, and that check cost about 200 ms in each test that wrote
+ * its own copy. The agent reads its mode and its log path from the environment.
+ */
+let executableRoot: string;
 let executable: string;
 let logPath: string;
 let client: AcpAgentClient | null = null;
 
+beforeAll(async () => {
+  executableRoot = await mkdtemp(join(tmpdir(), "openbot-grok-acp-cli-"));
+  executable = join(executableRoot, "grok");
+  await writeFile(executable, FAKE_GROK_ACP, { mode: 0o700 });
+});
+
+afterAll(async () => {
+  await rm(executableRoot, { recursive: true, force: true });
+});
+
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), "openbot-grok-acp-"));
-  executable = join(root, "grok");
   logPath = join(root, "fake-grok.jsonl");
-  await writeFile(executable, FAKE_GROK_ACP);
-  await chmod(executable, 0o700);
   process.env.OPENBOT_FAKE_GROK_LOG = logPath;
   delete process.env.OPENBOT_FAKE_GROK_MODE;
 });
@@ -656,13 +669,13 @@ describe.sequential("GrokAgentClient", () => {
     await runCauseEffect(client.request("initialize", {}, decodeRecordResponse));
     const models = await runCauseEffect(client.request("model/list", {}, decodeModelListResponse));
     expect(models.data).toContainEqual(expect.objectContaining({ model: "grok-future-2", displayName: "Future Grok" }));
-    expect(await readLog()).toContainEqual({ method: "session/close", sessionId: "grok-session-2" });
+    await expectLogged({ method: "session/close", sessionId: "grok-session-2" });
     await expect(runCauseEffect(client.request("model/list", {}, decodeModelListResponse))).rejects.toThrow(
       "Discovery unavailable",
     );
     const refreshed = await runCauseEffect(client.request("model/list", {}, decodeModelListResponse));
     expect(refreshed.data.map((model) => model.model)).toEqual(["grok-4.5", "grok-fast", "grok-future-4"]);
-    expect(await readLog()).toContainEqual({ method: "session/close", sessionId: "grok-session-4" });
+    await expectLogged({ method: "session/close", sessionId: "grok-session-4" });
   });
 
   it("bounds Grok model discovery by the caller timeout", async () => {
@@ -814,6 +827,11 @@ describe.sequential("GrokAgentClient", () => {
     },
   );
 });
+
+/** Discovery closes its session in the background after `model/list` returns, so wait for the close. */
+async function expectLogged(entry: DynamicRecord): Promise<void> {
+  await vi.waitFor(async () => expect(await readLog()).toContainEqual(entry), { timeout: 3_000 });
+}
 
 async function readLog(): Promise<DynamicRecord[]> {
   const text = await readFile(logPath, "utf8").catch(() => "");

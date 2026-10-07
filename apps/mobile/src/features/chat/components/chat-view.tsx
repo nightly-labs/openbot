@@ -4,16 +4,17 @@ import { router, useIsFocused } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { ArrowDown } from "lucide-react-native";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { AccessibilityInfo, AppState, Keyboard, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AccessibilityInfo, AppState, Keyboard, useColorScheme, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { KeyboardController, KeyboardGestureArea } from "react-native-keyboard-controller";
 import Animated, { useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
+import { getBloubAvatarColor } from "@/features/agents/model/bloub-activity";
 import { MobileConversationAnalytics } from "@/features/analytics/conversation";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
-import { ChatComposer } from "@/features/chat/components/chat-composer";
+import { ChatComposer, VOICE_BUTTON_SIZE } from "@/features/chat/components/chat-composer";
 import { ChatGlassIconButton } from "@/features/chat/components/chat-glass-icon-button";
 import { ChatHeader } from "@/features/chat/components/chat-header";
 import { ChatMessageList } from "@/features/chat/components/chat-message-list";
@@ -38,11 +39,14 @@ import type { ChatTarget } from "../model/chat-target";
 import { takeComposerFocus, takeComposerRequest, useComposerRequest } from "../model/composer-requests";
 import { queueReceiptMessages } from "../model/queue-edit-draft";
 import { retainConfirmedAttachments } from "../model/upload-chat-attachments";
+import { voiceAccent, voicePalette } from "../model/voice-palette";
 import { rememberImageDimensions } from "./attachment-preview";
 import { BrowserSecretCard } from "./browser-secret-card";
 import { ChatAttachmentPanel } from "./chat-attachment-panel";
 import { ChatQueueButton } from "./chat-queue-button";
 import type { ChatQueueController } from "./use-chat-queue";
+import { useVoiceMode } from "./use-voice-mode";
+import { VoiceOverlay } from "./voice-overlay";
 
 export interface ChatViewProps {
   target: ChatTarget;
@@ -252,6 +256,27 @@ export function ChatView({
   const liquidGlassAvailable = isLiquidGlassAvailable() && !reducedTransparency;
   const server = servers.find((server) => server.id === target.serverId);
   const serverOnline = server?.state === "online";
+  // Speech goes to the voice mode's own transcript, and only Send makes it a
+  // message. Leaving the chat or losing the server stops listening and keeps it.
+  const voice = useVoiceMode({
+    enabled: isFocused && serverOnline && canSend && !readOnly,
+    focused: isFocused,
+    sendable: serverOnline && canSend && !sending && !pendingMessage,
+    onSend: sendMessage,
+  });
+  const voiceOpen = voice.stage !== "closed";
+  const dark = useColorScheme() === "dark";
+  // The glow and the filled voice controls take the agent's own colour. A
+  // channel mixes the colours of its first members.
+  const voiceColors = useMemo(
+    () =>
+      target.kind === "agent"
+        ? [getBloubAvatarColor(target.avatarSeed, target.avatarHue)]
+        : target.members.slice(0, 4).map((member) => getBloubAvatarColor(member.avatarSeed, member.avatarHue)),
+    [target],
+  );
+  const palette = useMemo(() => voicePalette(voiceColors, dark), [voiceColors, dark]);
+  const accent = useMemo(() => voiceAccent(palette), [palette]);
   useEffect(() => {
     conversationAnalytics.update(
       isFocused && foregroundVisit,
@@ -301,6 +326,17 @@ export function ChatView({
   useEffect(() => {
     menuOpenValue.set(attachments.menuOpen);
   }, [attachments.menuOpen, menuOpenValue]);
+  // The same for the voice mode: the edge swipe stops or cancels it, as the
+  // back button does, instead of leaving the chat with the spoken text.
+  const voiceOpenValue = useSharedValue(false);
+  useEffect(() => {
+    voiceOpenValue.set(voiceOpen);
+  }, [voiceOpen, voiceOpenValue]);
+  const voiceBack = useRef(voice.back);
+  useEffect(() => {
+    voiceBack.current = voice.back;
+  });
+  const leaveVoiceMode = useCallback(() => voiceBack.current(), []);
   const edgeBackGesture = useMemo(
     () =>
       Gesture.Pan()
@@ -311,9 +347,10 @@ export function ChatView({
         .failOffsetY([-16, 16])
         .onEnd((event) => {
           if (menuOpenValue.get()) return;
-          if (event.translationX >= 48 || event.velocityX >= 650) scheduleOnRN(leaveConversation);
+          if (event.translationX < 48 && event.velocityX < 650) return;
+          scheduleOnRN(voiceOpenValue.get() ? leaveVoiceMode : leaveConversation);
         }),
-    [menuOpenValue],
+    [menuOpenValue, voiceOpenValue, leaveVoiceMode],
   );
 
   async function retryAcceptedHistory() {
@@ -499,10 +536,14 @@ export function ChatView({
               liquidGlassAvailable={liquidGlassAvailable}
               topInset={insets.top}
               onBack={leaveConversation}
+              // The voice overlay covers the chat. It blocks touches, and this
+              // keeps screen readers on the transcript and the voice controls.
+              accessibilityHidden={voiceOpen}
             />
             <ChatMessageList
               agents={serverAgents}
               target={target}
+              accessibilityHidden={voiceOpen}
               motion={motion}
               sending={sending}
               keyboardOffset={keyboardOffset}
@@ -567,12 +608,28 @@ export function ChatView({
                   : null
               }
             />
+            {voiceOpen ? (
+              <VoiceOverlay
+                voice={voice}
+                palette={palette}
+                hint={voice.phase === "listening" ? t("mobile.chat.voice.listening") : ""}
+                reply={replyTarget ? mentionDraft(replyTarget.body).text || t("mobile.chat.reply.attachment") : null}
+                muted={muted}
+                topInset={insets.top}
+                controlsHeight={Math.max(insets.bottom, 10) + VOICE_BUTTON_SIZE + 48}
+                reducedTransparency={reducedTransparency}
+              />
+            ) : null}
             <Animated.View
-              style={[{ position: "absolute", left: 0, right: 0, bottom: 0 }, motion.composerStyle]}
+              style={[
+                // Above the voice overlay, which covers the header, while the voice mode is open.
+                { position: "absolute", left: 0, right: 0, bottom: 0, zIndex: voiceOpen ? 31 : undefined },
+                motion.composerStyle,
+              ]}
               pointerEvents="box-none"
               onLayout={motion.onComposerLayout}
             >
-              {!atLatest && motion.historyVisible && messages.length > 0 ? (
+              {!voiceOpen && !atLatest && motion.historyVisible && messages.length > 0 ? (
                 <View className="absolute -top-14 self-center">
                   <ChatGlassIconButton
                     accessibilityLabel={t("mobile.chat.scrollToLatest")}
@@ -668,6 +725,8 @@ export function ChatView({
                   menuOpen={attachments.menuOpen}
                   menuProgress={menuProgress}
                   stopping={stopping}
+                  voice={voice}
+                  voiceAccent={accent}
                 />
               ) : null}
             </Animated.View>

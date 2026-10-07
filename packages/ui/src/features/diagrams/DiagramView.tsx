@@ -178,9 +178,13 @@ export function DiagramView(props: DiagramViewProps) {
           {(run) => (
             <span class="diagram-view-run">
               <Badge
-                size="sm"
-                shape="pill"
-                tone={run().status === "failed" ? "danger" : run().status === "succeeded" ? "success" : "neutral"}
+                variant={
+                  run().status === "failed"
+                    ? "destructive-light"
+                    : run().status === "succeeded"
+                      ? "success-light"
+                      : "secondary"
+                }
               >
                 {t(DIAGRAM_RUN_STATUS_KEY[run().status])}
               </Badge>

@@ -1,23 +1,27 @@
 // The messaging payloads. No message here quotes the input.
 
-import type { AddSlackOrchestratorInput, SetSlackEnabledInput, SlackWorkspaceInput } from "@openbot/contracts/ipc";
+import type {
+  AddMessagingOrchestratorInput,
+  MessagingWorkspaceInput,
+  SetMessagingEnabledInput,
+} from "@openbot/contracts/ipc";
 import { isAgentModel, isAgentProvider, isReasoningEffort } from "@openbot/contracts/ipc";
 import { isBoolean } from "@openbot/contracts/runtime-values";
 import { isObject, requireString } from "./validation";
 
-export function parseSlackWorkspaceInput(value: unknown): SlackWorkspaceInput {
+export function parseMessagingWorkspaceInput(value: unknown): MessagingWorkspaceInput {
   if (!isObject(value)) throw new Error("A messaging request is invalid.");
   return { workspaceId: requireString(value.workspaceId, "Workspace id") };
 }
 
-export function parseSetSlackEnabledInput(value: unknown): SetSlackEnabledInput {
+export function parseSetMessagingEnabledInput(value: unknown): SetMessagingEnabledInput {
   if (!isObject(value) || !isBoolean(value.enabled)) throw new Error("A messaging request is invalid.");
   return { workspaceId: requireString(value.workspaceId, "Workspace id"), enabled: value.enabled };
 }
 
-export function parseAddSlackOrchestratorInput(value: unknown): AddSlackOrchestratorInput {
+export function parseAddMessagingOrchestratorInput(value: unknown): AddMessagingOrchestratorInput {
   if (!isObject(value)) throw new Error("A messaging request is invalid.");
-  const result: AddSlackOrchestratorInput = { workspaceId: requireString(value.workspaceId, "Workspace id") };
+  const result: AddMessagingOrchestratorInput = { workspaceId: requireString(value.workspaceId, "Workspace id") };
   if (value.provider !== undefined) {
     if (!isAgentProvider(value.provider)) throw new Error("A messaging request is invalid.");
     result.provider = value.provider;

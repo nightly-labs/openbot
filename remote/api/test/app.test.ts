@@ -4,6 +4,8 @@ import { exportJWK, SignJWT } from "jose";
 import { describe, expect, it, vi } from "vitest";
 import { createRemoteApiApp, signalClientIp } from "../src/app";
 import { readRemoteApiConfig } from "../src/config";
+import { type DiscordRestRequest, DiscordTransportError, makeDiscordApi } from "../src/discord-api";
+import { DiscordState } from "../src/discord-events";
 import type { RemoteTicketClaims } from "../src/protocol";
 import { type RemoteTokenProvider, SignalService } from "../src/signal-service";
 import { RemoteTokenError, RemoteTokenService, signServiceRequest } from "../src/tokens";
@@ -401,6 +403,202 @@ describe("Slack request route", () => {
     );
   }
 });
+
+// A host acts in Discord with the bot's token through Signal, so each refusal here keeps one host
+// out of another host's guilds.
+describe("Discord route", () => {
+  it("refuses a Discord route ticket of another host", async () => {
+    const { signal, route } = await discordRoute();
+    const socket = testSocket("ingress");
+    signal.connect(socket);
+    await runSignal(
+      signal,
+      signal.receive(
+        socket,
+        JSON.stringify({
+          type: "hello",
+          version: 1,
+          peer: "ingress",
+          token: "host-ticket",
+          discordRoute: await route({ hid: "host-2", guilds: ["100"] }),
+        }),
+      ),
+    );
+    expect(socket.messages.at(-1)).toContain('"code":"authentication_required"');
+    expect(signal.deliverDiscord("100", { kind: "removed" })).toBe(false);
+  });
+
+  it("lets a host act only in its own guilds and their channels", async () => {
+    const { app, connect, call, discordCalls } = await discordRoute();
+    const first = await connect("first", ["100"]);
+    const second = await connect("second", ["200"]);
+    const message = { op: "createMessage", content: "Hello", replyTo: null, buttons: [] };
+
+    const created = await call(first.token, { ...message, guildId: "100", channelId: "110" });
+    expect(created.status).toBe(200);
+    expect(await created.json()).toEqual({ messageId: "999" });
+    expect(discordCalls.at(-1)).toMatchObject({
+      method: "POST",
+      route: "/channels/110/messages",
+      body: { allowed_mentions: { parse: [], replied_user: false } },
+    });
+    const sent = discordCalls.length;
+
+    // Another host's guild, a channel of another guild, a missing or unknown token.
+    const otherGuild = await call(first.token, { ...message, guildId: "200", channelId: "210" });
+    expect(otherGuild.status).toBe(403);
+    expect(await otherGuild.json()).toEqual({ error: { code: "unknown_guild" } });
+    const otherChannel = await call(first.token, { ...message, guildId: "100", channelId: "210" });
+    expect(otherChannel.status).toBe(403);
+    expect(await otherChannel.json()).toEqual({ error: { code: "forbidden" } });
+    expect((await call(second.token, { op: "member", guildId: "100", userId: "1" })).status).toBe(403);
+    expect((await call(null, { ...message, guildId: "100", channelId: "110" })).status).toBe(401);
+    expect((await call("x".repeat(43), { ...message, guildId: "100", channelId: "110" })).status).toBe(401);
+    expect(discordCalls.slice(sent).filter((request) => request.method !== "GET")).toEqual([]);
+
+    // The session ends with its socket.
+    await runSignal(app.signal, app.signal.disconnect(first.socket));
+    expect((await call(first.token, { ...message, guildId: "100", channelId: "110" })).status).toBe(401);
+  });
+
+  it("stops deliveries and calls for a revoked guild", async () => {
+    const { connect, call, revoke, signal } = await discordRoute();
+    const host = await connect("host", ["100"]);
+    expect(signal.deliverDiscord("100", { kind: "removed" })).toBe(true);
+    expect(JSON.parse(host.socket.messages.at(-1) ?? "{}")).toEqual({
+      type: "discord-delivery",
+      version: 1,
+      guildId: "100",
+      delivery: { kind: "removed" },
+    });
+
+    await revoke("100", 1_000);
+    const count = host.socket.messages.length;
+    expect(signal.deliverDiscord("100", { kind: "removed" })).toBe(false);
+    expect(host.socket.messages).toHaveLength(count);
+    const refused = await call(host.token, { op: "channel", guildId: "100", channelId: "110" });
+    expect(refused.status).toBe(403);
+    expect(await refused.json()).toEqual({ error: { code: "unknown_guild" } });
+  });
+
+  it("does not route a guild that the bot left, and has the account service unlink it", async () => {
+    const { connect, signal } = await discordRoute();
+    const left: string[] = [];
+    signal.setDiscordMembership({ isMember: (guildId) => guildId === "100", left: (guildId) => left.push(guildId) });
+    const host = await connect("host", ["100", "200"]);
+    expect(JSON.parse(host.socket.messages.at(-1) ?? "{}")).toMatchObject({ guilds: ["100"] });
+    expect(left).toEqual(["200"]);
+    expect(signal.deliverDiscord("200", { kind: "removed" })).toBe(false);
+  });
+});
+
+async function discordRoute() {
+  const { privateKey, publicKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
+  const jwk = await exportJWK(publicKey);
+  jwk.kid = "discord-route-1";
+  jwk.alg = "ES256";
+  const config = readRemoteApiConfig({
+    REMOTE_TICKET_PUBLIC_JWKS: JSON.stringify({ keys: [jwk] }),
+    REMOTE_TLS_DISABLED: "true",
+    REMOTE_CONTROL_PLANE_URL: "http://127.0.0.1:3100",
+    REMOTE_SESSION_SECRET: "s".repeat(32),
+    REMOTE_AUTH_WEBHOOK_SECRET: "w".repeat(32),
+    TURN_SHARED_SECRET: "t".repeat(32),
+    TURN_HOST: "localhost",
+    DISCORD_BOT_TOKEN: "bot.token.value",
+    DISCORD_APPLICATION_ID: "12345678901234567",
+  });
+  const routes = new RemoteTokenService(config);
+  const signal = new SignalService(
+    {
+      ...hostTickets(),
+      verifyDiscordRoute: (token, hostId) => routes.verifyDiscordRoute(token, hostId),
+      validateDiscordRoute: (_hostId, guilds) => Effect.succeed(guilds.map((guild) => guild.id)),
+    },
+    8,
+    undefined,
+    undefined,
+    undefined,
+    { discord: true },
+  );
+  // Discord itself: channels 110 and 210 are in guilds 100 and 200.
+  const discordCalls: DiscordRestRequest[] = [];
+  const channelGuilds = new Map([
+    ["110", "100"],
+    ["210", "200"],
+  ]);
+  const api = makeDiscordApi(
+    {
+      request: (input) =>
+        Effect.gen(function* () {
+          discordCalls.push(input);
+          const channelId = /^\/channels\/([0-9]+)$/u.exec(input.route)?.[1];
+          if (input.method === "GET" && channelId) {
+            const guildId = channelGuilds.get(channelId);
+            if (!guildId) return yield* new DiscordTransportError({ status: 404 });
+            return { id: channelId, guild_id: guildId, name: `channel-${channelId}` };
+          }
+          if (input.method === "GET") return { nick: null, user: { id: "1", username: "user" } };
+          return { id: "999" };
+        }),
+    },
+    new DiscordState("12345678901234567"),
+  );
+  const app = Object.assign(createRemoteApiApp(config, signal, signalRuntime(signal), api), { signal });
+  const now = Math.floor(Date.now() / 1_000);
+  const route = (claims: { hid: string; guilds: string[] }, linkedAt = 1_000) =>
+    new SignJWT({ hid: claims.hid, guilds: claims.guilds.map((id) => ({ id, linkedAt })) })
+      .setProtectedHeader({ alg: "ES256", kid: "discord-route-1" })
+      .setAudience("openbot-discord-route")
+      .setIssuedAt(now - 120)
+      .setExpirationTime(now + 3_600)
+      .sign(privateKey);
+  const connect = async (id: string, guilds: string[]) => {
+    const socket = testSocket(id);
+    signal.connect(socket);
+    await runSignal(
+      signal,
+      signal.receive(
+        socket,
+        JSON.stringify({
+          type: "hello",
+          version: 1,
+          peer: "ingress",
+          token: "host-ticket",
+          discordRoute: await route({ hid: "host-1", guilds }),
+        }),
+      ),
+    );
+    const session = JSON.parse(socket.messages.at(-1) ?? "{}");
+    expect(session).toMatchObject({ type: "discord-session", token: expect.any(String) });
+    return { socket, token: String(session.token) };
+  };
+  const call = (token: string | null, body: unknown) =>
+    app.handle(
+      new Request("http://localhost/v1/discord/api", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify(body),
+      }),
+    );
+  const revoke = async (guildId: string, through: number) => {
+    const body = JSON.stringify({ type: "discord-route-revoked", guildId, through });
+    const timestamp = String(Math.floor(Date.now() / 1_000));
+    const response = await app.handle(
+      new Request("http://localhost/internal/auth-events", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "OpenBot-Timestamp": timestamp,
+          "OpenBot-Signature": signServiceRequest(body, timestamp, config.authWebhookSecret),
+        },
+        body,
+      }),
+    );
+    expect(response.status).toBe(204);
+  };
+  return { app, signal, route, connect, call, revoke, discordCalls };
+}
 
 async function slackRoute(
   signingSecret: string | null,

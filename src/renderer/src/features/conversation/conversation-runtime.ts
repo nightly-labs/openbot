@@ -12,6 +12,7 @@ export interface ConversationRuntime {
     | "editQueuedMessage"
     | "listInstalledSkills"
     | "listMcpServers"
+    | "listWorkspaceDirectory"
     | "onAttachmentImport"
     | "openAttachment"
     | "openSharedFile"

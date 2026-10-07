@@ -19,7 +19,7 @@ import { createSimpleContext } from "./simple-context";
 /**
  * Cross-domain open/select commands (agent chat, direct conversation, message focus, global
  * search). Leaf context below agents/conversation/direct-messages so one call can write to
- * all three without cycles (`noImportCycles` is an error). See docs/ARCHITECTURE.md.
+ * all three without cycles (`noImportCycles` is an error). See docs/architecture/change-rules.md.
  * Ungated - see `app-providers.tsx`.
  */
 const Navigation = createSimpleContext({

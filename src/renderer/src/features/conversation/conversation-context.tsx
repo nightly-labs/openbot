@@ -52,6 +52,11 @@ import type { SendMessageResult } from "./conversation-types";
 import { useDirectMessages } from "./direct-messages-context";
 
 const LATEST_PAGE_SIZE = 50;
+/**
+ * How much of a snapshot an agent that is not open converts. Commentary of one turn becomes one
+ * message and queued messages none, so a page needs more than a page of the thread.
+ */
+const INACTIVE_SNAPSHOT_TAIL = LATEST_PAGE_SIZE * 4;
 
 function trimToLatestPage(conversation: ConversationState): void {
   if (conversation.messages.length <= LATEST_PAGE_SIZE) return;
@@ -235,6 +240,7 @@ const Conversation = createSimpleContext({
         for (const agentId of agentIds) {
           current[agentId] ??= { messages: [] };
           current[agentId].messages = next[agentId] ?? [];
+          if (agentId !== activeAgentId()) trimToLatestPage(current[agentId]);
         }
       });
       for (const agentId of agentIds) deleteAgentMessageBodies(rawAgentMessageBodies, agentId);
@@ -462,6 +468,7 @@ const Conversation = createSimpleContext({
         });
         appended = true;
         conversation.messages = [...messages, message];
+        if (event.agentId !== activeAgentId()) trimToLatestPage(conversation);
       });
       if (appended) {
         const readState = conversations[event.agentId]?.read;
@@ -484,14 +491,22 @@ const Conversation = createSimpleContext({
       const agentId = snapshot.agentId;
       if (snapshot.revision < (conversations[agentId]?.revision ?? -1)) return;
       const initialLoad = conversations[agentId]?.loaded !== true;
+      const inactive = agentId !== activeAgentId();
+      const windowMode = conversations[agentId]?.windowMode ?? "latest";
+      // A snapshot carries the whole thread. An agent that is not open shows none of it, and opening
+      // it reads the latest page again, so only the tail is converted and kept. A window around an
+      // older message, from a search, is not in the tail, so it keeps the whole snapshot.
+      const sourceMessages =
+        inactive && windowMode === "latest" && snapshot.messages.length > INACTIVE_SNAPSHOT_TAIL
+          ? snapshot.messages.slice(-INACTIVE_SNAPSHOT_TAIL)
+          : snapshot.messages;
       updateConversation(agentId, (conversation) => {
         conversation.revision = snapshot.revision;
         conversation.loaded = true;
         const previous = conversation.messages;
         const previousById = new Map(previous.map((message) => [message.id, message]));
-        const allMappedMessages = toAgentMessages(snapshot.messages, snapshot.agentId);
+        const allMappedMessages = toAgentMessages(sourceMessages, snapshot.agentId);
         const pageInfo = conversations[agentId]?.page;
-        const windowMode = conversations[agentId]?.windowMode ?? "latest";
         const mappedMessages = retainThinkingMessages(
           previous,
           windowedSnapshotMessages(previous, allMappedMessages, {
@@ -509,9 +524,9 @@ const Conversation = createSimpleContext({
           return;
         }
         conversation.messages = next;
-        // A snapshot carries the whole thread. An agent that is not open shows none of it, and
-        // opening it reads the latest page again, so only that page's worth stays in memory.
-        if (agentId !== activeAgentId()) trimToLatestPage(conversation);
+        if (!inactive) return;
+        trimToLatestPage(conversation);
+        if (sourceMessages !== snapshot.messages) conversation.page = { hasOlder: true, olderCursor: null };
       });
       const presentedRequestKey = presentedPromptResolutions()[agentId];
       const pendingPrompt = pendingPrompts()[agentId];

@@ -41,7 +41,7 @@ export class SlackEventsTransport implements MessagingTransport {
 
   start(sink: TransportSink): void {
     this.#sink = sink;
-    this.#release ??= this.#ingress.acquire();
+    this.#release ??= this.#ingress.acquire("slack");
     this.#unsubscribe ??= this.#ingress.onState((state) => this.#report(state));
     this.#report(this.#ingress.state());
   }
@@ -63,6 +63,7 @@ export class SlackEventsTransport implements MessagingTransport {
     Effect.sync((): IngressAnswer => {
       const sink = this.#sink;
       if (!sink) return { status: 503 };
+      if (delivery.platform !== "slack") return { status: 400 };
       const text = new TextDecoder().decode(delivery.body);
       if (delivery.kind === "interactivity") {
         const payload = parseRecord(new URLSearchParams(text).get("payload") ?? "");

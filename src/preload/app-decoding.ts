@@ -23,6 +23,7 @@ import {
   type AppLogoColorPreference,
   type ApprovalAutomationPreference,
   type AppSetupState,
+  type BitwardenConnectorStatus,
   type BusyMessageModePreference,
   type CentralAuthIssue,
   type CentralAuthState,
@@ -441,4 +442,10 @@ export function decodeRemoteDesktopSetupFromMain(value: unknown): RemoteDesktopS
 export function decodeRemoteDesktopTestFromMain(value: unknown): RemoteDesktopTestStatus {
   if (!isRemoteDesktopTestStatus(value)) throw new Error("Invalid remote desktop test response.");
   return { ...value };
+}
+
+export function decodeBitwardenConnectorStatus(value: unknown): BitwardenConnectorStatus {
+  if (!value || typeof value !== "object" || !("connected" in value) || typeof value.connected !== "boolean")
+    throw new Error("Invalid Bitwarden connector response.");
+  return { connected: value.connected };
 }

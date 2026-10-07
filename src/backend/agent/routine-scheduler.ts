@@ -24,6 +24,7 @@ import { collapseMissedOccurrences, RoutineInputError } from "@openbot/team-clie
 import { Effect, Schema } from "effect";
 import { AgentRoutineStore } from "../agent-routine-store";
 import type { AgentStore } from "../agent-store";
+import { causeHelpers } from "../effect-boundary";
 import type { MailboxStore } from "../mailbox-store";
 import type { DynamicToolCallParams } from "../protocol";
 import { recordRestartActivity } from "../restart-activity";
@@ -683,9 +684,7 @@ export class RoutineScheduler implements RoutineDueSource {
     if (skipped) return skipped;
     recordRestartActivity();
     const validateRecipient = yield* routineStep(() => this.#mailbox.prepareDelivery([run.agentId]));
-    const agent = yield* this.#store
-      .getOrCreate(run.agentId)
-      .pipe(Effect.mapError((failure) => new RoutineOperationFailed({ cause: failure.cause })));
+    const agent = yield* this.#store.getOrCreate(run.agentId).pipe(toRoutineOperationFailed);
     return yield* Effect.gen({ self: this }, function* () {
       yield* routineStep(validateRecipient);
       const receipt = yield* this.#mailbox
@@ -703,7 +702,7 @@ export class RoutineScheduler implements RoutineDueSource {
           replyToMessageId: null,
           idempotencyKey: run.triggerId ? `routine:${run.triggerId}:${run.scheduledFor}` : `routine:manual:${run.id}`,
         })
-        .pipe(Effect.mapError((failure) => new RoutineOperationFailed({ cause: failure.cause })));
+        .pipe(toRoutineOperationFailed);
       const deliveryId = receipt.deliveries[0]?.id;
       if (!deliveryId)
         return yield* new RoutineOperationFailed({ cause: new Error("Unable to create the routine delivery.") });
@@ -713,9 +712,7 @@ export class RoutineScheduler implements RoutineDueSource {
         this.#hooks.syncMailboxMessages(current);
         return current;
       });
-      yield* this.#store
-        .updatePreview(agent.id, run.instruction)
-        .pipe(Effect.mapError((failure) => new RoutineOperationFailed({ cause: failure.cause })));
+      yield* this.#store.updatePreview(agent.id, run.instruction).pipe(toRoutineOperationFailed);
       yield* routineStep(() => {
         this.#hooks.emit({ type: "agents-changed", agents: this.#hooks.listAgents() });
         this.#conversation.emitConversation(snapshot, "routine.run-queued", {
@@ -890,6 +887,6 @@ export class RoutineOperationFailed extends Schema.TaggedError<RoutineOperationF
   cause: Schema.Defect(),
 }) {}
 
-function routineStep<A>(run: () => A): Effect.Effect<A, RoutineOperationFailed> {
-  return Effect.try({ try: run, catch: (cause) => new RoutineOperationFailed({ cause }) });
-}
+const { sync: routineStep, rewrap: toRoutineOperationFailed } = causeHelpers(RoutineOperationFailed);
+
+export { toRoutineOperationFailed };

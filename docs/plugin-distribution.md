@@ -73,9 +73,7 @@ marketplace/plugin-catalog/
 
 ### 2.2 What the app gets
 
-The Account Worker (`apps/auth-api`) serves the catalog from its own bundle. The requests need no
-account. `AGENTS.md` requires the app to work without an account, so the browse path must not use a
-session token.
+The Account Worker (`apps/auth-api`) serves the catalog from its own bundle. The catalog is public, so requests do not use a session token.
 
 | URL | Content | Cache-Control |
 | --- | --- | --- |
@@ -356,7 +354,7 @@ export type DeepLink = { kind: "invite"; url: string } | { kind: "plugin"; slug:
 | --- | --- | --- |
 | `invite` | `openbot://join?…` | Opens the join dialog, as today. |
 | `plugin` | `openbot://plugins/<slug>` | Opens the marketplace listing. |
-| `agent-template` | `openbot://agents/<id>` | Opens the agent template preview. See [ARCHITECTURE.md](ARCHITECTURE.md#agent-templates). |
+| `agent-template` | `openbot://agents/<id>` | Opens the agent template preview. See [architecture/agents.md](architecture/agents.md#agent-templates). |
 | other | — | The URL is dropped without a message, as today. |
 
 The invite parser runs first, so an invite URL never reaches the plugin parser. `src/main/index.ts`

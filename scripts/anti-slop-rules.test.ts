@@ -21,9 +21,14 @@ const ruleNames = readdirSync(rulesDirectory)
   .map((entry) => entry.replace(/\.grit$/, ""))
   .sort();
 
+interface BiomeOverride {
+  readonly includes?: readonly string[];
+  readonly plugins?: readonly string[];
+}
+
 interface BiomeConfig {
   readonly plugins?: readonly string[];
-  readonly overrides?: readonly { readonly plugins?: readonly string[] }[];
+  readonly overrides?: readonly BiomeOverride[];
 }
 
 const biomeConfig: BiomeConfig = JSON.parse(readFileSync(join(repositoryRoot, "biome.json"), "utf8"));
@@ -32,8 +37,21 @@ function ruleNamesIn(plugins: readonly string[] | undefined): readonly string[] 
   return (plugins ?? []).map((path) => path.replace(/^.*\//, "").replace(/\.grit$/, "")).sort();
 }
 
-const globalRules = ruleNamesIn(biomeConfig.plugins);
-const testOnlyRules = ruleNamesIn(biomeConfig.overrides?.flatMap((override) => override.plugins ?? []));
+const isTestFileOverride = (override: BiomeOverride) =>
+  override.includes?.join() === ["**/*.test.ts", "**/*.test.tsx"].join();
+const overrides = biomeConfig.overrides ?? [];
+// The `// scope: global` line is the list the skill installer prints for other repositories. This
+// repository runs these global rules only on the code where their pattern can occur, through a
+// non-test override: `no-collections-in-stores` on SolidJS code.
+const scopedGlobalRules: readonly string[] = ["no-collections-in-stores"];
+const globalRules = ruleNamesIn([
+  ...(biomeConfig.plugins ?? []),
+  ...overrides
+    .filter((override) => !isTestFileOverride(override))
+    .flatMap((override) => override.plugins ?? [])
+    .filter((path) => scopedGlobalRules.some((rule) => path.endsWith(`/${rule}.grit`))),
+]);
+const testOnlyRules = ruleNamesIn(overrides.filter(isTestFileOverride).flatMap((override) => override.plugins ?? []));
 
 function ruleSource(rule: string): string {
   return readFileSync(join(rulesDirectory, `${rule}.grit`), "utf8");

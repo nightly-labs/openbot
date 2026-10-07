@@ -61,11 +61,13 @@ import {
   type ThreadItem,
 } from "./protocol";
 import {
-  ProviderClientOperationError,
+  type ProviderClientOperationError,
   providerCall,
   providerFailure,
   providerResult,
   providerSync,
+  requiredString,
+  toProviderClientOperationError,
 } from "./provider-client-effects";
 import { createDiagnosticStream } from "./stderr-diagnostics";
 import { stopWindowsProcessTree } from "./windows-process-tree";
@@ -132,6 +134,11 @@ interface AcpTurn {
   thought: string;
   thoughtStarted: boolean;
   receivedOutput: boolean;
+  /**
+   * The partial reply and the harness error that cut it. It becomes the answer when no text comes
+   * after the error, because then the harness did not retry.
+   */
+  interruptedAnswer: string | null;
   /** The prompt told the model not to answer, so an empty turn is a success. */
   answerOptional: boolean;
   messages: ThreadItem[];
@@ -451,7 +458,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this.#serverRequests.rejectAll("ACP session stopped.");
     yield* this.#bridge
       .close()
-      .pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })))
+      .pipe(toProviderClientOperationError)
       .pipe(
         Effect.ensuring(
           Effect.suspend(() => (!child || child.exitCode !== null ? Effect.void : endProcess(child))).pipe(
@@ -480,9 +487,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this.#threads.forget(sessionId);
     const thread = this.#threads.get(sessionId);
     if (!thread) return;
-    yield* this.#threads
-      .close(thread)
-      .pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })));
+    yield* this.#threads.close(thread).pipe(toProviderClientOperationError);
   });
 
   readonly #closeSession = Effect.fn("AcpAgentClient.closeSession")(function* (
@@ -908,9 +913,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     // session again. A session with a turn keeps its servers until a later resume.
     if (held && !held.activeTurn && held.computerUse !== computerUseParam(params)) {
       turns = held.turns;
-      yield* this.#threads
-        .close(held)
-        .pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })));
+      yield* this.#threads.close(held).pipe(toProviderClientOperationError);
     }
     // A thread this client already holds takes the caller's settings even though no session is
     // opened for them: the loader may have been a `thread/read`, which carries none of its own, and
@@ -959,7 +962,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           () => threadRef?.activeTurn?.id ?? null,
           (call, signal) => this.#callDynamicTool(call, signal),
         )
-        .pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause }))),
+        .pipe(toProviderClientOperationError),
       (mcp) =>
         Effect.gen({ self: this }, function* () {
           try {
@@ -977,7 +980,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
                     agentMcpServers(this.options.mcpServers?.() ?? [], computerUse),
                     this.options.mcpToolRuntimes?.(),
                     this.options.mcpAuthorization,
-                  ).pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause }))),
+                  ).pipe(toProviderClientOperationError),
                 ),
               ),
             );
@@ -1182,7 +1185,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     const threadId = yield* providerSync(() => requiredString(params, "threadId"));
     return yield* this.#threads
       .startTurn(threadId, () => this.#openTurn(threadId, params, steer))
-      .pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })));
+      .pipe(toProviderClientOperationError);
   });
 
   readonly #openTurn = Effect.fn("AcpAgentClient.openTurn")(function* (
@@ -1191,9 +1194,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     params: unknown,
     steer: boolean,
   ): Effect.fn.Return<{ turn: { id: string; status: string }; turnId?: string }, ProviderClientOperationError> {
-    yield* this.#threads
-      .wake(threadId)
-      .pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })));
+    yield* this.#threads.wake(threadId).pipe(toProviderClientOperationError);
     const thread = yield* providerSync(() => this.#requireThread(threadId));
     if (!steer && thread.activeTurn)
       return yield* providerFailure(new Error("The ACP thread already has an active turn."));
@@ -1241,6 +1242,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       thought: "",
       thoughtStarted: false,
       receivedOutput: false,
+      interruptedAnswer: null,
       answerOptional: isRecord(params) && params.answerOptional === true,
       messages: [],
       toolNames: new Map(),
@@ -1346,31 +1348,28 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     const update = notification.update;
     if (!turn) return;
     if (update.sessionUpdate === "agent_message_chunk" && update.content.type === "text") {
+      // A harness reports a dropped stream as answer text, and then sends the retried answer (#1471).
+      // The report gets its own muted item, so it is not joined to the answer around it. When no
+      // retried answer comes, the partial reply and the report become the answer.
+      if (HARNESS_ERROR_CHUNK.test(update.content.text)) {
+        const error = update.content.text.trim();
+        turn.receivedOutput = true;
+        turn.interruptedAnswer = [turn.text.trim() || turn.interruptedAnswer, error].filter(Boolean).join("\n\n");
+        this.#completeThought(thread, turn);
+        this.#appendThought(thread, turn, error);
+        this.#completeThought(thread, turn);
+        return;
+      }
       if (update.content.text) this.#completeThought(thread, turn);
-      if (update.content.text.trim()) turn.receivedOutput = true;
+      if (update.content.text.trim()) {
+        turn.receivedOutput = true;
+        turn.interruptedAnswer = null;
+      }
       turn.text += update.content.text;
       return;
     }
     if (update.sessionUpdate === "agent_thought_chunk" && update.content.type === "text") {
-      this.#completeMessage(thread, turn, "commentary");
-      /* A delta carries no phase, so the item has to be opened as `commentary` first — otherwise the
-         thought lands in an ordinary agentMessage and renders as a chat bubble. */
-      if (!turn.thoughtStarted) {
-        turn.thoughtStarted = true;
-        this.emit("notification", {
-          method: "item/started",
-          params: {
-            threadId: thread.id,
-            turnId: turn.id,
-            item: { id: turn.thoughtItemId, type: "agentMessage", phase: "commentary" },
-          },
-        });
-      }
-      turn.thought += update.content.text;
-      this.emit("notification", {
-        method: "item/agentMessage/delta",
-        params: { threadId: thread.id, turnId: turn.id, itemId: turn.thoughtItemId, delta: update.content.text },
-      });
+      this.#appendThought(thread, turn, update.content.text);
       return;
     }
     if (update.sessionUpdate === "tool_call" || update.sessionUpdate === "tool_call_update") {
@@ -1410,12 +1409,38 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   // ACP cannot identify final text while streaming. Buffer unclassified text privately,
   // publishing commentary at a later step boundary or an answer when the prompt finishes.
   #completeMessage(thread: AcpThread, turn: AcpTurn, phase: "commentary" | "final_answer"): void {
+    if (phase === "final_answer") {
+      if (!turn.text.trim() && turn.interruptedAnswer) turn.text = turn.interruptedAnswer;
+      turn.interruptedAnswer = null;
+    }
     if (!turn.text) return;
     const item = { id: turn.itemId, type: "agentMessage", phase, text: turn.text } satisfies ThreadItem;
     turn.messages.push(item);
     this.emit("notification", { method: "item/completed", params: { threadId: thread.id, turnId: turn.id, item } });
     turn.text = "";
     turn.itemId = `${turn.id}:assistant:${turn.messages.length}`;
+  }
+
+  #appendThought(thread: AcpThread, turn: AcpTurn, text: string): void {
+    this.#completeMessage(thread, turn, "commentary");
+    /* A delta carries no phase, so the item has to be opened as `commentary` first — otherwise the
+       thought lands in an ordinary agentMessage and renders as a chat bubble. */
+    if (!turn.thoughtStarted) {
+      turn.thoughtStarted = true;
+      this.emit("notification", {
+        method: "item/started",
+        params: {
+          threadId: thread.id,
+          turnId: turn.id,
+          item: { id: turn.thoughtItemId, type: "agentMessage", phase: "commentary" },
+        },
+      });
+    }
+    turn.thought += text;
+    this.emit("notification", {
+      method: "item/agentMessage/delta",
+      params: { threadId: thread.id, turnId: turn.id, itemId: turn.thoughtItemId, delta: text },
+    });
   }
 
   #completeThought(thread: AcpThread, turn: AcpTurn): void {
@@ -1511,7 +1536,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           acpOptions: params.options,
         },
       )
-      .pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })));
+      .pipe(toProviderClientOperationError);
     const accepted =
       isRecord(result) &&
       (result.decision === "accept" ||
@@ -1537,7 +1562,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         turnId: thread?.activeTurn?.id ?? randomUUID(),
         sourceMethod: method,
       })
-      .pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })));
+      .pipe(toProviderClientOperationError);
     return yield* providerSync(() => (isRecord(result) ? result : {}));
   });
 
@@ -1597,7 +1622,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   ): Effect.fn.Return<DynamicToolResult, ProviderClientOperationError> {
     const result = yield* this.#serverRequests
       .call("item/tool/call", params, signal)
-      .pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })));
+      .pipe(toProviderClientOperationError);
     if (!isDynamicToolResult(result))
       return yield* providerFailure(new Error("OpenBot returned an invalid dynamic tool result."));
     return yield* providerSync(() => result);
@@ -1837,12 +1862,6 @@ function imageMimeType(path: string): "image/jpeg" | "image/webp" | "image/png" 
   return "image/png";
 }
 
-function requiredString(value: unknown, key: string): string {
-  const result = getString(value, key);
-  if (!result) throw new Error(`${key} is required.`);
-  return result;
-}
-
 function printableInput(value: unknown): string | null {
   if (isString(value)) return value;
   if (value === undefined || value === null) return null;
@@ -1906,6 +1925,13 @@ function failureText(error: unknown): string {
 function isOpenCodeServiceFailure(error: unknown): boolean {
   return error instanceof RequestError && error.code === -32603 && /\bOpenCode service failure\b/.test(error.message);
 }
+
+/**
+ * A message chunk that is the harness's own complete error report: "API Error: Connection lost
+ * mid-response. The response above may be incomplete." Only the full report matches, so answer text
+ * that starts with "API Error: " stays in the answer.
+ */
+const HARNESS_ERROR_CHUNK = /^\s*API Error: [^\n]*The response above may be incomplete\.\s*$/u;
 
 const OPENCODE_FAILURE_DETAIL_LIMIT = 200;
 

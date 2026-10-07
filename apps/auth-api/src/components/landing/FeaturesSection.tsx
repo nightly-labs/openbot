@@ -12,6 +12,7 @@ import {
   TrashIcon,
 } from "@openbot/ui/features/conversation/ConversationIcons";
 import type { JSX } from "@solidjs/web";
+import { Link } from "@tanstack/solid-router";
 import { createSignal, For, lazy, onSettled, Show } from "solid-js";
 import {
   LANDING_BROWSER_FIELD,
@@ -40,6 +41,7 @@ import {
   LANDING_TEAM_HANDOFF,
   LANDING_TEAM_MESSAGES,
   LANDING_TEAM_REPLY,
+  type LandingFeature,
   type LandingFeatureId,
   type LandingPersistReply,
   type LandingTeamMessage,
@@ -326,7 +328,9 @@ export function FeaturesSection() {
                 </div>
                 <div class="landing-feature-copy">
                   <h3>{feature.title}</h3>
-                  <p>{feature.description}</p>
+                  <p>
+                    <FeatureDescription description={feature.description} />
+                  </p>
                 </div>
               </li>
             )}
@@ -334,5 +338,23 @@ export function FeaturesSection() {
         </ul>
       </div>
     </section>
+  );
+}
+
+/** A tile's sentence. A part with a slug links to its provider page. */
+function FeatureDescription(props: { description: LandingFeature["description"] }) {
+  const parts = () => (typeof props.description === "string" ? [props.description] : props.description);
+  return (
+    <For each={parts()}>
+      {(part) =>
+        typeof part === "string" ? (
+          part
+        ) : (
+          <Link class="landing-feature-link" to="/providers/$slug" params={{ slug: part.slug }}>
+            {part.text}
+          </Link>
+        )
+      }
+    </For>
   );
 }

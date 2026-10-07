@@ -22,6 +22,7 @@ import { Deferred, Effect, Exit, Fiber, Result, Scope, Stream } from "effect";
 import lockValue from "../../native-runtime.lock.json";
 import { type AgentRuntimeLock, parseAgentRuntimeLock } from "../../scripts/agent-runtime-lock";
 import { type BundledProviderExecutables, configuredCliPath } from "../backend/cli";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { sha256File } from "../backend/file-hash";
 import { type McpToolRuntimes, NO_MCP_TOOL_RUNTIMES } from "../backend/mcp-provider-shapes";
 import {
@@ -32,7 +33,7 @@ import {
   type RuntimeSpec,
   type RuntimeTarget,
 } from "./provider-runtime-descriptors";
-import { ProviderRuntimeFailure, runRuntime, runtimeIO, runtimeSync } from "./provider-runtime-effects";
+import { ProviderRuntimeFailure, runtimeIO, runtimeSync } from "./provider-runtime-effects";
 import {
   type BlockedVersions,
   fetchBlockedVersions,
@@ -75,7 +76,7 @@ const COMMIT_ATTEMPTS = 3;
  * How long a move waits, in turn, for a file in its source that another program still holds open.
  * About a second and a half, the same budget Node gives `rm` with `maxRetries: 5`.
  */
-const HELD_SOURCE_WAITS_MS = [100, 200, 400, 800];
+const HELD_SOURCE_WAITS_MS: readonly number[] = [100, 200, 400, 800];
 /**
  * How long a commit keeps trying to move a stage that another program holds open. Windows Defender
  * can scan a new CLI for tens of seconds after its version check, and the move fails with `EPERM`
@@ -129,6 +130,8 @@ export interface ProviderRuntimeManagerOptions {
   availableDiskBytes?: () => Promise<number>;
   /** How long a commit waits for a stage that another program holds open. Tests shorten it. */
   heldStageWaitMs?: number;
+  /** The waits, in turn, of one move whose source another program holds open. Tests shorten them. */
+  heldSourceWaitsMs?: readonly number[];
   updateRuntime?: (
     runtime: ManagedRuntimeId,
     install: () => Effect.Effect<string, ProviderRuntimeFailure>,
@@ -162,6 +165,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   readonly #lock: AgentRuntimeLock;
   readonly #availableDiskBytes: () => Promise<number>;
   readonly #heldStageWaitMs: number;
+  readonly #heldSourceWaitsMs: readonly number[];
   readonly #statuses: Record<ManagedRuntimeId, ProviderRuntimeStatus>;
   readonly #controllers = new Map<ManagedRuntimeId, AbortController>();
   readonly #tasks = new Map<ManagedRuntimeId, Fiber.Fiber<void, ProviderRuntimeFailure>>();
@@ -198,6 +202,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
         return filesystem.bavail * filesystem.bsize;
       });
     this.#heldStageWaitMs = options.heldStageWaitMs ?? HELD_STAGE_WAIT_MS;
+    this.#heldSourceWaitsMs = options.heldSourceWaitsMs ?? HELD_SOURCE_WAITS_MS;
     const unsupportedMessage = this.#target ? null : "This platform is not supported.";
     this.#statuses = {
       codex: emptyStatus(unsupportedMessage),
@@ -272,7 +277,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   /** Checks now and then every hour, until `stop`. The caller starts it once the app is up. */
   startUpdateChecks(intervalMs = UPDATE_CHECK_INTERVAL_MS): void {
     if (this.#checkTimer || !this.#target || this.#stopping) return;
-    const check = () => void runRuntime(this.checkForUpdates()).catch(() => undefined);
+    const check = () => void runCauseEffect(this.checkForUpdates()).catch(() => undefined);
     this.#checkTimer = setInterval(check, intervalMs);
     this.#checkTimer.unref();
     check();
@@ -793,7 +798,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       );
       if (!(yield* renameIfPresent(installRoot, aside))) return;
       if (yield* this.#verifiesEffect(aside, spec)) {
-        if (yield* renameIfVacant(aside, installRoot)) return;
+        if (yield* renameIfVacant(aside, installRoot, this.#heldSourceWaitsMs)) return;
       }
       yield* runtimeIO(async () => await rm(aside, { recursive: true, force: true }).catch(() => undefined));
     });
@@ -826,7 +831,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       let attempts = 0;
       const heldUntil = Date.now() + this.#heldStageWaitMs;
       while (attempts < COMMIT_ATTEMPTS) {
-        if (yield* renameIfVacant(staging, destination)) return true;
+        if (yield* renameIfVacant(staging, destination, this.#heldSourceWaitsMs)) return true;
         // Still vacant: each refusal already waited in renameIfVacant. A held stage uses time,
         // not a replacement attempt, while Windows Defender can still have its files open.
         held = !(yield* pathExists(destination));
@@ -894,11 +899,11 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
           // install a sibling committed in between, so it goes back where the sibling left it and is
           // adopted. Nothing that verifies is ever replaced, whatever the claim said.
           if (yield* this.#verifiesEffect(aside, spec)) {
-            if (yield* renameIfVacant(aside, destination)) return "adopted";
+            if (yield* renameIfVacant(aside, destination, this.#heldSourceWaitsMs)) return "adopted";
             yield* runtimeIO(() => rm(aside, { recursive: true, force: true })).pipe(Effect.catch(() => Effect.void));
             return "moved";
           }
-          const committed = yield* renameIfVacant(staging, destination).pipe(
+          const committed = yield* renameIfVacant(staging, destination, this.#heldSourceWaitsMs).pipe(
             Effect.ensuring(
               runtimeIO(() => rm(aside, { recursive: true, force: true })).pipe(Effect.catch(() => Effect.void)),
             ),
@@ -1146,6 +1151,7 @@ const verifyInstalledRuntime = Effect.fn("ProviderRuntime.verifyInstalledRuntime
 const renameIfVacant = Effect.fn("ProviderRuntime.renameIfVacant")(function* (
   from: string,
   to: string,
+  waits: readonly number[] = HELD_SOURCE_WAITS_MS,
 ): Effect.fn.Return<boolean, ProviderRuntimeFailure> {
   for (let attempt = 0; ; attempt += 1) {
     const renamed = yield* Effect.result(runtimeIO(() => rename(from, to)));
@@ -1153,7 +1159,7 @@ const renameIfVacant = Effect.fn("ProviderRuntime.renameIfVacant")(function* (
     const code = errorCode(renamed.failure.cause);
     if (code === "ENOTEMPTY" || code === "EEXIST") return false;
     if (code !== "EPERM" && code !== "EACCES" && code !== "EBUSY") return yield* renamed.failure;
-    const wait = HELD_SOURCE_WAITS_MS[attempt];
+    const wait = waits[attempt];
     if (wait === undefined || (yield* pathExists(to))) return false;
     yield* Effect.sleep(wait);
   }

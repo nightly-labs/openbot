@@ -12,12 +12,12 @@ const OPENAI_HELP = "https://help.openai.com/en/articles";
 export const CHATGPT_DOTS_COMPARISON: Comparison = {
   rival: { name: "ChatGPT dots", mark: "chatgpt-dots" },
   answer:
-    "Choose OpenBot if you want a team of agents on your own computer, in any country, with your ChatGPT plan and the other AI plans you already pay for, such as Claude, Gemini or Grok: the app is free and needs no account. Choose ChatGPT dots if you pay for ChatGPT Pro or Business Premium, and you want one always-on agent in OpenAI's cloud.",
+    "Choose OpenBot if you want a team of agents on your own computer, in any country, with your ChatGPT plan and the other AI plans you already pay for, such as Claude, Gemini or Grok: the app is free. Choose ChatGPT dots if you pay for ChatGPT Pro or Business Premium, and you want one always-on agent in OpenAI's cloud.",
   chooseOpenBot: [
     "You live in the European Economic Area, Switzerland or the UK, where ChatGPT Pro does not include dots.",
     "You want ChatGPT, Claude, Gemini, Grok and Cursor agents in one team, or your own model.",
     "Your files and chats must stay on your own computer, not in OpenAI's cloud.",
-    "You want a free app that works without an account, and source code that you can read.",
+    "You want a free app, and source code that you can read.",
   ],
   rivalPlans:
     "ChatGPT dots runs on GPT-6 Astra, an OpenAI model. One dot comes with ChatGPT Pro, from $100 a month, or with Business Premium, from $100 a seat a month. Enterprise plans get a beta.",
@@ -81,7 +81,7 @@ export const CHATGPT_DOTS_COMPARISON: Comparison = {
       icon: "tag",
       topic: "Price and account",
       openbot:
-        "Free for noncommercial use; commercial use needs a license. No account is necessary on one computer. Your agents use the plans you already pay for.",
+        "Free for noncommercial use; commercial use needs a license. Your agents use the plans you already pay for.",
       rival:
         "Needs ChatGPT Pro, from $100 a month, or Business Premium, from $100 a seat a month for 2 seats or more. The first dot is included; OpenAI gives no price for more.",
       better: "openbot",

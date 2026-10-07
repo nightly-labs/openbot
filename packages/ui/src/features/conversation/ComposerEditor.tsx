@@ -1,21 +1,52 @@
-import { attachmentReferenceIds, serializeAttachmentReference } from "@openbot/contracts/attachment-references";
-import { type ChatTagKind, chatTagReferences, serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
+import { attachmentReferenceIds } from "@openbot/contracts/attachment-references";
+import { serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { DraftAttachment, InstalledSkill, McpServerConfig } from "@openbot/contracts/ipc";
-import { markdownListLineBreak } from "@openbot/contracts/markdown-lists";
-import { Badge, Blocks, Bot, File, Folder, Listbox, Plug, Puzzle, ShieldCheck, Store } from "@openbot/ui";
-import { referenceChipClasses } from "@openbot/ui/reference-chip";
+import { Badge, Blocks, Listbox, Puzzle } from "@openbot/ui";
 import { usesTouchLayout } from "@openbot/ui/utils";
 import { Dynamic, Portal } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, createUniqueId, onCleanup, onSettled, Show } from "solid-js";
-import { createStaticAvatarSvg } from "../../bloub-avatar";
 import { createScrollFades } from "../../components/createScrollFades";
 import type { AgentProfile } from "../../data";
-import { currentText, type TextValue, useText } from "../../text";
+import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { AnchoredTooltip } from "./AnchoredTooltip";
-import { AttachmentReferenceVisual, appendAttachmentReferenceVisual } from "./AttachmentReference";
+import { AttachmentReferenceVisual } from "./AttachmentReference";
+import {
+  automaticMentionSpaceAtCaretBoundary,
+  insertLineBreak,
+  insertPlainText,
+  mentionTokenAtCaretBoundary,
+  placeCaretAtChildOffset,
+  placeCaretAtEnd,
+  rangeFromTextOffsets,
+  serializeEditor,
+  syncTrailingLineSentinel,
+} from "./composer-dom";
 import { shouldRestoreComposerFocus } from "./composer-focus";
+import {
+  measurePickerFrame,
+  type PickerFrame,
+  type PickerOption,
+  pickerOptionBadge,
+  pickerOptionDescription,
+  pickerOptionKey,
+  pickerOptionName,
+  pickerOptionText,
+  skillMatchRank,
+} from "./composer-picker";
+import {
+  type AttachmentTokenActions,
+  createAttachmentToken,
+  createMcpToken,
+  createMentionToken,
+  createSkillToken,
+  MENTION_PATTERN,
+  renderEditorValue,
+  syncMcpTokens,
+  syncSkillTokens,
+  truncateComposerValue,
+} from "./composer-tokens";
 import { isSendShortcutKey, type SendShortcut } from "./send-shortcut";
 
 interface ComposerEditorProps {
@@ -55,113 +86,11 @@ interface MentionContext {
   trigger: "@" | "$";
 }
 
-/**
- * Where the picker hangs, and from which element. Like the queue panel, it is a child of
- * `.composer-wrap` that hangs from the composer's top edge, so the composer paints over its
- * bottom and it grows out from under the input. `mount` is undefined for an editor rendered
- * without a composer around it, which leaves the panel where Solid puts an unmounted portal.
- */
-interface PickerFrame {
-  mount: HTMLElement | undefined;
-  bottom: number;
-}
-
-const MENTION_PATTERN = /@\[([^\]]+)]\(([^)]+)\)/g;
-
 export function expandComposerMentions(value: string): string {
   return value.replace(MENTION_PATTERN, (match, name: string, target: string) => {
     if (target.includes(":")) return match;
     return serializeChatTagReference("agent", name, target);
   });
-}
-
-type PickerOption =
-  | { type: "agent"; agent: AgentProfile }
-  /** `showSlug` is set when another listed skill has the same name: the slug tells them apart. */
-  | { type: "skill"; skill: InstalledSkill; showSlug: boolean }
-  | { type: "mcp"; server: McpServerConfig }
-  | { type: "attachment"; attachment: DraftAttachment };
-
-function pickerOptionKey(option: PickerOption): string {
-  if (option.type === "agent") return `agent:${option.agent.id}`;
-  if (option.type === "skill") return `skill:${option.skill.skillId}`;
-  return option.type === "mcp" ? `mcp:${option.server.id}` : `attachment:${option.attachment.id}`;
-}
-
-function pickerOptionText(option: PickerOption, t: TextValue["t"]): string {
-  if (option.type === "agent") return t("composer.picker.option.agent", { name: option.agent.name });
-  if (option.type === "skill") {
-    const name = option.showSlug ? `${option.skill.name} ${option.skill.slug}` : option.skill.name;
-    return t("composer.picker.option.skill", { name });
-  }
-  return option.type === "mcp"
-    ? t("composer.picker.option.mcp", { name: option.server.name })
-    : t("composer.picker.option.file", { name: option.attachment.name });
-}
-
-function pickerOptionName(option: PickerOption): string {
-  if (option.type === "agent") return option.agent.name;
-  if (option.type === "skill") return option.skill.name;
-  return option.type === "mcp" ? option.server.name : option.attachment.name;
-}
-
-function pickerOptionDescription(option: PickerOption, format: TextValue["format"]): string | undefined {
-  if (option.type === "attachment") return format.fileSize(option.attachment.size);
-  if (option.type === "skill") return skillDescription(option.skill);
-  if (option.type === "mcp") return mcpServerDescription(option.server);
-  return option.agent.description.trim() || option.agent.title.trim() || undefined;
-}
-
-/** Where the server answers: the address for an http server, the command for a stdio one. */
-function mcpServerDescription(server: McpServerConfig): string | undefined {
-  const source = server.transport === "stdio" ? [server.command, ...server.args].join(" ") : server.url;
-  return source.trim() || undefined;
-}
-
-/** Hangs the picker off the composer's top edge, inside the wrap the queue panel also sits in. */
-function measurePickerFrame(editor: HTMLElement): PickerFrame {
-  const wrap = editor.closest(".composer-wrap");
-  const composer = editor.closest(".composer");
-  if (!(wrap instanceof HTMLElement) || !composer) return { mount: undefined, bottom: 0 };
-  return { mount: wrap, bottom: wrap.getBoundingClientRect().bottom - composer.getBoundingClientRect().top };
-}
-
-/*
- * The badge carries the option type, and for a skill where it came from. Every row in a skill list
- * is a skill, so the badge names only the source.
- */
-function pickerOptionBadge(option: PickerOption, t: TextValue["t"]): { label: string; icon: typeof Puzzle } {
-  if (option.type === "agent") return { label: t("composer.picker.badge.agent"), icon: Bot };
-  if (option.type === "attachment") return { label: t("composer.picker.badge.file"), icon: File };
-  if (option.type === "mcp") return { label: MCP_BADGE, icon: Plug };
-  switch (option.skill.origin ?? "marketplace") {
-    case "local":
-      return { label: t("composer.picker.badge.custom"), icon: Folder };
-    case "managed":
-      return { label: t("composer.picker.badge.system"), icon: ShieldCheck };
-    case "workspace":
-      return { label: t("composer.picker.badge.workspace"), icon: Folder };
-    default:
-      return { label: t("composer.picker.badge.marketplace"), icon: Store };
-  }
-}
-
-/** The protocol name. It is not translated. */
-const MCP_BADGE = "MCP";
-
-/**
- * How well a skill answers the query, lower first; null when it does not. A hit in the name
- * outranks one in the description, so the skill the user names is at the top.
- */
-function skillMatchRank(skill: InstalledSkill, query: string): number | null {
-  if (!query) return 0;
-  const name = skill.name.toLocaleLowerCase();
-  const slug = skill.slug.toLocaleLowerCase();
-  if (name === query || slug === query) return 0;
-  if (name.startsWith(query) || slug.startsWith(query)) return 1;
-  if (name.split(/[\s\-_]+/u).some((word) => word.startsWith(query))) return 2;
-  if (name.includes(query) || slug.includes(query)) return 3;
-  return skill.description?.toLocaleLowerCase().includes(query) ? 4 : null;
 }
 
 export function ComposerEditor(props: ComposerEditorProps) {
@@ -402,9 +331,19 @@ export function ComposerEditor(props: ComposerEditorProps) {
     props.onValueChange(value);
   }
 
-  function insertPrintableKey(key: string) {
-    if (!editor) return;
-    insertPlainText(editor, key);
+  /*
+   * Every plain character takes the same road: this handler cancels the native insert and asks the
+   * browser to insert the text. Letting the default action write some characters and the editor
+   * write the rest raced, and a native insert that landed a task late, or one reported with a
+   * composition input type, was read as "no native input" and the character went in twice.
+   * The text comes from the input event, not from the key: an input method that picks a phrase
+   * with Shift+1 sends the "!" key, and Chromium delivers the phrase as that key's text.
+   */
+  function handleBeforeInput(event: InputEvent) {
+    if (!editor || props.disabled || isComposing || event.isComposing) return;
+    if (event.inputType !== "insertText" || !event.data) return;
+    event.preventDefault();
+    insertPlainText(editor, event.data);
     emitValue();
     updateMention();
     scrollToEndIfCaretAtEnd();
@@ -633,19 +572,6 @@ export function ComposerEditor(props: ComposerEditorProps) {
       return;
     }
 
-    /*
-     * Every plain character takes the same road: this handler cancels the key and asks the browser
-     * to insert the text. Letting the default action write some characters and this handler write
-     * the rest raced, and a native insert that landed a task late, or one reported with a
-     * composition input type, was read as "no native input" and the character went in twice.
-     */
-    const printableKey = event.key.length === 1 && !event.ctrlKey && !event.metaKey;
-    if (printableKey) {
-      event.preventDefault();
-      insertPrintableKey(event.key);
-      return;
-    }
-
     if (event.key === "Enter" && event.shiftKey) {
       event.preventDefault();
       if (!editor) return;
@@ -751,6 +677,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
         }}
         onClick={updateMention}
         onKeyDown={handleKeyDown}
+        onBeforeInput={handleBeforeInput}
         onCompositionStart={() => {
           isComposing = true;
         }}
@@ -870,539 +797,4 @@ export function ComposerEditor(props: ComposerEditorProps) {
       </Show>
     </div>
   );
-}
-
-function truncateComposerValue(value: string, limit: number): string {
-  if (value.length <= limit) return value;
-  let result = "";
-  let cursor = 0;
-  for (const match of value.matchAll(MENTION_PATTERN)) {
-    const index = match.index ?? 0;
-    const text = value.slice(cursor, index);
-    if (result.length + text.length >= limit) {
-      return result + text.slice(0, limit - result.length);
-    }
-    result += text;
-    if (result.length + match[0].length > limit) return result;
-    result += match[0];
-    cursor = index + match[0].length;
-  }
-  return result + value.slice(cursor, cursor + limit - result.length);
-}
-
-interface AttachmentTokenActions {
-  tooltipId: string;
-  open: (attachment: DraftAttachment, keepTooltip?: boolean) => void;
-  showTooltip: (anchor: HTMLElement, content: string) => void;
-  hideTooltip: (anchor: HTMLElement) => void;
-  remove: (token: HTMLElement) => void;
-}
-
-function createAttachmentToken(attachment: DraftAttachment, actions: AttachmentTokenActions): HTMLSpanElement {
-  const token = document.createElement("span");
-  token.className = "composer-file-reference";
-  token.contentEditable = "false";
-  token.dataset.attachmentReferenceId = attachment.id;
-  token.dataset.attachmentReferenceName = attachment.name;
-  token.setAttribute("role", "button");
-  token.setAttribute("tabindex", "0");
-  token.setAttribute("aria-label", currentText().t("composer.token.attachment", { name: attachment.name }));
-  token.setAttribute("aria-describedby", actions.tooltipId);
-  appendAttachmentReferenceVisual(token, attachment.name);
-  const name = document.createElement("span");
-  name.className = "inline-file-reference-name";
-  name.textContent = attachment.name;
-  token.append(name);
-  const showTooltip = () => actions.showTooltip(token, attachment.name);
-  const hideTooltip = () => actions.hideTooltip(token);
-  token.addEventListener("pointerenter", showTooltip);
-  token.addEventListener("pointerleave", hideTooltip);
-  token.addEventListener("focus", showTooltip);
-  token.addEventListener("blur", hideTooltip);
-  token.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") {
-      hideTooltip();
-      return;
-    }
-    if (event.key === "Backspace" || event.key === "Delete") {
-      event.preventDefault();
-      event.stopPropagation();
-      actions.remove(token);
-      return;
-    }
-    if (event.key !== "Enter" && event.key !== " ") return;
-    event.preventDefault();
-    event.stopPropagation();
-    actions.open(attachment);
-  });
-  token.addEventListener("click", (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    if (usesTouchLayout()) showTooltip();
-    actions.open(attachment, usesTouchLayout());
-  });
-  return token;
-}
-
-function createMentionToken(agent: AgentProfile): HTMLSpanElement {
-  const token = document.createElement("span");
-  token.className = `composer-mention-token ${referenceChipClasses.root}`;
-  token.dataset.kind = "agent";
-  token.title = agent.name;
-  token.contentEditable = "false";
-  token.dataset.mentionId = agent.id;
-  token.dataset.mentionName = agent.name;
-  token.setAttribute("aria-label", currentText().t("composer.token.agent", { name: agent.name }));
-  const avatar = document.createElement("span");
-  avatar.className = `composer-mention-avatar agent-avatar-motion-hover ${referenceChipClasses.icon}`;
-  if (agent.avatarUrl) {
-    const image = document.createElement("img");
-    image.src = agent.avatarUrl;
-    image.alt = "";
-    image.draggable = false;
-    image.addEventListener("error", () => {
-      scheduleStaticMentionAvatar(avatar, agent);
-    });
-    avatar.append(image);
-  } else {
-    scheduleStaticMentionAvatar(avatar, agent);
-  }
-  const name = document.createElement("span");
-  name.className = referenceChipClasses.name;
-  name.textContent = agent.name;
-  token.append(avatar, name);
-  return token;
-}
-
-function createSkillToken(skill: InstalledSkill): HTMLSpanElement {
-  const token = document.createElement("span");
-  updateSkillToken(token, skill);
-  return token;
-}
-
-function updateSkillToken(token: HTMLSpanElement, skill: InstalledSkill): void {
-  token.className = `composer-mention-token ${referenceChipClasses.root}`;
-  token.dataset.kind = "skill";
-  token.title = skill.name;
-  token.contentEditable = "false";
-  token.dataset.skillId = skill.skillId;
-  token.dataset.skillName = skill.name;
-  token.setAttribute("aria-label", currentText().t("composer.token.skill", { name: skill.name }));
-  const iconWrap = document.createElement("span");
-  iconWrap.className = referenceChipClasses.icon;
-  iconWrap.setAttribute("aria-hidden", "true");
-  const icon = Puzzle({ class: "skill-chip-glyph" });
-  if (!(icon instanceof Node)) throw new Error("Puzzle icon did not render to a DOM node");
-  iconWrap.append(icon);
-  const name = document.createElement("span");
-  name.className = referenceChipClasses.name;
-  name.textContent = skill.name;
-  token.replaceChildren(iconWrap, name);
-}
-
-function createMcpToken(server: McpServerConfig): HTMLSpanElement {
-  const token = document.createElement("span");
-  updateMcpToken(token, server);
-  return token;
-}
-
-function updateMcpToken(token: HTMLSpanElement, server: McpServerConfig): void {
-  token.className = `composer-mention-token ${referenceChipClasses.root}`;
-  token.dataset.kind = "mcp";
-  token.title = server.name;
-  token.contentEditable = "false";
-  token.dataset.mcpId = server.id;
-  token.dataset.mcpName = server.name;
-  token.setAttribute("aria-label", currentText().t("composer.token.mcp", { name: server.name }));
-  const iconWrap = document.createElement("span");
-  iconWrap.className = referenceChipClasses.icon;
-  iconWrap.setAttribute("aria-hidden", "true");
-  const icon = Blocks({ class: "skill-chip-glyph" });
-  if (!(icon instanceof Node)) throw new Error("Blocks icon did not render to a DOM node");
-  iconWrap.append(icon);
-  const name = document.createElement("span");
-  name.className = referenceChipClasses.name;
-  name.textContent = server.name;
-  token.replaceChildren(iconWrap, name);
-}
-
-function skillDescription(skill: InstalledSkill): string | undefined {
-  const description = skill.description?.trim();
-  return description || undefined;
-}
-
-function createUnavailableTagToken(kind: ChatTagKind, id: string, name: string): HTMLSpanElement {
-  const token = document.createElement("span");
-  if (kind === "skill") {
-    updateUnavailableSkillToken(token, id, name);
-    return token;
-  }
-  if (kind === "mcp") {
-    updateUnavailableMcpToken(token, id, name);
-    return token;
-  }
-  token.className = "composer-mention-token composer-tag-unavailable";
-  token.contentEditable = "false";
-  token.dataset.mentionId = id;
-  token.dataset.mentionName = name;
-  token.setAttribute("aria-label", currentText().t("composer.token.unavailableAgent", { name }));
-  token.textContent = name;
-  return token;
-}
-
-function updateUnavailableSkillToken(token: HTMLSpanElement, id: string, name: string): void {
-  token.className = "composer-mention-token composer-tag-unavailable";
-  token.contentEditable = "false";
-  token.dataset.skillId = id;
-  token.dataset.skillName = name;
-  token.setAttribute("aria-label", currentText().t("composer.token.unavailableSkill", { name }));
-  token.textContent = name;
-}
-
-function updateUnavailableMcpToken(token: HTMLSpanElement, id: string, name: string): void {
-  token.className = "composer-mention-token composer-tag-unavailable";
-  token.contentEditable = "false";
-  token.dataset.mcpId = id;
-  token.dataset.mcpName = name;
-  token.setAttribute("aria-label", currentText().t("composer.token.unavailableMcp", { name }));
-  token.textContent = name;
-}
-
-/* A server the host no longer holds, or one the user turned off, is drawn as a name the agent
-   cannot reach - the same outline a removed skill takes. */
-function syncMcpTokens(editor: HTMLDivElement, servers: McpServerConfig[]): void {
-  const available = new Map(servers.filter((server) => server.enabled).map((server) => [server.id, server]));
-  for (const token of editor.querySelectorAll<HTMLSpanElement>("[data-mcp-id]")) {
-    const id = token.dataset.mcpId;
-    if (!id) continue;
-    const server = available.get(id);
-    if (server) updateMcpToken(token, server);
-    else updateUnavailableMcpToken(token, id, token.dataset.mcpName ?? "MCP server");
-  }
-}
-
-function syncSkillTokens(editor: HTMLDivElement, skills: InstalledSkill[]): void {
-  const available = new Map(
-    skills
-      .filter((skill) => skill.state !== "needs-repair" && skill.enabled !== false)
-      .map((skill) => [skill.skillId, skill]),
-  );
-  for (const token of editor.querySelectorAll<HTMLSpanElement>("[data-skill-id]")) {
-    const id = token.dataset.skillId;
-    if (!id) continue;
-    const skill = available.get(id);
-    if (skill) updateSkillToken(token, skill);
-    else updateUnavailableSkillToken(token, id, token.dataset.skillName ?? "Skill");
-  }
-}
-
-function renderEditorValue(
-  editor: HTMLDivElement,
-  value: string,
-  agents: AgentProfile[],
-  skills: InstalledSkill[],
-  mcpServers: McpServerConfig[],
-  attachments: DraftAttachment[],
-  attachmentTokenActions: AttachmentTokenActions,
-) {
-  editor.replaceChildren();
-  let cursor = 0;
-  for (const match of value.matchAll(MENTION_PATTERN)) {
-    const index = match.index ?? 0;
-    if (index > cursor) editor.append(document.createTextNode(value.slice(cursor, index)));
-    const semanticReference = chatTagReferences(match[0])[0];
-    const name = semanticReference?.name ?? match[1] ?? "Agent";
-    const target = semanticReference ? `${semanticReference.kind}:${semanticReference.id}` : (match[2] ?? "");
-    if (target.startsWith("attachment:")) {
-      const id = target.slice("attachment:".length);
-      const attachment = attachments.find((candidate) => candidate.id === id);
-      editor.append(
-        attachment ? createAttachmentToken(attachment, attachmentTokenActions) : document.createTextNode(name),
-      );
-      cursor = index + match[0].length;
-      continue;
-    }
-    if (target.startsWith("skill:")) {
-      const id = target.slice("skill:".length);
-      const skill = skills.find(
-        (candidate) => candidate.skillId === id && candidate.state !== "needs-repair" && candidate.enabled !== false,
-      );
-      editor.append(skill ? createSkillToken(skill) : createUnavailableTagToken("skill", id, name));
-      cursor = index + match[0].length;
-      continue;
-    }
-    if (target.startsWith("mcp:")) {
-      const id = target.slice("mcp:".length);
-      const server = mcpServers.find((candidate) => candidate.id === id && candidate.enabled);
-      editor.append(server ? createMcpToken(server) : createUnavailableTagToken("mcp", id, name));
-      cursor = index + match[0].length;
-      continue;
-    }
-    const id = target.startsWith("agent:") ? target.slice("agent:".length) : target;
-    const agent = agents.find((candidate) => candidate.id === id);
-    editor.append(agent ? createMentionToken(agent) : createUnavailableTagToken("agent", id, name));
-    cursor = index + match[0].length;
-  }
-  if (cursor < value.length) editor.append(document.createTextNode(value.slice(cursor)));
-}
-
-function scheduleStaticMentionAvatar(avatar: HTMLElement, agent: AgentProfile): void {
-  queueMicrotask(() => {
-    if (!avatar.isConnected) return;
-    avatar.replaceChildren(createStaticAvatarSvg(agent.avatarSeed, agent.avatarHue));
-  });
-}
-
-function serializeEditor(editor: HTMLDivElement): string {
-  if (
-    editor.textContent === "" &&
-    !editor.querySelector("[data-mention-id], [data-skill-id], [data-mcp-id], [data-attachment-reference-id]")
-  )
-    return "";
-  return Array.from(editor.childNodes).map(serializeNode).join("");
-}
-
-function serializeNode(node: Node): string {
-  if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? "";
-  if (!(node instanceof HTMLElement)) return "";
-  if (node.dataset.composerTrailingLine !== undefined) return "";
-  const attachmentId = node.dataset.attachmentReferenceId;
-  const attachmentName = node.dataset.attachmentReferenceName;
-  if (attachmentId && attachmentName) {
-    return serializeAttachmentReference(attachmentName, attachmentId);
-  }
-  const mentionId = node.dataset.mentionId;
-  const mentionName = node.dataset.mentionName;
-  if (mentionId && mentionName) return serializeChatTagReference("agent", mentionName, mentionId);
-  const skillId = node.dataset.skillId;
-  const skillName = node.dataset.skillName;
-  if (skillId && skillName) return serializeChatTagReference("skill", skillName, skillId);
-  const mcpId = node.dataset.mcpId;
-  const mcpName = node.dataset.mcpName;
-  if (mcpId && mcpName) return serializeChatTagReference("mcp", mcpName, mcpId);
-  if (node.tagName === "BR") return "\n";
-  const content = Array.from(node.childNodes).map(serializeNode).join("");
-  return node.tagName === "DIV" || node.tagName === "P" ? `${content}\n` : content;
-}
-
-/*
- * Writes through the browser's own editing command, so the change joins the undo stack: Ctrl+Z
- * still takes typing back, and still restores text a keystroke replaced. A range edit writes
- * nothing there. The command needs the caret inside this editor, and jsdom has no such command,
- * so it reports what it did and `insertPlainText` keeps a range edit for both cases.
- */
-function insertTextThroughBrowser(editor: HTMLDivElement, text: string): boolean {
-  // The command answers a newline with a block split, which serializes as two line breaks.
-  if (text.includes("\n") || typeof document.execCommand !== "function") return false;
-  const selection = window.getSelection();
-  const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
-  if (!range || !editor.contains(range.commonAncestorContainer)) return false;
-  return document.execCommand("insertText", false, text);
-}
-
-function insertPlainText(editor: HTMLDivElement, text: string): void {
-  if (insertTextThroughBrowser(editor, text)) return;
-  /*
-   * The browser leaves a placeholder `<br>` behind when it empties the editable, and drops it only
-   * when it writes text itself. The range edit below writes the text instead, so it drops the
-   * placeholder: left in place beside the new text, it would serialize as a line break the user
-   * never typed.
-   */
-  if (!editor.textContent) editor.querySelector(":scope > br:last-child")?.remove();
-  const selection = window.getSelection();
-  let range: Range;
-  const selectedRange = selection?.rangeCount ? selection.getRangeAt(0) : null;
-  if (selectedRange && editor.contains(selectedRange.commonAncestorContainer)) {
-    range = selectedRange.cloneRange();
-  } else {
-    range = document.createRange();
-    range.selectNodeContents(editor);
-    range.collapse(false);
-  }
-
-  const prefix = range.cloneRange();
-  prefix.selectNodeContents(editor);
-  prefix.setEnd(range.startContainer, range.startOffset);
-  const caretOffset = prefix.toString().length + text.length;
-  range.deleteContents();
-  range.insertNode(document.createTextNode(text));
-  editor.normalize();
-  syncTrailingLineSentinel(editor);
-  const caretRange = rangeFromTextOffsets(editor, caretOffset, caretOffset);
-  if (!caretRange) return;
-  selection?.removeAllRanges();
-  selection?.addRange(caretRange);
-}
-
-/*
- * Continues or ends a Markdown list, as `markdownListLineBreak` describes. The edit works in the
- * editor's text offsets, where a chip counts as its visible text, and it changes only the current
- * line, so chips stay in place.
- */
-function insertLineBreak(editor: HTMLDivElement): void {
-  const selection = window.getSelection();
-  const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
-  if (!range?.collapsed || !editor.contains(range.commonAncestorContainer)) {
-    insertPlainText(editor, "\n");
-    return;
-  }
-  const before = range.cloneRange();
-  before.selectNodeContents(editor);
-  before.setEnd(range.startContainer, range.startOffset);
-  const after = range.cloneRange();
-  after.selectNodeContents(editor);
-  after.setStart(range.endContainer, range.endOffset);
-  const text = before.toString() + after.toString();
-  const caret = before.toString().length;
-  const edit = markdownListLineBreak(text, caret);
-  if (!edit) {
-    insertPlainText(editor, "\n");
-    return;
-  }
-  if (edit.caret > caret) {
-    insertPlainText(editor, edit.text.slice(caret, edit.caret));
-    return;
-  }
-  const marker = rangeFromTextOffsets(editor, edit.caret, edit.caret + text.length - edit.text.length);
-  if (!marker) return;
-  selection?.removeAllRanges();
-  selection?.addRange(marker);
-  insertPlainText(editor, "");
-}
-
-function syncTrailingLineSentinel(editor: HTMLDivElement, value = serializeEditor(editor)): void {
-  const existing = editor.querySelector<HTMLElement>("[data-composer-trailing-line]");
-  existing?.remove();
-  if (!value.endsWith("\n")) return;
-
-  const sentinel = document.createElement("span");
-  sentinel.className = "composer-trailing-line";
-  sentinel.dataset.composerTrailingLine = "";
-  sentinel.contentEditable = "false";
-  sentinel.setAttribute("aria-hidden", "true");
-  editor.append(sentinel);
-}
-
-function placeCaretAtEnd(editor: HTMLDivElement): void {
-  const range = document.createRange();
-  range.selectNodeContents(editor);
-  range.collapse(false);
-  const selection = window.getSelection();
-  selection?.removeAllRanges();
-  selection?.addRange(range);
-}
-
-function placeCaretAtChildOffset(container: Node, offset: number): void {
-  const range = document.createRange();
-  range.setStart(container, offset);
-  range.collapse(true);
-  const selection = window.getSelection();
-  selection?.removeAllRanges();
-  selection?.addRange(range);
-}
-
-function mentionTokenAtCaretBoundary(
-  editor: HTMLDivElement,
-  range: Range,
-  key: "Backspace" | "Delete",
-): HTMLElement | null {
-  const tokenAtCaret = closestMentionToken(range.startContainer, editor);
-  if (tokenAtCaret) return tokenAtCaret;
-
-  let candidate: Node | null = null;
-  const container = range.startContainer;
-  if (container === editor) {
-    candidate = editor.childNodes[key === "Backspace" ? range.startOffset - 1 : range.startOffset] ?? null;
-  } else if (container.nodeType === Node.TEXT_NODE) {
-    const length = container.textContent?.length ?? 0;
-    const atBoundary = key === "Backspace" ? range.startOffset === 0 : range.startOffset === length;
-    if (!atBoundary) return null;
-    const directChild = directChildOf(editor, container);
-    candidate = key === "Backspace" ? (directChild?.previousSibling ?? null) : (directChild?.nextSibling ?? null);
-  } else if (container instanceof HTMLElement) {
-    candidate =
-      container.childNodes[key === "Backspace" ? range.startOffset - 1 : range.startOffset] ??
-      (key === "Backspace" ? container.previousSibling : container.nextSibling);
-  }
-
-  while (candidate?.nodeType === Node.TEXT_NODE && !candidate.textContent) {
-    candidate = key === "Backspace" ? candidate.previousSibling : candidate.nextSibling;
-  }
-  return candidate ? closestMentionToken(candidate, editor) : null;
-}
-
-function closestMentionToken(node: Node, editor: HTMLDivElement): HTMLElement | null {
-  const element = node instanceof HTMLElement ? node : node.parentElement;
-  const token = element?.closest<HTMLElement>("[data-mention-id], [data-skill-id], [data-mcp-id]") ?? null;
-  return token && editor.contains(token) ? token : null;
-}
-
-function directChildOf(editor: HTMLDivElement, node: Node): Node | null {
-  let current: Node | null = node;
-  while (current?.parentNode && current.parentNode !== editor) current = current.parentNode;
-  return current?.parentNode === editor ? current : null;
-}
-
-function automaticMentionSpaceAtCaretBoundary(
-  editor: HTMLDivElement,
-  range: Range,
-): { text: Text; offset: number; token: HTMLElement } | null {
-  const container = range.startContainer;
-  let text: Text | null = null;
-  let offset = 0;
-  if (isTextNode(container)) {
-    text = container;
-    offset = range.startOffset;
-    if (!offset && !text.data) {
-      const candidate = previousNonemptySibling(text.previousSibling);
-      if (!candidate || !isTextNode(candidate)) return null;
-      text = candidate;
-      offset = candidate.data.length;
-    }
-  } else if (container === editor) {
-    const candidate = previousNonemptySibling(editor.childNodes[range.startOffset - 1] ?? null);
-    if (!candidate || !isTextNode(candidate)) return null;
-    text = candidate;
-    offset = candidate.data.length;
-  }
-
-  if (!text || offset !== 1 || text.data[0] !== " ") return null;
-  let previous = text.previousSibling;
-  while (previous && isTextNode(previous) && !previous.data) previous = previous.previousSibling;
-  const token = previous ? closestMentionToken(previous, editor) : null;
-  return token ? { text, offset, token } : null;
-}
-
-function isTextNode(node: Node): node is Text {
-  return node.nodeType === Node.TEXT_NODE;
-}
-
-function previousNonemptySibling(node: Node | null): Node | null {
-  let candidate = node;
-  while (candidate?.nodeType === Node.TEXT_NODE && !candidate.textContent) candidate = candidate.previousSibling;
-  return candidate;
-}
-
-function rangeFromTextOffsets(root: HTMLElement, start: number, end: number): Range | null {
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  const range = document.createRange();
-  let offset = 0;
-  let startSet = false;
-  let node = walker.nextNode();
-  while (node) {
-    const length = node.textContent?.length ?? 0;
-    if (!startSet && start <= offset + length) {
-      range.setStart(node, Math.max(0, start - offset));
-      startSet = true;
-    }
-    if (startSet && end <= offset + length) {
-      range.setEnd(node, Math.max(0, end - offset));
-      return range;
-    }
-    offset += length;
-    node = walker.nextNode();
-  }
-  if (!startSet) range.setStart(root, root.childNodes.length);
-  range.setEnd(root, root.childNodes.length);
-  return range;
 }

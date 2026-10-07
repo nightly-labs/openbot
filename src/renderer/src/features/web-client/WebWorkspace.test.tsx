@@ -80,6 +80,7 @@ function harness(overrides: Partial<WebWorkspaceRuntime> = {}) {
     download: vi.fn(),
     sharedFile: vi.fn(),
     workspaceFile: vi.fn(),
+    workspaceDirectory: vi.fn(),
     dispose: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };

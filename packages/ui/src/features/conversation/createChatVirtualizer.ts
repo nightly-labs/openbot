@@ -28,8 +28,8 @@ export interface ChatVirtualizer<TItemElement extends Element> {
    * Read it with `getTotalSize`, which changes when a measurement does.
    */
   itemStart: (index: number) => number | undefined;
-  /** Opens a row at the top of the list, rendered or not. */
-  scrollToIndex: (index: number) => void;
+  /** Opens a row at the top of the list, rendered or not. A smooth scroll animates there. */
+  scrollToIndex: (index: number, options?: { smooth?: boolean }) => void;
 }
 
 const STATIC_CHAT_LIMIT = 100;
@@ -153,7 +153,8 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
     },
     scrollMargin: options.scrollMargin,
     itemStart: (index) => virtualizer.measurementsCache[index]?.start,
-    scrollToIndex: (index) => virtualizer.scrollToIndex(index, { align: "start" }),
+    scrollToIndex: (index, scroll) =>
+      virtualizer.scrollToIndex(index, { align: "start", behavior: scroll?.smooth ? "smooth" : "auto" }),
   };
 }
 

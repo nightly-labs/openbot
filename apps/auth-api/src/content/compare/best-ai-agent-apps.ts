@@ -24,7 +24,7 @@ export const BEST_AI_AGENT_APPS: RoundupComparison = {
       models: "Your ChatGPT, Claude, Gemini, Grok or Cursor plan, free models, or your own model.",
       price: "Free for noncommercial use. Hosted EU server from €20 or $25 a month.",
       summary:
-        "OpenBot runs Codex, Claude Code, Antigravity, Grok CLI, Cursor CLI and OpenCode as one team on your computer. Each agent gets a job, and they pass work to each other in shared channels. You follow along from the iPhone and Android apps, no VPN needed. Workspaces, chats and files stay in a database on your computer, and you don't need an account to use it on one machine.",
+        "OpenBot runs Codex, Claude Code, Antigravity, Grok CLI, Cursor CLI and OpenCode as one team on your computer. Each agent gets a job, and they pass work to each other in shared channels. You follow along from the iPhone and Android apps, no VPN needed. Workspaces, chats and files stay in a database on your computer.",
     },
     {
       name: "Claude Code",

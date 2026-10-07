@@ -96,12 +96,14 @@ type HostRequestActions = Pick<
 /** Workspace actions that only send host requests and read advertised capabilities. */
 export function createHostRequestActions({
   request,
+  teamApi,
   queryClient,
   queryScope,
   capabilities,
   attachmentDownloads,
 }: {
   request: WorkspaceRequest;
+  teamApi: (serverId: string) => TeamApiRequest;
   queryClient: QueryClient;
   /** The API URL, user ID and session scope that start each account query key. */
   queryScope: readonly [apiUrl: string, userId: string, sessionScope: number];
@@ -112,7 +114,7 @@ export function createHostRequestActions({
   function skillsAdmin(serverId: string): TeamApiRequest {
     if (!capabilities.get(serverId)?.includes(SKILLS_ADMIN_CAPABILITY))
       throw new Error(currentText().t("mobile.agent.skill.manageUnsupported"));
-    return (method, path, decode, body, upload) => request(method, path, decode, body, serverId, upload);
+    return teamApi(serverId);
   }
   return {
     saveAgentMemory: async (agentId, text, serverId, memoryId) => {
@@ -226,19 +228,16 @@ export function createHostRequestActions({
           { from: new Date(input.from), to: new Date(input.to) },
           new Date(),
           routineCalendarSource(
-            request,
-            serverId,
+            teamApi(serverId),
             capabilities.get(serverId)?.includes(CHANNEL_CHATS_CAPABILITY) ?? false,
           ),
         ).pipe(Effect.mapError((error) => error.cause)),
       ),
     loadHostAnalytics: (input, serverId) =>
       runTeamEffect(
-        readHostAnalytics(
-          (method, path, decode) => request(method, path, decode, undefined, serverId),
-          capabilities.get(serverId) ?? [],
-          input,
-        ).pipe(Effect.mapError((error) => error.cause)),
+        readHostAnalytics(teamApi(serverId), capabilities.get(serverId) ?? [], input).pipe(
+          Effect.mapError((error) => error.cause),
+        ),
       ),
     searchMessages: (query, serverId, cursor) =>
       request(
@@ -291,10 +290,7 @@ export function createHostRequestActions({
       if (!capabilities.get(serverId)?.includes(AGENT_INSTALL_CAPABILITY))
         return Promise.reject(new Error(currentText().t("mobile.link.template.error.unsupported")));
       return runTeamEffect(
-        installAgentTemplate(
-          (method, path, decode, body, upload) => request(method, path, decode, body, serverId, upload),
-          input,
-        ).pipe(Effect.mapError((error) => error.cause)),
+        installAgentTemplate(teamApi(serverId), input).pipe(Effect.mapError((error) => error.cause)),
       );
     },
     loadAgentAvatar: (agentId, avatarUrl, serverId) => requestAgentAvatar(request, agentId, avatarUrl, serverId),
@@ -375,15 +371,11 @@ export function createHostRequestActions({
 }
 
 /** The routes that the desktop calendar reads from a remote host, so both place the same runs. */
-function routineCalendarSource(
-  request: WorkspaceRequest,
-  serverId: string,
-  channels: boolean,
-): RoutineCalendarSource<TeamRequestError> {
+function routineCalendarSource(request: TeamApiRequest, channels: boolean): RoutineCalendarSource<TeamRequestError> {
   /** One request to this server as an Effect. */
   const send = <T>(method: string, path: string, decode: (value: unknown) => T, body?: TeamProtocolV2Json) =>
     Effect.tryPromise({
-      try: () => request(method, path, decode, body, serverId),
+      try: () => request(method, path, decode, body),
       catch: (cause) => new TeamRequestError({ cause }),
     });
   return {

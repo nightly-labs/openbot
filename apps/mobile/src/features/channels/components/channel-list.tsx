@@ -5,13 +5,13 @@ import * as Crypto from "expo-crypto";
 import { Link, router } from "expo-router";
 import { Typography } from "heroui-native";
 import { memo, useRef } from "react";
-import { Alert, View } from "react-native";
+import { Alert, useWindowDimensions, View } from "react-native";
 import { useUniwind } from "uniwind";
 import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
 import { AgentPinSwipeRow } from "@/features/agents/components/agent-pin-swipe-row";
 import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
-import { PinnedChatItem } from "@/features/agents/components/pinned-agents-grid";
+import { PinnedChatItem, usePinnedItemWidth } from "@/features/agents/components/pinned-agents-grid";
 import { useChatSectionMenu } from "@/features/agents/components/use-chat-section-menu";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
@@ -38,6 +38,8 @@ export const ChannelListRow = memo(function ChannelListRow({
   const { toggleChannelPinAnimated } = useAgentPinTransition();
   const { theme } = useUniwind();
   const menu = useRef<MenuComponentRef>(null);
+  const pinnedItemWidth = usePinnedItemWidth();
+  const { width: windowWidth } = useWindowDimensions();
   const sectionMenu = useChatSectionMenu(serverId, channel.id);
   const isPinned = pinnedChannelIds.includes(channel.id);
   const canPin = canToggleAgentPin([...pinnedAgentIds, ...pinnedChannelIds], channel.id);
@@ -229,7 +231,8 @@ export const ChannelListRow = memo(function ChannelListRow({
         if (nativeEvent.event === "delete") remove();
       }}
     >
-      {link}
+      {/* The menu measures its child without a width limit; a list row fills the window. */}
+      <View style={{ width: pinned ? pinnedItemWidth : windowWidth }}>{link}</View>
     </MenuView>
   ) : (
     link

@@ -137,7 +137,7 @@ const SIGN_IN_EXPRESSION = `(async () => {
   if (challenge.status !== "code_sent" || !challenge.developmentCode) {
     return { status: challenge.status, issue: challenge.issue?.message ?? "no development code", signedInNow: false };
   }
-  const verified = await auth.verifyEmailCode(challenge.challengeId, challenge.developmentCode);
+  const verified = await auth.verifyEmailCode({ challengeId: challenge.challengeId, code: challenge.developmentCode });
   return { status: verified.status, issue: verified.issue?.message ?? null, signedInNow: true };
 })()`;
 

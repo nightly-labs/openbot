@@ -4,6 +4,7 @@ import type { Logger } from "@openbot/logging";
 import { Effect, Result, Schema } from "effect";
 import type { AgentStore } from "../agent-store";
 import type { ChannelService } from "../channel-service";
+import { causeHelpers } from "../effect-boundary";
 import type { MailboxStore } from "../mailbox-store";
 import type { MessagingThreads } from "../messaging/messaging-threads";
 import type { ContextCompaction } from "./context-compaction";
@@ -154,21 +155,15 @@ export class AgentRemoval {
     let stage = "provider-files";
     yield* Effect.gen({ self: this }, function* () {
       for (const session of providerSessions)
-        yield* this.#threads
-          .deleteProviderSessionFiles(session.externalSessionId)
-          .pipe(Effect.mapError((failure) => new AgentRemovalFailed({ cause: failure.cause })));
+        yield* this.#threads.deleteProviderSessionFiles(session.externalSessionId).pipe(toAgentRemovalFailed);
       stage = "messaging";
-      yield* this.#messaging
-        .deleteForAgent(agent.id)
-        .pipe(Effect.mapError((failure) => new AgentRemovalFailed({ cause: failure.cause })));
+      yield* this.#messaging.deleteForAgent(agent.id).pipe(toAgentRemovalFailed);
       stage = "mailbox";
       yield* this.#mailbox
         .deleteAgentData(agent.id, this.#channels.store.allContextThreads())
-        .pipe(Effect.mapError((failure) => new AgentRemovalFailed({ cause: failure.cause })));
+        .pipe(toAgentRemovalFailed);
       stage = "agent-files-and-record";
-      yield* this.#store
-        .deleteAgent(agent.id)
-        .pipe(Effect.mapError((failure) => new AgentRemovalFailed({ cause: failure.cause })));
+      yield* this.#store.deleteAgent(agent.id).pipe(toAgentRemovalFailed);
     }).pipe(
       Effect.mapError(() => {
         // File-system errors can contain private paths. Log only the failed stage.
@@ -215,11 +210,7 @@ export class AgentRemoval {
       );
     let closed = 0;
     for (const tab of owned) {
-      const result = yield* Effect.result(
-        this.#browser
-          .close(tab.id)
-          .pipe(Effect.mapError((failure) => new AgentRemovalFailed({ cause: failure.cause }))),
-      );
+      const result = yield* Effect.result(this.#browser.close(tab.id).pipe(toAgentRemovalFailed));
       if (Result.isSuccess(result)) closed += 1;
       else this.#logger.warn("Could not close a deleted agent's browser tab.", { error: result.failure.cause });
     }
@@ -231,6 +222,6 @@ export class AgentRemovalFailed extends Schema.TaggedError<AgentRemovalFailed>()
   cause: Schema.Defect(),
 }) {}
 
-function removalStep<A>(run: () => A): Effect.Effect<A, AgentRemovalFailed> {
-  return Effect.try({ try: run, catch: (cause) => new AgentRemovalFailed({ cause }) });
-}
+const { sync: removalStep, rewrap: toAgentRemovalFailed } = causeHelpers(AgentRemovalFailed);
+
+export { toAgentRemovalFailed };

@@ -121,10 +121,14 @@ function bracketBalance(line: string) {
  * and can try again, and the chat marks the step as failed. The user met it as a "Provider error"
  * toast during an embedded-browser click, with nothing to do about it. It belongs in the log.
  *
- * Only Grok's per-call kinds count. Any other failure, the provider's own included, stays visible.
+ * Antigravity logs failed MCP calls as `error executing cascade step: CORTEX_STEP_TYPE_MCP_TOOL:`.
+ * These records also describe one tool call. Other cascade step failures stay visible.
  */
 export function isToolCallDiagnostic(message: string): boolean {
-  return /\btool_error:\s*(?:tool_output_error|execution_failure|parse_failure)\b/.test(message);
+  return (
+    /\btool_error:\s*(?:tool_output_error|execution_failure|parse_failure)\b/.test(message) ||
+    /\berror executing cascade step:\s*CORTEX_STEP_TYPE_MCP_TOOL:\s*Error:/.test(message)
+  );
 }
 
 /**

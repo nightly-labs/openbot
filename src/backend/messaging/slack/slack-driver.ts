@@ -3,6 +3,7 @@ import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contract
 import { SLACK_BOT_SCOPES } from "@openbot/contracts/slack-app";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Result } from "effect";
+import { causeHelpers } from "../../effect-boundary";
 import type { MessagingAnswerFile } from "../messaging-threads";
 import type {
   ConnectionIdentity,
@@ -21,6 +22,8 @@ import { plainText, SLACK_ACTION_IDS } from "./slack-events";
 import { SlackEventsTransport } from "./slack-events-transport";
 import { slackChunks, slackMrkdwn } from "./slack-render";
 import { SlackApiError, SlackWebApi } from "./slack-web-api";
+
+const { io: adapterIo } = causeHelpers(MessagingAdapterError);
 
 /** Slack's own limit for one uploaded file is 1 GB; the host holds its uploads to this. */
 const UPLOAD_BYTES = 100 * 1024 * 1024;
@@ -359,6 +362,7 @@ export interface SlackDriverOptions {
 export function slackDriver(options: SlackDriverOptions = {}): MessagingDriver {
   return {
     platform: "slack",
+    requiredCredential: "botToken",
     createAdapter(credentials, driverOptions) {
       return new SlackAdapter(credentials.botToken ?? "", { ...driverOptions, origin: options.origin });
     },
@@ -367,8 +371,4 @@ export function slackDriver(options: SlackDriverOptions = {}): MessagingDriver {
       return new SlackEventsTransport({ identity, ingress: options.ingress });
     },
   };
-}
-
-function adapterIo<A>(run: () => Promise<A>): Effect.Effect<A, MessagingAdapterError> {
-  return Effect.tryPromise({ try: run, catch: (cause) => new MessagingAdapterError({ cause }) });
 }

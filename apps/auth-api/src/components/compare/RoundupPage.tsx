@@ -8,8 +8,8 @@ import {
   formatArticleDate,
 } from "../../lib/content-collection";
 import { ArticleGradient } from "../content/ArticleGradient";
+import { DataArticleFrame } from "../content/DataArticleFrame";
 import { LandingIcon } from "../landing/LandingIcon";
-import { CompareArticleFrame } from "./CompareArticleFrame";
 import { CompareBenchmark } from "./CompareBenchmark";
 import { CheckedMeta, CompareFaq, CompareMarkRow, CompareSources, RevealSection, SideLabel } from "./CompareParts";
 
@@ -29,7 +29,7 @@ function appMark(app: RoundupApp) {
 // summary table is a real table, for the same reason as on a comparison.
 export function RoundupPage(props: RoundupPageProps) {
   return (
-    <CompareArticleFrame collection={props.collection} article={props.article}>
+    <DataArticleFrame collection={props.collection} article={props.article}>
       <header class="compare-hero">
         <div class="compare-hero-copy" data-enter="post-copy">
           <Link class="post-article-back" to={props.collection.indexRoute}>
@@ -131,6 +131,6 @@ export function RoundupPage(props: RoundupPageProps) {
       <CompareFaq faq={props.roundup.faq} />
 
       <CompareSources subject="these apps" page={props.roundup} />
-    </CompareArticleFrame>
+    </DataArticleFrame>
   );
 }

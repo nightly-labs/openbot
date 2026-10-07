@@ -3,11 +3,5 @@
   "compilerOptions": {
     "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom", "node"]
   },
-  "include": [
-    ".storybook/**/*.ts",
-    ".storybook/**/*.tsx",
-    "src/renderer/**/*.ts",
-    "src/renderer/**/*.tsx",
-    "packages/contracts/src/**/*.ts"
-  ]
+  "include": [".storybook/**/*.ts", ".storybook/**/*.tsx", "src/renderer/src/env.d.ts"]
 }

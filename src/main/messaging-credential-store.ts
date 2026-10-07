@@ -10,16 +10,11 @@ import { registerSecretValue } from "@openbot/logging";
 import { Effect, Result, Semaphore } from "effect";
 import { z } from "zod";
 import { writeFileAtomically } from "../backend/atomic-json-file";
+import { causeHelpers } from "../backend/effect-boundary";
 import { type MessagingCredentials, MessagingOperationFailed } from "../backend/messaging/messaging-service";
 import type { SecretCipher } from "./provider-credential-store";
 
-function messagingIO<A>(operation: () => Promise<A>): Effect.Effect<A, MessagingOperationFailed> {
-  return Effect.tryPromise({ try: operation, catch: (cause) => new MessagingOperationFailed({ cause }) });
-}
-
-function messagingSync<A>(operation: () => A): Effect.Effect<A, MessagingOperationFailed> {
-  return Effect.try({ try: operation, catch: (cause) => new MessagingOperationFailed({ cause }) });
-}
+const { io: messagingIO, sync: messagingSync } = causeHelpers(MessagingOperationFailed);
 
 /**
  * One envelope with the tokens of every connection, each connection encrypted on its own. The

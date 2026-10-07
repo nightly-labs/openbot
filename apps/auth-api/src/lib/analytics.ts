@@ -47,7 +47,6 @@ type LandingPlacement =
   | "content_index"
   | "content_article"
   | "content_related"
-  | "launch_dialog"
   | "other";
 
 const LANDING_PLACEMENTS = [
@@ -59,7 +58,6 @@ const LANDING_PLACEMENTS = [
   "content_index",
   "content_article",
   "content_related",
-  "launch_dialog",
   "other",
 ] as const satisfies readonly LandingPlacement[];
 /** The platforms the landing page can send a visitor to a download for. */
@@ -102,6 +100,7 @@ const FIXED_SCREEN_PATHS = [
   "/news",
   "/guides",
   "/compare",
+  "/providers",
 ] as const satisfies readonly LandingScreenPath[];
 
 /**
@@ -404,7 +403,7 @@ function isSafeLandingProperty(name: LandingEventName, key: string, value: unkno
   if (key === "action") return isOneOf(["view", "open_app", "download"] as const, value);
   if (key === "valid_invite") return name === "join_page_action" && isBoolean(value);
   if (key === "detected") return name === "landing_download_selected" && isBoolean(value);
-  if (key === "collection") return isOneOf(["news", "guides", "compare"] as const, value);
+  if (key === "collection") return CONTENT_COLLECTIONS.some((collection) => collection.id === value);
   if (key === "slug") return typeof value === "string" && PUBLISHED_SLUGS.has(value);
   if (key === "depth") return isOneOf(["start", "half", "end"] as const, value);
   // The invitation page only ever offers the two platforms it can detect; the download events cover
@@ -527,8 +526,6 @@ export function landingAttribution(document: Document, hostname: string) {
 }
 
 function landingPlacement(link: HTMLAnchorElement): LandingPlacement {
-  // Portaled out of every page container, so it is checked by its own class.
-  if (link.closest(".ph-dialog")) return "launch_dialog";
   if (link.closest(".landing-header")) return "header";
   // Checked before `.post-article`, which wraps it: a card in the related row is a different
   // question from a link inside the article body.

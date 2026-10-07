@@ -109,6 +109,9 @@ describe("ComposerEditor", () => {
     disable();
     await waitFor(() => expect(editor).toHaveAttribute("aria-disabled", "true"));
     await fireEvent.keyDown(editor, { key: "a" });
+    editor.dispatchEvent(
+      new InputEvent("beforeinput", { inputType: "insertText", data: "a", bubbles: true, cancelable: true }),
+    );
     await fireEvent.keyDown(editor, { key: "Enter" });
     expect(editor).toHaveTextContent("");
     expect(onValueChange).not.toHaveBeenCalled();

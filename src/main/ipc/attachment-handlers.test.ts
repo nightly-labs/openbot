@@ -110,6 +110,7 @@ describe("ZIP attachment IPC", () => {
         discardDraftAttachment: vi.fn(),
         resolveSharedFile: vi.fn(),
         resolveLocalWorkspaceFile: vi.fn(),
+        listLocalWorkspaceDirectory: vi.fn(),
       },
       mailbox: {
         resolveAttachment: () => Effect.sync(() => ({ path: sourcePath, mimeType: "text/plain", name: "source.txt" })),
@@ -166,6 +167,7 @@ describe("single attachment download", () => {
         discardDraftAttachment: vi.fn(),
         resolveSharedFile: vi.fn(),
         resolveLocalWorkspaceFile: vi.fn(),
+        listLocalWorkspaceDirectory: vi.fn(),
       },
       mailbox: { resolveAttachment: () => Effect.sync(() => resolved) },
       remoteServers: {
@@ -243,6 +245,7 @@ describe("workspace file links", () => {
         discardDraftAttachment: vi.fn(),
         resolveSharedFile: vi.fn(),
         resolveLocalWorkspaceFile,
+        listLocalWorkspaceDirectory: vi.fn(),
       },
       mailbox: { resolveAttachment: vi.fn() },
       remoteServers: {

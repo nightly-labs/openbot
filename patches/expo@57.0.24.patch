@@ -1,0 +1,17 @@
+diff --git a/src/dom/webview-wrapper.tsx b/src/dom/webview-wrapper.tsx
+index c9d79a41e43da2e7e5f668bf0e2ab665bdbf5182..8762b3b5741febd9e3198da980a040df30bfee3d 100644
+--- a/src/dom/webview-wrapper.tsx
++++ b/src/dom/webview-wrapper.tsx
+@@ -81,7 +81,11 @@ const RawWebView = React.forwardRef<object, Props>((props, ref) => {
+ 
+   const emit = React.useCallback(
+     (detail: BridgeMessage<any>) => {
+-      webviewRef.current?.injectJavaScript(getInjectEventScript(detail));
++      // Android rejects when the native view is not mounted yet or was removed. The DOM side asks
++      // for the props again when it is ready, and a removed view has no listener.
++      Promise.resolve(webviewRef.current?.injectJavaScript(getInjectEventScript(detail))).catch(
++        () => {}
++      );
+     },
+     [webviewRef]
+   );

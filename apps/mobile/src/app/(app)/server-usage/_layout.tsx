@@ -1,6 +1,7 @@
 import { Stack } from "expo-router/stack";
 import { useCSSVariable } from "uniwind";
 import { isIOS } from "@/shared/lib/platform";
+import { sheetHeaderInsetOptions } from "@/shared/lib/sheet-header";
 import { useText } from "@/shared/lib/text";
 
 export default function ServerUsageLayout() {
@@ -9,6 +10,7 @@ export default function ServerUsageLayout() {
   return (
     <Stack
       screenOptions={{
+        ...sheetHeaderInsetOptions,
         headerShadowVisible: false,
         headerTransparent: isIOS,
         headerStyle: { backgroundColor: isIOS ? "transparent" : background },

@@ -1,7 +1,7 @@
 # Unreleased mobile notes
 
 The notes of the OpenBot iPhone app. They are separate from the notes of the desktop app and the
-web client in [`changelog.d/`](../../changelog.d/README.md), and the public `/changelog` page shows
+web client in [`changelog.d/`](../../../changelog.d/README.md), and the public `/changelog` page shows
 them in its Mobile tab.
 
 Each pull request that changes what a user sees in the iPhone app writes its notes in its own file

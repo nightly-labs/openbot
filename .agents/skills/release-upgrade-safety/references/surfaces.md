@@ -25,7 +25,7 @@ any of them before an upgrade. A renamed constant means the old file is never re
 | `openbot-central-auth-v1.bin` | `CENTRAL_AUTH_FILE`, `src/main/application-services.ts` | `safeStorage`-encrypted; `src/main/central-auth-manager.ts` **throws** on anything but `version === 2` and `#initialize` catches that into `#clearStoredSession()`, so a bad shape signs the user out; undecryptable if `appId` or the signing identity changes |
 | `openbot-remote-desktop-credential-v1.json` | `LEGACY_REMOTE_DESKTOP_CREDENTIAL_FILE`, `src/main/application-services.ts` | legacy, still read |
 | `openbot-remote-desktop-runtime-v1.json` | `REMOTE_DESKTOP_RUNTIME_SECRET_FILE`, `src/main/application-services.ts` | `safeStorage`-encrypted; `src/main/remote-desktop-secret-store.ts` accepts only `version: 1` |
-| `openbot-dev-remote-connection-v1.json` | `DEVELOPMENT_REMOTE_CONNECTION_FILE`, `src/main/development-remote-bootstrap.ts` | development only |
+| `remote/connection-<stack pid>.json` in the dev runtime directory | `developmentRemoteConnectionPath`, `src/main/development-runtime-directory.ts` | development only |
 | `bots.json` | `LEGACY_AGENTS_STATE_FILE`, `src/backend/agent-store.ts` | permanent name; imported once under command id `legacy-import:bots:v1` |
 | `mailbox.json` | `src/backend/mailbox-store.ts` | permanent name |
 | `sunshine-credentials.json`, `sunshine-state.json`, `sunshine-apps.json`, `moonlight-config.json`, `moonlight-data.json` | `src/main/sunshine-moonlight-runtime.ts` | written by the vendored runtimes, not by OpenBot |

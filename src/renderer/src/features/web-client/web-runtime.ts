@@ -39,8 +39,10 @@ import type {
   TeamRealtimeEvent,
   UpdateAgentInput,
   UpdateQueuedMessageInput,
+  WorkspaceDirectory,
 } from "@openbot/contracts/ipc";
 import {
+  decodeWorkspaceDirectory,
   isAccountUsage,
   isAgentModelOption,
   isAgentStatus,
@@ -68,6 +70,10 @@ import {
 } from "@openbot/contracts/team-protocol/v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
+import {
+  WORKSPACE_DIRECTORY_CAPABILITY,
+  WORKSPACE_DIRECTORY_ROUTES,
+} from "@openbot/contracts/team-protocol/workspace-directory-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import { createRemoteBrowserView, type RemoteBrowserView } from "@openbot/team-client/browser-view";
 import {
@@ -184,6 +190,8 @@ export interface WebWorkspaceRuntime {
   sharedFile(path: string): Promise<WebFile>;
   /** A file in one agent's workspace on the host. */
   workspaceFile(agentId: string, path: string): Promise<WebFile>;
+  /** A folder in one agent's workspace on the host. */
+  workspaceDirectory(agentId: string, path: string): Promise<WorkspaceDirectory>;
   react(input: SetMessageReactionInput): Promise<void>;
   setAvatar(agentId: string, image: AvatarImageInput | null): Promise<void>;
   models(): Promise<AgentModelOption[]>;
@@ -809,6 +817,11 @@ export function createWebWorkspaceRuntime(
       // The released URL spells the agent `botId`.
       const query = new URLSearchParams({ botId: agentId, path });
       return decodeWebFile(await request("GET", `${TEAM_API_ROUTES.workspaceFiles}?${query}`));
+    },
+    async workspaceDirectory(agentId, path) {
+      if (!capabilities.includes(WORKSPACE_DIRECTORY_CAPABILITY))
+        throw new Error(currentText().t("error.team.workspaceDirectoryUnsupported"));
+      return decodeWorkspaceDirectory(await request("POST", WORKSPACE_DIRECTORY_ROUTES.list, { agentId, path }));
     },
     async models() {
       return guardedListDecoder(isAgentModelOption, "models")(await request("GET", TEAM_API_ROUTES.agents.models));

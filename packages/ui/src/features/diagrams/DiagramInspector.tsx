@@ -99,11 +99,7 @@ export function DiagramInspector(props: DiagramInspectorProps) {
               </Show>
               <h2 class="diagram-inspector-title">{nodeName(node())}</h2>
               <Show when={steps().get(node().id)}>
-                {(step) => (
-                  <Badge size="sm" shape="pill">
-                    {t("diagram.node.step", { step: step() })}
-                  </Badge>
-                )}
+                {(step) => <Badge>{t("diagram.node.step", { step: step() })}</Badge>}
               </Show>
             </>
           )}
@@ -130,9 +126,13 @@ export function DiagramInspector(props: DiagramInspectorProps) {
                 <>
                   <div class="diagram-inspector-run">
                     <Badge
-                      size="sm"
-                      shape="pill"
-                      tone={run().status === "failed" ? "danger" : run().status === "succeeded" ? "success" : "neutral"}
+                      variant={
+                        run().status === "failed"
+                          ? "destructive-light"
+                          : run().status === "succeeded"
+                            ? "success-light"
+                            : "secondary"
+                      }
                     >
                       {t(DIAGRAM_RUN_STATUS_KEY[run().status])}
                     </Badge>
@@ -354,7 +354,7 @@ function RoutineDetail(props: {
   return (
     <>
       <div class="diagram-inspector-run">
-        <Badge size="sm" shape="pill" tone={props.routine.active ? "success" : "neutral"}>
+        <Badge variant={props.routine.active ? "success-light" : "secondary"}>
           {props.routine.active ? t("diagram.routine.active") : t("diagram.node.paused")}
         </Badge>
         <span>{routineScheduleSummary(props.routine.schedule, true)}</span>

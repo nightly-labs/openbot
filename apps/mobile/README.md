@@ -13,7 +13,8 @@ React Native app built with Expo SDK 57, Expo Router, TypeScript 7, Biome, and B
 The repository uses Bun’s hoisted linker so native Expo modules resolve to one installation.
 The root `postinstall` runs `bun run --cwd apps/mobile setup:skia` after dependency installation.
 Skia 2.6.2 needs this step to copy its packaged native libraries before CocoaPods runs;
-EAS and local installs use the same setup.
+EAS and local installs use the same setup. `OPENBOT_SKIP_SKIA=1` skips the step for desktop and
+API work. If you installed with it, run `bun run --cwd apps/mobile setup:skia` before a native build.
 
 EAS profiles pin Bun 1.4.0 to match the root `packageManager`. Use the same Bun version
 locally: dependency paths and package patch metadata affect the runtime fingerprint.
@@ -21,6 +22,17 @@ After switching from the isolated linker to the hoisted linker, move the old
 `apps/mobile/node_modules` directory out of the app and run `bun install --frozen-lockfile`
 from the repository root. A normal install can retain old workspace symlinks and cause
 the local fingerprint to differ from the clean EAS installation.
+
+Expo 57.0.24 is patched in `patches/expo@57.0.24.patch` so a DOM component ignores a props
+message that it sends before Android mounts its web view, or after Android removes it. Android
+rejects these calls, and the rejection shows as a console error. The DOM component asks for the
+props again when it is ready.
+
+react-native-screens 4.26.2 is patched in `patches/react-native-screens@4.26.2.patch` with the
+Android fix from upstream PR #4498. A header update for a screen that its stack removed, such as a
+Save in a one-page sheet that closes the sheet, no longer throws
+`ScreenStackFragment added into a non-stack container`. Remove the patch when a release
+contains that fix.
 
 Expo Router 57.0.20 is patched in `patches/expo-router@57.0.20.patch` to apply zoom dismissal
 bounds when its enabler registers after the chat mounts. This keeps the avatar-to-header zoom
@@ -342,6 +354,56 @@ The workflow uses the runner's installed Fastlane and CocoaPods and prints their
 the selected Xcode and EAS CLI versions when upgrading Expo. GitHub Actions usage and limits apply.
 See [local EAS builds](https://docs.expo.dev/build-reference/local-builds/) and
 [Fastlane TestFlight upload](https://docs.fastlane.tools/actions/upload_to_testflight/).
+
+### GitHub Actions Google Play release
+
+The `Release Android to Google Play` workflow builds the selected `main` commit on a GitHub-hosted
+`ubuntu-24.04` runner with JDK 17 and the runner's Android SDK. EAS CLI 24.1.2 runs with
+`--local --non-interactive`, so compilation uses GitHub Actions compute. Fastlane 2.240.1 uploads
+the `.aab` directly to Google Play without EAS Submit. The workflow uploads only to the `internal`
+or `alpha` (closed testing) track. Promote a release to production in Play Console.
+
+One-time setup:
+
+1. In GitHub repository settings, create the `release-android` environment. Under deployment branches
+   and tags, select only the `main` branch.
+2. Add environment secrets `EXPO_TOKEN` and `GOOGLE_PLAY_SERVICE_ACCOUNT_KEY`. The Expo token is the
+   same as in `release-ios`. The Google secret is the full JSON key of a Google Cloud service account.
+3. In the Google Cloud project of that service account, enable the Google Play Android Developer API.
+   In Play Console, under **Users and permissions**, invite the service account email and give it
+   access to `run.openbot.mobile` with the release permissions for testing tracks.
+4. Keep the Android upload keystore configured in EAS as the default build credentials. CI downloads
+   it. Play App Signing keeps the app signing key; the EAS keystore is the upload key.
+5. Keep the OpenPanel variables in EAS `production`, as for iOS.
+6. Google Play accepts API uploads only after the app has one bundle. For the first release, dispatch
+   the workflow with `upload` cleared, download the `android-*` artifact, and upload the `.aab` in
+   Play Console under **Test and release → Testing → Internal testing**. Until the app has a
+   published release, Play accepts only draft releases: dispatch with `release_status` set to `draft`
+   and roll out the release in Play Console.
+
+After this workflow is merged into `main`, run from the repository root:
+
+```bash
+bun run mobile:android:release:play
+```
+
+From `apps/mobile`, run `bun run android:release:play`. This dispatches a release of remote `main`
+to the `internal` track with status `completed`. To choose another track, status, or a build without
+upload, select **Run workflow** on `main` in GitHub, or run
+`gh workflow run release-android.yml --ref main -f track=alpha -f release_status=draft -f upload=true`.
+
+EAS increments the remote Android `versionCode`; a failed build can consume a number. iOS and Android
+use the same marketing version in `app.json` and the same notes in `apps/mobile/CHANGELOG.md`. Run
+`bun run mobile:release:published` when testers on both platforms can install the build.
+The signed `.aab` is saved as a GitHub Actions artifact for seven days before upload. If upload fails,
+upload that artifact in Play Console to avoid rebuilding.
+
+A successful workflow means Google Play accepted the bundle on the selected track. Fastlane does not
+upload store metadata, screenshots or release notes. Write the release notes in Play Console.
+
+To build a signed `.aab` on your computer, run `bun run mobile:android:build:local`. It needs JDK 17
+and the Android SDK, and writes `/private/tmp/openbot-play.aab`.
+See [Fastlane Google Play upload](https://docs.fastlane.tools/actions/upload_to_play_store/).
 
 ## OpenPanel product analytics
 

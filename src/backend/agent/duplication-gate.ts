@@ -4,6 +4,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Result, Schema } from "effect";
 import type { AgentService } from "../agent-service";
 import { type AgentStore, duplicationProfileSignature } from "../agent-store";
+import { causeHelpers } from "../effect-boundary";
 import type { MailboxStore } from "../mailbox-store";
 import type { SidebarLayoutStore } from "../sidebar-layout-store";
 import type { AgentMemories } from "./agent-memories";
@@ -110,9 +111,7 @@ export class DuplicationGate {
       });
       const signature = yield* duplicationStep(() => this.#sourceSignature(sourceAgentId));
       this.#duplicatingAgents.add(sourceAgentId);
-      duplicate = yield* this.#store
-        .duplicateAgent(sourceAgentId, operationId)
-        .pipe(Effect.mapError((failure) => new AgentDuplicationFailed({ cause: failure.cause })));
+      duplicate = yield* this.#store.duplicateAgent(sourceAgentId, operationId).pipe(toAgentDuplicationFailed);
       const copied = duplicate;
       let completedDuplicate = copied;
       yield* duplicationStep(() => {
@@ -147,7 +146,7 @@ export class DuplicationGate {
           const abandoned = duplicate;
           const rollback = yield* Effect.result(
             this.#hooks.deleteAgentData(abandoned).pipe(
-              Effect.mapError((failure) => new AgentDuplicationFailed({ cause: failure.cause })),
+              toAgentDuplicationFailed,
               Effect.catchDefect((cause) => Effect.fail(new AgentDuplicationFailed({ cause }))),
             ),
           );
@@ -191,7 +190,7 @@ export class DuplicationGate {
     const releaseDuplication = this.#pendingReleases.get(agentId);
     return yield* this.#store
       .commitAgentDuplication(agentId, operation.operationId, operation.sourceAgentId, layout)
-      .pipe(Effect.mapError((failure) => new AgentDuplicationFailed({ cause: failure.cause })))
+      .pipe(toAgentDuplicationFailed)
       .pipe(
         Effect.flatMap((result) =>
           duplicationStep(() => {
@@ -305,6 +304,10 @@ export class AgentDuplicationFailed extends Schema.TaggedError<AgentDuplicationF
   cause: Schema.Defect(),
 }) {}
 
+const { sync: duplicationStep, rewrap: toAgentDuplicationFailed } = causeHelpers(AgentDuplicationFailed);
+
+export { toAgentDuplicationFailed };
+
 /** A cancelled caller must not leave an uncommitted copy or interrupt its rollback. */
 export const duplicateAgentIntoLayout = Effect.fn("Agent.duplicateIntoLayout")(function* (
   agents: DuplicatingAgents,
@@ -312,16 +315,12 @@ export const duplicateAgentIntoLayout = Effect.fn("Agent.duplicateIntoLayout")(f
   sourceAgentId: string,
   operationId?: string,
 ) {
-  const agent = yield* agents
-    .duplicateAgent(sourceAgentId, operationId)
-    .pipe(Effect.mapError((failure) => new AgentDuplicationFailed({ cause: failure.cause })));
+  const agent = yield* agents.duplicateAgent(sourceAgentId, operationId).pipe(toAgentDuplicationFailed);
   return yield* Effect.gen(function* () {
     const layout = yield* sidebar
       .placeDuplicateAfter(sourceAgentId, agent.id, [...agents.sidebarChatIds(), agent.id])
-      .pipe(Effect.mapError((failure) => new AgentDuplicationFailed({ cause: failure.cause })));
-    return yield* agents
-      .commitAgentDuplication(agent.id, layout)
-      .pipe(Effect.mapError((failure) => new AgentDuplicationFailed({ cause: failure.cause })));
+      .pipe(toAgentDuplicationFailed);
+    return yield* agents.commitAgentDuplication(agent.id, layout).pipe(toAgentDuplicationFailed);
   }).pipe(
     Effect.catchDefect((cause) => Effect.fail(new AgentDuplicationFailed({ cause }))),
     Effect.catch((failure) =>
@@ -330,13 +329,13 @@ export const duplicateAgentIntoLayout = Effect.fn("Agent.duplicateIntoLayout")(f
           [
             Effect.result(
               agents.deleteAgent(agent.id).pipe(
-                Effect.mapError((failure) => new AgentDuplicationFailed({ cause: failure.cause })),
+                toAgentDuplicationFailed,
                 Effect.catchDefect((cause) => Effect.fail(new AgentDuplicationFailed({ cause }))),
               ),
             ),
             Effect.result(
               sidebar.removeAgent(agent.id).pipe(
-                Effect.mapError((failure) => new AgentDuplicationFailed({ cause: failure.cause })),
+                toAgentDuplicationFailed,
                 Effect.catchDefect((cause) => Effect.fail(new AgentDuplicationFailed({ cause }))),
                 Effect.asVoid,
               ),
@@ -355,7 +354,3 @@ export const duplicateAgentIntoLayout = Effect.fn("Agent.duplicateIntoLayout")(f
     ),
   );
 }, Effect.uninterruptible);
-
-function duplicationStep<A>(operation: () => A): Effect.Effect<A, AgentDuplicationFailed> {
-  return Effect.try({ try: operation, catch: (cause) => new AgentDuplicationFailed({ cause }) });
-}

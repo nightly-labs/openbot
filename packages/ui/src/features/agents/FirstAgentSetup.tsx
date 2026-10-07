@@ -15,6 +15,7 @@ import { createSignal, For, onSettled, Show } from "solid-js";
 import { AVATAR_HUE_CHOICES, avatarCandidateSeeds, avatarHeadColor, avatarHueSwatch } from "../../bloub-avatar";
 import { ProviderModelPicker } from "../../components/ProviderModelPicker";
 import { useText } from "../../text";
+import { prefersReducedMotion } from "../../utils";
 import { AgentAvatar } from "./AgentAvatar";
 import { AVATAR_HUE_LABEL } from "./avatar-hue-label";
 
@@ -190,11 +191,7 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
   }
 
   function startSuggestionMomentum(): void {
-    if (
-      !suggestionList ||
-      Math.abs(suggestionDragVelocity) < SUGGESTION_MOMENTUM_MINIMUM ||
-      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
-    ) {
+    if (!suggestionList || Math.abs(suggestionDragVelocity) < SUGGESTION_MOMENTUM_MINIMUM || prefersReducedMotion()) {
       return;
     }
 

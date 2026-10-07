@@ -17,9 +17,14 @@ import {
 } from "../src/server/remote-control-plane";
 import { sqliteD1 } from "./sqlite-d1";
 
-/** The account server reads the plan of a host for its member limit, and its Slack workspaces. */
+/** The account server reads the plan of a host for its member limit, and its Slack and Discord links. */
 function applyPlanMigrations(database: DatabaseSync): void {
-  for (const name of ["0022_billing.sql", "0023_hosted_servers.sql", "0025_slack_workspace_routes.sql"]) {
+  for (const name of [
+    "0022_billing.sql",
+    "0023_hosted_servers.sql",
+    "0025_slack_workspace_routes.sql",
+    "0026_discord_guild_routes.sql",
+  ]) {
     database.exec(readFileSync(new URL(`../migrations/${name}`, import.meta.url), "utf8"));
   }
 }
@@ -545,6 +550,8 @@ describe("RemoteControlPlane", () => {
       REMOTE_AUTH_WEBHOOK_SECRET: "s".repeat(32),
       SLACK_ROUTE_PRIVATE_JWK: JSON.stringify({ ...privateJwk, kid: "test-key", alg: "ES256" }),
       SLACK_ROUTE_KEY_ID: "test-key",
+      DISCORD_ROUTE_PRIVATE_JWK: JSON.stringify({ ...privateJwk, kid: "test-key", alg: "ES256" }),
+      DISCORD_ROUTE_KEY_ID: "test-key",
     };
     const controlPlane = new RemoteControlPlane(bindings, {
       now: () => 1_000,
@@ -677,6 +684,79 @@ describe("RemoteControlPlane", () => {
     ).resolves.toEqual([]);
     await runApiEffect(controlPlane.disconnectSlackWorkspace("host-1", registration.machineToken, "T1"));
     expect(revocations()).toHaveLength(1);
+    // The Discord route: the same rules, for the guilds linked to the host.
+    await expect(
+      runApiEffect(controlPlane.issueDiscordRoute("host-1", firstRegistration.machineToken)),
+    ).rejects.toMatchObject({ code: "host_unauthorized" });
+    database
+      .prepare(
+        `INSERT INTO discord_guild_routes(guild_id, host_id, account_id, connected_at)
+         VALUES ('111', 'host-1', 'owner', 1)`,
+      )
+      .run();
+    const discordRoute = await runApiEffect(controlPlane.issueDiscordRoute("host-1", registration.machineToken));
+    expect(decodeJwt(discordRoute.ticket)).toMatchObject({
+      aud: "openbot-discord-route",
+      hid: "host-1",
+      guilds: [{ id: "111", linkedAt: 1 }],
+    });
+    await expect(
+      runApiEffect(
+        controlPlane.validateDiscordRoute({
+          hostId: "host-1",
+          guilds: [
+            { id: "111", linkedAt: 1 },
+            { id: "222", linkedAt: 1 },
+          ],
+        }),
+      ),
+    ).resolves.toEqual(["111"]);
+    await expect(
+      runApiEffect(controlPlane.validateDiscordRoute({ hostId: "host-1", guilds: [{ id: "111", linkedAt: 0 }] })),
+    ).resolves.toEqual([]);
+    await expect(
+      runApiEffect(controlPlane.disconnectDiscordGuild("host-1", firstRegistration.machineToken, "111")),
+    ).rejects.toMatchObject({ code: "host_unauthorized" });
+    const discordRevocations = () =>
+      webhookBodies.map((body) => JSON.parse(body)).filter((event) => event.type === "discord-route-revoked");
+    await runApiEffect(controlPlane.disconnectDiscordGuild("host-1", registration.machineToken, "111"));
+    expect(
+      decodeJwt((await runApiEffect(controlPlane.issueDiscordRoute("host-1", registration.machineToken))).ticket),
+    ).toMatchObject({ guilds: [] });
+    expect(discordRevocations()).toEqual([
+      { type: "discord-route-revoked", guildId: "111", through: expect.any(Number) },
+    ]);
+    await expect(
+      runApiEffect(controlPlane.validateDiscordRoute({ hostId: "host-1", guilds: [{ id: "111", linkedAt: 1 }] })),
+    ).resolves.toEqual([]);
+    await runApiEffect(controlPlane.disconnectDiscordGuild("host-1", registration.machineToken, "111"));
+    expect(discordRevocations()).toHaveLength(1);
+    // Signal reports that the bot left a guild: the link goes without the host.
+    database
+      .prepare(
+        `INSERT INTO discord_guild_routes(guild_id, host_id, account_id, connected_at)
+         VALUES ('333', 'host-1', 'owner', 2)`,
+      )
+      .run();
+    await runApiEffect(controlPlane.removeDiscordGuild("333"));
+    expect(database.prepare("SELECT guild_id FROM discord_guild_routes WHERE guild_id = '333'").get()).toBeUndefined();
+    expect(discordRevocations().at(-1)).toEqual({
+      type: "discord-route-revoked",
+      guildId: "333",
+      through: expect.any(Number),
+    });
+    // Signal sends the bot's guilds: an older link of another guild goes, a newer one stays.
+    database
+      .prepare(
+        `INSERT INTO discord_guild_routes(guild_id, host_id, account_id, connected_at)
+         VALUES ('444', 'host-1', 'owner', 10), ('555', 'host-1', 'owner', 10), ('666', 'host-1', 'owner', 100)`,
+      )
+      .run();
+    await expect(runApiEffect(controlPlane.reconcileDiscordGuilds({ guilds: ["444"], before: 50 }))).resolves.toBe(1);
+    expect(
+      database.prepare("SELECT guild_id FROM discord_guild_routes WHERE guild_id IN ('444','555','666')").all(),
+    ).toEqual([{ guild_id: "444" }, { guild_id: "666" }]);
+    expect(discordRevocations().at(-1)).toMatchObject({ guildId: "555" });
     expect(database.prepare("SELECT membership_id FROM remote_memberships WHERE user_id = 'owner'").get()).toEqual({
       membership_id: "host-1:owner",
     });

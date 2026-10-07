@@ -15,6 +15,7 @@ import type { AgentClient } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import type { BrowserOperationError } from "../browser-effects";
 import { newAssistantMessage, normalizeCompletionStatus } from "../conversation-snapshots";
+import { causeHelpers } from "../effect-boundary";
 import type { DeliveryContext, MailboxStore } from "../mailbox-store";
 import {
   type AppServerNotification,
@@ -556,9 +557,7 @@ export class TurnLifecycle {
       for (const delivery of deliveries) {
         this.#refusedRetries.delete(delivery.delivery.id);
         const reason = terminal === "failed" && failure ? this.#hooks.redactMcp(failure) : null;
-        yield* this.#mailbox
-          .markTerminal(delivery.delivery.id, terminal, reason)
-          .pipe(Effect.mapError((failure) => new TurnOperationFailed({ cause: failure.cause })));
+        yield* this.#mailbox.markTerminal(delivery.delivery.id, terminal, reason).pipe(toTurnOperationFailed);
         this.#mailboxSync.syncDeliveryMessage(snapshot, delivery.delivery.id);
       }
       // A turn can start with the answers of several teammates. `#relayAgentResult` skips each one
@@ -574,9 +573,7 @@ export class TurnLifecycle {
       }
     }
     if (latestAssistant && !this.#conversation.isExecutionThread(snapshot.threadId)) {
-      yield* this.#store
-        .updatePreview(agentId, latestAssistant.text)
-        .pipe(Effect.mapError((failure) => new TurnOperationFailed({ cause: failure.cause })));
+      yield* this.#store.updatePreview(agentId, latestAssistant.text).pipe(toTurnOperationFailed);
       this.#hooks.emit({ type: "agents-changed", agents: this.#hooks.listAgents() });
     }
     this.#conversation.emitConversation(snapshot, "turn.completed", { turnId, status: outcome });
@@ -630,9 +627,7 @@ export class TurnLifecycle {
     deliveries: readonly DeliveryContext[],
   ) {
     for (const { delivery } of deliveries) {
-      yield* this.#mailbox
-        .requeueRefused(delivery.id)
-        .pipe(Effect.mapError((failure) => new TurnOperationFailed({ cause: failure.cause })));
+      yield* this.#mailbox.requeueRefused(delivery.id).pipe(toTurnOperationFailed);
       this.#mailboxSync.syncDeliveryMessage(snapshot, delivery.id);
     }
     this.#conversation.emitConversation(snapshot, "turn.completed", { turnId, status: "interrupted" });
@@ -669,9 +664,7 @@ export class TurnLifecycle {
     if (deliveries.length === 0) return;
     yield* Effect.gen({ self: this }, function* () {
       for (const { delivery } of deliveries) {
-        yield* this.#mailbox
-          .markRunning(delivery.id, turnId)
-          .pipe(Effect.mapError((failure) => new TurnOperationFailed({ cause: failure.cause })));
+        yield* this.#mailbox.markRunning(delivery.id, turnId).pipe(toTurnOperationFailed);
         yield* turnStep(() => this.#mailboxSync.syncDeliveryMessage(snapshot, delivery.id));
       }
       yield* turnStep(() => this.#mailboxSync.emitQueue(agentId));
@@ -715,7 +708,7 @@ export class TurnLifecycle {
         expectsReply: false,
         idempotencyKey: `auto-result:${turnId}:${messageId}`,
       })
-      .pipe(Effect.mapError((failure) => new TurnOperationFailed({ cause: failure.cause })));
+      .pipe(toTurnOperationFailed);
     const senderSnapshot = this.#conversation.snapshotToUpdate(agentId);
     if (senderSnapshot) {
       this.#mailboxSync.syncMailboxMessages(senderSnapshot);
@@ -830,9 +823,7 @@ export class TurnOperationFailed extends Schema.TaggedError<TurnOperationFailed>
   cause: Schema.Defect(),
 }) {}
 
-function turnStep<A>(run: () => A): Effect.Effect<A, TurnOperationFailed> {
-  return Effect.try({ try: run, catch: (cause) => new TurnOperationFailed({ cause }) });
-}
+const { sync: turnStep, rewrap: toTurnOperationFailed } = causeHelpers(TurnOperationFailed);
 
 /**
  * Whether running the turn again would repeat this item: a tool step, or answer text. Thinking and

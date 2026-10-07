@@ -1,5 +1,7 @@
 import { Button } from "@openbot/ui";
+import { createDigitRoll } from "@openbot/ui/digit-roll";
 import { useText } from "@openbot/ui/text";
+import { prefersReducedMotion } from "@openbot/ui/utils";
 import { createEffect, createMemo, createSignal, createStore, For, onSettled, Show } from "solid-js";
 import {
   type ChatDayRow,
@@ -12,6 +14,13 @@ import type { ChatVirtualizer } from "./createChatVirtualizer";
 
 /** How long the rail stays after the reader stops scrolling. */
 const IDLE_MS = 1_200;
+
+/**
+ * How long the rail's place takes to reach the opened section after a jump from the rail. A fixed
+ * length, not a decay: the place passes each section's start, and so moves the count, at the same
+ * moment as the head.
+ */
+const JUMP_MS = 450;
 
 /** A transcript of one or two days is short enough to find a place in without the rail. */
 const MIN_DAYS = 3;
@@ -130,13 +139,20 @@ export function createChatScrollRail(options: {
       text: { t, format },
     });
   });
-  // A loaded day opens at its first row. The part that is not loaded opens at the top and loads a page.
+  /*
+   * A loaded day opens at its first row, with a smooth scroll. The part that is not loaded opens at the
+   * top at once and loads a page: a page that loads above a smooth scroll moves its target.
+   */
   const onJump = (index: number) => {
     const section = sections()[index];
     if (!section) return;
     options.onJump();
-    options.virtualizer.scrollToIndex(section.row ?? 0);
-    if (section.row === undefined) options.onLoadOlder();
+    if (section.row === undefined) {
+      options.virtualizer.scrollToIndex(0);
+      options.onLoadOlder();
+      return;
+    }
+    options.virtualizer.scrollToIndex(section.row, { smooth: !prefersReducedMotion() });
   };
   return { ref: setScrollElement, props: { scrollElement, sections, onJump } };
 }
@@ -145,7 +161,8 @@ export function createChatScrollRail(options: {
  * Where the reader is in a long transcript. The scroll container shows no scroll bar, so this rail on
  * its right edge gives the length of the transcript and the reader's place in it.
  *
- * One segment per section, as long as the section, filling while the reader is in it. It comes in
+ * One segment per section, as long as the section, filling while the reader is in it. A jump from the
+ * rail eases the place there, so one fill runs through the days between. It comes in
  * while the reader scrolls and goes again when they stop. A pointer or keyboard focus opens it into
  * the section titles, and each title opens its section. A scroll that the app makes, such as following a
  * reply that streams in, does not bring it in.
@@ -168,12 +185,18 @@ export function ChatScrollRail(props: ChatScrollRailProps) {
   });
   const [scrolling, setScrolling] = createSignal(false);
   const [held, setHeld] = createSignal(false);
+  // Where the bar of the current section is in the list, for the reading head.
+  const [head, setHead] = createSignal({ top: 0, length: 0 });
 
   let nav: HTMLElement | undefined;
+  let track: HTMLElement | undefined;
   let list: HTMLOListElement | undefined;
   let frame = 0;
   let relayout = true;
   let idle: ReturnType<typeof setTimeout> | undefined;
+  // The place the rail draws, in the scroll content, and the jump that eases it from where it was.
+  let drawn: number | undefined;
+  let jump: { from: number; startedAt: number } | undefined;
   let update = () => {};
   /*
    * The section the reader opened from the rail, by its label. Near the end of a chat the jump stops at
@@ -195,6 +218,8 @@ export function ChatScrollRail(props: ChatScrollRailProps) {
     // A pointer over the rail of the previous chat left with it.
     setHeld(false);
     opened = undefined;
+    drawn = undefined;
+    jump = undefined;
     relayout = true;
     if (!element) return;
 
@@ -239,12 +264,29 @@ export function ChatScrollRail(props: ChatScrollRailProps) {
       const { starts, ends, lastScroll, height } = geometry;
       // The reader's place moves from the top of the viewport to its bottom over the whole scroll, so
       // the first section is empty at the top and the last one is full at the bottom.
-      const position = element.scrollTop + height * (element.scrollTop / Math.max(1, lastScroll));
+      const reading = element.scrollTop + height * (element.scrollTop / Math.max(1, lastScroll));
       const openedIndex = opened === undefined ? -1 : props.sections().findIndex((section) => section.label === opened);
+      // An opened section shows the place at the top of the viewport, kept inside the section: near the
+      // end of the chat the place above is past the section, and the jump opens the section at its start.
+      const target =
+        openedIndex >= 0
+          ? Math.min(Math.max(element.scrollTop, starts[openedIndex] ?? 0), ends[openedIndex] ?? reading)
+          : reading;
+      // A jump eases the place to the target, so one fill runs through the days between in order and
+      // the head and the count go with it. After it, the rail follows the scroll directly again.
+      let position = target;
+      if (jump) {
+        const progress = Math.min(1, (performance.now() - jump.startedAt) / JUMP_MS);
+        if (progress < 1) {
+          position = jump.from + (target - jump.from) * easeInOut(progress);
+          schedule(false);
+        } else jump = undefined;
+      }
+      drawn = position;
       setRail((state) => {
         state.fills = starts.map((start, index) => clamp((position - start) / Math.max(1, (ends[index] ?? 0) - start)));
         state.active =
-          openedIndex >= 0
+          openedIndex >= 0 && position === target
             ? openedIndex
             : Math.max(
                 0,
@@ -263,6 +305,7 @@ export function ChatScrollRail(props: ChatScrollRailProps) {
     // The reader scrolls on their own again, so their place decides the current section.
     const onInput = () => {
       opened = undefined;
+      jump = undefined;
       reveal();
     };
     // Every scroll moves the current day, also one the app makes: focus can open the rail at any time.
@@ -299,14 +342,17 @@ export function ChatScrollRail(props: ChatScrollRailProps) {
   createEffect(props.sections, () => schedule(true));
 
   // A list taller than the rail scrolls itself, not the transcript, to keep the current day in view.
+  // The reading head goes to the bar of the current day, which moves when the lengths change.
   createEffect(
-    () => rail.active,
-    (index) => {
+    () => ({ shown: rail.shown, index: rail.active, lengths: [...rail.lengths] }),
+    ({ index }) => {
       const item = list?.children[index];
-      if (!list || !(item instanceof HTMLElement) || list.scrollHeight <= list.clientHeight) return;
-      if (item.offsetTop < list.scrollTop) list.scrollTop = item.offsetTop;
-      else if (item.offsetTop + item.offsetHeight > list.scrollTop + list.clientHeight)
-        list.scrollTop = item.offsetTop + item.offsetHeight - list.clientHeight;
+      if (!track || !(item instanceof HTMLElement)) return;
+      setHead({ top: item.offsetTop, length: item.offsetHeight });
+      if (track.scrollHeight <= track.clientHeight) return;
+      if (item.offsetTop < track.scrollTop) track.scrollTop = item.offsetTop;
+      else if (item.offsetTop + item.offsetHeight > track.scrollTop + track.clientHeight)
+        track.scrollTop = item.offsetTop + item.offsetHeight - track.clientHeight;
     },
   );
 
@@ -316,6 +362,16 @@ export function ChatScrollRail(props: ChatScrollRailProps) {
   });
 
   const count = () => props.sections().length;
+  /*
+   * The number of the current section rolls to each new value: from below when the reader goes down
+   * the chat, from above when they go up. Only the digits that change roll.
+   */
+  const roll = createDigitRoll(() => rail.active + 1, { settleMs: 0, animate: () => !prefersReducedMotion() });
+  const position = createMemo<{ digits: string[]; previous: string; down: boolean }>((last) => {
+    const value = roll.displayed();
+    const previous = last ? last.digits.join("") : pad(value);
+    return { digits: pad(value).split(""), previous, down: !last || value >= Number(previous) };
+  });
   const state = (index: number) => {
     if (index === rail.active) return "active";
     return index < rail.active ? "read" : "unread";
@@ -345,46 +401,75 @@ export function ChatScrollRail(props: ChatScrollRailProps) {
           <p class="chat-scroll-rail-eyebrow" aria-hidden="true">
             <span>{t("chat.scrollRail.label")}</span>
             <span class="chat-scroll-rail-count">
-              {pad(rail.active + 1)} / {pad(count())}
+              <span ref={roll.ref} class="t-digit-group" style={{ "--digit-dir-y": position().down ? 1 : -1 }}>
+                <For each={position().digits} keyed={false}>
+                  {(digit, index) => (
+                    <span class={digit() === position().previous[index] ? undefined : "t-digit"}>{digit()}</span>
+                  )}
+                </For>
+              </span>
+              {" / "}
+              {pad(count())}
             </span>
           </p>
-          <ol
+          <div
             ref={(element) => {
-              list = element;
+              track = element;
             }}
-            class="chat-scroll-rail-list"
+            class="chat-scroll-rail-track"
           >
-            <For each={props.sections()} keyed={false}>
-              {(section, index) => (
-                <li
-                  class="chat-scroll-rail-item"
-                  data-state={state(index)}
-                  style={{
-                    "flex-grow": rail.lengths[index] ?? 1,
-                    "--chat-scroll-rail-fill": rail.fills[index] ?? 0,
-                    "--chat-scroll-rail-index": index,
-                  }}
-                >
-                  <Button
-                    variant="link"
-                    type="button"
-                    class="chat-scroll-rail-link"
-                    aria-current={index === rail.active ? "location" : undefined}
-                    onClick={() => {
-                      opened = section().label;
-                      schedule(false);
-                      props.onJump(index);
+            <ol
+              ref={(element) => {
+                list = element;
+              }}
+              class="chat-scroll-rail-list"
+            >
+              <For each={props.sections()} keyed={false}>
+                {(section, index) => (
+                  <li
+                    class="chat-scroll-rail-item"
+                    data-state={state(index)}
+                    style={{
+                      "flex-grow": rail.lengths[index] ?? 1,
+                      "--chat-scroll-rail-fill": rail.fills[index] ?? 0,
+                      "--chat-scroll-rail-index": index,
                     }}
                   >
-                    <span class="chat-scroll-rail-label">{section().label}</span>
-                    <span class="chat-scroll-rail-bar" aria-hidden="true">
-                      <span class="chat-scroll-rail-fill" />
-                    </span>
-                  </Button>
-                </li>
-              )}
-            </For>
-          </ol>
+                    <Button
+                      variant="link"
+                      type="button"
+                      class="chat-scroll-rail-link"
+                      aria-current={index === rail.active ? "location" : undefined}
+                      onClick={() => {
+                        opened = section().label;
+                        jump =
+                          drawn === undefined || prefersReducedMotion()
+                            ? undefined
+                            : { from: drawn, startedAt: performance.now() };
+                        schedule(false);
+                        props.onJump(index);
+                      }}
+                    >
+                      <span class="chat-scroll-rail-label">{section().label}</span>
+                      <span class="chat-scroll-rail-bar" aria-hidden="true">
+                        <span class="chat-scroll-rail-fill" />
+                      </span>
+                    </Button>
+                  </li>
+                )}
+              </For>
+            </ol>
+            {/* The reading head: where the reader is inside the current day. */}
+            <span
+              class="chat-scroll-rail-head"
+              aria-hidden="true"
+              style={{
+                "--chat-scroll-rail-head-top": `${head().top}px`,
+                "--chat-scroll-rail-head-length": `${head().length}px`,
+                "--chat-scroll-rail-fill": rail.fills[rail.active] ?? 0,
+              }}
+            />
+          </div>
         </nav>
       </div>
     </Show>
@@ -397,6 +482,10 @@ function editable(target: EventTarget | null): boolean {
   return (
     target instanceof HTMLElement && (target.isContentEditable || target.closest("input, textarea, select") !== null)
   );
+}
+
+function easeInOut(progress: number): number {
+  return progress < 0.5 ? 4 * progress ** 3 : 1 - (-2 * progress + 2) ** 3 / 2;
 }
 
 function clamp(value: number): number {

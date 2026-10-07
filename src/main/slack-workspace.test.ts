@@ -1,6 +1,6 @@
 // @vitest-environment node
 
-// End to end on the host half of the OpenBot Slack app: the real `SlackIngress` socket, the messaging
+// End to end on the host half of the OpenBot Slack app: the real `SignalIngress` socket, the messaging
 // core with its Events API transport, and `AgentService` with its SQLite database. Signal and Slack
 // are local fakes: Signal is a WebSocket server that speaks the `ingress` frames, and Slack is one
 // HTTP server. Signal's own route, with the signature check, is tested in
@@ -28,7 +28,7 @@ import {
 import { runCauseEffect } from "../backend/effect-boundary";
 import { type MessagingCredentials, MessagingService } from "../backend/messaging/messaging-service";
 import { slackDriver } from "../backend/messaging/slack/slack-driver";
-import { SlackIngress } from "./slack-ingress";
+import { SignalIngress } from "./signal-ingress";
 
 const REPORT_DIR = resolve(import.meta.dirname, "../../.openbot-build/slack-workspace-e2e");
 const BOT_TOKEN = "xoxb-9999-8888-openbotbottoken";
@@ -210,7 +210,7 @@ function mention(eventId: string, ts: string): DynamicRecord {
 let root = "";
 let service: AgentService | null = null;
 let messaging: MessagingService | null = null;
-let ingress: SlackIngress | null = null;
+let ingress: SignalIngress | null = null;
 let signal: FakeSignal;
 let slack: FakeSlack;
 
@@ -242,11 +242,12 @@ describe.sequential("OpenBot Slack app end to end", () => {
     const authorizations: Array<{ hostNonce: string; hostPublicKey: string }> = [];
     const unlinked: string[] = [];
     let routeTickets = 0;
-    ingress = new SlackIngress({
+    ingress = new SignalIngress({
       hostId: () => "host-1",
       signedIn: () => true,
       issueTicket: () => Effect.succeed({ ticket: "ticket-1", signalUrl: signal.url }),
       issueSlackRoute: () => Effect.sync(() => `route-${++routeTickets}`),
+      issueDiscordRoute: () => Effect.die(new Error("No Discord in this test.")),
     });
     messaging = new MessagingService({
       threads: started.service.messaging,
@@ -298,7 +299,7 @@ describe.sequential("OpenBot Slack app end to end", () => {
     };
     await connect();
     const connection = () => messaging?.slackOverview().connections[0];
-    const { agentId: orchestratorId } = await runCauseEffect(messaging.addOrchestrator({ workspaceId: "T1" }));
+    const { agentId: orchestratorId } = await runCauseEffect(messaging.addOrchestrator("slack", { workspaceId: "T1" }));
     await waitFor(() => connection()?.state === "connected");
     expect(connection()).toMatchObject({ workspaceId: "T1", workspaceName: "Test workspace", credentials: "saved" });
     // The socket told Signal its workspaces with a new route ticket after the connect.

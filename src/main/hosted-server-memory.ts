@@ -1,5 +1,6 @@
 import { readdir, readFile, readlink, writeFile } from "node:fs/promises";
 import { Deferred, Effect, Schema } from "effect";
+import { causeHelpers } from "../backend/effect-boundary";
 import type { HostMemory, HostMemoryLevel } from "../backend/host-memory";
 
 const SAMPLE_INTERVAL_MS = 5_000;
@@ -245,9 +246,7 @@ class HostMemoryFailure extends Schema.TaggedError<HostMemoryFailure>()("HostMem
   cause: Schema.Defect(),
 }) {}
 
-function memoryIO<A>(operation: () => Promise<A>): Effect.Effect<A, HostMemoryFailure> {
-  return Effect.tryPromise({ try: operation, catch: (cause) => new HostMemoryFailure({ cause }) });
-}
+const { io: memoryIO } = causeHelpers(HostMemoryFailure);
 
 function optionalMemoryIO<A>(operation: () => Promise<A>): Effect.Effect<A | null> {
   return memoryIO(operation).pipe(Effect.catch(() => Effect.succeed(null)));

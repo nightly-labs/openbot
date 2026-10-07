@@ -6,6 +6,7 @@ import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Schema, Semaphore } from "effect";
 import { parse as parseYaml } from "yaml";
+import { causeHelpers } from "../backend/effect-boundary";
 import { archiveDirectory, inspectArchive, normalizedFiles } from "./skill-package";
 
 /** Owns immutable local revisions. A revision exists only after its directory is published. */
@@ -214,9 +215,5 @@ const rejectLinks = Effect.fn("LocalSkill.rejectLinks")(function* (root: string,
 export class LocalSkillFailure extends Schema.TaggedError<LocalSkillFailure>()("LocalSkillFailure", {
   cause: Schema.Defect(),
 }) {}
-function localIO<A>(operation: () => Promise<A>): Effect.Effect<A, LocalSkillFailure> {
-  return Effect.tryPromise({ try: operation, catch: (cause) => new LocalSkillFailure({ cause }) });
-}
-function localSync<A>(operation: () => A): Effect.Effect<A, LocalSkillFailure> {
-  return Effect.try({ try: operation, catch: (cause) => new LocalSkillFailure({ cause }) });
-}
+
+const { io: localIO, sync: localSync } = causeHelpers(LocalSkillFailure);

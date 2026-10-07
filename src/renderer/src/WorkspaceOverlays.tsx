@@ -1,6 +1,7 @@
 import type { CentralAuthUser, ServerSummary } from "@openbot/contracts/ipc";
 import type { CustomAgentSettingsApi } from "@openbot/ui/features/custom-providers/CustomAgentSettings";
 import { providerDiagnosticsText } from "@openbot/ui/features/provider-diagnostics/provider-diagnostics";
+import type { BitwardenConnectorPanelProps } from "@openbot/ui/features/settings/BitwardenConnectorPanel";
 import type { HostedSiteDeleteResult } from "@openbot/ui/features/settings/stores/hosted-sites-store";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, Loading, Show } from "solid-js";
@@ -10,6 +11,8 @@ import { appPort } from "./app-port";
 import { useAuth } from "./features/account/account-context";
 import { resolveCreationModel } from "./features/agents/agent-creation-model";
 import { useAgents } from "./features/agents/agents-context";
+import { createBitwardenConnector } from "./features/connectors/bitwarden-connector";
+import { createDiscordConnector } from "./features/connectors/discord-connector";
 import { createGitHubConnector, type GitHubConnectorController } from "./features/connectors/github-connector";
 import {
   createOnePasswordConnector,
@@ -80,6 +83,8 @@ export function WorkspaceOverlays(props: AccountProps) {
     server?.kind === "local" && github.status().available ? github : undefined;
   /* The 1Password connection of this computer. The browser that fills its logins runs here too. */
   const onePassword = createOnePasswordConnector();
+  const bitwarden = createBitwardenConnector();
+  const bitwardenFor = (server: ServerSummary | undefined) => (server?.kind === "local" ? bitwarden : undefined);
   const onePasswordFor = (server: ServerSummary | undefined) => (server?.kind === "local" ? onePassword : undefined);
   /* The overlays mount with the app. A first read that failed then must not hide GitHub for good, and
      the sign-in can change outside this window, so each window reads the status again when it opens. */
@@ -95,6 +100,7 @@ export function WorkspaceOverlays(props: AccountProps) {
       <SkillsMarketplace
         githubConnector={githubFor(activeServer())}
         onePasswordConnector={onePasswordFor(activeServer())}
+        bitwardenConnector={bitwardenFor(activeServer())}
       />
       <SharedAgentInstall />
       <JoinServer account={props.account} />
@@ -102,6 +108,7 @@ export function WorkspaceOverlays(props: AccountProps) {
       <ServerSettings
         githubConnector={githubFor(serverSettingsTarget())}
         onePasswordConnector={onePasswordFor(serverSettingsTarget())}
+        bitwardenConnector={bitwardenFor(serverSettingsTarget())}
       />
       <AppSettings account={props.account} />
       <GlobalMessageSearch />
@@ -150,6 +157,7 @@ function PermissionsReview(props: AccountProps) {
 function SkillsMarketplace(props: {
   githubConnector: GitHubConnectorController | undefined;
   onePasswordConnector: OnePasswordConnectorController | undefined;
+  bitwardenConnector: BitwardenConnectorPanelProps | undefined;
 }) {
   const {
     skillsMarketplaceOpen,
@@ -182,6 +190,7 @@ function SkillsMarketplace(props: {
       }}
       githubConnector={props.githubConnector}
       onePasswordConnector={props.onePasswordConnector}
+      bitwardenConnector={props.bitwardenConnector}
     />
   );
 }
@@ -259,6 +268,7 @@ function AddServer() {
 function ServerSettings(props: {
   githubConnector: GitHubConnectorController | undefined;
   onePasswordConnector: OnePasswordConnectorController | undefined;
+  bitwardenConnector: BitwardenConnectorPanelProps | undefined;
 }) {
   const platform = usePlatform();
   const { hostStatus, setServerMuted, setServerNotificationLevel, activeServer } = useServers();
@@ -343,28 +353,27 @@ function ServerSettings(props: {
     setMcpServerEnabled,
     testMcpServer,
   } = useServerSettings();
-  // The Slack Orchestrator runs on this computer, so its picker lists this computer's models: none
-  // while a joined server is on screen, and then it starts on a new agent's default.
+  // The Slack and Discord Orchestrators run on this computer, so their picker lists this computer's
+  // models: none while a joined server is on screen, and then it starts on a new agent's default.
   const { collapseSidebarSection } = useSidebar();
-  const slack = createSlackConnector(
-    undefined,
-    () => {
-      const options = modelOptions();
-      if (activeServer()?.kind !== "local" || options.length === 0) return undefined;
-      return {
-        modelOptions: options,
-        agentStatus: agentStatus(),
-        initial: resolveCreationModel(serverSetupChoice() ?? setupState(), options),
-        customProviders: localEndpoints.customProviders(),
-        customAgents: localAgents.customAgents(),
-      };
-    },
-    // The Integrations section starts collapsed: the orchestrator is not an agent people chat with
-    // every day. The collapse belongs to the local server, the one on screen when Slack connects.
-    (sectionId) => {
-      if (activeServer()?.kind === "local") collapseSidebarSection(sectionId);
-    },
-  );
+  const orchestratorModels = () => {
+    const options = modelOptions();
+    if (activeServer()?.kind !== "local" || options.length === 0) return undefined;
+    return {
+      modelOptions: options,
+      agentStatus: agentStatus(),
+      initial: resolveCreationModel(serverSetupChoice() ?? setupState(), options),
+      customProviders: localEndpoints.customProviders(),
+      customAgents: localAgents.customAgents(),
+    };
+  };
+  // The Integrations section starts collapsed: the orchestrator is not an agent people chat with
+  // every day. The collapse belongs to the local server, the one on screen when Slack or Discord connects.
+  const collapseOrchestratorSection = (sectionId: string) => {
+    if (activeServer()?.kind === "local") collapseSidebarSection(sectionId);
+  };
+  const slack = createSlackConnector(undefined, orchestratorModels, collapseOrchestratorSection);
+  const discord = createDiscordConnector(undefined, orchestratorModels, collapseOrchestratorSection);
   // The workspace belongs to the selected server. For another server, the switch comes first and
   // the agent is published for the scope it lands in; a message there opens as its agent's chat.
   const openOnServer = (server: ServerSummary, agentId: string, open: () => void) => {
@@ -546,10 +555,18 @@ function ServerSettings(props: {
           }
           githubConnector={props.githubConnector}
           onePasswordConnector={props.onePasswordConnector}
-          // Slack is connected on the computer that runs the agents: Slack opens this computer's browser
-          // and returns to its `openbot://` link.
+          bitwardenConnector={props.bitwardenConnector}
+          // Slack and Discord are connected on the computer that runs the agents: they open this
+          // computer's browser and return to its `openbot://` link.
           slackConnector={server().kind === "local" ? slack : undefined}
+          discordConnector={server().kind === "local" ? discord : undefined}
           connectorAgents={agentList()}
+          // The feed listens on this computer, so a calendar app on another one cannot read it.
+          routineFeed={
+            server().kind === "local"
+              ? { api: appPort().routineFeed, listAgents: () => appPort().agent.listAgents(server().id) }
+              : undefined
+          }
         />
       )}
     </Show>

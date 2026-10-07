@@ -4,6 +4,7 @@ import {
   type AgentStatus,
   type AgentSummary,
   type AttachmentImportEvent,
+  type BridgedDesktopApi,
   type BrowserLiveViewEvent,
   type BrowserPictureInPictureEvent,
   type BrowserTab,
@@ -18,7 +19,10 @@ import {
   type GroupApi,
   groupApiMethodName,
   IPC_ENDPOINTS,
-  type IpcEndpointGroup,
+  IPC_GROUP_PATHS,
+  type IpcEndpoint,
+  type IpcEndpoints,
+  type IpcGroupName,
   type OpenBotDesktopApi,
   type QueueDelivery,
   type ScopedAgentEvent,
@@ -467,33 +471,59 @@ type StubMethod = (...args: never[]) => unknown;
 /**
  * A group the preload builds whole with `bridgeGroup`, built here the same way from `IPC_ENDPOINTS`,
  * so a new endpoint in it needs no line in this file. A request the test does not give is
- * `notStubbed`, and an event it does not give is a subscription that never fires. `path` is the
- * group's property on `window.openbot`, or null for a group spread into the top level.
+ * `notStubbed`, and an event it does not give is a subscription that never fires.
  *
  * The typed signature is an overload for the reason `bridgeGroup` gives in the preload.
  */
-function stubGroup<Group extends IpcEndpointGroup>(
-  group: Group,
-  path: string | null,
-  stubbed: NoInfer<Partial<GroupApi<Group>>>,
-): GroupApi<Group>;
-function stubGroup(
-  group: IpcEndpointGroup,
-  path: string | null,
+function stubGroup<Name extends IpcGroupName>(
+  name: Name,
+  stubbed: NoInfer<Partial<GroupApi<IpcEndpoints[Name]>>>,
+): GroupApi<IpcEndpoints[Name]>;
+function stubGroup(name: IpcGroupName, stubbed: Readonly<Record<string, StubMethod | undefined>>): object {
+  return stubMethods(name, stubbed);
+}
+
+function stubMethods(
+  name: IpcGroupName,
   stubbed: Readonly<Record<string, StubMethod | undefined>>,
-): object {
+): Record<string, StubMethod> {
+  const path = IPC_GROUP_PATHS[name];
   const api: Record<string, StubMethod> = {};
-  for (const [key, endpoint] of Object.entries(group)) {
-    const name = groupApiMethodName(key, endpoint);
-    const given = stubbed[name];
-    if (given !== undefined) api[name] = given;
-    else if (endpoint.kind === "event") api[name] = vi.fn(() => () => undefined);
-    else api[name] = notStubbed(path === null ? name : `${path}.${name}`);
+  for (const [key, endpoint] of Object.entries<IpcEndpoint>(IPC_ENDPOINTS[name])) {
+    const method = groupApiMethodName(key, endpoint);
+    const given = stubbed[method];
+    if (given !== undefined) api[method] = given;
+    else if (endpoint.kind === "event") api[method] = vi.fn(() => () => undefined);
+    else api[method] = notStubbed(path ? `${path}.${method}` : method);
   }
-  for (const name of Object.keys(stubbed)) {
-    if (!Object.hasOwn(api, name)) throw new Error(`window.openbot${path === null ? "" : `.${path}`} has no ${name}`);
+  for (const method of Object.keys(stubbed)) {
+    if (!Object.hasOwn(api, method)) throw new Error(`window.openbot${path ? `.${path}` : ""} has no ${method}`);
   }
   return api;
+}
+
+/**
+ * Every group at its `IPC_GROUP_PATHS` place with nothing stubbed, except the paths in `absent`, so a
+ * new group needs no line in this file. `installOpenbotStub` replaces the groups that tests reach.
+ */
+function unstubbedGroups<Absent extends string>(absent: readonly Absent[]): Omit<BridgedDesktopApi, Absent>;
+function unstubbedGroups(absent: readonly string[]): object {
+  const paths: Readonly<Record<string, string | null>> = IPC_GROUP_PATHS;
+  const root: Record<string, StubMethod | Record<string, StubMethod>> = {};
+  const nested = new Map<string, Record<string, StubMethod>>();
+  for (const name of Object.keys(IPC_ENDPOINTS)) {
+    const path = paths[name];
+    if (path === null || path === undefined || absent.includes(path) || !isGroupName(name)) continue;
+    const methods = stubMethods(name, {});
+    if (path === "") Object.assign(root, methods);
+    else nested.set(path, { ...nested.get(path), ...methods });
+  }
+  for (const [path, methods] of nested) root[path] = methods;
+  return root;
+}
+
+function isGroupName(name: string): name is IpcGroupName {
+  return Object.hasOwn(IPC_ENDPOINTS, name);
 }
 
 export function installOpenbotStub(): void {
@@ -518,7 +548,10 @@ export function installOpenbotStub(): void {
     value: { getUserMedia: vi.fn().mockRejectedValue(new DOMException("Denied", "NotAllowedError")) },
   });
   const stub = {
-    ...stubGroup(IPC_ENDPOINTS.app, null, {
+    // `providerRuntimes` stays out: the renderer shows the sign-in and Refresh flow when it is
+    // absent, and these tests cover that flow. A stub member switches every screen to downloads.
+    ...unstubbedGroups(["providerRuntimes"]),
+    ...stubGroup("app", {
       getAppInfo: vi.fn().mockResolvedValue({
         name: "OpenBot",
         version: "0.1.0",
@@ -543,7 +576,7 @@ export function installOpenbotStub(): void {
       openExternal: vi.fn().mockResolvedValue(undefined),
       openUrl: vi.fn().mockResolvedValue(undefined),
     }),
-    ...stubGroup(IPC_ENDPOINTS.providers, null, {
+    ...stubGroup("providers", {
       // One channel, so the mock has to answer for whichever provider the caller names:
       // each response marks that provider connecting and reports its own CLI version.
       connectProvider: vi.fn(async (provider: AgentProviderId) => CONNECTING_STATUS[provider]),
@@ -581,7 +614,7 @@ export function installOpenbotStub(): void {
       })),
       cancelProviderCodeLogin: vi.fn(async (provider: AgentProviderId) => CONNECTING_STATUS[provider]),
     }),
-    dynamicIsland: stubGroup(IPC_ENDPOINTS.dynamicIsland, "dynamicIsland", {
+    dynamicIsland: stubGroup("dynamicIsland", {
       getPreference: vi.fn().mockResolvedValue({
         enabled: true,
         hapticsEnabled: true,
@@ -599,39 +632,37 @@ export function installOpenbotStub(): void {
       onAction: vi.fn(dynamicIslandActionBridge.subscribe),
       setInteractive: vi.fn().mockResolvedValue(undefined),
     }),
-    computerUse: stubGroup(IPC_ENDPOINTS.computerUse, "computerUse", {
+    computerUse: stubGroup("computerUse", {
       getState: vi.fn().mockResolvedValue(COMPUTER_USE_STATE),
       openPermissionPane: vi.fn().mockResolvedValue(COMPUTER_USE_STATE),
     }),
-    skills: stubGroup(IPC_ENDPOINTS.skills, "skills", {
+    skills: stubGroup("skills", {
       localList: vi.fn().mockResolvedValue([]),
       list: vi.fn().mockResolvedValue({ skills: [], nextCursor: null }),
       listInstalled: vi.fn().mockResolvedValue([]),
     }),
-    hostedSites: stubGroup(IPC_ENDPOINTS.hostedSites, "hostedSites", {}),
-    githubConnector: stubGroup(IPC_ENDPOINTS.githubConnector, "githubConnector", {
+    githubConnector: stubGroup("githubConnector", {
       status: vi.fn().mockResolvedValue(DISCONNECTED_GITHUB_CONNECTOR),
       repositories: vi.fn().mockResolvedValue({ repositories: [], total: 0 }),
     }),
-    onePasswordConnector: stubGroup(IPC_ENDPOINTS.onePasswordConnector, "onePasswordConnector", {
+    bitwardenConnector: stubGroup("bitwardenConnector", { status: vi.fn().mockResolvedValue({ connected: false }) }),
+    onePasswordConnector: stubGroup("onePasswordConnector", {
       status: vi.fn().mockResolvedValue(DISCONNECTED_ONEPASSWORD_CONNECTOR),
     }),
-    billing: stubGroup(IPC_ENDPOINTS.billing, "billing", {}),
-    hostedServers: stubGroup(IPC_ENDPOINTS.hostedServers, "hostedServers", {
+    hostedServers: stubGroup("hostedServers", {
       list: vi.fn().mockResolvedValue({ available: false, servers: [], maxServers: null }),
     }),
-    marketplaceAgents: stubGroup(IPC_ENDPOINTS.marketplaceAgents, "marketplaceAgents", {}),
-    agentTemplates: stubGroup(IPC_ENDPOINTS.agentTemplates, "agentTemplates", {
+    agentTemplates: stubGroup("agentTemplates", {
       takePendingLink: vi.fn().mockResolvedValue(null),
     }),
     // No renderer test reaches routine flows yet; a request rejects as not stubbed.
-    routineFlows: stubGroup(IPC_ENDPOINTS.routineFlows, "routineFlows", {}),
-    voice: stubGroup(IPC_ENDPOINTS.voice, "voice", {
+    routineFlows: stubGroup("routineFlows", {}),
+    voice: stubGroup("voice", {
       getModelStatus: vi.fn().mockResolvedValue({ phase: "ready", progress: 100, message: null }),
       prepareModel: vi.fn().mockResolvedValue({ phase: "ready", progress: 100, message: null }),
       transcribe: vi.fn().mockResolvedValue({ text: "Voice transcript" }),
     }),
-    auth: stubGroup(IPC_ENDPOINTS.auth, "auth", {
+    auth: stubGroup("auth", {
       getState: vi.fn().mockResolvedValue({
         status: "signed_in",
         user: { id: "user-1", email: "person@example.com", name: null, avatarUrl: null },
@@ -896,6 +927,8 @@ export function installOpenbotStub(): void {
         previewKind: "markdown",
         bytes: new TextEncoder().encode("# Preview"),
       }),
+      // A path a test previews is a file, so it is not a folder either.
+      listWorkspaceDirectory: vi.fn().mockRejectedValue(new Error("Workspace path is not a folder.")),
       sendMessage: vi.fn().mockResolvedValue({
         messageId: "message-1",
         deliveries: [{ id: "delivery-1", recipientAgentId: "chief", status: "queued", position: 1 }],
@@ -945,7 +978,7 @@ export function installOpenbotStub(): void {
       hidePictureInPicture: vi.fn().mockResolvedValue(undefined),
       onPictureInPictureEvent: vi.fn(browserPictureInPictureBridge.subscribe),
     },
-    update: stubGroup(IPC_ENDPOINTS.update, "update", {
+    update: stubGroup("update", {
       getStatus: vi.fn().mockResolvedValue({
         phase: "idle",
         currentVersion: "0.1.0",
@@ -980,13 +1013,13 @@ export function installOpenbotStub(): void {
       })),
       onEvent: vi.fn(updateStatusBridge.subscribe),
     }),
-    notifications: stubGroup(IPC_ENDPOINTS.notifications, "notifications", {
+    notifications: stubGroup("notifications", {
       getPreference: vi.fn().mockResolvedValue({ desktopNotifications: true }),
       setPreference: vi.fn(async (input) => input),
       test: vi.fn().mockResolvedValue(undefined),
       openSettings: vi.fn().mockResolvedValue(undefined),
     }),
-    maintenance: stubGroup(IPC_ENDPOINTS.maintenance, "maintenance", {
+    maintenance: stubGroup("maintenance", {
       exportData: vi.fn().mockResolvedValue({ saved: true }),
       exportDiagnostics: vi.fn().mockResolvedValue({ saved: true }),
     }),
@@ -1111,11 +1144,11 @@ export function installOpenbotStub(): void {
       onEvent: vi.fn(serversBridge.subscribe),
       onInvite: vi.fn(inviteBridge.subscribe),
     },
-    plugins: stubGroup(IPC_ENDPOINTS.plugins, "plugins", {
+    plugins: stubGroup("plugins", {
       takePendingListing: vi.fn().mockResolvedValue(null),
       onOpenListing: vi.fn(pluginListingBridge.subscribe),
     }),
-    host: stubGroup(IPC_ENDPOINTS.host, "host", {
+    host: stubGroup("host", {
       getStatus: vi.fn().mockResolvedValue({
         phase: "unconfigured",
         configured: false,
@@ -1147,7 +1180,7 @@ export function installOpenbotStub(): void {
       revokeInvite: vi.fn().mockResolvedValue(undefined),
       createInvite: vi.fn().mockResolvedValue(undefined),
     }),
-    remoteDesktop: stubGroup(IPC_ENDPOINTS.remoteDesktop, "remoteDesktop", {
+    remoteDesktop: stubGroup("remoteDesktop", {
       list: vi.fn().mockResolvedValue([]),
       connect: vi.fn().mockResolvedValue(undefined),
       selectDisplay: vi.fn().mockResolvedValue(undefined),
@@ -1160,27 +1193,21 @@ export function installOpenbotStub(): void {
       openFile: vi.fn().mockResolvedValue(undefined),
       openLocation: vi.fn().mockResolvedValue(undefined),
     },
-    agentImport: stubGroup(IPC_ENDPOINTS.agentImport, "agentImport", {}),
     // The custom providers context lists on mount, so every harnessed mount reaches this group.
-    customProviders: stubGroup(IPC_ENDPOINTS.customProviders, "customProviders", {
+    customProviders: stubGroup("customProviders", {
       list: vi.fn().mockResolvedValue([]),
       save: vi.fn().mockResolvedValue({ providers: [], restart: "not-running" }),
       delete: vi.fn().mockResolvedValue({ providers: [], restart: "not-running" }),
     }),
-    customAgents: stubGroup(IPC_ENDPOINTS.customAgents, "customAgents", {
+    customAgents: stubGroup("customAgents", {
       list: vi.fn().mockResolvedValue([]),
     }),
     // Onboarding and the Providers section of Server settings scan on their own, so a scan finds nothing by default.
-    providerDetection: stubGroup(IPC_ENDPOINTS.providerDetection, "providerDetection", {
+    providerDetection: stubGroup("providerDetection", {
       getSettings: vi.fn().mockResolvedValue({ enabled: true, addresses: [], folders: [], hiddenIds: [] }),
       scanModelServers: vi.fn().mockResolvedValue([]),
       scanAgents: vi.fn().mockResolvedValue([]),
     }),
-    providerAdmin: stubGroup(IPC_ENDPOINTS.providerAdmin, "providerAdmin", {}),
-    hostAdmin: stubGroup(IPC_ENDPOINTS.hostAdmin, "hostAdmin", {}),
-    messaging: stubGroup(IPC_ENDPOINTS.messaging, "messaging", {}),
-    // `providerRuntimes` stays out: the renderer shows the sign-in and Refresh flow when it is
-    // absent, and these tests cover that flow. A stub member switches every screen to downloads.
   } satisfies Omit<OpenBotDesktopApi, "providerRuntimes">;
   Object.defineProperty(window, "openbot", { configurable: true, writable: true, value: stub });
 }

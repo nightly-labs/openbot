@@ -420,7 +420,7 @@ export function createServerGeneralSection(
               <Show
                 when={address()}
                 fallback={
-                  <Badge tone="neutral" size="md" shape="pill">
+                  <Badge variant="secondary" size="md" shape="pill">
                     {t("server.settings.private")}
                   </Badge>
                 }

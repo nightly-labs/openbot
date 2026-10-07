@@ -74,7 +74,8 @@ class FakeSlack {
         ? JSON.stringify({ type: "event_callback", api_app_id: this.appId, event_id: randomUUID(), ...payload })
         : new URLSearchParams({ payload: JSON.stringify(payload) }).toString();
     const answer = await runCauseEffect(
-      messaging?.deliverSlack("T1", {
+      messaging?.deliver("T1", {
+        platform: "slack",
         kind: type === "events_api" ? "events" : "interactivity",
         retryNum: null,
         body: Buffer.from(body),
@@ -202,6 +203,8 @@ const onlineIngress: MessagingIngress = {
   onState: () => () => undefined,
   handle: () => undefined,
   reconnect: () => undefined,
+  discord: () => Effect.die(new Error("No Discord in this test.")),
+  onDiscordRoutes: () => () => undefined,
 };
 
 class MemoryCredentials implements MessagingCredentials {
@@ -439,7 +442,7 @@ describe.sequential("Slack messaging end to end", () => {
   it("stops on a token Slack no longer accepts, and keeps the workspace when an agent is deleted", async () => {
     const { agent, credentials } = await connected();
     slack.rejectBotToken = true;
-    await runCauseEffect(messaging?.reconnect("T1") ?? Effect.succeed(undefined));
+    await runCauseEffect(messaging?.reconnect("slack", "T1") ?? Effect.succeed(undefined));
     await waitFor(() => workspace()?.state === "invalid_token");
     slack.rejectBotToken = false;
 
@@ -458,10 +461,13 @@ describe.sequential("Slack messaging end to end", () => {
     expect(turnStarts(client)).toEqual([]);
 
     // The orchestrator is a new agent with its remit and the facts it starts with.
-    const added = await runCauseEffect(messaging?.addOrchestrator({ workspaceId: "T1" }) ?? Effect.succeed(undefined));
+    const added = await runCauseEffect(
+      messaging?.addOrchestrator("slack", { workspaceId: "T1" }) ?? Effect.succeed(undefined),
+    );
     const orchestratorId = added?.agentId ?? "";
     expect(
-      (await runCauseEffect(messaging?.addOrchestrator({ workspaceId: "T1" }) ?? Effect.succeed(undefined)))?.agentId,
+      (await runCauseEffect(messaging?.addOrchestrator("slack", { workspaceId: "T1" }) ?? Effect.succeed(undefined)))
+        ?.agentId,
     ).toBe(orchestratorId);
     // It sits in the sidebar's Integrations section, which the screen shows collapsed.
     const layout = sidebar?.getSnapshot();

@@ -4,9 +4,10 @@
 
 import { COMPARISONS } from "../content/compare";
 import { OPENBOT_PLANS } from "../content/compare/comparison";
+import { PROVIDER_PAGES } from "../content/providers";
 import { CHANGELOG_DESCRIPTION, changelogUrl } from "../lib/changelog";
 import { CONTENT_COLLECTIONS } from "../lib/content";
-import { articleUrl, collectionIndexUrl } from "../lib/content-collection";
+import { articleUrl, type CollectionId, collectionIndexUrl } from "../lib/content-collection";
 import {
   OPENBOT_ALTERNATE_DOWNLOAD_LINKS,
   OPENBOT_DOWNLOAD_LINKS,
@@ -16,6 +17,13 @@ import {
 import { PLUGINS_DESCRIPTION, pluginIndexUrl } from "../lib/plugins";
 import { OPENBOT_SITE_DESCRIPTION, OPENBOT_SITE_URL } from "../lib/site-metadata";
 import { FEED_CACHE_CONTROL } from "./content-feed";
+
+/** The one-sentence answer of a page drawn from data. A prose article has none, and uses its description. */
+function referenceAnswer(collection: CollectionId, slug: string): string | undefined {
+  if (collection === "compare") return COMPARISONS[slug]?.answer;
+  if (collection === "providers") return PROVIDER_PAGES[slug]?.answer;
+  return undefined;
+}
 
 function absolute(path: string): string {
   return new URL(path, OPENBOT_SITE_URL).href;
@@ -27,7 +35,9 @@ function llmsTxt(): string {
     "",
     `> ${OPENBOT_SITE_DESCRIPTION}`,
     "",
-    "OpenBot is a desktop app for macOS, Windows and Linux. Each agent has its own workspace, thread and history, and keeps them when you change its provider or restart the app. Agents can give work to other agents. Chats, files and workspaces stay on your computer; OpenBot has no server that holds them. The app is free for noncommercial use, and it works with no account. iPhone and Android apps connect to OpenBot on your own computer.",
+    "OpenBot is a desktop app for macOS, Windows and Linux. Each agent has its own workspace, thread and history, and keeps them when you change its provider or restart the app. Agents can give work to other agents. Chats, files and workspaces stay on your computer; OpenBot has no server that holds them. The app is free for noncommercial use. iPhone and Android apps connect to OpenBot on your own computer.",
+    "",
+    `Each article below also has its text as Markdown, at its URL with \`.md\` added. [llms-full.txt](${absolute("/llms-full.txt")}) holds all of them in one file.`,
     "",
     "## Models and plans",
     "",
@@ -56,7 +66,7 @@ function llmsTxt(): string {
       "",
     );
     for (const article of collection.articles) {
-      const answer = collection.id === "compare" ? COMPARISONS[article.slug]?.answer : undefined;
+      const answer = referenceAnswer(collection.id, article.slug);
       lines.push(`- [${article.title}](${articleUrl(collection, article.slug)}): ${answer ?? article.description}`);
     }
     lines.push("");

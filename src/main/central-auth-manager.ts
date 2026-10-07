@@ -443,16 +443,24 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     return machineToken ? { hostId, machineToken } : null;
   }
 
+  readonly #hostMachineToken = Effect.fn("CentralAuth.hostMachineToken")(function* (
+    this: CentralAuthManager,
+    hostId: string,
+  ): Effect.fn.Return<string, CentralAuthOperationError> {
+    const machineToken = this.#teamHostTokens.get(hostId.toLowerCase());
+    if (!machineToken)
+      return yield* new CentralAuthOperationError({
+        cause: new Error(sourceText("error.auth.hostCredentialUnavailable")),
+      });
+    return machineToken;
+  });
+
   readonly issueRemoteHostTicket = Effect.fn("CentralAuth.issueRemoteHostTicket")(
     function* (
       this: CentralAuthManager,
       hostId: string,
     ): Effect.fn.Return<RemoteConnectionBootstrap, CentralAuthOperationError, CentralAuthTransport> {
-      const machineToken = this.#teamHostTokens.get(hostId.toLowerCase());
-      if (!machineToken)
-        return yield* new CentralAuthOperationError({
-          cause: new Error(sourceText("error.auth.hostCredentialUnavailable")),
-        });
+      const machineToken = yield* this.#hostMachineToken(hostId);
       return yield* this.#requestEffect(
         `/v2/remote/hosts/${encodeURIComponent(hostId)}/ticket`,
         { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ machineToken }) },
@@ -472,11 +480,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       this: CentralAuthManager,
       hostId: string,
     ): Effect.fn.Return<string, CentralAuthOperationError, CentralAuthTransport> {
-      const machineToken = this.#teamHostTokens.get(hostId.toLowerCase());
-      if (!machineToken)
-        return yield* new CentralAuthOperationError({
-          cause: new Error(sourceText("error.auth.hostCredentialUnavailable")),
-        });
+      const machineToken = yield* this.#hostMachineToken(hostId);
       return yield* this.#requestEffect(
         `/v2/remote/hosts/${encodeURIComponent(hostId)}/slack-route`,
         { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ machineToken }) },
@@ -494,17 +498,55 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       hostId: string,
       teamId: string,
     ): Effect.fn.Return<void, CentralAuthOperationError, CentralAuthTransport> {
-      const machineToken = this.#teamHostTokens.get(hostId.toLowerCase());
-      if (!machineToken)
-        return yield* new CentralAuthOperationError({
-          cause: new Error(sourceText("error.auth.hostCredentialUnavailable")),
-        });
+      const machineToken = yield* this.#hostMachineToken(hostId);
       yield* this.#requestEffect(
         `/v2/remote/hosts/${encodeURIComponent(hostId)}/slack-disconnect`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ machineToken, teamId }),
+        },
+        () => undefined,
+      );
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  /**
+   * The Discord route ticket of this host: the guilds that the account service links to it, which
+   * Signal routes to its `ingress` socket.
+   */
+
+  readonly issueDiscordRoute = Effect.fn("CentralAuth.issueDiscordRoute")(
+    function* (
+      this: CentralAuthManager,
+      hostId: string,
+    ): Effect.fn.Return<string, CentralAuthOperationError, CentralAuthTransport> {
+      const machineToken = yield* this.#hostMachineToken(hostId);
+      return yield* this.#requestEffect(
+        `/v2/remote/hosts/${encodeURIComponent(hostId)}/discord-route`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ machineToken }) },
+        (value) => requiredString(decodeRecord(value, "Discord route"), "ticket"),
+      );
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  /** Unlinks a Discord guild from this host, so Signal stops routing its events here. */
+
+  readonly unlinkDiscordGuild = Effect.fn("CentralAuth.unlinkDiscordGuild")(
+    function* (
+      this: CentralAuthManager,
+      hostId: string,
+      guildId: string,
+    ): Effect.fn.Return<void, CentralAuthOperationError, CentralAuthTransport> {
+      const machineToken = yield* this.#hostMachineToken(hostId);
+      yield* this.#requestEffect(
+        `/v2/remote/hosts/${encodeURIComponent(hostId)}/discord-disconnect`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ machineToken, guildId }),
         },
         () => undefined,
       );
@@ -524,11 +566,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       hostId: string,
       push: LiveActivityRelayPush,
     ): Effect.fn.Return<"sent" | "gone", CentralAuthOperationError, CentralAuthTransport> {
-      const machineToken = this.#teamHostTokens.get(hostId.toLowerCase());
-      if (!machineToken)
-        return yield* new CentralAuthOperationError({
-          cause: new Error(sourceText("error.auth.hostCredentialUnavailable")),
-        });
+      const machineToken = yield* this.#hostMachineToken(hostId);
       return yield* Effect.gen({ self: this }, function* (): Effect.fn.Return<
         "sent" | "gone",
         CentralAuthOperationError,

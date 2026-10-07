@@ -12,12 +12,12 @@ const MANUS_HELP = "https://help.manus.im/en/articles";
 export const MANUS_COMPARISON: Comparison = {
   rival: { name: "Manus", mark: "manus" },
   answer:
-    "Choose OpenBot if you want your agents on your own computer, with the AI plans you already pay for, such as ChatGPT, Claude, Gemini or Grok: the app is free and needs no account. Choose Manus if you want a general agent that works in its own cloud computer, keeps working with no computer of yours on, and chooses the model for you.",
+    "Choose OpenBot if you want your agents on your own computer, with the AI plans you already pay for, such as ChatGPT, Claude, Gemini or Grok: the app is free. Choose Manus if you want a general agent that works in its own cloud computer, keeps working with no computer of yours on, and chooses the model for you.",
   chooseOpenBot: [
     "You already pay for ChatGPT, Claude, Gemini, Grok or Cursor, or you run your own model.",
     "Your files and chats must stay on your own computer, not in a cloud in the US or Singapore.",
     "You want a team of coding agents that give work to each other, each with its own job.",
-    "You want a desktop app for Linux, or a free app that works without an account.",
+    "You want a desktop app for Linux, or a free app.",
   ],
   rivalPlans:
     "Manus chooses the model for each task; you choose only between Manus 2.0 Lite, Manus 2.0 and Manus 2.0 Max. You pay Manus in credits: 300 free credits a day, or Pro plans from $20 a month.",
@@ -81,7 +81,7 @@ export const MANUS_COMPARISON: Comparison = {
       icon: "tag",
       topic: "Price and account",
       openbot:
-        "Free for noncommercial use; commercial use needs a license. No account is necessary on one computer. Your agents use the plans you already pay for.",
+        "Free for noncommercial use; commercial use needs a license. Your agents use the plans you already pay for.",
       rival:
         "Free with 300 credits a day. Pro plans from $20 to $200 a month, and the Team plan from $20 a seat. Needs an account, and is for people aged 18 or more.",
       better: "openbot",
@@ -159,7 +159,7 @@ export const MANUS_COMPARISON: Comparison = {
     {
       question: "Why choose OpenBot over Manus?",
       answer:
-        "Your agents use the AI plans you already pay for, such as ChatGPT, Claude, Gemini or Grok, or your own model. OpenBot keeps your workspaces, chats and files on your own computer, it runs a team of coding agents, and it has desktop apps for macOS, Windows and Linux. The app is free, works without an account, and its source code is on GitHub. Manus is the better fit when you want an agent with no computer of yours to keep on.",
+        "Your agents use the AI plans you already pay for, such as ChatGPT, Claude, Gemini or Grok, or your own model. OpenBot keeps your workspaces, chats and files on your own computer, it runs a team of coding agents, and it has desktop apps for macOS, Windows and Linux. The app is free, and its source code is on GitHub. Manus is the better fit when you want an agent with no computer of yours to keep on.",
     },
     {
       question: "Can I use my ChatGPT, Claude or Gemini subscription with OpenBot?",

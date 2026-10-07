@@ -61,8 +61,10 @@ class PeerConnection {
   ondatachannel: ((event: { channel: DataChannel }) => void) | null = null;
   onicecandidate: (() => void) | null = null;
   onconnectionstatechange: (() => void) | null = null;
+  connectionState = "new";
   readonly close = vi.fn();
   readonly setConfiguration = vi.fn();
+  readonly restartIce = vi.fn();
   constructor() {
     PeerConnection.instances.push(this);
   }
@@ -74,6 +76,12 @@ class PeerConnection {
   }
   async createAnswer() {
     return { type: "answer", sdp: "a=fingerprint:sha-256 HOST" };
+  }
+  async createOffer() {
+    return { type: "offer", sdp: "a=fingerprint:sha-256 CLIENT" };
+  }
+  createDataChannel(label: string): DataChannel {
+    return new DataChannel(label);
   }
 }
 
@@ -256,6 +264,48 @@ it("stops a peer that Signal sends a frame it cannot read", async () => {
   expect(posted("peer-error")[0]).toMatchObject({ peerId: "client-1", code: "protocol_error" });
   expect(posted("peer-disconnected")).toHaveLength(1);
   expect(signal.close).toHaveBeenCalled();
+});
+
+// After a sleep the Signal socket can be half-open, so the ICE restart offer got no answer. The peer
+// stayed `failed` while main read the host as connected, until the app restarted.
+it("renews Signal for a lost client path, and reports the peer when the path does not come back", async () => {
+  vi.useFakeTimers();
+  const { posted, command } = await startBridge();
+  await command({
+    type: "connect",
+    peerId: "host-1",
+    peer: "client",
+    signalUrl: "wss://signal.example.test",
+    token: "test",
+    iceTransportPolicy: "all",
+  });
+  const signal = SignalSocket.instances[0];
+  if (!signal) throw new Error("No Signal socket.");
+  signal.dispatchEvent(new Event("open"));
+  signal.message({ type: "ready", version: 1, connectionId: "connection-1", resumeToken: "resume", iceServers: [] });
+  await vi.waitFor(() => expect(PeerConnection.instances).toHaveLength(1));
+  const rtc = PeerConnection.instances[0];
+  if (!rtc) throw new Error("No RTC connection.");
+  const setState = (state: string) => {
+    rtc.connectionState = state;
+    rtc.onconnectionstatechange?.();
+  };
+
+  setState("connected");
+  setState("disconnected");
+  setState("connected");
+  await vi.advanceTimersByTimeAsync(20_000);
+  expect(SignalSocket.instances).toHaveLength(1);
+  expect(posted("peer-disconnected")).toEqual([]);
+
+  setState("failed");
+  await vi.advanceTimersByTimeAsync(8_000);
+  expect(signal.close).toHaveBeenCalled();
+  expect(SignalSocket.instances).toHaveLength(2);
+  expect(posted("peer-disconnected")).toEqual([]);
+  await vi.advanceTimersByTimeAsync(7_000);
+  expect(posted("peer-disconnected")).toEqual([{ type: "peer-disconnected", peerId: "host-1" }]);
+  expect(rtc.close).toHaveBeenCalled();
 });
 
 describe("Team WebRTC payload framing", () => {

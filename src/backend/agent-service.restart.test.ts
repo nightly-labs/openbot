@@ -5,10 +5,10 @@ import { AgentRemovalFailed } from "./agent/agent-removal";
 import type { AgentProvider } from "./agent-client";
 import type { AgentService } from "./agent-service";
 import {
-  createFakeClaude,
   createTestService,
   FakeAgentClient,
   fakeBrowser,
+  fakeClaudeCli,
   firstInputText,
   nextRoutinesChanged,
   notification,
@@ -378,7 +378,7 @@ describe.sequential("AgentService: restart", () => {
   });
 
   it("recovers an interrupted Claude answer under its saved ID after a provider switch", async () => {
-    process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
+    process.env.OPENBOT_CLAUDE_PATH = await fakeClaudeCli();
     const { store, mailbox } = stores(root);
     await runCauseEffect(store.initialize());
     await runCauseEffect(store.getOrCreate("chief"));

@@ -24,6 +24,7 @@ import { Route as BillingReturnRouteImport } from './routes/billing/return'
 import { Route as CompareIndexRouteImport } from './routes/compare/index'
 import { Route as CompareSlugRouteImport } from './routes/compare/$slug'
 import { Route as CompareRssDotxmlRouteImport } from './routes/compare/rss[.]xml'
+import { Route as DiscordConnectRouteImport } from './routes/discord/connect'
 import { Route as DownloadIndexRouteImport } from './routes/download/index'
 import { Route as DownloadPlatformRouteImport } from './routes/download/$platform'
 import { Route as GuidesIndexRouteImport } from './routes/guides/index'
@@ -37,6 +38,9 @@ import { Route as NewsOpenbotVsGrokbotRouteImport } from './routes/news/openbot-
 import { Route as NewsRssDotxmlRouteImport } from './routes/news/rss[.]xml'
 import { Route as PluginsIndexRouteImport } from './routes/plugins/index'
 import { Route as PluginsSlugRouteImport } from './routes/plugins/$slug'
+import { Route as ProvidersIndexRouteImport } from './routes/providers/index'
+import { Route as ProvidersSlugRouteImport } from './routes/providers/$slug'
+import { Route as ProvidersRssDotxmlRouteImport } from './routes/providers/rss[.]xml'
 import { Route as SlackConnectRouteImport } from './routes/slack/connect'
 import { Route as V1MeRouteImport } from './routes/v1/me'
 import { Route as ApiBrowserSplatRouteImport } from './routes/api/browser/$'
@@ -68,6 +72,8 @@ import { Route as V1TeamAuthTicketRouteImport } from './routes/v1/team-auth/tick
 import { Route as V1TeamHostsIceServersRouteImport } from './routes/v1/team-hosts/ice-servers'
 import { Route as V1TeamInvitationsEmailRouteImport } from './routes/v1/team-invitations/email'
 import { Route as V1TeamTunnelsProvisionRouteImport } from './routes/v1/team-tunnels/provision'
+import { Route as V2DiscordAuthorizeRouteImport } from './routes/v2/discord/authorize'
+import { Route as V2DiscordCallbackRouteImport } from './routes/v2/discord/callback'
 import { Route as V2HostingPlansRouteImport } from './routes/v2/hosting/plans'
 import { Route as V2SlackAuthorizeRouteImport } from './routes/v2/slack/authorize'
 import { Route as V2SlackCallbackRouteImport } from './routes/v2/slack/callback'
@@ -88,6 +94,9 @@ import { Route as V1SkillsAdminSubmissionsRouteImport } from './routes/v1/skills
 import { Route as V2HostingBoatWebhookRouteImport } from './routes/v2/hosting/boat/webhook'
 import { Route as V2HostingClaimsRedeemRouteImport } from './routes/v2/hosting/claims/redeem'
 import { Route as V2HostingServersIndexRouteImport } from './routes/v2/hosting/servers/index'
+import { Route as V2RemoteDiscordRouteReconcileRouteImport } from './routes/v2/remote/discord-route/reconcile'
+import { Route as V2RemoteDiscordRouteRemovedRouteImport } from './routes/v2/remote/discord-route/removed'
+import { Route as V2RemoteDiscordRouteValidateRouteImport } from './routes/v2/remote/discord-route/validate'
 import { Route as V2RemoteHostsIndexRouteImport } from './routes/v2/remote/hosts/index'
 import { Route as V2RemoteHostsRegisterRouteImport } from './routes/v2/remote/hosts/register'
 import { Route as V2RemoteInvitesInviteIdRouteImport } from './routes/v2/remote/invites/$inviteId'
@@ -110,6 +119,8 @@ import { Route as V2HostingServersServerIdActivityRouteImport } from './routes/v
 import { Route as V2HostingServersServerIdCheckoutRouteImport } from './routes/v2/hosting/servers/$serverId/checkout'
 import { Route as V2HostingServersServerIdStatusRouteImport } from './routes/v2/hosting/servers/$serverId/status'
 import { Route as V2HostingServersServerIdWakeRouteImport } from './routes/v2/hosting/servers/$serverId/wake'
+import { Route as V2RemoteHostsHostIdDiscordDisconnectRouteImport } from './routes/v2/remote/hosts/$hostId/discord-disconnect'
+import { Route as V2RemoteHostsHostIdDiscordRouteRouteImport } from './routes/v2/remote/hosts/$hostId/discord-route'
 import { Route as V2RemoteHostsHostIdInvitesRouteImport } from './routes/v2/remote/hosts/$hostId/invites'
 import { Route as V2RemoteHostsHostIdLiveActivityRouteImport } from './routes/v2/remote/hosts/$hostId/live-activity'
 import { Route as V2RemoteHostsHostIdLogoRouteImport } from './routes/v2/remote/hosts/$hostId/logo'
@@ -200,6 +211,11 @@ const CompareRssDotxmlRoute = CompareRssDotxmlRouteImport.update({
   path: '/compare/rss.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DiscordConnectRoute = DiscordConnectRouteImport.update({
+  id: '/discord/connect',
+  path: '/discord/connect',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DownloadIndexRoute = DownloadIndexRouteImport.update({
   id: '/download/',
   path: '/download/',
@@ -263,6 +279,21 @@ const PluginsIndexRoute = PluginsIndexRouteImport.update({
 const PluginsSlugRoute = PluginsSlugRouteImport.update({
   id: '/plugins/$slug',
   path: '/plugins/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProvidersIndexRoute = ProvidersIndexRouteImport.update({
+  id: '/providers/',
+  path: '/providers/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProvidersSlugRoute = ProvidersSlugRouteImport.update({
+  id: '/providers/$slug',
+  path: '/providers/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProvidersRssDotxmlRoute = ProvidersRssDotxmlRouteImport.update({
+  id: '/providers/rss.xml',
+  path: '/providers/rss.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SlackConnectRoute = SlackConnectRouteImport.update({
@@ -423,6 +454,16 @@ const V1TeamTunnelsProvisionRoute = V1TeamTunnelsProvisionRouteImport.update({
   path: '/v1/team-tunnels/provision',
   getParentRoute: () => rootRouteImport,
 } as any)
+const V2DiscordAuthorizeRoute = V2DiscordAuthorizeRouteImport.update({
+  id: '/v2/discord/authorize',
+  path: '/v2/discord/authorize',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const V2DiscordCallbackRoute = V2DiscordCallbackRouteImport.update({
+  id: '/v2/discord/callback',
+  path: '/v2/discord/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const V2HostingPlansRoute = V2HostingPlansRouteImport.update({
   id: '/v2/hosting/plans',
   path: '/v2/hosting/plans',
@@ -529,6 +570,24 @@ const V2HostingServersIndexRoute = V2HostingServersIndexRouteImport.update({
   path: '/v2/hosting/servers/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const V2RemoteDiscordRouteReconcileRoute =
+  V2RemoteDiscordRouteReconcileRouteImport.update({
+    id: '/v2/remote/discord-route/reconcile',
+    path: '/v2/remote/discord-route/reconcile',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const V2RemoteDiscordRouteRemovedRoute =
+  V2RemoteDiscordRouteRemovedRouteImport.update({
+    id: '/v2/remote/discord-route/removed',
+    path: '/v2/remote/discord-route/removed',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const V2RemoteDiscordRouteValidateRoute =
+  V2RemoteDiscordRouteValidateRouteImport.update({
+    id: '/v2/remote/discord-route/validate',
+    path: '/v2/remote/discord-route/validate',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const V2RemoteHostsIndexRoute = V2RemoteHostsIndexRouteImport.update({
   id: '/v2/remote/hosts/',
   path: '/v2/remote/hosts/',
@@ -653,6 +712,18 @@ const V2HostingServersServerIdWakeRoute =
     path: '/v2/hosting/servers/$serverId/wake',
     getParentRoute: () => rootRouteImport,
   } as any)
+const V2RemoteHostsHostIdDiscordDisconnectRoute =
+  V2RemoteHostsHostIdDiscordDisconnectRouteImport.update({
+    id: '/v2/remote/hosts/$hostId/discord-disconnect',
+    path: '/v2/remote/hosts/$hostId/discord-disconnect',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const V2RemoteHostsHostIdDiscordRouteRoute =
+  V2RemoteHostsHostIdDiscordRouteRouteImport.update({
+    id: '/v2/remote/hosts/$hostId/discord-route',
+    path: '/v2/remote/hosts/$hostId/discord-route',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const V2RemoteHostsHostIdInvitesRoute =
   V2RemoteHostsHostIdInvitesRouteImport.update({
     id: '/v2/remote/hosts/$hostId/invites',
@@ -746,6 +817,7 @@ export interface FileRoutesByFullPath {
   '/billing/return': typeof BillingReturnRoute
   '/compare/$slug': typeof CompareSlugRoute
   '/compare/rss.xml': typeof CompareRssDotxmlRoute
+  '/discord/connect': typeof DiscordConnectRoute
   '/download/$platform': typeof DownloadPlatformRoute
   '/guides/$slug': typeof GuidesSlugRoute
   '/guides/rss.xml': typeof GuidesRssDotxmlRoute
@@ -755,6 +827,8 @@ export interface FileRoutesByFullPath {
   '/news/openbot-vs-grokbot': typeof NewsOpenbotVsGrokbotRoute
   '/news/rss.xml': typeof NewsRssDotxmlRoute
   '/plugins/$slug': typeof PluginsSlugRoute
+  '/providers/$slug': typeof ProvidersSlugRoute
+  '/providers/rss.xml': typeof ProvidersRssDotxmlRoute
   '/slack/connect': typeof SlackConnectRoute
   '/v1/me': typeof V1MeRouteWithChildren
   '/compare/': typeof CompareIndexRoute
@@ -762,6 +836,7 @@ export interface FileRoutesByFullPath {
   '/guides/': typeof GuidesIndexRoute
   '/news/': typeof NewsIndexRoute
   '/plugins/': typeof PluginsIndexRoute
+  '/providers/': typeof ProvidersIndexRoute
   '/api/browser/$': typeof ApiBrowserSplatRoute
   '/download/$platform/latest': typeof DownloadPlatformLatestRoute
   '/news/og/openbot-vs-grokbot.png': typeof NewsOgOpenbotVsGrokbotDotpngRoute
@@ -788,6 +863,8 @@ export interface FileRoutesByFullPath {
   '/v1/team-hosts/ice-servers': typeof V1TeamHostsIceServersRoute
   '/v1/team-invitations/email': typeof V1TeamInvitationsEmailRoute
   '/v1/team-tunnels/provision': typeof V1TeamTunnelsProvisionRoute
+  '/v2/discord/authorize': typeof V2DiscordAuthorizeRoute
+  '/v2/discord/callback': typeof V2DiscordCallbackRoute
   '/v2/hosting/plans': typeof V2HostingPlansRoute
   '/v2/slack/authorize': typeof V2SlackAuthorizeRoute
   '/v2/slack/callback': typeof V2SlackCallbackRoute
@@ -808,6 +885,9 @@ export interface FileRoutesByFullPath {
   '/v1/skills/admin/submissions': typeof V1SkillsAdminSubmissionsRouteWithChildren
   '/v2/hosting/boat/webhook': typeof V2HostingBoatWebhookRoute
   '/v2/hosting/claims/redeem': typeof V2HostingClaimsRedeemRoute
+  '/v2/remote/discord-route/reconcile': typeof V2RemoteDiscordRouteReconcileRoute
+  '/v2/remote/discord-route/removed': typeof V2RemoteDiscordRouteRemovedRoute
+  '/v2/remote/discord-route/validate': typeof V2RemoteDiscordRouteValidateRoute
   '/v2/remote/hosts/register': typeof V2RemoteHostsRegisterRoute
   '/v2/remote/invites/$inviteId': typeof V2RemoteInvitesInviteIdRoute
   '/v2/remote/invites/accept': typeof V2RemoteInvitesAcceptRoute
@@ -832,6 +912,8 @@ export interface FileRoutesByFullPath {
   '/v2/hosting/servers/$serverId/checkout': typeof V2HostingServersServerIdCheckoutRoute
   '/v2/hosting/servers/$serverId/status': typeof V2HostingServersServerIdStatusRoute
   '/v2/hosting/servers/$serverId/wake': typeof V2HostingServersServerIdWakeRoute
+  '/v2/remote/hosts/$hostId/discord-disconnect': typeof V2RemoteHostsHostIdDiscordDisconnectRoute
+  '/v2/remote/hosts/$hostId/discord-route': typeof V2RemoteHostsHostIdDiscordRouteRoute
   '/v2/remote/hosts/$hostId/invites': typeof V2RemoteHostsHostIdInvitesRoute
   '/v2/remote/hosts/$hostId/live-activity': typeof V2RemoteHostsHostIdLiveActivityRoute
   '/v2/remote/hosts/$hostId/logo': typeof V2RemoteHostsHostIdLogoRoute
@@ -862,6 +944,7 @@ export interface FileRoutesByTo {
   '/billing/return': typeof BillingReturnRoute
   '/compare/$slug': typeof CompareSlugRoute
   '/compare/rss.xml': typeof CompareRssDotxmlRoute
+  '/discord/connect': typeof DiscordConnectRoute
   '/download/$platform': typeof DownloadPlatformRoute
   '/guides/$slug': typeof GuidesSlugRoute
   '/guides/rss.xml': typeof GuidesRssDotxmlRoute
@@ -871,6 +954,8 @@ export interface FileRoutesByTo {
   '/news/openbot-vs-grokbot': typeof NewsOpenbotVsGrokbotRoute
   '/news/rss.xml': typeof NewsRssDotxmlRoute
   '/plugins/$slug': typeof PluginsSlugRoute
+  '/providers/$slug': typeof ProvidersSlugRoute
+  '/providers/rss.xml': typeof ProvidersRssDotxmlRoute
   '/slack/connect': typeof SlackConnectRoute
   '/v1/me': typeof V1MeRouteWithChildren
   '/compare': typeof CompareIndexRoute
@@ -878,6 +963,7 @@ export interface FileRoutesByTo {
   '/guides': typeof GuidesIndexRoute
   '/news': typeof NewsIndexRoute
   '/plugins': typeof PluginsIndexRoute
+  '/providers': typeof ProvidersIndexRoute
   '/api/browser/$': typeof ApiBrowserSplatRoute
   '/download/$platform/latest': typeof DownloadPlatformLatestRoute
   '/news/og/openbot-vs-grokbot.png': typeof NewsOgOpenbotVsGrokbotDotpngRoute
@@ -904,6 +990,8 @@ export interface FileRoutesByTo {
   '/v1/team-hosts/ice-servers': typeof V1TeamHostsIceServersRoute
   '/v1/team-invitations/email': typeof V1TeamInvitationsEmailRoute
   '/v1/team-tunnels/provision': typeof V1TeamTunnelsProvisionRoute
+  '/v2/discord/authorize': typeof V2DiscordAuthorizeRoute
+  '/v2/discord/callback': typeof V2DiscordCallbackRoute
   '/v2/hosting/plans': typeof V2HostingPlansRoute
   '/v2/slack/authorize': typeof V2SlackAuthorizeRoute
   '/v2/slack/callback': typeof V2SlackCallbackRoute
@@ -924,6 +1012,9 @@ export interface FileRoutesByTo {
   '/v1/skills/admin/submissions': typeof V1SkillsAdminSubmissionsRouteWithChildren
   '/v2/hosting/boat/webhook': typeof V2HostingBoatWebhookRoute
   '/v2/hosting/claims/redeem': typeof V2HostingClaimsRedeemRoute
+  '/v2/remote/discord-route/reconcile': typeof V2RemoteDiscordRouteReconcileRoute
+  '/v2/remote/discord-route/removed': typeof V2RemoteDiscordRouteRemovedRoute
+  '/v2/remote/discord-route/validate': typeof V2RemoteDiscordRouteValidateRoute
   '/v2/remote/hosts/register': typeof V2RemoteHostsRegisterRoute
   '/v2/remote/invites/$inviteId': typeof V2RemoteInvitesInviteIdRoute
   '/v2/remote/invites/accept': typeof V2RemoteInvitesAcceptRoute
@@ -948,6 +1039,8 @@ export interface FileRoutesByTo {
   '/v2/hosting/servers/$serverId/checkout': typeof V2HostingServersServerIdCheckoutRoute
   '/v2/hosting/servers/$serverId/status': typeof V2HostingServersServerIdStatusRoute
   '/v2/hosting/servers/$serverId/wake': typeof V2HostingServersServerIdWakeRoute
+  '/v2/remote/hosts/$hostId/discord-disconnect': typeof V2RemoteHostsHostIdDiscordDisconnectRoute
+  '/v2/remote/hosts/$hostId/discord-route': typeof V2RemoteHostsHostIdDiscordRouteRoute
   '/v2/remote/hosts/$hostId/invites': typeof V2RemoteHostsHostIdInvitesRoute
   '/v2/remote/hosts/$hostId/live-activity': typeof V2RemoteHostsHostIdLiveActivityRoute
   '/v2/remote/hosts/$hostId/logo': typeof V2RemoteHostsHostIdLogoRoute
@@ -979,6 +1072,7 @@ export interface FileRoutesById {
   '/billing/return': typeof BillingReturnRoute
   '/compare/$slug': typeof CompareSlugRoute
   '/compare/rss.xml': typeof CompareRssDotxmlRoute
+  '/discord/connect': typeof DiscordConnectRoute
   '/download/$platform': typeof DownloadPlatformRoute
   '/guides/$slug': typeof GuidesSlugRoute
   '/guides/rss.xml': typeof GuidesRssDotxmlRoute
@@ -988,6 +1082,8 @@ export interface FileRoutesById {
   '/news/openbot-vs-grokbot': typeof NewsOpenbotVsGrokbotRoute
   '/news/rss.xml': typeof NewsRssDotxmlRoute
   '/plugins/$slug': typeof PluginsSlugRoute
+  '/providers/$slug': typeof ProvidersSlugRoute
+  '/providers/rss.xml': typeof ProvidersRssDotxmlRoute
   '/slack/connect': typeof SlackConnectRoute
   '/v1/me': typeof V1MeRouteWithChildren
   '/compare/': typeof CompareIndexRoute
@@ -995,6 +1091,7 @@ export interface FileRoutesById {
   '/guides/': typeof GuidesIndexRoute
   '/news/': typeof NewsIndexRoute
   '/plugins/': typeof PluginsIndexRoute
+  '/providers/': typeof ProvidersIndexRoute
   '/api/browser/$': typeof ApiBrowserSplatRoute
   '/download/$platform_/latest': typeof DownloadPlatformLatestRoute
   '/news/og/openbot-vs-grokbot.png': typeof NewsOgOpenbotVsGrokbotDotpngRoute
@@ -1021,6 +1118,8 @@ export interface FileRoutesById {
   '/v1/team-hosts/ice-servers': typeof V1TeamHostsIceServersRoute
   '/v1/team-invitations/email': typeof V1TeamInvitationsEmailRoute
   '/v1/team-tunnels/provision': typeof V1TeamTunnelsProvisionRoute
+  '/v2/discord/authorize': typeof V2DiscordAuthorizeRoute
+  '/v2/discord/callback': typeof V2DiscordCallbackRoute
   '/v2/hosting/plans': typeof V2HostingPlansRoute
   '/v2/slack/authorize': typeof V2SlackAuthorizeRoute
   '/v2/slack/callback': typeof V2SlackCallbackRoute
@@ -1041,6 +1140,9 @@ export interface FileRoutesById {
   '/v1/skills/admin/submissions': typeof V1SkillsAdminSubmissionsRouteWithChildren
   '/v2/hosting/boat/webhook': typeof V2HostingBoatWebhookRoute
   '/v2/hosting/claims/redeem': typeof V2HostingClaimsRedeemRoute
+  '/v2/remote/discord-route/reconcile': typeof V2RemoteDiscordRouteReconcileRoute
+  '/v2/remote/discord-route/removed': typeof V2RemoteDiscordRouteRemovedRoute
+  '/v2/remote/discord-route/validate': typeof V2RemoteDiscordRouteValidateRoute
   '/v2/remote/hosts/register': typeof V2RemoteHostsRegisterRoute
   '/v2/remote/invites/$inviteId': typeof V2RemoteInvitesInviteIdRoute
   '/v2/remote/invites/accept': typeof V2RemoteInvitesAcceptRoute
@@ -1065,6 +1167,8 @@ export interface FileRoutesById {
   '/v2/hosting/servers/$serverId/checkout': typeof V2HostingServersServerIdCheckoutRoute
   '/v2/hosting/servers/$serverId/status': typeof V2HostingServersServerIdStatusRoute
   '/v2/hosting/servers/$serverId/wake': typeof V2HostingServersServerIdWakeRoute
+  '/v2/remote/hosts/$hostId/discord-disconnect': typeof V2RemoteHostsHostIdDiscordDisconnectRoute
+  '/v2/remote/hosts/$hostId/discord-route': typeof V2RemoteHostsHostIdDiscordRouteRoute
   '/v2/remote/hosts/$hostId/invites': typeof V2RemoteHostsHostIdInvitesRoute
   '/v2/remote/hosts/$hostId/live-activity': typeof V2RemoteHostsHostIdLiveActivityRoute
   '/v2/remote/hosts/$hostId/logo': typeof V2RemoteHostsHostIdLogoRoute
@@ -1097,6 +1201,7 @@ export interface FileRouteTypes {
     | '/billing/return'
     | '/compare/$slug'
     | '/compare/rss.xml'
+    | '/discord/connect'
     | '/download/$platform'
     | '/guides/$slug'
     | '/guides/rss.xml'
@@ -1106,6 +1211,8 @@ export interface FileRouteTypes {
     | '/news/openbot-vs-grokbot'
     | '/news/rss.xml'
     | '/plugins/$slug'
+    | '/providers/$slug'
+    | '/providers/rss.xml'
     | '/slack/connect'
     | '/v1/me'
     | '/compare/'
@@ -1113,6 +1220,7 @@ export interface FileRouteTypes {
     | '/guides/'
     | '/news/'
     | '/plugins/'
+    | '/providers/'
     | '/api/browser/$'
     | '/download/$platform/latest'
     | '/news/og/openbot-vs-grokbot.png'
@@ -1139,6 +1247,8 @@ export interface FileRouteTypes {
     | '/v1/team-hosts/ice-servers'
     | '/v1/team-invitations/email'
     | '/v1/team-tunnels/provision'
+    | '/v2/discord/authorize'
+    | '/v2/discord/callback'
     | '/v2/hosting/plans'
     | '/v2/slack/authorize'
     | '/v2/slack/callback'
@@ -1159,6 +1269,9 @@ export interface FileRouteTypes {
     | '/v1/skills/admin/submissions'
     | '/v2/hosting/boat/webhook'
     | '/v2/hosting/claims/redeem'
+    | '/v2/remote/discord-route/reconcile'
+    | '/v2/remote/discord-route/removed'
+    | '/v2/remote/discord-route/validate'
     | '/v2/remote/hosts/register'
     | '/v2/remote/invites/$inviteId'
     | '/v2/remote/invites/accept'
@@ -1183,6 +1296,8 @@ export interface FileRouteTypes {
     | '/v2/hosting/servers/$serverId/checkout'
     | '/v2/hosting/servers/$serverId/status'
     | '/v2/hosting/servers/$serverId/wake'
+    | '/v2/remote/hosts/$hostId/discord-disconnect'
+    | '/v2/remote/hosts/$hostId/discord-route'
     | '/v2/remote/hosts/$hostId/invites'
     | '/v2/remote/hosts/$hostId/live-activity'
     | '/v2/remote/hosts/$hostId/logo'
@@ -1213,6 +1328,7 @@ export interface FileRouteTypes {
     | '/billing/return'
     | '/compare/$slug'
     | '/compare/rss.xml'
+    | '/discord/connect'
     | '/download/$platform'
     | '/guides/$slug'
     | '/guides/rss.xml'
@@ -1222,6 +1338,8 @@ export interface FileRouteTypes {
     | '/news/openbot-vs-grokbot'
     | '/news/rss.xml'
     | '/plugins/$slug'
+    | '/providers/$slug'
+    | '/providers/rss.xml'
     | '/slack/connect'
     | '/v1/me'
     | '/compare'
@@ -1229,6 +1347,7 @@ export interface FileRouteTypes {
     | '/guides'
     | '/news'
     | '/plugins'
+    | '/providers'
     | '/api/browser/$'
     | '/download/$platform/latest'
     | '/news/og/openbot-vs-grokbot.png'
@@ -1255,6 +1374,8 @@ export interface FileRouteTypes {
     | '/v1/team-hosts/ice-servers'
     | '/v1/team-invitations/email'
     | '/v1/team-tunnels/provision'
+    | '/v2/discord/authorize'
+    | '/v2/discord/callback'
     | '/v2/hosting/plans'
     | '/v2/slack/authorize'
     | '/v2/slack/callback'
@@ -1275,6 +1396,9 @@ export interface FileRouteTypes {
     | '/v1/skills/admin/submissions'
     | '/v2/hosting/boat/webhook'
     | '/v2/hosting/claims/redeem'
+    | '/v2/remote/discord-route/reconcile'
+    | '/v2/remote/discord-route/removed'
+    | '/v2/remote/discord-route/validate'
     | '/v2/remote/hosts/register'
     | '/v2/remote/invites/$inviteId'
     | '/v2/remote/invites/accept'
@@ -1299,6 +1423,8 @@ export interface FileRouteTypes {
     | '/v2/hosting/servers/$serverId/checkout'
     | '/v2/hosting/servers/$serverId/status'
     | '/v2/hosting/servers/$serverId/wake'
+    | '/v2/remote/hosts/$hostId/discord-disconnect'
+    | '/v2/remote/hosts/$hostId/discord-route'
     | '/v2/remote/hosts/$hostId/invites'
     | '/v2/remote/hosts/$hostId/live-activity'
     | '/v2/remote/hosts/$hostId/logo'
@@ -1329,6 +1455,7 @@ export interface FileRouteTypes {
     | '/billing/return'
     | '/compare/$slug'
     | '/compare/rss.xml'
+    | '/discord/connect'
     | '/download/$platform'
     | '/guides/$slug'
     | '/guides/rss.xml'
@@ -1338,6 +1465,8 @@ export interface FileRouteTypes {
     | '/news/openbot-vs-grokbot'
     | '/news/rss.xml'
     | '/plugins/$slug'
+    | '/providers/$slug'
+    | '/providers/rss.xml'
     | '/slack/connect'
     | '/v1/me'
     | '/compare/'
@@ -1345,6 +1474,7 @@ export interface FileRouteTypes {
     | '/guides/'
     | '/news/'
     | '/plugins/'
+    | '/providers/'
     | '/api/browser/$'
     | '/download/$platform_/latest'
     | '/news/og/openbot-vs-grokbot.png'
@@ -1371,6 +1501,8 @@ export interface FileRouteTypes {
     | '/v1/team-hosts/ice-servers'
     | '/v1/team-invitations/email'
     | '/v1/team-tunnels/provision'
+    | '/v2/discord/authorize'
+    | '/v2/discord/callback'
     | '/v2/hosting/plans'
     | '/v2/slack/authorize'
     | '/v2/slack/callback'
@@ -1391,6 +1523,9 @@ export interface FileRouteTypes {
     | '/v1/skills/admin/submissions'
     | '/v2/hosting/boat/webhook'
     | '/v2/hosting/claims/redeem'
+    | '/v2/remote/discord-route/reconcile'
+    | '/v2/remote/discord-route/removed'
+    | '/v2/remote/discord-route/validate'
     | '/v2/remote/hosts/register'
     | '/v2/remote/invites/$inviteId'
     | '/v2/remote/invites/accept'
@@ -1415,6 +1550,8 @@ export interface FileRouteTypes {
     | '/v2/hosting/servers/$serverId/checkout'
     | '/v2/hosting/servers/$serverId/status'
     | '/v2/hosting/servers/$serverId/wake'
+    | '/v2/remote/hosts/$hostId/discord-disconnect'
+    | '/v2/remote/hosts/$hostId/discord-route'
     | '/v2/remote/hosts/$hostId/invites'
     | '/v2/remote/hosts/$hostId/live-activity'
     | '/v2/remote/hosts/$hostId/logo'
@@ -1446,6 +1583,7 @@ export interface RootRouteChildren {
   BillingReturnRoute: typeof BillingReturnRoute
   CompareSlugRoute: typeof CompareSlugRoute
   CompareRssDotxmlRoute: typeof CompareRssDotxmlRoute
+  DiscordConnectRoute: typeof DiscordConnectRoute
   DownloadPlatformRoute: typeof DownloadPlatformRoute
   GuidesSlugRoute: typeof GuidesSlugRoute
   GuidesRssDotxmlRoute: typeof GuidesRssDotxmlRoute
@@ -1455,6 +1593,8 @@ export interface RootRouteChildren {
   NewsOpenbotVsGrokbotRoute: typeof NewsOpenbotVsGrokbotRoute
   NewsRssDotxmlRoute: typeof NewsRssDotxmlRoute
   PluginsSlugRoute: typeof PluginsSlugRoute
+  ProvidersSlugRoute: typeof ProvidersSlugRoute
+  ProvidersRssDotxmlRoute: typeof ProvidersRssDotxmlRoute
   SlackConnectRoute: typeof SlackConnectRoute
   V1MeRoute: typeof V1MeRouteWithChildren
   CompareIndexRoute: typeof CompareIndexRoute
@@ -1462,6 +1602,7 @@ export interface RootRouteChildren {
   GuidesIndexRoute: typeof GuidesIndexRoute
   NewsIndexRoute: typeof NewsIndexRoute
   PluginsIndexRoute: typeof PluginsIndexRoute
+  ProvidersIndexRoute: typeof ProvidersIndexRoute
   ApiBrowserSplatRoute: typeof ApiBrowserSplatRoute
   DownloadPlatformLatestRoute: typeof DownloadPlatformLatestRoute
   NewsOgOpenbotVsGrokbotDotpngRoute: typeof NewsOgOpenbotVsGrokbotDotpngRoute
@@ -1486,6 +1627,8 @@ export interface RootRouteChildren {
   V1TeamHostsIceServersRoute: typeof V1TeamHostsIceServersRoute
   V1TeamInvitationsEmailRoute: typeof V1TeamInvitationsEmailRoute
   V1TeamTunnelsProvisionRoute: typeof V1TeamTunnelsProvisionRoute
+  V2DiscordAuthorizeRoute: typeof V2DiscordAuthorizeRoute
+  V2DiscordCallbackRoute: typeof V2DiscordCallbackRoute
   V2HostingPlansRoute: typeof V2HostingPlansRoute
   V2SlackAuthorizeRoute: typeof V2SlackAuthorizeRoute
   V2SlackCallbackRoute: typeof V2SlackCallbackRoute
@@ -1499,6 +1642,9 @@ export interface RootRouteChildren {
   V1SkillsAdminSubmissionsRoute: typeof V1SkillsAdminSubmissionsRouteWithChildren
   V2HostingBoatWebhookRoute: typeof V2HostingBoatWebhookRoute
   V2HostingClaimsRedeemRoute: typeof V2HostingClaimsRedeemRoute
+  V2RemoteDiscordRouteReconcileRoute: typeof V2RemoteDiscordRouteReconcileRoute
+  V2RemoteDiscordRouteRemovedRoute: typeof V2RemoteDiscordRouteRemovedRoute
+  V2RemoteDiscordRouteValidateRoute: typeof V2RemoteDiscordRouteValidateRoute
   V2RemoteHostsRegisterRoute: typeof V2RemoteHostsRegisterRoute
   V2RemoteInvitesInviteIdRoute: typeof V2RemoteInvitesInviteIdRoute
   V2RemoteInvitesAcceptRoute: typeof V2RemoteInvitesAcceptRoute
@@ -1518,6 +1664,8 @@ export interface RootRouteChildren {
   V2HostingServersServerIdCheckoutRoute: typeof V2HostingServersServerIdCheckoutRoute
   V2HostingServersServerIdStatusRoute: typeof V2HostingServersServerIdStatusRoute
   V2HostingServersServerIdWakeRoute: typeof V2HostingServersServerIdWakeRoute
+  V2RemoteHostsHostIdDiscordDisconnectRoute: typeof V2RemoteHostsHostIdDiscordDisconnectRoute
+  V2RemoteHostsHostIdDiscordRouteRoute: typeof V2RemoteHostsHostIdDiscordRouteRoute
   V2RemoteHostsHostIdInvitesRoute: typeof V2RemoteHostsHostIdInvitesRoute
   V2RemoteHostsHostIdLiveActivityRoute: typeof V2RemoteHostsHostIdLiveActivityRoute
   V2RemoteHostsHostIdLogoRoute: typeof V2RemoteHostsHostIdLogoRoute
@@ -1639,6 +1787,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof CompareRssDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/discord/connect': {
+      id: '/discord/connect'
+      path: '/discord/connect'
+      fullPath: '/discord/connect'
+      preLoaderRoute: typeof DiscordConnectRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/download/': {
       id: '/download/'
       path: '/download'
@@ -1728,6 +1883,27 @@ declare module '@tanstack/solid-router' {
       path: '/plugins/$slug'
       fullPath: '/plugins/$slug'
       preLoaderRoute: typeof PluginsSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/providers/': {
+      id: '/providers/'
+      path: '/providers'
+      fullPath: '/providers/'
+      preLoaderRoute: typeof ProvidersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/providers/$slug': {
+      id: '/providers/$slug'
+      path: '/providers/$slug'
+      fullPath: '/providers/$slug'
+      preLoaderRoute: typeof ProvidersSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/providers/rss.xml': {
+      id: '/providers/rss.xml'
+      path: '/providers/rss.xml'
+      fullPath: '/providers/rss.xml'
+      preLoaderRoute: typeof ProvidersRssDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/slack/connect': {
@@ -1947,6 +2123,20 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof V1TeamTunnelsProvisionRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/v2/discord/authorize': {
+      id: '/v2/discord/authorize'
+      path: '/v2/discord/authorize'
+      fullPath: '/v2/discord/authorize'
+      preLoaderRoute: typeof V2DiscordAuthorizeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v2/discord/callback': {
+      id: '/v2/discord/callback'
+      path: '/v2/discord/callback'
+      fullPath: '/v2/discord/callback'
+      preLoaderRoute: typeof V2DiscordCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/v2/hosting/plans': {
       id: '/v2/hosting/plans'
       path: '/v2/hosting/plans'
@@ -2085,6 +2275,27 @@ declare module '@tanstack/solid-router' {
       path: '/v2/hosting/servers'
       fullPath: '/v2/hosting/servers/'
       preLoaderRoute: typeof V2HostingServersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v2/remote/discord-route/reconcile': {
+      id: '/v2/remote/discord-route/reconcile'
+      path: '/v2/remote/discord-route/reconcile'
+      fullPath: '/v2/remote/discord-route/reconcile'
+      preLoaderRoute: typeof V2RemoteDiscordRouteReconcileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v2/remote/discord-route/removed': {
+      id: '/v2/remote/discord-route/removed'
+      path: '/v2/remote/discord-route/removed'
+      fullPath: '/v2/remote/discord-route/removed'
+      preLoaderRoute: typeof V2RemoteDiscordRouteRemovedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v2/remote/discord-route/validate': {
+      id: '/v2/remote/discord-route/validate'
+      path: '/v2/remote/discord-route/validate'
+      fullPath: '/v2/remote/discord-route/validate'
+      preLoaderRoute: typeof V2RemoteDiscordRouteValidateRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/v2/remote/hosts/': {
@@ -2239,6 +2450,20 @@ declare module '@tanstack/solid-router' {
       path: '/v2/hosting/servers/$serverId/wake'
       fullPath: '/v2/hosting/servers/$serverId/wake'
       preLoaderRoute: typeof V2HostingServersServerIdWakeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v2/remote/hosts/$hostId/discord-disconnect': {
+      id: '/v2/remote/hosts/$hostId/discord-disconnect'
+      path: '/v2/remote/hosts/$hostId/discord-disconnect'
+      fullPath: '/v2/remote/hosts/$hostId/discord-disconnect'
+      preLoaderRoute: typeof V2RemoteHostsHostIdDiscordDisconnectRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v2/remote/hosts/$hostId/discord-route': {
+      id: '/v2/remote/hosts/$hostId/discord-route'
+      path: '/v2/remote/hosts/$hostId/discord-route'
+      fullPath: '/v2/remote/hosts/$hostId/discord-route'
+      preLoaderRoute: typeof V2RemoteHostsHostIdDiscordRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/v2/remote/hosts/$hostId/invites': {
@@ -2477,6 +2702,7 @@ const rootRouteChildren: RootRouteChildren = {
   BillingReturnRoute: BillingReturnRoute,
   CompareSlugRoute: CompareSlugRoute,
   CompareRssDotxmlRoute: CompareRssDotxmlRoute,
+  DiscordConnectRoute: DiscordConnectRoute,
   DownloadPlatformRoute: DownloadPlatformRoute,
   GuidesSlugRoute: GuidesSlugRoute,
   GuidesRssDotxmlRoute: GuidesRssDotxmlRoute,
@@ -2486,6 +2712,8 @@ const rootRouteChildren: RootRouteChildren = {
   NewsOpenbotVsGrokbotRoute: NewsOpenbotVsGrokbotRoute,
   NewsRssDotxmlRoute: NewsRssDotxmlRoute,
   PluginsSlugRoute: PluginsSlugRoute,
+  ProvidersSlugRoute: ProvidersSlugRoute,
+  ProvidersRssDotxmlRoute: ProvidersRssDotxmlRoute,
   SlackConnectRoute: SlackConnectRoute,
   V1MeRoute: V1MeRouteWithChildren,
   CompareIndexRoute: CompareIndexRoute,
@@ -2493,6 +2721,7 @@ const rootRouteChildren: RootRouteChildren = {
   GuidesIndexRoute: GuidesIndexRoute,
   NewsIndexRoute: NewsIndexRoute,
   PluginsIndexRoute: PluginsIndexRoute,
+  ProvidersIndexRoute: ProvidersIndexRoute,
   ApiBrowserSplatRoute: ApiBrowserSplatRoute,
   DownloadPlatformLatestRoute: DownloadPlatformLatestRoute,
   NewsOgOpenbotVsGrokbotDotpngRoute: NewsOgOpenbotVsGrokbotDotpngRoute,
@@ -2517,6 +2746,8 @@ const rootRouteChildren: RootRouteChildren = {
   V1TeamHostsIceServersRoute: V1TeamHostsIceServersRoute,
   V1TeamInvitationsEmailRoute: V1TeamInvitationsEmailRoute,
   V1TeamTunnelsProvisionRoute: V1TeamTunnelsProvisionRoute,
+  V2DiscordAuthorizeRoute: V2DiscordAuthorizeRoute,
+  V2DiscordCallbackRoute: V2DiscordCallbackRoute,
   V2HostingPlansRoute: V2HostingPlansRoute,
   V2SlackAuthorizeRoute: V2SlackAuthorizeRoute,
   V2SlackCallbackRoute: V2SlackCallbackRoute,
@@ -2530,6 +2761,9 @@ const rootRouteChildren: RootRouteChildren = {
   V1SkillsAdminSubmissionsRoute: V1SkillsAdminSubmissionsRouteWithChildren,
   V2HostingBoatWebhookRoute: V2HostingBoatWebhookRoute,
   V2HostingClaimsRedeemRoute: V2HostingClaimsRedeemRoute,
+  V2RemoteDiscordRouteReconcileRoute: V2RemoteDiscordRouteReconcileRoute,
+  V2RemoteDiscordRouteRemovedRoute: V2RemoteDiscordRouteRemovedRoute,
+  V2RemoteDiscordRouteValidateRoute: V2RemoteDiscordRouteValidateRoute,
   V2RemoteHostsRegisterRoute: V2RemoteHostsRegisterRoute,
   V2RemoteInvitesInviteIdRoute: V2RemoteInvitesInviteIdRoute,
   V2RemoteInvitesAcceptRoute: V2RemoteInvitesAcceptRoute,
@@ -2550,6 +2784,9 @@ const rootRouteChildren: RootRouteChildren = {
   V2HostingServersServerIdCheckoutRoute: V2HostingServersServerIdCheckoutRoute,
   V2HostingServersServerIdStatusRoute: V2HostingServersServerIdStatusRoute,
   V2HostingServersServerIdWakeRoute: V2HostingServersServerIdWakeRoute,
+  V2RemoteHostsHostIdDiscordDisconnectRoute:
+    V2RemoteHostsHostIdDiscordDisconnectRoute,
+  V2RemoteHostsHostIdDiscordRouteRoute: V2RemoteHostsHostIdDiscordRouteRoute,
   V2RemoteHostsHostIdInvitesRoute: V2RemoteHostsHostIdInvitesRoute,
   V2RemoteHostsHostIdLiveActivityRoute: V2RemoteHostsHostIdLiveActivityRoute,
   V2RemoteHostsHostIdLogoRoute: V2RemoteHostsHostIdLogoRoute,

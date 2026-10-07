@@ -25,6 +25,8 @@ interface ChatHeaderProps {
   onBack: () => void;
   needsAction?: boolean;
   readOnly?: boolean;
+  /** Something covers the header, such as the voice mode, so screen readers skip it. */
+  accessibilityHidden?: boolean;
 }
 
 export function ChatHeader({
@@ -36,6 +38,7 @@ export function ChatHeader({
   onBack,
   needsAction = false,
   readOnly = false,
+  accessibilityHidden = false,
 }: ChatHeaderProps) {
   const warning = useThemeColor("warning");
   const { t } = useText();
@@ -52,6 +55,8 @@ export function ChatHeader({
       <View
         className="absolute inset-x-0 z-20 flex-row items-center gap-2 px-4"
         pointerEvents="box-none"
+        accessibilityElementsHidden={accessibilityHidden}
+        importantForAccessibility={accessibilityHidden ? "no-hide-descendants" : "auto"}
         style={{ top: topInset + 8 }}
       >
         <ChatGlassIconButton

@@ -85,6 +85,7 @@ export const createMockWebRuntime: WebRuntimeFactory = (_accountId, events) => {
     download: async () => ({ name: "preview.txt", mimeType: "text/plain", base64: btoa("OpenBot file preview") }),
     sharedFile: async () => ({ name: "preview.txt", mimeType: "text/plain", base64: btoa("OpenBot file preview") }),
     workspaceFile: async () => ({ name: "preview.txt", mimeType: "text/plain", base64: btoa("OpenBot file preview") }),
+    workspaceDirectory: (agentId, path) => agent.listWorkspaceDirectory({ agentId, path }),
     react: (input) => agent.setMessageReaction(input),
     setAvatar: async (agentId, image) => {
       await agent.setAvatar({ agentId, image });

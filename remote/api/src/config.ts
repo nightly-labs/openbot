@@ -21,6 +21,14 @@ export interface RemoteApiConfig {
   // The signing secret of each OpenBot Slack app, production and development, which share this
   // Signal. A request must name the app whose secret signed it. Without one, the Slack route answers 503.
   slackSigningSecrets: SlackSigningSecret[];
+  // The OpenBot Discord bot. Without it, Signal keeps no Gateway connection and the Discord API route
+  // answers 503.
+  discord: DiscordBotConfig | null;
+}
+
+export interface DiscordBotConfig {
+  botToken: string;
+  applicationId: string;
 }
 
 interface SlackSigningSecret {
@@ -44,6 +52,19 @@ function readSlackSigningSecrets(value: string | undefined): SlackSigningSecret[
     secrets.push({ appId, secret });
   }
   return secrets;
+}
+
+/**
+ * `DISCORD_BOT_TOKEN` and `DISCORD_APPLICATION_ID` turn on the Discord bot together. A missing or
+ * malformed value turns off only Discord: the remote sessions and the Slack route keep running.
+ */
+function readDiscordBot(token: string | undefined, applicationId: string | undefined): DiscordBotConfig | null {
+  const botToken = token?.trim();
+  const id = applicationId?.trim();
+  if (!botToken || !id) return null;
+  if (!/^[A-Za-z0-9_-]{1,128}\.[A-Za-z0-9_-]{1,128}\.[A-Za-z0-9_-]{1,256}$/u.test(botToken)) return null;
+  if (!/^[0-9]{17,20}$/u.test(id)) return null;
+  return { botToken, applicationId: id };
 }
 
 export function readRemoteApiConfig(environment: Record<string, string | undefined> = process.env): RemoteApiConfig {
@@ -73,6 +94,7 @@ export function readRemoteApiConfig(environment: Record<string, string | undefin
     maximumMessagesPerMinute: positiveInteger(environment.REMOTE_MAX_MESSAGES_PER_MINUTE, 600),
     trustProxy: environment.REMOTE_TRUST_PROXY === "true",
     slackSigningSecrets: readSlackSigningSecrets(environment.SLACK_SIGNING_SECRET),
+    discord: readDiscordBot(environment.DISCORD_BOT_TOKEN, environment.DISCORD_APPLICATION_ID),
   };
 }
 

@@ -2,7 +2,6 @@ import { AppLogo } from "@openbot/brand";
 import { Link } from "@tanstack/solid-router";
 import { EXTERNAL_LINK_REL, OPENBOT_LINKS } from "../../lib/landing-links";
 import { Button, ButtonLink } from "../ui/button";
-import { ProductHuntLaunchDialog } from "./ProductHuntLaunch";
 import { SiteMobileMenu } from "./SiteMobileMenu";
 import { SiteNavigationMenu } from "./SiteNavigationMenu";
 
@@ -66,7 +65,6 @@ export function SiteHeader(props: SiteHeaderProps) {
         {actions()}
         <SiteMobileMenu actions={actions} />
       </div>
-      <ProductHuntLaunchDialog />
     </header>
   );
 }

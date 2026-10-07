@@ -8,6 +8,8 @@
 // would push it into all three.
 
 import { isBoolean, isDynamicRecord, isNumber, isString } from "../runtime-values";
+import { decodeDiscordDelivery } from "./discord-api";
+import { DISCORD_ROUTE_GUILDS_LIMIT } from "./discord-route";
 import {
   type IceServer,
   SIGNAL_PROTOCOL_VERSION,
@@ -99,6 +101,15 @@ export function decodeSignalServerMessage(value: unknown): SignalServerMessage |
         retryReason: value.retryReason === null ? null : identifier(value.retryReason),
         bodyBase64: deliveryBody(value.bodyBase64),
       };
+    case "discord-session":
+      return { type: kind, version, token: identifier(value.token), guilds: guildList(value.guilds) };
+    case "discord-delivery":
+      return {
+        type: kind,
+        version,
+        guildId: identifier(value.guildId),
+        delivery: decodeDiscordDelivery(value.delivery),
+      };
     default:
       return null;
   }
@@ -172,6 +183,11 @@ function deliveryBody(value: unknown): string {
   )
     invalid();
   return candidate;
+}
+
+function guildList(value: unknown): string[] {
+  if (!Array.isArray(value) || value.length > DISCORD_ROUTE_GUILDS_LIMIT) invalid();
+  return value.map(identifier);
 }
 
 function channel(value: unknown): SignalChannel {

@@ -1,0 +1,19 @@
+diff --git a/android/src/main/java/com/swmansion/rnscreens/ScreenStackHeaderConfig.kt b/android/src/main/java/com/swmansion/rnscreens/ScreenStackHeaderConfig.kt
+index f9648bc29b24554299bd52d951c2bafa2ccbea6b..68b8d852b8433a05e02372356d00a10530ccb8c9 100644
+--- a/android/src/main/java/com/swmansion/rnscreens/ScreenStackHeaderConfig.kt
++++ b/android/src/main/java/com/swmansion/rnscreens/ScreenStackHeaderConfig.kt
+@@ -230,7 +230,13 @@ class ScreenStackHeaderConfig(
+ 
+     fun onUpdate() {
+         val stack = screenStack
+-        val isTop = stack == null || stack.topScreen == parent
++        // A screen that is not in a stack has nothing to configure a header for, and
++        // `canNavigateBack()` below asserts on exactly this condition. Treating a null
++        // stack as "is top" let a detached screen reach that assertion and throw.
++        if (stack == null) {
++            return
++        }
++        val isTop = stack.topScreen == parent
+ 
+         if (!isAttachedToWindow || !isTop || isDestroyed) {
+             return

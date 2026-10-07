@@ -126,6 +126,8 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.composer.messageAgent": "Message {name}",
   "mobile.chat.composer.pasteFailed": "Could not attach pasted text",
   "mobile.chat.composer.cancelDictation": "Cancel dictation",
+  "mobile.chat.voice.listening": "Listening…",
+  "mobile.chat.voice.continue": "Continue dictation",
   "mobile.chat.composer.addAttachment": "Add attachment",
   "mobile.chat.composer.ask": "Ask {name}",
   "mobile.chat.composer.stopFailed": "Could not stop the agent. It may have finished already.",

@@ -42,6 +42,7 @@ import { agentTemplateIpcHandlers } from "./ipc/agent-template-handlers";
 import { appIpcHandlers } from "./ipc/app-handlers";
 import { attachmentIpcHandlers } from "./ipc/attachment-handlers";
 import { billingIpcHandlers } from "./ipc/billing-handlers";
+import { bitwardenConnectorIpcHandlers } from "./ipc/bitwarden-connector-handlers";
 import { browserIpcHandlers } from "./ipc/browser-handlers";
 import { channelMemoryIpcHandlers } from "./ipc/channel-memory-handlers";
 import { channelRoutineIpcHandlers } from "./ipc/channel-routine-handlers";
@@ -64,6 +65,7 @@ import { pluginIpcHandlers } from "./ipc/plugin-handlers";
 import { providerAdminIpcHandlers } from "./ipc/provider-admin-handlers";
 import { providerDetectionIpcHandlers } from "./ipc/provider-detection-handlers";
 import { providerIpcHandlers } from "./ipc/provider-handlers";
+import { routineFeedIpcHandlers } from "./ipc/routine-feed-handlers";
 import { routineFlowIpcHandlers } from "./ipc/routine-flow-handlers";
 import { routineIpcHandlers } from "./ipc/routine-handlers";
 import { sharedTableIpcHandlers } from "./ipc/shared-table-handlers";
@@ -229,7 +231,7 @@ let relaunchRequested = false;
  * and the sign-in waiting for that grant lives in this process. It is also never held: a grant is
  * answered by the sign-in that started it, and there is no such sign-in before the app is running.
  */
-type RendererDeepLink = Exclude<DeepLink, { kind: "mcp-auth" | "slack-workspace" }>;
+type RendererDeepLink = Exclude<DeepLink, { kind: "mcp-auth" | "slack-workspace" | "discord-guild" }>;
 
 // One link at a time, of whichever kind: a second replaces the first, because what a user opened
 // last is what they meant. `deepLinkReceiverReady` says a window has asked for it, which is what
@@ -269,6 +271,7 @@ const {
   forwardGitHubConnectorStatus,
   forwardRoutineFlowsChanged,
   forwardOnePasswordConnectorStatus,
+  forwardBitwardenConnectorStatus,
   forwardHostStatus,
   forwardRemoteDesktopSessions,
   forwardServers,
@@ -346,9 +349,9 @@ function applyAppIconColor(color: AppLogoColor): void {
 /**
  * Outside macOS, closing the main window ends OpenBot.
  *
- * `window-all-closed` cannot carry that on its own any more. The Computer Use overlays are built
- * once and then hidden between actions rather than closed, and a hidden window is still a window,
- * so the event never arrives: the user would close the last window they can see and leave OpenBot
+ * `window-all-closed` cannot carry that on its own any more. The Computer Use overlays are hidden
+ * between actions and closed only after a minute of idle, and a hidden window is still a window,
+ * so the event may never arrive: the user would close the last window they can see and leave OpenBot
  * and the driver running with no way back to them.
  */
 function attachQuitOnMainWindowClose(window: BrowserWindow): void {
@@ -435,8 +438,10 @@ function registerIpcHandlers({
   hostedSites,
   githubConnector,
   onePasswordConnector,
+  bitwardenConnector,
   billing,
   hostedServers,
+  routineFeed,
   customProviderChanges,
   customAgentChanges,
   providerDetection,
@@ -491,7 +496,9 @@ function registerIpcHandlers({
     ...hostedSiteIpcHandlers({ hostedSites, remoteServers, getMainWindow, translate: language.translate }),
     ...githubConnectorIpcHandlers({ githubConnector }),
     ...onePasswordConnectorIpcHandlers({ onePasswordConnector }),
+    ...bitwardenConnectorIpcHandlers({ bitwardenConnector }),
     ...billingIpcHandlers({ billing }),
+    ...routineFeedIpcHandlers({ routineFeed }),
     ...hostedServerIpcHandlers({ hostedServers }),
     ...customProviderIpcHandlers(customProviderChanges),
     ...customAgentIpcHandlers(customAgentChanges),
@@ -699,6 +706,10 @@ function acceptDeepLink(link: DeepLink): void {
     receiveSlackSignIn(link);
     return;
   }
+  if (link.kind === "discord-guild") {
+    receiveDiscordSignIn(link);
+    return;
+  }
   pendingDeepLink = link;
   const window = windowHolder.current;
   if (!window || window.isDestroyed() || !deepLinkReceiverReady) return;
@@ -726,7 +737,9 @@ function takePendingDeepLink(kind: RendererDeepLink["kind"]): string | null {
 
 /** A link of a kind a renderer can be sent, or null for one it cannot - which includes no link. */
 function takeRendererDeepLink(link: DeepLink | null): RendererDeepLink | null {
-  return link && link.kind !== "mcp-auth" && link.kind !== "slack-workspace" ? link : null;
+  return link && link.kind !== "mcp-auth" && link.kind !== "slack-workspace" && link.kind !== "discord-guild"
+    ? link
+    : null;
 }
 
 /**
@@ -743,6 +756,23 @@ function receiveSlackSignIn(link: Extract<DeepLink, { kind: "slack-workspace" }>
     })
     .catch(() => {
       // The Slack settings show the connection's state. The error can quote Slack.
+    });
+}
+
+/**
+ * Hands a Discord install the sealed guild link it is waiting for. As with a Slack install, a link
+ * this run did not start does nothing and raises no window.
+ */
+function receiveDiscordSignIn(link: Extract<DeepLink, { kind: "discord-guild" }>): void {
+  const messaging = services?.messaging;
+  if (!messaging) return;
+  void Effect.runPromise(messaging.completeDiscordGuild(link.nonce, link.grant))
+    .then((accepted) => {
+      const window = windowHolder.current;
+      if (accepted && window && !window.isDestroyed()) showMainWindow(window);
+    })
+    .catch(() => {
+      // The Discord settings show the connection's state.
     });
 }
 
@@ -906,6 +936,7 @@ if (!hasSingleInstanceLock) {
       built.githubConnector.onChanged(forwardGitHubConnectorStatus);
       built.routineFlows.onChanged(forwardRoutineFlowsChanged);
       built.onePasswordConnector.onChanged(forwardOnePasswordConnectorStatus);
+      built.bitwardenConnector.onChanged(forwardBitwardenConnectorStatus);
       remoteServers.on("changed", forwardServers);
       remoteServers.on("agent", (serverId, event, bufferedLive) => {
         forwardAgentEvent(serverId, event, bufferedLive);

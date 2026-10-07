@@ -643,7 +643,7 @@ describe("remote server order", () => {
       const persisted = JSON.parse(await readFile(statePath, "utf8"));
       expect(persisted.activeServerId).toBe("local");
     } finally {
-      void runCauseEffect(manager.stop());
+      await runCauseEffect(manager.stop());
       await rm(directory, { recursive: true, force: true });
       await rm(unavailableDirectory, { recursive: true, force: true });
     }
@@ -769,7 +769,7 @@ describe("remote server order", () => {
         name: "page.tsx",
       });
       expect(fetchMock).toHaveBeenCalledTimes(2);
-      void runCauseEffect(manager.stop());
+      await runCauseEffect(manager.stop());
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
@@ -1077,7 +1077,7 @@ describe("remote control capability discovery", () => {
         remoteDesktopAvailable: false,
         state: "online",
       });
-      void runCauseEffect(manager.stop());
+      await runCauseEffect(manager.stop());
     } finally {
       await rm(directory, { recursive: true, force: true });
     }

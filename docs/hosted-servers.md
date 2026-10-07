@@ -175,7 +175,8 @@ over `providers-v3` and `providers-v4`: Codex, Grok and Cline show a device code
 whose code the user pastes back into the app, and Cursor shows a page that signs the host's CLI in by
 itself. The Claude sign-in runs under `script` from util-linux (package
 `bsdutils`, in every Ubuntu and Debian image). See
-[Admin capabilities](ARCHITECTURE.md#admin-capabilities) for the routes.
+[Admin capabilities](architecture/servers.md#admin-capabilities) for the routes. Before you sign in
+a Claude subscription on a server, read [provider terms](provider-terms.md#claude).
 
 ## Members
 

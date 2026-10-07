@@ -43,6 +43,7 @@ import {
 } from "@openbot/ui";
 import { teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
 import { useText } from "@openbot/ui/text";
+import { prefersReducedMotion } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, createStore, For, onCleanup, Show, untrack } from "solid-js";
 import { serverRoleCanAdminister } from "./server-capabilities";
@@ -208,7 +209,7 @@ export function createServerMembersSection(host: ServerSettingsSectionHost): Ser
 
   function swapInviteLink(next: string): void {
     const element = inviteLinkInput;
-    if (!element || (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false)) {
+    if (!element || prefersReducedMotion()) {
       setPanels((state) => {
         state.invite.link = next;
       });
@@ -579,7 +580,7 @@ export function createServerMembersSection(host: ServerSettingsSectionHost): Ser
           <ItemDescription class="server-settings-member-meta">{member.email ?? member.username}</ItemDescription>
         </ItemContent>
         <ItemActions class="server-settings-member-actions">
-          <Show when={member.role !== "owner"} fallback={<Badge tone="accent">{t(ROLE_LABELS.owner)}</Badge>}>
+          <Show when={member.role !== "owner"} fallback={<Badge variant="primary-light">{t(ROLE_LABELS.owner)}</Badge>}>
             <Text variant="label-sm" tone="secondary">
               {t(ROLE_LABELS[member.role])}
             </Text>

@@ -51,6 +51,10 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
     previewAttachment,
     openSidebarFileExternally,
     openWorkspaceFile,
+    openWorkspaceFolder,
+    openWorkspaceFolderEntry,
+    sidebarFileBack,
+    openSidebarFileBack,
     navigateBrowserTab,
     props,
     reloadBrowserTab,
@@ -135,6 +139,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
               <FilePreviewPanel
                 allowExternalOpen={!props.runtime}
                 preview={file().preview}
+                directory={file().directory ?? null}
                 agents={props.agents}
                 defaultWidth={() =>
                   (conversationPanelElement()?.clientWidth || window.innerWidth) * BROWSER_PANEL_DEFAULT_RATIO
@@ -151,12 +156,14 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
                 onWidthChange={setBrowserPanelWidth}
                 onOpenLink={(url) => void openExternalMessageUrl(url)}
                 onOpenSharedFile={openSharedFile}
-                onOpenWorkspaceFile={openWorkspaceFile}
+                onOpenWorkspaceFile={file().directory ? openWorkspaceFolderEntry : openWorkspaceFile}
+                onOpenWorkspaceFolder={openWorkspaceFolder}
+                onBack={sidebarFileBack() === null ? undefined : openSidebarFileBack}
                 sourceUrl={attached()?.previewUrl ?? null}
                 onOpenExternally={openSidebarFileExternally}
-                /* In the browser, "open" saves a shared or workspace file, so it is the download. */
-                onDownload={attached() ? downloadSidebarFile : props.runtime ? openSidebarFileExternally : undefined}
-                onReveal={attached() && !props.runtime ? revealSidebarFile : undefined}
+                onDownload={downloadSidebarFile}
+                /* A browser cannot show a file in the file manager. */
+                onReveal={props.runtime ? undefined : revealSidebarFile}
                 onClose={closeSidebarFilePreview}
               />
             </Loading>

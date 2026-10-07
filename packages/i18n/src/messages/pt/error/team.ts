@@ -64,6 +64,7 @@ export const messages = {
   "error.team.agentPublishUnsupported": "Esta conexão não oferece suporte à publicação de agentes.",
   "error.team.agentUpdateUnsupported": "Esta conexão não oferece suporte à atualização de agentes.",
   "error.team.contextResetUnsupported": "Esta conexão não oferece suporte ao início de um novo chat.",
+  "error.team.workspaceDirectoryUnsupported": "Esta conexão não oferece suporte à exibição de pastas.",
   "error.team.agentImportUnsupported": "Esta conexão não oferece suporte à importação de agentes.",
   "error.team.liveActivityUnsupported":
     "Este computador anfitrião não pode atualizar a Atividade ao Vivo de um celular.",

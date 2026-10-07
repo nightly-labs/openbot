@@ -45,7 +45,7 @@ export const OPENBOT_LINKS = {
   productHunt: "https://www.producthunt.com/products/openbot-3?launch=openbot-4",
 } as const;
 
-/** The Product Hunt launch pill and dialog. Set to `false` when the launch ends. */
+/** The Product Hunt launch pill. Set to `false` when the launch ends. */
 export const PRODUCT_HUNT_LAUNCH_LIVE = true;
 
 /**
@@ -59,10 +59,15 @@ export type FooterLink =
   | {
       readonly label: string;
       readonly external: false;
-      readonly to: "/" | "/download" | "/news" | "/guides" | "/plugins" | "/changelog" | "/compare";
+      readonly to: "/" | "/download" | "/news" | "/guides" | "/plugins" | "/changelog" | "/compare" | "/providers";
       readonly hash?: string;
     }
-  | { readonly label: string; readonly external: false; readonly to: "/compare/$slug"; readonly slug: string };
+  | {
+      readonly label: string;
+      readonly external: false;
+      readonly to: "/compare/$slug" | "/providers/$slug";
+      readonly slug: string;
+    };
 
 export interface FooterColumn {
   readonly title: string;
@@ -93,6 +98,20 @@ export const FOOTER_COLUMNS: readonly FooterColumn[] = [
       { label: "Contributing", external: true, href: OPENBOT_LINKS.contributing },
       { label: "Codex", external: true, href: OPENBOT_LINKS.codex },
       { label: "Claude Code", external: true, href: OPENBOT_LINKS.claude },
+    ],
+  },
+  {
+    title: "Providers",
+    links: [
+      { label: "Claude Code", external: false, to: "/providers/$slug", slug: "claude-code" },
+      { label: "Codex", external: false, to: "/providers/$slug", slug: "codex" },
+      { label: "Gemini", external: false, to: "/providers/$slug", slug: "gemini" },
+      { label: "Grok", external: false, to: "/providers/$slug", slug: "grok" },
+      { label: "Cursor", external: false, to: "/providers/$slug", slug: "cursor" },
+      { label: "OpenCode", external: false, to: "/providers/$slug", slug: "opencode" },
+      { label: "Cline", external: false, to: "/providers/$slug", slug: "cline" },
+      { label: "Ollama and LM Studio", external: false, to: "/providers/$slug", slug: "local-models" },
+      { label: "All providers", external: false, to: "/providers" },
     ],
   },
   {

@@ -1,6 +1,6 @@
 name: Cloudflare preview
 
-# The trusted half of the pull request preview. The `preview` job in ci.yml builds the pull
+# The trusted half of the pull request preview. The `api` job in ci.yml builds the pull
 # request's Worker without secrets. This workflow runs the `main` version of this file and of every
 # script it calls, with the preview deploy token, after that CI run completes. It never installs or
 # runs pull request code: it reads only the built files and the generated wrangler.json, and

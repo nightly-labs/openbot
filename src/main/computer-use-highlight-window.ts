@@ -20,6 +20,12 @@ const logger = createOpenBotLogger("computer-use-highlight");
  * spending a measurable part of a core on answering.
  */
 const DEFAULT_POLL_INTERVAL_MS = 33;
+/**
+ * How long the overlays stay after the rim goes down. Each overlay is a renderer process, and the
+ * daemon runs for the whole session while an agent holds the desktop only now and then. The next
+ * target builds them again, which costs one window load.
+ */
+const IDLE_OVERLAY_MS = 60_000;
 /** The corner radius of a standard macOS window, which is what the rim follows by default. */
 const DEFAULT_CORNER_RADIUS = 12;
 
@@ -112,6 +118,8 @@ export class ComputerUseHighlightController<W extends HighlightOverlayWindow = B
   /** The tick in progress, which a refresh that arrives meanwhile waits for instead of starting another. */
   #tick: Deferred.Deferred<void> | null = null;
   #destroyed = false;
+  /** When the rim went down, or `null` while it is up. */
+  #hiddenAt: number | null = null;
   /**
    * Which run of the controller a placement belongs to. A tick reads the driver and loads a window,
    * and `stop()` may land between either of those and the placement that follows it. Hiding alone
@@ -149,6 +157,7 @@ export class ComputerUseHighlightController<W extends HighlightOverlayWindow = B
       this.#timer = null;
     }
     this.#hide();
+    this.#retireAll();
   }
 
   /**
@@ -182,7 +191,6 @@ export class ComputerUseHighlightController<W extends HighlightOverlayWindow = B
   destroy(): void {
     this.#destroyed = true;
     this.stop();
-    for (const id of [...this.#overlays.keys()]) this.#retire(id);
   }
 
   readonly #refresh = Effect.fn("ComputerUseHighlight.refresh")(function* (this: ComputerUseHighlightController<W>) {
@@ -246,13 +254,27 @@ export class ComputerUseHighlightController<W extends HighlightOverlayWindow = B
     // Never `show()`: that would take the key window away from the application the agent is
     // typing into, and the overlay can accept no input anyway.
     if (!window.isVisible()) window.showInactive();
+    this.#hiddenAt = null;
   }
 
+  /**
+   * Hides the rim, and closes the overlays after `IDLE_OVERLAY_MS` of it. A failed driver read hides
+   * too, so a driver that stopped answering does not keep them either.
+   */
   #hide(): void {
     this.#target = null;
+    this.#hiddenAt ??= Date.now();
+    if (Date.now() - this.#hiddenAt >= IDLE_OVERLAY_MS) {
+      this.#retireAll();
+      return;
+    }
     for (const overlay of this.#overlays.values()) {
       if (!overlay.window.isDestroyed() && overlay.window.isVisible()) overlay.window.hide();
     }
+  }
+
+  #retireAll(): void {
+    for (const id of [...this.#overlays.keys()]) this.#retire(id);
   }
 
   /** Drops the overlay of a display that is gone, so no window is left on a desktop without it. */

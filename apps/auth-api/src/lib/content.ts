@@ -6,14 +6,16 @@ import { COMPARE_COLLECTION } from "./compare";
 import type { ContentCollection } from "./content-collection";
 import { GUIDES_COLLECTION } from "./guides";
 import { NEWS_COLLECTION } from "./news";
+import { PROVIDERS_COLLECTION } from "./providers";
 
 export const CONTENT_COLLECTIONS: readonly ContentCollection[] = [
   NEWS_COLLECTION,
   GUIDES_COLLECTION,
   COMPARE_COLLECTION,
+  PROVIDERS_COLLECTION,
 ];
 
-/** The collections whose articles are prose. A comparison is drawn from data instead. */
+/** The collections whose articles are prose. A comparison or a provider page is drawn from data instead. */
 export const PROSE_COLLECTIONS = [NEWS_COLLECTION, GUIDES_COLLECTION] as const;
 
 /** The collections the header menu offers, in its order. */

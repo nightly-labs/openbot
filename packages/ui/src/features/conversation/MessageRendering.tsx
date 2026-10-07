@@ -6,7 +6,7 @@ import { prefersReducedMotion } from "@openbot/ui/utils";
 import { createEffect, createMemo, createSignal, For, Match, onCleanup, Show, Switch, untrack } from "solid-js";
 import type { AgentMessage, AgentProfile } from "../../data";
 import { useText } from "../../text";
-import { AttachmentCards, AttachmentDownloadAll } from "./AttachmentCards";
+import { AttachmentCards } from "./AttachmentCards";
 import { CodeBlock } from "./CodeBlock";
 import { CodePreview } from "./CodePreview";
 import { ComparisonTable } from "./ComparisonTable";
@@ -243,7 +243,6 @@ export function MessageBody(props: {
   onAttachmentAction: (attachment: AttachmentSummary, action: "open" | "reveal" | "download") => void;
   onOpenSharedFile?: (path: string) => void;
   onOpenWorkspaceFile?: (path: string) => void;
-  onDownloadAttachments?: (attachments: AttachmentSummary[]) => Promise<void>;
   onDownload?: (attachment: AttachmentSummary) => void;
 }) {
   const { t } = useText();
@@ -278,7 +277,6 @@ export function MessageBody(props: {
       (attachment) => !referencedIds.has(attachment.id) && attachment.id !== generatedAttachmentId,
     );
   });
-  const [downloadingAttachments, setDownloadingAttachments] = createSignal(false);
   const standaloneImageAttachments = createMemo(() =>
     props.message.author === "agent" ? standaloneAttachments().filter(isLightboxImage) : [],
   );
@@ -494,19 +492,6 @@ export function MessageBody(props: {
       </Switch>
       <Show when={standaloneFileAttachments().length > 0}>
         <div class="message-attachments-group">
-          <Show when={(props.message.attachments?.length ?? 0) > 2 && props.onDownloadAttachments}>
-            <AttachmentDownloadAll
-              count={props.message.attachments?.length ?? 0}
-              pending={downloadingAttachments()}
-              onDownload={() => {
-                if (downloadingAttachments()) return;
-                setDownloadingAttachments(true);
-                void props
-                  .onDownloadAttachments?.(props.message.attachments ?? [])
-                  .finally(() => setDownloadingAttachments(false));
-              }}
-            />
-          </Show>
           <AttachmentCards
             attachments={standaloneFileAttachments()}
             onPreview={openAttachment}

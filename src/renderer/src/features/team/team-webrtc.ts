@@ -61,14 +61,32 @@ interface PeerState {
   reconnectAttempt: number;
   reconnectTimer: number | null;
   turnRefreshTimer: number | null;
+  /** Opens a new Signal socket when a lost path did not come back. */
+  signalRenewTimer: number | null;
+  /** Reports a lost path that did not come back as a disconnected peer. */
+  disconnectedTimer: number | null;
   iceRestartPending: boolean;
   iceRestarting: boolean;
+  iceRestarts: number;
   signalChain: Promise<void>;
   closed: boolean;
 }
 
+// After a sleep or a network change the path can stay `disconnected` or `failed`. The ICE restart
+// offer goes to the Signal socket from before, which can be half-open, so no answer comes. A new
+// socket restarts ICE on its `ready`; when the path is still lost after the grace time, main
+// connects again with a new ticket. Before this, main read the peer as connected until a restart.
+const SIGNAL_RENEW_DELAY_MS = 8_000;
+const DISCONNECT_GRACE_MS = 15_000;
+
 const peers = new Map<string, PeerState>();
 const dataChannelNames = ["rpc", "events", "files", "desktop"] as const;
+// Chromium keeps the sockets of every earlier ICE generation until the connection closes: one per
+// network interface, and one more per interface for TURN, for each restart. On a host with 10
+// interfaces, about 150 restarts reach the network service's limit of 3,000 sockets, and then no
+// device can connect until the app restarts. A connection that would restart once more than this is
+// dropped instead, and the client connects again on a new one.
+const maximumIceRestarts = 10;
 let mainPort: MessagePort;
 
 const receiveMainPort = (event: MessageEvent): void => {
@@ -119,8 +137,11 @@ async function handleCommand(command: BridgeCommand): Promise<void> {
         reconnectAttempt: 0,
         reconnectTimer: null,
         turnRefreshTimer: null,
+        signalRenewTimer: null,
+        disconnectedTimer: null,
         iceRestartPending: false,
         iceRestarting: false,
+        iceRestarts: 0,
         signalChain: Promise.resolve(),
         closed: false,
       };
@@ -200,8 +221,9 @@ function connectSignal(state: PeerState): void {
 }
 
 async function handleSignal(state: PeerState, message: SignalServerMessage): Promise<void> {
-  // Signal sends Slack deliveries only to the main process's `ingress` socket, never to this peer.
-  if (message.type === "slack-delivery") return;
+  // Signal sends Slack and Discord messages only to the main process's `ingress` socket, never to this peer.
+  if (message.type === "slack-delivery" || message.type === "discord-session" || message.type === "discord-delivery")
+    return;
   if (message.type === "account-profile-changed") {
     post({ type: "account-profile-changed", peerId: state.id });
     return;
@@ -298,6 +320,8 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
         payloadDecoders: {},
         reconnectTimer: null,
         turnRefreshTimer: null,
+        signalRenewTimer: null,
+        disconnectedTimer: null,
         signalChain: Promise.resolve(),
       };
       state.clients.set(message.sessionId, client);
@@ -337,6 +361,7 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
       disconnect(state.id);
       return;
     }
+    clearPathRecovery(state);
     state.peerConnection?.close();
     state.peerConnection = null;
     state.connectionId = null;
@@ -358,6 +383,10 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
   if (message.channel !== "team" || message.connectionId !== state.connectionId) return;
   if (message.type === "offer") {
     const connection = state.peerConnection ?? createPeerConnection(state, state.iceServers);
+    if (restartsIce(connection, message.sdp) && ++state.iceRestarts > maximumIceRestarts) {
+      dropRestartedConnection(state);
+      return;
+    }
     await connection.setRemoteDescription({ type: "offer", sdp: message.sdp });
     const answer = await connection.createAnswer();
     await connection.setLocalDescription(answer);
@@ -388,6 +417,7 @@ function createPeerConnection(state: PeerState, iceServers: RTCIceServer[]): RTC
     iceTransportPolicy: state.iceTransportPolicy,
   });
   state.peerConnection = connection;
+  state.iceRestarts = 0;
   connection.onicecandidate = (event) => {
     if (!event.candidate || !state.connectionId) return;
     sendSignal(state, {
@@ -406,7 +436,12 @@ function createPeerConnection(state: PeerState, iceServers: RTCIceServer[]): RTC
   };
   connection.onconnectionstatechange = () => {
     if (state.peerConnection !== connection) return;
-    if (connection.connectionState === "connected") void reportSelectedPath(state, connection).catch(() => undefined);
+    if (connection.connectionState === "connected") {
+      clearPathRecovery(state);
+      void reportSelectedPath(state, connection).catch(() => undefined);
+    }
+    if (connection.connectionState === "disconnected" || connection.connectionState === "failed")
+      recoverPath(state, connection);
     if (connection.connectionState === "failed") {
       state.iceRestartPending = true;
       void retryPendingIceRestart(state);
@@ -515,6 +550,7 @@ function waitForWritableChannel(channel: RTCDataChannel): Promise<void> {
 async function restartIce(state: PeerState): Promise<void> {
   const connection = state.peerConnection;
   if (!connection || !state.connectionId || state.role !== "client") return;
+  if (++state.iceRestarts > maximumIceRestarts) return dropRestartedConnection(state);
   connection.restartIce();
   const offer = await connection.createOffer({ iceRestart: true });
   await connection.setLocalDescription(offer);
@@ -547,6 +583,52 @@ async function retryPendingIceRestart(state: PeerState): Promise<void> {
   } finally {
     state.iceRestarting = false;
   }
+}
+
+/** Whether an offer for a connection that already has a remote description starts a new ICE generation. */
+function restartsIce(connection: RTCPeerConnection, offer: string): boolean {
+  const current = connection.remoteDescription?.sdp;
+  return current !== undefined && iceUfrag(current) !== iceUfrag(offer);
+}
+
+function iceUfrag(sdp: string): string | undefined {
+  return sdp.match(/^a=ice-ufrag:(\S+)$/mu)?.[1];
+}
+
+/**
+ * Closes a connection that has used up its ICE restarts. Signal tells the other end, which closes
+ * its own connection, and the client connects again with a new one.
+ */
+function dropRestartedConnection(state: PeerState): void {
+  if (state.signalHost) {
+    disconnect(state.id);
+    return;
+  }
+  clearPathRecovery(state);
+  disconnectPeerConnection(state);
+  post({ type: "peer-disconnected", peerId: state.id });
+}
+
+function recoverPath(state: PeerState, connection: RTCPeerConnection): void {
+  if (state.role !== "client" || state.closed || state.disconnectedTimer !== null) return;
+  const lost = () => !state.closed && state.peerConnection === connection && connection.connectionState !== "connected";
+  state.signalRenewTimer = window.setTimeout(() => {
+    state.signalRenewTimer = null;
+    if (lost()) replaceSignal(state);
+  }, SIGNAL_RENEW_DELAY_MS);
+  state.disconnectedTimer = window.setTimeout(() => {
+    state.disconnectedTimer = null;
+    if (!lost()) return;
+    disconnect(state.id);
+    post({ type: "peer-disconnected", peerId: state.id });
+  }, DISCONNECT_GRACE_MS);
+}
+
+function clearPathRecovery(state: PeerState): void {
+  if (state.signalRenewTimer !== null) clearTimeout(state.signalRenewTimer);
+  if (state.disconnectedTimer !== null) clearTimeout(state.disconnectedTimer);
+  state.signalRenewTimer = null;
+  state.disconnectedTimer = null;
 }
 
 function requiredDescriptionSdp(description: RTCSessionDescriptionInit): string {
@@ -622,6 +704,7 @@ function disconnect(peerId: string): void {
   }
   if (state.reconnectTimer !== null) clearTimeout(state.reconnectTimer);
   if (state.turnRefreshTimer !== null) clearTimeout(state.turnRefreshTimer);
+  clearPathRecovery(state);
   disconnectPeerConnection(state);
   state.socket?.close(1000, "Peer stopped");
   peers.delete(peerId);

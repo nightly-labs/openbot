@@ -17,17 +17,14 @@ import { z } from "zod";
 import { resolveAgentCommand } from "../backend/acp-agent-command";
 import { writeFileAtomically } from "../backend/atomic-json-file";
 import type { CustomAgentConfig } from "../backend/custom-acp-agents-client";
+import { causeHelpers } from "../backend/effect-boundary";
 import type { CustomProviderCipher } from "./custom-provider-store";
 
 export class CustomAgentFailure extends Schema.TaggedError<CustomAgentFailure>()("CustomAgentFailure", {
   cause: Schema.Defect(),
 }) {}
-function agentIO<A>(operation: () => Promise<A>): Effect.Effect<A, CustomAgentFailure> {
-  return Effect.tryPromise({ try: operation, catch: (cause) => new CustomAgentFailure({ cause }) });
-}
-function agentSync<A>(operation: () => A): Effect.Effect<A, CustomAgentFailure> {
-  return Effect.try({ try: operation, catch: (cause) => new CustomAgentFailure({ cause }) });
-}
+
+const { io: agentIO, sync: agentSync, rewrap: toCustomAgentFailure } = causeHelpers(CustomAgentFailure);
 export const CUSTOM_AGENTS_FILE = "custom-agents.json";
 
 /**
@@ -75,10 +72,7 @@ export class CustomAgentStore {
   }) {
     this.#path = options.path;
     this.#cipher = options.cipher;
-    this.#resolve =
-      options.resolve ??
-      ((command) =>
-        resolveAgentCommand(command).pipe(Effect.mapError((error) => new CustomAgentFailure({ cause: error.cause }))));
+    this.#resolve = options.resolve ?? ((command) => resolveAgentCommand(command).pipe(toCustomAgentFailure));
   }
 
   /**

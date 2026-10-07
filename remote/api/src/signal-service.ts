@@ -1,3 +1,6 @@
+import { createHash, randomBytes } from "node:crypto";
+import type { DiscordDelivery } from "@openbot/contracts/signal-protocol/discord-api";
+import { DISCORD_ROUTE_TTL_SECONDS, type DiscordRouteGuild } from "@openbot/contracts/signal-protocol/discord-route";
 import { SLACK_ROUTE_TTL_SECONDS, type SlackRouteTeam } from "@openbot/contracts/signal-protocol/slack-route";
 import { Context, Effect, Layer, Result } from "effect";
 import {
@@ -19,6 +22,11 @@ interface SlackRoute {
   teams: SlackRouteTeam[];
 }
 
+/** The guilds a verified Discord route ticket names, each with the time it was linked to the host. */
+interface DiscordRoute {
+  guilds: DiscordRouteGuild[];
+}
+
 export interface RemoteTokenProvider {
   verifyTicket(token: string): Effect.Effect<RemoteTicketClaims, RemoteTokenError>;
   verifyResumeToken(token: string): Effect.Effect<RemoteTicketClaims, RemoteTokenError>;
@@ -28,6 +36,9 @@ export interface RemoteTokenProvider {
   /** Without a route verifier, no ingress socket connects. */
   verifySlackRoute?(token: string, hostId: string): Effect.Effect<SlackRoute, RemoteTokenError>;
   validateSlackRoute?(hostId: string, teams: SlackRouteTeam[]): Effect.Effect<string[], RemoteTokenError>;
+  /** Without a Discord route verifier, an ingress socket cannot name Discord guilds. */
+  verifyDiscordRoute?(token: string, hostId: string): Effect.Effect<DiscordRoute, RemoteTokenError>;
+  validateDiscordRoute?(hostId: string, guilds: DiscordRouteGuild[]): Effect.Effect<string[], RemoteTokenError>;
   revokeHost?(hostId: string, authEpoch: number): void;
   revokeSession?(sessionId: string): void;
 }
@@ -57,6 +68,10 @@ interface AuthenticatedPeer {
   // `ingress` only: the Slack workspaces whose requests this socket receives.
   // The routes this socket holds: `<app ID>:<workspace ID>`.
   slackTeams: string[];
+  // `ingress` only: the Discord guild IDs whose events this socket receives.
+  discordGuilds: string[];
+  // `ingress` only: the hash of the `discord-session` token sent to this socket.
+  discordSession: string | null;
 }
 
 interface ActiveConnection {
@@ -76,6 +91,27 @@ export interface SignalMetrics {
   activePeerConnections: number;
   slackDeliveries: number;
   slackDeliveriesUnavailable: number;
+  discordDeliveries: number;
+  // No socket holds the guild, or the delivery is larger than a Signal message.
+  discordDeliveriesUnavailable: number;
+  discordApiCalls: number;
+  discordApiFailures: number;
+}
+
+/** The result of the authorization of one Discord API call. */
+export type DiscordCaller = { ok: true; hostId: string } | { ok: false; code: "unauthorized" | "unknown_guild" };
+
+export interface SignalServiceOptions {
+  /** Signal holds the Discord bot token: an `ingress` socket with a Discord route gets a session. */
+  discord?: boolean;
+}
+
+/** What the Discord Gateway knows of the bot's guilds. */
+export interface DiscordMembership {
+  /** Whether the bot is in the guild, or null before the Gateway has listed its guilds. */
+  isMember(guildId: string): boolean | null;
+  /** A route ticket names a guild that the bot left: the account service unlinks it. */
+  left(guildId: string): void;
 }
 
 /** One signed Slack request for a workspace. Signal passes it on and keeps nothing of it. */
@@ -129,6 +165,9 @@ const MAXIMUM_EXPIRATION_TIMER_MILLISECONDS = 24 * 60 * 60_000;
 const INGRESS_RATE_FACTOR = 10;
 // Slack sends at most 30,000 events an hour for one app in one workspace.
 const SLACK_TEAM_RATE_FACTOR = 2;
+const DISCORD_SESSION_TOKEN_BYTES = 32;
+// How long after a link Signal waits for the Gateway to report the bot in the guild.
+const DISCORD_NEW_LINK_MILLISECONDS = 5 * 60_000;
 
 export class SignalService {
   readonly #tokens: RemoteTokenProvider;
@@ -144,6 +183,14 @@ export class SignalService {
   // after the account service revoked it. A host that lost a workspace keeps its last ticket until it
   // expires; this keeps that ticket from taking the route back.
   readonly #slackRouteFloor = new Map<string, number>();
+  // Discord guild ID to the `ingress` socket that said hello last with a route ticket for it.
+  readonly #discordGuilds = new Map<string, string>();
+  // The oldest link that each guild still accepts, as `#slackRouteFloor` does for Slack.
+  readonly #discordRouteFloor = new Map<string, number>();
+  // The SHA-256 of each `discord-session` token to its socket. The token itself is not kept.
+  readonly #discordSessions = new Map<string, string>();
+  readonly #discordEnabled: boolean;
+  #discordMembership: DiscordMembership | null = null;
   readonly #pendingDeliveries = new Map<string, PendingDelivery>();
   readonly #slackLimits: SlackDeliveryLimits;
   readonly #connections = new Map<string, ActiveConnection>();
@@ -157,6 +204,7 @@ export class SignalService {
   // The revocations below are in memory. Until every route ticket issued before this start has
   // expired, the account service confirms each link.
   readonly #validateSlackRoutesUntil = Date.now() + SLACK_ROUTE_TTL_SECONDS * 1_000;
+  readonly #validateDiscordRoutesUntil = Date.now() + DISCORD_ROUTE_TTL_SECONDS * 1_000;
   #lastRatePruneAt = 0;
   readonly #metrics: SignalMetrics = {
     acceptedConnections: 0,
@@ -167,6 +215,10 @@ export class SignalService {
     activePeerConnections: 0,
     slackDeliveries: 0,
     slackDeliveriesUnavailable: 0,
+    discordDeliveries: 0,
+    discordDeliveriesUnavailable: 0,
+    discordApiCalls: 0,
+    discordApiFailures: 0,
   };
 
   readonly dependencies: Layer.Layer<SignalTokens>;
@@ -177,6 +229,7 @@ export class SignalService {
     maximumConnectionsPerIp = 32,
     maximumMessagesPerMinute = 600,
     slackLimits: SlackDeliveryLimits = DEFAULT_SLACK_DELIVERY_LIMITS,
+    options: SignalServiceOptions = {},
   ) {
     this.#tokens = tokens;
     this.dependencies = SignalTokens.layer(tokens);
@@ -184,6 +237,7 @@ export class SignalService {
     this.#maximumConnectionsPerIp = maximumConnectionsPerIp;
     this.#maximumMessagesPerMinute = maximumMessagesPerMinute;
     this.#slackLimits = slackLimits;
+    this.#discordEnabled = options.discord === true;
   }
 
   close(): void {
@@ -302,6 +356,10 @@ export class SignalService {
         for (const [requestId, pending] of [...this.#pendingDeliveries]) {
           if (pending.socketId === socket.id) this.#settleDelivery(requestId, this.#unavailable());
         }
+        for (const guildId of peer.discordGuilds) {
+          if (this.#discordGuilds.get(guildId) === socket.id) this.#discordGuilds.delete(guildId);
+        }
+        if (peer.discordSession) this.#discordSessions.delete(peer.discordSession);
       }
       for (const connection of [...this.#connections.values()]) {
         if (connection.client.id !== socket.id && connection.host.id !== socket.id) continue;
@@ -368,6 +426,64 @@ export class SignalService {
     if (floor > through) return;
     this.#slackRouteFloor.set(route, through + 1);
     this.#slackTeams.delete(route);
+  }
+
+  /** Set by the Discord Gateway when it starts, which is after this service. */
+  setDiscordMembership(membership: DiscordMembership | null): void {
+    this.#discordMembership = membership;
+  }
+
+  /** The account service unlinked a Discord guild, or moved it, after `through`'s link. */
+  revokeDiscordRoute(guildId: string, through: number): void {
+    const floor = this.#discordRouteFloor.get(guildId) ?? 0;
+    // A newer link already holds the route.
+    if (floor > through) return;
+    this.#discordRouteFloor.set(guildId, through + 1);
+    this.#discordGuilds.delete(guildId);
+  }
+
+  /**
+   * Passes one normalized Discord event to the `ingress` socket of the guild's host. Nothing waits
+   * for an answer, and nothing is kept: with no socket for the guild, the event is dropped.
+   */
+  deliverDiscord(guildId: string, delivery: DiscordDelivery): boolean {
+    const socketId = this.#discordGuilds.get(guildId);
+    const ingress = socketId ? this.#peers.get(socketId) : undefined;
+    const message = ingress
+      ? encodeSignalServerMessage({ type: "discord-delivery", version: 1, guildId, delivery })
+      : null;
+    if (!ingress || !message || new TextEncoder().encode(message).byteLength > SIGNAL_MESSAGE_BYTES_LIMIT) {
+      this.#metrics.discordDeliveriesUnavailable += 1;
+      return false;
+    }
+    ingress.socket.send(message);
+    this.#metrics.discordDeliveries += 1;
+    return true;
+  }
+
+  /**
+   * Authorizes one Discord API call: the `discord-session` token must belong to an open `ingress`
+   * socket, and that socket must hold the guild. With no guild, only the token is checked.
+   */
+  discordCaller(token: string, guildId: string | null): DiscordCaller {
+    const socketId = this.#discordSessions.get(discordSessionKey(token));
+    const peer = socketId ? this.#peers.get(socketId) : undefined;
+    if (!socketId || !peer) return { ok: false, code: "unauthorized" };
+    if (guildId !== null && this.#discordGuilds.get(guildId) !== socketId) return { ok: false, code: "unknown_guild" };
+    return { ok: true, hostId: peer.claims.hostId };
+  }
+
+  /** The rate limit of the Discord API calls of one host. It returns the wait in milliseconds, or null. */
+  acceptDiscordCall(hostId: string, now = Date.now()): number | null {
+    const key = `discord-host:${hostId}`;
+    if (this.#acceptRateKey(key, now)) return null;
+    const window = this.#rateWindows.get(key);
+    return window ? Math.max(1, window.startedAt + RATE_WINDOW_MILLISECONDS - now) : RATE_WINDOW_MILLISECONDS;
+  }
+
+  recordDiscordCall(succeeded: boolean): void {
+    this.#metrics.discordApiCalls += 1;
+    if (!succeeded) this.#metrics.discordApiFailures += 1;
   }
 
   revokeSession(sessionId: string): void {
@@ -503,21 +619,36 @@ export class SignalService {
           if (message.peer === "client" && claims.role === "host")
             return yield* new RemoteTokenError({ message: "Member role required." });
           let slackRoute: SlackRoute = { teams: [] };
+          let discordRoute: DiscordRoute = { guilds: [] };
           if (message.peer === "ingress") {
-            if (!message.slackRoute || !tokens.verifySlackRoute)
-              return yield* new RemoteTokenError({ message: "Slack route required." });
-            slackRoute = yield* tokens.verifySlackRoute(message.slackRoute, claims.hostId);
-            if (Date.now() < this.#validateSlackRoutesUntil) {
-              if (!tokens.validateSlackRoute)
-                return yield* new RemoteTokenError({ message: "Slack route validation required." });
-              const linked = new Set(yield* tokens.validateSlackRoute(claims.hostId, slackRoute.teams));
-              slackRoute = { teams: slackRoute.teams.filter((team) => linked.has(team.id)) };
+            if (!message.slackRoute && !message.discordRoute)
+              return yield* new RemoteTokenError({ message: "A Slack or Discord route is required." });
+            if (message.slackRoute) {
+              if (!tokens.verifySlackRoute) return yield* new RemoteTokenError({ message: "Slack route required." });
+              slackRoute = yield* tokens.verifySlackRoute(message.slackRoute, claims.hostId);
+              if (Date.now() < this.#validateSlackRoutesUntil) {
+                if (!tokens.validateSlackRoute)
+                  return yield* new RemoteTokenError({ message: "Slack route validation required." });
+                const linked = new Set(yield* tokens.validateSlackRoute(claims.hostId, slackRoute.teams));
+                slackRoute = { teams: slackRoute.teams.filter((team) => linked.has(team.id)) };
+              }
+            }
+            if (message.discordRoute) {
+              if (!tokens.verifyDiscordRoute)
+                return yield* new RemoteTokenError({ message: "Discord route verification required." });
+              discordRoute = yield* tokens.verifyDiscordRoute(message.discordRoute, claims.hostId);
+              if (Date.now() < this.#validateDiscordRoutesUntil) {
+                if (!tokens.validateDiscordRoute)
+                  return yield* new RemoteTokenError({ message: "Discord route validation required." });
+                const linked = new Set(yield* tokens.validateDiscordRoute(claims.hostId, discordRoute.guilds));
+                discordRoute = { guilds: discordRoute.guilds.filter((guild) => linked.has(guild.id)) };
+              }
             }
           }
           this.#pruneReplayCache();
           if (usedInitialTicket && this.#usedTicketIds.has(claims.jti))
             return yield* new RemoteTokenError({ message: "Ticket was already used." });
-          return { claims, slackRoute };
+          return { claims, slackRoute, discordRoute };
         }).pipe(Effect.result);
         if (Result.isFailure(authentication)) {
           this.#metrics.authenticationFailures += 1;
@@ -526,7 +657,7 @@ export class SignalService {
         }
         // Verification may finish after disconnect removed the socket. Register nothing then.
         if (!this.#sockets.has(socket.id)) return;
-        const { claims, slackRoute } = authentication.success;
+        const { claims, slackRoute, discordRoute } = authentication.success;
         // A reconnect of the same logical session replaces its old socket below, so that socket does not
         // count. A phone that changes network keeps a half-open socket until the idle timeout.
         const replaced =
@@ -549,6 +680,8 @@ export class SignalService {
           resumed: !usedInitialTicket,
           multiplex: message.peer === "host" && message.multiplex === true,
           slackTeams: slackRoute.teams.map((team) => slackRouteKey(team.appId, team.id)),
+          discordGuilds: discordRoute.guilds.map((guild) => guild.id),
+          discordSession: null,
         };
         this.#peers.set(socket.id, peer);
         this.#schedulePeerExpiration(peer);
@@ -564,6 +697,23 @@ export class SignalService {
             this.#slackRouteFloor.set(route, team.linkedAt);
             this.#slackTeams.set(route, socket.id);
           }
+          const heldGuilds: string[] = [];
+          for (const guild of discordRoute.guilds) {
+            if (guild.linkedAt < (this.#discordRouteFloor.get(guild.id) ?? 0)) continue;
+            // The bot left the guild while its unlink did not reach the account service, such as
+            // when the host was off and the request failed, or before Signal restarted. A new link
+            // can arrive before the Gateway reports that the bot joined, so it is not judged.
+            if (
+              this.#discordMembership?.isMember(guild.id) === false &&
+              Date.now() - guild.linkedAt > DISCORD_NEW_LINK_MILLISECONDS
+            ) {
+              this.#discordMembership.left(guild.id);
+              continue;
+            }
+            this.#discordRouteFloor.set(guild.id, guild.linkedAt);
+            this.#discordGuilds.set(guild.id, socket.id);
+            heldGuilds.push(guild.id);
+          }
           this.#send(socket, {
             type: "ready",
             version: 1,
@@ -571,6 +721,14 @@ export class SignalService {
             resumeToken,
             iceServers: this.#tokens.iceServers(claims),
           });
+          // Without the bot token, Signal cannot make a Discord call: the socket gets no session. The
+          // session names the guilds routed here, so the host learns of a guild it lost while off.
+          if (this.#discordEnabled && message.discordRoute) {
+            const token = randomBytes(DISCORD_SESSION_TOKEN_BYTES).toString("base64url");
+            peer.discordSession = discordSessionKey(token);
+            this.#discordSessions.set(peer.discordSession, socket.id);
+            this.#send(socket, { type: "discord-session", version: 1, token, guilds: heldGuilds });
+          }
           return;
         }
         if (message.peer === "host") {
@@ -850,6 +1008,11 @@ function memberRole(role: RemoteTicketClaims["role"]): "owner" | "admin" | "memb
 
 function randomIdentifier(): string {
   return crypto.randomUUID().replaceAll("-", "");
+}
+
+/** The map key of a `discord-session` token. A hash, so a lookup does not compare the secret itself. */
+function discordSessionKey(token: string): string {
+  return createHash("sha256").update(token).digest("base64url");
 }
 
 /** One Slack app in one workspace. The production and development apps can share a workspace. */

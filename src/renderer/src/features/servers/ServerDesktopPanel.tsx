@@ -79,7 +79,11 @@ export function ServerDesktopPanel(props: {
         <ItemContent>
           <ItemTitle>{t("server.desktop.remoteControl")}</ItemTitle>
           <ItemDescription class="server-settings-desktop-description">{status().message}</ItemDescription>
-          <Badge class="server-settings-desktop-status" tone={status().available ? "success" : "warning"} shape="pill">
+          <Badge
+            class="server-settings-desktop-status"
+            variant={status().available ? "success-light" : "warning-light"}
+            shape="pill"
+          >
             {status().title}
           </Badge>
         </ItemContent>
@@ -108,7 +112,7 @@ export function ServerDesktopPanel(props: {
               </ItemDescription>
             </ItemContent>
             <ItemActions class="server-settings-desktop-meta">
-              <Badge tone={props.hostStatus?.remoteDesktopReady ? "success" : "warning"} shape="pill">
+              <Badge variant={props.hostStatus?.remoteDesktopReady ? "success-light" : "warning-light"} shape="pill">
                 {props.hostStatus?.remoteDesktopReady
                   ? t("server.desktop.componentInstalled")
                   : t("server.desktop.componentNotInstalled")}

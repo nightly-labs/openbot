@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { sourceText } from "@openbot/i18n/source";
 import { Context, Deferred, Effect, Result, Schema } from "effect";
 import type { HostManagerConfig, HostTenantStatus, HostUpdateState } from "../../packages/contracts/src/host-manager";
+import { causeHelpers } from "../backend/effect-boundary";
 import { isMissingFileError } from "../backend/file-errors";
 import {
   HOST_HEARTBEAT_TIMEOUT_MS,
@@ -28,11 +29,8 @@ export interface HostManagerOperations {
 class HostMaintenanceError extends Schema.TaggedError<HostMaintenanceError>()("HostMaintenanceError", {
   cause: Schema.Defect(),
 }) {}
-const maintenanceCall = <A>(operation: () => Promise<A>) =>
-  Effect.tryPromise({
-    try: operation,
-    catch: (cause) => new HostMaintenanceError({ cause }),
-  });
+
+const { io: maintenanceCall } = causeHelpers(HostMaintenanceError);
 class HostInstallation extends Context.Service<
   HostInstallation,
   {

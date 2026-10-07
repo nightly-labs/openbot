@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
-import { OnePasswordOperationError, onePasswordCall } from "./onepassword-effects";
+import { OnePasswordOperationError, onePasswordCall, toOnePasswordOperationError } from "./onepassword-effects";
 import { extractZipFiles } from "./provider-runtime-archive";
 import type { RuntimeTarget } from "./provider-runtime-descriptors";
 
@@ -91,7 +91,7 @@ export const installOnePasswordCli = Effect.fn("OnePasswordCli.install")(functio
     const executable = executableName(target);
     yield* onePasswordCall(() => mkdir(staging));
     yield* extractZipFiles(archive, staging, [executable, `${executable}.sig`], failed).pipe(
-      Effect.mapError((failure) => new OnePasswordOperationError({ cause: failure.cause })),
+      toOnePasswordOperationError,
     );
     yield* onePasswordCall(async () => {
       await chmod(join(staging, executable), 0o755);

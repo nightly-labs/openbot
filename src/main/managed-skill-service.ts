@@ -6,6 +6,7 @@ import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Effect, Result, Schema } from "effect";
 import { parse as parseYaml } from "yaml";
+import { causeHelpers } from "../backend/effect-boundary";
 import { isMissingFileError } from "../backend/file-errors";
 import { isPathInside } from "../backend/path-containment";
 
@@ -276,9 +277,5 @@ export const listManagedSkillsForChat = Effect.fn("ManagedSkill.listForChat")(fu
 class ManagedSkillFailure extends Schema.TaggedError<ManagedSkillFailure>()("ManagedSkillFailure", {
   cause: Schema.Defect(),
 }) {}
-function managedIO<A>(operation: () => Promise<A>): Effect.Effect<A, ManagedSkillFailure> {
-  return Effect.tryPromise({ try: operation, catch: (cause) => new ManagedSkillFailure({ cause }) });
-}
-function managedSync<A>(operation: () => A): Effect.Effect<A, ManagedSkillFailure> {
-  return Effect.try({ try: operation, catch: (cause) => new ManagedSkillFailure({ cause }) });
-}
+
+const { io: managedIO, sync: managedSync } = causeHelpers(ManagedSkillFailure);
