@@ -72,10 +72,20 @@
   margin-left: auto;
 }
 
+/* As with the chat's browser sidebar: the run details panel appears at once at the right edge, and
+   the canvas eases its padding to make room. */
 .diagram-view-body {
+  --diagram-inspector-width: 340px;
+
+  position: relative;
   display: flex;
   min-height: 0;
   flex: 1;
+  transition: padding-right var(--panel-resize-duration, var(--openbot-duration-overlay)) cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.diagram-view-body[data-inspector="open"] {
+  padding-right: var(--diagram-inspector-width);
 }
 
 .diagram-view-chat {
@@ -888,15 +898,16 @@
 /* Run panel */
 
 .diagram-inspector {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
   display: flex;
-  width: 340px;
+  width: var(--diagram-inspector-width);
   min-height: 0;
-  flex: none;
   flex-direction: column;
   border-left: 1px solid var(--openbot-border);
   background: var(--openbot-bg-surface);
-  /* Slides in as the chat's settings panel does. */
-  animation: settings-panel-in var(--openbot-duration-slow) cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
 .diagram-inspector-header {
@@ -1284,8 +1295,7 @@
     animation: none;
   }
 
-  .diagram-node[data-kind="routine"][data-firing] .diagram-node-icon,
-  .diagram-inspector {
+  .diagram-node[data-kind="routine"][data-firing] .diagram-node-icon {
     animation: none;
   }
 

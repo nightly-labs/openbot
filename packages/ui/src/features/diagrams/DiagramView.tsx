@@ -175,7 +175,7 @@ export function DiagramView(props: DiagramViewProps) {
         </span>
       </header>
 
-      <div class="diagram-view-body">
+      <div class="diagram-view-body" data-inspector={panels.inspector ? "open" : undefined}>
         <DiagramBoard
           diagram={props.diagram}
           agents={props.agents}
