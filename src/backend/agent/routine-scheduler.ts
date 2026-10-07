@@ -270,14 +270,16 @@ export class RoutineScheduler implements RoutineDueSource {
                 options.turnId,
                 {
                   beforeMutate: (snapshot) => {
+                    const transitionMessages: ConversationMessage[] = [];
                     for (const run of activeRuns) {
                       if (run.status === "queued" && run.deliveryId) {
                         if (this.#mailbox.getDelivery(run.deliveryId)?.delivery.status === "queued") {
                           this.#mailbox.cancelNow(input.agentId, run.deliveryId);
                         }
                       }
-                      this.#appendRunTransition(snapshot, run, "cancelled");
+                      transitionMessages.push(this.#appendRunTransition(snapshot, run, "cancelled").message);
                     }
+                    return transitionMessages;
                   },
                   onRollback: () => this.#mailbox.restorePersistedState(),
                 },
@@ -795,13 +797,16 @@ export class RoutineScheduler implements RoutineDueSource {
     mutate: () => T,
     eventRoutine: (result: T) => Pick<Routine, "id" | "name">,
     turnId?: string,
-    transactionHooks?: { beforeMutate?: (snapshot: ConversationSnapshot) => void; onRollback?: () => void },
+    transactionHooks?: {
+      beforeMutate?: (snapshot: ConversationSnapshot) => readonly ConversationMessage[];
+      onRollback?: () => void;
+    },
   ): T {
     const database = this.#store.database;
     return this.#conversation.withConversationTransaction(
       agentId,
       ({ threadId, snapshot: nextSnapshot }) => {
-        transactionHooks?.beforeMutate?.(nextSnapshot);
+        const changedMessages = transactionHooks?.beforeMutate?.(nextSnapshot) ?? [];
         const result = mutate();
         const routine = eventRoutine(result);
         const createdAt = new Date().toISOString();
@@ -821,7 +826,7 @@ export class RoutineScheduler implements RoutineDueSource {
           agentId,
           threadId,
           activeTurnId: nextSnapshot.activeTurnId,
-          changedMessages: [message],
+          changedMessages: [...changedMessages, message],
           eventType: `routine.${action}`,
           detail: {
             action,

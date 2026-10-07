@@ -422,9 +422,9 @@ function startOpencode(
     apiKey,
     customProviders: options.customProviders ?? (() => []),
     mcpServers: options.mcpServers ?? (() => []),
-    mcpAuthorization: options.mcpAuthorization,
-    servesModel: options.servesModel,
-    history: options.history ? () => options.history : undefined,
+    ...(options.mcpAuthorization === undefined ? {} : { mcpAuthorization: options.mcpAuthorization }),
+    ...(options.servesModel === undefined ? {} : { servesModel: options.servesModel }),
+    ...(options.history === undefined ? {} : { history: () => options.history }),
   };
   const timeoutMs = options.requestTimeoutMs ?? 10_000;
   const client = options.profile

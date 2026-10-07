@@ -191,6 +191,119 @@ describe("bounded provider history import", () => {
     database.close();
   });
 
+  it("keeps canonical reasoning when a Claude turn has no narration", async () => {
+    const database = new MemoryHistoryDatabase();
+    database.connection.prepare("UPDATE projection_thread_messages SET message_json = ? WHERE message_id = ?").run(
+      JSON.stringify({
+        id: "turn-1:assistant",
+        turnId: "turn-1",
+        author: "assistant",
+        text: "Done.",
+        itemType: "agentMessage",
+        createdAt: "2026-09-01T12:00:00.000Z",
+        status: "completed",
+      }),
+      "turn-1:assistant",
+    );
+    database.storeMessage({
+      id: "turn-1:reasoning",
+      turnId: "turn-1",
+      author: "assistant",
+      text: "Check inputs.\nCompare options.",
+      createdAt: "2026-09-01T12:00:00.000Z",
+      status: "completed",
+      itemType: "commentary",
+    });
+    const readHistory: ReadProviderHistory = (_request, consume) =>
+      Effect.as(
+        consume({
+          turnId: "turn-1",
+          status: "completed",
+          items: [
+            { id: "phase-1:reasoning", type: "agentMessage", phase: "commentary", text: "Check inputs." },
+            { id: "phase-2:reasoning", type: "agentMessage", phase: "commentary", text: "Compare options." },
+            { id: "provider-answer", type: "agentMessage", text: "Done." },
+          ],
+          complete: true,
+        }),
+        undefined,
+      );
+
+    await Effect.runPromise(
+      importProviderHistory({
+        database,
+        readHistory,
+        sessionId: "session-reasoning",
+        provider: "claude",
+        externalSessionId: "external-1",
+        agentId: "chief",
+        publicThreadId: "openbot-thread",
+        findDelivery: () => null,
+        findMessageDelivery: () => null,
+      }),
+    );
+
+    expect(database.imported.has("phase-1:reasoning")).toBe(false);
+    expect(database.imported.has("phase-2:reasoning")).toBe(false);
+    expect(database.imported.has("provider-answer")).toBe(false);
+    expect(database.imported.has("turn-1:assistant")).toBe(true);
+    expect(
+      database.connection
+        .prepare(
+          "SELECT json_extract(message_json, '$.text') AS text FROM projection_thread_messages WHERE message_id = ?",
+        )
+        .get("turn-1:reasoning"),
+    ).toEqual({ text: "Check inputs.\nCompare options." });
+    database.close();
+  });
+
+  it("keeps reasoning that is missing from a partial canonical row", async () => {
+    const database = new MemoryHistoryDatabase();
+    database.storeMessage({
+      id: "turn-1:reasoning",
+      turnId: "turn-1",
+      author: "assistant",
+      text: "Check inputs.",
+      createdAt: "2026-09-01T12:00:00.000Z",
+      status: "completed",
+      itemType: "commentary",
+    });
+    const readHistory: ReadProviderHistory = (_request, consume) =>
+      Effect.as(
+        consume({
+          turnId: "turn-1",
+          status: "completed",
+          items: [
+            { id: "phase-1:reasoning", type: "agentMessage", phase: "commentary", text: "Check inputs." },
+            { id: "phase-2:reasoning", type: "agentMessage", phase: "commentary", text: "Compare options." },
+            { id: "provider-answer", type: "agentMessage", text: "Done." },
+          ],
+          complete: true,
+        }),
+        undefined,
+      );
+
+    await Effect.runPromise(
+      importProviderHistory({
+        database,
+        readHistory,
+        sessionId: "session-partial-reasoning",
+        provider: "claude",
+        externalSessionId: "external-1",
+        agentId: "chief",
+        publicThreadId: "openbot-thread",
+        findDelivery: () => null,
+        findMessageDelivery: () => null,
+      }),
+    );
+
+    expect(database.imported.has("phase-1:reasoning")).toBe(false);
+    expect(database.imported.get("phase-2:reasoning")).toEqual(
+      expect.objectContaining({ id: "phase-2:reasoning", text: "Compare options." }),
+    );
+    database.close();
+  });
+
   it("keeps staged items retryable after an interrupted read", async () => {
     const database = new MemoryHistoryDatabase();
     let attempt = 0;

@@ -53,14 +53,17 @@ export function providerHistoryPersistence(database: OpenBotDatabase, provider: 
       let after: ProviderHistoryTurnCursor | undefined;
       for (;;) {
         const page = yield* providerSync(() =>
-          database.stagedProviderHistoryTurnPage(session.sessionId, { after, limit: 50 }),
+          database.stagedProviderHistoryTurnPage(session.sessionId, {
+            ...(after === undefined ? {} : { after }),
+            limit: 50,
+          }),
         );
         for (const turn of page.turns) {
           if (request.items === "none") {
             if (
               !(yield* consume({
                 turnId: turn.turnId,
-                status: turn.status ?? undefined,
+                ...(turn.status === null ? {} : { status: turn.status }),
                 ...(turn.startedAt === null ? {} : { startedAt: turn.startedAt }),
                 ...(recordsOnly ? { recordsOnly: true } : {}),
                 complete: turn.complete,
@@ -84,7 +87,7 @@ export function providerHistoryPersistence(database: OpenBotDatabase, provider: 
               if (
                 !(yield* consume({
                   turnId: turn.turnId,
-                  status: turn.status ?? undefined,
+                  ...(turn.status === null ? {} : { status: turn.status }),
                   ...(turn.startedAt === null ? {} : { startedAt: turn.startedAt }),
                   ...(recordsOnly ? { recordsOnly: true } : {}),
                   items: [],
@@ -100,7 +103,7 @@ export function providerHistoryPersistence(database: OpenBotDatabase, provider: 
             if (
               !(yield* consume({
                 turnId: turn.turnId,
-                status: turn.status ?? undefined,
+                ...(turn.status === null ? {} : { status: turn.status }),
                 ...(turn.startedAt === null ? {} : { startedAt: turn.startedAt }),
                 ...(recordsOnly ? { recordsOnly: true } : {}),
                 items: items.map(({ item }) => item),

@@ -61,7 +61,8 @@ export class MailboxSync {
     const context = this.#mailbox.getDelivery(deliveryId);
     const message = snapshot.messages.find((candidate) => candidate.id === deliveryId);
     if (!context || !message) return;
-    message.turnId = context.delivery.turnId ?? undefined;
+    if (context.delivery.turnId === null) delete message.turnId;
+    else message.turnId = context.delivery.turnId;
     message.delivery = {
       id: context.delivery.id,
       status: context.delivery.status,
@@ -71,11 +72,10 @@ export class MailboxSync {
 
   syncMailboxMessages(snapshot: ConversationSnapshot, mailboxMessages?: readonly ConversationMessage[]): void {
     if (this.#conversation.isExecutionThread(snapshot.threadId)) return;
+    const fromCreatedAt = snapshot.messages[0]?.createdAt;
     const incomingMailboxMessages =
       mailboxMessages ??
-      this.#mailbox.conversationMessages(snapshot.agentId, {
-        fromCreatedAt: snapshot.messages[0]?.createdAt,
-      });
+      this.#mailbox.conversationMessages(snapshot.agentId, fromCreatedAt === undefined ? {} : { fromCreatedAt });
     const incomingMessages = new Map(
       incomingMailboxMessages.flatMap((message) =>
         message.exchange?.direction === "incoming" ? [[message.exchange.messageId, message] as const] : [],
@@ -115,7 +115,10 @@ export class MailboxSync {
     const previousMessageIds = new Set(persisted.messages.map((message) => message.id));
     const previousSignature = conversationContentSignature(persisted);
     const oldest = persisted.messages[0]?.createdAt;
-    this.syncMailboxMessages(persisted, this.#mailbox.conversationMessages(agent.id, { fromCreatedAt: oldest }));
+    this.syncMailboxMessages(
+      persisted,
+      this.#mailbox.conversationMessages(agent.id, oldest === undefined ? {} : { fromCreatedAt: oldest }),
+    );
     if (conversationContentSignature(persisted) === previousSignature) return;
     this.#database.persistConversationChanges({
       agentId: agent.id,
@@ -133,7 +136,10 @@ export class MailboxSync {
     const live = this.#conversation.snapshot(agent.id);
     if (live) {
       const liveOldest = live.messages[0]?.createdAt;
-      this.syncMailboxMessages(live, this.#mailbox.conversationMessages(agent.id, { fromCreatedAt: liveOldest }));
+      this.syncMailboxMessages(
+        live,
+        this.#mailbox.conversationMessages(agent.id, liveOldest === undefined ? {} : { fromCreatedAt: liveOldest }),
+      );
     }
   }
 

@@ -410,13 +410,14 @@ function turnProviderSessionIdsValue(value: unknown): Array<[string, string | nu
 function mergeReplayedMessage(existing: ConversationMessage, imported: ConversationMessage): ConversationMessage {
   const attachments = mergeReplayValues(existing.attachments, imported.attachments, (value) => value.id);
   const reactions = mergeReplayValues(existing.reactions, imported.reactions, (value) => JSON.stringify(value));
+  const turnId = existing.turnId ?? imported.turnId;
   return {
     ...existing,
     ...imported,
     id: existing.id,
     author: existing.author,
     createdAt: existing.createdAt,
-    turnId: existing.turnId ?? imported.turnId,
+    ...(turnId === undefined ? {} : { turnId }),
     ...(attachments === undefined ? {} : { attachments }),
     ...(reactions === undefined ? {} : { reactions }),
     ...(imported.delivery === undefined && existing.delivery ? { delivery: existing.delivery } : {}),
@@ -426,13 +427,14 @@ function mergeReplayedMessage(existing: ConversationMessage, imported: Conversat
 }
 
 function mergeReplayedLiveMessage(existing: ConversationMessage, updated: ConversationMessage): ConversationMessage {
+  const turnId = updated.turnId ?? existing.turnId;
   return {
     ...existing,
     ...updated,
     id: existing.id,
     author: existing.author,
     createdAt: existing.createdAt,
-    turnId: updated.turnId ?? existing.turnId,
+    ...(turnId === undefined ? {} : { turnId }),
   };
 }
 

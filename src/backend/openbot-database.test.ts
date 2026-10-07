@@ -206,13 +206,7 @@ describe("OpenBotDatabase", () => {
       turnId: "provider-turn",
       agentId: agent.id,
       threadId: agent.threadId,
-      messages: [
-        {
-          ...storedMessage,
-          text: "After",
-          attachments: undefined,
-        },
-      ],
+      messages: [withoutAttachments({ ...storedMessage, text: "After" })],
       throughItemIndex: 0,
       complete: false,
     });
@@ -230,7 +224,7 @@ describe("OpenBotDatabase", () => {
       turnId: "provider-turn",
       agentId: agent.id,
       threadId: agent.threadId,
-      messages: [{ ...storedMessage, text: "After", attachments: undefined }],
+      messages: [withoutAttachments({ ...storedMessage, text: "After" })],
       throughItemIndex: 0,
       complete: true,
     });
@@ -239,7 +233,7 @@ describe("OpenBotDatabase", () => {
       turnId: "provider-turn",
       agentId: agent.id,
       threadId: agent.threadId,
-      messages: [{ ...storedMessage, text: "After", attachments: undefined }],
+      messages: [withoutAttachments({ ...storedMessage, text: "After" })],
       complete: true,
     });
 
@@ -581,11 +575,11 @@ describe("OpenBotDatabase", () => {
     const database = await createDatabase();
     const agent = testAgent();
     database.replaceAgents("agents-large-history", [agent], "agents.imported");
-    const messages = Array.from({ length: 1_000 }, (_, index) => ({
+    const messages: ConversationMessage[] = Array.from({ length: 1_000 }, (_, index) => ({
       id: `message-${index.toString().padStart(5, "0")}`,
       author: index % 2 === 0 ? ("user" as const) : ("assistant" as const),
       text: index === 234 || index === 235 ? "A unique pagination needle" : `Message ${index}`,
-      itemType: index === 235 ? "commentary" : undefined,
+      ...(index === 235 ? { itemType: "commentary" } : {}),
       createdAt: new Date(Date.UTC(2026, 0, 1, 0, 0, 0, index)).toISOString(),
       status: "completed" as const,
     }));
@@ -3672,6 +3666,12 @@ function conversationSnapshot(agent: AgentSummary, text: string): ConversationSn
       },
     ],
   };
+}
+
+function withoutAttachments(message: ConversationMessage): ConversationMessage {
+  const result = { ...message };
+  delete result.attachments;
+  return result;
 }
 
 // These tests construct released schemas by stripping newer additions from a fresh fixture.

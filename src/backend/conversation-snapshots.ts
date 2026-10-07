@@ -25,7 +25,11 @@ export function snapshotFromThread(
     messages.push(
       ...messagesFromThreadItems(
         agentId,
-        { id: turn.id, status: turn.status, startedAt: turn.startedAt },
+        {
+          id: turn.id,
+          ...(turn.status === undefined ? {} : { status: turn.status }),
+          ...(turn.startedAt === undefined ? {} : { startedAt: turn.startedAt }),
+        },
         turn.items ?? [],
         0,
         findDelivery,
@@ -323,8 +327,20 @@ function reconcileClaudeHistoryMessages(
     if (!isClaudeNarration(message) || !message.turnId) continue;
     storedNarrationTurns.add(message.turnId);
   }
+  const storedReasoning = new Map<string, ConversationMessage>();
+  for (const message of stored) {
+    if (!isClaudeReasoning(message) || !message.turnId) continue;
+    if (message.id === `${message.turnId}:reasoning`) storedReasoning.set(message.turnId, message);
+  }
   const importedNarration = new Map<string, ConversationMessage[]>();
+  const importedReasoning = new Map<string, ConversationMessage[]>();
   for (const message of imported) {
+    if (isClaudeReasoning(message) && message.turnId) {
+      const parts = importedReasoning.get(message.turnId) ?? [];
+      parts.push(message);
+      importedReasoning.set(message.turnId, parts);
+      continue;
+    }
     if (!isClaudeNarration(message) || !message.turnId) continue;
     const parts = importedNarration.get(message.turnId) ?? [];
     parts.push(message);
@@ -340,6 +356,21 @@ function reconcileClaudeHistoryMessages(
   const omitted = new Set<string>();
   /** Stored rows this has to rewrite that the import carries no entry of its own for. */
   const appended: ConversationMessage[] = [];
+  for (const [turnId, parts] of importedReasoning) {
+    const existing = storedReasoning.get(turnId);
+    // Fresh imports keep provider IDs. A partial live row must not hide missing provider text.
+    if (existing) {
+      let canonicalPlaced = false;
+      for (const part of parts) {
+        if (!existing.text.includes(part.text)) continue;
+        if (!canonicalPlaced) {
+          replacements.set(part.id, existing);
+          canonicalPlaced = true;
+        } else omitted.add(part.id);
+      }
+      if (!canonicalPlaced) appended.push(existing);
+    }
+  }
   for (const [turnId, parts] of turns) {
     // Live Claude output combines SDK replies under one ID. Keep that ID and its metadata.
     const answer = storedMessages.get(`${turnId}:assistant`);
@@ -419,8 +450,12 @@ function isClaudeNarration(message: ConversationMessage): boolean {
     message.author === "assistant" &&
     message.itemType === "commentary" &&
     Boolean(message.turnId) &&
-    message.id !== `${message.turnId}:reasoning`
+    !isClaudeReasoning(message)
   );
+}
+
+function isClaudeReasoning(message: ConversationMessage): boolean {
+  return message.author === "assistant" && message.itemType === "commentary" && message.id.endsWith(":reasoning");
 }
 
 /**

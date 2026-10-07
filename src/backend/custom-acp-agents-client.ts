@@ -315,11 +315,12 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
           if (isRecord(params) && params.includeTurns === true) {
             const turns = new Map<string, { id: string; status?: string; startedAt?: number; items: ThreadItem[] }>();
             const seenItems = new Map<string, Set<string>>();
+            const cwd = getString(params, "cwd");
             yield* this.readHistory(
               {
                 threadId,
-                cwd: getString(params, "cwd") ?? undefined,
                 items: "full",
+                ...(cwd === null ? {} : { cwd }),
               },
               (fragment) =>
                 Effect.sync(() => {

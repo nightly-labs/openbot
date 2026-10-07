@@ -158,7 +158,10 @@ describe("ProviderHistoryStore", () => {
     const ids: string[] = [];
     let after: { startedAt: number | null; turnId: string } | undefined;
     for (;;) {
-      const page = database.stagedProviderHistoryTurnPage("session-pages", { after, limit: 50 });
+      const page = database.stagedProviderHistoryTurnPage("session-pages", {
+        ...(after === undefined ? {} : { after }),
+        limit: 50,
+      });
       ids.push(...page.turns.map((turn) => turn.turnId));
       if (!page.nextCursor) break;
       after = page.nextCursor;

@@ -31,7 +31,7 @@ import { isBalanceDiagnostic, isPlanLimitDiagnostic } from "./agent/provider-dia
 import { USAGE_LIMIT_METHOD } from "./agent/usage-limit-gate";
 import { type AgentProvider, RequestTimeoutError } from "./agent-client";
 import { BROWSER_TOOL_DEFINITIONS, OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
-import { claudeHistoryFromMessages, claudeHistoryReader } from "./claude-history";
+import { type ClaudeHistoryOptions, claudeHistoryFromMessages, claudeHistoryReader } from "./claude-history";
 import {
   CLAUDE_WORKSPACE_MANAGED_SETTINGS,
   claudeWorkspaceHooks,
@@ -262,13 +262,19 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     this.#stateDirectory = stateDirectory;
     this.#agentEnvironment = agentEnvironment;
     const historyEnvironment = agentEnvironment?.();
+    const resolvedHistoryIndexDirectory = historyIndexDirectory ?? stateDirectory;
+    const historyOptions: ClaudeHistoryOptions = {
+      ...(historyEnvironment?.CLAUDE_CONFIG_DIR === undefined
+        ? {}
+        : { configDirectory: historyEnvironment.CLAUDE_CONFIG_DIR }),
+      ...(historyEnvironment?.CLAUDE_CODE_PROJECT_DIR_NAME === undefined
+        ? {}
+        : { projectDirectoryName: historyEnvironment.CLAUDE_CODE_PROJECT_DIR_NAME }),
+      ...(resolvedHistoryIndexDirectory === undefined ? {} : { indexDirectory: resolvedHistoryIndexDirectory }),
+    };
     this.readHistory = readSessionMessages
       ? claudeHistoryFromMessages(readSessionMessages)
-      : claudeHistoryReader({
-          configDirectory: historyEnvironment?.CLAUDE_CONFIG_DIR,
-          projectDirectoryName: historyEnvironment?.CLAUDE_CODE_PROJECT_DIR_NAME,
-          indexDirectory: historyIndexDirectory ?? stateDirectory,
-        });
+      : claudeHistoryReader(historyOptions);
   }
 
   get running(): boolean {

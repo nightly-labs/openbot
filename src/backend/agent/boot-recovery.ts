@@ -168,7 +168,12 @@ export class BootRecovery {
                         !!item.clientId &&
                         (item.clientId === delivery.id || batchIds?.has(item.clientId) === true),
                     );
-                  if (matches) recovered = { turnId: fragment.turnId, status: fragment.status };
+                  if (matches) {
+                    recovered =
+                      fragment.status === undefined
+                        ? { turnId: fragment.turnId }
+                        : { turnId: fragment.turnId, status: fragment.status };
+                  }
                   return !matches;
                 }),
             )

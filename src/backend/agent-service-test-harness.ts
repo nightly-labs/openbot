@@ -125,10 +125,12 @@ export class FakeAgentClient extends EventEmitter implements AgentClient {
         const rawTurns = getArray(isRecord(value) ? value.thread : null, "turns");
         for (const [index, turn] of (decoded.thread.turns ?? []).entries()) {
           const rawItems = getArray(rawTurns[index], "items");
-          turn.items = turn.items?.map((item, itemIndex) => ({
-            ...(isRecord(rawItems[itemIndex]) ? rawItems[itemIndex] : {}),
-            ...item,
-          }));
+          if (turn.items) {
+            turn.items = turn.items.map((item, itemIndex) => ({
+              ...(isRecord(rawItems[itemIndex]) ? rawItems[itemIndex] : {}),
+              ...item,
+            }));
+          }
         }
         return decoded;
       },

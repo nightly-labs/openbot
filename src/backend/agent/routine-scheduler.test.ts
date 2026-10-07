@@ -243,6 +243,14 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
     expect(events).toContainEqual(
       expect.objectContaining({ routineId: routine.id, runId: run.id, status: "cancelled" }),
     );
+    const threadId = store.list().find((candidate) => candidate.id === agent.id)?.threadId;
+    if (!threadId) throw new Error("The routine agent thread is missing.");
+    const persistedEvents = store.database
+      .readConversationPage(agent.id, threadId, { type: "latest" }, 100)
+      .messages.flatMap((message) => routineRunConversationEvent(message) ?? []);
+    expect(persistedEvents).toContainEqual(
+      expect.objectContaining({ routineId: routine.id, runId: run.id, status: "cancelled" }),
+    );
   });
   it("rolls back a routine transition and retries without a duplicate marker", async () => {
     const { store, mailbox } = stores(root);

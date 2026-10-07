@@ -723,13 +723,14 @@ export class ConversationWriter {
 function mergeImportedMessage(existing: ConversationMessage, imported: ConversationMessage): ConversationMessage {
   const attachments = mergeValues(existing.attachments, imported.attachments, (attachment) => attachment.id);
   const reactions = mergeValues(existing.reactions, imported.reactions, (reaction) => JSON.stringify(reaction));
+  const turnId = existing.turnId ?? imported.turnId;
   return {
     ...existing,
     ...imported,
     id: existing.id,
     author: existing.author,
     createdAt: existing.createdAt,
-    turnId: existing.turnId ?? imported.turnId,
+    ...(turnId === undefined ? {} : { turnId }),
     ...(attachments === undefined ? {} : { attachments }),
     ...(reactions === undefined ? {} : { reactions }),
     ...(imported.delivery === undefined && existing.delivery ? { delivery: existing.delivery } : {}),
@@ -739,13 +740,14 @@ function mergeImportedMessage(existing: ConversationMessage, imported: Conversat
 }
 
 function mergeLiveMessage(existing: ConversationMessage, updated: ConversationMessage): ConversationMessage {
+  const turnId = updated.turnId ?? existing.turnId;
   return {
     ...existing,
     ...updated,
     id: existing.id,
     author: existing.author,
     createdAt: existing.createdAt,
-    turnId: updated.turnId ?? existing.turnId,
+    ...(turnId === undefined ? {} : { turnId }),
   };
 }
 

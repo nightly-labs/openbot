@@ -180,7 +180,11 @@ function importCompletedTurn(
           providerFailure(new Error("Provider history staging returned a repeated item index.")),
         );
       }
-      const turn = { id: fragment.turnId, status: fragment.status, startedAt: fragment.startedAt };
+      const turn = {
+        id: fragment.turnId,
+        ...(fragment.status === undefined ? {} : { status: fragment.status }),
+        ...(fragment.startedAt === undefined ? {} : { startedAt: fragment.startedAt }),
+      };
       baseTime ??= threadTurnBaseTime(
         turn,
         page.map(({ item }) => item),
@@ -220,7 +224,7 @@ function importCompletedTurn(
           agentId: input.agentId,
           threadId: input.publicThreadId,
           messages: reconciled,
-          throughItemIndex: last?.itemIndex,
+          ...(last === undefined ? {} : { throughItemIndex: last.itemIndex }),
           complete,
           detail: {
             provider: input.provider,
@@ -267,6 +271,9 @@ function readStoredTurnMessages(
   const ids = [
     ...new Set([
       `${turnId}:assistant`,
+      // Live Claude collapses all thinking for a turn under this canonical identity. Provider
+      // transcript reasoning keeps its own IDs, so this row is the duplicate check only.
+      `${turnId}:reasoning`,
       ...identityIds,
       ...imported.flatMap((message) => (message.id ? [message.id] : [])),
     ]),

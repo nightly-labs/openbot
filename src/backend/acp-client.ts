@@ -268,7 +268,7 @@ export const OPENBOT_ACP_CLIENT_INFO = { name: "openbot", title: "OpenBot", vers
 export interface AcpProviderOptions {
   provider: AgentProvider;
   /** Durable history supplied by the database. ACP never owns a full conversation snapshot. */
-  history?: AcpHistoryPersistence;
+  history?: AcpHistoryPersistence | undefined;
   /** The name in error text. The provider name when absent; a custom agent gives its own. */
   label?: string;
   /**
@@ -516,7 +516,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       yield* Effect.promise(() => replay.done);
       if (replay.error) return yield* providerFailure(replay.error);
       if (durableReplay && (!request.providerOnly || replay.hasUpdates)) {
-        yield* readStored({ ...request, providerOnly: undefined });
+        yield* readStored({
+          threadId: request.threadId,
+          items: request.items,
+          ...(request.cwd === undefined ? {} : { cwd: request.cwd }),
+        });
       }
     } finally {
       controller.abort();
@@ -805,11 +809,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         if (includeTurns) {
           const turns = new Map<string, { id: string; status?: string; startedAt?: number; items: ThreadItem[] }>();
           const seenItems = new Map<string, Set<string>>();
+          const cwd = getString(params, "cwd");
           yield* this.readHistory(
             {
               threadId,
-              cwd: getString(params, "cwd") ?? undefined,
               items: "full",
+              ...(cwd === null ? {} : { cwd }),
             },
             (fragment) =>
               Effect.sync(() => {
@@ -1466,13 +1471,14 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         this.#abortHistoryReplay(replay, new Error("ACP history replay has too many active items."));
         return;
       }
+      const status = update.status ?? previous?.status;
       const item: ThreadItem = {
         ...(previous ?? {}),
         id: update.toolCallId,
         type: "toolCall",
         name: update.name ?? update.title ?? previous?.name,
         toolKind: update.kind ?? previous?.toolKind,
-        status: update.status ?? previous?.status,
+        ...(status === undefined ? {} : { status }),
         arguments: update.rawInput ?? previous?.arguments,
         result: update.rawOutput ?? previous?.result,
       };
@@ -1825,13 +1831,14 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       turn.toolNames.set(update.toolCallId, name);
       const toolKind = update.kind ?? turn.toolKinds.get(update.toolCallId) ?? "other";
       turn.toolKinds.set(update.toolCallId, toolKind);
+      const status = update.status ?? turn.toolItems.get(update.toolCallId)?.status;
       const item: ThreadItem = {
         ...(turn.toolItems.get(update.toolCallId) ?? {}),
         id: update.toolCallId,
         type: "toolCall",
         name,
         toolKind,
-        status: update.status ?? turn.toolItems.get(update.toolCallId)?.status,
+        ...(status === undefined ? {} : { status }),
         arguments: update.rawInput ?? turn.toolItems.get(update.toolCallId)?.arguments,
         result: update.rawOutput ?? turn.toolItems.get(update.toolCallId)?.result,
       };
