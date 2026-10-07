@@ -52,8 +52,11 @@ export interface DiagramViewProps {
       }
     | undefined;
   onMoveNode: (nodeId: string, position: DiagramPoint) => void;
-  /** `routineId` is the routine in focus when the connection was drawn, or null on "All routines". */
-  onConnect: (from: string, to: string, routineId: string | null) => void;
+  /**
+   * `routineId` is the routine in focus when the connection was drawn, or null on "All routines".
+   * Answers whether the connection was saved, as on `DiagramBoard`.
+   */
+  onConnect: (from: string, to: string, routineId: string | null) => boolean | Promise<boolean>;
   onRemoveEdge: (edgeId: string) => void;
   onRemoveNode: (nodeId: string, routineId: string | null) => void;
   /** A connection belongs to one routine, so new ones are drawn only while a routine is in focus. */

@@ -242,10 +242,10 @@ export function WorkspaceRoutineFlows(props: { port?: RoutineFlowsPort }) {
                   const routineId = routineIdOfNode(routineNodeId);
                   const fromAgentId = agentIdOfNode(from);
                   const toAgentId = agentIdOfNode(to);
-                  if (!routineId) return;
+                  if (!routineId) return Promise.resolve(false);
                   if (!fromAgentId || !toAgentId) {
                     toast.error(t("diagram.flows.connectFromAgent"));
-                    return;
+                    return Promise.resolve(false);
                   }
                   const pending: RoutineFlowLink = {
                     id: `${PENDING_LINK_PREFIX}${crypto.randomUUID()}`,
@@ -268,12 +268,16 @@ export function WorkspaceRoutineFlows(props: { port?: RoutineFlowsPort }) {
                   setState((draft) => {
                     draft.pendingLinks.push(pending);
                   });
-                  port()
+                  return port()
                     .routineFlows.connect({ routineId, fromAgentId, toAgentId }, "local")
-                    .then(settle)
+                    .then((saved) => {
+                      settle(saved);
+                      return true;
+                    })
                     .catch((error) => {
                       settle(null);
                       failed(t("diagram.flows.saveFailed"))(error);
+                      return false;
                     });
                 }}
                 onRemoveEdge={(edgeId) => {

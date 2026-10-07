@@ -639,11 +639,12 @@ function InteractiveDiagram(props: {
           if (node) node.position = position;
         })
       }
-      onConnect={(from, to) =>
+      onConnect={(from, to) => {
         setDiagram((state) => {
           state.edges.push({ id: nextId("edge"), from, to });
-        })
-      }
+        });
+        return true;
+      }}
       onRemoveEdge={(edgeId) =>
         setDiagram((state) => ({ ...state, edges: state.edges.filter((e) => e.id !== edgeId) }))
       }

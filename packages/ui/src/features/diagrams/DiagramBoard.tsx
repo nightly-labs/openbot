@@ -84,7 +84,8 @@ export interface DiagramBoardProps {
   onSelectNode: (nodeId: string | null) => void;
   onFocusRoutine: (routineId: string) => void;
   onMoveNode: (nodeId: string, position: DiagramPoint) => void;
-  onConnect: (from: string, to: string) => void;
+  /** Answers whether the connection was saved; the canvas says it is connected only then. */
+  onConnect: (from: string, to: string) => boolean | Promise<boolean>;
   onRemoveEdge: (edgeId: string) => void;
   onRemoveNode: (nodeId: string) => void;
   onRunRoutine?: ((nodeId: string) => void) | undefined;
@@ -250,8 +251,11 @@ export function DiagramBoard(props: DiagramBoardProps) {
       announce(t(PROBLEM_KEY[problem]), "danger");
       return;
     }
-    props.onConnect(from, to);
-    announce(t("diagram.connect.done", { from: nodeName(nodeById().get(from)), to: nodeName(nodeById().get(to)) }));
+    const done = () =>
+      announce(t("diagram.connect.done", { from: nodeName(nodeById().get(from)), to: nodeName(nodeById().get(to)) }));
+    void Promise.resolve(props.onConnect(from, to)).then((saved) => {
+      if (saved) done();
+    });
   };
   const startConnection = (from: string) => {
     setInteraction((state) => {
