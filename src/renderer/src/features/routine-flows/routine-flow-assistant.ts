@@ -32,15 +32,35 @@ export function createRoutineFlowAssistant(port: () => RoutineFlowsPort, agentId
     });
   });
 
-  const answer = async (forAgent: string, turnId: string) => {
+  /**
+   * Looks at the request in the conversation, around its own message, whenever a turn of the agent
+   * ends or its queue moves. A request still in the queue takes no answer: the turn that ended read
+   * other work. A request whose delivery failed or was cancelled ends with an error, and one whose
+   * turn ended shows that turn's answer, or ends without one.
+   */
+  const check = async (forAgent: string, endedTurnId: string | null) => {
     const pending = chat.pending;
     if (!pending?.deliveryId || pending.agentId !== forAgent) return;
-    const page = await port().agent.readConversationPage({ agentId: forAgent }, "local");
-    const asked = page.messages.findIndex((message) => message.id === pending.deliveryId);
-    if (asked === -1 || chat.pending !== pending) return;
-    const reply = latestTurnAnswer(page.messages.slice(asked + 1), turnId);
-    const ended = !["queued", "starting", "running"].includes(page.messages[asked]?.delivery?.status ?? "running");
-    if (!reply && !ended) return;
+    const page = await port().agent.readConversationPage(
+      { agentId: forAgent, anchor: { type: "around", messageId: pending.deliveryId } },
+      "local",
+    );
+    const index = page.messages.findIndex((message) => message.id === pending.deliveryId);
+    const asked = page.messages[index];
+    if (!asked || chat.pending !== pending) return;
+    const status = asked.delivery?.status ?? (asked.turnId ? "completed" : "queued");
+    if (status === "queued") return;
+    if (status === "failed" || status === "cancelled" || status === "interrupted") {
+      toast.error(t("diagram.chat.failed"));
+      setChat((draft) => {
+        draft.pending = null;
+      });
+      return;
+    }
+    const turnId = asked.turnId ?? endedTurnId;
+    const reply = turnId ? latestTurnAnswer(page.messages.slice(index + 1), turnId) : undefined;
+    // Without the turn, a queue change can come before the answer does: only an ended turn ends it.
+    if (!reply && (status !== "completed" || !turnId)) return;
     setChat((draft) => {
       if (reply) draft.messages.push({ id: reply.id, author: "agent", text: reply.text, createdAt: reply.createdAt });
       draft.pending = null;
@@ -49,10 +69,15 @@ export function createRoutineFlowAssistant(port: () => RoutineFlowsPort, agentId
 
   onSettled(() =>
     port().agent.onScopedEvent(({ serverId, event }) => {
-      if (serverId === "local" && event.type === "turn-completed")
-        answer(event.agentId, event.turnId).catch((error) =>
-          toast.error(errorMessage(error, t("diagram.chat.failed"))),
-        );
+      if (serverId !== "local") return;
+      const ended =
+        event.type === "turn-completed"
+          ? { agentId: event.agentId, turnId: event.turnId }
+          : event.type === "queue-changed"
+            ? { agentId: event.snapshot.agentId, turnId: null }
+            : null;
+      if (ended)
+        check(ended.agentId, ended.turnId).catch((error) => toast.error(errorMessage(error, t("diagram.chat.failed"))));
     }),
   );
 

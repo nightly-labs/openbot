@@ -75,17 +75,20 @@ export function WorkspaceRoutineFlows(props: { port?: RoutineFlowsPort }) {
   /** Moves waiting to be saved, by node: the timer, and the save it runs. */
   const pendingSaves = new Map<string, { timer: number; save: () => void }>();
 
+  /** A load for an agent the user has left, such as one after a slow write, changes nothing. */
   const load = async (id: string) => {
+    if (id !== agentId()) return;
     const current = ++generation;
+    const stale = () => current !== generation || id !== agentId();
     try {
       const canvas = await port().routineFlows.canvas(id, "local");
-      if (current !== generation) return;
+      if (stale()) return;
       setState((draft) => {
         draft.canvas = canvas;
         draft.error = null;
       });
     } catch (error) {
-      if (current !== generation) return;
+      if (stale()) return;
       setState((draft) => {
         draft.error = errorMessage(error, t("diagram.flows.loadFailed"));
       });
@@ -282,6 +285,13 @@ export function WorkspaceRoutineFlows(props: { port?: RoutineFlowsPort }) {
                 onRemoveNode={(nodeId, routineNodeId) => {
                   const removed = agentIdOfNode(nodeId);
                   if (!removed) return;
+                  // A move still waiting to be saved would put the agent back after its removal.
+                  const nodeKey = routineFlowAgentKey(removed);
+                  window.clearTimeout(pendingSaves.get(nodeKey)?.timer);
+                  pendingSaves.delete(nodeKey);
+                  setState((draft) => {
+                    delete draft.moved[nodeKey];
+                  });
                   const routineId = routineIdOfNode(routineNodeId);
                   const links =
                     state.canvas?.links.filter(
@@ -289,10 +299,7 @@ export function WorkspaceRoutineFlows(props: { port?: RoutineFlowsPort }) {
                     ) ?? [];
                   void Promise.all([
                     ...links.map((link) => port().routineFlows.disconnect({ linkId: link.id }, "local")),
-                    port().routineFlows.removePosition(
-                      { agentId: canvasAgentId, nodeKey: routineFlowAgentKey(removed) },
-                      "local",
-                    ),
+                    port().routineFlows.removePosition({ agentId: canvasAgentId, nodeKey }, "local"),
                   ]).catch(failed(t("diagram.flows.saveFailed")));
                 }}
                 canRemoveNode={(nodeId) => {
