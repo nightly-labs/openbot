@@ -170,6 +170,14 @@ export const STORY_MODELS: AgentModelOption[] = [
   },
   {
     provider: "claude",
+    id: "claude-haiku-5-5",
+    name: "Claude Haiku 5.5",
+    description: "",
+    defaultReasoningEffort: "medium",
+    supportedReasoningEfforts: ["medium"],
+  },
+  {
+    provider: "claude",
     id: "claude-opus-5-5",
     name: "Claude Opus 5.5",
     description: "Most capable Claude model for complex work.",

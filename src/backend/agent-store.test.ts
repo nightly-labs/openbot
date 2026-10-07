@@ -516,7 +516,7 @@ describe("AgentStore", () => {
       workspacePath,
       provider: "claude",
       // The default of the provider the profile names, not the default of a new agent, which is Codex.
-      model: "claude-opus-5-5",
+      model: "claude-haiku-5-5",
       // The effort has no per-provider default, so an unreadable one is repaired to the one value
       // there is. It is the floor of the range, which is the safe direction for a repair: it costs
       // thinking on the next turn rather than money the user did not ask to spend.
@@ -529,7 +529,7 @@ describe("AgentStore", () => {
 
     // Written back at once, so the next launch reads a profile it accepts instead of repairing again.
     expect(repaired.database.listAgents().find((agent) => agent.id === "chief")).toMatchObject({
-      model: "claude-opus-5-5",
+      model: "claude-haiku-5-5",
       reasoningEffort: "low",
       access: "full",
       avatarSeed: "chief",

@@ -325,7 +325,7 @@ describe.sequential("AgentService: queue", () => {
       runCauseEffect(service.createAgent({ ...CREATE_AGENT_INPUT, name: "Chosen Agent", avatarSeed: "setup:chosen" })),
     ).resolves.toMatchObject({
       provider: "claude",
-      model: "claude-opus-5-5",
+      model: "claude-haiku-5-5",
     });
     // A template, a marketplace agent or an import names no model, and starts on the same choice.
     await expect(
@@ -337,7 +337,7 @@ describe.sequential("AgentService: queue", () => {
           avatarHue: null,
         }),
       ),
-    ).resolves.toMatchObject({ provider: "claude", model: "claude-opus-5-5" });
+    ).resolves.toMatchObject({ provider: "claude", model: "claude-haiku-5-5" });
 
     // A Codex model saved in setup is a choice too, not the built-in Luna 6 the record starts on.
     await runCauseEffect(service.setPreferredProvider("codex", "gpt-5.6-terra"));
@@ -429,8 +429,8 @@ describe.sequential("AgentService: queue", () => {
         }),
       ),
     ).resolves.toMatchObject({
-      model: "claude-opus-5-5",
-      reasoningEffort: "high",
+      model: "claude-haiku-5-5",
+      reasoningEffort: "medium",
     });
     await runCauseEffect(service.setPreferredProvider("codex"));
     expect(service.getStatus()).toMatchObject({
@@ -461,7 +461,7 @@ describe.sequential("AgentService: queue", () => {
       ),
     ).resolves.toMatchObject({
       provider: "claude",
-      model: "claude-opus-5-5",
+      model: "claude-haiku-5-5",
     });
   });
 
