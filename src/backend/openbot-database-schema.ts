@@ -6,6 +6,7 @@ import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { CHANNEL_SCHEMA_SQL, CHANNEL_SETTINGS_SCHEMA_SQL } from "./channel-schema";
 import { MCP_SERVERS_SCHEMA_SQL } from "./mcp-schema";
 import { MESSAGING_SCHEMA_SQL } from "./messaging/messaging-schema";
+import { ROUTINE_FLOW_SCHEMA_SQL } from "./routine-flows/routine-flow-schema";
 
 const BASELINE_SCHEMA_VERSION = 8;
 
@@ -409,7 +410,8 @@ const LATEST_SCHEMA_SQL =
     withRoutineLimitPolicy(V19_CHANNEL_ROUTINES_END_SQL),
   ) +
   MCP_SERVERS_SCHEMA_SQL +
-  MESSAGING_SCHEMA_SQL;
+  MESSAGING_SCHEMA_SQL +
+  ROUTINE_FLOW_SCHEMA_SQL;
 
 /** The end of a routine table with the migration 27 column after its last one. */
 function withRoutineLimitPolicy(tableEnd: string): string {
@@ -545,6 +547,12 @@ const MIGRATIONS: readonly OpenBotMigration[] = [
     // Adds a column with a constant default to two tables: no rebuild, so no foreign-key pause and no
     // vacuum. Every existing routine keeps waiting, which is what it did before.
     up: addRoutineLimitPolicy,
+  },
+  {
+    version: 28,
+    // Only creates tables, so no foreign-key pause and no vacuum. Existing routines have no links,
+    // so every routine keeps running only its own agent, which is what it did before.
+    up: (db) => db.exec(ROUTINE_FLOW_SCHEMA_SQL),
   },
 ];
 

@@ -2,9 +2,13 @@ import { isManagedRuntimeProvider } from "@openbot/contracts/agent-providers";
 import { Effect, Fiber } from "effect";
 import { AgentRemovalFailed } from "../backend/agent/agent-removal";
 import { HostedSiteOperationFailed } from "../backend/agent/hosted-site-coordinator";
+import { latestTurnAnswer } from "../backend/agent/turn-answer";
 import { AgentDatabaseSupervisor } from "../backend/agent-data/agent-database-supervisor";
 import { AgentTables } from "../backend/agent-data/agent-tables";
+import { AgentRoutineStore } from "../backend/agent-routine-store";
 import { SlackConnectFailed } from "../backend/messaging/slack/slack-connect";
+import { RoutineFlowStore } from "../backend/routine-flows/routine-flow-store";
+import { createRoutineFlows, type RoutineFlowsHandle } from "../backend/routine-flows/routine-flows";
 import { type AgentAdminSettingsService, createAgentAdminSettings } from "./agent-admin-settings";
 import { spawnAgentDatabaseHost } from "./agent-database-host-process";
 import { LocalSkillLibrary } from "./local-skill-library";
@@ -45,6 +49,7 @@ import type {
   CentralAuthState,
   ComputerUseState,
   ProviderRuntimeSnapshot,
+  RoutineFlowsChanged,
   VoiceModelStatus,
 } from "@openbot/contracts/ipc";
 import { IPC_ENDPOINTS, isManagedToolRuntime, isUpdateBusyPhase } from "@openbot/contracts/ipc";
@@ -257,6 +262,8 @@ const TEARDOWN_ORDER = {
   slackIngress: 86,
   host: 90,
   teamWebRtcBridge: 100,
+  // Before the agent service, so no handoff is sent to an agent while the service stops.
+  routineFlows: 104,
   mcpOAuthRedirect: 105,
   // Before the agent service. It holds no file an agent reads; only a CLI run that waits is stopped.
   onePasswordConnector: 106,
@@ -304,8 +311,14 @@ export interface ApplicationServiceContext {
 }
 
 /** Everything the entry point wires up, registers IPC handlers against, and shuts down. */
+/** The routine flow runtime, and a way to hear which agents' canvases changed. */
+export type RoutineFlowsService = RoutineFlowsHandle & {
+  onChanged(listener: (change: RoutineFlowsChanged) => void): void;
+};
+
 export interface ApplicationServices {
   service: AgentService;
+  routineFlows: RoutineFlowsService;
   providerRuntimes: ProviderRuntimeManager;
   providerCredentials: ProviderCredentialStore;
   /** The Slack connections of the agents on this host. */
@@ -1019,6 +1032,36 @@ export async function createApplicationServices({
     if (event.type === "agents-changed") Effect.runFork(automation.requestSync());
   });
   teardown.push(TEARDOWN_ORDER.automation, "the automation server", () => Effect.runPromise(automation.stop()));
+  // An agent routine's answer handed on from agent to agent; see `routine-flows.ts`.
+  const routineFlowListeners = new Set<(change: RoutineFlowsChanged) => void>();
+  const routineFlowRuntime = await Effect.runPromise(
+    createRoutineFlows({
+      store: new RoutineFlowStore({ database: store.database }),
+      routines: new AgentRoutineStore(store.database),
+      delivery: (deliveryId) => {
+        const found = mailbox.getDelivery(deliveryId)?.delivery;
+        return found ? { status: found.status, turnId: found.turnId, error: found.error } : null;
+      },
+      turnAnswer: (agentId, turnId) => {
+        const threadId = store.list().find((agent) => agent.id === agentId)?.threadId;
+        if (!threadId) return null;
+        return latestTurnAnswer(store.database.readConversation(agentId, threadId).messages, turnId)?.text ?? null;
+      },
+      agentName: (agentId) => store.list().find((agent) => agent.id === agentId)?.name ?? agentId,
+      sendHandoff: (input) => service.enqueueRoutineHandoff(input),
+      changed: (agentIds) => {
+        for (const listener of routineFlowListeners) listener({ agentIds });
+      },
+    }),
+  );
+  const routineFlows: RoutineFlowsService = {
+    ...routineFlowRuntime,
+    onChanged: (listener) => {
+      routineFlowListeners.add(listener);
+    },
+  };
+  service.on("event", (event) => Effect.runFork(routineFlowRuntime.notice(event)));
+  teardown.push(TEARDOWN_ORDER.routineFlows, "the routine flows", () => Effect.runPromise(routineFlowRuntime.close()));
   /*
    * The Slack workspaces where the agents answer. The tokens use the same cipher as every other
    * secret; an unreadable file is reported, not fatal, and each workspace then connects again.
@@ -1744,6 +1787,8 @@ export async function createApplicationServices({
       yield* Fiber.join(computerUseWarmUp);
       yield* service.initialize({ heldRoutines: takeRoutineHold(routineHoldFile, (message) => logger.warn(message)) });
       yield* automation.sync();
+      // Picks up the flows a restart stopped between one agent's answer and the next agent's message.
+      yield* routineFlowRuntime.sweep();
     }),
   );
   const describeRestartReadiness = (): RestartReadiness =>
@@ -1899,6 +1944,7 @@ export async function createApplicationServices({
 
   return {
     service,
+    routineFlows,
     providerRuntimes,
     providerCredentials,
     messaging,

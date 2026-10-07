@@ -355,6 +355,29 @@ changes it, on the computer that runs the agent: the Team API parser and the age
 not accept it, the remote IPC branch refuses it, and duplication does not copy it. When the flag is
 on, the developer instructions name the two file paths, never the token.
 
+## Routine flows
+
+A routine flow hands the answer of an agent routine on to other agents. The Routines view of the
+sidebar shows one canvas for each agent: every routine whose run reaches it, the agents its links
+reach, and the last run of each routine. Only this computer's host keeps flows; the remote IPC
+branch refuses them, and no Team API protocol changes.
+
+- `src/backend/routine-flows/` owns the three tables of migration 28: links, node positions and steps.
+  The rows are written directly, not through `dispatch`, because a step holds the text that one agent
+  gave another, and the event log is never deleted from. `hardDeleteAgent` removes the rows of a
+  deleted agent; a deleted routine or run takes its rows by foreign key.
+- `RoutineFlows` (`routine-flows.ts`) is an Effect service on its own managed runtime. It never
+  listens to a provider. On a turn, queue or routine event it sweeps: it records the answer of a run
+  that ended, settles each step whose delivery ended, and sends the next messages. Sweeps run one at
+  a time, and one more after a sweep runs again for an event that arrived during it. Startup sweeps
+  once, so a flow that a restart stopped continues.
+- A link belongs to one routine and applies only to runs that started after it. An agent with several
+  inputs waits for all of them and gets them in one message. An agent whose inputs all failed is
+  skipped, so a failure never leaves a flow waiting.
+- A handoff is a mailbox delivery from the routine (`RoutineScheduler.enqueueHandoff`). It names the
+  same routine and run, but `reconcileDelivery` finds a run only by its own delivery, so the run status
+  does not change.
+
 ## Provider CLI updates
 
 The runtime manager offers the latest upstream release of each provider CLI. It checks at startup,

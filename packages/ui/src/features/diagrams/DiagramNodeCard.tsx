@@ -46,7 +46,10 @@ export interface DiagramNodeCardProps {
   onFocusRoutine: (routineId: string) => void;
   stepRun?: DiagramStepRun | undefined;
   selected: boolean;
-  editable: boolean;
+  /** Whether its ports take a new connection. */
+  connectable: boolean;
+  /** Whether the user may take it off the canvas. */
+  removable: boolean;
   /** True while this node's output is the source of a connection in progress. */
   connecting: boolean;
   inputTarget: DiagramPortTarget;
@@ -111,7 +114,7 @@ export function DiagramNodeCard(props: DiagramNodeCardProps) {
           data-diagram-control=""
           data-diagram-port="in"
           data-target={props.inputTarget}
-          disabled={!props.editable}
+          disabled={!props.connectable}
           aria-label={t("diagram.port.input", { name: props.name })}
           onClick={() => props.onInputPort()}
         />
@@ -124,7 +127,7 @@ export function DiagramNodeCard(props: DiagramNodeCardProps) {
         data-diagram-control=""
         data-diagram-port="out"
         data-connecting={props.connecting ? "" : undefined}
-        disabled={!props.editable}
+        disabled={!props.connectable}
         aria-label={t("diagram.port.output", { name: props.name })}
         aria-pressed={props.connecting ? "true" : "false"}
         onClick={() => props.onOutputPort()}
@@ -165,7 +168,7 @@ export function DiagramNodeCard(props: DiagramNodeCardProps) {
             </span>
           )}
         </Show>
-        <Show when={props.selected && props.editable}>
+        <Show when={props.selected && props.removable}>
           <Button
             type="button"
             variant="ghost"
@@ -214,7 +217,11 @@ export function DiagramNodeCard(props: DiagramNodeCardProps) {
                 when={props.stepRun?.error ?? props.stepRun?.output}
                 fallback={
                   <span class="diagram-node-preview-empty">
-                    {props.stepRun?.status === "running" ? t("diagram.step.running") : t("diagram.node.noRun")}
+                    {props.stepRun?.status === "running"
+                      ? t("diagram.step.running")
+                      : props.stepRun?.status === "succeeded"
+                        ? t("diagram.node.noAnswer")
+                        : t("diagram.node.noRun")}
                   </span>
                 }
               >

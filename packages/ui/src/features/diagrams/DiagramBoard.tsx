@@ -9,7 +9,7 @@
  * every edit goes out through a callback, so the caller decides what an edit does.
  */
 
-import { Button, Maximize2, Minus, Plus } from "@openbot/ui";
+import { Button, buttonVariants, DropdownMenu, Maximize2, Minus, Plus } from "@openbot/ui";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
 import { createMemo, createStore, For, onSettled, Show } from "solid-js";
@@ -90,6 +90,14 @@ export interface DiagramBoardProps {
   onRunRoutine?: ((nodeId: string) => void) | undefined;
   onAddRoutine?: (() => void) | undefined;
   onAddAgent?: (() => void) | undefined;
+  /** Whether a new connection may start now. Defaults to `editable`. */
+  connectable?: boolean;
+  /** Whether a node or a connection may be removed. Everything may, when absent. */
+  canRemoveNode?: ((nodeId: string) => boolean) | undefined;
+  canRemoveEdge?: ((edgeId: string) => boolean) | undefined;
+  /** Agents the "Add agent" menu offers. With it, the button opens a menu rather than calling `onAddAgent`. */
+  addableAgents?: readonly AgentProfile[] | undefined;
+  onPlaceAgent?: ((agentId: string) => void) | undefined;
   /** Panels that float over the canvas, such as the assistant. */
   children?: JSX.Element;
 }
@@ -97,6 +105,9 @@ export interface DiagramBoardProps {
 export function DiagramBoard(props: DiagramBoardProps) {
   const { t, format } = useText();
   const editable = () => props.editable !== false;
+  const connectable = () => editable() && props.connectable !== false;
+  const nodeRemovable = (nodeId: string) => editable() && (props.canRemoveNode?.(nodeId) ?? true);
+  const edgeRemovable = (edgeId: string) => editable() && (props.canRemoveEdge?.(edgeId) ?? true);
   const [camera, setCamera] = createStore({ x: 0, y: 0, scale: 1, settling: false });
   const [interaction, setInteraction] = createStore<BoardInteraction>({
     source: null,
@@ -236,13 +247,14 @@ export function DiagramBoard(props: DiagramBoardProps) {
   const removeSelection = () => {
     const edgeId = interaction.selectedEdgeId;
     if (edgeId) {
+      if (!edgeRemovable(edgeId)) return false;
       props.onRemoveEdge(edgeId);
       setInteraction((state) => {
         state.selectedEdgeId = null;
       });
       return true;
     }
-    if (props.selectedNodeId) {
+    if (props.selectedNodeId && nodeRemovable(props.selectedNodeId)) {
       props.onRemoveNode(props.selectedNodeId);
       return true;
     }
@@ -342,7 +354,7 @@ export function DiagramBoard(props: DiagramBoardProps) {
       }
       const port = target.closest<HTMLElement>("[data-diagram-port='out']");
       const nodeId = target.closest<HTMLElement>("[data-diagram-node]")?.dataset.diagramNode;
-      if (port && nodeId && editable()) {
+      if (port && nodeId && connectable()) {
         gesture = { kind: "connect", from: nodeId, start, moved: false };
       } else if (target.closest("[data-diagram-control], [data-diagram-overlay]")) {
         return;
@@ -489,7 +501,7 @@ export function DiagramBoard(props: DiagramBoardProps) {
                     const midpoint = () =>
                       diagramEdgeMidpoint(diagramOutputPort(pair().from), diagramInputPort(pair().to));
                     return (
-                      <Show when={editable()}>
+                      <Show when={edgeRemovable(edge.id)}>
                         <Button
                           type="button"
                           variant="ghost"
@@ -534,7 +546,8 @@ export function DiagramBoard(props: DiagramBoardProps) {
                 onFocusRoutine={props.onFocusRoutine}
                 stepRun={stepRuns().get(node.id)}
                 selected={props.selectedNodeId === node.id}
-                editable={editable()}
+                connectable={connectable()}
+                removable={nodeRemovable(node.id)}
                 connecting={interaction.source === node.id}
                 inputTarget={inputTarget(node.id)}
                 now={props.now}
@@ -570,7 +583,7 @@ export function DiagramBoard(props: DiagramBoardProps) {
         </Show>
       </div>
 
-      <Show when={editable() && (props.onAddRoutine || props.onAddAgent)}>
+      <Show when={editable() && (props.onAddRoutine || props.onAddAgent || props.addableAgents)}>
         <div class="diagram-board-tools" role="toolbar" aria-label={t("diagram.toolbar.label")} data-diagram-overlay="">
           <Show when={props.onAddRoutine}>
             <Button type="button" variant="ghost" size="sm" onClick={() => props.onAddRoutine?.()}>
@@ -578,11 +591,39 @@ export function DiagramBoard(props: DiagramBoardProps) {
               {t("diagram.toolbar.addRoutine")}
             </Button>
           </Show>
-          <Show when={props.onAddAgent}>
-            <Button type="button" variant="ghost" size="sm" onClick={() => props.onAddAgent?.()}>
-              <Plus aria-hidden="true" />
-              {t("diagram.toolbar.addAgent")}
-            </Button>
+          <Show
+            when={props.addableAgents}
+            fallback={
+              <Show when={props.onAddAgent}>
+                <Button type="button" variant="ghost" size="sm" onClick={() => props.onAddAgent?.()}>
+                  <Plus aria-hidden="true" />
+                  {t("diagram.toolbar.addAgent")}
+                </Button>
+              </Show>
+            }
+          >
+            {(addable) => (
+              <DropdownMenu.Root placement="bottom-start" gutter={4}>
+                <DropdownMenu.Trigger
+                  class={buttonVariants({ variant: "ghost", size: "sm" })}
+                  disabled={addable().length === 0}
+                >
+                  <Plus aria-hidden="true" />
+                  {t("diagram.toolbar.addAgent")}
+                </DropdownMenu.Trigger>
+                <DropdownMenu.Portal>
+                  <DropdownMenu.Content aria-label={t("diagram.toolbar.addAgent")}>
+                    <For each={addable()}>
+                      {(agent) => (
+                        <DropdownMenu.Item onSelect={() => props.onPlaceAgent?.(agent.id)}>
+                          {agent.name}
+                        </DropdownMenu.Item>
+                      )}
+                    </For>
+                  </DropdownMenu.Content>
+                </DropdownMenu.Portal>
+              </DropdownMenu.Root>
+            )}
           </Show>
         </div>
       </Show>

@@ -10,6 +10,14 @@
   background: var(--openbot-bg-canvas);
 }
 
+/* What the Routines view says instead of a canvas: it is loading, it failed, or the server is remote. */
+.diagram-flows-notice {
+  align-items: center;
+  justify-content: center;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-md);
+}
+
 .diagram-view-header {
   display: flex;
   min-height: 56px;
@@ -40,7 +48,10 @@
   height: var(--openbot-icon-md);
 }
 
+/* The name keeps its room; the routine picker beside it is the part that narrows. */
 .diagram-view-title {
+  max-width: 32ch;
+  flex: none;
   overflow: hidden;
   margin: 0;
   font-size: var(--openbot-text-lg);
@@ -671,7 +682,7 @@
 }
 
 .diagram-view-lens-trigger.ui-select-trigger {
-  min-width: 180px;
+  min-width: 120px;
   max-width: 280px;
 }
 

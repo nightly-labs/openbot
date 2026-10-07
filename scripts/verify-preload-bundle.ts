@@ -23,6 +23,7 @@ const GROUP_PATHS: Readonly<Record<IpcGroupName, string | null>> = {
   maintenance: "maintenance",
   providerRuntimes: "providerRuntimes",
   voice: "voice",
+  routineFlows: "routineFlows",
   dynamicIsland: "dynamicIsland",
   computerUse: "computerUse",
   skills: "skills",

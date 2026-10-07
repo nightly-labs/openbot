@@ -78,6 +78,9 @@ export type RemoteDesktopDesktopApi = GroupApi<IpcEndpoints["remoteDesktop"]>;
 
 export type VoiceDesktopApi = GroupApi<IpcEndpoints["voice"]>;
 
+/** Routine flows of this computer's agents: the canvas, its edits, and when it changed. */
+export type RoutineFlowsDesktopApi = GroupApi<IpcEndpoints["routineFlows"]>;
+
 export type SkillsDesktopApi = GroupApi<IpcEndpoints["skills"]>;
 
 export type HostedSitesDesktopApi = GroupApi<IpcEndpoints["hostedSites"]>;
@@ -135,6 +138,7 @@ export interface OpenBotDesktopApi extends GroupApi<IpcEndpoints["app"]>, GroupA
   computerUse: ComputerUseDesktopApi;
   providerRuntimes: ProviderRuntimesDesktopApi;
   voice: VoiceDesktopApi;
+  routineFlows: RoutineFlowsDesktopApi;
   skills: SkillsDesktopApi;
   customProviders: CustomProvidersDesktopApi;
   providerDetection: ProviderDetectionDesktopApi;

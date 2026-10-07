@@ -43,6 +43,7 @@ export * from "./ipc-provider-admin";
 export * from "./ipc-provider-detection";
 export * from "./ipc-queue";
 export * from "./ipc-remote-desktop-setup";
+export * from "./ipc-routine-flows";
 export * from "./ipc-routines";
 export * from "./ipc-shared-tables";
 export * from "./ipc-sidebar-layout";

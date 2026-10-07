@@ -1213,6 +1213,22 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       .pipe(Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "testRoutine", cause: failure.cause })));
   }
 
+  /** Hands a routine run's work on to the next agent of its flow; answers the delivery id. */
+  enqueueRoutineHandoff(input: {
+    run: Pick<RoutineRun, "id" | "routineId" | "routineName" | "scheduledFor">;
+    agentId: string;
+    text: string;
+    idempotencyKey: string;
+  }): Effect.Effect<string, AgentLifecycleFailed> {
+    return this.#routines
+      .enqueueHandoff(input)
+      .pipe(
+        Effect.mapError(
+          (failure) => new AgentLifecycleFailed({ operation: "enqueueRoutineHandoff", cause: failure.cause }),
+        ),
+      );
+  }
+
   /** A run that a local script starts through the automation server. Only for agents that allow it. */
   readonly runRoutineFromAutomation = Effect.fn("AgentService.runRoutineFromAutomation")(function* (
     this: AgentService,

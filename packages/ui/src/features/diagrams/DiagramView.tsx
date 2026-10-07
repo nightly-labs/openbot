@@ -52,9 +52,16 @@ export interface DiagramViewProps {
       }
     | undefined;
   onMoveNode: (nodeId: string, position: DiagramPoint) => void;
-  onConnect: (from: string, to: string) => void;
+  /** `routineId` is the routine in focus when the connection was drawn, or null on "All routines". */
+  onConnect: (from: string, to: string, routineId: string | null) => void;
   onRemoveEdge: (edgeId: string) => void;
-  onRemoveNode: (nodeId: string) => void;
+  onRemoveNode: (nodeId: string, routineId: string | null) => void;
+  /** A connection belongs to one routine, so new ones are drawn only while a routine is in focus. */
+  connectsWithinRoutine?: boolean;
+  canRemoveNode?: ((nodeId: string) => boolean) | undefined;
+  canRemoveEdge?: ((edgeId: string) => boolean) | undefined;
+  addableAgents?: readonly AgentProfile[] | undefined;
+  onPlaceAgent?: ((agentId: string) => void) | undefined;
   onRunRoutine?: ((nodeId: string) => void) | undefined;
   onAddRoutine?: (() => void) | undefined;
   onAddAgent?: (() => void) | undefined;
@@ -220,12 +227,17 @@ export function DiagramView(props: DiagramViewProps) {
           onSelectNode={select}
           onFocusRoutine={setPicked}
           onMoveNode={props.onMoveNode}
-          onConnect={props.onConnect}
+          onConnect={(from, to) => props.onConnect(from, to, focusRoutineId())}
           onRemoveEdge={props.onRemoveEdge}
           onRemoveNode={(nodeId) => {
             if (selectedNodeId() === nodeId) setSelectedNodeId(null);
-            props.onRemoveNode(nodeId);
+            props.onRemoveNode(nodeId, focusRoutineId());
           }}
+          connectable={!props.connectsWithinRoutine || focusRoutineId() !== null}
+          canRemoveNode={props.canRemoveNode}
+          canRemoveEdge={props.canRemoveEdge}
+          addableAgents={props.addableAgents}
+          onPlaceAgent={props.onPlaceAgent}
           onRunRoutine={props.onRunRoutine ? runRoutine : undefined}
           onAddRoutine={props.onAddRoutine}
           onAddAgent={props.onAddAgent}
