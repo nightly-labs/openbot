@@ -9,11 +9,14 @@ import {
   expectOpenBotToolError,
   expectOpenBotToolFailure,
   FakeAgentClient,
+  fakeOpencodeCli,
+  notification,
   openBotToolPayload,
   startAgentTestFixture,
   stopAgentTestFixture,
   stores,
   waitFor,
+  waitForQueue,
 } from "../agent-service-test-harness";
 import { runCauseEffect } from "../effect-boundary";
 
@@ -30,6 +33,64 @@ afterEach(async () => {
 });
 
 describe.sequential("RoutineScheduler: routine mutations, runs and tools", () => {
+  it("keeps a daily Reddit routine after an OpenCode upload failure and refuses a duplicate", async () => {
+    process.env.OPENBOT_OPENCODE_PATH = await fakeOpencodeCli();
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("opencode", "", false);
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "opencode",
+      clientFactory: (provider) => (provider === "opencode" ? client : new FakeAgentClient(provider)),
+    });
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(store.getOrCreate("chief"));
+    await runCauseEffect(
+      service.updateAgent({ agentId: "chief", provider: "opencode", model: "opencode/example-model" }),
+    );
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Monitor Reddit for OpenBot each day." }));
+    await waitFor(() => events.some((event) => event.type === "turn-started"));
+    const threadId = store.activeProviderSession("chief")?.externalSessionId;
+    const turnId = service.listQueue("chief").deliveries[0]?.turnId;
+    if (!threadId || !turnId) throw new Error("The Reddit monitor turn did not start.");
+    const input = {
+      name: "Reddit OpenBot daily monitor",
+      instruction: "Report new mentions of OpenBot on Reddit in the last 24 hours.",
+      timezone: "UTC",
+      schedule: { kind: "daily", time: "08:00" },
+    };
+    const result = await callOpenBotTool(client, threadId, "create_routine", input, turnId);
+    const routine = openBotToolPayload(result.result);
+    expect(routine).toMatchObject({
+      name: input.name,
+      instruction: input.instruction,
+      timezone: input.timezone,
+      trigger: { schedule: input.schedule },
+      active: true,
+    });
+
+    client.emit(
+      "notification",
+      notification("error", { threadId, turnId, message: "Internal error: Invalid upload request." }),
+    );
+    client.emit("notification", notification("turn/completed", { threadId, turn: { id: turnId, status: "failed" } }));
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "failed");
+    expect(service.listRoutines("chief")).toEqual([expect.objectContaining(routine)]);
+    const conversation = await runCauseEffect(service.readConversation("chief"));
+    expect(conversation.messages.flatMap((message) => routineConversationEvent(message) ?? [])).toEqual([
+      { action: "created", routineId: routine.id, routineName: input.name },
+    ]);
+
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Create the daily Reddit monitor." }));
+    await waitFor(() => events.filter((event) => event.type === "turn-started").length === 2);
+    const retryThreadId = store.activeProviderSession("chief")?.externalSessionId;
+    if (!retryThreadId) throw new Error("The retry thread did not start.");
+    await expectOpenBotToolFailure(client, retryThreadId, "create_routine", input, "already exists with routineId");
+    expect(service.listRoutines("chief")).toEqual([expect.objectContaining(routine)]);
+  });
+
   it("lets an agent manage routines for itself and another agent", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);

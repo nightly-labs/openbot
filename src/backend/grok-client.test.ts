@@ -213,6 +213,8 @@ describe.sequential("GrokAgentClient", () => {
     ["Too Many Requests", "opencodeRateLimited"],
     ["No payment method.", "opencodeBilling"],
     ["Upstream request failed: Insufficient account funds", "opencodeBilling"],
+    ["Invalid upload request.", "opencodeInvalidUpload"],
+    ["Upstream request failed: [invalid_request_error] Invalid upload request.", "opencodeInvalidUpload"],
     ["Upstream request failed: Endpoint is unavailable.", "opencodeProviderFailed"],
     ["Service Unavailable", "opencodeProviderFailed"],
     ["Upstream request failed: Cannot connect to API: Unable to connect.", "opencodeProviderFailed"],

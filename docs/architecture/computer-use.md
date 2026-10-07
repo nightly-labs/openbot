@@ -103,3 +103,21 @@ On Linux, the gateway accepts only an X11 session (`DISPLAY` set, no `WAYLAND_DI
 `XDG_SESSION_TYPE` not `wayland`). Sunshine then runs with X11 capture and software encoding, and
 sends input through XTest, so a hosted server under Xvfb needs no uinput device and no extra
 capability. Linux has no permission checks: an X11 session is ready.
+
+### Codex tool approvals
+
+Codex saves an “Always allow” tool decision only when the MCP server is in a file-backed
+configuration layer. A thread configuration alone does not satisfy this check. Before starting or
+resuming a thread with Computer Use, OpenBot registers `computer_use` in the Codex user
+configuration through `config/value/write`. The new entry contains only the driver command and
+`enabled = false`. The write uses the user layer's version, and an existing entry is left unchanged.
+OpenBot does not save the driver socket, environment, or credentials in that entry.
+
+The thread configuration enables the running driver and supplies its current command, arguments,
+and environment. It also carries the saved per-tool settings, including `set_value.approval_mode`.
+Saved tool settings are also in the session fingerprint. When an approval changes, the next turn
+replaces a loaded provider session that holds the old policy.
+When Computer Use is off for the agent or the driver is unavailable, the thread keeps the saved
+entry disabled. A registration failure stops the thread with steps to repair the configuration or
+turn off Computer Use. The application-access questions from the driver still use their existing
+approval flow.

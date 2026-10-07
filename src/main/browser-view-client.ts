@@ -79,7 +79,14 @@ export class BrowserViewClient {
         this.#events.add(fiber);
         fiber.addObserver(() => this.#events.delete(fiber));
       };
-      socket.addEventListener("close", () => ended(sourceText("error.backend.browserViewEnded")));
+      socket.addEventListener("close", (event) =>
+        ended(
+          event.reason ||
+            (event.code === 1000
+              ? sourceText("error.backend.browserViewEnded")
+              : sourceText("error.backend.browserViewFailed")),
+        ),
+      );
       socket.addEventListener("error", () => ended(sourceText("error.backend.browserViewFailed")));
     },
     (operation) => this.#queue(operation),
