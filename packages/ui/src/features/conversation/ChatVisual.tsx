@@ -48,10 +48,10 @@ interface ChatVisualProps {
    * The page URL, or nothing while the app gets it. The server that gives it must send a sandbox
    * policy, as the frame does.
    */
-  src?: string;
+  src?: string | undefined;
   title: string;
   /** The height that the agent asked for, and the maximum height of the frame. */
-  height?: number;
+  height?: number | undefined;
   /** Set when the app cannot get the page. The text replaces the page in the same box. */
   failed?: boolean;
   /** The frame fills its box, as in the file preview, and the page scrolls in it. */

@@ -38,7 +38,7 @@ interface FilePreviewPanelProps {
    * Set for an HTML file that the app can serve as a sandboxed page with its scripts. The panel
    * shows the page, and the source on request. Without it the panel shows the source.
    */
-  pageUrl?: string | null;
+  pageUrl?: string | null | undefined;
   onOpenExternally: () => void;
   allowExternalOpen?: boolean;
   onDownload?: () => void;

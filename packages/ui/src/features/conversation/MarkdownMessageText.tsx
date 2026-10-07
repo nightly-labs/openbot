@@ -25,7 +25,7 @@ type MarkdownMessageTextProps = Omit<RichMessageTextProps, "showCitationFooter">
   streaming?: boolean;
   imagesAsLinks?: boolean;
   /** Opens a markdown image in the image viewer. Without it, an image is only a picture. */
-  onOpenImage?: (image: HTMLImageElement) => void;
+  onOpenImage?: ((image: HTMLImageElement) => void) | undefined;
 };
 
 type MarkdownContentProps = Omit<

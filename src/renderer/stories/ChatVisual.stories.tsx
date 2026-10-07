@@ -31,9 +31,9 @@ import "./ChatVisual.stories.css";
 interface StageProps {
   html: string;
   title: string;
-  height?: number;
+  height?: number | undefined;
   /** A page that the app is still getting, or that it cannot get. */
-  state?: "loading" | "failed";
+  state?: "loading" | "failed" | undefined;
   onOpenLink: (url: string) => void;
 }
 
