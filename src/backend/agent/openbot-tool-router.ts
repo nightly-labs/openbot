@@ -632,8 +632,9 @@ export class OpenBotToolRouter {
     ) {
       return openBotToolResult({ status: "shown", messageId });
     }
+    // The page and its message are saved together, so a failed save keeps no page and a retry stores one.
     const attachment = yield* this.#mailbox
-      .storeGeneratedAttachment({
+      .stageGeneratedBytes({
         bytes: new TextEncoder().encode(args.html),
         name: `${visualReplyFileName(args.title)}.html`,
         mimeType: "text/html",
@@ -657,15 +658,17 @@ export class OpenBotToolRouter {
     });
     sortConversationMessages(snapshot.messages);
     try {
-      const persisted = this.#store.database.persistConversation(snapshot, "response.visual-added", {
-        turnId: params.turnId,
-        messageId,
-        attachmentId: attachment.id,
-      });
+      const persisted = this.#mailbox.persistGeneratedAttachmentsWithConversation(
+        snapshot,
+        "response.visual-added",
+        { turnId: params.turnId, messageId, attachmentId: attachment.id },
+        [attachment.id],
+      );
       snapshot.revision = persisted.revision;
     } catch (error) {
       const messageIndex = snapshot.messages.findIndex((candidate) => candidate.id === messageId);
       if (messageIndex >= 0) snapshot.messages.splice(messageIndex, 1);
+      yield* this.#mailbox.discardStagedGeneratedAttachments([attachment.id]).pipe(toToolOperationFailed);
       throw error;
     }
     this.#conversation.publishConversation(snapshot);
