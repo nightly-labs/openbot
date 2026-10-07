@@ -7,7 +7,7 @@ export type AlertTone = "neutral" | "success" | "warning" | "danger";
 
 export interface AlertProps extends JSX.HTMLAttributes<HTMLDivElement> {
   tone?: AlertTone;
-  report?: NotificationMetadata;
+  report?: NotificationMetadata | false;
 }
 
 const NotificationContext = createContext<((report: FailureProperties) => void) | null>(null);
@@ -25,7 +25,7 @@ export function Alert(props: AlertProps): JSX.Element {
   createEffect(
     () => props.tone,
     (tone) => {
-      if (tone !== "danger" && tone !== "warning") return;
+      if (props.report === false || (tone !== "danger" && tone !== "warning")) return;
       observe?.({
         ...(props.report ?? { operation: "other", source: "system", cause_code: "unknown" }),
         severity: tone === "danger" ? "error" : "warning",

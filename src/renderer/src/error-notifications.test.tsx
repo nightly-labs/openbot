@@ -1,5 +1,5 @@
 import type { FailureProperties } from "@openbot/telemetry";
-import { Alert, NotificationObserver, Toaster, toast } from "@openbot/ui";
+import { Alert, ConfirmDialog, NotificationObserver, Toaster, toast } from "@openbot/ui";
 import { render, screen, waitFor } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { afterEach, expect, it } from "vitest";
@@ -7,6 +7,24 @@ import { actionToast } from "./action-toast";
 
 afterEach(() => {
   toast.dismiss();
+});
+
+it("does not count confirmation-dialog errors as notifications", async () => {
+  const reports: FailureProperties[] = [];
+  render(() => (
+    <NotificationObserver onShown={(report) => reports.push(report)}>
+      <ConfirmDialog
+        open
+        title="Confirm action"
+        confirmLabel="Confirm"
+        error="Action failed"
+        onCancel={() => {}}
+        onConfirm={() => {}}
+      />
+    </NotificationObserver>
+  ));
+  await screen.findByText("Action failed");
+  expect(reports).toEqual([]);
 });
 it("reports direct, action and promise failures without sending display text or repeating on remount", async () => {
   const reports: FailureProperties[] = [];
