@@ -632,6 +632,10 @@ export class ThreadLifecycle {
           [...BROWSER_DYNAMIC_TOOLS, OPENBOT_DYNAMIC_TOOLS],
           mcpFingerprintValues(configs),
           Object.keys(disabled).sort(),
+          // A revoked approval must also replace a loaded session with the old tool policy.
+          ...(configs.some((config) => config.id === COMPUTER_USE_MCP_SERVER_ID)
+            ? [disabled[COMPUTER_USE_MCP_SERVER_NAME]?.tools ?? {}]
+            : []),
           [toolRuntimes.binDirectories, toolRuntimes.commandAliases],
           CODEX_MCP_ADAPTER_VERSION,
           // Only a sandboxed agent, or one that allows local scripts, adds a value: Codex keeps the

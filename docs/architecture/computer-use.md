@@ -115,6 +115,8 @@ OpenBot does not save the driver socket, environment, or credentials in that ent
 
 The thread configuration enables the running driver and supplies its current command, arguments,
 and environment. It also carries the saved per-tool settings, including `set_value.approval_mode`.
+Saved tool settings are also in the session fingerprint. When an approval changes, the next turn
+replaces a loaded provider session that holds the old policy.
 When Computer Use is off for the agent or the driver is unavailable, the thread keeps the saved
 entry disabled. A registration failure stops the thread with steps to repair the configuration or
 turn off Computer Use. The application-access questions from the driver still use their existing

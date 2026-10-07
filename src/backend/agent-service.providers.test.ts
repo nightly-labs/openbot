@@ -932,6 +932,16 @@ describe.sequential("AgentService: providers", () => {
     const enabled = client.requests.filter((request) => request.method === "thread/start").at(-1);
     expect(paramsRecord(enabled?.params)?.config).toEqual(paramsRecord(start?.params)?.config);
 
+    savedServers.computer_use.tools = { set_value: { approval_mode: "prompt" } };
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Ask for approval again." }));
+    await waitForQueue(service, "chief", (queue) =>
+      queue.deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    const revoked = client.requests.filter((request) => request.method === "thread/start").at(-1);
+    expect(paramsRecord(revoked?.params)?.config).toMatchObject({
+      mcp_servers: { computer_use: { enabled: true, tools: { set_value: { approval_mode: "prompt" } } } },
+    });
+
     driverRunning = false;
     expect(service.enabledMcpServers()).toEqual([]);
     await runCauseEffect(service.refreshAllAgentRuntimes());
@@ -940,7 +950,10 @@ describe.sequential("AgentService: providers", () => {
       queue.deliveries.every((delivery) => delivery.status === "completed"),
     );
     const unavailable = client.requests.filter((request) => request.method === "thread/start").at(-1);
-    expect(paramsRecord(unavailable?.params)?.config).toEqual(restart?.config);
+    expect(paramsRecord(unavailable?.params)?.config).toEqual({
+      tools: CODEX_TOOLS,
+      mcp_servers: { computer_use: { enabled: false, tools: savedServers.computer_use.tools } },
+    });
   });
 
   /*
