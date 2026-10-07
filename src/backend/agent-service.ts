@@ -2835,7 +2835,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   #emitError(code: string, error: unknown, agentId?: string, context?: FailureContext): void {
-    this.emit("failure", { ...context, code, agentId, causeCode: context?.causeCode ?? classifyFailure(error) });
+    this.emit("failure", {
+      ...context,
+      code,
+      ...(agentId !== undefined ? { agentId } : {}),
+      causeCode: context?.causeCode ?? classifyFailure(error),
+    });
     this.#emit({
       type: "error",
       agentId,

@@ -1569,7 +1569,7 @@ export async function createApplicationServices({
         )
       : undefined;
   const analytics = new HostAnalytics({
-    reports: failureReports,
+    ...(failureReports ? { reports: failureReports } : {}),
     enabled: app.isPackaged && appVariant === "production",
     trackingEnabled: analyticsPreference.enabled,
     appVersion: app.getVersion(),

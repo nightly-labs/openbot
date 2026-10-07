@@ -469,7 +469,7 @@ export class TurnLifecycle {
           }
           this.#hooks.emitFailure?.({
             code: "agent_error",
-            agentId,
+            ...(agentId !== undefined ? { agentId } : {}),
             turnId: errorTurnId,
             provider: source.provider,
             model: agentId && errorTurnId ? this.#hooks.turnModel(agentId, errorTurnId) : null,

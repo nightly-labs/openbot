@@ -270,7 +270,7 @@ export class HostAnalytics {
         this.#makeTurnCapacity();
         const owner = normalizeAnalyticsIdentity(this.#resolveOwner());
         this.#activeTurns.set(event.turnId, {
-          failureScope: this.#reports?.scope(),
+          ...(this.#reports ? { failureScope: this.#reports.scope() } : {}),
           agentId: event.agentId,
           properties: this.#agentProperties(event.agentId),
           startedAt: now,
