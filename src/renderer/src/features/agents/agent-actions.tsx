@@ -1,4 +1,4 @@
-import type { AgentReasoningEffort, AgentSummary } from "@openbot/contracts/ipc";
+import type { AgentSummary } from "@openbot/contracts/ipc";
 import { TEAM_AGENT_CREATE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import type { AgentProfile } from "@openbot/ui/data";
 import type { FirstAgentDraft } from "@openbot/ui/features/agents/FirstAgentSetup";
@@ -67,7 +67,7 @@ const AgentActions = createSimpleContext({
     /** Asks the host for the agent. A draft without a provider leaves the backend to pick its starting default. */
     function requestNewAgent(
       draft: Pick<FirstAgentDraft, "name" | "purpose" | "avatarSeed" | "avatarHue"> &
-        Partial<Pick<FirstAgentDraft, "provider" | "model">> & { reasoningEffort?: AgentReasoningEffort },
+        Partial<Pick<FirstAgentDraft, "provider" | "model">>,
     ) {
       // The provider and model travel with the creation request: the backend applies them before
       // the initial message is queued, while a later provider change would be rejected as active
@@ -80,11 +80,7 @@ const AgentActions = createSimpleContext({
         avatarSeed: draft.avatarSeed,
         avatarHue: draft.avatarHue,
         ...(createModelSupported && draft.provider && draft.model
-          ? {
-              provider: draft.provider,
-              model: draft.model,
-              ...(draft.reasoningEffort ? { reasoningEffort: draft.reasoningEffort } : {}),
-            }
+          ? { provider: draft.provider, model: draft.model }
           : {}),
         initialMessage: createAgentInitialMessage(draft),
       });
