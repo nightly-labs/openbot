@@ -74,9 +74,11 @@ export class RoutineRecords {
 
   delete(owner: EventRoutineOwner, routineId: string): Effect.Effect<void, RoutineRecordFailed> {
     return owner.kind === "agent"
-      ? this.#options.agentRoutines.delete({ agentId: owner.id, routineId }).pipe(Effect.mapError(failed("delete")))
+      ? this.#options.agentRoutines
+          .delete({ agentId: owner.id, routineId }, { webhook: true })
+          .pipe(Effect.mapError(failed("delete")))
       : Effect.try({
-          try: () => this.#options.channelRoutines.delete({ channelId: owner.id, routineId }),
+          try: () => this.#options.channelRoutines.delete({ channelId: owner.id, routineId }, { webhook: true }),
           catch: (cause) => new RoutineRecordFailed({ operation: "delete", cause }),
         });
   }
@@ -84,8 +86,8 @@ export class RoutineRecords {
   test(owner: EventRoutineOwner, routineId: string): Effect.Effect<void, RoutineRecordFailed> {
     const run: Effect.Effect<unknown, { readonly cause: unknown }> =
       owner.kind === "agent"
-        ? this.#options.agentRoutines.test({ agentId: owner.id, routineId })
-        : this.#options.channelRoutines.test({ channelId: owner.id, routineId });
+        ? this.#options.agentRoutines.test({ agentId: owner.id, routineId }, { webhook: true })
+        : this.#options.channelRoutines.test({ channelId: owner.id, routineId }, { webhook: true });
     return Effect.mapError(Effect.asVoid(run), failed("test"));
   }
 

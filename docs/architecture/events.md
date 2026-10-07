@@ -44,7 +44,8 @@ A host has at most `WEBHOOK_ROUTES_LIMIT` (64) routes. Main and the account serv
 After a save, `HostEventsService.syncRoutes` registers each route that has no URL. The account
 service records the route for the host. `WebhookRelay` builds the URL from the Signal origin and
 `WEBHOOK_EVENTS_PATH` (`/v1/webhooks/<routeId>`). A failed call keeps the local state for the next
-sync and does not fail the save. The save releases its write lock before the sync, so a slow network
+sync and does not fail the save. After a failed call, the sync runs again after 30 seconds. The delay
+doubles up to 15 minutes until a sync succeeds. The save releases its write lock before the sync, so a slow network
 does not block other saves. At start and when the signed-in account changes, the host registers all
 routes again. A token refresh does not start a sync.
 
@@ -57,7 +58,8 @@ the routine a new route ID, keeps the secret, and registers the new ID. The URL 
 A routine delete, a change to `schedule`, and an agent or channel delete all call
 `revokeRoutineWebhooks`. It writes the route ID to `projection_webhook_route_revocations` and removes
 the trigger row in the same transaction. `syncRoutes` drains the queue: the account service marks
-the route revoked and sends `webhook-route-revoked` to Signal. The account service never deletes a
+the route revoked and sends `webhook-route-revoked` to Signal. A failed revocation stays in the queue
+for the next sync. The account service never deletes a
 route row and never frees its ID, also not after a host or account delete: senders can still post to
 the old public URL, so the ID must never belong to another host. A routine or owner delete also removes its
 receipts. A change to `schedule` keeps them.
@@ -100,7 +102,8 @@ timestamp must be within 5 minutes. The delivery ID matches `^[A-Za-z0-9][A-Za-z
 
 The receipt and the run commit in one transaction. The unique key `(owner_kind, routine_id,
 delivery_id)` makes a repeated delivery a no-op. Ignored requests also write a receipt, so their IDs
-are also deduplicated. Receipts older than 7 days are pruned when a new receipt is written. The
+are also deduplicated. Receipts older than 7 days do not count as duplicates, and they are pruned when
+a new receipt is written. The
 event is kept only in the run instruction, between `--- external event input ---` markers, so a
 restart that resumes the run still has it. Runs use the existing agent and channel queues, provider
 limits, and approval controls.
@@ -113,8 +116,9 @@ limits, and approval controls.
   routes are status, routine list, save, delete, and test, `rotateSecret`, and activity. Activity is
   the receipts of one routine. A failure with catalog text returns 400. Other failures return 500
   with `error.team.requestFailed`, and the dispatcher logs them.
-- Released schedule-only routine views do not show webhook routines. Only a schedule routine writes
-  a conversation event.
+- Released schedule-only routine views do not show webhook routines. Their delete and test routes
+  answer "routine gone" for a webhook routine, because they have no administrator check. Only a
+  schedule routine writes a conversation event.
 - Desktop and web use the shared routine editor components in
   `packages/ui/src/features/conversation`. Mobile uses native components in
   `apps/mobile/src/features/agents/components`.
@@ -133,6 +137,8 @@ Controls:
 - Body limits, Signal rate limits, and bounded pending requests protect the relay and the host.
 - A removed trigger revokes its route in the same transaction, and the relay revocation retries
   until it succeeds.
+- Only the events surface, which needs a host administrator, can change, test, or delete a webhook
+  routine.
 
 ## Rollout
 

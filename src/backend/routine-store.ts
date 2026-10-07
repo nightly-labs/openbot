@@ -454,7 +454,6 @@ export class RoutineStore {
     const routine = this.getRecord(ownerId, routineId);
     if (routine?.trigger.kind !== "webhook") return { kind: "gone" };
     const db = this.database.connection;
-    if (hasWebhookReceipt(db, this.tables.ownerKind, routineId, event.deliveryId)) return { kind: "duplicate" };
     const receipt = {
       ownerKind: this.tables.ownerKind,
       routineId,
@@ -462,6 +461,7 @@ export class RoutineStore {
       eventType: event.eventType,
       receivedAt: event.receivedAt,
     };
+    if (hasWebhookReceipt(db, receipt)) return { kind: "duplicate" };
     const reason = routine.active
       ? webhookMismatch(routine.trigger, { type: event.eventType, data: event.data })
       : "inactive";

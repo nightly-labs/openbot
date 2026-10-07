@@ -223,6 +223,7 @@ export class HostEventsService implements HostEventsApi {
    * Makes the relay match the local routes. It first sends the revocations that routine writes
    * queued, then registers each route without a URL, or every route when `all` is set (after an
    * account change). A failed call keeps its local state for the next sync and never fails a save.
+   * The result is `true` when no route work remains.
    */
   readonly syncRoutes = Effect.fn("HostEvents.syncRoutes")(
     function* (this: HostEventsService, options: { all: boolean }) {
@@ -269,15 +270,17 @@ export class HostEventsService implements HostEventsApi {
       // An open editor shows "URL pending" until it reloads the routine.
       for (const owner of updatedOwners.values()) this.#options.routines.changed(owner);
       if (failed) logger.warn("Some webhook routes are not ready. Local settings were retained.");
+      return !failed;
     },
     (operation) =>
-      this.#sync
-        .withPermit(operation)
-        .pipe(
-          Effect.catch(() =>
-            Effect.sync(() => logger.warn("Webhook routes could not be read. Local settings were retained.")),
-          ),
+      this.#sync.withPermit(operation).pipe(
+        Effect.catch(() =>
+          Effect.sync(() => {
+            logger.warn("Webhook routes could not be read. Local settings were retained.");
+            return false;
+          }),
         ),
+      ),
   ).bind(this);
 
   /** Writes the routine under the write lock, so the route limit check and the write are one step. */

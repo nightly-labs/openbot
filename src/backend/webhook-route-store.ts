@@ -125,24 +125,24 @@ export class WebhookRouteStore {
   }
 }
 
+/** A receipt past retention no longer counts, so its delivery ID starts a new run. */
 export function hasWebhookReceipt(
   db: OpenBotDatabase["connection"],
-  ownerKind: EventRoutineOwner["kind"],
-  routineId: string,
-  deliveryId: string,
+  receipt: Pick<WebhookReceipt, "ownerKind" | "routineId" | "deliveryId" | "receivedAt">,
 ): boolean {
   return isDynamicRecord(
     db
-      .prepare("SELECT 1 FROM projection_webhook_receipts WHERE owner_kind = ? AND routine_id = ? AND delivery_id = ?")
-      .get(ownerKind, routineId, deliveryId),
+      .prepare(
+        `SELECT 1 FROM projection_webhook_receipts
+         WHERE owner_kind = ? AND routine_id = ? AND delivery_id = ? AND received_at >= ?`,
+      )
+      .get(receipt.ownerKind, receipt.routineId, receipt.deliveryId, receiptCutoff(receipt.receivedAt)),
   );
 }
 
 /** Records one verified request in the caller's transaction and drops receipts past retention. */
 export function insertWebhookReceipt(db: OpenBotDatabase["connection"], receipt: WebhookReceipt): void {
-  db.prepare("DELETE FROM projection_webhook_receipts WHERE received_at < ?").run(
-    new Date(Date.parse(receipt.receivedAt) - RECEIPT_RETENTION_MS).toISOString(),
-  );
+  db.prepare("DELETE FROM projection_webhook_receipts WHERE received_at < ?").run(receiptCutoff(receipt.receivedAt));
   db.prepare(
     `INSERT INTO projection_webhook_receipts (
        receipt_id, owner_kind, routine_id, delivery_id, event_type, status, reason, run_id, received_at
@@ -158,6 +158,10 @@ export function insertWebhookReceipt(db: OpenBotDatabase["connection"], receipt:
     receipt.runId,
     receipt.receivedAt,
   );
+}
+
+function receiptCutoff(receivedAt: string): string {
+  return new Date(Date.parse(receivedAt) - RECEIPT_RETENTION_MS).toISOString();
 }
 
 /**

@@ -13,6 +13,7 @@ import type {
 import { sourceText } from "@openbot/i18n/source";
 import { collapseMissedOccurrences } from "@openbot/team-client/routine-schedule";
 import { Effect, Result, Schema } from "effect";
+import type { RoutineTriggerAccess } from "./agent/routine-scheduler";
 import { ChannelRoutineStore } from "./channel-routine-store";
 import type { ChannelService } from "./channel-service";
 import { causeHelpers } from "./effect-boundary";
@@ -170,6 +171,8 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
       return { kind: "unavailable" } as const;
     }
     const result = yield* channelRoutineStep(() => this.#routines.receiveWebhook(channelId, routineId, event));
+    // An ignored request adds a history row, so an open editor reloads it.
+    if (result.kind === "ignored") this.#changed(channelId);
     if (result.kind !== "started") return result;
     const run = result.run;
     const record = yield* channelRoutineStep(() => this.#routines.getRecord(channelId, routineId));
@@ -183,8 +186,12 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
     return result;
   }, Effect.uninterruptible);
 
-  delete(input: DeleteChannelRoutineInput): void {
-    this.#routines.delete(this.#requireChannel(input.channelId), input.routineId);
+  delete(input: DeleteChannelRoutineInput, access: RoutineTriggerAccess = {}): void {
+    const channelId = this.#requireChannel(input.channelId);
+    if (!access.webhook && this.#routines.getRecord(channelId, input.routineId)?.trigger.kind === "webhook") {
+      throw new Error(sourceText("error.backend.routineGone"));
+    }
+    this.#routines.delete(channelId, input.routineId);
     this.#changed(input.channelId);
   }
 
@@ -193,11 +200,14 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
   readonly test = Effect.fn("ChannelRoutineScheduler.test")(function* (
     this: ChannelRoutineScheduler,
     input: TestChannelRoutineInput,
+    access: RoutineTriggerAccess = {},
   ) {
     const routine = yield* channelRoutineStep(() => {
       const channelId = this.#requireChannel(input.channelId);
       const stored = this.#routines.getRecord(channelId, input.routineId);
-      if (!stored) throw new Error(sourceText("error.backend.routineGone"));
+      if (!stored || (stored.trigger.kind === "webhook" && !access.webhook)) {
+        throw new Error(sourceText("error.backend.routineGone"));
+      }
       return { ...stored, channelId: stored.ownerId };
     });
     const now = new Date().toISOString();

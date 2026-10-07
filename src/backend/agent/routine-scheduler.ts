@@ -49,6 +49,15 @@ export interface RoutineMutationOptions {
 }
 
 /**
+ * Released routine routes see schedule routines only, so a member cannot delete or start a webhook
+ * routine through them. Only `RoutineRecords`, behind the administrator-only events surface, sets
+ * `webhook`.
+ */
+export interface RoutineTriggerAccess {
+  webhook?: boolean | undefined;
+}
+
+/**
  * What the scheduler needs from the rest of the service. Every one of these is a *write* back into
  * a domain the scheduler does not own — the read side goes through `store`, `mailbox` and
  * `conversation` directly.
@@ -282,12 +291,14 @@ export class RoutineScheduler implements RoutineDueSource {
   readonly delete = Effect.fn("RoutineScheduler.delete")(function* (
     this: RoutineScheduler,
     input: DeleteRoutineInput,
-    options: RoutineMutationOptions = {},
+    options: RoutineMutationOptions & RoutineTriggerAccess = {},
   ) {
     const routine = yield* routineStep(() => {
       this.#conversation.requireKnownAgent(input.agentId);
       const routine = this.#routines.getRecord(input.agentId, input.routineId);
-      if (!routine) throw new RoutineInputError(sourceText("error.backend.routineGone"));
+      if (!routine || (routine.trigger.kind === "webhook" && !options.webhook)) {
+        throw new RoutineInputError(sourceText("error.backend.routineGone"));
+      }
       if (this.#deletionAgents.has(input.agentId)) {
         throw new RoutineInputError(sourceText("error.backend.routineDeletionBusy"));
       }
@@ -355,7 +366,18 @@ export class RoutineScheduler implements RoutineDueSource {
     );
   }, Effect.uninterruptible);
 
-  readonly test = Effect.fn("RoutineScheduler.test")(function* (this: RoutineScheduler, input: TestRoutineInput) {
+  readonly test = Effect.fn("RoutineScheduler.test")(function* (
+    this: RoutineScheduler,
+    input: TestRoutineInput,
+    access: RoutineTriggerAccess = {},
+  ) {
+    if (!access.webhook) {
+      yield* routineStep(() => {
+        if (this.getRecord(input.agentId, input.routineId)?.trigger.kind === "webhook") {
+          throw new RoutineInputError(sourceText("error.backend.routineGone"));
+        }
+      });
+    }
     return yield* this.runWithPayload({ ...input, payload: "" });
   });
 

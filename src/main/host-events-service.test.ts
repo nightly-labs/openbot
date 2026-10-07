@@ -3,7 +3,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { EventRoutineOwner, SaveEventRoutineInput } from "@openbot/contracts/ipc-events";
-import { Effect } from "effect";
+import { Effect, Exit } from "effect";
 import { afterEach, describe, expect, it } from "vitest";
 import type { AgentService } from "../backend/agent-service";
 import {
@@ -26,6 +26,8 @@ import { createWebhookSignature } from "./webhook-security";
 // - A deleted or switched routine keeps a live public route, also when Signal is offline:
 //   "revokes the route of a deleted routine".
 // - A route ID that the relay refuses for good keeps the URL empty forever: "replaces a refused route ID".
+// - A member deletes or starts a webhook routine through the released routine routes, which have no
+//   administrator check: "keeps webhook routines out of the released routine routes".
 // - A secret that the host cannot decrypt answers 401, so the sender stops a retry that can succeed:
 //   "rejects changed bytes and stale timestamps".
 let decryptFails = false;
@@ -103,7 +105,18 @@ async function fixture() {
   const routeId = relay.registered[0];
   if (!routeId) throw new Error("No route was registered.");
   const runs = () => service.listRoutineRuns({ agentId: agent.id, routineId: saved.routine.id, limit: 10 });
-  return { database: store.database, events, relay, owner, input, saved, secret: saved.secret, routeId, runs };
+  return {
+    database: store.database,
+    service,
+    events,
+    relay,
+    owner,
+    input,
+    saved,
+    secret: saved.secret,
+    routeId,
+    runs,
+  };
 }
 
 function signed(routeId: string, secret: string, deliveryId: string, payload: unknown) {
@@ -210,6 +223,22 @@ describe("HostEventsService receipt boundary", () => {
     relay.offline = false;
     await Effect.runPromise(events.syncRoutes({ all: false }));
     expect(relay.revoked).toEqual([routeId, secondRoute]);
+  });
+});
+
+describe("released routine routes", () => {
+  it("keeps webhook routines out of the released routine routes", async () => {
+    const { service, events, owner, saved, runs } = await fixture();
+    const ref = { agentId: owner.id, routineId: saved.routine.id };
+    expect(Exit.isFailure(await Effect.runPromiseExit(service.testRoutine(ref)))).toBe(true);
+    expect(Exit.isFailure(await Effect.runPromiseExit(service.deleteRoutine(ref)))).toBe(true);
+    expect(runs()).toEqual([]);
+    expect(await Effect.runPromise(events.listRoutines({ owner }))).toHaveLength(1);
+    // The administrator surface still tests and deletes it.
+    await Effect.runPromise(events.testRoutine({ owner, id: saved.routine.id }));
+    expect(runs()).toHaveLength(1);
+    await Effect.runPromise(events.deleteRoutine({ owner, id: saved.routine.id }));
+    expect(await Effect.runPromise(events.listRoutines({ owner }))).toEqual([]);
   });
 });
 
