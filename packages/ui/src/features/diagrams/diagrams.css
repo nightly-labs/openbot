@@ -196,9 +196,10 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Below the routine picker, which holds the top centre of the canvas. */
 .diagram-board-status {
   position: absolute;
-  top: var(--openbot-space-4);
+  top: calc(var(--openbot-space-4) + var(--openbot-control-sm) + var(--openbot-space-2));
   left: 50%;
   z-index: 2;
   max-width: min(420px, calc(100% - 320px));
@@ -545,7 +546,9 @@
   flex: none;
 }
 
-.diagram-node-run.ui-button svg {
+.diagram-node-run.ui-button svg,
+.diagram-view-actions .ui-button-size-xs svg,
+.diagram-board-tools .ui-button-size-xs svg {
   width: var(--openbot-icon-xs);
   height: var(--openbot-icon-xs);
 }
@@ -684,6 +687,20 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* The routine picker, at the top centre of the canvas, level with the canvas tools. */
+.diagram-view-lens-bar {
+  position: absolute;
+  top: var(--openbot-space-4);
+  left: 50%;
+  z-index: 2;
+  translate: -50% 0;
+}
+
+.diagram-view-lens-bar .ui-select-trigger {
+  background: var(--openbot-bg-overlay);
+  box-shadow: var(--openbot-shadow-raised);
 }
 
 .diagram-view-lens-trigger.ui-select-trigger {

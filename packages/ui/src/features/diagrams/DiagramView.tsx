@@ -150,30 +150,6 @@ export function DiagramView(props: DiagramViewProps) {
           {(owner) => <AgentAvatar agent={owner()} class="diagram-view-avatar" motion="idle" />}
         </Show>
         <h1 class="diagram-view-title">{props.diagram.name}</h1>
-        <Show when={routines().length > 1}>
-          <Select<RoutineOption>
-            class="diagram-view-lens"
-            options={routineOptions()}
-            optionValue="id"
-            optionTextValue="name"
-            value={routineOptions().find((option) => option.id === (focusRoutineId() ?? ALL))}
-            onChange={(option) => option && setPicked(option.id === ALL ? null : option.id)}
-            placement="bottom-start"
-            sameWidth={false}
-            itemComponent={(itemProps) => (
-              <SelectItem item={itemProps.item}>
-                <RoutineOptionLabel option={itemProps.item.rawValue} />
-              </SelectItem>
-            )}
-          >
-            <SelectTrigger size="sm" class="diagram-view-lens-trigger" aria-label={t("diagram.routine.lens")}>
-              <SelectValue<RoutineOption>>
-                {(state) => <RoutineOptionLabel option={state.selectedOption()} />}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent />
-          </Select>
-        </Show>
         <Show when={focusedRun()} fallback={<span class="diagram-view-run">{t("diagram.run.none")}</span>}>
           {(run) => (
             <span class="diagram-view-run">
@@ -195,7 +171,7 @@ export function DiagramView(props: DiagramViewProps) {
         <span class="diagram-view-actions">
           <Show when={props.onRunRoutine && runTarget()}>
             {(routineId) => (
-              <Button type="button" size="sm" onClick={() => runRoutine(routineId())}>
+              <Button type="button" size="xs" onClick={() => runRoutine(routineId())}>
                 <Play aria-hidden="true" />
                 {t("diagram.node.runNow")}
               </Button>
@@ -245,6 +221,32 @@ export function DiagramView(props: DiagramViewProps) {
           onAddRoutine={props.onAddRoutine}
           onAddAgent={props.onAddAgent}
         >
+          <Show when={routines().length > 1}>
+            <div class="diagram-view-lens-bar" data-diagram-overlay="">
+              <Select<RoutineOption>
+                class="diagram-view-lens"
+                options={routineOptions()}
+                optionValue="id"
+                optionTextValue="name"
+                value={routineOptions().find((option) => option.id === (focusRoutineId() ?? ALL))}
+                onChange={(option) => option && setPicked(option.id === ALL ? null : option.id)}
+                placement="bottom"
+                sameWidth={false}
+                itemComponent={(itemProps) => (
+                  <SelectItem item={itemProps.item}>
+                    <RoutineOptionLabel option={itemProps.item.rawValue} />
+                  </SelectItem>
+                )}
+              >
+                <SelectTrigger size="sm" class="diagram-view-lens-trigger" aria-label={t("diagram.routine.lens")}>
+                  <SelectValue<RoutineOption>>
+                    {(state) => <RoutineOptionLabel option={state.selectedOption()} />}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent />
+              </Select>
+            </div>
+          </Show>
           <Show when={props.assistant}>
             {(assistant) => (
               <div class="diagram-view-chat">

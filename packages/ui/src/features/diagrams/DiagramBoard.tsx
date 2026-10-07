@@ -587,7 +587,7 @@ export function DiagramBoard(props: DiagramBoardProps) {
       <Show when={editable() && (props.onAddRoutine || props.onAddAgent || props.addableAgents)}>
         <div class="diagram-board-tools" role="toolbar" aria-label={t("diagram.toolbar.label")} data-diagram-overlay="">
           <Show when={props.onAddRoutine}>
-            <Button type="button" variant="ghost" size="sm" onClick={() => props.onAddRoutine?.()}>
+            <Button type="button" variant="ghost" size="xs" onClick={() => props.onAddRoutine?.()}>
               <Plus aria-hidden="true" />
               {t("diagram.toolbar.addRoutine")}
             </Button>
@@ -596,7 +596,7 @@ export function DiagramBoard(props: DiagramBoardProps) {
             when={props.addableAgents}
             fallback={
               <Show when={props.onAddAgent}>
-                <Button type="button" variant="ghost" size="sm" onClick={() => props.onAddAgent?.()}>
+                <Button type="button" variant="ghost" size="xs" onClick={() => props.onAddAgent?.()}>
                   <Plus aria-hidden="true" />
                   {t("diagram.toolbar.addAgent")}
                 </Button>
@@ -606,7 +606,7 @@ export function DiagramBoard(props: DiagramBoardProps) {
             {(addable) => (
               <DropdownMenu.Root placement="bottom-start" gutter={4}>
                 <DropdownMenu.Trigger
-                  class={buttonVariants({ variant: "ghost", size: "sm" })}
+                  class={buttonVariants({ variant: "ghost", size: "xs" })}
                   disabled={addable().length === 0}
                 >
                   <Plus aria-hidden="true" />
