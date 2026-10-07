@@ -24,6 +24,7 @@ All notable changes to OpenBot will be documented here. The project follows
 - Show a yellow update notice with an Update button when the selected provider needs a newer runtime. Keep the draft and block sending until the required update is complete, instead of asking the user to reinstall OpenBot.
 - Hide the failed-send error while the required update notice is shown. Keep Edit and Dismiss available, and restore Retry after the update. Show manual update instructions when OpenBot cannot offer an update.
 - Pause webhook requests when you sign out. Sign in again to resume the saved routes without changing their URLs or secrets.
+- Protect saved MCP sign-in credentials from a changed authorization server. Older credentials refresh only when their original authorization server is known.
 
 ## [0.32.0] - 2026-10-07
 

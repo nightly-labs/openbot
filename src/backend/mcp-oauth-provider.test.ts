@@ -355,6 +355,56 @@ describe("signing in to an http MCP server", () => {
     expect(authorize.searchParams.get("redirect_uri")).toBe("openbot://mcp-auth");
     expect(server.tokenRequests[0]?.get("code_verifier")).toBeTruthy();
     expect(storage.read(server.url)?.tokens?.access_token).toBe(ACCESS_TOKEN);
+    expect(storage.read(server.url)?.client?.issuer).toBe(server.base);
+    expect(storage.read(server.url)?.tokens?.issuer).toBe(server.base);
+  });
+
+  it("does not refresh an unbound legacy token without trusted discovery", async () => {
+    const server = await fakeServer();
+    const storage = memoryStorage();
+    const record: McpOAuthRecord = {
+      client: { client_id: "test-client", client_secret: "old-secret", redirect_uris: ["openbot://mcp-auth"] },
+      tokens: {
+        access_token: ACCESS_TOKEN,
+        token_type: "Bearer",
+        expires_in: 3600,
+        refresh_token: REFRESH_TOKEN,
+      },
+      obtainedAt: Date.now() - 7_200_000,
+    };
+    storage.records.set(server.url, record);
+    const oauth = createOAuth({
+      storage,
+      redirectUrl: "openbot://mcp-auth",
+      openExternal: async () => expect.unreachable("An unbound legacy token must not refresh."),
+    });
+
+    expect(await runMcp(oauth.accessToken(server.url))).toBe(ACCESS_TOKEN);
+    expect(server.tokenRequests).toHaveLength(0);
+    expect(storage.read(server.url)).toEqual(record);
+  });
+
+  it("does not bind legacy credentials to newly discovered authorization state", async () => {
+    const server = await fakeServer();
+    const storage = memoryStorage();
+    const record: McpOAuthRecord = {
+      client: { client_id: "test-client", client_secret: "old-secret", redirect_uris: ["openbot://mcp-auth"] },
+      tokens: { access_token: ACCESS_TOKEN, token_type: "Bearer", refresh_token: REFRESH_TOKEN },
+    };
+    storage.records.set(server.url, record);
+    const oauth = createOAuth({
+      storage,
+      redirectUrl: "openbot://mcp-auth",
+      openExternal: async () => undefined,
+    });
+    const signIn = oauth.signIn(server.url);
+    expect(signIn).not.toBeNull();
+
+    await signIn?.provider.saveDiscoveryState?.({ authorizationServerUrl: "https://login.attacker.example" });
+
+    expect(signIn?.provider.tokens?.()).toBeUndefined();
+    expect(storage.read(server.url)).toEqual(record);
+    signIn?.abandon();
   });
 
   it("refreshes an expiring token once when two hand-offs ask together", async () => {
@@ -365,6 +415,7 @@ describe("signing in to an http MCP server", () => {
       tokens: { access_token: ACCESS_TOKEN, token_type: "Bearer", expires_in: 3600, refresh_token: REFRESH_TOKEN },
       // Long expired: this is the token a thread would otherwise hand a provider on its way out.
       obtainedAt: Date.now() - 7_200_000,
+      discovery: { authorizationServerUrl: server.base },
     });
     const oauth = createOAuth({
       storage,
@@ -391,6 +442,7 @@ describe("signing in to an http MCP server", () => {
       // reaches the server through this same authority: stored tokens are spent, and `signIn`
       // stays `null`, so no browser opens on a machine nobody is sitting at.
       obtainedAt: Date.now() - 7_200_000,
+      discovery: { authorizationServerUrl: server.base },
     });
     const oauth = createOAuth({
       storage,
@@ -418,6 +470,7 @@ describe("signing in to an http MCP server", () => {
       client: { client_id: "test-client", redirect_uris: ["openbot://mcp-auth"] },
       tokens: { access_token: ACCESS_TOKEN, token_type: "Bearer", expires_in: 3600, refresh_token: REFRESH_TOKEN },
       obtainedAt: Date.now() - 7_200_000,
+      discovery: { authorizationServerUrl: server.base },
     });
     const oauth = createOAuth({
       storage,
@@ -567,6 +620,7 @@ describe("signing in to an http MCP server", () => {
       client: { client_id: "test-client", redirect_uris: ["openbot://mcp-auth"] },
       tokens: { access_token: ACCESS_TOKEN, token_type: "Bearer", expires_in: 3600, refresh_token: REFRESH_TOKEN },
       obtainedAt: Date.now() - 7_200_000,
+      discovery: { authorizationServerUrl: server.base },
     });
     const oauth = createOAuth({
       storage,
@@ -610,6 +664,7 @@ describe("signing in to an http MCP server", () => {
       client: { client_id: "test-client", redirect_uris: ["openbot://mcp-auth"] },
       tokens: { access_token: ACCESS_TOKEN, token_type: "Bearer", expires_in: 3600, refresh_token: REFRESH_TOKEN },
       obtainedAt: Date.now() - 7_200_000,
+      discovery: { authorizationServerUrl: server.base },
     });
     const oauth = createOAuth({
       storage,
@@ -866,6 +921,7 @@ describe("signing in to an http MCP server", () => {
       client: { client_id: "test-client", redirect_uris: ["openbot://mcp-auth"] },
       tokens: { access_token: ACCESS_TOKEN, token_type: "Bearer", expires_in: 3600, refresh_token: REFRESH_TOKEN },
       obtainedAt: Date.now() - 7_200_000,
+      discovery: { authorizationServerUrl: server.base },
     });
     const oauth = createOAuth({
       storage,
@@ -987,6 +1043,8 @@ describe("the address a returning grant is sent to", () => {
     expect(server.registeredRedirectUris).toEqual([LOOPBACK]);
     expect(storage.read(server.url)?.client?.redirect_uris).toEqual([LOOPBACK]);
     expect(storage.read(server.url)?.tokens?.access_token).toBe(ACCESS_TOKEN);
+    expect(storage.read(server.url)?.client?.issuer).toBe(server.base);
+    expect(storage.read(server.url)?.tokens?.issuer).toBe(server.base);
   });
 
   it("refreshes against the stored registration before it registers again", async () => {
@@ -1003,6 +1061,7 @@ describe("the address a returning grant is sent to", () => {
         refresh_token: REFRESH_TOKEN,
       },
       obtainedAt: Date.now(),
+      discovery: { authorizationServerUrl: server.base },
     });
     const opened: string[] = [];
     const oauth = createOAuth({
@@ -1026,6 +1085,8 @@ describe("the address a returning grant is sent to", () => {
     expect(opened).toEqual([]);
     expect(storage.read(server.url)?.tokens?.access_token).toBe(REFRESHED_TOKEN);
     expect(storage.read(server.url)?.client?.client_id).toBe("test-client");
+    expect(storage.read(server.url)?.client?.issuer).toBe(server.base);
+    expect(storage.read(server.url)?.tokens?.issuer).toBe(server.base);
   });
 
   it("keeps the stored registration for a silent refresh", async () => {
@@ -1035,6 +1096,7 @@ describe("the address a returning grant is sent to", () => {
       client: { client_id: "test-client", redirect_uris: ["openbot://mcp-auth"] },
       tokens: { access_token: ACCESS_TOKEN, token_type: "Bearer", expires_in: 3600, refresh_token: REFRESH_TOKEN },
       obtainedAt: Date.now() - 7_200_000,
+      discovery: { authorizationServerUrl: server.base },
     });
     const oauth = createOAuth({
       storage,
