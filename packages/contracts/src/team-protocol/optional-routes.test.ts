@@ -75,37 +75,8 @@ describe("events-v1", () => {
     createdAt: "2026-10-07T10:00:00.000Z",
     updatedAt: "2026-10-07T10:00:00.000Z",
   };
-  const destination = {
-    id: "destination-1",
-    routineId: "routine-1",
-    active: true,
-    url: "https://example.com/hook",
-    method: "POST",
-    eventTypes: ["routine.run.succeeded"],
-    payloadTemplate: null,
-    hasSecret: true,
-    headerNames: ["Authorization"],
-    createdAt: "2026-10-07T10:00:00.000Z",
-    updatedAt: "2026-10-07T10:00:00.000Z",
-  };
 
-  it("accepts write secrets but never returns stored ones", () => {
-    expect(
-      codec(EVENTS_ROUTES.saveDestination).request({
-        owner,
-        routineId: "routine-1",
-        active: true,
-        url: "https://example.com/hook",
-        method: "POST",
-        eventTypes: ["routine.run.succeeded"],
-        payloadTemplate: null,
-        secret: "masked-secret",
-        headers: { Authorization: "Bearer masked" },
-      }),
-    ).toMatchObject({ secret: "masked-secret", headers: { Authorization: "Bearer masked" } });
-    expect(
-      codec(EVENTS_ROUTES.listDestinations).response(200, [{ ...destination, secret: "raw", headers: { a: "b" } }]),
-    ).toEqual([destination]);
+  it("never returns stored secrets", () => {
     expect(
       codec(EVENTS_ROUTES.listRoutines).response(200, [
         { ...routine, trigger: { ...routine.trigger, secret: "raw-secret" } },
@@ -119,18 +90,6 @@ describe("events-v1", () => {
   });
 
   it("bounds event payloads and rejects malformed event routes", () => {
-    expect(() =>
-      codec(EVENTS_ROUTES.saveDestination).request({
-        owner,
-        routineId: "routine-1",
-        active: true,
-        url: "https://example.com/hook",
-        method: "POST",
-        eventTypes: ["routine.run.succeeded"],
-        payloadTemplate: null,
-        headers: { Authorization: 123 },
-      }),
-    ).toThrow();
     expect(() => codec(EVENTS_ROUTES.listActivity).request({ owner })).toThrow();
     expect(() =>
       codec(EVENTS_ROUTES.saveRoutine).request({
@@ -154,40 +113,25 @@ describe("events-v1", () => {
         trigger: { kind: "schedule", schedule: nested },
       }),
     ).toThrow();
-    expect(() =>
-      codec(EVENTS_ROUTES.saveDestination).request({
-        owner,
-        routineId: "routine-1",
-        active: true,
-        url: "https://example.com/hook",
-        method: "POST",
-        eventTypes: ["routine.run.succeeded"],
-        payloadTemplate: new Array(10_001).fill(null),
-      }),
-    ).toThrow();
     expect(() => codec(EVENTS_ROUTES.status).response(200, { supported: true })).toThrow();
   });
 
   it("allows the wider delivery identifier bound without widening generic identifiers", () => {
     const activity = {
-      kind: "delivery",
-      id: "d".repeat(512),
-      destinationId: "destination-1",
-      eventType: "routine.run.failed",
-      status: "failed",
-      attempt: 3,
-      statusCode: 500,
+      kind: "received",
+      id: "receipt-1",
+      deliveryId: "d".repeat(512),
+      eventType: "build.completed",
+      status: "started",
+      reason: null,
       runId: "run-1",
       occurredAt: "2026-10-07T10:00:00.000Z",
     };
     expect(codec(EVENTS_ROUTES.listActivity).response(200, [activity])).toEqual([activity]);
-    expect(() => codec(EVENTS_ROUTES.listActivity).response(200, [{ ...activity, id: "d".repeat(513) }])).toThrow();
-    const scope = { owner, routineId: "routine-1" };
-    expect(() => codec(EVENTS_ROUTES.retryDelivery).request({ ...scope, id: "" })).toThrow();
-    expect(codec(EVENTS_ROUTES.retryDelivery).request({ ...scope, id: "d".repeat(512) })).toEqual({
-      ...scope,
-      id: "d".repeat(512),
-    });
+    expect(() =>
+      codec(EVENTS_ROUTES.listActivity).response(200, [{ ...activity, deliveryId: "d".repeat(513) }]),
+    ).toThrow();
+    expect(() => codec(EVENTS_ROUTES.listActivity).response(200, [{ ...activity, id: "d".repeat(512) }])).toThrow();
   });
 });
 

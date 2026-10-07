@@ -23,11 +23,7 @@ function unusedEvents(): HostEventsApi {
   const unused = () => Effect.fail(new HostEventsFailure({ cause: new Error("unused in this test") }));
   return {
     getStatus: () => Effect.succeed({ supported: true, connected: true }),
-    listDestinations: unused,
-    saveDestination: unused,
-    deleteDestination: unused,
     listActivity: unused,
-    retryDelivery: unused,
     listRoutines: unused,
     saveRoutine: unused,
     deleteRoutine: unused,

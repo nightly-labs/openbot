@@ -1,14 +1,13 @@
 import { isRoutineRun, type RoutineRunFields } from "@openbot/contracts/ipc";
-import type { EventActivity, EventRoutineRef } from "@openbot/contracts/ipc-events";
+import type { EventActivity, EventRoutineRef, ListEventActivityInput } from "@openbot/contracts/ipc-events";
 import type { AppTextKey } from "@openbot/i18n";
 import { Button, Check, CirclePause, Clock3, Minus, Text, TriangleAlert, X } from "@openbot/ui";
 import { createEffect, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import { type TextValue, useText } from "../../text";
-import type { RoutineWebhooksApi } from "./RoutineWebhookNotifications";
 
-/** The webhook activity of an event routine. Its ignored requests and failed notifications join the runs. */
+/** The webhook activity of an event routine. Its ignored requests join the runs. */
 export interface RoutineHistoryActivity {
-  api: Pick<RoutineWebhooksApi, "listActivity" | "retryDelivery">;
+  api: { listActivity: (input: ListEventActivityInput) => Promise<EventActivity[]> };
   routine: EventRoutineRef;
 }
 
@@ -18,26 +17,16 @@ interface RoutineRunHistoryProps {
   activity?: RoutineHistoryActivity;
 }
 
-type ReceivedActivity = Extract<EventActivity, { kind: "received" }>;
-type DeliveryActivity = Extract<EventActivity, { kind: "delivery" }>;
-
 type HistoryEntry =
   | { kind: "run"; at: string; run: RoutineRunFields }
-  | { kind: "ignored"; at: string; item: ReceivedActivity }
-  | { kind: "delivery"; at: string; item: DeliveryActivity };
+  | { kind: "ignored"; at: string; item: EventActivity };
 
 const VISIBLE_ENTRIES = 10;
 const ACTIVITY_LIMIT = 50;
 
-/**
- * A started request already shows as its run, and a sent notification needs no action. The
- * history adds only what the user must know: requests that did not start a run, and failed
- * notifications.
- */
+/** A started request already shows as its run. The history adds only the requests that did not start a run. */
 function activityEntry(item: EventActivity): HistoryEntry | null {
-  if (item.kind === "received")
-    return item.status === "ignored" ? { kind: "ignored", at: item.occurredAt, item } : null;
-  return item.status === "failed" ? { kind: "delivery", at: item.occurredAt, item } : null;
+  return item.status === "ignored" ? { kind: "ignored", at: item.occurredAt, item } : null;
 }
 
 /**
@@ -52,7 +41,6 @@ export function RoutineRunHistory(props: RoutineRunHistoryProps) {
   const text = useText();
   const { t, errorMessage } = text;
   const [activity, setActivity] = createSignal<EventActivity[]>([]);
-  const [retrying, setRetrying] = createSignal<string | null>(null);
   const [error, setError] = createSignal<string | null>(null);
   let request = 0;
 
@@ -86,21 +74,6 @@ export function RoutineRunHistory(props: RoutineRunHistoryProps) {
       void untrack(loadActivity);
     },
   );
-
-  async function retry(item: DeliveryActivity): Promise<void> {
-    const source = props.activity;
-    if (!source || retrying()) return;
-    setRetrying(item.id);
-    setError(null);
-    try {
-      await source.api.retryDelivery({ id: item.id, owner: source.routine.owner, routineId: source.routine.id });
-      await loadActivity();
-    } catch (cause) {
-      setError(errorMessage(cause, t("routine.history.retryFailed")));
-    } finally {
-      setRetrying(null);
-    }
-  }
 
   const entries = (): HistoryEntry[] =>
     [
@@ -136,31 +109,6 @@ export function RoutineRunHistory(props: RoutineRunHistoryProps) {
                         <span class="agent-routine-run-note">{ignoredNote(item(), text)}</span>
                       </span>
                       <RoutineRunStatus status="ignored" />
-                    </div>
-                  )}
-                </Match>
-                <Match when={entry.kind === "delivery" && entry.item}>
-                  {(item) => (
-                    <div class="agent-routine-run-row">
-                      <span class="agent-routine-run-text">
-                        <span>{formatRoutineRunTime(item().occurredAt, text)}</span>
-                        <span class="agent-routine-run-note" title={deliveryNote(item(), text)}>
-                          {t("routine.history.notificationFailed")}
-                        </span>
-                      </span>
-                      <span class="agent-routine-run-end">
-                        <Button
-                          type="button"
-                          size="xs"
-                          variant="ghost"
-                          disabled={retrying() !== null}
-                          loading={retrying() === item().id}
-                          onClick={() => void retry(item())}
-                        >
-                          {t("common.retry")}
-                        </Button>
-                        <RoutineRunStatus status="failed" />
-                      </span>
                     </div>
                   )}
                 </Match>
@@ -207,15 +155,8 @@ function RunRow(props: { run: RoutineRunFields; onOpenRun?: (messageId: string) 
   );
 }
 
-function ignoredNote(item: ReceivedActivity, text: Pick<TextValue, "t">): string {
+function ignoredNote(item: EventActivity, text: Pick<TextValue, "t">): string {
   return text.t(item.reason ? IGNORED_REASON_LABELS[item.reason] : "routine.history.ignored");
-}
-
-function deliveryNote(item: DeliveryActivity, text: Pick<TextValue, "t">): string {
-  const note = text.t("routine.history.notificationFailed");
-  return item.statusCode === null
-    ? note
-    : `${note} · ${text.t("routine.history.statusCode", { code: item.statusCode })}`;
 }
 
 type HistoryStatus = RoutineRunFields["status"] | "ignored";
@@ -275,7 +216,7 @@ const IGNORED_REASON_LABELS = {
   "event-type": "routine.history.ignored.eventType",
   filter: "routine.history.ignored.filter",
   inactive: "routine.history.ignored.inactive",
-} as const satisfies Record<NonNullable<ReceivedActivity["reason"]>, AppTextKey>;
+} as const satisfies Record<NonNullable<EventActivity["reason"]>, AppTextKey>;
 
 const RUN_STATUS_LABEL = {
   queued: "routine.runStatus.queued",

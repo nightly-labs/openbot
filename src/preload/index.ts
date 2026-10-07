@@ -39,8 +39,6 @@ import {
   decodeEventRoutines,
   decodeEventStatus,
   decodeSaveEventRoutineResult,
-  decodeWebhookDestination,
-  decodeWebhookDestinations,
   decodeWebhookSecret,
 } from "@openbot/contracts/ipc-events";
 import { contextBridge, ipcRenderer, webUtils } from "electron";
@@ -857,11 +855,7 @@ const openbotApi: OpenBotDesktopApi = {
     deleteRoutine: decodeVoid,
     testRoutine: decodeVoid,
     rotateSecret: decodeWebhookSecret,
-    listDestinations: decodeWebhookDestinations,
-    saveDestination: decodeWebhookDestination,
-    deleteDestination: decodeVoid,
     listActivity: decodeEventActivity,
-    retryDelivery: decodeVoid,
   }),
   // The shared contract decoder, as MCP does: it already bounds every row, and a remote answer was
   // decoded in main before it reached this point.

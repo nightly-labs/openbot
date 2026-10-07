@@ -72,37 +72,25 @@ function RoutinesStory(props: { routines?: Routine[]; runs?: RoutineRun[] }) {
   );
 }
 
-/** A routine that a webhook starts, with one notification destination, on the preview host. */
+/** A routine that a webhook starts, on the preview host. */
 function WebhookRoutineStory() {
   const previousApi = window.openbot;
   const mock = createMockOpenBot({ routines: { chief: [] } });
   window.openbot = mock.api;
   const owner = { kind: "agent", id: "chief" } as const;
   const api = desktopEventRoutinesApi("story-server");
-  const seeded = api
-    .saveRoutine({
-      owner,
-      name: "Deploy review",
-      instruction: "Check the new production deployment and report regressions.",
-      active: true,
-      timezone: "Europe/Warsaw",
-      trigger: {
-        kind: "webhook",
-        eventType: "deployment.created",
-        filters: [{ pointer: "/deployment/environment", value: "production" }],
-      },
-    })
-    .then(({ routine }) =>
-      api.saveDestination({
-        owner,
-        routineId: routine.id,
-        active: true,
-        url: "https://hooks.example.test/status",
-        method: "POST",
-        eventTypes: ["routine.run.succeeded", "routine.run.failed"],
-        payloadTemplate: null,
-      }),
-    );
+  const seeded = api.saveRoutine({
+    owner,
+    name: "Deploy review",
+    instruction: "Check the new production deployment and report regressions.",
+    active: true,
+    timezone: "Europe/Warsaw",
+    trigger: {
+      kind: "webhook",
+      eventType: "deployment.created",
+      filters: [{ pointer: "/deployment/environment", value: "production" }],
+    },
+  });
   const port = eventRoutinesPort(
     owner,
     {
@@ -111,7 +99,7 @@ function WebhookRoutineStory() {
         await seeded;
         return api.listRoutines(input);
       },
-      // One request that the filter ignored and one failed notification show in the history.
+      // One request that the filter ignored shows in the history.
       listActivity: async () => webhookStoryActivity(),
     },
     agentRoutinesPort("chief"),
@@ -130,17 +118,6 @@ function WebhookRoutineStory() {
 function webhookStoryActivity(): EventActivity[] {
   const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
   return [
-    {
-      kind: "delivery",
-      id: "delivery-story",
-      destinationId: "destination-story",
-      eventType: "routine.run.failed",
-      status: "failed",
-      attempt: 3,
-      statusCode: 502,
-      runId: "run-story",
-      occurredAt: minutesAgo(20),
-    },
     {
       kind: "received",
       id: "received-story",

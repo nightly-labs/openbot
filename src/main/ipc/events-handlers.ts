@@ -3,8 +3,6 @@ import {
   decodeEventRoutines,
   decodeEventStatus,
   decodeSaveEventRoutineResult,
-  decodeWebhookDestination,
-  decodeWebhookDestinations,
   decodeWebhookSecret,
 } from "@openbot/contracts/ipc-events";
 import { EVENTS_CAPABILITY, EVENTS_ROUTES } from "@openbot/contracts/team-protocol/events-v1";
@@ -16,11 +14,7 @@ import {
   parseEventRoutineRef,
   parseListEventActivity,
   parseListEventRoutines,
-  parseListWebhookDestinations,
   parseSaveEventRoutine,
-  parseSaveWebhookDestination,
-  parseWebhookDeliveryRef,
-  parseWebhookDestinationRef,
 } from "../host-events-inputs";
 import type { ResponseDecoder } from "../remote-host-decoding";
 import { decodeVoid } from "../remote-host-decoding";
@@ -79,25 +73,9 @@ export function eventsIpcHandlers({ events, remoteServers }: EventsIpcDependenci
         local: (input) => runCauseEffect(events.rotateSecret(input)),
         remote: (input, serverId) => remote(serverId, EVENTS_ROUTES.rotateSecret, decodeWebhookSecret, input),
       }),
-      listDestinations: scopedHandler(parseListWebhookDestinations, {
-        local: (input) => runCauseEffect(events.listDestinations(input)),
-        remote: (input, serverId) => remote(serverId, EVENTS_ROUTES.listDestinations, decodeWebhookDestinations, input),
-      }),
-      saveDestination: scopedHandler(parseSaveWebhookDestination, {
-        local: (input) => runCauseEffect(events.saveDestination(input)),
-        remote: (input, serverId) => remote(serverId, EVENTS_ROUTES.saveDestination, decodeWebhookDestination, input),
-      }),
-      deleteDestination: scopedHandler(parseWebhookDestinationRef, {
-        local: (input) => runCauseEffect(events.deleteDestination(input)),
-        remote: (input, serverId) => remote(serverId, EVENTS_ROUTES.deleteDestination, decodeVoid, input),
-      }),
       listActivity: scopedHandler(parseListEventActivity, {
         local: (input) => runCauseEffect(events.listActivity(input)),
         remote: (input, serverId) => remote(serverId, EVENTS_ROUTES.listActivity, decodeEventActivity, input),
-      }),
-      retryDelivery: scopedHandler(parseWebhookDeliveryRef, {
-        local: (input) => runCauseEffect(events.retryDelivery(input)),
-        remote: (input, serverId) => remote(serverId, EVENTS_ROUTES.retryDelivery, decodeVoid, input),
       }),
     },
   };

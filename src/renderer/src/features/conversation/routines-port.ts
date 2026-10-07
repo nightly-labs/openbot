@@ -8,8 +8,7 @@ import type {
   RoutineSchedule,
 } from "@openbot/contracts/ipc";
 import type { EventRoutine, EventRoutineOwner, EventRoutineTriggerInput } from "@openbot/contracts/ipc-events";
-import type { RoutineWebhooksApi } from "@openbot/ui/features/conversation/RoutineWebhookNotifications";
-import type { EventRoutinesApi } from "./routine-webhooks-api";
+import type { EventRoutinesApi, RoutineWebhooksApi } from "./routine-webhooks-api";
 
 interface RoutineSaveInput {
   routineId: string | null;
@@ -49,7 +48,7 @@ export interface RoutinesPort {
   /** Only for an agent on this computer that allows local scripts. */
   runCommand?: (routineId: string) => Promise<string>;
   subscribe: (reload: () => void) => () => void;
-  /** Webhook triggers, notifications and activity, for a host with event support. */
+  /** Webhook triggers and activity, for a host with event support. */
   events?: { owner: EventRoutineOwner; api: RoutineWebhooksApi };
 }
 

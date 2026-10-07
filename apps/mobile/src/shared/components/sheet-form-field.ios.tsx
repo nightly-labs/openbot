@@ -16,7 +16,6 @@ export function SheetFormField({
   hint,
   trailing,
   inputMode,
-  keyboardType,
   isRequired = false,
   label,
   maxLength,
@@ -28,7 +27,6 @@ export function SheetFormField({
   onSubmitEditing,
   placeholder,
   returnKeyType,
-  secureTextEntry,
   value,
 }: SheetFormFieldProps) {
   const [foreground, muted, border] = useThemeColor(["foreground", "muted", "border"]);
@@ -70,12 +68,10 @@ export function SheetFormField({
             autoFocus={autoFocus}
             editable={editable}
             inputMode={inputMode}
-            keyboardType={keyboardType}
             maxLength={maxLength}
             placeholder={placeholder}
             placeholderTextColor={muted}
             returnKeyType={returnKeyType}
-            secureTextEntry={secureTextEntry}
             selectionColor={foreground}
             style={{ height, paddingHorizontal: 16 }}
             textStyle={{ color: String(foreground), fontSize: 16 }}

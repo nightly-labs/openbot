@@ -69,8 +69,6 @@ import {
   decodeEventRoutines,
   decodeEventStatus,
   decodeSaveEventRoutineResult,
-  decodeWebhookDestination,
-  decodeWebhookDestinations,
   decodeWebhookSecret,
   type EventActivity,
   type EventRoutine,
@@ -78,13 +76,8 @@ import {
   type EventStatus,
   type ListEventActivityInput,
   type ListEventRoutinesInput,
-  type ListWebhookDestinationsInput,
   type SaveEventRoutineInput,
   type SaveEventRoutineResult,
-  type SaveWebhookDestinationInput,
-  type WebhookDeliveryRef,
-  type WebhookDestination,
-  type WebhookDestinationRef,
   type WebhookSecret,
 } from "@openbot/contracts/ipc-events";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
@@ -311,39 +304,11 @@ export function rotateEventRoutineSecret(
   return adminCall(() => request("POST", EVENTS_ROUTES.rotateSecret, decodeWebhookSecret, eventBody(input)));
 }
 
-export function listWebhookDestinations(
-  request: TeamApiRequest,
-  input: ListWebhookDestinationsInput,
-): Effect.Effect<WebhookDestination[], TeamAdminRequestError> {
-  return adminCall(() => request("POST", EVENTS_ROUTES.listDestinations, decodeWebhookDestinations, eventBody(input)));
-}
-
-export function saveWebhookDestination(
-  request: TeamApiRequest,
-  input: SaveWebhookDestinationInput,
-): Effect.Effect<WebhookDestination, TeamAdminRequestError> {
-  return adminCall(() => request("POST", EVENTS_ROUTES.saveDestination, decodeWebhookDestination, eventBody(input)));
-}
-
-export function deleteWebhookDestination(
-  request: TeamApiRequest,
-  input: WebhookDestinationRef,
-): Effect.Effect<void, TeamAdminRequestError> {
-  return adminCall(() => request("POST", EVENTS_ROUTES.deleteDestination, ignoreResponse, eventBody(input)));
-}
-
 export function listEventActivity(
   request: TeamApiRequest,
   input: ListEventActivityInput,
 ): Effect.Effect<EventActivity[], TeamAdminRequestError> {
   return adminCall(() => request("POST", EVENTS_ROUTES.listActivity, decodeEventActivity, eventBody(input)));
-}
-
-export function retryEventDelivery(
-  request: TeamApiRequest,
-  input: WebhookDeliveryRef,
-): Effect.Effect<void, TeamAdminRequestError> {
-  return adminCall(() => request("POST", EVENTS_ROUTES.retryDelivery, ignoreResponse, eventBody(input)));
 }
 
 /** An absent field stays unchanged; a `null` logo removes it. */

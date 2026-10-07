@@ -1,27 +1,33 @@
 import type {
+  EventActivity,
   EventRoutine,
   EventRoutineRef,
+  EventStatus,
+  ListEventActivityInput,
   ListEventRoutinesInput,
   SaveEventRoutineInput,
   SaveEventRoutineResult,
+  WebhookSecret,
 } from "@openbot/contracts/ipc-events";
 import { runTeamEffect } from "@openbot/team-client";
 import {
   deleteEventRoutine,
-  deleteWebhookDestination,
   getEventStatus,
   listEventActivity,
   listEventRoutines,
-  listWebhookDestinations,
-  retryEventDelivery,
   rotateEventRoutineSecret,
   saveEventRoutine,
-  saveWebhookDestination,
   testEventRoutine,
 } from "@openbot/team-client/team-admin-requests";
 import type { TeamApiRequest } from "@openbot/team-client/team-api-requests";
-import type { RoutineWebhooksApi } from "@openbot/ui/features/conversation/RoutineWebhookNotifications";
 import { Effect } from "effect";
+
+/** The webhook operations of one host that the routine editor uses. Every action names its routine. */
+export interface RoutineWebhooksApi {
+  getStatus: () => Promise<EventStatus>;
+  rotateSecret: (input: EventRoutineRef) => Promise<WebhookSecret>;
+  listActivity: (input: ListEventActivityInput) => Promise<EventActivity[]>;
+}
 
 /** The event routine operations of one host: the routines themselves, their webhooks and their activity. */
 export interface EventRoutinesApi extends RoutineWebhooksApi {
@@ -41,11 +47,7 @@ export function desktopEventRoutinesApi(serverId: string): EventRoutinesApi {
     deleteRoutine: (input) => events.deleteRoutine(input, serverId),
     testRoutine: (input) => events.testRoutine(input, serverId),
     rotateSecret: (input) => events.rotateSecret(input, serverId),
-    listDestinations: (input) => events.listDestinations(input, serverId),
-    saveDestination: (input) => events.saveDestination(input, serverId),
-    deleteDestination: (input) => events.deleteDestination(input, serverId),
     listActivity: (input) => events.listActivity(input, serverId),
-    retryDelivery: (input) => events.retryDelivery(input, serverId),
   };
 }
 
@@ -60,10 +62,6 @@ export function webEventRoutinesApi(request: TeamApiRequest): EventRoutinesApi {
     deleteRoutine: (input) => run(deleteEventRoutine(request, input)),
     testRoutine: (input) => run(testEventRoutine(request, input)),
     rotateSecret: (input) => run(rotateEventRoutineSecret(request, input)),
-    listDestinations: (input) => run(listWebhookDestinations(request, input)),
-    saveDestination: (input) => run(saveWebhookDestination(request, input)),
-    deleteDestination: (input) => run(deleteWebhookDestination(request, input)),
     listActivity: (input) => run(listEventActivity(request, input)),
-    retryDelivery: (input) => run(retryEventDelivery(request, input)),
   };
 }

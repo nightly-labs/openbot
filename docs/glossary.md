@@ -48,9 +48,6 @@ table, IPC channel or product string, or when a term in the code disagrees with 
 - **webhook route**: the opaque route ID of one webhook routine, and the public Signal URL that
   contains it (`WebhookRouteStore`, D1 `webhook_routes`). A **receipt** records one received
   delivery ID for deduplication.
-- **webhook destination**: an HTTPS endpoint of one routine that receives selected run status
-  notifications (`projection_webhook_destinations`). A **delivery** is one notification, including
-  its retry attempts (`projection_webhook_deliveries`).
 - **shared table**: a table an agent created in the one file every agent shares
   (`~/OpenBot/Shared/Data/agent-data.db`, `SharedTable`, `AgentTables`). `openbot.db` is the
   application's database and holds none of these. **owner**: the agent whose id

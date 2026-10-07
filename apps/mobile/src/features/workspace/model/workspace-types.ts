@@ -41,13 +41,8 @@ import type {
   EventRoutineOwner,
   EventRoutineRef,
   ListEventActivityInput,
-  ListWebhookDestinationsInput,
   SaveEventRoutineInput,
   SaveEventRoutineResult,
-  SaveWebhookDestinationInput,
-  WebhookDeliveryRef,
-  WebhookDestination,
-  WebhookDestinationRef,
   WebhookSecret,
 } from "@openbot/contracts/ipc-events";
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
@@ -175,11 +170,7 @@ export interface MobileWorkspaceContextValue {
   deleteEventRoutine: (input: EventRoutineRef, serverId: string) => Promise<void>;
   testEventRoutine: (input: EventRoutineRef, serverId: string) => Promise<void>;
   rotateEventRoutineSecret: (input: EventRoutineRef, serverId: string) => Promise<WebhookSecret>;
-  listWebhookDestinations: (input: ListWebhookDestinationsInput, serverId: string) => Promise<WebhookDestination[]>;
-  saveWebhookDestination: (input: SaveWebhookDestinationInput, serverId: string) => Promise<WebhookDestination>;
-  deleteWebhookDestination: (input: WebhookDestinationRef, serverId: string) => Promise<void>;
   listEventActivity: (input: ListEventActivityInput, serverId: string) => Promise<EventActivity[]>;
-  retryEventDelivery: (input: WebhookDeliveryRef, serverId: string) => Promise<void>;
   loadAgentModels: (serverId: string) => Promise<AgentModelOption[]>;
   loadAgentMemories: (agentId: string, serverId: string) => Promise<AgentMemory[]>;
   loadAgentRoutines: (agentId: string, serverId: string) => Promise<Routine[]>;

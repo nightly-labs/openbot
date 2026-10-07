@@ -277,7 +277,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #routines: RoutineScheduler;
   readonly #routineTimer: RoutineTimer;
   readonly #channelRoutines: ChannelRoutineScheduler;
-  /** Agent and channel routines of every trigger kind, with their webhook routes and notifications. */
+  /** Agent and channel routines of every trigger kind, with their webhook routes. */
   readonly routineRecords: RoutineRecords;
   readonly #mcp: McpGateway;
   readonly #providers: ProviderRuntime;

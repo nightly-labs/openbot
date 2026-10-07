@@ -1,10 +1,8 @@
 // @vitest-environment node
 
-import { EventEmitter } from "node:events";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { EventRoutineOwner, SaveEventRoutineInput } from "@openbot/contracts/ipc-events";
-import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
 import { afterEach, describe, expect, it } from "vitest";
 import type { AgentService } from "../backend/agent-service";
@@ -17,8 +15,7 @@ import {
   waitFor,
 } from "../backend/agent-service-test-harness";
 import { HostEventsService } from "./host-events-service";
-import { WebhookDeliveryWorker, type WebhookHttpsRequester, type WebhookResponseReader } from "./webhook-delivery";
-import { createWebhookSignature, verifyWebhookSignature } from "./webhook-security";
+import { createWebhookSignature } from "./webhook-security";
 
 // Failure modes, each with the test that covers it:
 // - Unsigned, changed, or stale input starts a run: "rejects changed bytes and stale timestamps".
@@ -27,9 +24,6 @@ import { createWebhookSignature, verifyWebhookSignature } from "./webhook-securi
 // - The old secret still works after regeneration: "shows the secret once".
 // - A deleted or switched routine keeps a live public route, also when Signal is offline:
 //   "revokes the route of a deleted routine".
-// - Retries change the signed notification, a disabled destination still sends, or a notification
-//   carries the instruction, the inbound event, or a secret: "sends one signed notification".
-const destinationSecret = "destination-signing-secret-for-event-flow-check";
 const cipher = {
   encrypt: (value: string) => Buffer.from([...value].reverse().join("")),
   decrypt: (value: Buffer) => [...value.toString()].reverse().join(""),
@@ -83,7 +77,7 @@ async function fixture() {
   agentService = service;
   await Effect.runPromise(service.initialize());
   const relay = fakeRelay();
-  const events = new HostEventsService({ routines: service.routineRecords, cipher, relay, wake: () => undefined });
+  const events = new HostEventsService({ routines: service.routineRecords, cipher, relay });
   const owner: EventRoutineOwner = { kind: "agent", id: agent.id };
   const input: SaveEventRoutineInput = {
     owner,
@@ -98,7 +92,7 @@ async function fixture() {
   const routeId = relay.registered[0];
   if (!routeId) throw new Error("No route was registered.");
   const runs = () => service.listRoutineRuns({ agentId: agent.id, routineId: saved.routine.id, limit: 10 });
-  return { database: store.database, service, events, relay, owner, input, saved, secret: saved.secret, routeId, runs };
+  return { database: store.database, events, relay, owner, input, saved, secret: saved.secret, routeId, runs };
 }
 
 function signed(routeId: string, secret: string, deliveryId: string, payload: unknown) {
@@ -206,113 +200,31 @@ describe("HostEventsService receipt boundary", () => {
   });
 });
 
-class Reply extends EventEmitter implements WebhookResponseReader {
-  headers = {};
-  constructor(readonly statusCode: number) {
-    super();
-  }
-  resume(): void {}
-}
-
-class Request extends EventEmitter {
-  constructor(
-    readonly reply: Reply,
-    readonly callback: (reply: WebhookResponseReader) => void,
-    readonly capture: (body: Buffer) => void,
-  ) {
-    super();
-  }
-  destroy(): this {
-    return this;
-  }
-  end(body: Buffer): this {
-    this.capture(body);
-    queueMicrotask(() => {
-      this.callback(this.reply);
-      this.reply.emit("end");
-    });
-    return this;
-  }
-}
-
 describe("signed webhook flow", () => {
-  it("sends one signed notification, the same bytes after disable, enable, and retry", async () => {
-    const { service, events, owner, saved, secret, routeId, runs } = await fixture();
+  it("starts a run from a signed receipt and lists the receipt as activity", async () => {
+    const { events, owner, saved, secret, routeId, runs } = await fixture();
     const routineId = saved.routine.id;
-    const destination = await Effect.runPromise(
-      events.saveDestination({
-        owner,
-        routineId,
-        active: true,
-        url: "https://receiver.example/runs",
-        method: "POST",
-        eventTypes: ["routine.run.started"],
-        payloadTemplate: { run: "{{event.runId}}", status: "{{event.status}}" },
-        secret: destinationSecret,
-      }),
-    );
-    expect(JSON.stringify(destination)).not.toContain(destinationSecret);
     expect(await Effect.runPromise(events.receive(signed(routeId, secret, "build-flow-1", BUILD)))).toEqual({
       status: 202,
     });
     await waitFor(() => runs()[0]?.status === "running");
     expect(runs()).toHaveLength(1);
-
-    const sent: Array<{ body: Buffer; deliveryId: string }> = [];
-    let now = Date.now();
-    const request: WebhookHttpsRequester = {
-      request(options, callback) {
-        const headers = options.headers;
-        if (!isDynamicRecord(headers)) throw new Error("Missing signed headers.");
-        const timestamp = headers["x-openbot-timestamp"];
-        const deliveryId = headers["x-openbot-delivery-id"];
-        const signature = headers["x-openbot-signature"];
-        if (typeof timestamp !== "string" || typeof deliveryId !== "string" || typeof signature !== "string")
-          throw new Error("Invalid signed headers.");
-        return new Request(new Reply(sent.length === 0 ? 503 : 202), callback, (body) => {
-          verifyWebhookSignature(destinationSecret, { timestamp, deliveryId, body, nowMs: now }, signature);
-          sent.push({ body, deliveryId });
-        });
-      },
-    };
-    const worker = new WebhookDeliveryWorker({
-      store: service.routineRecords.destinations,
-      cipher,
-      request,
-      lookup: { lookup: async () => [{ address: "8.8.8.8", family: 4 }] },
-      now: () => now,
-    });
-    expect(await Effect.runPromise(worker.runDue())).toMatchObject({ processed: 1, retried: 1 });
-    const { id, active: _active, url, method, eventTypes, payloadTemplate } = destination;
-    const settings = { id, owner, routineId, url, method, eventTypes, payloadTemplate };
-    await Effect.runPromise(events.saveDestination({ ...settings, active: false }));
-    now += 10_001;
-    expect(await Effect.runPromise(worker.runDue())).toMatchObject({ processed: 0 });
-    await Effect.runPromise(events.saveDestination({ ...settings, active: true }));
-    expect(await Effect.runPromise(worker.runDue())).toMatchObject({ processed: 1, succeeded: 1 });
-    expect(sent).toHaveLength(2);
-    expect(sent[1]).toEqual(sent[0]);
-    const body = sent[0]?.body.toString() ?? "";
-    expect(JSON.parse(body)).toEqual({ run: runs()[0]?.id, status: "started" });
-    for (const hidden of ["PRIVATE SAVED INSTRUCTION", "UNTRUSTED EVENT CONTENT", destinationSecret, secret]) {
-      expect(body).not.toContain(hidden);
-    }
     const activity = await Effect.runPromise(events.listActivity({ owner, routineId }));
-    expect(activity).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ kind: "received", status: "started" }),
-        expect.objectContaining({ kind: "delivery", status: "succeeded" }),
-      ]),
-    );
+    expect(activity).toEqual([
+      expect.objectContaining({
+        kind: "received",
+        deliveryId: "build-flow-1",
+        status: "started",
+        runId: runs()[0]?.id,
+      }),
+    ]);
     await mkdir(join(process.cwd(), ".openbot-build"), { recursive: true });
     await writeFile(
       join(process.cwd(), ".openbot-build/webhook-signed-flow-report.json"),
       `${JSON.stringify(
         {
-          scenario: "signed receipt → routine run → signed notification",
+          scenario: "signed receipt → routine run",
           runs: runs().length,
-          attempts: sent.length,
-          samePayload: true,
           activity: activity.map((entry) => `${entry.kind}:${entry.status}`),
           status: "passed",
         },

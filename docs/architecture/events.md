@@ -7,7 +7,7 @@ value. All filters must match. Filters and payload templates do not run code. Ag
 channel routines use the same model. Types: `packages/contracts/src/ipc-events.ts`. There is no
 shared, host-level event source. The [user guide](../webhooks.md) has the request format.
 
-The flow is: signed request → route → routine → run → notification.
+The flow is: signed request → route → routine → run.
 
 ## Ownership
 
@@ -15,7 +15,6 @@ The flow is: signed request → route → routine → run → notification.
 | --- | --- | --- |
 | Trigger, route ID, encrypted secret, URL | Host SQLite | `projection_routine_webhooks`, `projection_channel_routine_webhooks` |
 | Receipts (no body) | Host SQLite | `projection_webhook_receipts` |
-| Destinations and deliveries | Host SQLite | `projection_webhook_destinations`, `projection_webhook_deliveries` |
 | Routes to revoke on the relay | Host SQLite | `projection_webhook_route_revocations` |
 | Route ID → host and owner account, link time | Account service D1 | `webhook_routes` |
 | Route ID → ingress socket | Signal memory | `SignalService` |
@@ -27,15 +26,12 @@ runs do not change.
   same transaction. A changed trigger kind keeps the routine ID and its runs.
 - `WebhookRouteStore` (`src/backend/webhook-route-store.ts`) reads routes, rotates secrets, keeps
   receipts, and holds the revocation queue.
-- `WebhookDestinationStore` (`src/backend/webhook-destination-store.ts`) owns destinations and the
-  delivery outbox. It never decrypts a secret.
 - `RoutineRecords` (`src/backend/routine-records.ts`) is the one backend object that main uses. It
-  selects the agent or channel scheduler by owner and holds the two webhook stores.
+  selects the agent or channel scheduler by owner and holds the webhook route store.
 - `webhook-trigger.ts` has trigger validation, filter matching, the run instruction, and template
   filling.
-- Main owns the secret cipher, signature checks, the relay, and HTTPS delivery:
-  `HostEventsService` (`src/main/host-events-service.ts`), `WebhookRelay`, `HostEventsRuntime`,
-  `webhook-security.ts`, and `webhook-delivery.ts`.
+- Main owns the secret cipher, signature checks, and the relay: `HostEventsService`
+  (`src/main/host-events-service.ts`), `WebhookRelay`, `HostEventsRuntime`, and `webhook-security.ts`.
 
 ## Route lifecycle
 
@@ -55,7 +51,7 @@ A routine delete, a change to `schedule`, and an agent or channel delete all cal
 `revokeRoutineWebhooks`. It writes the route ID to `projection_webhook_route_revocations` and removes
 the trigger row in the same transaction. `syncRoutes` drains the queue: the account service deletes
 the route and sends `webhook-route-revoked` to Signal. A routine or owner delete also removes its
-receipts, destinations, and deliveries. A change to `schedule` keeps them.
+receipts. A change to `schedule` keeps them.
 
 The ingress socket presents a signed route ticket with the current routes
 (`WEBHOOK_ROUTE_TTL_SECONDS`, 5 minutes). After a route change, the host opens a new socket to get a
@@ -95,45 +91,13 @@ event is kept only in the run instruction, between `--- external event input ---
 restart that resumes the run still has it. Runs use the existing agent and channel queues, provider
 limits, and approval controls.
 
-## Outbound notifications
-
-A run status change to running, succeeded, failed, or needs-attention queues one delivery per active
-destination of the routine that selected the event type. The delivery commits in the same
-transaction as the run change (`enqueueRunNotification`). The delivery ID is
-`<eventId>:<destinationId>`, so a replayed transition cannot queue a second delivery. The stored
-payload is the default payload or the filled template. The routine name is redacted.
-
-`WebhookDeliveryWorker` (`src/main/webhook-delivery.ts`) claims due rows, decrypts the secret and
-headers for one attempt only, and sends the request:
-
-- HTTPS only, no URL credentials, no private IP literal. Methods `POST`, `PUT`, `PATCH`.
-- The DNS lookup has a 10-second limit. All answers must be public unicast addresses. The connection
-  uses the checked address (`pinnedLookup`), which prevents DNS rebinding.
-- The total deadline for one attempt is 30 seconds. The response read stops at 64 KiB. Redirects are
-  not followed.
-- Headers: `x-openbot-event-id`, `x-openbot-delivery-id`, `x-openbot-timestamp`, and
-  `x-openbot-signature` only when the destination has a secret. Custom headers cannot replace them.
-
-`WEBHOOK_RETRY_DELAYS_MS` is `[0, 10 s, 1 min, 5 min, 30 min, 2 h]`: 6 attempts, within a 24-hour
-window from the first attempt. 408, 429, 5xx, network failures, and DNS failures are retryable.
-`Retry-After` (seconds or a date) can only make the delay longer; a retry after the window fails.
-Other statuses, a private DNS answer, a response that is too large, and a secret that cannot be
-decrypted fail at once. A manual retry (`retryDelivery`) resets the attempts and the window for a
-failed delivery to an active destination.
-
-A delivery left in `sending` by a stopped process goes back to the queue at start. A destination
-that is not active gets no new deliveries, and its queued deliveries wait. Deleting a destination
-deletes its deliveries. Terminal deliveries older than 30 days are pruned when a new delivery is
-queued.
-
 ## Management surfaces
 
 - Local desktop: the `events` IPC group (`packages/contracts/src/ipc-endpoints.ts`).
 - Remote hosts: the `events-v1` Team API capability, `EVENTS_ROUTES` in
   `packages/contracts/src/team-protocol/events-v1.ts`. All routes need a host administrator. The
-  routes are status, routine list, save, delete, and test, `rotateSecret`, destination list, save,
-  and delete, activity, and delivery retry. Activity is per routine and merges receipts and
-  deliveries.
+  routes are status, routine list, save, delete, and test, `rotateSecret`, and activity. Activity is
+  the receipts of one routine.
 - Released schedule-only routine views do not show webhook routines. Only a schedule routine writes
   a conversation event.
 - Desktop and web use the shared routine editor components in
@@ -142,18 +106,16 @@ queued.
 
 ## Threat model
 
-The untrusted inputs are public request bytes, sender clocks and IDs, destination DNS answers, and
-receiver responses. The routine secret is the inbound authority. Host administrator access is the
-configuration authority. A valid event is still external data: it cannot give tools or skip
+The untrusted inputs are public request bytes, sender clocks, and delivery IDs. The routine secret
+is the inbound authority. Host administrator access is the configuration authority. A valid event is still external data: it cannot give tools or skip
 approvals. The relay cannot start a run without a valid signature.
 
 Controls:
 
 - Signatures bind the timestamp, the delivery ID, and the exact body bytes.
 - The secret is made by the host, shown one time, encrypted at rest, and registered for log
-  redaction. Destination secrets and header values are write-only.
+  redaction.
 - Body limits, Signal rate limits, and bounded pending requests protect the relay and the host.
-- Outbound requests use only public addresses that the host checked.
 - A removed trigger revokes its route in the same transaction, and the relay revocation retries
   until it succeeds.
 

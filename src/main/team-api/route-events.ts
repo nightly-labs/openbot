@@ -6,11 +6,7 @@ import {
   parseEventRoutineRef,
   parseListEventActivity,
   parseListEventRoutines,
-  parseListWebhookDestinations,
   parseSaveEventRoutine,
-  parseSaveWebhookDestination,
-  parseWebhookDeliveryRef,
-  parseWebhookDestinationRef,
 } from "../host-events-inputs";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
@@ -68,18 +64,8 @@ export async function routeEvents(
       return json(200, {});
     case EVENTS_ROUTES.rotateSecret:
       return json(200, await runEventsEffect(events.rotateSecret(input(parseEventRoutineRef))));
-    case EVENTS_ROUTES.listDestinations:
-      return json(200, await runEventsEffect(events.listDestinations(input(parseListWebhookDestinations))));
-    case EVENTS_ROUTES.saveDestination:
-      return json(200, await runEventsEffect(events.saveDestination(input(parseSaveWebhookDestination))));
-    case EVENTS_ROUTES.deleteDestination:
-      await runEventsEffect(events.deleteDestination(input(parseWebhookDestinationRef)));
-      return json(200, {});
     case EVENTS_ROUTES.listActivity:
       return json(200, await runEventsEffect(events.listActivity(input(parseListEventActivity))));
-    case EVENTS_ROUTES.retryDelivery:
-      await runEventsEffect(events.retryDelivery(input(parseWebhookDeliveryRef)));
-      return json(200, {});
   }
   return "unmatched";
 }

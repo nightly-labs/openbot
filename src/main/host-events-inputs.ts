@@ -1,17 +1,10 @@
 import {
-  EVENT_DELIVERY_ID_MAX_LENGTH,
   type EventRoutineOwner,
   type EventRoutineRef,
-  isEventJsonValue,
   isEventRoutineTriggerInput,
-  isRoutineRunEventType,
   type ListEventActivityInput,
   type ListEventRoutinesInput,
-  type ListWebhookDestinationsInput,
   type SaveEventRoutineInput,
-  type SaveWebhookDestinationInput,
-  type WebhookDeliveryRef,
-  type WebhookDestinationRef,
 } from "@openbot/contracts/ipc-events";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
@@ -70,44 +63,6 @@ export function parseSaveEventRoutine(value: unknown): SaveEventRoutineInput {
     timezone: requiredString(input.timezone, 128),
     trigger: input.trigger,
     ...(input.limitPolicy === undefined ? {} : { limitPolicy: input.limitPolicy }),
-  };
-}
-
-export const parseListWebhookDestinations: (value: unknown) => ListWebhookDestinationsInput = routineScope;
-
-export function parseWebhookDestinationRef(value: unknown): WebhookDestinationRef {
-  return { ...routineScope(value), id: requiredString(record(value).id, 128) };
-}
-
-export function parseWebhookDeliveryRef(value: unknown): WebhookDeliveryRef {
-  return { ...routineScope(value), id: requiredString(record(value).id, EVENT_DELIVERY_ID_MAX_LENGTH) };
-}
-
-export function parseSaveWebhookDestination(value: unknown): SaveWebhookDestinationInput {
-  const input = record(value);
-  if (input.method !== "POST" && input.method !== "PUT" && input.method !== "PATCH") throw invalidEventInput();
-  if (!Array.isArray(input.eventTypes) || !input.eventTypes.every(isRoutineRunEventType)) throw invalidEventInput();
-  if (input.payloadTemplate !== null && !isEventJsonValue(input.payloadTemplate)) throw invalidEventInput();
-  let headers: Record<string, string> | undefined;
-  if (input.headers !== undefined) {
-    headers = {};
-    for (const [name, headerValue] of Object.entries(record(input.headers))) {
-      headers[name] = requiredString(headerValue, 8_192);
-    }
-  }
-  if (input.secret !== undefined && (typeof input.secret !== "string" || input.secret.length > 1_024)) {
-    throw invalidEventInput();
-  }
-  return {
-    ...(input.id === undefined ? {} : { id: requiredString(input.id, 128) }),
-    ...routineScope(input),
-    active: requiredBoolean(input.active),
-    url: requiredString(input.url, 2_048),
-    method: input.method,
-    eventTypes: input.eventTypes,
-    payloadTemplate: input.payloadTemplate,
-    ...(input.secret === undefined ? {} : { secret: input.secret }),
-    ...(headers === undefined ? {} : { headers }),
   };
 }
 

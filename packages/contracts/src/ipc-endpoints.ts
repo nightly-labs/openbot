@@ -181,13 +181,8 @@ import type {
   EventStatus,
   ListEventActivityInput,
   ListEventRoutinesInput,
-  ListWebhookDestinationsInput,
   SaveEventRoutineInput,
   SaveEventRoutineResult,
-  SaveWebhookDestinationInput,
-  WebhookDeliveryRef,
-  WebhookDestination,
-  WebhookDestinationRef,
   WebhookSecret,
 } from "./ipc-events";
 import type { GitHubConnectorRepositories, GitHubConnectorStatus } from "./ipc-github-connector";
@@ -1036,15 +1031,7 @@ export const IPC_ENDPOINTS = {
     deleteRoutine: scopedRequest<EventRoutineRef, void, "required">()("events:delete-routine"),
     testRoutine: scopedRequest<EventRoutineRef, void, "required">()("events:test-routine"),
     rotateSecret: scopedRequest<EventRoutineRef, WebhookSecret, "required">()("events:rotate-secret"),
-    listDestinations: scopedRequest<ListWebhookDestinationsInput, WebhookDestination[], "required">()(
-      "events:list-destinations",
-    ),
-    saveDestination: scopedRequest<SaveWebhookDestinationInput, WebhookDestination, "required">()(
-      "events:save-destination",
-    ),
-    deleteDestination: scopedRequest<WebhookDestinationRef, void, "required">()("events:delete-destination"),
     listActivity: scopedRequest<ListEventActivityInput, EventActivity[], "required">()("events:list-activity"),
-    retryDelivery: scopedRequest<WebhookDeliveryRef, void, "required">()("events:retry-delivery"),
   },
 
   remoteDesktop: {

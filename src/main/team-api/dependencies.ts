@@ -229,7 +229,7 @@ export type TeamApiRemoteScreen = Pick<
   Partial<Pick<RemoteScreenGateway, "checkSetup" | "test">>;
 
 export interface TeamApiOptions {
-  /** `events-v1`: admin-only event source, routine and outbound delivery management. */
+  /** `events-v1`: admin-only event source and routine management. */
   events?: HostEventsApi;
   channels?: ChannelService;
   mcpServers?: TeamApiMcpServers;

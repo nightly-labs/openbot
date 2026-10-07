@@ -9,7 +9,7 @@ import { MESSAGING_SCHEMA_SQL } from "./messaging/messaging-schema";
 
 const BASELINE_SCHEMA_VERSION = 8;
 
-/** Webhook triggers, received deliveries and outbound notifications for routines. */
+/** Webhook triggers and received deliveries for routines. */
 const WEBHOOK_SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS projection_routine_webhooks (
     routine_id TEXT PRIMARY KEY REFERENCES projection_agent_routines(routine_id) ON DELETE CASCADE,
@@ -51,45 +51,6 @@ const WEBHOOK_SCHEMA_SQL = `
   );
   CREATE INDEX IF NOT EXISTS webhook_receipts_recent
     ON projection_webhook_receipts(owner_kind, routine_id, received_at DESC, receipt_id);
-  CREATE TABLE IF NOT EXISTS projection_webhook_destinations (
-    destination_id TEXT PRIMARY KEY,
-    owner_kind TEXT NOT NULL CHECK(owner_kind IN ('agent', 'channel')),
-    routine_id TEXT NOT NULL,
-    active INTEGER NOT NULL CHECK(active IN (0, 1)),
-    url TEXT NOT NULL,
-    method TEXT NOT NULL CHECK(method IN ('POST', 'PUT', 'PATCH')),
-    event_types_json TEXT NOT NULL CHECK(json_valid(event_types_json)),
-    payload_template_json TEXT CHECK(payload_template_json IS NULL OR json_valid(payload_template_json)),
-    secret_ciphertext TEXT,
-    headers_ciphertext TEXT,
-    header_names_json TEXT NOT NULL CHECK(json_valid(header_names_json)),
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-  );
-  CREATE INDEX IF NOT EXISTS webhook_destinations_routine
-    ON projection_webhook_destinations(owner_kind, routine_id, created_at, destination_id);
-  CREATE TABLE IF NOT EXISTS projection_webhook_deliveries (
-    delivery_id TEXT PRIMARY KEY,
-    destination_id TEXT NOT NULL REFERENCES projection_webhook_destinations(destination_id) ON DELETE CASCADE,
-    owner_kind TEXT NOT NULL CHECK(owner_kind IN ('agent', 'channel')),
-    routine_id TEXT NOT NULL,
-    run_id TEXT NOT NULL,
-    event_id TEXT NOT NULL,
-    event_type TEXT NOT NULL,
-    payload_json TEXT NOT NULL CHECK(json_valid(payload_json)),
-    attempt INTEGER NOT NULL CHECK(attempt >= 0),
-    next_attempt_at TEXT NOT NULL,
-    window_started_at TEXT NOT NULL,
-    status TEXT NOT NULL CHECK(status IN ('queued', 'sending', 'succeeded', 'failed')),
-    last_status_code INTEGER,
-    last_error TEXT,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-  );
-  CREATE INDEX IF NOT EXISTS webhook_deliveries_pending
-    ON projection_webhook_deliveries(status, next_attempt_at, delivery_id);
-  CREATE INDEX IF NOT EXISTS webhook_deliveries_routine
-    ON projection_webhook_deliveries(owner_kind, routine_id, updated_at DESC, delivery_id);
 `;
 
 // This is the frozen compatibility schema for every database that predates v8.

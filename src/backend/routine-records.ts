@@ -9,7 +9,6 @@ import type {
   RoutineRecordInput,
   WebhookReceiveResult,
 } from "./routine-store";
-import { WebhookDestinationStore } from "./webhook-destination-store";
 import { WebhookRouteStore } from "./webhook-route-store";
 
 export class RoutineRecordFailed extends Schema.TaggedError<RoutineRecordFailed>()("RoutineRecordFailed", {
@@ -32,20 +31,17 @@ function failed(operation: string) {
 
 /**
  * Owns the owner-neutral routine surface of the events API: agent and channel routines of every
- * trigger kind, the public webhook routes and the outbound run notifications. Each method picks the
- * agent or the channel scheduler by owner. It never imports `AgentService`.
+ * trigger kind and the public webhook routes. Each method picks the agent or the channel scheduler
+ * by owner. It never imports `AgentService`.
  */
 export class RoutineRecords {
   /** The public routes of webhook triggers, their secrets, revocations and receipts. */
   readonly routes: WebhookRouteStore;
-  /** Outbound run notifications of each routine and their delivery outbox. */
-  readonly destinations: WebhookDestinationStore;
   readonly #options: RoutineRecordsOptions;
 
   constructor(options: RoutineRecordsOptions) {
     this.#options = options;
     this.routes = new WebhookRouteStore(options.database);
-    this.destinations = new WebhookDestinationStore(options.database);
   }
 
   /** Whether the agent or channel that owns the routines still exists. */

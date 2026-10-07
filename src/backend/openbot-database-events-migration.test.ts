@@ -117,8 +117,6 @@ describe("OpenBot webhook routine migration", () => {
     expect(webhookTables(migrated.connection)).toEqual([
       "projection_channel_routine_webhooks",
       "projection_routine_webhooks",
-      "projection_webhook_deliveries",
-      "projection_webhook_destinations",
       "projection_webhook_receipts",
       "projection_webhook_route_revocations",
     ]);
@@ -196,8 +194,6 @@ function removeWebhookSchema(database: DatabaseSync): void {
     DROP TABLE projection_channel_routine_webhooks;
     DROP TABLE projection_webhook_route_revocations;
     DROP TABLE projection_webhook_receipts;
-    DROP TABLE projection_webhook_deliveries;
-    DROP TABLE projection_webhook_destinations;
     DELETE FROM schema_migrations WHERE version = 29;
   `);
 }

@@ -124,7 +124,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `providers-v4` | Code or link sign-in and managed runtimes, Cursor and Cline included | `providerAdmin` |
 | `host-admin-v1` | Server name and logo | `hostAdmin` |
 | `host-update-v1` | Check for, download and restart into an app update; cancel a restart that waits | `hostAdmin` |
-| `events-v1` | Manage webhook routines, their secrets, notification destinations, and activity | `events` |
+| `events-v1` | Manage webhook routines, their secrets, and activity | `events` |
 
 These IPC groups take a required server id and route with `scopedHandler`. A key travels only towards
 the host; no response carries one. `providers-v1` has no progress event, so the renderer reads runtime
@@ -181,8 +181,8 @@ instead of the `host_unavailable` wait for 10 minutes, and web tries again every
 
 ### Webhook routines
 
-A webhook belongs to its routine. The host keeps the trigger, the encrypted secret, receipts, and
-the notification outbox in SQLite. D1 keeps only the route ID, the host, and the owner account.
+A webhook belongs to its routine. The host keeps the trigger, the encrypted secret, and receipts in
+SQLite. D1 keeps only the route ID, the host, and the owner account.
 Signal sends each signed request to the connected host without a cloud queue. All `events-v1`
 routes need a host administrator. See [Webhook routines](events.md) and the
 [webhook guide](../webhooks.md).

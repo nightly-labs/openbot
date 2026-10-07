@@ -1,17 +1,12 @@
 import { randomBytes } from "node:crypto";
 import type {
-  EventActivity,
   EventJsonValue,
   EventRoutine,
   EventRoutineOwner,
   EventRoutineRef,
   ListEventActivityInput,
   ListEventRoutinesInput,
-  ListWebhookDestinationsInput,
   SaveEventRoutineInput,
-  SaveWebhookDestinationInput,
-  WebhookDeliveryRef,
-  WebhookDestinationRef,
 } from "@openbot/contracts/ipc-events";
 import { isEventJsonValue } from "@openbot/contracts/ipc-events";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
@@ -25,7 +20,6 @@ import type { OwnedRoutineRecord, RoutineRecordInput } from "../backend/routine-
 import { WEBHOOK_EVENT_TYPE_MAX_LENGTH } from "../backend/webhook-trigger";
 import { type HostEventsApi, HostEventsFailure } from "./host-events-api";
 import type { SecretCipher } from "./provider-credential-store";
-import { validateDestination } from "./webhook-delivery";
 import { verifyWebhookSignature } from "./webhook-security";
 
 const logger = createOpenBotLogger("host-events");
@@ -56,8 +50,6 @@ export interface HostEventsServiceOptions {
   routines: RoutineRecords;
   cipher: SecretCipher;
   relay: HostWebhookRelay;
-  /** Starts the outbound delivery worker. */
-  wake(): void;
 }
 
 function eventStep<A>(operation: () => A): Effect.Effect<A, HostEventsFailure> {
@@ -109,7 +101,7 @@ function decodeWebhookBody(body: Uint8Array): DecodedWebhookBody | null {
 
 /**
  * Owns webhook routines on this host: the trigger settings, the host-made signing secret, the relay
- * routes, outbound destinations and authenticated receipts. A secret leaves the host only once, in
+ * routes and authenticated receipts. A secret leaves the host only once, in
  * the result of the save or rotation that made it.
  */
 export class HostEventsService implements HostEventsApi {
@@ -192,7 +184,6 @@ export class HostEventsService implements HostEventsApi {
     yield* this.#routines
       .test(input.owner, input.id)
       .pipe(Effect.mapError((failure) => new HostEventsFailure({ cause: failure.cause })));
-    this.#options.wake();
   }).bind(this);
 
   readonly rotateSecret = Effect.fn("HostEvents.rotateSecret")(
@@ -208,90 +199,13 @@ export class HostEventsService implements HostEventsApi {
     (operation) => this.#writes.withPermit(operation),
   ).bind(this);
 
-  readonly listDestinations = Effect.fn("HostEvents.listDestinations")(function* (
-    this: HostEventsService,
-    input: ListWebhookDestinationsInput,
-  ) {
-    return yield* eventStep(() => this.#routines.destinations.list(input.owner, input.routineId));
-  }).bind(this);
-
-  readonly saveDestination = Effect.fn("HostEvents.saveDestination")(function* (
-    this: HostEventsService,
-    input: SaveWebhookDestinationInput,
-  ) {
-    // Destination rows have no foreign key to the two routine tables, so the routine is checked here.
-    yield* this.#requireRoutine({ owner: input.owner, id: input.routineId });
-    yield* eventStep(() =>
-      validateDestination({
-        url: input.url,
-        method: input.method,
-        headers: input.headers,
-        ...(input.payloadTemplate === null ? {} : { template: input.payloadTemplate }),
-      }),
-    ).pipe(Effect.mapError(() => eventFailure(sourceText("error.backend.webhookSettingsInvalid"))));
-    const secretCiphertext =
-      input.secret === undefined
-        ? undefined
-        : input.secret === ""
-          ? null
-          : yield* this.#encryptDestinationSecret(input.secret);
-    const headers = input.headers;
-    const headersCiphertext =
-      headers === undefined
-        ? undefined
-        : Object.keys(headers).length === 0
-          ? null
-          : yield* eventStep(() => {
-              for (const value of Object.values(headers)) registerSecretValue(value);
-              return this.#options.cipher.encrypt(JSON.stringify(headers)).toString("base64");
-            });
-    const saved = yield* eventStep(() =>
-      this.#routines.destinations.save(input.owner, {
-        ...(input.id === undefined ? {} : { id: input.id }),
-        routineId: input.routineId,
-        active: input.active,
-        url: input.url,
-        method: input.method,
-        eventTypes: input.eventTypes,
-        payloadTemplate: input.payloadTemplate,
-        ...(secretCiphertext === undefined ? {} : { secretCiphertext }),
-        ...(headers === undefined ? {} : { headersCiphertext, headerNames: Object.keys(headers) }),
-      }),
-    );
-    this.#options.wake();
-    return saved;
-  }).bind(this);
-
-  readonly deleteDestination = Effect.fn("HostEvents.deleteDestination")(function* (
-    this: HostEventsService,
-    input: WebhookDestinationRef,
-  ) {
-    yield* eventStep(() => this.#routines.destinations.delete(input.owner, input.routineId, input.id));
-    this.#options.wake();
-  }).bind(this);
-
   readonly listActivity = Effect.fn("HostEvents.listActivity")(function* (
     this: HostEventsService,
     input: ListEventActivityInput,
   ) {
     yield* this.#requireRoutine({ owner: input.owner, id: input.routineId });
     const limit = input.limit ?? DEFAULT_ACTIVITY_LIMIT;
-    return yield* eventStep((): EventActivity[] =>
-      [
-        ...this.#routines.routes.listReceipts(input.owner.kind, input.routineId, limit),
-        ...this.#routines.destinations.listActivity(input.owner, input.routineId, limit),
-      ]
-        .sort((left, right) => right.occurredAt.localeCompare(left.occurredAt) || left.id.localeCompare(right.id))
-        .slice(0, limit),
-    );
-  }).bind(this);
-
-  readonly retryDelivery = Effect.fn("HostEvents.retryDelivery")(function* (
-    this: HostEventsService,
-    input: WebhookDeliveryRef,
-  ) {
-    yield* eventStep(() => this.#routines.destinations.retry(input.owner, input.routineId, input.id));
-    this.#options.wake();
+    return yield* eventStep(() => this.#routines.routes.listReceipts(input.owner.kind, input.routineId, limit));
   }).bind(this);
 
   /** Verifies one relayed request and starts its routine. The status goes back to the sender. */
@@ -324,8 +238,6 @@ export class HostEventsService implements HostEventsApi {
       .pipe(Effect.mapError((failure) => new HostEventsFailure({ cause: failure.cause })));
     switch (result.kind) {
       case "started":
-        this.#options.wake();
-        return { status: 202 };
       case "ignored":
         return { status: 202 };
       case "duplicate":
@@ -409,15 +321,5 @@ export class HostEventsService implements HostEventsApi {
       registerSecretValue(secret);
       return this.#options.cipher.encrypt(secret).toString("base64");
     });
-  });
-
-  readonly #encryptDestinationSecret = Effect.fn("HostEvents.encryptDestinationSecret")(function* (
-    this: HostEventsService,
-    secret: string,
-  ) {
-    if (secret.length < 32 || Buffer.byteLength(secret) > 1024) {
-      return yield* eventFailure(sourceText("error.backend.webhookSecretRequired"));
-    }
-    return yield* this.#encrypt(secret);
   });
 }

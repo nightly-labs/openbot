@@ -29,7 +29,6 @@ import { SettingsBackIcon, SettingsForwardIcon } from "@openbot/ui/components/Se
 import { RoutineRunHistory } from "@openbot/ui/features/conversation/RoutineRunHistory";
 import { RoutineSchedulePicker } from "@openbot/ui/features/conversation/RoutineSchedulePicker";
 import { RoutineTriggerMenu } from "@openbot/ui/features/conversation/RoutineTriggerMenu";
-import { RoutineWebhookNotifications } from "@openbot/ui/features/conversation/RoutineWebhookNotifications";
 import {
   type RoutineWebhookFilterDraft,
   RoutineWebhookTrigger,
@@ -767,14 +766,6 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                 </div>
               </Show>
 
-              <Show when={routineRef()}>
-                {(ref) => (
-                  <section class="agent-routine-field-section" aria-labelledby="agent-routine-notifications-heading">
-                    <h3 id="agent-routine-notifications-heading">{t("routine.settings.notifications")}</h3>
-                    <RoutineWebhookNotifications api={ref().api} routine={ref().routine} />
-                  </section>
-                )}
-              </Show>
               <RoutineRunHistory
                 runs={runs()}
                 onOpenRun={props.onOpenRun ? requestOpenRun : undefined}

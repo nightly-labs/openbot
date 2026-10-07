@@ -10,7 +10,6 @@ import {
   requiredStringColumn,
 } from "./database/database-rows";
 import type { OpenBotDatabase } from "./openbot-database";
-import { deleteRoutineDestinations } from "./webhook-destination-store";
 import { ROUTINE_OWNER_TABLES, type RoutineOwnerKind } from "./webhook-trigger";
 
 const RECEIPT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
@@ -190,7 +189,6 @@ export function revokeRoutineWebhooks(
   if (!options.forget) return;
   const receipts = db.prepare("DELETE FROM projection_webhook_receipts WHERE owner_kind = ? AND routine_id = ?");
   for (const routineId of routineIds) receipts.run(ownerKind, routineId);
-  deleteRoutineDestinations(db, ownerKind, routineIds);
 }
 
 function route(row: DynamicRecord): WebhookRoute {

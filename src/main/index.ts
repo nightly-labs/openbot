@@ -917,8 +917,6 @@ if (!hasSingleInstanceLock) {
         switch (event.type) {
           case "routines-changed":
           case "channel-routines-changed":
-            built.eventsRuntime.wake();
-            break;
           case "agents-changed":
           case "channels-changed":
             break;

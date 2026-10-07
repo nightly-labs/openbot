@@ -336,9 +336,8 @@
   margin-top: 0;
 }
 
-/* The schedule, notifications and history are fields, so their headings match the field labels. */
+/* The schedule and history are fields, so their headings match the field labels. */
 .agent-routine-when h3,
-.agent-routine-field-section h3,
 .agent-routine-history h3 {
   margin: 0 0 var(--openbot-space-1-5) var(--openbot-space-2);
   color: var(--openbot-text-secondary);
@@ -347,7 +346,7 @@
   line-height: var(--openbot-leading-md);
 }
 
-/* A pointer and value row in the webhook filters, and a name and value row in notification headers. */
+/* A pointer and value row in the webhook filters. */
 .agent-routine-event-filter {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
@@ -385,7 +384,7 @@
   cursor: pointer;
 }
 
-/* A webhook request or a notification: the time, then a muted note. */
+/* An ignored webhook request: the time, then a muted note. */
 .agent-routine-run-text {
   display: flex;
   min-width: 0;
@@ -400,19 +399,6 @@
   color: var(--openbot-text-muted);
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.agent-routine-run-end {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: var(--openbot-space-1);
-}
-
-.agent-routine-run-end .ui-button {
-  color: var(--openbot-text-secondary);
-  font-size: inherit;
-  font-weight: inherit;
 }
 
 .agent-routine-history-error {
@@ -1164,66 +1150,4 @@
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-sm);
   line-height: 15px;
-}
-
-.agent-routine-disclosure {
-  justify-self: start;
-}
-
-.agent-routine-webhook-form,
-.agent-routine-webhook-options {
-  display: grid;
-  gap: var(--openbot-space-3);
-}
-
-.agent-routine-notifications {
-  display: grid;
-  gap: var(--openbot-space-2);
-}
-
-/* "Add notification" is a quiet link whose text starts under the field label. */
-.agent-routine-add-link {
-  justify-self: start;
-  padding-inline: var(--openbot-space-2);
-  color: var(--openbot-text-secondary);
-  font-size: var(--openbot-text-md);
-  font-weight: inherit;
-  line-height: var(--openbot-leading-md);
-}
-
-.agent-routine-webhook-form {
-  padding: var(--openbot-space-3);
-  border: 1px solid var(--openbot-border);
-  border-radius: var(--openbot-radius-md);
-}
-
-.agent-routine-webhook-events {
-  display: grid;
-  gap: var(--openbot-space-1-5);
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-
-.agent-routine-webhook-events legend {
-  margin-bottom: var(--openbot-space-1-5);
-  color: var(--openbot-text-secondary);
-  font-size: var(--openbot-text-md);
-  line-height: var(--openbot-leading-md);
-}
-
-.agent-routine-webhook-check {
-  display: flex;
-  align-items: center;
-  gap: var(--openbot-space-2);
-}
-
-.agent-routine-webhook-form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--openbot-space-2);
-}
-
-.agent-routine-webhook-url {
-  overflow-wrap: anywhere;
 }

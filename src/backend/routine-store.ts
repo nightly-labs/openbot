@@ -8,7 +8,7 @@ import type {
   RoutineSchedule,
 } from "@openbot/contracts/ipc";
 import { isRoutineSchedule, ROUTINE_LIMIT_POLICIES } from "@openbot/contracts/ipc";
-import type { EventFilter, EventJsonValue, RoutineRunNotification } from "@openbot/contracts/ipc-events";
+import type { EventFilter, EventJsonValue } from "@openbot/contracts/ipc-events";
 import { type DynamicRecord, isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import {
@@ -24,7 +24,6 @@ import {
   requiredStringColumn,
 } from "./database/database-rows";
 import type { OpenBotDatabase } from "./openbot-database";
-import { enqueueRunNotification } from "./webhook-destination-store";
 import { hasWebhookReceipt, insertWebhookReceipt, revokeRoutineWebhooks } from "./webhook-route-store";
 import {
   parseEventFilters,
@@ -924,16 +923,12 @@ export class RoutineStore {
     mutate: (db: OpenBotDatabase["connection"], sequence: number, now: string) => void,
   ): OwnedRoutineRun {
     const current = this.#requireRun(runId);
-    const transitionId = randomUUID();
     return this.database.dispatch(
-      `${this.tables.commandPrefix}-run:update:${runId}:${transitionId}`,
+      `${this.tables.commandPrefix}-run:update:${runId}:${randomUUID()}`,
       [{ aggregateType: this.tables.runAggregate, aggregateId: current.routineId, eventType, payload: { runId } }],
       (db, sequences) => {
         mutate(db, sequences[0] ?? 0, new Date().toISOString());
-        const updated = this.#requireRun(runId);
-        const notification = updated.status === current.status ? null : runNotification(updated, transitionId);
-        if (notification) enqueueRunNotification(db, this.tables.ownerKind, notification);
-        return updated;
+        return this.#requireRun(runId);
       },
     );
   }
@@ -980,29 +975,6 @@ export class RoutineStore {
 }
 
 type RunSource = Pick<OwnedRoutine, "id" | "ownerId" | "name" | "instruction">;
-
-/** The outbound event for a run status change, or null for a status that sends none. */
-function runNotification(run: OwnedRoutineRun, eventId: string): RoutineRunNotification | null {
-  const base = {
-    eventId,
-    runId: run.id,
-    routineId: run.routineId,
-    routineName: run.routineName,
-    occurredAt: run.updatedAt,
-  };
-  switch (run.status) {
-    case "running":
-      return { ...base, eventType: "routine.run.started", status: "started" };
-    case "succeeded":
-      return { ...base, eventType: "routine.run.succeeded", status: "succeeded" };
-    case "failed":
-      return { ...base, eventType: "routine.run.failed", status: "failed" };
-    case "needs-attention":
-      return { ...base, eventType: "routine.run.needs_attention", status: "needs-attention" };
-    default:
-      return null;
-  }
-}
 
 function scheduleColumn(row: DynamicRecord): RoutineSchedule {
   const value = JSON.parse(requiredStringColumn(row, "schedule_json"));

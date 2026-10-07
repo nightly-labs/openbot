@@ -1,12 +1,11 @@
 // Frozen optional events-v1 wire contract.
 //
-// Webhook routine management is an additive admin surface. The host makes and keeps the inbound
-// signing secret and shows it once, in the save or rotate response. Outbound secrets and header
-// values are write-only; only their presence and names cross this protocol. Widening one of these
-// records needs a new capability instead of changing this codec.
+// Webhook routine management is an additive admin surface. The host makes and keeps the signing
+// secret and shows it once, in the save or rotate response. Widening one of these records needs a
+// new capability instead of changing this codec.
 
 import { EVENT_DELIVERY_ID_MAX_LENGTH } from "../ipc-events";
-import { isDynamicRecord, isString } from "../runtime-values";
+import { isString } from "../runtime-values";
 import {
   type AdminDecoder,
   adminRoute,
@@ -33,11 +32,7 @@ export const EVENTS_ROUTES = {
   deleteRoutine: "/v1/admin/events/routines/delete",
   testRoutine: "/v1/admin/events/routines/test",
   rotateSecret: "/v1/admin/events/routines/rotate-secret",
-  listDestinations: "/v1/admin/events/destinations/list",
-  saveDestination: "/v1/admin/events/destinations/save",
-  deleteDestination: "/v1/admin/events/destinations/delete",
   listActivity: "/v1/admin/events/activity",
-  retryDelivery: "/v1/admin/events/deliveries/retry",
 } as const;
 
 const timestamp = string(64);
@@ -47,27 +42,6 @@ const eventDeliveryIdentifier: AdminDecoder = (value) => {
   if (!isString(decoded) || decoded.length === 0) throw new Error("Invalid event delivery identifier.");
   return decoded;
 };
-const eventDataAt = (
-  value: unknown,
-  depth: number,
-  budget: { remaining: number } = { remaining: 10_000 },
-): TeamProtocolV2Json => {
-  if (depth > 32 || budget.remaining <= 0) throw new Error("Invalid event data.");
-  budget.remaining -= 1;
-  if (value === null || typeof value === "string" || typeof value === "boolean") return value;
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (Array.isArray(value)) {
-    if (value.length > 10_000) throw new Error("Invalid event data.");
-    return value.map((item) => eventDataAt(item, depth + 1, budget));
-  }
-  if (typeof value === "object" && value !== null) {
-    const entries = Object.entries(value);
-    if (entries.length > 10_000) throw new Error("Invalid event data.");
-    return Object.fromEntries(entries.map(([key, item]) => [key, eventDataAt(item, depth + 1, budget)]));
-  }
-  throw new Error("Invalid event data.");
-};
-const eventData = (value: unknown): TeamProtocolV2Json => eventDataAt(value, 0);
 const integerInRange =
   (minimum: number, maximum: number): AdminDecoder =>
   (value) => {
@@ -129,19 +103,6 @@ const routineSchedule = variant({
   }),
   custom: fields({ kind: oneOf("custom"), expression: nonEmptyString(255) }),
 });
-const secretHeaders = (value: unknown): TeamProtocolV2Json => {
-  if (!isDynamicRecord(value)) throw new Error("Invalid webhook headers.");
-  const entries = Object.entries(value);
-  if (entries.length > 128) throw new Error("Invalid webhook headers.");
-  return Object.fromEntries(
-    entries.map(([name, headerValue]) => {
-      if (name.length === 0 || name.length > 256 || !isString(headerValue) || headerValue.length > 8_192) {
-        throw new Error("Invalid webhook headers.");
-      }
-      return [name, headerValue];
-    }),
-  );
-};
 const eventScalar = (value: unknown): TeamProtocolV2Json => {
   if (value === null || typeof value === "string" || typeof value === "boolean") return value;
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -157,12 +118,6 @@ const jsonPointer = (value: unknown): TeamProtocolV2Json => {
 };
 const filter = fields({ pointer: jsonPointer, value: eventScalar });
 const filters = list(filter, 128);
-const runEventType = oneOf(
-  "routine.run.started",
-  "routine.run.succeeded",
-  "routine.run.failed",
-  "routine.run.needs_attention",
-);
 const scheduleTrigger = fields({ kind: oneOf("schedule"), schedule: routineSchedule });
 const triggerInput = variant({
   schedule: scheduleTrigger,
@@ -177,42 +132,15 @@ const owner = variant({
   channel: fields({ kind: oneOf("channel"), id: identifier }),
 });
 const routineRef = fields({ id: identifier, owner });
-const routineScope = fields({ owner, routineId: identifier });
-const destination = fields({
+const activity = fields({
+  kind: oneOf("received"),
   id: identifier,
-  routineId: identifier,
-  active: boolean,
-  url: string(2_048),
-  method: oneOf("POST", "PUT", "PATCH"),
-  eventTypes: list(runEventType, 4),
-  payloadTemplate: nullable(eventData),
-  hasSecret: boolean,
-  headerNames: list(string(256), 128),
-  createdAt: timestamp,
-  updatedAt: timestamp,
-});
-const activity = variant({
-  received: fields({
-    kind: oneOf("received"),
-    id: identifier,
-    deliveryId: eventDeliveryIdentifier,
-    eventType,
-    status: oneOf("started", "ignored"),
-    reason: nullable(oneOf("event-type", "filter", "inactive")),
-    runId: nullable(identifier),
-    occurredAt: timestamp,
-  }),
-  delivery: fields({
-    kind: oneOf("delivery"),
-    id: eventDeliveryIdentifier,
-    destinationId: identifier,
-    eventType: runEventType,
-    status: oneOf("queued", "sending", "succeeded", "failed"),
-    attempt: count,
-    statusCode: nullable(count),
-    runId: identifier,
-    occurredAt: timestamp,
-  }),
+  deliveryId: eventDeliveryIdentifier,
+  eventType,
+  status: oneOf("started", "ignored"),
+  reason: nullable(oneOf("event-type", "filter", "inactive")),
+  runId: nullable(identifier),
+  occurredAt: timestamp,
 });
 const routine = fields(
   {
@@ -253,32 +181,8 @@ export const EVENTS_CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   [EVENTS_ROUTES.deleteRoutine, adminRoute(routineRef, empty)],
   [EVENTS_ROUTES.testRoutine, adminRoute(routineRef, empty)],
   [EVENTS_ROUTES.rotateSecret, adminRoute(routineRef, secret)],
-  [EVENTS_ROUTES.listDestinations, adminRoute(routineScope, list(destination, 1_000))],
-  [
-    EVENTS_ROUTES.saveDestination,
-    adminRoute(
-      fields(
-        {
-          owner,
-          routineId: identifier,
-          active: boolean,
-          url: string(2_048),
-          method: oneOf("POST", "PUT", "PATCH"),
-          eventTypes: list(runEventType, 4),
-          payloadTemplate: nullable(eventData),
-        },
-        { id: identifier, secret: string(4_096), headers: secretHeaders },
-      ),
-      destination,
-    ),
-  ],
-  [EVENTS_ROUTES.deleteDestination, adminRoute(fields({ id: identifier, owner, routineId: identifier }), empty)],
   [
     EVENTS_ROUTES.listActivity,
     adminRoute(fields({ owner, routineId: identifier }, { limit: count }), list(activity, 10_000)),
-  ],
-  [
-    EVENTS_ROUTES.retryDelivery,
-    adminRoute(fields({ id: eventDeliveryIdentifier, owner, routineId: identifier }), empty),
   ],
 ]);

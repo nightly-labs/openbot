@@ -36,16 +36,12 @@ import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import { buildRoutineCalendar, type RoutineCalendarSource } from "@openbot/team-client/routine-calendar";
 import {
   deleteEventRoutine,
-  deleteWebhookDestination,
   installAgentTemplate,
   listAgentSkills,
   listEventActivity,
   listEventRoutines,
-  listWebhookDestinations,
-  retryEventDelivery,
   rotateEventRoutineSecret,
   saveEventRoutine,
-  saveWebhookDestination,
   setAgentSkillEnabled,
   testEventRoutine,
   uninstallAgentSkill,
@@ -88,11 +84,7 @@ type HostRequestActions = Pick<
   | "deleteEventRoutine"
   | "testEventRoutine"
   | "rotateEventRoutineSecret"
-  | "listWebhookDestinations"
-  | "saveWebhookDestination"
-  | "deleteWebhookDestination"
   | "listEventActivity"
-  | "retryEventDelivery"
   | "loadHostAnalytics"
   | "searchMessages"
   | "loadAgentSkills"
@@ -156,20 +148,8 @@ export function createHostRequestActions({
       runTeamEffect(
         rotateEventRoutineSecret(eventsAdmin(serverId), input).pipe(Effect.mapError((error) => error.cause)),
       ),
-    listWebhookDestinations: (input, serverId) =>
-      runTeamEffect(
-        listWebhookDestinations(eventsAdmin(serverId), input).pipe(Effect.mapError((error) => error.cause)),
-      ),
-    saveWebhookDestination: (input, serverId) =>
-      runTeamEffect(saveWebhookDestination(eventsAdmin(serverId), input).pipe(Effect.mapError((error) => error.cause))),
-    deleteWebhookDestination: (input, serverId) =>
-      runTeamEffect(
-        deleteWebhookDestination(eventsAdmin(serverId), input).pipe(Effect.mapError((error) => error.cause)),
-      ),
     listEventActivity: (input, serverId) =>
       runTeamEffect(listEventActivity(eventsAdmin(serverId), input).pipe(Effect.mapError((error) => error.cause))),
-    retryEventDelivery: (input, serverId) =>
-      runTeamEffect(retryEventDelivery(eventsAdmin(serverId), input).pipe(Effect.mapError((error) => error.cause))),
     saveAgentMemory: async (agentId, text, serverId, memoryId) => {
       await saveAgentRecord(queryClient, ["agent-info", ...queryScope, serverId, agentId, "memories"], () =>
         request(

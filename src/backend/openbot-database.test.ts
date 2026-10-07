@@ -115,8 +115,6 @@ describe("OpenBotDatabase", () => {
         "projection_channel_routine_webhooks",
         "projection_webhook_route_revocations",
         "projection_webhook_receipts",
-        "projection_webhook_destinations",
-        "projection_webhook_deliveries",
         "file_deletion_outbox",
       ]),
     );

@@ -1,7 +1,7 @@
 import { isRoutineSchedule, type RoutineLimitPolicy, type RoutineSchedule } from "./ipc-routines";
 import { isDynamicRecord, isNumber, isString } from "./runtime-values";
 
-/** JSON values accepted from a webhook request or used in a webhook template. */
+/** JSON values accepted from a webhook request. */
 export type EventJsonValue =
   | string
   | number
@@ -10,7 +10,7 @@ export type EventJsonValue =
   | EventJsonValue[]
   | { readonly [key: string]: EventJsonValue };
 
-/** A sender's delivery ID. Outbound delivery IDs add the destination ID, so the bound is wider than an ID. */
+/** A sender's delivery ID. Senders choose it, so the bound is wider than an ID. */
 export const EVENT_DELIVERY_ID_MAX_LENGTH = 512;
 
 export type EventScalar = string | number | boolean | null;
@@ -100,24 +100,6 @@ export interface ListEventActivityInput {
   limit?: number;
 }
 
-export interface WebhookDestinationRef {
-  id: string;
-  owner: EventRoutineOwner;
-  routineId: string;
-}
-
-/** `id` is an outbound delivery ID. */
-export interface WebhookDeliveryRef {
-  id: string;
-  owner: EventRoutineOwner;
-  routineId: string;
-}
-
-export interface ListWebhookDestinationsInput {
-  owner: EventRoutineOwner;
-  routineId: string;
-}
-
 /** The verified request that starts a webhook routine. Secrets and signature headers are never part of it. */
 export interface EventEnvelope {
   version: 1;
@@ -129,88 +111,19 @@ export interface EventEnvelope {
   data: EventJsonValue;
 }
 
-export type WebhookMethod = "POST" | "PUT" | "PATCH";
-
-export const ROUTINE_RUN_EVENT_TYPES = [
-  "routine.run.started",
-  "routine.run.succeeded",
-  "routine.run.failed",
-  "routine.run.needs_attention",
-] as const;
-
-export type RoutineRunEventType = (typeof ROUTINE_RUN_EVENT_TYPES)[number];
-
-/** An outbound webhook that one routine sends when its runs change. */
-export interface WebhookDestination {
-  id: string;
-  routineId: string;
-  active: boolean;
-  url: string;
-  method: WebhookMethod;
-  eventTypes: RoutineRunEventType[];
-  payloadTemplate: EventJsonValue | null;
-  hasSecret: boolean;
-  headerNames: string[];
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface SaveWebhookDestinationInput {
-  id?: string;
-  owner: EventRoutineOwner;
-  routineId: string;
-  active: boolean;
-  url: string;
-  method: WebhookMethod;
-  eventTypes: RoutineRunEventType[];
-  payloadTemplate: EventJsonValue | null;
-  /** A new signing secret replaces the stored one. An empty string removes it. Reads never return it. */
-  secret?: string;
-  /** Header values are accepted only on writes and returned as `headerNames`. */
-  headers?: Record<string, string>;
-}
-
 /** Why a received request did not start a run. */
 export type WebhookReceiptReason = "event-type" | "filter" | "inactive";
 
-export type EventActivity =
-  | {
-      kind: "received";
-      id: string;
-      deliveryId: string;
-      eventType: string;
-      status: "started" | "ignored";
-      reason: WebhookReceiptReason | null;
-      runId: string | null;
-      occurredAt: string;
-    }
-  | {
-      kind: "delivery";
-      id: string;
-      destinationId: string;
-      eventType: RoutineRunEventType;
-      status: "queued" | "sending" | "succeeded" | "failed";
-      attempt: number;
-      statusCode: number | null;
-      runId: string;
-      occurredAt: string;
-    };
-
-export interface RoutineRunNotification {
-  /** Stable transition ID. Several committed transitions can share a run and a status. */
-  eventId: string;
-  eventType: RoutineRunEventType;
-  runId: string;
-  routineId: string;
-  routineName: string;
-  status: "started" | "succeeded" | "failed" | "needs-attention";
+/** One request that the webhook of a routine received. */
+export interface EventActivity {
+  kind: "received";
+  id: string;
+  deliveryId: string;
+  eventType: string;
+  status: "started" | "ignored";
+  reason: WebhookReceiptReason | null;
+  runId: string | null;
   occurredAt: string;
-}
-
-const ROUTINE_RUN_EVENT_TYPE_SET: ReadonlySet<unknown> = new Set(ROUTINE_RUN_EVENT_TYPES);
-
-export function isRoutineRunEventType(value: unknown): value is RoutineRunEventType {
-  return ROUTINE_RUN_EVENT_TYPE_SET.has(value);
 }
 
 export function isEventStatus(value: unknown): value is EventStatus {
@@ -329,55 +242,22 @@ export function isEventEnvelope(value: unknown): value is EventEnvelope {
   );
 }
 
-export function isWebhookDestination(value: unknown): value is WebhookDestination {
-  return (
-    isDynamicRecord(value) &&
-    isString(value.id) &&
-    isString(value.routineId) &&
-    typeof value.active === "boolean" &&
-    isString(value.url) &&
-    (value.method === "POST" || value.method === "PUT" || value.method === "PATCH") &&
-    Array.isArray(value.eventTypes) &&
-    value.eventTypes.every(isRoutineRunEventType) &&
-    (value.payloadTemplate === null || isEventJsonValue(value.payloadTemplate)) &&
-    typeof value.hasSecret === "boolean" &&
-    Array.isArray(value.headerNames) &&
-    value.headerNames.every(isString) &&
-    isTimestamp(value.createdAt) &&
-    isTimestamp(value.updatedAt)
-  );
-}
-
 function isDeliveryId(value: unknown): value is string {
   return isString(value) && value.length > 0 && value.length <= EVENT_DELIVERY_ID_MAX_LENGTH;
 }
 
 export function isEventActivity(value: unknown): value is EventActivity {
   if (!isDynamicRecord(value) || !isString(value.id) || !isTimestamp(value.occurredAt)) return false;
-  if (value.kind === "received") {
-    return (
-      isDeliveryId(value.deliveryId) &&
-      isString(value.eventType) &&
-      (value.status === "started" || value.status === "ignored") &&
-      (value.reason === null ||
-        value.reason === "event-type" ||
-        value.reason === "filter" ||
-        value.reason === "inactive") &&
-      isNullableString(value.runId)
-    );
-  }
   return (
-    value.kind === "delivery" &&
-    isString(value.destinationId) &&
-    isRoutineRunEventType(value.eventType) &&
-    (value.status === "queued" ||
-      value.status === "sending" ||
-      value.status === "succeeded" ||
-      value.status === "failed") &&
-    typeof value.attempt === "number" &&
-    Number.isSafeInteger(value.attempt) &&
-    (value.statusCode === null || (typeof value.statusCode === "number" && Number.isSafeInteger(value.statusCode))) &&
-    isString(value.runId)
+    value.kind === "received" &&
+    isDeliveryId(value.deliveryId) &&
+    isString(value.eventType) &&
+    (value.status === "started" || value.status === "ignored") &&
+    (value.reason === null ||
+      value.reason === "event-type" ||
+      value.reason === "filter" ||
+      value.reason === "inactive") &&
+    isNullableString(value.runId)
   );
 }
 
@@ -400,5 +280,3 @@ export const decodeEventActivity = decodeList(isEventActivity, "Invalid event ac
 export const decodeEventRoutines = decodeList(isEventRoutine, "Invalid event routine response.");
 export const decodeSaveEventRoutineResult = decodeOne(isSaveEventRoutineResult, "Invalid event routine response.");
 export const decodeWebhookSecret = decodeOne(isWebhookSecret, "Invalid webhook secret response.");
-export const decodeWebhookDestinations = decodeList(isWebhookDestination, "Invalid webhook destination response.");
-export const decodeWebhookDestination = decodeOne(isWebhookDestination, "Invalid webhook destination response.");

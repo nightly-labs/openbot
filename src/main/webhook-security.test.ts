@@ -1,7 +1,7 @@
 import { createHmac } from "node:crypto";
 import { WEBHOOK_DELIVERY_BODY_BYTES_LIMIT } from "@openbot/contracts/signal-protocol/messages";
 import { describe, expect, it } from "vitest";
-import { createWebhookSignature, isPublicIpAddress, verifyWebhookSignature } from "./webhook-security";
+import { createWebhookSignature, verifyWebhookSignature } from "./webhook-security";
 
 const NOW = Date.parse("2026-10-07T12:00:00.000Z");
 const SECRET = "webhook-signing-secret-for-tests-0123456789";
@@ -52,20 +52,5 @@ describe("webhook signatures", () => {
     expect(() =>
       verifyWebhookSignature(SECRET, { timestamp, deliveryId: "delivery-1", body: BODY, nowMs: NOW }, "sha256=00"),
     ).toThrowError(expect.objectContaining({ code: "invalid_signature" }));
-  });
-});
-
-describe("webhook destination IP policy", () => {
-  it("allows global unicast addresses and denies private, special, and mapped addresses", () => {
-    expect(isPublicIpAddress("8.8.8.8")).toBe(true);
-    expect(isPublicIpAddress("2001:4860:4860::8888")).toBe(true);
-    expect(isPublicIpAddress("127.0.0.1")).toBe(false);
-    expect(isPublicIpAddress("169.254.169.254")).toBe(false);
-    expect(isPublicIpAddress("10.0.0.1")).toBe(false);
-    expect(isPublicIpAddress("::1")).toBe(false);
-    expect(isPublicIpAddress("::ffff:127.0.0.1")).toBe(false);
-    expect(isPublicIpAddress("::ffff:8.8.8.8")).toBe(true);
-    expect(isPublicIpAddress("2001:db8::1")).toBe(false);
-    expect(isPublicIpAddress("2001:0000:4136:e378:8000:63bf:3fff:fdd2")).toBe(false);
   });
 });

@@ -5,7 +5,7 @@ import type {
   EventScalar,
   WebhookReceiptReason,
 } from "@openbot/contracts/ipc-events";
-import { isEventFilter, isEventJsonValue } from "@openbot/contracts/ipc-events";
+import { isEventFilter } from "@openbot/contracts/ipc-events";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { RoutineInputError } from "@openbot/team-client/routine-schedule";
@@ -50,46 +50,10 @@ export function webhookRunInstruction(instruction: string, envelope: EventEnvelo
   ].join("\n");
 }
 
-export function parseEventJson(value: string): EventJsonValue {
-  const parsed = JSON.parse(value);
-  if (!isEventJsonValue(parsed)) throw new Error("Stored event JSON is invalid.");
-  return parsed;
-}
-
 export function parseEventFilters(value: string): EventFilter[] {
   const parsed = JSON.parse(value);
   if (!Array.isArray(parsed) || !parsed.every(isEventFilter)) throw new Error("Stored event filters are invalid.");
   return parsed;
-}
-
-/**
- * Fills `{{field}}` placeholders from the notification payload. A string that is only a placeholder
- * takes the field's JSON value, or null when the field is missing. A placeholder inside other text
- * takes the field as text, or an empty string. `event.id` and `event.type` name the event ID and type.
- */
-export function materializeTemplate(template: EventJsonValue, payload: EventJsonValue): EventJsonValue {
-  if (typeof template === "string") {
-    const exact = /^\{\{\s*([A-Za-z][A-Za-z0-9_.-]*)\s*\}\}$/u.exec(template);
-    if (exact?.[1]) return readTemplateField(payload, exact[1]) ?? null;
-    return template.replace(/\{\{\s*([A-Za-z][A-Za-z0-9_.-]*)\s*\}\}/gu, (_match, path: string) => {
-      const value = readTemplateField(payload, path);
-      return value === undefined || value === null ? "" : typeof value === "string" ? value : JSON.stringify(value);
-    });
-  }
-  if (Array.isArray(template)) return template.map((value) => materializeTemplate(value, payload));
-  if (template === null || typeof template !== "object") return template;
-  return Object.fromEntries(Object.entries(template).map(([key, value]) => [key, materializeTemplate(value, payload)]));
-}
-
-function readTemplateField(payload: EventJsonValue, path: string): EventJsonValue | undefined {
-  const normalized = path.startsWith("event.") ? path.slice("event.".length) : path;
-  const payloadPath = normalized === "id" ? "eventId" : normalized === "type" ? "eventType" : normalized;
-  let current: EventJsonValue | undefined = payload;
-  for (const part of payloadPath.split(".")) {
-    if (!isDynamicRecord(current) || Array.isArray(current) || !Object.hasOwn(current, part)) return undefined;
-    current = current[part];
-  }
-  return current;
 }
 
 function readPointer(value: EventJsonValue, pointer: string): EventJsonValue | undefined {

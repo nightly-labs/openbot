@@ -111,7 +111,7 @@ function ValueRow({ label, action, children }: { label: string; action?: ReactNo
   );
 }
 
-export function IconAction({
+function IconAction({
   label,
   disabled = false,
   onPress,

@@ -189,7 +189,6 @@ import {
 import { listSiblingOpenBotInstances } from "./update-sibling-instances";
 import { WHISPER_MODEL_NAME, WHISPER_MODEL_URL } from "./voice-model-service";
 import { VoiceTranscriptionService } from "./voice-transcription-service";
-import { WebhookDeliveryWorker } from "./webhook-delivery";
 import { WebhookRelay } from "./webhook-relay";
 
 const logger = createOpenBotLogger("application-services");
@@ -1334,24 +1333,12 @@ export async function createApplicationServices({
     ingress: signalIngress,
     hostId: () => teamStore.getIdentity()?.serverId ?? null,
   });
-  let eventRuntime: HostEventsRuntime | null = null;
   const events = new HostEventsService({
     routines: service.routineRecords,
     cipher: secretCipher,
     relay: webhookRelay,
-    wake: () => eventRuntime?.wake(),
   });
-  const webhookDelivery = new WebhookDeliveryWorker({
-    store: service.routineRecords.destinations,
-    cipher: secretCipher,
-    maxBatch: 1,
-  });
-  const eventsRuntime = new HostEventsRuntime({
-    service: events,
-    destinations: service.routineRecords.destinations,
-    delivery: webhookDelivery,
-  });
-  eventRuntime = eventsRuntime;
+  const eventsRuntime = new HostEventsRuntime({ service: events });
   signalIngress.handleWebhooks((input) => events.receive(input));
   teardown.push(TEARDOWN_ORDER.hostEvents, "the event service", async () => {
     webhookRelay.stop();

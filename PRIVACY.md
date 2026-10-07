@@ -472,11 +472,9 @@ Network traffic can also occur when:
 ## Webhook routines
 
 An administrator can give a routine a webhook trigger. The routine then gets a public URL and a
-signing secret. An administrator can also add HTTPS destinations to a routine, which receive
-notifications about its runs. The host stores the trigger, the encrypted secret, the destinations,
-and the delivery history in its local SQLite database. Signing secrets and custom header values are
-encrypted with the operating system's secret storage. The secret of a webhook routine is shown one
-time. Management screens do not return saved secrets.
+signing secret. The host stores the trigger and the encrypted secret in its local SQLite database.
+The signing secret is encrypted with the operating system's secret storage. It is shown one time.
+Management screens do not return saved secrets.
 
 Requests to a webhook routine pass through OpenBot's Signal service to the connected host. Signal
 uses the sender's IP address in memory for rate limits. The account service keeps only the route
@@ -489,15 +487,8 @@ the delivery ID, the event type, the result, and the run ID, but not the request
 added to the run instruction, which the host stores with the run. Event data can reach the
 routine's model provider, as other routine input does.
 
-The host can send run notifications to the destinations. These notifications contain routine, run,
-and event IDs, the routine name, the status, and times. They do not contain instructions,
-conversation content, result text, or raw errors. The destination receives the host's network
-address and the configured request headers. A failed delivery can be retried, so a destination can
-receive the same notification more than once. The host deletes completed and failed deliveries
-after 30 days.
-
-Change a routine to a schedule, or delete it, to stop its URL. Turn off a destination to stop new
-notifications. Deleting a routine deletes its receipts, destinations, and delivery history.
+Change a routine to a schedule, or delete it, to stop its URL. Deleting a routine deletes its
+receipts.
 
 ## Slack connections
 
