@@ -1,8 +1,8 @@
 /**
  * A new agent, asked for where the user right-clicked: its face, its name, what it does and the
- * model it runs on. Enter creates it, Escape or a click on Cancel drops it. The face is picked at
- * random, as on the first agent form; the agent's settings can change it later. Without a model
- * catalog, the host picks the model.
+ * model it runs on. Enter creates it; Escape, Cancel or a press outside it drops it. The face is
+ * picked at random, as on the first agent form; the agent's settings can change it later. Without a
+ * model catalog, the host picks the model.
  */
 
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
@@ -47,7 +47,20 @@ export function DiagramNewAgentCard(props: {
   const [busy, setBusy] = createSignal(false);
   const [choice, setChoice] = createSignal(props.models?.initial ?? null);
   let nameInput: HTMLInputElement | undefined;
-  onSettled(() => nameInput?.focus());
+  let form: HTMLFormElement | undefined;
+  onSettled(() => {
+    nameInput?.focus();
+    // A press anywhere else drops the card, as a click outside a menu closes it. The model list
+    // opens in a layer of its own, so a press there keeps it.
+    const dismiss = (event: PointerEvent) => {
+      const target = event.target;
+      if (busy() || !(target instanceof Element)) return;
+      if (form?.contains(target) || target.closest(".provider-model-popover, [data-popper-positioner]")) return;
+      props.onCancel();
+    };
+    document.addEventListener("pointerdown", dismiss);
+    return () => document.removeEventListener("pointerdown", dismiss);
+  });
   const create = () => {
     if (!name().trim() || busy()) return;
     setBusy(true);
@@ -63,6 +76,7 @@ export function DiagramNewAgentCard(props: {
   };
   return (
     <form
+      ref={(element) => (form = element)}
       class="diagram-new-agent"
       style={{ "--diagram-new-agent-x": `${props.at.x}px`, "--diagram-new-agent-y": `${props.at.y}px` }}
       aria-label={t("diagram.newAgent.label")}

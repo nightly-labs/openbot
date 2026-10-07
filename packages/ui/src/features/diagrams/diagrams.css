@@ -222,6 +222,7 @@
   align-items: center;
   gap: var(--openbot-space-2);
   font-weight: var(--openbot-weight-medium);
+  user-select: none;
 }
 
 .diagram-new-agent-avatar.agent-avatar {
