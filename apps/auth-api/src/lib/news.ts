@@ -75,8 +75,9 @@ export const NEWS_COLLECTION: ContentCollection<"news"> = {
       slug: "run-the-team-server-yourself",
       title: "Run the team server yourself",
       description:
-        "Teams run on a computer you own. The hosted part holds accounts and memberships; it never holds your conversations, your files or your commands.",
+        "Learn how self-hosting an OpenBot team server works, where conversations and files live, what the account service handles, and who is responsible for uptime.",
       publishedAt: "2026-07-11",
+      updatedAt: "2026-10-07",
       author: NEWS_AUTHOR,
     },
     {
