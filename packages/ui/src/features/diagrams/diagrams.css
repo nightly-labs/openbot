@@ -230,6 +230,30 @@
   grid-template: 100% / 100%;
 }
 
+/* The model field, drawn as the inputs above it are: their height, edge and fill. */
+.diagram-new-agent .provider-model-trigger-field {
+  height: var(--openbot-control-sm);
+  min-height: var(--openbot-control-sm);
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-control);
+  box-shadow: none;
+  padding-inline: var(--openbot-space-2);
+  font-size: var(--openbot-text-sm);
+}
+
+.diagram-new-agent .provider-model-trigger-field:hover:not(:disabled),
+.diagram-new-agent .provider-model-trigger-field[aria-expanded="true"] {
+  border-color: var(--openbot-border-strong);
+  background: var(--openbot-bg-control);
+}
+
+.diagram-new-agent .provider-model-trigger-field:focus-visible {
+  border-color: var(--openbot-border-focus);
+  outline: none;
+  box-shadow: var(--openbot-focus-ring);
+}
+
 .diagram-new-agent-actions {
   display: flex;
   justify-content: flex-end;
