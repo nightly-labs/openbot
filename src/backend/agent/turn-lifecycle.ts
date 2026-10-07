@@ -450,7 +450,7 @@ export class TurnLifecycle {
         if (isRecord(params) && params.willRetry === true) return;
         // A usage limit shows no banner, but the failed delivery still keeps it as the reason.
         const errorTurnId = getString(params, "turnId");
-        if (notification.method === "error" && message && errorTurnId && this.#runningTurns.has(errorTurnId)) {
+        if (notification.method === "error" && errorTurnId && this.#runningTurns.has(errorTurnId)) {
           this.#turnErrors.set(errorTurnId, message);
           // The turn's completion runs it again or reports it in words the user can act on.
           if (isForeignReasoningError(message)) return;
