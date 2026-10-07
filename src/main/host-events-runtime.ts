@@ -55,6 +55,10 @@ export class HostEventsRuntime {
     );
   }
 
+  setAccountActive(active: boolean): void {
+    this.#service.setAccountActive(active);
+  }
+
   stop(): Effect.Effect<void> {
     return Effect.suspend(() => {
       this.#running = false;

@@ -51,13 +51,16 @@ afterEach(async () => {
 function fakeRelay() {
   const registered: string[] = [];
   const revoked: string[] = [];
+  const accountChanges: boolean[] = [];
   const relay = {
     registered,
     revoked,
+    accountChanges,
     offline: false,
     conflicts: new Set<string>(),
     connected: () => true,
     setEnabled: (_enabled: boolean) => undefined,
+    setAccountActive: (active: boolean) => relay.accountChanges.push(active),
     refresh: () => undefined,
     registerRoute: (routeId: string): Effect.Effect<string, { readonly cause: unknown } | WebhookRouteConflict> => {
       if (relay.offline) return Effect.fail({ cause: new Error("offline") });
@@ -90,7 +93,13 @@ async function fixture() {
   agentService = service;
   await Effect.runPromise(service.initialize());
   const relay = fakeRelay();
-  const events = new HostEventsService({ routines: service.routineRecords, cipher, relay });
+  const account = { active: true };
+  const events = new HostEventsService({
+    routines: service.routineRecords,
+    cipher,
+    relay,
+    accountActive: () => account.active,
+  });
   const owner: EventRoutineOwner = { kind: "agent", id: agent.id };
   const input: SaveEventRoutineInput = {
     owner,
@@ -109,6 +118,7 @@ async function fixture() {
     database: store.database,
     service,
     events,
+    account,
     relay,
     owner,
     input,
@@ -150,6 +160,33 @@ describe("HostEventsService receipt boundary", () => {
     expect(await Effect.runPromise(events.receive(receipt))).toEqual({ status: 503 });
     expect(database.connection.prepare("SELECT receipt_id FROM projection_webhook_receipts").all()).toEqual([]);
     expect(runs()).toEqual([]);
+  });
+
+  it("rejects signed deliveries while signed out and resumes the stored route after sign-in", async () => {
+    const { database, events, account, owner, routeId, secret, saved, runs, relay } = await fixture();
+    account.active = false;
+    events.setAccountActive(false);
+    expect(await Effect.runPromise(events.receive(signed(routeId, secret, "signed-out-1", BUILD)))).toEqual({
+      status: 503,
+    });
+    expect(runs()).toEqual([]);
+    expect(database.connection.prepare("SELECT receipt_id FROM projection_webhook_receipts").all()).toEqual([]);
+
+    const [signedOutRoutine] = await Effect.runPromise(events.listRoutines({ owner }));
+    expect(signedOutRoutine?.trigger).toMatchObject({ url: `https://signal.example/v1/webhooks/${routeId}` });
+    await Effect.runPromise(events.syncRoutes({ all: true }));
+    expect(relay.registered).toEqual([routeId]);
+
+    account.active = true;
+    events.setAccountActive(true);
+    await Effect.runPromise(events.syncRoutes({ all: true }));
+    expect(relay.registered).toContain(routeId);
+    expect(relay.accountChanges).toEqual([false, true]);
+    expect(saved.routine.trigger.kind).toBe("webhook");
+    expect(await Effect.runPromise(events.receive(signed(routeId, secret, "signed-in-1", BUILD)))).toEqual({
+      status: 202,
+    });
+    expect(runs()).toHaveLength(1);
   });
 
   it("starts one run per delivery ID when the sender retries after a lost acknowledgement", async () => {

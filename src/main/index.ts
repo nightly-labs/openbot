@@ -953,6 +953,7 @@ if (!hasSingleInstanceLock) {
         const principalId = centralAuthPrincipalId(state);
         if (principalId === webhookPrincipalId) return;
         webhookPrincipalId = principalId;
+        built.eventsRuntime.setAccountActive(principalId !== null);
         if (principalId !== null) built.eventsRuntime.syncRoutes({ all: true });
       };
       service.on("event", onRoutineEvent);

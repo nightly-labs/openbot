@@ -1350,6 +1350,7 @@ export async function createApplicationServices({
     routines: service.routineRecords,
     cipher: secretCipher,
     relay: webhookRelay,
+    accountActive: () => centralAuth.getState().status === "signed_in",
   });
   const eventsRuntime = new HostEventsRuntime(events);
   signalIngress.handleWebhooks((input) => events.receive(input));

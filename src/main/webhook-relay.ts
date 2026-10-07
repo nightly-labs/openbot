@@ -46,6 +46,14 @@ export class WebhookRelay implements HostWebhookRelay {
     }
   }
 
+  setAccountActive(active: boolean): void {
+    // Reconnect before releasing the webhook hold. Signal then builds its next hello with the
+    // current principal and route set. Releasing afterwards closes the socket when no other
+    // ingress consumer holds it.
+    if (this.#release) this.#options.ingress.reconnect();
+    if (!active) this.setEnabled(false);
+  }
+
   /**
    * Opens a new socket, so Signal issues a route ticket with the current routes. Without the hold,
    * `setEnabled(true)` opens that socket, so a second reconnect here is not necessary.

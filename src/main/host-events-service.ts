@@ -34,6 +34,8 @@ export interface HostWebhookRelay {
   connected(): boolean;
   /** Holds the inbound relay connection open while at least one route exists. */
   setEnabled(enabled: boolean): void;
+  /** Pauses or refreshes the relay when the signed-in account changes. */
+  setAccountActive(active: boolean): void;
   /** Applies route changes to the open relay connection. */
   refresh(): void;
   registerRoute(routeId: string): Effect.Effect<string, { readonly cause: unknown } | WebhookRouteConflict>;
@@ -44,6 +46,7 @@ export interface HostEventsServiceOptions {
   routines: RoutineRecords;
   cipher: SecretCipher;
   relay: HostWebhookRelay;
+  accountActive: () => boolean;
 }
 
 const { sync: eventStep, rewrap: toHostEventsFailure } = causeHelpers(HostEventsFailure);
@@ -175,6 +178,7 @@ export class HostEventsService implements HostEventsApi {
     this: HostEventsService,
     input: WebhookIngressDelivery,
   ): Effect.fn.Return<{ status: WebhookDeliveryStatus }, HostEventsFailure> {
+    if (!this.#options.accountActive()) return { status: 503 };
     if (input.body.byteLength > WEBHOOK_DELIVERY_BODY_BYTES_LIMIT) return { status: 413 };
     const route = yield* eventStep(() => this.#options.routines.routes.find(input.routeId));
     if (!route) return { status: 404 };
@@ -230,10 +234,18 @@ export class HostEventsService implements HostEventsApi {
   readonly syncRoutes = Effect.fn("HostEvents.syncRoutes")(
     function* (this: HostEventsService, options: { all: boolean }) {
       const { relay } = this.#options;
+      if (!this.#options.accountActive()) {
+        relay.setEnabled(false);
+        return true;
+      }
       const routes = this.#options.routines.routes;
       let failed = false;
       let changed = false;
       for (const routeId of yield* eventStep(() => routes.pendingRevocations())) {
+        if (!this.#options.accountActive()) {
+          relay.setEnabled(false);
+          return true;
+        }
         const revoked = yield* Effect.result(relay.revokeRoute(routeId));
         if (revoked._tag === "Failure") failed = true;
         else {
@@ -244,6 +256,10 @@ export class HostEventsService implements HostEventsApi {
       const current = yield* eventStep(() => routes.list());
       const updatedOwners = new Map<string, EventRoutineOwner>();
       for (const route of current) {
+        if (!this.#options.accountActive()) {
+          relay.setEnabled(false);
+          return true;
+        }
         if (!options.all && route.url !== null) continue;
         const ownerKey = `${route.owner.kind}:${route.owner.id}`;
         let { routeId, url } = route;
@@ -265,6 +281,10 @@ export class HostEventsService implements HostEventsApi {
           updatedOwners.set(ownerKey, route.owner);
         }
       }
+      if (!this.#options.accountActive()) {
+        relay.setEnabled(false);
+        return true;
+      }
       const enabled = current.length > 0;
       // `refresh` reconnects only a held socket. `setEnabled(true)` opens a new one with the current routes.
       if (changed && enabled) relay.refresh();
@@ -284,6 +304,11 @@ export class HostEventsService implements HostEventsApi {
         ),
       ),
   ).bind(this);
+
+  /** Closes stale route claims and leaves local route rows ready for the next account sync. */
+  setAccountActive(active: boolean): void {
+    this.#options.relay.setAccountActive(active);
+  }
 
   /** Writes the routine under the write lock, so the route limit check and the write are one step. */
   readonly #saveRecord = Effect.fn("HostEvents.saveRecord")(
