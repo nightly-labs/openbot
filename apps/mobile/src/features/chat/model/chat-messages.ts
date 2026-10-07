@@ -1,4 +1,4 @@
-import { CHAT_VISUAL_ITEM_TYPE_PREFIX, chatVisualReply } from "@openbot/contracts/chat-visual";
+import { CHAT_VISUAL_ITEM_TYPE_PREFIX } from "@openbot/contracts/chat-visual";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import type {
   AgentExchangeSummary,
@@ -70,9 +70,7 @@ export type ChatMessage =
       stopped: boolean;
       steps: { id: string; text: string; state: ChatPlanStepState }[];
     }
-  | { id: string; kind: "thinking"; turnId: string | undefined; steps: { id: string; text: string }[] }
-  /** An agent's HTML page, shown above its reply. `height` is the most that the agent asked for. */
-  | { id: string; kind: "visual"; title: string; attachment: AttachmentSummary; height?: number };
+  | { id: string; kind: "thinking"; turnId: string | undefined; steps: { id: string; text: string }[] };
 
 export interface PendingChatMessage {
   message: Extract<ChatMessage, { kind: "message" }>;
@@ -189,11 +187,6 @@ function projectRoutineMarker(message: ConversationMessage, latestRuns: Readonly
 const aliasedMessages = new WeakMap<ChatMessage, ChatMessage>();
 
 const PLAN_HEADING_LIMIT = 80;
-
-function projectVisual(id: string, message: ConversationMessage): ChatMessage | null {
-  const visual = message.author === "assistant" ? chatVisualReply(message) : null;
-  return visual ? { id, kind: "visual", title: message.text, ...visual } : null;
-}
 
 /**
  * The task list of a `plan` message, as desktop shows it. A released host sends only the checklist
@@ -339,20 +332,19 @@ export function projectChatMessages(
         const sender = message.author === "user" ? message.senderMember : undefined;
         const otherMember =
           sender !== undefined && reader !== null && sender.id !== reader && sender.id !== readerAccount;
-        bubble = projectPlan(message) ??
-          projectVisual(message.id, message) ?? {
-            id: message.id,
-            kind: "message",
-            // Another person's message stays a person's bubble, on the right, and adds their name.
-            author: message.author === "user" ? "user" : "agent",
-            ...(otherMember ? { sender } : {}),
-            body: message.exchange ? "" : message.text,
-            streaming: message.status === "streaming",
-            status: message.status,
-            attachments: message.attachments,
-            imageGeneration: message.imageGeneration,
-            replyToMessageId: message.replyToMessageId,
-          };
+        bubble = projectPlan(message) ?? {
+          id: message.id,
+          kind: "message",
+          // Another person's message stays a person's bubble, on the right, and adds their name.
+          author: message.author === "user" ? "user" : "agent",
+          ...(otherMember ? { sender } : {}),
+          body: message.exchange ? "" : message.text,
+          streaming: message.status === "streaming",
+          status: message.status,
+          attachments: message.attachments,
+          imageGeneration: message.imageGeneration,
+          replyToMessageId: message.replyToMessageId,
+        };
         projectedBubbles.set(message, { readerKey, bubble });
       }
       result.push(bubble);
@@ -458,8 +450,6 @@ function projectChannelMessage(
       steps: [{ id: entry.id, text: entry.message.text }],
     };
   }
-  const visual = entry.author.kind === "agent" ? projectVisual(entry.id, entry.message) : null;
-  if (visual) return visual;
   return {
     id: entry.id,
     kind: "message",
