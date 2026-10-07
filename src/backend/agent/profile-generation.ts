@@ -76,6 +76,7 @@ export const generateTextWithoutTools = Effect.fn("Agent.generateTextWithoutTool
   model: AgentModelOption,
   prompt: string,
   cancelled: () => boolean = () => false,
+  signal?: AbortSignal,
 ) {
   let cleanupFailure: ProfileGenerationFailed | null = null;
   const result = yield* Effect.acquireUseRelease(
@@ -85,7 +86,8 @@ export const generateTextWithoutTools = Effect.fn("Agent.generateTextWithoutTool
         const completion = yield* Effect.forkChild(profileCompletion(client), { startImmediately: true });
         // Read after the temporary directory is made and before anything is spawned: that await is the
         // window in which an endpoint change finds a client with no process to stop.
-        if (cancelled()) return yield* new ProfileGenerationFailed({ cause: new Error(CANCELLED_MESSAGE) });
+        if (cancelled() || signal?.aborted)
+          return yield* new ProfileGenerationFailed({ cause: new Error(CANCELLED_MESSAGE) });
         yield* Effect.try({ try: () => client.start(), catch: (cause) => new ProfileGenerationFailed({ cause }) });
         yield* client
           .request(
@@ -188,6 +190,7 @@ export const generateTextWithoutTools = Effect.fn("Agent.generateTextWithoutTool
           orElse: () =>
             Effect.fail(new ProfileGenerationFailed({ cause: new Error(sourceText("error.agent.profileTimedOut")) })),
         }),
+        (work) => (signal ? Effect.raceFirst(work, profileAborted(signal)) : work),
         Effect.result,
       ),
     (cwd) =>
@@ -208,6 +211,14 @@ export const generateTextWithoutTools = Effect.fn("Agent.generateTextWithoutTool
   if (Result.isFailure(result)) return yield* result.failure;
   return result.success;
 });
+
+const profileAborted = (signal: AbortSignal) =>
+  Effect.callback<never, ProfileGenerationFailed>((resume) => {
+    const abort = () => resume(Effect.fail(new ProfileGenerationFailed({ cause: new Error(CANCELLED_MESSAGE) })));
+    signal.addEventListener("abort", abort, { once: true });
+    if (signal.aborted) abort();
+    return Effect.sync(() => signal.removeEventListener("abort", abort));
+  });
 
 const profileCompletion = Effect.fnUntraced(function* (client: AgentClient) {
   return yield* Effect.callback<string, ProfileGenerationFailed | GenerationUsageLimitError>((resume) => {

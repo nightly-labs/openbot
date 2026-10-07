@@ -1883,18 +1883,24 @@ const failedAction: ChannelTask = {
   assignmentCount: 1,
   error: "Could not complete the task.",
 };
-it("shows recovery actions in the sheet and removes resolved tasks", async () => {
+it("removes resolved recovery tasks and keeps active tasks until they finish", async () => {
   actionTasks = [failedAction, { ...failedAction, id: "task-running", state: "running" }];
   await act(() => root.render(<ChannelActionsScreen />));
   await waitFor(() => expect(screen.getAllByRole("button", { name: "Resume" })).toHaveLength(1));
   expect(screen.queryByText("@Travel")).toBeNull();
   expect(screen.getAllByText("Travel").length).toBeGreaterThan(1);
   await click("Resume");
-  await waitFor(() => expect(screen.getByText("No actions needed.")).toBeTruthy());
+  await waitFor(() => expect(screen.queryByRole("button", { name: "Resume" })).toBeNull());
+  expect(screen.getByRole("button", { name: "Stop this task" })).toBeTruthy();
+  expect(screen.queryByText("No actions needed.")).toBeNull();
   expect(channelRequests).toHaveBeenCalledWith(
     CHANNEL_ROUTES.command,
     expect.objectContaining({ type: "resume", taskId: failedAction.id, channelId: channel.id }),
   );
+  actionTasks = actionTasks.map((task) => ({ ...task, state: "completed" }));
+  await act(() => workspace.channelStore.refreshHistory("host-one", channel.id));
+  await screen.findByText("No actions needed.");
+  expect(screen.queryByRole("button", { name: "Stop this task" })).toBeNull();
 });
 it("keeps a failed action in the sheet for retry and supports reassign", async () => {
   actionTasks = [failedAction];

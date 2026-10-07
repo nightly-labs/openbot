@@ -8,7 +8,7 @@ import { SettingsSection } from "@/features/settings/components/settings-content
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { useText } from "@/shared/lib/text";
 
-type TaskCommand = (taskId: string, type: "resume" | "reassign", recipientAgentId?: string | null) => void;
+type TaskCommand = (taskId: string, type: "stop" | "resume" | "reassign", recipientAgentId?: string | null) => void;
 
 export function ChannelTaskActions({
   tasks,
@@ -53,6 +53,7 @@ function TaskActionCard({
 }) {
   const { t, sourceText } = useText();
   const agent = members.find((member) => member.id === task.ownerAgentId);
+  const active = task.state === "queued" || task.state === "running" || task.state === "waiting";
   const name = agent?.name ?? t("mobile.channel.task.task");
   return (
     <SettingsSection>
@@ -71,7 +72,17 @@ function TaskActionCard({
             {name}
           </Typography.Paragraph>
           <Typography.Paragraph type="body-xs" className="text-grouped-secondary">
-            {t(task.state === "failed" ? "mobile.channel.task.failed" : "mobile.channel.task.paused")}
+            {t(
+              task.state === "running"
+                ? "mobile.channel.task.running"
+                : task.state === "queued"
+                  ? "mobile.channel.task.queued"
+                  : task.state === "waiting"
+                    ? "mobile.channel.task.waiting"
+                    : task.state === "failed"
+                      ? "mobile.channel.task.failed"
+                      : "mobile.channel.task.paused",
+            )}
           </Typography.Paragraph>
         </View>
         {task.instruction ? (
@@ -88,9 +99,9 @@ function TaskActionCard({
             size="sm"
             variant="secondary"
             isDisabled={disabled}
-            onPress={() => onCommand(task.id, "resume")}
+            onPress={() => onCommand(task.id, active ? "stop" : "resume")}
           >
-            <Button.Label>{t("mobile.channel.task.resume")}</Button.Label>
+            <Button.Label>{t(active ? "mobile.channel.task.stop" : "mobile.channel.task.resume")}</Button.Label>
           </Button>
           <View className="flex-1" pointerEvents={disabled || !members.length ? "none" : "auto"}>
             <MenuView

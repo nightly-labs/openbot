@@ -81,6 +81,7 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
       }}
       agents={members}
       mentionAgents={members}
+      channelGroupMentions={state.coordinationSupported}
       projectedMessages={messages}
       referenceMessages={messages}
       ready={Boolean(page)}
@@ -88,7 +89,10 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
       canSend={canSend}
       readOnly={Boolean(channel?.archived)}
       activities={activities}
-      activeTurnId={null}
+      activeTurnId={
+        page?.tasks.some((task) => ["queued", "running", "waiting"].includes(task.state)) ? channelId : null
+      }
+      stopTurn={() => state.store.stopActiveTasks(serverId, channelId, Crypto.randomUUID)}
       questionForm={questionForm}
       onSelectQuestion={selectPrompt}
       readBoundary={throughSequence ? String(throughSequence) : null}
@@ -112,7 +116,11 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
         sender.send(body, files, replyToMessageId, channel?.members ?? [], upload)
       }
       notice={channel?.archived ? t("mobile.channel.chat.deletedNotice") : undefined}
-      needsAction={channelTasksNeedingAction(page?.tasks ?? []).length > 0 && !channel?.archived}
+      needsAction={
+        (channelTasksNeedingAction(page?.tasks ?? []).length > 0 ||
+          (page?.tasks.some((task) => ["queued", "running", "waiting"].includes(task.state)) ?? false)) &&
+        !channel?.archived
+      }
     />
   );
 }

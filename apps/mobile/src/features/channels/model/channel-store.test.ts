@@ -5,11 +5,17 @@ import {
   type ChannelSummary,
   type ChannelTask,
 } from "@openbot/contracts/ipc";
+import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import {
+  CHANNEL_COORDINATION_CAPABILITY,
+  CHANNEL_COORDINATION_ROUTE,
+} from "@openbot/contracts/team-protocol/channel-coordination-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { createWorkspacePreferences } from "@openbot/team-client";
 import { assert, describe, expect, it, vi } from "vitest";
+import { RemoteRequestError } from "../../../shared/lib/remote-request-error";
 import { projectChannelMessages } from "../../chat/model/chat-messages";
 import { reconcileChannelPins } from "../../workspace/model/agent-pins";
 import { channelRecipient, toggleChannelMember } from "./channel-draft";
@@ -71,6 +77,126 @@ function deferred<T>() {
 }
 
 describe("mobile channels", () => {
+  it.each(["before-stop", "during-stop"])("stops the other roots when one finishes %s", async (race) => {
+    const task = (id: string): ChannelTask => ({
+      id,
+      channelId: channel.id,
+      parentTaskId: null,
+      rootTaskId: id,
+      ownerAgentId: "agent-one",
+      requestMessageId: "request",
+      instruction: "Check routes",
+      attachmentDraftIds: [],
+      expectedResult: "",
+      sourceMessageIds: [],
+      dependencies: [],
+      resources: [],
+      state: "running",
+      revision: 1,
+      assignmentCount: 1,
+      error: null,
+    });
+    const first = task("first");
+    const second = task("second");
+    const child = { ...task("child"), parentTaskId: second.id, rootTaskId: second.id };
+    let bulkStarted = false;
+    const { store, calls } = fixture(async (path, body) => {
+      if (path === CHANNEL_ROUTES.list) return [channel];
+      if (path === CHANNEL_ROUTES.read) {
+        if (bulkStarted && race === "before-stop") first.state = "completed";
+        return { ...page(1, 1), tasks: [first, second, child].map((item) => ({ ...item })) };
+      }
+      if (path === CHANNEL_ROUTES.command) {
+        if (isDynamicRecord(body) && body.taskId === first.id) {
+          first.state = "completed";
+          throw new RemoteRequestError(500, "The server request failed.");
+        }
+        second.state = "paused";
+        child.state = "paused";
+        return channel;
+      }
+      throw new Error("Unexpected request");
+    });
+    const stop = store.observe("host-one", channel.id);
+    await store.refresh("host-one");
+    bulkStarted = true;
+    await store.stopActiveTasks("host-one", channel.id, () => "stop-operation");
+    expect(second.state).toBe("paused");
+    expect(child.state).toBe("paused");
+    expect(
+      calls.mock.calls
+        .filter(([path]) => path === CHANNEL_ROUTES.command)
+        .map(([, body]) => (isDynamicRecord(body) ? body.taskId : undefined)),
+    ).toEqual(race === "before-stop" ? [second.id] : [first.id, second.id]);
+    stop();
+  });
+
+  it.each([
+    { status: 401, terminal: true, missing: false, readFails: false },
+    { status: 403, terminal: true, missing: false, readFails: false },
+    { status: null, terminal: true, missing: false, readFails: false },
+    { status: 500, terminal: false, missing: false, readFails: false },
+    { status: 500, terminal: false, missing: true, readFails: false },
+    { status: 500, terminal: true, missing: false, readFails: true },
+  ])("retains a bulk Stop failure unless terminal state is verified: %j", async (failure) => {
+    const first: ChannelTask = {
+      id: "first",
+      channelId: channel.id,
+      parentTaskId: null,
+      rootTaskId: "first",
+      ownerAgentId: "agent-one",
+      requestMessageId: "request",
+      instruction: "Check routes",
+      attachmentDraftIds: [],
+      expectedResult: "",
+      sourceMessageIds: [],
+      dependencies: [],
+      resources: [],
+      state: "running",
+      revision: 1,
+      assignmentCount: 1,
+      error: null,
+    };
+    const second = { ...first, id: "second", rootTaskId: "second" };
+    const error =
+      failure.status === null ? new Error("Connection lost") : new RemoteRequestError(failure.status, "Rejected");
+    let rejected = false;
+    const { store, calls } = fixture(async (path) => {
+      if (path === CHANNEL_ROUTES.list) return [channel];
+      if (path === CHANNEL_ROUTES.read) {
+        if (rejected && failure.readFails) throw new Error("History unavailable");
+        return {
+          ...page(1, 1),
+          tasks: (rejected && failure.missing ? [second] : [first, second]).map((item) => ({ ...item })),
+        };
+      }
+      rejected = true;
+      if (failure.terminal) first.state = "completed";
+      throw error;
+    });
+    const stop = store.observe("host-one", channel.id);
+    await store.refresh("host-one");
+    await expect(store.stopActiveTasks("host-one", channel.id, () => "stop-operation")).rejects.toBe(error);
+    expect(calls.mock.calls.filter(([path]) => path === CHANNEL_ROUTES.command)).toHaveLength(1);
+    expect(second.state).toBe("running");
+    stop();
+  });
+
+  it("uses explicit group delivery only when the host supports coordination", async () => {
+    const { store, calls } = fixture(async (path) => (path === CHANNEL_ROUTES.list ? [channel] : channel));
+    const sender = new ChannelSend(store, "host-one", channel.id, () => "broadcast-one");
+    await expect(sender.send("@everyone status", [], null, channel.members)).rejects.toThrow(
+      "does not support channel coordination",
+    );
+    expect(calls).not.toHaveBeenCalled();
+    store.configure("host-one", [CHANNEL_CHATS_CAPABILITY, CHANNEL_COORDINATION_CAPABILITY]);
+    await sender.send("@everyone status", [], null, channel.members);
+    expect(calls).toHaveBeenCalledWith(
+      CHANNEL_COORDINATION_ROUTE,
+      expect.objectContaining({ type: "coordinate", audience: "all", operationId: "broadcast-one" }),
+      "host-one",
+    );
+  });
   it("preserves empty channel forms and expires superseded prompts", () => {
     const history = page(1, 1);
     const message = history.messages[0];
@@ -829,29 +955,35 @@ describe("channel data in the shared chat", () => {
     ]);
   });
 
-  it("returns a history-only retry after acceptance and keeps it pending through failed reads", async () => {
-    let failRead = false;
-    const { store, calls } = fixture(async (path) => {
-      if (path === CHANNEL_ROUTES.list) return [channel];
-      if (path === CHANNEL_ROUTES.command) return channel;
-      if (failRead) throw new Error("Offline");
-      return page(1, 2);
-    });
-    const stop = store.observe("host-one", channel.id);
-    await store.refresh("host-one");
-    const cached = store.get("host-one").pages.get(channel.id);
-    failRead = true;
-    const sender = new ChannelSend(store, "host-one", channel.id, () => "accepted");
-    const receipt = await sender.send("Hello", [], null, channel.members);
-    expect(receipt).not.toBeNull();
-    if (!receipt) throw new Error("Expected a pending history receipt");
-    expect(store.get("host-one").pages.get(channel.id)).toBe(cached);
-    await expect(receipt.refreshHistory()).rejects.toThrow("chat history could not refresh");
-    failRead = false;
-    await receipt.refreshHistory();
-    expect(calls.mock.calls.filter(([path]) => path === CHANNEL_ROUTES.command)).toHaveLength(1);
-    stop();
-  });
+  it.each(["send", "lead", "all"] as const)(
+    "returns a history-only retry after accepted %s and keeps it pending through failed reads",
+    async (mode) => {
+      let failRead = false;
+      const { store, calls } = fixture(async (path) => {
+        if (path === CHANNEL_ROUTES.list) return [channel];
+        if (path === CHANNEL_ROUTES.command || path === CHANNEL_COORDINATION_ROUTE) return channel;
+        if (failRead) throw new Error("Offline");
+        return page(1, 2);
+      });
+      if (mode !== "send") store.configure("host-one", [CHANNEL_CHATS_CAPABILITY, CHANNEL_COORDINATION_CAPABILITY]);
+      const stop = store.observe("host-one", channel.id);
+      await store.refresh("host-one");
+      const cached = store.get("host-one").pages.get(channel.id);
+      failRead = true;
+      const sender = new ChannelSend(store, "host-one", channel.id, () => "accepted");
+      const receipt = await sender.send(mode === "all" ? "@all Hello" : "Hello", [], null, channel.members);
+      expect(receipt).not.toBeNull();
+      if (!receipt) throw new Error("Expected a pending history receipt");
+      expect(store.get("host-one").pages.get(channel.id)).toBe(cached);
+      await expect(receipt.refreshHistory()).rejects.toThrow("chat history could not refresh");
+      failRead = false;
+      await receipt.refreshHistory();
+      expect(
+        calls.mock.calls.filter(([path]) => path === CHANNEL_ROUTES.command || path === CHANNEL_COORDINATION_ROUTE),
+      ).toHaveLength(1);
+      stop();
+    },
+  );
 
   it("uses a new operation when the restored draft changes", async () => {
     const { store } = fixture(async () => [channel]);

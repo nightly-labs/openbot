@@ -263,7 +263,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly channels: ChannelService;
   readonly messaging: MessagingThreads;
   readonly #profileSave: ProfileSave;
-  readonly #profileClients = new ProfileClients();
+  readonly #profileClients = new ProfileClients(() => this.channels?.wake() ?? Effect.void);
+  #responsiveClients = 0;
   #scope = Scope.makeUnsafe();
   /** User sends still before their mailbox write, by idempotency key: a retry joins the first call. */
   readonly #pendingUserSends = new Map<string, Deferred.Deferred<QueuedMessageReceipt, AgentLifecycleFailed>>();
@@ -698,7 +699,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     });
     this.channels = new ChannelService(store.database, mailbox, {
       agents: () => this.listAgents(),
-      generate: (lead, prompt) =>
+      generate: (lead, prompt, signal) =>
         Effect.gen({ self: this }, function* () {
           yield* this.#providers.ensureProvider(lead.provider);
           const model = this.#endpoints
@@ -709,14 +710,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               cause: new Error(sourceText("error.backend.channelLeadModelUnavailable")),
             });
           const client = this.#providers.createProfileClient(lead.provider);
+          if (signal) this.#responsiveClients++;
           return yield* this.#profileClients
-            .run(client, (cancelled) =>
-              generateTextWithoutTools(
-                client,
-                { ...model, defaultReasoningEffort: lead.reasoningEffort },
-                prompt,
-                cancelled,
-              ),
+            .run(
+              client,
+              (cancelled) =>
+                generateTextWithoutTools(
+                  client,
+                  { ...model, defaultReasoningEffort: lead.reasoningEffort },
+                  prompt,
+                  cancelled,
+                  signal,
+                ),
+              signal,
             )
             .pipe(
               // A routing turn can be the first one a spent plan refuses: in its completion, or as the
@@ -729,6 +735,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
                     ? this.#usageLimits.reached(lead.id, null, lead.model)
                     : Effect.void,
               ),
+              Effect.ensuring(
+                Effect.gen({ self: this }, function* () {
+                  if (signal) this.#responsiveClients--;
+                  yield* this.channels.wake();
+                }).pipe(Effect.orDie),
+              ),
             );
         }).pipe(toChannelOperationError),
       schedule: (agentId) => this.#drain.scheduleDrain(agentId),
@@ -740,6 +752,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       },
       forgetThread: (threadId) => this.#forgetExecutionThread(threadId).pipe(toChannelOperationError),
       loadedSnapshot: (threadId) => this.#conversation.loadedExecutionSnapshot(threadId),
+      // Only these drivers enforce a no-tools session, beyond denying ACP approval requests.
+      reserveGeneration: () => hostMemory?.reserveTurn() ?? (() => {}),
+      canRespond: (agent) => ["codex", "claude", "grok", "opencode"].includes(agent.provider),
+      canGenerate: (reserved) => {
+        const generations = this.#profileClients.count() - this.#responsiveClients + reserved;
+        return (
+          (hostMemory?.level() ?? "ok") === "ok" &&
+          generations < 3 &&
+          (hostMemory === null || this.#drain.occupiedTurnCount() + generations < hostMemory.turnLimit())
+        );
+      },
       normalBusy: () =>
         this.#mailbox
           .unresolvedDeliveries()
@@ -823,9 +846,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       memory: hostMemory,
       hooks: {
         scheduleAll: () => {
+          this.channels.wake();
           for (const agent of this.#store.list()) this.#drain.scheduleDrain(agent.id);
         },
-        retryWaiting: () => this.#drain.retrySlotWaiters(),
+        retryWaiting: () => {
+          this.#drain.retrySlotWaiters();
+          this.channels.wake();
+        },
         releaseIdleThreads: () => this.#providers.releaseIdleThreads(),
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
       },

@@ -1,3 +1,4 @@
+import { channelGroupMention } from "@openbot/contracts/chat-tag-references";
 import type { ChannelCommand, ChannelMember } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import type { ChatAttachment } from "@/features/chat/components/use-chat-attachments";
@@ -5,7 +6,7 @@ import type { ChatHistoryReceipt } from "../../chat/model/chat-messages";
 import { channelRecipient } from "./channel-draft";
 import { ChannelHistoryRefreshError, type MobileChannelStore } from "./channel-store";
 
-type SendCommand = Extract<ChannelCommand, { type: "send" }>;
+type SendCommand = Extract<ChannelCommand, { type: "send" | "coordinate" }>;
 type UploadControl = {
   cancelled: () => boolean;
   progress: (completed: number) => void;
@@ -49,12 +50,22 @@ export class ChannelSend {
     upload?: UploadControl,
   ): Promise<ChatHistoryReceipt | null> {
     const recipientAgentId = channelRecipient(text, members);
+    const broadcast = channelGroupMention(text);
+    const channel = this.store.get(this.serverId).pages.get(this.channelId)?.channel;
+    const coordinate =
+      broadcast ||
+      (this.store.get(this.serverId).coordinationSupported &&
+        (!recipientAgentId || recipientAgentId === channel?.leadAgentId));
+    if (broadcast && !this.store.get(this.serverId).coordinationSupported)
+      throw new Error(sourceText("error.backend.channelCoordinationUnsupported"));
     const previous = this.failed;
     const sameOperation =
       previous &&
       previous.text === text &&
       previous.replyToMessageId === replyToMessageId &&
-      previous.recipientAgentId === recipientAgentId &&
+      (previous.type === "send"
+        ? !coordinate && previous.recipientAgentId === recipientAgentId
+        : coordinate && previous.audience === (broadcast ? "all" : "lead")) &&
       previous.attachmentDraftIds.length === files.length &&
       files.every((file, index) => this.uploaded.get(file.id) === previous.attachmentDraftIds[index]);
     if (previous && !sameOperation) {
@@ -80,11 +91,12 @@ export class ChannelSend {
     }
     if (upload?.cancelled()) throw new Error(sourceText("error.remote.attachmentUploadCancelled"));
     const command: SendCommand = {
-      type: "send",
+      ...(coordinate
+        ? { type: "coordinate" as const, audience: broadcast ? ("all" as const) : ("lead" as const) }
+        : { type: "send" as const, recipientAgentId }),
       channelId: this.channelId,
       operationId: sameOperation ? previous.operationId : this.operationId(),
       text,
-      recipientAgentId,
       replyToMessageId,
       attachmentDraftIds: ids,
     };

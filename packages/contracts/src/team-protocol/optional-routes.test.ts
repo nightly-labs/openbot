@@ -4,6 +4,7 @@ import { AGENT_IMPORT_ROUTES } from "./agent-import-v1";
 import { AGENT_INSTALL_ROUTES } from "./agent-install-v1";
 import { AGENT_PUBLISH_ROUTES } from "./agent-publish-v1";
 import { AGENT_UPDATE_ROUTES } from "./agent-update-v1";
+import { CHANNEL_COORDINATION_ROUTE } from "./channel-coordination-v1";
 import { CONTEXT_RESET_ROUTES } from "./context-reset-v1";
 import { HOST_ADMIN_ROUTES } from "./host-admin-v1";
 import { HOST_UPDATE_ROUTES, hostRestartEvent } from "./host-update-v1";
@@ -38,6 +39,40 @@ describe("optional admin routes", () => {
       code: "protocol_error",
     });
     expect(() => response(500, {})).toThrow();
+  });
+});
+
+describe("channel-coordination-v1", () => {
+  const command = {
+    type: "coordinate",
+    channelId: "channel-1",
+    operationId: "request-1",
+    audience: "lead",
+    text: "Status",
+    replyToMessageId: null,
+    attachmentDraftIds: [],
+  };
+
+  it("keeps text and file-only requests and drops caller-supplied authorship", () => {
+    const { request } = codec(CHANNEL_COORDINATION_ROUTE);
+    expect(request({ ...command, author: { id: "impostor" } })).toEqual(command);
+    const files = { ...command, audience: "all", text: " \n\t", attachmentDraftIds: ["draft-1", "draft-2"] };
+    expect(request(files)).toEqual(files);
+  });
+
+  it("rejects empty requests and repeated attachment drafts before service parsing", () => {
+    const { request } = codec(CHANNEL_COORDINATION_ROUTE);
+    expect(() => request({ ...command, text: "" })).toThrow();
+    expect(() => request({ ...command, text: " \n\t" })).toThrow();
+    expect(() => request({ ...command, attachmentDraftIds: ["draft-1", "draft-1"] })).toThrow();
+  });
+
+  it("keeps the route's audience, text and attachment bounds", () => {
+    const { request } = codec(CHANNEL_COORDINATION_ROUTE);
+    expect(() => request({ ...command, audience: "member" })).toThrow();
+    expect(() => request({ ...command, text: "x".repeat(100001) })).toThrow();
+    const attachmentDraftIds = Array.from({ length: 65 }, (_, index) => `draft-${index}`);
+    expect(() => request({ ...command, attachmentDraftIds })).toThrow();
   });
 });
 

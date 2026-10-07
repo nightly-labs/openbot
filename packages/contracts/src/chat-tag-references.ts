@@ -82,3 +82,8 @@ function decodeChatTagComponent(value: string, encoded: boolean): string {
     return value;
   }
 }
+
+/** Explicit channel-wide address, only at the start of the message. Quoted mentions are data. */
+export function channelGroupMention(text: string): boolean {
+  return /^\s*@(?:all|everyone)(?=\s|$|[:,!?])/iu.test(text);
+}

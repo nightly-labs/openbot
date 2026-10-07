@@ -9,7 +9,6 @@ import { useText } from "@/shared/lib/text";
 import { ChannelTaskActions } from "../components/channel-task-actions";
 import { useChannels } from "../components/use-channels";
 import { ChannelHistoryRefreshError } from "../model/channel-store";
-import { channelTasksNeedingAction } from "../model/channel-task-actions";
 
 export function ChannelActionsScreen() {
   const { t, errorMessage } = useText();
@@ -22,7 +21,7 @@ export function ChannelActionsScreen() {
   const members = agents.filter(
     (agent) => agent.serverId === serverId && channel?.members.some((member) => member.agentId === agent.id),
   );
-  const tasks = channelTasksNeedingAction(page?.tasks ?? []);
+  const tasks = (page?.tasks ?? []).filter((task) => task.state !== "completed" && task.state !== "cancelled");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const lock = useRef(false);
@@ -45,7 +44,7 @@ export function ChannelActionsScreen() {
       setPending(false);
     }
   }
-  async function command(taskId: string, type: "resume" | "reassign", recipientAgentId: string | null = null) {
+  async function command(taskId: string, type: "stop" | "resume" | "reassign", recipientAgentId: string | null = null) {
     if (
       lock.current ||
       historyPending ||

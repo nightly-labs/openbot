@@ -1,6 +1,13 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("channel", {
+  "channel.task.label": "Task for {name}",
+  "channel.task.queued": "Queued",
+  "channel.task.running": "Working",
+  "channel.task.waiting": "Waiting",
+  "channel.task.failed": "Failed",
+  "channel.task.paused": "Stopped",
+  "channel.task.stop": "Stop this task",
   "channel.activity.one": "{name} is working",
   "channel.activity.many": "{names} and {last} are working",
   "channel.activity.status": "{sentence}: {label}",

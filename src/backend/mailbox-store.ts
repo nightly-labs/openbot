@@ -521,6 +521,8 @@ export class MailboxStore {
       messageId: string;
       text: string;
       draftIds: string[];
+      /** Synchronous channel acceptance, committed with the upload consumption. */
+      accept?: (committed: { text: string; attachments: AttachmentSummary[] }) => void;
     },
   ): Effect.fn.Return<{ text: string; attachments: AttachmentSummary[] }, StoredStateFailure> {
     try {
@@ -559,10 +561,20 @@ export class MailboxStore {
         replyToMessageId: null,
         createdAt,
       };
-      this.#state.messages.push(message);
-      this.#state.drafts = this.#state.drafts.filter((draft) => !ids.has(draft.id));
-      try {
+      const committed = { text: message.text, attachments: attachments.map(toAttachmentSummary) };
+      const persist = () => {
+        this.#state.messages.push(message);
+        this.#state.drafts = this.#state.drafts.filter((draft) => !ids.has(draft.id));
         this.#persist("channel.attachments-committed", `mailbox:channel-attachments:${input.messageId}`);
+        input.accept?.(committed);
+      };
+      try {
+        if (input.accept)
+          this.#database.dispatch(`mailbox:channel-attachments-admission:${input.messageId}`, [], () => {
+            persist();
+            return null;
+          });
+        else persist();
       } catch (error) {
         this.#state.messages = this.#state.messages.filter((candidate) => candidate !== message);
         for (const draft of drafts)
@@ -575,7 +587,7 @@ export class MailboxStore {
       yield* this.#files
         .removeAttachmentDirectories(drafts.map((draft) => draft.path))
         .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
-      return { text: message.text, attachments: attachments.map(toAttachmentSummary) };
+      return committed;
     } catch (cause) {
       return yield* new StoredStateFailure({ cause });
     }

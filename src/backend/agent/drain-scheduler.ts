@@ -134,18 +134,31 @@ export class DrainScheduler {
     this.#channels = options.channels;
     this.#messaging = options.messaging;
     this.#slots = new TurnSlots({
-      limit: () => this.#memory.turnLimit(),
+      limit: () => {
+        const limit = this.#memory.turnLimit();
+        return limit === null ? null : Math.max(0, limit - (this.#channels?.responseCount() ?? 0));
+      },
       agentIds: () => this.#store.list().map((agent) => agent.id),
       // A start whose `turn/start` timed out stays "starting" with no turn ID, and its turn can still run.
-      isRunning: (agentId) =>
-        this.#drainingAgents.has(agentId) ||
-        Boolean(this.#conversation.workingSnapshot(agentId)?.activeTurnId) ||
-        this.#mailbox.startingDeliveryForAgent(agentId) !== null ||
-        !this.#compaction.mayDrain(agentId),
+      isRunning: (agentId) => this.#occupiesTurn(agentId),
       isWaiting: (agentId) =>
         this.#mayStartNow(agentId) && this.#memory.mayDrain(agentId) && this.#mailbox.nextQueued(agentId) !== null,
       head: (agentId) => this.#mailbox.nextQueued(agentId)?.delivery ?? null,
     });
+  }
+
+  /** Work, uncertain starts and compaction each occupy one turn per agent. */
+  occupiedTurnCount(): number {
+    return this.#store.list().filter((agent) => this.#occupiesTurn(agent.id)).length;
+  }
+
+  #occupiesTurn(agentId: string): boolean {
+    return (
+      this.#drainingAgents.has(agentId) ||
+      Boolean(this.#conversation.workingSnapshot(agentId)?.activeTurnId) ||
+      this.#mailbox.startingDeliveryForAgent(agentId) !== null ||
+      !this.#compaction.mayDrain(agentId)
+    );
   }
 
   /** The clauses of this agent's own state. `#heldByMachine` adds the memory and the turn slots. */

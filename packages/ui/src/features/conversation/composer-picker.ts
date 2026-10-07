@@ -15,6 +15,7 @@ export interface PickerFrame {
 }
 
 export type PickerOption =
+  | { type: "group"; name: "all" | "everyone" }
   | { type: "agent"; agent: AgentProfile }
   /** `showSlug` is set when another listed skill has the same name: the slug tells them apart. */
   | { type: "skill"; skill: InstalledSkill; showSlug: boolean }
@@ -22,12 +23,14 @@ export type PickerOption =
   | { type: "attachment"; attachment: DraftAttachment };
 
 export function pickerOptionKey(option: PickerOption): string {
+  if (option.type === "group") return `group:${option.name}`;
   if (option.type === "agent") return `agent:${option.agent.id}`;
   if (option.type === "skill") return `skill:${option.skill.skillId}`;
   return option.type === "mcp" ? `mcp:${option.server.id}` : `attachment:${option.attachment.id}`;
 }
 
 export function pickerOptionText(option: PickerOption, t: TextValue["t"]): string {
+  if (option.type === "group") return `@${option.name}`;
   if (option.type === "agent") return t("composer.picker.option.agent", { name: option.agent.name });
   if (option.type === "skill") {
     const name = option.showSlug ? `${option.skill.name} ${option.skill.slug}` : option.skill.name;
@@ -39,12 +42,14 @@ export function pickerOptionText(option: PickerOption, t: TextValue["t"]): strin
 }
 
 export function pickerOptionName(option: PickerOption): string {
+  if (option.type === "group") return `@${option.name}`;
   if (option.type === "agent") return option.agent.name;
   if (option.type === "skill") return option.skill.name;
   return option.type === "mcp" ? option.server.name : option.attachment.name;
 }
 
 export function pickerOptionDescription(option: PickerOption, format: TextValue["format"]): string | undefined {
+  if (option.type === "group") return undefined;
   if (option.type === "attachment") return format.fileSize(option.attachment.size);
   if (option.type === "skill") return skillDescription(option.skill);
   if (option.type === "mcp") return mcpServerDescription(option.server);
@@ -70,6 +75,7 @@ export function measurePickerFrame(editor: HTMLElement): PickerFrame {
  * is a skill, so the badge names only the source.
  */
 export function pickerOptionBadge(option: PickerOption, t: TextValue["t"]): { label: string; icon: typeof Puzzle } {
+  if (option.type === "group") return { label: t("composer.picker.badge.everyone"), icon: Bot };
   if (option.type === "agent") return { label: t("composer.picker.badge.agent"), icon: Bot };
   if (option.type === "attachment") return { label: t("composer.picker.badge.file"), icon: File };
   if (option.type === "mcp") return { label: MCP_BADGE, icon: Plug };

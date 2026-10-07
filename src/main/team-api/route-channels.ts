@@ -5,6 +5,10 @@ import {
   parseChannelRead,
 } from "@openbot/contracts/ipc";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
+import {
+  CHANNEL_COORDINATION_CAPABILITY,
+  CHANNEL_COORDINATION_ROUTE,
+} from "@openbot/contracts/team-protocol/channel-coordination-v1";
 import { CHANNEL_ROUTES, channelRequest, isChannelSettingsRoute } from "@openbot/contracts/team-protocol/channels-v1";
 import { sourceText } from "@openbot/i18n/source";
 import type { ChannelService } from "../../backend/channel-service";
@@ -52,12 +56,13 @@ export async function routeChannels(
   const { method, url, capabilities, member, request, json, empty } = context;
   const list = method === "GET" && url.pathname === CHANNEL_ROUTES.list;
   const read = method === "POST" && url.pathname === CHANNEL_ROUTES.read;
+  const coordination = method === "POST" && url.pathname === CHANNEL_COORDINATION_ROUTE;
   const command = method === "POST" && url.pathname === CHANNEL_ROUTES.command;
   const remove = method === "POST" && url.pathname === CHANNEL_ROUTES.delete;
   // Every settings route is a POST that names its channel in the body, so one test covers all
   // eleven of them and an unknown method on a known path stays a 404 rather than a 400.
   const settings = method === "POST" && isChannelSettingsRoute(url.pathname);
-  if (!list && !read && !command && !remove && !settings) return "unmatched";
+  if (!list && !read && !command && !coordination && !remove && !settings) return "unmatched";
   if (!channels || !capabilities.has(CHANNEL_CHATS_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.channelsUnsupported"));
   if (list) return json(200, channels.store.list(member.id));
@@ -74,7 +79,12 @@ export async function routeChannels(
     return empty(204);
   }
   if (settings) return routeChannelSettings(context, agents);
-  const input = parseChannelCommand(channelRequest(url.pathname, await readJson(request)));
+  if (coordination && !capabilities.has(CHANNEL_COORDINATION_CAPABILITY))
+    throw new HttpError(400, sourceText("error.backend.channelCoordinationUnsupported"));
+  const body = await readJson(request);
+  const input = parseChannelCommand(coordination ? body : channelRequest(url.pathname, body));
+  if (coordination && input.type !== "coordinate")
+    throw new HttpError(400, sourceText("error.backend.channelCoordinationUnsupported"));
   if (input.type === "archive" && member.role === "member")
     throw new HttpError(403, sourceText("error.team.membersCannotArchiveChannels"));
   return json(

@@ -1,4 +1,5 @@
 import type { ChannelCommand, ChannelPage, ChannelSummary } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import type { AgentProfile } from "@openbot/ui/data";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createStore, flush, onSettled, reconcile, untrack } from "solid-js";
@@ -44,6 +45,7 @@ export interface ChannelsEnvironment {
   readSelection: (scope: string) => string | null;
   writeSelection: (channelId: string | null) => void;
   supported: () => boolean;
+  coordinationSupported?: () => boolean;
   /** Whether this reader may delete a channel; `supported()` is checked as well. */
   deletionSupported: () => boolean;
   /** Clears whatever else covers the workspace, because a channel is about to cover it. */
@@ -73,6 +75,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
   const readThrough = new Map<string, number>();
 
   const supported = env.supported;
+  const coordinationSupported = () => env.coordinationSupported?.() ?? false;
   /**
    * One read at a time, and at most one more behind it.
    *
@@ -205,7 +208,11 @@ export function createChannelsController(env: ChannelsEnvironment) {
    * reader leaves the scope during the request, it runs at once and the result is `false`: a sent
    * message must still leave the composer, or it comes back as a draft.
    */
-  async function command(input: ChannelCommand, onAccepted?: (accepted: ChannelCommand) => void): Promise<boolean> {
+  async function command(
+    input: ChannelCommand,
+    onAccepted?: (accepted: ChannelCommand) => void,
+    bulkStop = false,
+  ): Promise<boolean> {
     const account = env.scopeKey();
     // Only the save that creates a channel opens it, and only while the reader has stayed where
     // the save started. The sidebar takes a click through a save of the settings, and settings
@@ -229,7 +236,32 @@ export function createChannelsController(env: ChannelsEnvironment) {
       }),
     );
     try {
-      await env.port().agent.channelCommand(attempt);
+      if (attempt.type === "coordinate" && !coordinationSupported())
+        throw new Error(currentText().t("error.backend.channelCoordinationUnsupported"));
+      try {
+        await env.port().agent.channelCommand(attempt);
+      } catch (error) {
+        // Electron wraps host errors in an IPC message; web retains the HTTP status.
+        // Only bulk Stop may continue after a verified terminal-task race.
+        if (
+          !bulkStop ||
+          disposed ||
+          account !== env.scopeKey() ||
+          attempt.type !== "stop" ||
+          !(error instanceof Error) ||
+          !("status" in error
+            ? error.status === 500
+            : error.message.endsWith(sourceText("error.backend.channelTaskComplete")) ||
+              error.message.endsWith(sourceText("error.team.requestFailed")))
+        )
+          throw error;
+        const page = await env
+          .port()
+          .agent.readChannel({ channelId: attempt.channelId })
+          .catch(() => null);
+        const task = page?.tasks.find((task) => task.id === attempt.taskId);
+        if (task?.state !== "completed" && task?.state !== "cancelled") throw error;
+      }
       if (disposed || account !== env.scopeKey()) {
         onAccepted?.(attempt);
         return false;
@@ -267,6 +299,51 @@ export function createChannelsController(env: ChannelsEnvironment) {
           state.pending = pendingCommands > 0;
         });
     }
+  }
+  /** Stop the original requests, including independent roots created while a coordinator finishes. */
+  async function stopActiveTasks(taskIds: string[]) {
+    const channelId = state.page?.channel.id;
+    if (!channelId || !taskIds.length) return;
+    const account = env.scopeKey();
+    const active = new Set(taskIds);
+    const requestIds = new Set(
+      state.page?.tasks.filter((task) => active.has(task.id)).map((task) => task.requestMessageId),
+    );
+    await perform(async () => {
+      const attempted = new Set<string>();
+      while (!disposed && account === env.scopeKey()) {
+        // Read directly: a shared refresh may have started before the preceding Stop.
+        const page = await env.port().agent.readChannel({ channelId });
+        if (disposed || account !== env.scopeKey()) return;
+        for (const task of page.tasks) {
+          if (
+            task.parentTaskId === null &&
+            requestIds.has(task.requestMessageId) &&
+            (task.state === "queued" || task.state === "running" || task.state === "waiting")
+          )
+            active.add(task.id);
+        }
+        const task = page.tasks.find(
+          (task) =>
+            active.has(task.id) &&
+            !attempted.has(task.id) &&
+            requestIds.has(task.requestMessageId) &&
+            task.state !== "completed" &&
+            task.state !== "cancelled",
+        );
+        if (!task) return;
+        attempted.add(task.id);
+        // Keep the first real error and its existing retry; later successes must not clear it.
+        if (
+          !(await command(
+            { type: "stop", operationId: crypto.randomUUID(), channelId, taskId: task.id, recipientAgentId: null },
+            undefined,
+            true,
+          ))
+        )
+          return;
+      }
+    });
   }
   async function loadOlder() {
     const channelId = state.selectedId;
@@ -349,6 +426,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
     });
   }
   return {
+    coordinationSupported,
     state,
     port: env.port,
     hasUnread: () => state.channels.some((channel) => channel.unreadCount > 0),
@@ -376,7 +454,8 @@ export function createChannelsController(env: ChannelsEnvironment) {
         throw new Error(state.error ?? currentText().t("channel.error.delete"));
       }
     },
-    command,
+    command: (input: ChannelCommand, onAccepted?: (accepted: ChannelCommand) => void) => command(input, onAccepted),
+    stopActiveTasks,
     perform,
     loadOlder,
     close: () => {

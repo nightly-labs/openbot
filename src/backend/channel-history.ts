@@ -10,7 +10,11 @@ import { type ChannelOperationError, channelFailure, channelSync } from "./chann
 import type { ChannelMemoryStore } from "./channel-memory-store";
 import type { ChannelStore } from "./channel-store";
 
-export type ChannelTextModel = (lead: AgentSummary, prompt: string) => Effect.Effect<string, ChannelOperationError>;
+export type ChannelTextModel = (
+  lead: AgentSummary,
+  prompt: string,
+  signal?: AbortSignal,
+) => Effect.Effect<string, ChannelOperationError>;
 const CONTEXT_CHARACTERS = 120_000;
 const SUMMARY_CHARACTERS = 12_000;
 

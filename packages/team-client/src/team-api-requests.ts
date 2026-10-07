@@ -1,3 +1,4 @@
+import { CHANNEL_COORDINATION_ROUTE } from "@openbot/contracts/team-protocol/channel-coordination-v1";
 import { Effect, Schema } from "effect";
 // Team API requests that the web client and the mobile app send in the same way.
 //
@@ -219,7 +220,8 @@ export function teamChannelsApi(request: TeamApiRequest): TeamChannelsApi {
   return {
     listChannels: () => request("GET", CHANNEL_ROUTES.list, decodeChannelSummaries),
     readChannel: (input) => post(CHANNEL_ROUTES.read, decodeChannelPage, input),
-    channelCommand: (command) => post(CHANNEL_ROUTES.command, decodeChannel, command),
+    channelCommand: (command) =>
+      post(command.type === "coordinate" ? CHANNEL_COORDINATION_ROUTE : CHANNEL_ROUTES.command, decodeChannel, command),
     listChannelMemories: (channelId) => post(CHANNEL_ROUTES.memories, decodeChannelMemories, { channelId }),
     createChannelMemory: (input) => post(CHANNEL_ROUTES.memoryCreate, decodeChannelMemory, input),
     updateChannelMemory: (input) => post(CHANNEL_ROUTES.memoryUpdate, decodeChannelMemory, input),

@@ -12,6 +12,7 @@ import {
   type ServerSummary,
 } from "@openbot/contracts/ipc";
 import { AGENT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-import-v1";
+import { CHANNEL_COORDINATION_CAPABILITY } from "@openbot/contracts/team-protocol/channel-coordination-v1";
 import { CONTEXT_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/context-reset-v1";
 import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-update-v1";
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
@@ -654,6 +655,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       if (hostId) writeChannelSelection(props.accountId, hostId, channelId);
     },
     supported: channelsSupported,
+    coordinationSupported: () => workspace.state.capabilities.includes(CHANNEL_COORDINATION_CAPABILITY),
     deletionSupported: () => workspace.state.host?.role === "owner" || workspace.state.host?.role === "admin",
     beforeOpen: () => {
       setCreating(false);

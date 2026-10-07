@@ -1,5 +1,6 @@
 import { Effect } from "effect";
 import type { AgentClient } from "../agent-client";
+import type { ChannelOperationError } from "../channel-effects";
 
 /** How many disposable generations may run at once. */
 const PROFILE_CLIENT_LIMIT = 3;
@@ -12,7 +13,14 @@ const PROFILE_CLIENT_LIMIT = 3;
  * It never imports the agent service facade.
  */
 export class ProfileClients {
-  readonly #clients = new Map<AgentClient, { cancelled: boolean }>();
+  readonly #clients = new Map<AgentClient, { cancelled: boolean; active: boolean }>();
+  readonly #waiters = new Set<() => void>();
+
+  constructor(readonly released: () => Effect.Effect<void, ChannelOperationError> = () => Effect.void) {}
+
+  count(): number {
+    return this.#clients.size;
+  }
 
   /** Whether a new profile generation must wait. */
   busy(): boolean {
@@ -23,17 +31,45 @@ export class ProfileClients {
   run<A, E, R>(
     client: AgentClient,
     generate: (cancelled: () => boolean) => Effect.Effect<A, E, R>,
-  ): Effect.Effect<A, E, R> {
+    signal?: AbortSignal,
+  ): Effect.Effect<A, E | ChannelOperationError, R> {
     return Effect.acquireUseRelease(
       Effect.sync(() => {
-        const generation = { cancelled: false };
+        const generation = { cancelled: false, active: false };
+        const abort = () => {
+          generation.cancelled = true;
+          for (const wake of this.#waiters) wake();
+          this.#waiters.clear();
+        };
         this.#clients.set(client, generation);
-        return generation;
+        signal?.addEventListener("abort", abort, { once: true });
+        if (signal?.aborted) abort();
+        return { generation, abort };
       }),
-      (generation) => generate(() => generation.cancelled),
-      () =>
-        Effect.sync(() => {
+      ({ generation }) =>
+        Effect.gen({ self: this }, function* () {
+          while (
+            !generation.cancelled &&
+            [...this.#clients.values()].filter((entry) => entry.active).length >= PROFILE_CLIENT_LIMIT
+          ) {
+            yield* Effect.callback<void>((resume) => {
+              const wake = () => resume(Effect.void);
+              this.#waiters.add(wake);
+              return Effect.sync(() => {
+                this.#waiters.delete(wake);
+              });
+            });
+          }
+          generation.active = true;
+          return yield* generate(() => generation.cancelled);
+        }),
+      ({ abort }) =>
+        Effect.gen({ self: this }, function* () {
+          signal?.removeEventListener("abort", abort);
           this.#clients.delete(client);
+          for (const wake of this.#waiters) wake();
+          this.#waiters.clear();
+          yield* this.released();
         }),
     );
   }
@@ -48,11 +84,16 @@ export class ProfileClients {
       generation.cancelled = true;
       yield* client.stop().pipe(Effect.ignore);
     }
+    for (const wake of this.#waiters) wake();
+    this.#waiters.clear();
   }).bind(this);
 
   /** Every client, forgotten, for the caller to stop at shutdown. */
   release(): AgentClient[] {
     const clients = [...this.#clients.keys()];
+    for (const generation of this.#clients.values()) generation.cancelled = true;
+    for (const wake of this.#waiters) wake();
+    this.#waiters.clear();
     this.#clients.clear();
     return clients;
   }

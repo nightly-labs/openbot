@@ -15,11 +15,16 @@ import {
   type UpdateChannelRoutineInput,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import {
+  CHANNEL_COORDINATION_CAPABILITY,
+  CHANNEL_COORDINATION_ROUTE,
+} from "@openbot/contracts/team-protocol/channel-coordination-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { sourceText } from "@openbot/i18n/source";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import { replaceEqualDeep } from "@tanstack/react-query";
+import { RemoteRequestError } from "../../../shared/lib/remote-request-error";
 import { answeredPromptResolution } from "../../chat/model/question-prompt";
 
 export type ChannelRequest = <T>(
@@ -36,6 +41,7 @@ export interface ChannelState {
   pages: ReadonlyMap<string, ChannelPage>;
   supported: boolean;
   canDelete: boolean;
+  coordinationSupported: boolean;
   loading: boolean;
   /** The last load failure. A screen renders it in the interface language. */
   error: { cause: unknown } | null;
@@ -45,6 +51,7 @@ const EMPTY: ChannelState = {
   pages: new Map(),
   supported: false,
   canDelete: false,
+  coordinationSupported: false,
   loading: false,
   error: null,
 };
@@ -117,6 +124,7 @@ export class MobileChannelStore {
       next.pages === entry.state.pages &&
       next.supported === entry.state.supported &&
       next.canDelete === entry.state.canDelete &&
+      next.coordinationSupported === entry.state.coordinationSupported &&
       next.loading === entry.state.loading &&
       next.error === entry.state.error
     )
@@ -129,6 +137,7 @@ export class MobileChannelStore {
     this.publish(entry, {
       supported: capabilities.includes(CHANNEL_CHATS_CAPABILITY),
       canDelete: capabilities.includes(CHANNEL_DELETE_CAPABILITY),
+      coordinationSupported: capabilities.includes(CHANNEL_COORDINATION_CAPABILITY),
     });
   }
   remove(serverId: string) {
@@ -363,11 +372,13 @@ export class MobileChannelStore {
   async command(serverId: string, command: ChannelCommand, options?: { waitForRefresh: boolean }) {
     const entry = this.entry(serverId);
     if (!entry.state.supported) throw new Error(sourceText("error.remote.channelsUnsupported"));
+    if (command.type === "coordinate" && !entry.state.coordinationSupported)
+      throw new Error(sourceText("error.backend.channelCoordinationUnsupported"));
     const unreadChannel =
       command.type === "read" ? entry.state.channels.find((channel) => channel.id === command.channelId) : undefined;
     const result = await this.request(
       "POST",
-      CHANNEL_ROUTES.command,
+      command.type === "coordinate" ? CHANNEL_COORDINATION_ROUTE : CHANNEL_ROUTES.command,
       decodeChannel,
       decodeTeamProtocolV2Json(command),
       serverId,
@@ -395,7 +406,8 @@ export class MobileChannelStore {
             : [...entry.state.channels, summary],
         });
       }
-      if (options?.waitForRefresh && command.type === "send") await this.refreshHistory(serverId, result.id);
+      if (options?.waitForRefresh && (command.type === "send" || command.type === "coordinate"))
+        await this.refreshHistory(serverId, result.id);
       else if (options?.waitForRefresh && (command.type === "resume" || command.type === "reassign"))
         await this.refreshHistory(serverId, result.id, sourceText("error.remote.taskHistoryRefreshFailed"));
       else {
@@ -404,6 +416,77 @@ export class MobileChannelStore {
       }
     }
     return result;
+  }
+  /** Stop the active branches from this request; a task that finishes needs no stop. */
+  async stopActiveTasks(serverId: string, channelId: string, operationId: () => string) {
+    const entry = this.entry(serverId);
+    const active = new Map(
+      (this.get(serverId).pages.get(channelId)?.tasks ?? [])
+        .filter((task) => task.state === "queued" || task.state === "running" || task.state === "waiting")
+        .map((task) => [task.id, task]),
+    );
+    const requestIds = new Set([...active.values()].map((task) => task.requestMessageId));
+    // A shared refresh can have started before the task finishes. Verify with a new read,
+    // and publish that page without discarding history the reader already loaded.
+    const read = async () => {
+      const page = await this.request("POST", CHANNEL_ROUTES.read, decodeChannelPage, { channelId }, serverId);
+      const current = entry.state.pages.get(channelId);
+      if (
+        entry.valid &&
+        entry.observed.has(channelId) &&
+        (!current || page.channel.revision >= current.channel.revision)
+      ) {
+        const merged = mergeLatestChannelPage(current, page);
+        if (merged !== current) {
+          const pages = new Map(entry.state.pages);
+          pages.set(channelId, merged);
+          this.publish(entry, { pages });
+        }
+      }
+      // A coordinator can finish with new independent roots while Stop waits. Include
+      // those roots for the original requests, but leave later requests alone.
+      for (const task of page.tasks) {
+        if (
+          task.parentTaskId === null &&
+          requestIds.has(task.requestMessageId) &&
+          (task.state === "queued" || task.state === "running" || task.state === "waiting")
+        )
+          active.set(task.id, task);
+      }
+      return page;
+    };
+    for (const task of active.values()) {
+      if (task.parentTaskId && active.has(task.parentTaskId)) continue;
+      const terminal = (page: ChannelPage) => {
+        const current = page.tasks.find((item) => item.id === task.id);
+        return current?.state === "completed" || current?.state === "cancelled";
+      };
+      const latest = await read();
+      const current = latest.tasks.find((item) => item.id === task.id);
+      // Released Send can continue this task ID with a later request while another Stop waits.
+      if (current && !requestIds.has(current.requestMessageId)) continue;
+      if (terminal(latest)) continue;
+      try {
+        await this.command(serverId, {
+          type: "stop",
+          operationId: operationId(),
+          channelId,
+          taskId: task.id,
+          recipientAgentId: null,
+        });
+      } catch (error) {
+        // Released hosts return 500 if a task completes between the read and Stop. Never
+        // discard a connection or permission failure, or a failure for work still active.
+        if (!(error instanceof RemoteRequestError) || error.status !== 500) throw error;
+        let latest: ChannelPage;
+        try {
+          latest = await read();
+        } catch {
+          throw error;
+        }
+        if (!terminal(latest)) throw error;
+      }
+    }
   }
   memories(serverId: string, channelId: string) {
     return this.request("POST", CHANNEL_ROUTES.memories, decodeChannelMemories, { channelId }, serverId);

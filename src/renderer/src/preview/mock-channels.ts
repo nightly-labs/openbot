@@ -88,7 +88,7 @@ export function createMockChannels(emit: (event: AgentEvent) => void, agentName:
         task.revision += 1;
         if (input.type === "reassign") task.ownerAgentId = input.recipientAgentId;
       }
-      if (input.type === "send") {
+      if (input.type === "send" || input.type === "coordinate") {
         const list = messages.get(channel.id) ?? [];
         const id = crypto.randomUUID();
         const taskId = crypto.randomUUID();
@@ -96,13 +96,17 @@ export function createMockChannels(emit: (event: AgentEvent) => void, agentName:
         // choice as a channel message. It skips both when the answer is already known: a named
         // recipient, or a channel with one member. The preview has no model, so it keeps assigning
         // the lead, but it reproduces which requests get a visible dispatch row and which do not.
-        const routed = !input.recipientAgentId && channel.members.length > 1 && channel.leadAgentId !== null;
+        const routed =
+          input.type === "send" &&
+          !input.recipientAgentId &&
+          channel.members.length > 1 &&
+          channel.leadAgentId !== null;
         work.push({
           id: taskId,
           channelId: channel.id,
           rootTaskId: taskId,
           parentTaskId: null,
-          ownerAgentId: input.recipientAgentId ?? channel.leadAgentId,
+          ownerAgentId: input.type === "send" ? (input.recipientAgentId ?? channel.leadAgentId) : channel.leadAgentId,
           requestMessageId: id,
           instruction: input.text,
           attachmentDraftIds: input.attachmentDraftIds,
@@ -115,12 +119,26 @@ export function createMockChannels(emit: (event: AgentEvent) => void, agentName:
           assignmentCount: 0,
           error: null,
         });
+        if (input.type === "coordinate" && input.audience === "all") {
+          const first = work.pop();
+          if (first)
+            for (const member of channel.members) {
+              const memberTaskId = crypto.randomUUID();
+              work.push({
+                ...first,
+                id: memberTaskId,
+                rootTaskId: memberTaskId,
+                ownerAgentId: member.agentId,
+                execution: "response",
+              });
+            }
+        }
         list.push({
           id,
           channelId: channel.id,
           sequence: list.length + 1,
           author: { kind: "member", id: "preview", name: "You" },
-          taskId,
+          taskId: input.type === "coordinate" ? null : taskId,
           superseded: false,
           message: {
             id,

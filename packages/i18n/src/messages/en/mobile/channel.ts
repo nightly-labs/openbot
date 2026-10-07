@@ -1,6 +1,10 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("mobile.channel", {
+  "mobile.channel.task.running": "Working",
+  "mobile.channel.task.queued": "Queued",
+  "mobile.channel.task.waiting": "Waiting",
+  "mobile.channel.task.stop": "Stop this task",
   "mobile.channel.route.info": "Info",
   "mobile.channel.route.memories": "Memories",
   "mobile.channel.route.memory": "Memory",

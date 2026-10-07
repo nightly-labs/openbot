@@ -22,8 +22,10 @@ import {
 } from "./agent-service-test-harness";
 import { browserFailure } from "./browser-effects";
 import { ChannelStore } from "./channel-store";
+import { runChannel } from "./channel-test-runtime";
 import { runCauseEffect } from "./effect-boundary";
 import { getString } from "./protocol";
+import { requireProviderDriver } from "./provider-drivers";
 import { StoredStateFailure } from "./stored-state-effects";
 
 const browserTab = (id: string, ownerAgentId: string | null, ownerThreadId: string | null): BrowserTab => ({
@@ -927,6 +929,88 @@ describe.sequential("AgentService: restart", () => {
       members: [{ agentId: "member-b" }],
       leadAgentId: "member-b",
     });
+  });
+
+  it("deletes a member with disposable channel work without leaving a running task", async () => {
+    // Provider discovery is simulated, as are the clients; the full deletion route stays real.
+    vi.spyOn(requireProviderDriver("codex"), "resolveCli").mockReturnValue(
+      Effect.succeed({
+        executable: process.execPath,
+        version: "0.144.1",
+        source: "system",
+      }),
+    );
+    const { store, mailbox } = stores(root);
+    const clients: FakeAgentClient[] = [];
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider, "Discard this reply", false);
+        client.configRead = { config: {} };
+        clients.push(client);
+        return client;
+      },
+    });
+    try {
+      await runChannel(service.initialize());
+      await runChannel(store.getOrCreate("chief"));
+      await runChannel(store.getOrCreate("member-b"));
+      await runChannel(
+        service.channels.command(
+          {
+            type: "save",
+            channelId: "channel-1",
+            operationId: "save",
+            draft: {
+              name: "Project",
+              title: "",
+              instructions: "",
+              members: [{ agentId: "chief" }, { agentId: "member-b" }],
+              leadAgentId: "chief",
+            },
+          },
+          { id: "human", name: "Alex" },
+        ),
+      );
+      await runChannel(
+        service.channels.command(
+          {
+            type: "coordinate",
+            audience: "lead",
+            channelId: "channel-1",
+            operationId: "status",
+            text: "Report status",
+            replyToMessageId: null,
+            attachmentDraftIds: [],
+          },
+          { id: "human", name: "Alex" },
+        ),
+      );
+      await waitFor(() => clients.some((client) => client.requests.some((request) => request.method === "turn/start")));
+      const task = service.channels.store.tasks("channel-1")[0];
+      expect(task?.state).toBe("running");
+      expect(mailbox.hasUnfinishedDelivery("chief")).toBe(false);
+      await runChannel(service.deleteAgent("chief"));
+      await waitFor(() => service?.channels.responseCount() === 0);
+      expect(service.channels.store.tasks("channel-1").find((item) => item.id === task?.id)?.state).toBe("paused");
+      expect(service.channels.hasActiveWork()).toBe(false);
+      expect(service.channels.store.get("channel-1").leadAgentId).toBe("member-b");
+      expect(service.listAgents().some((agent) => agent.id === "chief")).toBe(false);
+      expect(
+        clients
+          .filter((client) => client.requests.some((request) => request.method === "turn/start"))
+          .every((client) => !client.running),
+      ).toBe(true);
+      expect(
+        service.channels.store.messages("channel-1").some((entry) => entry.message.text === "Discard this reply"),
+      ).toBe(false);
+    } finally {
+      await runChannel(service.stop());
+      store.database.close();
+      service = null;
+    }
   });
 
   it("still deletes the agent when closing one of its browser tabs fails", async () => {

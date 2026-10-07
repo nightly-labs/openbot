@@ -46,7 +46,7 @@ thread is never replaced. Provider sessions, turns, questions, approvals, attach
 and restart recovery use the explicit execution thread. These internal execution records do not
 create extra navigation entries. The per-agent drain scheduler remains the authority for work.
 
-`ChannelService` selects one owner. A selected recipient has priority, followed by the task attached
+`ChannelService` selects one owner for the released `send` command. A selected recipient has priority, followed by the task attached
 to a reply, a reply to a member message that has no task, a clear follow-up to the sole open task,
 and a channel with one available member. These selections use no model. Other requests use the
 lead's provider, model, and reasoning setting in a separate session with no work tools. The request
@@ -55,6 +55,27 @@ stale routing cannot broadcast a request. Routing can select an existing task, a
 indicate that no work is needed. A selected owner or existing task adds one channel message from the
 lead, so the selection is visible and the user can correct it. Deterministic selection adds no
 message.
+
+The optional `channel-coordination-v1` capability adds a separate `coordinate` command. Current
+clients use the lead for unaddressed messages and direct lead mentions. A leading `@all` or
+`@everyone` creates one independent durable task for every member present at acceptance, including
+the lead. Replies do not broadcast again. The existing `channels-v1` command and codecs keep their
+released meaning. Older hosts retain single-owner sends and reject explicit group activation.
+
+`ChannelCoordination` owns disposable tool-free responses and the lead's control session. Two
+responses can run at once within the channel worker limit; one control session can run while workers
+are active. All disposable profile sessions share a three-session limit. Host memory and configured
+turn limits can reduce concurrency. Tool-free execution is enabled for Codex, Claude, Grok and
+OpenCode. Other providers use exclusive work for member responses and cannot run the restricted
+coordinator. Responses that need tools or attachments return to the existing work queue with a host
+reservation. Shared-resource locks and one work turn per agent remain in force.
+
+The coordinator reads recorded task state and a bounded transcript; it does not inspect a worker's
+private reasoning. It can answer, assign work, or append an instruction to a task. Follow-ups verify
+the target revision and owner from the decision's snapshot. Accepted steering appends the instruction;
+rejected steering queues a continuation without repeating completed actions. Uncertain steering pauses
+for user review. Task states, errors, individual Stop controls, and Stop all are available in channel
+clients. Interrupted disposable responses pause on restart rather than silently replaying.
 
 Channel tools retrieve history, assign a child task, transfer ownership, and report results. The
 runtime supplies channel and caller identity. A child keeps its parent owner; a transfer changes it.

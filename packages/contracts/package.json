@@ -70,6 +70,7 @@
     "./team-protocol/v6-base-adapter": "./src/team-protocol/v6-base-adapter.ts",
     "./team-protocol/v6-webrtc-adapter": "./src/team-protocol/v6-webrtc-adapter.ts",
     "./validation": "./src/validation.ts",
+    "./team-protocol/channel-coordination-v1": "./src/team-protocol/channel-coordination-v1.ts",
     "./team-protocol/channels-v1": "./src/team-protocol/channels-v1.ts",
     "./team-protocol/optional-events": "./src/team-protocol/optional-events.ts",
     "./team-protocol/mcp-v1": "./src/team-protocol/mcp-v1.ts",

@@ -1,3 +1,4 @@
+import type { ChannelPage } from "@openbot/contracts/ipc";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { assert, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import { App } from "./App";
@@ -158,10 +159,16 @@ it("shows the lead's routing choice as activity, not as a message from the lead"
   await fireEvent.click(await screen.findByRole("button", { name: /Launch room/ }));
   const chat = await screen.findByRole("main", { name: "Channel conversation" });
   await within(chat).findByRole("heading", { name: "Launch room", level: 1 });
-  const composer = within(chat).getByRole("textbox", { name: "Message to channel" });
-  composer.textContent = "Someone please draft the announcement";
-  await fireEvent.input(composer);
-  await fireEvent.click(within(chat).getByRole("button", { name: "Send message" }));
+  // A released client still uses send; its routing receipt remains readable by the new UI.
+  await window.openbot.agent.channelCommand({
+    type: "send",
+    operationId: "legacy-routing",
+    channelId: "channel-routed",
+    text: "Someone please draft the announcement",
+    recipientAgentId: null,
+    replyToMessageId: null,
+    attachmentDraftIds: [],
+  });
 
   const receipt = await within(chat).findByLabelText("Assigned to Chief");
   // Activity carries no bubble, so it offers none of the actions a message row does.
@@ -656,7 +663,9 @@ it("shows a channel read that lands while more changes are still arriving", asyn
   for (const release of gates) release();
 });
 
-async function openChannelWithStoppedTask(options: { withChild?: boolean; state?: "paused" | "failed" } = {}) {
+async function openChannelWithStoppedTask(
+  options: { withChild?: boolean; state?: "paused" | "failed"; waitingRoot?: boolean } = {},
+) {
   await window.openbot.agent.channelCommand({
     type: "save",
     operationId: "create",
@@ -679,7 +688,7 @@ async function openChannelWithStoppedTask(options: { withChild?: boolean; state?
     attachmentDraftIds: [],
   });
   const originalRead = window.openbot.agent.readChannel;
-  const state = { taskId: "", stopped: true };
+  const state = { taskId: "", childTaskId: "", stopped: true };
   const read = vi.spyOn(window.openbot.agent, "readChannel").mockImplementation(async (input) => {
     const page = await originalRead(input);
     state.taskId = page.tasks[0]?.id ?? "";
@@ -692,11 +701,22 @@ async function openChannelWithStoppedTask(options: { withChild?: boolean; state?
     // The assignment limit stops the root task and everything under it, so the child arrives
     // stopped with the same reason on it.
     const child = stopped[0] ? [{ ...stopped[0], id: `${stopped[0].id}-child`, parentTaskId: stopped[0].id }] : [];
+    state.childTaskId = child[0]?.id ?? "";
+    if (options.waitingRoot)
+      return {
+        ...page,
+        tasks: [...stopped.map((task) => ({ ...task, state: "waiting" as const, error: null })), ...child],
+      };
     return { ...page, tasks: options.withChild ? [...stopped, ...child] : stopped };
   });
   const originalCommand = window.openbot.agent.channelCommand;
   const command = vi.spyOn(window.openbot.agent, "channelCommand").mockImplementation(async (input) => {
-    const result = await originalCommand(input);
+    // The child exists in this read fixture; use the saved root to apply its recovery transition.
+    const result = await originalCommand(
+      (input.type === "resume" || input.type === "reassign") && input.taskId === state.childTaskId
+        ? { ...input, taskId: state.taskId }
+        : input,
+    );
     if (input.type === "resume" || input.type === "reassign") state.stopped = false;
     return result;
   });
@@ -744,6 +764,19 @@ it("reassigns a task the channel stopped with a reason", async () => {
   await waitFor(() => expect(screen.queryByRole("region", { name: "Stopped task for Chief" })).not.toBeInTheDocument());
 });
 
+it.each(["paused", "failed"] as const)("keeps recovery for a %s child under a waiting root", async (state) => {
+  const { notice, command, state: tasks } = await openChannelWithStoppedTask({ waitingRoot: true, state });
+  expect(notice).toHaveTextContent(STOPPED_TASK_REASON);
+  expect(within(notice).getByRole("button", { name: "Reassign the stopped task of Chief" })).toBeInTheDocument();
+  expect(
+    within(screen.getByRole("region", { name: "Task for Chief" })).getByRole("button", { name: "Stop this task" }),
+  ).toBeInTheDocument();
+  await fireEvent.click(within(notice).getByRole("button", { name: "Continue" }));
+  await waitFor(() =>
+    expect(command).toHaveBeenCalledWith(expect.objectContaining({ type: "resume", taskId: tasks.childTaskId })),
+  );
+});
+
 it("keeps a stopped-task notice after a failed action and a refresh", async () => {
   const { notice, command, read } = await openChannelWithStoppedTask();
   command.mockRejectedValueOnce(new Error("Connection lost. Try again."));
@@ -767,7 +800,7 @@ it("retries a lost response once and keeps a focused draft through incoming mess
   let loseResponse = true;
   vi.spyOn(window.openbot.agent, "channelCommand").mockImplementation(async (input) => {
     const result = await originalCommand(input);
-    if (input.type === "send" && loseResponse) {
+    if (input.type === "coordinate" && loseResponse) {
       loseResponse = false;
       throw new Error("Connection lost after sending.");
     }
@@ -779,7 +812,7 @@ it("retries a lost response once and keeps a focused draft through incoming mess
   await fireEvent.click(within(chat).getByRole("button", { name: "Send message" }));
   await fireEvent.click(await within(chat).findByRole("button", { name: "Retry" }));
   expect(window.openbot.agent.channelCommand).toHaveBeenCalledWith(
-    expect.objectContaining({ type: "send", recipientAgentId: "chief" }),
+    expect.objectContaining({ type: "coordinate", audience: "lead" }),
   );
   await waitFor(() => expect(composer).toHaveTextContent(""));
   expect(within(chat).getAllByRole("article", { name: "Message from You" })).toHaveLength(1);
@@ -849,7 +882,7 @@ it("addresses a channel member only while the request names one", async () => {
   await fireEvent.input(composer);
   await fireEvent.click(within(chat).getByRole("button", { name: "Send message" }));
   await waitFor(() =>
-    expect(command).toHaveBeenCalledWith(expect.objectContaining({ type: "send", recipientAgentId: "chief" })),
+    expect(command).toHaveBeenCalledWith(expect.objectContaining({ type: "coordinate", audience: "lead" })),
   );
 
   // The composer keeps no recipient of its own; a stale one would address every later request.
@@ -859,7 +892,7 @@ it("addresses a channel member only while the request names one", async () => {
   await fireEvent.click(within(chat).getByRole("button", { name: "Send message" }));
   await waitFor(() =>
     expect(command).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "send", text: "Add the rollback step", recipientAgentId: null }),
+      expect.objectContaining({ type: "coordinate", text: "Add the rollback step", audience: "lead" }),
     ),
   );
 });
@@ -911,4 +944,142 @@ it("keeps the working indicator while the coordinator chooses an owner", async (
   // The lead is the coordinator. Its routing turn holds the task and posts nothing until it
   // decides, so the indicator is the only sign that the request is alive.
   expect(await within(chat).findByRole("status", { name: /^Chief is working: / })).toBeInTheDocument();
+});
+
+it.each(["@all", "@everyone"])("keeps %s assignments separate when one member is stopped", async (mention) => {
+  const chat = await openSavedChannel();
+  await window.openbot.agent.channelCommand({
+    type: "save",
+    operationId: "add-member",
+    channelId: "channel-test",
+    draft: {
+      name: "Project room",
+      title: "",
+      instructions: "Research the project",
+      members: [{ agentId: "chief" }, { agentId: "sales-outbound" }],
+      leadAgentId: "chief",
+    },
+  });
+  const composer = within(chat).getByRole("textbox", { name: "Message to channel" });
+  composer.textContent = `${mention} Report status`;
+  await fireEvent.input(composer);
+  await fireEvent.click(within(chat).getByRole("button", { name: "Send message" }));
+  const chief = await within(chat).findByRole("region", { name: "Task for Chief" });
+  const sales = await within(chat).findByRole("region", { name: "Task for Sales Outbound" });
+  expect(within(sales).getByRole("button", { name: "Stop this task" })).toBeEnabled();
+  await fireEvent.click(within(chief).getByRole("button", { name: "Stop this task" }));
+  await within(chat).findByRole("region", { name: "Stopped task for Chief" });
+  expect(within(chat).getByRole("region", { name: "Task for Sales Outbound" })).toBeInTheDocument();
+  const page = await window.openbot.agent.readChannel({ channelId: "channel-test" });
+  expect(page.tasks).toHaveLength(2);
+  expect(page.tasks.find((task) => task.ownerAgentId === "chief")?.state).toBe("paused");
+  expect(page.tasks.find((task) => task.ownerAgentId === "sales-outbound")?.state).toBe("queued");
+});
+
+it.each([
+  { scenario: "before read", timing: "before-read", error: null, continues: true },
+  {
+    scenario: "IPC completion",
+    timing: "during-stop",
+    error: new Error("Error invoking remote method: Error: This task is already complete."),
+    continues: true,
+  },
+  {
+    scenario: "remote IPC completion",
+    timing: "during-stop",
+    error: new Error("Error invoking remote method 'agent:channelCommand': Error: Request failed."),
+    continues: true,
+  },
+  {
+    scenario: "HTTP completion",
+    timing: "during-stop",
+    error: Object.assign(new Error("Host request failed"), { status: 500 }),
+    continues: true,
+  },
+  {
+    scenario: "permission failure",
+    timing: "during-stop",
+    error: Object.assign(new Error("Permission denied"), { status: 403 }),
+    continues: false,
+  },
+  { scenario: "connection failure", timing: "during-stop", error: new Error("Connection lost"), continues: false },
+])("Stop tracks assigned work and later requests: $scenario", async ({ timing, error, continues }) => {
+  const chat = await openSavedChannel();
+  await window.openbot.agent.channelCommand({
+    type: "coordinate",
+    audience: "lead",
+    operationId: "coordination-probe",
+    channelId: "channel-test",
+    text: "Please edit the project",
+    replyToMessageId: null,
+    attachmentDraftIds: [],
+  });
+  const initial = await window.openbot.agent.readChannel({ channelId: "channel-test" });
+  const coordinator = initial.tasks[0];
+  assert(coordinator);
+  const reused = {
+    ...coordinator,
+    id: "reused-worker",
+    rootTaskId: "reused-worker",
+    ownerAgentId: "sales-outbound",
+    state: "queued" as const,
+  };
+  const page: ChannelPage = {
+    ...initial,
+    tasks: [{ ...coordinator, execution: "coordinate", state: "running" }, reused],
+  };
+  const originalCommand = window.openbot.agent.channelCommand;
+  const stops: string[] = [];
+  const worker = {
+    ...coordinator,
+    id: "review-worker",
+    rootTaskId: "review-worker",
+    instruction: "Edit the project",
+    state: "queued" as const,
+  };
+  const later = { ...worker, id: "later-worker", rootTaskId: "later-worker", requestMessageId: "later-request" };
+  const complete = () => {
+    page.tasks = [
+      { ...coordinator, execution: "coordinate", state: "completed" },
+      worker,
+      later,
+      { ...reused, requestMessageId: "replaced-request" },
+    ];
+    page.channel = { ...page.channel, revision: page.channel.revision + 1 };
+  };
+  let stopping = false;
+  const originalRead = window.openbot.agent.readChannel;
+  vi.spyOn(window.openbot.agent, "readChannel").mockImplementation(async (input) => {
+    if (input.channelId !== "channel-test") return originalRead(input);
+    if (stopping && timing === "before-read" && page.tasks[0]?.state === "running") complete();
+    return structuredClone(page);
+  });
+  vi.spyOn(window.openbot.agent, "channelCommand").mockImplementation(async (input) => {
+    if (input.type !== "stop") return originalCommand(input);
+    stops.push(input.taskId);
+    if (input.taskId === coordinator.id) {
+      complete();
+      emitAgentEvent?.({ type: "channels-changed", channelId: "channel-test", revision: page.channel.revision });
+      throw error;
+    }
+    page.tasks = page.tasks.map((task) => (task.id === input.taskId ? { ...task, state: "paused" } : task));
+    return page.channel;
+  });
+  emitAgentEvent?.({ type: "channels-changed", channelId: "channel-test", revision: page.channel.revision + 1 });
+  await within(chat).findByRole("region", { name: "Task for Sales Outbound" });
+  stopping = true;
+  await fireEvent.click(within(chat).getByRole("button", { name: "Stop work" }));
+  if (!continues) {
+    assert(error);
+    expect(await within(chat).findByRole("alert")).toHaveTextContent(error.message);
+    expect(page.tasks.find((task) => task.id === worker.id)?.state).toBe("queued");
+    expect(stops).toEqual([coordinator.id]);
+    return;
+  }
+  await waitFor(() => expect(page.tasks.find((task) => task.id === worker.id)?.state).toBe("paused"));
+  expect(page.tasks.find((task) => task.id === reused.id)?.state).toBe("queued");
+  expect(stops).not.toContain(reused.id);
+  expect(page.tasks.find((task) => task.id === later.id)?.state).toBe("queued");
+  expect(stops).not.toContain(later.id);
+  expect(within(chat).queryByRole("alert")).not.toBeInTheDocument();
 });

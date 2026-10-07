@@ -23,6 +23,7 @@ import {
   type TeamRealtimeEvent,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { CHANNEL_COORDINATION_CAPABILITY } from "@openbot/contracts/team-protocol/channel-coordination-v1";
 import {
   AGENT_ADMIN_CAPABILITY,
   AGENT_IMPORT_CAPABILITY,
@@ -1290,7 +1291,11 @@ export class TeamApiServer {
       appVersion: this.#options.appVersion ?? "0.0.0",
       protocol: { minimum: TEAM_PROTOCOL_V1, maximum: TEAM_PROTOCOL_V6 },
       capabilities: TEAM_CURRENT_CAPABILITIES.filter((capability) => {
-        if (capability === "channel-chats-v1" || capability === CHANNEL_DELETE_CAPABILITY)
+        if (
+          capability === "channel-chats-v1" ||
+          capability === CHANNEL_DELETE_CAPABILITY ||
+          capability === CHANNEL_COORDINATION_CAPABILITY
+        )
           return this.#options.channels !== undefined;
         // Advertised only when this host can serve it: a client that negotiated it gets a route,
         // and one that did not never shows the panel.

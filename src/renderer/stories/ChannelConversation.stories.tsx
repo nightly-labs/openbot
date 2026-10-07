@@ -226,16 +226,21 @@ function StoppedTaskConversation(props: {
   waiting?: boolean;
   /** No stopped task: the waiting block sits on the composer. */
   noStopped?: boolean;
+  active?: boolean;
 }) {
   const [state, setState] = createStore({
     text: props.expanded ? "Check the report again.\nInclude the source data." : "",
     attachment: Boolean(props.expanded),
-    tasks: (props.noStopped ? [] : props.multiple ? [chief, sales, research] : [chief]).map((agent) => ({
+    tasks: (props.noStopped ? [] : props.multiple ? [chief, sales, research] : [chief]).map((agent, index) => ({
       id: `stopped-${agent.id}`,
       ownerAgentId: agent.id,
-      error: props.expanded
-        ? "The automatic assignment limit was reached. Continue or reassign this task. The source report still needs review before the team can complete the work."
-        : "The agent could not complete this task.",
+      state: props.active ? (index < 2 ? ("running" as const) : ("queued" as const)) : ("paused" as const),
+      instruction: props.active ? "Report the current task status" : "",
+      error: props.active
+        ? null
+        : props.expanded
+          ? "The automatic assignment limit was reached. Continue or reassign this task. The source report still needs review before the team can complete the work."
+          : "The agent could not complete this task.",
     })),
   });
   const transcript = props.long
@@ -251,6 +256,13 @@ function StoppedTaskConversation(props: {
           tasks={state.tasks}
           members={STORY_AGENTS.map((agent) => ({ agentId: agent.id }))}
           name={(id) => STORY_AGENTS.find((agent) => agent.id === id)?.name ?? "Unassigned"}
+          onStop={async (id) => {
+            setState((state) => {
+              const task = state.tasks.find((task) => task.id === id);
+              if (task) task.state = "paused";
+            });
+            return true;
+          }}
           onResume={async (id) => {
             setState((state) => {
               state.tasks = state.tasks.filter((task) => task.id !== id);
@@ -287,6 +299,7 @@ function StoppedTaskConversation(props: {
           <div class="composer-input-label">
             <ComposerEditor
               agentId={undefined}
+              channelGroupMentions={props.active === true}
               agents={STORY_AGENTS}
               value={state.text}
               placeholder="Message Project room"
@@ -347,4 +360,9 @@ export const WaitingSubtasksAboveStoppedTask: Story = {
 
 export const WaitingSubtasksAboveComposer: Story = {
   render: () => <StoppedTaskConversation long waiting noStopped />,
+};
+
+/** Each broadcast member has an independent status and Stop action. Type @ for group mentions. */
+export const ActiveBroadcastTasks: Story = {
+  render: () => <StoppedTaskConversation active multiple />,
 };

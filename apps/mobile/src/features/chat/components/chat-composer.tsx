@@ -107,6 +107,7 @@ interface ChatComposerProps {
   /** Replaces "Ask {name}", such as while the composer answers a question. */
   placeholder?: string;
   mentionAgents: MobileAgent[];
+  channelGroupMentions?: boolean;
   bottomInset: number;
   disabled: boolean;
   draft: string;
@@ -171,6 +172,7 @@ export function ChatComposer({
   agentName,
   placeholder,
   mentionAgents,
+  channelGroupMentions = false,
   bottomInset,
   disabled,
   draft,
@@ -212,6 +214,10 @@ export function ChatComposer({
         )
         .slice(0, 8)
     : [];
+  const groupSuggestions =
+    query && channelGroupMentions && !displayText.slice(0, query.start).trim()
+      ? ["all", "everyone"].filter((name) => name.startsWith(query.query.trim()))
+      : [];
   const hasDraft = Boolean(draft.trim()) || attachments.items.length > 0;
   // What the bar has to stay open for. Attachments drop out of it the moment a
   // send starts: they are waiting for their upload then, and the bar already
@@ -502,7 +508,9 @@ export function ChatComposer({
     }
   }, [disabled, sendGate]);
 
-  const suggestionsVisible = Boolean(focused && query && suggestions.length > 0 && !disabled);
+  const suggestionsVisible = Boolean(
+    focused && query && (suggestions.length > 0 || groupSuggestions.length > 0) && !disabled,
+  );
   const announcedSuggestions = useRef("");
   useEffect(() => {
     // The list opens and closes under the keyboard with no focus change, so a
@@ -618,6 +626,27 @@ export function ChatComposer({
           }}
         >
           <ScrollView keyboardShouldPersistTaps="always" style={{ flexGrow: 0 }}>
+            {groupSuggestions.map((name) => (
+              <Button
+                key={name}
+                variant="ghost"
+                className="min-h-12 flex-row justify-start gap-3 rounded-none px-4"
+                onPress={() => {
+                  const next = editMentionDraft(
+                    latestTextRef.current,
+                    `${displayText.slice(0, query.start)}@${name} ${displayText.slice(query.end)}`,
+                  );
+                  latestTextRef.current = next;
+                  onChangeDraft(next);
+                  const position = query.start + name.length + 2;
+                  setCursor(position);
+                  pendingCursor.current = position;
+                  inputRef.current?.focus();
+                }}
+              >
+                <Button.Label>{`@${name}`}</Button.Label>
+              </Button>
+            ))}
             {suggestions.map((agent) => (
               <Button
                 key={agent.id}

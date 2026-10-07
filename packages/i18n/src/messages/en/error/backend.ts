@@ -1,6 +1,16 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.backend", {
+  "error.backend.channelRestrictedProviderRequired":
+    "Choose a Codex, Claude, Grok, or OpenCode lead for restricted channel coordination.",
+  "error.backend.channelInstructionTooLong":
+    "The task and follow-up exceed the context limit. Send a shorter instruction.",
+  "error.backend.channelCoordinationFailed": "The channel response failed. Retry this task.",
+  "error.backend.channelCoordinationInterrupted":
+    "The previous channel response was interrupted. Check before resuming.",
+  "error.backend.channelInstructionUncertain": "The worker has not confirmed the instruction. Check before retrying.",
+  "error.backend.channelCoordinationUnsupported":
+    "This host does not support channel coordination. Update the host to use group requests.",
   // Errors that the backend services send: channels, messages, routines, memories, MCP, browser and remote desktop.
   "error.backend.browserViewRemoteOnly": "A live browser view is only for a remote host.",
   "error.backend.browserViewUnsupported": "This remote host does not support a live browser view.",

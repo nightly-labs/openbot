@@ -1,3 +1,7 @@
+import {
+  CHANNEL_COORDINATION_CAPABILITY,
+  CHANNEL_COORDINATION_ROUTE,
+} from "@openbot/contracts/team-protocol/channel-coordination-v1";
 // An agent's core surface: status, agents, conversations, the queue and the prompts
 // a turn can raise. Memories, routines and attachments are their own registrars.
 // Every one of these routes to the local service or to a remote server by the
@@ -200,10 +204,21 @@ export function agentIpcHandlers({
       }),
       channelCommand: scopedHandler(parseChannelCommand, {
         local: (input) => runCauseEffect(service.channels.command(input, host.channelActor())),
-        remote: (input, serverId) =>
-          runCauseEffect(
-            remoteServers.request(serverId, CHANNEL_ROUTES.command, decodeChannel, { method: "POST", body: input }),
-          ),
+        remote: (input, serverId) => {
+          if (
+            input.type === "coordinate" &&
+            !remoteServers.supportsCapability(serverId, CHANNEL_COORDINATION_CAPABILITY)
+          )
+            throw new Error(sourceText("error.backend.channelCoordinationUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(
+              serverId,
+              input.type === "coordinate" ? CHANNEL_COORDINATION_ROUTE : CHANNEL_ROUTES.command,
+              decodeChannel,
+              { method: "POST", body: input },
+            ),
+          );
+        },
       }),
       deleteChannel: scopedHandler(parseChannelId, {
         local: (channelId) => runCauseEffect(service.deleteChannel(channelId)),

@@ -49,6 +49,10 @@ export interface ChannelTask {
   sourceMessageIds: string[];
   dependencies: string[];
   resources: string[];
+  /** Absent on existing tasks: normal provider work. */
+  execution?: "coordinate" | "response" | "instruction";
+  instructionTargetId?: string;
+  instructionTargetRevision?: number;
   state: ChannelTaskState;
   revision: number;
   assignmentCount: number;
@@ -104,6 +108,15 @@ export type ChannelCommand =
        * settings panel sets this and the service refuses to bring the channel back.
        */
       update?: boolean;
+    }
+  | {
+      type: "coordinate";
+      operationId: string;
+      channelId: string;
+      audience: "lead" | "all";
+      text: string;
+      replyToMessageId: string | null;
+      attachmentDraftIds: string[];
     }
   | { type: "restore"; operationId: string; channelId: string }
   | { type: "archive"; operationId: string; channelId: string }
@@ -221,6 +234,9 @@ export function isChannelTask(value: unknown): value is ChannelTask {
     value.resources.length <= 64 &&
     value.resources.every((resource) => isBoundedString(resource, INPUT_LIMITS.path)) &&
     isOneOf(["queued", "running", "waiting", "paused", "completed", "failed", "cancelled"] as const, value.state) &&
+    (value.execution === undefined || isOneOf(["coordinate", "response", "instruction"] as const, value.execution)) &&
+    (value.instructionTargetId === undefined || isIdentifier(value.instructionTargetId)) &&
+    (value.instructionTargetRevision === undefined || sequence(value.instructionTargetRevision)) &&
     sequence(value.revision) &&
     sequence(value.assignmentCount) &&
     (value.error === null || isBoundedString(value.error, INPUT_LIMITS.messageText))
@@ -316,6 +332,22 @@ export function parseChannelCommand(value: unknown): ChannelCommand {
   if (!isDynamicRecord(value) || !isIdentifier(value.operationId) || !isIdentifier(value.channelId))
     throw new Error("Provide a valid channel command.");
   const common = { operationId: value.operationId, channelId: value.channelId };
+  if (
+    value.type === "coordinate" &&
+    isOneOf(["lead", "all"] as const, value.audience) &&
+    isBoundedString(value.text, INPUT_LIMITS.messageText) &&
+    (value.replyToMessageId === null || isIdentifier(value.replyToMessageId)) &&
+    identifiers(value.attachmentDraftIds) &&
+    (value.text.trim().length > 0 || value.attachmentDraftIds.length > 0)
+  )
+    return {
+      ...common,
+      type: "coordinate",
+      audience: value.audience,
+      text: value.text,
+      replyToMessageId: value.replyToMessageId,
+      attachmentDraftIds: value.attachmentDraftIds,
+    };
   const draft = normalizeChannelDraft(value.draft);
   if (value.type === "save" && isChannelDraft(draft))
     return { ...common, type: value.type, draft, ...(value.update === true ? { update: true } : {}) };

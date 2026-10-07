@@ -1,5 +1,9 @@
 import { expandAttachmentReferences } from "@openbot/contracts/attachment-references";
-import { chatTagReferences, expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
+import {
+  channelGroupMention,
+  chatTagReferences,
+  expandChatTagReferences,
+} from "@openbot/contracts/chat-tag-references";
 import {
   type AgentApproval,
   type AttachmentSummary,
@@ -478,26 +482,25 @@ export function ChannelConversation(props: ChannelConversationProps) {
   });
   const name = (id: string | null) =>
     agentList().find((agent) => agent.id === id)?.name ?? t("sidebar.section.unassigned");
-  /**
-   * The work that waits for the reader: one entry for each stopped run, not for each stopped task.
-   *
-   * A task the service stopped carries the reason it stopped, and an archived channel stops every
-   * task without one, so the reason is what tells the two apart. A failed task belongs here too: it
-   * carries its own reason, its parent waits for it, and nothing but the reader starts it again.
-   * The assignment limit stops a whole tree at once, and `resume` starts a task with everything
-   * under it, so the entry has to be the root: a reader who continues a child would leave the root
-   * stopped, and a card for each task would repeat one reason several times.
-   */
+  /** Group active and stopped branches separately so a waiting parent cannot hide child recovery. */
   const pausedTasks = createMemo(() => {
     const page = channels.state.page;
     if (!page || page.channel.archived) return [];
-    const stopped = page.tasks.filter((task) => (task.state === "paused" || task.state === "failed") && task.error);
-    const roots = new Map<string, (typeof stopped)[number]>();
-    for (const task of stopped) {
-      const known = roots.get(task.rootTaskId);
-      if (!known || task.id === task.rootTaskId) roots.set(task.rootTaskId, task);
-    }
-    return [...roots.values()];
+    const stopped = page.tasks.filter(
+      (task) =>
+        task.state === "queued" ||
+        task.state === "running" ||
+        task.state === "waiting" ||
+        task.state === "paused" ||
+        task.state === "failed",
+    );
+    const byId = new Map(stopped.map((task) => [task.id, task]));
+    const active = (task: (typeof stopped)[number]) =>
+      task.state === "queued" || task.state === "running" || task.state === "waiting";
+    return stopped.filter((task) => {
+      const parent = task.parentTaskId ? byId.get(task.parentTaskId) : undefined;
+      return !parent || active(task) !== active(parent);
+    });
   });
   // The sub-tasks that an owner waits for, above the composer, as the agent chat shows its questions.
   const awaitingSubtasks = createMemo(() => {
@@ -530,25 +533,7 @@ export function ChannelConversation(props: ChannelConversationProps) {
     }
     return [...runs];
   });
-  /**
-   * One stop at a time, and none after the first that fails: the controller keeps one failed
-   * command for its retry, and a later stop that succeeds would clear the error of the one that
-   * failed.
-   */
-  const stopWork = async () => {
-    const channelId = channels.state.page?.channel.id;
-    if (!channelId) return;
-    for (const taskId of activeRuns()) {
-      const stopped = await channels.command({
-        type: "stop",
-        operationId: crypto.randomUUID(),
-        channelId,
-        taskId,
-        recipientAgentId: null,
-      });
-      if (!stopped) return;
-    }
-  };
+  const stopWork = () => channels.stopActiveTasks(activeRuns());
   const resumeTask = (taskId: string, recipientAgentId: string | null) =>
     channels.command({
       type: recipientAgentId ? "reassign" : "resume",
@@ -569,11 +554,16 @@ export function ChannelConversation(props: ChannelConversationProps) {
     );
     void channels.command(
       {
-        type: "send",
+        ...(channelGroupMention(expanded) ||
+        (channels.coordinationSupported() && (!mention || mention.id === channels.state.page?.channel.leadAgentId))
+          ? {
+              type: "coordinate" as const,
+              audience: channelGroupMention(expanded) ? ("all" as const) : ("lead" as const),
+            }
+          : { type: "send" as const, recipientAgentId: mention?.id ?? null }),
         operationId: crypto.randomUUID(),
         channelId,
         text: expanded,
-        recipientAgentId: mention?.id ?? null,
         replyToMessageId,
         attachmentDraftIds: attachments.map((attachment) => attachment.id),
       },
@@ -613,7 +603,7 @@ export function ChannelConversation(props: ChannelConversationProps) {
             variant="ghost"
             onClick={() =>
               void channels.retry((sent) => {
-                if (sent.type === "send") clearSent(sent.channelId, sent.text);
+                if (sent.type === "send" || sent.type === "coordinate") clearSent(sent.channelId, sent.text);
               })
             }
           >
@@ -943,6 +933,15 @@ export function ChannelConversation(props: ChannelConversationProps) {
                   members={page().channel.members}
                   name={name}
                   onResume={resumeTask}
+                  onStop={(taskId) =>
+                    channels.command({
+                      type: "stop",
+                      operationId: crypto.randomUUID(),
+                      channelId: page().channel.id,
+                      taskId,
+                      recipientAgentId: null,
+                    })
+                  }
                 />
                 <form
                   class="composer"
@@ -998,6 +997,7 @@ export function ChannelConversation(props: ChannelConversationProps) {
                   <div class="composer-input-label">
                     <ComposerEditor
                       agentId={undefined}
+                      channelGroupMentions={channels.coordinationSupported()}
                       agents={agentList().filter((agent) =>
                         page().channel.members.some((member) => member.agentId === agent.id),
                       )}

@@ -18,6 +18,7 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useSta
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { supportLog, supportLogUrl } from "@/features/support/model/support-log";
 import { expoGoDomOptions } from "@/shared/lib/expo-go-dom";
+import { RemoteRequestError } from "@/shared/lib/remote-request-error";
 import { currentText } from "@/shared/lib/text";
 
 import RemoteTeamBridge from "./remote-team-bridge.dom";
@@ -124,7 +125,7 @@ export const RemoteTeamTransport = forwardRef<RemoteTeamTransportRef, RemoteTeam
           if (result.status === 409 && isQueueEditRoute(method, path))
             throw new QueueEditRejectedError(currentText().t("mobile.workspace.error.queueEditRejected"));
           if (result.status !== undefined && result.status >= 400)
-            throw new Error(sourceText("error.remote.serverRequestFailed"));
+            throw new RemoteRequestError(result.status, sourceText("error.remote.serverRequestFailed"));
           return decode(result.body);
         },
       }),

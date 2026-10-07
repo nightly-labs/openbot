@@ -53,6 +53,7 @@ export interface ChatViewProps {
   queue?: ChatQueueController;
   agents: MobileAgent[];
   mentionAgents: MobileAgent[];
+  channelGroupMentions?: boolean;
   projectedMessages: ChatMessage[];
   referenceMessages: ChatMessage[];
   ready: boolean;
@@ -100,6 +101,7 @@ export function ChatView({
   queue,
   agents: serverAgents,
   mentionAgents,
+  channelGroupMentions = false,
   projectedMessages,
   referenceMessages,
   ready,
@@ -383,16 +385,21 @@ export function ChatView({
       setStoppingTurnId(turnId);
       setSendError(null);
       void haptics.impact();
-      stopTurn(turnId).catch((error: unknown) => {
-        void haptics.notification("error");
-        setStoppingTurnId((current) => (current === turnId ? null : current));
-        setSendError({
-          agentId: target.id,
-          message: errorMessage(error, t("mobile.chat.composer.stopFailed")),
+      stopTurn(turnId)
+        .then(() => {
+          // Channels stop a set of tasks, so the next set can reuse the channel ID.
+          if (target.kind === "channel") setStoppingTurnId((current) => (current === turnId ? null : current));
+        })
+        .catch((error: unknown) => {
+          void haptics.notification("error");
+          setStoppingTurnId((current) => (current === turnId ? null : current));
+          setSendError({
+            agentId: target.id,
+            message: errorMessage(error, t("mobile.chat.composer.stopFailed")),
+          });
         });
-      });
     };
-  }, [stopTurn, activeTurnId, target.id, errorMessage, t]);
+  }, [stopTurn, activeTurnId, target.id, target.kind, errorMessage, t]);
 
   function sendMessage(value: string): void {
     if (!serverOnline || !canSend || sendingRef.current || pendingMessage) return;
@@ -703,6 +710,7 @@ export function ChatView({
                   handoffFocusVersion={handoffFocusVersion}
                   onCancelReply={() => setReplyTarget(null)}
                   mentionAgents={mentionAgents}
+                  channelGroupMentions={channelGroupMentions}
                   key={target.id}
                   action={action}
                   actionForeground={actionForeground}

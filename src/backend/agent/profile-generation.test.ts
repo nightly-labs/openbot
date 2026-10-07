@@ -2,12 +2,13 @@ import { EventEmitter } from "node:events";
 import { access } from "node:fs/promises";
 import { type AgentProfileDraft, AVATAR_HUES } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import type { AgentClient } from "../agent-client";
 import { runCauseEffect } from "../effect-boundary";
 import { getString, type RequestId, type ResponseDecoder, type RpcError } from "../protocol";
 import { type ProviderClientOperationError, providerFailure } from "../provider-client-effects";
-import { generateProfile, profilePrompt } from "./profile-generation";
+import { ProfileClients } from "./profile-clients";
+import { generateProfile, generateTextWithoutTools, profilePrompt } from "./profile-generation";
 
 const draft: AgentProfileDraft = {
   name: "Researcher",
@@ -149,4 +150,81 @@ it("revises from the current draft using the existing avatar palette", () => {
   const prompt = profilePrompt({ prompt: "Focus on science", draft }, []);
   expect(prompt).toContain(JSON.stringify(draft));
   expect(prompt).toContain(AVATAR_HUES.join(","));
+});
+
+it("aborts a channel generation that has started without waiting for its timeout", async () => {
+  const client = new ProfileClient("");
+  const original = client.request.bind(client);
+  let started = false;
+  vi.spyOn(client, "request").mockImplementation((method, params, decode) => {
+    if (method === "turn/start") {
+      return Effect.sync(() => {
+        started = true;
+        return decode({ turn: { id: "waiting" } });
+      });
+    }
+    return original(method, params, decode);
+  });
+  const abort = new AbortController();
+  const generation = runCauseEffect(
+    generateTextWithoutTools(
+      client,
+      { ...model, supportedReasoningEfforts: ["medium"] },
+      "Status",
+      () => false,
+      abort.signal,
+    ),
+  );
+  const stopped = expect(generation).rejects.toThrow();
+  await vi.waitFor(() => expect(started).toBe(true));
+  abort.abort();
+  await stopped;
+  expect(client.running).toBe(false);
+  await expect(access(client.cwd)).rejects.toThrow();
+});
+
+it("bounds disposable sessions and cancels queued channel work before it can start", async () => {
+  const clients = new ProfileClients();
+  const finish: (() => void)[] = [];
+  const active = Array.from({ length: 3 }, () =>
+    runCauseEffect(
+      clients.run(new ProfileClient(""), () =>
+        Effect.promise(() => new Promise<void>((resolve) => finish.push(resolve))),
+      ),
+    ),
+  );
+  await vi.waitFor(() => expect(finish).toHaveLength(3));
+  const abort = new AbortController();
+  const cancelledClient = new ProfileClient("{}");
+  const queued = runCauseEffect(
+    clients.run(
+      cancelledClient,
+      (cancelled) =>
+        generateTextWithoutTools(
+          cancelledClient,
+          { ...model, supportedReasoningEfforts: ["medium"] },
+          "Status",
+          cancelled,
+          abort.signal,
+        ),
+      abort.signal,
+    ),
+  );
+  const rejected = expect(queued).rejects.toThrow();
+  expect(cancelledClient.starts).toBe(0);
+  abort.abort();
+  await rejected;
+  expect(cancelledClient.starts).toBe(0);
+  const waitingClient = new ProfileClient("Status");
+  const waiting = runCauseEffect(
+    clients.run(waitingClient, (cancelled) =>
+      generateTextWithoutTools(waitingClient, { ...model, supportedReasoningEfforts: ["medium"] }, "Status", cancelled),
+    ),
+  );
+  expect(waitingClient.starts).toBe(0);
+  finish[0]?.();
+  await expect(waiting).resolves.toBe("Status");
+  for (const release of finish) release();
+  await Promise.all(active);
+  expect(clients.count()).toBe(0);
 });
