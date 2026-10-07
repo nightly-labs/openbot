@@ -768,6 +768,80 @@ describe.sequential("AgentService: routines", () => {
     await expect(runCauseEffect(mailbox.listExportAttachments())).resolves.toHaveLength(1);
   });
 
+  it("keeps a visual reply that is saved while a response attachment reads its files", async () => {
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    const { store, mailbox } = stores(root);
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider, "", false);
+        clients.set(provider, client);
+        return client;
+      },
+    });
+    await runCauseEffect(service.initialize());
+    const screenshotPath = join(store.sharedRoot, "parallel-screenshot.png");
+    await writeFile(screenshotPath, Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Show a chart and a screenshot." }));
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "running");
+
+    const client = clients.get("codex");
+    const threadId = store.activeProviderSession("chief")?.externalSessionId;
+    const turnId = service.listQueue("chief").deliveries[0]?.turnId;
+    if (!client || !threadId || !turnId) throw new Error("The parallel visual reply turn did not start.");
+
+    const originalStore = mailbox.stageGeneratedAttachments.bind(mailbox);
+    let releaseStore: (() => void) | undefined;
+    const storeGate = new Promise<void>((resolve) => {
+      releaseStore = resolve;
+    });
+    let markStoreStarted: (() => void) | undefined;
+    const storeStarted = new Promise<void>((resolve) => {
+      markStoreStarted = resolve;
+    });
+    vi.spyOn(mailbox, "stageGeneratedAttachments").mockImplementation((input) =>
+      Effect.gen(function* () {
+        markStoreStarted?.();
+        yield* Effect.promise(() => storeGate);
+        return yield* originalStore(input);
+      }),
+    );
+    const attaching = callOpenBotTool(
+      client,
+      threadId,
+      "attach_files_to_response",
+      { paths: [screenshotPath] },
+      turnId,
+      "parallel-attachment-call",
+    );
+    await storeStarted;
+    const rendered = await callOpenBotTool(
+      client,
+      threadId,
+      "html_render",
+      { html: "<p>Chart</p>", title: "Chart" },
+      turnId,
+      "parallel-visual-call",
+    );
+    expect(openBotToolPayload(rendered.result)).toMatchObject({ status: "shown" });
+    releaseStore?.();
+    expect(openBotToolPayload((await attaching).result)).toMatchObject({ status: "attached" });
+
+    // The saved rows, not the memory copy: the memory copy can keep a message that the database lost.
+    const saved = store.database.readConversation(
+      "chief",
+      store.list().find((a) => a.id === "chief")?.threadId ?? null,
+    );
+    expect(saved.messages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ itemType: "agent_attachment" }),
+        expect.objectContaining({ text: "Chart", itemType: expect.stringMatching(/^visual-reply:/) }),
+      ]),
+    );
+  });
+
   it("rolls back response attachments when conversation persistence fails and permits retry", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);

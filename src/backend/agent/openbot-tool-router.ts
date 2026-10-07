@@ -641,7 +641,9 @@ export class OpenBotToolRouter {
         ownerThreadId: executionThreadId,
       })
       .pipe(toToolOperationFailed);
-    const snapshot = structuredClone(this.#conversation.ensureSnapshot(senderAgentId, executionThreadId));
+    // A concurrent `attach_files_to_response` keeps the live snapshot while it reads files, then saves
+    // it. A replaced snapshot would make that save delete this message, so the message goes in place.
+    const snapshot = this.#conversation.ensureSnapshot(senderAgentId, executionThreadId);
     snapshot.messages.push({
       id: messageId,
       turnId: params.turnId,
@@ -654,13 +656,19 @@ export class OpenBotToolRouter {
       attachments: [attachment],
     });
     sortConversationMessages(snapshot.messages);
-    const persisted = this.#store.database.persistConversation(snapshot, "response.visual-added", {
-      turnId: params.turnId,
-      messageId,
-      attachmentId: attachment.id,
-    });
-    this.#conversation.setSnapshot(senderAgentId, persisted);
-    this.#conversation.publishConversation(persisted);
+    try {
+      const persisted = this.#store.database.persistConversation(snapshot, "response.visual-added", {
+        turnId: params.turnId,
+        messageId,
+        attachmentId: attachment.id,
+      });
+      snapshot.revision = persisted.revision;
+    } catch (error) {
+      const messageIndex = snapshot.messages.findIndex((candidate) => candidate.id === messageId);
+      if (messageIndex >= 0) snapshot.messages.splice(messageIndex, 1);
+      throw error;
+    }
+    this.#conversation.publishConversation(snapshot);
     return openBotToolResult({ status: "shown", messageId });
   });
 
