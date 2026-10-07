@@ -1243,8 +1243,15 @@
   font-size: var(--openbot-text-md);
 }
 
-.diagram-chat-bubble p {
+.diagram-chat-text {
   margin: 0;
+  white-space: pre-wrap;
+}
+
+/* The chat's Markdown, a size down to fit the panel. */
+.diagram-chat-markdown {
+  min-width: 0;
+  font-size: var(--openbot-text-md);
 }
 
 .diagram-chat-changes {

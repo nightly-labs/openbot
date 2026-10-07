@@ -7,12 +7,13 @@
  */
 
 import { ArrowUp, Bubble, BubbleContent, Button, Check, Minimize2, Spinner } from "@openbot/ui";
-import { createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal, For, Show } from "solid-js";
 import type { AvatarMood } from "../../bloub-avatar";
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { ComposerEditor } from "../conversation/ComposerEditor";
+import { MarkdownMessageText } from "../conversation/MarkdownMessageText";
 import type { DiagramChatMessage } from "./diagram-model";
 
 /** A press that moves less than this is a click, so the button still opens the panel. */
@@ -26,6 +27,8 @@ export interface DiagramChatPanelProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSend: (text: string) => void;
+  /** Opens a link in an agent's answer. Without it, links do nothing. */
+  onOpenLink?: ((url: string) => void) | undefined;
 }
 
 export function DiagramChatPanel(props: DiagramChatPanelProps) {
@@ -35,6 +38,14 @@ export function DiagramChatPanel(props: DiagramChatPanelProps) {
   const [focusRequest, setFocusRequest] = createSignal(0);
   const [offset, setOffset] = createSignal({ x: 0, y: 0 });
   let launcher: HTMLElement | undefined;
+  let log: HTMLDivElement | undefined;
+  /** A new message, or the agent starting on one, scrolls the log to its end. */
+  createEffect(
+    () => [props.messages.length, props.working] as const,
+    () => {
+      requestAnimationFrame(() => log?.scrollTo({ top: log.scrollHeight }));
+    },
+  );
   let morph: HTMLDivElement | undefined;
   /** Set by a press that moved the chat, so the click that ends it does not open the panel. */
   let dragged = false;
@@ -123,7 +134,7 @@ export function DiagramChatPanel(props: DiagramChatPanelProps) {
           </Button>
         </header>
 
-        <div class="diagram-chat-messages" role="log" aria-live="polite">
+        <div ref={(element) => (log = element)} class="diagram-chat-messages" role="log" aria-live="polite">
           <Show
             when={props.messages.length > 0}
             fallback={<p class="diagram-chat-empty">{t("diagram.chat.empty", { name: props.agent.name })}</p>}
@@ -136,7 +147,17 @@ export function DiagramChatPanel(props: DiagramChatPanelProps) {
                   class="diagram-chat-bubble"
                 >
                   <BubbleContent>
-                    <p>{message.text}</p>
+                    <Show when={message.author === "agent"} fallback={<p class="diagram-chat-text">{message.text}</p>}>
+                      {/* An agent answers in Markdown, as in the chat. */}
+                      <div class="diagram-chat-markdown message-markdown">
+                        <MarkdownMessageText
+                          body={message.text}
+                          agents={[]}
+                          onSelectAgent={() => undefined}
+                          onOpenLink={(url) => props.onOpenLink?.(url)}
+                        />
+                      </div>
+                    </Show>
                     <Show when={message.changes?.length ? message.changes : undefined}>
                       {(changes) => (
                         <ul class="diagram-chat-changes" aria-label={t("diagram.chat.changes")}>

@@ -2,10 +2,11 @@ import type { OpenBotDesktopApi } from "@openbot/contracts/ipc";
 
 /**
  * What the routine canvas reaches in main: the flows, a test run, the events that make it stale, and
- * the open agent's conversation for the assistant.
+ * the open agent's conversation for the assistant, and the links in its answers.
  */
 export interface RoutineFlowsPort {
   routineFlows: OpenBotDesktopApi["routineFlows"];
+  openUrl: OpenBotDesktopApi["openUrl"];
   agent: Pick<
     OpenBotDesktopApi["agent"],
     "testRoutine" | "updateRoutine" | "onScopedEvent" | "sendMessage" | "readConversationPage"

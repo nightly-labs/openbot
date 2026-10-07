@@ -47,6 +47,7 @@ export interface DiagramViewProps {
         messages: DiagramChatMessage[];
         working: boolean;
         onSend: (text: string) => void;
+        onOpenLink?: ((url: string) => void) | undefined;
       }
     | undefined;
   onMoveNode: (nodeId: string, position: DiagramPoint) => void;
@@ -237,6 +238,7 @@ export function DiagramView(props: DiagramViewProps) {
                     })
                   }
                   onSend={(text) => assistant().onSend(text)}
+                  onOpenLink={(url) => assistant().onOpenLink?.(url)}
                 />
               </div>
             )}

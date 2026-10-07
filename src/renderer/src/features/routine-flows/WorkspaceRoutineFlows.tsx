@@ -128,7 +128,18 @@ export function WorkspaceRoutineFlows(props: { port?: RoutineFlowsPort }) {
 
   /** The open agent edits its own canvas from the chat panel. */
   const assistantOf = (agent: AgentProfile | undefined) =>
-    agent ? { agent, messages: assistant.messages(), working: assistant.working(), onSend: assistant.send } : undefined;
+    agent
+      ? {
+          agent,
+          messages: assistant.messages(),
+          working: assistant.working(),
+          onSend: assistant.send,
+          onOpenLink: (url: string) =>
+            port()
+              .openUrl(url)
+              .catch(failed(t("composer.error.openLink"))),
+        }
+      : undefined;
 
   const savePosition = (canvasAgentId: string, nodeKey: string, point: DiagramPoint) => {
     window.clearTimeout(saveTimers.get(nodeKey));
