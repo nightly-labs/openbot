@@ -214,6 +214,8 @@ export class HostEventsService implements HostEventsApi {
         return { status: 200 };
       case "gone":
         return { status: 404 };
+      case "too-large":
+        return { status: 413 };
       case "unavailable":
         return { status: 503 };
     }

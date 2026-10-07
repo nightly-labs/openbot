@@ -19,7 +19,8 @@ export function useEventRoutines(
     retry: false,
     staleTime: 0,
     gcTime: 0,
-    queryKey: [...key, "event-routines"],
+    // Under "routines", so the routine change events that invalidate that key also reload this list.
+    queryKey: [...key, "routines", "events"],
     queryFn: () => workspace.listEventRoutines(owner, serverId),
   });
   const webhookRoutines = (eventRoutines.data ?? []).filter((routine) => routine.trigger.kind === "webhook");

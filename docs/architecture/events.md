@@ -88,7 +88,7 @@ The host (`HostEventsService.receive`) returns:
 
 | Status | Cause |
 | --- | --- |
-| 413 | Body larger than `WEBHOOK_DELIVERY_BODY_BYTES_LIMIT` (64 KiB) |
+| 413 | Body larger than `WEBHOOK_DELIVERY_BODY_BYTES_LIMIT` (64 KiB), or the run instruction with the event is longer than `INPUT_LIMITS.messageText`; no receipt |
 | 404 | Unknown route, or the routine is no longer a webhook routine |
 | 401 | Bad timestamp, delivery ID, or signature (`verifyWebhookSignature`) |
 | 400 | Body is not UTF-8 JSON `{ type, occurredAt?, data? }` |

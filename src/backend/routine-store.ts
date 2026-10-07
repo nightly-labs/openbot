@@ -134,7 +134,8 @@ export type WebhookReceiveResult<Run = OwnedRoutineRun> =
   | { kind: "started"; run: Run }
   | { kind: "ignored"; reason: "event-type" | "filter" | "inactive" }
   | { kind: "duplicate" }
-  | { kind: "gone" };
+  | { kind: "gone" }
+  | { kind: "too-large" };
 
 /** The time from a hold of the routines to the restart that the hold waited for. */
 export interface RoutineHoldWindow {
@@ -479,6 +480,8 @@ export class RoutineStore {
       receivedAt: event.receivedAt,
       data: event.data,
     });
+    // The run input goes through the message limit. No receipt, so the sender can retry after a change.
+    if (instruction.length > INPUT_LIMITS.messageText) return { kind: "too-large" };
     const { commandPrefix, eventPrefix, runAggregate } = this.tables;
     return this.database.dispatch(
       `${commandPrefix}-run:webhook:${routineId}:${randomUUID()}`,

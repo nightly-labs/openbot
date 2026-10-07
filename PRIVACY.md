@@ -196,9 +196,10 @@ The service stores:
 - the current account avatar file and its content type when the user uploads an avatar.
 - optional host logo files and their content types when the owner uploads a logo.
 - webhook routes: for each webhook routine of a host, the opaque route ID, the host ID, the owner
-  account ID, and the link time. The service deletes a route when the routine stops using it, and
-  when the host or the account is deleted. It does not store the routine, the secret, or request
-  bodies.
+  account ID, the link time, and the revocation time. When the routine stops using a route, or the
+  host is deleted, the service sets the revocation time and the route stops working. The service
+  keeps the row with these fields permanently, so that the old public URL never belongs to another
+  host. It does not store the routine, the secret, or request bodies.
 - published agent templates: the agent name, title, instructions, avatar, routine names, schedules
   and instructions, marketplace skill references, the `SKILL.md` text of local skills, the local
   agent ID, a share card image made from these fields, and creation and update times. Anyone

@@ -720,6 +720,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         void queryClient.invalidateQueries({
           queryKey: ["server-routines", session.apiUrl, session.user.id, sessionScope, serverId],
         });
+        // Webhook history: a host also sends a routine change when it ignores a request.
+        void queryClient.invalidateQueries({ queryKey: ["routine-webhooks", serverId] });
       }
       if (
         event.type === "channels-changed" ||

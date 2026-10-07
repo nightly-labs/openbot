@@ -105,7 +105,7 @@ if (response.status !== 200 && response.status !== 202) {
 | `400` | The body is not valid. | No. Correct the body. |
 | `401` | A header or the signature is not valid, or the timestamp is not within 5 minutes of the host clock. | No. Correct the secret, the headers, or the clock. |
 | `404` | The host does not know the route. | No |
-| `413` | The body is larger than 64 KiB. | No |
+| `413` | The body is larger than 64 KiB, or the routine instruction and the event together are longer than 100,000 characters. | No. Send less data or shorten the instruction. |
 | `415` | `Content-Type` is not `application/json`. | No |
 | `429` | Too many requests to this route from your address. | Yes, later |
 | `503` | The host is offline, busy, or did not answer in 2.5 seconds. The relay does not know the route, the host cannot read the secret, or the agent or channel cannot take a run now. | Yes, later |
