@@ -11,12 +11,12 @@ const GROK_BOT_DOCS = "https://docs.x.ai/grok-bot";
 export const GROK_BOT_COMPARISON: Comparison = {
   rival: { name: "Grok Bot", mark: "grok-bot" },
   answer:
-    "For most people, OpenBot is the better choice: your agents use the AI plans you already pay for, such as ChatGPT, Claude, Gemini or Grok, or your own model. They run on your own computer, and the app is free and needs no account. Choose Grok Bot only if you want a cloud computer to run your Bots, so that you keep no computer of your own on.",
+    "For most people, OpenBot is the better choice: your agents use the AI plans you already pay for, such as ChatGPT, Claude, Gemini or Grok, or your own model. They run on your own computer, and the app is free. Choose Grok Bot only if you want a cloud computer to run your Bots, so that you keep no computer of your own on.",
   chooseOpenBot: [
     "You already pay for ChatGPT, Claude, Gemini, Grok or Cursor, or you run your own model.",
     "Your files and chats must stay on your own computer.",
     "You want to reach your agents from your phone while they work on your own computer or server.",
-    "You want a free app that works without an account.",
+    "You want a free app.",
     "You want to read the source code.",
   ],
   rivalPlans: "Cursor manages model selection. Grok Bot comes with paid Cursor plans and SuperGrok subscriptions.",
@@ -77,7 +77,7 @@ export const GROK_BOT_COMPARISON: Comparison = {
       icon: "tag",
       topic: "Price and account",
       openbot:
-        "Free for noncommercial use; commercial use needs a license. No account is necessary on one computer. Your agents use the plans you already pay for.",
+        "Free for noncommercial use; commercial use needs a license. Your agents use the plans you already pay for.",
       rival: "Included with paid Cursor plans and SuperGrok subscriptions. Needs a Cursor account.",
       better: "openbot",
     },
@@ -155,7 +155,7 @@ export const GROK_BOT_COMPARISON: Comparison = {
     {
       question: "Why choose OpenBot over Grok Bot?",
       answer:
-        "Your agents use the AI plans you already pay for, such as ChatGPT, Claude, Gemini or Grok, or your own model. OpenBot keeps your workspaces, chats and files on your own computer, the app is free and works without an account, and its source code is on GitHub. You can reach your agents from your phone too. Grok Bot is the better fit only when you do not want to keep any computer on for your agents.",
+        "Your agents use the AI plans you already pay for, such as ChatGPT, Claude, Gemini or Grok, or your own model. OpenBot keeps your workspaces, chats and files on your own computer, the app is free, and its source code is on GitHub. You can reach your agents from your phone too. Grok Bot is the better fit only when you do not want to keep any computer on for your agents.",
     },
     {
       question: "Can I use my ChatGPT, Claude or Gemini subscription with OpenBot?",

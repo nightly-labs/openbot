@@ -65,7 +65,7 @@ export interface DownloadPageContent {
 
 const PROVIDERS_ANSWER = LANDING_FAQ.find((entry) => entry.question === "Which AI models can OpenBot use?")?.answer;
 const FREE_ANSWER =
-  "Yes. The app costs $0, with no locked features, and needs no account. You pay only your AI provider, through the plan or API key you already have.";
+  "Yes. The app costs $0, with no locked features. You pay only your AI provider, through the plan or API key you already have.";
 const CONNECT_STEP: DownloadStep = {
   text: "Connect a provider, such as Codex with your ChatGPT plan or Claude Code with your Claude plan. Then describe the agent you want in one prompt and save it.",
 };

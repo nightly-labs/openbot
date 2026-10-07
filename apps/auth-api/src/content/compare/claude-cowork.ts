@@ -12,12 +12,12 @@ const CLAUDE_HELP = "https://support.claude.com/en/articles";
 export const CLAUDE_COWORK_COMPARISON: Comparison = {
   rival: { name: "Claude Cowork", mark: "claude-cowork" },
   answer:
-    "Choose OpenBot if you want your agents on your own computer, with Claude and the other AI plans you already pay for, such as ChatGPT, Gemini or Grok: the app is free and needs no account. Choose Claude Cowork if you use only Claude, and you want an agent in Anthropic's cloud that keeps working with no computer of yours on.",
+    "Choose OpenBot if you want your agents on your own computer, with Claude and the other AI plans you already pay for, such as ChatGPT, Gemini or Grok: the app is free. Choose Claude Cowork if you use only Claude, and you want an agent in Anthropic's cloud that keeps working with no computer of yours on.",
   chooseOpenBot: [
     "You want Claude, ChatGPT, Gemini, Grok and Cursor agents in one team, or your own model.",
     "Your files and chats must stay on your own computer, not in Anthropic's cloud.",
     "You want a team of agents that give work to each other, each with its own job.",
-    "You want a free app that works without an account, and source code that you can read.",
+    "You want a free app, and source code that you can read.",
   ],
   rivalPlans:
     "Claude Cowork uses only Claude models. It needs a paid Claude plan: Pro from $17 a month, Max from $100, Team from $20 a seat, or Enterprise.",
@@ -80,7 +80,7 @@ export const CLAUDE_COWORK_COMPARISON: Comparison = {
       icon: "tag",
       topic: "Price and account",
       openbot:
-        "Free for noncommercial use; commercial use needs a license. No account is necessary on one computer. Your agents use the plans you already pay for.",
+        "Free for noncommercial use; commercial use needs a license. Your agents use the plans you already pay for.",
       rival:
         "Needs a paid Claude plan: Pro from $17 a month, Max from $100, Team from $20 a seat, or Enterprise. Cowork uses your limits faster than chat.",
       better: "openbot",
@@ -160,7 +160,7 @@ export const CLAUDE_COWORK_COMPARISON: Comparison = {
     {
       question: "Why choose OpenBot over Claude Cowork?",
       answer:
-        "Your agents can use Claude, ChatGPT, Gemini or Grok, or your own model, and they work together as a team. OpenBot keeps your workspaces, chats and files on your own computer. The app is free, works without an account, and its source code is on GitHub. Claude Cowork is the better fit when you use only Claude and want an agent with no computer of yours to keep on.",
+        "Your agents can use Claude, ChatGPT, Gemini or Grok, or your own model, and they work together as a team. OpenBot keeps your workspaces, chats and files on your own computer. The app is free, and its source code is on GitHub. Claude Cowork is the better fit when you use only Claude and want an agent with no computer of yours to keep on.",
     },
     {
       question: "Can I use my Claude plan with OpenBot?",

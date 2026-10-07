@@ -262,7 +262,7 @@ The skill preview shows this text. **Try skill** appends it and a skill referenc
 
 ## Local skills
 
-Ask an agent to create a skill from a reusable workflow. It prepares a folder with `SKILL.md` and calls `create_skill`. The skill is saved in a shared local library and enabled for that agent. No account is required. Other agents can add it through **Settings → Skills → Local skills**.
+Ask an agent to create a skill from a reusable workflow. It prepares a folder with `SKILL.md` and calls `create_skill`. The skill is saved in a shared local library and enabled for that agent. Other agents can add it through **Settings → Skills → Local skills**.
 
 Agents can use `list_local_skills`, `read_local_skill`, `revise_skill`, and `install_local_skill`. Revisions require the version read by the agent and retain previous versions. Updating a library skill does not update installed copies: use the Update chip or install an exact revision. Modified installed files are protected. To publish a local skill, submit its folder separately through the marketplace.
 

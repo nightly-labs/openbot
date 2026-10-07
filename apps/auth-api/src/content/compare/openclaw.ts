@@ -78,7 +78,7 @@ export const OPENCLAW_COMPARISON: Comparison = {
       icon: "tag",
       topic: "Price and account",
       openbot:
-        "Free for noncommercial use; commercial use needs a license. No account is necessary on one computer. Your agents use the plans you already pay for.",
+        "Free for noncommercial use; commercial use needs a license. Your agents use the plans you already pay for.",
       rival:
         "Free under the MIT license, also for commercial use. No subscription and no hosted tier. You pay your model provider, and a VPS if you rent one.",
       better: "rival",

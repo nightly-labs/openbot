@@ -11,12 +11,12 @@ const DEVIN_DOCS = "https://docs.devin.ai";
 export const DEVIN_COMPARISON: Comparison = {
   rival: { name: "Devin", mark: "devin" },
   answer:
-    "Choose OpenBot if you want coding agents on your own computer that use the AI plans you already pay for, such as ChatGPT, Claude, Gemini or Grok: the app is free and needs no account. Choose Devin if you want an autonomous software engineer that works in Cognition's cloud, with no computer of yours on, and starts from Slack, GitHub, Linear or Jira.",
+    "Choose OpenBot if you want coding agents on your own computer that use the AI plans you already pay for, such as ChatGPT, Claude, Gemini or Grok: the app is free. Choose Devin if you want an autonomous software engineer that works in Cognition's cloud, with no computer of yours on, and starts from Slack, GitHub, Linear or Jira.",
   chooseOpenBot: [
     "You already pay for ChatGPT, Claude, Gemini, Grok or Cursor, and want your agents to use that plan.",
     "Your code and chats must stay on your own computer, not in Cognition's cloud.",
     "You want no app vendor to keep your code or train models on it.",
-    "You want native apps for iPhone and Android, or a free app that works without an account.",
+    "You want native apps for iPhone and Android, or a free app.",
   ],
   rivalPlans:
     "Devin chooses from models by Anthropic, OpenAI, Google, Cognition and open-source labs, and you pay Devin for use: Free with a light quota, Pro $20 a month, Max $200 a month. It does not take your own API keys.",
@@ -79,7 +79,7 @@ export const DEVIN_COMPARISON: Comparison = {
       icon: "tag",
       topic: "Price and account",
       openbot:
-        "Free for noncommercial use; commercial use needs a license. No account is necessary on one computer. Your agents use the plans you already pay for.",
+        "Free for noncommercial use; commercial use needs a license. Your agents use the plans you already pay for.",
       rival:
         "Free with a light quota. Pro $20 a month, Max $200 a month, and Teams $80 a month plus $40 for each full seat. Every app needs a Devin account.",
       better: "openbot",
@@ -157,7 +157,7 @@ export const DEVIN_COMPARISON: Comparison = {
     {
       question: "Why choose OpenBot over Devin?",
       answer:
-        "Your agents use the AI plans you already pay for, such as ChatGPT, Claude, Gemini or Grok, or your own model. OpenBot keeps your code, chats and files on your own computer, and OpenBot does not train models on them. It has native apps for iPhone and Android. The app is free, works without an account, and its source code is on GitHub. Devin is the better fit when you want agents in the cloud that start from Slack, GitHub or Jira.",
+        "Your agents use the AI plans you already pay for, such as ChatGPT, Claude, Gemini or Grok, or your own model. OpenBot keeps your code, chats and files on your own computer, and OpenBot does not train models on them. It has native apps for iPhone and Android. The app is free, and its source code is on GitHub. Devin is the better fit when you want agents in the cloud that start from Slack, GitHub or Jira.",
     },
     {
       question: "Can I use my ChatGPT, Claude or Gemini subscription with OpenBot?",

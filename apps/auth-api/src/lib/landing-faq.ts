@@ -39,10 +39,6 @@ export const LANDING_FAQ: readonly LandingQuestion[] = [
       "Workspaces, conversations, attachments and browser data stay on the computer that runs OpenBot. The AI provider you choose receives the prompts that your agents send to it, and the pages that agents open use the network.",
   },
   {
-    question: "Do I need an account?",
-    answer: "No. The app works without an account. You need one only to invite other people to your team.",
-  },
-  {
     question: "Which computers can run OpenBot?",
     answer:
       "macOS 13 or newer on Apple silicon or Intel, Windows 10 or newer on x64, and Linux on x64 or arm64 as an AppImage.",
