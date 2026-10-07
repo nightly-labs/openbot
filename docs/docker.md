@@ -50,8 +50,13 @@ and to Signal and TURN for remote use. The Team API listens on `127.0.0.1` in th
 | --- | --- |
 | `latest` | The newest release. |
 | `<version>`, for example `0.30.0` | One release. Use it to choose when to upgrade. |
+| `v<version>` | Alias for `<version>` in releases published after 0.31.0. Earlier releases use the tag without `v`. |
 | `sha-<commit>` | The release of that commit. |
 | `<version>-amd64`, `<version>-arm64` | One release for one architecture. |
+
+Public images need no GHCR sign-in. If `latest` or a version without `v` returns `denied`,
+`unauthorized` or `not found`, a maintainer must check the package visibility. See
+[Docker package access](RELEASING.md#docker-package-access).
 
 ## Data
 

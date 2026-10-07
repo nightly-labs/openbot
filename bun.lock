@@ -19,6 +19,7 @@
         "@openbot/i18n": "workspace:*",
         "@openbot/logging": "workspace:*",
         "@openbot/team-client": "workspace:*",
+        "@openbot/telemetry": "workspace:*",
         "@openbot/ui": "workspace:*",
         "@openbot/user-errors": "workspace:*",
         "@openpanel/web": "catalog:",
@@ -122,6 +123,7 @@
         "@openbot/i18n": "workspace:*",
         "@openbot/logging": "workspace:*",
         "@openbot/team-client": "workspace:*",
+        "@openbot/telemetry": "workspace:*",
         "@openbot/user-errors": "workspace:*",
         "@openpanel/react-native": "1.4.1",
         "@react-native-masked-view/masked-view": "0.3.2",
@@ -276,6 +278,19 @@
         "typescript": "catalog:",
       },
     },
+    "packages/telemetry": {
+      "name": "@openbot/telemetry",
+      "version": "0.0.0",
+      "dependencies": {
+        "@openbot/contracts": "workspace:*",
+        "effect": "catalog:",
+      },
+      "devDependencies": {
+        "@types/node": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
     "packages/ui": {
       "name": "@openbot/ui",
       "version": "0.0.0",
@@ -286,6 +301,7 @@
         "@openbot/contracts": "workspace:*",
         "@openbot/i18n": "workspace:*",
         "@openbot/team-client": "workspace:*",
+        "@openbot/telemetry": "workspace:*",
         "@openbot/user-errors": "workspace:*",
         "@speed-highlight/core": "catalog:",
         "@tanstack/virtual-core": "catalog:",
@@ -957,6 +973,8 @@
     "@openbot/site-router": ["@openbot/site-router@workspace:apps/site-router"],
 
     "@openbot/team-client": ["@openbot/team-client@workspace:packages/team-client"],
+
+    "@openbot/telemetry": ["@openbot/telemetry@workspace:packages/telemetry"],
 
     "@openbot/ui": ["@openbot/ui@workspace:packages/ui"],
 

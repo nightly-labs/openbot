@@ -13,6 +13,7 @@ export function MobileAnalyticsLifecycle() {
   useEffect(() => {
     if (!ready || loading) return;
     if (foreground && !previous.current) {
+      mobileAnalytics.retryReports();
       mobileAnalytics.track("mobile_app_opened", {
         kind: opened.current ? "foreground" : "cold_start",
         signed_in: Boolean(session),

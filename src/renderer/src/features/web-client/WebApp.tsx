@@ -5,11 +5,13 @@ import { pluginSlugFromWebAppSearch, WEB_APP_PLUGIN_PARAM } from "@openbot/contr
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { formatLocale, resolveLocale } from "@openbot/i18n";
 import { sourceText } from "@openbot/i18n/source";
-import { Toaster, toast } from "@openbot/ui";
+import { classifyFailure } from "@openbot/telemetry";
+import { NotificationObserver, Toaster, toast } from "@openbot/ui";
 import { AccountLogin } from "@openbot/ui/features/account/AccountLogin";
 import { AppLoadingScreen } from "@openbot/ui/features/account/AppLoadingScreen";
 import { currentText } from "@openbot/ui/text";
-import { createSignal, createStore, onSettled, Show } from "solid-js";
+import { createEffect, createSignal, createStore, onSettled, Show } from "solid-js";
+import { configureWebReports, reportNotification } from "../../error-reports";
 // Copying a selection with a formula in it gives its LaTeX source, as on desktop.
 import "katex/contrib/copy-tex";
 import { StaticI18nProvider } from "../../i18n-context";
@@ -82,6 +84,12 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
     login: { status: "signed_out" },
     resendAt: 0,
   });
+  createEffect(
+    () => ({ account: state.account, loaded: state.loaded }),
+    ({ account, loaded }) => {
+      if (loaded) configureWebReports(account);
+    },
+  );
   // Kept here, not in the workspace, so each link waits through sign-in.
   const [agentTemplateId, setAgentTemplateId] = createSignal(takeAgentTemplateLink());
   const [inviteUrl, setInviteUrl] = createSignal(takeInviteLink());
@@ -200,6 +208,7 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
         if (state.account)
           toast.error(
             text.sourceText(error instanceof Error ? error.message : text.t("webClient.login.sessionFailed")),
+            { report: { operation: "other", source: "system", cause_code: classifyFailure(error) } },
           );
         else
           setState((draft) => {
@@ -278,59 +287,61 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
       locale={resolveLocale(languagePreference.language(), navigator.language)}
       formatLocale={formatLocale(languagePreference.language(), navigator.language)}
     >
-      <div class="web-app">
-        <Toaster />
-        <Show when={state.loaded}>
-          <Show
-            keyed
-            when={state.account?.id}
-            fallback={
-              <AccountLogin
-                variant={variant}
-                state={state.login}
-                onRetry={checkSession}
-                onRequestEmailCode={start}
-                onVerifyEmailCode={verify}
-                onReset={async () => {
-                  clearSession();
-                  setState((draft) => {
-                    draft.resendAt = 0;
-                  });
-                }}
-              />
-            }
-          >
-            {(accountId) => (
-              <WebWorkspace
-                accountId={accountId}
-                accountEmail={state.account?.email ?? ""}
-                accountName={state.account?.name ?? null}
-                accountAvatarUrl={state.account?.avatarUrl ?? null}
-                accountFetch={accountFetch}
-                onSessionCheck={checkSession}
-                accountSessionEnded={() => sessionEnded}
-                onLogout={logout}
-                createRuntime={props.createRuntime}
-                agentTemplateId={agentTemplateId()}
-                onAgentTemplateClose={() => setAgentTemplateId(null)}
-                inviteUrl={inviteUrl()}
-                onInviteClose={() => setInviteUrl(null)}
-                pluginSlug={pluginSlug()}
-                onPluginSlugConsumed={() => setPluginSlug(null)}
-                billingReturn={billingReturn()}
-                onBillingReturnConsumed={() => setBillingReturn(false)}
-                hostingReturn={hostingReturn()}
-                onHostingReturnConsumed={() => setHostingReturn(null)}
-                language={languagePreference.language()}
-                onChangeLanguage={languagePreference.setLanguage}
-              />
-            )}
+      <NotificationObserver onShown={reportNotification}>
+        <div class="web-app">
+          <Toaster onToastShown={reportNotification} />
+          <Show when={state.loaded}>
+            <Show
+              keyed
+              when={state.account?.id}
+              fallback={
+                <AccountLogin
+                  variant={variant}
+                  state={state.login}
+                  onRetry={checkSession}
+                  onRequestEmailCode={start}
+                  onVerifyEmailCode={verify}
+                  onReset={async () => {
+                    clearSession();
+                    setState((draft) => {
+                      draft.resendAt = 0;
+                    });
+                  }}
+                />
+              }
+            >
+              {(accountId) => (
+                <WebWorkspace
+                  accountId={accountId}
+                  accountEmail={state.account?.email ?? ""}
+                  accountName={state.account?.name ?? null}
+                  accountAvatarUrl={state.account?.avatarUrl ?? null}
+                  accountFetch={accountFetch}
+                  onSessionCheck={checkSession}
+                  accountSessionEnded={() => sessionEnded}
+                  onLogout={logout}
+                  createRuntime={props.createRuntime}
+                  agentTemplateId={agentTemplateId()}
+                  onAgentTemplateClose={() => setAgentTemplateId(null)}
+                  inviteUrl={inviteUrl()}
+                  onInviteClose={() => setInviteUrl(null)}
+                  pluginSlug={pluginSlug()}
+                  onPluginSlugConsumed={() => setPluginSlug(null)}
+                  billingReturn={billingReturn()}
+                  onBillingReturnConsumed={() => setBillingReturn(false)}
+                  hostingReturn={hostingReturn()}
+                  onHostingReturnConsumed={() => setHostingReturn(null)}
+                  language={languagePreference.language()}
+                  onChangeLanguage={languagePreference.setLanguage}
+                />
+              )}
+            </Show>
           </Show>
-        </Show>
-        <Show when={loadingShown()}>
-          <AppLoadingScreen ready={state.loaded} onExited={() => setLoadingShown(false)} />
-        </Show>
-      </div>
+          <Show when={loadingShown()}>
+            <AppLoadingScreen ready={state.loaded} onExited={() => setLoadingShown(false)} />
+          </Show>
+        </div>
+      </NotificationObserver>
     </StaticI18nProvider>
   );
 }

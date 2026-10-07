@@ -1,4 +1,5 @@
 import type { CentralAuthUser, ServerSummary } from "@openbot/contracts/ipc";
+import { classifyFailure } from "@openbot/telemetry";
 import type { CustomAgentSettingsApi } from "@openbot/ui/features/custom-providers/CustomAgentSettings";
 import { providerDiagnosticsText } from "@openbot/ui/features/provider-diagnostics/provider-diagnostics";
 import type { BitwardenConnectorPanelProps } from "@openbot/ui/features/settings/BitwardenConnectorPanel";
@@ -468,7 +469,10 @@ function ServerSettings(props: {
       (error: unknown) => {
         const text = currentText();
         actionToast.error(text.t("server.select.failedTitle"), {
-          description: text.errorMessage(error, text.t("server.select.failedDescription")),
+          ...{
+            description: text.errorMessage(error, text.t("server.select.failedDescription")),
+          },
+          report: { operation: "other", source: "action", cause_code: classifyFailure(error) },
         });
         openServerSettings(server.id, null, "providers");
       },

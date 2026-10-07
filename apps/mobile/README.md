@@ -458,7 +458,7 @@ of both platforms is required before release.
 ### Event catalog
 
 Every event has `surface=mobile`, `platform=ios|android`, `environment=production`,
-`event_schema_version=1`, `app_version` and `build_number`. Operation outcomes use `result` and,
+`event_schema_version=2`, `app_version` and `build_number`. Operation outcomes use `result` and,
 where available, `duration_ms`. Failure codes are fixed categories, never raw error text.
 
 | Event | Meaning |
@@ -492,7 +492,8 @@ host owner and does not identify which client started the work. Analytics does n
 The local phone-wide preference is loaded before SDK creation. If it cannot be read, collection
 stays off. Opt-out clears pending events and blocks later sends; it cannot retract a request already
 sent. Account changes reset identity in order, and late results from an old account are discarded.
-There is no persistent offline analytics queue. Transport failures can lose events, and collection
+Error notifications and failed-action diagnostics use a persistent local queue. Other product
+events still have no disk queue. Transport failures can lose those product events, and collection
 never blocks product actions. Session replay, automatic screen capture, route IDs, QR values, tokens,
 file names, contents, URLs and raw errors are excluded. The SDK's Android referrer and path metadata
 are removed again at the final send filter. Account ID and normalized email identify the profile;
@@ -506,3 +507,10 @@ new signed-out activity can be claimed by the next sign-in. There is no disk que
 Existing anonymous events already sent by older builds are not reassigned by this fix.
 If mobile credentials belong to another project, replace both production variables with credentials
 for a write-only client in **Openbot**, then ship a build or compatible update with those values.
+
+Mobile schema generation 2 adds safe error diagnostics. Native error alerts and chat send errors
+emit `notification_shown`; existing failed actions emit a separate `client_operation_failed`.
+Only fixed cause, source, operation, and provider/model fields are sent. No alert text is sent.
+The file queue holds at most 1,000 reports, 1 MiB, and seven days, and sends only after a local
+write succeeds. Foreground and host reconnection trigger retries. Opt-out and account changes
+clear this queue. See [the analytics contract](../../ANALYTICS.md#reliable-error-reports).

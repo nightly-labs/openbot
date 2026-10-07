@@ -12,6 +12,7 @@ export class MobileConnectionAnalytics {
     const action = this.everConnected ? "reconnect" : "connect";
     return (result: "succeeded" | "failed", stage: RemoteConnectionStage) => {
       if (result === "succeeded") {
+        this.analytics.retryReports();
         this.connected = true;
         this.everConnected = true;
       }

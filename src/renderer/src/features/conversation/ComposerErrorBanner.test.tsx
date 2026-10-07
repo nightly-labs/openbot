@@ -1,5 +1,6 @@
 import { ComposerErrorBanner } from "@openbot/ui/features/conversation/ComposerErrorBanner";
-import { fireEvent, render, screen } from "@solidjs/testing-library";
+import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
+import { createSignal } from "solid-js";
 import { describe, expect, it, vi } from "vitest";
 
 describe("ComposerErrorBanner", () => {
@@ -38,4 +39,20 @@ describe("ComposerErrorBanner", () => {
     await fireEvent.keyDown(screen.getByRole("alert"), { key: "Escape" });
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
+});
+
+it("reports each banner presentation once without including the display text", async () => {
+  const onShown = vi.fn();
+  const [message, setMessage] = createSignal("Private provider text");
+  const [action, setAction] = createSignal("Retry");
+  render(() => (
+    <ComposerErrorBanner message={message()} action={<span>{action()}</span>} onShown={onShown} onDismiss={() => {}} />
+  ));
+  await waitFor(() => expect(onShown).toHaveBeenCalledOnce());
+  setAction("Try again");
+  await screen.findByText("Try again");
+  expect(onShown).toHaveBeenCalledOnce();
+  expect(onShown).toHaveBeenCalledWith();
+  setMessage("Second private failure");
+  await waitFor(() => expect(onShown).toHaveBeenCalledTimes(2));
 });

@@ -1,6 +1,6 @@
 import * as Clipboard from "expo-clipboard";
 import { useState } from "react";
-import { Alert } from "react-native";
+import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
@@ -15,7 +15,7 @@ export function useCopyMessage(text: string) {
       return true;
     } catch {
       void haptics.notification("error");
-      Alert.alert(t("mobile.chat.message.copyFailed"), t("mobile.chat.copyFailedMessage"));
+      showFailureAlert(undefined, "turn", t("mobile.chat.message.copyFailed"), t("mobile.chat.copyFailedMessage"));
       return false;
     }
   }

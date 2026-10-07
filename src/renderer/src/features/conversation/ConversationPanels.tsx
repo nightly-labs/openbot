@@ -1,4 +1,5 @@
 import type { ServerSummary } from "@openbot/contracts/ipc";
+import { classifyFailure } from "@openbot/telemetry";
 import { useText } from "@openbot/ui/text";
 import { actionToast } from "../../action-toast";
 import { createSettingsPanelWidth, saveSettingsPanelWidth } from "../../components/settings-panel-width";
@@ -101,7 +102,10 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
                 .storage.openLocation({ agentId })
                 .catch((error) =>
                   actionToast.error(t("conversation.panels.openWorkspaceFailed"), {
-                    description: errorMessage(error, t("conversation.panels.tryAgain")),
+                    ...{
+                      description: errorMessage(error, t("conversation.panels.tryAgain")),
+                    },
+                    report: { operation: "turn", source: "action", cause_code: classifyFailure(error) },
                   }),
                 )
           : undefined,

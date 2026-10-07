@@ -112,7 +112,7 @@ jobs:
         run: |
           bun run lint
           bun run typecheck
-          bun run test:desktop -- apps/mobile/src packages/contracts packages/team-client scripts/mobile-release.test.ts
+          bun run test:desktop -- apps/mobile/src packages/contracts packages/team-client packages/telemetry scripts/mobile-release.test.ts
 
       - name: Build production Android on this runner
         working-directory: apps/mobile

@@ -127,7 +127,9 @@ const ServerSelection = createSimpleContext({
       try {
         if (!(await selectServer(serverId, false))) return;
       } catch {
-        actionToast.error(currentText().t("server.select.openAgentFailed", { name: agent.name }));
+        actionToast.error(currentText().t("server.select.openAgentFailed", { name: agent.name }), {
+          report: { operation: "team", source: "action", cause_code: "unknown" },
+        });
         return;
       }
       // Published rather than called: if this was a switch, the navigation

@@ -2,6 +2,7 @@ import { type AgentEvent, type BrowserTab, isAgentEvent, routineRunConversationE
 import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentRemovalFailed } from "./agent/agent-removal";
+import type { FailureSignal } from "./agent/failure-signal";
 import type { AgentProvider } from "./agent-client";
 import type { AgentService } from "./agent-service";
 import {
@@ -272,6 +273,42 @@ describe.sequential("AgentService: restart", () => {
     );
     expect((await runCauseEffect(service.readConversation("chief"))).messages).toEqual([
       expect.objectContaining(local),
+    ]);
+  });
+
+  it("reports a structured provider error once when its message is absent", async () => {
+    const { store, mailbox } = stores(root);
+    let client: FakeAgentClient | undefined;
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        client = new FakeAgentClient(provider, "", false);
+        return client;
+      },
+    });
+    const events: AgentEvent[] = [];
+    const failures: FailureSignal[] = [];
+    service.on("event", (event) => events.push(event));
+    service.on("failure", (failure) => failures.push(failure));
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Say hi" }));
+    await waitFor(() => events.some((event) => event.type === "turn-started"));
+    const started = events.find((event) => event.type === "turn-started");
+    const threadId = store.activeProviderSession("chief")?.externalSessionId;
+    if (started?.type !== "turn-started" || !client || !threadId) throw new Error("The fake Codex turn did not start.");
+    client.emit(
+      "notification",
+      notification("error", { threadId, turnId: started.turnId, error: { code: "invalid_upload_request" } }),
+    );
+    client.emit(
+      "notification",
+      notification("turn/completed", { threadId, turn: { id: started.turnId, status: "failed" } }),
+    );
+    await waitForQueue(service, "chief", (queue) => queue.deliveries.some((delivery) => delivery.status === "failed"));
+    expect(failures.filter((failure) => failure.turnId === started.turnId)).toEqual([
+      expect.objectContaining({ causeCode: "invalid_upload_request", provider: "codex" }),
     ]);
   });
 

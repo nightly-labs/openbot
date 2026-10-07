@@ -25,6 +25,7 @@ import { useText } from "@openbot/ui/text";
 import { createSignal, onCleanup } from "solid-js";
 import { readActionSoundChoice, replayActionSoundChoice, setActionSoundChoice } from "../../action-sounds";
 import { isCompletionSoundEnabled, setCompletionSoundEnabled } from "../../completion-sound";
+import { setWebReportsEnabled, webReportsEnabled } from "../../error-reports";
 import { currentDevicePlatform, setSendShortcutMode, useSendShortcutMode } from "../../send-shortcut-preference";
 import type { WebAccountCalls } from "./web-account";
 
@@ -62,6 +63,7 @@ export interface WebAccountSettingsProps {
  * of their server.
  */
 export default function WebAccountSettings(props: WebAccountSettingsProps) {
+  const [reportsEnabled, setReportsEnabled] = createSignal(webReportsEnabled());
   const { t } = useText();
   const [activeTab, setActiveTab] = createSignal<WebAccountSettingsTab>("profile");
   const [completionSound, setCompletionSound] = createSignal(isCompletionSoundEnabled());
@@ -166,6 +168,18 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
                   />
                 </ItemActions>
               </Item>
+            </ItemGroup>
+          </SettingsSection>
+          <SettingsSection title={t("settings.analytics.webTitle")}>
+            <ItemGroup class="settings-modal-card">
+              <SwitchField
+                checked={reportsEnabled()}
+                onChange={(value) => {
+                  setReportsEnabled(setWebReportsEnabled(value));
+                }}
+                label={t("settings.analytics.webTitle")}
+                description={t("settings.analytics.webDescription")}
+              />
             </ItemGroup>
           </SettingsSection>
           <SettingsSection title={t("settings.notifications.title")}>

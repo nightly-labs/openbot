@@ -108,7 +108,7 @@ export function ConfirmDialog(props: ConfirmDialogProps): JSX.Element {
                   <div class="ui-confirm-dialog-body">{props.children}</div>
                 </Show>
                 <Show when={props.error}>
-                  <Alert tone="danger" role="alert" class="ui-confirm-dialog-error">
+                  <Alert tone="danger" report={false} role="alert" class="ui-confirm-dialog-error">
                     <AlertIcon>
                       <TriangleAlert />
                     </AlertIcon>

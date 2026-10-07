@@ -49,7 +49,7 @@ describe("desktop analytics", () => {
       __referrer: "",
       surface: "desktop",
       environment: "production",
-      event_schema_version: 6,
+      event_schema_version: 7,
       app_version: "1.2.3",
       platform: "darwin",
     });
