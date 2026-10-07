@@ -165,7 +165,11 @@ export function ComposerUpdateNotice(props: {
   };
   return (
     <ComposerNotice
-      body={t("composer.update.body", { provider: agentProviderName(props.provider) })}
+      body={
+        props.onUpdate
+          ? t("composer.update.body", { provider: agentProviderName(props.provider) })
+          : t("composer.update.manual", { provider: agentProviderName(props.provider) })
+      }
       action={
         <Show when={props.onUpdate}>
           <Button

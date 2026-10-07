@@ -95,3 +95,11 @@ export const Updating: Story = {
     </ComposerStack>
   ),
 };
+
+export const ManualUpdateRequired: Story = {
+  render: () => (
+    <ComposerStack>
+      <ComposerUpdateNotice provider="codex" />
+    </ComposerStack>
+  ),
+};

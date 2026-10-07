@@ -9,6 +9,7 @@ export const messages = {
   "composer.signIn.label": "{provider} にサインイン",
   "composer.signIn.action": "サインイン",
   "composer.update.body": "続行するには{provider}を更新してください。",
+  "composer.update.manual": "続行するには、{provider}を実行しているコンピューターで更新してください。",
   "composer.update.pending": "更新中…",
   "composer.update.action": "更新",
   "composer.usageLimit.resets": "{provider} の上限をすべて使用しました。上限は {reset} にリセットされます。",

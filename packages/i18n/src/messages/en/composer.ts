@@ -8,6 +8,7 @@ export const messages = defineMessages("composer", {
   "composer.signIn.label": "Sign in to {provider}",
   "composer.signIn.action": "Sign in",
   "composer.update.body": "Update {provider} to continue.",
+  "composer.update.manual": "Update {provider} on the computer that runs it to continue.",
   "composer.update.pending": "Updating…",
   "composer.update.action": "Update",
   "composer.usageLimit.resets": "You used all of your {provider} limit. It resets {reset}.",

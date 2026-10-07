@@ -221,7 +221,9 @@ export function ConversationComposer() {
           {(status) => (
             <ComposerUpdateNotice
               provider={status().id}
-              onUpdate={props.onDownloadProvider}
+              onUpdate={
+                props.providerRuntimeStatuses?.[status().id]?.availableVersion ? props.onDownloadProvider : undefined
+              }
               updating={
                 props.providerRuntimeStatuses?.[status().id]?.phase === "downloading" ||
                 props.providerRuntimeStatuses?.[status().id]?.phase === "finishing"

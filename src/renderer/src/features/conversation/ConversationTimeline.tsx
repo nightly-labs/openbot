@@ -655,9 +655,10 @@ export function ConversationTimeline() {
                             onDownload={(attachment) => attachmentAction(attachment, "download")}
                             class={pending() ? "message-entry-pending" : undefined}
                             footer={
-                              pending() && !(pendingState() === "failed" && providerUpdateRequired()) ? (
+                              pending() ? (
                                 <PendingSendStatus
                                   state={pendingState()}
+                                  updateRequired={Boolean(providerUpdateRequired())}
                                   error={pendingSend()?.error ?? null}
                                   retrySafe={pendingRetrySafe()}
                                   canEdit={!composerHasContent() && !editingDeliveryId()}
