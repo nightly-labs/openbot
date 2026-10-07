@@ -36,6 +36,7 @@ import { ConnectionHeaderStatus } from "@/features/workspace/components/connecti
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { mobileSidebarItems } from "@/features/workspace/model/sidebar-layout";
 import { useAppLoadingOverlay, useScreenLoadingLabel } from "@/shared/components/app-loading-overlay";
+import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
 import { haptics } from "@/shared/lib/haptics";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
@@ -189,7 +190,7 @@ export function ConnectedScreen() {
     () => new Map(agents.filter((agent) => agent.serverId === activeServer.id).map((agent) => [agent.id, agent])),
     [agents, activeServer.id],
   );
-  const [foreground, muted, background] = useThemeColor(["foreground", "muted", "background"]);
+  const [foreground, muted] = useThemeColor(["foreground", "muted"]);
   const iconColor = String(foreground);
   const mutedColor = String(muted);
   const hasSelectedServer = servers.some((server) => server.id === activeServer.id);
@@ -275,11 +276,10 @@ export function ConnectedScreen() {
   return (
     <View className="flex-1 bg-background">
       {listReady && showAgentsScene ? (
-        // iOS draws the header over the screen; Android lays the screen out below its opaque header.
-        // The bottom matches the list's `pb-safe-offset-4`.
+        // The transparent header covers the top of the screen. The bottom matches the list's `pb-safe-offset-4`.
         <EmptyAgentsScene
           onAddAgent={addAgent}
-          style={{ paddingTop: isIOS ? headerHeight : 0, paddingBottom: insets.bottom + 16 }}
+          style={{ paddingTop: headerHeight, paddingBottom: insets.bottom + 16 }}
         />
       ) : listReady ? (
         <Animated.FlatList
@@ -291,6 +291,8 @@ export function ConnectedScreen() {
           className="flex-1 bg-background"
           alwaysBounceVertical={false}
           contentContainerClassName={items.length > 0 ? "pb-safe-offset-4" : "grow pb-safe-offset-4"}
+          // Android has no content inset, so the list starts below the transparent header.
+          contentContainerStyle={isAndroid ? { paddingTop: headerHeight } : undefined}
           // Keep the native header inset even when short content cannot scroll or bounce.
           contentInsetAdjustmentBehavior="always"
           data={items}
@@ -411,6 +413,10 @@ export function ConnectedScreen() {
         />
       ) : null}
 
+      {/* The list scrolls under the transparent header, which gets the blur of the chat header. iOS 27
+          shows no native scroll edge effect here. The native top edge is hidden to avoid two effects. */}
+      <SheetScrollEdgeEffect style={{ height: headerHeight + 20, left: 0, position: "absolute", right: 0, top: 0 }} />
+
       <Stack.Screen
         options={{
           headerLeft: isAndroid
@@ -460,8 +466,8 @@ export function ConnectedScreen() {
               )
             : undefined,
           headerTintColor: foreground,
-          // The Android header is opaque. It takes the list color, as the transparent iOS header shows it.
-          ...(isAndroid ? { headerStyle: { backgroundColor: background } } : null),
+          headerTransparent: true,
+          scrollEdgeEffects: { top: "hidden" },
           title: "",
         }}
       />

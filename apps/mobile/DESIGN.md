@@ -36,6 +36,7 @@ Native ownership takes priority over HeroUI for navigation chrome. HeroUI owners
 - Obtain Liquid Glass through native navigation components. Do not imitate it with blur views, gradients, translucent HeroUI cards, shadows, or screenshots of glass.
 - Do not replace native headers, tab bars, toolbars, or search bars with `GlassView`. `expo-glass-effect` is for deliberate custom content surfaces, not for rebuilding system chrome.
 - Preserve platform safe-area and scroll-edge behavior. Ordinary screens normally use automatic content inset adjustment. Native sheets use the shared `SheetScrollView` header handling described below; do not add a second automatic inset or screen-local spacer.
+- The home list is the fallback exception for a full screen: iOS 27 shows no native scroll edge effect under its header. Its native header is transparent on iOS and Android, the native top edge is hidden, and the screen draws the canvas `SheetScrollEdgeEffect` of the chat header under the native buttons. Android pads the list by the header height, because it has no content inset.
 - Avoid forcing opaque colors or bespoke backgrounds onto native chrome unless the product requirement explicitly calls for it. Let the operating system adapt materials to the platform version, appearance, accessibility settings, and scroll state.
 - Treat older iOS versions and Android as first-class fallbacks. The interface must remain complete and readable when Liquid Glass is unavailable or reduced transparency is enabled.
 - Use platform-native icons in native navigation (`sf` on iOS and the corresponding Material icon on Android). Use the existing application icon convention for HeroUI content.
@@ -172,8 +173,8 @@ scrolling does not update React state. This approximates a variable blur radius 
 Expo APIs, as described in [Beautiful Expo](https://github.com/davidmokos/beautiful-expo).
 Android sheets draw no edge blur. Below the opaque native header, or at the top of a sheet with no
 header, the content fades into a 32 dp masked `bg-sheet` layer. The fade follows the same rule as the
-iOS blur. A sticky custom header, such as search, uses the opaque `bg-sheet` color. Chat and drawer
-edges keep their canvas effect.
+iOS blur. A sticky custom header, such as search, uses the opaque `bg-sheet` color. Chat, home list
+and drawer edges keep their canvas effect.
 
 The values belong to `packages/brand/src/tokens.css` and `tokens-native.css`; `global.css` only
 maps them to utilities. Do not copy these hex values into components.
