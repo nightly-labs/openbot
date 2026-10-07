@@ -829,6 +829,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       agentExists: (agentId) => this.listAgents().some((agent) => agent.id === agentId),
       channelExists: (channelId) => this.channels.store.exists(channelId),
       channelRoutinesChanged: (channelId) => this.#emit({ type: "channel-routines-changed", channelId }),
+      routinesHeld: () => this.#routineTimer.held,
     });
     this.messaging = new MessagingThreads(store.database, mailbox, {
       schedule: (agentId) => this.#drain.scheduleDrain(agentId),

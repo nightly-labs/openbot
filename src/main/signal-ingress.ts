@@ -116,6 +116,9 @@ export class SignalIngress implements MessagingIngress {
   #webhookHolders = 0;
   #webhookHandler: WebhookIngressHandler | null = null;
   #webhookReady = false;
+  /** The open socket serves Slack or Discord without the webhook route, because its ticket failed. */
+  #webhookMissing = false;
+  #webhookBackoffMs = BACKOFF_START_MS;
   readonly #sessionListeners = new Set<(session: DiscordSession | null) => void>();
   readonly #routeListeners = new Set<(guildIds: ReadonlySet<string>) => void>();
 
@@ -305,7 +308,7 @@ export class SignalIngress implements MessagingIngress {
       webhookTicket = webhookTicket.pipe(
         Effect.catch(() =>
           Effect.sync(() => {
-            logger.warn("The webhook route ticket is not available. Webhooks stay offline until a reconnect.");
+            logger.warn("The webhook route ticket is not available. The socket opens again later for webhooks.");
             return null;
           }),
         ),
@@ -330,6 +333,7 @@ export class SignalIngress implements MessagingIngress {
       ...(webhookRoute === null ? {} : { webhookRoute }),
     };
     if (generation !== this.#generation || (this.#held() === 0 && this.#webhookHolders === 0)) return;
+    this.#webhookMissing = webhooks && webhookRoute === null;
     const socket = new WebSocket(bootstrap.signalUrl);
     this.#socket = socket;
     this.#apiUrl = discordApiUrl(bootstrap.signalUrl);
@@ -375,10 +379,12 @@ export class SignalIngress implements MessagingIngress {
       this.#backoffMs = BACKOFF_START_MS;
       this.#startPing(socket);
       this.#setState("online");
+      if (this.#webhookMissing) this.#retryWebhooks();
       return;
     }
     if (message.type === "webhook-ready") {
       this.#webhookReady = true;
+      this.#webhookBackoffMs = BACKOFF_START_MS;
       return;
     }
     if (message.type === "error") {
@@ -466,6 +472,17 @@ export class SignalIngress implements MessagingIngress {
     this.#retry = setTimeout(() => {
       this.#retry = null;
       this.#run(this.#open());
+    }, delay);
+  }
+
+  /** Opens the shared socket again later, with a longer delay each time, so webhooks come back. */
+  #retryWebhooks(): void {
+    if (this.#retry) return;
+    const delay = this.#webhookBackoffMs * (0.5 + Math.random() / 2);
+    this.#webhookBackoffMs = Math.min(this.#webhookBackoffMs * 2, BACKOFF_LIMIT_MS);
+    this.#retry = setTimeout(() => {
+      this.#retry = null;
+      this.reconnect();
     }, delay);
   }
 

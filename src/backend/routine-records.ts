@@ -23,6 +23,8 @@ export interface RoutineRecordsOptions {
   agentExists(agentId: string): boolean;
   channelExists(channelId: string): boolean;
   channelRoutinesChanged(channelId: string): void;
+  /** True while a restart waits for the agents. Webhook runs then wait like scheduled runs. */
+  routinesHeld(): boolean;
 }
 
 function failed(operation: string) {
@@ -100,6 +102,7 @@ export class RoutineRecords {
     routineId: string,
     event: ReceivedWebhookEvent,
   ): Effect.Effect<WebhookReceiveResult<unknown> | { kind: "unavailable" }, RoutineRecordFailed> {
+    if (this.#options.routinesHeld()) return Effect.succeed({ kind: "unavailable" });
     return owner.kind === "agent"
       ? this.#options.agentRoutines.receiveWebhook(owner.id, routineId, event).pipe(Effect.mapError(failed("receive")))
       : this.#options.channelRoutines

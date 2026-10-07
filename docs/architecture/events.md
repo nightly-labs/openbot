@@ -70,7 +70,8 @@ ticket key and the webhook route audience
 new ticket. Signal keeps revocations in memory. For 5 minutes after Signal starts, it confirms each
 ticket route with the account service. The host keeps the webhook ingress open while it has at least
 one route. When Slack or Discord share the socket, a failed webhook ticket does not stop them: the
-socket connects without webhook routes, and webhooks stay offline until the next reconnect.
+socket connects without webhook routes. After it is online, the host opens it again with a backoff
+of 2 seconds that doubles up to 5 minutes, until Signal confirms the webhook route.
 
 ## Inbound request
 
@@ -106,7 +107,8 @@ are also deduplicated. Receipts older than 7 days do not count as duplicates, an
 a new receipt is written. The
 event is kept only in the run instruction, between `--- external event input ---` markers, so a
 restart that resumes the run still has it. Runs use the existing agent and channel queues, provider
-limits, and approval controls.
+limits, and approval controls. While a restart waits for idle agents (`holdRoutines`), the host
+answers 503 and writes no receipt, so the sender retries after the restart.
 
 ## Management surfaces
 
