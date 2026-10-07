@@ -82,6 +82,27 @@
   font-size: var(--openbot-text-sm);
 }
 
+/* Why Mermaid could not draw the diagram, above its code. */
+.message-preview-failure {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+  border-bottom: 1px solid var(--openbot-border);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-xs);
+}
+
+/* Mermaid points at the error with a caret line, which lines up only in a monospace font. */
+.message-preview-failure-detail {
+  flex-basis: 100%;
+  margin: 0;
+  overflow-x: auto;
+  font-family: var(--openbot-font-mono);
+  white-space: pre;
+}
+
 .message-preview-backdrop {
   position: fixed;
   inset: 0;

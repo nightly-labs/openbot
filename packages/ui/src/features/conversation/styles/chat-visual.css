@@ -1,0 +1,35 @@
+/* A visual reply: an agent's page with no card of its own. */
+.chat-visual-frame {
+  width: 100%;
+  min-width: 0;
+  display: block;
+  border: 0;
+  background: transparent;
+  /* The page also uses the dark scheme, so its canvas stays transparent. */
+  color-scheme: dark;
+}
+
+/*
+ * A page in the chat starts at the edge of the agent's reply below it (an agent chat shows no avatar
+ * column) and is as wide as a wide agent bubble.
+ */
+.chat-visual-reply {
+  max-width: 720px;
+}
+
+/* A page that fills a panel. The page has no margin, so the frame gives it one. */
+.chat-visual-frame-fill {
+  box-sizing: border-box;
+  height: 100%;
+  padding: 12px 16px;
+}
+
+/* The box of a page that loads or that the app cannot get. */
+.chat-visual-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-xs);
+}

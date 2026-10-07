@@ -457,6 +457,13 @@ Network traffic can also occur when:
   `downloads.cursor.com` (for the download size) for Cursor, and it reads a list of blocked
   versions from `raw.githubusercontent.com/nightly-labs/openbot`. These requests contain no account, agent,
   conversation or file data;
+- an agent shows a visual reply, an agent checks its page with `html_preview`, or a user opens an
+  HTML file in the file preview. The page is HTML that the agent or the file wrote. It runs its
+  scripts in a sandbox and can load scripts, styles, fonts and images from any address, such as a
+  CDN. The server that holds those files gets the request and the network address of the computer
+  or the phone, but no OpenBot cookies. The page cannot read the app, the conversation or other
+  files. `html_preview` draws the page in a hidden window that has its own
+  session in memory. On mobile, the phone loads the page's files;
 - a user opens an explicitly labeled external support or setup link;
 - a Slack workspace is connected. See [Slack connections](#slack-connections).
 

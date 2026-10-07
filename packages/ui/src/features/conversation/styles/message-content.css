@@ -132,6 +132,22 @@
   object-fit: contain;
 }
 
+/* The image opens in the image viewer. The button keeps the image's own size. */
+.message-markdown-image-button {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  padding: 0;
+  border-radius: var(--openbot-radius-md);
+  cursor: zoom-in;
+}
+
+.message-markdown-image-button:focus-visible {
+  outline: 2px solid var(--openbot-border-focus);
+  outline-offset: 2px;
+}
+
 .message-markdown-table-scroll {
   width: 100%;
   min-width: 0;
@@ -825,6 +841,19 @@
   overflow-x: auto;
   border-radius: var(--openbot-radius-lg);
   overscroll-behavior-inline: contain;
+}
+
+.message-data-table-frame {
+  width: 100%;
+  min-width: 0;
+}
+
+/* The copy actions under the table. */
+.message-data-table-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--openbot-space-1);
+  margin-top: var(--openbot-space-1);
 }
 
 .message-data-table-scroll:focus-visible {

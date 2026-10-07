@@ -16,7 +16,7 @@ import { DataTable, type MessageContentBlock, messageContentBlocks, reuseUnchang
 import { messageFileReferences } from "./FileReference";
 import { ImageGeneration } from "./ImageGeneration";
 import { ImageGallery, ImageLightbox, type ImageLightboxOpening, isLightboxImage } from "./ImageLightbox";
-import { MarkdownInlineText, MarkdownMessageText } from "./MarkdownMessageText";
+import { MarkdownInlineText, MarkdownMessageText, markdownImageName } from "./MarkdownMessageText";
 import { RichMessageText } from "./RichMessageText";
 import { parseSelectionInstruction } from "./SelectionActions";
 import {
@@ -316,7 +316,8 @@ export function MessageBody(props: {
     content: () => messageContent,
     enabled: () => props.message.author === "agent" && streamingBody.smoothHeight(),
   });
-  const [lightbox, setLightbox] = createSignal<ImageLightboxOpening | null>(null);
+  // A markdown image is a web address, not an attachment, so the viewer has no download for it.
+  const [lightbox, setLightbox] = createSignal<(ImageLightboxOpening & { markdown?: boolean }) | null>(null);
   const lightboxImages = createMemo(() => (props.message.attachments ?? []).filter(isLightboxImage));
   /* An image opens in the viewer with the other images of its message. A quoted message's image
      is not one of them, so it opens alone. Other files open in the preview panel. */
@@ -331,11 +332,37 @@ export function MessageBody(props: {
       props.onAttachmentAction(attachment, "open");
     }
   };
+  /* A markdown image opens with the other markdown images of its message, in the order they show. */
+  let markdownImages = new Map<string, HTMLElement>();
+  const openMarkdownImage = (origin: HTMLImageElement) => {
+    const pictures = [
+      ...(messageContent?.querySelectorAll<HTMLImageElement>(".message-markdown-image-button img") ?? []),
+    ];
+    markdownImages = new Map();
+    const images = pictures.map((picture, position): AttachmentSummary => {
+      const id = `markdown-image:${position}`;
+      if (picture.parentElement) markdownImages.set(id, picture.parentElement);
+      return {
+        id,
+        name: markdownImageName(picture.alt, picture.src),
+        size: 0,
+        kind: "image",
+        mimeType: "image/*",
+        previewKind: "image",
+        previewUrl: picture.src,
+      };
+    });
+    const index = pictures.indexOf(origin);
+    if (index < 0) return;
+    setLightbox({ images, index, origin: origin.parentElement ?? undefined, markdown: true });
+  };
   /* The images, the cards and the text blocks of one message share this parent. */
   const imageThumbnail = (attachment: AttachmentSummary) =>
+    markdownImages.get(attachment.id) ??
     messageContentResize?.parentElement?.querySelector<HTMLElement>(
       `[data-attachment-id="${CSS.escape(attachment.id)}"]`,
-    ) ?? undefined;
+    ) ??
+    undefined;
   const renderMarkdownInline = (body: string) => (
     <MarkdownInlineText
       body={body}
@@ -346,6 +373,7 @@ export function MessageBody(props: {
       onSelectAgent={props.onSelectAgent}
       onOpenLink={props.onOpenLink}
       onOpenAttachment={openAttachment}
+      onOpenImage={openMarkdownImage}
       onOpenSharedFile={props.onOpenSharedFile}
       onOpenWorkspaceFile={props.onOpenWorkspaceFile}
     />
@@ -437,6 +465,7 @@ export function MessageBody(props: {
                             onSelectAgent={props.onSelectAgent}
                             onOpenLink={props.onOpenLink}
                             onOpenAttachment={openAttachment}
+                            onOpenImage={openMarkdownImage}
                             onOpenSharedFile={props.onOpenSharedFile}
                             onOpenWorkspaceFile={props.onOpenWorkspaceFile}
                             showCitationFooter={index === lastTextBlockIndex()}
@@ -519,7 +548,7 @@ export function MessageBody(props: {
           <ImageLightbox
             opening={opening()}
             thumbnail={imageThumbnail}
-            onDownload={props.onDownload}
+            onDownload={opening().markdown ? undefined : props.onDownload}
             onClose={() => setLightbox(null)}
           />
         )}

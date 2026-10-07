@@ -68,6 +68,7 @@ import { uploadProgressAt } from "../model/upload-progress";
 import { ChatAttachmentView } from "./chat-attachment";
 import { ChatImageGeneration, imageGenerationStatus } from "./chat-image-generation";
 import { ChatMessageGesture } from "./chat-message-gesture";
+import { ChatVisualRow } from "./chat-visual";
 import { useReplyHaptics } from "./use-reply-haptics";
 
 type VisibleMessage = Exclude<ChatMessage, { kind: "thinking" }>;
@@ -472,6 +473,8 @@ const MessageRow = memo(function MessageRow({
       </View>
     ) : message.kind === "plan" ? (
       <ChatPlan key={message.id} message={message} />
+    ) : message.kind === "visual" ? (
+      <ChatVisualRow key={message.id} message={message} serverId={serverId} />
     ) : message.kind === "question" ? (
       <ChatQuestionPrompt
         key={message.id}

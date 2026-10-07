@@ -9,6 +9,23 @@ export function responseAttachmentMessageId(threadId: string, turnId: string, ca
   return `agent-attachments:${digest}`;
 }
 
+/** The id of the message that one `html_render` call adds, so a retried call adds no second page. */
+export function visualReplyMessageId(threadId: string, turnId: string, callId: string): string {
+  const digest = createHash("sha256").update(`${threadId}\0${turnId}\0${callId}`).digest("hex").slice(0, 32);
+  return `visual-reply:${digest}`;
+}
+
+/** A file name from a page title, without the characters that file systems refuse. */
+export function visualReplyFileName(title: string): string {
+  return (
+    title
+      .replace(/[\\/:*?"<>|\p{Cc}]+/gu, " ")
+      .replace(/\s+/gu, " ")
+      .trim()
+      .slice(0, 120) || "visual"
+  );
+}
+
 /** A digest, because each thread keeps its signature: the JSON itself would be a second copy of the history. */
 export function conversationContentSignature(snapshot: ConversationSnapshot): string {
   const content = JSON.stringify({

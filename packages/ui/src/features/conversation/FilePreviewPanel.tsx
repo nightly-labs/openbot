@@ -2,6 +2,7 @@ import type { FilePreview, WorkspaceDirectory, WorkspaceDirectoryEntry } from "@
 import { ArrowLeft, Button, Code, Download, ExternalLink, File, Folder, FolderOpen, X } from "@openbot/ui";
 import { PanelResizer } from "@openbot/ui/components/PanelResizer";
 import type { AgentProfile } from "@openbot/ui/data";
+import { ChatVisual } from "@openbot/ui/features/conversation/ChatVisual";
 import { MarkdownFilePreview } from "@openbot/ui/features/conversation/MarkdownFilePreview";
 import { SpreadsheetFilePreview } from "@openbot/ui/features/conversation/SpreadsheetFilePreview";
 import { useText } from "@openbot/ui/text";
@@ -33,6 +34,11 @@ interface FilePreviewPanelProps {
   onBack?: (() => void) | undefined;
   /** Set when the file already has a URL the panel can point at, as an attachment does. */
   sourceUrl?: string | null;
+  /**
+   * Set for an HTML file that the app can serve as a sandboxed page with its scripts. The panel
+   * shows the page, and the source on request. Without it the panel shows the source.
+   */
+  pageUrl?: string | null;
   onOpenExternally: () => void;
   allowExternalOpen?: boolean;
   onDownload?: () => void;
@@ -48,10 +54,11 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
   // The panel mounts when a file opens, so it has to paint its closed state
   // first. Two frames guarantee that paint before the open state applies.
   const [revealed, setRevealed] = createSignal(false);
-  const [rawMarkdown, setRawMarkdown] = createSignal(false);
+  const [rawSource, setRawSource] = createSignal(false);
   let currentPreviewUrl: string | null = null;
   const file = () => (props.directory ? null : props.preview);
   const previewKind = () => file()?.previewKind;
+  const pageUrl = () => (previewKind() === "text" ? props.pageUrl : null) ?? null;
   const title = () => props.directory?.name ?? props.preview?.name ?? "";
   const text = createMemo(() => {
     const preview = file();
@@ -73,7 +80,7 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
     },
   );
   createEffect(file, () => {
-    setRawMarkdown(false);
+    setRawSource(false);
   });
   createEffect(
     () => ({ preview: file(), sourceUrl: props.sourceUrl }),
@@ -163,8 +170,20 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
             type="button"
             class="browser-toolbar-button"
             aria-label={t("preview.panel.rawMarkdown")}
-            aria-pressed={rawMarkdown() ? "true" : "false"}
-            onClick={() => setRawMarkdown((raw) => !raw)}
+            aria-pressed={rawSource() ? "true" : "false"}
+            onClick={() => setRawSource((raw) => !raw)}
+          >
+            <Code class="browser-toolbar-icon" />
+          </Button>
+        </Show>
+        <Show when={pageUrl()}>
+          <Button
+            variant="ghost"
+            type="button"
+            class="browser-toolbar-button"
+            aria-label={t("preview.panel.rawHtml")}
+            aria-pressed={rawSource() ? "true" : "false"}
+            onClick={() => setRawSource((raw) => !raw)}
           >
             <Code class="browser-toolbar-icon" />
           </Button>
@@ -258,10 +277,10 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
             </Show>
           )}
         </Show>
-        <Show when={previewKind() === "markdown" && rawMarkdown()}>
+        <Show when={previewKind() === "markdown" && rawSource()}>
           <pre class="file-preview-text">{text().value}</pre>
         </Show>
-        <Show when={previewKind() === "markdown" && !rawMarkdown()}>
+        <Show when={previewKind() === "markdown" && !rawSource()}>
           <MarkdownFilePreview
             class="file-preview-markdown"
             renderedClass="message-markdown"
@@ -276,7 +295,10 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
             onOpenWorkspaceFile={props.onOpenWorkspaceFile}
           />
         </Show>
-        <Show when={previewKind() === "text"}>
+        <Show when={!rawSource() && pageUrl()}>
+          {(url) => <ChatVisual fill src={url()} title={title()} onOpenLink={props.onOpenLink} />}
+        </Show>
+        <Show when={previewKind() === "text" && (rawSource() || !pageUrl())}>
           <pre class="file-preview-text">{text().value}</pre>
           <Show when={text().truncated}>
             <p class="file-preview-truncated">{t("preview.truncated", { limit: format.number(TEXT_LIMIT) })}</p>

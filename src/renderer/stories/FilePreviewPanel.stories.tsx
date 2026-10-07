@@ -2,6 +2,7 @@ import { createSignal } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import FilePreviewPanel from "../src/features/conversation/FilePreviewPanel";
+import { INLINE_SVG_CHART, publishChatVisualPage } from "./chat-visual-fixtures";
 import {
   AUDIO_PREVIEW,
   IMAGE_PREVIEW,
@@ -100,6 +101,35 @@ export const Audio: Story = {
 /** An XLSX workbook rendered as a scrollable table with sheet tabs. */
 export const Spreadsheet: Story = {
   args: { preview: XLSX_PREVIEW },
+};
+
+const HTML_BYTES = new TextEncoder().encode(INLINE_SVG_CHART);
+
+/**
+ * An HTML file: the page with its scripts, in the sandbox of a visual reply. The code button shows
+ * the source. The Storybook server serves the page, as the app's page scheme does.
+ */
+export const HtmlPage: Story = {
+  name: "HTML page",
+  args: {
+    preview: {
+      name: "weekly-signups.html",
+      size: HTML_BYTES.length,
+      mimeType: "text/html",
+      previewKind: "text",
+      bytes: HTML_BYTES,
+    },
+  },
+  render: (args) => {
+    const [pageUrl, setPageUrl] = createSignal<string | null>(null);
+    void publishChatVisualPage(INLINE_SVG_CHART).then(setPageUrl);
+    return meta.render({
+      ...args,
+      get pageUrl() {
+        return pageUrl();
+      },
+    });
+  },
 };
 
 /** A kind that the panel cannot show. The user opens the file externally. */

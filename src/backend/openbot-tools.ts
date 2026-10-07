@@ -1,3 +1,9 @@
+import {
+  CHAT_VISUAL_HTML_LIMIT,
+  CHAT_VISUAL_MAX_HEIGHT,
+  CHAT_VISUAL_MIN_HEIGHT,
+  CHAT_VISUAL_TITLE_LIMIT,
+} from "@openbot/contracts/chat-visual";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { z } from "zod";
 import { interruptAgentToolSchema } from "./agent/agent-interrupt-tool";
@@ -23,6 +29,48 @@ interface OpenBotToolDefinition {
   description: string;
   shape: z.ZodRawShape;
 }
+
+/** The page rules for `html_render` and `html_preview`. The names match the variables that `ChatVisual` sends. */
+const VISUAL_PAGE_RULES = [
+  "Write one self-contained HTML document with inline <style> and <script>. Remote http(s) files, such as a chart library from a CDN, load as they are; local file paths do not load.",
+  "The page runs in a sandbox: it cannot use cookies, storage, pop-up windows or the OpenBot app. A click on an http(s) link opens the link in the user's browser.",
+  "The frame has no border and sits on the chat background, as wide as the reply column (about 360px on phones). Leave html and body with no background, use a fluid width and no outer card or banner title: the page is part of your reply.",
+  "Give charts fixed pixel heights. Let the content set the page height; do not use 100vh or height:100% on html or body. The frame cuts what is outside the page box, so highlight a box with its border, not an outline or an outer shadow.",
+  "OpenBot sets these CSS variables on :root from the app theme, which is dark on the desktop: --background (transparent), --foreground, --muted-foreground, --muted, --card, --card-foreground, --border, --accent, --destructive, --success, --chart-1 to --chart-6, --radius, --font-sans, --font-mono. The base style sets the body font and color from them.",
+].join(" ");
+
+export const htmlRenderToolSchema = z.object({
+  html: z.string().min(1).max(CHAT_VISUAL_HTML_LIMIT).describe("A complete, self-contained HTML document."),
+  title: z.string().trim().min(1).max(CHAT_VISUAL_TITLE_LIMIT).describe("A short name for the page."),
+  height: z
+    .number()
+    .int()
+    .min(CHAT_VISUAL_MIN_HEIGHT)
+    .max(CHAT_VISUAL_MAX_HEIGHT)
+    .optional()
+    .describe(
+      `The highest frame height in CSS pixels, ${CHAT_VISUAL_MIN_HEIGHT}-${CHAT_VISUAL_MAX_HEIGHT}. Omit it to fit the whole page.`,
+    ),
+});
+
+export const CHAT_VISUAL_PREVIEW_MIN_WIDTH = 240;
+export const CHAT_VISUAL_PREVIEW_MAX_WIDTH = 1_600;
+/** The width of the reply column in a desktop chat. */
+export const CHAT_VISUAL_PREVIEW_DEFAULT_WIDTH = 728;
+
+export const htmlPreviewToolSchema = z.object({
+  html: z.string().min(1).max(CHAT_VISUAL_HTML_LIMIT).describe("A complete, self-contained HTML document."),
+  width: z
+    .number()
+    .int()
+    .min(CHAT_VISUAL_PREVIEW_MIN_WIDTH)
+    .max(CHAT_VISUAL_PREVIEW_MAX_WIDTH)
+    .optional()
+    .describe(
+      `The page width in CSS pixels, ${CHAT_VISUAL_PREVIEW_MIN_WIDTH}-${CHAT_VISUAL_PREVIEW_MAX_WIDTH}. The default is ${CHAT_VISUAL_PREVIEW_DEFAULT_WIDTH}, the desktop reply column; use 360 to check a phone.`,
+    ),
+  appearance: z.enum(["dark", "light"]).optional().describe("The app theme to draw with. The default is dark."),
+});
 
 /** Shared declarations for Codex, Grok, and Claude. Service handlers enforce execution rules. */
 export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
@@ -68,6 +116,16 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     description:
       "Attach existing local files to the current response for the user. Use this after creating screenshots, charts, diagrams, reports, or other files that the user should receive. OpenBot copies each file and shows image previews in the conversation.",
     shape: { paths: z.array(z.string().min(1).max(INPUT_LIMITS.path)).min(1).max(INPUT_LIMITS.attachments) },
+  },
+  {
+    name: "html_preview",
+    description: `Draw an HTML page out of view and get a screenshot, the content height and the console output. The user does not see it. Use it to check a page before you call html_render, and correct what the screenshot or the console shows. ${VISUAL_PAGE_RULES}`,
+    shape: htmlPreviewToolSchema.shape,
+  },
+  {
+    name: "html_render",
+    description: `Show a finished HTML page (chart, table, diagram, collage, mockup) in this conversation, above your final text reply; call it before you write that reply. The user already sees the page, so the reply must not announce it or restate it: add only what the page does not say. OpenBot fits the frame to the page height. A height lower than the page caps the frame, and the rest scrolls in it. ${VISUAL_PAGE_RULES}`,
+    shape: htmlRenderToolSchema.shape,
   },
   {
     name: "list_sections",

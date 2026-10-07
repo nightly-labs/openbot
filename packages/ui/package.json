@@ -90,6 +90,7 @@
     "./features/conversation/ChatRowBoundary": "./src/features/conversation/ChatRowBoundary.tsx",
     "./features/conversation/ChatMessageRow": "./src/features/conversation/ChatMessageRow.tsx",
     "./features/conversation/ChatSearch": "./src/features/conversation/ChatSearch.tsx",
+    "./features/conversation/ChatVisual": "./src/features/conversation/ChatVisual.tsx",
     "./features/conversation/TaskList": "./src/features/conversation/TaskList.tsx",
     "./features/conversation/AwaitingReplies": "./src/features/conversation/AwaitingReplies.tsx",
     "./features/conversation/CodeBlock": "./src/features/conversation/CodeBlock.tsx",
