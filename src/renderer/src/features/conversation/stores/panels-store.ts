@@ -139,18 +139,6 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     }
   }
 
-  async function downloadAttachments(attachments: AttachmentSummary[]) {
-    const agentId = deps.props.agent?.id;
-    const target = agentId ? { agentId, serverId: deps.props.server?.id ?? "local" } : undefined;
-    try {
-      await conversationRuntime(deps.props).agent.downloadAttachments({
-        attachments: attachments.map(({ id, name }) => ({ id, name })),
-      });
-    } catch (error) {
-      deps.setComposerError(errorMessage(error, t("attachment.error.download")), target);
-    }
-  }
-
   function attachmentAction(attachment: AttachmentSummary, action: FileAction) {
     // A runtime has no app to open a file in, so a file it can preview opens in the panel.
     if (action === "open" && deps.props.runtime && canPreviewAttachment(attachment)) {
@@ -324,7 +312,6 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     hideBrowserPanel,
     previewAttachment,
     attachmentAction,
-    downloadAttachments,
     openSharedFile,
     openWorkspaceFile,
     openWorkspaceFolder,

@@ -7,27 +7,6 @@ import { AnchoredTooltip } from "./AnchoredTooltip";
 import { attachmentReferenceTone } from "./AttachmentReference";
 import { MediaFilePreview } from "./MediaFilePreview";
 
-export function AttachmentDownloadAll(props: { count: number; pending: boolean; onDownload: () => void }) {
-  const { t } = useText();
-  return (
-    <div class="attachment-download-bar">
-      <span>{t("attachment.downloadAll.count", { count: props.count })}</span>
-      <Button
-        type="button"
-        variant="ghost"
-        size="xs"
-        aria-label={props.pending ? t("attachment.downloadAll.pending") : t("attachment.downloadAll.label")}
-        loading={props.pending}
-        loadingLabel={t("attachment.downloadAll.zipping")}
-        onClick={() => props.onDownload()}
-      >
-        <Download />
-        {t("attachment.downloadAll.action")}
-      </Button>
-    </div>
-  );
-}
-
 export function AttachmentCards(props: {
   attachments: AttachmentSummary[];
   /** `origin` is the clicked card, for a viewer that zooms out of it. */

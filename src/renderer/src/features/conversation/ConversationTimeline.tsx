@@ -69,7 +69,6 @@ export function ConversationTimeline() {
     activeChatSearchIndex,
     agentActivitySpaceReserved,
     attachmentAction,
-    downloadAttachments,
     browserTakeoverPreview,
     browserTakeoverResolution,
     browserTakeoverTab,
@@ -594,7 +593,6 @@ export function ConversationTimeline() {
                             onAttachmentAction={attachmentAction}
                             onOpenSharedFile={openSharedFile}
                             onOpenWorkspaceFile={openWorkspaceFile}
-                            onDownloadAttachments={props.runtime ? undefined : downloadAttachments}
                             onDownload={(attachment) => attachmentAction(attachment, "download")}
                             class={pending() ? "message-entry-pending" : undefined}
                             footer={

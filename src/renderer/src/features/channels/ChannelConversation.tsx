@@ -249,16 +249,7 @@ export function ChannelConversation(props: ChannelConversationProps) {
     }
     void channels.perform(() => runtime().agent.openAttachment({ attachmentId: attachment.id, action }));
   };
-  /** Absent where the runtime saves files one at a time, so the row offers no bulk download. */
-  const downloadAttachments = () => {
-    const agent = runtime().agent;
-    if (!agent.downloadAttachments) return undefined;
-    return async (attachments: AttachmentSummary[]) => {
-      await channels.perform(async () => {
-        await agent.downloadAttachments?.({ attachments: attachments.map(({ id, name }) => ({ id, name })) });
-      });
-    };
-  };
+
   // The preview belongs to the channel it was opened from, and the settings panel takes the slot back.
   createEffect(
     () => ({ id: channelId(), editing: channels.state.editing }),
@@ -787,7 +778,6 @@ export function ChannelConversation(props: ChannelConversationProps) {
                                 void runtime().openUrl(url);
                               }}
                               onPreview={(attachment) => void previewChannelAttachment(attachment)}
-                              onDownloadAttachments={downloadAttachments()}
                               onAttachmentAction={channelAttachmentAction}
                               onDownload={(attachment) => channelAttachmentAction(attachment, "download")}
                               actions={

@@ -1,4 +1,4 @@
-import { AttachmentCards, AttachmentDownloadAll } from "@openbot/ui/features/conversation/AttachmentCards";
+import { AttachmentCards } from "@openbot/ui/features/conversation/AttachmentCards";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { AUDIO_PREVIEW } from "./file-previews";
@@ -65,26 +65,6 @@ export const NarrowLongNames: Story = {
 
 export const Empty: Story = {
   args: { attachments: [] },
-};
-
-export const WithDownloadAll: Story = {
-  name: "With download all as ZIP",
-  render: (storyArgs) => (
-    <div class="message-attachments-group">
-      <AttachmentDownloadAll count={storyArgs.attachments.length} pending={false} onDownload={fn()} />
-      <AttachmentCards {...storyArgs} />
-    </div>
-  ),
-};
-
-export const DownloadingZip: Story = {
-  name: "Downloading ZIP",
-  render: (storyArgs) => (
-    <div class="message-attachments-group">
-      <AttachmentDownloadAll count={storyArgs.attachments.length} pending onDownload={fn()} />
-      <AttachmentCards {...storyArgs} />
-    </div>
-  ),
 };
 
 export const AudioTakes: Story = {
