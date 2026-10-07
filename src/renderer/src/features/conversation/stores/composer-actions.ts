@@ -505,6 +505,15 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     const draft = copyComposerDraft(draftOverride ?? deps.currentDraft());
     const text = expandComposerMentions(draft.text);
     if (!agentId || !target || deps.submitting() || (!text.trim() && draft.attachments.length === 0)) return false;
+    const provider =
+      deps.props.agent?.id === agentId
+        ? deps.props.agent.provider
+        : deps.props.agents.find((agent) => agent.id === agentId)?.provider;
+    if (
+      target.serverId === (deps.props.server?.id ?? LOCAL_SERVER_ID) &&
+      deps.props.agentStatus.providers?.some((status) => status.id === provider && status.state === "outdated")
+    )
+      return false;
     stopTeamTyping();
     deps.setComposerError(null, target);
     deps.clearConversationError(target);
