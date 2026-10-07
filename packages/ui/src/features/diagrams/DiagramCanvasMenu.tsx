@@ -21,7 +21,7 @@ export function DiagramCanvasMenu(props: {
       <ContextMenu.Content class="agent-context-menu diagram-canvas-menu" aria-label={t("diagram.menu.label")}>
         <ContextMenu.Sub>
           <ContextMenu.SubTrigger>
-            <UserRound class="agent-context-icon size-4" aria-hidden="true" />
+            <UserRound class="size-4" aria-hidden="true" />
             <span>{t("diagram.menu.addAgent")}</span>
             <ChevronRight class="agent-context-submenu-chevron size-4" aria-hidden="true" />
           </ContextMenu.SubTrigger>
@@ -47,7 +47,7 @@ export function DiagramCanvasMenu(props: {
         <Show when={props.onNewAgent}>
           {(onNewAgent) => (
             <ContextMenu.Item onSelect={() => onNewAgent()()}>
-              <Plus class="agent-context-icon size-4" aria-hidden="true" />
+              <Plus class="size-4" aria-hidden="true" />
               <span>{t("diagram.menu.newAgent")}</span>
             </ContextMenu.Item>
           )}
