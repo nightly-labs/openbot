@@ -243,6 +243,26 @@ describe("routine flows", () => {
     expect(sent.map((item) => item.agentId)).toEqual(["writer"]);
   });
 
+  it("sends a handoff again after a restart that lost its delivery, with the same key", async () => {
+    const { store, finishRun, connect, sent, start, stepsOf } = await setup();
+    await connect("research", "writer");
+    const run = finishRun({ answer: "Three headlines." });
+    store.addStep({
+      runId: run.id,
+      agentId: "research",
+      input: "Collect the news.",
+      status: "succeeded",
+      output: "Three headlines.",
+    });
+    // The step was written, and the app stopped before its delivery was attached.
+    const step = store.addStep({ runId: run.id, agentId: "writer", input: "Research answered.", status: "running" });
+
+    const restarted = await start();
+    await Effect.runPromise(restarted.sweep());
+    expect(sent).toEqual([expect.objectContaining({ agentId: "writer", idempotencyKey: `routine-flow-${step?.id}` })]);
+    expect(stepsOf(run.id).writer).toMatchObject({ status: "running", delivery: "handoff-1" });
+  });
+
   it("does not hand an earlier run to a link made after it", async () => {
     const { flows, finishRun, connect, sent, stepsOf, state } = await setup();
     const run = finishRun({ answer: "Three headlines." });

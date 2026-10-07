@@ -48,7 +48,7 @@ const UPCOMING_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const UPCOMING_LIMIT = 400;
 const RECENT_RUNS = 10;
 
-export class RoutineFlowFailed extends Schema.TaggedError<RoutineFlowFailed>()("RoutineFlowFailed", {
+class RoutineFlowFailed extends Schema.TaggedError<RoutineFlowFailed>()("RoutineFlowFailed", {
   cause: Schema.Defect(),
 }) {}
 
@@ -94,7 +94,7 @@ export interface RoutineFlowsShape {
   notice(event: AgentEvent): Effect.Effect<void>;
 }
 
-export class RoutineFlows extends Context.Service<RoutineFlows, RoutineFlowsShape>()("openbot/backend/RoutineFlows") {
+class RoutineFlows extends Context.Service<RoutineFlows, RoutineFlowsShape>()("openbot/backend/RoutineFlows") {
   static layer(dependencies: RoutineFlowsDependencies) {
     return Layer.effect(
       RoutineFlows,
@@ -242,6 +242,28 @@ export class RoutineFlows extends Context.Service<RoutineFlows, RoutineFlowsShap
         };
 
         /**
+         * Sends one step's input to its agent and keeps the delivery. The key is the step's, so a
+         * second attempt after a restart finds the delivery the first one made instead of sending
+         * twice. A handoff that cannot go out fails the step, and the agents after it are skipped.
+         */
+        const sendStep = Effect.fn("RoutineFlows.sendStep")(function* (run: RoutineFlowRun, step: RoutineFlowStep) {
+          const sent = yield* dependencies
+            .sendHandoff({ run, agentId: step.agentId, text: step.input, idempotencyKey: `routine-flow-${step.id}` })
+            .pipe(Effect.exit);
+          if (Exit.isSuccess(sent)) {
+            store.attachDelivery(step.id, sent.value);
+            return;
+          }
+          const cause = Exit.isFailure(sent) ? sent.cause : null;
+          logger.warn("A routine flow could not hand work on.", {
+            runId: run.id,
+            agentId: step.agentId,
+            cause: String(cause),
+          });
+          store.settleStep(step.id, "failed", null, sourceText("error.backend.routineFlowHandoffFailed"));
+        });
+
+        /**
          * Sends a run's answers on as far as they can go now. Answers the agents it gave a step, so
          * the views showing them reload.
          */
@@ -282,17 +304,9 @@ export class RoutineFlows extends Context.Service<RoutineFlows, RoutineFlowsShap
             if (!step) continue;
             steps.set(agentId, step);
             changed.add(agentId);
-            const sent = yield* dependencies
-              .sendHandoff({ run, agentId, text, idempotencyKey: `routine-flow-${step.id}` })
-              .pipe(Effect.exit);
-            if (Exit.isSuccess(sent)) store.attachDelivery(step.id, sent.value);
-            else {
-              const cause = Exit.isFailure(sent) ? sent.cause : null;
-              logger.warn("A routine flow could not hand work on.", { runId: run.id, agentId, cause: String(cause) });
-              store.settleStep(step.id, "failed", null, sourceText("error.backend.routineFlowHandoffFailed"));
-              const failed = store.steps(run.id).find((candidate) => candidate.id === step.id);
-              if (failed) steps.set(agentId, failed);
-            }
+            yield* sendStep(run, step);
+            const current = store.steps(run.id).find((candidate) => candidate.id === step.id);
+            if (current) steps.set(agentId, current);
           }
           return changed;
         });
@@ -308,6 +322,15 @@ export class RoutineFlows extends Context.Service<RoutineFlows, RoutineFlowsShap
             }
           }
           for (const step of store.runningSteps()) {
+            // A step without a delivery lost its handoff to a restart between the two writes.
+            if (!step.deliveryId) {
+              const run = store.run(step.runId);
+              if (!run) continue;
+              yield* sendStep(run, step);
+              changed.add(step.agentId);
+              runIds.add(step.runId);
+              continue;
+            }
             if (settleFromDelivery(step)) {
               changed.add(step.agentId);
               runIds.add(step.runId);

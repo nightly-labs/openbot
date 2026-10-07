@@ -322,7 +322,7 @@ export interface ApplicationServiceContext {
 
 /** Everything the entry point wires up, registers IPC handlers against, and shuts down. */
 /** The routine flow runtime, and a way to hear which agents' canvases changed. */
-export type RoutineFlowsService = RoutineFlowsHandle & {
+type RoutineFlowsService = RoutineFlowsHandle & {
   onChanged(listener: (change: RoutineFlowsChanged) => void): void;
 };
 
