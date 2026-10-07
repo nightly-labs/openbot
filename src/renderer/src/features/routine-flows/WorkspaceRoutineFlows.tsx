@@ -5,7 +5,7 @@
  * The chat panel sends requests to the open agent, which edits the canvas with its tools.
  */
 
-import { type RoutineFlowCanvas, routineFlowAgentKey } from "@openbot/contracts/ipc";
+import { type RoutineFlowCanvas, type RoutineFlowLink, routineFlowAgentKey } from "@openbot/contracts/ipc";
 import { toast } from "@openbot/ui";
 import type { AgentProfile } from "@openbot/ui/data";
 import { DiagramView } from "@openbot/ui/features/diagrams/DiagramView";
@@ -22,12 +22,16 @@ import { type RoutineFlowsPort, routineFlowsPort } from "./routine-flows-port";
 const RELOAD_DELAY_MS = 250;
 /** A drag writes a position on every pointer move; only where it stops is saved. */
 const SAVE_DELAY_MS = 400;
+/** A connection drawn here and not yet saved by the host. It cannot be removed until it is. */
+const PENDING_LINK_PREFIX = "pending:";
 
 interface RoutineFlowState {
   canvas: RoutineFlowCanvas | null;
   error: string | null;
   /** Positions moved here and not yet answered by a reload. */
   moved: Record<string, DiagramPoint>;
+  /** Connections drawn here, shown at once while the host saves them. */
+  pendingLinks: RoutineFlowLink[];
 }
 
 export function WorkspaceRoutineFlows(props: { port?: RoutineFlowsPort }) {
@@ -37,7 +41,12 @@ export function WorkspaceRoutineFlows(props: { port?: RoutineFlowsPort }) {
   const port = () => props.port ?? routineFlowsPort();
   const local = () => activeServerId() === "local";
   const agentId = () => activeAgent()?.id ?? null;
-  const [state, setState] = createStore<RoutineFlowState>({ canvas: null, error: null, moved: {} });
+  const [state, setState] = createStore<RoutineFlowState>({
+    canvas: null,
+    error: null,
+    moved: {},
+    pendingLinks: [],
+  });
   const assistant = createRoutineFlowAssistant(port, agentId);
   let generation = 0;
   let reloadTimer: number | undefined;
@@ -76,6 +85,7 @@ export function WorkspaceRoutineFlows(props: { port?: RoutineFlowsPort }) {
         draft.canvas = null;
         draft.error = null;
         draft.moved = {};
+        draft.pendingLinks = [];
       });
       if (id && isLocal) void load(id);
     },
@@ -101,7 +111,17 @@ export function WorkspaceRoutineFlows(props: { port?: RoutineFlowsPort }) {
 
   const diagram = createMemo(() => {
     const canvas = state.canvas;
-    return canvas ? routineFlowDiagram(canvas, agentList(), state.moved) : null;
+    if (!canvas) return null;
+    const pending = state.pendingLinks.filter(
+      (link) =>
+        !canvas.links.some(
+          (saved) =>
+            saved.routineId === link.routineId &&
+            saved.fromAgentId === link.fromAgentId &&
+            saved.toAgentId === link.toAgentId,
+        ),
+    );
+    return routineFlowDiagram({ ...canvas, links: [...canvas.links, ...pending] }, agentList(), state.moved);
   });
   /** An agent with routines of its own stays: removing it would remove the routine, which belongs to settings. */
   const owners = createMemo(() => new Set(state.canvas?.routines.map((entry) => entry.routine.agentId) ?? []));
@@ -167,12 +187,37 @@ export function WorkspaceRoutineFlows(props: { port?: RoutineFlowsPort }) {
                     toast.error(t("diagram.flows.connectFromAgent"));
                     return;
                   }
+                  const pending: RoutineFlowLink = {
+                    id: `${PENDING_LINK_PREFIX}${crypto.randomUUID()}`,
+                    routineId,
+                    fromAgentId,
+                    toAgentId,
+                    instruction: "",
+                    createdAt: new Date().toISOString(),
+                  };
+                  const settle = (saved: RoutineFlowLink | null) =>
+                    setState((draft) => {
+                      draft.pendingLinks = draft.pendingLinks.filter((link) => link.id !== pending.id);
+                      if (
+                        saved &&
+                        draft.canvas?.agentId === canvasAgentId &&
+                        !draft.canvas.links.some((link) => link.id === saved.id)
+                      )
+                        draft.canvas.links.push(saved);
+                    });
+                  setState((draft) => {
+                    draft.pendingLinks.push(pending);
+                  });
                   port()
                     .routineFlows.connect({ routineId, fromAgentId, toAgentId }, "local")
-                    .catch(failed(t("diagram.flows.saveFailed")));
+                    .then(settle)
+                    .catch((error) => {
+                      settle(null);
+                      failed(t("diagram.flows.saveFailed"))(error);
+                    });
                 }}
                 onRemoveEdge={(edgeId) => {
-                  if (isRoutineStartEdge(edgeId)) return;
+                  if (isRoutineStartEdge(edgeId) || edgeId.startsWith(PENDING_LINK_PREFIX)) return;
                   port()
                     .routineFlows.disconnect({ linkId: edgeId }, "local")
                     .catch(failed(t("diagram.flows.saveFailed")));
@@ -197,7 +242,7 @@ export function WorkspaceRoutineFlows(props: { port?: RoutineFlowsPort }) {
                   const id = agentIdOfNode(nodeId);
                   return id !== null && id !== canvasAgentId && !owners().has(id);
                 }}
-                canRemoveEdge={(edgeId) => !isRoutineStartEdge(edgeId)}
+                canRemoveEdge={(edgeId) => !isRoutineStartEdge(edgeId) && !edgeId.startsWith(PENDING_LINK_PREFIX)}
                 addableAgents={agentList().filter((agent) => !onCanvas().has(agent.id))}
                 onPlaceAgent={(placed) => {
                   const lowest = Math.max(0, ...(diagram()?.nodes.map((node) => node.position.y) ?? [0]));
