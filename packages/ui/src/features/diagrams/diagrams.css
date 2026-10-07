@@ -233,11 +233,11 @@
 }
 
 .diagram-edge[data-state="delivered"] .diagram-edge-line {
-  stroke: var(--openbot-accent);
+  stroke: var(--diagram-routine-color, var(--openbot-accent));
 }
 
 .diagram-edge[data-state="running"] .diagram-edge-line {
-  stroke: var(--openbot-accent);
+  stroke: var(--diagram-routine-color, var(--openbot-accent));
   stroke-dasharray: 6 6;
   animation: diagram-edge-flow 0.6s linear infinite;
 }
@@ -298,7 +298,9 @@
     0 0 0 1px var(--openbot-border),
     var(--openbot-shadow-raised);
   cursor: grab;
-  transition: box-shadow var(--openbot-duration-fast) var(--openbot-ease-out);
+  transition:
+    box-shadow var(--openbot-duration-fast) var(--openbot-ease-out),
+    opacity var(--openbot-duration-normal) var(--openbot-ease-out);
   user-select: none;
 }
 
@@ -577,13 +579,118 @@
   cursor: default;
 }
 
+/* Routine colours. A routine, the chips that name it on agent cards, and its path while it is in
+   focus share one colour, so a run can be followed across the canvas. */
+[data-routine-color="0"] {
+  --diagram-routine-color: var(--openbot-file-blue);
+  --diagram-routine-soft: var(--openbot-file-blue-soft);
+}
+
+[data-routine-color="1"] {
+  --diagram-routine-color: var(--openbot-file-green);
+  --diagram-routine-soft: var(--openbot-file-green-soft);
+}
+
+[data-routine-color="2"] {
+  --diagram-routine-color: var(--openbot-file-orange);
+  --diagram-routine-soft: var(--openbot-file-orange-soft);
+}
+
+[data-routine-color="3"] {
+  --diagram-routine-color: var(--openbot-file-pink);
+  --diagram-routine-soft: var(--openbot-file-pink-soft);
+}
+
+[data-routine-color="4"] {
+  --diagram-routine-color: var(--openbot-file-teal);
+  --diagram-routine-soft: var(--openbot-file-teal-soft);
+}
+
+[data-routine-color="5"] {
+  --diagram-routine-color: var(--openbot-file-yellow);
+  --diagram-routine-soft: var(--openbot-file-yellow-soft);
+}
+
+/* Outside the focused routine's path the canvas recedes, but stays readable and editable. */
+.diagram-node[data-dimmed] {
+  opacity: 0.4;
+}
+
+.diagram-node[data-dimmed]:is(:hover, :focus-within) {
+  opacity: 0.8;
+}
+
+.diagram-edge[data-state="dimmed"] .diagram-edge-line {
+  opacity: 0.3;
+}
+
+.diagram-node-routines {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--openbot-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.diagram-routine-chip.ui-button {
+  height: 22px;
+  gap: var(--openbot-space-1);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--diagram-routine-soft);
+  padding: 0 var(--openbot-space-2);
+  color: var(--diagram-routine-color);
+  font-size: var(--openbot-text-sm);
+}
+
+.diagram-routine-chip.ui-button[aria-pressed="true"] {
+  box-shadow: inset 0 0 0 1px var(--diagram-routine-color);
+}
+
+.diagram-routine-chip.ui-button svg {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+}
+
+.diagram-routine-chip-name {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diagram-view-lens-tab.ui-sliding-tabs-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-1-5);
+  white-space: nowrap;
+}
+
+.diagram-view-lens-dot,
+.diagram-inspector-routine-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--diagram-routine-color);
+}
+
+.diagram-inspector-routine.ui-button[aria-pressed="true"] {
+  background: var(--diagram-routine-soft);
+}
+
 /* Routine: what it asks, when it fires, how it went */
 
 /* The routine glows while the run it started is in progress. */
 .diagram-node[data-kind="routine"][data-firing] {
   box-shadow:
-    0 0 0 1px var(--openbot-accent),
-    0 0 0 5px var(--openbot-accent-soft);
+    0 0 0 1px var(--diagram-routine-color),
+    0 0 0 5px var(--diagram-routine-soft);
+}
+
+.diagram-node[data-kind="routine"] .diagram-node-icon {
+  background: var(--diagram-routine-soft);
+  color: var(--diagram-routine-color);
 }
 
 .diagram-node[data-kind="routine"][data-firing] .diagram-node-icon {
@@ -596,7 +703,7 @@
   margin: 0;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
-  border-left: 2px solid var(--openbot-accent);
+  border-left: 2px solid var(--diagram-routine-color, var(--openbot-accent));
   padding-left: var(--openbot-space-2);
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-sm);
@@ -657,7 +764,7 @@
   height: 3px;
   translate: 0 -50%;
   border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-accent);
+  background: var(--diagram-routine-color, var(--openbot-accent));
 }
 
 .diagram-routine-day-name {

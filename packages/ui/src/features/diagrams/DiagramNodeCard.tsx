@@ -6,7 +6,7 @@
  */
 
 import { Button, Check, Clock3, Minus, Play, Spinner, TriangleAlert, X } from "@openbot/ui";
-import { Match, Show, Switch } from "solid-js";
+import { For, Match, Show, Switch } from "solid-js";
 import type { AvatarMood } from "../../bloub-avatar";
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
@@ -20,12 +20,30 @@ import { DIAGRAM_STEP_STATUS_KEY, diagramStepSeconds } from "./diagram-text";
 /** How an input port answers a connection in progress. */
 export type DiagramPortTarget = "none" | "valid" | "invalid";
 
+/** A routine whose run reaches an agent, and how the agent's step went in that run. */
+export interface DiagramRoutineChip {
+  id: string;
+  name: string;
+  color: number;
+  status: DiagramStepStatus | undefined;
+}
+
 export interface DiagramNodeCardProps {
   node: DiagramNode;
   name: string;
   agent?: AgentProfile | undefined;
-  /** The step an agent runs in; absent when no routine reaches it. */
+  /** The step an agent runs in when the focused routine fires; absent outside its path. */
   step?: number | undefined;
+  /** True for an agent that no routine reaches, so it never runs. */
+  unreachable: boolean;
+  /** True outside the focused routine's path. */
+  dimmed: boolean;
+  /** A routine's colour, from `diagramRoutineColor`. */
+  routineColor?: number | undefined;
+  /** For an agent: the routines that start it. Empty while the diagram has one routine. */
+  routines: DiagramRoutineChip[];
+  focusRoutineId: string | null;
+  onFocusRoutine: (routineId: string) => void;
   stepRun?: DiagramStepRun | undefined;
   selected: boolean;
   editable: boolean;
@@ -64,9 +82,8 @@ export function DiagramNodeCard(props: DiagramNodeCardProps) {
     const node = routine();
     if (node)
       return t("diagram.node.routineLabel", { name: props.name, schedule: routineScheduleSummary(node.schedule) });
-    return props.step === undefined
-      ? t("diagram.node.agentUnreachableLabel", { name: props.name })
-      : t("diagram.node.agentLabel", { name: props.name, step: props.step });
+    if (props.unreachable) return t("diagram.node.agentUnreachableLabel", { name: props.name });
+    return props.step === undefined ? props.name : t("diagram.node.agentLabel", { name: props.name, step: props.step });
   };
   return (
     <div
@@ -81,7 +98,9 @@ export function DiagramNodeCard(props: DiagramNodeCardProps) {
       data-status={status()}
       data-firing={props.firing ? "" : undefined}
       data-selected={props.selected ? "" : undefined}
-      data-unreachable={props.node.kind === "agent" && props.step === undefined ? "" : undefined}
+      data-unreachable={props.unreachable ? "" : undefined}
+      data-dimmed={props.dimmed ? "" : undefined}
+      data-routine-color={props.routineColor}
     >
       <Show when={props.node.kind === "agent"}>
         <Button
@@ -166,6 +185,30 @@ export function DiagramNodeCard(props: DiagramNodeCardProps) {
         fallback={
           <div class="diagram-node-body">
             <p class="diagram-node-task">{props.node.kind === "agent" ? props.node.task : ""}</p>
+            <Show when={props.routines.length > 0}>
+              <ul class="diagram-node-routines" aria-label={t("diagram.node.startedBy")}>
+                <For each={props.routines}>
+                  {(chip) => (
+                    <li>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="xs"
+                        class="diagram-routine-chip"
+                        data-diagram-control=""
+                        data-routine-color={chip.color}
+                        aria-pressed={props.focusRoutineId === chip.id ? "true" : "false"}
+                        title={t("diagram.node.showRoutine", { name: chip.name })}
+                        onClick={() => props.onFocusRoutine(chip.id)}
+                      >
+                        <span class="diagram-routine-chip-name">{chip.name}</span>
+                        <Show when={chip.status}>{(status) => <DiagramStepIcon status={status()} />}</Show>
+                      </Button>
+                    </li>
+                  )}
+                </For>
+              </ul>
+            </Show>
             <div class="diagram-node-preview" data-empty={props.stepRun?.output ? undefined : ""}>
               <Show
                 when={props.stepRun?.error ?? props.stepRun?.output}
@@ -180,7 +223,7 @@ export function DiagramNodeCard(props: DiagramNodeCardProps) {
             </div>
             <div class="diagram-node-footer">
               <Show
-                when={props.step !== undefined}
+                when={!props.unreachable}
                 fallback={
                   <span class="diagram-node-status" data-status="unreachable">
                     <TriangleAlert aria-hidden="true" />

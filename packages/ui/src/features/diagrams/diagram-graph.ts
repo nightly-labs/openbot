@@ -4,7 +4,7 @@
  * from its node's position alone, without measuring the DOM.
  */
 
-import type { DiagramEdge, DiagramNode, DiagramPoint } from "./diagram-model";
+import type { Diagram, DiagramEdge, DiagramNode, DiagramPoint, DiagramRun } from "./diagram-model";
 
 export const DIAGRAM_NODE_WIDTH = { routine: 264, agent: 264 } as const;
 /** The height the fit and the bounds use. A card can be taller; its ports stay at the top. */
@@ -50,18 +50,55 @@ export function diagramRoutineReach(
   edges: readonly DiagramEdge[],
   routineId: string,
 ): { direct: string[]; nodes: number; steps: number } {
+  const steps = diagramRoutineSteps(edges, routineId);
   const direct = edges.filter((edge) => edge.from === routineId).map((edge) => edge.to);
-  const depth = new Map<string, number>(direct.map((id) => [id, 1]));
-  const queue = [...direct];
+  return { direct, nodes: steps.size, steps: Math.max(0, ...steps.values()) };
+}
+
+/** The step each node runs in when this one routine fires. A node it does not reach is absent. */
+export function diagramRoutineSteps(edges: readonly DiagramEdge[], routineId: string): Map<string, number> {
+  const depth = new Map<string, number>();
+  const queue = [routineId];
   for (let next = queue.shift(); next !== undefined; next = queue.shift()) {
-    const current = depth.get(next) ?? 1;
+    const current = depth.get(next) ?? 0;
     for (const edge of edges) {
       if (edge.from !== next || (depth.get(edge.to) ?? 0) >= current + 1) continue;
       depth.set(edge.to, current + 1);
       queue.push(edge.to);
     }
   }
-  return { direct, nodes: depth.size, steps: Math.max(0, ...depth.values()) };
+  return depth;
+}
+
+/** The routines whose run reaches a node, in the order the diagram lists them. */
+export function diagramRoutinesReaching(
+  nodes: readonly DiagramNode[],
+  edges: readonly DiagramEdge[],
+  nodeId: string,
+): Extract<DiagramNode, { kind: "routine" }>[] {
+  return nodes.filter(
+    (node): node is Extract<DiagramNode, { kind: "routine" }> =>
+      node.kind === "routine" && diagramRoutineSteps(edges, node.id).has(nodeId),
+  );
+}
+
+/** The run that started last, whichever routine started it. */
+export function diagramLatestRun(diagram: Pick<Diagram, "lastRuns">): DiagramRun | null {
+  let latest: DiagramRun | null = null;
+  for (const run of diagram.lastRuns) if (!latest || run.startedAt > latest.startedAt) latest = run;
+  return latest;
+}
+
+export function diagramRunOf(diagram: Pick<Diagram, "lastRuns">, routineId: string | null): DiagramRun | null {
+  return diagram.lastRuns.find((run) => run.routineNodeId === routineId) ?? null;
+}
+
+/** Each routine gets one of a fixed set of colours, by its place among the routines. */
+export const DIAGRAM_ROUTINE_COLORS = 6;
+
+export function diagramRoutineColor(nodes: readonly DiagramNode[], routineId: string): number {
+  const index = nodes.filter((node) => node.kind === "routine").findIndex((node) => node.id === routineId);
+  return Math.max(0, index) % DIAGRAM_ROUTINE_COLORS;
 }
 
 /**

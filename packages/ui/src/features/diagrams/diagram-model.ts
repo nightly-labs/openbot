@@ -84,7 +84,11 @@ export interface Diagram {
   name: string;
   nodes: DiagramNode[];
   edges: DiagramEdge[];
-  lastRun: DiagramRun | null;
+  /**
+   * The last run of each routine, at most one per routine node. An agent that several routines
+   * start keeps what it received and returned in each of them.
+   */
+  lastRuns: DiagramRun[];
   updatedAt: string;
 }
 

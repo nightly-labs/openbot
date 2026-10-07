@@ -1,6 +1,7 @@
 /**
- * The last run of a diagram, beside the canvas. With no node selected it lists the steps in the
- * order they ran; a selected agent shows exactly what it received and what it returned, and a
+ * The last run of the focused routine, beside the canvas. With no node selected it lists the steps in
+ * the order they ran; a selected agent shows the routines that start it and exactly what it received
+ * and returned in the focused one's run, and a
  * selected routine shows what it asks for, which agents it starts, when it fires and how it went.
  */
 
@@ -13,7 +14,14 @@ import { routineScheduleSummary } from "../conversation/routine-schedule-ui";
 import { sidebarMessageTime } from "../sidebar/sidebar-filtering";
 import { DiagramStepIcon } from "./DiagramNodeCard";
 import { DiagramRoutineWeek, diagramRunStepStatus } from "./DiagramRoutineVisuals";
-import { diagramExecutionSteps, diagramRoutineReach } from "./diagram-graph";
+import {
+  diagramExecutionSteps,
+  diagramRoutineColor,
+  diagramRoutineReach,
+  diagramRoutineSteps,
+  diagramRoutinesReaching,
+  diagramRunOf,
+} from "./diagram-graph";
 import type { Diagram, DiagramNode, DiagramStepRun } from "./diagram-model";
 import { DIAGRAM_RUN_STATUS_KEY, DIAGRAM_STEP_STATUS_KEY, diagramStepSeconds } from "./diagram-text";
 
@@ -21,9 +29,12 @@ export interface DiagramInspectorProps {
   diagram: Diagram;
   agents: AgentProfile[];
   selectedNodeId: string | null;
+  /** The routine whose last run the panel shows. */
+  focusRoutineId: string | null;
   /** The day the routine week strip starts on. */
   now: Date;
   onSelectNode: (nodeId: string | null) => void;
+  onFocusRoutine: (routineId: string) => void;
   onClose: () => void;
   onRunRoutine?: ((nodeId: string) => void) | undefined;
 }
@@ -31,8 +42,13 @@ export interface DiagramInspectorProps {
 export function DiagramInspector(props: DiagramInspectorProps) {
   const { t, format } = useText();
   const agentById = createMemo(() => new Map(props.agents.map((agent) => [agent.id, agent])));
-  const steps = createMemo(() => diagramExecutionSteps(props.diagram.nodes, props.diagram.edges));
-  const stepRuns = createMemo(() => new Map((props.diagram.lastRun?.steps ?? []).map((step) => [step.nodeId, step])));
+  const steps = createMemo(() =>
+    props.focusRoutineId
+      ? diagramRoutineSteps(props.diagram.edges, props.focusRoutineId)
+      : diagramExecutionSteps(props.diagram.nodes, props.diagram.edges),
+  );
+  const focusedRun = () => diagramRunOf(props.diagram, props.focusRoutineId);
+  const stepRuns = createMemo(() => new Map((focusedRun()?.steps ?? []).map((step) => [step.nodeId, step])));
   const selected = () => props.diagram.nodes.find((node) => node.id === props.selectedNodeId);
   const selectedRoutine = () => {
     const node = selected();
@@ -47,14 +63,14 @@ export function DiagramInspector(props: DiagramInspectorProps) {
     if (node.kind === "routine") return node.name;
     return agentById().get(node.agentId)?.name ?? node.agentId;
   };
-  /** Agents in the order they run; an agent no routine reaches comes last. */
+  /** The agents of the focused routine's run, in the order they run. */
   const orderedAgents = createMemo(() =>
     props.diagram.nodes
-      .filter((node) => node.kind === "agent")
+      .filter((node) => node.kind === "agent" && (!props.focusRoutineId || steps().has(node.id)))
       .sort((left, right) => (steps().get(left.id) ?? Infinity) - (steps().get(right.id) ?? Infinity)),
   );
   const startedBy = () => {
-    const run = props.diagram.lastRun;
+    const run = focusedRun();
     if (!run) return "";
     if (run.kind === "manual") return t("diagram.run.manual");
     return t("diagram.run.scheduled", {
@@ -109,10 +125,7 @@ export function DiagramInspector(props: DiagramInspectorProps) {
         <Show
           when={selected()}
           fallback={
-            <Show
-              when={props.diagram.lastRun}
-              fallback={<p class="diagram-inspector-empty">{t("diagram.inspector.noRun")}</p>}
-            >
+            <Show when={focusedRun()} fallback={<p class="diagram-inspector-empty">{t("diagram.inspector.noRun")}</p>}>
               {(run) => (
                 <>
                   <div class="diagram-inspector-run">
@@ -170,7 +183,15 @@ export function DiagramInspector(props: DiagramInspectorProps) {
           {(node) => (
             <Show
               when={selectedRoutine()}
-              fallback={<AgentStepDetail node={node()} stepRun={stepRuns().get(node().id)} />}
+              fallback={
+                <AgentStepDetail
+                  node={node()}
+                  diagram={props.diagram}
+                  focusRoutineId={props.focusRoutineId}
+                  stepRun={stepRuns().get(node().id)}
+                  onFocusRoutine={props.onFocusRoutine}
+                />
+              }
             >
               {(routine) => (
                 <RoutineDetail
@@ -202,15 +223,57 @@ function StepStatus(props: { step: DiagramStepRun }) {
   );
 }
 
-function AgentStepDetail(props: { node: DiagramNode; stepRun: DiagramStepRun | undefined }) {
+function AgentStepDetail(props: {
+  node: DiagramNode;
+  diagram: Diagram;
+  focusRoutineId: string | null;
+  stepRun: DiagramStepRun | undefined;
+  onFocusRoutine: (routineId: string) => void;
+}) {
   const { t } = useText();
+  const routines = () => diagramRoutinesReaching(props.diagram.nodes, props.diagram.edges, props.node.id);
   return (
     <>
-      <Show when={props.stepRun}>{(step) => <StepStatus step={step()} />}</Show>
       <section class="diagram-inspector-section">
         <h3 class="diagram-inspector-section-title">{t("diagram.inspector.task")}</h3>
         <p>{props.node.kind === "agent" ? props.node.task : ""}</p>
       </section>
+      {/* Each routine that starts this agent, with how the agent's step went in its last run. The
+          one picked is the run the input and output below come from. */}
+      <Show when={routines().length > 0}>
+        <section class="diagram-inspector-section">
+          <h3 class="diagram-inspector-section-title">{t("diagram.node.startedBy")}</h3>
+          <ul class="diagram-inspector-steps">
+            <For each={routines()}>
+              {(routine) => {
+                const step = () =>
+                  diagramRunOf(props.diagram, routine.id)?.steps.find((entry) => entry.nodeId === props.node.id);
+                return (
+                  <li>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      class="diagram-inspector-step diagram-inspector-routine"
+                      data-routine-color={diagramRoutineColor(props.diagram.nodes, routine.id)}
+                      aria-pressed={props.focusRoutineId === routine.id ? "true" : "false"}
+                      onClick={() => props.onFocusRoutine(routine.id)}
+                    >
+                      <span class="diagram-inspector-routine-dot" aria-hidden="true" />
+                      <span class="diagram-inspector-step-name">{routine.name}</span>
+                      <Show
+                        when={step()}
+                        fallback={<span class="diagram-inspector-step-status">{t("diagram.node.noRun")}</span>}
+                      >
+                        {(current) => <StepStatus step={current()} />}
+                      </Show>
+                    </Button>
+                  </li>
+                );
+              }}
+            </For>
+          </ul>
+        </section>
+      </Show>
       <Show when={props.stepRun} fallback={<p class="diagram-inspector-empty">{t("diagram.inspector.notRun")}</p>}>
         {(step) => (
           <>

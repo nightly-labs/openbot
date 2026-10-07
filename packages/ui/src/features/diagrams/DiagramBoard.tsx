@@ -25,6 +25,10 @@ import {
   diagramExecutionSteps,
   diagramInputPort,
   diagramOutputPort,
+  diagramRoutineColor,
+  diagramRoutineSteps,
+  diagramRoutinesReaching,
+  diagramRunOf,
 } from "./diagram-graph";
 import type { Diagram, DiagramNode, DiagramPoint } from "./diagram-model";
 
@@ -68,10 +72,16 @@ export interface DiagramBoardProps {
   diagram: Diagram;
   agents: AgentProfile[];
   selectedNodeId: string | null;
+  /**
+   * The routine whose path and last run the canvas shows. The rest of the diagram dims. Null shows
+   * every routine's path, with no run.
+   */
+  focusRoutineId: string | null;
   /** The day the routine week strips start on. */
   now: Date;
   editable?: boolean;
   onSelectNode: (nodeId: string | null) => void;
+  onFocusRoutine: (routineId: string) => void;
   onMoveNode: (nodeId: string, position: DiagramPoint) => void;
   onConnect: (from: string, to: string) => void;
   onRemoveEdge: (edgeId: string) => void;
@@ -104,8 +114,31 @@ export function DiagramBoard(props: DiagramBoardProps) {
 
   const nodeById = createMemo(() => new Map(props.diagram.nodes.map((node) => [node.id, node])));
   const agentById = createMemo(() => new Map(props.agents.map((agent) => [agent.id, agent])));
-  const steps = createMemo(() => diagramExecutionSteps(props.diagram.nodes, props.diagram.edges));
-  const stepRuns = createMemo(() => new Map((props.diagram.lastRun?.steps ?? []).map((step) => [step.nodeId, step])));
+  /** Every node some routine reaches. The rest are not connected and never run. */
+  const reachable = createMemo(() => diagramExecutionSteps(props.diagram.nodes, props.diagram.edges));
+  const focusSteps = createMemo(() =>
+    props.focusRoutineId ? diagramRoutineSteps(props.diagram.edges, props.focusRoutineId) : null,
+  );
+  const steps = () => focusSteps() ?? reachable();
+  const stepRuns = createMemo(
+    () => new Map((diagramRunOf(props.diagram, props.focusRoutineId)?.steps ?? []).map((step) => [step.nodeId, step])),
+  );
+  /** True for a node outside the focused routine's path. */
+  const dimmed = (nodeId: string) => {
+    const focus = props.focusRoutineId;
+    return focus !== null && nodeId !== focus && !focusSteps()?.has(nodeId);
+  };
+  /** With one routine there is nothing to tell apart, so agent cards name routines only from two. */
+  const routineCount = createMemo(() => props.diagram.nodes.filter((node) => node.kind === "routine").length);
+  const routineChips = (nodeId: string) =>
+    routineCount() < 2
+      ? []
+      : diagramRoutinesReaching(props.diagram.nodes, props.diagram.edges, nodeId).map((routine) => ({
+          id: routine.id,
+          name: routine.name,
+          color: diagramRoutineColor(props.diagram.nodes, routine.id),
+          status: diagramRunOf(props.diagram, routine.id)?.steps.find((step) => step.nodeId === nodeId)?.status,
+        }));
   const nodeName = (node: DiagramNode | undefined) => {
     if (!node) return "";
     if (node.kind === "routine") return node.name;
@@ -339,7 +372,8 @@ export function DiagramBoard(props: DiagramBoardProps) {
     };
   });
 
-  const edgeState = (to: string) => {
+  const edgeState = (from: string, to: string) => {
+    if (dimmed(from) || dimmed(to)) return "dimmed";
     const status = stepRuns().get(to)?.status;
     if (status === "running") return "running";
     if (status === "succeeded" || status === "failed") return "delivered";
@@ -391,6 +425,9 @@ export function DiagramBoard(props: DiagramBoardProps) {
         <div
           class="diagram-board-world"
           data-settling={camera.settling ? "" : undefined}
+          data-routine-color={
+            props.focusRoutineId ? diagramRoutineColor(props.diagram.nodes, props.focusRoutineId) : undefined
+          }
           style={{ transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.scale})` }}
         >
           <svg class="diagram-edges" aria-hidden="true">
@@ -407,7 +444,7 @@ export function DiagramBoard(props: DiagramBoardProps) {
                       <g
                         class="diagram-edge"
                         data-diagram-edge={current().id}
-                        data-state={edgeState(current().to)}
+                        data-state={edgeState(current().from, current().to)}
                         data-selected={interaction.selectedEdgeId === current().id ? "" : undefined}
                       >
                         <path class="diagram-edge-hit" d={path()} />
@@ -481,13 +518,19 @@ export function DiagramBoard(props: DiagramBoardProps) {
                 name={nodeName(node)}
                 agent={node.kind === "agent" ? agentById().get(node.agentId) : undefined}
                 step={steps().get(node.id)}
+                unreachable={node.kind === "agent" && !reachable().has(node.id)}
+                dimmed={dimmed(node.id)}
+                routineColor={node.kind === "routine" ? diagramRoutineColor(props.diagram.nodes, node.id) : undefined}
+                routines={node.kind === "agent" ? routineChips(node.id) : []}
+                focusRoutineId={props.focusRoutineId}
+                onFocusRoutine={props.onFocusRoutine}
                 stepRun={stepRuns().get(node.id)}
                 selected={props.selectedNodeId === node.id}
                 editable={editable()}
                 connecting={interaction.source === node.id}
                 inputTarget={inputTarget(node.id)}
                 now={props.now}
-                firing={props.diagram.lastRun?.status === "running" && props.diagram.lastRun.routineNodeId === node.id}
+                firing={diagramRunOf(props.diagram, node.id)?.status === "running"}
                 onSelect={() => {
                   if (suppressClick) return;
                   setInteraction((state) => {
