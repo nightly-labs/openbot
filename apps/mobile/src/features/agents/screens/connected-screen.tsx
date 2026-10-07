@@ -1,10 +1,11 @@
 import { type MenuAction, MenuView } from "@expo/ui/community/menu";
 import type { SidebarLayoutSnapshot } from "@openbot/contracts/ipc";
 import { type Href, router, Stack } from "expo-router";
+import { HeaderHeightContext } from "expo-router/react-navigation";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import { Bot, Layers3, Plus, Search, WifiOff } from "lucide-react-native";
-import { useLayoutEffect, useMemo, useState } from "react";
+import { Layers3, Plus, Search, WifiOff } from "lucide-react-native";
+import { useContext, useLayoutEffect, useMemo, useState } from "react";
 import { Pressable, View } from "react-native";
 import Animated, {
   cancelAnimation,
@@ -16,6 +17,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
 import {
   type AgentListRevealState,
@@ -24,6 +26,7 @@ import {
 } from "@/features/agents/components/agent-list-reveal";
 import { AgentListRow } from "@/features/agents/components/agent-list-row";
 import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
+import { EmptyAgentsScene } from "@/features/agents/components/empty-agents-scene";
 import { PinnedAgentsGrid } from "@/features/agents/components/pinned-agents-grid";
 import { SidebarSectionHeader } from "@/features/agents/components/sidebar-section-header";
 import { ChannelListRow } from "@/features/channels/components/channel-list";
@@ -230,6 +233,22 @@ export function ConnectedScreen() {
     [sidebar?.layout, unpinnedAgents, channels.channels, hiddenChannelIds, pinnedChannelIds, t],
   );
   const visibleSectionIds = items.filter((item) => item.kind === "section").map((item) => item.id);
+  const headerHeight = useContext(HeaderHeightContext) ?? 0;
+  const insets = useSafeAreaInsets();
+  // With nothing in the list, the scene replaces it. In a list, the native header and safe-area
+  // insets add to a content container that already fills the screen, so iOS would scroll it.
+  // Pins and a sidebar error still need the list header, so they keep the scene in the list.
+  const showAgentsScene =
+    hasSelectedServer &&
+    activeServer.state === "online" &&
+    activeAgents.length === 0 &&
+    items.length === 0 &&
+    !hasPins &&
+    !sidebar?.error;
+  const addAgent = () => {
+    void haptics.impact("soft");
+    router.push("/add-agent");
+  };
   const listReveal = useAgentListReveal(listReady, activeServer.id);
   // Collapse keeps stable list cells and changes their heights on the UI thread.
   // Enable cell reflow again when a host layout update moves agents or sections.
@@ -255,7 +274,14 @@ export function ConnectedScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      {listReady ? (
+      {listReady && showAgentsScene ? (
+        // iOS draws the header over the screen; Android lays the screen out below its opaque header.
+        // The bottom matches the list's `pb-safe-offset-4`.
+        <EmptyAgentsScene
+          onAddAgent={addAgent}
+          style={{ paddingTop: isIOS ? headerHeight : 0, paddingBottom: insets.bottom + 16 }}
+        />
+      ) : listReady ? (
         <Animated.FlatList
           key={activeServer.id}
           onLayout={listReveal.onLayout}
@@ -379,28 +405,7 @@ export function ConnectedScreen() {
                 </View>
               </View>
             ) : activeAgents.length === 0 ? (
-              <View className="flex-1 items-center justify-center gap-5 px-8 py-16">
-                <View className="size-16 items-center justify-center rounded-3xl bg-control">
-                  <Bot color={mutedColor} size={30} strokeWidth={1.6} />
-                </View>
-                <View className="items-center gap-1.5">
-                  <Typography.Heading type="h4">{t("mobile.agent.home.noAgents")}</Typography.Heading>
-                  <Typography.Paragraph align="center" className="text-text-secondary">
-                    {t("mobile.agent.home.noAgentsBody")}
-                  </Typography.Paragraph>
-                </View>
-                <Button
-                  size="md"
-                  variant="secondary"
-                  onPress={() => {
-                    void haptics.impact("soft");
-                    router.push("/add-agent");
-                  }}
-                >
-                  <Plus color={iconColor} size={18} strokeWidth={2} />
-                  <Button.Label>{t("mobile.agent.home.addAgent")}</Button.Label>
-                </Button>
-              </View>
+              <EmptyAgentsScene onAddAgent={addAgent} />
             ) : null
           }
         />
