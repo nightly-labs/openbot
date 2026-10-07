@@ -159,8 +159,9 @@ export function DiagramView(props: DiagramViewProps) {
             <Button
               type="button"
               variant="ghost"
-              size="icon-sm"
+              class="header-panel-toggle"
               aria-label={t("diagram.inspector.label")}
+              aria-expanded="false"
               title={t("diagram.inspector.label")}
               onClick={() =>
                 setPanels((state) => {
@@ -168,7 +169,7 @@ export function DiagramView(props: DiagramViewProps) {
                 })
               }
             >
-              <PanelRight aria-hidden="true" />
+              <PanelRight aria-hidden="true" class="size-[14px]" />
             </Button>
           </Show>
         </span>

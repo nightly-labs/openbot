@@ -895,6 +895,8 @@
   flex-direction: column;
   border-left: 1px solid var(--openbot-border);
   background: var(--openbot-bg-surface);
+  /* Slides in as the chat's settings panel does. */
+  animation: settings-panel-in var(--openbot-duration-slow) cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
 .diagram-inspector-header {
@@ -1282,7 +1284,8 @@
     animation: none;
   }
 
-  .diagram-node[data-kind="routine"][data-firing] .diagram-node-icon {
+  .diagram-node[data-kind="routine"][data-firing] .diagram-node-icon,
+  .diagram-inspector {
     animation: none;
   }
 
