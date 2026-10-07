@@ -213,7 +213,7 @@
 
 .message-attachments-group:has(.attachment-media-player),
 .message-attachments:has(.attachment-media-player) {
-  width: min(100%, 320px);
+  width: min(100%, 360px);
 }
 
 .attachment-media-player {
@@ -222,4 +222,48 @@
   width: 100%;
   min-width: 0;
   border-radius: var(--openbot-radius-md);
+}
+
+.attachment-download-bar .ui-button {
+  gap: var(--openbot-space-1-5);
+  padding-inline: var(--openbot-space-2);
+  font-size: var(--openbot-text-xs);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.attachment-download-bar svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+.message-attachment[data-media] {
+  grid-template-columns: minmax(0, 1fr) var(--openbot-control-sm) var(--openbot-control-sm);
+  gap: var(--openbot-space-2);
+  padding: var(--openbot-space-3);
+}
+
+.message-attachment[data-media] .attachment-file-visual {
+  width: var(--openbot-control-md);
+  height: var(--openbot-control-md);
+  background: var(--openbot-bg-control);
+  color: var(--openbot-text-muted);
+}
+
+.message-attachment[data-media] .attachment-file-visual svg {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+}
+
+.message-attachment[data-media] .attachment-open-button {
+  width: var(--openbot-control-sm);
+  height: var(--openbot-control-sm);
+}
+
+.message-attachment[data-media] .attachment-open-button svg {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+}
+
+.message-attachment[data-media="audio"] .attachment-media-player {
+  height: var(--openbot-control-xl);
 }

@@ -1,6 +1,6 @@
 import { attachmentMimeTypeForName, playableMediaKind } from "@openbot/contracts/attachment-files";
 import { type AttachmentSummary, canPreviewAttachment } from "@openbot/contracts/ipc";
-import { Button, Download } from "@openbot/ui";
+import { AudioLines, Button, Download, Film } from "@openbot/ui";
 import { createSignal, createUniqueId, For, Show } from "solid-js";
 import { useText } from "../../text";
 import { AnchoredTooltip } from "./AnchoredTooltip";
@@ -40,6 +40,8 @@ export function AttachmentCards(props: {
   // An image whose preview does not load was deleted from the host, or never arrived. The card
   // keeps its place in the message and says so, instead of an empty frame.
   const [missing, setMissing] = createSignal<ReadonlySet<string>>(new Set());
+  const mediaKind = (attachment: AttachmentSummary) =>
+    playableMediaKind(attachment.mimeType || attachmentMimeTypeForName(attachment.name));
   const isMissing = (attachment: AttachmentSummary) => missing().has(attachment.id);
   const markMissing = (attachment: AttachmentSummary) => setMissing((current) => new Set(current).add(attachment.id));
 
@@ -58,7 +60,11 @@ export function AttachmentCards(props: {
       <div class="message-attachments">
         <For each={props.attachments}>
           {(attachment) => (
-            <div class="message-attachment" data-status={isMissing(attachment) ? "missing" : undefined}>
+            <div
+              class="message-attachment"
+              data-media={mediaKind(attachment) ?? undefined}
+              data-status={isMissing(attachment) ? "missing" : undefined}
+            >
               <Button
                 variant="ghost"
                 type="button"
@@ -77,7 +83,11 @@ export function AttachmentCards(props: {
                       data-file-tone={attachmentReferenceTone(attachment.name)}
                       aria-hidden="true"
                     >
-                      <AttachmentFileIcon />
+                      <Show when={mediaKind(attachment)} fallback={<AttachmentFileIcon />}>
+                        <Show when={mediaKind(attachment) === "audio"} fallback={<Film />}>
+                          <AudioLines />
+                        </Show>
+                      </Show>
                     </span>
                   }
                 >
@@ -95,7 +105,7 @@ export function AttachmentCards(props: {
                   </span>
                 </Show>
                 <span class="attachment-file-copy">
-                  <strong>{attachment.name}</strong>
+                  <strong title={attachment.name}>{attachment.name}</strong>
                   <small>{isMissing(attachment) ? t("attachment.notFound") : format.fileSize(attachment.size)}</small>
                 </span>
               </Button>
@@ -135,7 +145,7 @@ export function AttachmentCards(props: {
               </Show>
               <Show when={attachment.previewUrl && !isMissing(attachment)}>
                 <MediaFilePreview
-                  kind={playableMediaKind(attachment.mimeType || attachmentMimeTypeForName(attachment.name))}
+                  kind={mediaKind(attachment)}
                   src={attachment.previewUrl ?? ""}
                   name={attachment.name}
                   class="attachment-media-player"
