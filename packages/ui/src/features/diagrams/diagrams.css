@@ -670,11 +670,34 @@
   white-space: nowrap;
 }
 
-.diagram-view-lens-tab.ui-sliding-tabs-trigger {
+.diagram-view-lens-trigger.ui-select-trigger {
+  min-width: 180px;
+  max-width: 280px;
+}
+
+.diagram-view-lens-option {
   display: inline-flex;
+  min-width: 0;
   align-items: center;
-  gap: var(--openbot-space-1-5);
+  gap: var(--openbot-space-2);
+}
+
+.diagram-view-lens-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.diagram-view-lens-option svg {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+  flex: none;
+}
+
+/* "All routines" has no colour of its own: its dot is an outline. */
+.diagram-view-lens-dot[data-all] {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--openbot-text-muted);
 }
 
 .diagram-view-lens-dot,

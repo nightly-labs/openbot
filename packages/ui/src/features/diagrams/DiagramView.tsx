@@ -8,8 +8,19 @@
  * focus follows the newest run until the user picks a routine.
  */
 
-import { Badge, Button, PanelRight, Play, SlidingTabs, Workflow } from "@openbot/ui";
-import { createSignal, createStore, For, Show } from "solid-js";
+import {
+  Badge,
+  Button,
+  PanelRight,
+  Play,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Workflow,
+} from "@openbot/ui";
+import { createSignal, createStore, Show } from "solid-js";
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
@@ -17,8 +28,10 @@ import { sidebarMessageTime } from "../sidebar/sidebar-filtering";
 import { DiagramBoard } from "./DiagramBoard";
 import { DiagramChatPanel } from "./DiagramChatPanel";
 import { DiagramInspector } from "./DiagramInspector";
+import { DiagramStepIcon } from "./DiagramNodeCard";
+import { diagramRunStepStatus } from "./DiagramRoutineVisuals";
 import { diagramLatestRun, diagramRoutineColor, diagramRunOf } from "./diagram-graph";
-import type { Diagram, DiagramChatMessage, DiagramNode, DiagramPoint } from "./diagram-model";
+import type { Diagram, DiagramChatMessage, DiagramNode, DiagramPoint, DiagramRunStatus } from "./diagram-model";
 import { DIAGRAM_RUN_STATUS_KEY } from "./diagram-text";
 
 export interface DiagramViewProps {
@@ -47,6 +60,34 @@ export interface DiagramViewProps {
   onAddAgent?: (() => void) | undefined;
 }
 
+/** One choice in the routine selector, with its colour and how its last run went. */
+interface RoutineOption {
+  id: string;
+  name: string;
+  color: number | undefined;
+  status: DiagramRunStatus | undefined;
+}
+
+function RoutineOptionLabel(props: { option: RoutineOption }) {
+  return (
+    <span class="diagram-view-lens-option" data-routine-color={props.option.color}>
+      <span
+        class="diagram-view-lens-dot"
+        data-all={props.option.color === undefined ? "" : undefined}
+        aria-hidden="true"
+      />
+      <span class="diagram-view-lens-name">{props.option.name}</span>
+      <Show when={props.option.status}>
+        {(status) => (
+          <span class="diagram-node-status" data-status={status()}>
+            <DiagramStepIcon status={diagramRunStepStatus(status())} />
+          </span>
+        )}
+      </Show>
+    </span>
+  );
+}
+
 /** The lens value that shows every routine at once. A node id never takes this form. */
 const ALL = "routine-lens:all";
 
@@ -72,6 +113,16 @@ export function DiagramView(props: DiagramViewProps) {
     props.onRunRoutine?.(routineId);
   };
   const runTarget = () => focusRoutineId() ?? routines()[0]?.id;
+  /** The routines to highlight, after the choice to show them all. */
+  const routineOptions = (): RoutineOption[] => [
+    { id: ALL, name: t("diagram.routine.all"), color: undefined, status: undefined },
+    ...routines().map((routine) => ({
+      id: routine.id,
+      name: routine.name,
+      color: diagramRoutineColor(props.diagram.nodes, routine.id),
+      status: diagramRunOf(props.diagram, routine.id)?.status,
+    })),
+  ];
   const select = (nodeId: string | null) => {
     setSelectedNodeId(nodeId);
     if (nodeId)
@@ -94,28 +145,28 @@ export function DiagramView(props: DiagramViewProps) {
         </Show>
         <h1 class="diagram-view-title">{props.diagram.name}</h1>
         <Show when={routines().length > 1}>
-          <SlidingTabs.Root
-            value={focusRoutineId() ?? ALL}
-            onChange={(value: string) => setPicked(value === ALL ? null : value)}
+          <Select<RoutineOption>
+            class="diagram-view-lens"
+            options={routineOptions()}
+            optionValue="id"
+            optionTextValue="name"
+            value={routineOptions().find((option) => option.id === (focusRoutineId() ?? ALL))}
+            onChange={(option) => option && setPicked(option.id === ALL ? null : option.id)}
+            placement="bottom-start"
+            sameWidth={false}
+            itemComponent={(itemProps) => (
+              <SelectItem item={itemProps.item}>
+                <RoutineOptionLabel option={itemProps.item.rawValue} />
+              </SelectItem>
+            )}
           >
-            <SlidingTabs.List class="diagram-view-lens" aria-label={t("diagram.routine.lens")}>
-              <SlidingTabs.Trigger value={ALL} class="diagram-view-lens-tab">
-                {t("diagram.routine.all")}
-              </SlidingTabs.Trigger>
-              <For each={routines()}>
-                {(routine) => (
-                  <SlidingTabs.Trigger
-                    value={routine.id}
-                    class="diagram-view-lens-tab"
-                    data-routine-color={diagramRoutineColor(props.diagram.nodes, routine.id)}
-                  >
-                    <span class="diagram-view-lens-dot" aria-hidden="true" />
-                    {routine.name}
-                  </SlidingTabs.Trigger>
-                )}
-              </For>
-            </SlidingTabs.List>
-          </SlidingTabs.Root>
+            <SelectTrigger size="sm" class="diagram-view-lens-trigger" aria-label={t("diagram.routine.lens")}>
+              <SelectValue<RoutineOption>>
+                {(state) => <RoutineOptionLabel option={state.selectedOption()} />}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent />
+          </Select>
         </Show>
         <Show when={focusedRun()} fallback={<span class="diagram-view-run">{t("diagram.run.none")}</span>}>
           {(run) => (
