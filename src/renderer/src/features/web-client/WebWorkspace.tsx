@@ -469,6 +469,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       throw new Error(t("webClient.error.connectServerFirst"));
     return admin.request;
   }
+  // The events routes answer only an owner or admin. A member keeps the released routine routes.
+  const eventsEnabled = () =>
+    workspace.state.capabilities.includes(EVENTS_CAPABILITY) &&
+    (workspace.state.host?.role === "owner" || workspace.state.host?.role === "admin");
   const providerSettings = createWebProviderSettings({
     server: () => (workspace.runtime.admin ? server() : undefined),
     request: hostRequest,
@@ -481,7 +485,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     () => workspace.state.host?.hostId ?? "",
     workspace.runtime.admin ? () => hostRequest() : undefined,
     workspace.onHostEvent,
-    () => workspace.state.capabilities.includes(EVENTS_CAPABILITY),
+    eventsEnabled,
   );
   const remoteAgentAdmin = createRemoteAgentAdmin(
     () => {
@@ -632,7 +636,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     workspace.runtime,
     workspace.onHostEvent,
     () => workspace.state.host?.hostId ?? "",
-    () => workspace.state.capabilities.includes(EVENTS_CAPABILITY),
+    eventsEnabled,
   );
   const channelsSupported = () =>
     workspace.state.status === "online" &&

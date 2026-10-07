@@ -127,8 +127,9 @@ export class SignalIngress implements MessagingIngress {
   acquire(platform: MessagingPlatform): () => void {
     const before = this.#holders.get(platform) ?? 0;
     this.#holders.set(platform, before + 1);
-    if (this.#held() === 1) this.#run(this.#open());
-    // The socket asks Signal only for the routes of the platforms that hold it.
+    if (this.#held() === 1 && this.#webhookHolders === 0) this.#run(this.#open());
+    // The socket asks Signal only for the routes of the platforms that hold it, and webhooks can
+    // already hold it.
     else if (before === 0) this.reconnect();
     let released = false;
     return () => {
