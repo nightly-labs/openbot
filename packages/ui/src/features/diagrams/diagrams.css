@@ -41,6 +41,8 @@
 .diagram-view-avatar.agent-avatar {
   width: 30px;
   height: 30px;
+  /* As in the chat avatar below: one track the size of the box keeps the Bloub centred. */
+  grid-template: 100% / 100%;
 }
 
 .diagram-view-icon svg {
