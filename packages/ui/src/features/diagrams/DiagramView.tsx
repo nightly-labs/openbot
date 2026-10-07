@@ -58,13 +58,9 @@ export interface DiagramViewProps {
   connectsWithinRoutine?: boolean;
   canRemoveNode?: ((nodeId: string) => boolean) | undefined;
   canRemoveEdge?: ((edgeId: string) => boolean) | undefined;
-  addableAgents?: readonly AgentProfile[] | undefined;
-  onPlaceAgent?: ((agentId: string) => void) | undefined;
   onRunRoutine?: ((nodeId: string) => void) | undefined;
   /** Saves what an agent does in one routine, from the panel. Without it, tasks are read-only. */
   onEditTask?: ((nodeId: string, routineId: string, task: string) => void) | undefined;
-  onAddRoutine?: (() => void) | undefined;
-  onAddAgent?: (() => void) | undefined;
 }
 
 /** One choice in the routine selector, with its colour and how its last run went. */
@@ -199,11 +195,7 @@ export function DiagramView(props: DiagramViewProps) {
           connectable={!props.connectsWithinRoutine || focusRoutineId() !== null}
           canRemoveNode={props.canRemoveNode}
           canRemoveEdge={props.canRemoveEdge}
-          addableAgents={props.addableAgents}
-          onPlaceAgent={props.onPlaceAgent}
           onRunRoutine={props.onRunRoutine ? runRoutine : undefined}
-          onAddRoutine={props.onAddRoutine}
-          onAddAgent={props.onAddAgent}
         >
           <Show when={routines().length > 1}>
             <div class="diagram-view-lens-bar" data-diagram-overlay="">

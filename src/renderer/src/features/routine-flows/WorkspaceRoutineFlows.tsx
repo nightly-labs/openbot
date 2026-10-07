@@ -125,9 +125,6 @@ export function WorkspaceRoutineFlows(props: { port?: RoutineFlowsPort }) {
   });
   /** An agent with routines of its own stays: removing it would remove the routine, which belongs to settings. */
   const owners = createMemo(() => new Set(state.canvas?.routines.map((entry) => entry.routine.agentId) ?? []));
-  const onCanvas = createMemo(
-    () => new Set(diagram()?.nodes.flatMap((node) => (node.kind === "agent" ? [node.agentId] : [])) ?? []),
-  );
 
   /** The open agent edits its own canvas from the chat panel. */
   const assistantOf = (agent: AgentProfile | undefined) =>
@@ -243,17 +240,6 @@ export function WorkspaceRoutineFlows(props: { port?: RoutineFlowsPort }) {
                   return id !== null && id !== canvasAgentId && !owners().has(id);
                 }}
                 canRemoveEdge={(edgeId) => !isRoutineStartEdge(edgeId) && !edgeId.startsWith(PENDING_LINK_PREFIX)}
-                addableAgents={agentList().filter((agent) => !onCanvas().has(agent.id))}
-                onPlaceAgent={(placed) => {
-                  const lowest = Math.max(0, ...(diagram()?.nodes.map((node) => node.position.y) ?? [0]));
-                  port()
-                    .routineFlows.savePosition(
-                      { agentId: canvasAgentId, nodeKey: routineFlowAgentKey(placed), x: 360, y: lowest + 260 },
-                      "local",
-                    )
-                    .then(() => load(canvasAgentId))
-                    .catch(failed(t("diagram.flows.saveFailed")));
-                }}
                 onEditTask={(nodeId, routineNodeId, task) => {
                   const editedAgentId = agentIdOfNode(nodeId);
                   const routineId = routineIdOfNode(routineNodeId);

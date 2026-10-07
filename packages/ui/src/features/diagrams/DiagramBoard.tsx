@@ -9,7 +9,7 @@
  * every edit goes out through a callback, so the caller decides what an edit does.
  */
 
-import { Button, buttonVariants, DropdownMenu, Minus, Plus, Scan } from "@openbot/ui";
+import { Button, Minus, Plus, Scan } from "@openbot/ui";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
 import { createMemo, createStore, For, onSettled, Show } from "solid-js";
@@ -86,16 +86,11 @@ export interface DiagramBoardProps {
   onRemoveEdge: (edgeId: string) => void;
   onRemoveNode: (nodeId: string) => void;
   onRunRoutine?: ((nodeId: string) => void) | undefined;
-  onAddRoutine?: (() => void) | undefined;
-  onAddAgent?: (() => void) | undefined;
   /** Whether a new connection may start now. Defaults to `editable`. */
   connectable?: boolean;
   /** Whether a node or a connection may be removed. Everything may, when absent. */
   canRemoveNode?: ((nodeId: string) => boolean) | undefined;
   canRemoveEdge?: ((edgeId: string) => boolean) | undefined;
-  /** Agents the "Add agent" menu offers. With it, the button opens a menu rather than calling `onAddAgent`. */
-  addableAgents?: readonly AgentProfile[] | undefined;
-  onPlaceAgent?: ((agentId: string) => void) | undefined;
   /** Panels that float over the canvas, such as the assistant. */
   children?: JSX.Element;
 }
@@ -590,51 +585,6 @@ export function DiagramBoard(props: DiagramBoardProps) {
           </div>
         </Show>
       </div>
-
-      <Show when={editable() && (props.onAddRoutine || props.onAddAgent || props.addableAgents)}>
-        <div class="diagram-board-tools" role="toolbar" aria-label={t("diagram.toolbar.label")} data-diagram-overlay="">
-          <Show when={props.onAddRoutine}>
-            <Button type="button" variant="ghost" size="xs" onClick={() => props.onAddRoutine?.()}>
-              <Plus aria-hidden="true" />
-              {t("diagram.toolbar.addRoutine")}
-            </Button>
-          </Show>
-          <Show
-            when={props.addableAgents}
-            fallback={
-              <Show when={props.onAddAgent}>
-                <Button type="button" variant="ghost" size="xs" onClick={() => props.onAddAgent?.()}>
-                  <Plus aria-hidden="true" />
-                  {t("diagram.toolbar.addAgent")}
-                </Button>
-              </Show>
-            }
-          >
-            {(addable) => (
-              <DropdownMenu.Root placement="bottom-start" gutter={4}>
-                <DropdownMenu.Trigger
-                  class={buttonVariants({ variant: "ghost", size: "xs" })}
-                  disabled={addable().length === 0}
-                >
-                  <Plus aria-hidden="true" />
-                  {t("diagram.toolbar.addAgent")}
-                </DropdownMenu.Trigger>
-                <DropdownMenu.Portal>
-                  <DropdownMenu.Content aria-label={t("diagram.toolbar.addAgent")}>
-                    <For each={addable()}>
-                      {(agent) => (
-                        <DropdownMenu.Item onSelect={() => props.onPlaceAgent?.(agent.id)}>
-                          {agent.name}
-                        </DropdownMenu.Item>
-                      )}
-                    </For>
-                  </DropdownMenu.Content>
-                </DropdownMenu.Portal>
-              </DropdownMenu.Root>
-            )}
-          </Show>
-        </div>
-      </Show>
 
       <div class="diagram-board-zoom" role="toolbar" aria-label={t("diagram.zoom.label")} data-diagram-overlay="">
         <Button

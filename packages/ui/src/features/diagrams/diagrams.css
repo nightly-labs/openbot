@@ -174,25 +174,6 @@
   margin: 0;
 }
 
-.diagram-board-tools {
-  position: absolute;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  gap: var(--openbot-space-0-5);
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-bg-overlay);
-  box-shadow:
-    0 0 0 1px var(--openbot-border),
-    var(--openbot-shadow-raised);
-  padding: var(--openbot-space-1);
-}
-
-.diagram-board-tools {
-  top: var(--openbot-space-4);
-  left: var(--openbot-space-4);
-}
-
 /* Zoom in, zoom out and fit, as a column of separate square buttons. */
 .diagram-board-zoom {
   position: absolute;
@@ -218,10 +199,6 @@
 
 .diagram-board-zoom .ui-button:hover svg {
   color: var(--openbot-text-primary);
-}
-
-.diagram-board-tools .ui-button {
-  border-radius: var(--openbot-radius-pill);
 }
 
 /* Below the routine picker, which holds the top centre of the canvas. */
@@ -575,8 +552,7 @@
 }
 
 .diagram-node-run.ui-button svg,
-.diagram-view-actions .ui-button-size-xs svg,
-.diagram-board-tools .ui-button-size-xs svg {
+.diagram-view-actions .ui-button-size-xs svg {
   width: var(--openbot-icon-xs);
   height: var(--openbot-icon-xs);
 }
@@ -717,7 +693,7 @@
   white-space: nowrap;
 }
 
-/* The routine picker, at the top centre of the canvas, level with the canvas tools. */
+/* The routine picker, at the top centre of the canvas. */
 .diagram-view-lens-bar {
   position: absolute;
   top: var(--openbot-space-4);

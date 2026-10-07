@@ -655,32 +655,6 @@ function InteractiveDiagram(props: {
         }))
       }
       onRunRoutine={runNow}
-      onAddRoutine={() =>
-        setDiagram((state) => {
-          state.nodes.push({
-            kind: "routine",
-            id: nextId("node-routine"),
-            position: { x: 0, y: 440 + state.nodes.length * 8 },
-            name: "Friday review",
-            instruction: "Review the week and prepare the priorities for next week.",
-            schedule: { kind: "weekly", weekday: 5, time: "16:00" },
-            active: false,
-            upcomingRuns: [],
-            recentRuns: [],
-          });
-        })
-      }
-      onAddAgent={() =>
-        setDiagram((state) => {
-          state.nodes.push({
-            kind: "agent",
-            id: nextId("node-agent"),
-            position: { x: 336, y: 560 + state.nodes.length * 8 },
-            agentId: "research",
-            task: "Describe what this agent does with its input.",
-          });
-        })
-      }
     />
   );
 }
