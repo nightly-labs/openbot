@@ -30,7 +30,11 @@ export async function runBitwardenBrowserSmoke(browser: BrowserHost): Promise<vo
     findCli: async () => "/fixture/bw",
     runCli: async (_executable, args) => {
       if (args[0] === "sync") return "Sync complete.";
-      if (args[1] === "folders") return JSON.stringify([{ id: "shared", name: "Shared with OpenBot" }]);
+      if (args[1] === "folders")
+        return JSON.stringify([
+          { id: null, name: "No Folder" },
+          { id: "shared", name: "Shared with OpenBot" },
+        ]);
       if (args[1] === "totp") return CODE;
       const item = {
         id: ID,

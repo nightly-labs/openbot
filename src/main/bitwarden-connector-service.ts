@@ -9,7 +9,7 @@ import { Effect, Exit, Schema, Semaphore } from "effect";
 import { type PasswordVault, PasswordVaultError, type VaultLogin } from "../backend/password-vault";
 
 const IDLE_MS = 8 * 60 * 60 * 1000;
-const foldersSchema = Schema.Array(Schema.Struct({ id: Schema.String, name: Schema.String }));
+const foldersSchema = Schema.Array(Schema.Struct({ id: Schema.NullOr(Schema.String), name: Schema.String }));
 const itemSchema = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
