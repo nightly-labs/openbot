@@ -76,7 +76,7 @@ interface DiscordSession {
   url: string;
 }
 
-export interface WebhookIngressDelivery {
+interface WebhookIngressDelivery {
   routeId: string;
   deliveryId: string;
   timestamp: string;
@@ -84,7 +84,7 @@ export interface WebhookIngressDelivery {
   body: Uint8Array;
 }
 
-export interface WebhookIngressAnswer {
+interface WebhookIngressAnswer {
   status: WebhookDeliveryStatus;
 }
 

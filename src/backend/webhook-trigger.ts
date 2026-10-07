@@ -11,7 +11,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { RoutineInputError } from "@openbot/team-client/routine-schedule";
 
 export const WEBHOOK_EVENT_TYPE_MAX_LENGTH = 256;
-export const WEBHOOK_FILTERS_LIMIT = 128;
+const WEBHOOK_FILTERS_LIMIT = 128;
 
 /** Rejects a trigger that the editor or a Team API client could have corrected. */
 export function validateWebhookTrigger(eventType: string | null, filters: readonly EventFilter[]): void {

@@ -11,15 +11,15 @@ import { createWebhookSignature, isPublicIpAddress } from "./webhook-security";
 
 export const WEBHOOK_DELIVERY_WINDOW_MS = 24 * 60 * 60 * 1000;
 /** Index zero is the initial attempt. The remaining entries are the five retries. */
-export const WEBHOOK_RETRY_DELAYS_MS = [0, 10_000, 60_000, 5 * 60_000, 30 * 60_000, 2 * 60 * 60_000] as const;
-export const WEBHOOK_MAX_ATTEMPTS = WEBHOOK_RETRY_DELAYS_MS.length;
-export const WEBHOOK_MAX_TEMPLATE_DEPTH = 16;
-export const WEBHOOK_MAX_CUSTOM_HEADERS = 32;
-export const WEBHOOK_MAX_CUSTOM_HEADER_BYTES = 64 * 1024;
-export const WEBHOOK_MAX_RESPONSE_BYTES = 64 * 1024;
-export const WEBHOOK_DNS_TIMEOUT_MS = 10_000;
+const WEBHOOK_RETRY_DELAYS_MS = [0, 10_000, 60_000, 5 * 60_000, 30 * 60_000, 2 * 60 * 60_000] as const;
+const WEBHOOK_MAX_ATTEMPTS = WEBHOOK_RETRY_DELAYS_MS.length;
+const WEBHOOK_MAX_TEMPLATE_DEPTH = 16;
+const WEBHOOK_MAX_CUSTOM_HEADERS = 32;
+const WEBHOOK_MAX_CUSTOM_HEADER_BYTES = 64 * 1024;
+const WEBHOOK_MAX_RESPONSE_BYTES = 64 * 1024;
+const WEBHOOK_DNS_TIMEOUT_MS = 10_000;
 /** One attempt, from DNS to the end of the response, must finish in this time. */
-export const WEBHOOK_REQUEST_DEADLINE_MS = 30_000;
+const WEBHOOK_REQUEST_DEADLINE_MS = 30_000;
 
 /** Placeholders that `materializeTemplate` fills from a run notification. */
 const TEMPLATE_FIELDS = new Set([
@@ -34,9 +34,9 @@ const TEMPLATE_FIELDS = new Set([
   "status",
 ]);
 
-export type WebhookHttpMethod = "POST" | "PUT" | "PATCH";
+type WebhookHttpMethod = "POST" | "PUT" | "PATCH";
 
-export type WebhookDeliveryFailureCode =
+type WebhookDeliveryFailureCode =
   | "invalid_destination"
   | "invalid_headers"
   | "invalid_template"
@@ -90,7 +90,7 @@ export interface PreparedWebhookRequest {
   headers: Readonly<Record<string, string>>;
 }
 
-export interface WebhookDnsLookup {
+interface WebhookDnsLookup {
   lookup(hostname: string, options: { all: true; verbatim: true }): Promise<readonly LookupAddress[]>;
 }
 
@@ -376,7 +376,7 @@ function requestHttps(
   });
 }
 
-export interface WebhookAttemptResult {
+interface WebhookAttemptResult {
   outcome: "succeeded" | "retryable" | "failed";
   status: number | null;
   retryAt: number | null;
@@ -462,7 +462,7 @@ export interface WebhookDeliveryWorkerOptions extends WebhookTransport {
   maxBatch?: number;
 }
 
-export interface WebhookDeliveryRunSummary {
+interface WebhookDeliveryRunSummary {
   processed: number;
   succeeded: number;
   retried: number;

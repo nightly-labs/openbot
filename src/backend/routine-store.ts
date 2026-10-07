@@ -96,7 +96,7 @@ export interface RoutineUpdateFields {
   limitPolicy?: RoutineLimitPolicy;
 }
 
-export interface RoutineWebhookFields {
+interface RoutineWebhookFields {
   routeId: string;
   url: string | null;
   eventType: string | null;
@@ -109,7 +109,7 @@ export interface RoutineWebhookFields {
  * A routine starts from a schedule trigger row or from a webhook row, never both. The released
  * routine API reads only the schedule kind; `listRecords` and `getRecord` read both.
  */
-export type RoutineRecordTrigger =
+type RoutineRecordTrigger =
   | ({ kind: "schedule" } & OwnedRoutine["trigger"])
   | ({ kind: "webhook" } & RoutineWebhookFields);
 

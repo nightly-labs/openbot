@@ -17,7 +17,7 @@ export interface FilterDraft {
 
 let nextFilterId = 0;
 
-export function newFilterDraft(): FilterDraft {
+function newFilterDraft(): FilterDraft {
   nextFilterId += 1;
   return { id: `new-${nextFilterId}`, pointer: "", value: "" };
 }

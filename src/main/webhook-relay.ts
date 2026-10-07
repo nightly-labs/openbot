@@ -6,7 +6,7 @@ import { HostEventsFailure } from "./host-events-api";
 import type { HostWebhookRelay } from "./host-events-service";
 import type { SignalIngress } from "./signal-ingress";
 
-export interface WebhookRelayAccount {
+interface WebhookRelayAccount {
   registerWebhookRoute(hostId: string, routeId: string): Effect.Effect<{ routeId: string }, CentralAuthOperationError>;
   revokeWebhookRoute(hostId: string, routeId: string): Effect.Effect<void, CentralAuthOperationError>;
   issueRemoteHostTicket(hostId: string): Effect.Effect<{ signalUrl: string }, CentralAuthOperationError>;

@@ -22,6 +22,7 @@ import { createOpenBotLogger, registerSecretValue } from "@openbot/logging";
 import { Effect, Semaphore } from "effect";
 import type { RoutineRecords } from "../backend/routine-records";
 import type { OwnedRoutineRecord, RoutineRecordInput } from "../backend/routine-store";
+import { WEBHOOK_EVENT_TYPE_MAX_LENGTH } from "../backend/webhook-trigger";
 import { type HostEventsApi, HostEventsFailure } from "./host-events-api";
 import type { SecretCipher } from "./provider-credential-store";
 import { validateDestination } from "./webhook-delivery";
@@ -29,9 +30,6 @@ import { verifyWebhookSignature } from "./webhook-security";
 
 const logger = createOpenBotLogger("host-events");
 const DEFAULT_ACTIVITY_LIMIT = 50;
-const WEBHOOK_EVENT_TYPE_MAX_LENGTH = 256;
-
-/** The routine operations that webhooks need. `AgentService` implements them. */
 
 export interface HostWebhookRelay {
   connected(): boolean;

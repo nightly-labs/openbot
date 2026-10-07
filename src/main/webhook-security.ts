@@ -11,7 +11,7 @@ const WEBHOOK_MAX_SIGNATURE_BYTES = 160;
 /** The relay applies the same rule, so a delivery ID that it forwards always passes here. */
 const WEBHOOK_DELIVERY_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/;
 
-export type WebhookSecurityFailureCode =
+type WebhookSecurityFailureCode =
   | "body_too_large"
   | "invalid_body"
   | "invalid_timestamp"
@@ -21,7 +21,7 @@ export type WebhookSecurityFailureCode =
   | "invalid_secret";
 
 /** Does not retain the input, secret, or native error. It is safe to show and log. */
-export class WebhookSecurityError extends Schema.TaggedError<WebhookSecurityError>()("WebhookSecurityError", {
+class WebhookSecurityError extends Schema.TaggedError<WebhookSecurityError>()("WebhookSecurityError", {
   code: Schema.Literals([
     "body_too_large",
     "invalid_body",

@@ -26,7 +26,7 @@ interface RoutineSaveInput {
 
 export type RoutineEditorRecord = RoutineFields | EventRoutine;
 
-export interface RoutineSaveResult {
+interface RoutineSaveResult {
   routine: RoutineEditorRecord;
   /** The webhook signing secret, set only when this save made a new webhook trigger. It is not shown again. */
   secret: string | null;
