@@ -5,8 +5,8 @@
  * selected routine shows what it asks for, which agents it starts, when it fires and how it went.
  */
 
-import { Badge, Button, ChevronLeft, CopyButton } from "@openbot/ui";
-import { createMemo, For, Show } from "solid-js";
+import { Badge, Button, ChevronLeft, CopyButton, Textarea } from "@openbot/ui";
+import { createEffect, createMemo, createSignal, For, flush, Show } from "solid-js";
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
@@ -15,6 +15,7 @@ import { sidebarMessageTime } from "../sidebar/sidebar-filtering";
 import { DiagramStepIcon } from "./DiagramNodeCard";
 import { DiagramRoutineWeek, diagramRunStepStatus } from "./DiagramRoutineVisuals";
 import {
+  diagramAgentTask,
   diagramExecutionSteps,
   diagramRoutineColor,
   diagramRoutineReach,
@@ -35,6 +36,8 @@ export interface DiagramInspectorProps {
   now: Date;
   onSelectNode: (nodeId: string | null) => void;
   onFocusRoutine: (routineId: string) => void;
+  /** Saves what an agent does in one routine. Without it, the task is read-only. */
+  onEditTask?: ((nodeId: string, routineId: string, task: string) => void) | undefined;
 }
 
 export function DiagramInspector(props: DiagramInspectorProps) {
@@ -177,6 +180,7 @@ export function DiagramInspector(props: DiagramInspectorProps) {
                   focusRoutineId={props.focusRoutineId}
                   stepRun={stepRuns().get(node().id)}
                   onFocusRoutine={props.onFocusRoutine}
+                  onEditTask={props.onEditTask}
                 />
               }
             >
@@ -209,20 +213,89 @@ function StepStatus(props: { step: DiagramStepRun }) {
   );
 }
 
+/**
+ * The task as text the user can change in place. It saves when it loses focus or on Command or
+ * Control with Enter, and Escape puts back the saved task. A new task from the host replaces the
+ * draft only while the user is not typing.
+ */
+function TaskEditor(props: { value: string; labelledBy: string; onSave: (task: string) => void }) {
+  const { t } = useText();
+  const [draft, setDraft] = createSignal(props.value);
+  let editing = false;
+  createEffect(
+    () => props.value,
+    (value) => {
+      if (!editing) setDraft(value);
+    },
+  );
+  const save = () => {
+    editing = false;
+    const next = draft().trim();
+    if (next !== props.value.trim()) props.onSave(next);
+  };
+  return (
+    <Textarea
+      class="diagram-inspector-task"
+      rows={2}
+      value={draft()}
+      placeholder={t("diagram.inspector.taskPlaceholder")}
+      aria-labelledby={props.labelledBy}
+      onFocus={() => (editing = true)}
+      onValueChange={setDraft}
+      onBlur={save}
+      onKeyDown={(event: KeyboardEvent & { currentTarget: HTMLTextAreaElement }) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          // Applied before the blur below reads the draft, or the blur would save what was typed.
+          flush(() => setDraft(props.value));
+          editing = false;
+          event.currentTarget.blur();
+        } else if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+          event.preventDefault();
+          event.currentTarget.blur();
+        }
+      }}
+    />
+  );
+}
+
 function AgentStepDetail(props: {
   node: DiagramNode;
   diagram: Diagram;
   focusRoutineId: string | null;
   stepRun: DiagramStepRun | undefined;
   onFocusRoutine: (routineId: string) => void;
+  onEditTask?: ((nodeId: string, routineId: string, task: string) => void) | undefined;
 }) {
   const { t } = useText();
   const routines = () => diagramRoutinesReaching(props.diagram.nodes, props.diagram.edges, props.node.id);
+  const task = () => diagramAgentTask(props.node, props.focusRoutineId);
+  /** The routine in focus, when this agent has a task in it that the user can change. */
+  const editableIn = () => {
+    const routineId = props.focusRoutineId;
+    return props.onEditTask &&
+      routineId &&
+      props.node.kind === "agent" &&
+      props.node.tasks &&
+      routineId in props.node.tasks
+      ? routineId
+      : null;
+  };
   return (
     <>
       <section class="diagram-inspector-section">
-        <h3 class="diagram-inspector-section-title">{t("diagram.inspector.task")}</h3>
-        <p>{props.node.kind === "agent" ? props.node.task : ""}</p>
+        <h3 class="diagram-inspector-section-title" id={`diagram-task-${props.node.id}`}>
+          {t("diagram.inspector.task")}
+        </h3>
+        <Show when={editableIn()} keyed fallback={<p>{task()}</p>}>
+          {(routineId) => (
+            <TaskEditor
+              value={task()}
+              labelledBy={`diagram-task-${props.node.id}`}
+              onSave={(next) => props.onEditTask?.(props.node.id, routineId, next)}
+            />
+          )}
+        </Show>
       </section>
       {/* Each routine that starts this agent, with how the agent's step went in its last run. The
           one picked is the run the input and output below come from. */}

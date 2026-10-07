@@ -6,7 +6,10 @@ import type { OpenBotDesktopApi } from "@openbot/contracts/ipc";
  */
 export interface RoutineFlowsPort {
   routineFlows: OpenBotDesktopApi["routineFlows"];
-  agent: Pick<OpenBotDesktopApi["agent"], "testRoutine" | "onScopedEvent" | "sendMessage" | "readConversationPage">;
+  agent: Pick<
+    OpenBotDesktopApi["agent"],
+    "testRoutine" | "updateRoutine" | "onScopedEvent" | "sendMessage" | "readConversationPage"
+  >;
 }
 
 /** Read on each call: tests and stories replace `window.openbot` per case. */

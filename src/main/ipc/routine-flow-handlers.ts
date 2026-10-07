@@ -11,6 +11,7 @@ import {
   parseDisconnectRoutineFlow,
   parseRemoveRoutineFlowPosition,
   parseSaveRoutineFlowPosition,
+  parseUpdateRoutineFlowLink,
 } from "./routine-flow-inputs";
 import { scopedHandler } from "./scoped-handler";
 
@@ -45,6 +46,10 @@ export function routineFlowIpcHandlers({
       }),
       disconnect: scopedHandler(parseDisconnectRoutineFlow, {
         local: (input) => runCauseEffect(routineFlows.disconnect(input)),
+        remote: remoteUnsupported,
+      }),
+      updateLink: scopedHandler(parseUpdateRoutineFlowLink, {
+        local: (input) => runCauseEffect(routineFlows.updateLink(input)),
         remote: remoteUnsupported,
       }),
     },

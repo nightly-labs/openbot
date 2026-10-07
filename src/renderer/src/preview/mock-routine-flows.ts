@@ -93,6 +93,13 @@ export function mockRoutineFlows(source: MockRoutineFlowsSource): OpenBotDesktop
       changed([routineOwner, input.fromAgentId, input.toAgentId]);
       return structuredClone(link);
     },
+    updateLink: async (input) => {
+      const link = links.find((candidate) => candidate.id === input.linkId);
+      if (!link) throw new Error("This connection no longer exists.");
+      link.instruction = input.instruction.trim();
+      changed([owner(link.routineId) ?? link.fromAgentId, link.fromAgentId, link.toAgentId]);
+      return structuredClone(link);
+    },
     disconnect: async (input) => {
       const index = links.findIndex((link) => link.id === input.linkId);
       if (index < 0) throw new Error("This connection no longer exists.");

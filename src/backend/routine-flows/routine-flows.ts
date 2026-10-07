@@ -30,6 +30,7 @@ import type {
   RoutineFlowStep,
   RoutineRun,
   SaveRoutineFlowPositionInput,
+  UpdateRoutineFlowLinkInput,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
@@ -86,6 +87,7 @@ export interface RoutineFlowsShape {
   removePosition(input: RemoveRoutineFlowPositionInput): Effect.Effect<void, RoutineFlowFailed>;
   connect(input: ConnectRoutineFlowInput): Effect.Effect<RoutineFlowLink, RoutineFlowFailed>;
   disconnect(input: DisconnectRoutineFlowInput): Effect.Effect<void, RoutineFlowFailed>;
+  updateLink(input: UpdateRoutineFlowLinkInput): Effect.Effect<RoutineFlowLink, RoutineFlowFailed>;
   /** Moves every flow that can move now. */
   sweep(): Effect.Effect<void>;
   /** Asks for a sweep when an agent event may have ended a step. Returns at once. */
@@ -176,6 +178,12 @@ export class RoutineFlows extends Context.Service<RoutineFlows, RoutineFlowsShap
             if (!routine) throw new RoutineFlowError(sourceText("error.backend.routineGone"));
             return store.createLink(routine.agentId, input, now().toISOString());
           });
+          dependencies.changed(agentsOfRoutine(link.routineId));
+          return link;
+        });
+
+        const updateLink = Effect.fn("RoutineFlows.updateLink")(function* (input: UpdateRoutineFlowLinkInput) {
+          const link = yield* attempt(() => store.updateLinkInstruction(input.linkId, input.instruction));
           dependencies.changed(agentsOfRoutine(link.routineId));
           return link;
         });
@@ -344,7 +352,16 @@ export class RoutineFlows extends Context.Service<RoutineFlows, RoutineFlowsShap
           yield* Effect.forkIn(sweep(), scope);
         });
 
-        return RoutineFlows.of({ canvas, savePosition, removePosition, connect, disconnect, sweep, notice });
+        return RoutineFlows.of({
+          canvas,
+          savePosition,
+          removePosition,
+          connect,
+          disconnect,
+          updateLink,
+          sweep,
+          notice,
+        });
       }),
     );
   }

@@ -89,6 +89,12 @@ export interface DisconnectRoutineFlowInput {
   linkId: string;
 }
 
+/** A new instruction for one link: what the next agent is asked to do with the answer. May be empty. */
+export interface UpdateRoutineFlowLinkInput {
+  linkId: string;
+  instruction: string;
+}
+
 /** The agents whose canvases changed, so the views showing them reload. */
 export interface RoutineFlowsChanged {
   agentIds: string[];
@@ -207,4 +213,12 @@ export function isConnectRoutineFlowInput(value: unknown): value is ConnectRouti
 
 export function isDisconnectRoutineFlowInput(value: unknown): value is DisconnectRoutineFlowInput {
   return isDynamicRecord(value) && isIdentifier(value.linkId);
+}
+
+export function isUpdateRoutineFlowLinkInput(value: unknown): value is UpdateRoutineFlowLinkInput {
+  return (
+    isDynamicRecord(value) &&
+    isIdentifier(value.linkId) &&
+    isBoundedString(value.instruction, INPUT_LIMITS.routineInstruction)
+  );
 }

@@ -7,8 +7,10 @@ import {
   isDisconnectRoutineFlowInput,
   isRemoveRoutineFlowPositionInput,
   isSaveRoutineFlowPositionInput,
+  isUpdateRoutineFlowLinkInput,
   type RemoveRoutineFlowPositionInput,
   type SaveRoutineFlowPositionInput,
+  type UpdateRoutineFlowLinkInput,
 } from "@openbot/contracts/ipc";
 
 export function parseSaveRoutineFlowPosition(value: unknown): SaveRoutineFlowPositionInput {
@@ -34,4 +36,9 @@ export function parseConnectRoutineFlow(value: unknown): ConnectRoutineFlowInput
 export function parseDisconnectRoutineFlow(value: unknown): DisconnectRoutineFlowInput {
   if (!isDisconnectRoutineFlowInput(value)) throw new Error("Invalid routine flow link.");
   return { linkId: value.linkId };
+}
+
+export function parseUpdateRoutineFlowLink(value: unknown): UpdateRoutineFlowLinkInput {
+  if (!isUpdateRoutineFlowLinkInput(value)) throw new Error("Invalid routine flow link.");
+  return { linkId: value.linkId, instruction: value.instruction };
 }

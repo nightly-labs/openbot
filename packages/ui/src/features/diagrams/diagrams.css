@@ -982,6 +982,24 @@
   line-height: var(--openbot-leading-md);
 }
 
+/* The task reads as text until the user points at it or types in it. */
+.diagram-inspector-task.ui-textarea {
+  min-height: 0;
+  margin: calc(-1 * var(--openbot-space-1-5));
+  border-color: transparent;
+  background: transparent;
+  padding: var(--openbot-space-1) var(--openbot-space-1-5);
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
+  resize: none;
+  field-sizing: content;
+}
+
+.diagram-inspector-task.ui-textarea:is(:hover, :focus-visible, :focus) {
+  border-color: var(--openbot-border);
+  background: var(--openbot-bg-control);
+}
+
 .diagram-inspector-section-heading {
   display: flex;
   align-items: center;

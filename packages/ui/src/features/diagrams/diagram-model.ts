@@ -37,6 +37,8 @@ export type DiagramNode =
       agentId: string;
       /** What this agent does with its input. */
       task: string;
+      /** What it does in each routine that reaches it, by routine node id. `task` stands in for the rest. */
+      tasks?: Record<string, string>;
     };
 
 export interface DiagramEdge {

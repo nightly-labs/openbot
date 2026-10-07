@@ -136,6 +136,21 @@ export function routineFlowDiagram(
     return row;
   };
 
+  // What each agent does in each routine: the routine's own agent follows the routine, and every
+  // other agent the instruction of a link that reaches it in that routine.
+  const routineTasks = new Map<string, Record<string, string>>();
+  const setTask = (agentId: string, routineKey: string, text: string) => {
+    const byRoutine = routineTasks.get(agentId) ?? {};
+    if (!byRoutine[routineKey]) byRoutine[routineKey] = text;
+    routineTasks.set(agentId, byRoutine);
+  };
+  for (const entry of canvas.routines) {
+    const key = routineFlowRoutineKey(entry.routine.id);
+    setTask(entry.routine.agentId, key, entry.routine.instruction);
+    for (const link of canvas.links)
+      if (link.routineId === entry.routine.id) setTask(link.toAgentId, key, link.instruction);
+  }
+
   const tasks = new Map<string, string>();
   for (const link of canvas.links)
     if (link.instruction && !tasks.has(link.toAgentId)) tasks.set(link.toAgentId, link.instruction);
@@ -168,6 +183,7 @@ export function routineFlowDiagram(
           position: positionOf(key, { x: index * COLUMN, y: nextRow(index) * AGENT_ROW }),
           agentId,
           task: tasks.get(agentId) ?? "",
+          tasks: routineTasks.get(agentId) ?? {},
         };
       }),
   ];

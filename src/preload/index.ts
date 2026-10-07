@@ -517,6 +517,7 @@ const openbotApi: OpenBotDesktopApi = {
     removePosition: decodeVoid,
     connect: decodeRoutineFlowLink,
     disconnect: decodeVoid,
+    updateLink: decodeRoutineFlowLink,
     changed: decodeRoutineFlowsChanged,
   }),
   voice: bridgeGroup(IPC_ENDPOINTS.voice, {

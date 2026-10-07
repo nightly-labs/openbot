@@ -52,6 +52,7 @@ export const messages = defineMessages("diagram", {
   "diagram.inspector.back": "Back to the run",
   "diagram.inspector.steps": "Steps",
   "diagram.inspector.task": "Task",
+  "diagram.inspector.taskPlaceholder": "What this agent does with its input",
   "diagram.inspector.input": "Input",
   "diagram.inspector.output": "Output",
   "diagram.inspector.error": "Error",

@@ -254,6 +254,28 @@ export function WorkspaceRoutineFlows(props: { port?: RoutineFlowsPort }) {
                     .then(() => load(canvasAgentId))
                     .catch(failed(t("diagram.flows.saveFailed")));
                 }}
+                onEditTask={(nodeId, routineNodeId, task) => {
+                  const editedAgentId = agentIdOfNode(nodeId);
+                  const routineId = routineIdOfNode(routineNodeId);
+                  const routine = state.canvas?.routines.find((entry) => entry.routine.id === routineId)?.routine;
+                  if (!editedAgentId || !routine) return;
+                  // The routine's own agent does what the routine asks; every other agent, what the
+                  // links that reach it in this routine ask.
+                  const saved =
+                    routine.agentId === editedAgentId
+                      ? port().agent.updateRoutine(
+                          { agentId: routine.agentId, routineId: routine.id, instruction: task },
+                          "local",
+                        )
+                      : Promise.all(
+                          (state.canvas?.links ?? [])
+                            .filter((link) => link.routineId === routine.id && link.toAgentId === editedAgentId)
+                            .map((link) =>
+                              port().routineFlows.updateLink({ linkId: link.id, instruction: task }, "local"),
+                            ),
+                        );
+                  saved.then(() => load(canvasAgentId)).catch(failed(t("diagram.flows.saveFailed")));
+                }}
                 onRunRoutine={(nodeId) => {
                   const routineId = routineIdOfNode(nodeId);
                   const routine = state.canvas?.routines.find((entry) => entry.routine.id === routineId)?.routine;

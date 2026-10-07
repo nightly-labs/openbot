@@ -248,6 +248,7 @@ import type {
   RoutineFlowLink,
   RoutineFlowsChanged,
   SaveRoutineFlowPositionInput,
+  UpdateRoutineFlowLinkInput,
 } from "./ipc-routine-flows";
 import type {
   CreateRoutineInput,
@@ -868,6 +869,7 @@ export const IPC_ENDPOINTS = {
     removePosition: scopedRequest<RemoveRoutineFlowPositionInput, void>()("routine-flows:remove-position"),
     connect: scopedRequest<ConnectRoutineFlowInput, RoutineFlowLink>()("routine-flows:connect"),
     disconnect: scopedRequest<DisconnectRoutineFlowInput, void>()("routine-flows:disconnect"),
+    updateLink: scopedRequest<UpdateRoutineFlowLinkInput, RoutineFlowLink>()("routine-flows:update-link"),
     /** The local agents whose canvases changed. */
     changed: event<RoutineFlowsChanged>()("routine-flows:changed"),
   },

@@ -88,6 +88,13 @@ export function diagramRoutinesReaching(
   );
 }
 
+/** What an agent does in the routine in focus, or its general task when no routine is in focus. */
+export function diagramAgentTask(node: DiagramNode, routineId: string | null): string {
+  if (node.kind !== "agent") return "";
+  if (routineId && node.tasks && routineId in node.tasks) return node.tasks[routineId] ?? "";
+  return node.task;
+}
+
 /** The run that started last, whichever routine started it. */
 export function diagramLatestRun(diagram: Pick<Diagram, "lastRuns">): DiagramRun | null {
   let latest: DiagramRun | null = null;

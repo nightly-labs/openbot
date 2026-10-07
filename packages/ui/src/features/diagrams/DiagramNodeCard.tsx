@@ -13,7 +13,7 @@ import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { routineScheduleSummary } from "../conversation/routine-schedule-ui";
 import { DiagramRoutineRunDots } from "./DiagramRoutineVisuals";
-import { DIAGRAM_NODE_WIDTH } from "./diagram-graph";
+import { DIAGRAM_NODE_WIDTH, diagramAgentTask } from "./diagram-graph";
 import type { DiagramNode, DiagramStepRun, DiagramStepStatus } from "./diagram-model";
 import { DIAGRAM_STEP_STATUS_KEY, diagramStepSeconds } from "./diagram-text";
 
@@ -185,7 +185,7 @@ export function DiagramNodeCard(props: DiagramNodeCardProps) {
         when={routine()}
         fallback={
           <div class="diagram-node-body">
-            <p class="diagram-node-task">{props.node.kind === "agent" ? props.node.task : ""}</p>
+            <p class="diagram-node-task">{diagramAgentTask(props.node, props.focusRoutineId)}</p>
             <Show when={props.routines.length > 0}>
               <ul class="diagram-node-routines" aria-label={t("diagram.node.startedBy")}>
                 <For each={props.routines}>

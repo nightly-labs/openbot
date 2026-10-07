@@ -86,6 +86,16 @@ export class RoutineFlowStore {
     return row ? toLink(row) : null;
   }
 
+  /** Gives one link a new instruction: what the next agent is asked to do with the answer. */
+  updateLinkInstruction(linkId: string, instruction: string): RoutineFlowLink {
+    this.#database.connection
+      .prepare("UPDATE routine_flow_links SET instruction = ? WHERE link_id = ?")
+      .run(instruction.trim(), linkId);
+    const link = this.link(linkId);
+    if (!link) throw new RoutineFlowError(sourceText("error.backend.routineFlowLinkGone"));
+    return link;
+  }
+
   /** The agent a routine belongs to, or null when the routine is gone. */
   routineOwner(routineId: string): string | null {
     const row = databaseRow(

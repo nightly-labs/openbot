@@ -61,6 +61,8 @@ export interface DiagramViewProps {
   addableAgents?: readonly AgentProfile[] | undefined;
   onPlaceAgent?: ((agentId: string) => void) | undefined;
   onRunRoutine?: ((nodeId: string) => void) | undefined;
+  /** Saves what an agent does in one routine, from the panel. Without it, tasks are read-only. */
+  onEditTask?: ((nodeId: string, routineId: string, task: string) => void) | undefined;
   onAddRoutine?: (() => void) | undefined;
   onAddAgent?: (() => void) | undefined;
 }
@@ -258,6 +260,7 @@ export function DiagramView(props: DiagramViewProps) {
             now={now()}
             onSelectNode={select}
             onFocusRoutine={setPicked}
+            onEditTask={props.onEditTask}
           />
         </Show>
       </div>
