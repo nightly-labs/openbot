@@ -134,6 +134,9 @@ export class DiscordState {
   // guild on shard `(guild_id >> 22) % shard count`.
   readonly #shardGuilds = new Map<number, Set<string>>();
   #shardCount: number | null = null;
+  // The shards whose connection closed. Their guilds can be stale until the shard resumes, when the
+  // Gateway sends the missed events, or until its next READY.
+  readonly #closedShards = new Set<number>();
   // Channel or thread ID to its guild and name.
   readonly #channels = new Map<string, { guildId: string; name: string }>();
   readonly #interactions = new Map<string, StoredInteraction>();
@@ -151,11 +154,22 @@ export class DiscordState {
       : (this.#shardGuilds.get(this.#shardOf(guildId))?.has(guildId) ?? false);
   }
 
-  /** Every guild that the bot is in, or null before the READY of every shard. */
+  /** Every guild that the bot is in, or null before the READY of every shard and while one is closed. */
   memberGuildIds(): string[] | null {
     const count = this.#shardCount;
-    if (count === null || this.#shardGuilds.size < count) return null;
+    if (count === null || this.#shardGuilds.size < count || this.#closedShards.size > 0) return null;
     return [...this.#shardGuilds.values()].flatMap((guilds) => [...guilds]);
+  }
+
+  /** A shard's connection closed: its guilds are not known until it resumes or is ready again. */
+  shardClosed(shard: number): void {
+    this.#closedShards.add(shard);
+  }
+
+  /** A shard resumed: the Gateway sent the events it missed, so its guilds are current again. */
+  shardResumed(shard: number): DiscordAction[] {
+    this.#closedShards.delete(shard);
+    return this.memberGuildIds() === null ? [] : [{ type: "reconcile" }];
   }
 
   #shardOf(guildId: string): number {
@@ -198,6 +212,7 @@ export class DiscordState {
           if (this.#shardCount !== count) this.#shardGuilds.clear();
           this.#shardCount = count;
           this.#shardGuilds.set(shard, new Set(payload.d.guilds.map((guild) => guild.id)));
+          this.#closedShards.delete(shard);
         }
         return this.memberGuildIds() === null ? [] : [{ type: "reconcile" }];
       case GatewayDispatchEvents.GuildCreate:

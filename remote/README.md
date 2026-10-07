@@ -92,6 +92,7 @@ When the bot leaves a guild, Signal drops its route and asks the account service
 (`/v2/remote/discord-route/removed`). After the Gateway lists the bot's guilds, and every 30 minutes,
 Signal sends the account service the guild IDs that the bot is in
 (`/v2/remote/discord-route/reconcile`), and the account service unlinks each older link of another
+guild. Signal sends nothing while a Gateway shard is closed, because the list can then miss a new
 guild. So a link goes also when its host is off and the first unlink failed, or Signal restarted.
 
 ## Production requirements

@@ -179,10 +179,16 @@ export class DiscordGateway extends Context.Service<DiscordGateway, { readonly a
               for (const action of actions) act(action);
             });
             gateway.on(WebSocketShardEvents.Ready, () => console.log("OpenBot Discord Gateway is ready."));
-            gateway.on(WebSocketShardEvents.Resumed, () => console.log("OpenBot Discord Gateway resumed."));
-            gateway.on(WebSocketShardEvents.Closed, (code) =>
-              console.log(`OpenBot Discord Gateway closed with code ${code}.`),
-            );
+            gateway.on(WebSocketShardEvents.Resumed, (shardId) => {
+              console.log("OpenBot Discord Gateway resumed.");
+              for (const action of state.shardResumed(shardId)) act(action);
+            });
+            gateway.on(WebSocketShardEvents.Closed, (code, shardId) => {
+              // Until the shard resumes or is ready again, its guild list can be stale: a reconcile with
+              // it could unlink a guild that installed the bot meanwhile.
+              state.shardClosed(shardId);
+              console.log(`OpenBot Discord Gateway closed with code ${code}.`);
+            });
             gateway.on(WebSocketShardEvents.Error, () => console.error("OpenBot Discord Gateway failed."));
             return gateway;
           }),

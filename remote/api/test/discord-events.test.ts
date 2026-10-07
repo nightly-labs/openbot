@@ -102,8 +102,14 @@ describe("Discord guild membership", () => {
 
     state.handle({ op: GatewayOpcodes.Dispatch, t: GatewayDispatchEvents.GuildDelete, s: 2, d: { id: "4194304" } });
     expect(state.isMember("4194304")).toBe(false);
+    // A closed shard can miss a new guild: nothing is sent until it resumes or is ready again.
+    state.shardClosed(1);
+    expect(state.memberGuildIds()).toBeNull();
+    expect(state.shardResumed(1)).toEqual([{ type: "reconcile" }]);
+    expect(state.memberGuildIds()).toEqual(["8388608"]);
+    state.shardClosed(0);
     // A new session of a shard lists its guilds again.
-    state.handle(ready([0, 2], []));
+    expect(state.handle(ready([0, 2], []))).toEqual([{ type: "reconcile" }]);
     expect(state.memberGuildIds()).toEqual([]);
   });
 });
