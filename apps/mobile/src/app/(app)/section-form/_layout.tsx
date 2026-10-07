@@ -3,7 +3,8 @@ import { useText } from "@/shared/lib/text";
 
 export const unstable_settings = { initialRouteName: "index" };
 
-export default function InstallAgentLayout() {
+export default function SectionFormLayout() {
   const { t } = useText();
-  return <SheetPageStack title={t("mobile.app.route.addSharedAgent")} />;
+  // The page sets its own title for a new or renamed section.
+  return <SheetPageStack title={t("mobile.app.route.newSection")} />;
 }

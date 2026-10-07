@@ -15,15 +15,12 @@ import { setLiveActivityNavigator } from "@/features/live-activity/model/live-ac
 import { AppDrawerShell } from "@/features/servers/components/app-drawer-shell";
 import { MobileWorkspaceProvider } from "@/features/workspace/context/mobile-workspace-context";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
-import { sheetHeaderInsetOptions } from "@/shared/lib/sheet-header";
-import { useText } from "@/shared/lib/text";
 
 export const unstable_settings = {
   initialRouteName: "connected",
 };
 
 function AuthenticatedStack() {
-  const { t } = useText();
   const segments = useSegments();
   const background = useThemeColor("background");
   const sheetBackground = String(useCSSVariable("--openbot-bg-sheet") ?? background);
@@ -125,47 +122,38 @@ function AuthenticatedStack() {
         />
         <Stack.Screen
           name="channel-actions/[channelId]"
+          // The header comes from the route's `_layout.tsx`: Android draws no header on a formSheet route.
           options={{
-            ...sheetHeaderInsetOptions,
             contentStyle: { backgroundColor: sheetBackground },
-            headerStyle: { backgroundColor: sheetBackground },
-            headerTransparent: false,
-            headerBlurEffect: "none",
+            headerShown: false,
             scrollEdgeEffects: { top: "hidden", bottom: "soft" },
             presentation: "formSheet",
             sheetAllowedDetents: [0.6],
             sheetGrabberVisible: true,
-            title: t("mobile.app.route.actionsNeeded"),
           }}
         />
         <Stack.Screen
           name="add-channel"
+          // The header comes from the route's `_layout.tsx`: Android draws no header on a formSheet route.
           options={{
-            ...sheetHeaderInsetOptions,
             contentStyle: { backgroundColor: sheetBackground },
-            headerStyle: { backgroundColor: isIOS ? "transparent" : sheetBackground },
-            headerTransparent: isIOS,
-            headerBlurEffect: "none",
+            headerShown: false,
             scrollEdgeEffects: { top: "hidden", bottom: "soft" },
             presentation: "formSheet",
             sheetAllowedDetents: [0.85],
             sheetGrabberVisible: true,
-            title: t("mobile.app.route.newChannel"),
           }}
         />
         <Stack.Screen
           name="add-agent"
+          // The header comes from the route's `_layout.tsx`: Android draws no header on a formSheet route.
           options={{
-            ...sheetHeaderInsetOptions,
             contentStyle: { backgroundColor: sheetBackground },
-            headerStyle: { backgroundColor: isIOS ? "transparent" : sheetBackground },
-            headerTransparent: isIOS,
-            headerBlurEffect: "none",
+            headerShown: false,
             scrollEdgeEffects: { top: "hidden", bottom: "soft" },
             presentation: "formSheet",
             sheetAllowedDetents: [0.85],
             sheetGrabberVisible: true,
-            title: t("mobile.app.route.createAgent"),
           }}
         />
         <Stack.Screen
@@ -197,6 +185,7 @@ function AuthenticatedStack() {
         />
         <Stack.Screen
           name="section-form"
+          // The header comes from the route's `_layout.tsx`: Android draws no header on a formSheet route.
           // Android: autoFocus focuses the name field while the sheet opens, and Android does not show
           // the keyboard then. Focusing the field again after the opening shows it.
           listeners={
@@ -213,16 +202,12 @@ function AuthenticatedStack() {
               : undefined
           }
           options={{
-            ...sheetHeaderInsetOptions,
             contentStyle: { backgroundColor: sheetBackground },
-            headerStyle: { backgroundColor: isIOS ? "transparent" : sheetBackground },
-            headerTransparent: isIOS,
-            headerBlurEffect: "none",
+            headerShown: false,
             scrollEdgeEffects: { top: "hidden", bottom: "soft" },
             presentation: "formSheet",
             sheetAllowedDetents: [0.85],
             sheetGrabberVisible: true,
-            title: t("mobile.app.route.newSection"),
           }}
         />
         <Stack.Screen

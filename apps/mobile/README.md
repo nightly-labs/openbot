@@ -28,6 +28,12 @@ message that it sends before Android mounts its web view, or after Android remov
 rejects these calls, and the rejection shows as a console error. The DOM component asks for the
 props again when it is ready.
 
+react-native-screens 4.26.2 is patched in `patches/react-native-screens@4.26.2.patch` with the
+Android fix from upstream PR #4498. A header update for a screen that its stack removed, such as a
+Save in a one-page sheet that closes the sheet, no longer throws
+`ScreenStackFragment added into a non-stack container`. Remove the patch when a release
+contains that fix.
+
 Expo Router 57.0.20 is patched in `patches/expo-router@57.0.20.patch` to apply zoom dismissal
 bounds when its enabler registers after the chat mounts. This keeps the avatar-to-header zoom
 interactive from the left edge without enabling dismissal from the middle of the chat.

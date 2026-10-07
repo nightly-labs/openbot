@@ -75,7 +75,8 @@ search or similarly large content, not the default for a short form.
 
 On Android, react-native-screens draws no header on a `formSheet` route, so its title,
 `AndroidHeaderButton` and `SheetSaveAction` do not show. A sheet that needs them on Android uses the
-nested stack below, even for one page, as `install-agent` does. Android also puts a full-height (`[1]`)
+nested stack below, even for one page. A one-page sheet uses `SheetPageStack` in its `_layout.tsx`, as
+`add-agent` and `install-agent` do. Android also puts a full-height (`[1]`)
 sheet under the status bar, which covers the header; such a sheet uses `[0.85]` on Android.
 
 Multi-page flows such as Settings stay inside ONE sheet. Register the outer `settings` route with

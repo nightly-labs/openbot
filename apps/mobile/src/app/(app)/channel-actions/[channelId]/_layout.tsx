@@ -3,7 +3,8 @@ import { useText } from "@/shared/lib/text";
 
 export const unstable_settings = { initialRouteName: "index" };
 
-export default function InstallAgentLayout() {
+export default function ChannelActionsLayout() {
   const { t } = useText();
-  return <SheetPageStack title={t("mobile.app.route.addSharedAgent")} />;
+  // The list starts below the header, so the header is opaque on iOS too.
+  return <SheetPageStack title={t("mobile.app.route.actionsNeeded")} opaqueHeader />;
 }

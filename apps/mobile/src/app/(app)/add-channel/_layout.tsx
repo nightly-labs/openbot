@@ -3,7 +3,7 @@ import { useText } from "@/shared/lib/text";
 
 export const unstable_settings = { initialRouteName: "index" };
 
-export default function InstallAgentLayout() {
+export default function AddChannelLayout() {
   const { t } = useText();
-  return <SheetPageStack title={t("mobile.app.route.addSharedAgent")} />;
+  return <SheetPageStack title={t("mobile.app.route.newChannel")} />;
 }
