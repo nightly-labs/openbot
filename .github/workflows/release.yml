@@ -309,7 +309,8 @@ jobs:
           bun run check:desktop
           bun run test:desktop -- --maxWorkers=2
           bun run test:sites
-          bun run check:api
+          # The account service build needs more than the default Node heap of this 7 GB runner (about 2 GB).
+          NODE_OPTIONS=--max-old-space-size=4096 bun run check:api
 
       - name: Install and verify native runtimes
         run: |

@@ -6,6 +6,8 @@ import {
   agentAutomationAllowed,
   agentComputerUseEnabled,
   agentProviderDescriptor,
+  COMPUTER_USE_MCP_SERVER_ID,
+  COMPUTER_USE_MCP_SERVER_NAME,
   isContextResetMarker,
   type McpServerConfig,
   workspaceAccessEnforced,
@@ -40,6 +42,7 @@ import { OPENBOT_DYNAMIC_TOOLS } from "../openbot-tools";
 import { decodeRecordResponse, decodeThreadResponse, getString, type ResponseDecoder } from "../protocol";
 import { TimeoutError, withTimeout } from "../with-timeout";
 import type { AgentMemories } from "./agent-memories";
+import { readCodexMcpConfig } from "./codex-mcp-config";
 import type { ContextCompaction } from "./context-compaction";
 import type { ConversationRuntime } from "./conversation-runtime";
 import {
@@ -401,7 +404,7 @@ export class ThreadLifecycle {
     const toolRuntimes = this.#toolRuntimes();
     // The same reading rule as above, and for the same reason: the manifest has to record the set
     // this session was started with, including the names swept out of the provider's own file.
-    const disabled = yield* this.codexOwnServersEffect(client);
+    const disabled = yield* this.codexOwnServersEffect(client, mcpServers);
     // The same single reading, so the manifest records the variables this session was started with.
     const environment = this.#agentEnvironment();
     const config = yield* this.codexConfigEffect(agent, client, mcpServers, disabled, toolRuntimes, environment);
@@ -544,6 +547,14 @@ export class ThreadLifecycle {
     const { servers, dropped } = yield* threadStep(() => codexMcpServers(usable));
     this.#hooks.reportMcpDrops(client.provider, dropped);
     const mcpServers = { ...disabled, ...servers };
+    const computerUse = servers[COMPUTER_USE_MCP_SERVER_NAME];
+    if (computerUse) {
+      mcpServers[COMPUTER_USE_MCP_SERVER_NAME] = {
+        ...disabled[COMPUTER_USE_MCP_SERVER_NAME],
+        ...computerUse,
+        enabled: true,
+      };
+    }
     return {
       config: {
         ...(Object.keys(mcpServers).length > 0 ? { mcp_servers: mcpServers } : {}),
@@ -559,18 +570,24 @@ export class ThreadLifecycle {
   /**
    * The servers Codex would merge from its own file, each turned off.
    *
-   * A failed read answers with none rather than stopping the thread: a user whose Codex
-   * configuration cannot be parsed still gets their OpenBot servers, and the file's own entries
-   * are the ones Codex was going to add anyway.
+   * Computer Use needs a saved registration for persistent tool approvals. A registration failure
+   * stops the thread with recovery guidance. Without Computer Use, retain the existing empty
+   * result on a failed config read.
    */
   private readonly codexOwnServersEffect = Effect.fn("ThreadLifecycle.codexOwnServers")(function* (
     this: ThreadLifecycle,
     client: AgentClient,
-  ): Effect.fn.Return<Record<string, CodexDisabledMcpServer>> {
+    configs: readonly McpServerConfig[],
+  ): Effect.fn.Return<Record<string, CodexDisabledMcpServer>, ThreadOperationFailed> {
     if (client.provider !== "codex") return {};
-    return yield* codexDisabledServers(() =>
-      client.request("config/read", { includeLayers: false }, decodeRecordResponse).pipe(toMcpShapeFailed),
-    ).pipe(Effect.catch(() => Effect.succeed({})));
+    const computerUse = configs.find((server) => server.id === COMPUTER_USE_MCP_SERVER_ID);
+    return yield* codexDisabledServers(() => readCodexMcpConfig(client, computerUse).pipe(toMcpShapeFailed)).pipe(
+      Effect.catch(() =>
+        computerUse
+          ? Effect.fail(new ThreadOperationFailed({ cause: new Error(sourceText("error.provider.computerUseConfig")) }))
+          : Effect.succeed({}),
+      ),
+    );
   });
 
   /**
@@ -615,6 +632,10 @@ export class ThreadLifecycle {
           [...BROWSER_DYNAMIC_TOOLS, OPENBOT_DYNAMIC_TOOLS],
           mcpFingerprintValues(configs),
           Object.keys(disabled).sort(),
+          // A revoked approval must also replace a loaded session with the old tool policy.
+          ...(configs.some((config) => config.id === COMPUTER_USE_MCP_SERVER_ID)
+            ? [disabled[COMPUTER_USE_MCP_SERVER_NAME]?.tools ?? {}]
+            : []),
           [toolRuntimes.binDirectories, toolRuntimes.commandAliases],
           CODEX_MCP_ADAPTER_VERSION,
           // Only a sandboxed agent, or one that allows local scripts, adds a value: Codex keeps the
@@ -664,7 +685,7 @@ export class ThreadLifecycle {
       if (missingSessionFile(stored.failure.cause)) return false;
       return yield* stored.failure;
     }
-    const disabled = yield* this.codexOwnServersEffect(client);
+    const disabled = yield* this.codexOwnServersEffect(client, this.#agentMcpServers(agent));
     const fingerprint = yield* threadStep(() =>
       this.toolFingerprint(
         agent,
@@ -716,7 +737,7 @@ export class ThreadLifecycle {
         agent,
         client,
         this.#agentMcpServers(agent),
-        yield* this.codexOwnServersEffect(client),
+        yield* this.codexOwnServersEffect(client, this.#agentMcpServers(agent)),
         this.#toolRuntimes(),
         this.#agentEnvironment(),
       )),

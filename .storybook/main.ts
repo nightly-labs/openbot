@@ -2,6 +2,7 @@ import solidPlugin from "@solidjs/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import type { StorybookConfig } from "storybook-solidjs-vite";
 import { mergeConfig, type PluginOption } from "vite";
+import { chatVisualPages } from "./chat-visual-pages";
 
 const config = {
   // The desktop renderer, and the public site's article components. A site story
@@ -18,7 +19,7 @@ const config = {
   },
   viteFinal: async (viteConfig) => {
     const mergedConfig = mergeConfig(viteConfig, {
-      plugins: [tailwindcss({ optimize: false })],
+      plugins: [tailwindcss({ optimize: false }), chatVisualPages()],
       build: {
         // Storybook bundles axe and its preview runtime into intentionally large development-only chunks.
         chunkSizeWarningLimit: 1_200,

@@ -224,6 +224,7 @@ export class FakeAgentClient extends EventEmitter implements AgentClient {
       if (method === "model/list" && this.modelList) result = this.modelList(params);
       if (method === "plugin/list") result = { marketplaces: [] };
       if (method === "config/read") result = this.configRead;
+      if (method === "config/value/write") result = {};
       if (method === "thread/start") {
         this.#threadCounter += 1;
         result = { thread: { id: `${this.sessionIdPrefix ?? this.provider}-session-${this.#threadCounter}` } };

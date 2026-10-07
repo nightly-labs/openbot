@@ -1956,6 +1956,7 @@ const OPENCODE_REQUEST_FAILURES = [
     /\bno payment method\b|\binsufficient (?:account )?(?:funds|balance)\b|\bpayment required\b/iu,
   ],
   ["error.provider.opencodeRateLimited", /\brate[ _-]?limit|\btoo many requests\b/iu],
+  ["error.provider.opencodeInvalidUpload", /\binvalid upload request\b/iu],
   [
     "error.provider.opencodeProviderFailed",
     /\binternal server error\b|\bservice unavailable\b|\bendpoint is unavailable\b|\bbad gateway\b|\bgateway time-?out\b|\boverloaded\b|\bupstream request failed\b/iu,

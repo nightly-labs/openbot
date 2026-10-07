@@ -89,6 +89,7 @@ import { BrowserPictureInPicture } from "./browser-picture-in-picture";
 import { BrowserViewClient } from "./browser-view-client";
 import { BusyMessageModePreferenceStore } from "./busy-message-mode-preference-store";
 import { CentralAuthManager, readCentralAuthApiUrl, readMobileConnectApiUrl } from "./central-auth-manager";
+import { ChatVisualPreviewer } from "./chat-visual-preview";
 import { ComputerUseHighlightController } from "./computer-use-highlight-window";
 import { applicationBundlePath, applicationIconName } from "./computer-use-permission-app";
 import { ComputerUsePermissionHelpWindowController } from "./computer-use-permission-help-window";
@@ -1110,6 +1111,7 @@ export async function createApplicationServices({
     store,
     mailbox,
     browser,
+    visualPreview: new ChatVisualPreviewer(),
     hostMemory,
     requestTimeoutMs: 30_000,
     preferredProvider: setupState.preferredProvider ?? "codex",

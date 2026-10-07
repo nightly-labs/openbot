@@ -9,6 +9,7 @@ export const messages = defineMessages("preview", {
   "preview.panel.close": "Close file preview",
   "preview.panel.back": "Back",
   "preview.panel.rawMarkdown": "Show Markdown source",
+  "preview.panel.rawHtml": "Show HTML source",
   "preview.folder.empty": "This folder is empty.",
   "preview.folder.truncated": "Only the first {limit} items are shown.",
   "preview.truncated": "Preview truncated after {limit} characters.",

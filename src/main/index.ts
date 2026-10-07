@@ -189,6 +189,15 @@ protocol.registerSchemesAsPrivileged([
     scheme: "openbot-remote-attachment",
     privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true },
   },
+  // A visual reply page. It needs no fetch or CORS support: only a frame loads it.
+  {
+    scheme: "openbot-visual",
+    privileges: { standard: true, secure: true },
+  },
+  {
+    scheme: "openbot-remote-visual",
+    privileges: { standard: true, secure: true },
+  },
   {
     scheme: "openbot-avatar",
     privileges: { standard: true, secure: true, supportFetchAPI: true },

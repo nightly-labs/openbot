@@ -285,6 +285,7 @@ export function createWebWorkspaceRuntime(
       ...sessionActions,
       onConnectionUpdate: async (update) => {
         if (update.state !== "online") {
+          browserView.disconnect(update.message ?? undefined);
           const releaseGeneration = liveViewGeneration + 1;
           void releaseLiveView().finally(() => {
             if (liveViewGeneration === releaseGeneration) browserView.disconnect();
@@ -492,7 +493,8 @@ export function createWebWorkspaceRuntime(
           browserView.open(
             tabId,
             (frame) => emitView({ type: "frame", tabId, ...frame }),
-            () => emitView({ type: "stopped", tabId, reason: currentText().t("webClient.error.viewEnded") }),
+            (reason) =>
+              emitView({ type: "stopped", tabId, reason: reason || currentText().t("webClient.error.viewEnded") }),
           ),
         );
         if (currentGeneration !== liveViewGeneration) {

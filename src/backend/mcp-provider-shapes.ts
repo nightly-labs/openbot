@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 import {
   type AgentProviderId,
   COMPUTER_USE_MCP_SERVER_ID,
+  COMPUTER_USE_MCP_SERVER_NAME,
   isReservedMcpServerName,
   type McpServerConfig,
 } from "@openbot/contracts/ipc";
@@ -544,7 +545,7 @@ export function acpMcpServers(servers: readonly UsableMcpServer[]): McpHandoff<A
  * reported as a drop.
  */
 export type CodexMcpServer =
-  | { command: string; args: string[]; env: Record<string, string> }
+  | { command: string; args: string[]; env: Record<string, string>; enabled?: boolean; tools?: DynamicRecord }
   | { url: string; http_headers: Record<string, string> };
 
 export const codexDisabledServers = Effect.fn("McpShape.codexDisabledServers")(function* (
@@ -552,12 +553,18 @@ export const codexDisabledServers = Effect.fn("McpShape.codexDisabledServers")(f
 ) {
   const config = yield* readConfig();
   const configured = getRecord(getRecord(config, "config"), "mcp_servers");
-  return Object.fromEntries(Object.keys(configured ?? {}).map((name) => [name, { enabled: false } as const]));
+  return Object.fromEntries(
+    Object.keys(configured ?? {}).map((name) => {
+      const tools = name === COMPUTER_USE_MCP_SERVER_NAME ? getRecord(getRecord(configured, name), "tools") : null;
+      return [name, { enabled: false, ...(tools ? { tools } : {}) } satisfies CodexDisabledMcpServer];
+    }),
+  );
 });
 
 /** A name Codex found in its own file and must not start. It carries no command; that is the point. */
 export interface CodexDisabledMcpServer {
   enabled: false;
+  tools?: DynamicRecord;
 }
 
 /** A server name in the form Codex accepts. Claude makes the same change by itself. */

@@ -10,6 +10,7 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ### Added
 
+- Play attached audio and video directly in chat, without opening the preview panel.
 - Cursor and Cline agents on a joined server now show in the app and the browser client, and you can create them there. Before, they stayed on the host computer only.
 - An owner or admin can download Cursor and Cline on a joined server and sign them in from their own device. Cursor shows a sign-in page that signs the server in by itself, so a server with no screen can use your Cursor plan. Cline shows a device code.
 - Agents can show HTML pages and Mermaid diagrams in a reply. A code block marked `html` shows as a
@@ -59,11 +60,13 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ### Removed
 
+- Remove the Download all action from chat attachments. Individual file downloads remain available.
 - The website no longer opens the Product Hunt launch dialog when a page loads. The Product Hunt
   link above the landing page title stays.
 
 ### Fixed
 
+- Failed Antigravity MCP tool calls no longer show a separate provider error notification.
 - Remove claims from the website and documentation that OpenBot does not need an account.
 - Explain an OpenCode model whose provider rejects its API key, such as a Google Gemma model, and
   tell how to fix the key. Before, OpenBot showed only "Internal error: API key not valid".

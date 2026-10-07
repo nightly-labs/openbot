@@ -98,6 +98,7 @@ import { AttachmentGateway } from "./agent/attachment-gateway";
 import { AttentionRegistry } from "./agent/attention-registry";
 import { BootRecovery } from "./agent/boot-recovery";
 import { BrowserUploads } from "./agent/browser-uploads";
+import type { ChatVisualPreviewHost } from "./agent/chat-visual-preview";
 import { ContextCompaction } from "./agent/context-compaction";
 import { ConversationReader } from "./agent/conversation-reader";
 import { ConversationRuntime } from "./agent/conversation-runtime";
@@ -203,6 +204,8 @@ export interface AgentServiceOptions {
   bundledExecutables?: BundledProviderExecutables;
   prepareAgentWorkspace?: (agent: AgentSummary) => Effect.Effect<void, AgentLifecycleFailed>;
   hostedSites?: AgentHostedSites | null;
+  /** Draws pages for `html_preview`. Without it the tool tells the agent to show the page unchecked. */
+  visualPreview?: ChatVisualPreviewHost | null;
   sidebarLayout?: AgentSidebar | null;
   /**
    * What a spawned CLI is given beyond its own binary: the stored keys, and the user's own model
@@ -965,6 +968,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       localSkillTools: this.#localSkillTools,
       routineFlowTools: this.#routineFlowTools,
       approvalAutomation: options.approvalAutomation,
+      visualPreview: options.visualPreview,
       hooks: {
         listAgents: () => this.listAgents(),
         listModels: () => this.listModels(),

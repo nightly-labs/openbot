@@ -455,6 +455,7 @@ export function ImageLightbox(props: {
                             class={["image-lightbox-image", { "image-lightbox-image-pending": !loaded[entry.id] }]}
                             src={entry.previewUrl ?? ""}
                             alt={entry.name}
+                            referrerpolicy="no-referrer"
                             draggable={false}
                             onLoad={(event) => reveal(entry, event.currentTarget)}
                             onError={() => {
@@ -509,7 +510,13 @@ export function ImageLightbox(props: {
                     data-cuelume-tap="navigate"
                     onClick={() => go(position(), Math.sign(position() - index()))}
                   >
-                    <img src={entry.previewUrl ?? ""} alt="" decoding="async" draggable={false} />
+                    <img
+                      src={entry.previewUrl ?? ""}
+                      alt=""
+                      decoding="async"
+                      referrerpolicy="no-referrer"
+                      draggable={false}
+                    />
                   </Button>
                 )}
               </For>

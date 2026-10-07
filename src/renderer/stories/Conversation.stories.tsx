@@ -435,6 +435,60 @@ const codeBlockMessages: RendererAgentMessage[] = [
   },
 ];
 
+const diagramMessages: RendererAgentMessage[] = [
+  {
+    id: "diagram-user",
+    author: "you",
+    body: "Draw how a message gets to the agent.",
+    time: "10:02",
+    kind: "text",
+  },
+  {
+    id: "diagram-agent",
+    author: "agent",
+    body: [
+      "```mermaid",
+      "flowchart LR",
+      "  Composer --> Queue --> Agent --> Reply",
+      "```",
+      "",
+      "The second diagram has an error, so it stays code with the reason above it:",
+      "",
+      "```mermaid",
+      "flowchart LR",
+      "  Composer --> --> Agent",
+      "```",
+    ].join("\n"),
+    time: "10:03",
+    kind: "text",
+  },
+];
+
+const markdownImageMessages: RendererAgentMessage[] = [
+  {
+    id: "markdown-images-user",
+    author: "you",
+    body: "Show me the logo options.",
+    time: "10:02",
+    kind: "text",
+  },
+  {
+    id: "markdown-images-agent",
+    author: "agent",
+    body: [
+      "These are the three options. Select an image to open it larger.",
+      "",
+      `![Production logo](${generatedImagePreview})`,
+      "",
+      `![Development logo](${generatedImagePreviewAlternate})`,
+      "",
+      `![](${new URL("../src/assets/openbot-logo-preview.png", import.meta.url).href})`,
+    ].join("\n"),
+    time: "10:03",
+    kind: "text",
+  },
+];
+
 const markdownMessages: RendererAgentMessage[] = [
   {
     id: "markdown-user",
@@ -1176,6 +1230,20 @@ export const CodeBlockInChat: Story = {
   name: "Code block in chat",
   args: {
     messages: codeBlockMessages,
+  },
+};
+
+export const DiagramsInChat: Story = {
+  name: "Diagrams in chat",
+  args: {
+    messages: diagramMessages,
+  },
+};
+
+export const MarkdownImagesInChat: Story = {
+  name: "Markdown images in chat",
+  args: {
+    messages: markdownImageMessages,
   },
 };
 
