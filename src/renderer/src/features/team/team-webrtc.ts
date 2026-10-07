@@ -61,12 +61,23 @@ interface PeerState {
   reconnectAttempt: number;
   reconnectTimer: number | null;
   turnRefreshTimer: number | null;
+  /** Opens a new Signal socket when a lost path did not come back. */
+  signalRenewTimer: number | null;
+  /** Reports a lost path that did not come back as a disconnected peer. */
+  disconnectedTimer: number | null;
   iceRestartPending: boolean;
   iceRestarting: boolean;
   iceRestarts: number;
   signalChain: Promise<void>;
   closed: boolean;
 }
+
+// After a sleep or a network change the path can stay `disconnected` or `failed`. The ICE restart
+// offer goes to the Signal socket from before, which can be half-open, so no answer comes. A new
+// socket restarts ICE on its `ready`; when the path is still lost after the grace time, main
+// connects again with a new ticket. Before this, main read the peer as connected until a restart.
+const SIGNAL_RENEW_DELAY_MS = 8_000;
+const DISCONNECT_GRACE_MS = 15_000;
 
 const peers = new Map<string, PeerState>();
 const dataChannelNames = ["rpc", "events", "files", "desktop"] as const;
@@ -126,6 +137,8 @@ async function handleCommand(command: BridgeCommand): Promise<void> {
         reconnectAttempt: 0,
         reconnectTimer: null,
         turnRefreshTimer: null,
+        signalRenewTimer: null,
+        disconnectedTimer: null,
         iceRestartPending: false,
         iceRestarting: false,
         iceRestarts: 0,
@@ -306,6 +319,8 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
         payloadDecoders: {},
         reconnectTimer: null,
         turnRefreshTimer: null,
+        signalRenewTimer: null,
+        disconnectedTimer: null,
         signalChain: Promise.resolve(),
       };
       state.clients.set(message.sessionId, client);
@@ -345,6 +360,7 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
       disconnect(state.id);
       return;
     }
+    clearPathRecovery(state);
     state.peerConnection?.close();
     state.peerConnection = null;
     state.connectionId = null;
@@ -419,7 +435,12 @@ function createPeerConnection(state: PeerState, iceServers: RTCIceServer[]): RTC
   };
   connection.onconnectionstatechange = () => {
     if (state.peerConnection !== connection) return;
-    if (connection.connectionState === "connected") void reportSelectedPath(state, connection).catch(() => undefined);
+    if (connection.connectionState === "connected") {
+      clearPathRecovery(state);
+      void reportSelectedPath(state, connection).catch(() => undefined);
+    }
+    if (connection.connectionState === "disconnected" || connection.connectionState === "failed")
+      recoverPath(state, connection);
     if (connection.connectionState === "failed") {
       state.iceRestartPending = true;
       void retryPendingIceRestart(state);
@@ -582,8 +603,31 @@ function dropRestartedConnection(state: PeerState): void {
     disconnect(state.id);
     return;
   }
+  clearPathRecovery(state);
   disconnectPeerConnection(state);
   post({ type: "peer-disconnected", peerId: state.id });
+}
+
+function recoverPath(state: PeerState, connection: RTCPeerConnection): void {
+  if (state.role !== "client" || state.closed || state.disconnectedTimer !== null) return;
+  const lost = () => !state.closed && state.peerConnection === connection && connection.connectionState !== "connected";
+  state.signalRenewTimer = window.setTimeout(() => {
+    state.signalRenewTimer = null;
+    if (lost()) replaceSignal(state);
+  }, SIGNAL_RENEW_DELAY_MS);
+  state.disconnectedTimer = window.setTimeout(() => {
+    state.disconnectedTimer = null;
+    if (!lost()) return;
+    disconnect(state.id);
+    post({ type: "peer-disconnected", peerId: state.id });
+  }, DISCONNECT_GRACE_MS);
+}
+
+function clearPathRecovery(state: PeerState): void {
+  if (state.signalRenewTimer !== null) clearTimeout(state.signalRenewTimer);
+  if (state.disconnectedTimer !== null) clearTimeout(state.disconnectedTimer);
+  state.signalRenewTimer = null;
+  state.disconnectedTimer = null;
 }
 
 function requiredDescriptionSdp(description: RTCSessionDescriptionInit): string {
@@ -659,6 +703,7 @@ function disconnect(peerId: string): void {
   }
   if (state.reconnectTimer !== null) clearTimeout(state.reconnectTimer);
   if (state.turnRefreshTimer !== null) clearTimeout(state.turnRefreshTimer);
+  clearPathRecovery(state);
   disconnectPeerConnection(state);
   state.socket?.close(1000, "Peer stopped");
   peers.delete(peerId);
