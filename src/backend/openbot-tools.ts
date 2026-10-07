@@ -53,8 +53,8 @@ export const htmlRenderToolSchema = z.object({
     ),
 });
 
-export const CHAT_VISUAL_PREVIEW_MIN_WIDTH = 240;
-export const CHAT_VISUAL_PREVIEW_MAX_WIDTH = 1_600;
+const CHAT_VISUAL_PREVIEW_MIN_WIDTH = 240;
+const CHAT_VISUAL_PREVIEW_MAX_WIDTH = 1_600;
 /** The width of the reply column in a desktop chat. */
 export const CHAT_VISUAL_PREVIEW_DEFAULT_WIDTH = 728;
 
