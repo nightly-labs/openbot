@@ -314,6 +314,15 @@ export class ConversationRuntime {
         if (cached?.snapshot.activeTurnId) {
           if (!this.#trimCompletedCache(cached)) return;
         } else {
+          // Keep the same recovery path as idle eviction. A caller may still hold this snapshot
+          // while the process budget evicts it; dropping the map entry without a marker would make
+          // queue and mailbox updates skip this agent until a full conversation read.
+          if (cached?.snapshot.threadId) {
+            this.#evictedSnapshots.set(oldest.id, {
+              threadId: cached.snapshot.threadId,
+              snapshot: new WeakRef(cached.snapshot),
+            });
+          }
           this.#dropCachedSnapshot(oldest.id);
           this.#snapshots.delete(oldest.id);
           this.#snapshotUsedAt.delete(oldest.id);

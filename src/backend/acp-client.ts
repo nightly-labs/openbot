@@ -1366,14 +1366,14 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     if (startsTurn) {
       this.#finishHistoryTurn(replay);
       replay.turnSequence += 1;
-      replay.currentTurnId = `${notification.sessionId}:history:${replay.turnSequence}`;
+      replay.currentTurnId = `${notification.sessionId}:history:${String(replay.turnSequence).padStart(12, "0")}`;
       replay.currentTurnStartedAt = undefined;
       replay.currentUserMessageId = messageId;
       replay.currentUserItemId = null;
       replay.currentAgentItemId = null;
     } else if (replay.currentTurnId === null) {
       replay.turnSequence += 1;
-      replay.currentTurnId = `${notification.sessionId}:history:${replay.turnSequence}`;
+      replay.currentTurnId = `${notification.sessionId}:history:${String(replay.turnSequence).padStart(12, "0")}`;
       replay.currentTurnStartedAt = undefined;
       replay.currentUserMessageId = update.sessionUpdate === "user_message_chunk" ? messageId : null;
       replay.currentUserItemId = null;

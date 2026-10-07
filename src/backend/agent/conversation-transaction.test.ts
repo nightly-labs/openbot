@@ -376,6 +376,34 @@ describe("conversation transactions", () => {
     expect(completedBytes).toBeLessThanOrEqual(CONVERSATION_CACHE_TOTAL_BYTES_LIMIT);
   });
 
+  it("keeps a budget-evicted committed snapshot available to mailbox updates", async () => {
+    const completedText = "x".repeat(Math.floor(CONVERSATION_CACHE_BYTES_LIMIT * 0.95));
+    const heldSnapshots: ConversationMessage[][] = [];
+    const agentIds: string[] = [];
+    for (let index = 0; index < 9; index += 1) {
+      const agentId = `evicted-cache-${index}`;
+      agentIds.push(agentId);
+      await runCauseEffect(store.getOrCreate(agentId, agentId, "Evicted cache test"));
+      const threadId = store.ensureThreadIdNow(agentId);
+      runtime.setSnapshot(agentId, {
+        agentId,
+        threadId,
+        activeTurnId: null,
+        revision: 0,
+        messages: [{ ...systemMessage(`${agentId}-completed`), text: completedText }],
+      });
+      const snapshot = runtime.snapshot(agentId);
+      if (!snapshot) throw new Error("The cache snapshot was not retained.");
+      heldSnapshots.push(snapshot.messages);
+    }
+
+    const firstAgentId = agentIds[0];
+    const firstMessages = heldSnapshots[0];
+    if (!firstAgentId || !firstMessages) throw new Error("The first cache snapshot was not retained.");
+    expect(runtime.loadedSnapshot(firstAgentId)).toBeUndefined();
+    expect(runtime.snapshotToUpdate(firstAgentId)?.messages).toEqual(firstMessages);
+  });
+
   it("ignores a late provider snapshot after an execution thread is forgotten", () => {
     const threadId = "channel-execution-thread";
     const now = new Date().toISOString();
