@@ -494,7 +494,8 @@ export class OpenBotToolRouter {
     }
 
     if (params.tool === "html_render") {
-      if (channelId) throw new Error("A channel cannot show an HTML page. Send the result as text or a file.");
+      if (channelId)
+        return openBotToolFailure("A channel cannot show an HTML page. Send the result as text or a file.");
       return yield* this.#renderVisual(params, senderAgentId, executionThreadId);
     }
 
@@ -621,7 +622,10 @@ export class OpenBotToolRouter {
     senderAgentId: string,
     executionThreadId: string,
   ) {
-    const args = htmlRenderToolSchema.parse(params.arguments, { reportInput: true });
+    // The agent can correct its page, so it gets the reason. The reason does not repeat the page.
+    const parsed = htmlRenderToolSchema.safeParse(params.arguments, { reportInput: true });
+    if (!parsed.success) return openBotToolFailure(profileToolErrorMessage(parsed.error));
+    const args = parsed.data;
     const messageId = visualReplyMessageId(params.threadId, params.turnId, params.callId);
     if (
       this.#conversation.ensureSnapshot(senderAgentId, executionThreadId).messages.some(({ id }) => id === messageId)
@@ -668,7 +672,9 @@ export class OpenBotToolRouter {
     this: OpenBotToolRouter,
     params: DynamicToolCallParams,
   ) {
-    const args = htmlPreviewToolSchema.parse(params.arguments, { reportInput: true });
+    const parsed = htmlPreviewToolSchema.safeParse(params.arguments, { reportInput: true });
+    if (!parsed.success) return openBotToolFailure(profileToolErrorMessage(parsed.error));
+    const args = parsed.data;
     const preview = this.#visualPreview;
     if (!preview) return openBotToolFailure("This OpenBot cannot draw a page. Call html_render without a preview.");
     return yield* preview

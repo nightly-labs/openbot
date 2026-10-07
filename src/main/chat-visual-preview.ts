@@ -94,8 +94,6 @@ export class ChatVisualPreviewer implements ChatVisualPreviewHost {
       Effect.acquireUseRelease(
         Effect.try({
           try: () => {
-            const token = randomUUID();
-            this.#pages.set(token, new TextEncoder().encode(request.html));
             this.#previewSession();
             // Not `offscreen`: after a resize, its capture loses every canvas that does not draw again,
             // so a chart comes out empty.
@@ -104,6 +102,7 @@ export class ChatVisualPreviewer implements ChatVisualPreviewHost {
               width: request.width,
               height: INITIAL_HEIGHT,
               useContentSize: true,
+              enableLargerThanScreen: true,
               webPreferences: {
                 sandbox: true,
                 contextIsolation: true,
@@ -112,6 +111,8 @@ export class ChatVisualPreviewer implements ChatVisualPreviewHost {
                 partition: PREVIEW_PARTITION,
               },
             });
+            const token = randomUUID();
+            this.#pages.set(token, new TextEncoder().encode(request.html));
             return { token, window };
           },
           catch: () => previewFailure("OpenBot could not open a window to draw the page."),

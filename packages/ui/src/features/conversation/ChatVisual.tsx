@@ -110,7 +110,10 @@ function VisualFrame(props: ChatVisualProps & { src: string }) {
     page.postMessage({ jsonrpc: "2.0", id: message.id, result: {} }, "*");
     if (document.activeElement !== frame || !navigator.userActivation.isActive) return;
     const url = safeBrowserUrl(message.url);
-    if (url) props.onOpenLink(url);
+    if (!url) return;
+    // One click opens one link: the next link needs a new click, which focuses the frame again.
+    frame?.blur();
+    props.onOpenLink(url);
   };
 
   onSettled(() => {

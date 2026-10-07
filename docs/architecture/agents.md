@@ -173,7 +173,7 @@ network, but it has an opaque origin, gets no permission, and talks to the app o
 MCP Apps messages for its height, its theme and a link that the user clicked. Mobile downloads the
 page through the team connection and shows it in a `srcdoc` frame with the same sandbox, inside an
 Expo DOM component. `html_preview` lets the agent look at a page before it publishes it: the main
-process draws it in a hidden offscreen window with its own in-memory session (`ChatVisualPreviewer`)
+process draws it in a hidden window with its own in-memory session (`ChatVisualPreviewer`)
 and returns a PNG, the content height and the console lines. The file preview shows an HTML file in
 the same frame.
 
