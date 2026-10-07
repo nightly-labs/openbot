@@ -3,7 +3,7 @@
  * reply lists the edits it made, so the user can match each line to what moved on the canvas.
  * Collapsed, it is one button, and the canvas keeps the whole area. The button and the panel are
  * both always mounted, so the panel can grow out of the button's shape and fold back into it; the
- * hidden one is inert.
+ * hidden one is inert. The user drags the chat by the button or the panel header, inside the canvas.
  */
 
 import { ArrowUp, Bubble, BubbleContent, Button, Check, Minimize2, Spinner } from "@openbot/ui";
@@ -14,6 +14,9 @@ import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { ComposerEditor } from "../conversation/ComposerEditor";
 import type { DiagramChatMessage } from "./diagram-model";
+
+/** A press that moves less than this is a click, so the button still opens the panel. */
+const DRAG_THRESHOLD_PX = 4;
 
 export interface DiagramChatPanelProps {
   agent: AgentProfile;
@@ -30,7 +33,39 @@ export function DiagramChatPanel(props: DiagramChatPanelProps) {
   const [draft, setDraft] = createSignal("");
   const mood = (): AvatarMood => (props.working ? "working" : "idle");
   const [focusRequest, setFocusRequest] = createSignal(0);
+  const [offset, setOffset] = createSignal({ x: 0, y: 0 });
   let launcher: HTMLElement | undefined;
+  let morph: HTMLDivElement | undefined;
+  /** Set by a press that moved the chat, so the click that ends it does not open the panel. */
+  let dragged = false;
+  const startDrag = (event: PointerEvent & { currentTarget: HTMLElement }) => {
+    if (event.button !== 0 || !morph) return;
+    const handle = event.currentTarget;
+    const area = morph.parentElement?.offsetParent?.getBoundingClientRect();
+    const box = morph.getBoundingClientRect();
+    const start = { x: event.clientX, y: event.clientY, offset: offset() };
+    dragged = false;
+    const move = (moveEvent: PointerEvent) => {
+      let dx = moveEvent.clientX - start.x;
+      let dy = moveEvent.clientY - start.y;
+      if (!dragged && Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
+      dragged = true;
+      if (area) {
+        dx = Math.min(Math.max(dx, area.left - box.left), area.right - box.right);
+        dy = Math.min(Math.max(dy, area.top - box.top), area.bottom - box.bottom);
+      }
+      setOffset({ x: start.offset.x + dx, y: start.offset.y + dy });
+    };
+    const end = () => {
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", end);
+      handle.removeEventListener("pointercancel", end);
+    };
+    handle.setPointerCapture(event.pointerId);
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", end);
+    handle.addEventListener("pointercancel", end);
+  };
   /** Focus follows the surface that is now shown, once it has stopped being inert. */
   const setOpen = (open: boolean) => {
     props.onOpenChange(open);
@@ -43,7 +78,13 @@ export function DiagramChatPanel(props: DiagramChatPanelProps) {
     setDraft("");
   };
   return (
-    <div class="diagram-chat-morph" data-open={props.open ? "true" : "false"} data-diagram-overlay="">
+    <div
+      ref={(element) => (morph = element)}
+      class="diagram-chat-morph"
+      data-open={props.open ? "true" : "false"}
+      data-diagram-overlay=""
+      style={{ translate: `${offset().x}px ${offset().y}px` }}
+    >
       <Button
         ref={(element) => (launcher = element)}
         type="button"
@@ -52,13 +93,22 @@ export function DiagramChatPanel(props: DiagramChatPanelProps) {
         aria-expanded="false"
         aria-hidden={props.open ? "true" : undefined}
         tabindex={props.open ? -1 : 0}
-        onClick={() => setOpen(true)}
+        onPointerDown={startDrag}
+        onClick={() => {
+          if (dragged) dragged = false;
+          else setOpen(true);
+        }}
       >
         <AgentAvatar agent={props.agent} class="diagram-chat-avatar" motion="idle" />
         {t("diagram.chat.show")}
       </Button>
       <section class="diagram-chat" aria-label={t("diagram.chat.label")} inert={!props.open}>
-        <header class="diagram-chat-header">
+        <header
+          class="diagram-chat-header"
+          onPointerDown={(event) => {
+            if (!(event.target instanceof Element && event.target.closest("button"))) startDrag(event);
+          }}
+        >
           <AgentAvatar agent={props.agent} class="diagram-chat-avatar" motion="idle" mood={mood()} />
           <h2 class="diagram-chat-title">{t("diagram.chat.title", { name: props.agent.name })}</h2>
           <Button

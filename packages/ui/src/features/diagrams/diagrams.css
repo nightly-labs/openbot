@@ -1082,6 +1082,7 @@
 
 .diagram-chat-launcher.ui-button {
   height: var(--diagram-chat-launcher-height);
+  touch-action: none;
   justify-self: start;
   gap: var(--openbot-space-2);
   border-radius: var(--openbot-radius-pill);
@@ -1164,6 +1165,8 @@
   display: flex;
   align-items: center;
   gap: var(--openbot-space-2);
+  cursor: grab;
+  touch-action: none;
   border-bottom: 1px solid var(--openbot-border);
   padding: var(--openbot-space-2) var(--openbot-space-2) var(--openbot-space-2) var(--openbot-space-3);
 }
