@@ -22,6 +22,15 @@ import {
   type PendingHostedSiteTerminalEvent,
 } from "./database/hosted-site-event-log";
 import { MailboxProjection, type MailboxProjectionState } from "./database/mailbox-projection";
+import {
+  type ProviderHistoryImportState,
+  type ProviderHistorySessionInput,
+  type ProviderHistoryStagedItem,
+  type ProviderHistoryStagedTurn,
+  type ProviderHistoryStagedTurnPage,
+  ProviderHistoryStore,
+  type ProviderHistoryTurnCursor,
+} from "./database/provider-history-store";
 import { type ProviderSession, ProviderSessions } from "./database/provider-sessions";
 import { ThreadReplay } from "./database/thread-replay";
 import { type StoredThreadSummary, ThreadSummaries } from "./database/thread-summaries";
@@ -34,6 +43,14 @@ export type {
   ActiveHostedSiteConversationEvent,
   PendingHostedSiteTerminalEvent,
 } from "./database/hosted-site-event-log";
+export type {
+  ProviderHistoryImportState,
+  ProviderHistorySessionInput,
+  ProviderHistoryStagedItem,
+  ProviderHistoryStagedTurn,
+  ProviderHistoryStagedTurnPage,
+  ProviderHistoryTurnCursor,
+} from "./database/provider-history-store";
 export type { ProviderSession } from "./database/provider-sessions";
 export type { StoredThreadSummary } from "./database/thread-summaries";
 
@@ -53,6 +70,7 @@ export class OpenBotDatabase {
   readonly #hostedSiteEvents: HostedSiteEventLog;
   readonly #mailbox: MailboxProjection;
   readonly #sessions: ProviderSessions;
+  readonly #providerHistory: ProviderHistoryStore;
   readonly #summaries: ThreadSummaries;
 
   constructor(readonly userDataPath: string) {
@@ -65,6 +83,7 @@ export class OpenBotDatabase {
     this.#hostedSiteEvents = new HostedSiteEventLog({ core: this.#core });
     this.#mailbox = new MailboxProjection({ core: this.#core });
     this.#sessions = new ProviderSessions({ core: this.#core });
+    this.#providerHistory = new ProviderHistoryStore({ core: this.#core });
     this.#summaries = new ThreadSummaries({ core: this.#core });
   }
 
@@ -160,11 +179,31 @@ export class OpenBotDatabase {
     return this.#conversations.readActiveTurnId(agentId, threadId);
   }
 
+  readConversationRevision(agentId: string, threadId: string | null): number {
+    return this.#conversations.readConversationRevision(agentId, threadId);
+  }
+
   readConversationRuntime(
     agentId: string,
     threadId: string | null,
   ): { activeTurnId: string | null; latestMessage: ConversationMessage | null } {
     return this.#conversations.readConversationRuntime(agentId, threadId);
+  }
+
+  readConversationMessages(
+    agentId: string,
+    threadId: string | null,
+    messageIds: readonly string[],
+  ): ConversationMessage[] {
+    return this.#conversations.readConversationMessages(agentId, threadId, messageIds);
+  }
+
+  readConversationRecoveryMessages(
+    agentId: string,
+    threadId: string | null,
+    activeTurnId: string | null,
+  ): ConversationMessage[] {
+    return this.#conversations.readConversationRecoveryMessages(agentId, threadId, activeTurnId);
   }
 
   readConversationPage(
@@ -238,6 +277,66 @@ export class OpenBotDatabase {
     return this.#conversationWrites.appendConversationMessage(input);
   }
 
+  persistConversationChanges(input: {
+    agentId: string;
+    threadId: string;
+    activeTurnId: string | null;
+    changedMessages: readonly ConversationMessage[];
+    removedMessageIds?: readonly string[];
+    eventType: string;
+    detail?: unknown;
+    commandId?: string;
+  }): number {
+    return this.#conversationWrites.persistConversationChanges(input);
+  }
+
+  upsertProviderHistoryMessage(input: {
+    agentId: string;
+    threadId: string;
+    activeTurnId?: string | null;
+    message: ConversationMessage;
+    eventType?: string;
+    detail?: unknown;
+    commandId?: string;
+  }): number {
+    return this.#conversationWrites.upsertProviderHistoryMessage(input);
+  }
+
+  /** Commits one normalized provider-history page and its staging marker as one transaction. */
+  importProviderHistoryMessages(input: {
+    sessionId: string;
+    turnId: string;
+    agentId: string;
+    threadId: string;
+    messages: readonly ConversationMessage[];
+    throughItemIndex?: number;
+    complete: boolean;
+    detail?: unknown;
+  }): void {
+    const db = this.connection;
+    const ownsTransaction = !db.isTransaction;
+    if (ownsTransaction) db.exec("BEGIN IMMEDIATE");
+    try {
+      for (const message of input.messages) {
+        this.upsertProviderHistoryMessage({
+          agentId: input.agentId,
+          threadId: input.threadId,
+          message,
+          eventType: "provider-history.message-imported",
+          detail: input.detail,
+        });
+      }
+      if (input.throughItemIndex !== undefined) {
+        this.#providerHistory.markItemsImportedThrough(input.sessionId, input.turnId, input.throughItemIndex);
+      }
+      if (input.complete) this.#providerHistory.markTurnImported(input.sessionId, input.turnId);
+      if (ownsTransaction) db.exec("COMMIT");
+    } catch (error) {
+      if (ownsTransaction && db.isTransaction) db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
   persistConversationAndMailbox(
     snapshot: ConversationSnapshot,
     eventType: string,
@@ -257,6 +356,39 @@ export class OpenBotDatabase {
       );
       db.exec("COMMIT");
       return persisted;
+    } catch (error) {
+      if (db.isTransaction) db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  persistConversationChangesAndMailbox(
+    snapshot: ConversationSnapshot,
+    changedMessages: readonly ConversationMessage[],
+    eventType: string,
+    payload: unknown,
+    mailboxState: MailboxProjectionState,
+    mailboxEventType: string,
+  ): ConversationSnapshot {
+    const db = this.connection;
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      this.replaceMailboxState(`mailbox:${mailboxEventType}:${randomUUID()}`, mailboxState, mailboxEventType);
+      if (!snapshot.threadId) {
+        db.exec("COMMIT");
+        return structuredClone(snapshot);
+      }
+      const revision = this.#conversationWrites.persistConversationChanges({
+        agentId: snapshot.agentId,
+        threadId: snapshot.threadId,
+        activeTurnId: snapshot.activeTurnId,
+        changedMessages,
+        eventType,
+        detail: payload,
+        commandId: `conversation:${eventType}:${randomUUID()}`,
+      });
+      db.exec("COMMIT");
+      return { ...structuredClone(snapshot), revision };
     } catch (error) {
       if (db.isTransaction) db.exec("ROLLBACK");
       throw error;
@@ -296,6 +428,55 @@ export class OpenBotDatabase {
 
   updateProviderSessionConfig(sessionId: string, threadId: string, model: string, effort: string): void {
     this.#sessions.updateProviderSessionConfig(sessionId, threadId, model, effort);
+  }
+
+  ensureProviderHistoryImport(input: ProviderHistorySessionInput): ProviderHistoryImportState {
+    return this.#providerHistory.ensureImport(input);
+  }
+
+  stageProviderHistoryFragment(input: {
+    sessionId: string;
+    fragment: import("./provider-history").ProviderHistoryFragment;
+    cursor?: unknown;
+  }): ProviderHistoryImportState {
+    return this.#providerHistory.stageProviderHistoryFragment(input);
+  }
+
+  providerHistoryImport(sessionId: string): ProviderHistoryImportState | null {
+    return this.#providerHistory.readImport(sessionId);
+  }
+
+  stagedProviderHistoryTurns(sessionId: string, limit = 50): ProviderHistoryStagedTurn[] {
+    return this.#providerHistory.readStagedTurns(sessionId, limit);
+  }
+
+  stagedProviderHistoryTurnPage(
+    sessionId: string,
+    input: { after?: ProviderHistoryTurnCursor; limit?: number } = {},
+  ): ProviderHistoryStagedTurnPage {
+    return this.#providerHistory.readStagedTurnPage(sessionId, input);
+  }
+
+  stagedProviderHistoryItems(input: {
+    sessionId: string;
+    turnId: string;
+    afterIndex?: number;
+    limit?: number;
+    pendingOnly?: boolean;
+  }): ProviderHistoryStagedItem[] {
+    return this.#providerHistory.readStagedItems(input);
+  }
+
+  markProviderHistoryTurnImported(sessionId: string, turnId: string): void {
+    this.#providerHistory.markTurnImported(sessionId, turnId);
+  }
+
+  markProviderHistoryImportState(
+    sessionId: string,
+    state: ProviderHistoryImportState["state"],
+    cursor?: unknown,
+  ): void {
+    this.#providerHistory.markImportState(sessionId, state, cursor);
   }
 
   saveThreadSummary(

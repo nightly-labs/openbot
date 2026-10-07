@@ -403,7 +403,7 @@ describe.sequential("AgentService: queue", () => {
         {
           id: "codex",
           state: "available",
-          version: "0.144.1",
+          version: "0.156.0",
           email: "codex@example.com",
         },
         {
@@ -435,7 +435,7 @@ describe.sequential("AgentService: queue", () => {
     await runCauseEffect(service.setPreferredProvider("codex"));
     expect(service.getStatus()).toMatchObject({
       auth: { kind: "chatgpt", email: "codex@example.com" },
-      cliVersion: "0.144.1",
+      cliVersion: "0.156.0",
     });
     // The store default, which is what a new agent on the default provider keeps: `low`, not the
     // `medium` the Codex CLI reports for every GPT-5.6 model.

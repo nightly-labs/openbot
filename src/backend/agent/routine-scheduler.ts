@@ -800,7 +800,7 @@ export class RoutineScheduler implements RoutineDueSource {
     const database = this.#store.database;
     return this.#conversation.withConversationTransaction(
       agentId,
-      ({ snapshot: nextSnapshot }) => {
+      ({ threadId, snapshot: nextSnapshot }) => {
         transactionHooks?.beforeMutate?.(nextSnapshot);
         const result = mutate();
         const routine = eventRoutine(result);
@@ -817,14 +817,20 @@ export class RoutineScheduler implements RoutineDueSource {
         };
         nextSnapshot.messages.push(message);
         sortConversationMessages(nextSnapshot.messages);
-        // persistConversation returns a fresh snapshot, so the published one is not `nextSnapshot`.
-        const persisted = database.persistConversation(nextSnapshot, `routine.${action}`, {
-          action,
-          routineId: routine.id,
-          routineName: routine.name,
-          messageId: message.id,
+        nextSnapshot.revision = database.persistConversationChanges({
+          agentId,
+          threadId,
+          activeTurnId: nextSnapshot.activeTurnId,
+          changedMessages: [message],
+          eventType: `routine.${action}`,
+          detail: {
+            action,
+            routineId: routine.id,
+            routineName: routine.name,
+            messageId: message.id,
+          },
         });
-        return { result, snapshot: persisted };
+        return { result, snapshot: nextSnapshot };
       },
       transactionHooks?.onRollback,
     );

@@ -68,6 +68,13 @@ SolidJS, provider, Cloudflare, and application code; and the account server to d
   Generated response attachments become visible only after the conversation and mailbox commit
   succeeds. Agent deletion and queue edits record file removals in the mailbox transaction; the
   deletion outbox retries failed removals.
+- `src/backend/provider-history.ts` defines the internal fragment reader. Provider adapters own
+  pagination and decoding. `provider-history-import.ts` commits normalized message pages without
+  deleting messages absent from a page. SQLite stores incomplete turns and import progress.
+  ACP replay records without stable OpenBot message IDs remain provider records for handoff and
+  recovery. They do not create a second copy of messages already saved by the live turn.
+- `ConversationRuntime` keeps active work and a bounded recent cache. Released full-history APIs
+  build their responses from SQLite for each request. They do not set the working cache.
 - `~/.codex`, `~/.claude`, `~/.grok`, and `~/.gemini` are provider-owned login and resume state. They are not OpenBot
   conversation storage.
 - D1 is the source of truth for central accounts, remote membership, invitations, and logical sessions.

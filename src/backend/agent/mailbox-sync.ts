@@ -1,5 +1,12 @@
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
-import type { AgentEvent, AgentSummary, ConversationSnapshot, QueueHold, QueueSnapshot } from "@openbot/contracts/ipc";
+import type {
+  AgentEvent,
+  AgentSummary,
+  ConversationMessage,
+  ConversationSnapshot,
+  QueueHold,
+  QueueSnapshot,
+} from "@openbot/contracts/ipc";
 import { isMailboxMessageCopy } from "../conversation-snapshots";
 import type { MailboxStore } from "../mailbox-store";
 import type { OpenBotDatabase } from "../openbot-database";
@@ -58,11 +65,15 @@ export class MailboxSync {
     };
   }
 
-  syncMailboxMessages(snapshot: ConversationSnapshot): void {
+  syncMailboxMessages(snapshot: ConversationSnapshot, mailboxMessages?: readonly ConversationMessage[]): void {
     if (this.#conversation.isExecutionThread(snapshot.threadId)) return;
-    const mailboxMessages = this.#mailbox.conversationMessages(snapshot.agentId);
+    const incomingMailboxMessages =
+      mailboxMessages ??
+      this.#mailbox.conversationMessages(snapshot.agentId, {
+        fromCreatedAt: snapshot.messages[0]?.createdAt,
+      });
     const incomingMessages = new Map(
-      mailboxMessages.flatMap((message) =>
+      incomingMailboxMessages.flatMap((message) =>
         message.exchange?.direction === "incoming" ? [[message.exchange.messageId, message] as const] : [],
       ),
     );
@@ -71,7 +82,7 @@ export class MailboxSync {
       if (message && isMailboxMessageCopy(message, incomingMessages)) snapshot.messages.splice(index, 1);
     }
     const indexes = new Map(snapshot.messages.map((message, index) => [message.id, index]));
-    for (const mailboxMessage of mailboxMessages) {
+    for (const mailboxMessage of incomingMailboxMessages) {
       const index = indexes.get(mailboxMessage.id);
       if (index !== undefined) snapshot.messages[index] = mailboxMessage;
       else {
@@ -89,15 +100,37 @@ export class MailboxSync {
 
   reconcilePersistedMailboxMessages(agent: AgentSummary): void {
     if (!agent.threadId) return;
-    const persisted = this.#database.readConversation(agent.id, agent.threadId);
+    const page = this.#database.readConversationPage(agent.id, agent.threadId, { type: "latest" }, 100);
+    const persisted: ConversationSnapshot = {
+      agentId: page.agentId,
+      threadId: page.threadId,
+      activeTurnId: page.activeTurnId,
+      revision: page.revision,
+      messages: page.messages,
+    };
+    const previousMessageIds = new Set(persisted.messages.map((message) => message.id));
     const previousSignature = conversationContentSignature(persisted);
-    this.syncMailboxMessages(persisted);
+    const oldest = persisted.messages[0]?.createdAt;
+    this.syncMailboxMessages(persisted, this.#mailbox.conversationMessages(agent.id, { fromCreatedAt: oldest }));
     if (conversationContentSignature(persisted) === previousSignature) return;
-    this.#database.persistConversation(persisted, "conversation.mailbox-reconciled", {
-      messageCount: persisted.messages.length,
+    this.#database.persistConversationChanges({
+      agentId: agent.id,
+      threadId: agent.threadId,
+      activeTurnId: persisted.activeTurnId,
+      changedMessages: persisted.messages,
+      removedMessageIds: [...previousMessageIds].filter(
+        (messageId) => !persisted.messages.some((message) => message.id === messageId),
+      ),
+      eventType: "conversation.mailbox-reconciled",
+      detail: {
+        messageCount: persisted.messages.length,
+      },
     });
     const live = this.#conversation.snapshot(agent.id);
-    if (live) this.syncMailboxMessages(live);
+    if (live) {
+      const liveOldest = live.messages[0]?.createdAt;
+      this.syncMailboxMessages(live, this.#mailbox.conversationMessages(agent.id, { fromCreatedAt: liveOldest }));
+    }
   }
 
   /**

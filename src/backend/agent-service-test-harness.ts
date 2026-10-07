@@ -22,11 +22,15 @@ import {
   type AppServerNotification,
   type DynamicToolCallParams,
   type DynamicToolResult,
+  decodeThreadResponse,
+  getArray,
   getString,
+  isRecord,
   type RequestId,
   type ResponseDecoder,
   type RpcError,
 } from "./protocol";
+import type { ProviderHistoryConsumer, ProviderHistoryRequest } from "./provider-history";
 import { HARNESS_WAIT_TIMEOUT_MS } from "./test-deadlines";
 
 export const CREATE_AGENT_INPUT = {
@@ -108,6 +112,39 @@ export async function stopAgentTestFixture(root: string, service: AgentService |
 }
 
 export class FakeAgentClient extends EventEmitter implements AgentClient {
+  readonly readHistory = Effect.fn("FakeAgentClient.readHistory")(function* (
+    this: FakeAgentClient,
+    input: ProviderHistoryRequest,
+    consume: ProviderHistoryConsumer,
+  ) {
+    const response = yield* this.request(
+      "thread/read",
+      { threadId: input.threadId, cwd: input.cwd, includeTurns: true },
+      (value) => {
+        const decoded = decodeThreadResponse(value);
+        const rawTurns = getArray(isRecord(value) ? value.thread : null, "turns");
+        for (const [index, turn] of (decoded.thread.turns ?? []).entries()) {
+          const rawItems = getArray(rawTurns[index], "items");
+          turn.items = turn.items?.map((item, itemIndex) => ({
+            ...(isRecord(rawItems[itemIndex]) ? rawItems[itemIndex] : {}),
+            ...item,
+          }));
+        }
+        return decoded;
+      },
+    );
+    for (const turn of (response.thread.turns ?? []).toReversed()) {
+      if (
+        !(yield* consume({
+          turnId: turn.id,
+          ...(turn.status ? { status: turn.status } : {}),
+          items: input.items === "none" ? [] : (turn.items ?? []),
+          complete: true,
+        }))
+      )
+        break;
+    }
+  });
   readonly requests: Array<{ method: string; params: unknown }> = [];
   readonly responses: Array<{ id: RequestId; result: unknown }> = [];
   readonly errors: Array<{ id: RequestId; error: RpcError }> = [];
@@ -616,7 +653,7 @@ export function fakeCodexCli(): Promise<string> {
     `#!/usr/bin/env node
 const fs = require("node:fs");
 if (process.argv.includes("--version")) {
-  process.stdout.write("codex-cli 0.144.1\\n");
+  process.stdout.write("codex-cli 0.156.0\\n");
   process.exit(0);
 }
 const log = process.env.OPENBOT_FAKE_CODEX_LOG;
@@ -672,6 +709,22 @@ process.stdin.on("data", (chunk) => {
       if (message.method === "thread/unarchive") {
         archivedThread = false;
         write({ id: message.id, result: { thread: { id: message.params.threadId, turns: [] } } });
+      }
+      if (message.method === "thread/turns/list") {
+        const offset = Number(message.params.cursor || 0);
+        const all = [...turns.values()].reverse();
+        const data = all.slice(offset, offset + message.params.limit).map(({ items, ...turn }) => turn);
+        const nextCursor = offset + data.length < all.length ? String(offset + data.length) : null;
+        const respond = () => write({ id: message.id, result: { data, nextCursor } });
+        const delay = Number(process.env.OPENBOT_FAKE_THREAD_READ_DELAY || 0);
+        if (delay > 0) setTimeout(respond, delay);
+        else respond();
+      }
+      if (message.method === "thread/items/list") {
+        const offset = Number(message.params.cursor || 0);
+        const all = turns.get(message.params.turnId)?.items || [];
+        const data = all.slice(offset, offset + message.params.limit).map(item => ({ turnId: message.params.turnId, item }));
+        write({ id: message.id, result: { data, nextCursor: offset + data.length < all.length ? String(offset + data.length) : null } });
       }
       if (message.method === "thread/read") {
         const capturedTurns = JSON.parse(JSON.stringify([...turns.values()]));

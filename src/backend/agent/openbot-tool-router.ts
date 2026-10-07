@@ -6,6 +6,7 @@ import type {
   AgentModelOption,
   AgentSummary,
   AvatarImageInput,
+  ConversationMessage,
   CreateAgentInput,
   McpServerConfig,
   SidebarLayoutSnapshot,
@@ -436,7 +437,7 @@ export class OpenBotToolRouter {
             (event) => {
               const executionThreadId = this.#conversation.publicThreadId(senderAgentId, params.threadId);
               const snapshot = structuredClone(this.#conversation.ensureSnapshot(senderAgentId, executionThreadId));
-              snapshot.messages.push({
+              const message: ConversationMessage = {
                 id: randomUUID(),
                 turnId: params.turnId,
                 author: "system",
@@ -445,8 +446,17 @@ export class OpenBotToolRouter {
                 createdAt: new Date().toISOString(),
                 itemType: skillConversationEventItemType(event),
                 text: redactText(event.skillName),
+              };
+              snapshot.messages.push(message);
+              snapshot.revision = this.#store.database.persistConversationChanges({
+                agentId: senderAgentId,
+                threadId: executionThreadId,
+                activeTurnId: snapshot.activeTurnId,
+                changedMessages: [message],
+                eventType: `skill.${event.action}`,
+                detail: event,
               });
-              const persisted = this.#store.database.persistConversation(snapshot, `skill.${event.action}`, event);
+              const persisted = snapshot;
               this.#conversation.setSnapshot(senderAgentId, persisted);
               this.#conversation.publishConversation(persisted);
             },
@@ -589,7 +599,7 @@ export class OpenBotToolRouter {
         throw new Error("app must be a Marketplace plugin slug, or github.");
       }
       const snapshot = structuredClone(this.#conversation.ensureSnapshot(senderAgentId, executionThreadId));
-      snapshot.messages.push({
+      const message: ConversationMessage = {
         id: randomUUID(),
         turnId: params.turnId,
         author: "system",
@@ -598,10 +608,19 @@ export class OpenBotToolRouter {
         createdAt: new Date().toISOString(),
         itemType: marketplaceSuggestionItemType({ appId: args.app }),
         text: sourceText("status.agent.marketplaceSuggested", { app: args.app }),
+      };
+      snapshot.messages.push(message);
+      snapshot.revision = this.#store.database.persistConversationChanges({
+        agentId: senderAgentId,
+        threadId: executionThreadId,
+        activeTurnId: snapshot.activeTurnId,
+        changedMessages: [message],
+        eventType: "marketplace.suggested",
+        detail: {
+          appId: args.app,
+        },
       });
-      const persisted = this.#store.database.persistConversation(snapshot, "marketplace.suggested", {
-        appId: args.app,
-      });
+      const persisted = snapshot;
       this.#conversation.setSnapshot(senderAgentId, persisted);
       this.#conversation.publishConversation(persisted);
       return openBotToolResult({ status: "suggested", app: args.app });

@@ -103,6 +103,7 @@ export function createAgents(overrides: Partial<TeamApiAgents> = {}, events = ne
     testChannelRoutine: unimplemented,
     listChannelRoutineRuns: unimplemented,
     listConversationReads: unimplemented,
+    readConversation: unimplemented,
     generateProfile: unimplemented,
     saveProfile: unimplemented,
     createAgent: unimplemented,

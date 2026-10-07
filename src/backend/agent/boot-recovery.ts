@@ -1,10 +1,12 @@
 import { Effect, Schema } from "effect";
 import type { AgentProvider } from "../agent-client";
 import type { AgentStore } from "../agent-store";
-import { mergeProviderHistory, snapshotFromThread } from "../conversation-snapshots";
+import { mergeConversationSnapshots } from "../conversation-snapshots";
 import { causeHelpers } from "../effect-boundary";
+import { LineTooLongError } from "../jsonl";
 import type { MailboxStore } from "../mailbox-store";
-import { decodeThreadResponse } from "../protocol";
+import { providerSync } from "../provider-client-effects";
+import { importProviderHistory } from "../provider-history-import";
 import type { ConversationRuntime } from "./conversation-runtime";
 import { conversationContentSignature } from "./delivery-content";
 import { markIncompleteImageGeneration } from "./image-generation";
@@ -63,6 +65,8 @@ export class BootRecovery {
    * no active turn, and `markTerminal` cannot correct a terminal status.
    */
   readonly #orphanedDeliveryIds = new Set<string>();
+  /** Do not read the same oversized history again after the provider restarts. */
+  readonly #oversizedHistory = new Set<string>();
 
   constructor(options: BootRecoveryOptions) {
     this.#store = options.store;
@@ -142,23 +146,41 @@ export class BootRecovery {
           return { agent, client, session };
         });
         if (agent && session && client) {
-          const params = yield* this.#threads
-            .threadParams(agent, client, session.externalSessionId)
-            .pipe(toBootRecoveryFailed);
-          const response = yield* client
-            .request("thread/read", { ...params, includeTurns: true }, decodeThreadResponse)
-            .pipe(toBootRecoveryFailed);
+          const historyKey = `${session.provider}:${session.externalSessionId}`;
+          if (this.#oversizedHistory.has(historyKey)) return interrupted;
+          if (!client.readHistory) return interrupted;
           const batchIds = delivery.turnId ? null : unconfirmedStarts.get(delivery.recipientAgentId);
-          const turn = response.thread.turns?.find(
-            (candidate) =>
-              candidate.id === delivery.turnId ||
-              candidate.items?.some(
-                (item) =>
-                  item.type === "userMessage" &&
-                  !!item.clientId &&
-                  (item.clientId === delivery.id || batchIds?.has(item.clientId) === true),
+          let recovered: { turnId: string; status?: string } | undefined;
+          yield* client
+            .readHistory(
+              {
+                threadId: session.externalSessionId,
+                cwd: agent.workspacePath,
+                items: delivery.turnId ? "none" : "full",
+              },
+              (fragment) =>
+                providerSync(() => {
+                  const matches =
+                    fragment.turnId === delivery.turnId ||
+                    fragment.items.some(
+                      (item) =>
+                        item.type === "userMessage" &&
+                        !!item.clientId &&
+                        (item.clientId === delivery.id || batchIds?.has(item.clientId) === true),
+                    );
+                  if (matches) recovered = { turnId: fragment.turnId, status: fragment.status };
+                  return !matches;
+                }),
+            )
+            .pipe(
+              Effect.tapError((failure) =>
+                Effect.sync(() => {
+                  if (containsLineTooLong(failure)) this.#oversizedHistory.add(historyKey);
+                }),
               ),
-          );
+              toBootRecoveryFailed,
+            );
+          const turn = recovered ? { id: recovered.turnId, status: recovered.status } : undefined;
           if (turn && !delivery.turnId) {
             yield* this.#mailbox.markRunning(delivery.id, turn.id).pipe(toBootRecoveryFailed);
           }
@@ -176,49 +198,73 @@ export class BootRecovery {
         const agent = this.#store.list().find((candidate) => candidate.id === delivery.recipientAgentId);
         const threadId = this.#hooks.deliveryThreadId?.(delivery.id) ?? agent?.threadId;
         if (agent && threadId) {
-          const snapshot = this.#store.database.readConversation(agent.id, threadId);
-          snapshot.activeTurnId = null;
-          for (const message of snapshot.messages) {
-            if (message.turnId === delivery.turnId && message.status === "streaming") {
-              message.status = terminal;
-              markIncompleteImageGeneration(message, terminal);
-            }
-          }
-          this.#store.database.persistConversation(snapshot, "turn.reconciled-after-restart", {
-            turnId: delivery.turnId,
-            status: terminal,
+          const recoveryTurnId =
+            delivery.turnId ?? this.#store.database.readConversationRuntime(agent.id, threadId).activeTurnId;
+          const changedMessages = this.#store.database
+            .readConversationRecoveryMessages(agent.id, threadId, recoveryTurnId)
+            .filter((message) => message.turnId === recoveryTurnId && message.status === "streaming")
+            .map((message) => {
+              const changed = structuredClone(message);
+              changed.status = terminal;
+              markIncompleteImageGeneration(changed, terminal);
+              return changed;
+            });
+          const revision = this.#store.database.persistConversationChanges({
+            agentId: agent.id,
+            threadId,
+            activeTurnId: null,
+            changedMessages,
+            eventType: "turn.reconciled-after-restart",
+            detail: { turnId: delivery.turnId, status: terminal },
           });
+          const snapshot = structuredClone(this.#conversation.ensureSnapshot(agent.id, threadId));
+          const changedById = new Map(changedMessages.map((message) => [message.id, message]));
+          snapshot.messages = snapshot.messages.map((message) => changedById.get(message.id) ?? message);
+          snapshot.activeTurnId = null;
+          snapshot.revision = revision;
+          // Clear the cached turn before queue listeners can read or change the agent.
+          this.#conversation.setSnapshot(agent.id, snapshot);
+          this.#conversation.publishConversation(snapshot);
         }
         this.#mailboxSync.emitQueue(delivery.recipientAgentId);
       });
     }
-  }, Effect.uninterruptible);
+  });
 
   recoverPersistedTurns(): void {
     for (const { delivery } of this.#mailbox.unresolvedDeliveries()) this.#orphanedDeliveryIds.add(delivery.id);
     for (const agent of this.threads()) {
       if (!agent.threadId) continue;
-      const snapshot = this.#store.database.readConversation(agent.id, agent.threadId);
-      const turnId = snapshot.activeTurnId;
-      let changed = false;
-      if (turnId) {
-        snapshot.activeTurnId = null;
-        changed = true;
-      }
-      for (const message of snapshot.messages) {
-        if (message.questionPrompt?.resolution === null) {
-          message.questionPrompt.resolution = { status: "expired" };
-          changed = true;
-        }
-        if (turnId && message.turnId === turnId && message.status === "streaming") {
-          message.status = "interrupted";
-          markIncompleteImageGeneration(message, "interrupted");
-          changed = true;
-        }
-      }
+      const turnId = this.#store.database.readConversationRuntime(agent.id, agent.threadId).activeTurnId;
+      const changedMessages = this.#store.database
+        .readConversationRecoveryMessages(agent.id, agent.threadId, turnId)
+        .flatMap((message) => {
+          const changed = structuredClone(message);
+          if (changed.questionPrompt?.resolution === null) changed.questionPrompt.resolution = { status: "expired" };
+          if (turnId && changed.turnId === turnId && changed.status === "streaming") {
+            changed.status = "interrupted";
+            markIncompleteImageGeneration(changed, "interrupted");
+          }
+          return changed.questionPrompt?.resolution?.status === "expired" || changed.status === "interrupted"
+            ? [changed]
+            : [];
+        });
+      const changed = turnId !== null || changedMessages.length > 0;
       if (!changed) continue;
-      const persisted = this.#store.database.persistConversation(snapshot, "turn.interrupted-by-restart", { turnId });
-      this.#conversation.setSnapshot(agent.id, persisted);
+      const revision = this.#store.database.persistConversationChanges({
+        agentId: agent.id,
+        threadId: agent.threadId,
+        activeTurnId: null,
+        changedMessages,
+        eventType: "turn.interrupted-by-restart",
+        detail: { turnId },
+      });
+      const snapshot = structuredClone(this.#conversation.ensureSnapshot(agent.id, agent.threadId));
+      const changedById = new Map(changedMessages.map((message) => [message.id, message]));
+      snapshot.messages = snapshot.messages.map((message) => changedById.get(message.id) ?? message);
+      snapshot.activeTurnId = null;
+      snapshot.revision = revision;
+      this.#conversation.setSnapshot(agent.id, snapshot);
     }
   }
 
@@ -231,6 +277,8 @@ export class BootRecovery {
       for (const session of this.#store.database.listProviderSessions(publicThreadId)) {
         const client = this.#providers.clientFor(session.provider);
         if (!client) continue;
+        const historyKey = `${session.provider}:${session.externalSessionId}`;
+        if (this.#oversizedHistory.has(historyKey)) continue;
         yield* Effect.gen({ self: this }, function* () {
           // The full parameters for the session the agent still runs on, and the id alone for the
           // retired ones: a client that loads a session to read it must not reopen a session that
@@ -239,44 +287,54 @@ export class BootRecovery {
             session.externalSessionId === active?.externalSessionId
               ? yield* this.#threads.threadParams(agent, client, session.externalSessionId).pipe(toBootRecoveryFailed)
               : { threadId: session.externalSessionId };
-          const response = yield* client
-            .request("thread/read", { ...params, includeTurns: true }, decodeThreadResponse)
-            .pipe(toBootRecoveryFailed);
-          yield* recoveryStep(() => {
-            const imported = snapshotFromThread(
-              agent.id,
-              response.thread,
-              (deliveryId) => this.#mailbox.getDelivery(deliveryId),
-              (messageId) => this.#mailbox.deliveryForMessage(messageId, agent.id),
-            );
-            imported.threadId = publicThreadId;
-            const current = this.#store.database.readConversation(agent.id, publicThreadId);
-            const merged = mergeProviderHistory(current, imported, session.provider);
-            this.#mailboxSync.syncMailboxMessages(merged);
-            if (conversationContentSignature(merged) === conversationContentSignature(current)) {
-              const live = this.#conversation.ensureSnapshot(agent.id, publicThreadId);
-              if (!live?.activeTurnId) this.#conversation.setSnapshot(agent.id, current);
-              return;
-            }
-            const persisted = this.#store.database.persistConversation(merged, "provider-history.backfilled", {
-              provider: session.provider,
-              externalSessionId: session.externalSessionId,
-            });
-            const live = this.#conversation.ensureSnapshot(agent.id, publicThreadId);
-            if (!live?.activeTurnId) {
-              this.#conversation.setSnapshot(agent.id, persisted);
-              if (this.#conversation.isExecutionThread(publicThreadId))
-                this.#conversation.publishConversation(persisted);
-            }
-          });
+          if (!client.readHistory) return;
+          yield* importProviderHistory({
+            database: this.#store.database,
+            readHistory: client.readHistory.bind(client),
+            sessionId: session.id,
+            provider: session.provider,
+            externalSessionId: session.externalSessionId,
+            agentId: agent.id,
+            publicThreadId,
+            cwd: typeof params.cwd === "string" ? params.cwd : agent.workspacePath,
+            findDelivery: (deliveryId) => this.#mailbox.getDelivery(deliveryId),
+            findMessageDelivery: (messageId) => this.#mailbox.deliveryForMessage(messageId, agent.id),
+          }).pipe(toBootRecoveryFailed);
+          yield* recoveryStep(() => this.#refreshBackfilledConversation(agent.id, publicThreadId));
         }).pipe(
           Effect.catch((failure) =>
-            Effect.sync(() => this.#hooks.emitError("provider_history_backfill_pending", failure.cause, agent.id)),
+            Effect.sync(() => {
+              if (containsLineTooLong(failure)) this.#oversizedHistory.add(historyKey);
+              try {
+                this.#refreshBackfilledConversation(agent.id, publicThreadId);
+              } catch (refreshFailure) {
+                this.#hooks.emitError("provider_history_backfill_pending", refreshFailure, agent.id);
+              }
+              this.#hooks.emitError("provider_history_backfill_pending", failure.cause, agent.id);
+            }),
           ),
         );
       }
     }
   });
+
+  #refreshBackfilledConversation(agentId: string, threadId: string): void {
+    const page = this.#store.database.readConversationPage(agentId, threadId, { type: "latest" }, 100);
+    const persisted = {
+      agentId: page.agentId,
+      threadId: page.threadId,
+      activeTurnId: page.activeTurnId,
+      revision: page.revision,
+      messages: page.messages,
+    };
+    const live = this.#conversation.loadedSnapshot(agentId);
+    const next = live?.activeTurnId ? mergeConversationSnapshots(persisted, live) : persisted;
+    const previousSignature = live ? conversationContentSignature(live) : null;
+    this.#conversation.setSnapshot(agentId, next);
+    const published = this.#conversation.loadedSnapshot(agentId) ?? next;
+    const signature = conversationContentSignature(published);
+    if (!live || signature !== previousSignature) this.#conversation.publishConversation(published, signature);
+  }
 }
 
 class BootRecoveryFailed extends Schema.TaggedError<BootRecoveryFailed>()("BootRecoveryFailed", {
@@ -284,3 +342,14 @@ class BootRecoveryFailed extends Schema.TaggedError<BootRecoveryFailed>()("BootR
 }) {}
 
 const { sync: recoveryStep, rewrap: toBootRecoveryFailed } = causeHelpers(BootRecoveryFailed);
+
+function containsLineTooLong(value: unknown): boolean {
+  const seen = new Set<unknown>();
+  let current = value;
+  while (current && (typeof current === "object" || typeof current === "function") && !seen.has(current)) {
+    seen.add(current);
+    if (current instanceof LineTooLongError) return true;
+    current = "cause" in current && typeof current === "object" ? current.cause : undefined;
+  }
+  return false;
+}

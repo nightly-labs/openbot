@@ -667,20 +667,32 @@ export class MailboxStore {
     });
   }
 
-  conversationMessages(agentId: string): ConversationMessage[] {
+  conversationMessages(
+    agentId: string,
+    options: { fromCreatedAt?: string; limit?: number } = {},
+  ): ConversationMessage[] {
+    const limit = Math.max(1, Math.min(options.limit ?? 100, 100));
+    const selectedStoredMessages: StoredMessage[] = [];
+    for (let index = this.#state.messages.length - 1; index >= 0 && selectedStoredMessages.length < limit; index -= 1) {
+      const message = this.#state.messages[index];
+      if (!message || message.channelId || message.messaging) continue;
+      if (options.fromCreatedAt && message.createdAt < options.fromCreatedAt) continue;
+      // A request the agent sent from a Slack thread belongs to that thread, not to its own chat.
+      // The teammate it went to still sees it.
+      if (message.messagingReturn && message.sender.kind === "agent" && message.sender.agentId === agentId) continue;
+      selectedStoredMessages.unshift(message);
+    }
+    const selectedMessageIds = new Set(selectedStoredMessages.map((message) => message.id));
     const messages: ConversationMessage[] = [];
     const deliveriesByMessage = new Map<string, StoredDelivery[]>();
     const positions = this.#queuedPositions();
     for (const delivery of this.#state.deliveries) {
+      if (!selectedMessageIds.has(delivery.messageId)) continue;
       const deliveries = deliveriesByMessage.get(delivery.messageId) ?? [];
       deliveries.push(delivery);
       deliveriesByMessage.set(delivery.messageId, deliveries);
     }
-    for (const message of this.#state.messages) {
-      if (message.channelId || message.messaging) continue;
-      // A request the agent sent from a Slack thread belongs to that thread, not to its own chat.
-      // The teammate it went to still sees it.
-      if (message.messagingReturn && message.sender.kind === "agent" && message.sender.agentId === agentId) continue;
+    for (const message of selectedStoredMessages) {
       const deliveries = deliveriesByMessage.get(message.id) ?? [];
       if (message.sender.kind === "agent" && message.sender.agentId === agentId) {
         messages.push({
@@ -1858,8 +1870,12 @@ export class MailboxStore {
       ...this.#state,
       generatedAttachments: [...this.#state.generatedAttachments, ...staged],
     };
-    const persisted = this.#database.persistConversationAndMailbox(
+    const changedMessages = snapshot.messages.filter((message) =>
+      message.attachments?.some((attachment) => attachmentIds.includes(attachment.id)),
+    );
+    const persisted = this.#database.persistConversationChangesAndMailbox(
       snapshot,
+      changedMessages,
       eventType,
       detail,
       nextState,

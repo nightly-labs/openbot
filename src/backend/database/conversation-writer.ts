@@ -12,6 +12,7 @@ import {
   requiredNumberColumn,
   requiredStringColumn,
 } from "./database-rows";
+import { currentConversationMessage } from "./legacy-conversation-message";
 
 export interface ConversationWriterOptions {
   core: DatabaseCore;
@@ -371,6 +372,392 @@ export class ConversationWriter {
     );
     return result.revision;
   }
+
+  /**
+   * Applies the changed part of a bounded conversation projection.
+   *
+   * The caller may omit older messages. This method only upserts the messages it receives and
+   * removes the explicit ids, so a bounded working snapshot can never delete an omitted durable
+   * row. The event payload is also incremental, which keeps replay independent of the full chat.
+   */
+  persistConversationChanges(input: {
+    agentId: string;
+    threadId: string;
+    activeTurnId: string | null;
+    changedMessages: readonly ConversationMessage[];
+    removedMessageIds?: readonly string[];
+    eventType: string;
+    detail?: unknown;
+    commandId?: string;
+  }): number {
+    const removedMessageIds = input.removedMessageIds ?? [];
+    const result = this.#core.dispatch(
+      input.commandId ?? `conversation:${input.eventType}:${randomUUID()}`,
+      [
+        {
+          aggregateType: "thread",
+          aggregateId: input.threadId,
+          eventType: input.eventType,
+          payload: {
+            detail: input.detail ?? {},
+            changedMessages: input.changedMessages,
+            removedMessageIds,
+            activeTurnId: input.activeTurnId,
+          },
+        },
+      ],
+      (db, sequences) => {
+        const sequence = sequences[0] ?? 0;
+        const agent = this.#roster.listAgents().find((candidate) => candidate.id === input.agentId);
+        const threadOwner = databaseRow(
+          db.prepare("SELECT agent_id FROM projection_threads WHERE thread_id = ?").get(input.threadId),
+        );
+        if (
+          !agent ||
+          (threadOwner ? requiredStringColumn(threadOwner, "agent_id") !== agent.id : agent.threadId !== input.threadId)
+        ) {
+          throw new Error(`Unknown agent for conversation changes: ${input.agentId}`);
+        }
+        if (!threadOwner) this.#roster.ensureThreadProjection(db, agent, sequence);
+        const findOrdinal = db.prepare(
+          "SELECT ordinal, message_json FROM projection_thread_messages WHERE thread_id = ? AND message_id = ?",
+        );
+        const nextOrdinal = db.prepare(
+          "SELECT COALESCE(MAX(ordinal), -1) + 1 AS ordinal FROM projection_thread_messages WHERE thread_id = ?",
+        );
+        const upsert = db.prepare(`
+          INSERT INTO projection_thread_messages (
+            thread_id, message_id, turn_id, author, status, item_type, created_at,
+            ordinal, message_json, last_event_sequence
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(thread_id, message_id) DO UPDATE SET
+            turn_id = excluded.turn_id,
+            author = excluded.author,
+            status = excluded.status,
+            item_type = excluded.item_type,
+            created_at = excluded.created_at,
+            ordinal = excluded.ordinal,
+            message_json = excluded.message_json,
+            last_event_sequence = excluded.last_event_sequence
+        `);
+        for (const imported of input.changedMessages) {
+          const existingRow = databaseRow(findOrdinal.get(input.threadId, imported.id));
+          const existing = existingRow
+            ? currentConversationMessage(JSON.parse(requiredStringColumn(existingRow, "message_json")))
+            : null;
+          // This is a live projection update. Provider-history reconciliation uses the additive
+          // merge below, but a streamed update must replace status and text from the caller. The
+          // historical merge keeps the old turn id and can therefore preserve stale live state.
+          const message = existing ? mergeLiveMessage(existing, imported) : imported;
+          const ordinal = existingRow
+            ? requiredNumberColumn(existingRow, "ordinal")
+            : requiredNumberColumn(databaseRow(nextOrdinal.get(input.threadId)) ?? { ordinal: 0 }, "ordinal");
+          upsert.run(
+            input.threadId,
+            message.id,
+            message.turnId ?? null,
+            message.author,
+            message.status,
+            message.itemType ?? null,
+            message.createdAt,
+            ordinal,
+            JSON.stringify(message),
+            sequence,
+          );
+          recordUsageMessage(db, agent.id, message, agent.provider, agent.model);
+          db.prepare("DELETE FROM projection_attachments WHERE owner_kind = 'thread-message' AND owner_id = ?").run(
+            `${input.threadId}:${message.id}`,
+          );
+          for (const attachment of message.attachments ?? []) {
+            db.prepare(`
+              INSERT OR REPLACE INTO projection_attachments
+                (attachment_id, owner_kind, owner_id, name, path, metadata_json, created_at, last_event_sequence)
+              VALUES (?, 'thread-message', ?, ?, '', ?, ?, ?)
+            `).run(
+              `${input.threadId}:${message.id}:${attachment.id}`,
+              `${input.threadId}:${message.id}`,
+              attachment.name,
+              JSON.stringify(attachment),
+              message.createdAt,
+              sequence,
+            );
+          }
+        }
+        const deleteAttachments = db.prepare(
+          "DELETE FROM projection_attachments WHERE owner_kind = 'thread-message' AND owner_id = ?",
+        );
+        const deleteMessage = db.prepare(
+          "DELETE FROM projection_thread_messages WHERE thread_id = ? AND message_id = ?",
+        );
+        for (const messageId of removedMessageIds) {
+          deleteAttachments.run(`${input.threadId}:${messageId}`);
+          deleteMessage.run(input.threadId, messageId);
+        }
+        db.prepare(
+          `UPDATE projection_threads
+           SET active_turn_id = ?, updated_at = ?, last_event_sequence = ? WHERE thread_id = ?`,
+        ).run(input.activeTurnId, new Date().toISOString(), sequence, input.threadId);
+        if (input.activeTurnId) {
+          db.prepare(`
+            INSERT INTO projection_turns
+              (turn_id, thread_id, provider_session_id, status, started_at, completed_at, last_event_sequence)
+            VALUES (?, ?, (
+              SELECT id FROM projection_provider_sessions
+              WHERE thread_id = ? AND state = 'active' ORDER BY created_at DESC LIMIT 1
+            ), 'running', ?, NULL, ?)
+            ON CONFLICT(turn_id) DO UPDATE SET status = 'running', last_event_sequence = excluded.last_event_sequence
+          `).run(input.activeTurnId, input.threadId, input.threadId, new Date().toISOString(), sequence);
+        }
+        if (
+          ["turn.completed", "turn.reconciled-after-restart", "turn.interrupted-by-restart"].includes(
+            input.eventType,
+          ) &&
+          isDynamicRecord(input.detail) &&
+          "turnId" in input.detail &&
+          isString(input.detail.turnId)
+        ) {
+          const status =
+            "status" in input.detail && isString(input.detail.status)
+              ? input.detail.status
+              : input.eventType === "turn.interrupted-by-restart"
+                ? "interrupted"
+                : "completed";
+          db.prepare(
+            `UPDATE projection_turns
+             SET status = ?, completed_at = ?, last_event_sequence = ?
+             WHERE thread_id = ? AND turn_id = ?`,
+          ).run(status, new Date().toISOString(), sequence, input.threadId, input.detail.turnId);
+        }
+        db.prepare(`
+          INSERT INTO projection_thread_activities
+            (activity_id, thread_id, turn_id, activity_type, payload_json, created_at, last_event_sequence)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          randomUUID(),
+          input.threadId,
+          input.activeTurnId,
+          input.eventType,
+          JSON.stringify(input.detail ?? {}),
+          new Date().toISOString(),
+          sequence,
+        );
+        return { revision: sequence };
+      },
+    );
+    return result.revision;
+  }
+
+  /**
+   * Upserts one message learned from a paged provider history read.
+   *
+   * This operation never removes rows that are absent from the provider page. Existing local
+   * identity, author, ordering, delivery, attachments and reactions are retained while provider
+   * text/status fields are refreshed. The event contains this one message, so replay has the same
+   * non-destructive behavior without rebuilding a full conversation snapshot.
+   */
+  upsertProviderHistoryMessage(input: {
+    agentId: string;
+    threadId: string;
+    activeTurnId?: string | null;
+    message: ConversationMessage;
+    eventType?: string;
+    detail?: unknown;
+    commandId?: string;
+  }): number {
+    const eventType = input.eventType ?? "provider-history.message-imported";
+    const existingBeforeWrite = databaseRow(
+      this.#core.connection
+        .prepare(
+          `SELECT message_json FROM projection_thread_messages
+           WHERE thread_id = ? AND message_id = ?`,
+        )
+        .get(input.threadId, input.message.id),
+    );
+    if (existingBeforeWrite && input.activeTurnId === undefined) {
+      const existingMessage = currentConversationMessage(
+        JSON.parse(requiredStringColumn(existingBeforeWrite, "message_json")),
+      );
+      if (
+        existingMessage &&
+        JSON.stringify(mergeImportedMessage(existingMessage, input.message)) === JSON.stringify(existingMessage)
+      ) {
+        const revision = databaseRow(
+          this.#core.connection
+            .prepare("SELECT last_event_sequence FROM projection_threads WHERE thread_id = ?")
+            .get(input.threadId),
+        );
+        return revision ? requiredNumberColumn(revision, "last_event_sequence") : 0;
+      }
+    }
+    const result = this.#core.dispatch(
+      input.commandId ?? `conversation:${eventType}:${randomUUID()}`,
+      [
+        {
+          aggregateType: "thread",
+          aggregateId: input.threadId,
+          eventType,
+          occurredAt: input.message.createdAt,
+          payload: {
+            detail: input.detail ?? {},
+            importedMessage: input.message,
+            ...(input.activeTurnId === undefined ? {} : { activeTurnId: input.activeTurnId }),
+          },
+        },
+      ],
+      (db, sequences) => {
+        const sequence = sequences[0] ?? 0;
+        const agent = this.#roster.listAgents().find((candidate) => candidate.id === input.agentId);
+        if (!agent) {
+          throw new Error(`Unknown agent thread for provider history: ${input.agentId}`);
+        }
+        const threadRow = databaseRow(
+          db.prepare("SELECT agent_id FROM projection_threads WHERE thread_id = ?").get(input.threadId),
+        );
+        if (threadRow && requiredStringColumn(threadRow, "agent_id") !== agent.id) {
+          throw new Error(`Provider history thread belongs to another agent: ${input.threadId}`);
+        }
+        if (!threadRow) {
+          if (agent.threadId !== input.threadId) {
+            throw new Error(`Unknown provider history thread: ${input.threadId}`);
+          }
+          this.#roster.ensureThreadProjection(db, agent, sequence);
+        }
+        const existingRow = databaseRow(
+          db
+            .prepare(
+              `SELECT ordinal, message_json FROM projection_thread_messages
+               WHERE thread_id = ? AND message_id = ?`,
+            )
+            .get(input.threadId, input.message.id),
+        );
+        const existing = existingRow
+          ? currentConversationMessage(JSON.parse(requiredStringColumn(existingRow, "message_json")))
+          : null;
+        const message = existing ? mergeImportedMessage(existing, input.message) : input.message;
+        const ordinal = existingRow
+          ? requiredNumberColumn(existingRow, "ordinal")
+          : requiredNumberColumn(
+              databaseRow(
+                db
+                  .prepare(
+                    `SELECT COALESCE(MAX(ordinal), -1) + 1 AS ordinal
+                     FROM projection_thread_messages WHERE thread_id = ?`,
+                  )
+                  .get(input.threadId),
+              ) ?? { ordinal: 0 },
+              "ordinal",
+            );
+        db.prepare(
+          `INSERT INTO projection_thread_messages (
+             thread_id, message_id, turn_id, author, status, item_type, created_at,
+             ordinal, message_json, last_event_sequence
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(thread_id, message_id) DO UPDATE SET
+             turn_id = excluded.turn_id,
+             author = excluded.author,
+             status = excluded.status,
+             item_type = excluded.item_type,
+             created_at = excluded.created_at,
+             ordinal = excluded.ordinal,
+             message_json = excluded.message_json,
+             last_event_sequence = excluded.last_event_sequence`,
+        ).run(
+          input.threadId,
+          message.id,
+          message.turnId ?? null,
+          message.author,
+          message.status,
+          message.itemType ?? null,
+          message.createdAt,
+          ordinal,
+          JSON.stringify(message),
+          sequence,
+        );
+        recordUsageMessage(db, agent.id, message, agent.provider, agent.model);
+        for (const attachment of message.attachments ?? []) {
+          db.prepare(
+            `INSERT OR REPLACE INTO projection_attachments
+               (attachment_id, owner_kind, owner_id, name, path, metadata_json, created_at, last_event_sequence)
+             VALUES (?, 'thread-message', ?, ?, '', ?, ?, ?)`,
+          ).run(
+            `${input.threadId}:${message.id}:${attachment.id}`,
+            `${input.threadId}:${message.id}`,
+            attachment.name,
+            JSON.stringify(attachment),
+            message.createdAt,
+            sequence,
+          );
+        }
+        if (input.activeTurnId !== undefined) {
+          db.prepare(
+            `UPDATE projection_threads
+             SET active_turn_id = ?, updated_at = ?, last_event_sequence = ? WHERE thread_id = ?`,
+          ).run(input.activeTurnId, new Date().toISOString(), sequence, input.threadId);
+        } else {
+          db.prepare(`UPDATE projection_threads SET updated_at = ?, last_event_sequence = ? WHERE thread_id = ?`).run(
+            new Date().toISOString(),
+            sequence,
+            input.threadId,
+          );
+        }
+        db.prepare(
+          `INSERT INTO projection_thread_activities
+             (activity_id, thread_id, turn_id, activity_type, payload_json, created_at, last_event_sequence)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        ).run(
+          randomUUID(),
+          input.threadId,
+          message.turnId ?? input.activeTurnId ?? null,
+          eventType,
+          JSON.stringify(input.detail ?? {}),
+          input.message.createdAt,
+          sequence,
+        );
+        return { revision: sequence };
+      },
+    );
+    return result.revision;
+  }
+}
+
+function mergeImportedMessage(existing: ConversationMessage, imported: ConversationMessage): ConversationMessage {
+  const attachments = mergeValues(existing.attachments, imported.attachments, (attachment) => attachment.id);
+  const reactions = mergeValues(existing.reactions, imported.reactions, (reaction) => JSON.stringify(reaction));
+  return {
+    ...existing,
+    ...imported,
+    id: existing.id,
+    author: existing.author,
+    createdAt: existing.createdAt,
+    turnId: existing.turnId ?? imported.turnId,
+    ...(attachments === undefined ? {} : { attachments }),
+    ...(reactions === undefined ? {} : { reactions }),
+    ...(imported.delivery === undefined && existing.delivery ? { delivery: existing.delivery } : {}),
+    ...(imported.exchange === undefined && existing.exchange ? { exchange: existing.exchange } : {}),
+    ...(imported.senderMember === undefined && existing.senderMember ? { senderMember: existing.senderMember } : {}),
+  };
+}
+
+function mergeLiveMessage(existing: ConversationMessage, updated: ConversationMessage): ConversationMessage {
+  return {
+    ...existing,
+    ...updated,
+    id: existing.id,
+    author: existing.author,
+    createdAt: existing.createdAt,
+    turnId: updated.turnId ?? existing.turnId,
+  };
+}
+
+function mergeValues<T>(
+  existing: T[] | undefined,
+  imported: T[] | undefined,
+  key: (value: T) => string,
+): T[] | undefined {
+  if (existing === undefined && imported === undefined) return undefined;
+  const values = new Map((existing ?? []).map((value) => [key(value), value]));
+  for (const value of imported ?? []) values.set(key(value), value);
+  return [...values.values()];
 }
 
 function conversationRecoveryState(

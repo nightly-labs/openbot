@@ -76,7 +76,7 @@ import { TEAM_CURSOR_CLINE_CAPABILITY, TEAM_PROTOCOL_V6 } from "@openbot/contrac
 import { encodeTeamProtocolV6BaseCurrentEvent } from "@openbot/contracts/team-protocol/v6-base-adapter";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
-import { Deferred, Effect } from "effect";
+import { Deferred, Effect, Exit, Scope } from "effect";
 import type * as Ws from "ws";
 import { AgentDuplicationFailed, duplicateAgentIntoLayout } from "../backend/agent/duplication-gate";
 import { runCauseEffect } from "../backend/effect-boundary";
@@ -160,6 +160,13 @@ interface EventClientState {
   nextSnapshotRequestAt: number;
 }
 
+type ConversationEventAudience = "all" | "modern" | "legacy";
+
+interface PendingLegacyConversationRead {
+  event: Extract<AgentEvent, { type: "conversation" }>;
+  retries: number;
+}
+
 interface RateEntry {
   attempts: number;
   resetAt: number;
@@ -179,6 +186,8 @@ export class TeamApiServer {
   readonly #options: Omit<TeamApiOptions, "sidebarLayout"> & { sidebarLayout: TeamApiSidebarLayout };
   readonly #rateLimits = new Map<string, RateEntry>();
   readonly #eventClients = new Map<Ws.WebSocket, EventClientState>();
+  readonly #pendingLegacyConversationReads = new Map<string, PendingLegacyConversationRead>();
+  #legacyConversationScope = Scope.makeUnsafe();
   #hostRestart: HostRestartEvent = { type: HOST_RESTART_EVENT, state: "none", version: null };
   readonly #responseRoutes = new WeakMap<
     ServerResponse,
@@ -238,6 +247,7 @@ export class TeamApiServer {
 
   readonly #start = Effect.fn("TeamApiServer.start")(function* (this: TeamApiServer) {
     if (this.#server && this.#port) return this.#port;
+    if (this.#legacyConversationScope.state._tag === "Closed") this.#legacyConversationScope = Scope.makeUnsafe();
     const server = createServer((request, response) => void this.#handle(request, response));
     this.#server = server;
     server.on("upgrade", (request, socket, head) => {
@@ -320,12 +330,15 @@ export class TeamApiServer {
     this.#agentListener = null;
     if (this.#sidebarLayoutListener) this.#options.sidebarLayout.off("changed", this.#sidebarLayoutListener);
     this.#sidebarLayoutListener = null;
+    yield* Scope.close(this.#legacyConversationScope, Exit.void);
+    this.#legacyConversationScope = Scope.makeUnsafe();
     for (const [client, connection] of this.#eventClients) {
       if (connection.typingTimer) clearTimeout(connection.typingTimer);
       if (connection.directTypingTimer) clearTimeout(connection.directTypingTimer);
       client.close(1001, "Server stopped");
     }
     this.#eventClients.clear();
+    this.#pendingLegacyConversationReads.clear();
     this.#localTypingAgentId = null;
     const { remoteScreen, browserView } = this.#options;
     yield* Effect.gen(function* () {
@@ -808,9 +821,101 @@ export class TeamApiServer {
   }
 
   #broadcastAgentEvent(event: AgentEvent): void {
+    if (event.type !== "conversation") {
+      this.#broadcastAgentEventToClients(event);
+      return;
+    }
+
+    // A bounded runtime snapshot is enough for modern clients: they fetch the page they need after
+    // this invalidation. The released event clients have no invalidation path, so they keep the old
+    // full snapshot contract. Read that snapshot only when such a client is connected, and keep the
+    // read out of the synchronous event path used by modern clients.
+    const primaryAgent = this.#options.agents.listAgents().find((agent) => agent.id === event.snapshot.agentId);
+    if (!primaryAgent || primaryAgent.threadId !== event.snapshot.threadId) {
+      // Execution and channel threads are consumed by their owners before this listener. A stale
+      // event for a deleted agent must also never enter readConversation, whose released endpoint
+      // can recreate an agent from its id.
+      this.#broadcastAgentEventToClients(event, "modern");
+      return;
+    }
+    const hasLegacyClient = [...this.#eventClients.values()].some(isLegacyConversationClient);
+    this.#broadcastAgentEventToClients(event, hasLegacyClient ? "modern" : "all");
+    if (hasLegacyClient) this.#queueLegacyConversationEvent(event);
+  }
+
+  #queueLegacyConversationEvent(event: Extract<AgentEvent, { type: "conversation" }>, retries = 0): void {
+    const agentId = event.snapshot.agentId;
+    const pending = this.#pendingLegacyConversationReads.get(agentId);
+    if (pending) {
+      // One full SQLite materialization is enough for a burst. The newest event is the state that
+      // the legacy client needs, so an older read never gets replayed after a newer event arrives.
+      pending.event = event;
+      return;
+    }
+
+    const next: PendingLegacyConversationRead = { event, retries };
+    this.#pendingLegacyConversationReads.set(agentId, next);
+    const materialize = Effect.gen({ self: this }, function* () {
+      // `readConversation` uses getOrCreate for the released HTTP endpoint. Do not let a delayed
+      // event read recreate an agent that was deleted after the event was emitted.
+      if (!this.#options.agents.listAgents().some((agent) => agent.id === agentId)) {
+        this.#pendingLegacyConversationReads.delete(agentId);
+        return;
+      }
+      if (![...this.#eventClients.values()].some(isLegacyConversationClient)) {
+        this.#pendingLegacyConversationReads.delete(agentId);
+        return;
+      }
+      const snapshot = yield* this.#options.agents.readConversation(agentId);
+      if (this.#pendingLegacyConversationReads.get(agentId) !== next) return;
+      if (!this.#options.agents.listAgents().some((agent) => agent.id === agentId)) {
+        this.#pendingLegacyConversationReads.delete(agentId);
+        return;
+      }
+      if (![...this.#eventClients.values()].some(isLegacyConversationClient)) {
+        this.#pendingLegacyConversationReads.delete(agentId);
+        return;
+      }
+      const latest = next.event;
+      if (snapshot.revision < latest.snapshot.revision && next.retries === 0) {
+        // The event can be emitted while the read is still catching up with its transaction.
+        // Retry once the newest revision is the durable one instead of sending a stale snapshot.
+        this.#pendingLegacyConversationReads.delete(agentId);
+        this.#queueLegacyConversationEvent(latest, 1);
+        return;
+      }
+      if (snapshot.revision < latest.snapshot.revision) {
+        this.#pendingLegacyConversationReads.delete(agentId);
+        (this.#options.logger ?? logger).warn("Legacy conversation event read is behind its revision.");
+        return;
+      }
+      this.#pendingLegacyConversationReads.delete(agentId);
+      this.#broadcastAgentEventToClients({ type: "conversation", snapshot }, "legacy");
+    }).pipe(
+      Effect.catch((error) =>
+        Effect.sync(() => {
+          if (this.#pendingLegacyConversationReads.get(agentId) === next) {
+            this.#pendingLegacyConversationReads.delete(agentId);
+          }
+          (this.#options.logger ?? logger).warn(
+            "Legacy conversation event could not be materialized:",
+            toLogValue(error.cause),
+          );
+        }),
+      ),
+      Effect.forkIn(this.#legacyConversationScope, { startImmediately: true }),
+    );
+    Effect.runFork(materialize);
+  }
+
+  #broadcastAgentEventToClients(event: AgentEvent, audience: ConversationEventAudience = "all"): void {
     const filteredConversationPayloads = new Map<string, string>();
 
     for (const [client, connection] of this.#eventClients) {
+      if (event.type === "conversation") {
+        const legacy = isLegacyConversationClient(connection);
+        if ((audience === "legacy" && !legacy) || (audience === "modern" && legacy)) continue;
+      }
       // An event this client's protocol cannot describe is skipped for this client only. Thrown
       // out of the loop, it would stop the event for every client after this one.
       const encodeEvent = (event: AgentEvent, options = {}) => {
@@ -1436,6 +1541,10 @@ function unavailableSidebarLayout(): TeamApiSidebarLayout {
 function eventProtocol(capabilities: ReadonlySet<string>): 1 | 4 | 5 | 6 {
   if (capabilities.has(TEAM_CURSOR_CLINE_CAPABILITY)) return 6;
   return capabilities.has(TEAM_LOCAL_PROVIDERS_CAPABILITY) ? 5 : capabilities.has("opencode") ? 4 : 1;
+}
+
+function isLegacyConversationClient(connection: EventClientState): boolean {
+  return connection.includeConversationEvents && !connection.capabilities.has("agent-runtime-snapshots");
 }
 
 function eventCapability(event: AgentEvent): TeamCurrentCapability | null {

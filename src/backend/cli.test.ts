@@ -77,14 +77,14 @@ describe("bundled Codex resolution", () => {
   });
 
   it.runIf(process.platform !== "win32")("prefers the managed CLI over a compatible system CLI", async () => {
-    const system = await createExecutable("system-codex", "codex-cli 0.148.0");
-    const bundled = await createExecutable("bundled-codex", "codex-cli 0.149.1");
+    const system = await createExecutable("system-codex", "codex-cli 0.156.0");
+    const bundled = await createExecutable("bundled-codex", "codex-cli 0.160.1");
 
     await expect(
       runCauseEffect(resolveCodexCli({ systemCandidates: [system], bundledExecutable: bundled })),
     ).resolves.toEqual({
       executable: bundled,
-      version: "0.149.1",
+      version: "0.160.1",
       source: "managed",
     });
   });
@@ -92,13 +92,13 @@ describe("bundled Codex resolution", () => {
   it.runIf(process.platform !== "win32")("falls back when the system CLI is outdated or invalid", async () => {
     const outdated = await createExecutable("old-codex", "codex-cli 0.120.0");
     const invalid = await createExecutable("broken-codex", "not a version");
-    const bundled = await createExecutable("bundled-codex", "codex-cli 0.149.1");
+    const bundled = await createExecutable("bundled-codex", "codex-cli 0.160.1");
 
     await expect(
       runCauseEffect(resolveCodexCli({ systemCandidates: [outdated, invalid], bundledExecutable: bundled })),
     ).resolves.toEqual({
       executable: bundled,
-      version: "0.149.1",
+      version: "0.160.1",
       source: "managed",
     });
   });
@@ -295,7 +295,7 @@ describe("Windows CLI fallback paths", () => {
 
   it.runIf(process.platform === "win32")("runs npm command shims when the user profile contains a space", async () => {
     await createWindowsNpmShims();
-    await expect(runCauseEffect(resolveCodexCli())).resolves.toMatchObject({ version: "0.144.1" });
+    await expect(runCauseEffect(resolveCodexCli())).resolves.toMatchObject({ version: "0.156.0" });
     await expect(runCauseEffect(resolveClaudeCli())).resolves.toMatchObject({ version: "2.1.232", source: "system" });
   });
 
@@ -362,7 +362,7 @@ async function createWindowsNpmShims(): Promise<void> {
   const npmDirectory = join(appData, "npm");
   await mkdir(npmDirectory, { recursive: true });
   await Promise.all([
-    writeFile(join(npmDirectory, "codex.cmd"), "@echo off\r\necho codex-cli 0.144.1\r\n"),
+    writeFile(join(npmDirectory, "codex.cmd"), "@echo off\r\necho codex-cli 0.156.0\r\n"),
     writeFile(join(npmDirectory, "claude.cmd"), "@echo off\r\necho 2.1.232 (Claude Code)\r\n"),
   ]);
   useIsolatedWindowsEnvironment(appData, join(root, "missing-local-app-data"));

@@ -1,7 +1,12 @@
 // @vitest-environment node
 import { readFile, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { type AgentEvent, routineConversationEvent, routineRunConversationEvent } from "@openbot/contracts/ipc";
+import {
+  type AgentEvent,
+  type ConversationMessage,
+  routineConversationEvent,
+  routineRunConversationEvent,
+} from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentProvider } from "./agent-client";
@@ -1172,4 +1177,41 @@ describe.sequential("AgentService: routines", () => {
         .get(delivery.turnId),
     ).toMatchObject({ status: "completed", completed_at: expect.any(String) });
   });
+});
+
+it("updates and clears a reaction on a message older than the working cache", async () => {
+  const { store, mailbox } = stores(root);
+  service = createTestService({ store, mailbox });
+  await runCauseEffect(service.initialize());
+  const agent = await runCauseEffect(store.getOrCreate("chief"));
+  const threadId = store.ensureThreadIdNow(agent.id);
+  const messages: ConversationMessage[] = Array.from({ length: 125 }, (_, index) => ({
+    id: `old-reaction-${index}`,
+    author: "user",
+    source: "user",
+    text: `Message ${index}`,
+    createdAt: new Date(Date.UTC(2026, 7, 19, 9, 0, index)).toISOString(),
+    status: "completed",
+  }));
+  store.database.persistConversation(
+    { agentId: agent.id, threadId, activeTurnId: null, revision: 0, messages },
+    "test.old-reaction-history",
+  );
+
+  const loaded = await runCauseEffect(service.readConversation(agent.id));
+  expect(loaded.messages).toHaveLength(messages.length);
+  const oldMessageId = messages[0]?.id;
+  if (!oldMessageId) throw new Error("The old reaction message was not created.");
+
+  await runCauseEffect(service.setMessageReaction({ agentId: agent.id, messageId: oldMessageId, emoji: "❤️" }));
+  let persisted = store.database.readConversation(agent.id, threadId);
+  expect(persisted.messages).toHaveLength(messages.length);
+  expect(persisted.messages.map((message) => message.id)).toEqual(messages.map((message) => message.id));
+  expect(persisted.messages[0]).toMatchObject({ id: oldMessageId, reaction: "❤️" });
+
+  await runCauseEffect(service.setMessageReaction({ agentId: agent.id, messageId: oldMessageId, emoji: null }));
+  persisted = store.database.readConversation(agent.id, threadId);
+  expect(persisted.messages).toHaveLength(messages.length);
+  expect(persisted.messages.map((message) => message.id)).toEqual(messages.map((message) => message.id));
+  expect(persisted.messages[0]).toMatchObject({ id: oldMessageId, reaction: null, reactions: [] });
 });

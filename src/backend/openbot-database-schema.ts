@@ -4,6 +4,7 @@ import { type DynamicRecord, isDynamicRecord, isNumber, isString } from "@openbo
 import { isGeneratedAgentId } from "@openbot/contracts/validation";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { CHANNEL_SCHEMA_SQL, CHANNEL_SETTINGS_SCHEMA_SQL } from "./channel-schema";
+import { PROVIDER_HISTORY_SCHEMA_SQL } from "./database/provider-history-schema";
 import { MCP_SERVERS_SCHEMA_SQL } from "./mcp-schema";
 import { MESSAGING_SCHEMA_SQL } from "./messaging/messaging-schema";
 
@@ -415,7 +416,8 @@ const LATEST_SCHEMA_SQL =
     withRoutineLimitPolicy(V19_CHANNEL_ROUTINES_END_SQL),
   ) +
   MCP_SERVERS_SCHEMA_SQL +
-  MESSAGING_SCHEMA_SQL;
+  MESSAGING_SCHEMA_SQL +
+  PROVIDER_HISTORY_SCHEMA_SQL;
 
 /** The end of a routine table with the migration 27 column after its last one. */
 function withRoutineLimitPolicy(tableEnd: string): string {
@@ -557,6 +559,12 @@ const MIGRATIONS: readonly OpenBotMigration[] = [
     // The same rebuild as migrations 17, 22, 23, 24 and 26, with foreign keys off for the same reason.
     disableForeignKeys: true,
     up: removeProviderSessionsCheck,
+  },
+  {
+    version: 29,
+    // Provider history is additive durable import state. Existing conversation projections and
+    // provider sessions remain untouched, so foreign keys stay enabled and no vacuum is needed.
+    up: (db) => db.exec(PROVIDER_HISTORY_SCHEMA_SQL),
   },
 ];
 

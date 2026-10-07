@@ -100,6 +100,16 @@ export class ConversationQueries {
     return row ? optionalStringColumn(row, "active_turn_id") : null;
   }
 
+  readConversationRevision(agentId: string, threadId: string | null): number {
+    if (!threadId) return 0;
+    const row = databaseRow(
+      this.#core.connection
+        .prepare("SELECT last_event_sequence FROM projection_threads WHERE thread_id = ? AND agent_id = ?")
+        .get(threadId, agentId),
+    );
+    return row ? requiredNumberColumn(row, "last_event_sequence") : 0;
+  }
+
   readConversationRuntime(
     agentId: string,
     threadId: string | null,
@@ -132,6 +142,51 @@ export class ConversationQueries {
       activeTurnId: optionalStringColumn(row, "active_turn_id"),
       latestMessage: latestMessage ? decodeConversationMessageJson(latestMessage) : null,
     };
+  }
+
+  /** Reads only named messages for a row-level conversation update. */
+  readConversationMessages(
+    agentId: string,
+    threadId: string | null,
+    messageIds: readonly string[],
+  ): ConversationMessage[] {
+    if (!threadId || messageIds.length === 0) return [];
+    const placeholders = messageIds.map(() => "?").join(", ");
+    return databaseRows(
+      this.#core.connection
+        .prepare(
+          `SELECT message_json FROM projection_thread_messages
+           WHERE thread_id = ? AND message_id IN (${placeholders})
+           AND thread_id IN (SELECT thread_id FROM projection_threads WHERE agent_id = ?)
+           ORDER BY created_at, ordinal, message_id`,
+        )
+        .all(threadId, ...messageIds, agentId),
+    ).map((row) => decodeConversationMessageJson(requiredStringColumn(row, "message_json")));
+  }
+
+  /** Reads only messages that restart recovery can change. */
+  readConversationRecoveryMessages(
+    agentId: string,
+    threadId: string | null,
+    activeTurnId: string | null,
+  ): ConversationMessage[] {
+    if (!threadId) return [];
+    const rows = databaseRows(
+      this.#core.connection
+        .prepare(
+          `SELECT message_json FROM projection_thread_messages
+           WHERE thread_id = ?
+             AND thread_id IN (SELECT thread_id FROM projection_threads WHERE agent_id = ?)
+             AND (
+               (? IS NOT NULL AND turn_id = ? AND status = 'streaming')
+               OR json_type(message_json, '$.questionPrompt.resolution') = 'null'
+                  AND json_type(message_json, '$.questionPrompt') = 'object'
+             )
+           ORDER BY created_at, ordinal, message_id`,
+        )
+        .all(threadId, agentId, activeTurnId, activeTurnId),
+    );
+    return rows.map((row) => decodeConversationMessageJson(requiredStringColumn(row, "message_json")));
   }
 
   readConversationPage(

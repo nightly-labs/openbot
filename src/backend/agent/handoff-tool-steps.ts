@@ -1,16 +1,9 @@
 import { type DynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { redactText } from "@openbot/logging";
+import { Effect } from "effect";
+import type { AgentClient } from "../agent-client";
 import { getArray, getRecord, getString, isRecord } from "../protocol";
-
-/**
- * One turn of an earlier provider session, as `thread/read` returns it. The items stay whole:
- * `decodeThreadResponse` keeps only the fields a transcript needs, and drops the command, output
- * and file paths that a handoff gives to the next provider.
- */
-export interface ProviderTurnSteps {
-  turnId: string;
-  items: DynamicRecord[];
-}
+import { providerFailure, providerSync } from "../provider-client-effects";
 
 /**
  * The ids Claude (`:reasoning`) and the ACP client (`:thought`, then `:thought:<n>` for each later
@@ -23,13 +16,6 @@ const STEP_LIMIT = 1_000;
 const OUTPUT_TAIL = 600;
 /** The most text the steps of one turn add. The newest steps are kept. */
 const TURN_LIMIT = 4_000;
-
-export function decodeProviderTurns(value: unknown): ProviderTurnSteps[] {
-  return getArray(getRecord(value, "thread"), "turns").flatMap((turn) => {
-    const turnId = getString(turn, "id");
-    return turnId ? [{ turnId, items: getArray(turn, "items").filter(isRecord) }] : [];
-  });
-}
 
 /**
  * A text field of a step, redacted whole. Redaction runs before any cut: a cut through a secret
@@ -92,42 +78,52 @@ function renderStep(item: DynamicRecord): string | null {
   }
 }
 
-/**
- * The work one turn did, for a handoff: commands with their exit code and the end of their output,
- * changed files, tool calls, searches and progress notes. Diffs are left out, because the files are
- * on disk in the same workspace. Each field is redacted before it is cut.
- */
-export function renderTurnSteps(items: readonly DynamicRecord[]): string | null {
-  const steps = items.map(renderStep).filter(isString);
-  const kept: string[] = [];
-  let size = 0;
-  for (const step of steps.toReversed()) {
-    if (size + step.length > TURN_LIMIT) break;
-    kept.unshift(step);
-    size += step.length + 1;
-  }
-  if (kept.length === 0) return null;
-  const omitted = steps.length - kept.length;
-  return ["[work steps]", omitted > 0 ? `(${omitted} earlier steps left out)` : null, ...kept, "[end work steps]"]
-    .filter(Boolean)
-    .join("\n");
-}
-
 /** How many of a session's newest turns with work steps a capture keeps. */
 const CAPTURED_TURNS = 60;
 
-/**
- * The rendered steps of a session's turns, for the file a capture writes. Only redacted text is
- * written: the raw output and diffs stay with the provider. A session with no steps gives `{}`, so
- * the handoff does not start its provider again to read the same nothing.
- */
-export function encodeCapturedSteps(turns: readonly ProviderTurnSteps[]): string {
-  const steps = turns.flatMap((turn) => {
-    const rendered = renderTurnSteps(turn.items);
-    return rendered ? [[turn.turnId, rendered] as const] : [];
-  });
-  return JSON.stringify(Object.fromEntries(steps.slice(-CAPTURED_TURNS)));
-}
+/** Keep only rendered steps, never the provider's full tool results. */
+export const readCapturedSteps = Effect.fn("ProviderHistory.readCapturedSteps")(function* (
+  client: AgentClient,
+  threadId: string,
+) {
+  if (!client.readHistory) return yield* providerFailure(new Error("Provider history reader is unavailable."));
+  const captured = new Map<string, string>();
+  let kept: string[] = [];
+  let size = 0;
+  let omitted = 0;
+  yield* client.readHistory({ threadId, items: "full" }, (fragment) =>
+    providerSync(() => {
+      for (const item of fragment.items) {
+        const step = renderStep(item);
+        if (!step) continue;
+        kept.push(step);
+        size += step.length + 1;
+        while (size > TURN_LIMIT - 100 && kept.length) {
+          size -= (kept.shift()?.length ?? 0) + 1;
+          omitted += 1;
+        }
+      }
+      if (fragment.complete) {
+        if (kept.length) {
+          captured.set(
+            fragment.turnId,
+            [
+              "[work steps]",
+              ...(omitted ? [`(${omitted} earlier steps left out)`] : []),
+              ...kept,
+              "[end work steps]",
+            ].join("\n"),
+          );
+        }
+        kept = [];
+        size = 0;
+        omitted = 0;
+      }
+      return captured.size < CAPTURED_TURNS;
+    }),
+  );
+  return captured;
+});
 
 export function decodeCapturedSteps(text: string): Map<string, string> {
   const parsed = JSON.parse(text);

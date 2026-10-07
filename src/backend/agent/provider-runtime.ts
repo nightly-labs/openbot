@@ -530,6 +530,12 @@ export class ProviderRuntime implements ProviderPort {
     }
     const now = Date.now();
     for (const [provider, client] of this.#clients) {
+      // ACP can hold sessions that exist only in a live process. Its client vetoes stopping while
+      // one of those sessions is held; a later turn must not start a new provider context.
+      if (client.canReleaseProcess?.() === false) {
+        this.#lastUsed.set(provider, now);
+        continue;
+      }
       if (
         this.#hooks.isProviderBusy(provider) ||
         this.#providerStarts.has(provider) ||
@@ -560,6 +566,10 @@ export class ProviderRuntime implements ProviderPort {
       yield* this.#hooks.onClientStopped(client);
     }
     for (const [agentId, confined] of this.#confined) {
+      if (confined.client.canReleaseProcess?.() === false) {
+        confined.lastUsed = now;
+        continue;
+      }
       if (this.#hooks.isAgentBusy(agentId)) confined.lastUsed = now;
       if (now - confined.lastUsed < PROVIDER_IDLE_RELEASE_MS) continue;
       logger.info("Stopped an idle Workspace only provider process.", { provider: confined.client.provider, agentId });

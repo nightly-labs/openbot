@@ -23,6 +23,7 @@ import {
 import { browserFailure } from "./browser-effects";
 import { ChannelStore } from "./channel-store";
 import { runCauseEffect } from "./effect-boundary";
+import { LineTooLongError } from "./jsonl";
 import { getString } from "./protocol";
 import { StoredStateFailure } from "./stored-state-effects";
 
@@ -49,6 +50,38 @@ afterEach(async () => {
 });
 
 describe.sequential("AgentService: restart", () => {
+  it("keeps the conversation and permits provider changes after a size-limit exit", async () => {
+    process.env.OPENBOT_CLAUDE_PATH = await fakeClaudeCli();
+    const { store, mailbox } = stores(root);
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider, undefined, false);
+        clients.set(provider, client);
+        return client;
+      },
+    });
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Keep this message" }));
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "running");
+    const before = await runCauseEffect(service.readConversation("chief"));
+    expect(before.activeTurnId).not.toBeNull();
+    const client = clients.get("codex");
+    if (!client) throw new Error("The fake provider did not start.");
+    client.emit("exit", new LineTooLongError("Codex"));
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "interrupted");
+
+    await runCauseEffect(service.updateAgent({ agentId: "chief", provider: "claude", model: "claude-fable-5" }));
+    await runCauseEffect(service.updateAgent({ agentId: "chief", provider: "codex", model: "gpt-5.6-sol" }));
+    const after = await runCauseEffect(service.readConversation("chief"));
+    expect(after.threadId).toBe(before.threadId);
+    expect(after.activeTurnId).toBeNull();
+    expect(after.messages.map((message) => message.id)).toEqual(before.messages.map((message) => message.id));
+  });
+
   it("notifies other devices when a member reads a reply without clearing another member's unread state", async () => {
     const { store, mailbox } = stores(root);
     service = createTestService({

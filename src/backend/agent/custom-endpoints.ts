@@ -498,7 +498,7 @@ export class CustomEndpoints {
     if (this.#mailbox.hasUnfinishedDelivery(agent.id)) return true;
     const active =
       this.#conversation.workingSnapshot(agent.id)?.activeTurnId ??
-      (agent.threadId ? this.#store.database.readConversation(agent.id, agent.threadId).activeTurnId : null);
+      (agent.threadId ? this.#store.database.readConversationRuntime(agent.id, agent.threadId).activeTurnId : null);
     return Boolean(active);
   }
 }
