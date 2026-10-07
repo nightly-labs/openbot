@@ -179,19 +179,18 @@ function AuthenticatedStack() {
         />
         <Stack.Screen
           name="install-agent"
+          // The header comes from the stack in `install-agent/_layout.tsx`: Android draws no header on
+          // a formSheet route, so Close and Add agent would not show there.
           options={{
-            ...sheetHeaderInsetOptions,
             contentStyle: { backgroundColor: sheetBackground },
-            headerStyle: { backgroundColor: isIOS ? "transparent" : sheetBackground },
-            headerTransparent: isIOS,
-            headerBlurEffect: "none",
+            headerShown: false,
             scrollEdgeEffects: { top: "hidden", bottom: "soft" },
             presentation: "formSheet",
-            // A page to read before adding: full height, as the agent search.
-            sheetAllowedDetents: [1],
+            // A page to read before adding: full height, as the agent search. On Android a full-height
+            // sheet goes under the status bar and covers its header, so it uses the form height.
+            sheetAllowedDetents: isAndroid ? [0.85] : [1],
             sheetInitialDetentIndex: "last",
             sheetGrabberVisible: true,
-            title: t("mobile.app.route.addSharedAgent"),
           }}
         />
         <Stack.Screen
