@@ -11,7 +11,7 @@ import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
 import { AgentPinSwipeRow } from "@/features/agents/components/agent-pin-swipe-row";
 import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
-import { PinnedChatItem } from "@/features/agents/components/pinned-agents-grid";
+import { PinnedChatItem, usePinnedItemWidth } from "@/features/agents/components/pinned-agents-grid";
 import { useChatSectionMenu } from "@/features/agents/components/use-chat-section-menu";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
@@ -38,6 +38,7 @@ export const ChannelListRow = memo(function ChannelListRow({
   const { toggleChannelPinAnimated } = useAgentPinTransition();
   const { theme } = useUniwind();
   const menu = useRef<MenuComponentRef>(null);
+  const pinnedItemWidth = usePinnedItemWidth();
   const sectionMenu = useChatSectionMenu(serverId, channel.id);
   const isPinned = pinnedChannelIds.includes(channel.id);
   const canPin = canToggleAgentPin([...pinnedAgentIds, ...pinnedChannelIds], channel.id);
@@ -229,7 +230,7 @@ export const ChannelListRow = memo(function ChannelListRow({
         if (nativeEvent.event === "delete") remove();
       }}
     >
-      {link}
+      {pinned ? <View style={{ width: pinnedItemWidth }}>{link}</View> : link}
     </MenuView>
   ) : (
     link
