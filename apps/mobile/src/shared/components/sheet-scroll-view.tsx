@@ -41,6 +41,9 @@ export function SheetScrollView({
   const stickyEdge = scrollEdgeEffect && !nativeHeader;
   // Android draws no blur at the sheet edge. A sticky header gets the opaque sheet color instead.
   const showCustomEdge = stickyEdge && isIOS;
+  // Android: the content fades in the sheet color below the opaque native header, or at the top of a
+  // sheet without a header. iOS draws its blur in the same cases.
+  const androidFade = isAndroid && !header && (headerShown || scrollEdgeEffect);
   // Android: the sheet finds its scroll view only when it lays out, so nested scrolling is on from
   // the first render. A drag that starts on the list then goes to the list, and at the top of the list
   // a downward drag moves the sheet. A list that cannot scroll never takes the drag, so the content is
@@ -97,6 +100,12 @@ export function SheetScrollView({
         <SheetScrollEdgeEffect
           surface="sheet"
           style={{ position: "absolute", top: 0, left: 0, right: 0, height: headerHeight + 48 }}
+        />
+      ) : null}
+      {androidFade ? (
+        <SheetScrollEdgeEffect
+          surface="sheet"
+          style={{ position: "absolute", top: 0, left: 0, right: 0, height: 32 }}
         />
       ) : null}
     </View>

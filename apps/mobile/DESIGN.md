@@ -169,8 +169,10 @@ covers it, because the dark material is lighter than the dark sheet. Render it
 following the scrolling content so the native blur samples that content. The masks are static;
 scrolling does not update React state. This approximates a variable blur radius using public
 Expo APIs, as described in [Beautiful Expo](https://github.com/davidmokos/beautiful-expo).
-Android sheets draw no edge blur or fade. A sticky custom header, such as search, uses the opaque
-`bg-sheet` color. Chat and drawer edges keep their canvas effect.
+Android sheets draw no edge blur. Below the opaque native header, or at the top of a sheet with no
+header, the content fades into a 32 dp masked `bg-sheet` layer. The fade follows the same rule as the
+iOS blur. A sticky custom header, such as search, uses the opaque `bg-sheet` color. Chat and drawer
+edges keep their canvas effect.
 
 The values belong to `packages/brand/src/tokens.css` and `tokens-native.css`; `global.css` only
 maps them to utilities. Do not copy these hex values into components.
