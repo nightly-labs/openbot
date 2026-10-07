@@ -188,6 +188,16 @@
   box-shadow: var(--openbot-shadow-raised);
 }
 
+.diagram-board-zoom .ui-button svg {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  color: var(--openbot-text-muted);
+}
+
+.diagram-board-zoom .ui-button:hover svg {
+  color: var(--openbot-text-primary);
+}
+
 .diagram-board-tools .ui-button {
   border-radius: var(--openbot-radius-pill);
 }
