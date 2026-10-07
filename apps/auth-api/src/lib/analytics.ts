@@ -47,7 +47,6 @@ type LandingPlacement =
   | "content_index"
   | "content_article"
   | "content_related"
-  | "launch_dialog"
   | "other";
 
 const LANDING_PLACEMENTS = [
@@ -59,7 +58,6 @@ const LANDING_PLACEMENTS = [
   "content_index",
   "content_article",
   "content_related",
-  "launch_dialog",
   "other",
 ] as const satisfies readonly LandingPlacement[];
 /** The platforms the landing page can send a visitor to a download for. */
@@ -528,8 +526,6 @@ export function landingAttribution(document: Document, hostname: string) {
 }
 
 function landingPlacement(link: HTMLAnchorElement): LandingPlacement {
-  // Portaled out of every page container, so it is checked by its own class.
-  if (link.closest(".ph-dialog")) return "launch_dialog";
   if (link.closest(".landing-header")) return "header";
   // Checked before `.post-article`, which wraps it: a card in the related row is a different
   // question from a link inside the article body.

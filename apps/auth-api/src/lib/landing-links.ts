@@ -45,7 +45,7 @@ export const OPENBOT_LINKS = {
   productHunt: "https://www.producthunt.com/products/openbot-3?launch=openbot-4",
 } as const;
 
-/** The Product Hunt launch pill and dialog. Set to `false` when the launch ends. */
+/** The Product Hunt launch pill. Set to `false` when the launch ends. */
 export const PRODUCT_HUNT_LAUNCH_LIVE = true;
 
 /**
