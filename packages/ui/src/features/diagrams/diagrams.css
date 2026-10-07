@@ -1085,7 +1085,7 @@
   justify-self: start;
   gap: var(--openbot-space-2);
   border-radius: var(--openbot-radius-pill);
-  padding-left: var(--openbot-space-1);
+  padding-left: var(--openbot-space-1-5);
   pointer-events: auto;
   transition:
     opacity var(--diagram-chat-open-duration) var(--openbot-ease-out),
@@ -1151,6 +1151,13 @@
 .diagram-chat-avatar.agent-avatar {
   width: 24px;
   height: 24px;
+}
+
+/* The Bloub overflows its box. An auto grid track grows to the Bloub and starts at the box's top,
+   and its percentage height then resolves against that track, so the Bloub grows taller than wide
+   and sits low. One track the size of the box centres it in the pill. */
+.diagram-chat-avatar.agent-avatar {
+  grid-template: 100% / 100%;
 }
 
 .diagram-chat-header {
