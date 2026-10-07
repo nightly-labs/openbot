@@ -185,9 +185,18 @@
   grid-template: 100% / 100%;
 }
 
+/* An agent row has a name and a title, so it gets more room than a one-line menu row. */
+.ui-action-menu.diagram-canvas-agents:not([data-menu-layout="grid"]) [role="menuitem"] {
+  height: auto;
+  gap: var(--openbot-space-3);
+  padding-block: var(--openbot-space-2);
+}
+
 .diagram-canvas-menu-agent {
   display: grid;
   min-width: 0;
+  gap: var(--openbot-space-0-5);
+  line-height: var(--openbot-leading-md);
 }
 
 .diagram-canvas-menu-agent small {
