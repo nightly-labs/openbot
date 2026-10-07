@@ -104,7 +104,7 @@ export const messages = {
   "error.provider.acpNoModels":
     "A CLI ACP não anunciou nenhum modelo ACP. O OpenBot não vai escolher um modelo alternativo por suposição.",
   "error.provider.endpointRemoveBusy": "Aguarde o turno ativo e a fila terminarem antes de remover este endpoint.",
-  "error.provider.codexOutdated": "A CLI do Codex {version} é muito antiga. O OpenBot exige 0.144.1 ou posterior.",
+  "error.provider.codexOutdated": "A CLI do Codex {version} é muito antiga. O OpenBot exige 0.156.0 ou posterior.",
   "error.provider.codexNotStarted": "A CLI do Codex foi encontrada, mas não foi possível iniciá-la.",
   "error.provider.codexNotStartedHint":
     "A CLI do Codex foi encontrada, mas não foi possível iniciá-la. Execute `codex --version` em um novo terminal.",

@@ -36,6 +36,7 @@ Native ownership takes priority over HeroUI for navigation chrome. HeroUI owners
 - Obtain Liquid Glass through native navigation components. Do not imitate it with blur views, gradients, translucent HeroUI cards, shadows, or screenshots of glass.
 - Do not replace native headers, tab bars, toolbars, or search bars with `GlassView`. `expo-glass-effect` is for deliberate custom content surfaces, not for rebuilding system chrome.
 - Preserve platform safe-area and scroll-edge behavior. Ordinary screens normally use automatic content inset adjustment. Native sheets use the shared `SheetScrollView` header handling described below; do not add a second automatic inset or screen-local spacer.
+- The home list is the fallback exception for a full screen: iOS 27 shows no native scroll edge effect under its header. Its native header is transparent on iOS and Android, the native top edge is hidden, and the screen draws the canvas `SheetScrollEdgeEffect` of the chat header under the native buttons. Android pads the list by the header height, because it has no content inset.
 - Avoid forcing opaque colors or bespoke backgrounds onto native chrome unless the product requirement explicitly calls for it. Let the operating system adapt materials to the platform version, appearance, accessibility settings, and scroll state.
 - Treat older iOS versions and Android as first-class fallbacks. The interface must remain complete and readable when Liquid Glass is unavailable or reduced transparency is enabled.
 - Use platform-native icons in native navigation (`sf` on iOS and the corresponding Material icon on Android). Use the existing application icon convention for HeroUI content.
@@ -45,7 +46,8 @@ Native ownership takes priority over HeroUI for navigation chrome. HeroUI owners
 The sheet style is a neutral iOS-style grouped surface: a white/light-gray sheet in light mode,
 charcoal in dark mode, gently contrasting groups, muted descriptions, inset separators and soft
 16 pt group corners. Keep this visual language consistent across settings, add/edit forms and
-other sheets. The system owns the outer sheet shape and presentation.
+other sheets. The system owns the outer sheet shape and presentation. On Android, the system sheet
+has square corners, so the parent stack sets `sheetCornerRadius: 28` there.
 
 ### Native presentation and headers
 
@@ -74,7 +76,8 @@ search or similarly large content, not the default for a short form.
 
 On Android, react-native-screens draws no header on a `formSheet` route, so its title,
 `AndroidHeaderButton` and `SheetSaveAction` do not show. A sheet that needs them on Android uses the
-nested stack below, even for one page, as `install-agent` does. Android also puts a full-height (`[1]`)
+nested stack below, even for one page. A one-page sheet uses `SheetPageStack` in its `_layout.tsx`, as
+`add-agent` and `install-agent` do. Android also puts a full-height (`[1]`)
 sheet under the status bar, which covers the header; such a sheet uses `[0.85]` on Android.
 
 Multi-page flows such as Settings stay inside ONE sheet. Register the outer `settings` route with
@@ -168,8 +171,10 @@ covers it, because the dark material is lighter than the dark sheet. Render it
 following the scrolling content so the native blur samples that content. The masks are static;
 scrolling does not update React state. This approximates a variable blur radius using public
 Expo APIs, as described in [Beautiful Expo](https://github.com/davidmokos/beautiful-expo).
-Android sheets draw no edge blur or fade. A sticky custom header, such as search, uses the opaque
-`bg-sheet` color. Chat and drawer edges keep their canvas effect.
+Android sheets draw no edge blur. Below the opaque native header, or at the top of a sheet with no
+header, the content fades into a 32 dp masked `bg-sheet` layer. The fade follows the same rule as the
+iOS blur. A sticky custom header, such as search, uses the opaque `bg-sheet` color. Chat, home list
+and drawer edges keep their canvas effect.
 
 The values belong to `packages/brand/src/tokens.css` and `tokens-native.css`; `global.css` only
 maps them to utilities. Do not copy these hex values into components.

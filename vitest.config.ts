@@ -76,6 +76,7 @@ export default defineConfig({
             "packages/contracts/**/*.test.ts",
             "packages/i18n/**/*.test.ts",
             "packages/logging/**/*.test.ts",
+            "packages/telemetry/**/*.test.ts",
             "packages/user-errors/**/*.test.ts",
             "packages/team-client/**/*.test.ts",
             "packages/ui/**/*.test.ts",

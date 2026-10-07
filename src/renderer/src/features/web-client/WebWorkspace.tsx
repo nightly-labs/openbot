@@ -32,6 +32,7 @@ import {
   updateAgentAdminSettings,
 } from "@openbot/team-client/team-admin-requests";
 import { clearAgentContext, type TeamApiRequest } from "@openbot/team-client/team-api-requests";
+import { classifyFailure } from "@openbot/telemetry";
 import { hasVisibleToasts, toast } from "@openbot/ui";
 import { AccountDock } from "@openbot/ui/features/account/AccountDock";
 import { computeAgentAvatarMoods } from "@openbot/ui/features/agents/agent-avatar-mood";
@@ -687,7 +688,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         return;
       }
       const description = readableAgentError(event.message);
-      if (claimErrorToast(description)) toast.error(t("webClient.error.hostReported"), { description });
+      if (claimErrorToast(description))
+        toast.error(t("webClient.error.hostReported"), {
+          ...{ description },
+          report: { operation: "other", source: "system", cause_code: "unknown" },
+        });
     }),
   );
   // The scope starts before the host is online, so the first connection opens the saved channel here.
@@ -734,7 +739,12 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         ? (workspace.conversation()?.page?.messages.at(-1)?.id ?? null)
         : null,
     (unread) => {
-      if (unread) void workspace.markRead().catch(() => toast.error(t("chat.unread.markReadFailed")));
+      if (unread)
+        void workspace.markRead().catch(() =>
+          toast.error(t("chat.unread.markReadFailed"), {
+            report: { operation: "other", source: "system", cause_code: "unknown" },
+          }),
+        );
     },
   );
   const channelApprovals = createMemo(() => {
@@ -812,7 +822,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   createEffect(
     () => workspace.state.error,
     (error) => {
-      if (error) toast.error(sourceText(error));
+      if (error)
+        toast.error(sourceText(error), {
+          report: { operation: "other", source: "system", cause_code: classifyFailure(error) },
+        });
     },
   );
   createEffect(
@@ -837,7 +850,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
             showModels(request, nextModels);
           },
           (error: unknown) => {
-            if (active) toast.error(error instanceof Error ? error.message : t("webClient.error.hostStatus"));
+            if (active)
+              toast.error(error instanceof Error ? error.message : t("webClient.error.hostStatus"), {
+                report: { operation: "other", source: "system", cause_code: "unknown" },
+              });
           },
         );
       }
@@ -959,7 +975,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 onMarkAllRead={
                   workspace.state.status === "online"
                     ? () => {
-                        void workspace.markAllRead().catch(() => actionToast.error(t("chat.unread.markReadFailed")));
+                        void workspace.markAllRead().catch(() =>
+                          actionToast.error(t("chat.unread.markReadFailed"), {
+                            report: { operation: "other", source: "action", cause_code: "unknown" },
+                          }),
+                        );
                         if (channelsSupported()) void channels.markAllRead();
                       }
                     : undefined

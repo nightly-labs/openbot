@@ -8,12 +8,38 @@ import {
   HANDOFF_END,
   HANDOFF_START,
 } from "./agent/delivery-content";
-import { isMailboxMessageCopy, mergeProviderHistory, snapshotFromThread } from "./conversation-snapshots";
+import {
+  isMailboxMessageCopy,
+  mergeProviderHistory,
+  messagesFromThreadItems,
+  snapshotFromThread,
+} from "./conversation-snapshots";
 import type { DeliveryContext } from "./mailbox-store";
 
 import { decodeThreadResponse } from "./protocol";
 
 describe("provider conversation history", () => {
+  it("normalizes bounded item pages with stable offsets", () => {
+    const first = messagesFromThreadItems(
+      "chief",
+      { id: "turn-1", startedAt: 1_756_000_000 },
+      [{ id: "answer-1", type: "agentMessage", text: "First" }],
+      0,
+      () => null,
+      () => null,
+    );
+    const second = messagesFromThreadItems(
+      "chief",
+      { id: "turn-1", startedAt: 1_756_000_000, baseTime: Date.parse(first[0]?.createdAt ?? "") },
+      [{ id: "answer-2", type: "agentMessage", text: "Second" }],
+      1,
+      () => null,
+      () => null,
+    );
+    expect(first[0]?.createdAt).toBe("2025-08-24T01:46:40.000Z");
+    expect(second[0]?.createdAt).toBe("2025-08-24T01:46:40.001Z");
+  });
+
   it("restores Codex reasoning as thinking while keeping the answer separate", () => {
     const decoded = decodeThreadResponse({
       thread: {

@@ -19,7 +19,7 @@ afterEach(async () => {
 });
 
 describe("OpenBot webhook routine migration", () => {
-  it("preserves scheduled routines and runs while upgrading a version 28 database", async () => {
+  it("preserves scheduled routines and runs while upgrading a version 29 database", async () => {
     const { database, routineStore } = await createDatabase();
     const agent = testAgent();
     database.replaceAgents("migration-event-agent", [agent], "agents.imported");
@@ -114,7 +114,7 @@ describe("OpenBot webhook routine migration", () => {
     expect(migratedRoutines.getRecord("chief", routine.id)?.trigger).toMatchObject({ kind: "webhook", url: null });
     expect(migratedRoutines.listRuns("chief", routine.id, 10)).toEqual([expect.objectContaining({ id: run.id })]);
     expect(migrated.connection.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({
-      version: 29,
+      version: 30,
     });
     expect(migrated.connection.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
     expect(migrated.connection.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
@@ -138,17 +138,17 @@ describe("OpenBot webhook routine migration", () => {
 
     const legacy = new DatabaseSync(path);
     removeWebhookSchema(legacy);
-    // Migration 29 creates this index after creating its first tables. A table with the same name
+    // Migration 30 creates this index after creating its first tables. A table with the same name
     // makes the migration fail after its first DDL statement, which exercises transaction rollback.
     legacy.exec("CREATE TABLE webhook_receipts_recent (conflict TEXT)");
     legacy.close();
 
     const failed = new OpenBotDatabase(root);
-    await expect(runCauseEffect(failed.initialize())).rejects.toThrow("migration to version 29 failed");
+    await expect(runCauseEffect(failed.initialize())).rejects.toThrow("migration to version 30 failed");
     failed.close();
 
     const rolledBack = new DatabaseSync(path);
-    expect(rolledBack.prepare("SELECT version FROM schema_migrations WHERE version = 29").get()).toBeUndefined();
+    expect(rolledBack.prepare("SELECT version FROM schema_migrations WHERE version = 30").get()).toBeUndefined();
     expect(
       rolledBack
         .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?")
@@ -164,7 +164,7 @@ describe("OpenBot webhook routine migration", () => {
       instruction: routine.instruction,
     });
     expect(retried.connection.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({
-      version: 29,
+      version: 30,
     });
     expect(retried.connection.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
     expect(retried.connection.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
@@ -187,7 +187,7 @@ function removeWebhookSchema(database: DatabaseSync): void {
     DROP TABLE projection_channel_routine_webhooks;
     DROP TABLE projection_webhook_route_revocations;
     DROP TABLE projection_webhook_receipts;
-    DELETE FROM schema_migrations WHERE version = 29;
+    DELETE FROM schema_migrations WHERE version = 30;
   `);
 }
 

@@ -296,8 +296,8 @@ jobs:
       - name: Typecheck remote API
         run: bun run typecheck:remote
 
-      - name: Typecheck logging, user errors and i18n
-        run: bun run --parallel typecheck:logging typecheck:user-errors typecheck:i18n
+      - name: Typecheck logging, telemetry, user errors and i18n
+        run: bun run --parallel typecheck:logging typecheck:telemetry typecheck:user-errors typecheck:i18n
 
       - name: Validate the remote Compose files
         run: bun run remote:check:compose

@@ -4,8 +4,9 @@ import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { Check, Copy } from "lucide-react-native";
 import { memo, useEffect, useRef, useState } from "react";
-import { Alert, type ColorValue, ScrollView, useWindowDimensions, View } from "react-native";
+import { type ColorValue, ScrollView, useWindowDimensions, View } from "react-native";
 import { useCSSVariable } from "uniwind";
+import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { type CodeToken, codeLanguageLabel, highlightCode } from "../model/code-highlight";
@@ -63,7 +64,7 @@ export const ChatCodeBlock = memo(function ChatCodeBlock({
       void haptics.notification("success");
     } catch {
       void haptics.notification("error");
-      Alert.alert(t("mobile.chat.code.copyFailed"), t("mobile.chat.copyFailedMessage"));
+      showFailureAlert(undefined, "turn", t("mobile.chat.code.copyFailed"), t("mobile.chat.copyFailedMessage"));
     }
   }
   return (

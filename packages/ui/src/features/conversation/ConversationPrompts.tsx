@@ -6,6 +6,7 @@ import type {
   BrowserTakeoverRequest,
   RespondToBrowserSecretInput,
 } from "@openbot/contracts/ipc";
+import { classifyFailure } from "@openbot/telemetry";
 import { Badge, Button, Check, Input, LoaderCircle, Maximize2, Monitor, RadioGroup, toast, X } from "@openbot/ui";
 import { StandingApprovalConfirmation } from "@openbot/ui/components/StandingApprovalConfirmation";
 import { BrowserSecretCard } from "@openbot/ui/features/conversation/BrowserSecretCard";
@@ -135,7 +136,9 @@ export function ApprovalCard(props: {
       const completed = await (decision === "accept" ? props.onApprove() : props.onReject());
       if (!completed) setSubmitting(false);
     } catch (error) {
-      toast.error(errorMessage(error, t("prompt.approval.answerFailed")));
+      toast.error(errorMessage(error, t("prompt.approval.answerFailed")), {
+        report: { operation: "turn", source: "system", cause_code: classifyFailure(error) },
+      });
       setSubmitting(false);
     }
   };
@@ -148,7 +151,9 @@ export function ApprovalCard(props: {
       const completed = await grant();
       if (!completed) setSubmitting(false);
     } catch (error) {
-      toast.error(errorMessage(error, t("prompt.approval.grantFailed")));
+      toast.error(errorMessage(error, t("prompt.approval.grantFailed")), {
+        report: { operation: "turn", source: "system", cause_code: classifyFailure(error) },
+      });
       setSubmitting(false);
     }
   };

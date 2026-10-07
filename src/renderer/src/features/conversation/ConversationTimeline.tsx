@@ -1,3 +1,4 @@
+import { chatVisualReply } from "@openbot/contracts/chat-visual";
 import type { ConversationMessageSender } from "@openbot/contracts/ipc";
 import { Button } from "@openbot/ui";
 import type { AgentMessage, ChatActionMarkerModel } from "@openbot/ui/data";
@@ -8,6 +9,7 @@ import { type ChatMessageAuthor, ChatMessageRow } from "@openbot/ui/features/con
 import { ChatRowBoundary } from "@openbot/ui/features/conversation/ChatRowBoundary";
 import { ChatScrollRail, createChatScrollRail } from "@openbot/ui/features/conversation/ChatScrollRail";
 import { ChatSearch } from "@openbot/ui/features/conversation/ChatSearch";
+import { ChatVisual } from "@openbot/ui/features/conversation/ChatVisual";
 import { BrowserTakeoverCard } from "@openbot/ui/features/conversation/ConversationPrompts";
 import { dayMarkerLabel } from "@openbot/ui/features/conversation/chat-day-markers";
 import { ScrollToLatestButton } from "@openbot/ui/features/conversation/MessageNavigation";
@@ -22,6 +24,7 @@ import { planItems, planTitle } from "../../app-message-projection";
 import { deviceSendShortcut } from "../../send-shortcut-preference";
 import { groupedMessageIds } from "./agent-message-timeline";
 import { continuesSenderRun } from "./chat-grouping";
+import { chatVisualPageUrl } from "./chat-visual-url";
 import { conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
 import type { ConversationProps } from "./conversation-types";
@@ -40,12 +43,17 @@ function markerOnlyMessage(message: AgentMessage): boolean {
 /**
  * Does this row draw a time of its own?
  *
- * A marker-only row carries the marker's own time, and a question prompt and a plan draw a card
- * instead of a message row. None shows the header a run continues under, so none can hold a run
- * open.
+ * A marker-only row carries the marker's own time, and a question prompt, a plan and a visual reply
+ * draw a card instead of a message row. None shows the header a run continues under, so none can
+ * hold a run open.
  */
 function rowDrawsTime(message: AgentMessage): boolean {
-  return !markerOnlyMessage(message) && !message.questionPrompt && message.kind !== "plan";
+  return (
+    !markerOnlyMessage(message) &&
+    !message.questionPrompt &&
+    message.kind !== "plan" &&
+    chatVisualReply(message) === null
+  );
 }
 
 /** Marker-only rows that render attachment cards below the marker do not end with one. */
@@ -69,7 +77,6 @@ export function ConversationTimeline() {
     activeChatSearchIndex,
     agentActivitySpaceReserved,
     attachmentAction,
-    downloadAttachments,
     browserTakeoverPreview,
     browserTakeoverResolution,
     browserTakeoverTab,
@@ -528,6 +535,56 @@ export function ConversationTimeline() {
                     </div>
                   );
                 }
+                const initialVisual = untrack(() => chatVisualReply(initialMessage));
+                // The web client cannot load the page, so there the message shows its title and file.
+                if (initialVisual && chatVisualPageUrl(initialVisual.attachment.previewUrl)) {
+                  // A visual reply is the agent's page. It shows above the final reply, with no bubble.
+                  const visual = () => chatVisualReply(message() ?? initialMessage) ?? initialVisual;
+                  const pageUrl = () => chatVisualPageUrl(visual().attachment.previewUrl);
+                  return (
+                    <div
+                      data-index={virtualRow.index}
+                      ref={messageVirtualizer.measureElement}
+                      class="virtual-chat-row"
+                      style={{
+                        transform: messageVirtualizer.isVirtualized()
+                          ? `translateY(${virtualRow.start - messageVirtualizer.scrollMargin()}px)`
+                          : "none",
+                      }}
+                    >
+                      <Show when={dayMarker()}>
+                        {(label) => (
+                          <div class="time-marker">
+                            <span>{label()}</span>
+                          </div>
+                        )}
+                      </Show>
+                      <Show when={message()?.id === unreadBoundaryMessageId()}>
+                        <UnreadMessagesDivider
+                          elementRef={(element) => {
+                            setUnreadMessagesDividerElement(element);
+                            scheduleUnreadDividerVisibilityUpdate();
+                          }}
+                        />
+                      </Show>
+                      <ChatRowBoundary>
+                        <article
+                          data-chat-search-message={message()?.id}
+                          aria-label={(message() ?? initialMessage).body}
+                          class={{ "message-entry-animated": animateEntrance }}
+                        >
+                          <ChatVisual
+                            src={pageUrl()}
+                            failed={pageUrl() === undefined}
+                            title={(message() ?? initialMessage).body}
+                            height={visual().height}
+                            onOpenLink={(url) => void openExternalMessageUrl(url)}
+                          />
+                        </article>
+                      </ChatRowBoundary>
+                    </div>
+                  );
+                }
                 const displayedReactions = createMemo(() => {
                   const currentMessage = message();
                   if (currentMessage?.reactions?.length) return currentMessage.reactions;
@@ -594,7 +651,6 @@ export function ConversationTimeline() {
                             onAttachmentAction={attachmentAction}
                             onOpenSharedFile={openSharedFile}
                             onOpenWorkspaceFile={openWorkspaceFile}
-                            onDownloadAttachments={props.runtime ? undefined : downloadAttachments}
                             onDownload={(attachment) => attachmentAction(attachment, "download")}
                             class={pending() ? "message-entry-pending" : undefined}
                             footer={

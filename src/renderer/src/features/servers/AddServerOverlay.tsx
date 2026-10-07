@@ -1,6 +1,7 @@
 import type { BillingInterval } from "@openbot/contracts/billing";
 import type { HostedServerList, HostedServerSummary } from "@openbot/contracts/hosted-servers";
 import type { HostedServersDesktopApi, ServerSummary } from "@openbot/contracts/ipc";
+import { classifyFailure } from "@openbot/telemetry";
 import type {
   CreatedHostedServer,
   CreateHostedServerInput,
@@ -140,7 +141,10 @@ function AddServerSession(
     } catch (error) {
       const text = currentText();
       const title = text.t("settings.hostedServers.loadFailed");
-      actionToast.error(title, { description: text.errorMessage(error, title) });
+      actionToast.error(title, {
+        ...{ description: text.errorMessage(error, title) },
+        report: { operation: "team", source: "action", cause_code: classifyFailure(error) },
+      });
       if (resume) props.onPendingResume(resume);
       props.onClose();
     }
@@ -266,7 +270,10 @@ function AddServerSession(
     } catch (error) {
       const text = currentText();
       const title = text.t("settings.hostedServers.wakeFailed");
-      actionToast.error(title, { description: text.errorMessage(error, title) });
+      actionToast.error(title, {
+        ...{ description: text.errorMessage(error, title) },
+        report: { operation: "team", source: "action", cause_code: classifyFailure(error) },
+      });
     }
   }
 

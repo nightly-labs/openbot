@@ -1,4 +1,5 @@
 import type { SlackOverview } from "@openbot/contracts/ipc";
+import { classifyFailure } from "@openbot/telemetry";
 import type {
   SlackOrchestratorChoice,
   SlackOrchestratorModels,
@@ -63,7 +64,10 @@ export function createSlackConnector(
       .catch((error: unknown) => {
         const { t, errorMessage } = currentText();
         actionToast.error(t("connector.slack.actionFailed"), {
-          description: errorMessage(error, t("connector.slack.actionFailed")),
+          ...{
+            description: errorMessage(error, t("connector.slack.actionFailed")),
+          },
+          report: { operation: "other", source: "action", cause_code: classifyFailure(error) },
         });
       })
       .finally(() => {

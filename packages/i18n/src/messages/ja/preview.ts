@@ -10,6 +10,7 @@ export const messages = {
   "preview.panel.close": "ファイルのプレビューを閉じる",
   "preview.panel.back": "戻る",
   "preview.panel.rawMarkdown": "Markdown のソースを表示",
+  "preview.panel.rawHtml": "HTML のソースを表示",
   "preview.folder.empty": "このフォルダは空です。",
   "preview.folder.truncated": "最初の {limit} 件だけを表示しています。",
   "preview.truncated": "プレビューは {limit} 文字までです。",

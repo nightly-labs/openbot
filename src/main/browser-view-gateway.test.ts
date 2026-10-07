@@ -16,6 +16,7 @@ import { afterEach, assert, describe, expect, it, vi } from "vitest";
 import type * as Ws from "ws";
 import { z } from "zod";
 import type { BrowserViewportInput } from "../backend/browser-cdp";
+import { browserFailure } from "../backend/browser-effects";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { BrowserViewGateway } from "./browser-view-gateway";
 
@@ -36,6 +37,71 @@ afterEach(async () => {
 });
 
 describe("the live browser view on a host", () => {
+  // Failure modes: a stopped upgrade server rejects new views; old sessions survive a restart;
+  // a restarted view loses frames or input. Exercise the real socket for each case.
+  it("streams frames and input after the Team API stops and starts", async () => {
+    const stopView = vi.fn(() => Effect.void);
+    const dispatch = vi.fn(() => Effect.void);
+    const gateway = new BrowserViewGateway({
+      browser: {
+        startView: (_tabId, onFrame) =>
+          Effect.sync(() => {
+            onFrame({ sequence: 1, width: 1200, height: 800, image: new Uint8Array([0xff, 0xd8, 0xff]) });
+            return stopView;
+          }),
+        dispatchViewInput: dispatch,
+      },
+      authenticate: () => null,
+    });
+    const origin = await serve(gateway);
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      const session = gateway.createSession({ memberId: "member-1", teamSessionId: TEAM_SESSION, tabId: "tab-1" });
+      const socket = new webSockets.WebSocket(`${origin}${session.streamPath}`, {
+        headers: { "X-OpenBot-WebRTC-Session": TEAM_SESSION },
+      });
+      const frames = collect(socket);
+      await new Promise<void>((resolve, reject) => {
+        socket.once("open", resolve);
+        socket.once("error", reject);
+      });
+      await vi.waitFor(() => expect(frames).toHaveLength(1));
+      assert(frames[0]);
+      expect(decodeBrowserViewFrame(frames[0])).toMatchObject({ sequence: 1, width: 1200, height: 800 });
+      socket.send(
+        encodeBrowserViewInput({ type: "key", action: "down", key: "a", code: "KeyA", text: "", modifiers: 0 }),
+      );
+      await vi.waitFor(() => expect(dispatch).toHaveBeenCalledTimes(attempt));
+      expect(dispatch).toHaveBeenLastCalledWith("tab-1", expect.objectContaining({ type: "key", key: "a" }));
+      const closed = new Promise<void>((resolve) => socket.once("close", () => resolve()));
+      await runCauseEffect(gateway.stop());
+      await closed;
+      expect(stopView).toHaveBeenCalledTimes(attempt);
+      expect(gateway.activeViewCount()).toBe(0);
+      expect(await runCauseEffect(gateway.closeMemberSession(session.id, "member-1"))).toBe(false);
+    }
+  });
+
+  it("redacts a browser start failure before sending its close reason", async () => {
+    const gateway = new BrowserViewGateway({
+      browser: {
+        startView: () => Effect.fail(browserFailure(new Error("CDP failed: token=secret-value-123456"))),
+        dispatchViewInput: () => Effect.void,
+      },
+      authenticate: () => null,
+    });
+    const origin = await serve(gateway);
+    const session = gateway.createSession({ memberId: "member-1", teamSessionId: TEAM_SESSION, tabId: "tab-1" });
+    const socket = new webSockets.WebSocket(`${origin}${session.streamPath}`, {
+      headers: { "X-OpenBot-WebRTC-Session": TEAM_SESSION },
+    });
+    const ended = await new Promise<{ code: number; reason: string }>((resolve, reject) => {
+      socket.once("close", (code, reason) => resolve({ code, reason: reason.toString() }));
+      socket.once("error", reject);
+    });
+    expect(ended).toEqual({ code: 1011, reason: "CDP failed: token=[redacted]" });
+    await runCauseEffect(gateway.stop());
+  });
+
   it("sends the tab's frames and dispatches a click at the point on the frame", async () => {
     const dispatched: BrowserViewportInput[] = [];
     let send: ((frame: { sequence: number; width: number; height: number; image: Uint8Array }) => void) | undefined;

@@ -54,7 +54,8 @@ import {
   useRef,
   useState,
 } from "react";
-import { Alert, View } from "react-native";
+import { View } from "react-native";
+import { showFailureAlert, showWarningAlert } from "@/features/analytics/failure-reports";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { trackWorkspaceActions } from "@/features/analytics/workspace-actions";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
@@ -402,7 +403,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           const saved = reconcileChannelPins(preferenceStore, serverId, channels);
           setPreferences((current) => ({ ...current, [serverId]: saved }));
         } catch {
-          Alert.alert(
+          showFailureAlert(
+            undefined,
+            "settings",
             currentText().t("mobile.workspace.alert.preferencesTitle"),
             currentText().t("mobile.workspace.alert.preferencesBody"),
           );
@@ -428,7 +431,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           return next === current[serverId] ? current : { ...current, [serverId]: next };
         });
       } catch {
-        Alert.alert(
+        showFailureAlert(
+          undefined,
+          "settings",
           currentText().t("mobile.workspace.alert.preferencesTitle"),
           currentText().t("mobile.workspace.alert.preferencesBody"),
         );
@@ -842,7 +847,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         (!activeServerId ||
           !serverCapabilities.current.get(activeServerId)?.includes(TEAM_CONVERSATION_UNREAD_CAPABILITY))
       ) {
-        Alert.alert(
+        showWarningAlert(
+          "team",
           currentText().t("mobile.workspace.alert.updateRequiredTitle"),
           currentText().t("mobile.workspace.alert.updateRequiredUnread"),
         );
@@ -880,7 +886,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         .catch(() => {
           if (generation === loadGeneration.current) void refreshConversationReads().catch(() => undefined);
           if (visibleMessageId === null)
-            Alert.alert(
+            showFailureAlert(
+              undefined,
+              "settings",
               currentText().t("mobile.workspace.alert.markUnreadTitle"),
               currentText().t("mobile.workspace.alert.markUnreadBody"),
             );
@@ -910,7 +918,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         setPreferences((current) => ({ ...current, [serverId]: next }));
         return next;
       } catch {
-        Alert.alert(
+        showFailureAlert(
+          undefined,
+          "settings",
           currentText().t("mobile.workspace.alert.preferencesTitle"),
           currentText().t("mobile.workspace.alert.preferencesBody"),
         );
@@ -957,7 +967,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           setSavedServerOrder({ key: orderKey, ids: serverIds });
           return true;
         } catch {
-          Alert.alert(
+          showFailureAlert(
+            undefined,
+            "settings",
             currentText().t("mobile.workspace.alert.serverOrderTitle"),
             currentText().t("mobile.workspace.alert.serverOrderBody"),
           );

@@ -1,3 +1,4 @@
+import { CHAT_VISUAL_ITEM_TYPE_PREFIX } from "@openbot/contracts/chat-visual";
 import {
   AGENT_RUNTIME_PERMISSION_PATHS_LIMIT,
   AGENT_RUNTIME_QUESTION_DESCRIPTION_LIMIT,
@@ -169,6 +170,7 @@ export function buildRuntimeSnapshot({
         message.itemType !== "commentary" &&
         message.itemType !== "question_prompt" &&
         message.itemType !== "agent_attachment" &&
+        !message.itemType?.startsWith(CHAT_VISUAL_ITEM_TYPE_PREFIX) &&
         message.itemType !== CONVERSATION_PLAN_ITEM_TYPE,
     );
     const persisted =

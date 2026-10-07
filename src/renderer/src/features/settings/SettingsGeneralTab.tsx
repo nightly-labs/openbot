@@ -64,7 +64,9 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
   ) => {
     void Promise.resolve()
       .then(action)
-      .catch(() => toast.error(i18n.t(failed)));
+      .catch(() =>
+        toast.error(i18n.t(failed), { report: { operation: "settings", source: "system", cause_code: "unknown" } }),
+      );
   };
   const linkTargetLabel = (value: GeneralSettingsValue["externalLinkTarget"] | undefined) =>
     value === undefined ? "" : i18n.t(LINK_TARGET_KEYS[value]);

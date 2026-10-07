@@ -379,6 +379,14 @@ Billing is off, and Stripe receives nothing, when the account service has no Str
   the OpenBot GitHub App's installation tokens in plain text, with mode 0600, for `gh` and `git` in
   agent tools. OpenBot deletes that folder when you disconnect and when the app closes; after a crash
   it stays until the next start. The tokens are redacted from logs, exports and diagnostics.
+- The Bitwarden connection keeps a CLI session key in process memory only. OpenBot does not
+  save it to a file. Disconnect, eight hours without vault use, and app exit stop this connection.
+  The log redactor can retain values in memory until exit to mask later messages.
+  The Bitwarden CLI keeps its own encrypted vault cache. OpenBot reads login items in the folder
+  `Shared with OpenBot`. Agents receive item ids, titles, and usernames; passwords and authenticator
+  codes go through the main process to the browser page. This folder is an OpenBot access rule;
+  the CLI session key can decrypt the wider vault. Use a separate Bitwarden account if you need
+  the password manager itself to enforce that separation.
 - The 1Password connection (Marketplace > 1Password) is kept in
   `~/Library/Application Support/OpenBot/openbot-onepassword-connector-v1.json`, encrypted by the
   operating system's secret storage. It holds the service account token and the account ID only.
@@ -440,6 +448,9 @@ Network traffic can also occur when:
   pins from `cache.agilebits.com`, checks its SHA-256, and keeps it in
   `~/Library/Application Support/OpenBot/provider-state/1password-cli`. The request carries no user
   data;
+- the user connects Bitwarden. OpenBot runs the installed `bw` CLI to sync with the server already
+  configured in that CLI, including a self-hosted server. It syncs before listing or filling logins.
+  These calls send no OpenBot conversations, files, or agent instructions to Bitwarden;
 - the user connects 1Password. Connect runs the user's own 1Password CLI (`op`) on this computer to
   create the vault "Shared with OpenBot" and a service account that can read only it. OpenBot then
   reads that vault from 1Password's servers with the token: the vault names, the login titles and
@@ -465,6 +476,13 @@ Network traffic can also occur when:
   `downloads.cursor.com` (for the download size) for Cursor, and it reads a list of blocked
   versions from `raw.githubusercontent.com/nightly-labs/openbot`. These requests contain no account, agent,
   conversation or file data;
+- an agent shows a visual reply, an agent checks its page with `html_preview`, or a user opens an
+  HTML file in the file preview. The page is HTML that the agent or the file wrote. It runs its
+  scripts in a sandbox and can load scripts, styles, fonts and images from any address, such as a
+  CDN. The server that holds those files gets the request and the network address of the computer,
+  but no OpenBot cookies. The page cannot read the app, the conversation or other
+  files. `html_preview` draws the page in a hidden window that has its own
+  session in memory. The mobile app does not run the page: it shows the page as its file;
 - a user opens an explicitly labeled external support or setup link;
 - a Slack workspace is connected. See [Slack connections](#slack-connections).
 - a Discord server is connected. See [Discord connections](#discord-connections).
@@ -855,3 +873,24 @@ automatically, and the tab's back/forward history is cleared after replacement t
 the sensitive document. The destination site receives the value and controls its own processing.
 This protection does not isolate credentials from the operating system or agents with unrestricted
 machine access. Values pasted into ordinary chat are not covered by secure handoff.
+
+## Error and warning reports
+
+Production desktop, browser app, and mobile clients report safe failure categories to the same
+self-hosted OpenPanel service. Reports can include the app version, platform, provider, model,
+operation, severity, and a fixed cause code. They also record whether a problem appeared as a
+toast, shared alert or chat banner, or native error/warning alert. These reports do not include displayed text,
+raw exceptions, stack traces, prompts, messages, file names, paths, commands, or credentials.
+A random report ID helps identify repeated delivery attempts; it is not a conversation or file ID.
+A reported cause describes the error observed by OpenBot and might not explain its root cause.
+
+Validated reports wait in local files on the host and mobile, or IndexedDB in desktop and browser
+clients. Each queue is limited to 1,000 reports, 1 MiB, and seven days. Reports are removed after
+OpenPanel accepts them, when they expire, or when the queue reaches its limits. Network failures
+can cause retries and duplicate delivery. Queue failures do not block the application.
+
+Turning off analytics or changing accounts clears pending reports and cancels active sends.
+Requests already received by OpenPanel cannot be recalled. Anonymous error reports remain
+anonymous. The browser app has its own local analytics setting in account settings, separate
+from desktop and mobile. Collection is enabled by default; a malformed or unreadable setting
+keeps it disabled. Existing OpenPanel retention rules apply after delivery.

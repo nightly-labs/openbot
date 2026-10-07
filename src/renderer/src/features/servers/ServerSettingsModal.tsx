@@ -10,6 +10,7 @@ import type {
   UpdateTeamMemberInput,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
+import { classifyFailure } from "@openbot/telemetry";
 import {
   Alert,
   AlertActions,
@@ -35,6 +36,7 @@ import {
   UsersRound,
 } from "@openbot/ui";
 import type { AgentProfile } from "@openbot/ui/data";
+import type { BitwardenConnectorPanelProps } from "@openbot/ui/features/settings/BitwardenConnectorPanel";
 import { SaveBarDock, SettingsDialogShell } from "@openbot/ui/features/settings/SettingsDialogShell";
 import { SettingsHostedSitesTab } from "@openbot/ui/features/settings/SettingsHostedSitesTab";
 import {
@@ -150,6 +152,7 @@ export interface ServerSettingsModalProps {
   githubConnector?: GitHubConnectorController | undefined;
   /** This computer's 1Password connection. A remote server passes none. */
   onePasswordConnector?: OnePasswordConnectorController | undefined;
+  bitwardenConnector?: BitwardenConnectorPanelProps | undefined;
   slackConnector?: SlackConnectorController | undefined;
   discordConnector?: DiscordConnectorController | undefined;
   /** This computer's agents, for the Slack and Discord pages. */
@@ -241,7 +244,10 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
       return true;
     } catch (error) {
       actionToast.error(t("server.settings.actionFailedTitle"), {
-        description: errorMessage(error, t("server.settings.actionFailed")),
+        ...{
+          description: errorMessage(error, t("server.settings.actionFailed")),
+        },
+        report: { operation: "settings", source: "action", cause_code: classifyFailure(error) },
       });
       return false;
     } finally {
@@ -259,7 +265,10 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     busy,
     run,
     showCopyError() {
-      actionToast.error(t("server.settings.copyFailedTitle"), { description: t("server.settings.copyFailed") });
+      actionToast.error(t("server.settings.copyFailedTitle"), {
+        ...{ description: t("server.settings.copyFailed") },
+        report: { operation: "settings", source: "action", cause_code: "unknown" },
+      });
     },
   };
   const general = createServerGeneralSection(host, { onSetUpDesktop: () => setSection("desktop") });
@@ -573,7 +582,11 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
             </Show>
             <Show
               when={
-                props.githubConnector || props.onePasswordConnector || props.slackConnector || props.discordConnector
+                props.githubConnector ||
+                props.onePasswordConnector ||
+                props.bitwardenConnector ||
+                props.slackConnector ||
+                props.discordConnector
               }
             >
               <Tabs.Trigger class="settings-modal-nav-item" value="connectors">
@@ -705,12 +718,19 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
           )}
         </Show>
         <Show
-          when={props.githubConnector || props.onePasswordConnector || props.slackConnector || props.discordConnector}
+          when={
+            props.githubConnector ||
+            props.onePasswordConnector ||
+            props.bitwardenConnector ||
+            props.slackConnector ||
+            props.discordConnector
+          }
         >
           <Tabs.Content value="connectors" class="settings-modal-tab-panel server-settings-panel" data-tab="connectors">
             <ConnectorsPanel
               github={props.githubConnector}
               onePassword={props.onePasswordConnector}
+              bitwarden={props.bitwardenConnector}
               slack={props.slackConnector}
               discord={props.discordConnector}
               agents={props.connectorAgents ?? []}

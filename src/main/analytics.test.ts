@@ -93,7 +93,7 @@ describe("host analytics", () => {
     );
 
     expect(client.setGlobalProperties).toHaveBeenCalledWith(
-      expect.objectContaining({ event_schema_version: 6, surface: "desktop_host" }),
+      expect.objectContaining({ event_schema_version: 7, surface: "desktop_host" }),
     );
 
     analytics.handleAgentEvent({
@@ -777,6 +777,9 @@ describe("host analytics", () => {
       reasoning_effort: "medium",
       area: "agent",
       failure_code: "interrupt_failed",
+      cause_code: "unknown",
+      severity: "error",
+      operation: "turn",
       profileId: "owner-account",
     });
   });

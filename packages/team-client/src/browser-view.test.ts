@@ -15,6 +15,28 @@ import { runTeamEffect } from "./effect-boundary";
 const sessionId = "11111111-1111-4111-8111-111111111111";
 const tabId = "22222222-2222-4222-8222-222222222222";
 describe("remote browser view", () => {
+  it.each([
+    { type: "error", message: "The host stream socket failed." },
+    { type: "close", code: 1011, reason: "The live view of this page failed." },
+    { type: "close", code: 1011 },
+  ] as const)("reports a $type failure and releases the host session", async (failure) => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    const request = vi.fn().mockResolvedValue({ id: sessionId, tabId, streamPath: browserViewStreamPath(sessionId) });
+    const client = createRemoteBrowserView(send, request, () => false);
+    const ended = vi.fn();
+    await runTeamEffect(client.open(tabId, vi.fn(), ended));
+    const streamId = decodeRemoteDesktopSignalControl(send.mock.calls[0]?.[0]).streamId;
+    client.receive(encodeRemoteDesktopSignalControl({ ...failure, streamId }));
+    expect(ended).toHaveBeenCalledWith(
+      failure.type === "error" ? failure.message : "The live view of this page failed.",
+    );
+    await vi.waitFor(() =>
+      expect(request).toHaveBeenLastCalledWith("DELETE", `/v1/browser/view/sessions/${sessionId}`),
+    );
+    client.receive(encodeRemoteDesktopSignalControl({ type: "close", streamId, code: 1006 }));
+    expect(ended).toHaveBeenCalledOnce();
+  });
+
   it("routes frames only to the current opened stream and closes the host session", async () => {
     const send = vi.fn().mockResolvedValue(undefined);
     const request = vi.fn().mockResolvedValue({ id: sessionId, tabId, streamPath: browserViewStreamPath(sessionId) });

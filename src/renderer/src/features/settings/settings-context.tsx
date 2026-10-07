@@ -190,6 +190,7 @@ const Settings = createSimpleContext({
             const { t } = currentText();
             actionToast.error(
               previous.turboMode ? t("settings.turbo.turnOffFailed") : t("settings.turbo.turnOnFailed"),
+              { report: { operation: "settings", source: "action", cause_code: "unknown" } },
             );
           })
           .finally(() => setTurboModePending(false));

@@ -2,6 +2,7 @@ import type { HostStatus, ServerNotificationLevel, ServerSummary } from "@openbo
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-update-v1";
 import { WAKE_RECONNECT_STATES } from "@openbot/team-client/hosted-server-wake";
+import { classifyFailure } from "@openbot/telemetry";
 import { toast } from "@openbot/ui";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, flush, onSettled } from "solid-js";
@@ -166,16 +167,19 @@ const Servers = createSimpleContext({
           // The host action does not help when this app is the older side.
           const offerUpdate = opener && administersUpdate && older !== "client";
           toast.warning(t("server.compatibility.versionMismatchTitle", { name: server.name }), {
-            description:
-              older === "host"
-                ? t("server.compatibility.versionMismatchUpdateHostDescription", descriptionParams)
-                : older === "client"
-                  ? t("server.compatibility.versionMismatchUpdateClientDescription", descriptionParams)
-                  : t("server.compatibility.versionMismatchDescription", descriptionParams),
-            action:
-              opener && offerUpdate
-                ? { label: t("server.update.hostAction"), onClick: () => opener(serverId) }
-                : undefined,
+            ...{
+              description:
+                older === "host"
+                  ? t("server.compatibility.versionMismatchUpdateHostDescription", descriptionParams)
+                  : older === "client"
+                    ? t("server.compatibility.versionMismatchUpdateClientDescription", descriptionParams)
+                    : t("server.compatibility.versionMismatchDescription", descriptionParams),
+              action:
+                opener && offerUpdate
+                  ? { label: t("server.update.hostAction"), onClick: () => opener(serverId) }
+                  : undefined,
+            },
+            report: { operation: "team", source: "system", cause_code: "unknown" },
           });
           if (offerUpdate) mismatchOffers.add(`${serverId}:${sequence}`);
         }
@@ -289,7 +293,10 @@ const Servers = createSimpleContext({
         pendingCompatibilityRetryServerId = null;
         const text = currentText();
         actionToast.error(text.t("server.connection.failedTitle"), {
-          description: text.errorMessage(error, text.t("server.connection.failedDescription")),
+          ...{
+            description: text.errorMessage(error, text.t("server.connection.failedDescription")),
+          },
+          report: { operation: "team", source: "action", cause_code: classifyFailure(error) },
         });
       }
     }
@@ -305,7 +312,10 @@ const Servers = createSimpleContext({
       } catch (error) {
         const text = currentText();
         actionToast.error(text.t("server.notifications.changeFailedTitle"), {
-          description: text.errorMessage(error, text.t("server.notifications.changeFailedDescription")),
+          ...{
+            description: text.errorMessage(error, text.t("server.notifications.changeFailedDescription")),
+          },
+          report: { operation: "team", source: "action", cause_code: classifyFailure(error) },
         });
       }
     }
@@ -316,7 +326,10 @@ const Servers = createSimpleContext({
       } catch (error) {
         const text = currentText();
         actionToast.error(text.t("server.notifications.changeFailedTitle"), {
-          description: text.errorMessage(error, text.t("server.notifications.changeFailedDescription")),
+          ...{
+            description: text.errorMessage(error, text.t("server.notifications.changeFailedDescription")),
+          },
+          report: { operation: "team", source: "action", cause_code: classifyFailure(error) },
         });
       }
     }

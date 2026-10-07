@@ -161,6 +161,22 @@ to ungroup an agent; deleting a section also ungroups its agents without deletin
 use the same `SidebarLayoutStore` as manual sidebar edits, including persistence, validation,
 and change events delivered to desktop and connected clients.
 
+`html_render` publishes a visual reply: an HTML page that shows above the agent's reply. The router
+stores the page as a generated `text/html` attachment and adds an assistant message with the item
+type `visual-reply:<height>` and the page title as its text (`@openbot/contracts/chat-visual`). A
+client that does not know the item type shows the title and the file. A visual message is not
+readable: unread counts, latest-message previews and mobile read state skip it. The desktop serves
+the page on `openbot-visual:` (`openbot-remote-visual:` for a remote host) with
+`Content-Security-Policy: sandbox allow-scripts allow-forms` and the frame script, and the frame has
+the same sandbox without `allow-same-origin`. The page runs its scripts and can load files from the
+network, but it has an opaque origin, gets no permission, and talks to the app only with the checked
+MCP Apps messages for its height, its theme and a link that the user clicked. Mobile shows the
+page as its file and does not run it: in react-native-webview, a script in any frame can reach the
+bridge to the app. `html_preview` lets the agent look at a page before it publishes it: the main
+process draws it in a hidden window with its own in-memory session (`ChatVisualPreviewer`)
+and returns a PNG, the content height and the console lines. The file preview shows an HTML file in
+the same frame.
+
 Codex fixes dynamic tools at provider-session creation; resume does not update them. A local
 `provider-toolsets` manifest records the tool fingerprint for each new Codex session. Sessions with
 missing or outdated fingerprints are replaced before the next turn, using the existing history

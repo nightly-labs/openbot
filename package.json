@@ -242,7 +242,8 @@
     "dist:win": "bun run voice:prepare-runtime && bun scripts/prepare-remote-desktop-runtime.ts win32 x64 && bun run verify:remote-desktop-runtime --windows && bun scripts/install-cua-driver.ts win32 x64 && bun run build && electron-builder --win nsis --x64 --publish never",
     "dist:linux": "bun scripts/prepare-remote-desktop-runtime.ts linux x64 && bun run verify:remote-desktop-runtime --linux && bun scripts/install-cua-driver.ts linux x64 && bun run build && electron-builder --linux AppImage --x64 --publish never",
     "dist:linux:arm64": "bun scripts/install-cua-driver.ts linux arm64 && bun run build && electron-builder --linux AppImage --arm64 --publish never",
-    "dist:release": "bun run voice:prepare-runtime && bun run prepare:remote-desktop-runtime && bun run verify:remote-desktop-runtime && bun run prepare:cua-driver && bun run build && electron-builder --mac --publish never"
+    "dist:release": "bun run voice:prepare-runtime && bun run prepare:remote-desktop-runtime && bun run verify:remote-desktop-runtime && bun run prepare:cua-driver && bun run build && electron-builder --mac --publish never",
+    "typecheck:telemetry": "bun run --cwd packages/telemetry typecheck"
   },
   "dependencies": {
     "@1password/sdk": "0.5.0",
@@ -283,7 +284,8 @@
     "yaml": "catalog:",
     "zod": "catalog:",
     "@openbot/ui": "workspace:*",
-    "effect": "catalog:"
+    "effect": "catalog:",
+    "@openbot/telemetry": "workspace:*"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.9",
@@ -321,7 +323,8 @@
     "solid-recharts@1.0.1": "patches/solid-recharts@1.0.1.patch",
     "@solidjs/signals@2.0.0-rc.0": "patches/@solidjs%2Fsignals@2.0.0-rc.0.patch",
     "@solidjs/web@2.0.0-rc.0": "patches/@solidjs%2Fweb@2.0.0-rc.0.patch",
-    "expo@57.0.24": "patches/expo@57.0.24.patch"
+    "expo@57.0.24": "patches/expo@57.0.24.patch",
+    "react-native-screens@4.26.2": "patches/react-native-screens@4.26.2.patch"
   },
   "trustedDependencies": [
     "electron-winstaller",

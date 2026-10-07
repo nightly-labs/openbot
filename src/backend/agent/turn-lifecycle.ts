@@ -10,6 +10,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
+import { classifyFailure } from "@openbot/telemetry";
 import { Deferred, Effect, Exit, Schema, Scope } from "effect";
 import type { AgentClient } from "../agent-client";
 import type { AgentStore } from "../agent-store";
@@ -31,6 +32,7 @@ import type { BrowserUploadTarget } from "./browser-uploads";
 import type { ContextCompaction } from "./context-compaction";
 import type { ConversationRuntime } from "./conversation-runtime";
 import type { DeltaBuffer } from "./delta-buffer";
+import type { FailureContext, FailureSignal } from "./failure-signal";
 import type { ImageGenRuntime } from "./image-gen-runtime";
 import { markIncompleteImageGeneration } from "./image-generation";
 import type { MailboxSync } from "./mailbox-sync";
@@ -64,8 +66,9 @@ export interface AgentBrowserHost extends AttentionBrowserHost, BrowserUploadTar
 }
 
 export interface TurnHooks {
+  emitFailure?(failure: FailureSignal): void;
   emit(event: AgentEvent): void;
-  emitError(code: string, error: unknown, agentId?: string): void;
+  emitError(code: string, error: unknown, agentId?: string, context?: FailureContext): void;
   emitRuntimeSnapshot(): void;
   scheduleDrain(agentId: string): void;
   /** Closes a provider session the provider refuses; the next turn opens a new one with the transcript. */
@@ -389,6 +392,16 @@ export class TurnLifecycle {
         const turnId = getString(turn, "id");
         if (!turnId) return;
         const status = getString(turn, "status") ?? "completed";
+        if (status === "failed" && !this.#turnErrors.has(turnId)) {
+          this.#hooks.emitFailure?.({
+            code: "agent_error",
+            agentId,
+            turnId,
+            provider: source.provider,
+            model: this.#hooks.turnModel(agentId, turnId),
+            causeCode: classifyFailure(getRecord(turn, "error")),
+          });
+        }
         this.#attention.clearForTurn(threadId, turnId);
         if (this.#compaction.isCompactionTurn(threadId, turnId)) {
           this.#compaction.finish(agentId, threadId, status);
@@ -437,7 +450,7 @@ export class TurnLifecycle {
         if (isRecord(params) && params.willRetry === true) return;
         // A usage limit shows no banner, but the failed delivery still keeps it as the reason.
         const errorTurnId = getString(params, "turnId");
-        if (notification.method === "error" && message && errorTurnId && this.#runningTurns.has(errorTurnId)) {
+        if (notification.method === "error" && errorTurnId && this.#runningTurns.has(errorTurnId)) {
           this.#turnErrors.set(errorTurnId, message);
           // The turn's completion runs it again or reports it in words the user can act on.
           if (isForeignReasoningError(message)) return;
@@ -454,10 +467,25 @@ export class TurnLifecycle {
           if (planLimit && notification.method === "error" && errorTurnId && this.#runningTurns.has(errorTurnId)) {
             this.#limitedTurns.set(errorTurnId, this.#limitedTurns.get(errorTurnId) ?? null);
           }
+          this.#hooks.emitFailure?.({
+            code: "agent_error",
+            ...(agentId !== undefined ? { agentId } : {}),
+            turnId: errorTurnId,
+            provider: source.provider,
+            model: agentId && errorTurnId ? this.#hooks.turnModel(agentId, errorTurnId) : null,
+            causeCode: classifyFailure(error ?? message),
+            severity: notification.method === "warning" ? "warning" : "error",
+          });
           yield* this.#providers.refreshUsageAfterLimit(source);
           return;
         }
-        this.#hooks.emitError(`agent_${notification.method}`, message, agentId);
+        this.#hooks.emitError(`agent_${notification.method}`, message, agentId, {
+          causeCode: classifyFailure(error ?? message),
+          provider: source.provider,
+          model: agentId && errorTurnId ? this.#hooks.turnModel(agentId, errorTurnId) : null,
+          turnId: errorTurnId,
+          severity: notification.method === "warning" ? "warning" : "error",
+        });
       }
     }
   }).bind(this);

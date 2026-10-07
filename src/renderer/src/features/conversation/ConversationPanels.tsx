@@ -1,4 +1,5 @@
 import type { ServerSummary } from "@openbot/contracts/ipc";
+import { classifyFailure } from "@openbot/telemetry";
 import { useText } from "@openbot/ui/text";
 import { actionToast } from "../../action-toast";
 import { createSettingsPanelWidth, saveSettingsPanelWidth } from "../../components/settings-panel-width";
@@ -6,6 +7,7 @@ import { serverCanAdministerAgents } from "../agents/remote-agent-admin";
 import type { AgentFilesOptions } from "../files/AgentFilesSettings";
 import { canManageStorage, serverHasStorage } from "../files/storage-usage";
 import { serverCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
+import { htmlAttachmentPageUrl } from "./chat-visual-url";
 import { useConversationController } from "./conversation-controller-context";
 import { useConversationViewScope } from "./conversation-scope";
 import { desktopEventRoutinesApi } from "./routine-webhooks-api";
@@ -101,7 +103,10 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
                 .storage.openLocation({ agentId })
                 .catch((error) =>
                   actionToast.error(t("conversation.panels.openWorkspaceFailed"), {
-                    description: errorMessage(error, t("conversation.panels.tryAgain")),
+                    ...{
+                      description: errorMessage(error, t("conversation.panels.tryAgain")),
+                    },
+                    report: { operation: "turn", source: "action", cause_code: classifyFailure(error) },
                   }),
                 )
           : undefined,
@@ -161,6 +166,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
                 onOpenWorkspaceFolder={openWorkspaceFolder}
                 onBack={sidebarFileBack() === null ? undefined : openSidebarFileBack}
                 sourceUrl={attached()?.previewUrl ?? null}
+                pageUrl={htmlAttachmentPageUrl(attached())}
                 onOpenExternally={openSidebarFileExternally}
                 onDownload={downloadSidebarFile}
                 /* A browser cannot show a file in the file manager. */

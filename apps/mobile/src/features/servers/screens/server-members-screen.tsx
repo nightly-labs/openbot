@@ -10,6 +10,7 @@ import { Typography } from "heroui-native";
 import { useRef, useState } from "react";
 import { Alert, type AlertButton, View } from "react-native";
 import { useUniwind } from "uniwind";
+import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { SERVER_ROLE_KEYS, SERVER_ROLE_LABEL_KEYS } from "@/features/servers/model/server-role";
 import {
@@ -271,7 +272,12 @@ export function ServerMembersScreen() {
                         })
                         .catch(() => {
                           void haptics.notification("error");
-                          Alert.alert(t("mobile.server.members.copyFailed"), t("mobile.server.members.copyFailedBody"));
+                          showFailureAlert(
+                            undefined,
+                            "other",
+                            t("mobile.server.members.copyFailed"),
+                            t("mobile.server.members.copyFailedBody"),
+                          );
                         });
                     }}
                   >

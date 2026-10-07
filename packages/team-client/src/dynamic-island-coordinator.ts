@@ -1,3 +1,4 @@
+import { CHAT_VISUAL_ITEM_TYPE_PREFIX } from "@openbot/contracts/chat-visual";
 import type {
   AgentEvent,
   AgentRuntimeWorkItem,
@@ -541,6 +542,7 @@ function toDynamicIslandMessage(
     message.itemType === "commentary" ||
     message.itemType === "question_prompt" ||
     message.itemType === "agent_attachment" ||
+    message.itemType?.startsWith(CHAT_VISUAL_ITEM_TYPE_PREFIX) ||
     message.itemType === "plan"
   ) {
     return [];

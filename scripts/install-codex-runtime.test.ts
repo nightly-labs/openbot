@@ -40,7 +40,7 @@ describe.runIf(process.platform !== "win32")("bundled Codex installer", () => {
 
       await expect(installCodexRuntime({ outputRoot: output, target, fetchImpl, lock })).resolves.toBe("installed");
       await expect(installCodexRuntime({ outputRoot: output, target, fetchImpl, lock })).resolves.toBe("current");
-      await expect(readFile(join(output, directory, "codex-package.json"), "utf8")).resolves.toContain('"0.153.4"');
+      await expect(readFile(join(output, directory, "codex-package.json"), "utf8")).resolves.toContain('"0.160.1"');
       await expect(readFile(join(output, "licenses/Codex-Apache-2.0.txt"), "utf8")).resolves.toBe(
         license.toString("utf8"),
       );
@@ -74,7 +74,7 @@ async function createPackage(root: string, manifestTarget = "aarch64-apple-darwi
     mkdir(join(root, "codex-resources/zsh/bin"), { recursive: true }),
   ]);
   await Promise.all([
-    writeFile(join(root, "bin/codex"), "#!/bin/sh\nprintf 'codex-cli 0.153.4\\n'\n"),
+    writeFile(join(root, "bin/codex"), "#!/bin/sh\nprintf 'codex-cli 0.160.1\\n'\n"),
     writeFile(join(root, "bin/codex-code-mode-host"), "host\n"),
     writeFile(join(root, "codex-path/rg"), "rg\n"),
     writeFile(join(root, "codex-resources/zsh/bin/zsh"), "zsh\n"),
@@ -82,7 +82,7 @@ async function createPackage(root: string, manifestTarget = "aarch64-apple-darwi
       join(root, "codex-package.json"),
       `${JSON.stringify({
         layoutVersion: 1,
-        version: "0.153.4",
+        version: "0.160.1",
         target: manifestTarget,
         variant: "codex",
         entrypoint: "bin/codex",

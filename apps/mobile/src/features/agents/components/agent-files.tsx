@@ -5,6 +5,7 @@ import { useThemeColor } from "heroui-native/hooks";
 import { Trash2 } from "lucide-react-native";
 import { useState } from "react";
 import { Alert, Pressable } from "react-native";
+import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { AttachmentThumbnail, useAttachmentFile } from "@/features/chat/components/attachment-preview";
 import { SettingsNote, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
@@ -135,7 +136,9 @@ function StoredFile({
               .catch((cause: unknown) => {
                 void haptics.notification("error");
                 const text = currentText();
-                Alert.alert(
+                showFailureAlert(
+                  cause,
+                  "agent",
                   text.t("mobile.agent.files.deleteFailed"),
                   text.errorMessage(cause, text.t("mobile.agent.files.deleteFailedBody")),
                 );

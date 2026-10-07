@@ -6,6 +6,7 @@ import { Alert, type StyleProp, type ViewStyle } from "react-native";
 import { useUniwind } from "uniwind";
 import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
 import { useChatSectionMenu } from "@/features/agents/components/use-chat-section-menu";
+import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { useAgentUnread } from "@/features/workspace/components/use-live-workspace";
 import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
@@ -32,7 +33,9 @@ function useAgentMenuActions(agent: MobileAgent) {
     } catch (error) {
       void haptics.notification("error");
       const text = currentText();
-      Alert.alert(
+      showFailureAlert(
+        error,
+        "agent",
         text.t(action === "delete" ? "mobile.agent.menu.deleteFailed" : "mobile.agent.menu.duplicateFailed"),
         text.errorMessage(error, text.t("mobile.agent.menu.actionFailed")),
       );

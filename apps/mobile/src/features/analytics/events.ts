@@ -1,11 +1,13 @@
 import { AGENT_PROVIDERS, AGENT_REASONING_EFFORTS, isAgentModel } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isBoolean, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { isCauseCode } from "@openbot/telemetry";
 
 const result = ["succeeded", "failed", "cancelled"] as const;
 const count = (value: unknown) => isNumber(value) && Number.isSafeInteger(value) && value >= 0 && value <= 1_000_000;
 const duration = (value: unknown) => isNumber(value) && Number.isFinite(value) && value >= 0 && value <= 86_400_000;
 const agent = { provider: AGENT_PROVIDERS, model: isAgentModel, reasoning_effort: AGENT_REASONING_EFFORTS };
 const outcome = {
+  cause_code: isCauseCode,
   result,
   duration_ms: duration,
   failure_code: ["operation_failed", "connection_failed", "permission_denied", "pairing_failed", "load_failed"],

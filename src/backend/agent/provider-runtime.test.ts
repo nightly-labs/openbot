@@ -708,7 +708,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
         id: "codex",
         state: "sign-in-required",
         connectionState: "connecting",
-        version: "0.144.1",
+        version: "0.156.0",
       }),
     );
     expect(openExternal).toHaveBeenCalledWith("https://auth.openai.test/connect");
@@ -1724,7 +1724,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     ]);
   });
 
-  it("keeps Grok's failed tool call out of the provider error toast", async () => {
+  it("keeps failed tool calls out of the provider error toast", async () => {
     process.env.OPENBOT_GROK_PATH = await fakeGrokCli();
     const { store, mailbox } = stores(root);
     const clients = new Map<AgentProvider, FakeAgentClient>();
@@ -1752,10 +1752,23 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
       "diagnostic",
       "tool_error: tool_output_error tool_name='use_tool' effective_tool_name='openbot_browser__click' model_id='grok-4.7' error_kind='tool_output_error'",
     );
+    // The Antigravity harness reports a failed MCP call with an inner error record.
+    client.emit(
+      "diagnostic",
+      "I1007 18:11:18.606862 9452 local_connection.py:579] harness stderr: ERROR: logging before google.Init: E1007 18:11:18.606862 917 errorreport.go:224] error executing cascade step: CORTEX_STEP_TYPE_MCP_TOOL: Error: No node found at given location",
+    );
+    client.emit(
+      "diagnostic",
+      "E1007 18:11:18.606862 917 errorreport.go:224] error executing cascade step: CORTEX_STEP_TYPE_MODEL: Error: model request failed",
+    );
     client.emit("diagnostic", "ERROR grok: the model endpoint could not be reached");
 
-    await waitFor(() => events.some((event) => event.type === "error"));
+    await waitFor(() => events.filter((event) => event.type === "error").length >= 2);
     expect(events.filter((event) => event.type === "error")).toEqual([
+      expect.objectContaining({
+        message:
+          "E1007 18:11:18.606862 917 errorreport.go:224] error executing cascade step: CORTEX_STEP_TYPE_MODEL: Error: model request failed",
+      }),
       expect.objectContaining({ message: "ERROR grok: the model endpoint could not be reached" }),
     ]);
   });
@@ -1962,7 +1975,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     ).rejects.toThrow(/working on a turn/u);
 
     expect(service.getStatus().providers).toContainEqual(
-      expect.objectContaining({ id: "codex", state: "available", version: "0.144.1" }),
+      expect.objectContaining({ id: "codex", state: "available", version: "0.156.0" }),
     );
   });
 

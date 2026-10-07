@@ -26,4 +26,6 @@ export const messages = defineMessages("error.connector", {
     "The service account cannot read a vault. Give it access to a vault, then try again.",
   "error.connector.onePasswordFileUnreadable": "The 1Password connection file is unreadable.",
   "error.connector.onePasswordFileTooLarge": "The 1Password connection file is too large.",
+  "error.connector.bitwardenFailed":
+    "Could not read Bitwarden. Install the bw CLI, sign in, unlock it, and create one folder named Shared with OpenBot. Connect with a new session key.",
 });

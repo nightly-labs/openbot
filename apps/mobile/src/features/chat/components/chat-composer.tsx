@@ -5,7 +5,6 @@ import { ArrowUp, Mic, Plus, Reply, Square, X } from "lucide-react-native";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   AccessibilityInfo,
-  Alert,
   Text as NativeText,
   Pressable,
   ScrollView,
@@ -30,6 +29,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
+import { showFailureAlert } from "@/features/analytics/failure-reports";
 import type { ChatBubbleMessage } from "@/features/chat/context/message-actions-context";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { haptics } from "@/shared/lib/haptics";
@@ -940,7 +940,9 @@ export function ChatComposer({
                           })
                           .catch((error) => {
                             void haptics.notification("error");
-                            Alert.alert(
+                            showFailureAlert(
+                              error,
+                              "turn",
                               t("mobile.chat.composer.pasteFailed"),
                               error instanceof Error ? sourceText(error.message) : t("mobile.chat.tryAgain"),
                             );

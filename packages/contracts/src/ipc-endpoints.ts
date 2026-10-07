@@ -107,6 +107,7 @@ import type {
   OpenWorkspaceFileInput,
   WorkspaceDirectory,
 } from "./ipc-attachments";
+import type { BitwardenConnectorStatus } from "./ipc-bitwarden-connector";
 import type {
   BrowserBounds,
   BrowserControlState,
@@ -655,6 +656,12 @@ export const IPC_ENDPOINTS = {
   },
   // The 1Password connection of this computer. Local only, like `githubConnector`. The token goes
   // from the renderer to main once, in `connectWithToken`; every answer is the status only.
+  bitwardenConnector: {
+    status: request<undefined, BitwardenConnectorStatus>()("bitwarden-connector:status"),
+    connect: request<string, BitwardenConnectorStatus>()("bitwarden-connector:connect"),
+    disconnect: request<undefined, BitwardenConnectorStatus>()("bitwarden-connector:disconnect"),
+    changed: event<BitwardenConnectorStatus>()("bitwarden-connector:changed"),
+  },
   onePasswordConnector: {
     status: request<undefined, OnePasswordConnectorStatus>()("onepassword-connector:status"),
     // Looks again for the CLI and the 1Password app's CLI integration, for a page that opens or regains focus.
@@ -1072,6 +1079,7 @@ export const IPC_GROUP_PATHS = {
   hostAdmin: "hostAdmin",
   githubConnector: "githubConnector",
   onePasswordConnector: "onePasswordConnector",
+  bitwardenConnector: "bitwardenConnector",
   hostedSites: "hostedSites",
   routineFeed: "routineFeed",
   billing: "billing",

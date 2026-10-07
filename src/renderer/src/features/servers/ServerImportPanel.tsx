@@ -1,4 +1,5 @@
 import type { AgentImportPreview, AgentImportResult, OpenBotDesktopApi } from "@openbot/contracts/ipc";
+import { classifyFailure } from "@openbot/telemetry";
 import {
   type AgentImportPhase,
   type AgentImportSetup,
@@ -90,7 +91,10 @@ export function ServerImportPanel(props: ServerImportOptions & { serverId: strin
       await calls.saveSkill();
     } catch (error) {
       actionToast.error(t("server.import.skillSaveFailed"), {
-        description: errorMessage(error, t("server.import.tryAgain")),
+        ...{
+          description: errorMessage(error, t("server.import.tryAgain")),
+        },
+        report: { operation: "team", source: "action", cause_code: classifyFailure(error) },
       });
     }
   };

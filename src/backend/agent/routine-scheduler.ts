@@ -340,14 +340,16 @@ export class RoutineScheduler implements RoutineDueSource {
                 options.turnId,
                 {
                   beforeMutate: (snapshot) => {
+                    const transitionMessages: ConversationMessage[] = [];
                     for (const run of activeRuns) {
                       if (run.status === "queued" && run.deliveryId) {
                         if (this.#mailbox.getDelivery(run.deliveryId)?.delivery.status === "queued") {
                           this.#mailbox.cancelNow(input.agentId, run.deliveryId);
                         }
                       }
-                      this.#appendRunTransition(snapshot, run, "cancelled");
+                      transitionMessages.push(this.#appendRunTransition(snapshot, run, "cancelled").message);
                     }
+                    return transitionMessages;
                   },
                   onRollback: () => this.#mailbox.restorePersistedState(),
                 },
@@ -881,13 +883,16 @@ export class RoutineScheduler implements RoutineDueSource {
     mutate: () => T,
     eventRoutine: (result: T) => Pick<Routine, "id" | "name">,
     turnId?: string,
-    transactionHooks?: { beforeMutate?: (snapshot: ConversationSnapshot) => void; onRollback?: () => void },
+    transactionHooks?: {
+      beforeMutate?: (snapshot: ConversationSnapshot) => readonly ConversationMessage[];
+      onRollback?: () => void;
+    },
   ): T {
     const database = this.#store.database;
     return this.#conversation.withConversationTransaction(
       agentId,
-      ({ snapshot: nextSnapshot }) => {
-        transactionHooks?.beforeMutate?.(nextSnapshot);
+      ({ threadId, snapshot: nextSnapshot }) => {
+        const changedMessages = transactionHooks?.beforeMutate?.(nextSnapshot) ?? [];
         const result = mutate();
         const routine = eventRoutine(result);
         const createdAt = new Date().toISOString();
@@ -903,14 +908,20 @@ export class RoutineScheduler implements RoutineDueSource {
         };
         nextSnapshot.messages.push(message);
         sortConversationMessages(nextSnapshot.messages);
-        // persistConversation returns a fresh snapshot, so the published one is not `nextSnapshot`.
-        const persisted = database.persistConversation(nextSnapshot, `routine.${action}`, {
-          action,
-          routineId: routine.id,
-          routineName: routine.name,
-          messageId: message.id,
+        nextSnapshot.revision = database.persistConversationChanges({
+          agentId,
+          threadId,
+          activeTurnId: nextSnapshot.activeTurnId,
+          changedMessages: [...changedMessages, message],
+          eventType: `routine.${action}`,
+          detail: {
+            action,
+            routineId: routine.id,
+            routineName: routine.name,
+            messageId: message.id,
+          },
         });
-        return { result, snapshot: persisted };
+        return { result, snapshot: nextSnapshot };
       },
       transactionHooks?.onRollback,
     );

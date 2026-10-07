@@ -19,6 +19,7 @@ import type {
   SkillRead,
 } from "@openbot/ui/features/marketplace/marketplace-model";
 import { serverAddress } from "@openbot/ui/features/marketplace/marketplace-view";
+import type { BitwardenConnectorPanelProps } from "@openbot/ui/features/settings/BitwardenConnectorPanel";
 import type { McpConnectSubject } from "@openbot/ui/features/settings/McpConnectShell";
 import {
   isPluginAppConfig,
@@ -69,6 +70,7 @@ export interface MarketplaceControllerProps {
   githubConnector?: GitHubConnectorController | undefined;
   /** This computer's 1Password connection. Absent on a joined server. */
   onePasswordConnector?: OnePasswordConnectorController | undefined;
+  bitwardenConnector?: BitwardenConnectorPanelProps | undefined;
   /** What the Marketplace calls. Absent: this computer's bridge. */
   calls?: MarketplaceCalls | undefined;
 }
@@ -375,6 +377,18 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
               tagline: t("marketplace.app.onePasswordTagline"),
               category: "productivity",
               status: props.onePasswordConnector.status().state === "connected" ? "connected" : "idle",
+            } satisfies MarketplaceApp,
+          ]
+        : []),
+      ...(props.bitwardenConnector
+        ? [
+            {
+              kind: "bitwarden",
+              id: "bitwarden",
+              name: t("connector.bitwarden.title"),
+              tagline: t("connector.bitwarden.description"),
+              category: "productivity",
+              status: props.bitwardenConnector.status.connected ? "connected" : "idle",
             } satisfies MarketplaceApp,
           ]
         : []),
@@ -708,6 +722,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     disconnectApp: (app) => {
       if (app.kind === "plugin") setUninstalling(app.plugin);
       if (app.kind === "github") props.githubConnector?.disconnect();
+      if (app.kind === "bitwarden") props.bitwardenConnector?.onDisconnect();
       if (app.kind === "onepassword") props.onePasswordConnector?.disconnect();
     },
     removeServer,
@@ -720,6 +735,10 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     openUrl: openPluginUrl,
     get github() {
       const panel = githubPanel();
+      return panel ? () => panel : undefined;
+    },
+    get bitwarden() {
+      const panel = props.bitwardenConnector;
       return panel ? () => panel : undefined;
     },
     get onePassword() {

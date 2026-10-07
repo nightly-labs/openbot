@@ -9,11 +9,14 @@ import {
   expectOpenBotToolError,
   expectOpenBotToolFailure,
   FakeAgentClient,
+  fakeOpencodeCli,
+  notification,
   openBotToolPayload,
   startAgentTestFixture,
   stopAgentTestFixture,
   stores,
   waitFor,
+  waitForQueue,
 } from "../agent-service-test-harness";
 import { runCauseEffect } from "../effect-boundary";
 
@@ -30,6 +33,64 @@ afterEach(async () => {
 });
 
 describe.sequential("RoutineScheduler: routine mutations, runs and tools", () => {
+  it("keeps a daily Reddit routine after an OpenCode upload failure and refuses a duplicate", async () => {
+    process.env.OPENBOT_OPENCODE_PATH = await fakeOpencodeCli();
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("opencode", "", false);
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "opencode",
+      clientFactory: (provider) => (provider === "opencode" ? client : new FakeAgentClient(provider)),
+    });
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(store.getOrCreate("chief"));
+    await runCauseEffect(
+      service.updateAgent({ agentId: "chief", provider: "opencode", model: "opencode/example-model" }),
+    );
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Monitor Reddit for OpenBot each day." }));
+    await waitFor(() => events.some((event) => event.type === "turn-started"));
+    const threadId = store.activeProviderSession("chief")?.externalSessionId;
+    const turnId = service.listQueue("chief").deliveries[0]?.turnId;
+    if (!threadId || !turnId) throw new Error("The Reddit monitor turn did not start.");
+    const input = {
+      name: "Reddit OpenBot daily monitor",
+      instruction: "Report new mentions of OpenBot on Reddit in the last 24 hours.",
+      timezone: "UTC",
+      schedule: { kind: "daily", time: "08:00" },
+    };
+    const result = await callOpenBotTool(client, threadId, "create_routine", input, turnId);
+    const routine = openBotToolPayload(result.result);
+    expect(routine).toMatchObject({
+      name: input.name,
+      instruction: input.instruction,
+      timezone: input.timezone,
+      trigger: { schedule: input.schedule },
+      active: true,
+    });
+
+    client.emit(
+      "notification",
+      notification("error", { threadId, turnId, message: "Internal error: Invalid upload request." }),
+    );
+    client.emit("notification", notification("turn/completed", { threadId, turn: { id: turnId, status: "failed" } }));
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "failed");
+    expect(service.listRoutines("chief")).toEqual([expect.objectContaining(routine)]);
+    const conversation = await runCauseEffect(service.readConversation("chief"));
+    expect(conversation.messages.flatMap((message) => routineConversationEvent(message) ?? [])).toEqual([
+      { action: "created", routineId: routine.id, routineName: input.name },
+    ]);
+
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Create the daily Reddit monitor." }));
+    await waitFor(() => events.filter((event) => event.type === "turn-started").length === 2);
+    const retryThreadId = store.activeProviderSession("chief")?.externalSessionId;
+    if (!retryThreadId) throw new Error("The retry thread did not start.");
+    await expectOpenBotToolFailure(client, retryThreadId, "create_routine", input, "already exists with routineId");
+    expect(service.listRoutines("chief")).toEqual([expect.objectContaining(routine)]);
+  });
+
   it("lets an agent manage routines for itself and another agent", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
@@ -180,6 +241,14 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
       (message) => routineRunConversationEvent(message) ?? [],
     );
     expect(events).toContainEqual(
+      expect.objectContaining({ routineId: routine.id, runId: run.id, status: "cancelled" }),
+    );
+    const threadId = store.list().find((candidate) => candidate.id === agent.id)?.threadId;
+    if (!threadId) throw new Error("The routine agent thread is missing.");
+    const persistedEvents = store.database
+      .readConversationPage(agent.id, threadId, { type: "latest" }, 100)
+      .messages.flatMap((message) => routineRunConversationEvent(message) ?? []);
+    expect(persistedEvents).toContainEqual(
       expect.objectContaining({ routineId: routine.id, runId: run.id, status: "cancelled" }),
     );
   });
@@ -353,7 +422,7 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
     expect(errors).toEqual([]);
 
     // A fault is not a request the model can correct, so it still fails as a provider error.
-    vi.spyOn(store.database, "persistConversation").mockImplementationOnce(() => {
+    vi.spyOn(store.database, "persistConversationChanges").mockImplementationOnce(() => {
       throw new Error("conversation persistence failed");
     });
     await expectOpenBotToolError(
@@ -434,7 +503,7 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
     await runCauseEffect(service.initialize());
     const agent = await runCauseEffect(store.getOrCreate("chief"));
     const initialAgent = store.list().find((candidate) => candidate.id === agent.id);
-    vi.spyOn(store.database, "persistConversation").mockImplementationOnce(() => {
+    vi.spyOn(store.database, "persistConversationChanges").mockImplementationOnce(() => {
       throw new Error("conversation persistence failed");
     });
 
@@ -477,10 +546,10 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
       .listRoutineRuns({ agentId: agent.id, routineId: routine.id, limit: 10 })
       .find((run) => run.deliveryId === queuedDelivery.id);
     if (!queuedRun) throw new Error("The queued routine run is missing.");
-    const persistConversation = store.database.persistConversation.bind(store.database);
-    vi.spyOn(store.database, "persistConversation").mockImplementation((...args) => {
-      if (args[1] === "routine.deleted") throw new Error("delete marker persistence failed");
-      return persistConversation(...args);
+    const persistConversationChanges = store.database.persistConversationChanges.bind(store.database);
+    vi.spyOn(store.database, "persistConversationChanges").mockImplementation((input) => {
+      if (input.eventType === "routine.deleted") throw new Error("delete marker persistence failed");
+      return persistConversationChanges(input);
     });
 
     await expect(runCauseEffect(service.deleteRoutine({ agentId: agent.id, routineId: routine.id }))).rejects.toThrow(

@@ -1,10 +1,6 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("attachment", {
-  "attachment.downloadAll.pending": "Downloading ZIP…",
-  "attachment.downloadAll.label": "Download all as ZIP",
-  "attachment.downloadAll.count": { one: "{count} attachment", other: "{count} attachments" },
-  "attachment.downloadAll.zipping": "Zipping",
   "attachment.openFile": "Open file",
   "attachment.preview": "Preview {name}",
   "attachment.notFound": "File not found",

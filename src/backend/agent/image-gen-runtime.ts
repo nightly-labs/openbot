@@ -176,11 +176,11 @@ export class ImageGenRuntime {
       ...(failure ? { error: failure } : {}),
     } satisfies ImageGenerationInfo;
     message.status = operation.interrupted ? "interrupted" : completed ? "completed" : "streaming";
+    if (operation.interrupted) message.imageGeneration.error ??= "Image generation was interrupted.";
     this.#hooks.trackItem(item.id, turnId);
     this.#conversation.emitConversation(snapshot);
 
     if (!completed || operation.interrupted) {
-      if (operation.interrupted) message.imageGeneration.error ??= "Image generation was interrupted.";
       return;
     }
     if (providerStatus === "failed" || failure) {

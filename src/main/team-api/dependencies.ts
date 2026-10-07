@@ -88,6 +88,7 @@ type TeamApiAgentMethods = Pick<
   | "listChannelRoutineRuns"
   | "setAvatar"
   | "resolveAvatar"
+  | "readConversation"
   | "readConversationFor"
   | "readConversationPageFor"
   | "searchConversationMessages"

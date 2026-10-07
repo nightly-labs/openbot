@@ -19,7 +19,7 @@ The flow is: signed request → route → routine → run.
 | Route ID → host and owner account, link time, revoke time | Account service D1 | `webhook_routes` |
 | Route ID → ingress socket | Signal memory | `SignalService` |
 
-Schema v29 (`src/backend/openbot-database-schema.ts`) only adds these tables. Existing routines and
+Schema v30 (`src/backend/openbot-database-schema.ts`) only adds these tables. Existing routines and
 runs do not change.
 
 - `RoutineStore` (`src/backend/routine-store.ts`) writes the trigger row with the routine, in the

@@ -10,16 +10,17 @@ import { createSmoothHeightResize } from "./createSmoothHeightResize";
 import type { MessageCodeBlock } from "./DataTable";
 import { DiagramCanvas } from "./DiagramCanvas";
 import { BACKDROP_IN, BACKDROP_OUT, IMAGE_FADE_IN, ZOOM_IN, ZOOM_OUT, ZOOM_OUT_DURATION } from "./lightbox-motion";
-import { mermaidDiagramUrl } from "./mermaid-diagram";
+import { type MermaidDiagram, mermaidDiagram } from "./mermaid-diagram";
 import { safeBrowserUrl } from "./RichMessageText";
 
-type DiagramState = { status: "drawing" } | { status: "ready"; url: string } | { status: "failed" };
+type DiagramState = { status: "drawing" } | MermaidDiagram;
 type PreviewView = "preview" | "code";
 
 /**
  * A fenced ```html or ```mermaid block: the rendered page or diagram in the code block's frame,
  * with a switch to its code and a larger view. While the block streams, it shows the code, because
- * half a page or diagram is not worth drawing. A diagram that Mermaid cannot parse stays code.
+ * half a page or diagram is not worth drawing. A diagram that Mermaid cannot draw stays code, with
+ * the reason above it.
  */
 export function CodePreview(props: {
   block: MessageCodeBlock;
@@ -31,6 +32,7 @@ export function CodePreview(props: {
   const [view, setView] = createSignal<PreviewView>("preview");
   const [expanded, setExpanded] = createSignal(false);
   const [diagram, setDiagram] = createSignal<DiagramState>({ status: "drawing" });
+  const [diagramAttempt, setDiagramAttempt] = createSignal(0);
   let diagramRun = 0;
   let card: HTMLElement | undefined;
   let expandButton: HTMLButtonElement | undefined;
@@ -38,13 +40,16 @@ export function CodePreview(props: {
   let views: HTMLDivElement | undefined;
 
   createEffect(
-    () => (props.kind === "mermaid" && !props.streaming ? props.block.code : null),
+    () => {
+      diagramAttempt();
+      return props.kind === "mermaid" && !props.streaming ? props.block.code : null;
+    },
     (source) => {
       const run = ++diagramRun;
       if (source === null) return;
       setDiagram({ status: "drawing" });
-      void mermaidDiagramUrl(source).then((url) => {
-        if (run === diagramRun) setDiagram(url ? { status: "ready", url } : { status: "failed" });
+      void mermaidDiagram(source).then((result) => {
+        if (run === diagramRun) setDiagram(result);
       });
     },
   );
@@ -54,7 +59,19 @@ export function CodePreview(props: {
   // The block eases to the height of the view that the switch selects.
   createSmoothHeightResize({ container: () => resize, content: () => views });
 
-  const previewable = () => !props.streaming && !(props.kind === "mermaid" && diagram().status === "failed");
+  const diagramFailure = () => {
+    const state = diagram();
+    return props.kind === "mermaid" &&
+      !props.streaming &&
+      (state.status === "invalid" || state.status === "unavailable")
+      ? state
+      : undefined;
+  };
+  const invalidDiagramMessage = () => {
+    const failure = diagramFailure();
+    return failure?.status === "invalid" ? failure.message : "";
+  };
+  const previewable = () => !props.streaming && !diagramFailure();
   const title = () => (props.kind === "html" ? t("chat.preview.htmlTitle") : t("chat.preview.mermaidTitle"));
   const content = (fill: boolean) => (
     <Switch>
@@ -92,6 +109,30 @@ export function CodePreview(props: {
     </div>
   );
 
+  const failedDiagram = (code: JSX.Element) => (
+    <>
+      <div class="message-preview-failure" role="status">
+        <Show
+          when={diagramFailure()?.status === "unavailable"}
+          fallback={
+            <>
+              <span>{t("chat.preview.diagramInvalid")}</span>
+              <Show when={invalidDiagramMessage()}>
+                {(message) => <pre class="message-preview-failure-detail">{message()}</pre>}
+              </Show>
+            </>
+          }
+        >
+          <span>{t("chat.preview.diagramUnavailable")}</span>
+          <Button type="button" variant="ghost" size="xs" onClick={() => setDiagramAttempt((attempt) => attempt + 1)}>
+            {t("common.retry")}
+          </Button>
+        </Show>
+      </div>
+      {code}
+    </>
+  );
+
   return (
     <SlidingTabs.Root
       ref={card}
@@ -126,7 +167,7 @@ export function CodePreview(props: {
             </Button>
           </Show>
         }
-        body={previewable() ? previewViews : undefined}
+        body={previewable() ? previewViews : diagramFailure() ? failedDiagram : undefined}
       />
       <Show when={expanded() && previewable()}>
         <PreviewDialog

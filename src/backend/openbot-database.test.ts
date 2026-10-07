@@ -97,6 +97,9 @@ describe("OpenBotDatabase", () => {
         "projection_provider_sessions",
         "projection_turns",
         "projection_thread_messages",
+        "provider_history_imports",
+        "provider_history_turns",
+        "provider_history_staging",
         "projection_thread_activities",
         "projection_mailbox_messages",
         "projection_deliveries",
@@ -145,7 +148,112 @@ describe("OpenBotDatabase", () => {
       { version: 27 },
       { version: 28 },
       { version: 29 },
+      { version: 30 },
     ]);
+    database.close();
+  });
+
+  it("commits bounded provider pages with attachment preservation and retry markers", async () => {
+    const database = await createDatabase();
+    const agent = testAgent();
+    database.replaceAgents("provider-history-agent", [agent], "agents.imported");
+    if (!agent.threadId) throw new Error("The test agent has no thread.");
+    const session = database.bindProviderSession({
+      threadId: agent.threadId,
+      provider: "codex",
+      externalSessionId: "provider-history-thread",
+      model: agent.model,
+      effort: agent.reasoningEffort,
+    });
+    const stored: ConversationSnapshot = {
+      agentId: agent.id,
+      threadId: agent.threadId,
+      activeTurnId: null,
+      revision: 0,
+      messages: [
+        {
+          id: "provider-answer",
+          turnId: "provider-turn",
+          author: "assistant",
+          text: "Before",
+          createdAt: "2026-09-01T12:00:00.000Z",
+          status: "completed",
+          attachments: [
+            {
+              id: "kept-attachment",
+              name: "notes.txt",
+              size: 5,
+              kind: "file",
+              mimeType: "text/plain",
+              previewKind: "text",
+              previewUrl: null,
+            },
+          ],
+        },
+      ],
+    };
+    const storedMessage = stored.messages[0];
+    assert(storedMessage);
+    database.persistConversation(stored, "conversation.seeded");
+    database.ensureProviderHistoryImport({
+      sessionId: session.id,
+      threadId: agent.threadId,
+      provider: "codex",
+      externalSessionId: session.externalSessionId,
+    });
+    const item = { id: "provider-answer", type: "agentMessage", text: "After" };
+    database.stageProviderHistoryFragment({
+      sessionId: session.id,
+      fragment: { turnId: "provider-turn", status: "completed", items: [item], complete: false },
+    });
+    database.importProviderHistoryMessages({
+      sessionId: session.id,
+      turnId: "provider-turn",
+      agentId: agent.id,
+      threadId: agent.threadId,
+      messages: [withoutAttachments({ ...storedMessage, text: "After" })],
+      throughItemIndex: 0,
+      complete: false,
+    });
+    expect(database.providerHistoryImport(session.id)?.state).toBe("active");
+    expect(database.stagedProviderHistoryItems({ sessionId: session.id, turnId: "provider-turn" })).toEqual([
+      expect.objectContaining({ itemIndex: 0, imported: true }),
+    ]);
+
+    database.stageProviderHistoryFragment({
+      sessionId: session.id,
+      fragment: { turnId: "provider-turn", status: "completed", items: [item], complete: true },
+    });
+    database.importProviderHistoryMessages({
+      sessionId: session.id,
+      turnId: "provider-turn",
+      agentId: agent.id,
+      threadId: agent.threadId,
+      messages: [withoutAttachments({ ...storedMessage, text: "After" })],
+      throughItemIndex: 0,
+      complete: true,
+    });
+    database.importProviderHistoryMessages({
+      sessionId: session.id,
+      turnId: "provider-turn",
+      agentId: agent.id,
+      threadId: agent.threadId,
+      messages: [withoutAttachments({ ...storedMessage, text: "After" })],
+      complete: true,
+    });
+
+    expect(database.providerHistoryImport(session.id)?.state).toBe("active");
+    expect(database.stagedProviderHistoryTurns(session.id)).toEqual([
+      expect.objectContaining({ turnId: "provider-turn", complete: true, imported: true }),
+    ]);
+    expect(database.readConversation(agent.id, agent.threadId).messages).toEqual([
+      expect.objectContaining({
+        id: "provider-answer",
+        text: "After",
+        attachments: [expect.objectContaining({ id: "kept-attachment" })],
+      }),
+    ]);
+    expect(database.readConversation(agent.id, agent.threadId).messages).toHaveLength(1);
     database.close();
   });
 
@@ -472,11 +580,11 @@ describe("OpenBotDatabase", () => {
     const database = await createDatabase();
     const agent = testAgent();
     database.replaceAgents("agents-large-history", [agent], "agents.imported");
-    const messages = Array.from({ length: 1_000 }, (_, index) => ({
+    const messages: ConversationMessage[] = Array.from({ length: 1_000 }, (_, index) => ({
       id: `message-${index.toString().padStart(5, "0")}`,
       author: index % 2 === 0 ? ("user" as const) : ("assistant" as const),
       text: index === 234 || index === 235 ? "A unique pagination needle" : `Message ${index}`,
-      itemType: index === 235 ? "commentary" : undefined,
+      ...(index === 235 ? { itemType: "commentary" } : {}),
       createdAt: new Date(Date.UTC(2026, 0, 1, 0, 0, 0, index)).toISOString(),
       status: "completed" as const,
     }));
@@ -1139,7 +1247,68 @@ describe("OpenBotDatabase", () => {
       { version: 27 },
       { version: 28 },
       { version: 29 },
+      { version: 30 },
     ]);
+    expect(migrated.connection.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+    migrated.close();
+  });
+
+  it.each([false, true])("adds provider history tables without losing data (failed attempt=%s)", async (failFirst) => {
+    const root = await mkdtemp(join(tmpdir(), "openbot-db-provider-history-v29-"));
+    roots.push(root);
+    const database = new OpenBotDatabase(root);
+    await runCauseEffect(database.initialize());
+    const agent = testAgent();
+    if (!agent.threadId) throw new Error("The test agent has no thread.");
+    const threadId = agent.threadId;
+    database.replaceAgents("provider-history-migration", [agent], "agents.imported");
+    database.persistConversation(conversationSnapshot(agent, "Keep this message"), "conversation.seeded");
+    database.bindProviderSession({
+      threadId,
+      provider: "codex",
+      externalSessionId: "history-v29-session",
+      model: agent.model,
+      effort: agent.reasoningEffort,
+    });
+    database.close();
+
+    const legacy = new DatabaseSync(database.path);
+    removeProviderHistorySchema(legacy);
+    legacy.prepare("DELETE FROM schema_migrations WHERE version IN (29, 30)").run();
+    if (failFirst) legacy.exec("CREATE TABLE provider_history_imports_thread (conflict TEXT)");
+    legacy.close();
+
+    if (failFirst) {
+      await expect(runCauseEffect(new OpenBotDatabase(root).initialize())).rejects.toThrow(
+        "migration to version 29 failed",
+      );
+      const rolledBack = new DatabaseSync(database.path);
+      expect(rolledBack.prepare("SELECT 1 FROM schema_migrations WHERE version = 29").get()).toBeUndefined();
+      expect(rolledBack.prepare("SELECT name FROM sqlite_master WHERE name LIKE 'provider_history_%'").all()).toEqual([
+        { name: "provider_history_imports_thread" },
+      ]);
+      expect(rolledBack.prepare("SELECT message_json FROM projection_thread_messages").all()).toHaveLength(1);
+      rolledBack.exec("DROP TABLE provider_history_imports_thread");
+      rolledBack.close();
+    }
+
+    const migrated = new OpenBotDatabase(root);
+    await runCauseEffect(migrated.initialize());
+    expect(
+      migrated.connection
+        .prepare("SELECT name FROM sqlite_master WHERE name LIKE 'provider_history_%' ORDER BY name")
+        .all(),
+    ).toEqual([
+      { name: "provider_history_imports" },
+      { name: "provider_history_imports_thread" },
+      { name: "provider_history_staging" },
+      { name: "provider_history_staging_pending" },
+      { name: "provider_history_staging_turn" },
+      { name: "provider_history_turns" },
+      { name: "provider_history_turns_pending" },
+    ]);
+    expect(migrated.readConversation(agent.id, threadId).messages[0]?.text).toBe("Keep this message");
+    expect(migrated.listProviderSessions(threadId)).toHaveLength(1);
     expect(migrated.connection.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
     migrated.close();
   });
@@ -1185,6 +1354,7 @@ describe("OpenBotDatabase", () => {
     // Recreate the unshipped channel branch's version 18 profile: channel migrations are marked through
     // 18, while its provider table still has the three-provider CHECK that migration 17 widens.
     const legacy = new DatabaseSync(database.path);
+    removeProviderHistorySchema(legacy);
     legacy.exec(`
       PRAGMA foreign_keys = OFF;
       CREATE TABLE projection_provider_sessions_v18 (
@@ -1206,7 +1376,7 @@ describe("OpenBotDatabase", () => {
       ALTER TABLE projection_provider_sessions_v18 RENAME TO projection_provider_sessions;
       CREATE INDEX provider_sessions_thread
         ON projection_provider_sessions(thread_id, provider, state);
-      DELETE FROM schema_migrations WHERE version IN (19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29);
+      DELETE FROM schema_migrations WHERE version IN (19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30);
       PRAGMA foreign_keys = ON;
     `);
     legacy.close();
@@ -1234,7 +1404,7 @@ describe("OpenBotDatabase", () => {
         .get(),
     ).toMatchObject({ sql: expect.not.stringContaining("CHECK(provider") });
     expect(migrated.connection.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({
-      version: 29,
+      version: 30,
     });
     migrated.close();
   });
@@ -1250,9 +1420,10 @@ describe("OpenBotDatabase", () => {
 
     // A version 19 database: the table migration 20 creates is not there, and neither is its row.
     const legacy = new DatabaseSync(database.path);
+    removeProviderHistorySchema(legacy);
     legacy.exec(`
       DROP TABLE projection_mcp_servers;
-      DELETE FROM schema_migrations WHERE version IN (20, 21, 22, 23, 24, 25, 26, 27, 28, 29);
+      DELETE FROM schema_migrations WHERE version IN (20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30);
     `);
     legacy.close();
 
@@ -1277,7 +1448,7 @@ describe("OpenBotDatabase", () => {
       { name: "Filesystem" },
     ]);
     expect(reopened.connection.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({
-      version: 29,
+      version: 30,
     });
     reopened.close();
   });
@@ -1312,10 +1483,11 @@ describe("OpenBotDatabase", () => {
 
       // A version 24 database: neither the tables of migration 25 nor its marker.
       const legacy = new DatabaseSync(database.path);
+      removeProviderHistorySchema(legacy);
       legacy.exec(`
         DROP TABLE projection_messaging_threads;
         DROP TABLE projection_messaging_connections;
-        DELETE FROM schema_migrations WHERE version IN (25, 26, 27, 28, 29);
+        DELETE FROM schema_migrations WHERE version IN (25, 26, 27, 28, 29, 30);
       `);
       // The squatted name is the index's: the tables use IF NOT EXISTS, so only the index can collide.
       if (failFirst) legacy.exec("CREATE TABLE messaging_threads_agent (conflict TEXT)");
@@ -1340,7 +1512,7 @@ describe("OpenBotDatabase", () => {
       expect(migrated.listAgents()).toEqual([agent]);
       expect(migrated.readConversation(agent.id, agent.threadId).messages).toEqual(conversation.messages);
       expect(connection.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({
-        version: 29,
+        version: 30,
       });
       expect(connection.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
       expect(connection.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
@@ -1386,6 +1558,7 @@ describe("OpenBotDatabase", () => {
     // A version 20 database, written when `computer_use` was still a name a user could take. The
     // second row holds the first name the migration reaches for, so it has to reach further.
     const legacy = new DatabaseSync(database.path);
+    removeProviderHistorySchema(legacy);
     legacy.exec(`
       INSERT INTO projection_mcp_servers
         (mcp_server_id, name, transport, enabled, command, args_json, env_json, env_passthrough_json,
@@ -1395,7 +1568,7 @@ describe("OpenBotDatabase", () => {
          '2026-09-14T10:00:00.000Z', '2026-09-14T10:00:00.000Z'),
         ('mcp-2', 'computer_use_saved', 'stdio', 1, 'other', '[]', '[]', '[]', '', '', '[]', 1,
          '2026-09-14T10:00:00.000Z', '2026-09-14T10:00:00.000Z');
-      DELETE FROM schema_migrations WHERE version IN (21, 22, 23, 24, 25, 26, 27, 28, 29);
+      DELETE FROM schema_migrations WHERE version IN (21, 22, 23, 24, 25, 26, 27, 28, 29, 30);
     `);
     legacy.close();
 
@@ -1482,6 +1655,7 @@ describe("OpenBotDatabase", () => {
       { version: 27 },
       { version: 28 },
       { version: 29 },
+      { version: 30 },
     ]);
     migrated.close();
   });
@@ -1569,6 +1743,7 @@ describe("OpenBotDatabase", () => {
       { version: 27 },
       { version: 28 },
       { version: 29 },
+      { version: 30 },
     ]);
     retried.close();
   });
@@ -2307,7 +2482,7 @@ describe("OpenBotDatabase", () => {
       expect(migrated.connection.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
       expect(migrated.connection.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
       expect(migrated.connection.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({
-        version: 29,
+        version: 30,
       });
       expect(
         migrated.connection.prepare("SELECT provider_session_id FROM projection_turns WHERE turn_id = ?").get("turn-1"),
@@ -2448,7 +2623,7 @@ describe("OpenBotDatabase", () => {
       expect(connection.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
       expect(connection.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
       expect(connection.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({
-        version: 29,
+        version: 30,
       });
       expect(
         connection.prepare("SELECT provider_session_id FROM projection_turns WHERE turn_id = ?").get("turn-1"),
@@ -2610,7 +2785,7 @@ describe("OpenBotDatabase", () => {
       expect(connection.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
       expect(connection.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
       expect(connection.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({
-        version: 29,
+        version: 30,
       });
       expect(
         connection.prepare("SELECT provider_session_id FROM projection_turns WHERE turn_id = ?").get("turn-1"),
@@ -2785,7 +2960,7 @@ describe("OpenBotDatabase", () => {
       expect(connection.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
       expect(connection.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
       expect(connection.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({
-        version: 29,
+        version: 30,
       });
       expect(
         connection.prepare("SELECT provider_session_id FROM projection_turns WHERE turn_id = ?").get("turn-1"),
@@ -2954,7 +3129,7 @@ describe("OpenBotDatabase", () => {
       expect(connection.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
       expect(connection.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
       expect(connection.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({
-        version: 29,
+        version: 30,
       });
       const agentRoutines = new AgentRoutineStore(migrated);
       expect(agentRoutines.get(agent.id, agentRoutine.id)?.limitPolicy).toBe("wait");
@@ -3119,7 +3294,7 @@ describe("OpenBotDatabase", () => {
       expect(connection.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
       expect(connection.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
       expect(connection.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({
-        version: 29,
+        version: 30,
       });
       expect(
         connection.prepare("SELECT provider_session_id FROM projection_turns WHERE turn_id = ?").get("turn-1"),
@@ -3501,6 +3676,12 @@ function conversationSnapshot(agent: AgentSummary, text: string): ConversationSn
   };
 }
 
+function withoutAttachments(message: ConversationMessage): ConversationMessage {
+  const result = { ...message };
+  delete result.attachments;
+  return result;
+}
+
 // These tests construct released schemas by stripping newer additions from a fresh fixture.
 function removeSchemaAfterVersion14(db: DatabaseSync): void {
   // Channel migrations 18 and 19 stand on the provider migration 17, so a fixture below 17 must
@@ -3512,5 +3693,12 @@ function removeSchemaAfterVersion14(db: DatabaseSync): void {
     db.exec(`DROP TABLE projection_channel_${table}`);
   db.exec("DROP TABLE projection_channels");
   db.exec("DROP TABLE agent_usage_records; DROP TABLE agent_usage_checkpoints; DROP TABLE agent_usage_activity");
+  removeProviderHistorySchema(db);
   db.exec("DELETE FROM schema_migrations WHERE version >= 15");
+}
+
+function removeProviderHistorySchema(db: DatabaseSync): void {
+  db.exec(
+    "DROP TABLE IF EXISTS provider_history_staging; DROP TABLE IF EXISTS provider_history_turns; DROP TABLE IF EXISTS provider_history_imports",
+  );
 }

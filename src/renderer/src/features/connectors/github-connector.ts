@@ -3,6 +3,7 @@ import {
   type GitHubConnectorRepositories,
   type GitHubConnectorStatus,
 } from "@openbot/contracts/ipc";
+import { classifyFailure } from "@openbot/telemetry";
 import type { GitHubConnectorPanelProps } from "@openbot/ui/features/settings/GitHubConnectorPanel";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createSignal, onCleanup, onSettled } from "solid-js";
@@ -113,7 +114,10 @@ export function createGitHubConnector(
       .catch((error: unknown) => {
         const { t, errorMessage } = currentText();
         actionToast.error(t("connector.github.actionFailed"), {
-          description: errorMessage(error, t("connector.github.actionFailed")),
+          ...{
+            description: errorMessage(error, t("connector.github.actionFailed")),
+          },
+          report: { operation: "other", source: "action", cause_code: classifyFailure(error) },
         });
       })
       .finally(() => {

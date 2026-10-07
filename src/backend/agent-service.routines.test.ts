@@ -1,7 +1,12 @@
 // @vitest-environment node
 import { readFile, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { type AgentEvent, routineConversationEvent, routineRunConversationEvent } from "@openbot/contracts/ipc";
+import {
+  type AgentEvent,
+  type ConversationMessage,
+  routineConversationEvent,
+  routineRunConversationEvent,
+} from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentProvider } from "./agent-client";
@@ -768,6 +773,80 @@ describe.sequential("AgentService: routines", () => {
     await expect(runCauseEffect(mailbox.listExportAttachments())).resolves.toHaveLength(1);
   });
 
+  it("keeps a visual reply that is saved while a response attachment reads its files", async () => {
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    const { store, mailbox } = stores(root);
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider, "", false);
+        clients.set(provider, client);
+        return client;
+      },
+    });
+    await runCauseEffect(service.initialize());
+    const screenshotPath = join(store.sharedRoot, "parallel-screenshot.png");
+    await writeFile(screenshotPath, Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Show a chart and a screenshot." }));
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "running");
+
+    const client = clients.get("codex");
+    const threadId = store.activeProviderSession("chief")?.externalSessionId;
+    const turnId = service.listQueue("chief").deliveries[0]?.turnId;
+    if (!client || !threadId || !turnId) throw new Error("The parallel visual reply turn did not start.");
+
+    const originalStore = mailbox.stageGeneratedAttachments.bind(mailbox);
+    let releaseStore: (() => void) | undefined;
+    const storeGate = new Promise<void>((resolve) => {
+      releaseStore = resolve;
+    });
+    let markStoreStarted: (() => void) | undefined;
+    const storeStarted = new Promise<void>((resolve) => {
+      markStoreStarted = resolve;
+    });
+    vi.spyOn(mailbox, "stageGeneratedAttachments").mockImplementation((input) =>
+      Effect.gen(function* () {
+        markStoreStarted?.();
+        yield* Effect.promise(() => storeGate);
+        return yield* originalStore(input);
+      }),
+    );
+    const attaching = callOpenBotTool(
+      client,
+      threadId,
+      "attach_files_to_response",
+      { paths: [screenshotPath] },
+      turnId,
+      "parallel-attachment-call",
+    );
+    await storeStarted;
+    const rendered = await callOpenBotTool(
+      client,
+      threadId,
+      "html_render",
+      { html: "<p>Chart</p>", title: "Chart" },
+      turnId,
+      "parallel-visual-call",
+    );
+    expect(openBotToolPayload(rendered.result)).toMatchObject({ status: "shown" });
+    releaseStore?.();
+    expect(openBotToolPayload((await attaching).result)).toMatchObject({ status: "attached" });
+
+    // The saved rows, not the memory copy: the memory copy can keep a message that the database lost.
+    const saved = store.database.readConversation(
+      "chief",
+      store.list().find((a) => a.id === "chief")?.threadId ?? null,
+    );
+    expect(saved.messages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ itemType: "agent_attachment" }),
+        expect.objectContaining({ text: "Chart", itemType: expect.stringMatching(/^visual-reply:/) }),
+      ]),
+    );
+  });
+
   it("rolls back response attachments when conversation persistence fails and permits retry", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
@@ -1098,4 +1177,41 @@ describe.sequential("AgentService: routines", () => {
         .get(delivery.turnId),
     ).toMatchObject({ status: "completed", completed_at: expect.any(String) });
   });
+});
+
+it("updates and clears a reaction on a message older than the working cache", async () => {
+  const { store, mailbox } = stores(root);
+  service = createTestService({ store, mailbox });
+  await runCauseEffect(service.initialize());
+  const agent = await runCauseEffect(store.getOrCreate("chief"));
+  const threadId = store.ensureThreadIdNow(agent.id);
+  const messages: ConversationMessage[] = Array.from({ length: 125 }, (_, index) => ({
+    id: `old-reaction-${index}`,
+    author: "user",
+    source: "user",
+    text: `Message ${index}`,
+    createdAt: new Date(Date.UTC(2026, 7, 19, 9, 0, index)).toISOString(),
+    status: "completed",
+  }));
+  store.database.persistConversation(
+    { agentId: agent.id, threadId, activeTurnId: null, revision: 0, messages },
+    "test.old-reaction-history",
+  );
+
+  const loaded = await runCauseEffect(service.readConversation(agent.id));
+  expect(loaded.messages).toHaveLength(messages.length);
+  const oldMessageId = messages[0]?.id;
+  if (!oldMessageId) throw new Error("The old reaction message was not created.");
+
+  await runCauseEffect(service.setMessageReaction({ agentId: agent.id, messageId: oldMessageId, emoji: "❤️" }));
+  let persisted = store.database.readConversation(agent.id, threadId);
+  expect(persisted.messages).toHaveLength(messages.length);
+  expect(persisted.messages.map((message) => message.id)).toEqual(messages.map((message) => message.id));
+  expect(persisted.messages[0]).toMatchObject({ id: oldMessageId, reaction: "❤️" });
+
+  await runCauseEffect(service.setMessageReaction({ agentId: agent.id, messageId: oldMessageId, emoji: null }));
+  persisted = store.database.readConversation(agent.id, threadId);
+  expect(persisted.messages).toHaveLength(messages.length);
+  expect(persisted.messages.map((message) => message.id)).toEqual(messages.map((message) => message.id));
+  expect(persisted.messages[0]).toMatchObject({ id: oldMessageId, reaction: null, reactions: [] });
 });

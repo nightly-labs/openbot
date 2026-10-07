@@ -1,3 +1,4 @@
+import { type CauseCode, classifyFailure, type FailureProperties } from "@openbot/telemetry";
 import { useQueryClient } from "@tanstack/react-query";
 import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { router, useIsFocused } from "expo-router";
@@ -13,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
 import { getBloubAvatarColor } from "@/features/agents/model/bloub-activity";
 import { MobileConversationAnalytics } from "@/features/analytics/conversation";
+import { reportMobileNotification } from "@/features/analytics/failure-reports";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { ChatComposer, VOICE_BUTTON_SIZE } from "@/features/chat/components/chat-composer";
 import { ChatGlassIconButton } from "@/features/chat/components/chat-glass-icon-button";
@@ -146,7 +148,23 @@ export function ChatView({
   const [replyTarget, setReplyTarget] = useState<ChatBubbleMessage | null>(null);
   const [replyFocusVersion, setReplyFocusVersion] = useState(0);
   const [draft, setDraft] = useState("");
-  const [sendError, setSendError] = useState<{ agentId: string; message: string } | null>(null);
+  const [sendError, setSendError] = useState<{
+    agentId: string;
+    message: string;
+    cause: CauseCode;
+    context: Partial<Pick<FailureProperties, "provider" | "model">>;
+  } | null>(null);
+  const failureAgent = target.kind === "agent" ? serverAgents.find((agent) => agent.id === target.id) : undefined;
+  const failureContext = useMemo(
+    () => (failureAgent ? { provider: failureAgent.provider, model: failureAgent.model } : {}),
+    [failureAgent],
+  );
+  const reportedError = useRef<typeof sendError>(null);
+  useEffect(() => {
+    if (!isFocused || !sendError || sendError.agentId !== target.id || reportedError.current === sendError) return;
+    reportedError.current = sendError;
+    reportMobileNotification({ code: sendError.cause }, "turn", "banner", sendError.context);
+  }, [isFocused, sendError, target.id]);
   const [sending, setSending] = useState(false);
   const [historyReceipt, setHistoryReceipt] = useState<ChatHistoryReceipt | null>(null);
   const [refreshingHistory, setRefreshingHistory] = useState(false);
@@ -365,7 +383,12 @@ export function ChatView({
       void haptics.notification("success");
     } catch (error) {
       void haptics.notification("error");
-      setSendError({ agentId: target.id, message: errorMessage(error, t("mobile.chat.history.refreshFailed")) });
+      setSendError({
+        cause: classifyFailure(error),
+        context: failureContext,
+        agentId: target.id,
+        message: errorMessage(error, t("mobile.chat.history.refreshFailed")),
+      });
     } finally {
       setRefreshingHistory(false);
     }
@@ -387,12 +410,14 @@ export function ChatView({
         void haptics.notification("error");
         setStoppingTurnId((current) => (current === turnId ? null : current));
         setSendError({
+          cause: classifyFailure(error),
+          context: failureContext,
           agentId: target.id,
           message: errorMessage(error, t("mobile.chat.composer.stopFailed")),
         });
       });
     };
-  }, [stopTurn, activeTurnId, target.id, errorMessage, t]);
+  }, [stopTurn, activeTurnId, target.id, errorMessage, t, failureContext]);
 
   function sendMessage(value: string): void {
     if (!serverOnline || !canSend || sendingRef.current || pendingMessage) return;
@@ -484,6 +509,8 @@ export function ChatView({
         if (!uploadCancelled.current) {
           void haptics.notification("error");
           setSendError({
+            cause: classifyFailure(error),
+            context: failureContext,
             agentId: target.id,
             message: errorMessage(error, t("mobile.chat.composer.sendFailed")),
           });

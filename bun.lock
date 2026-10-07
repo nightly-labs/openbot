@@ -19,6 +19,7 @@
         "@openbot/i18n": "workspace:*",
         "@openbot/logging": "workspace:*",
         "@openbot/team-client": "workspace:*",
+        "@openbot/telemetry": "workspace:*",
         "@openbot/ui": "workspace:*",
         "@openbot/user-errors": "workspace:*",
         "@openpanel/web": "catalog:",
@@ -112,7 +113,7 @@
     },
     "apps/mobile": {
       "name": "@openbot/mobile",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "dependencies": {
         "@expo/metro-runtime": "~57.0.16",
         "@expo/ui": "~57.0.19",
@@ -122,6 +123,7 @@
         "@openbot/i18n": "workspace:*",
         "@openbot/logging": "workspace:*",
         "@openbot/team-client": "workspace:*",
+        "@openbot/telemetry": "workspace:*",
         "@openbot/user-errors": "workspace:*",
         "@openpanel/react-native": "1.4.1",
         "@react-native-masked-view/masked-view": "0.3.2",
@@ -276,6 +278,19 @@
         "typescript": "catalog:",
       },
     },
+    "packages/telemetry": {
+      "name": "@openbot/telemetry",
+      "version": "0.0.0",
+      "dependencies": {
+        "@openbot/contracts": "workspace:*",
+        "effect": "catalog:",
+      },
+      "devDependencies": {
+        "@types/node": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
     "packages/ui": {
       "name": "@openbot/ui",
       "version": "0.0.0",
@@ -286,6 +301,7 @@
         "@openbot/contracts": "workspace:*",
         "@openbot/i18n": "workspace:*",
         "@openbot/team-client": "workspace:*",
+        "@openbot/telemetry": "workspace:*",
         "@openbot/user-errors": "workspace:*",
         "@speed-highlight/core": "catalog:",
         "@tanstack/virtual-core": "catalog:",
@@ -347,12 +363,13 @@
     "react-native-keyboard-controller@1.21.9": "patches/react-native-keyboard-controller@1.21.9.patch",
     "lucide-solid@1.33.0": "patches/lucide-solid@1.33.0.patch",
     "solid-recharts@1.0.1": "patches/solid-recharts@1.0.1.patch",
-    "dmg-builder@26.15.7": "patches/dmg-builder@26.15.7.patch",
+    "react-native-screens@4.26.2": "patches/react-native-screens@4.26.2.patch",
     "expo@57.0.24": "patches/expo@57.0.24.patch",
     "expo-router@57.0.22": "patches/expo-router@57.0.22.patch",
     "@kobalte/core@2.0.0-alpha.0": "patches/@kobalte%2Fcore@2.0.0-alpha.0.patch",
     "@solidjs/signals@2.0.0-rc.0": "patches/@solidjs%2Fsignals@2.0.0-rc.0.patch",
     "solid-sonner@0.3.2": "patches/solid-sonner@0.3.2.patch",
+    "dmg-builder@26.15.7": "patches/dmg-builder@26.15.7.patch",
     "@solidjs/web@2.0.0-rc.0": "patches/@solidjs%2Fweb@2.0.0-rc.0.patch",
   },
   "catalog": {
@@ -956,6 +973,8 @@
     "@openbot/site-router": ["@openbot/site-router@workspace:apps/site-router"],
 
     "@openbot/team-client": ["@openbot/team-client@workspace:packages/team-client"],
+
+    "@openbot/telemetry": ["@openbot/telemetry@workspace:packages/telemetry"],
 
     "@openbot/ui": ["@openbot/ui@workspace:packages/ui"],
 

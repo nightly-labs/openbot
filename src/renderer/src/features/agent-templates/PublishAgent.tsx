@@ -1,4 +1,5 @@
 import { type AgentTemplatePreview, isAgentTemplateCardPng } from "@openbot/contracts/ipc";
+import { classifyFailure } from "@openbot/telemetry";
 import { toast } from "@openbot/ui";
 import { PublishAgentDialog } from "@openbot/ui/features/agents/PublishAgentDialog";
 import { currentText } from "@openbot/ui/text";
@@ -45,7 +46,9 @@ export function createPublishAgent(calls: () => AgentTemplatePublishCalls = () =
         draft.loading = false;
       });
       const { t, errorMessage } = currentText();
-      actionToast.error(errorMessage(error, t("agentTemplate.publish.readFailed")));
+      actionToast.error(errorMessage(error, t("agentTemplate.publish.readFailed")), {
+        report: { operation: "agent", source: "action", cause_code: classifyFailure(error) },
+      });
     }
   }
 

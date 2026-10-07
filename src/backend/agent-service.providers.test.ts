@@ -854,6 +854,18 @@ describe.sequential("AgentService: providers", () => {
   it("hands the provider the Computer Use entry while the driver runs, and nothing when it stops", async () => {
     const { store, mailbox } = stores(root);
     const client = new FakeAgentClient("codex", "CODEX_DONE", true, true);
+    const tools = { set_value: { approval_mode: "approve" } };
+    const savedServers = { computer_use: { command: "/old/cua-driver", enabled: false, tools } };
+    client.configRead = {
+      config: { mcp_servers: savedServers },
+      layers: [
+        {
+          name: { type: "user", file: "/test/.codex/config.toml", profile: null },
+          version: "saved-version",
+          config: { mcp_servers: savedServers },
+        },
+      ],
+    };
     let driverRunning = true;
     service = createTestService({
       store,
@@ -889,6 +901,8 @@ describe.sequential("AgentService: providers", () => {
       tools: CODEX_TOOLS,
       mcp_servers: {
         [COMPUTER_USE_MCP_SERVER_NAME]: {
+          enabled: true,
+          tools,
           command: "/opt/cua/bin/cua-driver",
           args: ["mcp", "--socket", "/tmp/openbot-test.sock"],
           env: await launchEnvironment({ CUA_DRIVER_EMBEDDED: "1" }),
@@ -904,11 +918,42 @@ describe.sequential("AgentService: providers", () => {
       queue.deliveries.every((delivery) => delivery.status === "completed"),
     );
     const restart = paramsRecord(client.requests.filter((request) => request.method === "thread/start")[1]?.params);
-    expect(restart?.config).toEqual({ tools: CODEX_TOOLS });
+    expect(restart?.config).toEqual({
+      tools: CODEX_TOOLS,
+      mcp_servers: { computer_use: { enabled: false, tools } },
+    });
     expect(restart?.developerInstructions).toContain("The user turned Computer Use off for you.");
+
+    await runCauseEffect(service.updateAgent({ agentId: "chief", computerUse: true }));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Use Computer Use again." }));
+    await waitForQueue(service, "chief", (queue) =>
+      queue.deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    const enabled = client.requests.filter((request) => request.method === "thread/start").at(-1);
+    expect(paramsRecord(enabled?.params)?.config).toEqual(paramsRecord(start?.params)?.config);
+
+    savedServers.computer_use.tools = { set_value: { approval_mode: "prompt" } };
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Ask for approval again." }));
+    await waitForQueue(service, "chief", (queue) =>
+      queue.deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    const revoked = client.requests.filter((request) => request.method === "thread/start").at(-1);
+    expect(paramsRecord(revoked?.params)?.config).toMatchObject({
+      mcp_servers: { computer_use: { enabled: true, tools: { set_value: { approval_mode: "prompt" } } } },
+    });
 
     driverRunning = false;
     expect(service.enabledMcpServers()).toEqual([]);
+    await runCauseEffect(service.refreshAllAgentRuntimes());
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Continue without the driver." }));
+    await waitForQueue(service, "chief", (queue) =>
+      queue.deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    const unavailable = client.requests.filter((request) => request.method === "thread/start").at(-1);
+    expect(paramsRecord(unavailable?.params)?.config).toEqual({
+      tools: CODEX_TOOLS,
+      mcp_servers: { computer_use: { enabled: false, tools: savedServers.computer_use.tools } },
+    });
   });
 
   /*
@@ -2767,7 +2812,7 @@ describe.sequential("AgentService: providers", () => {
         {
           id: "codex",
           state: "available",
-          version: "0.144.1",
+          version: "0.156.0",
           email: "codex@example.com",
         },
         { id: "claude", state: "error", version: null },

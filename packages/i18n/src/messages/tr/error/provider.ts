@@ -102,7 +102,7 @@ export const messages = {
   "error.provider.noModelNamed": "{provider} sağlayıcısının kullanılabilir modeli yok.",
   "error.provider.acpNoModels": "ACP CLI hiçbir ACP modeli tanıtmadı. OpenBot bir yedek model tahmin etmeyecektir.",
   "error.provider.endpointRemoveBusy": "Bu uç noktayı kaldırmadan önce etkin turun ve kuyruğun bitmesini bekleyin.",
-  "error.provider.codexOutdated": "Codex CLI {version} çok eski. OpenBot 0.144.1 veya daha yenisini gerektirir.",
+  "error.provider.codexOutdated": "Codex CLI {version} çok eski. OpenBot 0.156.0 veya daha yenisini gerektirir.",
   "error.provider.codexNotStarted": "Codex CLI bulundu ancak başlatılamadı.",
   "error.provider.codexNotStartedHint":
     "Codex CLI bulundu ancak başlatılamadı. Yeni bir terminalde `codex --version` komutunu çalıştırın.",

@@ -18,6 +18,7 @@
     "./event-filter-value": "./src/event-filter-value.ts",
     "./chat-math": "./src/chat-math.ts",
     "./chat-preview": "./src/chat-preview.ts",
+    "./chat-visual": "./src/chat-visual.ts",
     "./chat-tag-references": "./src/chat-tag-references.ts",
     "./conversation-order": "./src/conversation-order.ts",
     "./hosted-servers": "./src/hosted-servers.ts",

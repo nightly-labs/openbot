@@ -44,13 +44,13 @@ const DESKTOP: ReleaseTarget = {
 };
 
 const MOBILE: ReleaseTarget = {
-  name: "OpenBot for iPhone",
+  name: "OpenBot mobile",
   changelog: MOBILE_CHANGELOG,
   fragmentDir: MOBILE_FRAGMENT_DIR,
   versionFiles: MOBILE_VERSION_FILES,
   lockWorkspace: "apps/mobile",
   inReview: true,
-  next: "commit the files, merge them to main, then run bun run mobile:ios:release:testflight. When the store makes the build available, run bun run mobile:release:published",
+  next: "commit the files, merge them to main, then run bun run mobile:ios:release:testflight and bun run mobile:android:release:play. When the stores make the builds available, run bun run mobile:release:published",
 };
 
 /** The first `"version"` in the file, which is the top-level one in each file that this script changes. */

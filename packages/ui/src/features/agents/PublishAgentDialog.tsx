@@ -1,5 +1,6 @@
 import type { AgentTemplatePreview, MarketplaceAgentRoutine } from "@openbot/contracts/ipc";
 import type { AppFormat, AppTranslate } from "@openbot/i18n";
+import { classifyFailure } from "@openbot/telemetry";
 import {
   ArrowLeft,
   Badge,
@@ -61,7 +62,9 @@ export function PublishAgentDialog(props: PublishAgentDialogProps) {
     try {
       await action();
     } catch (error) {
-      toast.error(errorMessage(error, fallback));
+      toast.error(errorMessage(error, fallback), {
+        report: { operation: "agent", source: "system", cause_code: classifyFailure(error) },
+      });
     } finally {
       setPending(null);
       queueMicrotask(() => {
@@ -77,7 +80,9 @@ export function PublishAgentDialog(props: PublishAgentDialogProps) {
     try {
       await props.onCopyLink();
     } catch (error) {
-      toast.error(errorMessage(error, t("agentTemplate.publish.copyFailed")));
+      toast.error(errorMessage(error, t("agentTemplate.publish.copyFailed")), {
+        report: { operation: "agent", source: "system", cause_code: classifyFailure(error) },
+      });
     }
   }
 

@@ -90,6 +90,7 @@
     "./features/conversation/ChatRowBoundary": "./src/features/conversation/ChatRowBoundary.tsx",
     "./features/conversation/ChatMessageRow": "./src/features/conversation/ChatMessageRow.tsx",
     "./features/conversation/ChatSearch": "./src/features/conversation/ChatSearch.tsx",
+    "./features/conversation/ChatVisual": "./src/features/conversation/ChatVisual.tsx",
     "./features/conversation/TaskList": "./src/features/conversation/TaskList.tsx",
     "./features/conversation/AwaitingReplies": "./src/features/conversation/AwaitingReplies.tsx",
     "./features/conversation/CodeBlock": "./src/features/conversation/CodeBlock.tsx",
@@ -157,6 +158,7 @@
     "./features/settings/GitHubConnectorPanel": "./src/features/settings/GitHubConnectorPanel.tsx",
     "./features/settings/IntegrationLayout": "./src/features/settings/IntegrationLayout.tsx",
     "./features/settings/IntegrationsHub": "./src/features/settings/IntegrationsHub.tsx",
+    "./features/settings/BitwardenConnectorPanel": "./src/features/settings/BitwardenConnectorPanel.tsx",
     "./features/settings/OnePasswordConnectorPanel": "./src/features/settings/OnePasswordConnectorPanel.tsx",
     "./features/settings/SlackIntegrationPanel": "./src/features/settings/SlackIntegrationPanel.tsx",
     "./features/settings/LanguageSelect": "./src/features/settings/LanguageSelect.tsx",
@@ -316,7 +318,8 @@
     "mermaid": "catalog:",
     "@tanstack/virtual-core": "catalog:",
     "zod": "catalog:",
-    "@openbot/i18n": "workspace:*"
+    "@openbot/i18n": "workspace:*",
+    "@openbot/telemetry": "workspace:*"
   },
   "peerDependencies": {
     "solid-js": "2.0.0-rc.0",

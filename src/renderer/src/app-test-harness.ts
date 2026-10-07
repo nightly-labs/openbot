@@ -645,6 +645,7 @@ export function installOpenbotStub(): void {
       status: vi.fn().mockResolvedValue(DISCONNECTED_GITHUB_CONNECTOR),
       repositories: vi.fn().mockResolvedValue({ repositories: [], total: 0 }),
     }),
+    bitwardenConnector: stubGroup("bitwardenConnector", { status: vi.fn().mockResolvedValue({ connected: false }) }),
     onePasswordConnector: stubGroup("onePasswordConnector", {
       status: vi.fn().mockResolvedValue(DISCONNECTED_ONEPASSWORD_CONNECTOR),
     }),

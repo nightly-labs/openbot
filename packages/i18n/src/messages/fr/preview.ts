@@ -10,6 +10,7 @@ export const messages = {
   "preview.panel.close": "Fermer l’aperçu du fichier",
   "preview.panel.back": "Retour",
   "preview.panel.rawMarkdown": "Afficher la source Markdown",
+  "preview.panel.rawHtml": "Afficher la source HTML",
   "preview.folder.empty": "Ce dossier est vide.",
   "preview.folder.truncated": "Seuls les {limit} premiers éléments sont affichés.",
   "preview.truncated": "Aperçu tronqué après {limit} caractères.",
