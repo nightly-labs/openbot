@@ -2,7 +2,6 @@ import { isManagedRuntimeProvider } from "@openbot/contracts/agent-providers";
 import { Effect, Fiber } from "effect";
 import { toAgentRemovalFailed } from "../backend/agent/agent-removal";
 import { toHostedSiteOperationFailed } from "../backend/agent/hosted-site-coordinator";
-import { latestTurnAnswer } from "../backend/agent/turn-answer";
 import { AgentDatabaseSupervisor } from "../backend/agent-data/agent-database-supervisor";
 import { AgentTables } from "../backend/agent-data/agent-tables";
 import { AgentRoutineStore } from "../backend/agent-routine-store";
@@ -53,7 +52,7 @@ import type {
   RoutineFlowsChanged,
   VoiceModelStatus,
 } from "@openbot/contracts/ipc";
-import { IPC_ENDPOINTS, isManagedToolRuntime, isUpdateBusyPhase } from "@openbot/contracts/ipc";
+import { IPC_ENDPOINTS, isManagedToolRuntime, isUpdateBusyPhase, latestTurnAnswer } from "@openbot/contracts/ipc";
 import { decodeRecord, requiredString } from "@openbot/contracts/ipc-decoding";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
@@ -1163,6 +1162,7 @@ export async function createApplicationServices({
     },
     passwordVault: passwordVaultRouter(onePasswordConnector, bitwardenConnector),
     localSkillTools: () => localSkillTools(skills),
+    routineFlowTools: () => routineFlowRuntime,
     approvalAutomation,
     busyMessageMode: () => busyMessageMode.get().mode,
     deleteWithRevokedApproval: (agentId, remove) =>

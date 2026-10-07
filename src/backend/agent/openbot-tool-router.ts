@@ -30,6 +30,7 @@ import type { ChannelService } from "../channel-service";
 import type { MailboxStore } from "../mailbox-store";
 import { agentMcpServers } from "../mcp-provider-shapes";
 import { type AppServerRequest, type DynamicToolCallParams, isRecord } from "../protocol";
+import { handleRoutineFlowTool, type RoutineFlowTools } from "../routine-flows/routine-flow-tools";
 import type { StoredStateFailure } from "../stored-state-effects";
 import { AgentInterruptTool } from "./agent-interrupt-tool";
 import type { AgentMemories } from "./agent-memories";
@@ -111,6 +112,7 @@ export interface OpenBotToolRouterOptions {
   tables: AgentTables | null;
   sidebarLayout: AgentSidebar | null;
   localSkillTools?: () => LocalSkillTools;
+  routineFlowTools?: () => RoutineFlowTools;
   approvalAutomation?: ApprovalAutomationPolicy;
   hooks: OpenBotToolRouterHooks;
 }
@@ -139,6 +141,7 @@ export class OpenBotToolRouter {
   readonly #tables: AgentTables | null;
   readonly #sidebarLayout: AgentSidebar | null;
   readonly #localSkillTools?: () => LocalSkillTools;
+  readonly #routineFlowTools?: () => RoutineFlowTools;
   readonly #approvalAutomation: ApprovalAutomationPolicy;
   readonly #hooks: OpenBotToolRouterHooks;
   readonly #interruptTool: AgentInterruptTool;
@@ -160,6 +163,7 @@ export class OpenBotToolRouter {
     this.#tables = options.tables;
     this.#sidebarLayout = options.sidebarLayout;
     this.#localSkillTools = options.localSkillTools;
+    this.#routineFlowTools = options.routineFlowTools;
     this.#approvalAutomation = options.approvalAutomation ?? NO_APPROVAL_AUTOMATION;
     this.#hooks = options.hooks;
     this.#interruptTool = new AgentInterruptTool({
@@ -555,6 +559,15 @@ export class OpenBotToolRouter {
 
     const routineResult = yield* this.#routines.handleTool(params, senderAgentId);
     if (routineResult) return routineResult;
+
+    const flowResult = yield* handleRoutineFlowTool(
+      params.tool,
+      params.arguments,
+      senderAgentId,
+      this.#routineFlowTools?.() ?? null,
+      new Set(this.#hooks.listAgents().map((agent) => agent.id)),
+    );
+    if (flowResult) return flowResult;
 
     const memoryResult = this.#memories.handleTool(params, senderAgentId);
     if (memoryResult) return memoryResult;

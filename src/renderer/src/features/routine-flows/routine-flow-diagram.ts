@@ -27,7 +27,7 @@ import type {
 
 const COLUMN = 360;
 const ROUTINE_ROW = 300;
-const AGENT_ROW = 240;
+const AGENT_ROW = 300;
 /** The edge from a routine to its own agent is the routine itself, not a link the user can remove. */
 const ROUTINE_START_PREFIX = "routine-start:";
 

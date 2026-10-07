@@ -55,6 +55,10 @@ branch refuses them, and no Team API protocol changes.
 - A handoff is a mailbox delivery from the routine (`RoutineScheduler.enqueueHandoff`). It names the
   same routine and run, but `reconcileDelivery` finds a run only by its own delivery, so the run status
   does not change.
+- Agents read and change flows with the `openbot` tools `list_routine_flows`, `connect_routine_agents`
+  and `disconnect_routine_agents` (`routine-flow-tools.ts`). `RoutineFlows` is built after the agent
+  service, so the tool router reads it through a getter. The canvas chat panel sends the user's request
+  to the open agent's own conversation and shows the answer of the turn that read it.
 
 ## Agent communication policy
 

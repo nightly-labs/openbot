@@ -16,6 +16,7 @@ import {
 } from "./agent/sidebar-tools";
 import { LOCAL_SKILL_TOOL_DEFINITIONS } from "./agent/skill-tools";
 import { CHANNEL_TOOL_DEFINITIONS } from "./channel-tools";
+import { ROUTINE_FLOW_TOOL_DEFINITIONS } from "./routine-flows/routine-flow-tools";
 import { routineScheduleZodSchema } from "./routine-tool-schema";
 
 interface OpenBotToolDefinition {
@@ -29,6 +30,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   ...CHANNEL_TOOL_DEFINITIONS,
   ...DATA_TOOL_DEFINITIONS,
   ...LOCAL_SKILL_TOOL_DEFINITIONS,
+  ...ROUTINE_FLOW_TOOL_DEFINITIONS,
   {
     name: "list_sites",
     description:

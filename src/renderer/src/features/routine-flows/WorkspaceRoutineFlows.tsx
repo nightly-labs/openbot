@@ -2,16 +2,19 @@
  * The Routines view of the open agent: its canvas, as this computer's host keeps it. The host answers
  * the canvas; every edit goes back to it, and the canvas reloads when the host says it changed or a
  * routine run moved. A moved node is drawn where the user left it at once and saved a moment later.
+ * The chat panel sends requests to the open agent, which edits the canvas with its tools.
  */
 
 import { type RoutineFlowCanvas, routineFlowAgentKey } from "@openbot/contracts/ipc";
 import { toast } from "@openbot/ui";
+import type { AgentProfile } from "@openbot/ui/data";
 import { DiagramView } from "@openbot/ui/features/diagrams/DiagramView";
 import type { DiagramPoint } from "@openbot/ui/features/diagrams/diagram-model";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createStore, onSettled, Show } from "solid-js";
 import { useAgents } from "../agents/agents-context";
 import { useServers } from "../servers/servers-context";
+import { createRoutineFlowAssistant } from "./routine-flow-assistant";
 import { agentIdOfNode, isRoutineStartEdge, routineFlowDiagram, routineIdOfNode } from "./routine-flow-diagram";
 import { type RoutineFlowsPort, routineFlowsPort } from "./routine-flows-port";
 
@@ -35,6 +38,7 @@ export function WorkspaceRoutineFlows(props: { port?: RoutineFlowsPort }) {
   const local = () => activeServerId() === "local";
   const agentId = () => activeAgent()?.id ?? null;
   const [state, setState] = createStore<RoutineFlowState>({ canvas: null, error: null, moved: {} });
+  const assistant = createRoutineFlowAssistant(port, agentId);
   let generation = 0;
   let reloadTimer: number | undefined;
   const saveTimers = new Map<string, number>();
@@ -105,6 +109,10 @@ export function WorkspaceRoutineFlows(props: { port?: RoutineFlowsPort }) {
     () => new Set(diagram()?.nodes.flatMap((node) => (node.kind === "agent" ? [node.agentId] : [])) ?? []),
   );
 
+  /** The open agent edits its own canvas from the chat panel. */
+  const assistantOf = (agent: AgentProfile | undefined) =>
+    agent ? { agent, messages: assistant.messages(), working: assistant.working(), onSend: assistant.send } : undefined;
+
   const savePosition = (canvasAgentId: string, nodeKey: string, point: DiagramPoint) => {
     window.clearTimeout(saveTimers.get(nodeKey));
     saveTimers.set(
@@ -142,6 +150,7 @@ export function WorkspaceRoutineFlows(props: { port?: RoutineFlowsPort }) {
                 diagram={current()}
                 agents={agentList()}
                 owner={activeAgent()}
+                assistant={assistantOf(activeAgent())}
                 connectsWithinRoutine
                 onMoveNode={(nodeId, position) => {
                   setState((draft) => {

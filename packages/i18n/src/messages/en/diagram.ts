@@ -96,4 +96,5 @@ export const messages = defineMessages("diagram", {
   "diagram.chat.show": "Ask an agent to edit this diagram",
   "diagram.chat.working": "{name} is editing the diagram",
   "diagram.chat.changes": "Changes to the diagram",
+  "diagram.chat.failed": "Could not reach the agent.",
 });

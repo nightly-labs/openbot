@@ -7,6 +7,7 @@ import {
   type ConversationPlan,
   type ConversationSnapshot,
   conversationPlanText,
+  latestTurnAnswer,
 } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
@@ -46,7 +47,6 @@ import {
   toolUsage,
   toThreadItem,
 } from "./thread-items";
-import { latestTurnAnswer } from "./turn-answer";
 import { collectProviderUsage } from "./usage-collection";
 import { USAGE_LIMIT_METHOD, type UsageLimitGate } from "./usage-limit-gate";
 

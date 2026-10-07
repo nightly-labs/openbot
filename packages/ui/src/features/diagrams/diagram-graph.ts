@@ -110,29 +110,19 @@ export function diagramRoutineColor(nodes: readonly DiagramNode[], routineId: st
 /**
  * The step each agent runs in: 1 for an agent a routine starts directly, and one more than its
  * latest input for the rest. Agents in the same step run side by side. An agent that no routine
- * reaches has no step and never runs.
+ * reaches has no step and never runs. Each routine is walked on its own connections: two routines
+ * can link the same agents in opposite directions.
  */
 export function diagramExecutionSteps(
   nodes: readonly DiagramNode[],
   edges: readonly DiagramEdge[],
 ): Map<string, number> {
+  const agents = new Set(nodes.flatMap((node) => (node.kind === "agent" ? [node.id] : [])));
   const steps = new Map<string, number>();
-  const level = new Map<string, number>();
-  const queue = nodes.filter((node) => node.kind === "routine").map((node) => node.id);
-  for (const id of queue) level.set(id, 0);
-  for (let next = queue.shift(); next !== undefined; next = queue.shift()) {
-    const current = level.get(next) ?? 0;
-    for (const edge of edges) {
-      if (edge.from !== next) continue;
-      // The graph has no cycle, so a node's level only grows to its longest path from a routine.
-      if ((level.get(edge.to) ?? -1) >= current + 1) continue;
-      level.set(edge.to, current + 1);
-      queue.push(edge.to);
-    }
-  }
-  for (const node of nodes) {
-    const value = level.get(node.id);
-    if (node.kind === "agent" && value !== undefined) steps.set(node.id, value);
+  for (const routine of nodes) {
+    if (routine.kind !== "routine") continue;
+    for (const [id, step] of diagramRoutineSteps(edges, routine.id))
+      if (agents.has(id)) steps.set(id, Math.max(steps.get(id) ?? 0, step));
   }
   return steps;
 }

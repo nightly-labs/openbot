@@ -220,8 +220,12 @@ export function DiagramBoard(props: DiagramBoardProps) {
       state.pointer = null;
       state.hoverTarget = null;
     });
-  const problemFor = (from: string, to: string) =>
-    diagramConnectionProblem(props.diagram.nodes, props.diagram.edges, from, to);
+  /** A connection drawn while a routine is in focus joins that routine, so only its edges count. */
+  const problemFor = (from: string, to: string) => {
+    const focus = props.focusRoutineId;
+    const edges = focus ? props.diagram.edges.filter((edge) => diagramEdgeCarries(edge, focus)) : props.diagram.edges;
+    return diagramConnectionProblem(props.diagram.nodes, edges, from, to);
+  };
   const inputTarget = (nodeId: string): DiagramPortTarget => {
     const source = interaction.source;
     if (!source) return "none";
