@@ -101,7 +101,7 @@ export function ServerConnection({
           supportLog.add(
             "info",
             "connection",
-            `${hostId} recovery ${status.phase}, attempt ${status.attempt}${status.remainingSeconds ? `, retry in ${status.remainingSeconds} s` : ""}`,
+            `${hostId} recovery ${status.phase}, attempt ${status.attempt}${status.phase !== "connecting" && status.remainingSeconds ? `, retry in ${status.remainingSeconds} s` : ""}`,
           );
         }
         if (status.phase === "online") failure = null;

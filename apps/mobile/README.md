@@ -23,6 +23,11 @@ After switching from the isolated linker to the hoisted linker, move the old
 from the repository root. A normal install can retain old workspace symlinks and cause
 the local fingerprint to differ from the clean EAS installation.
 
+Expo 57.0.24 is patched in `patches/expo@57.0.24.patch` so a DOM component ignores a props
+message that it sends before Android mounts its web view, or after Android removes it. Android
+rejects these calls, and the rejection shows as a console error. The DOM component asks for the
+props again when it is ready.
+
 Expo Router 57.0.20 is patched in `patches/expo-router@57.0.20.patch` to apply zoom dismissal
 bounds when its enabler registers after the chat mounts. This keeps the avatar-to-header zoom
 interactive from the left edge without enabling dismissal from the middle of the chat.

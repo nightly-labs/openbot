@@ -46,6 +46,19 @@ export function applyServerRecovery(
   };
 }
 
+/** A lost connection reports attempt 0 while its first attempt is due; show that attempt. */
+export function recoveryAttempt(status: RemoteRecoveryStatus): number {
+  return Math.max(1, status.attempt);
+}
+
+/**
+ * Seconds for the reconnect countdown, or null to hide it. Connecting shows the wait that follows a
+ * failure. A lost connection reports zero before its first attempt starts, with no wait to show.
+ */
+export function recoveryCountdown(status: RemoteRecoveryStatus): number | null {
+  return status.remainingSeconds > 0 ? status.remainingSeconds : null;
+}
+
 export function serverKind(hostId: string, pairedHostId: string | undefined): MobileServer["kind"] {
   return hostId === pairedHostId ? "local" : "remote";
 }
