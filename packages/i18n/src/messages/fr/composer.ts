@@ -8,6 +8,9 @@ export const messages = {
   "composer.signIn.pending": "Connexion…",
   "composer.signIn.label": "Se connecter à {provider}",
   "composer.signIn.action": "Se connecter",
+  "composer.update.body": "Mettez à jour {provider} pour continuer.",
+  "composer.update.pending": "Mise à jour…",
+  "composer.update.action": "Mettre à jour",
   "composer.usageLimit.resets": "Vous avez utilisé toute votre limite {provider}. Elle se réinitialise {reset}.",
   "composer.usageLimit.selectModel":
     "Vous avez utilisé toute votre limite {provider}. Sélectionnez un autre modèle pour continuer.",

@@ -8,6 +8,9 @@ export const messages = {
   "composer.signIn.pending": "Giriş yapılıyor…",
   "composer.signIn.label": "{provider} sağlayıcısına giriş yap",
   "composer.signIn.action": "Giriş yap",
+  "composer.update.body": "Devam etmek için {provider} güncellemesini yapın.",
+  "composer.update.pending": "Güncelleniyor…",
+  "composer.update.action": "Güncelle",
   "composer.usageLimit.resets": "{provider} sınırınızın tamamını kullandınız. Sıfırlanma zamanı: {reset}.",
   "composer.usageLimit.selectModel":
     "{provider} sınırınızın tamamını kullandınız. Devam etmek için farklı bir model seçin.",

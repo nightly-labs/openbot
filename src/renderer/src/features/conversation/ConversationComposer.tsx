@@ -22,7 +22,11 @@ import { attachmentReferenceTone } from "@openbot/ui/features/conversation/Attac
 import { AwaitingReplies } from "@openbot/ui/features/conversation/AwaitingReplies";
 import { ComposerEditor } from "@openbot/ui/features/conversation/ComposerEditor";
 import { ComposerErrorBanner } from "@openbot/ui/features/conversation/ComposerErrorBanner";
-import { ComposerSignInNotice, ComposerUsageLimitNotice } from "@openbot/ui/features/conversation/ComposerNotice";
+import {
+  ComposerSignInNotice,
+  ComposerUpdateNotice,
+  ComposerUsageLimitNotice,
+} from "@openbot/ui/features/conversation/ComposerNotice";
 import { CloseIcon, MoreIcon, StopIcon } from "@openbot/ui/features/conversation/ConversationIcons";
 import { RichMessageText } from "@openbot/ui/features/conversation/RichMessageText";
 import { useText } from "@openbot/ui/text";
@@ -36,6 +40,7 @@ import { formatVoiceDuration, voiceButtonLabel, voiceSupported } from "./voice-s
 export function ConversationComposer() {
   const {
     agentReady,
+    providerUpdateRequired,
     attachmentAction,
     attachmentBusy,
     awaitingReplies,
@@ -212,6 +217,18 @@ export function ConversationComposer() {
             </div>
           )}
         </Show>
+        <Show when={providerUpdateRequired()}>
+          {(status) => (
+            <ComposerUpdateNotice
+              provider={status().id}
+              onUpdate={props.onDownloadProvider}
+              updating={
+                props.providerRuntimeStatuses?.[status().id]?.phase === "downloading" ||
+                props.providerRuntimeStatuses?.[status().id]?.phase === "finishing"
+              }
+            />
+          )}
+        </Show>
         <Show when={signInRequired()}>
           {(status) => (
             <ComposerSignInNotice
@@ -249,7 +266,11 @@ export function ConversationComposer() {
             />
           )}
         </Show>
-        <Show when={currentChatError()}>
+        <Show
+          when={
+            currentChatError() && currentChatError() !== providerUpdateRequired()?.message ? currentChatError() : null
+          }
+        >
           {(message) => (
             <ComposerErrorBanner
               message={message()}
@@ -524,6 +545,7 @@ export function ConversationComposer() {
                       attachmentBusy() ||
                       submitting() ||
                       !agentReady() ||
+                      Boolean(providerUpdateRequired()) ||
                       voicePhase() === "preparing" ||
                       voicePhase() === "requesting" ||
                       voicePhase() === "transcribing"

@@ -146,6 +146,44 @@ export function ComposerSignInNotice(props: {
   );
 }
 
+export function ComposerUpdateNotice(props: {
+  provider: AgentProviderId;
+  onUpdate?: (provider: AgentProviderId) => void | Promise<void>;
+  updating?: boolean;
+}) {
+  const { t } = useText();
+  const [starting, setStarting] = createSignal(false);
+  const busy = () => starting() || Boolean(props.updating);
+  const update = async () => {
+    if (busy()) return;
+    setStarting(true);
+    try {
+      await props.onUpdate?.(props.provider);
+    } finally {
+      setStarting(false);
+    }
+  };
+  return (
+    <ComposerNotice
+      body={t("composer.update.body", { provider: agentProviderName(props.provider) })}
+      action={
+        <Show when={props.onUpdate}>
+          <Button
+            variant="outline"
+            size="sm"
+            type="button"
+            loading={busy()}
+            loadingLabel={t("composer.update.pending")}
+            onClick={() => void update()}
+          >
+            {t("composer.update.action")}
+          </Button>
+        </Show>
+      }
+    />
+  );
+}
+
 /** The reset moment, in the reader's own locale. A window with no reported reset gets no sentence. */
 function formatUsageReset(resetsAt: number | null | undefined, format: AppFormat): string | null {
   if (resetsAt === null || resetsAt === undefined) return null;

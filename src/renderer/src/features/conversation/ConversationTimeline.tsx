@@ -115,6 +115,7 @@ export function ConversationTimeline() {
     openSharedFile,
     openWorkspaceFile,
     pendingSendFor,
+    providerUpdateRequired,
     previewAttachment,
     props,
     reactToMessage,
@@ -654,7 +655,7 @@ export function ConversationTimeline() {
                             onDownload={(attachment) => attachmentAction(attachment, "download")}
                             class={pending() ? "message-entry-pending" : undefined}
                             footer={
-                              pending() ? (
+                              pending() && !(pendingState() === "failed" && providerUpdateRequired()) ? (
                                 <PendingSendStatus
                                   state={pendingState()}
                                   error={pendingSend()?.error ?? null}
