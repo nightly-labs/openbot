@@ -10,7 +10,6 @@ import {
   describeDevPages,
   findBrowserProcessId,
   findRendererPages,
-  isOpenBotBrowser,
   matchPages,
   processBelongsToInstance,
   resolveAutomationPort,
@@ -23,17 +22,6 @@ import {
   resolveScreenshotPath,
   resolveWritablePath,
 } from "./tools";
-
-describe("isOpenBotBrowser", () => {
-  it("accepts the Electron user agent", () => {
-    expect(isOpenBotBrowser("Mozilla/5.0 OpenBot/44.0.0 Chrome/152 Electron/44.0.0")).toBe(true);
-  });
-
-  it("rejects foreign Chromium instances sharing the machine", () => {
-    expect(isOpenBotBrowser("Mozilla/5.0 Chrome/152 Safari/537.36")).toBe(false);
-    expect(isOpenBotBrowser("")).toBe(false);
-  });
-});
 
 describe("findMainPages", () => {
   const island = { url: () => "http://localhost:5173/?surface=dynamic-island" };

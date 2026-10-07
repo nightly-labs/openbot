@@ -102,7 +102,7 @@ vi.mock("electron", async () => {
     navigationHistory = { clear() {}, canGoBack: () => false, canGoForward: () => false };
   }
   return {
-    app: { getPreferredSystemLanguages: () => ["en-US"] },
+    app: { getPreferredSystemLanguages: () => ["en-US"], userAgentFallback: "Chrome/144.0.0.0" },
     clipboard: {
       writeText(text: string) {
         clipboardWrites.push(text);

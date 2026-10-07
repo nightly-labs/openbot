@@ -1,10 +1,11 @@
 /**
  * Per-site request identity for the embedded browser.
  *
- * One shared session means one page identity: native everywhere, which Google reads as a
- * known client. A few allowlists read the other way, so those hosts get the build and
- * product tokens scrubbed back out, request by request. Page JavaScript always sees the
- * native string; only listed hosts are ever rewritten, so one host's gate cannot change
+ * One shared session means one page identity: the Chromium string with its `Electron/` build
+ * token, which Google reads as a known client, but without the `OpenBot/` product token, which
+ * Framer's sign-in policy refuses from page JavaScript. A few allowlists also refuse the build
+ * token, so those hosts get it scrubbed out, request by request. Page JavaScript always sees
+ * the session string; only listed hosts are ever rewritten, so one host's gate cannot change
  * another's verdict.
  *
  * To add a site: append a row with the measured reason and cover it with an opt-in live
@@ -45,6 +46,15 @@ export function siteIdentityForUrl(url: string): BrowserSiteIdentity {
     }
   }
   return "native";
+}
+
+/**
+ * The session identity: the native string without the app product token. Removing the build
+ * token as well made Google refuse sign-in (`--google-live`); keeping the product token made
+ * Framer answer every sign-in with "Access denied by policy" (`--framer-live`).
+ */
+export function sessionBrowserUserAgent(userAgent: string): string {
+  return userAgent.replace(/\sOpenBot\/[^\s]+/gu, "");
 }
 
 export function scrubbedBrowserUserAgent(userAgent: string): string {
