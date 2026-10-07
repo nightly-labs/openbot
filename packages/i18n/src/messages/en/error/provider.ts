@@ -2,6 +2,8 @@ import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.provider", {
   // Provider, provider runtime and custom endpoint errors.
+  "error.provider.computerUseConfig":
+    "OpenBot could not register Computer Use in the Codex configuration. Check that your Codex config.toml is valid and writable, then restart OpenBot. You can turn off Computer Use in the teammate settings to continue without it.",
   "error.provider.endpointsReadOnly":
     "The saved endpoints were written by a newer version of OpenBot, or the file cannot be read. Update OpenBot to change them.",
   "error.provider.endpointNoSecureStorage":
