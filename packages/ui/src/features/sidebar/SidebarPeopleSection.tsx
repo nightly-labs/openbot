@@ -89,7 +89,7 @@ export function SidebarPeopleSection(sectionProps: { sectionId: string }) {
                       <span class="agent-row-avatar">
                         <TeamPersonAvatar member={member} motion="hover" />
                         <Show when={(thread()?.unreadCount ?? 0) > 0}>
-                          <Badge class="person-unread-badge" tone="accent" shape="pill" aria-hidden="true">
+                          <Badge class="person-unread-badge" variant="primary-light" shape="pill" aria-hidden="true">
                             {Math.min(thread()?.unreadCount ?? 0, 99)}
                           </Badge>
                         </Show>

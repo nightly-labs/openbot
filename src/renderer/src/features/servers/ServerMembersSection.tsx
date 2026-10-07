@@ -580,7 +580,7 @@ export function createServerMembersSection(host: ServerSettingsSectionHost): Ser
           <ItemDescription class="server-settings-member-meta">{member.email ?? member.username}</ItemDescription>
         </ItemContent>
         <ItemActions class="server-settings-member-actions">
-          <Show when={member.role !== "owner"} fallback={<Badge tone="accent">{t(ROLE_LABELS.owner)}</Badge>}>
+          <Show when={member.role !== "owner"} fallback={<Badge variant="primary-light">{t(ROLE_LABELS.owner)}</Badge>}>
             <Text variant="label-sm" tone="secondary">
               {t(ROLE_LABELS[member.role])}
             </Text>
