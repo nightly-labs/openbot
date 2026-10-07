@@ -18,6 +18,7 @@ import {
   routineDraftProblemCode,
   routineScheduleFromDraft,
   routineScheduleToDraft,
+  switchDraftKind,
 } from "@openbot/team-client/routine-schedule-draft";
 import { type QueryKey, useQueryClient } from "@tanstack/react-query";
 import { router, useNavigation } from "expo-router";
@@ -27,13 +28,13 @@ import { useEffect, useRef, useState } from "react";
 import { Alert, View } from "react-native";
 import { useUniwind } from "uniwind";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
-import { SettingsPicker } from "@/features/settings/components/settings-controls";
 import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { RoutineScheduleFields } from "./routine-schedule-fields";
+import { type RoutineTriggerChoice, RoutineTriggerPicker } from "./routine-trigger-picker";
 import { RoutineWebhookNotifications } from "./routine-webhook-notifications";
 import {
   eventFilters,
@@ -287,7 +288,16 @@ export function RoutineEditor({
   const setName = (name: string) => setEdits((current) => ({ ...current, name }));
   const setInstruction = (instruction: string) => setEdits((current) => ({ ...current, instruction }));
   const setSchedule = (schedule: RoutineScheduleDraft) => setEdits((current) => ({ ...current, schedule }));
-  const setTrigger = (trigger: "schedule" | "webhook") => setEdits((current) => ({ ...current, trigger }));
+  // A schedule frequency also switches the trigger back to the schedule, as on desktop. The same
+  // frequency keeps the draft untouched, so a saved schedule that the form cannot show stays.
+  const selectTrigger = (choice: RoutineTriggerChoice) =>
+    setEdits((current) =>
+      choice === "webhook"
+        ? { ...current, trigger: "webhook" }
+        : choice === scheduleDraft.kind
+          ? { ...current, trigger: "schedule" }
+          : { ...current, trigger: "schedule", schedule: switchDraftKind(scheduleDraft, choice, new Date()) },
+    );
   const setEventType = (eventType: string) => setEdits((current) => ({ ...current, eventType }));
   const setFilters = (filters: FilterDraft[]) => setEdits((current) => ({ ...current, filters }));
   const [timezone, setTimezone] = useState(routine?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone);
@@ -386,6 +396,14 @@ export function RoutineEditor({
   const shownWebhook = webhookRoutine ?? created ?? undefined;
   // The URL and the secret belong to the saved trigger. An unsaved switch to a webhook has neither yet.
   const savedWebhook = trigger === "webhook" && shownWebhook ? shownWebhook : undefined;
+  const triggerPicker = (
+    <RoutineTriggerPicker
+      value={trigger === "webhook" ? "webhook" : scheduleDraft.kind}
+      webhook={Boolean(webhookRoutine || eventsSupported)}
+      disabled={disabled}
+      onSelect={selectTrigger}
+    />
+  );
   return (
     <View className="gap-5">
       <SheetFormField
@@ -411,31 +429,11 @@ export function RoutineEditor({
         maxLength={INPUT_LIMITS.routineInstruction}
         onChangeText={setInstruction}
       />
-      <SettingsSection title={t("mobile.agent.record.trigger")}>
-        <SettingsRow
-          trailing={
-            <SettingsPicker
-              label={t("mobile.agent.record.trigger")}
-              value={trigger}
-              options={[
-                { value: "schedule" as const, label: t("mobile.agent.record.trigger.schedule") },
-                ...(webhookRoutine || eventsSupported
-                  ? [{ value: "webhook" as const, label: t("mobile.agent.record.trigger.webhook") }]
-                  : []),
-              ]}
-              enabled={!disabled}
-              dark={theme === "dark"}
-              onChange={setTrigger}
-            />
-          }
-        >
-          <Typography.Paragraph>{t("mobile.agent.record.trigger")}</Typography.Paragraph>
-        </SettingsRow>
-      </SettingsSection>
       {trigger === "schedule" ? (
         <RoutineScheduleFields
           draft={scheduleDraft}
           disabled={disabled}
+          header={triggerPicker}
           onChange={setSchedule}
           footer={
             routine ? (
@@ -453,6 +451,7 @@ export function RoutineEditor({
         />
       ) : (
         <RoutineWebhookTrigger
+          header={triggerPicker}
           url={savedWebhook ? savedWebhook.trigger.url : undefined}
           secret={secret}
           eventType={eventType}
@@ -461,6 +460,7 @@ export function RoutineEditor({
           rotatePending={rotate.pending}
           onEventTypeChange={setEventType}
           onFiltersChange={setFilters}
+          onSecretDismiss={() => setSecret(null)}
           onRotate={
             webhookRoutine && eventsSupported
               ? () =>

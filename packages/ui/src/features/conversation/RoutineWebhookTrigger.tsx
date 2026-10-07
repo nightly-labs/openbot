@@ -1,19 +1,19 @@
 import { type EventFilter, isEventFilterPointer } from "@openbot/contracts/ipc-events";
 import {
-  Alert,
-  AlertActions,
-  AlertContent,
-  AlertDescription,
-  AlertTitle,
-  Badge,
   Button,
+  ChevronDown,
+  ChevronRight,
   ConfirmDialog,
   CopyButton,
+  IconButton,
   Input,
   Plus,
+  RefreshCw,
   Text,
+  Webhook,
   X,
 } from "@openbot/ui";
+import type { JSX } from "@solidjs/web";
 import { createSignal, For, Show } from "solid-js";
 import { useText } from "../../text";
 
@@ -39,12 +39,27 @@ export interface RoutineWebhookTriggerProps {
   onSecretDismiss: () => void;
   /** Makes a new secret. The parent shows it through `secret`. Left out, the action is hidden. */
   onRegenerateSecret?: () => Promise<void>;
+  /** A control at the end of the header, such as the menu that changes the trigger. */
+  menu?: JSX.Element;
 }
 
+/** The host never returns a saved secret, so the row shows its prefix and a mask. */
+const MASKED_SECRET = "whsec_••••••••••••";
+
+/**
+ * The webhook trigger as one card: what starts the routine, the endpoint, the signing secret
+ * and the events that start it. Each value has one action beside it.
+ */
 export function RoutineWebhookTrigger(props: RoutineWebhookTriggerProps) {
   const { t, errorMessage } = useText();
-  const [filtersOpen, setFiltersOpen] = createSignal(false);
+  const [eventsOpen, setEventsOpen] = createSignal(false);
   const [confirm, setConfirm] = createSignal<{ pending: boolean; error: string | null } | null>(null);
+
+  const eventsSummary = () => {
+    const parts = [props.eventType.trim() || t("routine.webhook.eventsAll")];
+    if (props.filters.length > 0) parts.push(t("routine.webhook.filterCount", { count: props.filters.length }));
+    return parts.join(" · ");
+  };
 
   function updateFilter(index: number, change: Partial<RoutineWebhookFilterDraft>): void {
     props.onFiltersChange(
@@ -65,121 +80,138 @@ export function RoutineWebhookTrigger(props: RoutineWebhookTriggerProps) {
   }
 
   return (
-    <div class="agent-routine-webhook">
-      <div class="settings-field">
-        <span>{t("routine.webhook.url")}</span>
-        <Show
-          when={props.saved}
-          fallback={
-            <Text variant="caption" tone="muted">
-              {t("routine.webhook.urlAfterSave")}
-            </Text>
-          }
-        >
+    <div class="routine-trigger-card">
+      <div class="routine-trigger-card-header">
+        <span class="routine-trigger-icon" aria-hidden="true">
+          <Webhook />
+        </span>
+        <span class="routine-trigger-card-title">{t("routine.trigger.webhookDescription")}</span>
+        <span class="routine-trigger-action">{props.menu}</span>
+      </div>
+
+      <Show
+        when={props.saved}
+        fallback={
+          <Text variant="caption" tone="muted" class="routine-webhook-note">
+            {t("routine.webhook.urlAfterSave")}
+          </Text>
+        }
+      >
+        <div class="routine-webhook-field">
+          <span class="routine-webhook-label">{t("routine.webhook.url")}</span>
           <Show
             when={props.url}
             fallback={
-              <Text variant="caption" tone="muted" role="status">
+              <Text variant="caption" tone="muted" role="status" class="routine-webhook-value">
                 {t(props.connected === false ? "routine.webhook.urlPendingOffline" : "routine.webhook.urlPending")}
               </Text>
             }
           >
             {(url) => (
               <>
-                <div class="agent-routine-webhook-row">
-                  <Input readonly value={url()} aria-label={t("routine.webhook.url")} />
-                  <CopyButton
-                    value={url()}
-                    label={t("routine.webhook.copyUrl")}
-                    copiedLabel={t("common.copied")}
-                    size="sm"
-                    variant="secondary"
-                  />
-                </div>
-                <Show when={props.connected === false}>
-                  <Text variant="caption" tone="warning">
-                    {t("routine.webhook.relayOffline")}
-                  </Text>
-                </Show>
+                {/* The row leaves out "https://" to show more of the path. Copy gives the full URL. */}
+                <code class="routine-webhook-value" title={url()}>
+                  {url().replace(/^https:\/\//, "")}
+                </code>
+                <CopyButton
+                  value={url()}
+                  label={t("routine.webhook.copyUrl")}
+                  copiedLabel={t("common.copied")}
+                  iconOnly
+                />
               </>
             )}
           </Show>
+        </div>
+        <Show when={props.url && props.connected === false}>
+          <Text variant="caption" tone="warning" class="routine-webhook-note">
+            {t("routine.webhook.relayOffline")}
+          </Text>
         </Show>
-      </div>
 
-      <Show when={props.secret}>
-        {(secret) => (
-          <Alert tone="warning" class="agent-routine-webhook-secret">
-            <AlertContent>
-              <AlertTitle>{t("routine.webhook.secretTitle")}</AlertTitle>
-              <AlertDescription>{t("routine.webhook.secretWarning")}</AlertDescription>
-              <div class="agent-routine-webhook-row">
-                <Input readonly value={secret()} aria-label={t("routine.webhook.secretTitle")} />
+        <div class="routine-webhook-field">
+          <span class="routine-webhook-label">{t("routine.webhook.secretTitle")}</span>
+          <Show
+            when={props.secret}
+            fallback={
+              <>
+                <code class="routine-webhook-value" aria-hidden="true">
+                  {MASKED_SECRET}
+                </code>
+                <span class="sr-only">{t("routine.webhook.secretHidden")}</span>
+                <Show when={props.onRegenerateSecret}>
+                  <IconButton
+                    variant="ghost"
+                    label={t("routine.webhook.regenerateSecret")}
+                    onClick={() => setConfirm({ pending: false, error: null })}
+                  >
+                    <RefreshCw aria-hidden="true" />
+                  </IconButton>
+                </Show>
+              </>
+            }
+          >
+            {(secret) => (
+              <>
+                <code class="routine-webhook-value routine-webhook-secret" title={secret()}>
+                  {secret()}
+                </code>
                 <CopyButton
                   value={secret()}
                   label={t("routine.webhook.copySecret")}
                   copiedLabel={t("common.copied")}
-                  size="sm"
-                  variant="secondary"
+                  iconOnly
                 />
-              </div>
-              <AlertActions>
-                <Button type="button" size="sm" variant="secondary" onClick={props.onSecretDismiss}>
-                  {t("common.done")}
-                </Button>
-              </AlertActions>
-            </AlertContent>
-          </Alert>
-        )}
-      </Show>
-
-      <Show when={props.saved && props.onRegenerateSecret && !props.secret}>
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          class="agent-routine-disclosure"
-          onClick={() => setConfirm({ pending: false, error: null })}
-        >
-          {t("routine.webhook.regenerateSecret")}
-        </Button>
-      </Show>
-
-      <label class="settings-field">
-        <span>{t("routine.webhook.eventType")}</span>
-        <Input
-          value={props.eventType}
-          placeholder={t("routine.webhook.eventTypePlaceholder")}
-          onValueChange={props.onEventTypeChange}
-        />
-        <Text variant="caption" tone="muted">
-          {t("routine.webhook.eventTypeHint")}
-        </Text>
-      </label>
-
-      <div class="agent-routine-webhook-filters">
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          class="agent-routine-disclosure"
-          aria-expanded={filtersOpen() ? "true" : "false"}
-          onClick={() => setFiltersOpen((open) => !open)}
-        >
-          {t("routine.webhook.filters")}
-          <Show when={props.filters.length > 0}>
-            <Badge variant="secondary">{props.filters.length}</Badge>
+              </>
+            )}
           </Show>
-        </Button>
-        <Show when={filtersOpen()}>
-          <div class="agent-routine-webhook-filter-list">
-            <Text variant="caption" tone="muted">
-              {t("routine.webhook.filtersHint")}
+        </div>
+        <Show when={props.secret}>
+          <div class="routine-webhook-note routine-webhook-secret-note">
+            <Text variant="caption" tone="warning">
+              {t("routine.webhook.secretWarning")}
             </Text>
+            <Button type="button" size="xs" variant="ghost" onClick={props.onSecretDismiss}>
+              {t("common.done")}
+            </Button>
+          </div>
+        </Show>
+      </Show>
+
+      <Button
+        type="button"
+        variant="ghost"
+        class="routine-webhook-field routine-webhook-events-toggle"
+        aria-expanded={eventsOpen() ? "true" : "false"}
+        onClick={() => setEventsOpen((open) => !open)}
+      >
+        <span class="routine-webhook-label">{t("routine.webhook.events")}</span>
+        <span class="routine-webhook-value">{eventsSummary()}</span>
+        <Show when={eventsOpen()} fallback={<ChevronRight aria-hidden="true" />}>
+          <ChevronDown aria-hidden="true" />
+        </Show>
+      </Button>
+      <Show when={eventsOpen()}>
+        <div class="routine-webhook-events">
+          <label class="settings-field">
+            <span>{t("routine.webhook.eventType")}</span>
+            <Input
+              size="sm"
+              value={props.eventType}
+              placeholder={t("routine.webhook.eventTypePlaceholder")}
+              onValueChange={props.onEventTypeChange}
+            />
+            <Text variant="caption" tone="muted">
+              {t("routine.webhook.eventTypeHint")}
+            </Text>
+          </label>
+          <div class="settings-field">
+            <span>{t("routine.webhook.filters")}</span>
             <For each={props.filters}>
               {(filter, index) => (
                 <div class="agent-routine-event-filter">
                   <Input
+                    size="sm"
                     aria-label={t("routine.webhook.filterPointer")}
                     value={filter.pointer}
                     placeholder={t("routine.webhook.filterPointerPlaceholder")}
@@ -187,36 +219,38 @@ export function RoutineWebhookTrigger(props: RoutineWebhookTriggerProps) {
                     onValueChange={(pointer) => updateFilter(index(), { pointer })}
                   />
                   <Input
+                    size="sm"
                     aria-label={t("routine.webhook.filterValue")}
                     value={filter.value}
                     placeholder={t("routine.webhook.filterValue")}
                     onValueChange={(value) => updateFilter(index(), { value })}
                   />
-                  <Button
-                    type="button"
+                  <IconButton
                     variant="ghost"
-                    size="icon-sm"
-                    aria-label={t("routine.webhook.removeFilter")}
+                    label={t("routine.webhook.removeFilter")}
                     onClick={() => props.onFiltersChange(props.filters.filter((_, itemIndex) => itemIndex !== index()))}
                   >
                     <X aria-hidden="true" />
-                  </Button>
+                  </IconButton>
                 </div>
               )}
             </For>
+            <Text variant="caption" tone="muted">
+              {t("routine.webhook.filtersHint")}
+            </Text>
             <Button
               type="button"
-              variant="secondary"
+              variant="ghost"
               size="sm"
-              class="agent-routine-disclosure"
+              class="routine-webhook-add-filter"
               onClick={() => props.onFiltersChange([...props.filters, { pointer: "", value: "" }])}
             >
               <Plus aria-hidden="true" />
               {t("routine.webhook.addFilter")}
             </Button>
           </div>
-        </Show>
-      </div>
+        </div>
+      </Show>
 
       <ConfirmDialog
         open={confirm() !== null}

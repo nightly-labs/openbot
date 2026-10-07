@@ -4,16 +4,13 @@ import type { MobileTextKey } from "@openbot/i18n/mobile";
 import {
   ROUTINE_EVERY_DAY,
   ROUTINE_EVERY_HOURS,
-  ROUTINE_SAVED_DRAFT_KIND_VALUES,
   ROUTINE_WORKDAYS,
-  type RoutineDraftKind,
   type RoutineDraftProblem,
   type RoutineScheduleDraft,
   routineDraftProblemCode,
   routineHourlyMinute,
   routineYearlyDaysInMonth,
   sameRoutineDays,
-  switchDraftKind,
   toggleRoutineDay,
 } from "@openbot/team-client/routine-schedule-draft";
 import { Typography } from "heroui-native";
@@ -26,16 +23,6 @@ import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { RoutineTimePicker } from "./routine-schedule-time";
-
-const KIND_LABEL = {
-  once: "mobile.agent.record.repeat.once",
-  hourly: "mobile.agent.record.repeat.hourly",
-  daily: "mobile.agent.record.repeat.daily",
-  weekly: "mobile.agent.record.repeat.weekly",
-  monthly: "mobile.agent.record.repeat.monthly",
-  yearly: "mobile.agent.record.repeat.yearly",
-  custom: "mobile.agent.record.repeat.custom",
-} as const satisfies Record<RoutineDraftKind, MobileTextKey>;
 
 const PROBLEM_TEXT = {
   once: "mobile.agent.record.problem.once",
@@ -51,17 +38,20 @@ const MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 const DEFAULT_WINDOW = { start: "09:00", end: "18:00" };
 
 /**
- * The schedule as the desktop asks for it: how often, on which days, and at what time. A cron
- * expression is the last choice of the frequency, for a schedule the other choices cannot say.
+ * The schedule as the desktop asks for it: on which days and at what time. The trigger picker in
+ * `header` sets how often; a cron expression is its last frequency, for a schedule the others cannot say.
  */
 export function RoutineScheduleFields({
   draft,
   disabled,
+  header,
   footer,
   onChange,
 }: {
   draft: RoutineScheduleDraft;
   disabled: boolean;
+  /** The first row of the group: the picker that changes the trigger and its frequency. */
+  header: ReactNode;
   /** Rows after the schedule, in the same group, such as the time zone. */
   footer?: ReactNode;
   onChange: (draft: RoutineScheduleDraft) => void;
@@ -250,15 +240,10 @@ export function RoutineScheduleFields({
 
   return (
     <SettingsSection
-      title={t("mobile.agent.record.schedule")}
+      title={t("mobile.agent.record.whenToRun")}
       footer={problem && problem !== "cronRequired" ? t(PROBLEM_TEXT[problem]) : hint}
     >
-      {pickerRow(
-        "mobile.agent.record.repeat",
-        draft.kind,
-        ROUTINE_SAVED_DRAFT_KIND_VALUES.map((kind) => ({ value: kind, label: t(KIND_LABEL[kind]) })),
-        (kind) => onChange(switchDraftKind(draft, kind, new Date())),
-      )}
+      {header}
       {fields}
       {footer}
     </SettingsSection>

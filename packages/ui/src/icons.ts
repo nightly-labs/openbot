@@ -102,4 +102,5 @@ export { default as TriangleAlert } from "lucide-solid/icons/triangle-alert";
 export { default as Upload } from "lucide-solid/icons/upload";
 export { default as UserRound } from "lucide-solid/icons/user-round";
 export { default as UsersRound } from "lucide-solid/icons/users-round";
+export { default as Webhook } from "lucide-solid/icons/webhook";
 export { default as X } from "lucide-solid/icons/x";

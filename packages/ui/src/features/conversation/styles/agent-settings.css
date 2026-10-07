@@ -362,14 +362,6 @@
   line-height: var(--openbot-leading-md);
 }
 
-.agent-routine-trigger-choice {
-  display: flex;
-  width: fit-content;
-  align-items: center;
-  gap: var(--openbot-space-2);
-  margin-bottom: var(--openbot-space-3);
-}
-
 /* A pointer and value row in the webhook filters, and a name and value row in notification headers. */
 .agent-routine-event-filter {
   display: grid;
@@ -1162,24 +1154,15 @@
   line-height: 15px;
 }
 
-.agent-routine-webhook-row {
-  display: flex;
-  align-items: center;
-  gap: var(--openbot-space-2);
-}
-
-.agent-routine-webhook-row .ui-input,
-.agent-routine-webhook-row .ui-select {
-  flex: 1;
-  min-width: 0;
-}
-
 .agent-routine-disclosure {
   justify-self: start;
 }
 
-.agent-routine-webhook,
-.agent-routine-webhook-filters,
+/* Notifications and Activity line up with the field labels above them. */
+.agent-routine-section > .agent-routine-disclosure {
+  padding-inline: var(--openbot-space-2);
+}
+
 .agent-routine-webhook-form,
 .agent-routine-webhook-options,
 .agent-routine-notifications,
@@ -1187,12 +1170,6 @@
 .agent-routine-section {
   display: grid;
   gap: var(--openbot-space-3);
-}
-
-.agent-routine-webhook-filter-list,
-.agent-routine-webhook-secret .ui-alert-content {
-  display: grid;
-  gap: var(--openbot-space-2);
 }
 
 .agent-routine-webhook-form {

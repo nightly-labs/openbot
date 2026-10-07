@@ -30,6 +30,7 @@ import { createScrollFades } from "@openbot/ui/components/createScrollFades";
 import { SettingsBackIcon, SettingsForwardIcon } from "@openbot/ui/components/SettingsPanel";
 import { RoutineRunHistory } from "@openbot/ui/features/conversation/RoutineRunHistory";
 import { RoutineSchedulePicker } from "@openbot/ui/features/conversation/RoutineSchedulePicker";
+import { RoutineTriggerMenu } from "@openbot/ui/features/conversation/RoutineTriggerMenu";
 import { RoutineWebhookActivity } from "@openbot/ui/features/conversation/RoutineWebhookActivity";
 import { RoutineWebhookNotifications } from "@openbot/ui/features/conversation/RoutineWebhookNotifications";
 import {
@@ -43,6 +44,7 @@ import {
   ROUTINE_EVERY_DAY,
   type RoutineScheduleDraft,
   routineDraftSummary,
+  switchDraftKind,
 } from "@openbot/ui/features/conversation/routine-schedule-draft";
 import {
   ROUTINE_SAVED_DRAFT_KINDS,
@@ -469,6 +471,30 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     }
   }
 
+  /** The menu that changes the trigger. A host without events keeps the schedule chips only. */
+  function triggerMenu(current: RoutineDraft): JSX.Element {
+    if (!props.port.events) return undefined;
+    return (
+      <RoutineTriggerMenu
+        value={current.triggerKind === "webhook" ? "webhook" : current.scheduleDraft.kind}
+        kinds={ROUTINE_SAVED_DRAFT_KINDS}
+        webhook
+        onSelect={(choice) =>
+          changeDraft((value) => {
+            if (choice === "webhook") return { ...value, triggerKind: "webhook" };
+            const scheduleDraft = switchDraftKind(value.scheduleDraft, choice, new Date());
+            return {
+              ...value,
+              triggerKind: "schedule",
+              schedule: routineScheduleFromDraft(scheduleDraft),
+              scheduleDraft,
+            };
+          })
+        }
+      />
+    );
+  }
+
   async function regenerateSecret(): Promise<void> {
     const events = props.port.events;
     const id = draft()?.id;
@@ -678,25 +704,6 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
               </label>
               <section class="agent-routine-when" aria-labelledby="agent-routine-when-heading">
                 <h3 id="agent-routine-when-heading">{t("routine.settings.whenToRun")}</h3>
-                <Show when={props.port.events}>
-                  <div class="agent-routine-trigger-choice">
-                    <For each={["schedule", "webhook"] as const}>
-                      {(kind) => (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant={current().triggerKind === kind ? "secondary" : "ghost"}
-                          aria-pressed={current().triggerKind === kind ? "true" : "false"}
-                          onClick={() => changeDraft((value) => ({ ...value, triggerKind: kind }))}
-                        >
-                          {t(
-                            kind === "webhook" ? "routine.settings.triggerWebhook" : "routine.settings.triggerSchedule",
-                          )}
-                        </Button>
-                      )}
-                    </For>
-                  </div>
-                </Show>
                 <Show
                   when={current().triggerKind === "schedule"}
                   fallback={
@@ -715,12 +722,14 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                         })
                       }
                       onRegenerateSecret={props.port.events ? regenerateSecret : undefined}
+                      menu={triggerMenu(current())}
                     />
                   }
                 >
                   <RoutineSchedulePicker
                     schedule={current().scheduleDraft}
                     kinds={ROUTINE_SAVED_DRAFT_KINDS}
+                    action={triggerMenu(current())}
                     onChange={(scheduleDraft) =>
                       changeDraft((value) => ({
                         ...value,

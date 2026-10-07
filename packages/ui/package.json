@@ -115,6 +115,7 @@
     "./features/conversation/RoutineWebhookActivity": "./src/features/conversation/RoutineWebhookActivity.tsx",
     "./features/conversation/RoutineWebhookTrigger": "./src/features/conversation/RoutineWebhookTrigger.tsx",
     "./features/conversation/RoutineSchedulePicker": "./src/features/conversation/RoutineSchedulePicker.tsx",
+    "./features/conversation/RoutineTriggerMenu": "./src/features/conversation/RoutineTriggerMenu.tsx",
     "./features/conversation/RoutineCalendar": "./src/features/conversation/RoutineCalendar.tsx",
     "./features/conversation/RoutineScheduleCard": "./src/features/conversation/RoutineScheduleCard.tsx",
     "./features/conversation/routine-schedule-draft": "./src/features/conversation/routine-schedule-draft.ts",

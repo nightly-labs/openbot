@@ -549,7 +549,7 @@ vi.mock("@expo/ui/community/datetime-picker", () => ({
       />
     ),
 }));
-vi.mock("uniwind", () => ({ useUniwind: () => ({ theme: "light" }) }));
+vi.mock("uniwind", () => ({ useUniwind: () => ({ theme: "light" }), useCSSVariable: () => "gray" }));
 vi.mock("@expo/ui", () => {
   const Picker = ({
     label,
@@ -607,6 +607,14 @@ vi.mock("@/shared/lib/haptics", () => ({
   haptics: { impact: async () => {}, notification: async () => {}, selection: async () => {} },
 }));
 vi.mock("lucide-react-native", () => ({
+  AlarmClock: () => null,
+  Check: () => null,
+  ChevronDown: () => null,
+  ChevronsDownUp: () => null,
+  ChevronsUpDown: () => null,
+  Copy: () => null,
+  RefreshCw: () => null,
+  Webhook: () => null,
   ChevronRight: () => null,
   Ellipsis: () => null,
   ArrowLeft: () => null,
@@ -1656,7 +1664,8 @@ it("saves the selected monthly day and wall-clock time", async () => {
   await edit("Routine name", "Monthly check");
   await edit("Routine instructions", "Check updates");
   await edit("Time zone", "Europe/Warsaw");
-  await act(() => fireEvent.change(screen.getByDisplayValue("Daily"), { target: { value: "monthly" } }));
+  await click("Daily");
+  await click("Monthly");
   await act(() => fireEvent.change(screen.getByLabelText("Time"), { target: { value: "17:45" } }));
   // A new monthly run starts on today's date, as on desktop.
   await act(() =>

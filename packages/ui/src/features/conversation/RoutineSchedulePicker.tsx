@@ -36,6 +36,8 @@ export interface RoutineSchedulePickerProps {
   today?: Date;
   /** The frequencies the menu offers. Defaults to all of them. */
   kinds?: RoutineDraftKindOption[];
+  /** A control at the end of the row, such as the menu that changes the trigger. */
+  action?: JSX.Element;
 }
 
 /** A cron example. It is the same in each language. */
@@ -315,6 +317,7 @@ export function RoutineSchedulePicker(props: RoutineSchedulePickerProps) {
             </Match>
           </Switch>
         </span>
+        <span class="routine-trigger-action">{props.action}</span>
       </fieldset>
       <Show when={lateMonthDay()}>
         {(day) => <p class="routine-schedule-hint">{t("routine.picker.lateMonthDay", { day: day() })}</p>}
