@@ -147,7 +147,7 @@ export class OpenBotToolRouter {
   readonly #tables: AgentTables | null;
   readonly #sidebarLayout: AgentSidebar | null;
   readonly #localSkillTools?: () => LocalSkillTools;
-  readonly #routineFlowTools?: () => RoutineFlowTools;
+  readonly #routineFlowTools: (() => RoutineFlowTools) | undefined;
   readonly #approvalAutomation: ApprovalAutomationPolicy;
   readonly #visualPreview: ChatVisualPreviewHost | null;
   readonly #hooks: OpenBotToolRouterHooks;

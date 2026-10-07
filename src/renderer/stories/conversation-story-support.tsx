@@ -41,13 +41,13 @@ export const CONVERSATION_STORY_MESSAGES: RendererAgentMessage[] = STORY_CONVERS
       ? `${message.text}\n\nPlease review ${serializeAttachmentReference(CONVERSATION_STORY_ATTACHMENT.name, CONVERSATION_STORY_ATTACHMENT.id)} before editing the implementation notes.\n\nTransformers scale well with data and compute [1], though attention is quadratic in sequence length [2].`
       : message.text,
   time: "10:00",
-  itemType: message.itemType,
-  senderAgentId: message.senderAgentId,
-  replyToMessageId: message.replyToMessageId,
-  attachments: message.attachments,
-  citations:
-    message.id === "message-agent-1"
-      ? [
+  ...(message.itemType === undefined ? {} : { itemType: message.itemType }),
+  ...(message.senderAgentId === undefined ? {} : { senderAgentId: message.senderAgentId }),
+  ...(message.replyToMessageId === undefined ? {} : { replyToMessageId: message.replyToMessageId }),
+  ...(message.attachments === undefined ? {} : { attachments: message.attachments }),
+  ...(message.id === "message-agent-1"
+    ? {
+        citations: [
           {
             number: 1,
             label: "Attention Is All You Need",
@@ -60,12 +60,13 @@ export const CONVERSATION_STORY_MESSAGES: RendererAgentMessage[] = STORY_CONVERS
             url: "https://arxiv.org/abs/2009.06732",
             host: "arxiv.org",
           },
-        ]
-      : undefined,
-  exchange: message.exchange,
-  reaction: message.reaction,
+        ],
+      }
+    : {}),
+  ...(message.exchange === undefined ? {} : { exchange: message.exchange }),
+  ...(message.reaction === undefined ? {} : { reaction: message.reaction }),
   kind: message.exchange ? "exchange" : message.plan ? "plan" : "text",
-  plan: message.plan && { ...message.plan, stopped: false },
+  ...(message.plan ? { plan: { ...message.plan, stopped: false } } : {}),
 }));
 
 /**

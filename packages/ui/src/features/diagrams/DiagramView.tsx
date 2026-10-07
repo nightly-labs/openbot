@@ -40,7 +40,7 @@ export interface DiagramViewProps {
   owner?: AgentProfile | undefined;
   /** The day the routine week strips start on. Defaults to the time the view opens. */
   now?: string | undefined;
-  editable?: boolean;
+  editable?: boolean | undefined;
   /** The agent that edits the diagram from the chat panel. Without it, the panel is hidden. */
   assistant?:
     | {
@@ -216,7 +216,7 @@ export function DiagramView(props: DiagramViewProps) {
                 options={routineOptions()}
                 optionValue="id"
                 optionTextValue="name"
-                value={routineOptions().find((option) => option.id === (focusRoutineId() ?? ALL))}
+                value={routineOptions().find((option) => option.id === (focusRoutineId() ?? ALL)) ?? null}
                 onChange={(option) => option && setPicked(option.id === ALL ? null : option.id)}
                 placement="bottom"
                 sameWidth={false}

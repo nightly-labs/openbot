@@ -80,7 +80,7 @@ export interface DiagramBoardProps {
    * every routine's path, with no run.
    */
   focusRoutineId: string | null;
-  editable?: boolean;
+  editable?: boolean | undefined;
   onSelectNode: (nodeId: string | null) => void;
   onFocusRoutine: (routineId: string) => void;
   onMoveNode: (nodeId: string, position: DiagramPoint) => void;

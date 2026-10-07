@@ -85,7 +85,12 @@ export const handleRoutineFlowTool = Effect.fn("RoutineFlowTools.handle")(functi
       const input = yield* toolStep(() => connectSchema.parse(args));
       const unknown = unknownAgent([input.fromAgentId, input.toAgentId]);
       if (unknown) return openBotToolFailure(`Unknown agent: ${unknown}.`);
-      const link = yield* flows.connect(input);
+      const link = yield* flows.connect({
+        routineId: input.routineId,
+        fromAgentId: input.fromAgentId,
+        toAgentId: input.toAgentId,
+        ...(input.instruction === undefined ? {} : { instruction: input.instruction }),
+      });
       return openBotToolResult({ linkId: link.id });
     }
     const input = yield* toolStep(() => disconnectSchema.parse(args));
