@@ -111,7 +111,9 @@ const VoiceWord = memo(function VoiceWord({ word, reserve }: { word: string; res
     transform: [{ translateY: (1 - progress.get()) * 10 }, { scale: 0.97 + 0.03 * progress.get() }],
   }));
   return (
-    <Animated.View style={style}>
+    // A language without spaces, such as Japanese, gives one long "word". It
+    // must wrap inside the screen, not run past its edge.
+    <Animated.View style={[{ maxWidth: "100%" }, style]}>
       <Typography type="h3" weight="medium">
         {word}
       </Typography>
