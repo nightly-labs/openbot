@@ -6,8 +6,12 @@ import type { MessagingService } from "../../backend/messaging/messaging-service
 import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import {
   parseAddMessagingOrchestratorInput,
+  parseConnectTelegramInput,
   parseMessagingWorkspaceInput,
   parseSetMessagingEnabledInput,
+  parseSetTelegramAgentInput,
+  parseSetTelegramEnabledInput,
+  parseTelegramBotInput,
 } from "./messaging-inputs";
 
 interface MessagingIpcDependencies {
@@ -22,6 +26,10 @@ interface MessagingIpcDependencies {
     | "reconnect"
     | "setEnabled"
     | "addOrchestrator"
+    | "telegramOverview"
+    | "connectTelegram"
+    | "disconnectTelegram"
+    | "setTelegramAgent"
   >;
 }
 
@@ -55,6 +63,22 @@ export function messagingIpcHandlers({ messaging }: MessagingIpcDependencies): P
       ),
       addDiscordOrchestrator: payloadHandler(parseAddMessagingOrchestratorInput, (input) =>
         runCauseEffect(messaging.addOrchestrator("discord", input)),
+      ),
+      getTelegramOverview: handler(() => messaging.telegramOverview()),
+      connectTelegram: payloadHandler(parseConnectTelegramInput, async ({ botToken }) => {
+        await runCauseEffect(messaging.connectTelegram(botToken));
+      }),
+      disconnectTelegram: payloadHandler(parseTelegramBotInput, ({ workspaceId }) =>
+        runCauseEffect(messaging.disconnectTelegram(workspaceId)),
+      ),
+      reconnectTelegram: payloadHandler(parseTelegramBotInput, ({ workspaceId }) =>
+        runCauseEffect(messaging.reconnect("telegram", workspaceId)),
+      ),
+      setTelegramEnabled: payloadHandler(parseSetTelegramEnabledInput, ({ workspaceId, enabled }) =>
+        runCauseEffect(messaging.setEnabled("telegram", workspaceId, enabled)),
+      ),
+      setTelegramAgent: payloadHandler(parseSetTelegramAgentInput, ({ workspaceId, agentId }) =>
+        runCauseEffect(messaging.setTelegramAgent(workspaceId, agentId)),
       ),
     },
   };

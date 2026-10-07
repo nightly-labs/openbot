@@ -44,6 +44,7 @@ import {
   LogoTile,
   SlackMark,
   Stepper,
+  TelegramMark,
   WizardDialog,
   type WizardLink,
 } from "./IntegrationLayout";
@@ -111,6 +112,10 @@ const STATE_HELP: Record<MessagingPlatform, Partial<Record<MessagingConnection["
     invalid_token: "messaging.discordHelp.invalid_token",
     secret_storage_unavailable: "messaging.discordHelp.secret_storage_unavailable",
     relay_unavailable: "messaging.discordHelp.relay_unavailable",
+  },
+  telegram: {
+    invalid_token: "messaging.help.invalid_token",
+    secret_storage_unavailable: "messaging.help.secret_storage_unavailable",
   },
 };
 
@@ -228,15 +233,14 @@ export function messagingPlatformText(platform: MessagingPlatform = "slack") {
 const ORCHESTRATOR_AVATAR = {
   slack: SLACK_ORCHESTRATOR_AVATAR,
   discord: DISCORD_ORCHESTRATOR_AVATAR,
+  telegram: { avatarSeed: "telegram-bot", avatarHue: 215 },
 } as const satisfies Record<MessagingPlatform, { avatarSeed: string; avatarHue: number }>;
 
 /** The logo of a platform. */
 export function MessagingMark(props: { platform?: MessagingPlatform | undefined }) {
-  return (
-    <Show when={props.platform === "discord"} fallback={<SlackMark />}>
-      <DiscordMark />
-    </Show>
-  );
+  if (props.platform === "discord") return <DiscordMark />;
+  if (props.platform === "telegram") return <TelegramMark />;
+  return <SlackMark />;
 }
 
 /** The orchestrator agent of a workspace, when it still exists. */
@@ -422,10 +426,15 @@ function WorkspaceRow(props: {
   const note = () => {
     const current = props.connection;
     if (current.missingScopes.length > 0)
-      return t(text().missingScopes, { scopes: format.list(current.missingScopes) });
+      return t(text().missingScopes, {
+        scopes: format.list(current.missingScopes),
+      });
     if (current.retryAt)
       return t(text().retryAt, {
-        time: format.date(new Date(current.retryAt), { hour: "numeric", minute: "2-digit" }),
+        time: format.date(new Date(current.retryAt), {
+          hour: "numeric",
+          minute: "2-digit",
+        }),
       });
     const help = STATE_HELP[props.platform ?? "slack"][current.state];
     return help ? t(help) : t(text().workspaceDescription);
@@ -509,11 +518,16 @@ export function SlackConnectDialog(props: {
   const copy = () => {
     switch (step()) {
       case 0:
-        return { title: t(text().connectTitle), description: t(text().connectDescription) };
+        return {
+          title: t(text().connectTitle),
+          description: t(text().connectDescription),
+        };
       case 1:
         return {
           title: t(text().agentStepTitle),
-          description: t(text().agentStepDescription, { workspace: workspace() }),
+          description: t(text().agentStepDescription, {
+            workspace: workspace(),
+          }),
         };
       case 2:
         return {

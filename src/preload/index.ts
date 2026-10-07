@@ -146,7 +146,11 @@ import {
   decodeDynamicIslandPreference,
   decodeDynamicIslandPresentation,
 } from "./dynamic-island-decoding";
-import { decodeAddOrchestratorReply, decodeMessagingOverviewReply } from "./messaging-decoding";
+import {
+  decodeAddOrchestratorReply,
+  decodeMessagingOverviewReply,
+  decodeTelegramOverviewReply,
+} from "./messaging-decoding";
 import { decodeProviderRuntimeSnapshot } from "./provider-runtime";
 import {
   decodeAgentInstallation,
@@ -652,6 +656,12 @@ const openbotApi: OpenBotDesktopApi = {
     reconnectDiscordGuild: decodeVoid,
     setDiscordEnabled: decodeVoid,
     addDiscordOrchestrator: decodeAddOrchestratorReply,
+    getTelegramOverview: decodeTelegramOverviewReply,
+    connectTelegram: decodeVoid,
+    disconnectTelegram: decodeVoid,
+    reconnectTelegram: decodeVoid,
+    setTelegramEnabled: decodeVoid,
+    setTelegramAgent: decodeVoid,
   }),
   hostAdmin: bridgeGroup(IPC_ENDPOINTS.hostAdmin, {
     updateIdentity: decodeServer,

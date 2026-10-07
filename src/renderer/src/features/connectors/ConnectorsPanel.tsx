@@ -6,7 +6,12 @@ import {
   type BitwardenConnectorPanelProps,
 } from "@openbot/ui/features/settings/BitwardenConnectorPanel";
 import { GitHubConnectorPanel } from "@openbot/ui/features/settings/GitHubConnectorPanel";
-import { GitHubMark, type IntegrationStatus, OnePasswordMark } from "@openbot/ui/features/settings/IntegrationLayout";
+import {
+  GitHubMark,
+  type IntegrationStatus,
+  OnePasswordMark,
+  TelegramMark,
+} from "@openbot/ui/features/settings/IntegrationLayout";
 import { IntegrationsHub, type IntegrationsHubRow } from "@openbot/ui/features/settings/IntegrationsHub";
 import { OnePasswordConnectorPanel } from "@openbot/ui/features/settings/OnePasswordConnectorPanel";
 import {
@@ -16,12 +21,18 @@ import {
   slackIntegrationState,
   slackOrchestrator,
 } from "@openbot/ui/features/settings/SlackIntegrationPanel";
+import {
+  TelegramIntegrationPanel,
+  telegramAgent,
+  telegramIntegrationState,
+} from "@openbot/ui/features/settings/TelegramIntegrationPanel";
 import { useText } from "@openbot/ui/text";
 import { createSignal, Match, onSettled, Show, Switch } from "solid-js";
 import type { DiscordConnectorController } from "./discord-connector";
 import { type GitHubConnectorController, githubPanelProps } from "./github-connector";
 import { type OnePasswordConnectorController, onePasswordPanelProps } from "./onepassword-connector";
 import type { SlackConnectorController } from "./slack-connector";
+import type { TelegramConnectorController } from "./telegram-connector";
 
 type View = "hub" | "github" | "onepassword" | "bitwarden" | MessagingPlatform;
 
@@ -49,14 +60,18 @@ export function ConnectorsPanel(props: {
   bitwarden?: BitwardenConnectorPanelProps | undefined;
   slack?: SlackConnectorController | undefined;
   discord?: DiscordConnectorController | undefined;
+  telegram?: TelegramConnectorController | undefined;
   agents: AgentProfile[];
 }) {
   const { t } = useText();
   const [view, setView] = createSignal<View>("hub");
-  // The Slack and Discord states change on their own and main sends no event, so they are read while
+  // The messaging states change on their own and main sends no event, so they are read while
   // the section shows.
-  onSettled(() => props.slack?.watch());
-  onSettled(() => props.discord?.watch());
+  onSettled(() => {
+    props.slack?.watch();
+    props.discord?.watch();
+    props.telegram?.watch();
+  });
   /** The Slack or Discord page on screen, when this computer has that integration. */
   const openMessaging = () => {
     const platform = view();
@@ -127,10 +142,35 @@ export function ConnectorsPanel(props: {
       onOpen: () => setView(platform),
     };
   };
+  const telegramRow = (telegram: TelegramConnectorController): IntegrationsHubRow => {
+    const connections = telegram.overview()?.connections ?? [];
+    const state = telegramIntegrationState(connections, props.agents);
+    const [connection] = connections;
+    const agent = connection ? telegramAgent(connection, props.agents) : null;
+    const bot = connection?.workspaceName;
+    return {
+      id: "telegram",
+      name: t("connector.telegram.title"),
+      logo: <TelegramMark />,
+      status: state.status,
+      statusLabel: t(state.label),
+      summary:
+        state.attention > 0
+          ? t("connector.telegram.attentionTitle", { count: state.attention })
+          : bot === undefined
+            ? t("connector.telegram.description")
+            : agent
+              ? t("connector.telegram.summaryConnected", { botUsername: bot })
+              : t("connector.telegram.summaryNoAgent", { botUsername: bot }),
+      agents: agent ? [agent] : [],
+      onOpen: () => setView("telegram"),
+    };
+  };
   const rows = () => {
     const list: IntegrationsHubRow[] = [];
     if (props.slack) list.push(messagingRow("slack", props.slack));
     if (props.discord) list.push(messagingRow("discord", props.discord));
+    if (props.telegram) list.push(telegramRow(props.telegram));
     if (props.github) list.push(githubRow(props.github));
     if (props.onePassword) list.push(onePasswordRow(props.onePassword));
     if (props.bitwarden)
@@ -203,6 +243,27 @@ export function ConnectorsPanel(props: {
                   onReconnect={open().controller.reconnect}
                   onSetEnabled={open().controller.setEnabled}
                   onAddOrchestrator={open().controller.addOrchestrator}
+                />
+              )}
+            </Show>
+          </div>
+        )}
+      </Match>
+      <Match when={view() === "telegram" && props.telegram}>
+        {(telegram) => (
+          <div class="integrations-hub">
+            <Back />
+            <Show when={telegram().overview()}>
+              {(overview) => (
+                <TelegramIntegrationPanel
+                  agents={props.agents}
+                  connections={overview().connections}
+                  busy={telegram().busy()}
+                  onConnect={telegram().connectTelegram}
+                  onDisconnect={telegram().disconnectTelegram}
+                  onReconnect={telegram().reconnect}
+                  onSetEnabled={telegram().setEnabled}
+                  onSetAgent={telegram().setAgent}
                 />
               )}
             </Show>

@@ -10,7 +10,7 @@ import type { AgentProviderId } from "./ipc-agent-status";
 import { isBoundedString, isIdentifier, isNullableBoundedString } from "./ipc-bounded-values";
 import { isBoolean, isDynamicRecord, isOneOf } from "./runtime-values";
 
-export const MESSAGING_PLATFORMS = ["slack", "discord"] as const;
+export const MESSAGING_PLATFORMS = ["slack", "discord", "telegram"] as const;
 export type MessagingPlatform = (typeof MESSAGING_PLATFORMS)[number];
 
 export const MESSAGING_CONNECTION_STATES = [
@@ -127,5 +127,37 @@ export function isMessagingOverview(value: unknown): value is MessagingOverview 
 export function isAddMessagingOrchestratorResult(value: unknown): value is AddMessagingOrchestratorResult {
   return (
     isDynamicRecord(value) && isIdentifier(value.agentId) && (value.sectionId === null || isIdentifier(value.sectionId))
+  );
+}
+
+/** The Telegram bots connected on this computer. */
+export interface TelegramOverview {
+  connections: MessagingConnection[];
+}
+
+export interface ConnectTelegramInput {
+  botToken: string;
+}
+
+export interface TelegramBotInput {
+  workspaceId: string;
+}
+
+export interface SetTelegramEnabledInput {
+  workspaceId: string;
+  enabled: boolean;
+}
+
+export interface SetTelegramAgentInput {
+  workspaceId: string;
+  agentId: string | null;
+}
+
+export function isTelegramOverview(value: unknown): value is TelegramOverview {
+  return (
+    isDynamicRecord(value) &&
+    Array.isArray(value.connections) &&
+    value.connections.length <= MESSAGING_LIMITS.connections &&
+    value.connections.every(isMessagingConnection)
   );
 }

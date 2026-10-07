@@ -53,7 +53,7 @@ import type {
 import { IPC_ENDPOINTS, isManagedToolRuntime, isUpdateBusyPhase } from "@openbot/contracts/ipc";
 import { decodeRecord, requiredString } from "@openbot/contracts/ipc-decoding";
 import { sourceText } from "@openbot/i18n/source";
-import { createOpenBotLogger, toLogValue } from "@openbot/logging";
+import { createOpenBotLogger, registerSecretValue, toLogValue } from "@openbot/logging";
 import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "@openbot/team-client";
 import { app, type BrowserWindow, nativeImage, safeStorage, screen, shell } from "electron";
 import { pasteCodeLoginSupported } from "../backend/agent/cli-code-login";
@@ -67,6 +67,7 @@ import { McpOAuth } from "../backend/mcp-oauth-provider";
 import { discordDriver } from "../backend/messaging/discord/discord-driver";
 import { MessagingService } from "../backend/messaging/messaging-service";
 import { slackDriver } from "../backend/messaging/slack/slack-driver";
+import { telegramDriver } from "../backend/messaging/telegram/telegram-driver";
 import { passwordVaultRouter } from "../backend/password-vault-router";
 import { SidebarLayoutStore } from "../backend/sidebar-layout-store";
 import { StorageUsageScanner, StorageUsageService } from "../backend/storage-usage";
@@ -437,7 +438,10 @@ async function createMessagingServices({
   service,
   sidebarLayout,
   readHostId,
-}: MessagingServicesContext): Promise<{ messaging: MessagingService; signalIngress: SignalIngress }> {
+}: MessagingServicesContext): Promise<{
+  messaging: MessagingService;
+  signalIngress: SignalIngress;
+}> {
   /*
    * The Slack workspaces and Discord guilds where the agents answer. The tokens use the same cipher as every other
    * secret; an unreadable file is reported, not fatal, and each workspace then connects again.
@@ -474,6 +478,9 @@ async function createMessagingServices({
   // Development only: `bun run dev:slack` names this loopback port, so a Slack install returns to this
   // dev app and not to an installed OpenBot that owns `openbot://`.
   const developmentSlackCallbackPort = app.isPackaged ? 0 : Number(process.env.OPENBOT_DEV_SLACK_CALLBACK_PORT ?? 0);
+  const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN?.trim() || undefined;
+  if (telegramBotToken) registerSecretValue(telegramBotToken);
+
   const messaging = new MessagingService({
     threads: service.messaging,
     agents: {
@@ -487,7 +494,8 @@ async function createMessagingServices({
       createMemory: (input) => service.createMemory(input),
     },
     credentials: messagingCredentials,
-    drivers: [slackDriver({ ingress: signalIngress }), discordDriver({ ingress: signalIngress })],
+    drivers: [slackDriver({ ingress: signalIngress }), discordDriver({ ingress: signalIngress }), telegramDriver()],
+    telegramToken: telegramBotToken,
     downloadsRoot: join(app.getPath("userData"), "messaging-downloads"),
     ingress: signalIngress,
     sidebar: sidebarLayout,
@@ -497,7 +505,9 @@ async function createMessagingServices({
           const hostId = readHostId();
           if (!hostId)
             return Effect.fail(
-              new SlackConnectFailed({ cause: new Error(sourceText("error.messaging.relayUnavailable")) }),
+              new SlackConnectFailed({
+                cause: new Error(sourceText("error.messaging.relayUnavailable")),
+              }),
             );
           return centralAuth
             .requestAuthorized(
@@ -509,7 +519,9 @@ async function createMessagingServices({
                   hostId,
                   ...input,
                   ...(developmentSlackCallbackPort > 0
-                    ? { returnUrl: `http://127.0.0.1:${developmentSlackCallbackPort}${SLACK_DEV_CALLBACK_PATH}` }
+                    ? {
+                        returnUrl: `http://127.0.0.1:${developmentSlackCallbackPort}${SLACK_DEV_CALLBACK_PATH}`,
+                      }
                     : {}),
                 }),
               },
@@ -532,7 +544,9 @@ async function createMessagingServices({
           const hostId = readHostId();
           if (!hostId)
             return Effect.fail(
-              new DiscordConnectFailed({ cause: new Error(sourceText("error.messaging.discordRelayUnavailable")) }),
+              new DiscordConnectFailed({
+                cause: new Error(sourceText("error.messaging.discordRelayUnavailable")),
+              }),
             );
           return centralAuth
             .requestAuthorized(
@@ -599,7 +613,10 @@ export async function createApplicationServices({
   // startup because its window must be able to appear immediately, but the two services its
   // critical actions drive are built hundreds of lines below. A single named local rather than
   // two lazy getters, so the gap is visible and bounded.
-  let criticalActionTargets: { agents: AgentService; remoteServers: RemoteServerManager } | null = null;
+  let criticalActionTargets: {
+    agents: AgentService;
+    remoteServers: RemoteServerManager;
+  } | null = null;
   const dynamicIsland = new DynamicIslandWindowController({
     platform: process.platform,
     preferencePath: join(app.getPath("userData"), DYNAMIC_ISLAND_PREFERENCE_FILE),
@@ -613,7 +630,11 @@ export async function createApplicationServices({
     performCriticalAction: (action) =>
       Effect.suspend(() => {
         if (!criticalActionTargets) {
-          return Effect.fail(new DynamicIslandFailed({ cause: new Error(sourceText("error.app.notReady")) }));
+          return Effect.fail(
+            new DynamicIslandFailed({
+              cause: new Error(sourceText("error.app.notReady")),
+            }),
+          );
         }
         const { agents, remoteServers } = criticalActionTargets;
         return performDynamicIslandCriticalAction(action, agents, remoteServers, decodeVoid).pipe(
@@ -784,7 +805,9 @@ export async function createApplicationServices({
     systemLocale: app.getLocale(),
   });
   await runCauseEffect(language.load());
-  const logoColor = new LogoColorService({ path: join(app.getPath("userData"), LOGO_COLOR_PREFERENCE_FILE) });
+  const logoColor = new LogoColorService({
+    path: join(app.getPath("userData"), LOGO_COLOR_PREFERENCE_FILE),
+  });
   await runCauseEffect(logoColor.load());
   const notificationPreference = new NotificationPreferenceStore(
     join(app.getPath("userData"), NOTIFICATION_PREFERENCE_FILE),
@@ -829,7 +852,11 @@ export async function createApplicationServices({
         .updateProviderCli(runtime, () =>
           install().pipe(
             Effect.mapError(
-              (error) => new AgentLifecycleFailed({ operation: "updateProviderCli.install", cause: error.cause }),
+              (error) =>
+                new AgentLifecycleFailed({
+                  operation: "updateProviderCli.install",
+                  cause: error.cause,
+                }),
             ),
           ),
         )
@@ -969,7 +996,10 @@ export async function createApplicationServices({
     appVersion: app.getVersion(),
     // Outside every root an agent can write, like the GitHub tool files.
     cliInstall: onePasswordCliTarget
-      ? { directory: join(app.getPath("userData"), "provider-state", "1password-cli"), target: onePasswordCliTarget }
+      ? {
+          directory: join(app.getPath("userData"), "provider-state", "1password-cli"),
+          target: onePasswordCliTarget,
+        }
       : null,
     openExternal: (url) => shell.openExternal(url),
   });
@@ -979,7 +1009,9 @@ export async function createApplicationServices({
   );
   const tables = new AgentTables({
     sharedRoot: store.sharedRoot,
-    supervisor: new AgentDatabaseSupervisor({ spawnHost: spawnAgentDatabaseHost }),
+    supervisor: new AgentDatabaseSupervisor({
+      spawnHost: spawnAgentDatabaseHost,
+    }),
   });
   // Looked up again on demand, because a user may install the driver while OpenBot runs, and the
   // panel's "Check again" has to see it.
@@ -1381,7 +1413,12 @@ export async function createApplicationServices({
     environment: HostedServerEnvironment,
     initialization: Effect.Effect<CentralAuthState, RemoteWorkflowError>,
   ) =>
-    applyHostedServerAccount({ environment, centralAuth, centralAuthInitialization: initialization, teamStore }).pipe(
+    applyHostedServerAccount({
+      environment,
+      centralAuth,
+      centralAuthInitialization: initialization,
+      teamStore,
+    }).pipe(
       Effect.tap(() =>
         Effect.sync(() => {
           hostedServerSignedIn = true;
@@ -1405,9 +1442,18 @@ export async function createApplicationServices({
       overrideRoot: process.env.OPENBOT_REMOTE_DESKTOP_RUNTIME_PATH,
     }),
   );
-  const agentAdminSettings = createAgentAdminSettings({ agents: service, approvalAutomation });
-  const customProviderChanges = createCustomProviderChanges({ service, customProviders });
-  const customAgentChanges = createCustomAgentChanges({ service, customAgents });
+  const agentAdminSettings = createAgentAdminSettings({
+    agents: service,
+    approvalAutomation,
+  });
+  const customProviderChanges = createCustomProviderChanges({
+    service,
+    customProviders,
+  });
+  const customAgentChanges = createCustomAgentChanges({
+    service,
+    customAgents,
+  });
   // The host comes before the updater, and the restart readiness reads the host. The routes reach
   // the schedule through this, and a request that arrives before it exists is refused.
   let requestedUpdate: RequestedUpdate | undefined;
@@ -1529,7 +1575,9 @@ export async function createApplicationServices({
       Effect.suspend(() => {
         if (!safeStorage.isEncryptionAvailable())
           return Effect.fail(
-            new RemoteWorkflowError({ cause: new Error(sourceText("error.app.secretStorageUnavailable")) }),
+            new RemoteWorkflowError({
+              cause: new Error(sourceText("error.app.secretStorageUnavailable")),
+            }),
           );
         return loadOrCreateRemoteDesktopCredentials(
           join(app.getPath("userData"), REMOTE_DESKTOP_RUNTIME_SECRET_FILE),
@@ -1587,7 +1635,10 @@ export async function createApplicationServices({
     app.isPackaged && appVariant === "production"
       ? new ReportQueue(
           fileReportStorage(join(app.getPath("userData"), "openbot-error-reports-v1.json")),
-          openPanelTransport({ clientId: "6c989975-87ef-4f0c-857e-ab449a65b5c2", origin: "openbot-app://app" }),
+          openPanelTransport({
+            clientId: "6c989975-87ef-4f0c-857e-ab449a65b5c2",
+            origin: "openbot-app://app",
+          }),
           {
             surface: "desktop_host",
             app_version: app.getVersion(),
@@ -1644,7 +1695,9 @@ export async function createApplicationServices({
   // than flushing a queue, so a later call would attribute them to nobody.
   analytics.flushPending();
   service.on("failure", (failure) => analytics.handleFailure(failure));
-  const trace = new TraceFile({ directory: join(app.getPath("userData"), "logs") });
+  const trace = new TraceFile({
+    directory: join(app.getPath("userData"), "logs"),
+  });
   teardown.push(TEARDOWN_ORDER.trace, "the trace file", () => Effect.runPromise(trace.close()));
   const remoteServers = new RemoteServerManager(
     join(app.getPath("userData"), REMOTE_SERVERS_FILE),
@@ -1728,7 +1781,11 @@ export async function createApplicationServices({
         : remoteServers.closeRemoteDesktopSession(serverId, sessionId),
     selectRemoteDesktopDisplay: (serverId, displayId) => {
       if (serverId === "local")
-        return Effect.fail(new RemoteWorkflowError({ cause: new Error(sourceText("error.app.finishLocalTest")) }));
+        return Effect.fail(
+          new RemoteWorkflowError({
+            cause: new Error(sourceText("error.app.finishLocalTest")),
+          }),
+        );
       return remoteServers.selectRemoteDesktopDisplay(serverId, displayId);
     },
   });
@@ -1808,7 +1865,9 @@ export async function createApplicationServices({
   const agentInitialization = new AgentInitializationGate(() =>
     Effect.gen(function* () {
       yield* Fiber.join(computerUseWarmUp);
-      yield* service.initialize({ heldRoutines: takeRoutineHold(routineHoldFile, (message) => logger.warn(message)) });
+      yield* service.initialize({
+        heldRoutines: takeRoutineHold(routineHoldFile, (message) => logger.warn(message)),
+      });
       yield* eventsRuntime.start();
       yield* automation.sync();
     }),
@@ -1911,7 +1970,11 @@ export async function createApplicationServices({
         centralAuth
           .requestAuthorized(
             path,
-            { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(report) },
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(report),
+            },
             () => undefined,
           )
           .pipe(toRemoteWorkflowError),

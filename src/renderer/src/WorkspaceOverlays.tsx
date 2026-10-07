@@ -20,6 +20,7 @@ import {
   type OnePasswordConnectorController,
 } from "./features/connectors/onepassword-connector";
 import { createSlackConnector } from "./features/connectors/slack-connector";
+import { createTelegramConnector } from "./features/connectors/telegram-connector";
 import { useCustomAgents } from "./features/custom-agents/custom-agents-context";
 import { useCustomProviders } from "./features/custom-providers/custom-providers-context";
 import { useProviderDetection } from "./features/custom-providers/provider-detection-context";
@@ -357,6 +358,7 @@ function ServerSettings(props: {
   // The Slack and Discord Orchestrators run on this computer, so their picker lists this computer's
   // models: none while a joined server is on screen, and then it starts on a new agent's default.
   const { collapseSidebarSection } = useSidebar();
+  const telegram = createTelegramConnector();
   const orchestratorModels = () => {
     const options = modelOptions();
     if (activeServer()?.kind !== "local" || options.length === 0) return undefined;
@@ -564,6 +566,7 @@ function ServerSettings(props: {
           // computer's browser and return to its `openbot://` link.
           slackConnector={server().kind === "local" ? slack : undefined}
           discordConnector={server().kind === "local" ? discord : undefined}
+          telegramConnector={server().kind === "local" ? telegram : undefined}
           connectorAgents={agentList()}
           // The feed listens on this computer, so a calendar app on another one cannot read it.
           routineFeed={

@@ -161,6 +161,7 @@
     "./features/settings/BitwardenConnectorPanel": "./src/features/settings/BitwardenConnectorPanel.tsx",
     "./features/settings/OnePasswordConnectorPanel": "./src/features/settings/OnePasswordConnectorPanel.tsx",
     "./features/settings/SlackIntegrationPanel": "./src/features/settings/SlackIntegrationPanel.tsx",
+    "./features/settings/TelegramIntegrationPanel": "./src/features/settings/TelegramIntegrationPanel.tsx",
     "./features/settings/LanguageSelect": "./src/features/settings/LanguageSelect.tsx",
     "./features/marketplace/Marketplace": "./src/features/marketplace/Marketplace.tsx",
     "./features/marketplace/PluginIcon": "./src/features/marketplace/PluginIcon.tsx",

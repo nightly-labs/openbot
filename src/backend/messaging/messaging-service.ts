@@ -14,6 +14,7 @@ import type {
   MessagingOverview,
   MessagingPlatform,
   RespondToApprovalInput,
+  TelegramOverview,
 } from "@openbot/contracts/ipc";
 import { MESSAGING_CONNECTION_STATES } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
@@ -94,6 +95,7 @@ export interface MessagingServiceOptions {
   slackOrigin?: string;
   /** Where the Slack and Discord Orchestrators go in the sidebar: an Integrations section. */
   sidebar?: Pick<SidebarLayoutStore, "getSnapshot" | "mutate">;
+  telegramToken?: string;
 }
 
 interface LiveConnection {
@@ -163,6 +165,8 @@ export class MessagingService {
   readonly #discordConnect: DiscordConnect | null;
   readonly #slackOrigin: string | undefined;
   readonly #sidebar: Pick<SidebarLayoutStore, "getSnapshot" | "mutate"> | null;
+  readonly #telegramToken: string | undefined;
+  readonly #ephemeralTokens = new Map<string, Record<string, string>>();
   #started = false;
   #scope = Scope.makeUnsafe();
 
@@ -177,6 +181,7 @@ export class MessagingService {
     this.#discordConnect = options.ingress && options.discordApp ? new DiscordConnect(options.discordApp) : null;
     this.#slackOrigin = options.slackOrigin;
     this.#sidebar = options.sidebar ?? null;
+    this.#telegramToken = options.telegramToken;
   }
 
   readonly start = Effect.fn("MessagingService.start")(function* (
@@ -194,12 +199,25 @@ export class MessagingService {
     this.#threads.setContextSource((link, origin) => this.#promptContext(link, origin));
     this.#ingress?.handle((workspaceId, delivery) => this.deliver(workspaceId, delivery));
     const records = this.#threads.store.connections();
-    yield* this.#credentials.retain(new Set(records.map((record) => record.connectionId)));
+    yield* this.#credentials.retain(new Set(records.map((record) => record.connectionId))).pipe(
+      Effect.catch((error) => {
+        this.#warn(error);
+        return Effect.void;
+      }),
+    );
     yield* Effect.forEach(
       records.filter((record) => record.enabled),
       (record) => this.#startConnection(record),
       { concurrency: "unbounded", discard: true },
     );
+    if (this.#telegramToken) {
+      yield* this.connectTelegram(this.#telegramToken).pipe(
+        Effect.catch((error) => {
+          this.#warn(error);
+          return Effect.void;
+        }),
+      );
+    }
   }).bind(this);
 
   readonly stop = Effect.fn("MessagingService.stop")(function* (
@@ -245,10 +263,86 @@ export class MessagingService {
     return {
       connections: this.#threads.store
         .connections()
-        .filter((record) => record.platform === platform && this.#credentials.status(record.connectionId) !== "missing")
+        .filter((record) => record.platform === platform && this.#credentialsState(record.connectionId) !== "missing")
         .map((record) => this.#summary(record)),
     };
   }
+
+  /** The Telegram bots of this computer, for Server settings > Connectors. */
+  telegramOverview(): TelegramOverview {
+    return {
+      connections: this.#threads.store
+        .connections()
+        .filter((record) => record.platform === "telegram" && this.#credentialsState(record.connectionId) !== "missing")
+        .map((record) => this.#summary(record)),
+    };
+  }
+
+  readonly connectTelegram = Effect.fn("MessagingService.connectTelegram")(function* (
+    this: MessagingService,
+    botToken: string,
+  ): Effect.fn.Return<MessagingConnectionRecord, MessagingOperationFailed> {
+    const driver = this.#drivers.get("telegram");
+    if (!driver)
+      return yield* new MessagingOperationFailed({ cause: new Error(sourceText("error.messaging.unsupported")) });
+    const adapter = driver.createAdapter({ botToken }, { rateLimited: () => undefined });
+    const identity = yield* adapter.identify().pipe(toMessagingOperationFailed);
+    const record = this.#threads.store.ensureConnection("telegram", identity.workspaceId, identity.workspaceName);
+    yield* this.#stopConnection(record.connectionId);
+    const credentials = {
+      botToken,
+      botUserId: identity.botUserId,
+      appId: identity.appId,
+      workspaceId: identity.workspaceId,
+    };
+    this.#ephemeralTokens.set(record.connectionId, credentials);
+    yield* this.#credentials.set(record.connectionId, credentials).pipe(Effect.catch(() => Effect.void));
+    const orchestratorAgentId = record.orchestratorAgentId ?? this.#agents.listAgents()[0]?.id ?? null;
+    this.#threads.store.updateConnection(record.connectionId, {
+      enabled: true,
+      workspaceName: identity.workspaceName,
+      botUserId: identity.botUserId,
+      appId: identity.appId,
+      orchestratorAgentId,
+      lastErrorCode: null,
+    });
+    const updated = this.#threads.store.connection(record.connectionId);
+    if (updated) yield* this.#startConnection(updated);
+    return updated ?? record;
+  }).bind(this);
+
+  readonly disconnectTelegram = Effect.fn("MessagingService.disconnectTelegram")(function* (
+    this: MessagingService,
+    workspaceId: string,
+  ): Effect.fn.Return<void, MessagingOperationFailed> {
+    const record = this.#threads.store.connectionForWorkspace("telegram", workspaceId);
+    if (!record) return;
+    yield* this.#stopConnection(record.connectionId);
+    this.#ephemeralTokens.delete(record.connectionId);
+    yield* this.#credentials.clear(record.connectionId).pipe(
+      Effect.catch((error) => {
+        this.#warn(error);
+        return Effect.void;
+      }),
+    );
+    this.#threads.store.updateConnection(record.connectionId, {
+      enabled: false,
+      lastErrorCode: null,
+    });
+  }).bind(this);
+
+  readonly setTelegramAgent = Effect.fn("MessagingService.setTelegramAgent")(function* (
+    this: MessagingService,
+    workspaceId: string,
+    agentId: string | null,
+  ): Effect.fn.Return<void, MessagingOperationFailed> {
+    const record = this.#threads.store.connectionForWorkspace("telegram", workspaceId);
+    if (!record)
+      return yield* new MessagingOperationFailed({ cause: new Error(sourceText("error.messaging.notConnected")) });
+    this.#threads.store.updateConnection(record.connectionId, {
+      orchestratorAgentId: agentId,
+    });
+  }).bind(this);
 
   readonly reconnect = Effect.fn("MessagingService.reconnect")(function* (
     this: MessagingService,
@@ -474,7 +568,7 @@ export class MessagingService {
     this: MessagingService,
     record: MessagingConnectionRecord,
   ) {
-    const credentials = this.#credentials.get(record.connectionId);
+    const credentials = this.#getCredentials(record.connectionId);
     const driver = this.#drivers.get(record.platform);
     if (!driver || !credentials?.[driver.requiredCredential]) return;
     const live: LiveConnection = {
@@ -1041,6 +1135,25 @@ export class MessagingService {
       { startImmediately: true, uninterruptible: true },
     );
   });
+
+  #credentialsState(connectionId: string): MessagingCredentialState {
+    if (this.#ephemeralTokens.has(connectionId)) return "saved";
+    const connection = this.#threads.store.connection(connectionId);
+    if (connection?.platform === "telegram" && this.#telegramToken) return "saved";
+    return this.#credentials.status(connectionId);
+  }
+
+  #getCredentials(connectionId: string): Record<string, string> | null {
+    const fromStore = this.#credentials.get(connectionId);
+    if (fromStore) return fromStore;
+    const ephemeral = this.#ephemeralTokens.get(connectionId);
+    if (ephemeral) return ephemeral;
+    const connection = this.#threads.store.connection(connectionId);
+    if (connection?.platform === "telegram" && this.#telegramToken) {
+      return { botToken: this.#telegramToken };
+    }
+    return null;
+  }
 
   #requireConnection(platform: MessagingPlatform, workspaceId: string): MessagingConnectionRecord {
     const record = this.#threads.store.connectionForWorkspace(platform, workspaceId);

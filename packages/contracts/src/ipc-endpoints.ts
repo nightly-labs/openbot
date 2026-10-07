@@ -218,12 +218,17 @@ import type {
   AddMessagingOrchestratorResult,
   AddSlackOrchestratorInput,
   AddSlackOrchestratorResult,
+  ConnectTelegramInput,
   MessagingOverview,
   MessagingWorkspaceInput,
   SetMessagingEnabledInput,
   SetSlackEnabledInput,
+  SetTelegramAgentInput,
+  SetTelegramEnabledInput,
   SlackOverview,
   SlackWorkspaceInput,
+  TelegramBotInput,
+  TelegramOverview,
 } from "./ipc-messaging";
 import type { NotificationOpenedEvent, NotificationPreference } from "./ipc-notifications";
 import type { OnePasswordConnectInput, OnePasswordConnectorStatus } from "./ipc-onepassword-connector";
@@ -628,6 +633,12 @@ export const IPC_ENDPOINTS = {
     addDiscordOrchestrator: request<AddMessagingOrchestratorInput, AddMessagingOrchestratorResult>()(
       "messaging:add-discord-orchestrator",
     ),
+    getTelegramOverview: request<undefined, TelegramOverview>()("messaging:get-telegram-overview"),
+    connectTelegram: request<ConnectTelegramInput, void>()("messaging:connect-telegram"),
+    disconnectTelegram: request<TelegramBotInput, void>()("messaging:disconnect-telegram"),
+    reconnectTelegram: request<TelegramBotInput, void>()("messaging:reconnect-telegram"),
+    setTelegramEnabled: request<SetTelegramEnabledInput, void>()("messaging:set-telegram-enabled"),
+    setTelegramAgent: request<SetTelegramAgentInput, void>()("messaging:set-telegram-agent"),
   },
   // The server name, logo and app update of one server's host. `host.updateIdentity` and `update`
   // reach this computer only; these take the server, so a remote admin reaches the host. The

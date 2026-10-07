@@ -22,7 +22,10 @@ export const messages = defineMessages("connector", {
   "connector.github.repositoriesFailed": "OpenBot could not read the repositories from GitHub.",
   "connector.github.noRepositories": "The OpenBot GitHub App is not installed on a repository yet.",
   // {count} is a number, such as 12.
-  "connector.github.moreRepositories": { one: "And {count} more repository", other: "And {count} more repositories" },
+  "connector.github.moreRepositories": {
+    one: "And {count} more repository",
+    other: "And {count} more repositories",
+  },
   // A badge next to a repository that only its members can see.
   "connector.github.private": "Private",
   "connector.github.disconnect": "Disconnect",
@@ -39,7 +42,10 @@ export const messages = defineMessages("connector", {
   "connector.github.statusNotSetUp": "Not set up",
   "connector.github.accountTitle": "Account",
   // {count} is the number of repositories in the list, such as 12.
-  "connector.github.filterPlaceholder": { one: "Filter {count} repository", other: "Filter {count} repositories" },
+  "connector.github.filterPlaceholder": {
+    one: "Filter {count} repository",
+    other: "Filter {count} repositories",
+  },
   "connector.github.filterLabel": "Filter repositories",
   // {query} is the text the user typed in the filter.
   "connector.github.noMatch": "No repository matches “{query}”.",
@@ -256,7 +262,10 @@ export const messages = defineMessages("connector", {
     "Move a login into this vault in 1Password to let agents sign in with it. Remove it to stop.",
   "connector.onePassword.loginsLoading": "Reading the logins from 1Password",
   // {count} is a number, such as 3.
-  "connector.onePassword.loginCount": { one: "{count} login", other: "{count} logins" },
+  "connector.onePassword.loginCount": {
+    one: "{count} login",
+    other: "{count} logins",
+  },
   "connector.onePassword.disconnect": "Disconnect",
   "connector.onePassword.disconnectTitle": "Disconnect 1Password",
   "connector.onePassword.disconnectSummary":
@@ -279,4 +288,41 @@ export const messages = defineMessages("connector", {
   "connector.bitwarden.connected": "Connected",
   "connector.bitwarden.disconnected": "Not connected",
   "connector.bitwarden.failed": "Could not connect to Bitwarden.",
+
+  // Server settings > Connectors > Telegram
+  "connector.telegram.title": "Telegram",
+  "connector.telegram.description": "Send tasks to your OpenBot agents and get reports back via Telegram bot.",
+  "connector.telegram.statusNotSetUp": "Not set up",
+  "connector.telegram.statusConnected": "Connected",
+  "connector.telegram.statusAttention": "Needs attention",
+  "connector.telegram.summaryConnected": "{botUsername} · Active",
+  "connector.telegram.summaryNoAgent": "{botUsername} · No agent assigned",
+  "connector.telegram.attentionTitle": {
+    one: "{count} connection needs attention",
+    other: "{count} connections need attention",
+  },
+  "connector.telegram.attentionDescription": "The status below says what to do.",
+  "connector.telegram.connect": "Connect Telegram",
+  "connector.telegram.actionFailed": "Telegram did not accept the change",
+  "connector.telegram.botTitle": "Bot",
+  "connector.telegram.botDescription": "Direct messages and mentions in groups send tasks to OpenBot.",
+  "connector.telegram.disconnect": "Disconnect",
+  "connector.telegram.reconnect": "Reconnect",
+  "connector.telegram.resume": "Resume",
+  "connector.telegram.pause": "Pause",
+  "connector.telegram.tokenLabel": "Bot Token",
+  "connector.telegram.tokenPlaceholder": "123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ",
+  "connector.telegram.tokenHelp": "Create a bot with @BotFather on Telegram and paste the token here.",
+  "connector.telegram.saveToken": "Connect Bot",
+  "connector.telegram.agentTitle": "Assigned Agent",
+  "connector.telegram.agentDescription": "This agent receives tasks sent to your Telegram bot.",
+  "connector.telegram.agentSelect": "Select an agent",
+  "connector.telegram.disconnectTitle": "Disconnect {bot}?",
+  "connector.telegram.disconnectDescription":
+    "OpenBot stops answering on Telegram and removes the bot token from this computer.",
+  "connector.telegram.disconnectEffect": "You will no longer be able to reach your OpenBot agents via Telegram.",
+  "connector.telegram.removeEffectKept": "Conversations and agents stay in OpenBot.",
+  "connector.telegram.keep": "Keep connected",
+  "connector.telegram.close": "Close",
+  "connector.telegram.rowAction": "{action}: {name}",
 });

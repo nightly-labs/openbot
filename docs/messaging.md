@@ -97,6 +97,23 @@ again.
 - An answer longer than 2,000 characters is sent in more than one post. A file larger than 10 MB is
   not sent, and the conversation says which files were not sent.
 
+## Connect Telegram
+
+Telegram is a remote for the desktop app. OpenBot connects directly to the Telegram Bot API over HTTPS using long polling (`getUpdates`). It does not route through Signal and does not require any public webhook, URL, or tunnel.
+
+1. Create a bot with `@BotFather` on Telegram to obtain a Bot Token.
+2. In OpenBot, open **Server settings → Connectors → Telegram**.
+3. If `TELEGRAM_BOT_TOKEN` is set in the environment, OpenBot connects the bot automatically on startup. Otherwise, paste your token in the settings panel and select **Connect Bot**.
+4. Select the assigned agent that receives Telegram tasks.
+5. In Telegram, send a direct message to your bot or mention it in a group. OpenBot processes the task on your local machine and returns the report.
+
+### Telegram behavior
+- Direct messages to the bot start or continue a conversation thread.
+- Group messages addressing the bot (via `@mention`, `/command`, or reply to the bot) route to the assigned agent.
+- Telegram does not have a channel history API for bots; OpenBot maintains a local cache of observed messages per chat/thread to supply conversation context for subsequent turns.
+- OpenBot formats markdown into Telegram HTML tags (`<b>`, `<i>`, `<code>`, `<pre>`, `<a href="...">`), falling back to plain text if Telegram rejects the markup. Long responses are split into safe chunks within Telegram's 4096-character limit without breaking code blocks.
+- Inline action buttons allow approval requests and stopping active tasks directly from Telegram.
+
 ## Test Slack locally
 
 Slack must reach Signal over public HTTPS. `bun run dev:slack` opens a `cloudflared` tunnel to the
@@ -175,7 +192,7 @@ core changes:
 | --- | --- | --- | --- |
 | Slack | The Events API through Signal | `thread_ts`, or the message `ts` that starts a thread | Implemented. |
 | Discord | The Gateway in Signal (`@discordjs/ws`), which passes mentions to the host; calls go through Signal | The id of the first message of a reply chain | Implemented. No privileged intent. |
-| Telegram | Long polling with `getUpdates` and an offset | `message_thread_id` in a forum, else the chat id | No history API: store what the bot sees for context. |
+| Telegram | Long polling with `getUpdates` and an offset | `message_thread_id` in a forum, else the chat id | Implemented. Direct API long polling without Signal. Local history cache. |
 
 Then add the platform to `MESSAGING_PLATFORMS`, a page in Server settings → Connectors, and its i18n
 keys. The database needs no migration: `platform` has no `CHECK`.
