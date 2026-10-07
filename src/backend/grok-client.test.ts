@@ -669,13 +669,13 @@ describe.sequential("GrokAgentClient", () => {
     await runCauseEffect(client.request("initialize", {}, decodeRecordResponse));
     const models = await runCauseEffect(client.request("model/list", {}, decodeModelListResponse));
     expect(models.data).toContainEqual(expect.objectContaining({ model: "grok-future-2", displayName: "Future Grok" }));
-    expect(await readLog()).toContainEqual({ method: "session/close", sessionId: "grok-session-2" });
+    await expectLogged({ method: "session/close", sessionId: "grok-session-2" });
     await expect(runCauseEffect(client.request("model/list", {}, decodeModelListResponse))).rejects.toThrow(
       "Discovery unavailable",
     );
     const refreshed = await runCauseEffect(client.request("model/list", {}, decodeModelListResponse));
     expect(refreshed.data.map((model) => model.model)).toEqual(["grok-4.5", "grok-fast", "grok-future-4"]);
-    expect(await readLog()).toContainEqual({ method: "session/close", sessionId: "grok-session-4" });
+    await expectLogged({ method: "session/close", sessionId: "grok-session-4" });
   });
 
   it("bounds Grok model discovery by the caller timeout", async () => {
@@ -827,6 +827,11 @@ describe.sequential("GrokAgentClient", () => {
     },
   );
 });
+
+/** Discovery closes its session in the background after `model/list` returns, so wait for the close. */
+async function expectLogged(entry: DynamicRecord): Promise<void> {
+  await vi.waitFor(async () => expect(await readLog()).toContainEqual(entry), { timeout: 3_000 });
+}
 
 async function readLog(): Promise<DynamicRecord[]> {
   const text = await readFile(logPath, "utf8").catch(() => "");
