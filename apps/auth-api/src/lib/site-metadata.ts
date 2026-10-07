@@ -90,7 +90,7 @@ export function openBotSoftwareApplication(facts: OpenBotApplicationFacts) {
       "Agents that work as a team and keep their workspace and history",
       "Chats, files and workspaces stay on your computer",
       "iPhone and Android apps that connect to your own computer",
-      "Free for noncommercial use, with no account needed",
+      "Free for noncommercial use",
     ],
     isAccessibleForFree: true,
     offers: {

@@ -1081,6 +1081,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       },
       ...createHostRequestActions({
         request,
+        teamApi,
         queryClient,
         queryScope: [session.apiUrl, session.user.id, sessionScope],
         capabilities: serverCapabilities.current,

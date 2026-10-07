@@ -180,7 +180,7 @@ export function OpenBot101() {
       </p>
       <p>
         Cloudflare holds accounts, avatars, host configuration, memberships, invitations and logical session records. It
-        does not carry chats, files or commands. An account is optional. OpenBot works without one.
+        does not carry chats, files or commands.
       </p>
 
       <h2>What is next</h2>

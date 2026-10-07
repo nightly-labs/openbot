@@ -7,7 +7,6 @@ import {
 import type { AppTextKey } from "@openbot/i18n";
 import {
   Badge,
-  type BadgeTone,
   Button,
   ConfirmDialog,
   Field,
@@ -51,16 +50,19 @@ const STATE_LABELS = {
   deleted: "settings.hostedServers.state.deleted",
 } as const satisfies Record<HostedServerState, AppTextKey>;
 
-const STATE_TONES: Record<HostedServerState, BadgeTone> = {
-  awaiting_payment: "warning",
-  creating: "accent",
-  starting: "accent",
-  running: "success",
-  stopping: "neutral",
-  stopped: "neutral",
-  waking: "accent",
-  error: "danger",
-  deleted: "neutral",
+const STATE_VARIANTS: Record<
+  HostedServerState,
+  "warning-light" | "primary-light" | "success-light" | "secondary" | "destructive-light"
+> = {
+  awaiting_payment: "warning-light",
+  creating: "primary-light",
+  starting: "primary-light",
+  running: "success-light",
+  stopping: "secondary",
+  stopped: "secondary",
+  waking: "primary-light",
+  error: "destructive-light",
+  deleted: "secondary",
 };
 
 export function SettingsHostedServersTab(props: SettingsHostedServersTabProps) {
@@ -116,9 +118,9 @@ export function SettingsHostedServersTab(props: SettingsHostedServersTabProps) {
                     {server.name}
                     <Show
                       when={planEnded(server)}
-                      fallback={<Badge tone={STATE_TONES[server.state]}>{t(STATE_LABELS[server.state])}</Badge>}
+                      fallback={<Badge variant={STATE_VARIANTS[server.state]}>{t(STATE_LABELS[server.state])}</Badge>}
                     >
-                      <Badge tone="warning">{t("settings.hostedServers.state.planEnded")}</Badge>
+                      <Badge variant="warning-light">{t("settings.hostedServers.state.planEnded")}</Badge>
                     </Show>
                   </ItemTitle>
                   <ItemDescription>{description(server)}</ItemDescription>

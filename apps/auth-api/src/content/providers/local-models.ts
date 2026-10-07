@@ -53,8 +53,7 @@ export const LOCAL_MODELS_PROVIDER: ProviderPage = {
     },
     {
       question: "Does a local model need an account?",
-      answer:
-        "No. Ollama and LM Studio need no account for local models, and OpenBot needs no account on one computer.",
+      answer: "No. Ollama and LM Studio need no account for local models.",
     },
     {
       question: "Can I use a model server on another computer?",

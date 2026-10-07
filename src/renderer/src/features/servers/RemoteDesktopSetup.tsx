@@ -319,7 +319,7 @@ export function RemoteDesktopSetup(props: { server: ServerSummary; platform: "da
                     <ItemTitle>{t(label)}</ItemTitle>
                   </ItemContent>
                   <ItemActions>
-                    <Badge tone={status() === "allowed" ? "success" : "warning"}>
+                    <Badge variant={status() === "allowed" ? "success-light" : "warning-light"}>
                       {status() === "allowed" && key !== "screenRecording" && key !== "accessibility"
                         ? t("remoteDesktop.setup.state.available")
                         : t(LABELS[status()])}

@@ -35,7 +35,7 @@ function llmsTxt(): string {
     "",
     `> ${OPENBOT_SITE_DESCRIPTION}`,
     "",
-    "OpenBot is a desktop app for macOS, Windows and Linux. Each agent has its own workspace, thread and history, and keeps them when you change its provider or restart the app. Agents can give work to other agents. Chats, files and workspaces stay on your computer; OpenBot has no server that holds them. The app is free for noncommercial use, and it works with no account. iPhone and Android apps connect to OpenBot on your own computer.",
+    "OpenBot is a desktop app for macOS, Windows and Linux. Each agent has its own workspace, thread and history, and keeps them when you change its provider or restart the app. Agents can give work to other agents. Chats, files and workspaces stay on your computer; OpenBot has no server that holds them. The app is free for noncommercial use. iPhone and Android apps connect to OpenBot on your own computer.",
     "",
     `Each article below also has its text as Markdown, at its URL with \`.md\` added. [llms-full.txt](${absolute("/llms-full.txt")}) holds all of them in one file.`,
     "",

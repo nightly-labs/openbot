@@ -73,9 +73,7 @@ marketplace/plugin-catalog/
 
 ### 2.2 What the app gets
 
-The Account Worker (`apps/auth-api`) serves the catalog from its own bundle. The requests need no
-account. `AGENTS.md` requires the app to work without an account, so the browse path must not use a
-session token.
+The Account Worker (`apps/auth-api`) serves the catalog from its own bundle. The catalog is public, so requests do not use a session token.
 
 | URL | Content | Cache-Control |
 | --- | --- | --- |

@@ -73,11 +73,11 @@ export function SettingsHostedSitesTab(props: SettingsHostedSitesTabProps) {
                         </Text>
                       }
                     >
-                      <Badge tone="neutral">{t("settings.hostedSites.blocked")}</Badge>
+                      <Badge variant="secondary">{t("settings.hostedSites.blocked")}</Badge>
                     </Show>
                     {/* An upload with no proven server counts against the account's own site, not this server's plan. */}
                     <Show when={site.serverId === null}>
-                      <Badge tone="neutral">{t("settings.hostedSites.unlinked")}</Badge>
+                      <Badge variant="secondary">{t("settings.hostedSites.unlinked")}</Badge>
                     </Show>
                   </ItemContent>
                   <ItemActions class="hosted-sites-actions">

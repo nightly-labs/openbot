@@ -3,10 +3,7 @@ import { Link } from "@tanstack/solid-router";
 export function RunTheTeamServerYourself() {
   return (
     <>
-      <p>
-        OpenBot works with no account at all. Everything that makes the app useful on your own machine — agents,
-        threads, workspaces, files — is there the moment you open it, and none of it needs us.
-      </p>
+      <p>OpenBot keeps your agents, threads, workspaces and files on your own computer.</p>
 
       <h2>What a team adds</h2>
       <p>
@@ -19,7 +16,7 @@ export function RunTheTeamServerYourself() {
       <p>
         There is an account service, and it is deliberately small. It holds accounts, avatars, memberships, invitations
         and the configuration that lets one computer find another. It does not hold your conversations, your files or
-        your commands, and it is not in the path when you use the app alone.
+        your commands.
       </p>
       <p>
         The account service is separate from the team server. With self-hosting, the host and your work run on hardware
@@ -31,8 +28,8 @@ export function RunTheTeamServerYourself() {
         for the plans and setup.
       </p>
       <p>
-        We drew that line early because it is the kind of boundary that is hard to move later: the account service helps
-        devices find each other, but it is not a second copy of the work.
+        In other words, the account service handles the connection between people and servers; the team server is where
+        the shared work lives.
       </p>
 
       <h2>The trade you are making</h2>

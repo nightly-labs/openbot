@@ -227,7 +227,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
         <span class="provider-picker-state">
           {/* Count only; endpoint naming is the model picker's job. Moves beside Add when it opens the list. */}
           <Show when={endpointCount() > 0 && !countManageable()}>
-            <Badge class="provider-picker-custom-count" tone="neutral" shape="pill">
+            <Badge class="provider-picker-custom-count" variant="secondary" shape="pill">
               {endpointCountLabel()}
             </Badge>
           </Show>
@@ -235,7 +235,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
           <Show when={!customReady()}>
             <Badge
               class={`provider-picker-status provider-picker-status-${engine().state}`}
-              tone={providerStatusTone(engine().state)}
+              variant={providerStatusVariant(engine().state)}
               shape="pill"
             >
               {providerStatusLabel(t, format, engine().state)}
@@ -511,7 +511,11 @@ export function ProviderPicker(props: ProviderPickerProps) {
                       <Show
                         when={!off()}
                         fallback={
-                          <Badge class="provider-picker-status provider-picker-status-off" tone="neutral" shape="pill">
+                          <Badge
+                            class="provider-picker-status provider-picker-status-off"
+                            variant="secondary"
+                            shape="pill"
+                          >
                             {t("provider.status.off")}
                           </Badge>
                         }
@@ -526,14 +530,18 @@ export function ProviderPicker(props: ProviderPickerProps) {
                             (option().keyStatus === "missing" || option().keyStatus === "unreadable")
                           }
                         >
-                          <Badge class="provider-picker-status provider-picker-key-status" tone="neutral" shape="pill">
+                          <Badge
+                            class="provider-picker-status provider-picker-key-status"
+                            variant="secondary"
+                            shape="pill"
+                          >
                             {t("provider.key.free")}
                           </Badge>
                         </Show>
                         <Show when={runtimeStatus()?.phase !== "not-downloaded" || updatable()}>
                           <Badge
                             class={`provider-picker-status provider-picker-status-${visualState()}`}
-                            tone={providerStatusTone(visualState())}
+                            variant={providerStatusVariant(visualState())}
                             shape="pill"
                           >
                             {providerStatusLabel(t, format, state(), connecting(), runtimeStatus(), updatable())}
@@ -856,13 +864,15 @@ function servesCustomProvider(openCode: ProviderPickerOption | undefined): boole
 
 type ProviderVisualState = AgentProviderState | ProviderRuntimePhase | "connecting" | "update-available";
 
-function providerStatusTone(state: ProviderVisualState): "success" | "warning" | "danger" | "neutral" {
-  if (state === "available") return "success";
-  if (state === "ready") return "success";
-  if (state === "error" || state === "download-error") return "danger";
-  if (state === "sign-in-required" || state === "outdated" || state === "finishing") return "warning";
-  if (state === "update-available") return "warning";
-  return "neutral";
+function providerStatusVariant(
+  state: ProviderVisualState,
+): "success-light" | "warning-light" | "destructive-light" | "secondary" {
+  if (state === "available") return "success-light";
+  if (state === "ready") return "success-light";
+  if (state === "error" || state === "download-error") return "destructive-light";
+  if (state === "sign-in-required" || state === "outdated" || state === "finishing") return "warning-light";
+  if (state === "update-available") return "warning-light";
+  return "secondary";
 }
 
 /** Badge text, translated where drawn; downloads report a percentage, not a key. */

@@ -82,7 +82,7 @@ export const HERMES_AGENT_COMPARISON: Comparison = {
       icon: "tag",
       topic: "Price and account",
       openbot:
-        "Free for noncommercial use; commercial use needs a license. No account is necessary on one computer. Your agents use the plans you already pay for.",
+        "Free for noncommercial use; commercial use needs a license. Your agents use the plans you already pay for.",
       rival:
         "Free under the MIT license, also for commercial use. No account is necessary. You pay your model provider, and Hermes Cloud if you use it.",
       better: "rival",
@@ -110,7 +110,7 @@ export const HERMES_AGENT_COMPARISON: Comparison = {
     },
   ],
   intro:
-    "OpenBot and Hermes Agent are close: both run AI agents on the computer that you choose, keep your chats there, work without an account, and publish their source code. The difference is what an agent is. In OpenBot, each agent is a coding tool from the provider whose plan you pay for, and the agents work as a team. Hermes Agent is its own agent that calls a model through an API, learns skills as it works, and can run several named Bots.",
+    "OpenBot and Hermes Agent are close: both run AI agents on the computer that you choose, keep your chats there, and publish their source code. The difference is what an agent is. In OpenBot, each agent is a coding tool from the provider whose plan you pay for, and the agents work as a team. Hermes Agent is its own agent that calls a model through an API, learns skills as it works, and can run several named Bots.",
   sections: [
     {
       title: "Models and the plans you pay for",

@@ -9,13 +9,13 @@ import type { Comparison } from "./comparison";
 export const MUSE_COMPARISON: Comparison = {
   rival: { name: "Muse", mark: "muse" },
   answer:
-    "For most people who want agents for their work, OpenBot is the better choice: your agents use the AI plans you already pay for, such as ChatGPT, Claude, Gemini or Grok, or your own model. They run on your own computer, and the app is free and needs no account. Choose Muse if you want one personal assistant from Meta that runs on Meta's cloud and helps with email and purchases.",
+    "For most people who want agents for their work, OpenBot is the better choice: your agents use the AI plans you already pay for, such as ChatGPT, Claude, Gemini or Grok, or your own model. They run on your own computer, and the app is free. Choose Muse if you want one personal assistant from Meta that runs on Meta's cloud and helps with email and purchases.",
   chooseOpenBot: [
     "You already pay for ChatGPT, Claude, Gemini, Grok or Cursor, or you run your own model.",
     "Your files and chats must stay on your own computer, not on Meta's cloud.",
     "You want a team of agents that give work to each other, not one assistant.",
     "You live outside the US and Canada, or you want a desktop app for Windows or Linux.",
-    "You want a free app that works without an account, and source code that you can read.",
+    "You want a free app, and source code that you can read.",
   ],
   rivalPlans: "Muse uses Muse Spark, Meta's own model. Muse is free with a weekly limit, or $20 or $100 a month.",
   chooseRival: [
@@ -76,7 +76,7 @@ export const MUSE_COMPARISON: Comparison = {
       icon: "tag",
       topic: "Price and account",
       openbot:
-        "Free for noncommercial use; commercial use needs a license. No account is necessary on one computer. Your agents use the plans you already pay for.",
+        "Free for noncommercial use; commercial use needs a license. Your agents use the plans you already pay for.",
       rival:
         "Free with a weekly usage limit. Power costs $20 a month and Maximum $100 a month. Needs an account, and is for people aged 18 or more in the US and Canada.",
       better: "openbot",
@@ -158,7 +158,7 @@ export const MUSE_COMPARISON: Comparison = {
     {
       question: "Why choose OpenBot over Muse?",
       answer:
-        "Your agents use the AI plans you already pay for, such as ChatGPT, Claude, Gemini or Grok, or your own model. OpenBot keeps your workspaces, chats and files on your own computer, it runs a team of agents instead of one, and it has desktop apps for macOS, Windows and Linux with no country limit. The app is free, works without an account, and its source code is on GitHub. Muse is the better fit when you want a personal assistant with no computer to keep on.",
+        "Your agents use the AI plans you already pay for, such as ChatGPT, Claude, Gemini or Grok, or your own model. OpenBot keeps your workspaces, chats and files on your own computer, it runs a team of agents instead of one, and it has desktop apps for macOS, Windows and Linux with no country limit. The app is free, and its source code is on GitHub. Muse is the better fit when you want a personal assistant with no computer to keep on.",
     },
     {
       question: "Can I use my ChatGPT, Claude or Gemini subscription with OpenBot?",
