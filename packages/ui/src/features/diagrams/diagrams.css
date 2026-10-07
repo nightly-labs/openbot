@@ -1236,23 +1236,14 @@
   font-size: var(--openbot-text-sm);
 }
 
-.diagram-chat-composer {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--openbot-space-2);
-  border-top: 1px solid var(--openbot-border);
-  padding: var(--openbot-space-2);
+/* The chat composer's compact row, without its attach button: the editor and the send button. */
+.diagram-chat-composer.composer[data-compact] {
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin: var(--openbot-space-2);
 }
 
-.diagram-chat-input.ui-textarea {
-  min-height: 0;
-  flex: 1;
-  resize: none;
-}
-
-.diagram-chat-send.ui-button {
-  flex: none;
-  border-radius: var(--openbot-radius-pill);
+.diagram-chat-composer.composer[data-compact] > .composer-input-label {
+  grid-column: 1;
 }
 
 @media (prefers-reduced-motion: reduce) {

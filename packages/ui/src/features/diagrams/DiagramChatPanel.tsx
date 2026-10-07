@@ -6,12 +6,13 @@
  * hidden one is inert.
  */
 
-import { ArrowUp, Bubble, BubbleContent, Button, Check, Minimize2, Spinner, Textarea } from "@openbot/ui";
+import { ArrowUp, Bubble, BubbleContent, Button, Check, Minimize2, Spinner } from "@openbot/ui";
 import { createSignal, For, Show } from "solid-js";
 import type { AvatarMood } from "../../bloub-avatar";
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
+import { ComposerEditor } from "../conversation/ComposerEditor";
 import type { DiagramChatMessage } from "./diagram-model";
 
 export interface DiagramChatPanelProps {
@@ -28,12 +29,12 @@ export function DiagramChatPanel(props: DiagramChatPanelProps) {
   const { t } = useText();
   const [draft, setDraft] = createSignal("");
   const mood = (): AvatarMood => (props.working ? "working" : "idle");
-  let input: HTMLTextAreaElement | undefined;
+  const [focusRequest, setFocusRequest] = createSignal(0);
   let launcher: HTMLElement | undefined;
   /** Focus follows the surface that is now shown, once it has stopped being inert. */
   const setOpen = (open: boolean) => {
     props.onOpenChange(open);
-    requestAnimationFrame(() => (open ? input : launcher)?.focus());
+    requestAnimationFrame(() => (open ? setFocusRequest((count) => count + 1) : launcher?.focus()));
   };
   const send = () => {
     const text = draft().trim();
@@ -114,36 +115,38 @@ export function DiagramChatPanel(props: DiagramChatPanelProps) {
         </div>
 
         <form
-          class="diagram-chat-composer"
+          class="composer diagram-chat-composer"
+          data-compact=""
           onSubmit={(event: SubmitEvent) => {
             event.preventDefault();
             send();
           }}
         >
-          <Textarea
-            ref={(element: HTMLTextAreaElement) => (input = element)}
-            class="diagram-chat-input"
-            rows={2}
-            value={draft()}
-            placeholder={t("diagram.chat.placeholder")}
-            aria-label={t("diagram.chat.placeholder")}
-            onValueChange={setDraft}
-            onKeyDown={(event: KeyboardEvent) => {
-              if (event.key !== "Enter" || event.shiftKey || event.isComposing) return;
-              event.preventDefault();
-              send();
-            }}
-          />
-          <Button
-            type="submit"
-            size="icon-sm"
-            class="diagram-chat-send"
-            disabled={!draft().trim() || props.working}
-            aria-label={t("diagram.chat.send")}
-            title={t("diagram.chat.send")}
-          >
-            <ArrowUp aria-hidden="true" />
-          </Button>
+          <div class="composer-input-label">
+            <ComposerEditor
+              agentId={undefined}
+              agents={[]}
+              value={draft()}
+              placeholder={t("diagram.chat.placeholder")}
+              ariaLabel={t("diagram.chat.placeholder")}
+              disabled={false}
+              focusRequest={focusRequest()}
+              onValueChange={setDraft}
+              onSubmit={send}
+            />
+          </div>
+          <div class="composer-primary-actions">
+            <Button
+              type="submit"
+              variant="ghost"
+              class="voice-button"
+              disabled={!draft().trim() || props.working}
+              aria-label={t("diagram.chat.send")}
+              title={t("diagram.chat.send")}
+            >
+              <ArrowUp aria-hidden="true" />
+            </Button>
+          </div>
         </form>
       </section>
     </div>
