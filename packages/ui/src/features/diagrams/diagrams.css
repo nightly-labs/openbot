@@ -18,19 +18,21 @@
   font-size: var(--openbot-text-md);
 }
 
+/* The same height, avatar and name as the agent chat header, so switching views keeps the bar. */
 .diagram-view-header {
   display: flex;
-  min-height: 56px;
+  height: 38px;
+  flex: none;
   align-items: center;
-  gap: var(--openbot-space-2);
+  gap: var(--openbot-space-1-5);
   border-bottom: 1px solid var(--openbot-border);
-  padding: var(--openbot-space-2) var(--openbot-space-4);
+  padding: 0 var(--openbot-space-3);
 }
 
 .diagram-view-icon {
   display: grid;
-  width: 30px;
-  height: 30px;
+  width: 18px;
+  height: 18px;
   flex: none;
   place-items: center;
   border-radius: var(--openbot-radius-md);
@@ -39,15 +41,15 @@
 }
 
 .diagram-view-avatar.agent-avatar {
-  width: 30px;
-  height: 30px;
+  width: 18px;
+  height: 18px;
   /* As in the chat avatar below: one track the size of the box keeps the Bloub centred. */
   grid-template: 100% / 100%;
 }
 
 .diagram-view-icon svg {
-  width: var(--openbot-icon-md);
-  height: var(--openbot-icon-md);
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
 }
 
 /* The name keeps its room; the routine picker beside it is the part that narrows. */
@@ -56,8 +58,9 @@
   flex: none;
   overflow: hidden;
   margin: 0;
-  font-size: var(--openbot-text-lg);
-  font-weight: var(--openbot-weight-semibold);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-regular);
+  line-height: 18px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
