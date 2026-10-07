@@ -425,8 +425,9 @@ The workflow:
     architecture, after it checks the AppImage against its `SHA256SUMS` file. It starts each image
     with `docker/seccomp.json`, waits for `openbot status`, and stops it, which must exit with 0;
 11. after the GitHub Release is published, pushes both images to `ghcr.io/nightly-labs/openbot`
-    with the tags `<version>-amd64` and `<version>-arm64`, joins them under `<version>`, `latest` and
-    `sha-<commit>`, and attests the build provenance of that image. See [Docker](docker.md).
+    with the tags `<version>-amd64` and `<version>-arm64`, joins them under `<version>`, `v<version>`,
+    `latest` and `sha-<commit>`, and attests the build provenance of that image. It then checks
+    anonymous access to both architectures. See [Docker](docker.md).
 
 Users can verify a downloaded artifact with
 `gh attestation verify <file> --repo nightly-labs/openbot`.
