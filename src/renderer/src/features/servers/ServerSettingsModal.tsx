@@ -10,6 +10,7 @@ import type {
   UpdateTeamMemberInput,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
+import { classifyFailure } from "@openbot/telemetry";
 import {
   Alert,
   AlertActions,
@@ -243,7 +244,10 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
       return true;
     } catch (error) {
       actionToast.error(t("server.settings.actionFailedTitle"), {
-        description: errorMessage(error, t("server.settings.actionFailed")),
+        ...{
+          description: errorMessage(error, t("server.settings.actionFailed")),
+        },
+        report: { operation: "settings", source: "action", cause_code: classifyFailure(error) },
       });
       return false;
     } finally {
@@ -261,7 +265,10 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     busy,
     run,
     showCopyError() {
-      actionToast.error(t("server.settings.copyFailedTitle"), { description: t("server.settings.copyFailed") });
+      actionToast.error(t("server.settings.copyFailedTitle"), {
+        ...{ description: t("server.settings.copyFailed") },
+        report: { operation: "settings", source: "action", cause_code: "unknown" },
+      });
     },
   };
   const general = createServerGeneralSection(host, { onSetUpDesktop: () => setSection("desktop") });

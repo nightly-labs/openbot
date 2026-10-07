@@ -23,6 +23,7 @@ import { encodeLiveActivityBytes } from "@openbot/team-client/live-activity-seal
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert } from "react-native";
 import { getBloubAvatarColor } from "@/features/agents/model/bloub-activity";
+import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { useLiveActivitiesPreference } from "@/features/settings/model/live-activities";
 import type { LiveWorkspaceStore } from "@/features/workspace/model/live-workspace-store";
 import type { MobileAgent, MobileServer } from "@/features/workspace/model/workspace-types";
@@ -383,7 +384,7 @@ export function useLiveActivity({
           if (disposed.current) return;
           const { t, errorMessage } = currentText();
           const [title, fallback] = ACTION_FAILURES[action.type];
-          Alert.alert(t(title), errorMessage(error, t(fallback)));
+          showFailureAlert(error, "other", t(title), errorMessage(error, t(fallback)));
         },
       );
     if (action.type !== "respond-approval" || action.decision !== "accept") {
@@ -394,7 +395,12 @@ export function useLiveActivity({
     // So the user sees the command here before the host runs it. The signed link carries it.
     const { t } = currentText();
     if (!command) {
-      Alert.alert(t("mobile.liveActivity.error.decision"), t("mobile.liveActivity.requestChanged"));
+      showFailureAlert(
+        undefined,
+        "other",
+        t("mobile.liveActivity.error.decision"),
+        t("mobile.liveActivity.requestChanged"),
+      );
       return;
     }
     Alert.alert(t("mobile.liveActivity.confirm.title"), command, [

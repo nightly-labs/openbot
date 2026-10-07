@@ -1,5 +1,7 @@
 import type { CentralAuthUser } from "@openbot/contracts/ipc";
 import { normalizeEmailAddress } from "@openbot/contracts/validation";
+import { classifyFailure, type ReportQueue, safeProperties } from "@openbot/telemetry";
+import { Effect } from "effect";
 import { type MobileEventName, type MobileEventProperties, type SafeProperties, sanitizeMobileEvent } from "./events";
 
 export interface MobileAnalyticsClient {
@@ -21,6 +23,7 @@ export class MobileAnalytics {
   private anonymousStartedAt: number | null = null;
   private expiry: ReturnType<typeof setTimeout> | undefined;
   private enabled = false;
+  private consentReady = false;
   private generation = 0;
   private consentGeneration = 0;
   private user: Pick<CentralAuthUser, "id" | "email"> | null = null;
@@ -28,11 +31,17 @@ export class MobileAnalytics {
   private pending = 0;
   private client: MobileAnalyticsClient | null = null;
 
-  constructor(private readonly createClient: () => MobileAnalyticsClient | null) {}
+  constructor(
+    private readonly createClient: () => MobileAnalyticsClient | null,
+    private readonly createReports?: () => ReportQueue | undefined,
+  ) {}
 
   setEnabled(enabled: boolean): void {
-    if (this.enabled === enabled) return;
+    if (this.consentReady && this.enabled === enabled) return;
+    this.consentReady = true;
     this.enabled = enabled;
+    const reports = this.createReports?.();
+    if (reports) Effect.runFork(reports.configure(enabled, this.user?.id ?? null));
     this.consentGeneration += 1;
     this.generation += 1;
     if (!enabled) {
@@ -55,6 +64,8 @@ export class MobileAnalytics {
       this.clearAnonymous();
     }
     this.user = next;
+    const reports = this.createReports?.();
+    if (reports && this.consentReady) Effect.runFork(reports.configure(this.enabled, next?.id ?? null));
     this.enqueue(() => this.client?.clear());
     this.identify();
     if (next) {
@@ -108,19 +119,53 @@ export class MobileAnalytics {
     this.expireAnonymous();
     const generation = this.generation;
     const enabled = this.enabled;
+    const failureScope = this.createReports?.()?.scope() ?? null;
     return {
       track: (name, properties) => {
         this.expireAnonymous();
         if (!enabled || generation !== this.generation) return;
-        this.track(name, properties);
+        this.track(name, properties, failureScope);
       },
     };
   }
 
-  track<N extends MobileEventName>(name: N, properties: MobileEventProperties<N>): void {
-    if (!this.enabled || !this.client || this.pending >= MAX_PENDING_EVENTS) return;
+  track<N extends MobileEventName>(
+    name: N,
+    properties: MobileEventProperties<N>,
+    failureScope?: ReturnType<ReportQueue["scope"]> | null,
+  ): void {
+    if (!this.enabled) return;
     this.expireAnonymous();
     const safe = sanitizeMobileEvent(name, properties);
+    if (safe.result === "failed") {
+      const reports = failureScope === undefined ? this.createReports?.() : failureScope;
+      const operation =
+        name === "attachment_action"
+          ? "attachment"
+          : name === "message_send" || name === "conversation_opened"
+            ? "turn"
+            : name === "routine_action"
+              ? "routine"
+              : name === "agent_action"
+                ? "agent"
+                : name === "memory_action"
+                  ? "memory"
+                  : name === "search_action"
+                    ? "search"
+                    : name === "account_sign_out"
+                      ? "auth"
+                      : "team";
+      const failure = safeProperties({
+        ...safe,
+        operation,
+        source: "action",
+        severity: "error",
+        cause_code: safe.cause_code ?? "unknown",
+        failure_code: "operation_failed",
+      });
+      if (reports && failure) Effect.runFork(reports.record("client_operation_failed", failure));
+    }
+    if (!this.client || this.pending >= MAX_PENDING_EVENTS) return;
     if (!this.user) {
       if (this.anonymousStartedAt === null) {
         this.anonymousStartedAt = Date.now();
@@ -149,10 +194,16 @@ export class MobileAnalytics {
         ...properties,
         result: "failed",
         failure_code: "operation_failed",
+        cause_code: classifyFailure(error),
         duration_ms: performance.now() - started,
       });
       throw error;
     }
+  }
+
+  retryReports(): void {
+    const reports = this.createReports?.();
+    if (reports) Effect.runFork(reports.flush());
   }
 
   async settled(): Promise<void> {

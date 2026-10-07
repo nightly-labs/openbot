@@ -41,7 +41,8 @@
     "yaml": "catalog:",
     "zod": "catalog:",
     "@openbot/ui": "workspace:*",
-    "effect": "catalog:"
+    "effect": "catalog:",
+    "@openbot/telemetry": "workspace:*"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.52.1",

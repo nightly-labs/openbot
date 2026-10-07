@@ -13,6 +13,7 @@ import { useAgentPinTransition } from "@/features/agents/components/agent-pin-tr
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
 import { PinnedChatItem, usePinnedItemWidth } from "@/features/agents/components/pinned-agents-grid";
 import { useChatSectionMenu } from "@/features/agents/components/use-chat-section-menu";
+import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
@@ -70,7 +71,9 @@ export const ChannelListRow = memo(function ChannelListRow({
             .catch((cause: unknown) => {
               void haptics.notification("error");
               const text = currentText();
-              Alert.alert(
+              showFailureAlert(
+                cause,
+                "team",
                 text.t("mobile.channel.list.deleteFailed"),
                 text.errorMessage(cause, text.t("mobile.channel.list.deleteFailedBody")),
               );

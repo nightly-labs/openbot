@@ -72,7 +72,9 @@ export function watchHostUpdate(options: HostUpdateWatch, status?: HostUpdateSta
     const hadProgress = watch.live !== null;
     stop(options.serverId);
     if (hadProgress && next.phase === "error")
-      toast.error(currentText().t("server.update.status.downloadFailed", { name: options.name }));
+      toast.error(currentText().t("server.update.status.downloadFailed", { name: options.name }), {
+        report: { operation: "update", source: "system", cause_code: "unknown" },
+      });
     // An admin who cannot start the update gets no offer.
     else if (
       next.remoteUpdates === "allowed" &&

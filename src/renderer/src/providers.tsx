@@ -1,4 +1,5 @@
 import { type AgentProviderId, type AgentStatus, agentProviderDescriptor } from "@openbot/contracts/ipc";
+import { classifyFailure } from "@openbot/telemetry";
 import { toast } from "@openbot/ui";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, flush, onSettled } from "solid-js";
@@ -194,7 +195,10 @@ const Providers = createSimpleContext({
       } catch (error) {
         const { t, errorMessage } = currentText();
         const title = t("app.provider.restartFailed", { name: agentProviderDescriptor(provider).displayName });
-        toast.error(title, { description: errorMessage(error, title) });
+        toast.error(title, {
+          ...{ description: errorMessage(error, title) },
+          report: { operation: "provider", source: "system", cause_code: classifyFailure(error) },
+        });
       }
     }
 

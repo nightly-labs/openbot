@@ -27,6 +27,7 @@ import { CloseIcon, MoreIcon, StopIcon } from "@openbot/ui/features/conversation
 import { RichMessageText } from "@openbot/ui/features/conversation/RichMessageText";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, For, Loading, lazy, onCleanup, Show } from "solid-js";
+import { reportErrorBanner, reportNotification } from "../../error-reports";
 import { deviceSendShortcut, sendShortcutAriaKey, sendShortcutHintKey } from "../../send-shortcut-preference";
 import { useConversationViewScope } from "./conversation-scope";
 import { formatVoiceDuration, voiceButtonLabel, voiceSupported } from "./voice-status";
@@ -215,18 +216,44 @@ export function ConversationComposer() {
           {(status) => (
             <ComposerSignInNotice
               provider={status().id}
+              onShown={() =>
+                reportNotification({
+                  operation: "provider",
+                  source: "provider",
+                  cause_code: "authentication",
+                  severity: "warning",
+                  presentation: "banner",
+                  provider: status().id,
+                })
+              }
               signingIn={status().connectionState === "connecting"}
               onSignIn={(provider) => props.onSignInProvider?.(provider)}
             />
           )}
         </Show>
         <Show when={usageExhausted()}>
-          {(spent) => <ComposerUsageLimitNotice provider={spent().provider} resetsAt={spent().resetsAt} />}
+          {(spent) => (
+            <ComposerUsageLimitNotice
+              provider={spent().provider}
+              resetsAt={spent().resetsAt}
+              onShown={() =>
+                reportNotification({
+                  operation: "turn",
+                  source: "provider",
+                  cause_code: "usage_limit",
+                  severity: "error",
+                  presentation: "banner",
+                  provider: spent().provider,
+                })
+              }
+            />
+          )}
         </Show>
         <Show when={currentChatError()}>
           {(message) => (
             <ComposerErrorBanner
               message={message()}
+              onShown={() => reportErrorBanner(message(), "turn")}
               conversationKey={currentChatConversationKey()}
               onDismiss={() => {
                 dismissCurrentChatErrors();

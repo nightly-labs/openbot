@@ -15,10 +15,11 @@ import { useThemeColor } from "heroui-native/hooks";
 import { FileText } from "lucide-react-native";
 import type { Token, Tokens } from "marked";
 import { Fragment, memo, type ReactNode, useMemo } from "react";
-import { Alert, type ColorValue, ScrollView, type TextStyle, useWindowDimensions, View } from "react-native";
+import { type ColorValue, ScrollView, type TextStyle, useWindowDimensions, View } from "react-native";
 import { useReducedMotion } from "react-native-reanimated";
 import { useCSSVariable } from "uniwind";
 import { BloubAvatarThumbnail } from "@/features/agents/components/bloub-avatar";
+import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { ChatLinkIcon } from "@/features/chat/components/chat-link-icon";
 import {
   StreamingBlock,
@@ -333,7 +334,12 @@ function inline(tokens: Token[], parentPresentation: TextPresentation): ReactNod
             void Linking.openURL(url).catch(() => {
               void haptics.notification("error");
               const { t } = currentText();
-              Alert.alert(t("mobile.chat.markdown.linkFailedTitle"), t("mobile.chat.markdown.linkFailedMessage"));
+              showFailureAlert(
+                undefined,
+                "browser",
+                t("mobile.chat.markdown.linkFailedTitle"),
+                t("mobile.chat.markdown.linkFailedMessage"),
+              );
             });
           }}
         >

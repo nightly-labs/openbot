@@ -847,3 +847,24 @@ automatically, and the tab's back/forward history is cleared after replacement t
 the sensitive document. The destination site receives the value and controls its own processing.
 This protection does not isolate credentials from the operating system or agents with unrestricted
 machine access. Values pasted into ordinary chat are not covered by secure handoff.
+
+## Error and warning reports
+
+Production desktop, browser app, and mobile clients report safe failure categories to the same
+self-hosted OpenPanel service. Reports can include the app version, platform, provider, model,
+operation, severity, and a fixed cause code. They also record whether a problem appeared as a
+toast, shared alert or chat banner, or native error/warning alert. These reports do not include displayed text,
+raw exceptions, stack traces, prompts, messages, file names, paths, commands, or credentials.
+A random report ID helps identify repeated delivery attempts; it is not a conversation or file ID.
+A reported cause describes the error observed by OpenBot and might not explain its root cause.
+
+Validated reports wait in local files on the host and mobile, or IndexedDB in desktop and browser
+clients. Each queue is limited to 1,000 reports, 1 MiB, and seven days. Reports are removed after
+OpenPanel accepts them, when they expire, or when the queue reaches its limits. Network failures
+can cause retries and duplicate delivery. Queue failures do not block the application.
+
+Turning off analytics or changing accounts clears pending reports and cancels active sends.
+Requests already received by OpenPanel cannot be recalled. Anonymous error reports remain
+anonymous. The browser app has its own local analytics setting in account settings, separate
+from desktop and mobile. Collection is enabled by default; a malformed or unreadable setting
+keeps it disabled. Existing OpenPanel retention rules apply after delivery.

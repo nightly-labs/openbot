@@ -1,4 +1,5 @@
 import type { MessagingOverview } from "@openbot/contracts/ipc";
+import { classifyFailure } from "@openbot/telemetry";
 import type { SlackOrchestratorModels } from "@openbot/ui/features/settings/SlackIntegrationPanel";
 import { currentText } from "@openbot/ui/text";
 import { createSignal, onCleanup } from "solid-js";
@@ -49,7 +50,10 @@ export function createDiscordConnector(
       .catch((error: unknown) => {
         const { t, errorMessage } = currentText();
         actionToast.error(t("connector.discord.actionFailed"), {
-          description: errorMessage(error, t("connector.discord.actionFailed")),
+          ...{
+            description: errorMessage(error, t("connector.discord.actionFailed")),
+          },
+          report: { operation: "other", source: "action", cause_code: classifyFailure(error) },
         });
       })
       .finally(() => {

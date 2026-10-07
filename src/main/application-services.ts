@@ -1,4 +1,6 @@
 import { isManagedRuntimeProvider } from "@openbot/contracts/agent-providers";
+import { openPanelTransport, ReportQueue } from "@openbot/telemetry";
+import { fileReportStorage } from "@openbot/telemetry/node";
 import { Effect, Fiber } from "effect";
 import { toAgentRemovalFailed } from "../backend/agent/agent-removal";
 import { toHostedSiteOperationFailed } from "../backend/agent/hosted-site-coordinator";
@@ -1553,7 +1555,21 @@ export async function createApplicationServices({
         : resolve(__dirname, "../../resources/plugin-catalog"),
     ),
   );
+  const failureReports =
+    app.isPackaged && appVariant === "production"
+      ? new ReportQueue(
+          fileReportStorage(join(app.getPath("userData"), "openbot-error-reports-v1.json")),
+          openPanelTransport({ clientId: "6c989975-87ef-4f0c-857e-ab449a65b5c2", origin: "openbot-app://app" }),
+          {
+            surface: "desktop_host",
+            app_version: app.getVersion(),
+            platform: analyticsPlatform,
+            event_schema_version: 7,
+          },
+        )
+      : undefined;
   const analytics = new HostAnalytics({
+    reports: failureReports,
     enabled: app.isPackaged && appVariant === "production",
     trackingEnabled: analyticsPreference.enabled,
     appVersion: app.getVersion(),
@@ -1599,6 +1615,7 @@ export async function createApplicationServices({
   // Immediately after construction: this attributes buffered events to the current owner rather
   // than flushing a queue, so a later call would attribute them to nobody.
   analytics.flushPending();
+  service.on("failure", (failure) => analytics.handleFailure(failure));
   const trace = new TraceFile({ directory: join(app.getPath("userData"), "logs") });
   teardown.push(TEARDOWN_ORDER.trace, "the trace file", () => Effect.runPromise(trace.close()));
   const remoteServers = new RemoteServerManager(

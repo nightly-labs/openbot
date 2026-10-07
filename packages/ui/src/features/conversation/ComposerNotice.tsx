@@ -2,7 +2,7 @@ import { type AgentProviderId, agentProviderName } from "@openbot/contracts/agen
 import type { AppFormat } from "@openbot/i18n";
 import { Button, TriangleAlert } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createSignal, Show } from "solid-js";
+import { createEffect, createSignal, Show } from "solid-js";
 import { useText } from "../../text";
 import { CloseIcon } from "./ConversationIcons";
 
@@ -100,8 +100,13 @@ export function ComposerSignInNotice(props: {
   provider: AgentProviderId;
   onSignIn: (provider: AgentProviderId) => void | Promise<void>;
   signingIn?: boolean;
+  onShown?: () => void;
 }) {
   const { t } = useText();
+  createEffect(
+    () => props.provider,
+    () => props.onShown?.(),
+  );
   const providerName = () => agentProviderName(props.provider);
   /**
    * Opening the sign-in guide is a round trip to the main process, and the provider only reports
@@ -161,8 +166,16 @@ function formatUsageReset(resetsAt: number | null | undefined, format: AppFormat
  * does, or a different model, and the model picker under this notice already does that. So the card
  * says when the limit resets instead, which is the one fact the user needs to plan around it.
  */
-export function ComposerUsageLimitNotice(props: { provider: AgentProviderId; resetsAt?: number | null }) {
+export function ComposerUsageLimitNotice(props: {
+  provider: AgentProviderId;
+  resetsAt?: number | null;
+  onShown?: () => void;
+}) {
   const { t, format } = useText();
+  createEffect(
+    () => props.provider,
+    () => props.onShown?.(),
+  );
   const resetAt = () => formatUsageReset(props.resetsAt, format);
   const body = () => {
     const provider = agentProviderName(props.provider);

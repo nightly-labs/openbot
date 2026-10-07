@@ -19,6 +19,7 @@ export function loadAnalyticsPreference(): Promise<void> {
     })
     .catch(() => {
       // An unreadable preference must not turn tracking on.
+      mobileAnalytics.setEnabled(false);
       useAnalyticsPreference.setState({ enabled: false, ready: true });
     });
   return loading;

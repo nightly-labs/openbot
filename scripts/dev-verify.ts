@@ -82,6 +82,7 @@ function isDesktopTest(file: string): boolean {
     "packages/contracts/",
     "packages/i18n/",
     "packages/logging/",
+    "packages/telemetry/",
     "packages/user-errors/",
     "packages/team-client/",
     "apps/mobile/src/",

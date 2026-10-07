@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Linking } from "react-native";
+import { Linking } from "react-native";
 import { type SharedValue, useSharedValue, withTiming } from "react-native-reanimated";
+import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { AUTOMATIC_DICTATION_LANGUAGE, useDictationLanguage } from "@/features/settings/model/dictation-language";
 import { haptics } from "@/shared/lib/haptics";
 import { phoneLanguages } from "@/shared/lib/phone-languages";
@@ -93,7 +94,9 @@ async function recognitionOptions(module: Recognizer, supported: Promise<Support
 function showNotice(notice: DictationNotice): void {
   void haptics.notification("error");
   const { t } = currentText();
-  Alert.alert(
+  showFailureAlert(
+    undefined,
+    "voice",
     t(notice.title),
     t(notice.message),
     notice.openSettings

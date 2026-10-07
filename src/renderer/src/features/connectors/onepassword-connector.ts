@@ -1,4 +1,5 @@
 import { DISCONNECTED_ONEPASSWORD_CONNECTOR, type OnePasswordConnectorStatus } from "@openbot/contracts/ipc";
+import { classifyFailure } from "@openbot/telemetry";
 import { toast } from "@openbot/ui";
 import type { OnePasswordConnectorPanelProps } from "@openbot/ui/features/settings/OnePasswordConnectorPanel";
 import { currentText } from "@openbot/ui/text";
@@ -70,7 +71,10 @@ export function createOnePasswordConnector(
         if (current !== attempt) return;
         const { t, errorMessage } = currentText();
         toast.error(t("connector.onePassword.actionFailed"), {
-          description: errorMessage(error, t("connector.onePassword.actionFailed")),
+          ...{
+            description: errorMessage(error, t("connector.onePassword.actionFailed")),
+          },
+          report: { operation: "other", source: "system", cause_code: classifyFailure(error) },
         });
       })
       .finally(() => {

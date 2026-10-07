@@ -1,3 +1,4 @@
+import { classifyFailure } from "@openbot/telemetry";
 import { ConversationHeader as SharedConversationHeader } from "@openbot/ui/features/conversation/ConversationHeader";
 import { useConversationViewScope } from "./conversation-scope";
 
@@ -41,6 +42,7 @@ export function ConversationHeader() {
           next
             ? errorMessage(error, t("conversation.header.grantFailed", { name }))
             : t("settings.autoApprove.revokeFailed", { name }),
+          { report: { operation: "turn", source: "action", cause_code: classifyFailure(error) } },
         );
       });
     };
