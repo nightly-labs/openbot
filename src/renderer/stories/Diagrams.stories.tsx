@@ -408,6 +408,65 @@ const emptyDiagram: Diagram = {
   lastRuns: [],
 };
 
+/**
+ * The simplest diagram: one routine, one agent, nothing after it. The agent checks a page on a timer
+ * and writes a report only when something changed, so most runs end with "No change".
+ */
+const HEADLINE = "Senate passes the infrastructure bill after a late-night vote";
+const headlineDiagram: Diagram = {
+  id: "diagram-headline",
+  name: "Headline watch",
+  updatedAt: STARTED,
+  nodes: [
+    {
+      kind: "routine",
+      id: "node-headline-check",
+      position: { x: 0, y: 0 },
+      name: "NYT headline check",
+      instruction: "Open nytimes.com and read the top headline. Report it only when it changed since the last check.",
+      schedule: { kind: "interval", amount: 30, unit: "minutes", anchorAt: "2026-10-01T00:00:00.000Z" },
+      active: true,
+      upcomingRuns: Array.from({ length: 48 * 7 }, (_, index) => at(5 * 3600 + 1800 + index * 1800)),
+      recentRuns: pastRuns("headline", 1800, [
+        "succeeded",
+        "succeeded",
+        "succeeded",
+        "succeeded",
+        "failed",
+        "succeeded",
+      ]),
+    },
+    {
+      kind: "agent",
+      id: "node-headline-agent",
+      position: { x: 360, y: 0 },
+      agentId: "research",
+      task: "Compare the top headline with the one you saw last time. Write a short report only when it changed.",
+    },
+  ],
+  edges: [{ id: "edge-headline", from: "node-headline-check", to: "node-headline-agent" }],
+  lastRuns: [
+    {
+      id: "run-headline",
+      routineNodeId: "node-headline-check",
+      kind: "scheduled",
+      status: "succeeded",
+      startedAt: STARTED,
+      finishedAt: at(18),
+      steps: [
+        step(
+          "node-headline-agent",
+          "succeeded",
+          "Open nytimes.com and read the top headline. Report it only when it changed since the last check.",
+          `No change. The top headline is still: "${HEADLINE}".`,
+          0,
+          18,
+        ),
+      ],
+    },
+  ],
+};
+
 const assistantHistory: DiagramChatMessage[] = [
   {
     id: "m1",
@@ -642,6 +701,15 @@ const diagramSummaries: DiagramSummary[] = [
     updatedAt: "2026-10-05T16:30:00.000Z",
   },
   {
+    id: "diagram-headline",
+    name: "Headline watch",
+    agentIds: ["research"],
+    routineNames: ["NYT headline check"],
+    lastRunStatus: "succeeded",
+    lastRunAt: STARTED,
+    updatedAt: STARTED,
+  },
+  {
     id: "diagram-weekly",
     name: "Weekly planning",
     agentIds: ["chief"],
@@ -740,6 +808,7 @@ function SidebarWithViews(props: { initialView: SidebarView }) {
 const workspaceDiagrams: Record<string, Diagram> = {
   "diagram-morning": succeededDiagram,
   "diagram-leads": { ...failedDiagram, id: "diagram-leads", name: "Inbound leads" },
+  "diagram-headline": headlineDiagram,
   "diagram-weekly": { ...emptyDiagram, id: "diagram-weekly", name: "Weekly planning" },
 };
 
@@ -828,6 +897,12 @@ export const Running: Story = {
 
 export const NoRunYet: Story = {
   render: () => <InteractiveDiagram diagram={newDiagram} />,
+  decorators: [(Story) => <div style={{ display: "flex", height: "100vh" }}>{Story()}</div>],
+};
+
+/** One routine and one agent that works alone: a page check every 30 minutes. */
+export const SingleAgentRoutine: Story = {
+  render: () => <InteractiveDiagram diagram={headlineDiagram} />,
   decorators: [(Story) => <div style={{ display: "flex", height: "100vh" }}>{Story()}</div>],
 };
 
