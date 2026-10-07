@@ -328,6 +328,13 @@ export function DiagramBoard(props: DiagramBoardProps) {
           suppressClick = false;
         });
       }
+      // A press on a card that did not move it selects the card, wherever on the card it landed.
+      if (current.kind === "node" && !current.moved) {
+        setInteraction((state) => {
+          state.selectedEdgeId = null;
+        });
+        props.onSelectNode(current.nodeId);
+      }
       if (current.kind === "pan" && !current.moved) {
         cancelConnection();
         setInteraction((state) => {
