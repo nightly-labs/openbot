@@ -1,5 +1,5 @@
 /** Linear 0-1 channels, as the aurora shader takes them. */
-export type VoiceRgb = readonly [number, number, number];
+type VoiceRgb = readonly [number, number, number];
 
 /** Four lobe colours for the aurora: the shader needs a fixed count. */
 export type VoicePalette = readonly [VoiceRgb, VoiceRgb, VoiceRgb, VoiceRgb];

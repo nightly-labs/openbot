@@ -7,8 +7,8 @@ import type { DictationPhase } from "../model/voice-dictation";
 import { useVoiceDictation } from "./use-voice-dictation";
 
 /** `review` shows Cancel, Continue and Send after the user stops speaking. */
-export type VoiceStage = "closed" | "listening" | "review";
-export type VoiceExit = "send" | "cancel";
+type VoiceStage = "closed" | "listening" | "review";
+type VoiceExit = "send" | "cancel";
 
 export interface VoiceMode {
   available: boolean;
