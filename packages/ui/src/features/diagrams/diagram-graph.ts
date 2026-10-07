@@ -8,7 +8,7 @@ import type { Diagram, DiagramEdge, DiagramNode, DiagramPoint, DiagramRun } from
 
 export const DIAGRAM_NODE_WIDTH = { routine: 264, agent: 264 } as const;
 /** The height the fit and the bounds use. A card can be taller; its ports stay at the top. */
-export const DIAGRAM_NODE_HEIGHT = { routine: 248, agent: 196 } as const;
+export const DIAGRAM_NODE_HEIGHT = { routine: 176, agent: 196 } as const;
 /** The distance from a card's top edge to the centre of its ports. */
 export const DIAGRAM_PORT_OFFSET_Y = 26;
 

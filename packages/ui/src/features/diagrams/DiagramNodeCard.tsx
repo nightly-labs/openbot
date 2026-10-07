@@ -12,7 +12,7 @@ import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { routineScheduleSummary } from "../conversation/routine-schedule-ui";
-import { DiagramRoutineRunDots, DiagramRoutineWeek } from "./DiagramRoutineVisuals";
+import { DiagramRoutineRunDots } from "./DiagramRoutineVisuals";
 import { DIAGRAM_NODE_WIDTH } from "./diagram-graph";
 import type { DiagramNode, DiagramStepRun, DiagramStepStatus } from "./diagram-model";
 import { DIAGRAM_STEP_STATUS_KEY, diagramStepSeconds } from "./diagram-text";
@@ -53,8 +53,6 @@ export interface DiagramNodeCardProps {
   /** True while this node's output is the source of a connection in progress. */
   connecting: boolean;
   inputTarget: DiagramPortTarget;
-  /** The day the week strip of a routine starts on. */
-  now: Date;
   /** True while the run this routine started is in progress. */
   firing?: boolean;
   onSelect: () => void;
@@ -262,7 +260,6 @@ export function DiagramNodeCard(props: DiagramNodeCardProps) {
           <div class="diagram-node-body">
             <p class="diagram-node-schedule">{routineScheduleSummary(node().schedule)}</p>
             <p class="diagram-routine-instruction">{node().instruction}</p>
-            <DiagramRoutineWeek upcomingRuns={node().upcomingRuns} now={props.now} size="card" />
             <div class="diagram-node-footer">
               <DiagramRoutineRunDots runs={node().recentRuns} limit={8} />
               <Show when={props.onRunRoutine}>

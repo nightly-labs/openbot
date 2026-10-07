@@ -226,7 +226,6 @@ export function DiagramView(props: DiagramViewProps) {
           agents={props.agents}
           selectedNodeId={selectedNodeId()}
           focusRoutineId={focusRoutineId()}
-          now={now()}
           editable={props.editable}
           onSelectNode={select}
           onFocusRoutine={setPicked}

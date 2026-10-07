@@ -78,8 +78,6 @@ export interface DiagramBoardProps {
    * every routine's path, with no run.
    */
   focusRoutineId: string | null;
-  /** The day the routine week strips start on. */
-  now: Date;
   editable?: boolean;
   onSelectNode: (nodeId: string | null) => void;
   onFocusRoutine: (routineId: string) => void;
@@ -554,7 +552,6 @@ export function DiagramBoard(props: DiagramBoardProps) {
                 removable={nodeRemovable(node.id)}
                 connecting={interaction.source === node.id}
                 inputTarget={inputTarget(node.id)}
-                now={props.now}
                 firing={diagramRunOf(props.diagram, node.id)?.status === "running"}
                 onSelect={() => {
                   if (suppressClick) return;
