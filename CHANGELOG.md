@@ -17,7 +17,7 @@ All notable changes to OpenBot will be documented here. The project follows
   switch to see the source. Select the expand button to open the page or diagram in a larger
   window, which grows out of the block. A page runs no scripts and loads nothing from the network.
   Its links open in your browser.
-- A chat with three or more days of history shows a day rail on its right edge while you scroll. Each segment is one day, so you can see how long the chat is and where you are in it, also before older messages load: a top segment stands for them. Point at the rail to see the days, and click a day to go to it. This is in agent chats, team channels and direct messages on this computer; on a joined server the rail shows the loaded days.
+- A chat with three or more days of history shows a day rail on its right edge while you scroll. Each segment is one day, so you can see how long the chat is and where you are in it, also before older messages load: a top segment stands for them. Point at the rail to see the days, and click a day to scroll smoothly to it; the day count rolls to each new number. This is in agent chats, team channels and direct messages on this computer; on a joined server the rail shows the loaded days.
 - Settings > General has a new "Steer agents while they work" switch. When it is on, a message sent to a busy ChatGPT or Claude agent joins the current work at the next step, and does not wait in the queue. The switch is off by default, so messages queue as before. It also applies to messages from teammates on a server that this computer runs.
 - Each agent has a "While working" setting in its settings panel. It uses the app default, or it always queues or always steers for that agent.
 - A message that cannot steer waits in the queue with a "Not steered" label and the reason. Grok, OpenCode, Gemini, Cursor, Cline and custom agents cannot steer a running turn. The message starts when the current turn ends.
@@ -36,6 +36,7 @@ All notable changes to OpenBot will be documented here. The project follows
   channel, and the Discord Orchestrator agent asks the right agent and answers in the reply chain.
   Replies to OpenBot continue the conversation. Approvals, **Stop**, reactions and files work as in
   Slack.
+- Connect Bitwarden in Marketplace or Server settings to fill browser passwords and authenticator codes. Share logins through a folder named `Shared with OpenBot`. The CLI session lasts until disconnect, eight idle hours, or app exit.
 
 ### Changed
 
@@ -63,6 +64,7 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ### Fixed
 
+- Remove claims from the website and documentation that OpenBot does not need an account.
 - Explain an OpenCode model whose provider rejects its API key, such as a Google Gemma model, and
   tell how to fix the key. Before, OpenBot showed only "Internal error: API key not valid".
 - The **Add member** menu in channel settings has a search field, and its list scrolls. Before, the menu had no search and did not scroll, so agents above or below the window edge could not be added.
@@ -105,6 +107,7 @@ All notable changes to OpenBot will be documented here. The project follows
 
 - The Windows installer and app are now signed by SYNTHETIFY LABS SPÓŁKA Z OGRANICZONĄ ODPOWIEDZIALNOŚCIĄ. Windows no longer shows "Unknown publisher" for them, and later updates install only when they have the same signature. Before, the Windows release was not signed.
 - The account service now checks the skills and agent marketplace admin token in constant time. Before, the check time could show how much of a guessed token was correct.
+- Bitwarden fills require an exact HTTPS origin and a current item in the shared folder. Session keys and login values are not saved by OpenBot, and short authenticator codes are redacted from logs.
 
 ## [0.30.0] - 2026-10-05
 
