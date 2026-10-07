@@ -148,7 +148,7 @@ export function ComposerSignInNotice(props: {
 
 export function ComposerUpdateNotice(props: {
   provider: AgentProviderId;
-  onUpdate?: (provider: AgentProviderId) => void | Promise<void>;
+  onUpdate?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   updating?: boolean;
 }) {
   const { t } = useText();
