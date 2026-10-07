@@ -114,12 +114,12 @@ export function DiagramChatPanel(props: DiagramChatPanelProps) {
           <Button
             type="button"
             variant="ghost"
-            size="icon-sm"
+            class="header-panel-toggle"
             aria-label={t("diagram.chat.hide")}
             title={t("diagram.chat.hide")}
             onClick={() => setOpen(false)}
           >
-            <Minimize2 aria-hidden="true" />
+            <Minimize2 aria-hidden="true" class="size-[14px]" />
           </Button>
         </header>
 
