@@ -94,8 +94,7 @@ const ALL = "routine-lens:all";
 export function DiagramView(props: DiagramViewProps) {
   const { t, format } = useText();
   const [selectedNodeId, setSelectedNodeId] = createSignal<string | null>(null);
-  // The run panel opens when a card is picked, so the canvas starts with the whole width.
-  const [panels, setPanels] = createStore({ inspector: false, chat: true });
+  const [panels, setPanels] = createStore({ inspector: true, chat: true });
   const now = () => (props.now ? new Date(props.now) : new Date());
   const routines = () =>
     props.diagram.nodes.filter((node): node is Extract<DiagramNode, { kind: "routine" }> => node.kind === "routine");
