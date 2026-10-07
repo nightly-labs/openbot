@@ -80,6 +80,7 @@
     "./team-protocol/agent-publish-v1": "./src/team-protocol/agent-publish-v1.ts",
     "./team-protocol/agent-update-v1": "./src/team-protocol/agent-update-v1.ts",
     "./team-protocol/context-reset-v1": "./src/team-protocol/context-reset-v1.ts",
+    "./team-protocol/workspace-directory-v1": "./src/team-protocol/workspace-directory-v1.ts",
     "./team-protocol/live-activity-push-v1": "./src/team-protocol/live-activity-push-v1.ts",
     "./team-protocol/providers-v1": "./src/team-protocol/providers-v1.ts",
     "./team-protocol/providers-v2": "./src/team-protocol/providers-v2.ts",

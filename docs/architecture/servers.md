@@ -71,6 +71,15 @@ The next provider session gets a handoff of only the messages after the last mar
 the request while a turn runs or a message waits in the queue. A client without the capability shows
 the marker as its text. Channel execution threads are not reset.
 
+### Workspace folders
+
+`workspace-directory-v1` adds `POST /v1/workspace-directory` with `{ agentId, path }`. Any member who
+can see the agent can send it, as with `GET /v1/workspace-files`. The host answers the folder entries
+(name, path, kind, size, modification time), at most 500, directories first. The path must stay inside
+the agent workspace; a symbolic link that leaves it is not listed. A missing path answers 404 with a
+message that names the path and the workspace. A client without the capability shows the file preview
+error. The desktop lists a local folder without the containment when the agent has no workspace limit.
+
 ### Agent import from a joined server
 
 `agent-import-v1` lets any member, not only an owner or admin, import a Grok Bot export into the host.

@@ -32,7 +32,7 @@ import {
   refreshGitHubToken,
   requestGitHubDeviceCode,
 } from "./github-device-flow";
-import { GitHubOperationError, GitHubPlatform, githubCall } from "./github-effects";
+import { GitHubOperationError, GitHubPlatform, githubCall, toGitHubOperationError } from "./github-effects";
 import { GitHubMcpProxy } from "./github-mcp-proxy";
 
 const logger = createOpenBotLogger("github-connector");
@@ -854,9 +854,7 @@ export class GitHubConnectorService {
       .map(([repository, token]) => `${repository}\t${token}\n`)
       .join("");
     if (content === this.#repositoriesWritten) return;
-    yield* writeFileAtomically(this.#repositoriesFile(), content).pipe(
-      Effect.mapError((error) => new GitHubOperationError({ cause: error.cause })),
-    );
+    yield* writeFileAtomically(this.#repositoriesFile(), content).pipe(toGitHubOperationError);
     this.#repositoriesWritten = content;
   });
 
@@ -932,12 +930,8 @@ export class GitHubConnectorService {
       `    user: ${record.login}`,
       "",
     ].join("\n");
-    yield* writeFileAtomically(join(this.#ghConfigDirectory(), "hosts.yml"), hosts).pipe(
-      Effect.mapError((error) => new GitHubOperationError({ cause: error.cause })),
-    );
-    yield* writeFileAtomically(this.#credentialFile(), record.accessToken).pipe(
-      Effect.mapError((error) => new GitHubOperationError({ cause: error.cause })),
-    );
+    yield* writeFileAtomically(join(this.#ghConfigDirectory(), "hosts.yml"), hosts).pipe(toGitHubOperationError);
+    yield* writeFileAtomically(this.#credentialFile(), record.accessToken).pipe(toGitHubOperationError);
     yield* this.#writeRepositoriesFileEffect();
   });
 

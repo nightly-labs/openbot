@@ -1,6 +1,7 @@
 import type { DynamicIslandNotchSize } from "@openbot/contracts/ipc";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, createUniqueId, onCleanup, onSettled, Show, untrack } from "solid-js";
+import { computedBlur, computedScale, type Spring, springKeyframes } from "./spring-motion";
 import { useText } from "./text";
 import { cx, mix, prefersReducedMotion } from "./utils";
 
@@ -956,20 +957,16 @@ function silhouetteGeometryMatches(
 function resizeKeyframes(
   start: { width: number; height: number },
   end: { width: number; height: number },
-  spring: { response: number; dampingFraction: number },
+  spring: Spring,
 ): Keyframe[] {
-  const sampleCount = 24;
-  const finalProgress = springProgress(spring.response, spring);
-  return Array.from({ length: sampleCount + 1 }, (_, index) => {
-    const offset = index / sampleCount;
-    const rawProgress = springProgress(offset * spring.response, spring);
-    const progress = index === sampleCount ? 1 : rawProgress / finalProgress;
-    return {
-      width: `${start.width + (end.width - start.width) * progress}px`,
-      height: `${start.height + (end.height - start.height) * progress}px`,
-      offset,
-    };
-  });
+  return springKeyframes(
+    spring,
+    (progress) => ({
+      width: `${mix(start.width, end.width, progress)}px`,
+      height: `${mix(start.height, end.height, progress)}px`,
+    }),
+    24,
+  );
 }
 
 function silhouetteBodyKeyframes(
@@ -1015,22 +1012,6 @@ function sharedElementKeyframes(
   return springKeyframes(spring, (progress) => ({
     transform: `translate3d(${mix(start.x, end.x, progress)}px, ${mix(start.y, end.y, progress)}px, 0) scale(${mix(start.scale, end.scale, progress)})`,
   }));
-}
-
-interface Spring {
-  response: number;
-  dampingFraction: number;
-}
-
-function springKeyframes(spring: Spring, frame: (progress: number) => Keyframe): Keyframe[] {
-  const sampleCount = 32;
-  const finalProgress = springProgress(spring.response, spring);
-  return Array.from({ length: sampleCount + 1 }, (_, index) => {
-    const offset = index / sampleCount;
-    const rawProgress = springProgress(offset * spring.response, spring);
-    const progress = index === sampleCount ? 1 : rawProgress / finalProgress;
-    return { ...frame(progress), offset };
-  });
 }
 
 function resizeSpring(
@@ -1180,18 +1161,14 @@ function createSpringContentTransition(options: SpringContentTransitionOptions):
 }
 
 function springContentEntranceKeyframes(startOpacity: number, startScale: number): Keyframe[] {
-  const sampleCount = 20;
-  const finalProgress = springProgress(CONTENT_SPRING.response, CONTENT_SPRING);
-  return Array.from({ length: sampleCount + 1 }, (_, index) => {
-    const offset = index / sampleCount;
-    const rawProgress = springProgress(offset * CONTENT_SPRING.response, CONTENT_SPRING);
-    const progress = index === sampleCount ? 1 : rawProgress / finalProgress;
-    return {
-      opacity: Math.min(1, startOpacity + (1 - startOpacity) * progress),
-      transform: `scale(${startScale + (1 - startScale) * progress})`,
-      offset,
-    };
-  });
+  return springKeyframes(
+    CONTENT_SPRING,
+    (progress) => ({
+      opacity: Math.min(1, mix(startOpacity, 1, progress)),
+      transform: `scale(${mix(startScale, 1, progress)})`,
+    }),
+    20,
+  );
 }
 
 interface IslandBlurAnimationOptions {
@@ -1232,32 +1209,4 @@ function animateIslandBlur(targets: HTMLElement[], endBlur: number, options: Isl
 
 function captureIslandBlurs(targets: HTMLElement[]): Map<HTMLElement, number> {
   return new Map(targets.map((target) => [target, computedBlur(getComputedStyle(target).filter)]));
-}
-
-function computedScale(transform: string): number {
-  if (!transform || transform === "none") return 1;
-  const match = transform.match(/^matrix\(([^,]+)/);
-  const scale = Number.parseFloat(match?.[1] ?? "");
-  return Number.isFinite(scale) ? scale : 1;
-}
-
-function computedBlur(filter: string): number {
-  if (!filter || filter === "none") return 0;
-  const match = filter.match(/blur\(([-\d.]+)px\)/);
-  const blur = Number.parseFloat(match?.[1] ?? "");
-  return Number.isFinite(blur) ? blur : 0;
-}
-
-function springProgress(time: number, spring: { response: number; dampingFraction: number }): number {
-  const angularFrequency = (2 * Math.PI) / spring.response;
-  const damping = spring.dampingFraction;
-  if (damping === 1) {
-    const phase = angularFrequency * time;
-    return 1 - Math.exp(-phase) * (1 + phase);
-  }
-
-  const dampedFrequency = angularFrequency * Math.sqrt(1 - damping * damping);
-  const envelope = Math.exp(-damping * angularFrequency * time);
-  const phase = dampedFrequency * time;
-  return 1 - envelope * (Math.cos(phase) + (damping * Math.sin(phase)) / Math.sqrt(1 - damping * damping));
 }

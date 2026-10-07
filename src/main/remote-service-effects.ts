@@ -1,14 +1,13 @@
-import { Context, Effect, Layer, Schema } from "effect";
+import { Context, type Effect, Layer, Schema } from "effect";
+import { causeHelpers } from "../backend/effect-boundary";
 import type { ResponseDecoder } from "./remote-host-decoding";
 import type { RemoteRequestFn, RemoteRequestInit } from "./remote-server-client";
 
 export class RemoteWorkflowError extends Schema.TaggedError<RemoteWorkflowError>()("RemoteWorkflowError", {
   cause: Schema.Defect(),
 }) {}
-export const remoteCall = <A>(operation: () => Promise<A>) =>
-  Effect.tryPromise({ try: operation, catch: (cause) => new RemoteWorkflowError({ cause }) });
-export const remoteDecode = <A>(operation: () => A) =>
-  Effect.try({ try: operation, catch: (cause) => new RemoteWorkflowError({ cause }) });
+
+export const { io: remoteCall, sync: remoteDecode, rewrap: toRemoteWorkflowError } = causeHelpers(RemoteWorkflowError);
 
 export class RemoteRequest extends Context.Service<
   RemoteRequest,

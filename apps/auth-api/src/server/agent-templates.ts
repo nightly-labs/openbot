@@ -10,6 +10,7 @@ import {
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { Effect, Result, Schema } from "effect";
 import { AgentMarketplaceError } from "./agent-marketplace";
+import { encodeBase64Url } from "./crypto";
 import { MarketplaceStorage } from "./marketplace-storage";
 import type { AuthUser, WorkerBindings } from "./types";
 
@@ -399,11 +400,7 @@ function notFound(): AgentMarketplaceError {
 
 /** 16 random bytes as base64url: 22 characters, the shape `isAgentTemplateId` accepts. */
 function newTemplateId(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(16));
-  return btoa(String.fromCharCode(...bytes))
-    .replaceAll("+", "-")
-    .replaceAll("/", "_")
-    .replace(/=+$/u, "");
+  return encodeBase64Url(crypto.getRandomValues(new Uint8Array(16)));
 }
 
 class AgentTemplatesStorageError extends Schema.TaggedError<AgentTemplatesStorageError>()(

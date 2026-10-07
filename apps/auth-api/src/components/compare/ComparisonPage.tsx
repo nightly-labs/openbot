@@ -3,8 +3,8 @@ import { For } from "solid-js";
 import { type Comparison, comparisonScore, OPENBOT_PLANS } from "../../content/compare/comparison";
 import { type CollectionArticle, type ContentCollection, formatArticleDate } from "../../lib/content-collection";
 import { ArticleGradient } from "../content/ArticleGradient";
+import { DataArticleFrame } from "../content/DataArticleFrame";
 import { LandingIcon } from "../landing/LandingIcon";
-import { CompareArticleFrame } from "./CompareArticleFrame";
 import {
   CheckedMeta,
   ChoiceCard,
@@ -41,7 +41,7 @@ export function ComparisonPage(props: ComparisonPageProps) {
   const topics = () => props.comparison.rows.length;
 
   return (
-    <CompareArticleFrame collection={props.collection} article={props.article}>
+    <DataArticleFrame collection={props.collection} article={props.article}>
       <header class="compare-hero">
         <div class="compare-hero-copy" data-enter="post-copy">
           <Link class="post-article-back" to={props.collection.indexRoute}>
@@ -155,6 +155,6 @@ export function ComparisonPage(props: ComparisonPageProps) {
       <CompareFaq faq={props.comparison.faq} />
 
       <CompareSources subject={rival().name} page={props.comparison} />
-    </CompareArticleFrame>
+    </DataArticleFrame>
   );
 }

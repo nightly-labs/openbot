@@ -16,6 +16,23 @@ changes it, on the computer that runs the agent: the Team API parser and the age
 not accept it, the remote IPC branch refuses it, and duplication does not copy it. When the flag is
 on, the developer instructions name the two file paths, never the token.
 
+## Routine calendar feed
+
+`src/main/routine-feed-server.ts` is a loopback HTTP listener that serves the routines of this
+computer as an iCalendar feed (`src/main/routine-feed-ics.ts`) for Server Settings > Routines. It
+runs only after the user makes a feed URL, and binds `127.0.0.1`. The URL is
+`/routines/<token>.ics`, with an optional `?agent=<id>`: a calendar app cannot send a header, so the
+token is in the path. `<userData>/openbot-routine-feed-v1.json` keeps the token, encrypted with the
+secret storage cipher, and the port, so the URL stays the same after a restart. When the port is not
+free, the listener takes a new one and saves it. **New URL** replaces the token, and **Turn off**
+deletes the file. A wrong token gets 404. A request with an `Origin` header or a foreign `Host`
+gets 403 before the token is checked. Logs never contain the URL.
+
+The feed lists each run of the next 30 days of active routines as one UTC event, placed by the same
+schedule code that fires the run, so it needs no RRULE or time zone rules. Nothing leaves the
+computer: a calendar service that fetches feeds from its own servers, such as Google Calendar or
+iCloud, cannot read it.
+
 ## Agent communication policy
 
 The shared developer instructions keep routine teammate exchanges internal by default. Agents

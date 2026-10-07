@@ -9,6 +9,7 @@ import { GITHUB_CONNECTOR_MCP_SERVER_ID, mcpConfigErrors, normalizeMcpConfig } f
 import type { Logger } from "@openbot/logging";
 import { Effect, Schema } from "effect";
 import type { AgentProvider } from "../agent-client";
+import { causeHelpers } from "../effect-boundary";
 import { McpHandoffLog } from "../mcp-handoff-log";
 import { type McpOAuthAuthority, normalizeResource } from "../mcp-oauth-provider";
 import { testMcpServer } from "../mcp-probe";
@@ -129,14 +130,10 @@ export class McpGateway {
     const token =
       config.id === GITHUB_CONNECTOR_MCP_SERVER_ID
         ? github
-          ? yield* github
-              .mcpAuthorization()
-              .pipe(Effect.mapError((failure) => new McpGatewayFailed({ cause: failure.cause })))
+          ? yield* github.mcpAuthorization().pipe(toMcpGatewayFailed)
           : null
         : oauth
-          ? yield* oauth
-              .accessToken(config.url)
-              .pipe(Effect.mapError((failure) => new McpGatewayFailed({ cause: failure.cause })))
+          ? yield* oauth.accessToken(config.url).pipe(toMcpGatewayFailed)
           : null;
     if (token) this.#handoff.recordSecret(token);
     return token;
@@ -189,10 +186,7 @@ export class McpGateway {
       removedResource &&
       !list.some((config) => config.transport === "http" && normalizeResource(config.url) === removedResource)
     ) {
-      if (this.#oauth)
-        yield* this.#oauth
-          .forget(removed.url)
-          .pipe(Effect.mapError((failure) => new McpGatewayFailed({ cause: failure.cause })));
+      if (this.#oauth) yield* this.#oauth.forget(removed.url).pipe(toMcpGatewayFailed);
     }
     return list;
   }, Effect.uninterruptible);
@@ -263,9 +257,7 @@ export class McpGateway {
           }
         : undefined;
     const oauth = options.interactive ? (stored ?? undefined) : silent;
-    return yield* testMcpServer(config, undefined, this.#toolRuntimes(), oauth).pipe(
-      Effect.mapError((failure) => new McpGatewayFailed({ cause: failure.cause })),
-    );
+    return yield* testMcpServer(config, undefined, this.#toolRuntimes(), oauth).pipe(toMcpGatewayFailed);
   });
 
   /**
@@ -334,3 +326,5 @@ export class McpGateway {
 export class McpGatewayFailed extends Schema.TaggedError<McpGatewayFailed>()("McpGatewayFailed", {
   cause: Schema.Defect(),
 }) {}
+
+export const { rewrap: toMcpGatewayFailed } = causeHelpers(McpGatewayFailed);

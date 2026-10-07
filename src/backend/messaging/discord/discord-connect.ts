@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { createDiscordGuildKeyPair, openDiscordGuildGrant } from "@openbot/contracts/discord-guild-grant";
 import { Effect, Schema } from "effect";
+import { causeHelpers } from "../../effect-boundary";
 
 /** How long a connect link stays usable. */
 const PENDING_TTL_MS = 15 * 60_000;
@@ -58,6 +59,6 @@ export class DiscordConnectFailed extends Schema.TaggedError<DiscordConnectFaile
   cause: Schema.Defect(),
 }) {}
 
-function connectIo<A>(run: () => Promise<A>): Effect.Effect<A, DiscordConnectFailed> {
-  return Effect.tryPromise({ try: run, catch: (cause) => new DiscordConnectFailed({ cause }) });
-}
+const { io: connectIo, rewrap: toDiscordConnectFailed } = causeHelpers(DiscordConnectFailed);
+
+export { toDiscordConnectFailed };

@@ -5,6 +5,7 @@ import { dirname, join, resolve } from "node:path";
 import { Effect, Schema } from "effect";
 import { z } from "zod";
 import type { HostManagerConfig, HostTenantStatus, HostUpdateState } from "../../packages/contracts/src/host-manager";
+import { causeHelpers } from "../backend/effect-boundary";
 import { isMissingFileError } from "../backend/file-errors";
 
 export const HOST_MANAGER_DIRECTORY = "/Library/Application Support/OpenBot/HostManager";
@@ -50,11 +51,8 @@ export const tenantStatusSchema: z.ZodType<HostTenantStatus> = z
 export class HostProtocolFileError extends Schema.TaggedError<HostProtocolFileError>()("HostProtocolFileError", {
   cause: Schema.Defect(),
 }) {}
-const fileCall = <A>(operation: () => Promise<A>) =>
-  Effect.tryPromise({
-    try: operation,
-    catch: (cause) => new HostProtocolFileError({ cause }),
-  });
+
+const { io: fileCall } = causeHelpers(HostProtocolFileError);
 export const verifyHostDirectory: (path: string, hostUid?: number) => Effect.Effect<void, HostProtocolFileError> =
   Effect.fn("HostFiles.verifyDirectory")(function* (
     path: string,

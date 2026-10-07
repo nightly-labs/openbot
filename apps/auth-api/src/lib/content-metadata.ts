@@ -8,6 +8,7 @@
 
 import {
   articleArtPath,
+  articleMarkdownUrl,
   articleOgImageUrl,
   articleUrl,
   type CollectionArticle,
@@ -155,6 +156,7 @@ export function articleHead(
         title: collection.feedTitle,
         href: collectionFeedUrl(collection, siteUrl),
       },
+      { rel: "alternate", type: "text/markdown", href: articleMarkdownUrl(collection, article.slug, siteUrl) },
       // The same reason as on the index: this article's artwork is the first
       // thing under the title and it is a background, not an <img>.
       { rel: "preload", as: "image" as const, href: articleArtPath(collection, article.slug, artShape) },
@@ -208,8 +210,8 @@ function articleBreadcrumbData(collection: ContentCollection, article: Collectio
 }
 
 function collectionStructuredData(collection: ContentCollection, siteUrl: string) {
-  // A comparison is a reference page, not a dated post, so the index is a list of them.
-  if (collection.id === "compare") {
+  // A comparison or a provider page is a reference page, not a dated post, so the index is a list of them.
+  if (collection.id === "compare" || collection.id === "providers") {
     return {
       "@context": "https://schema.org",
       "@type": "ItemList",

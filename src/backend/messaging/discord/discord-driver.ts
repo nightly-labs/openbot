@@ -12,6 +12,7 @@ import {
 } from "@openbot/contracts/signal-protocol/discord-api";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Result } from "effect";
+import { causeHelpers } from "../../effect-boundary";
 import { chunkMarkdown } from "../messaging-chunks";
 import type { MessagingAnswerFile } from "../messaging-threads";
 import type {
@@ -37,6 +38,8 @@ const HISTORY_PAGES = 3;
 const RATE_LIMIT_NOTICE_MS = 5_000;
 const REDIRECT_LIMIT = 3;
 const CDN_HOSTS = new Set(["cdn.discordapp.com", "media.discordapp.net"]);
+
+const { io: adapterIo } = causeHelpers(MessagingAdapterError);
 
 const REACTIONS: Record<StatusReaction, string> = {
   received: "👀",
@@ -363,10 +366,6 @@ function compareSnowflakes(left: string, right: string): number {
 
 /** The answer of a call that returns nothing OpenBot reads. */
 function ignoreAnswer(): void {}
-
-function adapterIo<A>(run: () => Promise<A>): Effect.Effect<A, MessagingAdapterError> {
-  return Effect.tryPromise({ try: run, catch: (cause) => new MessagingAdapterError({ cause }) });
-}
 
 function trustedCdnUrl(value: string): boolean {
   try {

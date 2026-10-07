@@ -924,6 +924,8 @@ export function installOpenbotStub(): void {
         previewKind: "markdown",
         bytes: new TextEncoder().encode("# Preview"),
       }),
+      // A path a test previews is a file, so it is not a folder either.
+      listWorkspaceDirectory: vi.fn().mockRejectedValue(new Error("Workspace path is not a folder.")),
       sendMessage: vi.fn().mockResolvedValue({
         messageId: "message-1",
         deliveries: [{ id: "delivery-1", recipientAgentId: "chief", status: "queued", position: 1 }],

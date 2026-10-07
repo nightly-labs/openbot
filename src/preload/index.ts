@@ -20,6 +20,7 @@ import {
   decodeMcpTestResult,
   decodeOptionalStorageUsage,
   decodeSaveAgentProfileResult,
+  decodeWorkspaceDirectory,
   type EventEndpoint,
   type GroupApi,
   groupApiMethodName,
@@ -50,6 +51,7 @@ import {
   decodeProviderCodeLoginStart,
   decodeRoutine,
   decodeRoutineCalendar,
+  decodeRoutineFeed,
   decodeRoutineRun,
   decodeRoutineRuns,
   decodeRoutines,
@@ -572,6 +574,11 @@ const openbotApi: OpenBotDesktopApi = {
     disconnect: decodeOnePasswordConnectorStatus,
     changed: decodeOnePasswordConnectorStatus,
   }),
+  routineFeed: bridgeGroup(IPC_ENDPOINTS.routineFeed, {
+    get: decodeRoutineFeed,
+    create: decodeRoutineFeed,
+    remove: decodeRoutineFeed,
+  }),
   billing: bridgeGroup(IPC_ENDPOINTS.billing, {
     getState: decodeBillingState,
     openPortal: decodeVoid,
@@ -728,6 +735,7 @@ const openbotApi: OpenBotDesktopApi = {
       openWorkspaceFile: decodeVoid,
       previewSharedFile: decodeFilePreview,
       previewWorkspaceFile: decodeFilePreview,
+      listWorkspaceDirectory: decodeWorkspaceDirectory,
     }),
     onAttachmentImport: (listener) => {
       attachmentImportListeners.add(listener);

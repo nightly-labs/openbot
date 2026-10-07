@@ -21,7 +21,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Exit, Result } from "effect";
 import { CuaDriverActionTap, type ObservedAction, type ObservedPointer } from "./cua-driver-action-tap";
 import { CUA_DRIVER_VENDOR_CALLS_OFF } from "./cua-driver-artifact";
-import { CuaDriverFailure, cuaIO, cuaSync } from "./cua-driver-effects";
+import { CuaDriverFailure, cuaIO, cuaSync, toCuaDriverFailure } from "./cua-driver-effects";
 import { LifecycleGate } from "./lifecycle-gate";
 import { forwardDiagnosticLines, stopRemoteProcess } from "./remote-diagnostics";
 
@@ -513,8 +513,7 @@ export class CuaDriverRuntime {
     const child = this.#child;
     this.#child = null;
     yield* this.#tap.close();
-    if (child)
-      yield* stopRemoteProcess(child).pipe(Effect.mapError((error) => new CuaDriverFailure({ cause: error.cause })));
+    if (child) yield* stopRemoteProcess(child).pipe(toCuaDriverFailure);
     yield* this.#removeSocket();
     // No announcement: a stop this process asked for is the teardown, and telling the providers
     // there would deactivate the very sessions the next run resumes.

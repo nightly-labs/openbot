@@ -14,6 +14,7 @@ export const messages = {
     "リモートデスクトップ用に空いている Sunshine のポート群を確保できませんでした。",
   "error.backend.moonlightPortsUnavailable":
     "リモートデスクトップ用に空いている Moonlight WebRTC のポート範囲を確保できませんでした。",
+  "error.backend.iceServerNoPort": "リモートデスクトップの ICE サーバーにポートが割り当てられませんでした。",
   "error.backend.remoteDesktopStoppedWhileStarting": "リモートデスクトップのランタイムは起動中に停止されました。",
   "error.backend.sunshineNotStarted": "Sunshine は確保したポート群で起動しませんでした。",
   "error.backend.moonlightNoHost": "Moonlight にペアリング済みのローカルホストがありません。",
@@ -164,6 +165,9 @@ export const messages = {
   "error.backend.workspaceFileOutside":
     "ワークスペースのファイルはエージェントのワークスペース内にある必要があります。",
   "error.backend.workspacePathNotFile": "ワークスペースのパスがファイルではありません。",
+  "error.backend.workspacePathNotDirectory": "ワークスペースのパスがフォルダではありません。",
+  "error.backend.workspacePathMissing": "エージェントのワークスペース {root} に {path} はありません。",
+  "error.backend.workspacePathMissingForMember": "エージェントのワークスペースに {path} はありません。",
   "error.backend.useChannelTaskControls": "この割り当てにはチャンネルのタスク操作を使用してください。",
   "error.backend.editFinished": "この編集はすでに終了しています。",
   "error.backend.editCancelled": "この編集はキャンセルされたため、メッセージは元のテキストのままです。",

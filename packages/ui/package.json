@@ -21,6 +21,7 @@
     "./complex": "./src/complex.tsx",
     "./confirm-dialog": "./src/confirm-dialog.tsx",
     "./utils": "./src/utils.ts",
+    "./spring-motion": "./src/spring-motion.ts",
     "./dynamic-island-identity": "./src/dynamic-island-identity.tsx",
     "./bubble": "./src/bubble.tsx",
     "./typography": "./src/typography.tsx",

@@ -26,6 +26,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { type AttachmentOperationError, attachmentCall, attachmentFailure, attachmentSync } from "./attachment-effects";
 import { sha256File } from "./file-hash";
+import { isWithin } from "./workspace-paths";
 
 const MAX_ATTACHMENTS = INPUT_LIMITS.attachments;
 const MAX_FILE_BYTES = ATTACHMENT_LIMITS.fileBytes;
@@ -713,11 +714,6 @@ export function toAttachmentSummary(attachment: StoredAttachment): AttachmentSum
 function normalizeBytes(value: Uint8Array): Uint8Array {
   if (value instanceof Uint8Array) return value;
   throw new Error("Attachment data is invalid.");
-}
-
-function isWithin(root: string, path: string): boolean {
-  const candidate = relative(root, path);
-  return candidate !== "" && !candidate.startsWith("..") && !isAbsolute(candidate);
 }
 
 function transferRootForPath(root: string, path: string): string | null {

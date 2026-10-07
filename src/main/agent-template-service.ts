@@ -40,6 +40,7 @@ import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
 import { Effect, Result, Schema } from "effect";
+import { causeHelpers } from "../backend/effect-boundary";
 import { imageMimeType, localSchedule, toArrayBuffer, validTimezone } from "./agent-marketplace-service";
 import type { LocalSkillLibrary } from "./local-skill-library";
 import { inspectSkillMarkdown, normalizedFiles } from "./skill-package";
@@ -161,7 +162,7 @@ export class AgentTemplateService {
           this.owned(agentId).pipe(Effect.catch(() => Effect.succeed(null))),
           this.skills
             .listTemplateSkills(agentId)
-            .pipe(Effect.mapError((error) => new AgentTemplateFailure({ cause: error.cause })))
+            .pipe(toAgentTemplateFailure)
             .pipe(
               Effect.map((value) => ({ value, error: null })),
               Effect.catch((error) => Effect.succeed({ value: [], error: message(error.cause) })),
@@ -204,7 +205,7 @@ export class AgentTemplateService {
       if (card) form.set("card", new Blob([toArrayBuffer(card)], { type: "image/png" }), "card.png");
       const owned = yield* this.auth
         .requestAuthorized("/v1/agent-templates/", { method: "POST", body: form }, decodeOwnedTemplate, 30_000)
-        .pipe(Effect.mapError((error) => new AgentTemplateFailure({ cause: error.cause })));
+        .pipe(toAgentTemplateFailure);
       return this.publication(owned);
     });
   }
@@ -215,7 +216,7 @@ export class AgentTemplateService {
       if (!owned) return;
       yield* this.auth
         .requestAuthorized(`/v1/agent-templates/${encodeURIComponent(owned.id)}`, { method: "DELETE" }, decodeDeleted)
-        .pipe(Effect.mapError((error) => new AgentTemplateFailure({ cause: error.cause })));
+        .pipe(toAgentTemplateFailure);
     });
   }
 
@@ -229,7 +230,7 @@ export class AgentTemplateService {
           { method: "GET" },
           decodeAgentTemplateDetail,
         )
-        .pipe(Effect.mapError((error) => new AgentTemplateFailure({ cause: error.cause })));
+        .pipe(toAgentTemplateFailure);
       return { ...detail, avatarUrl: detail.avatarUrl ? this.auth.resolveApiUrl(detail.avatarUrl) : null };
     });
   }
@@ -248,9 +249,7 @@ export class AgentTemplateService {
       // skill with the same name is reused only when its text is the same: a template never revises a
       // skill the user already has.
       const library = yield* templateSync(() => this.skills.library());
-      const localSkills = yield* library
-        .list()
-        .pipe(Effect.mapError((error) => new AgentTemplateFailure({ cause: error.cause })));
+      const localSkills = yield* library.list().pipe(toAgentTemplateFailure);
       const reused = new Map<string, { id: string; revision: number }>();
       for (const skill of detail.skills) {
         if (skill.kind !== "embedded") continue;
@@ -258,11 +257,7 @@ export class AgentTemplateService {
         const current = localSkills.find((candidate) => candidate.slug === slug);
         if (!current) continue;
         const text = new TextDecoder().decode(
-          normalizedFiles(
-            yield* library
-              .bundle(current.id, current.version)
-              .pipe(Effect.mapError((error) => new AgentTemplateFailure({ cause: error.cause }))),
-          )["SKILL.md"],
+          normalizedFiles(yield* library.bundle(current.id, current.version).pipe(toAgentTemplateFailure))["SKILL.md"],
         );
         if (text !== skill.markdown)
           return yield* new AgentTemplateFailure({
@@ -273,9 +268,7 @@ export class AgentTemplateService {
       let avatar: AvatarImageInput | null = null;
       if (detail.avatarUrl) {
         const avatarUrl = detail.avatarUrl;
-        const bytes = yield* this.auth
-          .downloadAuthorized(avatarUrl)
-          .pipe(Effect.mapError((error) => new AgentTemplateFailure({ cause: error.cause })));
+        const bytes = yield* this.auth.downloadAuthorized(avatarUrl).pipe(toAgentTemplateFailure);
         const mimeType = imageMimeType(bytes);
         if (!mimeType)
           return yield* new AgentTemplateFailure({ cause: new Error(sourceText("error.marketplace.avatarInvalid")) });
@@ -290,7 +283,7 @@ export class AgentTemplateService {
           avatarSeed: detail.avatarSeed,
           avatarHue: detail.avatarHue,
         })
-        .pipe(Effect.mapError((error) => new AgentTemplateFailure({ cause: error.cause })));
+        .pipe(toAgentTemplateFailure);
       const published: Array<{ id: string; revision: number }> = [];
       {
         const outcome = yield* Effect.result(
@@ -299,14 +292,14 @@ export class AgentTemplateService {
               if (skill.kind === "marketplace") {
                 yield* this.skills
                   .installVersion({ agentId: agent.id, skillId: skill.skillId, versionId: skill.versionId })
-                  .pipe(Effect.mapError((error) => new AgentTemplateFailure({ cause: error.cause })));
+                  .pipe(toAgentTemplateFailure);
                 continue;
               }
               const existing = reused.get(inspectSkillMarkdown(skill.markdown).slug);
               if (existing) {
                 yield* this.skills
                   .installLocal({ agentId: agent.id, skillId: existing.id, revision: existing.revision })
-                  .pipe(Effect.mapError((error) => new AgentTemplateFailure({ cause: error.cause })));
+                  .pipe(toAgentTemplateFailure);
                 continue;
               }
               const folder = `${SKILL_STAGING}/${skill.slug}`;
@@ -314,13 +307,11 @@ export class AgentTemplateService {
               yield* Effect.gen({ self: this }, function* () {
                 yield* templateIO(() => mkdir(target, { recursive: true }));
                 yield* templateIO(() => writeFile(join(target, "SKILL.md"), skill.markdown, { flag: "wx" }));
-                const revision = yield* library
-                  .create(agent.id, folder)
-                  .pipe(Effect.mapError((error) => new AgentTemplateFailure({ cause: error.cause })));
+                const revision = yield* library.create(agent.id, folder).pipe(toAgentTemplateFailure);
                 published.push({ id: revision.id, revision: revision.version });
                 yield* this.skills
                   .installLocal({ agentId: agent.id, skillId: revision.id, revision: revision.version })
-                  .pipe(Effect.mapError((error) => new AgentTemplateFailure({ cause: error.cause })));
+                  .pipe(toAgentTemplateFailure);
               }).pipe(
                 Effect.ensuring(
                   Effect.gen({ self: this }, function* () {
@@ -343,10 +334,7 @@ export class AgentTemplateService {
                   { recordConversationEvent: false },
                 ),
               );
-            if (avatar)
-              agent = yield* this.agents
-                .setAvatar(agent.id, avatar)
-                .pipe(Effect.mapError((error) => new AgentTemplateFailure({ cause: error.cause })));
+            if (avatar) agent = yield* this.agents.setAvatar(agent.id, avatar).pipe(toAgentTemplateFailure);
           }),
         );
         if (Result.isFailure(outcome)) {
@@ -364,12 +352,7 @@ export class AgentTemplateService {
 
   snapshot(agent: AgentSummary): Effect.Effect<AgentTemplateSnapshot, AgentTemplateFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<AgentTemplateSnapshot, AgentTemplateFailure> {
-      return this.profile(
-        agent,
-        yield* this.skills
-          .listTemplateSkills(agent.id)
-          .pipe(Effect.mapError((error) => new AgentTemplateFailure({ cause: error.cause }))),
-      );
+      return this.profile(agent, yield* this.skills.listTemplateSkills(agent.id).pipe(toAgentTemplateFailure));
     });
   }
 
@@ -402,7 +385,7 @@ export class AgentTemplateService {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<OwnedTemplate | null, AgentTemplateFailure> {
       const mine = yield* this.auth
         .requestAuthorized("/v1/agent-templates/mine", { method: "GET" }, decodeOwnedTemplates)
-        .pipe(Effect.mapError((error) => new AgentTemplateFailure({ cause: error.cause })));
+        .pipe(toAgentTemplateFailure);
       return mine.find((template) => template.sourceAgentId === agentId) ?? null;
     });
   }
@@ -483,10 +466,5 @@ function message(error: unknown): string {
 export class AgentTemplateFailure extends Schema.TaggedError<AgentTemplateFailure>()("AgentTemplateFailure", {
   cause: Schema.Defect(),
 }) {}
-function templateIO<A>(operation: () => Promise<A>): Effect.Effect<A, AgentTemplateFailure> {
-  return Effect.tryPromise({ try: operation, catch: (cause) => new AgentTemplateFailure({ cause }) });
-}
 
-function templateSync<A>(operation: () => A): Effect.Effect<A, AgentTemplateFailure> {
-  return Effect.try({ try: operation, catch: (cause) => new AgentTemplateFailure({ cause }) });
-}
+const { io: templateIO, sync: templateSync, rewrap: toAgentTemplateFailure } = causeHelpers(AgentTemplateFailure);

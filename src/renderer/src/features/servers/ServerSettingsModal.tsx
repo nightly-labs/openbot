@@ -19,6 +19,7 @@ import {
   AlertTitle,
   Blocks,
   Button,
+  CalendarClock,
   ChevronRight,
   Download,
   Globe2,
@@ -56,6 +57,7 @@ import { createServerGeneralSection } from "./ServerGeneralSection";
 import { type ServerImportOptions, ServerImportPanel } from "./ServerImportPanel";
 import { type McpPanelDetail, ServerMcpPanel } from "./ServerMcpPanel";
 import { createServerMembersSection } from "./ServerMembersSection";
+import { type ServerRoutineFeedOptions, ServerRoutineFeedPanel } from "./ServerRoutineFeedPanel";
 import { type ServerUpdateOptions, ServerUpdatePanel } from "./ServerUpdatePanel";
 import { serverRoleCanAdminister } from "./server-capabilities";
 import type { ServerSettingsSectionHost } from "./server-settings-section";
@@ -157,6 +159,11 @@ export interface ServerSettingsModalProps {
    * `host-update-v1` that this member administers.
    */
   hostUpdate?: ServerUpdateOptions | undefined;
+  /**
+   * The Routines section appears only when a caller supplies this: the feed listens on this
+   * computer, so a remote server passes nothing.
+   */
+  routineFeed?: ServerRoutineFeedOptions | undefined;
   /** The section to show when the dialog opens. Updates shows General when the server has no Updates section. */
   initialSection?: ServerSettingsSection | null;
 }
@@ -179,6 +186,7 @@ export type ServerSettingsSection =
   | "providers"
   | "updates"
   | "import"
+  | "routines"
   | "connectors";
 type Section = ServerSettingsSection;
 
@@ -192,6 +200,7 @@ const sections = {
   providers: { title: "server.settings.providersTitle", description: "server.settings.providersDescription" },
   updates: { title: "server.settings.updatesTitle", description: "server.settings.updatesDescription" },
   import: { title: "server.settings.importTitle", description: "server.settings.importDescription" },
+  routines: { title: "server.settings.routinesTitle", description: "server.settings.routinesDescription" },
   connectors: { title: "server.settings.connectorsTitle", description: "server.settings.connectorsDescription" },
 } as const satisfies Record<Section, { title: AppTextKey; description: AppTextKey }>;
 
@@ -358,6 +367,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         value === "providers" ||
         value === "updates" ||
         value === "import" ||
+        value === "routines" ||
         value === "connectors"
       )
         setSection(value);
@@ -555,6 +565,12 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                 <span>{t(sections.import.title)}</span>
               </Tabs.Trigger>
             </Show>
+            <Show when={props.routineFeed}>
+              <Tabs.Trigger class="settings-modal-nav-item" value="routines">
+                <CalendarClock aria-hidden="true" />
+                <span>{t(sections.routines.title)}</span>
+              </Tabs.Trigger>
+            </Show>
             <Show
               when={
                 props.githubConnector || props.onePasswordConnector || props.slackConnector || props.discordConnector
@@ -672,6 +688,19 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
               <Show when={props.server.id} keyed>
                 {(serverId) => <ServerImportPanel serverId={serverId} {...agentImport()} />}
               </Show>
+            </Tabs.Content>
+          )}
+        </Show>
+        <Show when={props.routineFeed}>
+          {(routineFeed) => (
+            <Tabs.Content value="routines" class="settings-modal-tab-panel server-settings-panel" data-tab="routines">
+              <ServerRoutineFeedPanel
+                {...routineFeed()}
+                busy={busy}
+                run={run}
+                menuMount={modalElement}
+                showCopyError={host.showCopyError}
+              />
             </Tabs.Content>
           )}
         </Show>

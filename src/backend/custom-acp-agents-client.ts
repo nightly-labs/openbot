@@ -24,6 +24,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Exit } from "effect";
 import { assertAgentArgs, assertWindowsScriptArgs, resolveAgentCommand } from "./acp-agent-command";
 import type { AgentClient, DiagnosticOrigin } from "./agent-client";
+import { causeHelpers } from "./effect-boundary";
 import {
   type AppServerNotification,
   type AppServerRequest,
@@ -37,7 +38,9 @@ import {
   type ResponseDecoder,
   type RpcError,
 } from "./protocol";
-import { ProviderClientOperationError } from "./provider-client-effects";
+import { ProviderClientOperationError, toProviderClientOperationError } from "./provider-client-effects";
+
+const { sync: customStep } = causeHelpers(ProviderClientOperationError);
 
 export interface CustomAgentConfig {
   readonly id: string;
@@ -173,10 +176,7 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
   ) {
     const held = this.#sessions.get(externalThreadId);
     const release = held?.child.releaseThread?.bind(held.child);
-    if (held && release)
-      yield* release(held.sessionId).pipe(
-        Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })),
-      );
+    if (held && release) yield* release(held.sessionId).pipe(toProviderClientOperationError);
   });
 
   readonly request = Effect.fn("CustomAcp.request")(
@@ -212,12 +212,10 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
         case "thread/start": {
           const agentId = yield* customStep(() => this.#modelAgent(params));
           const cwd = yield* customStep(() => requiredCwd(params));
-          const child = yield* this.#child(agentId, cwd).pipe(
-            Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })),
-          );
+          const child = yield* this.#child(agentId, cwd).pipe(toProviderClientOperationError);
           const response = yield* child
             .request(method, forChild(params, null), decodeRecordResponse, timeoutMs)
-            .pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })));
+            .pipe(toProviderClientOperationError);
           return yield* customStep(() =>
             decoder(
               withThreadId(response, (sessionId) => {
@@ -232,15 +230,13 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
           const threadId = getString(params, "threadId") ?? "";
           const agentId = yield* customStep(() => this.#routedAgent(params));
           const cwd = yield* customStep(() => requiredCwd(params));
-          const child = yield* this.#child(agentId, cwd).pipe(
-            Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })),
-          );
+          const child = yield* this.#child(agentId, cwd).pipe(toProviderClientOperationError);
           const held = { child, sessionId: ownSessionId(threadId, agentId, cwd) };
           // Held before the agent answers, so what it sends while it loads the session reaches the
           // caller under the id the caller knows, a saved id with no folder tag included.
           this.#sessions.set(threadId, held);
           return yield* child.request(method, forChild(params, held.sessionId), decodeRecordResponse, timeoutMs).pipe(
-            Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })),
+            toProviderClientOperationError,
             Effect.flatMap((response) => customStep(() => decoder(withThreadId(response, () => threadId)))),
             Effect.onError(() =>
               Effect.sync(() => {
@@ -262,16 +258,14 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
             this.#sessions.get(threadId) ??
             (cwd
               ? {
-                  child: yield* this.#child(agentId, cwd).pipe(
-                    Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })),
-                  ),
+                  child: yield* this.#child(agentId, cwd).pipe(toProviderClientOperationError),
                   sessionId: ownSessionId(threadId, agentId, cwd),
                 }
               : null);
           if (!held) return yield* customStep(() => decoder({ thread: { id: threadId, turns: [] } }));
           const response = yield* held.child
             .request(method, forChild(params, held.sessionId), decodeRecordResponse, timeoutMs)
-            .pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })));
+            .pipe(toProviderClientOperationError);
           return yield* customStep(() => decoder(withThreadId(response, () => threadId)));
         }
         case "turn/start":
@@ -283,14 +277,14 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
           if (!held) return yield* new ProviderClientOperationError({ cause: unknownSession(threadId) });
           return yield* held.child
             .request(method, forChild(params, held.sessionId), decoder, timeoutMs)
-            .pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })));
+            .pipe(toProviderClientOperationError);
         }
         case "turn/interrupt": {
           const held = this.#sessions.get(getString(params, "threadId") ?? "");
           if (!held) return yield* customStep(() => decoder({}));
           return yield* held.child
             .request(method, forChild(params, held.sessionId), decoder, timeoutMs)
-            .pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })));
+            .pipe(toProviderClientOperationError);
         }
         default:
           return yield* new ProviderClientOperationError({
@@ -377,9 +371,7 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
           cause: new Error(sourceText("error.provider.customAgentMissing")),
         });
       yield* customStep(() => assertAgentArgs(config.args));
-      const executable = yield* this.#resolve(config.command).pipe(
-        Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })),
-      );
+      const executable = yield* this.#resolve(config.command).pipe(toProviderClientOperationError);
       if (!executable)
         return yield* new ProviderClientOperationError({
           cause: new Error(sourceText("error.provider.customAgentNotFound", { command: config.command })),
@@ -402,7 +394,7 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
       yield* customStep(() => child.start());
       yield* child
         .request("initialize", {}, decodeRecordResponse)
-        .pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })))
+        .pipe(toProviderClientOperationError)
         .pipe(Effect.onError(() => child.stop().pipe(Effect.catch(() => Effect.void))));
       return child;
     },
@@ -466,12 +458,12 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
       configs,
       (config) =>
         this.#child(config.id, null)
-          .pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })))
+          .pipe(toProviderClientOperationError)
           .pipe(
             Effect.flatMap((child) =>
               child
                 .request("model/list", params, decodeModelListResponse, timeoutMs)
-                .pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause }))),
+                .pipe(toProviderClientOperationError),
             ),
             Effect.timeoutOrElse({
               duration: timeoutMs,
@@ -547,8 +539,4 @@ function withThreadId(response: DynamicRecord, route: (sessionId: string) => str
   const id = getString(thread, "id");
   if (!thread || id === null) return response;
   return { ...response, thread: { ...thread, id: route(id) } };
-}
-
-function customStep<A>(run: () => A): Effect.Effect<A, ProviderClientOperationError> {
-  return Effect.try({ try: run, catch: (cause) => new ProviderClientOperationError({ cause }) });
 }

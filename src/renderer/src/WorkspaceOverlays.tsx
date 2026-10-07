@@ -551,6 +551,12 @@ function ServerSettings(props: {
           slackConnector={server().kind === "local" ? slack : undefined}
           discordConnector={server().kind === "local" ? discord : undefined}
           connectorAgents={agentList()}
+          // The feed listens on this computer, so a calendar app on another one cannot read it.
+          routineFeed={
+            server().kind === "local"
+              ? { api: appPort().routineFeed, listAgents: () => appPort().agent.listAgents(server().id) }
+              : undefined
+          }
         />
       )}
     </Show>

@@ -65,7 +65,7 @@ import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from 
 import { type AgentSidebar, handleSidebarTool } from "./sidebar-tools";
 import { LOCAL_SKILL_TOOL_DEFINITIONS, type LocalSkillTools, runLocalSkillTool } from "./skill-tools";
 import { isDynamicToolCall } from "./thread-items";
-import { ToolOperationFailed, toolStep } from "./tool-operation";
+import { ToolOperationFailed, toolStep, toToolOperationFailed } from "./tool-operation";
 import type { AgentBrowserHost } from "./turn-lifecycle";
 
 const logger = createOpenBotLogger("openbot-tool-router");
@@ -315,9 +315,7 @@ export class OpenBotToolRouter {
           if (!this.#localSkillTools) throw new Error("Skill tools are unavailable.");
           return this.#localSkillTools();
         });
-        return (yield* tools
-          .listInstalled(agent.id)
-          .pipe(Effect.mapError((failure) => new ToolOperationFailed({ cause: failure.cause })))).map((skill) => ({
+        return (yield* tools.listInstalled(agent.id).pipe(toToolOperationFailed)).map((skill) => ({
           skillId: skill.skillId,
           name: skill.name,
           ...(skill.description ? { description: skill.description } : {}),
@@ -643,10 +641,7 @@ export class OpenBotToolRouter {
           },
           (agent) =>
             Effect.gen({ self: this }, function* () {
-              if (assign)
-                yield* assign(agent.id).pipe(
-                  Effect.mapError((failure) => new ToolOperationFailed({ cause: failure.cause })),
-                );
+              if (assign) yield* assign(agent.id).pipe(toToolOperationFailed);
               if (lateEffort !== undefined) {
                 const models = this.#hooks.listModels();
                 const model = models.find(
@@ -673,16 +668,14 @@ export class OpenBotToolRouter {
                   ...(lateEffort === undefined ? {} : { reasoningEffort: lateEffort }),
                   ...limits,
                 })
-                .pipe(Effect.mapError((failure) => new ToolOperationFailed({ cause: failure.cause })));
+                .pipe(toToolOperationFailed);
             }).pipe(Effect.catchDefect((cause) => Effect.fail(new ToolOperationFailed({ cause })))),
         );
       const sidebar = this.#sidebarLayout;
       const created =
         sidebar && sectionId !== null
-          ? yield* sidebar
-              .withProfileAssignment(sectionId, create)
-              .pipe(Effect.mapError((failure) => new ToolOperationFailed({ cause: failure.cause })))
-          : yield* create().pipe(Effect.mapError((failure) => new ToolOperationFailed({ cause: failure.cause })));
+          ? yield* sidebar.withProfileAssignment(sectionId, create).pipe(toToolOperationFailed)
+          : yield* create().pipe(toToolOperationFailed);
       return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(created) }] };
     },
     Effect.catchDefect((cause) => Effect.fail(new ToolOperationFailed({ cause }))),
@@ -728,9 +721,7 @@ export class OpenBotToolRouter {
       const image =
         avatarPath === undefined
           ? undefined
-          : yield* loadAvatarFile(avatarPath, sender.workspacePath).pipe(
-              Effect.mapError((failure) => new ToolOperationFailed({ cause: failure.cause })),
-            );
+          : yield* loadAvatarFile(avatarPath, sender.workspacePath).pipe(toToolOperationFailed);
       const input: UpdateAgentInput = {
         agentId,
         ...fields,
@@ -740,17 +731,11 @@ export class OpenBotToolRouter {
         ...(computerUse === false ? { computerUse } : {}),
         ...(avatarHue === undefined ? {} : { avatarHue }),
       };
-      let updated = yield* this.#hooks
-        .updateAgent(input, senderAgentId)
-        .pipe(Effect.mapError((failure) => new ToolOperationFailed({ cause: failure.cause })));
+      let updated = yield* this.#hooks.updateAgent(input, senderAgentId).pipe(toToolOperationFailed);
       if (image !== undefined) {
-        updated = yield* this.#hooks
-          .setAvatar(agentId, image)
-          .pipe(Effect.mapError((failure) => new ToolOperationFailed({ cause: failure.cause })));
+        updated = yield* this.#hooks.setAvatar(agentId, image).pipe(toToolOperationFailed);
       } else if (args.avatarSeed !== undefined || args.avatarHue !== undefined) {
-        updated = yield* this.#hooks
-          .setAvatar(agentId, null)
-          .pipe(Effect.mapError((failure) => new ToolOperationFailed({ cause: failure.cause })));
+        updated = yield* this.#hooks.setAvatar(agentId, null).pipe(toToolOperationFailed);
       }
       return {
         success: true,
@@ -797,7 +782,7 @@ export class OpenBotToolRouter {
       const emoji = args.emoji;
       yield* this.#mailbox
         .setReaction(senderAgentId, delivery.delivery.id, { kind: "agent", agentId: senderAgentId }, emoji)
-        .pipe(Effect.mapError((failure) => new ToolOperationFailed({ cause: failure.cause })));
+        .pipe(toToolOperationFailed);
       const snapshot = this.#conversation.ensureSnapshot(senderAgentId, params.threadId);
       this.#mailboxSync.syncMailboxMessages(snapshot);
       this.#conversation.emitConversation(snapshot);
@@ -859,7 +844,7 @@ export class OpenBotToolRouter {
           ...(messagingReturn ? { messagingReturn } : {}),
           idempotencyKey: `${params.threadId}:${params.turnId}:${params.callId}`,
         })
-        .pipe(Effect.mapError((failure) => new ToolOperationFailed({ cause: failure.cause })));
+        .pipe(toToolOperationFailed);
       for (const recipient of recipientValues) {
         this.#mailboxSync.emitQueue(recipient);
         this.#drain.scheduleDrain(recipient);

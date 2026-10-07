@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { GitHubOperationError, githubCall } from "./github-effects";
+import { GitHubOperationError, githubCall, toGitHubOperationError } from "./github-effects";
 // The GitHub MCP server that agents reach on this computer. It forwards to GitHub's remote MCP
 // server with the token for each call: the bot token of the repository that the call names, or
 // the user token.
@@ -170,9 +170,7 @@ export class GitHubMcpProxy {
     const transport = new StreamableHTTPServerTransport({});
     yield* Effect.gen(function* () {
       yield* githubCall(() => mcp.connect(transport));
-      const body = yield* readJsonBody(request, MAX_BODY_BYTES).pipe(
-        Effect.mapError((error) => new GitHubOperationError({ cause: error.cause })),
-      );
+      const body = yield* readJsonBody(request, MAX_BODY_BYTES).pipe(toGitHubOperationError);
       yield* githubCall(() => transport.handleRequest(request, response, body));
     }).pipe(
       Effect.catch(() =>

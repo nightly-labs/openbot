@@ -1,5 +1,7 @@
+import { prefersReducedMotion } from "../../utils";
+
 export function rendererDuration(property: string, fallback: number): number {
-  if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return 0;
+  if (prefersReducedMotion()) return 0;
   const value = getComputedStyle(document.documentElement).getPropertyValue(property).trim();
   if (value.endsWith("ms")) return Number.parseFloat(value) || fallback;
   if (value.endsWith("s")) return (Number.parseFloat(value) || fallback / 1_000) * 1_000;

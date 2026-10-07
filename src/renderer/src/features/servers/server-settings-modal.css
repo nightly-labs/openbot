@@ -249,14 +249,10 @@
   text-align: center;
 }
 
-.server-settings-invite-copy > svg {
-  width: var(--openbot-icon-sm);
-  height: var(--openbot-icon-sm);
-  flex: 0 0 auto;
-  stroke-width: var(--openbot-icon-stroke);
-}
-
-.server-settings-invite-new-link > svg {
+.server-settings-invite-copy > svg,
+.server-settings-invite-new-link > svg,
+.server-settings-routine-feed-row .ui-button > svg,
+.server-settings-routine-feed-actions .ui-button > svg {
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
   flex: 0 0 auto;
@@ -496,4 +492,34 @@
   .server-settings-invite-qr {
     animation: none;
   }
+}
+
+.server-settings-routine-feed-row {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.server-settings-routine-feed-agent {
+  flex: none;
+  width: auto;
+}
+
+.server-settings-routine-feed-row .ui-input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--openbot-font-mono);
+  cursor: text;
+}
+
+.server-settings-routine-feed-text {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+.server-settings-routine-feed-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--openbot-space-1);
 }

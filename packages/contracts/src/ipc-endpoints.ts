@@ -105,6 +105,7 @@ import type {
   OpenAttachmentInput,
   OpenSharedFileInput,
   OpenWorkspaceFileInput,
+  WorkspaceDirectory,
 } from "./ipc-attachments";
 import type {
   BrowserBounds,
@@ -245,6 +246,7 @@ import type {
   Routine,
   RoutineCalendar,
   RoutineCalendarInput,
+  RoutineFeed,
   RoutineRun,
   TestRoutineInput,
   UpdateRoutineInput,
@@ -666,6 +668,12 @@ export const IPC_ENDPOINTS = {
   },
   // The account's Stripe subscription. The main process gets the Checkout or Portal URL from the
   // account server and opens it in the browser, so the renderer never sends a URL.
+  // The iCalendar feed of this computer's routines. `create` also replaces the URL of a feed that is on.
+  routineFeed: {
+    get: request<undefined, RoutineFeed>()("routine-feed:get"),
+    create: request<undefined, RoutineFeed>()("routine-feed:create"),
+    remove: request<undefined, RoutineFeed>()("routine-feed:remove"),
+  },
   billing: {
     getState: request<undefined, BillingState>()("billing:get-state"),
     openPortal: request<BillingPortalRequest, void>()("billing:open-portal"),
@@ -843,6 +851,9 @@ export const IPC_ENDPOINTS = {
     openWorkspaceFile: scopedRequest<OpenWorkspaceFileInput, void>()("agent:open-workspace-file"),
     previewSharedFile: scopedRequest<OpenSharedFileInput, FilePreview>()("agent:preview-shared-file"),
     previewWorkspaceFile: scopedRequest<OpenWorkspaceFileInput, FilePreview>()("agent:preview-workspace-file"),
+    listWorkspaceDirectory: scopedRequest<OpenWorkspaceFileInput, WorkspaceDirectory>()(
+      "agent:list-workspace-directory",
+    ),
   },
   // Not part of `agentAttachments`: the preload sends the paths of dropped and pasted files, and the
   // renderer must never name a path to import. So this group is never bridged to the renderer.
@@ -1041,6 +1052,7 @@ export const IPC_GROUP_PATHS = {
   githubConnector: "githubConnector",
   onePasswordConnector: "onePasswordConnector",
   hostedSites: "hostedSites",
+  routineFeed: "routineFeed",
   billing: "billing",
   hostedServers: "hostedServers",
   marketplaceAgents: "marketplaceAgents",

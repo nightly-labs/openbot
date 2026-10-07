@@ -10,9 +10,9 @@ import {
   OPENBOT_SOCIAL_IMAGE_ALT,
   OPENBOT_SOCIAL_IMAGE_META,
   OPENBOT_SOCIAL_IMAGE_URL,
-  OPENBOT_SOFTWARE_APPLICATION,
   OPENBOT_X_HANDLE,
 } from "./site-metadata";
+import { OPENBOT_SOFTWARE_APPLICATION } from "./software-application";
 
 /** The sitemap date of the four pages. Change it when their text changes. */
 export const DOWNLOAD_PAGES_UPDATED_AT = "2026-10-03";

@@ -2,9 +2,10 @@ import type { AppTranslate } from "@openbot/i18n";
 import { Button, X } from "@openbot/ui";
 import { Show } from "solid-js";
 import { useText } from "../../text";
+import { prefersReducedMotion } from "../../utils";
 
 export function preferredMessageScrollBehavior(): ScrollBehavior {
-  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+  return prefersReducedMotion() ? "auto" : "smooth";
 }
 
 export function scrollToLatestMessage(scrollElement: HTMLElement): void {

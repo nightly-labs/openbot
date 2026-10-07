@@ -11,10 +11,14 @@ import { COMPARE_COLLECTION } from "./compare";
 /** Each feature has its own picture, which the section draws for this id. */
 export type LandingFeatureId = "team" | "providers" | "local" | "persist" | "browser" | "queue";
 
+/** A part of a tile's sentence: plain text, or words that link to a page under /providers. */
+type LandingCopyPart = string | { readonly text: string; readonly slug: string };
+
 export interface LandingFeature {
   id: LandingFeatureId;
   title: string;
-  description: string;
+  /** Plain text, or parts when some words link to a page. A tile's picture is decorative, so the links are here. */
+  description: string | readonly LandingCopyPart[];
 }
 
 /** In reading order. The bento places each tile from its id. */
@@ -28,8 +32,25 @@ export const LANDING_FEATURES: readonly LandingFeature[] = [
   {
     id: "providers",
     title: "Use the AI plan you have",
-    description:
-      "Run Codex, Claude Code, Gemini, Grok, OpenCode, Cursor or Cline. Or connect an OpenAI-compatible endpoint, Ollama or LM Studio.",
+    description: [
+      "Run ",
+      { text: "Codex", slug: "codex" },
+      ", ",
+      { text: "Claude Code", slug: "claude-code" },
+      ", ",
+      { text: "Gemini", slug: "gemini" },
+      ", ",
+      { text: "Grok", slug: "grok" },
+      ", ",
+      { text: "OpenCode", slug: "opencode" },
+      ", ",
+      { text: "Cursor", slug: "cursor" },
+      " or ",
+      { text: "Cline", slug: "cline" },
+      ". Or connect an OpenAI-compatible endpoint, ",
+      { text: "Ollama or LM Studio", slug: "local-models" },
+      ".",
+    ],
   },
   {
     id: "local",

@@ -87,7 +87,13 @@ import { RemoteServerStore, type TokenCipher } from "./remote-server-store";
 import type { StoredRemoteServer } from "./remote-server-stored-shape";
 import { remoteServerSummaries } from "./remote-server-summaries";
 import { addRemotePreviewUrls, isLocalDevelopmentApi, pageQuery } from "./remote-server-urls";
-import { RemoteRequest, RemoteWorkflowError, remoteCall, remoteDecode } from "./remote-service-effects";
+import {
+  RemoteRequest,
+  RemoteWorkflowError,
+  remoteCall,
+  remoteDecode,
+  toRemoteWorkflowError,
+} from "./remote-service-effects";
 import { decodeInvitePreview, decodeJoinResult, decodeTeamPresenceSnapshot } from "./remote-team-decoding";
 import { RemoteTeamDirectory } from "./remote-team-directory";
 import { RemoteViewerProxy } from "./remote-viewer-proxy";
@@ -615,7 +621,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       const verifiedIdentity = yield* this.#client.verifyIdentity(invite.apiUrl, invite.serverId, invite.fingerprint);
       const accountTicket = yield* this.#centralAccount
         .createTeamAuthTicket(invite.serverId)
-        .pipe(Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause })));
+        .pipe(toRemoteWorkflowError);
       const result = yield* requestJson(invite.apiUrl, TEAM_API_ROUTES.join.account, decodeJoinResult, {
         method: "POST",
         body: {
@@ -769,9 +775,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       this.#emitChanged();
       const attempt0 = yield* Effect.gen({ self: this }, function* () {
         const identity = yield* this.#client.verifyIdentity(server.apiUrl, server.id, server.fingerprint);
-        const accountTicket = yield* this.#centralAccount
-          .createTeamAuthTicket(server.id)
-          .pipe(Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause })));
+        const accountTicket = yield* this.#centralAccount.createTeamAuthTicket(server.id).pipe(toRemoteWorkflowError);
         const result = yield* requestJson(server.apiUrl, TEAM_API_ROUTES.auth.account, decodeJoinResult, {
           method: "POST",
           body: { accountTicket },

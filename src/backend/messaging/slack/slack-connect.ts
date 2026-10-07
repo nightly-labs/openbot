@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { createSlackWorkspaceKeyPair, openSlackWorkspaceGrant } from "@openbot/contracts/slack-workspace-grant";
 import { Effect, Schema } from "effect";
+import { causeHelpers } from "../../effect-boundary";
 
 /** How long a connect link stays usable. */
 const PENDING_TTL_MS = 15 * 60_000;
@@ -58,6 +59,6 @@ export class SlackConnectFailed extends Schema.TaggedError<SlackConnectFailed>()
   cause: Schema.Defect(),
 }) {}
 
-function connectIo<A>(run: () => Promise<A>): Effect.Effect<A, SlackConnectFailed> {
-  return Effect.tryPromise({ try: run, catch: (cause) => new SlackConnectFailed({ cause }) });
-}
+const { io: connectIo, rewrap: toSlackConnectFailed } = causeHelpers(SlackConnectFailed);
+
+export { toSlackConnectFailed };

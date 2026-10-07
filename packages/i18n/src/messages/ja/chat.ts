@@ -144,6 +144,7 @@ export const messages = {
   "chat.table.data": "データ表",
   "chat.file.openShared": "共有ファイル {name} を開く",
   "chat.file.openWorkspace": "ワークスペースのファイル {name} を開く",
+  "chat.file.openWorkspaceFolder": "ワークスペースのフォルダ {name} を開く",
   "chat.file.openAttached": "添付ファイル {name} を開く",
   "chat.tag.unavailableAgent": "利用できないエージェント",
   "chat.tag.unavailableSkill": "利用できないスキル",

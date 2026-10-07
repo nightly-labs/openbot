@@ -15,6 +15,7 @@ import { collapseMissedOccurrences } from "@openbot/team-client/routine-schedule
 import { Effect, Result, Schema } from "effect";
 import { ChannelRoutineStore } from "./channel-routine-store";
 import type { ChannelService } from "./channel-service";
+import { causeHelpers } from "./effect-boundary";
 import { recordRestartActivity } from "./restart-activity";
 import type { RoutineHoldWindow } from "./routine-store";
 import type { RoutineDueSource } from "./routine-timer";
@@ -341,7 +342,7 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
           },
           this.#actor(run),
         )
-        .pipe(Effect.mapError((failure) => new ChannelRoutineFailed({ cause: failure.cause }))),
+        .pipe(toChannelRoutineFailed),
     );
     if (Result.isFailure(issued)) {
       const error = issued.failure.cause;
@@ -387,6 +388,4 @@ class ChannelRoutineFailed extends Schema.TaggedError<ChannelRoutineFailed>()("C
   cause: Schema.Defect(),
 }) {}
 
-function channelRoutineStep<A>(run: () => A): Effect.Effect<A, ChannelRoutineFailed> {
-  return Effect.try({ try: run, catch: (cause) => new ChannelRoutineFailed({ cause }) });
-}
+const { sync: channelRoutineStep, rewrap: toChannelRoutineFailed } = causeHelpers(ChannelRoutineFailed);

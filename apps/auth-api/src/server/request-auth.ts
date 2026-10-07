@@ -1,6 +1,7 @@
 import { env, waitUntil } from "cloudflare:workers";
 import { HOSTING_DEVELOPER_KEY_HEADER } from "@openbot/contracts/hosted-servers";
 import { Effect } from "effect";
+import { adminTokenMatches } from "./admin-token";
 import { AgentMarketplace, AgentMarketplaceError } from "./agent-marketplace";
 import { AgentTemplates } from "./agent-templates";
 import { AuthOperationError, AuthService, AuthServiceError } from "./auth-service";
@@ -223,27 +224,12 @@ export function skillErrorResponse(error: unknown): Response {
   return authErrorResponse(error);
 }
 
-export function requireSkillsAdmin(request: Request): boolean {
-  const bindings = requireWorkerBindings(env);
-  const expected = bindings.SKILLS_ADMIN_TOKEN;
-  return Boolean(expected && bearerToken(request) === expected);
-}
+export const requireSkillsAdmin = Effect.fn("Auth.requireSkillsAdmin")(function* (request: Request) {
+  return yield* adminTokenMatches(requireWorkerBindings(env).SKILLS_ADMIN_TOKEN, bearerToken(request));
+});
 
 export const requireOperationsAdmin = Effect.fn("Auth.requireOperationsAdmin")(function* (request: Request) {
-  const bindings = requireWorkerBindings(env);
-  const expected = bindings.SITE_OPERATIONS_ADMIN_TOKEN;
-  const provided = bearerToken(request);
-  if (!expected || !provided) return false;
-  const encoder = new TextEncoder();
-  const [expectedHash, providedHash] = yield* Effect.tryPromise({
-    try: () =>
-      Promise.all([
-        crypto.subtle.digest("SHA-256", encoder.encode(expected)),
-        crypto.subtle.digest("SHA-256", encoder.encode(provided)),
-      ]),
-    catch: () => new AuthOperationError({ message: "Account operation failed." }),
-  });
-  return constantTimeEqual(new Uint8Array(expectedHash), new Uint8Array(providedHash));
+  return yield* adminTokenMatches(requireWorkerBindings(env).SITE_OPERATIONS_ADMIN_TOKEN, bearerToken(request));
 });
 
 export function requestTeamInviteEmailDelivery(): TeamInviteEmailDelivery | null {
@@ -338,13 +324,6 @@ export function bearerToken(request: Request): string | null {
   if (!authorization?.startsWith("Bearer ")) return null;
   const token = authorization.slice("Bearer ".length);
   return token && token.length <= 512 ? token : null;
-}
-
-function constantTimeEqual(left: Uint8Array, right: Uint8Array): boolean {
-  if (left.byteLength !== right.byteLength) return false;
-  let difference = 0;
-  for (let index = 0; index < left.byteLength; index += 1) difference |= (left[index] ?? 0) ^ (right[index] ?? 0);
-  return difference === 0;
 }
 
 export function json(value: unknown, status = 200): Response {

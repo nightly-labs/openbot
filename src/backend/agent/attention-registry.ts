@@ -21,6 +21,7 @@ import type { AgentClient } from "../agent-client";
 import type { BrowserOperationError } from "../browser-effects";
 import type { PreparedBrowserSecret } from "../browser-host";
 import { parseBrowserToolCall } from "../browser-tools";
+import { causeHelpers } from "../effect-boundary";
 import type { PasswordVault } from "../password-vault";
 import {
   type AppServerRequest,
@@ -276,7 +277,7 @@ export class AttentionRegistry {
           { client: pending.client, id: pending.id, agentId: pending.approval.agentId },
           input.decision,
         )
-        .pipe(Effect.mapError((failure) => new AttentionOperationFailed({ cause: failure.cause })));
+        .pipe(toAttentionOperationFailed);
     } else if (pending.approval.kind === "permissions") {
       const permissions = getRecord(pending.params, "permissions") ?? {};
       pending.client.respond(pending.id, {
@@ -355,9 +356,7 @@ export class AttentionRegistry {
     if (input.decision === "submit" && pending.request.secret)
       pending.request.secret = { ...pending.request.secret, requiresReload: true };
     else delete pending.request.secret;
-    yield* this.#browser
-      .beginTakeover(pending.request.tabId)
-      .pipe(Effect.mapError((failure) => new AttentionOperationFailed({ cause: failure.cause })));
+    yield* this.#browser.beginTakeover(pending.request.tabId).pipe(toAttentionOperationFailed);
     this.#emit({ type: "browser-takeover-requested", request: pending.request });
     this.#emitRuntimeSnapshot();
   }, Effect.uninterruptible);
@@ -429,13 +428,13 @@ export class AttentionRegistry {
   ) {
     const prepared = yield* this.#hostedSites
       .prepareApproval(client, request, params, tool)
-      .pipe(Effect.mapError((failure) => new AttentionOperationFailed({ cause: failure.cause })));
+      .pipe(toAttentionOperationFailed);
     // A request the provider abandoned during the preparation has nobody to report the decision to.
     if (!prepared || request.signal?.aborted) return;
     if (shouldAutoApprove(this.#approvalAutomation, prepared.approval) && this.#approvalAutomation.turboEnabled()) {
       yield* this.#hostedSites
         .resolveApproval(prepared.mutation, { client, id: request.id, agentId: prepared.approval.agentId }, "accept")
-        .pipe(Effect.mapError((failure) => new AttentionOperationFailed({ cause: failure.cause })));
+        .pipe(toAttentionOperationFailed);
       return;
     }
     this.#approvals.set(request.id, {
@@ -544,17 +543,14 @@ export class AttentionRegistry {
             ...params,
             threadId: publicThreadId,
             ownerAgentId: agentId,
-          }).pipe(Effect.mapError((failure) => new AttentionOperationFailed({ cause: failure.cause })));
+          }).pipe(toAttentionOperationFailed);
           if (this.#takeovers.get(requestId) !== pending) {
             secret.cancel();
             return;
           }
           pending.secret = secret;
           pending.request.secret = secret.request;
-        } else
-          yield* this.#browser
-            .beginTakeover(takeover.tabId)
-            .pipe(Effect.mapError((failure) => new AttentionOperationFailed({ cause: failure.cause })));
+        } else yield* this.#browser.beginTakeover(takeover.tabId).pipe(toAttentionOperationFailed);
       });
       const prepared = yield* Effect.result(prepare);
       if (Result.isSuccess(prepared)) {
@@ -995,10 +991,8 @@ export class AttentionRegistry {
   }
 }
 
-export class AttentionOperationFailed extends Schema.TaggedError<AttentionOperationFailed>()(
-  "AttentionOperationFailed",
-  { cause: Schema.Defect() },
-) {}
-function attentionStep<A>(run: () => A): Effect.Effect<A, AttentionOperationFailed> {
-  return Effect.try({ try: run, catch: (cause) => new AttentionOperationFailed({ cause }) });
-}
+class AttentionOperationFailed extends Schema.TaggedError<AttentionOperationFailed>()("AttentionOperationFailed", {
+  cause: Schema.Defect(),
+}) {}
+
+const { sync: attentionStep, rewrap: toAttentionOperationFailed } = causeHelpers(AttentionOperationFailed);

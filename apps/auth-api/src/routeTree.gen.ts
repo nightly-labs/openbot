@@ -38,6 +38,9 @@ import { Route as NewsOpenbotVsGrokbotRouteImport } from './routes/news/openbot-
 import { Route as NewsRssDotxmlRouteImport } from './routes/news/rss[.]xml'
 import { Route as PluginsIndexRouteImport } from './routes/plugins/index'
 import { Route as PluginsSlugRouteImport } from './routes/plugins/$slug'
+import { Route as ProvidersIndexRouteImport } from './routes/providers/index'
+import { Route as ProvidersSlugRouteImport } from './routes/providers/$slug'
+import { Route as ProvidersRssDotxmlRouteImport } from './routes/providers/rss[.]xml'
 import { Route as SlackConnectRouteImport } from './routes/slack/connect'
 import { Route as V1MeRouteImport } from './routes/v1/me'
 import { Route as ApiBrowserSplatRouteImport } from './routes/api/browser/$'
@@ -276,6 +279,21 @@ const PluginsIndexRoute = PluginsIndexRouteImport.update({
 const PluginsSlugRoute = PluginsSlugRouteImport.update({
   id: '/plugins/$slug',
   path: '/plugins/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProvidersIndexRoute = ProvidersIndexRouteImport.update({
+  id: '/providers/',
+  path: '/providers/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProvidersSlugRoute = ProvidersSlugRouteImport.update({
+  id: '/providers/$slug',
+  path: '/providers/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProvidersRssDotxmlRoute = ProvidersRssDotxmlRouteImport.update({
+  id: '/providers/rss.xml',
+  path: '/providers/rss.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SlackConnectRoute = SlackConnectRouteImport.update({
@@ -809,6 +827,8 @@ export interface FileRoutesByFullPath {
   '/news/openbot-vs-grokbot': typeof NewsOpenbotVsGrokbotRoute
   '/news/rss.xml': typeof NewsRssDotxmlRoute
   '/plugins/$slug': typeof PluginsSlugRoute
+  '/providers/$slug': typeof ProvidersSlugRoute
+  '/providers/rss.xml': typeof ProvidersRssDotxmlRoute
   '/slack/connect': typeof SlackConnectRoute
   '/v1/me': typeof V1MeRouteWithChildren
   '/compare/': typeof CompareIndexRoute
@@ -816,6 +836,7 @@ export interface FileRoutesByFullPath {
   '/guides/': typeof GuidesIndexRoute
   '/news/': typeof NewsIndexRoute
   '/plugins/': typeof PluginsIndexRoute
+  '/providers/': typeof ProvidersIndexRoute
   '/api/browser/$': typeof ApiBrowserSplatRoute
   '/download/$platform/latest': typeof DownloadPlatformLatestRoute
   '/news/og/openbot-vs-grokbot.png': typeof NewsOgOpenbotVsGrokbotDotpngRoute
@@ -933,6 +954,8 @@ export interface FileRoutesByTo {
   '/news/openbot-vs-grokbot': typeof NewsOpenbotVsGrokbotRoute
   '/news/rss.xml': typeof NewsRssDotxmlRoute
   '/plugins/$slug': typeof PluginsSlugRoute
+  '/providers/$slug': typeof ProvidersSlugRoute
+  '/providers/rss.xml': typeof ProvidersRssDotxmlRoute
   '/slack/connect': typeof SlackConnectRoute
   '/v1/me': typeof V1MeRouteWithChildren
   '/compare': typeof CompareIndexRoute
@@ -940,6 +963,7 @@ export interface FileRoutesByTo {
   '/guides': typeof GuidesIndexRoute
   '/news': typeof NewsIndexRoute
   '/plugins': typeof PluginsIndexRoute
+  '/providers': typeof ProvidersIndexRoute
   '/api/browser/$': typeof ApiBrowserSplatRoute
   '/download/$platform/latest': typeof DownloadPlatformLatestRoute
   '/news/og/openbot-vs-grokbot.png': typeof NewsOgOpenbotVsGrokbotDotpngRoute
@@ -1058,6 +1082,8 @@ export interface FileRoutesById {
   '/news/openbot-vs-grokbot': typeof NewsOpenbotVsGrokbotRoute
   '/news/rss.xml': typeof NewsRssDotxmlRoute
   '/plugins/$slug': typeof PluginsSlugRoute
+  '/providers/$slug': typeof ProvidersSlugRoute
+  '/providers/rss.xml': typeof ProvidersRssDotxmlRoute
   '/slack/connect': typeof SlackConnectRoute
   '/v1/me': typeof V1MeRouteWithChildren
   '/compare/': typeof CompareIndexRoute
@@ -1065,6 +1091,7 @@ export interface FileRoutesById {
   '/guides/': typeof GuidesIndexRoute
   '/news/': typeof NewsIndexRoute
   '/plugins/': typeof PluginsIndexRoute
+  '/providers/': typeof ProvidersIndexRoute
   '/api/browser/$': typeof ApiBrowserSplatRoute
   '/download/$platform_/latest': typeof DownloadPlatformLatestRoute
   '/news/og/openbot-vs-grokbot.png': typeof NewsOgOpenbotVsGrokbotDotpngRoute
@@ -1184,6 +1211,8 @@ export interface FileRouteTypes {
     | '/news/openbot-vs-grokbot'
     | '/news/rss.xml'
     | '/plugins/$slug'
+    | '/providers/$slug'
+    | '/providers/rss.xml'
     | '/slack/connect'
     | '/v1/me'
     | '/compare/'
@@ -1191,6 +1220,7 @@ export interface FileRouteTypes {
     | '/guides/'
     | '/news/'
     | '/plugins/'
+    | '/providers/'
     | '/api/browser/$'
     | '/download/$platform/latest'
     | '/news/og/openbot-vs-grokbot.png'
@@ -1308,6 +1338,8 @@ export interface FileRouteTypes {
     | '/news/openbot-vs-grokbot'
     | '/news/rss.xml'
     | '/plugins/$slug'
+    | '/providers/$slug'
+    | '/providers/rss.xml'
     | '/slack/connect'
     | '/v1/me'
     | '/compare'
@@ -1315,6 +1347,7 @@ export interface FileRouteTypes {
     | '/guides'
     | '/news'
     | '/plugins'
+    | '/providers'
     | '/api/browser/$'
     | '/download/$platform/latest'
     | '/news/og/openbot-vs-grokbot.png'
@@ -1432,6 +1465,8 @@ export interface FileRouteTypes {
     | '/news/openbot-vs-grokbot'
     | '/news/rss.xml'
     | '/plugins/$slug'
+    | '/providers/$slug'
+    | '/providers/rss.xml'
     | '/slack/connect'
     | '/v1/me'
     | '/compare/'
@@ -1439,6 +1474,7 @@ export interface FileRouteTypes {
     | '/guides/'
     | '/news/'
     | '/plugins/'
+    | '/providers/'
     | '/api/browser/$'
     | '/download/$platform_/latest'
     | '/news/og/openbot-vs-grokbot.png'
@@ -1557,6 +1593,8 @@ export interface RootRouteChildren {
   NewsOpenbotVsGrokbotRoute: typeof NewsOpenbotVsGrokbotRoute
   NewsRssDotxmlRoute: typeof NewsRssDotxmlRoute
   PluginsSlugRoute: typeof PluginsSlugRoute
+  ProvidersSlugRoute: typeof ProvidersSlugRoute
+  ProvidersRssDotxmlRoute: typeof ProvidersRssDotxmlRoute
   SlackConnectRoute: typeof SlackConnectRoute
   V1MeRoute: typeof V1MeRouteWithChildren
   CompareIndexRoute: typeof CompareIndexRoute
@@ -1564,6 +1602,7 @@ export interface RootRouteChildren {
   GuidesIndexRoute: typeof GuidesIndexRoute
   NewsIndexRoute: typeof NewsIndexRoute
   PluginsIndexRoute: typeof PluginsIndexRoute
+  ProvidersIndexRoute: typeof ProvidersIndexRoute
   ApiBrowserSplatRoute: typeof ApiBrowserSplatRoute
   DownloadPlatformLatestRoute: typeof DownloadPlatformLatestRoute
   NewsOgOpenbotVsGrokbotDotpngRoute: typeof NewsOgOpenbotVsGrokbotDotpngRoute
@@ -1844,6 +1883,27 @@ declare module '@tanstack/solid-router' {
       path: '/plugins/$slug'
       fullPath: '/plugins/$slug'
       preLoaderRoute: typeof PluginsSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/providers/': {
+      id: '/providers/'
+      path: '/providers'
+      fullPath: '/providers/'
+      preLoaderRoute: typeof ProvidersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/providers/$slug': {
+      id: '/providers/$slug'
+      path: '/providers/$slug'
+      fullPath: '/providers/$slug'
+      preLoaderRoute: typeof ProvidersSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/providers/rss.xml': {
+      id: '/providers/rss.xml'
+      path: '/providers/rss.xml'
+      fullPath: '/providers/rss.xml'
+      preLoaderRoute: typeof ProvidersRssDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/slack/connect': {
@@ -2652,6 +2712,8 @@ const rootRouteChildren: RootRouteChildren = {
   NewsOpenbotVsGrokbotRoute: NewsOpenbotVsGrokbotRoute,
   NewsRssDotxmlRoute: NewsRssDotxmlRoute,
   PluginsSlugRoute: PluginsSlugRoute,
+  ProvidersSlugRoute: ProvidersSlugRoute,
+  ProvidersRssDotxmlRoute: ProvidersRssDotxmlRoute,
   SlackConnectRoute: SlackConnectRoute,
   V1MeRoute: V1MeRouteWithChildren,
   CompareIndexRoute: CompareIndexRoute,
@@ -2659,6 +2721,7 @@ const rootRouteChildren: RootRouteChildren = {
   GuidesIndexRoute: GuidesIndexRoute,
   NewsIndexRoute: NewsIndexRoute,
   PluginsIndexRoute: PluginsIndexRoute,
+  ProvidersIndexRoute: ProvidersIndexRoute,
   ApiBrowserSplatRoute: ApiBrowserSplatRoute,
   DownloadPlatformLatestRoute: DownloadPlatformLatestRoute,
   NewsOgOpenbotVsGrokbotDotpngRoute: NewsOgOpenbotVsGrokbotDotpngRoute,

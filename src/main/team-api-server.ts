@@ -22,7 +22,6 @@ import {
   type TeamPresenceSnapshot,
   type TeamRealtimeEvent,
 } from "@openbot/contracts/ipc";
-import { isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
   AGENT_ADMIN_CAPABILITY,
@@ -85,8 +84,9 @@ import { McpServerError } from "../backend/mcp-server-store";
 import { StoredStateFailure } from "../backend/stored-state-effects";
 import type { TeamChatStore } from "../backend/team-chat-store";
 import { LifecycleGate } from "./lifecycle-gate";
+import { listenLoopback } from "./listen-loopback";
 import { RemoteScreenError } from "./remote-screen-gateway";
-import { RemoteWorkflowError, remoteCall } from "./remote-service-effects";
+import { RemoteWorkflowError, remoteCall, toRemoteWorkflowError } from "./remote-service-effects";
 import { isClientUse } from "./team-api/client-use";
 import type { TeamApiOptions, TeamApiSidebarLayout } from "./team-api/dependencies";
 import { HttpError } from "./team-api/http-error";
@@ -129,6 +129,7 @@ import { routeSharedTables } from "./team-api/route-shared-tables";
 import { routeSkillsAdmin } from "./team-api/route-skills-admin";
 import { routeStorage } from "./team-api/route-storage";
 import { routeTeam } from "./team-api/route-team";
+import { routeWorkspaceDirectory } from "./team-api/route-workspace-directory";
 import { TeamStoreError } from "./team-store";
 
 const EVENT_PAYLOAD_LIMIT = 256 * 1_024;
@@ -294,18 +295,8 @@ export class TeamApiServer {
       socket.write("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n");
       socket.destroy();
     });
-    yield* remoteCall(
-      () =>
-        new Promise<void>((resolve, reject) => {
-          server.once("error", reject);
-          server.listen(0, "127.0.0.1", () => resolve());
-        }),
-    );
-    const address = server.address();
-    if (!address || isString(address)) {
-      return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.team.bindFailed")) });
-    }
-    this.#port = address.port;
+    const port = yield* remoteCall(() => listenLoopback(server, () => new Error(sourceText("error.team.bindFailed"))));
+    this.#port = port;
     this.#agentListener = (event) => this.#broadcastAgentEvent(event);
     this.#options.agents.on("event", this.#agentListener);
     this.#sidebarLayoutListener = (layout) => this.#broadcastAgentEvent({ type: "sidebar-layout-changed", layout });
@@ -319,7 +310,7 @@ export class TeamApiServer {
     }, 15_000);
     this.#heartbeat.unref?.();
     this.#publishPresence();
-    return address.port;
+    return port;
   }).bind(this);
 
   readonly #stop = Effect.fn("TeamApiServer.stop")(function* (this: TeamApiServer) {
@@ -341,7 +332,7 @@ export class TeamApiServer {
       if (remoteScreen) yield* remoteScreen.stop();
       if (browserView) yield* browserView.stop();
     }).pipe(
-      Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause })),
+      toRemoteWorkflowError,
       Effect.ensuring(
         Effect.gen({ self: this }, function* () {
           // The heartbeat and the event listeners are already gone. Leaving the socket open
@@ -682,6 +673,7 @@ export class TeamApiServer {
       if ((await routeHostAdmin(context, this.#options.admin)) === "handled") return;
       if ((await routeHostUpdate(context, this.#options.admin)) === "handled") return;
       if ((await routeContextReset(context, this.#options.agents, hidden)) === "handled") return;
+      if ((await routeWorkspaceDirectory(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeAgentImport(context, this.#options.agentImport, newAgentHidden)) === "handled") return;
       if (
         (await routeLiveActivityPush(context, this.#options.liveActivityPush, () =>

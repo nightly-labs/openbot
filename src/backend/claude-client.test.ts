@@ -976,7 +976,12 @@ fi
         };
         database.persistConversation(live, "test.live-completed");
         const restored = await runCauseEffect(client.request("thread/read", { threadId }, decodeThreadResponse));
-        const imported = snapshotFromThread(agent.id, restored.thread, () => null);
+        const imported = snapshotFromThread(
+          agent.id,
+          restored.thread,
+          () => null,
+          () => null,
+        );
         imported.threadId = publicThreadId;
         const merged = mergeProviderHistory(database.readConversation(agent.id, publicThreadId), imported, "claude");
         database.persistConversation(merged, "provider-history.backfilled");

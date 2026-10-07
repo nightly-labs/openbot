@@ -1,5 +1,5 @@
 import { Dialog, IconButton, X } from "@openbot/ui";
-import { cx } from "@openbot/ui/utils";
+import { cx, prefersReducedMotion } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, onCleanup, Show, untrack } from "solid-js";
 import { useText } from "../../text";
@@ -33,7 +33,7 @@ function durationToMilliseconds(value: string, fallback: number): number {
 }
 
 function closeDuration(): number {
-  if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return 0;
+  if (prefersReducedMotion()) return 0;
   return durationToMilliseconds(
     getComputedStyle(document.documentElement).getPropertyValue("--openbot-duration-fast"),
     120,
@@ -44,7 +44,7 @@ function closeDuration(): number {
 const SAVE_BAR_CLOSE_FALLBACK = 250;
 
 function saveBarCloseDuration(element: HTMLElement | undefined): number {
-  if (!element || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return 0;
+  if (!element || prefersReducedMotion()) return 0;
   return durationToMilliseconds(getComputedStyle(element).getPropertyValue("--acc-collapse"), SAVE_BAR_CLOSE_FALLBACK);
 }
 

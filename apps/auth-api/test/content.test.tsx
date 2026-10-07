@@ -10,7 +10,9 @@ import { ArticleClip, ArticleGif } from "../src/components/content/ArticleMedia"
 import { ArticlePage } from "../src/components/content/ArticlePage";
 import { CollectionIndexPage } from "../src/components/content/CollectionIndexPage";
 import { LandingPage } from "../src/components/landing/LandingPage";
+import { ProviderArticlePage } from "../src/components/providers/ProviderArticlePage";
 import { COMPARISONS } from "../src/content/compare";
+import { PROVIDER_PAGES } from "../src/content/providers";
 import { landingAnalytics } from "../src/lib/analytics";
 import { articleGradient } from "../src/lib/article-gradient";
 import { COMPARE_COLLECTION } from "../src/lib/compare";
@@ -22,9 +24,11 @@ import {
   type ContentCollection,
 } from "../src/lib/content-collection";
 import { PLUGIN_INDEX_ROUTE } from "../src/lib/plugins";
+import { PROVIDERS_COLLECTION } from "../src/lib/providers";
 import { loadComparison } from "../src/routes/compare/$slug";
 import { loadGuide } from "../src/routes/guides/$slug";
 import { loadNewsArticle } from "../src/routes/news/$slug";
+import { loadProvider } from "../src/routes/providers/$slug";
 
 // The frame each shader opened on, in order. A card loads the shader library with
 // a dynamic import, to keep it out of the first bundle, so there is no seam to hand
@@ -61,6 +65,9 @@ function createTestRouter() {
     createRoute({ getParentRoute: () => rootRoute, path: "/plugins" }),
     createRoute({ getParentRoute: () => rootRoute, path: "/compare" }),
     createRoute({ getParentRoute: () => rootRoute, path: "/compare/$slug" }),
+    createRoute({ getParentRoute: () => rootRoute, path: "/providers" }),
+    createRoute({ getParentRoute: () => rootRoute, path: "/providers/$slug" }),
+    createRoute({ getParentRoute: () => rootRoute, path: "/download/$platform" }),
   ]);
   return createRouter({ routeTree: rootRoute });
 }
@@ -215,6 +222,27 @@ describe("Compare", () => {
   });
 });
 
+describe("Providers", () => {
+  // The setup steps and the questions are what a reader came for, so a provider page
+  // must not render as a title with nothing under it.
+  it("shows the title, the setup steps and the questions of every provider", () => {
+    for (const article of PROVIDERS_COLLECTION.articles) {
+      const page = PROVIDER_PAGES[article.slug];
+      if (!page) throw new Error(`${article.slug} must have provider data.`);
+      renderPage(() => <ProviderArticlePage collection={PROVIDERS_COLLECTION} article={article} page={page} />);
+
+      expect(screen.getByRole("heading", { level: 1, name: article.title })).toBeInTheDocument();
+      const body = within(screen.getByRole("article"));
+      expect(body.getByRole("heading", { level: 3, name: `Connect ${page.name}` })).toBeInTheDocument();
+      for (const entry of page.faq) {
+        expect(body.getByText(entry.question)).toBeInTheDocument();
+      }
+
+      cleanup();
+    }
+  });
+});
+
 describe("landing header", () => {
   it("offers every content section", () => {
     renderPage(() => <LandingPage />);
@@ -249,6 +277,7 @@ describe.each([
   ["news", loadNewsArticle, CONTENT_COLLECTIONS[0]],
   ["guides", loadGuide, CONTENT_COLLECTIONS[1]],
   ["compare", loadComparison, COMPARE_COLLECTION],
+  ["providers", loadProvider, PROVIDERS_COLLECTION],
 ] as const)("%s article route", (_id, load, collection) => {
   it("loads a published article and reports an unknown slug as not found", () => {
     if (!collection) throw new Error("The registry must hold this collection.");

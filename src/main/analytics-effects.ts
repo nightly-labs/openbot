@@ -1,4 +1,5 @@
-import { Effect, Schema } from "effect";
+import { Schema } from "effect";
+import { causeHelpers } from "../backend/effect-boundary";
 
 export class AnalyticsOperationFailure extends Schema.TaggedError<AnalyticsOperationFailure>()(
   "AnalyticsOperationFailure",
@@ -7,10 +8,8 @@ export class AnalyticsOperationFailure extends Schema.TaggedError<AnalyticsOpera
   },
 ) {}
 
-export function analyticsIO<A>(operation: () => Promise<A>): Effect.Effect<A, AnalyticsOperationFailure> {
-  return Effect.tryPromise({ try: operation, catch: (cause) => new AnalyticsOperationFailure({ cause }) });
-}
-
-export function analyticsSync<A>(operation: () => A): Effect.Effect<A, AnalyticsOperationFailure> {
-  return Effect.try({ try: operation, catch: (cause) => new AnalyticsOperationFailure({ cause }) });
-}
+export const {
+  io: analyticsIO,
+  sync: analyticsSync,
+  rewrap: toAnalyticsOperationFailure,
+} = causeHelpers(AnalyticsOperationFailure);

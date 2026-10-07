@@ -150,6 +150,7 @@ export const messages = defineMessages("chat", {
   "chat.table.data": "Data table",
   "chat.file.openShared": "Open shared file {name}",
   "chat.file.openWorkspace": "Open workspace file {name}",
+  "chat.file.openWorkspaceFolder": "Open workspace folder {name}",
   "chat.file.openAttached": "Open attached file {name}",
   "chat.tag.unavailableAgent": "Unavailable agent",
   "chat.tag.unavailableSkill": "Unavailable skill",

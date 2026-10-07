@@ -2,6 +2,7 @@ import type { AttachmentSummary, ImageGenerationInfo } from "@openbot/contracts/
 import { isString } from "@openbot/contracts/runtime-values";
 import { Effect, Exit, Fiber, Result, Schema, Scope } from "effect";
 import { newAssistantMessage } from "../conversation-snapshots";
+import { causeHelpers } from "../effect-boundary";
 import type { MailboxStore } from "../mailbox-store";
 import { getString, type ThreadItem } from "../protocol";
 import type { ConversationRuntime } from "./conversation-runtime";
@@ -205,7 +206,7 @@ export class ImageGenRuntime {
             ownerAgentId: agentId,
             ownerThreadId: threadId,
           })
-          .pipe(Effect.mapError((failure) => new GeneratedImageFailed({ cause: failure.cause })));
+          .pipe(toGeneratedImageFailed);
       });
       if (savedPath) {
         const saved = yield* Effect.result(
@@ -216,7 +217,7 @@ export class ImageGenRuntime {
               ownerAgentId: agentId,
               ownerThreadId: threadId,
             })
-            .pipe(Effect.mapError((failure) => new GeneratedImageFailed({ cause: failure.cause }))),
+            .pipe(toGeneratedImageFailed),
         );
         if (Result.isSuccess(saved)) attachment = saved.success;
         else {
@@ -264,6 +265,4 @@ export class GeneratedImageFailed extends Schema.TaggedError<GeneratedImageFaile
   cause: Schema.Defect(),
 }) {}
 
-function imageStep<A>(run: () => A): Effect.Effect<A, GeneratedImageFailed> {
-  return Effect.try({ try: run, catch: (cause) => new GeneratedImageFailed({ cause }) });
-}
+const { sync: imageStep, rewrap: toGeneratedImageFailed } = causeHelpers(GeneratedImageFailed);

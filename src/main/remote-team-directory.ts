@@ -25,7 +25,7 @@ import type { RemoteInviteRecord, RemoteMemberRecord } from "./central-auth-reco
 import { decodeVoid } from "./remote-host-decoding";
 import type { RemoteRequestFn } from "./remote-server-client";
 import type { RemoteServerDirectory } from "./remote-server-store";
-import { RemoteRequest, RemoteWorkflowError, remoteDecode } from "./remote-service-effects";
+import { RemoteRequest, RemoteWorkflowError, remoteDecode, toRemoteWorkflowError } from "./remote-service-effects";
 import { decodeInviteSummary, decodeTeamInvites, decodeTeamMember, decodeTeamMembers } from "./remote-team-decoding";
 
 // The account service, not the host. Every method here crosses to a second authority.
@@ -229,7 +229,7 @@ export class RemoteTeamDirectory {
             inviteUrl: result.inviteUrl,
             role: input.role,
           })
-            .pipe(Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause })))
+            .pipe(toRemoteWorkflowError)
             .pipe(
               Effect.tapError(() =>
                 transport
