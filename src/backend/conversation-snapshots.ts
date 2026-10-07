@@ -1,14 +1,17 @@
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import type { AgentProviderId, ConversationMessage, ConversationSnapshot } from "@openbot/contracts/ipc";
 import { isImageGenerationAspectRatio } from "@openbot/contracts/ipc";
-import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { isString } from "@openbot/contracts/runtime-values";
+import { displayMessageReferences, type TeammatePrompt, teammatePrompts } from "./agent/delivery-content";
+import { imageGenerationFailure, isImageGenerationItem } from "./agent/image-generation";
 import type { DeliveryContext } from "./mailbox-store";
-import type { ThreadItem, ThreadResponse } from "./protocol";
+import type { ThreadResponse } from "./protocol";
 
 export function snapshotFromThread(
   agentId: string,
   thread: ThreadResponse["thread"],
   findDelivery: (deliveryId: string) => DeliveryContext | null,
+  findMessageDelivery: (messageId: string) => DeliveryContext | null,
 ): ConversationSnapshot {
   const messages: ConversationMessage[] = [];
   for (const turn of thread.turns ?? []) {
@@ -25,31 +28,37 @@ export function snapshotFromThread(
     for (const [itemIndex, item] of items.entries()) {
       const createdAt = new Date(baseTime + itemIndex).toISOString();
       if (item.type === "userMessage" && isString(item.id)) {
-        const delivery = item.clientId ? findDelivery(item.clientId) : null;
         const text = (item.content ?? [])
           .filter((part) => part.type === "text" && isString(part.text))
           .map((part) => part.text)
           .join("\n");
-        if (text) {
-          messages.push({
-            id: delivery?.delivery.id ?? item.id,
-            turnId: turn.id,
-            author: delivery?.delivery.sender.kind === "agent" ? "agent" : "user",
-            source: delivery?.delivery.sender.kind === "agent" ? "agent" : "user",
-            senderAgentId: delivery?.delivery.sender.kind === "agent" ? delivery.delivery.sender.agentId : undefined,
-            replyToMessageId: delivery?.delivery.replyToMessageId,
-            attachments: delivery?.delivery.attachments,
-            delivery: delivery
-              ? {
-                  id: delivery.delivery.id,
-                  status: delivery.delivery.status,
-                  position: delivery.delivery.position,
-                }
-              : undefined,
-            text: delivery?.delivery.text ?? text,
-            createdAt: delivery?.delivery.createdAt ?? createdAt,
-            status: "completed",
-          });
+        const delivery = item.clientId ? findDelivery(item.clientId) : null;
+        if (!text) continue;
+        const row = { id: item.id, turnId: turn.id, text, createdAt };
+        if (delivery) messages.push(promptMessage(delivery, row));
+        else {
+          /* The provider can keep a prompt under an ID that names no delivery. A teammate's message
+             still names its sender and its mailbox message in the prompt, so it is not shown as one
+             the user wrote. */
+          const teammates = teammatePrompts(text).map((teammate) => ({
+            teammate,
+            found: findMessageDelivery(teammate.messageId),
+          }));
+          const fromTeammates =
+            teammates.length > 0 &&
+            teammates.every(({ teammate, found }) => !found || isTeammatePromptOf(teammate, promptMessage(found, row)));
+          if (!fromTeammates) messages.push(promptMessage(null, row));
+          else
+            for (const [index, { teammate, found }] of teammates.entries())
+              messages.push(
+                found
+                  ? promptMessage(found, row)
+                  : teammateMessage(agentId, teammate, {
+                      id: index === 0 ? item.id : `${item.id}:${teammate.messageId}`,
+                      turnId: turn.id,
+                      createdAt,
+                    }),
+              );
         }
       }
       if (item.type === "agentMessage" && isString(item.id) && item.text) {
@@ -87,6 +96,85 @@ export function snapshotFromThread(
   }
   sortConversationMessages(messages);
   return { agentId, threadId: thread.id, activeTurnId: null, revision: 0, messages };
+}
+
+/** A user prompt from provider history, or the mailbox delivery that the prompt came from. */
+function promptMessage(
+  context: DeliveryContext | null,
+  row: Pick<ConversationMessage, "id" | "turnId" | "text" | "createdAt">,
+): ConversationMessage {
+  const delivery = context?.delivery;
+  return {
+    id: delivery?.id ?? row.id,
+    turnId: row.turnId,
+    author: delivery?.sender.kind === "agent" ? "agent" : "user",
+    source: delivery?.sender.kind === "agent" ? "agent" : "user",
+    senderAgentId: delivery?.sender.kind === "agent" ? delivery.sender.agentId : undefined,
+    replyToMessageId: delivery?.replyToMessageId,
+    attachments: delivery?.attachments,
+    delivery: delivery ? { id: delivery.id, status: delivery.status, position: delivery.position } : undefined,
+    text: delivery?.text ?? row.text,
+    createdAt: delivery?.createdAt ?? row.createdAt,
+    status: "completed",
+  };
+}
+
+/** A teammate's message whose mailbox delivery is gone, rebuilt from its provider prompt. */
+function teammateMessage(
+  recipientAgentId: string,
+  teammate: TeammatePrompt,
+  row: Pick<ConversationMessage, "id" | "turnId" | "createdAt">,
+): ConversationMessage {
+  return {
+    ...row,
+    author: "agent",
+    source: "agent",
+    senderAgentId: teammate.senderAgentId,
+    replyToMessageId: teammate.replyToMessageId,
+    exchange: {
+      direction: "incoming",
+      messageId: teammate.messageId,
+      senderAgentId: teammate.senderAgentId,
+      recipientAgentIds: [recipientAgentId],
+      replyToMessageId: teammate.replyToMessageId,
+      deliveries: [],
+      ...(teammate.expectsReply ? {} : { expectsReply: false }),
+    },
+    text: teammate.text,
+    status: "completed",
+  };
+}
+
+/**
+ * A copy of a teammate message that the mailbox holds too. An import that did not find the delivery
+ * kept the message under the provider's ID: as one the user wrote, in builds before this check, or
+ * rebuilt from its prompt. The mailbox row carries the same message, so the copy only repeats it.
+ * A row the user wrote is a copy only when its text is the mailbox text, so no words of theirs go.
+ */
+export function isMailboxMessageCopy(
+  message: ConversationMessage,
+  mailboxMessages: ReadonlyMap<string, ConversationMessage>,
+): boolean {
+  if (message.delivery) return false;
+  if (message.exchange?.direction === "incoming") return mailboxMessages.has(message.exchange.messageId);
+  if (message.author !== "user") return false;
+  const teammates = teammatePrompts(message.text);
+  return (
+    teammates.length > 0 &&
+    teammates.every((teammate) => {
+      const original = mailboxMessages.get(teammate.messageId);
+      return original !== undefined && isTeammatePromptOf(teammate, original);
+    })
+  );
+}
+
+/** Whether a prompt holds this message and nothing more, so the message can take the prompt's place. */
+function isTeammatePromptOf(teammate: TeammatePrompt, message: ConversationMessage): boolean {
+  // A chat tag keeps its name, so the prompt text comes back without the agent list.
+  return (
+    message.senderAgentId === teammate.senderAgentId &&
+    displayMessageReferences(message.text, message.attachments ?? [], new Map()).trimEnd() === teammate.text
+  );
 }
 
 export function mergeConversationSnapshots(
@@ -303,19 +391,6 @@ function isProviderAssistantMessage(message: ConversationMessage): boolean {
 
 function providerMessageIdentity(message: ConversationMessage): string {
   return JSON.stringify([message.turnId, message.itemType ?? null, message.text, message.imageGeneration ?? null]);
-}
-
-function isImageGenerationItem(item: { type: string }): boolean {
-  return item.type === "image_generation_call" || item.type === "imageGeneration";
-}
-
-function imageGenerationFailure(item: ThreadItem): string | null {
-  const failure = item.failure;
-  if (isDynamicRecord(failure)) {
-    const message = failure.message;
-    if (isString(message)) return message;
-  }
-  return isString(item.error) ? item.error : isString(failure) ? failure : null;
 }
 
 export function newAssistantMessage(id: string, turnId: string): ConversationMessage {

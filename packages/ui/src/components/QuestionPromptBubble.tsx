@@ -22,6 +22,7 @@ import {
   X,
 } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
+import { prefersReducedMotion } from "@openbot/ui/utils";
 import { createEffect, createSignal, For, onCleanup, Show, untrack } from "solid-js";
 import { isSendShortcutKey, type SendShortcut, sendShortcutAriaKey } from "../features/conversation/send-shortcut";
 
@@ -54,7 +55,7 @@ function resolutionPageContent(content: PageContent): Extract<PageContent, { kin
 }
 
 function motionDuration(element: HTMLElement, property: string, fallback: number): number {
-  if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return 0;
+  if (prefersReducedMotion()) return 0;
   const value = getComputedStyle(element).getPropertyValue(property).trim();
   if (value.endsWith("ms")) return Number.parseFloat(value) || fallback;
   if (value.endsWith("s")) return (Number.parseFloat(value) || fallback / 1_000) * 1_000;

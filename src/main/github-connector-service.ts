@@ -16,6 +16,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText, registerSecretValue, toLogValue } from "@openbot/logging";
+import { Deferred, Effect, Exit, type Layer, Result, Scope, Semaphore } from "effect";
 import { z } from "zod";
 import { writeFileAtomically } from "../backend/atomic-json-file";
 import { GitHubBotTokens } from "./github-bot-tokens";
@@ -31,6 +32,7 @@ import {
   refreshGitHubToken,
   requestGitHubDeviceCode,
 } from "./github-device-flow";
+import { GitHubOperationError, GitHubPlatform, githubCall, toGitHubOperationError } from "./github-effects";
 import { GitHubMcpProxy } from "./github-mcp-proxy";
 
 const logger = createOpenBotLogger("github-connector");
@@ -104,7 +106,9 @@ export class GitHubConnectorService {
   readonly #app: GitHubAppConfig | null;
   readonly #store: GitHubConnectorStore;
   readonly #toolDirectory: string;
-  readonly #openExternal: (url: string) => Promise<void>;
+  readonly #platform: Layer.Layer<GitHubPlatform>;
+  readonly #scope = Scope.makeUnsafe();
+  readonly #operations = new Set<Deferred.Deferred<void>>();
   readonly #fetch: GitHubFetch;
   readonly #now: () => number;
   readonly #statusListeners = new Set<(status: GitHubConnectorStatus) => void>();
@@ -113,7 +117,7 @@ export class GitHubConnectorService {
   /** The stored sign-in can no longer refresh. The record stays, so the panel can name the account. */
   #expired = false;
   #error: string | null = null;
-  #refreshing: Promise<GitHubConnectorRecord | null> | null = null;
+  #refreshing: Deferred.Deferred<GitHubConnectorRecord | null, GitHubOperationError> | null = null;
   #refreshCheck: ReturnType<typeof setInterval> | null = null;
   /** Network failures of the refresh in a row. Only the first is logged. */
   #refreshFailures = 0;
@@ -123,12 +127,13 @@ export class GitHubConnectorService {
    */
   #generation = 0;
   #disposed = false;
+  #disposal: Deferred.Deferred<void, GitHubOperationError> | null = null;
   /** Store writes and the `gh` and `git` files change in this order, one change at a time. */
-  #queue: Promise<void> = Promise.resolve();
+  #queue = Semaphore.makeUnsafe(1);
   /** What agents were last told, so a change that does not alter it replaces no session. */
   #agentAccess = false;
   readonly #botTokens: GitHubBotTokens;
-  #renewingBotTokens: Promise<void> | null = null;
+  #renewingBotTokens: Deferred.Deferred<void, GitHubOperationError> | null = null;
   /** The content of the repositories file, or null when it is not there. */
   #repositoriesWritten: string | null = null;
   /** Null when the loopback server could not start: agents then reach GitHub's server with the user token. */
@@ -140,44 +145,72 @@ export class GitHubConnectorService {
     this.#app = options.app;
     this.#store = options.store;
     this.#toolDirectory = options.toolDirectory;
-    this.#openExternal = options.openExternal;
     this.#fetch = options.fetch ?? ((url, init) => fetch(url, init));
+    this.#platform = GitHubPlatform.layer(this.#fetch, options.openExternal);
     this.#now = options.now ?? Date.now;
     this.#botTokens = new GitHubBotTokens({ apiUrl: options.apiUrl, fetch: this.#fetch, now: this.#now });
     registerSecretValue(this.#mcpProxySecret);
+  }
+
+  #owned<A>(operation: Effect.Effect<A, GitHubOperationError, GitHubPlatform>): Effect.Effect<A, GitHubOperationError> {
+    return Effect.suspend(() => {
+      const done = Deferred.makeUnsafe<void>();
+      this.#operations.add(done);
+      return operation.pipe(
+        Effect.provide(this.#platform),
+        Effect.ensuring(
+          Effect.gen({ self: this }, function* () {
+            this.#operations.delete(done);
+            yield* Deferred.succeed(done, undefined);
+          }),
+        ),
+      );
+    });
   }
 
   /**
    * Reads the stored sign-in and prepares the `gh` and `git` files. Call once, before an agent starts.
    * A file that cannot be read is logged and treated as no sign-in: a new sign-in replaces it.
    */
-  async load(): Promise<void> {
-    const error = await this.#store.load();
-    if (error) logger.warn("The GitHub connection file could not be read.", { cause: toLogValue(error) });
-    const record = this.#store.read();
-    if (this.#app) await this.#startMcpProxy(record);
-    await this.#serialize(async () => {
-      if (!record || !this.#app) {
-        await this.#removeToolFiles();
-        return;
-      }
-      registerTokenSecrets(record);
-      if (!this.#canRefresh(record) && this.#accessTokenExpired(record)) {
-        this.#expired = true;
-        await this.#removeToolFiles();
-      } else {
-        // A file that cannot be written must not stop the app. The next refresh writes it again.
-        await this.#writeToolFiles(record).catch((error: unknown) => {
-          logger.warn("The GitHub token files could not be written.", { cause: toLogValue(error) });
-        });
-      }
-    });
-    this.#agentAccess = this.#agentConnected();
-    if (!this.#app || this.#disposed) return;
-    this.#refreshCheck = setInterval(() => this.#checkRefresh(), REFRESH_CHECK_MS);
-    this.#refreshCheck.unref?.();
-    this.#checkRefresh();
-  }
+
+  readonly load = Effect.fn("GitHubConnector.load")(
+    function* (this: GitHubConnectorService): Effect.fn.Return<void, GitHubOperationError, GitHubPlatform> {
+      const error = yield* this.#store.load();
+      if (error) logger.warn("The GitHub connection file could not be read.", { cause: toLogValue(error) });
+      const record = this.#store.read();
+      if (this.#app) yield* this.#startMcpProxyEffect(record);
+      yield* this.#serialize(() =>
+        Effect.gen({ self: this }, function* () {
+          if (!record || !this.#app) {
+            yield* this.#removeToolFiles();
+            return;
+          }
+          registerTokenSecrets(record);
+          if (!this.#canRefresh(record) && this.#accessTokenExpired(record)) {
+            this.#expired = true;
+            yield* this.#removeToolFiles();
+          } else {
+            // A file that cannot be written must not stop the app. The next refresh writes it again.
+            yield* this.#writeToolFilesEffect(record).pipe(
+              Effect.catch(({ cause: error }) =>
+                Effect.sync(() => {
+                  logger.warn("The GitHub token files could not be written.", { cause: toLogValue(error) });
+                }),
+              ),
+            );
+          }
+        }),
+      );
+      this.#agentAccess = this.#agentConnected();
+      if (!this.#app || this.#disposed) return;
+      this.#refreshCheck = setInterval(() => {
+        void Effect.runPromise(this.#owned(this.#checkRefresh()).pipe(Effect.catch(() => Effect.void)));
+      }, REFRESH_CHECK_MS);
+      this.#refreshCheck.unref?.();
+      yield* this.#checkRefresh();
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
 
   status(): GitHubConnectorStatus {
     const record = this.#store.read();
@@ -208,31 +241,41 @@ export class GitHubConnectorService {
    * Starts the device flow and opens GitHub's code page. Returns at once with the user code; the
    * wait for the user runs in the background and reports through `onChanged`.
    */
-  async connect(): Promise<GitHubConnectorStatus> {
-    const app = this.#app;
-    if (!app) throw new Error(sourceText("error.connector.githubUnavailable"));
-    this.#pending?.controller.abort();
-    const pending: PendingSignIn = { controller: new AbortController(), device: null };
-    this.#pending = pending;
-    this.#error = null;
-    this.#emitStatus();
-    try {
-      pending.device = await requestGitHubDeviceCode({
-        clientId: app.clientId,
-        fetch: this.#fetch,
-        now: this.#now,
-        signal: pending.controller.signal,
-      });
-    } catch (error) {
-      if (this.#pending === pending && !pending.controller.signal.aborted) this.#fail(pending, error);
+
+  readonly connect = Effect.fn("GitHubConnector.connect")(
+    function* (
+      this: GitHubConnectorService,
+    ): Effect.fn.Return<GitHubConnectorStatus, GitHubOperationError, GitHubPlatform> {
+      const app = this.#app;
+      if (!app)
+        return yield* new GitHubOperationError({ cause: new Error(sourceText("error.connector.githubUnavailable")) });
+      this.#pending?.controller.abort();
+      const pending: PendingSignIn = { controller: new AbortController(), device: null };
+      this.#pending = pending;
+      this.#error = null;
+      this.#emitStatus();
+      const attempt0 = yield* Effect.gen({ self: this }, function* () {
+        return yield* requestGitHubDeviceCode({
+          clientId: app.clientId,
+          fetch: this.#fetch,
+          now: this.#now,
+          signal: pending.controller.signal,
+        });
+      }).pipe(Effect.result);
+      if (Result.isFailure(attempt0)) {
+        const error = attempt0.failure.cause;
+        if (this.#pending === pending && !pending.controller.signal.aborted) this.#fail(pending, error);
+        return this.status();
+      }
+      pending.device = attempt0.success;
+      if (this.#pending !== pending) return this.status();
+      this.#emitStatus();
+      yield* Effect.forkIn(this.openVerification(), this.#scope);
+      yield* Effect.forkIn(this.#owned(this.#finishSignIn(app, pending, pending.device)), this.#scope);
       return this.status();
-    }
-    if (this.#pending !== pending) return this.status();
-    this.#emitStatus();
-    void this.openVerification();
-    void this.#finishSignIn(app, pending, pending.device);
-    return this.status();
-  }
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
 
   cancel(): GitHubConnectorStatus {
     this.#pending?.controller.abort();
@@ -246,98 +289,134 @@ export class GitHubConnectorService {
    * Forgets the sign-in. GitHub revokes a token only with the client secret, which OpenBot does not
    * hold, so the GitHub page where the user can revoke it opens as well.
    */
-  async disconnect(): Promise<GitHubConnectorStatus> {
-    this.#pending?.controller.abort();
-    this.#pending = null;
-    this.#generation += 1;
-    const hadRecord = this.#store.read() !== null;
-    await this.#serialize(async () => {
-      await this.#store.clear();
-      this.#botTokens.clear();
-      this.#mcpProxy?.retain(new Set());
-      await this.#removeToolFiles();
-    });
-    this.#expired = false;
-    this.#error = null;
-    this.#emitStatus();
-    this.#syncAgentAccess();
-    if (hadRecord && this.#app) {
-      void this.#open(`https://github.com/settings/connections/applications/${encodeURIComponent(this.#app.clientId)}`);
-    }
-    return this.status();
-  }
 
-  async openVerification(): Promise<void> {
-    const uri = this.#pending?.device?.verificationUri;
-    if (uri) await this.#open(uri);
-  }
+  readonly disconnect = Effect.fn("GitHubConnector.disconnect")(
+    function* (
+      this: GitHubConnectorService,
+    ): Effect.fn.Return<GitHubConnectorStatus, GitHubOperationError, GitHubPlatform> {
+      this.#pending?.controller.abort();
+      this.#pending = null;
+      this.#generation += 1;
+      const hadRecord = this.#store.read() !== null;
+      yield* this.#serialize(() =>
+        Effect.gen({ self: this }, function* () {
+          yield* this.#store.clear();
+          this.#botTokens.clear();
+          if (this.#mcpProxy) yield* this.#mcpProxy.retain(new Set());
+          yield* this.#removeToolFiles();
+        }),
+      );
+      this.#expired = false;
+      this.#error = null;
+      this.#emitStatus();
+      this.#syncAgentAccess();
+      if (hadRecord && this.#app) {
+        yield* Effect.forkIn(
+          this.#owned(
+            this.#open(
+              `https://github.com/settings/connections/applications/${encodeURIComponent(this.#app.clientId)}`,
+            ),
+          ),
+          this.#scope,
+        );
+      }
+      return this.status();
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  readonly openVerification = Effect.fn("GitHubConnector.openVerification")(
+    function* (this: GitHubConnectorService): Effect.fn.Return<void, GitHubOperationError, GitHubPlatform> {
+      const uri = this.#pending?.device?.verificationUri;
+      if (uri) yield* this.#open(uri);
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
 
   /**
    * The repositories that agents reach: those of each installation of the app that the user can use.
    * Empty while the connection is not active.
    */
-  async repositories(): Promise<GitHubConnectorRepositories> {
-    const token = await this.accessToken();
-    if (!token) return { repositories: [], total: 0 };
-    // The panel reads the list again after an install, which can add repositories.
-    this.#botTokens.invalidate();
-    this.#checkRefresh();
-    const { installations } = await this.#getGitHub(
-      `https://api.github.com/user/installations?per_page=${GITHUB_PAGE_SIZE}`,
-      token,
-      githubInstallationsSchema,
-    );
-    const repositories: GitHubConnectorRepository[] = [];
-    let total = 0;
-    for (const installation of installations) {
-      for (let page = 1; ; page += 1) {
-        const answer = await this.#getGitHub(
-          `https://api.github.com/user/installations/${installation.id}/repositories?per_page=${GITHUB_PAGE_SIZE}&page=${page}`,
-          token,
-          githubRepositoriesSchema,
-        );
-        if (page === 1) total += answer.total_count;
-        for (const repository of answer.repositories) {
-          repositories.push({ fullName: repository.full_name, private: repository.private });
+
+  readonly repositories = Effect.fn("GitHubConnector.repositories")(
+    function* (
+      this: GitHubConnectorService,
+    ): Effect.fn.Return<GitHubConnectorRepositories, GitHubOperationError, GitHubPlatform> {
+      const token = yield* this.accessToken();
+      if (!token) return { repositories: [], total: 0 };
+      // The panel reads the list again after an install, which can add repositories.
+      this.#botTokens.invalidate();
+      yield* this.#checkRefresh();
+      const { installations } = yield* this.#getGitHubEffect(
+        `https://api.github.com/user/installations?per_page=${GITHUB_PAGE_SIZE}`,
+        token,
+        githubInstallationsSchema,
+      );
+      const repositories: GitHubConnectorRepository[] = [];
+      let total = 0;
+      for (const installation of installations) {
+        for (let page = 1; ; page += 1) {
+          const answer = yield* this.#getGitHubEffect(
+            `https://api.github.com/user/installations/${installation.id}/repositories?per_page=${GITHUB_PAGE_SIZE}&page=${page}`,
+            token,
+            githubRepositoriesSchema,
+          );
+          if (page === 1) total += answer.total_count;
+          for (const repository of answer.repositories) {
+            repositories.push({ fullName: repository.full_name, private: repository.private });
+          }
+          const listedAll = page * GITHUB_PAGE_SIZE >= answer.total_count || answer.repositories.length === 0;
+          if (listedAll || repositories.length >= MAX_LISTED_REPOSITORIES) break;
         }
-        const listedAll = page * GITHUB_PAGE_SIZE >= answer.total_count || answer.repositories.length === 0;
-        if (listedAll || repositories.length >= MAX_LISTED_REPOSITORIES) break;
+        if (repositories.length >= MAX_LISTED_REPOSITORIES) break;
       }
-      if (repositories.length >= MAX_LISTED_REPOSITORIES) break;
-    }
-    repositories.sort((left, right) => left.fullName.localeCompare(right.fullName, "en", { sensitivity: "base" }));
-    return {
-      repositories: repositories.slice(0, MAX_LISTED_REPOSITORIES),
-      total: Math.max(total, repositories.length),
-    };
-  }
+      repositories.sort((left, right) => left.fullName.localeCompare(right.fullName, "en", { sensitivity: "base" }));
+      return {
+        repositories: repositories.slice(0, MAX_LISTED_REPOSITORIES),
+        total: Math.max(total, repositories.length),
+      };
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
 
   /** GitHub's page where the user picks the repositories the app may reach. */
-  async openInstall(): Promise<void> {
-    if (this.#app) await this.#open(`https://github.com/apps/${this.#app.slug}/installations/new`);
-  }
+
+  readonly openInstall = Effect.fn("GitHubConnector.openInstall")(
+    function* (this: GitHubConnectorService): Effect.fn.Return<void, GitHubOperationError, GitHubPlatform> {
+      if (this.#app) yield* this.#open(`https://github.com/apps/${this.#app.slug}/installations/new`);
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
 
   /**
    * The user token, refreshed first when it has less than ten minutes left. Null while the
    * connection is not active.
    */
-  async accessToken(): Promise<string | null> {
-    const record = this.#store.read();
-    if (!record || !this.#agentConnected()) return null;
-    if (!this.#needsRefresh(record)) return record.accessToken;
-    // A sign-in that replaced this one during the refresh gives its own token.
-    const current = (await this.#refresh()) ?? this.#store.read();
-    return current && this.#agentConnected() && !this.#accessTokenExpired(current) ? current.accessToken : null;
-  }
+
+  readonly accessToken = Effect.fn("GitHubConnector.accessToken")(
+    function* (this: GitHubConnectorService): Effect.fn.Return<string | null, GitHubOperationError, GitHubPlatform> {
+      const record = this.#store.read();
+      if (!record || !this.#agentConnected()) return null;
+      if (!this.#needsRefresh(record)) return record.accessToken;
+      // A sign-in that replaced this one during the refresh gives its own token.
+      const current = (yield* this.#refresh()) ?? this.#store.read();
+      return current && this.#agentConnected() && !this.#accessTokenExpired(current) ? current.accessToken : null;
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
 
   /**
    * The bearer that agents send to the GitHub MCP server: the loopback server's own secret, or the
    * user token when that server did not start.
    */
-  async mcpAuthorization(): Promise<string | null> {
-    if (!this.#agentConnected()) return null;
-    return this.#mcpProxy ? this.#mcpProxySecret : this.accessToken();
-  }
+
+  readonly mcpAuthorization = Effect.fn("GitHubConnector.mcpAuthorization")(
+    function* (this: GitHubConnectorService): Effect.fn.Return<string | null, GitHubOperationError, GitHubPlatform> {
+      if (!this.#agentConnected()) return null;
+      return this.#mcpProxy ? this.#mcpProxySecret : yield* this.accessToken();
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
 
   /** The GitHub MCP server that agents are given, or null while the connection is not active. */
   mcpServer(): McpServerConfig | null {
@@ -399,7 +478,25 @@ export class GitHubConnectorService {
    * Stops the refresh check and the sign-in, and removes the token files after the change in
    * progress. The encrypted sign-in stays.
    */
-  async dispose(): Promise<void> {
+  readonly dispose = Effect.fn("GitHubConnector.disposeOwned")(function* (this: GitHubConnectorService) {
+    if (this.#disposal) return yield* Deferred.await(this.#disposal);
+    const done = Deferred.makeUnsafe<void, GitHubOperationError>();
+    this.#disposal = done;
+    return yield* this.#disposeWork().pipe(
+      Effect.provide(this.#platform),
+      Effect.ensuring(
+        Effect.gen({ self: this }, function* () {
+          yield* Scope.close(this.#scope, Exit.void);
+          while (this.#operations.size)
+            yield* Effect.forEach([...this.#operations], Deferred.await, { concurrency: "unbounded" });
+        }),
+      ),
+      Effect.onExit((exit) => Deferred.done(done, exit)),
+    );
+  }).bind(this);
+  readonly #disposeWork = Effect.fn("GitHubConnector.dispose")(function* (
+    this: GitHubConnectorService,
+  ): Effect.fn.Return<void, GitHubOperationError, GitHubPlatform> {
     this.#disposed = true;
     this.#generation += 1;
     this.#pending?.controller.abort();
@@ -409,9 +506,10 @@ export class GitHubConnectorService {
     this.#statusListeners.clear();
     this.#accessListeners.clear();
     this.#botTokens.clear();
-    await this.#mcpProxy?.stop();
-    await this.#serialize(() => this.#removeToolFiles());
-  }
+    const proxy = this.#mcpProxy;
+    if (proxy) yield* proxy.stop();
+    yield* this.#serialize(() => this.#removeToolFiles());
+  });
 
   /**
    * Whether agents get GitHub. A sign-in that runs while a stored one is still valid does not take
@@ -428,9 +526,14 @@ export class GitHubConnectorService {
     return this.#expired ? "expired" : "connected";
   }
 
-  async #finishSignIn(app: GitHubAppConfig, pending: PendingSignIn, device: GitHubDeviceCode): Promise<void> {
-    try {
-      const tokens = await pollGitHubDeviceToken({
+  readonly #finishSignIn = Effect.fn("GitHubConnector.finishSignIn")(function* (
+    this: GitHubConnectorService,
+    app: GitHubAppConfig,
+    pending: PendingSignIn,
+    device: GitHubDeviceCode,
+  ): Effect.fn.Return<void, GitHubOperationError, GitHubPlatform> {
+    return yield* Effect.gen({ self: this }, function* () {
+      const tokens = yield* pollGitHubDeviceToken({
         clientId: app.clientId,
         device,
         fetch: this.#fetch,
@@ -438,32 +541,42 @@ export class GitHubConnectorService {
         signal: pending.controller.signal,
       });
       registerTokenSecrets(tokens);
-      const user = await this.#readUser(tokens.accessToken, pending.controller.signal);
+      const user = yield* this.#readUserEffect(tokens.accessToken, pending.controller.signal);
       const record: GitHubConnectorRecord = { ...tokens, ...user, mcpProxy: this.#mcpProxySettings() };
       // Checked in the queue: a cancel or disconnect that ran while the last change was written wins.
-      const committed = await this.#serialize(async () => {
-        if (this.#pending !== pending || this.#disposed) return false;
-        await this.#store.write(record);
-        this.#generation += 1;
-        this.#pending = null;
-        this.#expired = false;
-        this.#error = null;
-        this.#botTokens.clear();
-        // The sign-in is stored: the MCP server works without the files, so a write failure does not undo it.
-        await this.#writeToolFiles(record).catch((error: unknown) => {
-          logger.warn("The GitHub token files could not be written.", { cause: toLogValue(error) });
-        });
-        return true;
-      });
+      const committed = yield* this.#serialize(() =>
+        Effect.gen({ self: this }, function* () {
+          if (this.#pending !== pending || this.#disposed) return false;
+          yield* this.#store.write(record);
+          this.#generation += 1;
+          this.#pending = null;
+          this.#expired = false;
+          this.#error = null;
+          this.#botTokens.clear();
+          // The sign-in is stored: the MCP server works without the files, so a write failure does not undo it.
+          yield* this.#writeToolFilesEffect(record).pipe(
+            Effect.catch(({ cause: error }) =>
+              Effect.sync(() => {
+                logger.warn("The GitHub token files could not be written.", { cause: toLogValue(error) });
+              }),
+            ),
+          );
+          return true;
+        }),
+      );
       if (!committed) return;
       this.#emitStatus();
       this.#syncAgentAccess();
-      this.#checkRefresh();
-    } catch (error) {
-      if (pending.controller.signal.aborted || this.#pending !== pending) return;
-      this.#fail(pending, error);
-    }
-  }
+      yield* this.#checkRefresh();
+    }).pipe(
+      Effect.catch(({ cause: error }) =>
+        Effect.sync(() => {
+          if (pending.controller.signal.aborted || this.#pending !== pending) return;
+          this.#fail(pending, error);
+        }),
+      ),
+    );
+  });
 
   #fail(pending: PendingSignIn, error: unknown): void {
     pending.controller.abort();
@@ -475,47 +588,67 @@ export class GitHubConnectorService {
     this.#emitStatus();
   }
 
-  async #readUser(
+  readonly #readUserEffect = Effect.fn("GitHubConnector.readUser")(function* (
+    this: GitHubConnectorService,
     accessToken: string,
     signal: AbortSignal,
-  ): Promise<Pick<GitHubConnectorRecord, "login" | "userId" | "avatarUrl">> {
-    const user = await this.#getGitHub("https://api.github.com/user", accessToken, githubUserSchema, signal);
+  ): Effect.fn.Return<
+    Pick<GitHubConnectorRecord, "login" | "userId" | "avatarUrl">,
+    GitHubOperationError,
+    GitHubPlatform
+  > {
+    const user = yield* this.#getGitHubEffect("https://api.github.com/user", accessToken, githubUserSchema, signal);
     return { login: user.login, userId: user.id, avatarUrl: user.avatar_url ?? null };
-  }
+  });
 
   /** One GitHub API read. A failure is a `GitHubDeviceFlowError` whose message the panel can show. */
-  async #getGitHub<T>(url: string, accessToken: string, schema: z.ZodType<T>, signal?: AbortSignal): Promise<T> {
+
+  readonly #getGitHubEffect = Effect.fn("GitHubConnector.getGitHub")(function* <T>(
+    this: GitHubConnectorService,
+    url: string,
+    accessToken: string,
+    schema: z.ZodType<T>,
+    signal?: AbortSignal,
+  ): Effect.fn.Return<T, GitHubOperationError, GitHubPlatform> {
     const timeout = AbortSignal.timeout(GITHUB_REQUEST_TIMEOUT_MS);
-    let response: Response;
-    try {
-      response = await this.#fetch(url, {
-        signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
-        headers: {
-          Accept: "application/vnd.github+json",
-          Authorization: `Bearer ${accessToken}`,
-          "User-Agent": "OpenBot",
-          "X-GitHub-Api-Version": "2022-11-28",
-        },
-      });
-    } catch (cause) {
-      if (signal?.aborted) throw signal.reason;
-      throw new GitHubDeviceFlowError(
-        "unreachable",
-        sourceText("error.connector.githubUnreachable", {
-          detail: cause instanceof Error ? cause.message : String(cause),
+    const attempt2 = yield* Effect.gen({ self: this }, function* () {
+      return yield* GitHubPlatform.use((platform) =>
+        platform.fetch(url, {
+          signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+          headers: {
+            Accept: "application/vnd.github+json",
+            Authorization: `Bearer ${accessToken}`,
+            "User-Agent": "OpenBot",
+            "X-GitHub-Api-Version": "2022-11-28",
+          },
         }),
       );
+    }).pipe(Effect.result);
+    if (Result.isFailure(attempt2)) {
+      const cause = attempt2.failure.cause;
+      if (signal?.aborted) return yield* new GitHubOperationError({ cause: signal.reason });
+      return yield* new GitHubOperationError({
+        cause: new GitHubDeviceFlowError(
+          "unreachable",
+          sourceText("error.connector.githubUnreachable", {
+            detail: cause instanceof Error ? cause.message : String(cause),
+          }),
+        ),
+      });
     }
-    const answer = schema.safeParse(await response.json().catch(() => null));
+    const response = attempt2.success;
+    const answer = schema.safeParse(yield* githubCall(() => response.json().catch(() => null)));
     if (!response.ok || !answer.success) {
       const path = new URL(url).pathname;
-      throw new GitHubDeviceFlowError(
-        "unexpected",
-        sourceText("error.connector.githubUnexpected", { detail: `${path} HTTP ${response.status}` }),
-      );
+      return yield* new GitHubOperationError({
+        cause: new GitHubDeviceFlowError(
+          "unexpected",
+          sourceText("error.connector.githubUnexpected", { detail: `${path} HTTP ${response.status}` }),
+        ),
+      });
     }
     return answer.data;
-  }
+  });
 
   #needsRefresh(record: GitHubConnectorRecord): boolean {
     return record.accessTokenExpiresAt !== null && record.accessTokenExpiresAt - this.#now() < REFRESH_MARGIN_MS;
@@ -536,86 +669,118 @@ export class GitHubConnectorService {
    * Starts a refresh when the user token has less than ten minutes left, so `gh` and `git` keep a
    * valid one, and asks for new installation tokens when they are due.
    */
-  #checkRefresh(): void {
+  readonly #checkRefresh = Effect.fn("GitHubConnector.checkRefresh")(function* (this: GitHubConnectorService) {
     const record = this.#store.read();
     if (this.#disposed || !record || !this.#agentConnected()) return;
-    if (this.#needsRefresh(record)) void this.#refresh();
-    if (this.#botTokens.due()) void this.#renewBotTokens();
-  }
+    if (this.#needsRefresh(record)) yield* Effect.forkIn(this.#owned(this.#refresh()), this.#scope);
+    if (this.#botTokens.due()) yield* Effect.forkIn(this.#owned(this.#renewBotTokens()), this.#scope);
+  });
 
   /** One request at a time. A new set is written to the repositories file for the git helper. */
-  #renewBotTokens(): Promise<void> {
-    this.#renewingBotTokens ??= this.#runBotTokenRenewal().finally(() => {
-      this.#renewingBotTokens = null;
-    });
-    return this.#renewingBotTokens;
-  }
+  readonly #renewBotTokens = Effect.fn("GitHubConnector.renewBotTokensAdmission")(function* (
+    this: GitHubConnectorService,
+  ) {
+    if (this.#renewingBotTokens) return yield* Deferred.await(this.#renewingBotTokens);
+    const done = Deferred.makeUnsafe<void, GitHubOperationError>();
+    this.#renewingBotTokens = done;
+    return yield* this.#runBotTokenRenewal().pipe(
+      Effect.onExit((exit) => Deferred.done(done, exit)),
+      Effect.ensuring(
+        Effect.sync(() => {
+          if (this.#renewingBotTokens === done) this.#renewingBotTokens = null;
+        }),
+      ),
+    );
+  });
 
-  async #runBotTokenRenewal(): Promise<void> {
+  readonly #runBotTokenRenewal = Effect.fn("GitHubConnector.runBotTokenRenewal")(function* (
+    this: GitHubConnectorService,
+  ): Effect.fn.Return<void, GitHubOperationError, GitHubPlatform> {
     const generation = this.#generation;
-    const userToken = await this.accessToken();
+    const userToken = yield* this.accessToken();
     if (!userToken) return;
-    await this.#botTokens.renew(userToken);
+    yield* this.#botTokens.renew(userToken);
     // Also after a failure: a token that expired while the API was not reachable leaves the file.
-    const current = await this.#serialize(async () => {
-      if (this.#disposed || this.#generation !== generation || !this.#agentConnected()) return false;
-      await this.#writeRepositoriesFile();
-      return true;
-    });
+    const current = yield* this.#serialize(() =>
+      Effect.gen({ self: this }, function* () {
+        if (this.#disposed || this.#generation !== generation || !this.#agentConnected()) return false;
+        yield* this.#writeRepositoriesFileEffect();
+        return true;
+      }),
+    );
     if (!current) return;
-    this.#mcpProxy?.retain(new Set([userToken, ...this.#botTokens.entries().map(([, token]) => token)]));
-  }
+    if (this.#mcpProxy)
+      yield* this.#mcpProxy.retain(new Set([userToken, ...this.#botTokens.entries().map(([, token]) => token)]));
+  });
 
   /** One refresh at a time: a hand-off and the check can ask together, and GitHub rotates the refresh token. */
-  #refresh(): Promise<GitHubConnectorRecord | null> {
-    this.#refreshing ??= this.#runRefresh().finally(() => {
-      this.#refreshing = null;
-    });
-    return this.#refreshing;
-  }
+  readonly #refresh = Effect.fn("GitHubConnector.refreshAdmission")(function* (this: GitHubConnectorService) {
+    if (this.#refreshing) return yield* Deferred.await(this.#refreshing);
+    const done = Deferred.makeUnsafe<GitHubConnectorRecord | null, GitHubOperationError>();
+    this.#refreshing = done;
+    return yield* this.#runRefresh().pipe(
+      Effect.onExit((exit) => Deferred.done(done, exit)),
+      Effect.ensuring(
+        Effect.sync(() => {
+          if (this.#refreshing === done) this.#refreshing = null;
+        }),
+      ),
+    );
+  });
 
   /**
    * Resolves with the record to use: the new one, the old one after a network failure, or null when
    * the sign-in expired or changed during the refresh. It does not reject.
    */
-  async #runRefresh(): Promise<GitHubConnectorRecord | null> {
+
+  readonly #runRefresh = Effect.fn("GitHubConnector.runRefresh")(function* (
+    this: GitHubConnectorService,
+  ): Effect.fn.Return<GitHubConnectorRecord | null, GitHubOperationError, GitHubPlatform> {
     const generation = this.#generation;
     const record = this.#store.read();
     const app = this.#app;
     if (!record || !app || this.#expired) return null;
     // A disconnect, a new sign-in or a shutdown that ran during the refresh wins.
     const current = () => !this.#disposed && this.#generation === generation && this.#store.read() === record;
-    try {
+    return yield* Effect.gen({ self: this }, function* () {
       if (!record.refreshToken || !this.#canRefresh(record)) {
-        await this.#serialize(async () => {
-          if (current()) await this.#expire();
-        });
+        yield* this.#serialize(() =>
+          Effect.gen({ self: this }, function* () {
+            if (current()) yield* this.#expireEffect();
+          }),
+        );
         return null;
       }
-      let tokens: GitHubTokenSet;
-      try {
-        tokens = await refreshGitHubToken({
+      const refreshToken = record.refreshToken;
+      const attempt4 = yield* Effect.gen({ self: this }, function* () {
+        return yield* refreshGitHubToken({
           clientId: app.clientId,
-          refreshToken: record.refreshToken,
+          refreshToken,
           fetch: this.#fetch,
           now: this.#now,
         });
-      } catch (error) {
-        if (!(error instanceof GitHubDeviceFlowError && error.failure === "refresh_rejected")) throw error;
-        await this.#serialize(async () => {
-          if (!current()) return;
-          // Saved without the refresh token, so the next start shows the sign-in as expired too.
-          const now = this.#now();
-          await this.#store.write({
-            ...record,
-            accessTokenExpiresAt: Math.min(record.accessTokenExpiresAt ?? now, now),
-            refreshToken: null,
-            refreshTokenExpiresAt: null,
-          });
-          await this.#expire();
-        });
+      }).pipe(Effect.result);
+      if (Result.isFailure(attempt4)) {
+        const error = attempt4.failure.cause;
+        if (!(error instanceof GitHubDeviceFlowError && error.failure === "refresh_rejected"))
+          return yield* new GitHubOperationError({ cause: error });
+        yield* this.#serialize(() =>
+          Effect.gen({ self: this }, function* () {
+            if (!current()) return;
+            // Saved without the refresh token, so the next start shows the sign-in as expired too.
+            const now = this.#now();
+            yield* this.#store.write({
+              ...record,
+              accessTokenExpiresAt: Math.min(record.accessTokenExpiresAt ?? now, now),
+              refreshToken: null,
+              refreshTokenExpiresAt: null,
+            });
+            yield* this.#expireEffect();
+          }),
+        );
         return null;
       }
+      const tokens = attempt4.success;
       registerTokenSecrets(tokens);
       const next: GitHubConnectorRecord = {
         ...record,
@@ -623,43 +788,47 @@ export class GitHubConnectorService {
         refreshToken: tokens.refreshToken ?? record.refreshToken,
         refreshTokenExpiresAt: tokens.refreshToken ? tokens.refreshTokenExpiresAt : record.refreshTokenExpiresAt,
       };
-      const committed = await this.#serialize(async () => {
-        if (!current()) return false;
-        await this.#store.write(next);
-        await this.#writeToolFiles(next);
-        return true;
-      });
+      const committed = yield* this.#serialize(() =>
+        Effect.gen({ self: this }, function* () {
+          if (!current()) return false;
+          yield* this.#store.write(next);
+          yield* this.#writeToolFilesEffect(next);
+          return true;
+        }),
+      );
       this.#refreshFailures = 0;
       return committed ? next : null;
-    } catch (error) {
-      this.#refreshFailures += 1;
-      if (this.#refreshFailures === 1) {
-        logger.warn("The GitHub token could not be refreshed. OpenBot tries again each minute.", {
-          cause: toLogValue(error),
-        });
-      }
-      return record;
-    }
-  }
+    }).pipe(
+      Effect.catch(({ cause: error }) =>
+        Effect.sync(() => {
+          this.#refreshFailures += 1;
+          if (this.#refreshFailures === 1) {
+            logger.warn("The GitHub token could not be refreshed. OpenBot tries again each minute.", {
+              cause: toLogValue(error),
+            });
+          }
+          return record;
+        }),
+      ),
+    );
+  });
 
   /** Runs in the queue. */
-  async #expire(): Promise<void> {
+
+  readonly #expireEffect = Effect.fn("GitHubConnector.expire")(function* (
+    this: GitHubConnectorService,
+  ): Effect.fn.Return<void, GitHubOperationError, GitHubPlatform> {
     this.#expired = true;
     this.#error = sourceText("error.connector.githubExpired");
     this.#botTokens.clear();
-    this.#mcpProxy?.retain(new Set());
-    await this.#removeToolFiles();
+    if (this.#mcpProxy) yield* this.#mcpProxy.retain(new Set());
+    yield* this.#removeToolFiles();
     this.#emitStatus();
     this.#syncAgentAccess();
-  }
+  });
 
-  #serialize<T>(change: () => Promise<T>): Promise<T> {
-    const result = this.#queue.then(change, change);
-    this.#queue = result.then(
-      () => undefined,
-      () => undefined,
-    );
-    return result;
+  #serialize<T>(change: () => Effect.Effect<T, GitHubOperationError, GitHubPlatform>) {
+    return this.#queue.withPermit(Effect.suspend(change)).pipe(Effect.uninterruptible);
   }
 
   #ghConfigDirectory(): string {
@@ -676,21 +845,28 @@ export class GitHubConnectorService {
   }
 
   /** Writes only a change: a renewal runs each 15 minutes while the API is not reachable. */
-  async #writeRepositoriesFile(): Promise<void> {
+
+  readonly #writeRepositoriesFileEffect = Effect.fn("GitHubConnector.writeRepositoriesFile")(function* (
+    this: GitHubConnectorService,
+  ): Effect.fn.Return<void, GitHubOperationError, GitHubPlatform> {
     const content = this.#botTokens
       .entries()
       .map(([repository, token]) => `${repository}\t${token}\n`)
       .join("");
     if (content === this.#repositoriesWritten) return;
-    await writeFileAtomically(this.#repositoriesFile(), content);
+    yield* writeFileAtomically(this.#repositoriesFile(), content).pipe(toGitHubOperationError);
     this.#repositoriesWritten = content;
-  }
+  });
 
   /**
    * Starts the loopback GitHub MCP server on the port it had, so that a resumed session finds it. A
    * server that cannot start is logged: agents then reach GitHub's server with the user token.
    */
-  async #startMcpProxy(record: GitHubConnectorRecord | null): Promise<void> {
+
+  readonly #startMcpProxyEffect = Effect.fn("GitHubConnector.startMcpProxy")(function* (
+    this: GitHubConnectorService,
+    record: GitHubConnectorRecord | null,
+  ): Effect.fn.Return<void, GitHubOperationError, GitHubPlatform> {
     if (record?.mcpProxy) {
       this.#mcpProxySecret = record.mcpProxy.secret;
       registerSecretValue(this.#mcpProxySecret);
@@ -701,13 +877,15 @@ export class GitHubConnectorService {
       userToken: () => this.accessToken(),
       botToken: (owner, name) => this.#botTokens.forRepository(owner, name),
     });
-    let port: number;
-    try {
-      port = await proxy.start(record?.mcpProxy?.port ?? null);
-    } catch (error) {
+    const attempt5 = yield* Effect.gen({ self: this }, function* () {
+      return yield* proxy.start(record?.mcpProxy?.port ?? null);
+    }).pipe(Effect.result);
+    if (Result.isFailure(attempt5)) {
+      const error = attempt5.failure.cause;
       logger.warn("The GitHub MCP server of this computer did not start.", { cause: toLogValue(error) });
       return;
     }
+    const port = attempt5.success;
     this.#mcpProxy = proxy;
     if (!record || record.mcpProxy?.port === port) return;
     if (record.mcpProxy) {
@@ -715,10 +893,14 @@ export class GitHubConnectorService {
       this.#mcpProxySecret = randomBytes(32).toString("base64url");
       registerSecretValue(this.#mcpProxySecret);
     }
-    await this.#store.write({ ...record, mcpProxy: this.#mcpProxySettings() }).catch((error: unknown) => {
-      logger.warn("The GitHub MCP server port could not be saved.", { cause: toLogValue(error) });
-    });
-  }
+    yield* this.#store.write({ ...record, mcpProxy: this.#mcpProxySettings() }).pipe(
+      Effect.catch((error) =>
+        Effect.sync(() => {
+          logger.warn("The GitHub MCP server port could not be saved.", { cause: toLogValue(error.cause) });
+        }),
+      ),
+    );
+  });
 
   #mcpProxySettings(): GitHubConnectorRecord["mcpProxy"] {
     const url = this.#mcpProxy?.url();
@@ -730,11 +912,14 @@ export class GitHubConnectorService {
    * Both `hosts.yml` layouts: `users` for `gh` 2.40 and later, the flat keys for older releases. A
    * `GH_TOKEN` in the user's own environment still wins, as `gh` documents.
    */
-  async #writeToolFiles(record: GitHubConnectorRecord): Promise<void> {
-    await mkdir(this.#ghConfigDirectory(), { recursive: true, mode: 0o700 });
+  readonly #writeToolFilesEffect = Effect.fn("GitHubConnector.writeToolFiles")(function* (
+    this: GitHubConnectorService,
+    record: GitHubConnectorRecord,
+  ): Effect.fn.Return<void, GitHubOperationError, GitHubPlatform> {
+    yield* githubCall(() => mkdir(this.#ghConfigDirectory(), { recursive: true, mode: 0o700 }));
     // `mkdir` leaves a directory that is already there as it is. The files are 0600 either way.
-    await chmod(this.#toolDirectory, 0o700);
-    await chmod(this.#ghConfigDirectory(), 0o700);
+    yield* githubCall(() => chmod(this.#toolDirectory, 0o700));
+    yield* githubCall(() => chmod(this.#ghConfigDirectory(), 0o700));
     const hosts = [
       "github.com:",
       "    users:",
@@ -745,23 +930,34 @@ export class GitHubConnectorService {
       `    user: ${record.login}`,
       "",
     ].join("\n");
-    await writeFileAtomically(join(this.#ghConfigDirectory(), "hosts.yml"), hosts);
-    await writeFileAtomically(this.#credentialFile(), record.accessToken);
-    await this.#writeRepositoriesFile();
-  }
+    yield* writeFileAtomically(join(this.#ghConfigDirectory(), "hosts.yml"), hosts).pipe(toGitHubOperationError);
+    yield* writeFileAtomically(this.#credentialFile(), record.accessToken).pipe(toGitHubOperationError);
+    yield* this.#writeRepositoriesFileEffect();
+  });
 
-  async #removeToolFiles(): Promise<void> {
+  readonly #removeToolFiles = Effect.fn("GitHubConnector.removeToolFiles")(function* (
+    this: GitHubConnectorService,
+  ): Effect.fn.Return<void, GitHubOperationError, GitHubPlatform> {
     this.#repositoriesWritten = null;
-    await rm(this.#toolDirectory, { recursive: true, force: true }).catch((error: unknown) => {
-      logger.warn("The GitHub token files could not be removed.", { cause: toLogValue(error) });
-    });
-  }
+    yield* githubCall(() =>
+      rm(this.#toolDirectory, { recursive: true, force: true }).catch((error: unknown) => {
+        logger.warn("The GitHub token files could not be removed.", { cause: toLogValue(error) });
+      }),
+    );
+  });
 
-  async #open(url: string): Promise<void> {
-    await this.#openExternal(url).catch((error: unknown) => {
-      logger.warn("A GitHub page could not be opened.", { cause: toLogValue(error) });
-    });
-  }
+  readonly #open = Effect.fn("GitHubConnector.open")(function* (
+    this: GitHubConnectorService,
+    url: string,
+  ): Effect.fn.Return<void, GitHubOperationError, GitHubPlatform> {
+    yield* GitHubPlatform.use((platform) => platform.openPage(url)).pipe(
+      Effect.catch(({ cause: error }) =>
+        Effect.sync(() => {
+          logger.warn("The GitHub page could not be opened.", { cause: toLogValue(error) });
+        }),
+      ),
+    );
+  });
 
   #emitStatus(): void {
     const status = this.status();

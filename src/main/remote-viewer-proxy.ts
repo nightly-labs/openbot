@@ -11,14 +11,18 @@ import { isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { browserViewStreamSessionId } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { sourceText } from "@openbot/i18n/source";
+import { Deferred, Effect, Semaphore } from "effect";
 import type * as Ws from "ws";
+import { readBodyWithin } from "./http-body";
 import { LifecycleGate } from "./lifecycle-gate";
+import { listenLoopback } from "./listen-loopback";
 import {
   decodeRemoteDesktopSignalBinary,
   decodeRemoteDesktopSignalControl,
   encodeRemoteDesktopSignalBinary,
   encodeRemoteDesktopSignalControl,
 } from "./remote-desktop-signal";
+import { RemoteWorkflowError, remoteCall } from "./remote-service-effects";
 import { rawDataBytes, rawDataSize, rawDataText, sendableCloseCode } from "./ws-raw-data";
 
 const requireModule = createRequire(import.meta.url);
@@ -27,14 +31,14 @@ const MAX_REQUEST_BYTES = 2 * 1024 * 1024;
 const MAX_PENDING_SIGNAL_BYTES = 1024 * 1024;
 
 interface RemoteViewerTransport {
-  sendDesktop(serverId: string, data: string | ArrayBuffer): Promise<void>;
+  sendDesktop(serverId: string, data: string | ArrayBuffer): Effect.Effect<void, RemoteWorkflowError>;
   on(event: "desktopData", listener: (serverId: string, data: string | ArrayBuffer) => void): unknown;
   off(event: "desktopData", listener: (serverId: string, data: string | ArrayBuffer) => void): unknown;
 }
 
 interface RemoteViewerProxyOptions {
   transport: RemoteViewerTransport;
-  fetchResource: (serverId: string, path: string, init: RequestInit) => Promise<Response>;
+  fetchResource: (serverId: string, path: string, init: RequestInit) => Effect.Effect<Response, RemoteWorkflowError>;
 }
 
 interface ViewerStream {
@@ -44,50 +48,74 @@ interface ViewerStream {
   pending: Array<{ data: Ws.RawData; binary: boolean }>;
   pendingBytes: number;
   forwardingBytes: number;
-  forwarding: Promise<void>;
+  forwarding: Semaphore.Semaphore;
 }
 
 export class RemoteViewerProxy {
   readonly #options: RemoteViewerProxyOptions;
+  readonly #operations = new Set<Deferred.Deferred<void>>();
   readonly #token = crypto.randomUUID().replaceAll("-", "");
   readonly #webSockets = new webSockets.WebSocketServer({ noServer: true });
   readonly #streams = new Map<string, ViewerStream>();
   #server: Server | null = null;
   #port: number | null = null;
-  readonly #lifecycle = new LifecycleGate<number>();
+  readonly #lifecycle = new LifecycleGate<number, RemoteWorkflowError>();
 
   constructor(options: RemoteViewerProxyOptions) {
     this.#options = options;
     options.transport.on("desktopData", this.#onDesktopData);
   }
 
-  async viewerUrl(serverId: string, upstreamPath: string): Promise<string> {
-    const port = await this.#lifecycle.start(() => this.#start());
+  readonly viewerUrl = Effect.fn("RemoteViewerProxy.viewerUrl")(function* (
+    this: RemoteViewerProxy,
+    serverId: string,
+    upstreamPath: string,
+  ) {
+    const port = yield* this.#lifecycle.start(() => this.#start());
     return `http://127.0.0.1:${port}${this.#basePath(serverId)}${upstreamPath}`;
-  }
+  });
 
-  // After a start that is still running, so the listener it opens does not stay open after the stop.
-  stop(): Promise<void> {
+  stop(): Effect.Effect<void, RemoteWorkflowError> {
     return this.#lifecycle.stop(() => this.#stop());
   }
 
-  async #stop(): Promise<void> {
+  readonly #stop = Effect.fn("RemoteViewerProxy.stop")(function* (this: RemoteViewerProxy) {
     this.#options.transport.off("desktopData", this.#onDesktopData);
-    const streams = [...this.#streams.values()];
-    for (const stream of streams) stream.socket.close(1001, "Remote viewer stopped");
+    for (const stream of this.#streams.values()) stream.socket.close(1001, "Remote viewer stopped");
     this.#streams.clear();
-    await Promise.allSettled(streams.map((stream) => stream.forwarding));
+    while (this.#operations.size)
+      yield* Effect.forEach([...this.#operations], Deferred.await, { concurrency: "unbounded" });
     this.#webSockets.close();
     const server = this.#server;
     this.#server = null;
     this.#port = null;
-    if (server) await new Promise<void>((resolve) => server.close(() => resolve()));
+    if (server)
+      yield* Effect.callback<void>((resume) => {
+        server.close(() => resume(Effect.void));
+      });
+  });
+
+  #owned<A, E>(operation: Effect.Effect<A, E>): Effect.Effect<A, E> {
+    return Effect.suspend(() => {
+      const done = Deferred.makeUnsafe<void>();
+      this.#operations.add(done);
+      return operation.pipe(
+        Effect.ensuring(
+          Effect.sync(() => this.#operations.delete(done)).pipe(Effect.andThen(Deferred.succeed(done, undefined))),
+        ),
+      );
+    });
   }
 
-  async #start(): Promise<number> {
+  readonly #start = Effect.fn("RemoteViewerProxy.start")(function* (this: RemoteViewerProxy) {
     if (this.#port) return this.#port;
-    return new Promise<number>((resolve, reject) => {
-      const server = createServer((request, response) => void this.#handleHttp(request, response));
+    return yield* Effect.callback<number, RemoteWorkflowError>((resume) => {
+      const resolve = (value: number) => resume(Effect.succeed(value));
+      const reject = (cause: unknown) => resume(Effect.fail(new RemoteWorkflowError({ cause })));
+      const server = createServer(
+        (request, response) =>
+          void Effect.runPromise(this.#owned(this.#handleHttp(request, response))).catch(() => undefined),
+      );
       server.on("upgrade", (request, socket, head) => {
         const route = this.#route(request.url ?? "/");
         const tunneled =
@@ -103,23 +131,28 @@ export class RemoteViewerProxy {
           this.#openStream(route.serverId, route.upstreamPath, webSocket),
         );
       });
-      server.once("error", reject);
-      server.listen(0, "127.0.0.1", () => {
-        const address = server.address();
-        if (!address || isString(address)) return reject(new Error(sourceText("error.remote.viewerProxyNoPort")));
+      listenLoopback(server, () => new Error(sourceText("error.remote.viewerProxyNoPort"))).then((port) => {
         this.#server = server;
-        this.#port = address.port;
-        resolve(address.port);
+        this.#port = port;
+        resolve(port);
+      }, reject);
+      return Effect.sync(() => {
+        if (this.#server !== server) server.close();
       });
     });
-  }
+  });
 
-  async #handleHttp(request: IncomingMessage, response: ServerResponse): Promise<void> {
+  readonly #handleHttp = Effect.fn("RemoteViewerProxy.handleHttp")(function* (
+    this: RemoteViewerProxy,
+    request: IncomingMessage,
+    response: ServerResponse,
+  ): Effect.fn.Return<void, RemoteWorkflowError> {
     const route = this.#route(request.url ?? "/");
     if (!route) return sendText(response, 404, "Not found");
-    try {
-      const body = request.method === "GET" || request.method === "HEAD" ? undefined : await readBody(request);
-      const upstream = await this.#options.fetchResource(route.serverId, route.upstreamPath, {
+    return yield* Effect.gen({ self: this }, function* () {
+      const body =
+        request.method === "GET" || request.method === "HEAD" ? undefined : yield* remoteCall(() => readBody(request));
+      const upstream = yield* this.#options.fetchResource(route.serverId, route.upstreamPath, {
         method: request.method === "HEAD" ? "GET" : request.method,
         headers: { "Content-Type": request.headers["content-type"] ?? "application/octet-stream" },
         body: body ? Uint8Array.from(body).buffer : undefined,
@@ -130,7 +163,7 @@ export class RemoteViewerProxy {
         return;
       }
       const contentType = upstream.headers.get("content-type") ?? "application/octet-stream";
-      let bytes = new Uint8Array(await upstream.arrayBuffer());
+      let bytes = new Uint8Array(yield* remoteCall(() => upstream.arrayBuffer()));
       if (contentType.includes("text/html") || contentType.includes("javascript")) {
         const prefix = this.#basePath(route.serverId);
         const escapedPrefix = prefix.replaceAll("/", "\\/");
@@ -156,10 +189,14 @@ export class RemoteViewerProxy {
       }
       response.writeHead(upstream.status, responseHeaders);
       response.end(request.method === "HEAD" ? undefined : Buffer.from(bytes));
-    } catch {
-      sendText(response, 502, "Remote viewer resource unavailable");
-    }
-  }
+    }).pipe(
+      Effect.catch(() =>
+        Effect.sync(() => {
+          sendText(response, 502, "Remote viewer resource unavailable");
+        }),
+      ),
+    );
+  });
 
   #openStream(serverId: string, upstreamPath: string, socket: Ws.WebSocket): void {
     const streamId = crypto.randomUUID();
@@ -170,7 +207,7 @@ export class RemoteViewerProxy {
       pending: [],
       pendingBytes: 0,
       forwardingBytes: 0,
-      forwarding: Promise.resolve(),
+      forwarding: Semaphore.makeUnsafe(1),
     };
     this.#streams.set(streamId, stream);
     socket.on("message", (data, binary) => {
@@ -187,38 +224,40 @@ export class RemoteViewerProxy {
     });
     socket.once("close", (code, reason) => {
       this.#streams.delete(streamId);
-      void this.#options.transport
-        .sendDesktop(
-          serverId,
-          encodeRemoteDesktopSignalControl({
-            type: "close",
-            streamId,
-            code,
-            reason: reason.toString(),
-          }),
-        )
-        .catch(() => undefined);
+      void Effect.runPromise(
+        this.#owned(
+          this.#options.transport
+            .sendDesktop(
+              serverId,
+              encodeRemoteDesktopSignalControl({ type: "close", streamId, code, reason: reason.toString() }),
+            )
+            .pipe(Effect.catch(() => Effect.void)),
+        ),
+      ).catch(() => undefined);
     });
-    void this.#options.transport
-      .sendDesktop(
-        serverId,
-        encodeRemoteDesktopSignalControl({
-          type: "open",
-          streamId,
-          path: upstreamPath,
-        }),
-      )
-      .catch(() => socket.close(1011, "Remote desktop signal failed"));
+    void Effect.runPromise(
+      this.#owned(
+        this.#options.transport
+          .sendDesktop(serverId, encodeRemoteDesktopSignalControl({ type: "open", streamId, path: upstreamPath }))
+          .pipe(Effect.catch(() => Effect.sync(() => socket.close(1011, "Remote desktop signal failed")))),
+      ),
+    ).catch(() => undefined);
   }
 
-  async #sendFrame(streamId: string, stream: ViewerStream, data: Ws.RawData, binary: boolean): Promise<void> {
+  readonly #sendFrameEffect = Effect.fn("RemoteViewerProxy.sendFrame")(function* (
+    this: RemoteViewerProxy,
+    streamId: string,
+    stream: ViewerStream,
+    data: Ws.RawData,
+    binary: boolean,
+  ): Effect.fn.Return<void, RemoteWorkflowError> {
     if (binary) {
-      await this.#options.transport.sendDesktop(
+      yield* this.#options.transport.sendDesktop(
         stream.serverId,
         encodeRemoteDesktopSignalBinary(streamId, rawDataBytes(data)),
       );
     } else {
-      await this.#options.transport.sendDesktop(
+      yield* this.#options.transport.sendDesktop(
         stream.serverId,
         encodeRemoteDesktopSignalControl({
           type: "text",
@@ -227,7 +266,7 @@ export class RemoteViewerProxy {
         }),
       );
     }
-  }
+  });
 
   #queueFrame(streamId: string, stream: ViewerStream, data: Ws.RawData, binary: boolean): void {
     const bytes = rawDataSize(data);
@@ -238,20 +277,31 @@ export class RemoteViewerProxy {
       stream.socket.close(1009, "Remote desktop signal queue is too large");
       return;
     }
-    stream.forwarding = stream.forwarding
-      .then(async () => {
-        if (this.#streams.get(streamId) !== stream || stream.socket.readyState !== webSockets.WebSocket.OPEN) return;
-        await this.#sendFrame(streamId, stream, data, binary);
-      })
-      .catch(() => {
-        if (this.#streams.get(streamId) === stream) {
-          this.#streams.delete(streamId);
-          stream.socket.close(1011, "Remote desktop signal failed");
-        }
-      })
-      .finally(() => {
-        stream.forwardingBytes -= bytes;
-      });
+    void Effect.runPromise(
+      this.#owned(
+        stream.forwarding.withPermit(
+          Effect.gen({ self: this }, function* () {
+            if (this.#streams.get(streamId) !== stream || stream.socket.readyState !== webSockets.WebSocket.OPEN)
+              return;
+            yield* this.#sendFrameEffect(streamId, stream, data, binary);
+          }).pipe(
+            Effect.catch(() =>
+              Effect.sync(() => {
+                if (this.#streams.get(streamId) === stream) {
+                  this.#streams.delete(streamId);
+                  stream.socket.close(1011, "Remote desktop signal failed");
+                }
+              }),
+            ),
+            Effect.ensuring(
+              Effect.sync(() => {
+                stream.forwardingBytes -= bytes;
+              }),
+            ),
+          ),
+        ),
+      ),
+    ).catch(() => undefined);
   }
 
   readonly #onDesktopData = (serverId: string, data: string | ArrayBuffer): void => {
@@ -303,15 +353,9 @@ export class RemoteViewerProxy {
 }
 
 async function readBody(request: IncomingMessage): Promise<Buffer> {
-  const chunks: Buffer[] = [];
-  let size = 0;
-  for await (const chunk of request) {
-    const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-    size += bytes.byteLength;
-    if (size > MAX_REQUEST_BYTES) throw new Error("Remote viewer request is too large.");
-    chunks.push(bytes);
-  }
-  return Buffer.concat(chunks);
+  const body = await readBodyWithin(request, MAX_REQUEST_BYTES);
+  if (body === null) throw new Error("Remote viewer request is too large.");
+  return body;
 }
 
 function sendText(response: ServerResponse, status: number, body: string): void {

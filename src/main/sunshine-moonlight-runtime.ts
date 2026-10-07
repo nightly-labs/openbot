@@ -6,6 +6,7 @@ import { createServer, request as httpRequest, type IncomingMessage, type Server
 import https from "node:https";
 import { createServer as createTcpServer } from "node:net";
 import { dirname, join } from "node:path";
+import { StringDecoder } from "node:string_decoder";
 import type { PeerCertificate } from "node:tls";
 import type {
   RemoteDesktopDisplay,
@@ -14,15 +15,20 @@ import type {
   RemoteDesktopTestStatus,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
-import { z } from "zod";
+import { Effect, Result, Schema } from "effect";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { LifecycleGate } from "./lifecycle-gate";
+import { listenLoopback } from "./listen-loopback";
+import { desktopCall, desktopFailure, desktopSync, type RemoteDesktopOperationError } from "./remote-desktop-effects";
 import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifact";
 import { forwardDiagnosticLines, stopRemoteProcess } from "./remote-diagnostics";
 
-export class SunshineApiError extends Error {
-  constructor(readonly status: number) {
-    super(sourceText("error.backend.sunshineApiHttp", { status }));
-    this.name = "SunshineApiError";
+export class SunshineApiError extends Schema.TaggedError<SunshineApiError>()("SunshineApiError", {
+  status: Schema.Int,
+  message: Schema.String,
+}) {
+  constructor(status: number) {
+    super({ status, message: sourceText("error.backend.sunshineApiHttp", { status }) });
   }
 }
 
@@ -118,153 +124,194 @@ const claimedSunshineBasePorts = new Set<number>();
 const webRtcReservations = new Map<number, ReturnType<typeof createTcpServer>>();
 
 /** Reserve a Sunshine base port whose whole port family is free on loopback. */
-export async function allocateSunshineBasePort(): Promise<number> {
+export const allocateSunshineBasePort = Effect.fn("RemoteDesktop.allocateSunshineBasePort")(function* () {
   let candidate = SUNSHINE_DEFAULT_BASE_PORT;
   for (
     let attempt = 0;
     attempt < SUNSHINE_ALLOCATION_ATTEMPTS && candidate <= SUNSHINE_BASE_PORT_CEILING;
     attempt += 1
   ) {
-    if (![...claimedSunshineBasePorts].some((active) => sunshinePortFamiliesOverlap(candidate, active))) {
-      claimedSunshineBasePorts.add(candidate);
-      try {
-        if (await sunshinePortFamilyFree(candidate)) return candidate;
-      } catch {
-        // Treat probe failures as "not free" and keep scanning; the bind error itself is
-        // re-surfaced if no candidate works.
-      }
-      claimedSunshineBasePorts.delete(candidate);
+    const port = candidate;
+    if (![...claimedSunshineBasePorts].some((active) => sunshinePortFamiliesOverlap(port, active))) {
+      let retained = false;
+      const available = yield* Effect.acquireUseRelease(
+        desktopSync(() => claimedSunshineBasePorts.add(port)),
+        () =>
+          sunshinePortFamilyFreeEffect(port).pipe(
+            Effect.tap((free) =>
+              Effect.sync(() => {
+                retained = free;
+              }),
+            ),
+          ),
+        () =>
+          Effect.sync(() => {
+            if (!retained) claimedSunshineBasePorts.delete(port);
+          }),
+      );
+      if (available) return port;
     }
     candidate += SUNSHINE_BASE_PORT_STEP;
   }
-  throw new Error(sourceText("error.backend.sunshinePortsUnavailable"));
-}
+  return yield* desktopFailure(new Error(sourceText("error.backend.sunshinePortsUnavailable")));
+});
 
 export function releaseSunshineBasePort(basePort: number): void {
   claimedSunshineBasePorts.delete(basePort);
 }
 
 /** Reserve a block of consecutive UDP ports for one Moonlight WebRTC streamer. */
-export async function allocateWebRtcPortRange(): Promise<MoonlightWebRtcPortRange> {
+export const allocateWebRtcPortRange = Effect.fn("RemoteDesktop.allocateWebRtcPortRange")(function* () {
   const size = MOONLIGHT_WEBRTC_RANGE_SIZE;
   for (let min = MOONLIGHT_WEBRTC_RANGE_START; min + size - 1 <= 65_535; min += size) {
-    const max = min + size - 1;
-    const range = { min, max };
-    let reservation: ReturnType<typeof createTcpServer> | null = null;
-    try {
-      reservation = await listenTcp(min);
-      reservation.on("connection", (socket) => socket.destroy());
-      if (await udpRangeFree(range)) {
-        webRtcReservations.set(min, reservation);
-        return range;
-      }
-    } catch {
-      // Probe failures mean "not free" here as well.
-    }
-    if (reservation) await new Promise<void>((resolve) => reservation?.close(() => resolve()));
+    const range = { min, max: min + size - 1 };
+    let retained = false;
+    const result = yield* Effect.result(
+      Effect.acquireUseRelease(
+        listenTcpEffect(min),
+        (reservation) =>
+          Effect.gen(function* () {
+            reservation.on("connection", (socket) => socket.destroy());
+            if (!(yield* udpRangeFreeEffect(range))) return null;
+            webRtcReservations.set(range.min, reservation);
+            retained = true;
+            return range;
+          }),
+        (reservation) => (retained ? Effect.void : closeSocketEffect(reservation).pipe(Effect.orDie)),
+      ),
+    );
+    if (Result.isSuccess(result) && result.success) return result.success;
   }
-  throw new Error(sourceText("error.backend.moonlightPortsUnavailable"));
-}
+  return yield* desktopFailure(new Error(sourceText("error.backend.moonlightPortsUnavailable")));
+});
 
 export function releaseWebRtcPortRange(range: MoonlightWebRtcPortRange): void {
   webRtcReservations.get(range.min)?.close();
   webRtcReservations.delete(range.min);
 }
 
-async function sunshinePortFamilyFree(basePort: number): Promise<boolean> {
-  const sockets: Array<{ close: (callback: () => void) => void }> = [];
-  try {
+const sunshinePortFamilyFreeEffect = Effect.fn("RemoteDesktop.sunshinePortFamilyFree")((basePort: number) =>
+  Effect.gen(function* () {
     for (const offset of SUNSHINE_PORT_FAMILY_OFFSETS) {
-      sockets.push(await listenTcp(basePort + offset));
-      sockets.push(await bindUdp(basePort + offset));
+      yield* Effect.acquireRelease(listenTcpEffect(basePort + offset), (socket) =>
+        closeSocketEffect(socket).pipe(Effect.orDie),
+      );
+      yield* Effect.acquireRelease(bindUdpEffect(basePort + offset), (socket) =>
+        closeSocketEffect(socket).pipe(Effect.orDie),
+      );
     }
     return true;
-  } catch {
-    return false;
-  } finally {
-    await Promise.all(sockets.map((socket) => new Promise<void>((resolve) => socket.close(() => resolve()))));
-  }
-}
+  }).pipe(
+    Effect.scoped,
+    Effect.catch(() => Effect.succeed(false)),
+  ),
+);
 
-async function udpRangeFree(range: MoonlightWebRtcPortRange): Promise<boolean> {
-  const sockets: Array<{ close: (callback: () => void) => void }> = [];
-  try {
-    for (let port = range.min; port <= range.max; port += 1) sockets.push(await bindUdp(port));
+const udpRangeFreeEffect = Effect.fn("RemoteDesktop.udpRangeFree")((range: MoonlightWebRtcPortRange) =>
+  Effect.gen(function* () {
+    for (let port = range.min; port <= range.max; port += 1) {
+      yield* Effect.acquireRelease(bindUdpEffect(port), (socket) => closeSocketEffect(socket).pipe(Effect.orDie));
+    }
     return true;
-  } catch {
-    return false;
-  } finally {
-    await Promise.all(sockets.map((socket) => new Promise<void>((resolve) => socket.close(() => resolve()))));
-  }
-}
+  }).pipe(
+    Effect.scoped,
+    Effect.catch(() => Effect.succeed(false)),
+  ),
+);
 
-function listenTcp(port: number): Promise<ReturnType<typeof createTcpServer>> {
-  return new Promise((resolve, reject) => {
+const closeSocketEffect = Effect.fn("RemoteDesktop.closeSocket")((socket: { close(callback: () => void): unknown }) =>
+  Effect.callback<void, RemoteDesktopOperationError>((resume) => {
+    try {
+      socket.close(() => resume(Effect.void));
+    } catch (cause) {
+      resume(Effect.fail(desktopFailure(cause)));
+    }
+  }),
+);
+
+const listenTcpEffect = Effect.fn("RemoteDesktop.listenTcp")((port: number) =>
+  Effect.callback<ReturnType<typeof createTcpServer>, RemoteDesktopOperationError>((resume) => {
     const server = createTcpServer();
-    server.once("error", reject);
+    let retained = false;
+    const failed = (cause: Error) => resume(Effect.fail(desktopFailure(cause)));
+    server.once("error", failed);
     server.listen(port, "127.0.0.1", () => {
-      server.removeListener("error", reject);
-      resolve(server);
+      retained = true;
+      resume(Effect.succeed(server));
     });
-  });
-}
+    return Effect.sync(() => {
+      server.removeListener("error", failed);
+      if (!retained) server.close();
+    });
+  }),
+);
 
-function bindUdp(port: number): Promise<ReturnType<typeof createSocket>> {
-  return new Promise((resolve, reject) => {
+const bindUdpEffect = Effect.fn("RemoteDesktop.bindUdp")((port: number) =>
+  Effect.callback<ReturnType<typeof createSocket>, RemoteDesktopOperationError>((resume) => {
     const socket = createSocket("udp4");
-    const onError = (error: Error): void => {
-      socket.close(() => reject(error));
+    let retained = false;
+    let closed = false;
+    const failed = (cause: Error) => {
+      closed = true;
+      socket.close(() => resume(Effect.fail(desktopFailure(cause))));
     };
-    socket.once("error", onError);
+    socket.once("error", failed);
     socket.bind(port, "127.0.0.1", () => {
-      socket.removeListener("error", onError);
-      resolve(socket);
+      retained = true;
+      resume(Effect.succeed(socket));
     });
-  });
-}
-const localAddressSchema = z.object({ address: z.string(), family: z.string(), port: z.number().int() });
-const moonlightHostSchema = z.object({
-  host_id: z.number().int(),
-  paired: z.enum(["Paired", "NotPaired"]),
+    return Effect.sync(() => {
+      socket.removeListener("error", failed);
+      if (!retained && !closed) socket.close();
+    });
+  }),
+);
+
+const localAddressSchema = Schema.Struct({ address: Schema.String, family: Schema.String, port: Schema.Int });
+const moonlightHostSchema = Schema.Struct({ host_id: Schema.Int, paired: Schema.Literals(["Paired", "NotPaired"]) });
+const moonlightHostsSchema = Schema.Struct({ hosts: Schema.Array(moonlightHostSchema) });
+const moonlightCreatedHostSchema = Schema.Struct({ host: moonlightHostSchema });
+const moonlightAppsSchema = Schema.Struct({
+  apps: Schema.Array(Schema.Struct({ app_id: Schema.Int, title: Schema.String })),
 });
-const moonlightHostsSchema = z.object({ hosts: z.array(moonlightHostSchema) });
-const moonlightCreatedHostSchema = z.object({ host: moonlightHostSchema });
-const moonlightAppsSchema = z.object({
-  apps: z.array(z.object({ app_id: z.number().int(), title: z.string() })),
-});
-const moonlightRoleSchema = z.object({
-  role: z.object({
-    permissions: z.object({
-      allow_transport_webrtc: z.boolean(),
-      allow_transport_websockets: z.boolean(),
-    }),
+const moonlightRoleSchema = Schema.Struct({
+  role: Schema.Struct({
+    permissions: Schema.Struct({ allow_transport_webrtc: Schema.Boolean, allow_transport_websockets: Schema.Boolean }),
   }),
 });
-const moonlightPairMessageSchema = z.union([
-  z.object({ Pin: z.string().min(1) }).transform(({ Pin }) => ({ kind: "pin" as const, pin: Pin })),
-  z.object({ Paired: z.object({ host_id: z.number().int() }) }).transform(() => ({ kind: "paired" as const })),
-  z.literal("PairError").transform(() => ({ kind: "error" as const })),
-  z.literal("InternalServerError").transform(() => ({ kind: "error" as const })),
+const moonlightPairMessageSchema = Schema.Union([
+  Schema.Struct({ Pin: Schema.NonEmptyString }),
+  Schema.Struct({ Paired: Schema.Struct({ host_id: Schema.Int }) }),
+  Schema.Literals(["PairError", "InternalServerError"]),
 ]);
-const sunshineSetupSchema = z.object({
-  hostName: z.string().max(255),
-  username: z.string().max(255),
-  screenRecording: z.enum(["allowed", "blocked"]),
-  accessibility: z.enum(["allowed", "blocked"]),
-  guiSession: z.enum(["allowed", "blocked"]),
-  displays: z.enum(["allowed", "unavailable", "failed"]),
-  restartRequired: z.boolean(),
+const sunshineSetupSchema = Schema.Struct({
+  hostName: Schema.String.check(Schema.isMaxLength(255)),
+  username: Schema.String.check(Schema.isMaxLength(255)),
+  screenRecording: Schema.Literals(["allowed", "blocked"]),
+  accessibility: Schema.Literals(["allowed", "blocked"]),
+  guiSession: Schema.Literals(["allowed", "blocked"]),
+  displays: Schema.Literals(["allowed", "unavailable", "failed"]),
+  restartRequired: Schema.Boolean,
 });
-const sunshineTestSchema = z.object({
-  active: z.boolean(),
-  mouse: z.boolean(),
-  keyboard: z.boolean(),
-  code: z.string().regex(/^(?:[0-9]{4})?$/u),
+const sunshineTestSchema = Schema.Struct({
+  active: Schema.Boolean,
+  mouse: Schema.Boolean,
+  keyboard: Schema.Boolean,
+  code: Schema.String.check(Schema.isPattern(/^(?:[0-9]{4})?$/u)),
 });
-
-const sunshineDisplaysSchema = z.object({
-  displays: z.array(z.object({ id: z.string().min(1), name: z.string().min(1) })),
+const sunshineDisplaysSchema = Schema.Struct({
+  displays: Schema.Array(Schema.Struct({ id: Schema.NonEmptyString, name: Schema.NonEmptyString })),
 });
+const sunshinePairingsSchema = Schema.Struct({
+  pairings: Schema.Array(
+    Schema.Struct({
+      id: Schema.String.check(Schema.isPattern(/^[a-fA-F0-9]{32}$/)),
+      name: Schema.String,
+      address: Schema.String,
+    }),
+  ),
+});
+const endpointSchema = Schema.Struct({ port: Schema.Int });
 
 interface MoonlightRequestInit {
   method?: "GET" | "POST" | "DELETE";
@@ -290,14 +337,14 @@ interface SunshineMoonlightRuntimeOptions {
   platform: "darwin" | "win32" | "linux";
   credentials: { username: string; password: string };
   getDisplays: () => RemoteDesktopDisplay[];
-  getIceServers: () => Promise<RemoteDesktopIceServer[]>;
+  getIceServers: () => Effect.Effect<RemoteDesktopIceServer[], RemoteDesktopOperationError>;
   spawnProcess?: RemoteRuntimeSpawn;
   onDiagnostic?: (source: "sunshine" | "moonlight", message: string) => void;
-  /** Called when Sunshine or Moonlight Web exits after the runtime started. The runtime is then stopped. */
+  /** Called when Sunshine or Moonlight Web exits after the runtime started. */
   onExit?: (source: "sunshine" | "moonlight") => void;
-  allocateSunshineBasePort?: () => Promise<number>;
-  allocateMoonlightPort?: () => Promise<number>;
-  allocateWebRtcPortRange?: () => Promise<MoonlightWebRtcPortRange>;
+  allocateSunshineBasePort?: () => Effect.Effect<number, RemoteDesktopOperationError>;
+  allocateMoonlightPort?: () => Effect.Effect<number, RemoteDesktopOperationError>;
+  allocateWebRtcPortRange?: () => Effect.Effect<MoonlightWebRtcPortRange, RemoteDesktopOperationError>;
 }
 
 export class SunshineMoonlightRuntime {
@@ -312,7 +359,7 @@ export class SunshineMoonlightRuntime {
   #screenCaptureDenied = false;
   readonly #moonlightHeader = `X-OpenBot-Remote-${randomBytes(32).toString("hex")}`;
   #selectedDisplayId: string | null = null;
-  readonly #lifecycle = new LifecycleGate<SunshineMoonlightRuntimeState>();
+  readonly #lifecycle = new LifecycleGate<SunshineMoonlightRuntimeState, RemoteDesktopOperationError>();
   /** Set by a stop that arrives while a start runs. The start then opens nothing more and fails. */
   #stopRequested = false;
   #sunshineBasePort: number | null = null;
@@ -355,74 +402,99 @@ export class SunshineMoonlightRuntime {
     return this.#screenCaptureDenied;
   }
 
-  start(): Promise<SunshineMoonlightRuntimeState> {
-    return this.#lifecycle.start(async () => (this.#state ? { ...this.#state } : this.#start()));
-  }
+  readonly start = Effect.fn("SunshineMoonlightRuntime.start")(() =>
+    this.#lifecycle.start(() =>
+      Effect.gen({ self: this }, function* () {
+        return this.#state ? { ...this.#state } : yield* this.#startEffect();
+      }),
+    ),
+  );
 
-  async checkSetup(): Promise<
+  readonly checkSetup = Effect.fn("SunshineMoonlightRuntime.checkSetup")(function* (
+    this: SunshineMoonlightRuntime,
+  ): Effect.fn.Return<
     Pick<
       RemoteDesktopSetupStatus,
       "hostName" | "username" | "screenRecording" | "accessibility" | "guiSession" | "displays" | "restartRequired"
-    >
+    >,
+    RemoteDesktopOperationError
   > {
-    return sunshineJson(
-      this.#requireSunshineHttpsPort(),
+    return yield* sunshineJsonEffect(
+      yield* desktopSync(() => this.#requireSunshineHttpsPort()),
       "/api/openbot/setup",
       this.#options.credentials,
       join(this.#options.stateDirectory, "sunshine-cert.pem"),
       sunshineSetupSchema,
     );
-  }
+  }).bind(this);
 
-  async test(action: "start" | "status" | "stop"): Promise<RemoteDesktopTestStatus> {
-    const port = this.#requireSunshineHttpsPort();
+  readonly test = Effect.fn("SunshineMoonlightRuntime.test")(function* (
+    this: SunshineMoonlightRuntime,
+    action: "start" | "status" | "stop",
+  ): Effect.fn.Return<RemoteDesktopTestStatus, RemoteDesktopOperationError> {
+    const port = yield* desktopSync(() => this.#requireSunshineHttpsPort());
     const certificate = join(this.#options.stateDirectory, "sunshine-cert.pem");
     if (action !== "status")
-      await sunshineRequest(
+      yield* sunshineRequestEffect(
         port,
         "/api/openbot/test",
         this.#options.credentials,
         certificate,
         JSON.stringify({ action, displayId: this.#selectedDisplayId ?? "" }),
       );
-    return sunshineJson(port, "/api/openbot/test", this.#options.credentials, certificate, sunshineTestSchema);
-  }
+    return yield* sunshineJsonEffect(
+      port,
+      "/api/openbot/test",
+      this.#options.credentials,
+      certificate,
+      sunshineTestSchema,
+    );
+  }).bind(this);
 
-  async selectDisplay(displayId: string): Promise<void> {
+  readonly selectDisplay = Effect.fn("SunshineMoonlightRuntime.selectDisplay")(function* (
+    this: SunshineMoonlightRuntime,
+    displayId: string,
+  ): Effect.fn.Return<void, RemoteDesktopOperationError> {
     this.#selectedDisplayId = displayId;
     if (!this.#state) return;
-    await this.#writeSunshineConfig();
-    // Cleared before the wait, so the exit watch reads this stop as intended.
+    yield* this.#writeSunshineConfigEffect();
     const sunshine = this.#sunshine;
+    // Clear before waiting so the exit watcher recognizes an intended stop.
     this.#sunshine = null;
-    if (sunshine) await stopRemoteProcess(sunshine);
+    if (sunshine) yield* stopRemoteProcess(sunshine);
     // Reuse the already allocated ports: Moonlight paired against this Sunshine HTTP port, so a
     // reallocation here would orphan every existing pairing.
-    await this.#startSunshineOnce();
+    yield* this.#startSunshineOnceEffect();
     if (this.#state) this.#state = { ...this.#state, selectedDisplayId: displayId };
-  }
+  }).bind(this);
 
-  stop(): Promise<void> {
-    return this.#lifecycle.stop(
-      () => this.#stop(),
-      // A start can wait 20 seconds for each process. Stopping its processes now makes that wait fail
-      // at once, and the flag keeps it from starting a new one. Then `#stop` closes what it opened.
-      async () => {
-        this.#stopRequested = true;
-        await this.#stopChildren();
-      },
-    );
-  }
+  readonly stop = Effect.fn("SunshineMoonlightRuntime.stop")(() =>
+    this.#lifecycle.stop(
+      () => this.#stopEffect(),
+      () =>
+        Effect.gen({ self: this }, function* () {
+          this.#stopRequested = true;
+          yield* this.#stopChildrenEffect();
+        }),
+    ),
+  );
 
-  async #stop(): Promise<void> {
+  readonly #stopEffect = Effect.fn("SunshineMoonlightRuntime.stop")(function* (
+    this: SunshineMoonlightRuntime,
+  ): Effect.fn.Return<void, RemoteDesktopOperationError> {
     this.#state = null;
-    await this.#stopChildren();
-    const iceServer = this.#iceServer;
-    this.#iceServer = null;
-    if (iceServer) await new Promise<void>((resolve) => iceServer.close(() => resolve()));
-    this.#iceToken = "";
-    this.#releasePortClaims();
-  }
+    yield* this.#stopChildrenEffect().pipe(
+      Effect.ensuring(
+        Effect.gen({ self: this }, function* () {
+          const iceServer = this.#iceServer;
+          this.#iceServer = null;
+          if (iceServer) yield* closeSocketEffect(iceServer).pipe(Effect.orDie);
+          this.#iceToken = "";
+          this.#releasePortClaims();
+        }),
+      ),
+    );
+  });
 
   #releasePortClaims(): void {
     if (this.#ownsSunshineAllocation && this.#sunshineBasePort !== null) {
@@ -450,11 +522,11 @@ export class SunshineMoonlightRuntime {
 
   // A stop that interrupts the start is not a start failure. A process that has already ended names
   // the stage, because a pairing call to a Sunshine that has exited fails too.
-  #failStart(stage: RemoteRuntimeStartStage): (error: unknown) => never {
+  #failStart(stage: RemoteRuntimeStartStage): (error: RemoteDesktopOperationError) => RemoteDesktopOperationError {
     return (error) => {
-      if (this.#stopRequested) throw error;
+      if (this.#stopRequested) return error;
       const ended = childEnded(this.#sunshine) ? "sunshine" : childEnded(this.#moonlight) ? "moonlight" : null;
-      throw new RemoteRuntimeStartError(ended ?? stage, error);
+      return desktopFailure(new RemoteRuntimeStartError(ended ?? stage, error.cause));
     };
   }
 
@@ -462,90 +534,112 @@ export class SunshineMoonlightRuntime {
     if (this.#stopRequested) throw new Error(sourceText("error.backend.remoteDesktopStoppedWhileStarting"));
   }
 
-  async #start(): Promise<SunshineMoonlightRuntimeState> {
+  readonly #startEffect = Effect.fn("SunshineMoonlightRuntime.start")(function* (
+    this: SunshineMoonlightRuntime,
+  ): Effect.fn.Return<SunshineMoonlightRuntimeState, RemoteDesktopOperationError> {
     this.#stopRequested = false;
-    await mkdir(this.#options.stateDirectory, { recursive: true, mode: 0o700 });
-    try {
-      if (this.#sunshineBasePort === null) {
-        if (this.#options.allocateSunshineBasePort) {
-          this.#sunshineBasePort = await this.#options.allocateSunshineBasePort();
-        } else {
-          this.#sunshineBasePort = await allocateSunshineBasePort();
-          this.#ownsSunshineAllocation = true;
+    yield* desktopCall(() => mkdir(this.#options.stateDirectory, { recursive: true, mode: 0o700 }));
+    let completed = false;
+    return yield* Effect.gen({ self: this }, function* () {
+      try {
+        if (this.#sunshineBasePort === null) {
+          const allocateSunshine = this.#options.allocateSunshineBasePort;
+          if (allocateSunshine) {
+            this.#sunshineBasePort = yield* allocateSunshine();
+          } else {
+            this.#sunshineBasePort = yield* allocateSunshineBasePort();
+            this.#ownsSunshineAllocation = true;
+          }
         }
-      }
-      await this.#writeSunshineConfig();
-      const iceEndpoint = await this.#startIceServer();
-      this.#throwIfStopRequested();
-      if (this.#moonlightPort === null) {
-        this.#moonlightPort = await (this.#options.allocateMoonlightPort ?? reservePort)();
-      }
-      if (this.#webRtcRange === null) {
-        if (this.#options.allocateWebRtcPortRange) {
-          this.#webRtcRange = await this.#options.allocateWebRtcPortRange();
-        } else {
-          this.#webRtcRange = await allocateWebRtcPortRange();
-          this.#ownsWebRtcRange = true;
+        yield* this.#writeSunshineConfigEffect();
+        const iceEndpoint = yield* this.#startIceServerEffect();
+        yield* desktopSync(() => this.#throwIfStopRequested());
+        if (this.#moonlightPort === null) {
+          this.#moonlightPort = yield* (this.#options.allocateMoonlightPort ?? reservePort)();
         }
+        if (this.#webRtcRange === null) {
+          const allocateWebRtc = this.#options.allocateWebRtcPortRange;
+          if (allocateWebRtc) {
+            this.#webRtcRange = yield* allocateWebRtc();
+          } else {
+            this.#webRtcRange = yield* allocateWebRtcPortRange();
+            this.#ownsWebRtcRange = true;
+          }
+        }
+        yield* this.#writeIceHelperEffect();
+        yield* this.#setSunshineCredentialsEffect();
+        yield* this.#startSunshineWithRetryEffect().pipe(Effect.mapError(this.#failStart("sunshine")));
+        yield* this.#writeMoonlightConfigEffect();
+        const displays = yield* this.#getSunshineDisplaysEffect();
+        if (!this.#selectedDisplayId || !displays.some((display) => display.id === this.#selectedDisplayId)) {
+          this.#selectedDisplayId = displays.find((display) => display.primary)?.id ?? displays[0]?.id ?? null;
+        }
+        const moonlightPort = this.#moonlightPort;
+        if (moonlightPort === null) throw new Error("Moonlight port has not been allocated yet.");
+        yield* desktopSync(() => this.#throwIfStopRequested());
+        yield* desktopSync(() => this.#startMoonlight(moonlightPort, iceEndpoint));
+        yield* waitForHttpEffect(
+          `http://127.0.0.1:${moonlightPort}/api/authenticate`,
+          {
+            headers: { [this.#moonlightHeader]: moonlightSlotUser(1) },
+          },
+          this.#moonlight,
+        ).pipe(Effect.mapError(this.#failStart("moonlight")));
+        this.#options.onDiagnostic?.("moonlight", "OpenBot: Moonlight Web is ready.\n");
+        const paired = yield* this.#bootstrapMoonlightEffect(moonlightPort).pipe(
+          Effect.mapError(this.#failStart("pairing")),
+        );
+        yield* desktopSync(() => this.#throwIfStopRequested());
+        // An exit during pairing precedes the exit watcher becoming active.
+        if (childEnded(this.#sunshine) || childEnded(this.#moonlight)) {
+          return yield* this.#failStart("pairing")(
+            desktopFailure(new Error("A remote desktop process exited during pairing.")),
+          );
+        }
+        this.#state = {
+          baseUrl: `http://127.0.0.1:${moonlightPort}`,
+          authHeader: this.#moonlightHeader,
+          ...paired,
+          displays,
+          selectedDisplayId: this.#selectedDisplayId,
+        };
+        completed = true;
+        return { ...this.#state };
+      } catch (error) {
+        return yield* desktopFailure(error);
       }
-      await this.#writeIceHelper();
-      await this.#setSunshineCredentials();
-      await this.#startSunshineWithRetry().catch(this.#failStart("sunshine"));
-      await this.#writeMoonlightConfig();
-      const displays = await this.#getSunshineDisplays();
-      if (!this.#selectedDisplayId || !displays.some((display) => display.id === this.#selectedDisplayId)) {
-        this.#selectedDisplayId = displays.find((display) => display.primary)?.id ?? displays[0]?.id ?? null;
-      }
-      const moonlightPort = this.#moonlightPort;
-      if (moonlightPort === null) throw new Error("Moonlight port has not been allocated yet.");
-      this.#throwIfStopRequested();
-      this.#startMoonlight(moonlightPort, iceEndpoint);
-      await waitForHttp(
-        `http://127.0.0.1:${moonlightPort}/api/authenticate`,
-        {
-          headers: { [this.#moonlightHeader]: moonlightSlotUser(1) },
-        },
-        this.#moonlight,
-      ).catch(this.#failStart("moonlight"));
-      this.#options.onDiagnostic?.("moonlight", "OpenBot: Moonlight Web is ready.\n");
-      const paired = await this.#bootstrapMoonlight(moonlightPort).catch(this.#failStart("pairing"));
-      this.#throwIfStopRequested();
-      // #watchExit ignores an exit while #state is null, so a process that ended during pairing is
-      // found here. Nothing is awaited between this check and #state, so a later exit is watched.
-      if (childEnded(this.#sunshine) || childEnded(this.#moonlight)) {
-        this.#failStart("pairing")(new Error("A remote desktop process exited during pairing."));
-      }
-      this.#state = {
-        baseUrl: `http://127.0.0.1:${moonlightPort}`,
-        authHeader: this.#moonlightHeader,
-        ...paired,
-        displays,
-        selectedDisplayId: this.#selectedDisplayId,
-      };
-      return { ...this.#state };
-    } catch (error) {
-      await this.#stopChildren();
-      this.#releasePortClaims();
-      throw error;
-    }
-  }
+    }).pipe(
+      Effect.ensuring(
+        Effect.gen({ self: this }, function* () {
+          if (completed) return;
+          yield* this.#stopChildrenEffect();
+          this.#releasePortClaims();
+        }).pipe(Effect.orDie),
+      ),
+    );
+  });
 
   // The fields are cleared before the wait: a start that is still running can spawn a process during
   // it, and clearing them after would lose that process without stopping it.
-  async #stopChildren(): Promise<void> {
+
+  readonly #stopChildrenEffect = Effect.fn("SunshineMoonlightRuntime.stopChildren")(function* (
+    this: SunshineMoonlightRuntime,
+  ): Effect.fn.Return<void, RemoteDesktopOperationError> {
     const moonlight = this.#moonlight;
     const sunshine = this.#sunshine;
     this.#moonlight = null;
     this.#sunshine = null;
-    await Promise.all([
-      moonlight ? stopRemoteProcess(moonlight) : Promise.resolve(),
-      sunshine ? stopRemoteProcess(sunshine) : Promise.resolve(),
-    ]);
-  }
+    yield* Effect.all(
+      [moonlight ? stopRemoteProcess(moonlight) : Effect.void, sunshine ? stopRemoteProcess(sunshine) : Effect.void],
+      { concurrency: "unbounded" },
+    );
+  });
 
-  async #writeSunshineConfig(): Promise<void> {
+  readonly #writeSunshineConfigEffect = Effect.fn("SunshineMoonlightRuntime.writeSunshineConfig")(function* (
+    this: SunshineMoonlightRuntime,
+  ): Effect.fn.Return<void, RemoteDesktopOperationError> {
     const basePort = this.#sunshineBasePort;
-    if (basePort === null) throw new Error("Sunshine ports have not been allocated yet.");
+    if (basePort === null) return yield* desktopFailure(new Error("Sunshine ports have not been allocated yet."));
     const values = [
       "sunshine_name = OpenBot Remote Desktop",
       // The base port: every other Sunshine port (GameStream HTTP/HTTPS, Web UI HTTPS, video,
@@ -568,21 +662,25 @@ export class SunshineMoonlightRuntime {
       // probe the others.
       ...(this.#options.platform === "linux" ? ["capture = x11", "encoder = software"] : []),
     ];
-    await Promise.all([
-      writeFile(join(this.#options.stateDirectory, "sunshine.conf"), `${values.join("\n")}\n`, { mode: 0o600 }),
-      writeFile(
-        join(this.#options.stateDirectory, "sunshine-apps.json"),
-        `${JSON.stringify({ env: {}, apps: [{ name: "Desktop", image_path: "desktop.png" }] }, null, 2)}\n`,
-        { mode: 0o600 },
-      ),
-    ]);
-  }
+    yield* desktopCall(() =>
+      Promise.all([
+        writeFile(join(this.#options.stateDirectory, "sunshine.conf"), `${values.join("\n")}\n`, { mode: 0o600 }),
+        writeFile(
+          join(this.#options.stateDirectory, "sunshine-apps.json"),
+          `${JSON.stringify({ env: {}, apps: [{ name: "Desktop", image_path: "desktop.png" }] }, null, 2)}\n`,
+          { mode: 0o600 },
+        ),
+      ]),
+    );
+  });
 
-  async #writeMoonlightConfig(): Promise<void> {
+  readonly #writeMoonlightConfigEffect = Effect.fn("SunshineMoonlightRuntime.writeMoonlightConfig")(function* (
+    this: SunshineMoonlightRuntime,
+  ): Effect.fn.Return<void, RemoteDesktopOperationError> {
     const moonlightPort = this.#moonlightPort;
     const webRtcRange = this.#webRtcRange;
     if (moonlightPort === null || webRtcRange === null) {
-      throw new Error("Moonlight ports have not been allocated yet.");
+      return yield* desktopFailure(new Error("Moonlight ports have not been allocated yet."));
     }
     const config = {
       data_storage: {
@@ -613,21 +711,24 @@ export class SunshineMoonlightRuntime {
         default_role_id: null,
         session_cookie_expiration: { secs: 3600, nanos: 0 },
       },
-      moonlight: { default_http_port: this.#requireSunshineHttpPort(), pair_device_name: this.#pairingName },
+      moonlight: {
+        default_http_port: yield* desktopSync(() => this.#requireSunshineHttpPort()),
+        pair_device_name: this.#pairingName,
+      },
       streamer_path: this.#options.paths.moonlightStreamer,
       log: { level_filter: "Info", file_path: join(this.#options.stateDirectory, "moonlight.log"), dev_venator: false },
       default_settings: null,
     };
-    await writeFile(
-      join(this.#options.stateDirectory, "moonlight-config.json"),
-      `${JSON.stringify(config, null, 2)}\n`,
-      {
+    yield* desktopCall(() =>
+      writeFile(join(this.#options.stateDirectory, "moonlight-config.json"), `${JSON.stringify(config, null, 2)}\n`, {
         mode: 0o600,
-      },
+      }),
     );
-  }
+  });
 
-  async #writeIceHelper(): Promise<void> {
+  readonly #writeIceHelperEffect = Effect.fn("SunshineMoonlightRuntime.writeIceHelper")(function* (
+    this: SunshineMoonlightRuntime,
+  ): Effect.fn.Return<void, RemoteDesktopOperationError> {
     const path = join(
       this.#options.stateDirectory,
       this.#options.platform === "win32" ? "openbot-ice-helper.cmd" : "openbot-ice-helper.sh",
@@ -636,67 +737,76 @@ export class SunshineMoonlightRuntime {
       this.#options.platform === "win32"
         ? "@powershell.exe -NoProfile -NonInteractive -Command \"Invoke-RestMethod -Headers @{Authorization=('Bearer ' + $env:OPENBOT_ICE_HELPER_TOKEN)} -Uri $env:OPENBOT_ICE_HELPER_URL | ConvertTo-Json -Compress\"\r\n"
         : `#!/bin/sh\nprintf 'header = "Authorization: Bearer %s"\\nurl = "%s"\\n' "$OPENBOT_ICE_HELPER_TOKEN" "$OPENBOT_ICE_HELPER_URL" | /usr/bin/curl --fail --silent --show-error --config -\n`;
-    await writeFile(path, contents, { mode: 0o700 });
-    if (this.#options.platform !== "win32") await chmod(path, 0o700);
-  }
+    yield* desktopCall(() => writeFile(path, contents, { mode: 0o700 }));
+    if (this.#options.platform !== "win32") yield* desktopCall(() => chmod(path, 0o700));
+  });
 
-  async #setSunshineCredentials(): Promise<void> {
+  readonly #setSunshineCredentialsEffect = Effect.fn("SunshineMoonlightRuntime.setSunshineCredentials")(function* (
+    this: SunshineMoonlightRuntime,
+  ): Effect.fn.Return<void, RemoteDesktopOperationError> {
     // Matches pinned Sunshine http::save_user_creds and util::Hex (reversed SHA-256,
     // uppercase). Do not pass the plaintext password through globally visible argv.
     const salt = randomBytes(16).toString("hex");
     const password = sunshinePasswordHash(this.#options.credentials.password, salt);
     const path = join(this.#options.stateDirectory, "sunshine-credentials.json");
-    await writeFile(path, JSON.stringify({ username: this.#options.credentials.username, salt, password }), {
-      mode: 0o600,
-    });
-    if (this.#options.platform !== "win32") await chmod(path, 0o600);
-  }
+    yield* desktopCall(() =>
+      writeFile(path, JSON.stringify({ username: this.#options.credentials.username, salt, password }), {
+        mode: 0o600,
+      }),
+    );
+    if (this.#options.platform !== "win32") yield* desktopCall(() => chmod(path, 0o600));
+  });
 
   // Probing a free family and starting Sunshine cannot be atomic, so a rival process can take
   // the ports in between. On failure the claim is released and the next disjoint family is tried;
   // Moonlight only starts after this succeeds, so reallocating here never orphans a pairing.
-  async #startSunshineWithRetry(): Promise<void> {
+
+  readonly #startSunshineWithRetryEffect = Effect.fn("SunshineMoonlightRuntime.startSunshineWithRetry")(function* (
+    this: SunshineMoonlightRuntime,
+  ): Effect.fn.Return<void, RemoteDesktopOperationError> {
     let lastError: unknown;
     for (let attempt = 0; attempt < SUNSHINE_START_ATTEMPTS; attempt += 1) {
-      this.#throwIfStopRequested();
-      try {
-        await this.#startSunshineOnce();
-        return;
-      } catch (error) {
-        lastError = error;
-        if (this.#sunshine) {
-          await stopRemoteProcess(this.#sunshine).catch(() => undefined);
-          this.#sunshine = null;
-        }
-        if (attempt + 1 >= SUNSHINE_START_ATTEMPTS) break;
-        if (this.#ownsSunshineAllocation && this.#sunshineBasePort !== null) {
-          releaseSunshineBasePort(this.#sunshineBasePort);
-          this.#sunshineBasePort = await allocateSunshineBasePort();
-        }
-        await this.#writeSunshineConfig();
+      yield* desktopSync(() => this.#throwIfStopRequested());
+      const result = yield* Effect.result(this.#startSunshineOnceEffect());
+      if (Result.isSuccess(result)) return;
+      lastError = result.failure.cause;
+      const sunshine = this.#sunshine;
+      if (sunshine) {
+        yield* stopRemoteProcess(sunshine).pipe(Effect.catch(() => Effect.void));
+        this.#sunshine = null;
       }
+      if (attempt + 1 >= SUNSHINE_START_ATTEMPTS) break;
+      if (this.#ownsSunshineAllocation && this.#sunshineBasePort !== null) {
+        releaseSunshineBasePort(this.#sunshineBasePort);
+        this.#sunshineBasePort = yield* allocateSunshineBasePort();
+      }
+      yield* this.#writeSunshineConfigEffect();
     }
-    throw new Error(sourceText("error.backend.sunshineNotStarted"), { cause: lastError });
-  }
+    return yield* desktopFailure(new Error(sourceText("error.backend.sunshineNotStarted"), { cause: lastError }));
+  });
 
-  async #startSunshineOnce(): Promise<void> {
+  readonly #startSunshineOnceEffect = Effect.fn("SunshineMoonlightRuntime.startSunshineOnce")(function* (
+    this: SunshineMoonlightRuntime,
+  ): Effect.fn.Return<void, RemoteDesktopOperationError> {
     // A restart is how a newly granted permission takes effect, so the verdict is this process's
     // alone -- carrying the previous one over would keep reporting a grant the user has already made.
     this.#screenCaptureDenied = false;
-    this.#sunshine = this.#spawn(this.#options.paths.sunshine, [join(this.#options.stateDirectory, "sunshine.conf")], {
-      cwd: dirname(this.#options.paths.sunshine),
-      env: { ...process.env, OPENBOT_REMOTE_SETUP: "1" },
-      stdio: ["ignore", "pipe", "pipe"],
-      windowsHide: true,
-    });
+    this.#sunshine = yield* desktopSync(() =>
+      this.#spawn(this.#options.paths.sunshine, [join(this.#options.stateDirectory, "sunshine.conf")], {
+        cwd: dirname(this.#options.paths.sunshine),
+        env: { ...process.env, OPENBOT_REMOTE_SETUP: "1" },
+        stdio: ["ignore", "pipe", "pipe"],
+        windowsHide: true,
+      }),
+    );
     this.#pipeDiagnostics(this.#sunshine, "sunshine");
     this.#watchExit(this.#sunshine, "sunshine");
-    await waitForHttps(
-      this.#requireSunshineHttpsPort(),
+    yield* waitForHttpsEffect(
+      yield* desktopSync(() => this.#requireSunshineHttpsPort()),
       join(this.#options.stateDirectory, "sunshine-cert.pem"),
       this.#sunshine,
     );
-  }
+  });
 
   #startMoonlight(port: number, iceEndpoint: string): void {
     this.#moonlight = this.#spawn(
@@ -725,18 +835,29 @@ export class SunshineMoonlightRuntime {
     this.#watchExit(this.#moonlight, "moonlight");
   }
 
-  async #bootstrapMoonlight(port: number): Promise<{ hostId: number; hostIds: number[]; desktopAppId: number }> {
+  readonly #bootstrapMoonlightEffect = Effect.fn("SunshineMoonlightRuntime.bootstrapMoonlight")(function* (
+    this: SunshineMoonlightRuntime,
+    port: number,
+  ): Effect.fn.Return<{ hostId: number; hostIds: number[]; desktopAppId: number }, RemoteDesktopOperationError> {
     const baseUrl = `http://127.0.0.1:${port}`;
     const endpointPath = join(this.#options.stateDirectory, "moonlight-endpoint.json");
-    const endpoint = await readFile(endpointPath, "utf8")
-      .then((text) => z.object({ port: z.number().int() }).parse(JSON.parse(text)))
-      .catch(() => null);
-    const endpointChanged = endpoint?.port !== this.#requireSunshineHttpPort();
+    const endpoint = yield* Effect.gen(function* () {
+      const text = yield* desktopCall(() => readFile(endpointPath, "utf8"));
+      const data = yield* desktopSync(() => JSON.parse(text));
+      return yield* Schema.decodeUnknownEffect(endpointSchema)(data);
+    }).pipe(Effect.catch(() => Effect.succeed(null)));
+    const endpointChanged = endpoint?.port !== (yield* desktopSync(() => this.#requireSunshineHttpPort()));
     const hostIds: number[] = [];
     for (let slot = 1; slot <= MOONLIGHT_STREAMER_SLOTS; slot += 1) {
       const user = moonlightSlotUser(slot);
-      const hosts = (await moonlightJson(baseUrl, "/api/hosts", moonlightHostsSchema, this.#moonlightHeader, {}, user))
-        .hosts;
+      const hosts = (yield* moonlightJsonEffect(
+        baseUrl,
+        "/api/hosts",
+        moonlightHostsSchema,
+        this.#moonlightHeader,
+        {},
+        user,
+      )).hosts;
       this.#options.onDiagnostic?.(
         "moonlight",
         `OpenBot: found ${hosts.length} local Moonlight hosts for streamer slot ${slot}.\n`,
@@ -744,7 +865,7 @@ export class SunshineMoonlightRuntime {
       // Stored hosts keep their original port. Recreate the managed endpoint before pairing,
       // including when another user claimed this runtime's previous port after restart.
       for (const previous of endpointChanged ? hosts : []) {
-        const deleted = await moonlightHttpResponse(
+        const deleted = yield* moonlightHttpResponseEffect(
           baseUrl,
           `/api/host?host_id=${previous.host_id}`,
           { method: "DELETE" },
@@ -755,14 +876,17 @@ export class SunshineMoonlightRuntime {
       }
       let host = endpointChanged ? undefined : hosts[0];
       if (!host) {
-        const created = await moonlightJson(
+        const created = yield* moonlightJsonEffect(
           baseUrl,
           "/api/host",
           moonlightCreatedHostSchema,
           this.#moonlightHeader,
           {
             method: "POST",
-            body: JSON.stringify({ address: "127.0.0.1", http_port: this.#requireSunshineHttpPort() }),
+            body: JSON.stringify({
+              address: "127.0.0.1",
+              http_port: yield* desktopSync(() => this.#requireSunshineHttpPort()),
+            }),
           },
           user,
         );
@@ -773,32 +897,34 @@ export class SunshineMoonlightRuntime {
           "moonlight",
           `OpenBot: pairing local host ${host.host_id} for streamer slot ${slot}.\n`,
         );
-        await this.#pairMoonlight(baseUrl, host.host_id, user);
+        yield* this.#pairMoonlightEffect(baseUrl, host.host_id, user);
       }
-      await this.#assertEmbeddedPermissions(baseUrl, user);
+      yield* this.#assertEmbeddedPermissionsEffect(baseUrl, user);
       hostIds.push(host.host_id);
     }
     const [hostId] = hostIds;
-    if (hostId === undefined) throw new Error(sourceText("error.backend.moonlightNoHost"));
-    const apps = (
-      await moonlightJson(
-        baseUrl,
-        `/api/apps?host_id=${hostId}`,
-        moonlightAppsSchema,
-        this.#moonlightHeader,
-        {},
-        moonlightSlotUser(1),
-      )
-    ).apps;
+    if (hostId === undefined) return yield* desktopFailure(new Error(sourceText("error.backend.moonlightNoHost")));
+    const apps = (yield* moonlightJsonEffect(
+      baseUrl,
+      `/api/apps?host_id=${hostId}`,
+      moonlightAppsSchema,
+      this.#moonlightHeader,
+      {},
+      moonlightSlotUser(1),
+    )).apps;
     const desktop = apps.find((app) => app.title.toLowerCase() === "desktop") ?? apps[0];
-    if (!desktop) throw new Error(sourceText("error.backend.sunshineNoDesktop"));
-    await writeFile(endpointPath, JSON.stringify({ port: this.#requireSunshineHttpPort() }), { mode: 0o600 });
+    if (!desktop) return yield* desktopFailure(new Error(sourceText("error.backend.sunshineNoDesktop")));
+    yield* desktopCall(() =>
+      writeFile(endpointPath, JSON.stringify({ port: this.#requireSunshineHttpPort() }), { mode: 0o600 }),
+    );
     return { hostId, hostIds, desktopAppId: desktop.app_id };
-  }
+  });
 
-  async #getSunshineDisplays(): Promise<RemoteDesktopDisplay[]> {
-    const native = await sunshineJson(
-      this.#requireSunshineHttpsPort(),
+  readonly #getSunshineDisplaysEffect = Effect.fn("SunshineMoonlightRuntime.getSunshineDisplays")(function* (
+    this: SunshineMoonlightRuntime,
+  ): Effect.fn.Return<RemoteDesktopDisplay[], RemoteDesktopOperationError> {
+    const native = yield* sunshineJsonEffect(
+      yield* desktopSync(() => this.#requireSunshineHttpsPort()),
       "/api/openbot/displays",
       this.#options.credentials,
       join(this.#options.stateDirectory, "sunshine-cert.pem"),
@@ -821,115 +947,169 @@ export class SunshineMoonlightRuntime {
         },
       ];
     });
-    return displays.length === 0 ? structuredClone(local) : displays;
-  }
+    return yield* desktopCall(() => (displays.length === 0 ? structuredClone(local) : displays));
+  });
 
-  async #waitForPairingRequest(): Promise<string> {
+  readonly #waitForPairingRequestEffect = Effect.fn("SunshineMoonlightRuntime.waitForPairingRequest")(function* (
+    this: SunshineMoonlightRuntime,
+  ): Effect.fn.Return<string, RemoteDesktopOperationError> {
     const deadline = Date.now() + 10_000;
     while (Date.now() < deadline) {
-      const pending = await sunshineJson(
-        this.#requireSunshineHttpsPort(),
+      const pending = yield* sunshineJsonEffect(
+        yield* desktopSync(() => this.#requireSunshineHttpsPort()),
         "/api/pin",
         this.#options.credentials,
         join(this.#options.stateDirectory, "sunshine-cert.pem"),
-        z.object({
-          pairings: z.array(
-            z.object({ id: z.string().regex(/^[a-fA-F0-9]{32}$/), name: z.string(), address: z.string() }),
-          ),
-        }),
+        sunshinePairingsSchema,
       );
       const matches = pending.pairings.filter(
         (pairing) =>
           pairing.name === this.#pairingName && ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(pairing.address),
       );
       const [match, ...others] = matches;
-      if (others.length > 0) throw new Error(sourceText("error.backend.sunshineAmbiguousPairing"));
-      if (match) return match.id;
-      await shortDelay();
+      if (others.length > 0)
+        return yield* desktopFailure(new Error(sourceText("error.backend.sunshineAmbiguousPairing")));
+      if (match) return yield* desktopCall(() => match.id);
+      yield* Effect.sleep(200);
     }
-    throw new Error(sourceText("error.backend.sunshineNoPairingRequest"));
-  }
+    return yield* desktopFailure(new Error(sourceText("error.backend.sunshineNoPairingRequest")));
+  });
 
-  async #pairMoonlight(baseUrl: string, hostId: number, user: string): Promise<void> {
+  readonly #pairMoonlightEffect = Effect.fn("SunshineMoonlightRuntime.pairMoonlight")(function* (
+    this: SunshineMoonlightRuntime,
+    baseUrl: string,
+    hostId: number,
+    user: string,
+  ): Effect.fn.Return<void, RemoteDesktopOperationError> {
     const body = JSON.stringify({ host_id: hostId });
-    const response = await requestStream(
-      `${baseUrl}/api/pair`,
-      {
-        [this.#moonlightHeader]: user,
-        "Content-Type": "application/json",
-        "Content-Length": String(Buffer.byteLength(body)),
-      },
-      body,
+    return yield* Effect.acquireUseRelease(
+      requestStreamEffect(
+        `${baseUrl}/api/pair`,
+        {
+          [this.#moonlightHeader]: user,
+          "Content-Type": "application/json",
+          "Content-Length": String(Buffer.byteLength(body)),
+        },
+        body,
+      ),
+      (response) =>
+        Effect.gen({ self: this }, function* () {
+          if (response.statusCode !== 200) {
+            response.resume();
+            return yield* desktopFailure(
+              new Error(sourceText("error.backend.moonlightPairingHttp", { status: response.statusCode ?? 0 })),
+            );
+          }
+          let buffer = "";
+          let pinSubmitted = false;
+          const iterator = response[Symbol.asyncIterator]();
+          for (;;) {
+            const next = yield* desktopCall(() => iterator.next());
+            if (next.done) break;
+            const chunk = next.value;
+            buffer += Buffer.from(chunk).toString("utf8");
+            while (buffer.includes("\n")) {
+              const newline = buffer.indexOf("\n");
+              const line = buffer.slice(0, newline).trim();
+              buffer = buffer.slice(newline + 1);
+              if (!line) continue;
+              const json = yield* desktopSync(() => JSON.parse(line));
+              const message = yield* Schema.decodeUnknownEffect(moonlightPairMessageSchema)(json).pipe(
+                Effect.mapError(desktopFailure),
+              );
+              if (typeof message === "object" && "Pin" in message) {
+                this.#options.onDiagnostic?.("moonlight", "OpenBot: received local pairing PIN.\n");
+                const pairingId = yield* this.#waitForPairingRequestEffect();
+                yield* sunshineRequestEffect(
+                  yield* desktopSync(() => this.#requireSunshineHttpsPort()),
+                  "/api/pin",
+                  this.#options.credentials,
+                  join(this.#options.stateDirectory, "sunshine-cert.pem"),
+                  JSON.stringify({ pairing_id: pairingId, pin: message.Pin, name: "OpenBot Remote Desktop" }),
+                );
+                this.#options.onDiagnostic?.("moonlight", "OpenBot: submitted local pairing PIN.\n");
+                pinSubmitted = true;
+                continue;
+              }
+              if (typeof message === "object" && "Paired" in message) return;
+              return yield* desktopFailure(new Error(sourceText("error.backend.moonlightRejectedPairing")));
+            }
+          }
+          if (!pinSubmitted) return yield* desktopFailure(new Error(sourceText("error.backend.moonlightNoPin")));
+          return yield* desktopFailure(new Error(sourceText("error.backend.moonlightPairingIncomplete")));
+        }),
+      (response) =>
+        Effect.sync(() => {
+          response.destroy();
+        }),
     );
-    if (response.statusCode !== 200) {
-      response.resume();
-      throw new Error(sourceText("error.backend.moonlightPairingHttp", { status: response.statusCode ?? 0 }));
-    }
-    let buffer = "";
-    let pinSubmitted = false;
-    for await (const chunk of response) {
-      buffer += Buffer.from(chunk).toString("utf8");
-      while (buffer.includes("\n")) {
-        const newline = buffer.indexOf("\n");
-        const line = buffer.slice(0, newline).trim();
-        buffer = buffer.slice(newline + 1);
-        if (!line) continue;
-        const message = moonlightPairMessageSchema.parse(JSON.parse(line));
-        if (message.kind === "pin") {
-          this.#options.onDiagnostic?.("moonlight", "OpenBot: received local pairing PIN.\n");
-          const pairingId = await this.#waitForPairingRequest();
-          await sunshineRequest(
-            this.#requireSunshineHttpsPort(),
-            "/api/pin",
-            this.#options.credentials,
-            join(this.#options.stateDirectory, "sunshine-cert.pem"),
-            JSON.stringify({ pairing_id: pairingId, pin: message.pin, name: "OpenBot Remote Desktop" }),
-          );
-          this.#options.onDiagnostic?.("moonlight", "OpenBot: submitted local pairing PIN.\n");
-          pinSubmitted = true;
-          continue;
-        }
-        if (message.kind === "paired") return;
-        throw new Error(sourceText("error.backend.moonlightRejectedPairing"));
+  });
+
+  readonly #assertEmbeddedPermissionsEffect = Effect.fn("SunshineMoonlightRuntime.assertEmbeddedPermissions")(
+    function* (
+      this: SunshineMoonlightRuntime,
+      baseUrl: string,
+      user: string,
+    ): Effect.fn.Return<void, RemoteDesktopOperationError> {
+      const { role } = yield* moonlightJsonEffect(
+        baseUrl,
+        "/api/role",
+        moonlightRoleSchema,
+        this.#moonlightHeader,
+        {},
+        user,
+      );
+      if (role.permissions.allow_transport_webrtc !== true || role.permissions.allow_transport_websockets !== false) {
+        return yield* desktopFailure(new Error(sourceText("error.backend.moonlightWebNotEmbedded")));
       }
-    }
-    if (!pinSubmitted) throw new Error(sourceText("error.backend.moonlightNoPin"));
-    throw new Error(sourceText("error.backend.moonlightPairingIncomplete"));
-  }
+    },
+  );
 
-  async #assertEmbeddedPermissions(baseUrl: string, user: string): Promise<void> {
-    const { role } = await moonlightJson(baseUrl, "/api/role", moonlightRoleSchema, this.#moonlightHeader, {}, user);
-    if (role.permissions.allow_transport_webrtc !== true || role.permissions.allow_transport_websockets !== false) {
-      throw new Error(sourceText("error.backend.moonlightWebNotEmbedded"));
-    }
-  }
-
-  async #startIceServer(): Promise<string> {
+  readonly #startIceServerEffect = Effect.fn("SunshineMoonlightRuntime.startIceServer")(function* (
+    this: SunshineMoonlightRuntime,
+  ): Effect.fn.Return<string, RemoteDesktopOperationError> {
     if (this.#iceServer) {
-      const address = localAddressSchema.safeParse(this.#iceServer.address());
-      if (address.success) return `http://127.0.0.1:${address.data.port}/ice`;
+      const address = Schema.decodeUnknownResult(localAddressSchema)(this.#iceServer.address());
+      if (Result.isSuccess(address)) return yield* desktopCall(() => `http://127.0.0.1:${address.success.port}/ice`);
     }
     this.#iceToken = randomBytes(32).toString("base64url");
-    this.#iceServer = createServer((request, response) => {
-      if (request.url !== "/ice" || request.headers.authorization !== `Bearer ${this.#iceToken}`) {
-        response.writeHead(401).end();
-        return;
-      }
-      void Promise.resolve()
-        .then(() => this.#options.getIceServers())
-        .then((servers) => {
-          response.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
-          response.end(JSON.stringify(servers.map((server) => ({ ...server, urls: arrayUrls(server.urls) }))));
-        })
-        .catch(() => response.writeHead(503).end());
-    });
-    await new Promise<void>((resolve, reject) => {
-      this.#iceServer?.once("error", reject);
-      this.#iceServer?.listen(0, "127.0.0.1", resolve);
-    });
-    const address = localAddressSchema.parse(this.#iceServer.address());
-    return `http://127.0.0.1:${address.port}/ice`;
-  }
+    let retained = false;
+    return yield* Effect.acquireUseRelease(
+      desktopSync(() =>
+        createServer((request, response) => {
+          if (request.url !== "/ice" || request.headers.authorization !== `Bearer ${this.#iceToken}`) {
+            response.writeHead(401).end();
+            return;
+          }
+          void runCauseEffect(
+            this.#options.getIceServers().pipe(
+              Effect.flatMap((servers) =>
+                desktopSync(() => {
+                  response.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+                  response.end(JSON.stringify(servers.map((server) => ({ ...server, urls: arrayUrls(server.urls) }))));
+                }),
+              ),
+              Effect.catch(() =>
+                Effect.sync(() => {
+                  response.writeHead(503).end();
+                }),
+              ),
+            ),
+          );
+        }),
+      ),
+      (server) =>
+        Effect.gen({ self: this }, function* () {
+          const port = yield* desktopCall(() =>
+            listenLoopback(server, () => new Error(sourceText("error.backend.iceServerNoPort"))),
+          );
+          this.#iceServer = server;
+          retained = true;
+          return `http://127.0.0.1:${port}/ice`;
+        }),
+      (server) => (retained ? Effect.void : closeSocketEffect(server).pipe(Effect.catch(() => Effect.void))),
+    );
+  });
 
   // After a start, nothing waits on these processes. One that exits on its own would leave a runtime
   // that still reports itself started, and every new session would wait for a stream that never comes.
@@ -958,64 +1138,57 @@ export class SunshineMoonlightRuntime {
   }
 }
 
-async function moonlightJson<T>(
+const moonlightJsonEffect = Effect.fn("RemoteDesktop.moonlightJson")(function* <T>(
   baseUrl: string,
   path: string,
-  schema: z.ZodType<T>,
+  schema: Schema.Decoder<T>,
   authHeader: string,
   init: MoonlightRequestInit = {},
   user = moonlightSlotUser(1),
-): Promise<T> {
-  const response = await moonlightHttpResponse(baseUrl, path, init, user, authHeader);
-  let buffer = "";
-  for await (const chunk of response) {
-    buffer += Buffer.from(chunk).toString("utf8");
-    const newline = buffer.indexOf("\n");
-    if (newline >= 0) {
-      response.destroy();
-      return schema.parse(JSON.parse(buffer.slice(0, newline)));
-    }
-  }
-  if (!buffer.trim()) throw new Error(sourceText("error.backend.moonlightEmptyResponse"));
-  return schema.parse(JSON.parse(buffer));
-}
+) {
+  return yield* Effect.acquireUseRelease(
+    moonlightHttpResponseEffect(baseUrl, path, init, user, authHeader),
+    (response) => readJsonResponseEffect(response, schema, true),
+    (response) =>
+      Effect.sync(() => {
+        response.destroy();
+      }),
+  );
+});
 
-async function moonlightHttpResponse(
+const moonlightHttpResponseEffect = Effect.fn("RemoteDesktop.moonlightHttpResponse")(function* (
   baseUrl: string,
   path: string,
   init: MoonlightRequestInit,
   user: string,
   authHeader: string,
-): Promise<IncomingMessage> {
+) {
   const body = init.body ?? "";
   const headers: Record<string, string> = {
     [authHeader]: user,
     "Content-Type": "application/json",
     ...(body ? { "Content-Length": String(Buffer.byteLength(body)) } : {}),
   };
-  const response = await new Promise<IncomingMessage>((resolve, reject) => {
-    const request = httpRequest(`${baseUrl}${path}`, { method: init.method ?? "GET", headers }, resolve);
-    request.setTimeout(10_000, () => request.destroy(new Error(sourceText("error.backend.remoteDesktopTimeout"))));
-    request.once("error", reject);
-    request.end(body);
-  });
+  const response = yield* requestStreamEffect(`${baseUrl}${path}`, headers, body, init.method ?? "GET");
   if (!response.statusCode || response.statusCode >= 300) {
     response.resume();
-    throw new Error(sourceText("error.backend.moonlightApiHttp", { status: response.statusCode ?? 0 }));
+    return yield* desktopFailure(
+      new Error(sourceText("error.backend.moonlightApiHttp", { status: response.statusCode ?? 0 })),
+    );
   }
   return response;
-}
+});
 
-async function sunshineRequest(
+const sunshineRequestEffect = Effect.fn("RemoteDesktop.sunshineRequest")(function* (
   port: number,
   path: string,
   credentials: { username: string; password: string },
   certificatePath: string,
   body: string,
-): Promise<void> {
-  const tls = await sunshineTlsOptions(certificatePath);
-  await new Promise<void>((resolve, reject) => {
-    const request = https.request(
+) {
+  const tls = yield* sunshineTlsOptionsEffect(certificatePath);
+  return yield* Effect.acquireUseRelease(
+    httpsResponseEffect(
       {
         hostname: "127.0.0.1",
         port,
@@ -1025,168 +1198,236 @@ async function sunshineRequest(
         auth: `${credentials.username}:${credentials.password}`,
         headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) },
       },
-      (response) => {
-        response.resume();
-        response.on("end", () =>
-          response.statusCode && response.statusCode < 300
-            ? resolve()
-            : reject(new SunshineApiError(response.statusCode ?? 0)),
-        );
-      },
-    );
-    request.setTimeout(10_000, () => request.destroy(new Error(sourceText("error.backend.remoteDesktopTimeout"))));
-    request.once("error", reject);
-    request.end(body);
-  });
-}
+      body,
+    ),
+    (response) =>
+      Effect.gen(function* () {
+        yield* Effect.callback<void, RemoteDesktopOperationError>((resume) => {
+          const end = () => resume(Effect.void);
+          const fail = (cause: Error) => resume(Effect.fail(desktopFailure(cause)));
+          response.once("end", end);
+          response.once("error", fail);
+          response.resume();
+          return Effect.sync(() => {
+            response.removeListener("end", end);
+            response.removeListener("error", fail);
+          });
+        });
+        if (!response.statusCode || response.statusCode >= 300)
+          return yield* desktopFailure(new SunshineApiError(response.statusCode ?? 0));
+      }),
+    (response) =>
+      Effect.sync(() => {
+        response.destroy();
+      }),
+  );
+});
 
-async function sunshineJson<T>(
+const sunshineJsonEffect = Effect.fn("RemoteDesktop.sunshineJson")(function* <T>(
   port: number,
   path: string,
   credentials: { username: string; password: string },
   certificatePath: string,
-  schema: z.ZodType<T>,
-): Promise<T> {
-  const tls = await sunshineTlsOptions(certificatePath);
-  return new Promise<T>((resolve, reject) => {
-    const request = https.get(
-      {
-        hostname: "127.0.0.1",
-        port,
-        path,
-        ...tls,
-        auth: `${credentials.username}:${credentials.password}`,
-        headers: { Accept: "application/json" },
-      },
-      (response) => {
-        const chunks: Buffer[] = [];
-        response.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
-        response.once("error", reject);
-        response.on("end", () => {
-          if (!response.statusCode || response.statusCode >= 300) {
-            reject(new SunshineApiError(response.statusCode ?? 0));
-            return;
-          }
-          try {
-            resolve(schema.parse(JSON.parse(Buffer.concat(chunks).toString("utf8"))));
-          } catch (error) {
-            reject(error);
-          }
-        });
-      },
-    );
-    request.setTimeout(10_000, () => request.destroy(new Error(sourceText("error.backend.remoteDesktopTimeout"))));
-    request.once("error", reject);
-  });
-}
+  schema: Schema.Decoder<T>,
+) {
+  const tls = yield* sunshineTlsOptionsEffect(certificatePath);
+  return yield* Effect.acquireUseRelease(
+    httpsResponseEffect({
+      hostname: "127.0.0.1",
+      port,
+      path,
+      ...tls,
+      auth: `${credentials.username}:${credentials.password}`,
+      headers: { Accept: "application/json" },
+    }),
+    (response) =>
+      Effect.gen(function* () {
+        if (!response.statusCode || response.statusCode >= 300)
+          return yield* desktopFailure(new SunshineApiError(response.statusCode ?? 0));
+        return yield* readJsonResponseEffect(response, schema, false);
+      }),
+    (response) =>
+      Effect.sync(() => {
+        response.destroy();
+      }),
+  );
+});
 
-async function requestStream(url: string, headers: Record<string, string>, body: string): Promise<IncomingMessage> {
-  return new Promise<IncomingMessage>((resolve, reject) => {
-    const request = httpRequest(url, { method: "POST", headers }, resolve);
-    request.setTimeout(10_000, () => request.destroy(new Error(sourceText("error.backend.remoteDesktopTimeout"))));
-    request.once("error", reject);
-    request.end(body);
-  });
-}
+const readJsonResponseEffect = Effect.fn("RemoteDesktop.readJsonResponse")(function* <T>(
+  response: IncomingMessage,
+  schema: Schema.Decoder<T>,
+  firstLine: boolean,
+) {
+  const iterator = response[Symbol.asyncIterator]();
+  let buffer = "";
+  const decoder = new StringDecoder("utf8");
+  for (;;) {
+    const next = yield* desktopCall(() => iterator.next());
+    if (next.done) {
+      buffer += decoder.end();
+      break;
+    }
+    buffer += decoder.write(Buffer.from(next.value));
+    const newline = buffer.indexOf("\n");
+    if (firstLine && newline >= 0) {
+      buffer = buffer.slice(0, newline);
+      break;
+    }
+  }
+  if (firstLine && !buffer.trim())
+    return yield* desktopFailure(new Error(sourceText("error.backend.moonlightEmptyResponse")));
+  const json = yield* desktopSync(() => JSON.parse(buffer));
+  return yield* Schema.decodeUnknownEffect(schema)(json).pipe(Effect.mapError(desktopFailure));
+});
+
+const requestStreamEffect = Effect.fn("RemoteDesktop.requestStream")(
+  (url: string, headers: Record<string, string>, body: string, method = "POST") =>
+    Effect.callback<IncomingMessage, RemoteDesktopOperationError>((resume) => {
+      let retained = false;
+      const request = httpRequest(url, { method, headers }, (response) => {
+        retained = true;
+        resume(Effect.succeed(response));
+      });
+      request.setTimeout(10_000, () => request.destroy(new Error(sourceText("error.backend.remoteDesktopTimeout"))));
+      request.once("error", (cause) => resume(Effect.fail(desktopFailure(cause))));
+      request.end(body);
+      return Effect.sync(() => {
+        if (!retained) request.destroy();
+      });
+    }),
+);
+
+const httpsResponseEffect = Effect.fn("RemoteDesktop.httpsResponse")(
+  (
+    options: https.RequestOptions,
+    body?: string,
+    timeoutMs = 10_000,
+    timeoutMessage = sourceText("error.backend.remoteDesktopTimeout"),
+  ) =>
+    Effect.callback<IncomingMessage, RemoteDesktopOperationError>((resume) => {
+      let retained = false;
+      const receive = (response: IncomingMessage) => {
+        retained = true;
+        resume(Effect.succeed(response));
+      };
+      const request = body === undefined ? https.get(options, receive) : https.request(options, receive);
+      request.setTimeout(timeoutMs, () => request.destroy(new Error(timeoutMessage)));
+      request.once("error", (cause) => resume(Effect.fail(desktopFailure(cause))));
+      if (body !== undefined) request.end(body);
+      return Effect.sync(() => {
+        if (!retained) request.destroy();
+      });
+    }),
+);
 
 type WatchedChild = Pick<ChildProcess, "exitCode" | "signalCode">;
-
-// A child that a signal ended, such as the one a stop sends, has no exit code, only a signal code.
 function childEnded(child: WatchedChild | null | undefined): boolean {
   return child !== null && child !== undefined && (child.exitCode !== null || child.signalCode !== null);
 }
 
-async function waitForHttps(port: number, certificatePath: string, child?: WatchedChild | null): Promise<void> {
+const waitForHttpsEffect = Effect.fn("RemoteDesktop.waitForHttps")(function* (
+  port: number,
+  certificatePath: string,
+  child?: WatchedChild | null,
+) {
   const deadline = Date.now() + 20_000;
   let lastError: unknown;
   while (Date.now() < deadline) {
-    if (childEnded(child)) {
-      throw new Error(sourceText("error.backend.sunshineExited", { port }), { cause: lastError });
-    }
-    try {
-      const tls = await sunshineTlsOptions(certificatePath);
-      await new Promise<void>((resolve, reject) => {
-        const request = https.get({ hostname: "127.0.0.1", port, path: "/", ...tls }, (response) => {
-          response.resume();
-          resolve();
-        });
-        request.setTimeout(readinessAttemptTimeout(deadline), () =>
-          request.destroy(new Error(sourceText("error.backend.sunshineNoAnswer"))),
+    if (childEnded(child))
+      return yield* desktopFailure(
+        new Error(sourceText("error.backend.sunshineExited", { port }), { cause: lastError }),
+      );
+    const ready = yield* Effect.result(
+      Effect.gen(function* () {
+        const tls = yield* sunshineTlsOptionsEffect(certificatePath);
+        yield* Effect.acquireUseRelease(
+          httpsResponseEffect(
+            { hostname: "127.0.0.1", port, path: "/", ...tls },
+            undefined,
+            readinessAttemptTimeout(deadline),
+            sourceText("error.backend.sunshineNoAnswer"),
+          ),
+          (response) =>
+            Effect.sync(() => {
+              response.resume();
+            }),
+          (response) =>
+            Effect.sync(() => {
+              response.destroy();
+            }),
         );
-        request.once("error", reject);
-      });
-      return;
-    } catch (error) {
-      lastError = error;
-      await shortDelay();
-    }
+      }),
+    );
+    if (Result.isSuccess(ready)) return;
+    lastError = ready.failure.cause;
+    yield* Effect.sleep(200);
   }
   const message =
     lastError instanceof Error
       ? sourceText("error.backend.sunshineNotReadyReason", { reason: lastError.message })
       : sourceText("error.backend.sunshineNotReady");
-  throw new Error(message, { cause: lastError });
-}
+  return yield* desktopFailure(new Error(message, { cause: lastError }));
+});
 
-async function sunshineTlsOptions(certificatePath: string): Promise<{
-  allowPartialTrustChain: true;
-  ca: Buffer;
-  checkServerIdentity: (hostname: string, certificate: PeerCertificate) => Error | undefined;
-}> {
-  const ca = await readFile(certificatePath);
-  const expected = new X509Certificate(ca).raw;
+const sunshineTlsOptionsEffect = Effect.fn("RemoteDesktop.sunshineTlsOptions")(function* (certificatePath: string) {
+  const ca = yield* desktopCall(() => readFile(certificatePath));
+  const expected = yield* desktopSync(() => new X509Certificate(ca).raw);
   return {
-    // Sunshine creates a self-signed certificate for its loopback API.
-    // Treat only this pinned certificate as the local trust anchor.
-    allowPartialTrustChain: true,
+    allowPartialTrustChain: true as const,
     ca,
-    checkServerIdentity: (_hostname, certificate) => {
+    checkServerIdentity: (_hostname: string, certificate: PeerCertificate): Error | undefined => {
       const presented = certificate.raw;
       if (presented.length === expected.length && timingSafeEqual(presented, expected)) return undefined;
       return new Error(sourceText("error.backend.sunshineTlsUnexpected"));
     },
   };
-}
+});
 
-async function waitForHttp(url: string, init: RequestInit, child?: WatchedChild | null): Promise<void> {
+const waitForHttpEffect = Effect.fn("RemoteDesktop.waitForHttp")(function* (
+  url: string,
+  init: RequestInit,
+  child?: WatchedChild | null,
+) {
   const deadline = Date.now() + 20_000;
   while (Date.now() < deadline) {
-    if (childEnded(child)) {
-      throw new Error(sourceText("error.backend.moonlightWebExited", { url }));
-    }
-    try {
-      const response = await fetch(url, { ...init, signal: AbortSignal.timeout(readinessAttemptTimeout(deadline)) });
-      if (response.ok) return;
-    } catch {
-      // Retry while the local service starts.
-    }
-    await shortDelay();
+    if (childEnded(child))
+      return yield* desktopFailure(new Error(sourceText("error.backend.moonlightWebExited", { url })));
+    const ready = yield* Effect.result(
+      Effect.acquireUseRelease(
+        Effect.tryPromise({
+          try: (signal) =>
+            fetch(url, {
+              ...init,
+              signal: AbortSignal.any([signal, AbortSignal.timeout(readinessAttemptTimeout(deadline))]),
+            }),
+          catch: desktopFailure,
+        }),
+        (response) => Effect.succeed(response.ok),
+        (response) => desktopCall(() => response.body?.cancel()).pipe(Effect.catch(() => Effect.void)),
+      ),
+    );
+    if (Result.isSuccess(ready) && ready.success) return;
+    yield* Effect.sleep(200);
   }
-  throw new Error(sourceText("error.backend.moonlightWebNotReady"));
-}
+  return yield* desktopFailure(new Error(sourceText("error.backend.moonlightWebNotReady")));
+});
 
-/**
- * One readiness request's limit. A service that accepts the connection and never answers would
- * otherwise hold the wait past its deadline, and the loop would not see the process exit meanwhile.
- */
+/** Keep each readiness attempt inside the original overall deadline. */
 function readinessAttemptTimeout(deadline: number): number {
   return Math.max(1, Math.min(READINESS_ATTEMPT_TIMEOUT_MS, deadline - Date.now()));
 }
 
-function shortDelay(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 200));
-}
-
-async function reservePort(): Promise<number> {
-  const server = createServer();
-  await new Promise<void>((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", resolve);
-  });
-  const address = localAddressSchema.parse(server.address());
-  await new Promise<void>((resolve) => server.close(() => resolve()));
-  return address.port;
-}
+const reservePort = Effect.fn("RemoteDesktop.reservePort")(() =>
+  Effect.acquireUseRelease(
+    listenTcpEffect(0),
+    (server) =>
+      Schema.decodeUnknownEffect(localAddressSchema)(server.address()).pipe(
+        Effect.map((address) => address.port),
+        Effect.mapError(desktopFailure),
+      ),
+    (server) => closeSocketEffect(server).pipe(Effect.orDie),
+  ),
+);
 
 function arrayUrls(urls: string | string[]): string[] {
   return Array.isArray(urls) ? urls : [urls];

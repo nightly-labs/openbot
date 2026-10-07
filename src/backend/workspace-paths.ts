@@ -1,9 +1,17 @@
-import { realpath, stat } from "node:fs/promises";
+import { readdir, realpath, stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { basename, dirname, isAbsolute, join, relative } from "node:path";
-import type { AgentSummary } from "@openbot/contracts/ipc";
+import { basename, dirname, isAbsolute, join, relative, sep } from "node:path";
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import {
+  type AgentSummary,
+  WORKSPACE_DIRECTORY_LIMIT,
+  type WorkspaceDirectory,
+  type WorkspaceDirectoryEntry,
+} from "@openbot/contracts/ipc";
 import { legacyAgentId } from "@openbot/contracts/validation";
 import { sourceText } from "@openbot/i18n/source";
+import { Effect } from "effect";
+import { type AttachmentOperationError, attachmentCall, attachmentFailure } from "./attachment-effects";
 import { isRecord } from "./protocol";
 
 export interface ResolvedSharedFile {
@@ -96,58 +104,194 @@ function decodePath(value: string): string {
     return value;
   }
 }
-
-export async function resolveSharedFile(sharedRootPath: string, inputPath: string): Promise<ResolvedSharedFile> {
-  const sharedRoot = await realpath(sharedRootPath);
+export const resolveSharedFile = Effect.fn("Workspace.resolveSharedFile")(function* (
+  sharedRootPath: string,
+  inputPath: string,
+): Effect.fn.Return<ResolvedSharedFile, AttachmentOperationError> {
+  const sharedRoot = yield* attachmentCall(() => realpath(sharedRootPath));
   const candidatePath = sharedPathFromInput(sharedRootPath, inputPath);
-  const resolvedPath = await realpath(candidatePath);
+  const resolvedPath = yield* attachmentCall(() => realpath(candidatePath));
   if (!isWithin(sharedRoot, resolvedPath)) {
-    throw new Error(sourceText("error.backend.sharedFileOutside"));
+    return yield* attachmentFailure(new Error(sourceText("error.backend.sharedFileOutside")));
   }
-  const metadata = await stat(resolvedPath);
-  if (!metadata.isFile()) throw new Error(sourceText("error.backend.sharedPathNotFile"));
+  const metadata = yield* attachmentCall(() => stat(resolvedPath));
+  if (!metadata.isFile()) return yield* attachmentFailure(new Error(sourceText("error.backend.sharedPathNotFile")));
   return { path: resolvedPath, name: basename(resolvedPath), size: metadata.size };
+});
+/**
+ * Why a workspace path was refused. The cause of the failure, so the Team API can answer each with its
+ * own status and a remote member reads the sentence instead of a generic server error. `memberMessage`
+ * is the sentence for a remote member: it does not name the absolute workspace path of the host.
+ */
+export class WorkspacePathRefused extends Error {
+  constructor(
+    readonly reason: "missing" | "outside" | "not-file" | "not-directory",
+    message: string,
+    readonly memberMessage = message,
+  ) {
+    super(message);
+  }
 }
 
+function refuse(reason: WorkspacePathRefused["reason"], message: string, memberMessage?: string) {
+  return Effect.fail(attachmentFailure(new WorkspacePathRefused(reason, message, memberMessage)));
+}
+
+/** Resolves a path that a message or the model wrote to a real path, with the workspace containment check. */
+const resolveWorkspacePath = Effect.fn("Workspace.resolveWorkspacePath")(function* (
+  agent: Pick<AgentSummary, "id" | "workspacePath">,
+  inputPath: string,
+  options: { allowOutside?: boolean; allowRoot?: boolean },
+) {
+  const workspaceRoot = yield* attachmentCall(() => realpath(agent.workspacePath));
+  const candidatePath = workspacePathFromInput(agent.workspacePath, agent.id, inputPath);
+  // A member reads one sentence for a path that is missing and for a path outside the workspace, so
+  // the answer does not tell whether a path exists on the host.
+  const memberMessage = sourceText("error.backend.workspacePathMissingForMember", { path: inputPath });
+  const resolvedPath = yield* realpathWithLegacyRoot(agent, candidatePath).pipe(
+    Effect.catch((error) => {
+      // The literal path goes first, so a real file named `notes:2` still opens.
+      const withoutLocation = candidatePath.replace(LOCATION_SUFFIX, "");
+      if (!isMissing(error) || withoutLocation === candidatePath) return Effect.fail(error);
+      return realpathWithLegacyRoot(agent, withoutLocation);
+    }),
+    Effect.catch((error) =>
+      isMissing(error)
+        ? refuse(
+            "missing",
+            sourceText("error.backend.workspacePathMissing", {
+              path: homeRelative(inputPath),
+              root: homeRelative(agent.workspacePath),
+            }),
+            memberMessage,
+          )
+        : Effect.fail(error),
+    ),
+  );
+  const insideWorkspace =
+    isWithin(workspaceRoot, resolvedPath) || (options.allowRoot === true && resolvedPath === workspaceRoot);
+  if (!insideWorkspace && !options.allowOutside) {
+    return yield* refuse("outside", sourceText("error.backend.workspaceFileOutside"), memberMessage);
+  }
+  const metadata = yield* attachmentCall(() => stat(resolvedPath));
+  return { workspaceRoot, resolvedPath, insideWorkspace, metadata };
+});
+
 /**
- * `allowOutside` is for the local desktop only, and only for an agent with full computer access: that
- * agent could already read the file. The Team API and the web client never pass it, so a remote member
- * still reaches nothing outside the workspace.
+ * A path in the home folder as `~/…`. The error display hides a message with a `/Users/` path as runtime
+ * output, and the short form is also easier to read.
  */
-export async function resolveWorkspaceFile(
+function homeRelative(path: string): string {
+  const home = homedir();
+  return path === home || path.startsWith(`${home}${sep}`) ? `~${path.slice(home.length)}` : path;
+}
+
+/** `ENOTDIR` is a path through a file, such as `notes.md/child`: nothing exists there either. */
+function isMissing(error: AttachmentOperationError): boolean {
+  return isRecord(error.cause) && (error.cause.code === "ENOENT" || error.cause.code === "ENOTDIR");
+}
+
+export const resolveWorkspaceFile = Effect.fn("Workspace.resolveWorkspaceFile")(function* (
   agent: Pick<AgentSummary, "id" | "workspacePath">,
   inputPath: string,
   options: { allowOutside?: boolean } = {},
-): Promise<ResolvedWorkspaceFile> {
-  const workspaceRoot = await realpath(agent.workspacePath);
-  const candidatePath = workspacePathFromInput(agent.workspacePath, agent.id, inputPath);
-  const resolvedPath = await realpathWithLegacyRoot(agent, candidatePath).catch(async (error: unknown) => {
-    // The literal path goes first, so a real file named `notes:2` still opens.
-    const withoutLocation = candidatePath.replace(LOCATION_SUFFIX, "");
-    if (!isRecord(error) || error.code !== "ENOENT" || withoutLocation === candidatePath) throw error;
-    return await realpathWithLegacyRoot(agent, withoutLocation);
-  });
-  const insideWorkspace = isWithin(workspaceRoot, resolvedPath);
-  if (!insideWorkspace && !options.allowOutside) {
-    throw new Error(sourceText("error.backend.workspaceFileOutside"));
-  }
-  const metadata = await stat(resolvedPath);
-  if (!metadata.isFile()) throw new Error(sourceText("error.backend.workspacePathNotFile"));
+): Effect.fn.Return<ResolvedWorkspaceFile, AttachmentOperationError> {
+  const { resolvedPath, insideWorkspace, metadata } = yield* resolveWorkspacePath(agent, inputPath, options);
+  if (!metadata.isFile()) return yield* refuse("not-file", sourceText("error.backend.workspacePathNotFile"));
   return { path: resolvedPath, name: basename(resolvedPath), size: metadata.size, insideWorkspace };
-}
+});
 
-async function realpathWithLegacyRoot(
+/**
+ * One folder of an agent's workspace, for the folder view of a chip. Each entry carries a path that the
+ * file and folder routes accept again: relative to the workspace root when it is inside it. A link
+ * whose target leaves the workspace is left out when the caller may not go outside, so a remote member
+ * cannot read the size and date of a file on the host through it.
+ */
+export const listWorkspaceDirectory = Effect.fn("Workspace.listWorkspaceDirectory")(function* (
+  agent: Pick<AgentSummary, "id" | "workspacePath">,
+  inputPath: string,
+  options: { allowOutside?: boolean } = {},
+): Effect.fn.Return<WorkspaceDirectory, AttachmentOperationError> {
+  const { workspaceRoot, resolvedPath, insideWorkspace, metadata } = yield* resolveWorkspacePath(agent, inputPath, {
+    ...options,
+    allowRoot: true,
+  });
+  if (!metadata.isDirectory())
+    return yield* refuse("not-directory", sourceText("error.backend.workspacePathNotDirectory"));
+  // `workspacePathFromInput` trims, decodes `%XX` and expands `~/`. Each segment is encoded and a
+  // relative path starts with `./`, so a name such as ` a%20b` or `~` reads back as the same file.
+  const encode = (path: string) => path.split(sep).map(encodeURIComponent).join("/");
+  const pathFor = (path: string) => {
+    if (!insideWorkspace) return encode(path);
+    const inside = relative(workspaceRoot, path);
+    return inside ? `./${encode(inside)}` : ".";
+  };
+  const dirents = yield* attachmentCall(() => readdir(resolvedPath, { withFileTypes: true }));
+  const candidates: { name: string; target: string; kind: WorkspaceDirectoryEntry["kind"] }[] = [];
+  for (const dirent of dirents) {
+    // `workspacePathFromInput` reads `\` as a separator, so such a name would open a different file.
+    if (dirent.name.includes("\\")) continue;
+    const entryPath = join(resolvedPath, dirent.name);
+    if (dirent.isDirectory() || dirent.isFile()) {
+      candidates.push({ name: dirent.name, target: entryPath, kind: dirent.isDirectory() ? "directory" : "file" });
+      continue;
+    }
+    if (!dirent.isSymbolicLink()) continue;
+    // A link is followed for its kind; its target must pass the same containment check as a path.
+    const target = yield* attachmentCall(() => realpath(entryPath)).pipe(Effect.orElseSucceed(() => null));
+    if (target === null || (!options.allowOutside && !isWithin(workspaceRoot, target))) continue;
+    const linked = yield* attachmentCall(() => stat(target)).pipe(Effect.orElseSucceed(() => null));
+    if (linked?.isDirectory() || linked?.isFile())
+      candidates.push({ name: dirent.name, target, kind: linked.isDirectory() ? "directory" : "file" });
+  }
+  candidates.sort((left, right) =>
+    left.kind === right.kind ? left.name.localeCompare(right.name) : left.kind === "directory" ? -1 : 1,
+  );
+  const shown = yield* Effect.forEach(
+    candidates.slice(0, WORKSPACE_DIRECTORY_LIMIT),
+    (candidate) =>
+      // An entry that disappears while the folder is listed is left out.
+      attachmentCall(() => stat(candidate.target)).pipe(
+        Effect.map(
+          (metadata): WorkspaceDirectoryEntry => ({
+            name: candidate.name,
+            path: pathFor(join(resolvedPath, candidate.name)),
+            kind: candidate.kind,
+            size: candidate.kind === "file" ? metadata.size : 0,
+            modifiedAt: Math.max(0, Math.floor(metadata.mtimeMs)),
+          }),
+        ),
+        Effect.orElseSucceed(() => null),
+      ),
+    { concurrency: 16 },
+  );
+  const parent = dirname(resolvedPath);
+  return {
+    name: resolvedPath === workspaceRoot ? basename(agent.workspacePath) : basename(resolvedPath),
+    path: pathFor(resolvedPath),
+    root: agent.workspacePath,
+    // A folder outside the workspace is listed only for a caller that may go outside, so its parent is too.
+    parentPath: resolvedPath === workspaceRoot || parent === resolvedPath ? null : pathFor(parent),
+    // An encoded path can pass the limit that the routes accept again; that entry is left out.
+    entries: shown.filter(
+      (entry): entry is WorkspaceDirectoryEntry => entry !== null && entry.path.length <= INPUT_LIMITS.path,
+    ),
+    truncated: candidates.length > WORKSPACE_DIRECTORY_LIMIT,
+  };
+});
+
+const realpathWithLegacyRoot = Effect.fn("Workspace.realpathWithLegacyRoot")(function* (
   agent: Pick<AgentSummary, "id" | "workspacePath">,
   candidatePath: string,
-): Promise<string> {
-  return await realpath(candidatePath).catch(async (error: unknown) => {
-    // The file may be one the provider's own transcript still names under this agent's pre-rename
-    // workspace root. The containment check in the caller is unchanged and runs on whatever comes back.
-    const rebased =
-      isRecord(error) && error.code === "ENOENT"
-        ? rebaseLegacyWorkspacePath(agent.workspacePath, agent.id, candidatePath)
-        : null;
-    if (rebased === null) throw error;
-    return await realpath(rebased);
-  });
-}
+): Effect.fn.Return<string, AttachmentOperationError> {
+  return yield* attachmentCall(() => realpath(candidatePath)).pipe(
+    Effect.catch((error) => {
+      // Apply the same containment check to paths from released provider transcripts.
+      const rebased =
+        isRecord(error.cause) && error.cause.code === "ENOENT"
+          ? rebaseLegacyWorkspacePath(agent.workspacePath, agent.id, candidatePath)
+          : null;
+      return rebased === null ? Effect.fail(error) : attachmentCall(() => realpath(rebased));
+    }),
+  );
+});

@@ -1,3 +1,5 @@
+import { Effect } from "effect";
+import { runCauseEffect } from "../backend/effect-boundary";
 // @vitest-environment node
 
 // The fixtures the `team-api-server.*` tests share: a temporary team file, a server built over it,
@@ -120,6 +122,7 @@ export function createAgents(overrides: Partial<TeamApiAgents> = {}, events = ne
     discardDraftAttachment: unimplemented,
     resolveSharedFile: unimplemented,
     resolveWorkspaceFile: unimplemented,
+    listWorkspaceDirectory: unimplemented,
     sendMessage: unimplemented,
     listQueue: unimplemented,
     acknowledgeFailedTurn: unimplemented,
@@ -203,9 +206,9 @@ export async function createTeamApiFixture(
   const root = await mkdtemp(join(tmpdir(), `openbot-team-api-${slug}-`));
   roots.push(root);
   const store = new TeamStore(join(root, "team.json"));
-  await store.initialize();
+  await Effect.runPromise(store.initialize());
   if (settings.configure) {
-    await store.configure(FIXTURE_OWNER.team, FIXTURE_OWNER.username, FIXTURE_OWNER.password);
+    await Effect.runPromise(store.configure(FIXTURE_OWNER.team, FIXTURE_OWNER.username, FIXTURE_OWNER.password));
   }
   let started: StartedTeamApi | null = null;
   let stopped = false;
@@ -220,7 +223,7 @@ export async function createTeamApiFixture(
         browser: createBrowser(),
         ...options,
       });
-      const port = await api.start();
+      const port = await runCauseEffect(api.start());
       started = { api, base: `http://127.0.0.1:${port}`, port };
       return started;
     },
@@ -237,7 +240,7 @@ export async function createTeamApiFixture(
     stop: async () => {
       if (stopped || !started) return;
       stopped = true;
-      await started.api.stop();
+      await runCauseEffect(started.api.stop());
     },
   };
   fixtures.push(fixture);

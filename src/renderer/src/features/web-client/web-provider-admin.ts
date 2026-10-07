@@ -15,6 +15,7 @@ import {
   PROVIDERS_SIGN_IN_V3_ROUTES,
 } from "@openbot/contracts/team-protocol/providers-v3";
 import { PROVIDERS_V4_CAPABILITY, PROVIDERS_V4_ROUTES } from "@openbot/contracts/team-protocol/providers-v4";
+import { runTeamEffect } from "@openbot/team-client";
 import {
   cancelProviderCodeLogin,
   cancelProviderRuntime,
@@ -34,6 +35,7 @@ import {
 } from "@openbot/team-client/team-admin-requests";
 import type { TeamApiRequest } from "@openbot/team-client/team-api-requests";
 import { currentText } from "@openbot/ui/text";
+import { Effect } from "effect";
 import { createEffect, createMemo } from "solid-js";
 import { hostCustomProvidersApi } from "../custom-providers/custom-providers-port";
 import { createCustomProvidersStore } from "../custom-providers/stores/custom-providers-store";
@@ -74,27 +76,60 @@ function webProviderAdmin(
   signInRoutes: () => ProviderCodeLoginRoutes,
 ): ProviderAdminDesktopApi {
   return {
-    startCodeLogin: async (provider, serverId) => startProviderCodeLogin(request(serverId), provider, signInRoutes()),
+    startCodeLogin: async (provider, serverId) =>
+      runTeamEffect(
+        startProviderCodeLogin(request(serverId), provider, signInRoutes()).pipe(
+          Effect.mapError((error) => error.cause),
+        ),
+      ),
     submitCodeLogin: async (input, serverId) => {
       const routes = signInRoutes();
-      return submitProviderCodeLogin(
-        request(serverId),
-        input,
-        routes === PROVIDERS_V4_ROUTES ? routes : PROVIDERS_SIGN_IN_V3_ROUTES,
+      return runTeamEffect(
+        submitProviderCodeLogin(
+          request(serverId),
+          input,
+          routes === PROVIDERS_V4_ROUTES ? routes : PROVIDERS_SIGN_IN_V3_ROUTES,
+        ).pipe(Effect.mapError((error) => error.cause)),
       );
     },
-    cancelCodeLogin: async (provider, serverId) => cancelProviderCodeLogin(request(serverId), provider, signInRoutes()),
-    getApiKeyState: async (provider, serverId) => getProviderApiKeyState(request(serverId), provider),
-    setApiKey: async (input, serverId) => setProviderApiKey(request(serverId), input),
-    clearApiKey: async (provider, serverId) => clearProviderApiKey(request(serverId), provider),
-    getRuntimes: async (serverId) => getProviderRuntimes(request(serverId), runtimeRoutes()),
+    cancelCodeLogin: async (provider, serverId) =>
+      runTeamEffect(
+        cancelProviderCodeLogin(request(serverId), provider, signInRoutes()).pipe(
+          Effect.mapError((error) => error.cause),
+        ),
+      ),
+    getApiKeyState: async (provider, serverId) =>
+      runTeamEffect(getProviderApiKeyState(request(serverId), provider).pipe(Effect.mapError((error) => error.cause))),
+    setApiKey: async (input, serverId) =>
+      runTeamEffect(setProviderApiKey(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
+    clearApiKey: async (provider, serverId) =>
+      runTeamEffect(clearProviderApiKey(request(serverId), provider).pipe(Effect.mapError((error) => error.cause))),
+    getRuntimes: async (serverId) =>
+      runTeamEffect(
+        getProviderRuntimes(request(serverId), runtimeRoutes()).pipe(Effect.mapError((error) => error.cause)),
+      ),
     downloadRuntime: async (provider, serverId) =>
-      downloadProviderRuntime(request(serverId), provider, runtimeRoutes()),
-    cancelRuntime: async (provider, serverId) => cancelProviderRuntime(request(serverId), provider, runtimeRoutes()),
-    checkRuntimeUpdates: async (serverId) => checkProviderRuntimeUpdates(request(serverId), runtimeRoutes()),
-    listCustomProviders: async (serverId) => listCustomProviders(request(serverId)),
-    saveCustomProvider: async (input, serverId) => saveCustomProvider(request(serverId), input),
-    deleteCustomProvider: async (input, serverId) => deleteCustomProvider(request(serverId), input),
+      runTeamEffect(
+        downloadProviderRuntime(request(serverId), provider, runtimeRoutes()).pipe(
+          Effect.mapError((error) => error.cause),
+        ),
+      ),
+    cancelRuntime: async (provider, serverId) =>
+      runTeamEffect(
+        cancelProviderRuntime(request(serverId), provider, runtimeRoutes()).pipe(
+          Effect.mapError((error) => error.cause),
+        ),
+      ),
+    checkRuntimeUpdates: async (serverId) =>
+      runTeamEffect(
+        checkProviderRuntimeUpdates(request(serverId), runtimeRoutes()).pipe(Effect.mapError((error) => error.cause)),
+      ),
+    listCustomProviders: async (serverId) =>
+      runTeamEffect(listCustomProviders(request(serverId)).pipe(Effect.mapError((error) => error.cause))),
+    saveCustomProvider: async (input, serverId) =>
+      runTeamEffect(saveCustomProvider(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
+    deleteCustomProvider: async (input, serverId) =>
+      runTeamEffect(deleteCustomProvider(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
   };
 }
 

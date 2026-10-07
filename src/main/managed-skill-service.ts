@@ -4,7 +4,9 @@ import { agentProviderDescriptor } from "@openbot/contracts/agent-providers";
 import type { AgentSummary, InstalledSkill } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
+import { Effect, Result, Schema } from "effect";
 import { parse as parseYaml } from "yaml";
+import { causeHelpers } from "../backend/effect-boundary";
 import { isMissingFileError } from "../backend/file-errors";
 import { isPathInside } from "../backend/path-containment";
 
@@ -34,42 +36,44 @@ export class ManagedSkillService {
     private readonly slug = MANAGED_SKILL_SLUG,
   ) {}
 
-  async syncAll(agents: AgentSummary[]): Promise<void> {
-    let content: string;
-    try {
-      content = await this.content();
-    } catch (error) {
-      this.reportFailure(this.sourcePath, error);
-      return;
-    }
-    const results = await Promise.allSettled(
-      agents.map((agent) => syncTargets(agent.workspacePath, content, this.slug)),
-    );
-    for (const [index, result] of results.entries()) {
-      if (result.status === "fulfilled") {
-        this.reportResult(result.value);
-      } else {
-        this.reportFailure(agents[index]?.workspacePath ?? "unknown workspace", result.reason);
+  syncAll(agents: AgentSummary[]): Effect.Effect<void> {
+    return Effect.gen({ self: this }, function* () {
+      const content = yield* Effect.result(this.content());
+      if (Result.isFailure(content)) {
+        this.reportFailure(this.sourcePath, content.failure.cause);
+        return;
       }
-    }
+      const results = yield* Effect.forEach(
+        agents,
+        (agent) => Effect.result(syncTargets(agent.workspacePath, content.success, this.slug)),
+        { concurrency: "unbounded" },
+      );
+      for (const [index, result] of results.entries()) {
+        if (Result.isSuccess(result)) this.reportResult(result.success);
+        else this.reportFailure(agents[index]?.workspacePath ?? "unknown workspace", result.failure.cause);
+      }
+    });
   }
 
-  async syncAgent(agent: AgentSummary): Promise<void> {
-    try {
-      this.reportResult(await syncTargets(agent.workspacePath, await this.content(), this.slug));
-    } catch (error) {
-      this.reportFailure(agent.workspacePath, error);
-    }
+  syncAgent(agent: AgentSummary): Effect.Effect<void> {
+    return Effect.gen({ self: this }, function* () {
+      const result = yield* Effect.result(
+        this.content().pipe(Effect.flatMap((content) => syncTargets(agent.workspacePath, content, this.slug))),
+      );
+      if (Result.isSuccess(result)) this.reportResult(result.success);
+      else this.reportFailure(agent.workspacePath, result.failure.cause);
+    });
   }
 
-  private async content(): Promise<string> {
-    if (this.#content !== null) return this.#content;
-    const content = await readFile(this.sourcePath, "utf8");
-    if (!content.startsWith(`---\nname: ${this.slug}\n`)) {
-      throw new Error("The managed site hosting skill is invalid.");
-    }
-    this.#content = content;
-    return content;
+  private content(): Effect.Effect<string, ManagedSkillFailure> {
+    return Effect.gen({ self: this }, function* () {
+      if (this.#content !== null) return this.#content;
+      const content = yield* managedIO(() => readFile(this.sourcePath, "utf8"));
+      if (!content.startsWith(`---\nname: ${this.slug}\n`))
+        return yield* new ManagedSkillFailure({ cause: new Error("The managed site hosting skill is invalid.") });
+      this.#content = content;
+      return content;
+    });
   }
 
   private reportResult(result: SyncTargetsResult): void {
@@ -78,12 +82,18 @@ export class ManagedSkillService {
   }
 }
 
-async function syncTargets(workspacePath: string, content: string, slug: string): Promise<SyncTargetsResult> {
-  const workspaceRoot = await realpath(resolve(workspacePath));
+const syncTargets = Effect.fn("ManagedSkill.syncTargets")(function* (
+  workspacePath: string,
+  content: string,
+  slug: string,
+) {
+  const workspaceRoot = yield* managedIO(() => realpath(resolve(workspacePath)));
   const targets = MANAGED_SKILL_FOLDERS.map((folder) => join(workspacePath, folder, slug, "SKILL.md"));
   const resolvedTargets = MANAGED_SKILL_FOLDERS.map((folder) => join(workspaceRoot, folder, slug, "SKILL.md"));
-  const results = await Promise.allSettled(
-    resolvedTargets.map((target) => syncTarget(workspaceRoot, target, content, slug)),
+  const results = yield* Effect.forEach(
+    resolvedTargets,
+    (target) => Effect.result(syncTarget(workspaceRoot, target, content, slug)),
+    { concurrency: "unbounded" },
   );
   const collisions: string[] = [];
   const failures: SyncTargetsResult["failures"] = [];
@@ -91,89 +101,96 @@ async function syncTargets(workspacePath: string, content: string, slug: string)
     const result = results[index];
     const target = targets[index];
     if (!result || !target) continue;
-    if (result.status === "rejected") failures.push({ target, error: result.reason });
-    else if (result.value === "collision") collisions.push(target);
+    if (Result.isFailure(result)) failures.push({ target, error: result.failure.cause });
+    else if (result.success === "collision") collisions.push(target);
   }
   return { collisions, failures };
-}
+});
 
-async function syncTarget(
+const syncTarget = Effect.fn("ManagedSkill.syncTarget")(function* (
   workspaceRoot: string,
   target: string,
   content: string,
   slug: string,
-): Promise<"synced" | "collision"> {
+): Effect.fn.Return<"synced" | "collision", ManagedSkillFailure> {
   const ownershipContent = `${JSON.stringify({ managedBy: "openbot", slug, version: 1 })}\n`;
   const parent = dirname(target);
-  await ensureSafeDirectory(workspaceRoot, parent);
+  yield* ensureSafeDirectory(workspaceRoot, parent);
   const marker = join(parent, OWNERSHIP_MARKER);
-  await rejectSymlink(target);
-  await rejectSymlink(marker);
-  if (await fileExists(target)) {
-    if ((await optionalText(marker)) !== ownershipContent) return "collision";
-    await atomicWrite(workspaceRoot, target, content);
+  yield* rejectSymlink(target);
+  yield* rejectSymlink(marker);
+  if (yield* fileExists(target)) {
+    if ((yield* optionalText(marker)) !== ownershipContent) return "collision";
+    yield* atomicWrite(workspaceRoot, target, content);
     return "synced";
   }
-  try {
-    await verifySafeDirectory(workspaceRoot, parent);
-    await writeFile(target, content, { encoding: "utf8", mode: 0o600, flag: "wx" });
-  } catch (error) {
-    if (isFileExistsError(error)) return "collision";
-    throw error;
+  const written = yield* Effect.result(
+    verifySafeDirectory(workspaceRoot, parent).pipe(
+      Effect.andThen(managedIO(() => writeFile(target, content, { encoding: "utf8", mode: 0o600, flag: "wx" }))),
+    ),
+  );
+  if (Result.isFailure(written)) {
+    if (isFileExistsError(written.failure.cause)) return "collision";
+    return yield* written.failure;
   }
-  try {
-    await atomicWrite(workspaceRoot, marker, ownershipContent);
-  } catch (error) {
-    await verifySafeDirectory(workspaceRoot, parent)
-      .then(() => unlink(target))
-      .catch(() => undefined);
-    throw error;
+  const ownership = yield* Effect.result(atomicWrite(workspaceRoot, marker, ownershipContent));
+  if (Result.isFailure(ownership)) {
+    yield* verifySafeDirectory(workspaceRoot, parent).pipe(
+      Effect.andThen(managedIO(() => unlink(target))),
+      Effect.catch(() => Effect.void),
+    );
+    return yield* ownership.failure;
   }
   return "synced";
-}
+}, Effect.uninterruptible);
 
-async function atomicWrite(workspaceRoot: string, target: string, content: string): Promise<void> {
+const atomicWrite = Effect.fn("ManagedSkill.atomicWrite")(function* (
+  workspaceRoot: string,
+  target: string,
+  content: string,
+) {
   const parent = dirname(target);
-  await verifySafeDirectory(workspaceRoot, parent);
+  yield* verifySafeDirectory(workspaceRoot, parent);
   const temporary = `${target}.${process.pid}.${crypto.randomUUID()}.tmp`;
-  await writeFile(temporary, content, { encoding: "utf8", mode: 0o600 });
-  try {
-    await verifySafeDirectory(workspaceRoot, parent);
-    await rename(temporary, target);
-  } catch (error) {
-    await unlink(temporary).catch(() => undefined);
-    throw error;
-  }
-}
+  yield* managedIO(() => writeFile(temporary, content, { encoding: "utf8", mode: 0o600 }));
+  return yield* verifySafeDirectory(workspaceRoot, parent).pipe(
+    Effect.andThen(managedIO(() => rename(temporary, target))),
+    Effect.ensuring(managedIO(() => unlink(temporary)).pipe(Effect.catch(() => Effect.void))),
+  );
+});
 
-async function ensureSafeDirectory(workspaceRoot: string, directory: string): Promise<void> {
-  const path = containedRelativePath(workspaceRoot, directory);
+const ensureSafeDirectory = Effect.fn("ManagedSkill.ensureDirectory")(function* (
+  workspaceRoot: string,
+  directory: string,
+) {
+  const path = yield* managedSync(() => containedRelativePath(workspaceRoot, directory));
   let current = workspaceRoot;
   for (const segment of path.split(sep).filter(Boolean)) {
     current = join(current, segment);
-    try {
-      await mkdir(current, { mode: 0o700 });
-    } catch (error) {
-      if (!isFileExistsError(error)) throw error;
-    }
-    await requireRealDirectory(current);
+    const created = yield* Effect.result(managedIO(() => mkdir(current, { mode: 0o700 })));
+    if (Result.isFailure(created) && !isFileExistsError(created.failure.cause)) return yield* created.failure;
+    yield* requireRealDirectory(current);
   }
-  await verifySafeDirectory(workspaceRoot, directory);
-}
+  yield* verifySafeDirectory(workspaceRoot, directory);
+});
 
-async function verifySafeDirectory(workspaceRoot: string, directory: string): Promise<void> {
-  const path = containedRelativePath(workspaceRoot, directory);
-  await requireRealDirectory(workspaceRoot);
+const verifySafeDirectory = Effect.fn("ManagedSkill.verifyDirectory")(function* (
+  workspaceRoot: string,
+  directory: string,
+) {
+  const path = yield* managedSync(() => containedRelativePath(workspaceRoot, directory));
+  yield* requireRealDirectory(workspaceRoot);
   let current = workspaceRoot;
   for (const segment of path.split(sep).filter(Boolean)) {
     current = join(current, segment);
-    await requireRealDirectory(current);
+    yield* requireRealDirectory(current);
   }
-  const resolvedDirectory = await realpath(directory);
-  if (!isPathInside(workspaceRoot, resolvedDirectory)) {
-    throw new Error(`Managed skill target escapes its workspace: ${directory}`);
-  }
-}
+  const resolvedDirectory = yield* managedIO(() => realpath(directory));
+  if (!isPathInside(workspaceRoot, resolvedDirectory))
+    return yield* new ManagedSkillFailure({
+      cause: new Error(`Managed skill target escapes its workspace: ${directory}`),
+    });
+});
 
 function containedRelativePath(workspaceRoot: string, candidate: string): string {
   if (!isPathInside(workspaceRoot, candidate)) {
@@ -182,72 +199,64 @@ function containedRelativePath(workspaceRoot: string, candidate: string): string
   return relative(workspaceRoot, candidate);
 }
 
-async function requireRealDirectory(path: string): Promise<void> {
-  const stats = await lstat(path);
-  if (stats.isSymbolicLink() || !stats.isDirectory()) {
-    throw new Error(`Managed skill path must be a real directory: ${path}`);
+const requireRealDirectory = Effect.fn("ManagedSkill.requireDirectory")(function* (path: string) {
+  const stats = yield* managedIO(() => lstat(path));
+  if (stats.isSymbolicLink() || !stats.isDirectory())
+    return yield* new ManagedSkillFailure({ cause: new Error(`Managed skill path must be a real directory: ${path}`) });
+});
+const rejectSymlink = Effect.fn("ManagedSkill.rejectSymlink")(function* (path: string) {
+  const result = yield* Effect.result(managedIO(() => lstat(path)));
+  if (Result.isFailure(result)) {
+    if (isMissingFileError(result.failure.cause)) return;
+    return yield* result.failure;
   }
-}
-
-async function rejectSymlink(path: string): Promise<void> {
-  try {
-    if ((await lstat(path)).isSymbolicLink()) throw new Error(`Managed skill path cannot be a symlink: ${path}`);
-  } catch (error) {
-    if (isMissingFileError(error)) return;
-    throw error;
-  }
-}
-
-async function fileExists(path: string): Promise<boolean> {
-  try {
-    await lstat(path);
-    return true;
-  } catch (error) {
-    if (isMissingFileError(error)) return false;
-    throw error;
-  }
-}
-
-async function optionalText(path: string): Promise<string | null> {
-  try {
-    return await readFile(path, "utf8");
-  } catch (error) {
-    if (isMissingFileError(error)) return null;
-    throw error;
-  }
-}
+  if (result.success.isSymbolicLink())
+    return yield* new ManagedSkillFailure({ cause: new Error(`Managed skill path cannot be a symlink: ${path}`) });
+});
+const fileExists = Effect.fn("ManagedSkill.fileExists")((path: string) =>
+  managedIO(() => lstat(path)).pipe(
+    Effect.as(true),
+    Effect.catch((error) => (isMissingFileError(error.cause) ? Effect.succeed(false) : Effect.fail(error))),
+  ),
+);
+const optionalText = Effect.fn("ManagedSkill.optionalText")((path: string) =>
+  managedIO(() => readFile(path, "utf8")).pipe(
+    Effect.catch((error) => (isMissingFileError(error.cause) ? Effect.succeed(null) : Effect.fail(error))),
+  ),
+);
 
 function isFileExistsError(error: unknown): boolean {
   return error instanceof Error && "code" in error && error.code === "EEXIST";
 }
 
 /** Read only OpenBot-owned skills from the active provider's skill folder. */
-export async function listManagedSkillsForChat(agent: AgentSummary): Promise<InstalledSkill[]> {
-  const root = await realpath(agent.workspacePath);
+export const listManagedSkillsForChat = Effect.fn("ManagedSkill.listForChat")(function* (agent: AgentSummary) {
+  const root = yield* managedIO(() => realpath(agent.workspacePath));
   const reads = agentProviderDescriptor(agent.provider).skillFolders;
   const directory = join(root, MANAGED_SKILL_FOLDERS.find((folder) => reads.includes(folder)) ?? reads[0]);
   const skills: InstalledSkill[] = [];
-  try {
-    await verifySafeDirectory(root, directory);
-    for (const entry of await readdir(directory, { withFileTypes: true })) {
+  yield* Effect.gen(function* () {
+    yield* verifySafeDirectory(root, directory);
+    for (const entry of yield* managedIO(() => readdir(directory, { withFileTypes: true }))) {
       if (!entry.isDirectory()) continue;
-      try {
+      yield* Effect.gen(function* () {
         const folder = join(directory, entry.name);
-        await verifySafeDirectory(root, folder);
+        yield* verifySafeDirectory(root, folder);
         const marker = join(folder, OWNERSHIP_MARKER);
         const file = join(folder, "SKILL.md");
-        await rejectSymlink(marker);
-        await rejectSymlink(file);
+        yield* rejectSymlink(marker);
+        yield* rejectSymlink(file);
         if (
-          (await optionalText(marker)) !== `${JSON.stringify({ managedBy: "openbot", slug: entry.name, version: 1 })}\n`
+          (yield* optionalText(marker)) !==
+          `${JSON.stringify({ managedBy: "openbot", slug: entry.name, version: 1 })}\n`
         )
-          continue;
-        const content = await readFile(file, "utf8");
+          return;
+        const content = yield* managedIO(() => readFile(file, "utf8"));
         const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/u.exec(content)?.[1];
-        if (!frontmatter) continue;
-        const metadata = parseYaml(frontmatter);
+        if (!frontmatter) return;
+        const metadata = yield* managedSync(() => parseYaml(frontmatter));
         if (!isDynamicRecord(metadata) || metadata.name !== entry.name || typeof metadata.description !== "string")
-          continue;
+          return;
         skills.push({
           skillId: entry.name,
           slug: entry.name,
@@ -259,12 +268,14 @@ export async function listManagedSkillsForChat(agent: AgentSummary): Promise<Ins
           state: "installed",
           origin: "managed",
         });
-      } catch {
-        /* Missing or invalid managed files are not selectable. */
-      }
+      }).pipe(Effect.catch(() => Effect.void));
     }
-  } catch {
-    /* The workspace can have no managed skills yet. */
-  }
+  }).pipe(Effect.catch(() => Effect.void));
   return skills;
-}
+});
+
+class ManagedSkillFailure extends Schema.TaggedError<ManagedSkillFailure>()("ManagedSkillFailure", {
+  cause: Schema.Defect(),
+}) {}
+
+const { io: managedIO, sync: managedSync } = causeHelpers(ManagedSkillFailure);

@@ -8,6 +8,8 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
+import { Effect, Result, Schema } from "effect";
+import { causeHelpers } from "./effect-boundary";
 import { type McpOAuthAuthority, type McpSignIn, secureOAuthFetch } from "./mcp-oauth-provider";
 import {
   clearMcpCommandCache,
@@ -36,82 +38,60 @@ export interface McpProbeResult {
  * deadline below, and a server can do real work at startup. The answer is reported once and not
  * stored.
  */
-export async function testMcpServer(
+// SDK errors can quote credentials. Internal operations have no tracing spans; only the
+// redacted McpProbeResult crosses the probe boundary.
+export class McpProbeFailure extends Schema.TaggedError<McpProbeFailure>()("McpProbeFailure", {
+  cause: Schema.Defect(),
+}) {}
+
+const { io: probeIo, rewrap: toMcpProbeFailure } = causeHelpers(McpProbeFailure);
+
+export const testMcpServer = Effect.fnUntraced(function* (
   config: McpServerConfig,
   timeoutMs = MCP_PROBE_TIMEOUT_MS,
   tools: McpToolRuntimes = NO_MCP_TOOL_RUNTIMES,
   oauth?: McpOAuthAuthority,
-): Promise<McpProbeResult> {
-  // The user is asking about now, usually straight after installing the thing that was missing, so
-  // no command keeps an answer from earlier in this run. Only a test does this: a hand-off wants
-  // the answer the probe gave, or the panel and the agent would describe two different servers.
+) {
   clearMcpCommandCache();
-  // Nothing cancels a test from outside: it ends on its own within the deadline, and a child that
-  // outlives its transport is killed below either way.
-  const controller = new AbortController();
-  /*
-   * A sign-in is offered only here, and only for an http server. This is the one path a person is
-   * waiting on: at a thread start the same 401 has to stay silent, because a browser window nobody
-   * asked for arriving in the middle of an answer is worse than a tool that says it is not signed in.
-   */
-  const signIn = config.transport === "http" ? (oauth?.signIn(config.url) ?? null) : null;
-  try {
-    return await probeMcpServer(
-      await usableMcpServer(config, tools, oauth ? (subject) => oauth.accessToken(subject.url) : undefined),
-      controller.signal,
-      timeoutMs,
-      signIn,
-    );
-  } finally {
-    signIn?.abandon();
-  }
-}
+  return yield* Effect.acquireUseRelease(
+    Effect.sync(() => (config.transport === "http" ? (oauth?.signIn(config.url) ?? null) : null)),
+    (signIn) =>
+      Effect.gen(function* () {
+        const server = yield* usableMcpServer(
+          config,
+          tools,
+          oauth ? (subject) => oauth.accessToken(subject.url) : undefined,
+        );
+        return yield* probeMcpServerEffect(server, timeoutMs, signIn);
+      }),
+    (signIn) => Effect.sync(() => signIn?.abandon()),
+  );
+});
 
-/**
- * Connects to one already-resolved MCP server once, counts its tools, and disconnects.
- *
- * The providers make their own connections when an agent starts; a probe never becomes the
- * connection an agent talks to.
- */
-async function probeMcpServer(
+/** Connect, count, and close; a requested OAuth sign-in gets one fresh connection. */
+const probeMcpServerEffect = Effect.fnUntraced(function* (
   server: UsableMcpServer,
-  signal: AbortSignal,
-  timeoutMs = MCP_PROBE_TIMEOUT_MS,
-  signIn: McpSignIn | null = null,
-): Promise<McpProbeResult> {
+  timeoutMs: number,
+  signIn: McpSignIn | null,
+): Effect.fn.Return<McpProbeResult> {
   const { config } = server;
-  // `!== undefined`, not truthiness: the resolved arm declares `error?: undefined`, and only the
-  // explicit comparison narrows this union to the arm `connectAndCount` below is given.
   if (server.error !== undefined) return { toolCount: 0, error: boundedError(server.error) };
-
-  /*
-   * The token is minted for this connection and never written to the row, so `describeMcpError`,
-   * which reads the configuration, cannot know it. A transport reports a failure by quoting what it
-   * sent, and this is the one reader that would otherwise put a bearer token on the user's screen.
-   */
   const failure = (error: unknown): McpProbeResult => {
     const refused = signIn?.registrationFailed() && isRegistrationRefusal(error);
     const described = refused ? REGISTRATION_REFUSED : describeMcpError(error, config, timeoutMs);
     return { toolCount: 0, error: boundedError(redactMcpValues(described, probeSecrets(server, signIn))) };
   };
-
-  try {
-    return { toolCount: await connectAndCount(server, signal, timeoutMs, signIn?.provider), error: null };
-  } catch (error) {
-    if (!signIn || !(error instanceof UnauthorizedError)) return failure(error);
-    /*
-     * The browser is open on the server's own page. The deadline above measures the connection and
-     * not the person, so the wait for the grant is the sign-in's own and much longer; the second
-     * attempt is a fresh transport, because the first one has already been closed by its failure.
-     */
-    try {
-      await signIn.complete();
-      return { toolCount: await connectAndCount(server, signal, timeoutMs, signIn.provider), error: null };
-    } catch (retry) {
-      return failure(retry);
-    }
-  }
-}
+  const first = yield* Effect.result(connectAndCountEffect(server, timeoutMs, signIn?.provider));
+  if (Result.isSuccess(first)) return { toolCount: first.success, error: null };
+  if (!signIn || !(first.failure.cause instanceof UnauthorizedError)) return failure(first.failure.cause);
+  // The person's sign-in has its own deadline; the retried connection gets a fresh transport.
+  const retry = yield* Effect.result(
+    signIn
+      .complete()
+      .pipe(toMcpProbeFailure, Effect.andThen(connectAndCountEffect(server, timeoutMs, signIn.provider))),
+  );
+  return Result.isFailure(retry) ? failure(retry.failure.cause) : { toolCount: retry.success, error: null };
+});
 
 /**
  * Every secret this probe could have sent.
@@ -130,48 +110,49 @@ function probeSecrets(server: UsableMcpServer, signIn: McpSignIn | null): string
 }
 
 /** One connection, from the handshake to the tool count, closed again whatever it answered. */
-async function connectAndCount(
+const connectAndCountEffect = Effect.fnUntraced(function* (
   server: ResolvedMcpServer,
-  signal: AbortSignal,
   timeoutMs: number,
   authProvider: OAuthClientProvider | undefined,
-): Promise<number> {
-  const client = new Client({ name: "openbot-probe", version: "1" }, { capabilities: {} });
-  const transport = createTransport(server, authProvider);
-  try {
-    return await withDeadline(
-      (async () => {
-        await client.connect(transport);
-        return await countTools(client);
-      })(),
-      signal,
-      timeoutMs,
-    );
-  } finally {
-    await closeQuietly(client, transport);
-  }
-}
+) {
+  return yield* Effect.acquireUseRelease(
+    Effect.try({
+      try: () => ({
+        client: new Client({ name: "openbot-probe", version: "1" }, { capabilities: {} }),
+        transport: createTransport(server, authProvider),
+      }),
+      catch: (cause) => new McpProbeFailure({ cause }),
+    }),
+    ({ client, transport }) =>
+      Effect.gen(function* () {
+        yield* probeIo((signal) => client.connect(transport, { signal }));
+        return yield* countToolsEffect(client);
+      }).pipe(
+        Effect.timeoutOrElse({
+          duration: timeoutMs,
+          orElse: () => Effect.fail(new McpProbeFailure({ cause: new McpTimeout(timeoutMs) })),
+        }),
+      ),
+    ({ client, transport }) => closeQuietlyEffect(client, transport),
+  );
+});
 
-/**
- * Every tool the server offers, not the first page of them.
- *
- * A server with many tools answers `tools/list` one page at a time, and the number on the row is an
- * answer to "what would an agent get". The deadline around this call bounds the walk; a cursor that
- * repeats, and the count the panel can carry, end it as well.
- */
-async function countTools(client: Client): Promise<number> {
+/** Count all pages within the connection deadline, without repeating a cursor. */
+const countToolsEffect = Effect.fnUntraced(function* (client: Client) {
   const seen = new Set<string>();
   let count = 0;
   let cursor: string | undefined;
   for (;;) {
-    const page = await client.listTools(cursor === undefined ? undefined : { cursor });
+    const page = yield* probeIo((signal) =>
+      client.listTools(cursor === undefined ? undefined : { cursor }, { signal }),
+    );
     count += page.tools.length;
     if (count >= INPUT_LIMITS.mcpToolCount) return INPUT_LIMITS.mcpToolCount;
     cursor = page.nextCursor;
     if (cursor === undefined || seen.has(cursor)) return count;
     seen.add(cursor);
   }
-}
+});
 
 /**
  * The failure text, held to the length the IPC decoder and the remote codec accept.
@@ -233,42 +214,16 @@ function createTransport(server: ResolvedMcpServer, authProvider?: OAuthClientPr
   });
 }
 
-function withDeadline<T>(work: Promise<T>, signal: AbortSignal, timeoutMs: number): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new McpTimeout(timeoutMs)), timeoutMs);
-    const onAbort = () => reject(new Error(sourceText("error.backend.mcpConnectionCancelled")));
-    signal.addEventListener("abort", onAbort, { once: true });
-    if (signal.aborted) onAbort();
-    work.then(resolve, reject).finally(() => {
-      clearTimeout(timer);
-      signal.removeEventListener("abort", onAbort);
-    });
-  });
-}
-
-/**
- * A child that ignores a closed stdin would otherwise outlive the panel that started it, so the
- * transport's own close is followed by a signal to its process.
- */
-async function closeQuietly(client: Client, transport: Transport): Promise<void> {
-  try {
-    await client.close();
-  } catch {
-    // The transport is closed next either way.
-  }
-  try {
-    await transport.close();
-  } catch {
-    // Nothing left to do: the process kill below is the last resort.
-  }
+/** Close both SDK resources and kill a stdio child if it survives transport close. */
+const closeQuietlyEffect = Effect.fnUntraced(function* (client: Client, transport: Transport) {
+  yield* probeIo(() => client.close()).pipe(Effect.catch(() => Effect.void));
+  yield* probeIo(() => transport.close()).pipe(Effect.catch(() => Effect.void));
   const pid = transport instanceof StdioClientTransport ? transport.pid : null;
   if (pid === null) return;
-  try {
-    process.kill(pid, "SIGKILL");
-  } catch {
-    // Already gone, which is the outcome this wanted.
-  }
-}
+  yield* Effect.try({ try: () => process.kill(pid, "SIGKILL"), catch: (cause) => new McpProbeFailure({ cause }) }).pipe(
+    Effect.catch(() => Effect.void),
+  );
+});
 
 class McpTimeout extends Error {
   constructor(readonly timeoutMs: number) {

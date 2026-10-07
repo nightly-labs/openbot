@@ -1,5 +1,5 @@
 // The shape every writing section of the site shares: a list of articles, the
-// routes they sit on, and the words that wrap them. /news, /guides and /compare
+// routes they sit on, and the words that wrap them. /news, /guides, /compare and /providers
 // are values of this type, so the feed, the sitemap entries, the head tags and the
 // baked artwork are written once and read for each.
 //
@@ -10,9 +10,9 @@
 
 import { OPENBOT_SITE_URL } from "./site-metadata";
 
-export type CollectionId = "news" | "guides" | "compare";
+export type CollectionId = "news" | "guides" | "compare" | "providers";
 /** The collections whose articles are prose, drawn by the article page. */
-export type ProseCollectionId = Exclude<CollectionId, "compare">;
+export type ProseCollectionId = Exclude<CollectionId, "compare" | "providers">;
 
 export interface CollectionArticle {
   /** URL segment. Lowercase, hyphenated, never changed after publication. */
@@ -83,6 +83,11 @@ export function reportedArticlePath(collection: ContentCollection, slug: string)
 
 export function articleUrl(collection: ContentCollection, slug: string, siteUrl = OPENBOT_SITE_URL): string {
   return new URL(articlePath(collection, slug), siteUrl).toString();
+}
+
+/** The article's text as Markdown, which `src/server/page-markdown.ts` serves. */
+export function articleMarkdownUrl(collection: ContentCollection, slug: string, siteUrl = OPENBOT_SITE_URL): string {
+  return new URL(`${articlePath(collection, slug)}.md`, siteUrl).toString();
 }
 
 export function collectionIndexUrl(collection: ContentCollection, siteUrl = OPENBOT_SITE_URL): string {

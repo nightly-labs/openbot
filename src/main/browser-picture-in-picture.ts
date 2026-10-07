@@ -1,6 +1,8 @@
 import type { BrowserBounds, BrowserPictureInPictureEvent } from "@openbot/contracts/ipc";
+import { Effect, Schema } from "effect";
 import { BrowserWindow, screen, WebContentsView } from "electron";
 import type { BrowserHost } from "../backend/browser-host";
+import { causeHelpers } from "../backend/effect-boundary";
 import {
   BROWSER_PIP_MIN_HEIGHT,
   BROWSER_PIP_MIN_WIDTH,
@@ -31,7 +33,10 @@ export class BrowserPictureInPicture {
     this.#options = options;
   }
 
-  async open(savedBounds?: BrowserBounds): Promise<BrowserBounds> {
+  readonly open = Effect.fn("BrowserPictureInPicture.open")(function* (
+    this: BrowserPictureInPicture,
+    savedBounds?: BrowserBounds,
+  ): Effect.fn.Return<BrowserBounds, PictureInPictureFailed> {
     const existing = this.#window;
     if (existing && !existing.isDestroyed()) {
       existing.showInactive();
@@ -122,21 +127,25 @@ export class BrowserPictureInPicture {
     });
 
     const developmentUrl = this.#options.developmentUrl;
-    await (developmentUrl
-      ? window.loadURL(new URL("browser-pip.html", `${developmentUrl}/`).toString())
-      : window.loadURL("openbot-app://app/browser-pip.html"));
+    yield* pipCall(() =>
+      developmentUrl
+        ? window.loadURL(new URL("browser-pip.html", `${developmentUrl}/`).toString())
+        : window.loadURL("openbot-app://app/browser-pip.html"),
+    );
     // The system can close the window during the load, and the `closed` handler closes the controls.
     if (controlsView.webContents.isDestroyed()) return bounds;
-    await (developmentUrl
-      ? controlsView.webContents.loadURL(new URL("browser-pip-controls.html", `${developmentUrl}/`).toString())
-      : controlsView.webContents.loadURL("openbot-app://app/browser-pip-controls.html"));
+    yield* pipCall(() =>
+      developmentUrl
+        ? controlsView.webContents.loadURL(new URL("browser-pip-controls.html", `${developmentUrl}/`).toString())
+        : controlsView.webContents.loadURL("openbot-app://app/browser-pip-controls.html"),
+    );
     if (!window.isDestroyed()) {
       this.#startHoverTracking(window, controlsView);
       window.showInactive();
       window.moveTop();
     }
     return window.isDestroyed() ? bounds : window.getBounds();
-  }
+  }).bind(this);
 
   dock(): void {
     this.#close("dock");
@@ -221,3 +230,9 @@ export class BrowserPictureInPicture {
     this.#controlsVisible = false;
   }
 }
+
+export class PictureInPictureFailed extends Schema.TaggedError<PictureInPictureFailed>()("PictureInPictureFailed", {
+  cause: Schema.Defect(),
+}) {}
+
+const { io: pipCall } = causeHelpers(PictureInPictureFailed);

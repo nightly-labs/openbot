@@ -1,20 +1,18 @@
-/** The rejection of `withTimeout`, so a caller can tell its own timer from an error `work` threw. */
+import { Effect } from "effect";
+
+/** Distinguishes this deadline from a failure reported by the operation. */
 export class TimeoutError extends Error {}
 
-/**
- * Settles as `work` settles, or rejects with `message` after `timeoutMs`. The timer is cleared in
- * both cases. `work` itself keeps running: the caller only stops waiting for it.
- */
-export async function withTimeout<T>(work: Promise<T>, timeoutMs: number, message: string): Promise<T> {
-  let timer: NodeJS.Timeout | undefined;
-  try {
-    return await Promise.race([
-      work,
-      new Promise<never>((_resolve, reject) => {
-        timer = setTimeout(() => reject(new TimeoutError(message)), timeoutMs);
-      }),
-    ]);
-  } finally {
-    clearTimeout(timer);
-  }
+/** Bound one waiter. Use Fiber.join to wait without cancelling separately owned work. */
+export function withTimeout<A, E, R>(
+  work: Effect.Effect<A, E, R>,
+  timeoutMs: number,
+  message: string,
+): Effect.Effect<A, E | TimeoutError, R> {
+  return work.pipe(
+    Effect.timeoutOrElse({
+      duration: timeoutMs,
+      orElse: () => Effect.fail(new TimeoutError(message)),
+    }),
+  );
 }

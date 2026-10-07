@@ -1,8 +1,8 @@
-import { Host, Picker } from "@expo/ui";
 import { DEFAULT_TEAM_MEMBER_LIMIT, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { PERMANENT_INVITE_EXPIRES_AT_MS } from "@openbot/contracts/invite-links";
 import { normalizeEmailAddress } from "@openbot/contracts/validation";
 import type { RemoteTeamMember } from "@openbot/team-client";
+import { runTeamEffect } from "@openbot/team-client";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import * as Clipboard from "expo-clipboard";
 import { useLocalSearchParams } from "expo-router";
@@ -18,6 +18,7 @@ import {
   SettingsRow,
   SettingsSection,
 } from "@/features/settings/components/settings-content";
+import { SettingsPicker } from "@/features/settings/components/settings-controls";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { ProfileAvatar } from "@/shared/components/profile-avatar";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
@@ -50,14 +51,14 @@ export function ServerMembersScreen() {
     enabled: Boolean(server),
     retry: false,
     gcTime: 0,
-    queryFn: () => teamDirectory.listMembers(serverId),
+    queryFn: () => runTeamEffect(teamDirectory.listMembers(serverId)),
   });
   const invites = useQuery({
     queryKey: ["server-invites", session?.apiUrl, session?.user.id, sessionScope, serverId],
     enabled: canInvite,
     retry: false,
     gcTime: 0,
-    queryFn: () => teamDirectory.listInvites(serverId),
+    queryFn: () => runTeamEffect(teamDirectory.listInvites(serverId)),
   });
   const inviteUsed = Boolean(
     created &&
@@ -103,10 +104,12 @@ export function ServerMembersScreen() {
                 member.role === "admin" ? t("mobile.server.members.makeMember") : t("mobile.server.members.makeAdmin"),
               onPress: () =>
                 perform(() =>
-                  teamDirectory.updateMember(
-                    serverId,
-                    member.membershipId,
-                    memberRole === "admin" ? "member" : "admin",
+                  runTeamEffect(
+                    teamDirectory.updateMember(
+                      serverId,
+                      member.membershipId,
+                      memberRole === "admin" ? "member" : "admin",
+                    ),
                   ),
                 ),
             },
@@ -115,7 +118,7 @@ export function ServerMembersScreen() {
       {
         text: t("mobile.server.members.remove"),
         style: "destructive",
-        onPress: () => perform(() => teamDirectory.leaveHost(serverId, member.membershipId)),
+        onPress: () => perform(() => runTeamEffect(teamDirectory.leaveHost(serverId, member.membershipId))),
       },
     ];
     Alert.alert(member.name || member.email, t("mobile.server.members.manage"), [
@@ -137,23 +140,24 @@ export function ServerMembersScreen() {
             <SettingsRow
               disclosure={false}
               trailing={
-                <Host matchContents colorScheme={theme === "dark" ? "dark" : "light"}>
-                  <Picker
-                    selectedValue={inviteMode}
-                    enabled={!action.isPending}
-                    onValueChange={(value) => {
-                      void haptics.selection();
-                      setInviteMode(value);
-                      setCreated(null);
-                      setCopied(false);
-                      action.reset();
-                    }}
-                  >
-                    <Picker.Item label={t("mobile.server.members.inviteLink")} value="link" />
-                    <Picker.Item label={t("mobile.server.members.email")} value="email" />
-                    <Picker.Item label={t("mobile.server.members.permanentLink")} value="permanent" />
-                  </Picker>
-                </Host>
+                <SettingsPicker
+                  value={inviteMode}
+                  options={[
+                    { value: "link", label: t("mobile.server.members.inviteLink") },
+                    { value: "email", label: t("mobile.server.members.email") },
+                    { value: "permanent", label: t("mobile.server.members.permanentLink") },
+                  ]}
+                  enabled={!action.isPending}
+                  dark={theme === "dark"}
+                  label={t("mobile.server.members.inviteWith")}
+                  onChange={(value) => {
+                    void haptics.selection();
+                    setInviteMode(value);
+                    setCreated(null);
+                    setCopied(false);
+                    action.reset();
+                  }}
+                />
               }
             >
               <Typography.Paragraph type="body-sm">{t("mobile.server.members.inviteWith")}</Typography.Paragraph>
@@ -176,19 +180,20 @@ export function ServerMembersScreen() {
             <SettingsRow
               disclosure={false}
               trailing={
-                <Host matchContents colorScheme={theme === "dark" ? "dark" : "light"}>
-                  <Picker
-                    selectedValue={role}
-                    enabled={!action.isPending}
-                    onValueChange={(value) => {
-                      void haptics.selection();
-                      setRole(value);
-                    }}
-                  >
-                    <Picker.Item label={t(SERVER_ROLE_LABEL_KEYS.member)} value="member" />
-                    <Picker.Item label={t(SERVER_ROLE_LABEL_KEYS.admin)} value="admin" />
-                  </Picker>
-                </Host>
+                <SettingsPicker
+                  value={role}
+                  options={[
+                    { value: "member", label: t(SERVER_ROLE_LABEL_KEYS.member) },
+                    { value: "admin", label: t(SERVER_ROLE_LABEL_KEYS.admin) },
+                  ]}
+                  enabled={!action.isPending}
+                  dark={theme === "dark"}
+                  label={t("mobile.server.members.role")}
+                  onChange={(value) => {
+                    void haptics.selection();
+                    setRole(value);
+                  }}
+                />
               }
             >
               <Typography.Paragraph type="body-sm">{t("mobile.server.members.role")}</Typography.Paragraph>
@@ -202,14 +207,18 @@ export function ServerMembersScreen() {
                   if (inviteMode === "email") {
                     const normalized = normalizeEmailAddress(email);
                     if (!normalized) throw new Error(t("mobile.server.members.invalidEmail"));
-                    const invite = await teamDirectory.sendInviteEmail(host, { role, email: normalized });
+                    const invite = await runTeamEffect(
+                      teamDirectory.sendInviteEmail(host, { role, email: normalized }),
+                    );
                     setCreated({ ...invite, email: normalized });
                   } else {
                     setCreated(
-                      await teamDirectory.createInvite(host, {
-                        role,
-                        ...(inviteMode === "permanent" ? { permanent: true } : {}),
-                      }),
+                      await runTeamEffect(
+                        teamDirectory.createInvite(host, {
+                          role,
+                          ...(inviteMode === "permanent" ? { permanent: true } : {}),
+                        }),
+                      ),
                     );
                   }
                   setCopied(false);
@@ -386,7 +395,7 @@ export function ServerMembersScreen() {
                     style: "destructive",
                     onPress: () =>
                       perform(async () => {
-                        await teamDirectory.revokeInvite(invite.inviteId);
+                        await runTeamEffect(teamDirectory.revokeInvite(invite.inviteId));
                         if (created?.inviteId === invite.inviteId) setCreated(null);
                       }),
                   },

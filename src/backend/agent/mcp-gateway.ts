@@ -1,6 +1,5 @@
 import type {
   McpServerConfig,
-  McpTestResult,
   RemoveMcpServerInput,
   SaveMcpServerInput,
   SetMcpServerEnabledInput,
@@ -8,7 +7,9 @@ import type {
 } from "@openbot/contracts/ipc";
 import { GITHUB_CONNECTOR_MCP_SERVER_ID, mcpConfigErrors, normalizeMcpConfig } from "@openbot/contracts/ipc";
 import type { Logger } from "@openbot/logging";
+import { Effect, Schema } from "effect";
 import type { AgentProvider } from "../agent-client";
+import { causeHelpers } from "../effect-boundary";
 import { McpHandoffLog } from "../mcp-handoff-log";
 import { type McpOAuthAuthority, normalizeResource } from "../mcp-oauth-provider";
 import { testMcpServer } from "../mcp-probe";
@@ -40,7 +41,7 @@ export interface TestMcpServerOptions {
 export interface McpGatewayHooks {
   emitError(code: string, error: unknown): void;
   /** Marks every agent's provider session for refresh. Read late: the threads are built after this. */
-  refreshAllAgentRuntimes(): void;
+  refreshAllAgentRuntimes(): Effect.Effect<void, McpGatewayFailed>;
 }
 
 /**
@@ -50,7 +51,7 @@ export interface McpGatewayHooks {
 export interface GitHubConnectorSource {
   mcpServer(): McpServerConfig | null;
   /** The bearer for `mcpServer()`: the secret of the loopback GitHub MCP server, or the user token. */
-  mcpAuthorization(): Promise<string | null>;
+  mcpAuthorization(): Effect.Effect<string | null, McpGatewayFailed>;
 }
 
 export interface McpGatewayOptions {
@@ -122,17 +123,21 @@ export class McpGateway {
   }
 
   /** The bearer token for one configuration, asked at every hand-off and never written to a row. */
-  async authorization(config: McpServerConfig): Promise<string | null> {
-    // The built-in GitHub entry spends the GitHub connection, not an MCP sign-in of its own.
+
+  readonly authorization = Effect.fnUntraced(function* (this: McpGateway, config: McpServerConfig) {
+    const github = this.#githubConnector;
+    const oauth = this.#oauth;
     const token =
       config.id === GITHUB_CONNECTOR_MCP_SERVER_ID
-        ? ((await this.#githubConnector?.mcpAuthorization()) ?? null)
-        : ((await this.#oauth?.accessToken(config.url)) ?? null);
-    // The one place a minted token is known before it leaves this process. The row never holds
-    // it, so this is what lets `redact` keep it out of a provider's own report of a failure.
+        ? github
+          ? yield* github.mcpAuthorization().pipe(toMcpGatewayFailed)
+          : null
+        : oauth
+          ? yield* oauth.accessToken(config.url).pipe(toMcpGatewayFailed)
+          : null;
     if (token) this.#handoff.recordSecret(token);
     return token;
-  }
+  });
 
   /**
    * Remembers a set that leaves for a provider, so its secrets stay redactable after the user edits
@@ -153,15 +158,21 @@ export class McpGateway {
     return this.#servers.list();
   }
 
-  save(input: SaveMcpServerInput): McpServerConfig[] {
-    this.#servers.save(input.config);
-    return this.changed();
-  }
+  readonly save = Effect.fn("McpGateway.save")(function* (this: McpGateway, input: SaveMcpServerInput) {
+    yield* Effect.try({
+      try: () => this.#servers.save(input.config),
+      catch: (cause) => new McpGatewayFailed({ cause }),
+    });
+    return yield* this.changed();
+  }, Effect.uninterruptible);
 
-  remove(input: RemoveMcpServerInput): McpServerConfig[] {
+  readonly remove = Effect.fn("McpGateway.remove")(function* (this: McpGateway, input: RemoveMcpServerInput) {
     const removed = this.#servers.list().find((config) => config.id === input.mcpServerId);
-    this.#servers.remove(input.mcpServerId);
-    const list = this.changed();
+    yield* Effect.try({
+      try: () => this.#servers.remove(input.mcpServerId),
+      catch: (cause) => new McpGatewayFailed({ cause }),
+    });
+    const list = yield* this.changed();
     /*
      * A row that goes takes its sign-in with it: a refresh token nothing can reach again is a secret
      * kept for no reason. Only when no row is left naming the same account, because two rows on one
@@ -175,15 +186,21 @@ export class McpGateway {
       removedResource &&
       !list.some((config) => config.transport === "http" && normalizeResource(config.url) === removedResource)
     ) {
-      void this.#oauth?.forget(removed.url);
+      if (this.#oauth) yield* this.#oauth.forget(removed.url).pipe(toMcpGatewayFailed);
     }
     return list;
-  }
+  }, Effect.uninterruptible);
 
-  setEnabled(input: SetMcpServerEnabledInput): McpServerConfig[] {
-    this.#servers.setEnabled(input.mcpServerId, input.enabled);
-    return this.changed();
-  }
+  readonly setEnabled = Effect.fn("McpGateway.setEnabled")(function* (
+    this: McpGateway,
+    input: SetMcpServerEnabledInput,
+  ) {
+    yield* Effect.try({
+      try: () => this.#servers.setEnabled(input.mcpServerId, input.enabled),
+      catch: (cause) => new McpGatewayFailed({ cause }),
+    });
+    return yield* this.changed();
+  }, Effect.uninterruptible);
 
   /**
    * The new list, and every agent marked to start a fresh provider session for its next turn.
@@ -192,13 +209,13 @@ export class McpGateway {
    * removed server stays callable and an added one is invisible until the app restarts. The public
    * thread and its history are untouched - only the private provider session is replaced.
    */
-  changed(): McpServerConfig[] {
+  readonly changed = Effect.fn("McpGateway.changed")(function* (this: McpGateway) {
     // A user who edits a server and does not fix it has to be told again. Without this the first
     // report of a run would be the only one, and an edit that changed nothing would look like a fix.
     this.#reportedDrops.clear();
-    this.#hooks.refreshAllAgentRuntimes();
+    yield* this.#hooks.refreshAllAgentRuntimes();
     return this.list();
-  }
+  });
 
   /**
    * Rows installed from the old catalog's `mcp-remote` bridge definitions reach their servers
@@ -215,11 +232,16 @@ export class McpGateway {
    * is saved. It is validated here first: a name this machine reserves, or a missing command, is a
    * sentence rather than a connection attempt.
    */
-  async test(input: TestMcpServerInput, options: TestMcpServerOptions = {}): Promise<McpTestResult> {
+
+  readonly test = Effect.fnUntraced(function* (
+    this: McpGateway,
+    input: TestMcpServerInput,
+    options: TestMcpServerOptions = {},
+  ) {
     const config = normalizeMcpConfig(input.config);
     const errors = mcpConfigErrors(config);
     const firstError = errors.name ?? errors.command ?? errors.url;
-    if (firstError) throw new Error(firstError);
+    if (firstError) return yield* new McpGatewayFailed({ cause: new Error(firstError) });
     // A browser only opens when a person is waiting for it. The remote Team API route asks for the
     // same test and gets the silent answer, because nobody is at this machine to finish a sign-in.
     // The stored sign-ins are still spent: without them the probe cannot read or refresh the host's
@@ -235,8 +257,8 @@ export class McpGateway {
           }
         : undefined;
     const oauth = options.interactive ? (stored ?? undefined) : silent;
-    return testMcpServer(config, undefined, this.#toolRuntimes(), oauth);
-  }
+    return yield* testMcpServer(config, undefined, this.#toolRuntimes(), oauth).pipe(toMcpGatewayFailed);
+  });
 
   /**
    * What the providers are given at spawn. They connect for themselves; a test is not used.
@@ -300,3 +322,9 @@ export class McpGateway {
     return redactMcpValues(text, [...mcpSecretValues(this.#servers.list()), ...this.#handoff.values()]);
   }
 }
+
+export class McpGatewayFailed extends Schema.TaggedError<McpGatewayFailed>()("McpGatewayFailed", {
+  cause: Schema.Defect(),
+}) {}
+
+export const { rewrap: toMcpGatewayFailed } = causeHelpers(McpGatewayFailed);

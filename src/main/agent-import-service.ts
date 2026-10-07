@@ -1,3 +1,5 @@
+import { Deferred, Effect, Exit, Result, Schema } from "effect";
+import { type ArchiveOperationError, archiveCall, archiveFailure, archiveResult, archiveSync } from "./archive-effects";
 // Agent import into this host from one `.zip` export: chosen by the local user, or sent by a member
 // of a joined client with `agent-import-v1`.
 //
@@ -22,7 +24,6 @@ import {
   type AgentSummary,
   type ApplyAgentImportInput,
   type AvatarImageInput,
-  type Channel,
   type ChannelCommand,
   type ChannelDraft,
   type CreateChannelMemoryInput,
@@ -32,6 +33,9 @@ import {
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { unzipSync, zipSync } from "fflate";
+import type { AgentService } from "../backend/agent-service";
+import type { ChannelService } from "../backend/channel-service";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { isPathInside } from "../backend/path-containment";
 import {
   AGENT_IMPORT_MANIFEST,
@@ -39,7 +43,9 @@ import {
   type ImportAgent,
   type ImportChannel,
 } from "./agent-import-manifest";
+import { validTimezone } from "./agent-marketplace-service";
 import type { LocalSkillLibrary } from "./local-skill-library";
+import type { SkillMarketplaceFailure } from "./skill-marketplace-service";
 import { inspectArchive, isUnsafeArchivePath } from "./skill-package";
 
 /** Skill folders are copied here, published to the local library, and removed again. */
@@ -55,15 +61,15 @@ export interface AgentImportAgents {
     description: string;
     avatarSeed: string;
     avatarHue: null;
-  }): Promise<AgentSummary>;
+  }): ReturnType<AgentService["createAgentProfile"]>;
   createRoutine(input: CreateRoutineInput, options?: { recordConversationEvent?: boolean }): unknown;
   createMemory(input: { agentId: string; text: string }): unknown;
-  setAvatar(agentId: string, image: AvatarImageInput | null): Promise<AgentSummary>;
-  deleteAgent(agentId: string): Promise<void>;
-  channels: { command(command: ChannelCommand, actor: ChannelActor): Promise<Channel> };
+  setAvatar(agentId: string, image: AvatarImageInput | null): ReturnType<AgentService["setAvatar"]>;
+  deleteAgent(agentId: string): ReturnType<AgentService["deleteAgent"]>;
+  channels: { command(command: ChannelCommand, actor: ChannelActor): ReturnType<ChannelService["command"]> };
   createChannelMemory(input: CreateChannelMemoryInput): unknown;
   createChannelRoutine(input: CreateChannelRoutineInput): unknown;
-  deleteChannel(channelId: string): Promise<void>;
+  deleteChannel(channelId: string): ReturnType<AgentService["deleteChannel"]>;
 }
 
 /** Who creates an imported channel: the local user or the member who imports, as when they create one by hand. */
@@ -74,7 +80,11 @@ export interface ChannelActor {
 
 export interface AgentImportSkills {
   library(): Pick<LocalSkillLibrary, "list" | "create" | "revise" | "withdraw">;
-  installLocal(input: { agentId: string; skillId: string; revision: number }): Promise<unknown>;
+  installLocal(input: {
+    agentId: string;
+    skillId: string;
+    revision: number;
+  }): Effect.Effect<unknown, SkillMarketplaceFailure>;
 }
 
 interface StagedEntry {
@@ -129,7 +139,7 @@ export class AgentImportService {
   /** Uploaded files that are not in `#staged`: being staged, or being applied. */
   #busyUploads = 0;
   /** Files left by an earlier run are removed before the first upload. */
-  #uploadDirectoryReady: Promise<void> | null = null;
+  #uploadDirectoryReady: Deferred.Deferred<void, ArchiveOperationError> | null = null;
 
   constructor(
     private readonly agents: AgentImportAgents,
@@ -140,66 +150,99 @@ export class AgentImportService {
   ) {}
 
   /** Reads and checks an export. A new stage by the same owner replaces the owner's previous one. */
-  stage(path: string, owner = LOCAL_IMPORT_OWNER): Promise<AgentImportPreview> {
-    this.#release(owner);
-    return this.#stageFile(path, owner, false);
-  }
+  readonly stage = Effect.fn("AgentImportService.stage")(function* (
+    this: AgentImportService,
+    path: string,
+    owner = LOCAL_IMPORT_OWNER,
+  ) {
+    yield* this.#release(owner);
+    return yield* this.#stageFile(path, owner, false);
+  }).bind(this);
 
-  /**
-   * Stages an export a member sends. The slot is taken before `read` receives the body, so parallel
-   * uploads cannot hold more than the limit in memory. The service keeps the file until apply,
-   * discard or expiry.
-   */
-  async stageUpload(read: () => Promise<Uint8Array>, owner: string): Promise<AgentImportPreview> {
+  readonly stageUpload = Effect.fn("AgentImportService.stageUpload")(function* (
+    this: AgentImportService,
+    read: () => Promise<Uint8Array>,
+    owner: string,
+  ): Effect.fn.Return<AgentImportPreview, ArchiveOperationError> {
     const directory = this.uploadDirectory;
-    if (!directory) throw new Error("Agent import uploads are not available.");
-    this.#release(owner);
+    if (!directory) return yield* archiveFailure(new Error("Agent import uploads are not available."));
+    yield* this.#release(owner);
     const held = [...this.#staged.values()].filter((slot) => slot.temporary).length;
-    if (held + this.#busyUploads >= UPLOAD_SLOTS) throw new Error(sourceText("error.import.hostBusy"));
+    if (held + this.#busyUploads >= UPLOAD_SLOTS)
+      return yield* archiveFailure(new Error(sourceText("error.import.hostBusy")));
     this.#busyUploads += 1;
-    try {
-      const bytes = await read();
-      this.#uploadDirectoryReady ??= rm(directory, { recursive: true, force: true })
-        .then(() => mkdir(directory, { recursive: true, mode: 0o700 }).then(() => undefined))
-        .catch((error: unknown) => {
-          // A failed setup is tried again by the next upload.
-          this.#uploadDirectoryReady = null;
-          throw error;
-        });
-      await this.#uploadDirectoryReady;
+    return yield* Effect.gen({ self: this }, function* () {
+      const bytes = yield* archiveCall(() => read());
+      yield* this.#prepareUploadDirectory(directory);
       const path = join(directory, `${randomUUID()}.zip`);
-      await writeFile(path, bytes, { flag: "wx", mode: 0o600 });
-      try {
-        return await this.#stageFile(path, owner, true);
-      } catch (error) {
-        await rm(path, { force: true });
-        throw error;
-      }
-    } finally {
-      this.#busyUploads -= 1;
-    }
-  }
+      let retained = false;
+      return yield* Effect.acquireUseRelease(
+        Effect.succeed(path),
+        () =>
+          Effect.gen({ self: this }, function* () {
+            yield* archiveCall(() => writeFile(path, bytes, { flag: "wx", mode: 0o600 })).pipe(Effect.uninterruptible);
+            const preview = yield* this.#stageFile(path, owner, true);
+            retained = true;
+            return preview;
+          }),
+        () => (retained ? Effect.void : archiveCall(() => rm(path, { force: true }))),
+      );
+    }).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          this.#busyUploads -= 1;
+        }),
+      ),
+    );
+  }).bind(this);
 
-  async #stageFile(path: string, owner: string, temporary: boolean): Promise<AgentImportPreview> {
-    const bytes = await readArchive(path);
-    const entries = listEntries(bytes);
+  readonly #prepareUploadDirectory = Effect.fn("AgentImportService.prepareUploadDirectory")(function* (
+    this: AgentImportService,
+    directory: string,
+  ) {
+    if (this.#uploadDirectoryReady) return yield* Deferred.await(this.#uploadDirectoryReady);
+    const ready = Deferred.makeUnsafe<void, ArchiveOperationError>();
+    this.#uploadDirectoryReady = ready;
+    const exit = yield* Effect.exit(
+      Effect.gen(function* () {
+        yield* archiveCall(() => rm(directory, { recursive: true, force: true }));
+        yield* archiveCall(() => mkdir(directory, { recursive: true, mode: 0o700 }));
+      }),
+    );
+    yield* Deferred.done(ready, exit);
+    if (Exit.isFailure(exit)) this.#uploadDirectoryReady = null;
+    return yield* exit;
+  }, Effect.uninterruptible);
+
+  readonly #stageFile = Effect.fn("AgentImportService.stageFile")(function* (
+    this: AgentImportService,
+    path: string,
+    owner: string,
+    temporary: boolean,
+  ): Effect.fn.Return<AgentImportPreview, ArchiveOperationError> {
+    const bytes = yield* readArchiveEffect(path);
+    const entries = yield* archiveSync(() => listEntries(bytes));
     const wrapper = wrapperFolder([...entries.keys()]);
     const inner = new Map([...entries].map(([name, entry]) => [name.slice(wrapper.length), entry]));
     const manifestName = `${wrapper}${AGENT_IMPORT_MANIFEST}`;
     if (!entries.has(manifestName))
-      throw new Error(sourceText("error.import.manifestMissing", { manifest: AGENT_IMPORT_MANIFEST }));
-    const { manifest, warnings } = decodeImportManifest(
-      extract(bytes, (name) => name === manifestName)[manifestName] ?? new Uint8Array(),
+      return yield* archiveFailure(
+        new Error(sourceText("error.import.manifestMissing", { manifest: AGENT_IMPORT_MANIFEST })),
+      );
+    const { manifest, warnings } = yield* archiveSync(() =>
+      decodeImportManifest(extract(bytes, (name) => name === manifestName)[manifestName] ?? new Uint8Array()),
     );
 
     const avatarPaths = new Set(manifest.agents.flatMap((agent) => (agent.avatar ? [wrapper + agent.avatar] : [])));
-    const avatarBytes = extract(bytes, (name) => avatarPaths.has(name));
+    const avatarBytes = yield* archiveSync(() => extract(bytes, (name) => avatarPaths.has(name)));
     const avatars = new Map<string, AvatarImageInput>();
     const existing = new Set(this.agents.listAgents().map((agent) => agent.name.toLowerCase()));
     for (const agent of manifest.agents) {
       for (const skill of agent.skills)
         if (!inner.has(`${skill}/SKILL.md`))
-          throw new Error(sourceText("error.import.skillFolderMissing", { name: agent.name, skill }));
+          return yield* archiveFailure(
+            new Error(sourceText("error.import.skillFolderMissing", { name: agent.name, skill })),
+          );
       if (agent.avatar) {
         const image = avatarImage(avatarBytes[wrapper + agent.avatar]);
         if (image) avatars.set(agent.key, image);
@@ -209,7 +252,7 @@ export class AgentImportService {
 
     const token = randomUUID();
     // A second stage by the same owner can finish first: the owner keeps one export.
-    this.#release(owner);
+    yield* this.#release(owner);
     const slot: StagedSlot = {
       owner,
       value: { path, sha256: sha256(bytes), agents: manifest.agents, channels: manifest.channels, wrapper, avatars },
@@ -217,7 +260,9 @@ export class AgentImportService {
       expiry: null,
     };
     if (temporary) {
-      slot.expiry = setTimeout(() => this.#drop(token, slot), UPLOAD_TTL_MS);
+      slot.expiry = setTimeout(() => {
+        void runCauseEffect(this.#drop(token, slot));
+      }, UPLOAD_TTL_MS);
       slot.expiry.unref();
     }
     this.#staged.set(token, slot);
@@ -253,96 +298,121 @@ export class AgentImportService {
       })),
       warnings: bounded(warnings),
     };
-  }
+  });
 
-  discard(token: string, owner = LOCAL_IMPORT_OWNER): void {
+  readonly discard = Effect.fn("AgentImportService.discard")(function* (
+    this: AgentImportService,
+    token: string,
+    owner = LOCAL_IMPORT_OWNER,
+  ) {
     const slot = this.#staged.get(token);
-    if (slot?.owner === owner) this.#drop(token, slot);
-  }
+    if (slot && slot.owner === owner) yield* this.#drop(token, slot);
+  }).bind(this);
 
-  async apply(input: ApplyAgentImportInput, caller?: AgentImportCaller): Promise<AgentImportResult> {
+  readonly apply = Effect.fn("AgentImportService.apply")(function* (
+    this: AgentImportService,
+    input: ApplyAgentImportInput,
+    caller?: AgentImportCaller,
+  ): Effect.fn.Return<AgentImportResult, ArchiveOperationError> {
     const slot = this.#staged.get(input.token);
     // Another member's token reads as a closed export, so the answer does not show that it exists.
     if (!slot || slot.owner !== (caller?.owner ?? LOCAL_IMPORT_OWNER))
-      throw new Error(sourceText("error.import.exportClosed"));
+      return yield* archiveFailure(new Error(sourceText("error.import.exportClosed")));
     this.#staged.delete(input.token);
     if (slot.expiry) clearTimeout(slot.expiry);
     // The file stays on disk until the import ends, so it keeps its upload slot until then.
     if (slot.temporary) this.#busyUploads += 1;
-    try {
-      return await this.#apply(slot.value, input, {
+    return yield* Effect.gen({ self: this }, function* () {
+      return yield* this.#importSelected(slot.value, input, {
         actor: caller?.actor ?? this.channelActor(),
         timezone: caller?.timezone && validTimezone(caller.timezone) ? caller.timezone : this.timezone(),
         reviseSkills: caller?.reviseSkills ?? true,
       });
-    } finally {
-      if (slot.temporary) {
-        await rm(slot.value.path, { force: true }).catch(() => undefined);
-        this.#busyUploads -= 1;
-      }
-    }
-  }
+    }).pipe(
+      Effect.ensuring(
+        Effect.gen({ self: this }, function* () {
+          if (slot.temporary) {
+            yield* archiveCall(() => rm(slot.value.path, { force: true }).catch(() => undefined));
+            this.#busyUploads -= 1;
+          }
+        }).pipe(Effect.orDie),
+      ),
+    );
+  }).bind(this);
 
-  #release(owner: string): void {
-    for (const [token, slot] of this.#staged) if (slot.owner === owner) this.#drop(token, slot);
-  }
+  readonly #release = Effect.fn("AgentImportService.release")(function* (this: AgentImportService, owner: string) {
+    for (const [token, slot] of this.#staged) if (slot.owner === owner) yield* this.#drop(token, slot);
+  });
 
-  #drop(token: string, slot: StagedSlot): void {
+  readonly #drop = Effect.fn("AgentImportService.drop")(function* (
+    this: AgentImportService,
+    token: string,
+    slot: StagedSlot,
+  ) {
     if (this.#staged.get(token) !== slot) return;
     this.#staged.delete(token);
     if (slot.expiry) clearTimeout(slot.expiry);
-    if (slot.temporary) void rm(slot.value.path, { force: true }).catch(() => undefined);
-  }
+    if (slot.temporary) yield* archiveCall(() => rm(slot.value.path, { force: true })).pipe(Effect.ignore);
+  });
 
-  async #apply(staged: StagedImport, input: ApplyAgentImportInput, context: ImportContext): Promise<AgentImportResult> {
+  readonly #importSelected = Effect.fn("AgentImportService.importSelected")(function* (
+    this: AgentImportService,
+    staged: StagedImport,
+    input: ApplyAgentImportInput,
+    context: ImportContext,
+  ): Effect.fn.Return<AgentImportResult, ArchiveOperationError> {
     const selected = staged.agents.filter((agent) => input.keys.includes(agent.key));
-    if (selected.length !== input.keys.length) throw new Error(sourceText("error.import.agentNotInExport"));
+    if (selected.length !== input.keys.length)
+      return yield* archiveFailure(new Error(sourceText("error.import.agentNotInExport")));
     const selectedChannels = staged.channels.filter((channel) => input.channelKeys.includes(channel.key));
     if (selectedChannels.length !== input.channelKeys.length)
-      throw new Error(sourceText("error.import.channelNotInExport"));
+      return yield* archiveFailure(new Error(sourceText("error.import.channelNotInExport")));
     if (this.agents.listAgents().length + selected.length > INPUT_LIMITS.agents)
-      throw new Error(sourceText("error.import.serverAgentLimit", { limit: INPUT_LIMITS.agents }));
+      return yield* archiveFailure(
+        new Error(sourceText("error.import.serverAgentLimit", { limit: INPUT_LIMITS.agents })),
+      );
 
     // The archive is read again rather than held since `stage`: an export can be hundreds of MB.
     // The file can change in between, so only the same bytes are accepted.
-    const bytes = await readArchive(staged.path);
-    if (sha256(bytes) !== staged.sha256) throw new Error(sourceText("error.import.exportChanged"));
+    const bytes = yield* readArchiveEffect(staged.path);
+    if (sha256(bytes) !== staged.sha256)
+      return yield* archiveFailure(new Error(sourceText("error.import.exportChanged")));
     const imported: AgentSummary[] = [];
     const skipped: AgentImportSkipped[] = [];
     const warnings: string[] = [];
     const agentIds = new Map<string, string>();
     for (const agent of selected) {
-      try {
-        const summary = await this.importAgent(bytes, staged, agent, context, warnings);
-        imported.push(summary);
-        agentIds.set(agent.key, summary.id);
-      } catch (error) {
-        skipped.push({ key: agent.key, name: agent.name, reason: message(error) });
+      const importedAgent = yield* Effect.result(this.#importAgent(bytes, staged, agent, context, warnings));
+      if (Result.isFailure(importedAgent)) {
+        skipped.push({ key: agent.key, name: agent.name, reason: message(importedAgent.failure.cause) });
+      } else {
+        imported.push(importedAgent.success);
+        agentIds.set(agent.key, importedAgent.success.id);
       }
     }
     const channels: AgentImportChannel[] = [];
     const skippedChannels: AgentImportSkipped[] = [];
     for (const channel of selectedChannels) {
-      try {
-        channels.push(await this.importChannel(channel, agentIds, context, warnings));
-      } catch (error) {
-        skippedChannels.push({ key: channel.key, name: channel.name, reason: message(error) });
-      }
+      const importedChannel = yield* Effect.result(this.#importChannel(channel, agentIds, context, warnings));
+      if (Result.isFailure(importedChannel)) {
+        skippedChannels.push({ key: channel.key, name: channel.name, reason: message(importedChannel.failure.cause) });
+      } else channels.push(importedChannel.success);
     }
     return { agents: imported, skipped, channels, skippedChannels, warnings: bounded(warnings) };
-  }
+  });
 
-  private async importChannel(
+  readonly #importChannel = Effect.fn("AgentImportService.importChannel")(function* (
+    this: AgentImportService,
     source: ImportChannel,
     agentIds: ReadonlyMap<string, string>,
     context: ImportContext,
     warnings: string[],
-  ): Promise<AgentImportChannel> {
+  ): Effect.fn.Return<AgentImportChannel, ArchiveOperationError> {
     const members = source.members.flatMap((key) => {
       const agentId = agentIds.get(key);
       return agentId ? [{ agentId }] : [];
     });
-    if (members.length === 0) throw new Error(sourceText("error.import.noMembersImported"));
+    if (members.length === 0) return yield* archiveFailure(new Error(sourceText("error.import.noMembersImported")));
     const leadAgentId = source.lead ? (agentIds.get(source.lead) ?? null) : null;
     if (source.lead && !leadAgentId) warnings.push(sourceText("error.import.leadNotImported", { name: source.name }));
     const draft: ChannelDraft = {
@@ -352,139 +422,200 @@ export class AgentImportService {
       members,
       leadAgentId,
     };
-    if (!isChannelDraft(draft)) throw new Error("The channel is invalid.");
-    const channel = await this.agents.channels.command(
-      { type: "save", operationId: randomUUID(), channelId: randomUUID(), draft },
-      context.actor,
-    );
-    try {
-      for (const text of source.memories) this.agents.createChannelMemory({ channelId: channel.id, text });
-      for (const routine of source.routines) {
-        try {
-          this.agents.createChannelRoutine({
-            channelId: channel.id,
-            name: routine.name,
-            instruction: routine.instruction,
-            active: routine.active,
-            timezone: routine.timezone && validTimezone(routine.timezone) ? routine.timezone : context.timezone,
-            schedule: routine.schedule,
-          });
-        } catch (error) {
-          warnings.push(
-            sourceText("error.import.routineSkipped", {
-              name: source.name,
-              routine: routine.name,
-              reason: message(error),
-            }),
-          );
-        }
-      }
-      return { id: channel.id, name: channel.name };
-    } catch (error) {
-      await this.agents.deleteChannel(channel.id).catch(() => undefined);
-      throw error;
-    }
-  }
+    if (!isChannelDraft(draft)) return yield* archiveFailure(new Error("The channel is invalid."));
 
-  private async importAgent(
+    let completed = false;
+    return yield* Effect.acquireUseRelease(
+      this.agents.channels
+        .command({ type: "save", operationId: randomUUID(), channelId: randomUUID(), draft }, context.actor)
+        .pipe(Effect.mapError((error) => archiveFailure(error.cause))),
+      (created) =>
+        Effect.gen({ self: this }, function* () {
+          const channel = created;
+          try {
+            for (const text of source.memories) this.agents.createChannelMemory({ channelId: channel.id, text });
+            for (const routine of source.routines) {
+              try {
+                this.agents.createChannelRoutine({
+                  channelId: channel.id,
+                  name: routine.name,
+                  instruction: routine.instruction,
+                  active: routine.active,
+                  timezone: routine.timezone && validTimezone(routine.timezone) ? routine.timezone : context.timezone,
+                  schedule: routine.schedule,
+                });
+              } catch (error) {
+                warnings.push(
+                  sourceText("error.import.routineSkipped", {
+                    name: source.name,
+                    routine: routine.name,
+                    reason: message(error),
+                  }),
+                );
+              }
+            }
+            completed = true;
+            return { id: channel.id, name: channel.name };
+          } catch (error) {
+            return yield* archiveFailure(error);
+          }
+        }),
+      (channel) =>
+        completed
+          ? Effect.void
+          : Effect.gen({ self: this }, function* () {
+              yield* this.agents.deleteChannel(channel.id).pipe(Effect.ignore);
+            }).pipe(Effect.orDie),
+    );
+  });
+
+  readonly #importAgent = Effect.fn("AgentImportService.importAgent")(function* (
+    this: AgentImportService,
     bytes: Uint8Array,
     staged: StagedImport,
     source: ImportAgent,
     context: ImportContext,
     warnings: string[],
-  ): Promise<AgentSummary> {
+  ): Effect.fn.Return<AgentSummary, ArchiveOperationError> {
     const prefix = `${staged.wrapper}agents/${source.key}/`;
-    const files = extract(bytes, (name) => name.startsWith(prefix));
+    const files = yield* archiveSync(() => extract(bytes, (name) => name.startsWith(prefix)));
     const read = (path: string) =>
       Object.entries(files)
         .filter(([name]) => name.startsWith(`${staged.wrapper}${path}/`))
         .map(([name, data]) => [name.slice(staged.wrapper.length + path.length + 1), data] as const);
     // Every skill is checked before the agent exists, so a bad one publishes nothing.
-    const skills = source.skills.map((skill) => {
-      const skillFiles = read(skill);
-      return { files: skillFiles, slug: inspectArchive(zipSync(Object.fromEntries(skillFiles))).slug };
-    });
+    const skills = yield* archiveSync(() =>
+      source.skills.map((skill) => {
+        const skillFiles = read(skill);
+        return { files: skillFiles, slug: inspectArchive(zipSync(Object.fromEntries(skillFiles))).slug };
+      }),
+    );
 
-    let agent = await this.agents.createAgentProfile({
-      name: source.name,
-      ...(source.title ? { title: source.title } : {}),
-      description: source.description,
-      avatarSeed: `${source.key}-${randomUUID()}`,
-      avatarHue: null,
-    });
     const published: Array<{ id: string; revision: number }> = [];
-    try {
-      if (source.files)
-        await writeImportedFiles(join(agent.workspacePath, IMPORTED_FILES), read(source.files), source.name, warnings);
-      for (const skill of skills) {
-        const library = this.skills.library();
-        const current = (await library.list()).find((candidate) => candidate.slug === skill.slug);
-        if (current && !context.reviseSkills) {
-          warnings.push(sourceText("error.import.skillKept", { name: source.name, skill: skill.slug }));
-          await this.skills.installLocal({ agentId: agent.id, skillId: current.id, revision: current.version });
-          continue;
-        }
-        const folder = `${SKILL_STAGING}/${skill.slug}`;
-        const target = join(agent.workspacePath, ...folder.split("/"));
-        try {
-          await writeTree(target, skill.files);
-          // An earlier import published this skill already: a new revision keeps one library entry.
-          const revision = current
-            ? await library.revise(agent.id, current.id, current.version, folder)
-            : await library.create(agent.id, folder);
-          published.push({ id: revision.id, revision: revision.version });
-          await this.skills.installLocal({ agentId: agent.id, skillId: revision.id, revision: revision.version });
-        } finally {
-          await rm(target, { recursive: true, force: true });
-        }
-      }
-      for (const routine of source.routines) {
-        try {
-          this.agents.createRoutine(
-            {
-              agentId: agent.id,
-              name: routine.name,
-              instruction: routine.instruction,
-              active: routine.active,
-              timezone: routine.timezone && validTimezone(routine.timezone) ? routine.timezone : context.timezone,
-              schedule: routine.schedule,
-            },
-            { recordConversationEvent: false },
-          );
-        } catch (error) {
-          warnings.push(
-            sourceText("error.import.routineSkipped", {
-              name: source.name,
-              routine: routine.name,
-              reason: message(error),
-            }),
-          );
-        }
-      }
-      for (const text of source.memories) this.agents.createMemory({ agentId: agent.id, text });
-      const avatar = staged.avatars.get(source.key);
-      if (avatar) agent = await this.agents.setAvatar(agent.id, avatar);
-      return agent;
-    } catch (error) {
-      await this.agents.deleteAgent(agent.id).catch(() => undefined);
-      // A failed import leaves the shared library as it was.
-      for (const skill of published.reverse())
-        await this.skills
-          .library()
-          .withdraw(skill.id, skill.revision)
-          .catch(() => undefined);
-      throw error;
-    }
-  }
+    let completed = false;
+    return yield* Effect.acquireUseRelease(
+      this.agents
+        .createAgentProfile({
+          name: source.name,
+          ...(source.title ? { title: source.title } : {}),
+          description: source.description,
+          avatarSeed: `${source.key}-${randomUUID()}`,
+          avatarHue: null,
+        })
+        .pipe(Effect.mapError((error) => archiveFailure(error.cause))),
+      (created) =>
+        Effect.gen({ self: this }, function* () {
+          let agent = created;
+          try {
+            if (source.files)
+              yield* writeImportedFilesEffect(
+                join(agent.workspacePath, IMPORTED_FILES),
+                read(source.files),
+                source.name,
+                warnings,
+              );
+            for (const skill of skills) {
+              const library = this.skills.library();
+              const current = (yield* library
+                .list()
+                .pipe(Effect.mapError((error) => archiveFailure(error.cause)))).find(
+                (candidate) => candidate.slug === skill.slug,
+              );
+              if (current && !context.reviseSkills) {
+                warnings.push(sourceText("error.import.skillKept", { name: source.name, skill: skill.slug }));
+                yield* this.skills
+                  .installLocal({ agentId: agent.id, skillId: current.id, revision: current.version })
+                  .pipe(Effect.mapError((error) => archiveFailure(error.cause)))
+                  .pipe(Effect.uninterruptible);
+                continue;
+              }
+              const folder = `${SKILL_STAGING}/${skill.slug}`;
+              const target = join(agent.workspacePath, ...folder.split("/"));
+              yield* Effect.acquireUseRelease(
+                Effect.succeed(target),
+                () =>
+                  Effect.gen({ self: this }, function* () {
+                    yield* writeTreeEffect(target, skill.files);
+                    // A new revision retains the existing library entry.
+                    const revision = yield* Effect.gen(function* () {
+                      const revision = yield* (
+                        current
+                          ? library.revise(agent.id, current.id, current.version, folder)
+                          : library.create(agent.id, folder)
+                      ).pipe(Effect.mapError((error) => archiveFailure(error.cause)));
+                      published.push({ id: revision.id, revision: revision.version });
+                      return revision;
+                    }).pipe(Effect.uninterruptible);
+                    yield* this.skills
+                      .installLocal({
+                        agentId: agent.id,
+                        skillId: revision.id,
+                        revision: revision.version,
+                      })
+                      .pipe(Effect.mapError((error) => archiveFailure(error.cause)))
+                      .pipe(Effect.uninterruptible);
+                  }),
+                () => archiveCall(() => rm(target, { recursive: true, force: true })),
+              );
+            }
+
+            for (const routine of source.routines) {
+              try {
+                this.agents.createRoutine(
+                  {
+                    agentId: agent.id,
+                    name: routine.name,
+                    instruction: routine.instruction,
+                    active: routine.active,
+                    timezone: routine.timezone && validTimezone(routine.timezone) ? routine.timezone : context.timezone,
+                    schedule: routine.schedule,
+                  },
+                  { recordConversationEvent: false },
+                );
+              } catch (error) {
+                warnings.push(
+                  sourceText("error.import.routineSkipped", {
+                    name: source.name,
+                    routine: routine.name,
+                    reason: message(error),
+                  }),
+                );
+              }
+            }
+            for (const text of source.memories) this.agents.createMemory({ agentId: agent.id, text });
+            const avatar = staged.avatars.get(source.key);
+            if (avatar)
+              agent = yield* this.agents
+                .setAvatar(agent.id, avatar)
+                .pipe(Effect.mapError((error) => archiveFailure(error.cause)))
+                .pipe(Effect.uninterruptible);
+            completed = true;
+            return agent;
+          } catch (error) {
+            return yield* archiveFailure(error);
+          }
+        }),
+      (agent) =>
+        completed
+          ? Effect.void
+          : Effect.gen({ self: this }, function* () {
+              yield* this.agents.deleteAgent(agent.id).pipe(Effect.ignore);
+              for (const skill of published.reverse())
+                yield* this.skills.library().withdraw(skill.id, skill.revision).pipe(Effect.ignore);
+            }).pipe(Effect.orDie),
+    );
+  });
 }
 
-async function readArchive(path: string): Promise<Uint8Array> {
-  const info = await stat(path);
-  if (!info.isFile()) throw new Error(sourceText("error.import.chooseZip"));
+const readArchiveEffect = Effect.fn("Archive.readArchive")(function* (
+  path: string,
+): Effect.fn.Return<Uint8Array, ArchiveOperationError> {
+  const info = yield* archiveCall(() => stat(path));
+  if (!info.isFile()) return yield* archiveFailure(new Error(sourceText("error.import.chooseZip")));
   if (info.size === 0 || info.size > AGENT_IMPORT_LIMITS.archiveBytes)
-    throw new Error(sourceText("error.import.zipTooLarge"));
-  return new Uint8Array(await readFile(path));
-}
+    return yield* archiveFailure(new Error(sourceText("error.import.zipTooLarge")));
+  return new Uint8Array(yield* archiveCall(() => readFile(path)));
+});
 
 /** Every file entry and its expanded size, checked, without inflating anything. */
 function listEntries(bytes: Uint8Array): Map<string, StagedEntry> {
@@ -533,9 +664,12 @@ function isUnsafeEntry(name: string): boolean {
   return isUnsafeArchivePath(name) || name.split("/").some((part) => /^[a-z]:/iu.test(part));
 }
 
-class UnsafeEntry extends Error {
-  constructor(readonly entry: string | null) {
-    super("Unsafe archive entry.");
+class UnsafeEntry extends Schema.TaggedError<UnsafeEntry>()("UnsafeEntry", {
+  entry: Schema.NullOr(Schema.String),
+  message: Schema.String,
+}) {
+  constructor(entry: string | null) {
+    super({ entry, message: "Unsafe archive entry." });
   }
 }
 
@@ -551,39 +685,52 @@ function filesUnder(entries: Map<string, StagedEntry>, folder: string): Array<[s
   return [...entries].filter(([name]) => name.startsWith(`${folder}/`));
 }
 
-async function writeTree(root: string, files: ReadonlyArray<readonly [string, Uint8Array]>): Promise<void> {
+const writeTreeEffect = Effect.fn("Archive.writeTree")(function* (
+  root: string,
+  files: ReadonlyArray<readonly [string, Uint8Array]>,
+): Effect.fn.Return<void, ArchiveOperationError> {
   const base = resolve(root);
   for (const [name, data] of files) {
     const target = resolve(base, name);
     if (isAbsolute(name) || isUnsafeEntry(name) || target === base || !isPathInside(base, target))
-      throw new Error(sourceText("error.import.unsafeFile", { name }));
-    await mkdir(dirname(target), { recursive: true });
+      return yield* archiveFailure(new Error(sourceText("error.import.unsafeFile", { name })));
+    yield* archiveCall(() => mkdir(dirname(target), { recursive: true })).pipe(Effect.uninterruptible);
     // `wx` refuses to replace a file, so an entry can never overwrite what is already there.
-    await writeFile(target, data, { flag: "wx" });
+    yield* archiveCall(() => writeFile(target, data, { flag: "wx" })).pipe(Effect.uninterruptible);
   }
-}
+});
 
 /**
  * Writes the workspace files of one agent and never replaces a file. When a file is already there,
  * for example `README.md` and `readme.md` on a disk that ignores case, the entry is saved beside it
  * as `README (2).md`. A file that still cannot be written is skipped. Each case adds a warning.
  */
-async function writeImportedFiles(
+const writeImportedFilesEffect = Effect.fn("Archive.writeImportedFiles")(function* (
   root: string,
   files: ReadonlyArray<readonly [string, Uint8Array]>,
   agentName: string,
   warnings: string[],
-): Promise<void> {
+): Effect.fn.Return<void, ArchiveOperationError> {
   const base = resolve(root);
   for (const [name, data] of files) {
     const target = resolve(base, name);
     if (isAbsolute(name) || isUnsafeEntry(name) || target === base || !isPathInside(base, target))
-      throw new Error(sourceText("error.import.unsafeFile", { name }));
+      return yield* archiveFailure(new Error(sourceText("error.import.unsafeFile", { name })));
     try {
-      await mkdir(dirname(target), { recursive: true });
+      archiveResult(
+        yield* Effect.result(
+          archiveCall(() => mkdir(dirname(target), { recursive: true })).pipe(Effect.uninterruptible),
+        ),
+      );
       for (let copy = 1; ; copy += 1) {
         try {
-          await writeFile(copy === 1 ? target : copyName(target, copy), data, { flag: "wx" });
+          archiveResult(
+            yield* Effect.result(
+              archiveCall(() => writeFile(copy === 1 ? target : copyName(target, copy), data, { flag: "wx" })).pipe(
+                Effect.uninterruptible,
+              ),
+            ),
+          );
           if (copy > 1)
             warnings.push(
               sourceText("error.import.fileRenamed", { name: agentName, file: name, saved: copyName(name, copy) }),
@@ -597,7 +744,7 @@ async function writeImportedFiles(
       warnings.push(sourceText("error.import.fileSkipped", { name: agentName, file: name, reason: message(error) }));
     }
   }
-}
+});
 
 /** `notes/plan.md` becomes `notes/plan (2).md`. */
 function copyName(path: string, copy: number): string {
@@ -613,15 +760,6 @@ function avatarImage(bytes: Uint8Array | undefined): AvatarImageInput | null {
   if (!bytes) return null;
   const mimeType = AVATAR_MIME_TYPES.find((type) => isValidAvatarImage(type, bytes));
   return mimeType ? { mimeType, bytes } : null;
-}
-
-function validTimezone(value: string): boolean {
-  try {
-    new Intl.DateTimeFormat("en", { timeZone: value }).format();
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 function bounded(warnings: string[]): string[] {

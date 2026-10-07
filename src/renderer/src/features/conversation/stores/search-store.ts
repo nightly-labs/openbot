@@ -1,3 +1,4 @@
+import { prefersReducedMotion } from "@openbot/ui/utils";
 import { createEffect, onCleanup } from "solid-js";
 import type { ChatSearchMatch } from "../chat-search";
 import { clearChatSearchHighlights, findChatSearchMatches, renderChatSearchHighlights } from "../chat-search";
@@ -116,7 +117,7 @@ export function createSearchStore(deps: SearchStoreDeps) {
       if (!match) return;
       deps.revealMatch();
       match.message.scrollIntoView({
-        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+        behavior: prefersReducedMotion() ? "auto" : "smooth",
         block: "center",
         inline: "nearest",
       });

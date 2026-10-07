@@ -49,7 +49,7 @@ export function automationRunCommand(input: AutomationRunCommandInput): string {
   ].join(" ");
 }
 
-function shellQuote(value: string): string {
+export function shellQuote(value: string): string {
   return `'${value.replaceAll("'", `'\\''`)}'`;
 }
 

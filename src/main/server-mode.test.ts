@@ -3,7 +3,10 @@ import { request } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CentralAuthState, HostStatus } from "@openbot/contracts/ipc";
+import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
+import { RemoteWorkflowError, remoteCall } from "./remote-service-effects";
 import { ServerMode, takeServerModeEnvironment } from "./server-mode";
 
 const SESSION_TOKEN = "session-token-that-must-stay-in-main";
@@ -18,7 +21,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await server?.close();
+  if (server) await Effect.runPromise(server.close());
   server = null;
   await rm(directory, { recursive: true, force: true });
 });
@@ -43,36 +46,48 @@ function fixture() {
   };
   const centralAuth = {
     getState: () => state,
-    requestEmailCode: vi.fn(async (email: string) => {
-      state = { status: "code_sent", challengeId: "challenge-1", email, expiresAt: 1, resendAvailableAt: 1 };
-      return state;
-    }),
-    verifyEmailCode: vi.fn(async () => {
-      state = { status: "signed_in", user: { id: "u1", email: "owner@example.com", name: null, avatarUrl: null } };
-      // The real manager keeps the token to itself; a leak would come from echoing what it holds.
-      const held = { ...state, sessionToken: SESSION_TOKEN };
-      return held;
-    }),
-    logout: vi.fn(async () => {
-      state = { status: "signed_out" };
-      return state;
-    }),
+    requestEmailCode: vi.fn((email: string) =>
+      Effect.sync(() => {
+        state = { status: "code_sent", challengeId: "challenge-1", email, expiresAt: 1, resendAvailableAt: 1 };
+        return state;
+      }),
+    ),
+    verifyEmailCode: vi.fn(() =>
+      Effect.sync(() => {
+        state = { status: "signed_in", user: { id: "u1", email: "owner@example.com", name: null, avatarUrl: null } };
+        // The real manager keeps the token to itself; a leak would come from echoing what it holds.
+        const held = { ...state, sessionToken: SESSION_TOKEN };
+        return held;
+      }),
+    ),
+    logout: vi.fn(() =>
+      Effect.sync(() => {
+        state = { status: "signed_out" };
+        return state;
+      }),
+    ),
   };
   const host = {
     getStatus: () => hostStatus,
-    configure: vi.fn(async ({ serverName }: { serverName: string }) => {
-      await Promise.resolve();
-      hostStatus = { ...hostStatus, phase: "idle", configured: true, serverName };
-      return hostStatus;
-    }),
-    start: vi.fn(async () => {
-      hostStatus = { ...hostStatus, phase: "online" };
-      return hostStatus;
-    }),
-    updateIdentity: vi.fn(async ({ serverName }: { serverName?: string }) => {
-      hostStatus = { ...hostStatus, serverName: serverName ?? null };
-      return hostStatus;
-    }),
+    configure: vi.fn(({ serverName }: { serverName: string }) =>
+      remoteCall(async () => {
+        await Promise.resolve();
+        hostStatus = { ...hostStatus, phase: "idle", configured: true, serverName };
+        return hostStatus;
+      }),
+    ),
+    start: vi.fn(() =>
+      remoteCall(async () => {
+        hostStatus = { ...hostStatus, phase: "online" };
+        return hostStatus;
+      }),
+    ),
+    updateIdentity: vi.fn(({ serverName }: { serverName?: string }) =>
+      remoteCall(async () => {
+        hostStatus = { ...hostStatus, serverName: serverName ?? null };
+        return hostStatus;
+      }),
+    ),
   };
   const mode = new ServerMode({
     environment: { controlSocketPath: join(directory, "control.sock") },
@@ -124,26 +139,26 @@ describe("ServerMode control socket", () => {
   it("refuses a runtime directory that another user can enter", async () => {
     await chmod(directory, 0o750);
     server = fixture().mode;
-    await expect(server.listen()).rejects.toThrow("private directory");
+    await expect(runCauseEffect(server.listen())).rejects.toThrow("private directory");
   });
 
   it("keeps a file at the socket path that is not a socket", async () => {
     await writeFile(join(directory, "control.sock"), "not ours");
     server = fixture().mode;
-    await expect(server.listen()).rejects.toThrow("another file");
+    await expect(runCauseEffect(server.listen())).rejects.toThrow("another file");
     expect((await stat(join(directory, "control.sock"))).isFile()).toBe(true);
   });
 
   it("makes a socket that only its owner can open", async () => {
     server = fixture().mode;
-    await server.listen();
+    await runCauseEffect(server.listen());
     expect((await stat(join(directory, "control.sock"))).mode & 0o777).toBe(0o600);
   });
 
   it("signs in with an email code, never sends the session back, and publishes once", async () => {
     const { mode, host, centralAuth } = fixture();
     server = mode;
-    await server.listen();
+    await runCauseEffect(server.listen());
 
     const started = await send("POST", "/v1/login/start", "email=owner%40example.com");
     expect(started).toEqual({ status: 200, text: "challenge=challenge-1\nexpires_at=1\n" });
@@ -163,7 +178,7 @@ describe("ServerMode control socket", () => {
     expect(verified.text).toContain("account=signed_in\n");
 
     // The entry point and the start retry can both call this at the same time.
-    await Promise.all([mode.publish(), mode.publish()]);
+    await Promise.all([runCauseEffect(mode.publish()), runCauseEffect(mode.publish())]);
     expect(host.configure).toHaveBeenCalledOnce();
     const status = await send("GET", "/v1/status");
     expect(status.text).toContain("server=online\nserver_name=Lab Server\n");
@@ -172,10 +187,12 @@ describe("ServerMode control socket", () => {
   it("shows why publishing failed, on one line", async () => {
     const { mode, host } = fixture();
     server = mode;
-    await server.listen();
+    await runCauseEffect(server.listen());
     await send("POST", "/v1/login/verify", "challenge=challenge-1&code=123456");
-    host.configure.mockRejectedValueOnce(new Error("Refused.\naccount=x"));
-    await expect(mode.publish()).rejects.toThrow("Refused.");
+    host.configure.mockReturnValueOnce(
+      Effect.fail(new RemoteWorkflowError({ cause: new Error("Refused.\naccount=x") })),
+    );
+    await expect(runCauseEffect(mode.publish())).rejects.toThrow("Refused.");
 
     // A message with a line break stays one line, so it cannot add a key.
     const status = await send("GET", "/v1/status");
@@ -186,7 +203,7 @@ describe("ServerMode control socket", () => {
   it("refuses a body that is too large and an unknown request", async () => {
     const { mode, centralAuth } = fixture();
     server = mode;
-    await server.listen();
+    await runCauseEffect(server.listen());
     const large = await send("POST", "/v1/login/start", `email=${"a".repeat(5000)}%40example.com`);
     expect(large).toEqual({ status: 413, text: "error=too_large\n" });
     expect(centralAuth.requestEmailCode).not.toHaveBeenCalled();

@@ -5,7 +5,7 @@ import { View } from "react-native";
 import { ConnectionCountdown } from "@/features/workspace/components/connection-countdown";
 import { AnimatedCounter } from "@/features/workspace/components/connection-counter";
 import { ConnectionStatusReveal } from "@/features/workspace/components/connection-status-reveal";
-import { serverStatusLabel } from "@/features/workspace/model/server-status";
+import { recoveryAttempt, recoveryCountdown, serverStatusLabel } from "@/features/workspace/model/server-status";
 import type { MobileServer } from "@/features/workspace/model/workspace-types";
 import { useText } from "@/shared/lib/text";
 
@@ -15,9 +15,9 @@ function ConnectionStatusText({ server }: { server: MobileServer }) {
   const reconnecting = recovery && recovery.phase !== "online" && recovery.phase !== "suspended";
   const title = reconnecting ? t("mobile.workspace.status.reconnecting") : serverStatusLabel(server, t);
   const detail = reconnecting
-    ? t("mobile.workspace.status.attempt", { attempt: recovery.attempt, limit: REMOTE_RETRY_LIMIT })
+    ? t("mobile.workspace.status.attempt", { attempt: recoveryAttempt(recovery), limit: REMOTE_RETRY_LIMIT })
     : server.connectionMessage && sourceText(server.connectionMessage);
-  const remainingSeconds = reconnecting ? recovery.remainingSeconds : null;
+  const remainingSeconds = reconnecting ? recoveryCountdown(recovery) : null;
 
   return (
     <View
@@ -43,7 +43,7 @@ function ConnectionStatusText({ server }: { server: MobileServer }) {
       </Typography.Paragraph>
       {reconnecting ? (
         <>
-          <AnimatedCounter value={String(recovery.attempt)} />
+          <AnimatedCounter value={String(recoveryAttempt(recovery))} />
           <Typography.Paragraph type="body-xs" className="text-text-secondary" maxFontSizeMultiplier={1.2}>
             /{REMOTE_RETRY_LIMIT}
           </Typography.Paragraph>

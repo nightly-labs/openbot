@@ -16,6 +16,7 @@ export const messages = {
     "Não foi possível reservar um conjunto de portas livres do Sunshine para a área de trabalho remota.",
   "error.backend.moonlightPortsUnavailable":
     "Não foi possível reservar uma faixa de portas livres do Moonlight WebRTC para a área de trabalho remota.",
+  "error.backend.iceServerNoPort": "O servidor ICE da área de trabalho remota não recebeu uma porta.",
   "error.backend.remoteDesktopStoppedWhileStarting":
     "O ambiente de execução da área de trabalho remota foi interrompido durante a inicialização.",
   "error.backend.sunshineNotStarted": "O Sunshine não iniciou em um conjunto de portas reservadas.",
@@ -141,7 +142,6 @@ export const messages = {
   "error.backend.mcpServerGone": "Este servidor MCP não existe mais.",
   "error.backend.mcpServerLimit": "O OpenBot mantém até {limit} servidores MCP.",
   "error.backend.mcpServerNameTaken": "Já existe um servidor MCP chamado {name}.",
-  "error.backend.mcpConnectionCancelled": "A conexão foi cancelada.",
   "error.backend.mcpServerNoAnswer": "O servidor não respondeu em {seconds} segundos.",
   "error.backend.mcpSignInNotAccepted": "O servidor não aceitou essa autenticação.",
   "error.backend.mcpCommandNotFound": "Comando não encontrado: {command}",
@@ -169,6 +169,9 @@ export const messages = {
   "error.backend.workspaceFileOutside":
     "O arquivo do espaço de trabalho deve estar dentro do espaço de trabalho do agente.",
   "error.backend.workspacePathNotFile": "O caminho do espaço de trabalho não é um arquivo.",
+  "error.backend.workspacePathNotDirectory": "O caminho do espaço de trabalho não é uma pasta.",
+  "error.backend.workspacePathMissing": "Nada existe em {path} no espaço de trabalho do agente {root}.",
+  "error.backend.workspacePathMissingForMember": "Nada existe em {path} no espaço de trabalho do agente.",
   "error.backend.useChannelTaskControls": "Use os controles de tarefas do canal para esta tarefa atribuída.",
   "error.backend.editFinished": "Esta edição já terminou.",
   "error.backend.editCancelled": "Esta edição foi cancelada, por isso a mensagem mantém o texto original.",

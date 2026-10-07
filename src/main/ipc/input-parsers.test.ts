@@ -574,10 +574,12 @@ describe("agent IPC input parsing", () => {
     });
     expect(parseOpenSharedFile({ path: "~/OpenBot/Shared/report.csv" })).toEqual({
       path: "~/OpenBot/Shared/report.csv",
+      action: "open",
     });
     expect(parseOpenWorkspaceFile({ agentId: "bot-1", path: "app/page.tsx" })).toEqual({
       agentId: "bot-1",
       path: "app/page.tsx",
+      action: "open",
     });
     expect(parseCancelQueuedMessage({ agentId: "bot-1", deliveryId: "delivery-1" })).toEqual({
       agentId: "bot-1",

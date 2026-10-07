@@ -108,8 +108,8 @@ export function LandingFooter() {
 // the page is not fetched and parsed again. An external one stays a plain anchor.
 function FooterNavLink(props: { link: FooterLink }) {
   const external = () => (props.link.external ? props.link : undefined);
-  const page = () => (props.link.external || props.link.to === "/compare/$slug" ? undefined : props.link);
-  const article = () => (!props.link.external && props.link.to === "/compare/$slug" ? props.link : undefined);
+  const page = () => (props.link.external || "slug" in props.link ? undefined : props.link);
+  const article = () => (!props.link.external && "slug" in props.link ? props.link : undefined);
 
   return (
     <>

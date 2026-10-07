@@ -14,8 +14,10 @@ import type {
 } from "@openbot/contracts/ipc";
 import { hostedSiteConversationEventItemType, hostedSiteConversationEventText } from "@openbot/contracts/ipc";
 import { isBoolean } from "@openbot/contracts/runtime-values";
+import { Effect, Result, Schema } from "effect";
 import type { AgentClient } from "../agent-client";
 import type { AgentStore } from "../agent-store";
+import { causeHelpers } from "../effect-boundary";
 import type { PendingHostedSiteTerminalEvent } from "../openbot-database";
 import { type AppServerRequest, type DynamicToolCallParams, isRecord, type RequestId } from "../protocol";
 import type { ConversationRuntime } from "./conversation-runtime";
@@ -31,13 +33,16 @@ import { type OpenBotToolResponse, openBotToolResult, siteToolString } from "./r
 
 /** The openbot.site host, injected so the backend never depends on the account Worker directly. */
 export interface AgentHostedSites {
-  list(): Promise<HostedSiteList>;
-  publish(input: PublishHostedSiteInput, allowedRoots: readonly string[]): Promise<HostedSiteSummary>;
+  list(): Effect.Effect<HostedSiteList, HostedSiteOperationFailed>;
+  publish(
+    input: PublishHostedSiteInput,
+    allowedRoots: readonly string[],
+  ): Effect.Effect<HostedSiteSummary, HostedSiteOperationFailed>;
   replace(
     input: PublishHostedSiteInput & { siteId: string },
     allowedRoots: readonly string[],
-  ): Promise<HostedSiteSummary>;
-  delete(siteId: string): Promise<void>;
+  ): Effect.Effect<HostedSiteSummary, HostedSiteOperationFailed>;
+  delete(siteId: string): Effect.Effect<void, HostedSiteOperationFailed>;
 }
 
 /**
@@ -114,16 +119,17 @@ export class HostedSiteCoordinator {
     this.#reconcileEventsAfterRestart();
   }
 
-  listSites(): Promise<HostedSiteList> {
+  listSites(): Effect.Effect<HostedSiteList, HostedSiteOperationFailed> {
     return this.#requireHostedSites().list();
   }
 
-  async prepareApproval(
+  readonly prepareApproval = Effect.fn("HostedSiteCoordinator.prepareApproval")(function* (
+    this: HostedSiteCoordinator,
     client: AgentClient,
     request: AppServerRequest,
     params: DynamicToolCallParams,
     tool: HostedSiteMutationTool,
-  ): Promise<{ approval: AgentApproval; mutation: HostedSiteMutationContext } | null> {
+  ) {
     const threadId = params.threadId;
     const turnId = params.turnId;
     const agentId = this.#conversation.agentForThread(threadId);
@@ -134,7 +140,7 @@ export class HostedSiteCoordinator {
       });
       return null;
     }
-    const details = await this.#approvalDetails(params, tool);
+    const details = yield* this.#approvalDetailsEffect(params, tool);
     const mutation: HostedSiteMutationContext = {
       agentId,
       operationId: randomUUID(),
@@ -155,17 +161,19 @@ export class HostedSiteCoordinator {
       permissions: details.permissions,
     };
     return { approval, mutation };
-  }
+  });
 
   /**
    * Runs an approved mutation, or records the decline. Never throws: every failure becomes a
    * terminal marker plus an error event, because the provider is still waiting on a response.
    */
-  async resolveApproval(
+
+  readonly resolveApproval = Effect.fn("HostedSiteCoordinator.resolveApproval")(function* (
+    this: HostedSiteCoordinator,
     mutation: HostedSiteMutationContext,
     target: HostedSiteApprovalTarget,
     decision: "accept" | "decline",
-  ): Promise<void> {
+  ) {
     if (decision === "decline") {
       this.#recordTerminalEvent(mutation, "cancelled", mutation.eventDetails, () => {
         target.client.respondError(target.id, {
@@ -189,22 +197,21 @@ export class HostedSiteCoordinator {
       this.#emitError("hosted_site_marker_persistence_failed", error, target.agentId);
       return;
     }
-    let result: HostedSiteMutationResult | null = null;
-    try {
-      result = await this.#executeMutation(mutation);
-    } catch (error) {
+    const result = yield* Effect.result(this.#executeMutationEffect(mutation));
+    if (Result.isFailure(result)) {
+      const error = result.failure.cause;
       this.#recordTerminalEvent(mutation, "failed", mutation.eventDetails, () => {
         target.client.respondError(target.id, { code: -32603, message: String(error) });
       });
       this.#emitError("server_request_failed", error, target.agentId);
     }
-    if (result) {
-      const succeeded = result;
+    if (Result.isSuccess(result)) {
+      const succeeded = result.success;
       this.#recordTerminalEvent(mutation, "succeeded", succeeded.eventDetails, () => {
         target.client.respond(target.id, succeeded.response);
       });
     }
-  }
+  }, Effect.uninterruptible);
 
   forgetAgent(agentId: string): void {
     for (const [key, event] of this.#pendingTerminalEvents) {
@@ -230,15 +237,19 @@ export class HostedSiteCoordinator {
     return this.#hostedSites;
   }
 
-  async #approvalDetails(
+  readonly #approvalDetailsEffect = Effect.fn("HostedSiteCoordinator.approvalDetails")(function* (
+    this: HostedSiteCoordinator,
     params: DynamicToolCallParams,
     tool: HostedSiteMutationTool,
-  ): Promise<HostedSiteApprovalDetails> {
-    const args = params.arguments;
-    if (!isRecord(args)) throw new Error("Hosted site arguments are required.");
+  ): Effect.fn.Return<HostedSiteApprovalDetails, HostedSiteOperationFailed> {
+    const args = yield* siteStep(() => {
+      const value = params.arguments;
+      if (!isRecord(value)) throw new Error("Hosted site arguments are required.");
+      return value;
+    });
     if (tool === "delete_site") {
-      const siteId = siteToolString(args.siteId, "siteId", INPUT_LIMITS.identifier);
-      const site = await this.#ownedSite(siteId);
+      const siteId = yield* siteStep(() => siteToolString(args.siteId, "siteId", INPUT_LIMITS.identifier));
+      const site = yield* this.#ownedSiteEffect(siteId);
       return {
         reason: `Delete ${site.hostname} from openbot.site.`,
         permissions: { fileSystem: { read: [], write: [] }, network: true },
@@ -246,11 +257,11 @@ export class HostedSiteCoordinator {
       };
     }
 
-    const sourcePath = siteToolString(args.sourcePath, "sourcePath", INPUT_LIMITS.path);
-    const title = siteToolString(args.title, "title", 120);
-    siteToolString(args.description, "description", 500);
+    const sourcePath = yield* siteStep(() => siteToolString(args.sourcePath, "sourcePath", INPUT_LIMITS.path));
+    const title = yield* siteStep(() => siteToolString(args.title, "title", 120));
+    yield* siteStep(() => siteToolString(args.description, "description", 500));
     if (args.spaFallback !== undefined && !isBoolean(args.spaFallback)) {
-      throw new Error("spaFallback must be a boolean.");
+      return yield* new HostedSiteOperationFailed({ cause: new Error("spaFallback must be a boolean.") });
     }
     const permissions = { fileSystem: { read: [sourcePath], write: [] }, network: true };
     if (tool === "publish_site") {
@@ -260,38 +271,49 @@ export class HostedSiteCoordinator {
         eventDetails: { siteId: null, title, hostname: null, url: null },
       };
     }
-    const siteId = siteToolString(args.siteId, "siteId", INPUT_LIMITS.identifier);
-    const site = await this.#ownedSite(siteId);
+    const siteId = yield* siteStep(() => siteToolString(args.siteId, "siteId", INPUT_LIMITS.identifier));
+    const site = yield* this.#ownedSiteEffect(siteId);
     return {
       reason: `Replace ${site.hostname} with ${JSON.stringify(title)}.`,
       permissions,
       eventDetails: { ...hostedSiteEventDetails(site, siteId), title },
     };
-  }
+  });
 
-  async #ownedSite(siteId: string): Promise<HostedSiteSummary> {
-    const { sites } = await this.#requireHostedSites().list();
+  readonly #ownedSiteEffect = Effect.fn("HostedSiteCoordinator.ownedSite")(function* (
+    this: HostedSiteCoordinator,
+    siteId: string,
+  ) {
+    const host = yield* siteStep(() => this.#requireHostedSites());
+    const { sites } = yield* host.list();
     for (const site of sites) if (site.id === siteId) return site;
-    throw new Error("The hosted site was not found.");
-  }
+    return yield* new HostedSiteOperationFailed({ cause: new Error("The hosted site was not found.") });
+  });
 
-  async #executeMutation(context: HostedSiteMutationContext): Promise<HostedSiteMutationResult> {
+  readonly #executeMutationEffect = Effect.fn("HostedSiteCoordinator.executeMutation")(function* (
+    this: HostedSiteCoordinator,
+    context: HostedSiteMutationContext,
+  ): Effect.fn.Return<HostedSiteMutationResult, HostedSiteOperationFailed> {
     const { params } = context;
-    const args = params.arguments;
-    if (!isRecord(args)) throw new Error("Hosted site arguments are required.");
+    const args = yield* siteStep(() => {
+      const value = params.arguments;
+      if (!isRecord(value)) throw new Error("Hosted site arguments are required.");
+      return value;
+    });
     if (context.action === "delete") {
-      const siteId = siteToolString(args.siteId, "siteId", INPUT_LIMITS.identifier);
-      await this.#requireHostedSites().delete(siteId);
+      const siteId = yield* siteStep(() => siteToolString(args.siteId, "siteId", INPUT_LIMITS.identifier));
+      const host = yield* siteStep(() => this.#requireHostedSites());
+      yield* host.delete(siteId);
       return { response: openBotToolResult({ deleted: true, siteId }), eventDetails: context.eventDetails };
     }
 
-    const sourcePath = siteToolString(args.sourcePath, "sourcePath", INPUT_LIMITS.path);
-    const title = siteToolString(args.title, "title", 120);
-    const description = siteToolString(args.description, "description", 500);
+    const sourcePath = yield* siteStep(() => siteToolString(args.sourcePath, "sourcePath", INPUT_LIMITS.path));
+    const title = yield* siteStep(() => siteToolString(args.title, "title", 120));
+    const description = yield* siteStep(() => siteToolString(args.description, "description", 500));
     if (args.spaFallback !== undefined && !isBoolean(args.spaFallback)) {
-      throw new Error("spaFallback must be a boolean.");
+      return yield* new HostedSiteOperationFailed({ cause: new Error("spaFallback must be a boolean.") });
     }
-    const agent = this.#conversation.requireKnownAgent(context.agentId);
+    const agent = yield* siteStep(() => this.#conversation.requireKnownAgent(context.agentId));
     const input = {
       sourcePath,
       title,
@@ -300,12 +322,13 @@ export class HostedSiteCoordinator {
     };
     const roots = [agent.workspacePath, this.#store.sharedRoot];
     const siteId =
-      context.action === "publish" ? undefined : siteToolString(args.siteId, "siteId", INPUT_LIMITS.identifier);
-    const site = siteId
-      ? await this.#requireHostedSites().replace({ ...input, siteId }, roots)
-      : await this.#requireHostedSites().publish(input, roots);
+      context.action === "publish"
+        ? undefined
+        : yield* siteStep(() => siteToolString(args.siteId, "siteId", INPUT_LIMITS.identifier));
+    const host = yield* siteStep(() => this.#requireHostedSites());
+    const site = siteId ? yield* host.replace({ ...input, siteId }, roots) : yield* host.publish(input, roots);
     return { response: openBotToolResult(site), eventDetails: hostedSiteEventDetails(site, siteId) };
-  }
+  });
 
   #recordEvent(
     context: HostedSiteMutationContext,
@@ -503,3 +526,12 @@ export class HostedSiteCoordinator {
     }
   }
 }
+
+export class HostedSiteOperationFailed extends Schema.TaggedError<HostedSiteOperationFailed>()(
+  "HostedSiteOperationFailed",
+  { cause: Schema.Defect() },
+) {}
+
+const { sync: siteStep, rewrap: toHostedSiteOperationFailed } = causeHelpers(HostedSiteOperationFailed);
+
+export { toHostedSiteOperationFailed };

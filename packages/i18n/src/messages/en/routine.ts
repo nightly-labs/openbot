@@ -9,6 +9,10 @@ export const messages = defineMessages("routine", {
   "routine.kind.yearly": "Yearly",
   "routine.kind.custom": "Custom",
 
+  "routine.feed.calendarName": "OpenBot routines",
+  "routine.feed.eventAgent": "Agent: {name}",
+  "routine.feed.eventChannel": "Channel: {name}",
+  "routine.feed.eventTimezone": "Time zone: {timezone}",
   "routine.clock.am": "AM",
   "routine.clock.pm": "PM",
   "routine.clock.withMeridiem": "{time} {meridiem}",

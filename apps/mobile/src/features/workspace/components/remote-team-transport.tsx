@@ -3,6 +3,7 @@ import { isQueueEditRoute, QueueEditRejectedError } from "@openbot/contracts/tea
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { sourceText } from "@openbot/i18n/source";
 import type { RemoteTeamDirectoryClient } from "@openbot/team-client";
+import { runTeamEffect } from "@openbot/team-client";
 import {
   createRemoteCommandMailbox,
   type RemoteFileUpload,
@@ -16,6 +17,7 @@ import * as Crypto from "expo-crypto";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { supportLog, supportLogUrl } from "@/features/support/model/support-log";
+import { expoGoDomOptions } from "@/shared/lib/expo-go-dom";
 import { currentText } from "@/shared/lib/text";
 
 import RemoteTeamBridge from "./remote-team-bridge.dom";
@@ -141,6 +143,7 @@ export const RemoteTeamTransport = forwardRef<RemoteTeamTransportRef, RemoteTeam
         active={foreground}
         commands={commands}
         dom={{
+          ...expoGoDomOptions,
           containerStyle: {
             flex: 0,
             height: 1,
@@ -154,9 +157,9 @@ export const RemoteTeamTransport = forwardRef<RemoteTeamTransportRef, RemoteTeam
           scrollEnabled: false,
           style: { flex: 0, height: 1, width: 1 },
         }}
-        endSession={(sessionId) => directory.endSession(sessionId)}
+        endSession={(sessionId) => runTeamEffect(directory.endSession(sessionId))}
         getBootstrap={(hostId, clientPublicKey, existingSessionId) =>
-          directory.createBootstrap(hostId, clientPublicKey, existingSessionId)
+          runTeamEffect(directory.createBootstrap(hostId, clientPublicKey, existingSessionId))
         }
         onCommandResult={handleCommandResult}
         onUploadProgress={async ({ commandId, sent, total }: RemoteUploadProgress) =>

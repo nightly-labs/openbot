@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // @vitest-environment node
 
 import { mkdir, mkdtemp, realpath, rm, symlink } from "node:fs/promises";
@@ -28,7 +29,7 @@ afterEach(async () => {
 });
 
 function outsideRoots(toolName: string, input: unknown): Promise<string | null> {
-  return claudeWriteOutsideRoots(toolName, input, workspace, [workspace, shared]);
+  return Effect.runPromise(claudeWriteOutsideRoots(toolName, input, workspace, [workspace, shared]));
 }
 
 describe("claudeWriteOutsideRoots", () => {

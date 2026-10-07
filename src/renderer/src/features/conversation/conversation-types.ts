@@ -19,6 +19,7 @@ import type {
   ServerSummary,
   TeamPresenceSnapshot,
   UpdateAgentInput,
+  WorkspaceDirectory,
 } from "@openbot/contracts/ipc";
 import type { AgentMessage, AgentProfile } from "@openbot/ui/data";
 import type { BrowserViewRuntime } from "@openbot/ui/features/browser/BrowserLiveView";
@@ -153,12 +154,17 @@ export interface ConversationProps {
   onSelectAgent: (agentId: string) => void;
   onUpdateAgent: (agentId: string, updates: Omit<UpdateAgentInput, "agentId">) => Promise<void>;
   onSetAgentAvatar: (agentId: string, image: AvatarImageInput | null) => Promise<void>;
+  /**
+   * Sends one message. `clientMessageId` names it for the host, so a retry with the same id
+   * returns the first receipt; the answer carries the host's id for the message, or why it failed.
+   */
   onSendMessage: (
     body: string,
     attachmentDraftIds: string[],
     replyToMessageId: string | null,
     target?: ConversationTarget,
-  ) => Promise<boolean>;
+    clientMessageId?: string,
+  ) => Promise<SendMessageResult>;
   onMarkRead: () => Promise<void>;
   onLoadOlder?: () => void;
   onLoadLatest?: () => Promise<void>;
@@ -204,6 +210,9 @@ export interface ConversationProps {
   onStop: () => void;
 }
 
+/** `messageId` is the conversation message the host stored: the delivery id of the receipt. */
+export type SendMessageResult = { messageId: string } | { error: string };
+
 export interface ComposerDraft {
   text: string;
   attachments: DraftAttachment[];
@@ -217,14 +226,18 @@ export interface ComposerDraft {
  */
 type SidebarFilePreviewSource =
   | { kind: "shared"; path: string }
-  | { kind: "workspace"; path: string }
+  /** `folder` is the folder view the file was opened from, so the panel can go back to it. */
+  | { kind: "workspace"; path: string; folder?: string | undefined }
   | { kind: "attachment"; attachment: AttachmentSummary };
 
-export interface SidebarFilePreview {
-  ownerAgentId: string;
-  source: SidebarFilePreviewSource;
-  preview: FilePreview;
-}
+export type SidebarFilePreview =
+  | { ownerAgentId: string; source: SidebarFilePreviewSource; preview: FilePreview; directory?: undefined }
+  | {
+      ownerAgentId: string;
+      source: { kind: "workspace-folder"; path: string };
+      preview: null;
+      directory: WorkspaceDirectory;
+    };
 
 export type RightPanelMode =
   | "none"

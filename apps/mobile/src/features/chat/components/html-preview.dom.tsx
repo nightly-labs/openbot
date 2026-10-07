@@ -25,8 +25,9 @@ const CARD_PAGE_WIDTH = 390;
  * app. `allow-same-origin` is safe without `allow-scripts`; it lets this view open the page's links.
  */
 export default function HtmlPreview({
-  source,
-  title,
+  // Empty in Expo Go on Android until the props come again; see expo-go-dom.ts.
+  source = "",
+  title = "",
   mode,
   topInset = 0,
   bottomInset = 0,

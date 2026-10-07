@@ -1,6 +1,7 @@
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { AGENT_DATABASE_LIMITS } from "./agent-database-protocol";
 import { AgentDatabaseSupervisor } from "./agent-database-supervisor";
@@ -15,16 +16,18 @@ let databasePath: string;
 let supervisor: AgentDatabaseSupervisor;
 
 function statement(sql: string, mode: "read" | "write", provision = false) {
-  return supervisor.send({
-    kind: "statement" as const,
-    databasePath,
-    mode,
-    provision,
-    protectedTables: [],
-    sql,
-    parameters: [],
-    limits: AGENT_DATABASE_LIMITS,
-  });
+  return Effect.runPromise(
+    supervisor.send({
+      kind: "statement" as const,
+      databasePath,
+      mode,
+      provision,
+      protectedTables: [],
+      sql,
+      parameters: [],
+      limits: AGENT_DATABASE_LIMITS,
+    }),
+  );
 }
 
 beforeEach(async () => {

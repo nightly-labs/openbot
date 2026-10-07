@@ -14,6 +14,10 @@ export const messages = {
   "queue.item.steerTooltip": "メッセージで方向を修正",
   "queue.item.steering": "修正中",
   "queue.item.steer": "方向を修正",
+  "queue.item.notSteered": "未修正",
+  "queue.item.steerFallback.providerUnsupported":
+    "このプロバイダーは実行中のターンの方向を修正できないため、メッセージはキューで待ちます。",
+  "queue.item.steerFallback.steerFailed": "方向の修正に失敗したため、メッセージはキューで待ちます。",
   "queue.item.deleteLabel": "キューのメッセージ {position} を削除",
   "queue.item.deleteTooltip": "メッセージを削除",
   "queue.item.editLabel": "キューのメッセージ {position} を編集",
@@ -22,8 +26,4 @@ export const messages = {
   "queue.deleteHeld.body":
     "別のデバイスがこのメッセージを編集しています。エージェントはこのメッセージを受け取りません。",
   "queue.deleteHeld.keep": "残す",
-  "queue.item.notSteered": "未修正",
-  "queue.item.steerFallback.providerUnsupported":
-    "このプロバイダーは実行中のターンの方向を修正できないため、メッセージはキューで待ちます。",
-  "queue.item.steerFallback.steerFailed": "方向の修正に失敗したため、メッセージはキューで待ちます。",
 } as const satisfies PartialTranslation<typeof source>;

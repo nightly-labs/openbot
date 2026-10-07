@@ -1,41 +1,36 @@
-import { readFile } from "node:fs/promises";
 import {
   type AgentSummary,
   COMPUTER_USE_MCP_SERVER_NAME,
-  type InstalledSkill,
   type McpServerConfig,
   RESERVED_MCP_SERVER_NAMES,
   type Routine,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
-import { writeJsonFileAtomically } from "../backend/atomic-json-file";
+import { Effect } from "effect";
 import { isMissingFileError } from "../backend/file-errors";
-import type { AnalyticsInventory, AnalyticsInventoryDayStore } from "./analytics";
+import type { AnalyticsInventoryDayStore } from "./analytics";
+import { AnalyticsOperationFailure, toAnalyticsOperationFailure } from "./analytics-effects";
+import { readPreferenceFile, writePreferenceFile } from "./preference-file";
+import type { SkillMarketplaceService } from "./skill-marketplace-service";
 
 const DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
 
 /** Stores the local day of the last inventory event. A malformed file counts as sent today. */
 export function analyticsInventoryDayStore(path: string): AnalyticsInventoryDayStore {
   return {
-    async read() {
-      try {
-        const parsed = JSON.parse(await readFile(path, "utf8"));
-        if (
-          !isDynamicRecord(parsed) ||
-          parsed.version !== 1 ||
-          !isString(parsed.day) ||
-          !DAY_PATTERN.test(parsed.day)
-        ) {
+    read: () =>
+      readPreferenceFile(path, (parsed) => {
+        if (!isDynamicRecord(parsed) || parsed.version !== 1 || !isString(parsed.day) || !DAY_PATTERN.test(parsed.day))
           return "malformed";
-        }
         return parsed.day;
-      } catch (error) {
-        if (isMissingFileError(error)) return "missing";
-        if (error instanceof SyntaxError) return "malformed";
-        throw error;
-      }
-    },
-    write: (day) => writeJsonFileAtomically(path, { version: 1, day }),
+      }).pipe(
+        Effect.catch((failure) => {
+          if (isMissingFileError(failure.cause)) return Effect.succeed("missing");
+          if (failure.cause instanceof SyntaxError) return Effect.succeed("malformed");
+          return Effect.fail(new AnalyticsOperationFailure({ cause: failure.cause }));
+        }),
+      ),
+    write: (day) => writePreferenceFile(path, { version: 1, day }).pipe(toAnalyticsOperationFailure),
   };
 }
 
@@ -46,7 +41,7 @@ const BUILTIN_SERVER_NAMES = new Set<string>([...RESERVED_MCP_SERVER_NAMES, COMP
 export interface AnalyticsInventorySources {
   agents: () => AgentSummary[];
   routines: (agentId: string) => Routine[];
-  skills: (agentId: string) => Promise<InstalledSkill[]>;
+  skills: SkillMarketplaceService["listInstalledForChatTags"];
   mcpServers: () => McpServerConfig[];
   pluginSlug: (config: McpServerConfig) => string | null;
   computerUseEnabled: () => boolean;
@@ -56,7 +51,9 @@ export interface AnalyticsInventorySources {
  * Counts what this computer has set up. Only OpenBot's own catalog names leave this function:
  * a custom server, a community listing or a local skill is a count, never a name.
  */
-export async function collectAnalyticsInventory(sources: AnalyticsInventorySources): Promise<AnalyticsInventory> {
+export const collectAnalyticsInventory = Effect.fn("Analytics.collectInventory")(function* (
+  sources: AnalyticsInventorySources,
+) {
   const agents = sources.agents();
   const plugins = new Set<string>();
   let customMcpServerCount = 0;
@@ -72,7 +69,7 @@ export async function collectAnalyticsInventory(sources: AnalyticsInventorySourc
   let enabledRoutineCount = 0;
   for (const agent of agents) {
     enabledRoutineCount += sources.routines(agent.id).filter((routine) => routine.active).length;
-    const skills = await sources.skills(agent.id).catch(() => []);
+    const skills = yield* sources.skills(agent.id).pipe(Effect.catch(() => Effect.succeed([])));
     for (const skill of skills) {
       if (skill.enabled === false) continue;
       if (skill.skillId.startsWith(CURATED_SKILL_PREFIX))
@@ -97,4 +94,4 @@ export async function collectAnalyticsInventory(sources: AnalyticsInventorySourc
     providers: agents.map((agent) => agent.provider),
     computerUseEnabled: sources.computerUseEnabled(),
   };
-}
+});

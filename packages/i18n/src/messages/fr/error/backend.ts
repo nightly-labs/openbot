@@ -14,6 +14,7 @@ export const messages = {
     "Impossible de réserver une famille de ports Sunshine libre pour le Bureau à distance.",
   "error.backend.moonlightPortsUnavailable":
     "Impossible de réserver une plage de ports WebRTC Moonlight libre pour le Bureau à distance.",
+  "error.backend.iceServerNoPort": "Le serveur ICE du Bureau à distance n’a pas obtenu de port.",
   "error.backend.remoteDesktopStoppedWhileStarting":
     "L’environnement du bureau à distance a été arrêté pendant son démarrage.",
   "error.backend.sunshineNotStarted": "Sunshine n’a pas démarré sur une famille de ports réservée.",
@@ -141,7 +142,6 @@ export const messages = {
   "error.backend.mcpServerGone": "Ce serveur MCP n’existe plus.",
   "error.backend.mcpServerLimit": "OpenBot garde jusqu’à {limit} serveurs MCP.",
   "error.backend.mcpServerNameTaken": "Un serveur MCP nommé {name} existe déjà.",
-  "error.backend.mcpConnectionCancelled": "La connexion a été annulée.",
   "error.backend.mcpServerNoAnswer": "Le serveur n’a pas répondu en {seconds} secondes.",
   "error.backend.mcpSignInNotAccepted": "Le serveur n’a pas accepté cette connexion.",
   "error.backend.mcpCommandNotFound": "Commande introuvable : {command}",
@@ -169,6 +169,9 @@ export const messages = {
   "error.backend.sharedPathNotFile": "Le chemin partagé n’est pas un fichier.",
   "error.backend.workspaceFileOutside": "Le fichier doit se trouver dans l’espace de travail de l’agent.",
   "error.backend.workspacePathNotFile": "Le chemin de l’espace de travail n’est pas un fichier.",
+  "error.backend.workspacePathNotDirectory": "Le chemin de l’espace de travail n’est pas un dossier.",
+  "error.backend.workspacePathMissing": "Rien n’existe à {path} dans l’espace de travail de l’agent {root}.",
+  "error.backend.workspacePathMissingForMember": "Rien n’existe à {path} dans l’espace de travail de l’agent.",
   "error.backend.useChannelTaskControls": "Utilisez les commandes de tâche du canal pour cette tâche.",
   "error.backend.editFinished": "Cette modification est déjà terminée.",
   "error.backend.editCancelled": "Cette modification a été annulée : le message garde son texte d’origine.",

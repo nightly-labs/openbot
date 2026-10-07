@@ -6,10 +6,11 @@ import {
   OPENBOT_PLANS,
   type OpenBotPlan,
 } from "../../content/compare/comparison";
+import { PROVIDER_PAGES, providerPageSlug } from "../../content/providers";
 import { type CollectionArticle, type ContentCollection, formatArticleDate } from "../../lib/content-collection";
 import { ArticleGradient } from "../content/ArticleGradient";
+import { DataArticleFrame } from "../content/DataArticleFrame";
 import { LandingIcon } from "../landing/LandingIcon";
-import { CompareArticleFrame } from "./CompareArticleFrame";
 import { CompareBenchmark } from "./CompareBenchmark";
 import {
   CheckedMeta,
@@ -46,9 +47,17 @@ export function MatchupPage(props: MatchupPageProps) {
     props.matchup.products.some((product) => product.provider === plan.provider);
   // The plans of the two products first, then the rest in their usual order.
   const plans = () => [...OPENBOT_PLANS.filter(isCompared), ...OPENBOT_PLANS.filter((plan) => !isCompared(plan))];
+  // The provider page of each product, which says how to set it up in OpenBot. The link uses the
+  // page's name, which is the provider's name in OpenBot: Antigravity runs as Gemini.
+  const setups = () =>
+    props.matchup.products.flatMap((product) => {
+      const slug = providerPageSlug(product.provider);
+      const page = slug ? PROVIDER_PAGES[slug] : undefined;
+      return slug && page ? [{ name: page.name, slug }] : [];
+    });
 
   return (
-    <CompareArticleFrame collection={props.collection} article={props.article}>
+    <DataArticleFrame collection={props.collection} article={props.article}>
       <header class="compare-hero">
         <div class="compare-hero-copy" data-enter="post-copy">
           <Link class="post-article-back" to={props.collection.indexRoute}>
@@ -137,6 +146,20 @@ export function MatchupPage(props: MatchupPageProps) {
             {(plan, index) => <PlanCard plan={plan} index={index()} highlighted={isCompared(plan)} />}
           </For>
         </ul>
+        <Show when={setups().length > 0}>
+          <ul class="provider-related-list">
+            <For each={setups()}>
+              {(setup) => (
+                <li>
+                  <Link to="/providers/$slug" params={{ slug: setup.slug }}>
+                    Set up {setup.name} in OpenBot
+                    <LandingIcon name="arrow-right" class="provider-step-arrow provider-related-arrow" />
+                  </Link>
+                </li>
+              )}
+            </For>
+          </ul>
+        </Show>
       </RevealSection>
 
       <p class="compare-intro">{props.matchup.intro}</p>
@@ -155,6 +178,6 @@ export function MatchupPage(props: MatchupPageProps) {
       <CompareFaq faq={props.matchup.faq} />
 
       <CompareSources subject={`${sideA().name} and ${sideB().name}`} page={props.matchup} />
-    </CompareArticleFrame>
+    </DataArticleFrame>
   );
 }

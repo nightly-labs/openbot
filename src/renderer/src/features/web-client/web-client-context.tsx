@@ -20,7 +20,6 @@ import type {
   TeamRealtimeEvent,
 } from "@openbot/contracts/ipc";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
-import { WAKE_RECONNECT_DELAY_MS } from "@openbot/team-client/hosted-server-wake";
 import type { RemoteTeamHost } from "@openbot/team-client/remote-directory";
 import { reconcilePendingRequests } from "@openbot/team-client/runtime-attention";
 import { currentText } from "@openbot/ui/text";
@@ -31,8 +30,8 @@ import { createSidebarPreferences } from "../sidebar/sidebar-preferences";
 import { defaultSidebarLayout } from "../sidebar/sidebar-sections";
 import { createHostRestartToasts } from "../updates/host-restart-toast";
 import type { WebHostNotice } from "./web-host-connections";
+import { createWebHostLifecycle } from "./web-host-lifecycle";
 import type { WebHostState } from "./web-host-lock";
-import { createWebHostedServerWake } from "./web-hosted-server-wake";
 import {
   createWebWorkspaceRuntime,
   WebHostIncompatibleError,
@@ -46,10 +45,6 @@ interface WebConversation {
   draft: string;
   attachments: AttachmentSummary[];
   loading: boolean;
-  sending: boolean;
-  uncertain: boolean;
-  /** Why the last send failed. The composer shows it; it is not a workspace error. */
-  sendError: string | null;
 }
 interface WebWorkspaceState {
   hosts: RemoteTeamHost[];
@@ -103,17 +98,14 @@ interface WebWorkspaceState {
   duplicatingAgentIds: string[];
   sidebarLayout: SidebarLayoutSnapshot;
 }
-/** A host restarts in under a minute; the retries stop after three. */
-const HOST_RESTART_RETRY_MS = 5_000;
-const HOST_RESTART_RETRY_LIMIT = 36;
-/** A sleeping server can start for a routine. The tab asks the account service again after this long. */
-const SLEEP_RECHECK_MS = 5 * 60_000;
 
 export type WebRuntimeFactory = (
   accountId: string,
   events: WebRuntimeEvents,
   accountFetch: typeof fetch,
 ) => WebWorkspaceRuntime;
+
+export type WebWorkspace = ReturnType<typeof createWebWorkspace>;
 
 export function createWebWorkspace(
   props: {
@@ -174,8 +166,6 @@ export function createWebWorkspace(
   let acceptedInvite: { inviteUrl: string; host: RemoteTeamHost } | null = null;
   /** Set when a revoked session connects again by itself; cleared when the host is online. */
   let revokedReconnect = false;
-  /** The next reconnect to a host that restarts into an update. The opened host has no other retry. */
-  let restartRetry: ReturnType<typeof setTimeout> | null = null;
   /** The queue read in flight by agent. An event during a read asks for one more read. */
   const queueLoads = new Map<string, { generation: number; again: boolean }>();
   /** Counts queue snapshots from events by agent. A read that started before a newer snapshot is dropped. */
@@ -185,11 +175,16 @@ export function createWebWorkspace(
   const conversationReads = new Map<string, number>();
   const heldDeltas = new Map<string, Array<Extract<AgentEvent, { type: "conversation-delta" }>>>();
   const hostEventListeners = new Set<(event: AgentEvent | TeamRealtimeEvent) => void>();
-  const hostedServer = createWebHostedServerWake(props.accountFetch);
-  let wakeReconnectTimer: number | undefined;
-  let sleepRecheckTimer: number | undefined;
-  /** Removes the listeners that wait for the user's input while the opened server sleeps. */
-  let stopWaitingForInput: (() => void) | null = null;
+  const hostLifecycle = createWebHostLifecycle({
+    accountFetch: props.accountFetch,
+    hostId: () => hostId,
+    disposed: () => disposed,
+    status: () => state.status,
+    hostedSleep: () => state.hostedSleep,
+    setHostedSleep,
+    reconnect,
+    report,
+  });
   const hostNoticeListeners = new Set<(hostId: string, event: WebHostNotice, agents: AgentSummary[]) => void>();
   const runtime = (props.createRuntime ?? createWebWorkspaceRuntime)(
     props.accountId,
@@ -268,11 +263,12 @@ export function createWebWorkspace(
           return;
         }
         // A host that announced a restart comes back by itself; a wake is only for a stopped server.
-        if (update.state === "offline" && !update.code && !state.hostRestart) hostUnavailable(update.hostId);
+        if (update.state === "offline" && !update.code && !state.hostRestart)
+          hostLifecycle.hostUnavailable(update.hostId);
         if (update.state === "online") {
           revokedReconnect = false;
-          endSleep();
-        } else if (state.hostRestart) retryAfterRestart();
+          hostLifecycle.endSleep();
+        } else if (state.hostRestart) hostLifecycle.retryAfterRestart();
         if (update.state === "online" && update.resync) {
           // A host that still waits to restart says so again when the connection declares capabilities.
           setState((draft) => {
@@ -570,79 +566,11 @@ export function createWebWorkspace(
   function retryHosts(): Promise<void> {
     return refreshHosts().catch(() => undefined);
   }
-  /**
-   * The opened host is offline. A hosted server that the account service stopped for no use waits for the
-   * user's input. Another stopped hosted server starts, and the tab connects again. A server that starts
-   * already is asked to start again, with no status read in between.
-   */
-  function hostUnavailable(id: string): void {
-    const starting = state.hostedSleep === "waking";
-    void (starting ? hostedServer.wake(id) : Promise.resolve(false)).then(async (waking) => {
-      const availability = waking ? "waking" : await hostedServer.unavailable(id);
-      if (disposed || hostId !== id || state.status === "online") return;
-      // The 5-minute recheck can find that the server does not sleep now, so input does not wake it.
-      if (availability !== "sleeping") stopWaitingForInput?.();
-      setHostedSleep(availability === "sleeping" ? "sleeping" : availability === "waking" ? "waking" : null);
-      if (availability === "waking") reconnectAfterWake(id);
-      else if (availability === "sleeping") waitForInput(id);
-    });
-  }
-  function reconnectAfterWake(id: string): void {
-    window.clearTimeout(wakeReconnectTimer);
-    wakeReconnectTimer = window.setTimeout(() => {
-      if (!disposed && hostId === id && state.status === "offline") void reconnect().catch(report);
-    }, WAKE_RECONNECT_DELAY_MS);
-  }
-  /** The next key or pointer press in the tab starts the sleeping server. */
-  function waitForInput(id: string): void {
-    stopWaitingForInput?.();
-    const onInput = () => {
-      stopWaitingForInput?.();
-      if (disposed || hostId !== id || state.status === "online") return;
-      setHostedSleep("waking");
-      void hostedServer.wakeForInput(id).then((waking) => {
-        if (disposed || hostId !== id || state.status === "online") return;
-        if (waking) reconnectAfterWake(id);
-        else {
-          setHostedSleep(null);
-          hostUnavailable(id);
-        }
-      });
-    };
-    window.addEventListener("pointerdown", onInput, true);
-    window.addEventListener("keydown", onInput, true);
-    sleepRecheckTimer = window.setTimeout(() => hostUnavailable(id), SLEEP_RECHECK_MS);
-    stopWaitingForInput = () => {
-      window.removeEventListener("pointerdown", onInput, true);
-      window.removeEventListener("keydown", onInput, true);
-      window.clearTimeout(sleepRecheckTimer);
-      stopWaitingForInput = null;
-    };
-  }
   function setHostedSleep(hostedSleep: HostedServerSleep | null): void {
     if (state.hostedSleep !== hostedSleep)
       setState((draft) => {
         draft.hostedSleep = hostedSleep;
       });
-  }
-  function endSleep(): void {
-    stopWaitingForInput?.();
-    setHostedSleep(null);
-  }
-
-  /** `connect` clears `hostRestart`, so the retries count down instead of reading it again. */
-  function retryAfterRestart(retries = HOST_RESTART_RETRY_LIMIT): void {
-    if (restartRetry || disposed || retries <= 0) return;
-    const retryHostId = hostId;
-    restartRetry = setTimeout(() => {
-      restartRetry = null;
-      if (disposed || hostId !== retryHostId || state.status === "online") return;
-      void reconnect()
-        .catch(() => undefined)
-        .then(() => {
-          if (!disposed && hostId === retryHostId && state.status !== "online") retryAfterRestart(retries - 1);
-        });
-    }, HOST_RESTART_RETRY_MS);
   }
   async function reconnect(): Promise<void> {
     const host = state.hosts.find((listed) => listed.hostId === state.host?.hostId) ?? state.host;
@@ -671,7 +599,7 @@ export function createWebWorkspace(
     const previousSelected = sameHost ? selectedId : null;
     hostId = host.hostId;
     if (!keepWorkspace) selectedId = null;
-    if (!sameHost) endSleep();
+    if (!sameHost) hostLifecycle.endSleep();
     setState((draft) => {
       draft.host = host;
       draft.status = "connecting";
@@ -686,13 +614,6 @@ export function createWebWorkspace(
         draft.conversations = {};
         draft.queues = {};
         draft.hiddenIds = [];
-      } else {
-        for (const item of Object.values(draft.conversations)) {
-          if (item.sending) {
-            item.sending = false;
-            item.uncertain = true;
-          }
-        }
       }
       draft.approvals = [];
       draft.prompts = [];
@@ -720,7 +641,7 @@ export function createWebWorkspace(
       ]);
       if (disposed || current !== generation) return;
       revokedReconnect = false;
-      endSleep();
+      hostLifecycle.endSleep();
       setState((draft) => {
         draft.capabilities = capabilities;
         draft.agents = agents;
@@ -769,7 +690,7 @@ export function createWebWorkspace(
       });
       if (!(error instanceof WebHostIncompatibleError)) {
         report(error);
-        hostUnavailable(host.hostId);
+        hostLifecycle.hostUnavailable(host.hostId);
       }
     }
   }
@@ -911,9 +832,6 @@ export function createWebWorkspace(
         draft: "",
         attachments: [],
         loading: true,
-        sending: false,
-        uncertain: false,
-        sendError: null,
       };
     });
     try {
@@ -971,68 +889,33 @@ export function createWebWorkspace(
       reloadPromise = null;
     }
   }
-  async function send(textOverride?: string, attachmentsOverride?: string[], replyToMessageId: string | null = null) {
-    const id = selectedId;
-    if (!id || state.status !== "online") return false;
-    const item = state.conversations[id];
-    if (
-      !item ||
-      item.sending ||
-      item.uncertain ||
-      (!(textOverride ?? item.draft).trim() && !(attachmentsOverride ?? item.attachments).length)
-    )
-      return false;
+  /**
+   * Sends one message to an agent of the open host. The chat shows it as pending and the answer says
+   * whether it arrived; a failure is never resent here. `clientMessageId` lets the host drop a retry.
+   */
+  async function send(
+    id: string,
+    text: string,
+    attachmentDraftIds: string[],
+    replyToMessageId: string | null = null,
+    clientMessageId?: string,
+  ): Promise<{ messageId: string } | { error: string }> {
+    const { t, errorMessage } = currentText();
+    if (state.status !== "online") return { error: t("chat.errorStatus.send") };
+    if (text.length > INPUT_LIMITS.messageText) return { error: t("webClient.error.messageTooLong") };
     const current = generation;
-    const text = textOverride ?? item.draft;
-    if (text.length > INPUT_LIMITS.messageText) {
-      setState((draft) => {
-        const conversation = draft.conversations[id];
-        if (conversation) conversation.sendError = currentText().t("webClient.error.messageTooLong");
-      });
-      return false;
-    }
-    setState((draft) => {
-      const conversation = draft.conversations[id];
-      if (!conversation) return;
-      conversation.sending = true;
-      conversation.sendError = null;
-    });
+    let messageId: string;
     try {
-      await runtime.send(
-        id,
-        text,
-        attachmentsOverride ?? item.attachments.map((attachment) => attachment.id),
-        replyToMessageId,
-      );
-      if (current !== generation || disposed) return false;
-      setState((draft) => {
-        const value = draft.conversations[id];
-        if (!value) return;
-        value.draft = "";
-        value.attachments = [];
-      });
-      try {
-        await refresh();
-      } catch (error) {
-        if (current === generation) report(error);
-      }
-      return true;
-    } catch {
-      if (current !== generation || disposed) return false;
-      setState((draft) => {
-        const conversation = draft.conversations[id];
-        if (!conversation) return;
-        conversation.uncertain = true;
-        conversation.sendError = currentText().t("webClient.error.deliveryUnconfirmed");
-      });
-      return false;
-    } finally {
-      if (current === generation && !disposed)
-        setState((draft) => {
-          const conversation = draft.conversations[id];
-          if (conversation) conversation.sending = false;
-        });
+      messageId = await runtime.send(id, text, attachmentDraftIds, replyToMessageId, clientMessageId);
+    } catch (error) {
+      return { error: errorMessage(error, t("webClient.error.deliveryUnconfirmed")) };
     }
+    // The next pending send of the chat waits for this answer, so the history reload runs beside it.
+    if (current === generation && !disposed)
+      refresh().catch((error: unknown) => {
+        if (current === generation) report(error);
+      });
+    return { messageId };
   }
   /** Marks the selected agent's messages read through the newest loaded one. Writes for one agent run in order. */
   function markRead() {
@@ -1110,10 +993,8 @@ export function createWebWorkspace(
     return () => {
       disposed = true;
       generation += 1;
-      window.clearTimeout(wakeReconnectTimer);
-      stopWaitingForInput?.();
+      hostLifecycle.dispose();
       acceptedInvite = null;
-      if (restartRetry) clearTimeout(restartRetry);
       window.removeEventListener("focus", focus);
       void runtime.dispose({ sessionsEnded: props.accountSessionEnded?.() ?? false }).catch(() => undefined);
     };
@@ -1314,16 +1195,6 @@ export function createWebWorkspace(
         setState((draft) => {
           const conversation = draft.conversations[id];
           if (conversation) conversation.draft = text;
-        });
-    },
-    acknowledgeSend() {
-      const id = selectedId;
-      if (id)
-        setState((draft) => {
-          const conversation = draft.conversations[id];
-          if (!conversation) return;
-          conversation.uncertain = false;
-          conversation.sendError = null;
         });
     },
     async upload(file: File) {

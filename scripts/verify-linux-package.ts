@@ -55,6 +55,8 @@ const asarPath = resolve(resourcesPath, "app.asar");
 
 await Promise.all([
   access(executablePath),
+  access(resolve(resourcesPath, "app.asar.unpacked/node_modules/effect/package.json")),
+  access(resolve(resourcesPath, "app.asar.unpacked/node_modules/effect/dist/index.js")),
   access(asarPath),
   access(resolve(resourcesPath, "managed-skills")),
   access(resolve(resourcesPath, "licenses/Electron-LICENSE")),

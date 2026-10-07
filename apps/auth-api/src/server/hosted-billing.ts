@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import { createAccountAnalytics } from "./account-analytics";
 import { BillingService } from "./billing-service";
 import {
@@ -5,6 +6,7 @@ import {
   HostedServerService,
   type HostedServerServiceOptions,
 } from "./hosted-server-service";
+import type { RemoteFailure } from "./remote-control-plane";
 import type { WorkerBindings } from "./types";
 
 export type HostedBillingBindings = HostedServerBindings &
@@ -23,9 +25,9 @@ export function createHostedBilling(
   bindings: HostedBillingBindings,
   options: Pick<HostedServerServiceOptions, "removeHost" | "developerKey"> & {
     /** Tells the members of a host that its plan, and so its member limit, can be different. */
-    planChanged: (hostId: string) => Promise<void>;
+    planChanged: (hostId: string) => Effect.Effect<void, RemoteFailure>;
     /** Keeps the Worker alive until an analytics send ends (`waitUntil`). */
-    schedule: (work: Promise<void>) => void;
+    schedule: (work: Effect.Effect<void>) => void;
   },
 ): { billing: BillingService | null; hosting: HostedServerService } {
   const analytics = createAccountAnalytics({
@@ -42,10 +44,8 @@ export function createHostedBilling(
         webhookSecret: bindings.STRIPE_WEBHOOK_SECRET?.trim() || null,
         fetch: (input, init) => fetch(input, init),
         analytics,
-        onSubscriptionSynced: async (sync) => {
-          await hosting.onSubscriptionSynced(sync);
-          await options.planChanged(sync.serverId);
-        },
+        onSubscriptionSynced: (sync) =>
+          hosting.onSubscriptionSynced(sync).pipe(Effect.andThen(() => options.planChanged(sync.serverId))),
       })
     : null;
   const hosting = new HostedServerService(bindings, {

@@ -1,21 +1,52 @@
-import { attachmentReferenceIds, serializeAttachmentReference } from "@openbot/contracts/attachment-references";
-import { type ChatTagKind, chatTagReferences, serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
+import { attachmentReferenceIds } from "@openbot/contracts/attachment-references";
+import { serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { DraftAttachment, InstalledSkill, McpServerConfig } from "@openbot/contracts/ipc";
-import { markdownListLineBreak } from "@openbot/contracts/markdown-lists";
-import { Badge, Blocks, Bot, File, Folder, Listbox, Plug, Puzzle, ShieldCheck, Store } from "@openbot/ui";
-import { referenceChipClasses } from "@openbot/ui/reference-chip";
+import { Badge, Blocks, Listbox, Puzzle } from "@openbot/ui";
 import { usesTouchLayout } from "@openbot/ui/utils";
 import { Dynamic, Portal } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, createUniqueId, onCleanup, onSettled, Show } from "solid-js";
-import { createStaticAvatarSvg } from "../../bloub-avatar";
 import { createScrollFades } from "../../components/createScrollFades";
 import type { AgentProfile } from "../../data";
-import { currentText, type TextValue, useText } from "../../text";
+import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { AnchoredTooltip } from "./AnchoredTooltip";
-import { AttachmentReferenceVisual, appendAttachmentReferenceVisual } from "./AttachmentReference";
+import { AttachmentReferenceVisual } from "./AttachmentReference";
+import {
+  automaticMentionSpaceAtCaretBoundary,
+  insertLineBreak,
+  insertPlainText,
+  mentionTokenAtCaretBoundary,
+  placeCaretAtChildOffset,
+  placeCaretAtEnd,
+  rangeFromTextOffsets,
+  serializeEditor,
+  syncTrailingLineSentinel,
+} from "./composer-dom";
 import { shouldRestoreComposerFocus } from "./composer-focus";
+import {
+  measurePickerFrame,
+  type PickerFrame,
+  type PickerOption,
+  pickerOptionBadge,
+  pickerOptionDescription,
+  pickerOptionKey,
+  pickerOptionName,
+  pickerOptionText,
+  skillMatchRank,
+} from "./composer-picker";
+import {
+  type AttachmentTokenActions,
+  createAttachmentToken,
+  createMcpToken,
+  createMentionToken,
+  createSkillToken,
+  MENTION_PATTERN,
+  renderEditorValue,
+  syncMcpTokens,
+  syncSkillTokens,
+  truncateComposerValue,
+} from "./composer-tokens";
 import { isSendShortcutKey, type SendShortcut } from "./send-shortcut";
 
 interface ComposerEditorProps {
@@ -30,6 +61,10 @@ interface ComposerEditorProps {
   ariaLabel: string;
   disabled: boolean;
   focusRequest?: number;
+  /** Raised by one to open the skill picker at the caret, as a typed `$` does. */
+  skillPickerRequest?: number;
+  /** The last skill list request failed, so an empty picker says so instead of "no skills". */
+  skillsLoadFailed?: boolean;
   onValueChange: (value: string) => void;
   onSubmit: () => void;
   /**
@@ -51,19 +86,6 @@ interface MentionContext {
   trigger: "@" | "$";
 }
 
-/**
- * Where the picker hangs, and from which element. Like the queue panel, it is a child of
- * `.composer-wrap` that hangs from the composer's top edge, so the composer paints over its
- * bottom and it grows out from under the input. `mount` is undefined for an editor rendered
- * without a composer around it, which leaves the panel where Solid puts an unmounted portal.
- */
-interface PickerFrame {
-  mount: HTMLElement | undefined;
-  bottom: number;
-}
-
-const MENTION_PATTERN = /@\[([^\]]+)]\(([^)]+)\)/g;
-
 export function expandComposerMentions(value: string): string {
   return value.replace(MENTION_PATTERN, (match, name: string, target: string) => {
     if (target.includes(":")) return match;
@@ -71,80 +93,12 @@ export function expandComposerMentions(value: string): string {
   });
 }
 
-type PickerOption =
-  | { type: "agent"; agent: AgentProfile }
-  | { type: "skill"; skill: InstalledSkill }
-  | { type: "mcp"; server: McpServerConfig }
-  | { type: "attachment"; attachment: DraftAttachment };
-
-function pickerOptionKey(option: PickerOption): string {
-  if (option.type === "agent") return `agent:${option.agent.id}`;
-  if (option.type === "skill") return `skill:${option.skill.skillId}`;
-  return option.type === "mcp" ? `mcp:${option.server.id}` : `attachment:${option.attachment.id}`;
-}
-
-function pickerOptionText(option: PickerOption, t: TextValue["t"]): string {
-  if (option.type === "agent") return t("composer.picker.option.agent", { name: option.agent.name });
-  if (option.type === "skill") return t("composer.picker.option.skill", { name: option.skill.name });
-  return option.type === "mcp"
-    ? t("composer.picker.option.mcp", { name: option.server.name })
-    : t("composer.picker.option.file", { name: option.attachment.name });
-}
-
-function pickerOptionName(option: PickerOption): string {
-  if (option.type === "agent") return option.agent.name;
-  if (option.type === "skill") return option.skill.name;
-  return option.type === "mcp" ? option.server.name : option.attachment.name;
-}
-
-function pickerOptionDescription(option: PickerOption, format: TextValue["format"]): string | undefined {
-  if (option.type === "attachment") return format.fileSize(option.attachment.size);
-  if (option.type === "skill") return skillDescription(option.skill);
-  if (option.type === "mcp") return mcpServerDescription(option.server);
-  return option.agent.description.trim() || option.agent.title.trim() || undefined;
-}
-
-/** Where the server answers: the address for an http server, the command for a stdio one. */
-function mcpServerDescription(server: McpServerConfig): string | undefined {
-  const source = server.transport === "stdio" ? [server.command, ...server.args].join(" ") : server.url;
-  return source.trim() || undefined;
-}
-
-/** Hangs the picker off the composer's top edge, inside the wrap the queue panel also sits in. */
-function measurePickerFrame(editor: HTMLElement): PickerFrame {
-  const wrap = editor.closest(".composer-wrap");
-  const composer = editor.closest(".composer");
-  if (!(wrap instanceof HTMLElement) || !composer) return { mount: undefined, bottom: 0 };
-  return { mount: wrap, bottom: wrap.getBoundingClientRect().bottom - composer.getBoundingClientRect().top };
-}
-
-/*
- * The badge carries the option type, and for a skill where it came from. Every row in a skill list
- * is a skill, so the badge names only the source.
- */
-function pickerOptionBadge(option: PickerOption, t: TextValue["t"]): { label: string; icon: typeof Puzzle } {
-  if (option.type === "agent") return { label: t("composer.picker.badge.agent"), icon: Bot };
-  if (option.type === "attachment") return { label: t("composer.picker.badge.file"), icon: File };
-  if (option.type === "mcp") return { label: MCP_BADGE, icon: Plug };
-  switch (option.skill.origin ?? "marketplace") {
-    case "local":
-      return { label: t("composer.picker.badge.custom"), icon: Folder };
-    case "managed":
-      return { label: t("composer.picker.badge.system"), icon: ShieldCheck };
-    case "workspace":
-      return { label: t("composer.picker.badge.workspace"), icon: Folder };
-    default:
-      return { label: t("composer.picker.badge.marketplace"), icon: Store };
-  }
-}
-
-/** The protocol name. It is not translated. */
-const MCP_BADGE = "MCP";
-
 export function ComposerEditor(props: ComposerEditorProps) {
   const { t, format } = useText();
   const [mention, setMention] = createSignal<MentionContext | null>(null);
   const [activeOption, setActiveOption] = createSignal(0);
+  /* Where the `$` that the add menu wrote starts, so that picker can say why it is empty. */
+  const [requestedMentionStart, setRequestedMentionStart] = createSignal<number | null>(null);
   const [attachmentTooltip, setAttachmentTooltip] = createSignal<{
     anchor: HTMLElement;
     content: string;
@@ -175,14 +129,26 @@ export function ComposerEditor(props: ComposerEditorProps) {
         !referencedIds.has(attachment.id) && (!query || attachment.name.toLocaleLowerCase().includes(query)),
     );
   });
+  const usableSkills = createMemo(() =>
+    (props.skills ?? []).filter((skill) => skill.state !== "needs-repair" && skill.enabled !== false),
+  );
   const matchingSkills = createMemo(() => {
     const query = mention()?.query.trim().toLocaleLowerCase() ?? "";
-    return (props.skills ?? []).filter(
-      (skill) =>
-        skill.state !== "needs-repair" &&
-        skill.enabled !== false &&
-        (!query || `${skill.name} ${skill.slug} ${skill.description ?? ""}`.toLocaleLowerCase().includes(query)),
-    );
+    const ranked = usableSkills().flatMap((skill) => {
+      const rank = skillMatchRank(skill, query);
+      return rank === null ? [] : [{ skill, rank }];
+    });
+    // Array sort is stable, so skills of one rank keep the host's order.
+    ranked.sort((left, right) => left.rank - right.rank);
+    const nameCounts = new Map<string, number>();
+    for (const { skill } of ranked) {
+      const name = skill.name.toLocaleLowerCase();
+      nameCounts.set(name, (nameCounts.get(name) ?? 0) + 1);
+    }
+    return ranked.map(({ skill }) => ({
+      skill,
+      showSlug: (nameCounts.get(skill.name.toLocaleLowerCase()) ?? 0) > 1,
+    }));
   });
   const matchingMcpServers = createMemo(() => {
     const query = mention()?.query.trim().toLocaleLowerCase() ?? "";
@@ -195,7 +161,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
     /* Skills first: a skill is what the user writes with, and a server is what one of them reaches. */
     if (trigger === "$")
       return [
-        ...matchingSkills().map((skill) => ({ type: "skill" as const, skill })),
+        ...matchingSkills().map((match) => ({ type: "skill" as const, ...match })),
         ...matchingMcpServers().map((server) => ({ type: "mcp" as const, server })),
       ];
     if (trigger !== "@") return [];
@@ -211,7 +177,19 @@ export function ComposerEditor(props: ComposerEditorProps) {
     const option = matchingOptions()[activeOption()];
     return option ? new Set([pickerOptionKey(option)]) : new Set<string>();
   });
-  const pickerOpen = createMemo(() => mention() !== null && matchingOptions().length > 0);
+  /*
+   * A `$` with no match says why only when the user asked for skills: after the add menu, or a
+   * bare `$`. A price such as "$5" in a sentence keeps the picker closed.
+   */
+  const pickerStatus = createMemo(() => {
+    const context = mention();
+    if (context?.trigger !== "$" || matchingOptions().length > 0) return null;
+    if (requestedMentionStart() !== context.start && context.query.trim()) return null;
+    if (usableSkills().length === 0)
+      return t(props.skillsLoadFailed ? "composer.picker.skillsLoadFailed" : "composer.picker.noSkills");
+    return t("composer.picker.noSkillMatch", { query: context.query.trim() });
+  });
+  const pickerOpen = createMemo(() => mention() !== null && (matchingOptions().length > 0 || pickerStatus() !== null));
   createEffect(
     () => pickerOpen(),
     (open) => {
@@ -233,6 +211,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
   let lastMcpKey = "";
   let lastEmittedValue = "";
   let lastFocusRequest = 0;
+  let lastSkillPickerRequest = 0;
   let isComposing = false;
   const attachmentTokenActions: AttachmentTokenActions = {
     tooltipId: attachmentTooltipId,
@@ -268,8 +247,9 @@ export function ComposerEditor(props: ComposerEditorProps) {
       mcpServers: props.mcpServers ?? [],
       attachments: props.attachments ?? [],
       focusRequest: props.focusRequest ?? 0,
+      skillPickerRequest: props.skillPickerRequest ?? 0,
     }),
-    ({ agentId, value, agents, skills, mcpServers, attachments, focusRequest }) => {
+    ({ agentId, value, agents, skills, mcpServers, attachments, focusRequest, skillPickerRequest }) => {
       if (!editor) return;
       const attachmentKey = attachments.map((attachment) => `${attachment.id}:${attachment.name}`).join("|");
       const skillKey = skills
@@ -299,6 +279,10 @@ export function ComposerEditor(props: ComposerEditorProps) {
         lastFocusRequest = focusRequest;
         editor.focus();
         placeCaretAtEnd(editor);
+      }
+      if (skillPickerRequest > lastSkillPickerRequest) {
+        lastSkillPickerRequest = skillPickerRequest;
+        openSkillPicker();
       }
     },
   );
@@ -388,6 +372,26 @@ export function ComposerEditor(props: ComposerEditorProps) {
     setPickerFrame(measurePickerFrame(editor));
     setMention({ query, start: beforeCaret.length - query.length - 1, end: beforeCaret.length, trigger });
     setActiveOption(0);
+  }
+
+  /* Writes a `$` at the caret, as if typed, so the picker and its query work as for a typed one. */
+  function openSkillPicker() {
+    if (!editor || props.disabled) return;
+    editor.focus();
+    ensureEditorSelection();
+    const selection = window.getSelection();
+    if (!selection?.rangeCount) return;
+    // Keep selected text: put the `$` after it.
+    if (!selection.isCollapsed) selection.collapseToEnd();
+    const range = selection.getRangeAt(0).cloneRange();
+    range.selectNodeContents(editor);
+    range.setEnd(selection.anchorNode ?? editor, selection.anchorOffset);
+    const beforeCaret = range.toString();
+    const separator = beforeCaret && !/\s$/u.test(beforeCaret) ? " " : "";
+    insertPlainText(editor, `${separator}$`);
+    setRequestedMentionStart(beforeCaret.length + separator.length);
+    emitValue();
+    updateMention();
   }
 
   function insertOption(option: PickerOption) {
@@ -685,7 +689,11 @@ export function ComposerEditor(props: ComposerEditorProps) {
         onPaste={handlePaste}
         onBlur={() => {
           isComposing = false;
-          window.setTimeout(() => setMention(null), 100);
+          // A menu can return the focus to the editor within this delay; keep the picker it opened.
+          window.setTimeout(() => {
+            const ownerDocument = editor?.ownerDocument;
+            if (!ownerDocument?.hasFocus() || ownerDocument.activeElement !== editor) setMention(null);
+          }, 100);
         }}
       />
       <Show when={pickerOpen()}>
@@ -694,79 +702,93 @@ export function ComposerEditor(props: ComposerEditorProps) {
             class="mention-picker"
             style={{
               "--mention-picker-bottom": `${pickerFrame().bottom}px`,
-              "--mention-picker-rows": matchingOptions().length,
+              "--mention-picker-rows": pickerStatus() === null ? matchingOptions().length : 1,
             }}
           >
-            <Listbox.Root<PickerOption>
-              as="div"
-              ref={pickerFades.bind}
-              class={["mention-picker-list", pickerFades.classes()]}
-              onScroll={pickerFades.measure}
-              aria-label={t(mention()?.trigger === "$" ? "composer.picker.skillLabel" : "composer.picker.mentionLabel")}
-              options={matchingOptions()}
-              optionValue={pickerOptionKey}
-              optionTextValue={(option) => pickerOptionText(option, t)}
-              selectionMode="single"
-              disallowEmptySelection={true}
-              allowDuplicateSelectionEvents={true}
-              shouldUseVirtualFocus={true}
-              shouldFocusOnHover={true}
-              shouldSelectOnPressUp={true}
-              value={activePickerValue()}
-              onChange={(keys) => {
-                const key = keys.values().next().value;
-                const option = matchingOptions().find((candidate) => pickerOptionKey(candidate) === key);
-                if (option) insertOption(option);
-              }}
-              renderItem={(item) => {
-                const option = item.rawValue;
-                const optionIndex = () =>
-                  matchingOptions().findIndex((candidate) => pickerOptionKey(candidate) === item.key);
-                const badge = pickerOptionBadge(option, t);
-                return (
-                  <Listbox.Item
-                    ref={(element) => pickerOptionElements.set(pickerOptionKey(option), element)}
-                    item={item}
-                    aria-label={pickerOptionText(option, t)}
-                    class={[
-                      "mention-picker-option",
-                      {
-                        "mention-picker-file-option": option.type === "attachment",
-                        "mention-picker-option-active": activeOption() === optionIndex(),
-                      },
-                    ]}
-                    onPointerDown={(event) => {
-                      event.preventDefault();
-                      // The composer focuses its editor on any pointerdown that is not a control.
-                      event.stopPropagation();
-                    }}
-                    onMouseEnter={() => setActiveOption(optionIndex())}
-                  >
-                    {option.type === "agent" ? (
-                      <AgentAvatar agent={option.agent} />
-                    ) : option.type === "skill" ? (
-                      <span class="mention-picker-skill-icon" aria-hidden="true">
-                        <Puzzle />
-                      </span>
-                    ) : option.type === "mcp" ? (
-                      <span class="mention-picker-skill-icon" aria-hidden="true">
-                        <Blocks />
-                      </span>
-                    ) : (
-                      <AttachmentReferenceVisual name={option.attachment.name} />
-                    )}
-                    <strong>{pickerOptionName(option)}</strong>
-                    <Show when={pickerOptionDescription(option, format)}>
-                      {(description) => <span class="mention-picker-description">{description()}</span>}
-                    </Show>
-                    <Badge class="mention-picker-badge" variant="ghost">
-                      <Dynamic component={badge.icon} aria-hidden="true" />
-                      {badge.label}
-                    </Badge>
-                  </Listbox.Item>
-                );
-              }}
-            />
+            <Show when={pickerStatus()}>
+              {(status) => (
+                <p class="mention-picker-status" role="status">
+                  {status()}
+                </p>
+              )}
+            </Show>
+            <Show when={pickerStatus() === null}>
+              <Listbox.Root<PickerOption>
+                as="div"
+                ref={pickerFades.bind}
+                class={["mention-picker-list", pickerFades.classes()]}
+                onScroll={pickerFades.measure}
+                aria-label={t(
+                  mention()?.trigger === "$" ? "composer.picker.skillLabel" : "composer.picker.mentionLabel",
+                )}
+                options={matchingOptions()}
+                optionValue={pickerOptionKey}
+                optionTextValue={(option) => pickerOptionText(option, t)}
+                selectionMode="single"
+                disallowEmptySelection={true}
+                allowDuplicateSelectionEvents={true}
+                shouldUseVirtualFocus={true}
+                shouldFocusOnHover={true}
+                shouldSelectOnPressUp={true}
+                value={activePickerValue()}
+                onChange={(keys) => {
+                  const key = keys.values().next().value;
+                  const option = matchingOptions().find((candidate) => pickerOptionKey(candidate) === key);
+                  if (option) insertOption(option);
+                }}
+                renderItem={(item) => {
+                  const option = item.rawValue;
+                  const optionIndex = () =>
+                    matchingOptions().findIndex((candidate) => pickerOptionKey(candidate) === item.key);
+                  const badge = pickerOptionBadge(option, t);
+                  return (
+                    <Listbox.Item
+                      ref={(element) => pickerOptionElements.set(pickerOptionKey(option), element)}
+                      item={item}
+                      aria-label={pickerOptionText(option, t)}
+                      class={[
+                        "mention-picker-option",
+                        {
+                          "mention-picker-file-option": option.type === "attachment",
+                          "mention-picker-option-active": activeOption() === optionIndex(),
+                        },
+                      ]}
+                      onPointerDown={(event) => {
+                        event.preventDefault();
+                        // The composer focuses its editor on any pointerdown that is not a control.
+                        event.stopPropagation();
+                      }}
+                      onMouseEnter={() => setActiveOption(optionIndex())}
+                    >
+                      {option.type === "agent" ? (
+                        <AgentAvatar agent={option.agent} />
+                      ) : option.type === "skill" ? (
+                        <span class="mention-picker-skill-icon" aria-hidden="true">
+                          <Puzzle />
+                        </span>
+                      ) : option.type === "mcp" ? (
+                        <span class="mention-picker-skill-icon" aria-hidden="true">
+                          <Blocks />
+                        </span>
+                      ) : (
+                        <AttachmentReferenceVisual name={option.attachment.name} />
+                      )}
+                      <strong>{pickerOptionName(option)}</strong>
+                      <Show when={option.type === "skill" && option.showSlug ? option.skill.slug : undefined}>
+                        {(slug) => <span class="mention-picker-slug">{slug()}</span>}
+                      </Show>
+                      <Show when={pickerOptionDescription(option, format)}>
+                        {(description) => <span class="mention-picker-description">{description()}</span>}
+                      </Show>
+                      <Badge class="mention-picker-badge" variant="ghost">
+                        <Dynamic component={badge.icon} aria-hidden="true" />
+                        {badge.label}
+                      </Badge>
+                    </Listbox.Item>
+                  );
+                }}
+              />
+            </Show>
           </div>
         </Portal>
       </Show>
@@ -777,539 +799,4 @@ export function ComposerEditor(props: ComposerEditorProps) {
       </Show>
     </div>
   );
-}
-
-function truncateComposerValue(value: string, limit: number): string {
-  if (value.length <= limit) return value;
-  let result = "";
-  let cursor = 0;
-  for (const match of value.matchAll(MENTION_PATTERN)) {
-    const index = match.index ?? 0;
-    const text = value.slice(cursor, index);
-    if (result.length + text.length >= limit) {
-      return result + text.slice(0, limit - result.length);
-    }
-    result += text;
-    if (result.length + match[0].length > limit) return result;
-    result += match[0];
-    cursor = index + match[0].length;
-  }
-  return result + value.slice(cursor, cursor + limit - result.length);
-}
-
-interface AttachmentTokenActions {
-  tooltipId: string;
-  open: (attachment: DraftAttachment, keepTooltip?: boolean) => void;
-  showTooltip: (anchor: HTMLElement, content: string) => void;
-  hideTooltip: (anchor: HTMLElement) => void;
-  remove: (token: HTMLElement) => void;
-}
-
-function createAttachmentToken(attachment: DraftAttachment, actions: AttachmentTokenActions): HTMLSpanElement {
-  const token = document.createElement("span");
-  token.className = "composer-file-reference";
-  token.contentEditable = "false";
-  token.dataset.attachmentReferenceId = attachment.id;
-  token.dataset.attachmentReferenceName = attachment.name;
-  token.setAttribute("role", "button");
-  token.setAttribute("tabindex", "0");
-  token.setAttribute("aria-label", currentText().t("composer.token.attachment", { name: attachment.name }));
-  token.setAttribute("aria-describedby", actions.tooltipId);
-  appendAttachmentReferenceVisual(token, attachment.name);
-  const name = document.createElement("span");
-  name.className = "inline-file-reference-name";
-  name.textContent = attachment.name;
-  token.append(name);
-  const showTooltip = () => actions.showTooltip(token, attachment.name);
-  const hideTooltip = () => actions.hideTooltip(token);
-  token.addEventListener("pointerenter", showTooltip);
-  token.addEventListener("pointerleave", hideTooltip);
-  token.addEventListener("focus", showTooltip);
-  token.addEventListener("blur", hideTooltip);
-  token.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") {
-      hideTooltip();
-      return;
-    }
-    if (event.key === "Backspace" || event.key === "Delete") {
-      event.preventDefault();
-      event.stopPropagation();
-      actions.remove(token);
-      return;
-    }
-    if (event.key !== "Enter" && event.key !== " ") return;
-    event.preventDefault();
-    event.stopPropagation();
-    actions.open(attachment);
-  });
-  token.addEventListener("click", (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    if (usesTouchLayout()) showTooltip();
-    actions.open(attachment, usesTouchLayout());
-  });
-  return token;
-}
-
-function createMentionToken(agent: AgentProfile): HTMLSpanElement {
-  const token = document.createElement("span");
-  token.className = `composer-mention-token ${referenceChipClasses.root}`;
-  token.dataset.kind = "agent";
-  token.title = agent.name;
-  token.contentEditable = "false";
-  token.dataset.mentionId = agent.id;
-  token.dataset.mentionName = agent.name;
-  token.setAttribute("aria-label", currentText().t("composer.token.agent", { name: agent.name }));
-  const avatar = document.createElement("span");
-  avatar.className = `composer-mention-avatar agent-avatar-motion-hover ${referenceChipClasses.icon}`;
-  if (agent.avatarUrl) {
-    const image = document.createElement("img");
-    image.src = agent.avatarUrl;
-    image.alt = "";
-    image.draggable = false;
-    image.addEventListener("error", () => {
-      scheduleStaticMentionAvatar(avatar, agent);
-    });
-    avatar.append(image);
-  } else {
-    scheduleStaticMentionAvatar(avatar, agent);
-  }
-  const name = document.createElement("span");
-  name.className = referenceChipClasses.name;
-  name.textContent = agent.name;
-  token.append(avatar, name);
-  return token;
-}
-
-function createSkillToken(skill: InstalledSkill): HTMLSpanElement {
-  const token = document.createElement("span");
-  updateSkillToken(token, skill);
-  return token;
-}
-
-function updateSkillToken(token: HTMLSpanElement, skill: InstalledSkill): void {
-  token.className = `composer-mention-token ${referenceChipClasses.root}`;
-  token.dataset.kind = "skill";
-  token.title = skill.name;
-  token.contentEditable = "false";
-  token.dataset.skillId = skill.skillId;
-  token.dataset.skillName = skill.name;
-  token.setAttribute("aria-label", currentText().t("composer.token.skill", { name: skill.name }));
-  const iconWrap = document.createElement("span");
-  iconWrap.className = referenceChipClasses.icon;
-  iconWrap.setAttribute("aria-hidden", "true");
-  const icon = Puzzle({ class: "skill-chip-glyph" });
-  if (!(icon instanceof Node)) throw new Error("Puzzle icon did not render to a DOM node");
-  iconWrap.append(icon);
-  const name = document.createElement("span");
-  name.className = referenceChipClasses.name;
-  name.textContent = skill.name;
-  token.replaceChildren(iconWrap, name);
-}
-
-function createMcpToken(server: McpServerConfig): HTMLSpanElement {
-  const token = document.createElement("span");
-  updateMcpToken(token, server);
-  return token;
-}
-
-function updateMcpToken(token: HTMLSpanElement, server: McpServerConfig): void {
-  token.className = `composer-mention-token ${referenceChipClasses.root}`;
-  token.dataset.kind = "mcp";
-  token.title = server.name;
-  token.contentEditable = "false";
-  token.dataset.mcpId = server.id;
-  token.dataset.mcpName = server.name;
-  token.setAttribute("aria-label", currentText().t("composer.token.mcp", { name: server.name }));
-  const iconWrap = document.createElement("span");
-  iconWrap.className = referenceChipClasses.icon;
-  iconWrap.setAttribute("aria-hidden", "true");
-  const icon = Blocks({ class: "skill-chip-glyph" });
-  if (!(icon instanceof Node)) throw new Error("Blocks icon did not render to a DOM node");
-  iconWrap.append(icon);
-  const name = document.createElement("span");
-  name.className = referenceChipClasses.name;
-  name.textContent = server.name;
-  token.replaceChildren(iconWrap, name);
-}
-
-function skillDescription(skill: InstalledSkill): string | undefined {
-  const description = skill.description?.trim();
-  return description || undefined;
-}
-
-function createUnavailableTagToken(kind: ChatTagKind, id: string, name: string): HTMLSpanElement {
-  const token = document.createElement("span");
-  if (kind === "skill") {
-    updateUnavailableSkillToken(token, id, name);
-    return token;
-  }
-  if (kind === "mcp") {
-    updateUnavailableMcpToken(token, id, name);
-    return token;
-  }
-  token.className = "composer-mention-token composer-tag-unavailable";
-  token.contentEditable = "false";
-  token.dataset.mentionId = id;
-  token.dataset.mentionName = name;
-  token.setAttribute("aria-label", currentText().t("composer.token.unavailableAgent", { name }));
-  token.textContent = name;
-  return token;
-}
-
-function updateUnavailableSkillToken(token: HTMLSpanElement, id: string, name: string): void {
-  token.className = "composer-mention-token composer-tag-unavailable";
-  token.contentEditable = "false";
-  token.dataset.skillId = id;
-  token.dataset.skillName = name;
-  token.setAttribute("aria-label", currentText().t("composer.token.unavailableSkill", { name }));
-  token.textContent = name;
-}
-
-function updateUnavailableMcpToken(token: HTMLSpanElement, id: string, name: string): void {
-  token.className = "composer-mention-token composer-tag-unavailable";
-  token.contentEditable = "false";
-  token.dataset.mcpId = id;
-  token.dataset.mcpName = name;
-  token.setAttribute("aria-label", currentText().t("composer.token.unavailableMcp", { name }));
-  token.textContent = name;
-}
-
-/* A server the host no longer holds, or one the user turned off, is drawn as a name the agent
-   cannot reach - the same outline a removed skill takes. */
-function syncMcpTokens(editor: HTMLDivElement, servers: McpServerConfig[]): void {
-  const available = new Map(servers.filter((server) => server.enabled).map((server) => [server.id, server]));
-  for (const token of editor.querySelectorAll<HTMLSpanElement>("[data-mcp-id]")) {
-    const id = token.dataset.mcpId;
-    if (!id) continue;
-    const server = available.get(id);
-    if (server) updateMcpToken(token, server);
-    else updateUnavailableMcpToken(token, id, token.dataset.mcpName ?? "MCP server");
-  }
-}
-
-function syncSkillTokens(editor: HTMLDivElement, skills: InstalledSkill[]): void {
-  const available = new Map(
-    skills
-      .filter((skill) => skill.state !== "needs-repair" && skill.enabled !== false)
-      .map((skill) => [skill.skillId, skill]),
-  );
-  for (const token of editor.querySelectorAll<HTMLSpanElement>("[data-skill-id]")) {
-    const id = token.dataset.skillId;
-    if (!id) continue;
-    const skill = available.get(id);
-    if (skill) updateSkillToken(token, skill);
-    else updateUnavailableSkillToken(token, id, token.dataset.skillName ?? "Skill");
-  }
-}
-
-function renderEditorValue(
-  editor: HTMLDivElement,
-  value: string,
-  agents: AgentProfile[],
-  skills: InstalledSkill[],
-  mcpServers: McpServerConfig[],
-  attachments: DraftAttachment[],
-  attachmentTokenActions: AttachmentTokenActions,
-) {
-  editor.replaceChildren();
-  let cursor = 0;
-  for (const match of value.matchAll(MENTION_PATTERN)) {
-    const index = match.index ?? 0;
-    if (index > cursor) editor.append(document.createTextNode(value.slice(cursor, index)));
-    const semanticReference = chatTagReferences(match[0])[0];
-    const name = semanticReference?.name ?? match[1] ?? "Agent";
-    const target = semanticReference ? `${semanticReference.kind}:${semanticReference.id}` : (match[2] ?? "");
-    if (target.startsWith("attachment:")) {
-      const id = target.slice("attachment:".length);
-      const attachment = attachments.find((candidate) => candidate.id === id);
-      editor.append(
-        attachment ? createAttachmentToken(attachment, attachmentTokenActions) : document.createTextNode(name),
-      );
-      cursor = index + match[0].length;
-      continue;
-    }
-    if (target.startsWith("skill:")) {
-      const id = target.slice("skill:".length);
-      const skill = skills.find(
-        (candidate) => candidate.skillId === id && candidate.state !== "needs-repair" && candidate.enabled !== false,
-      );
-      editor.append(skill ? createSkillToken(skill) : createUnavailableTagToken("skill", id, name));
-      cursor = index + match[0].length;
-      continue;
-    }
-    if (target.startsWith("mcp:")) {
-      const id = target.slice("mcp:".length);
-      const server = mcpServers.find((candidate) => candidate.id === id && candidate.enabled);
-      editor.append(server ? createMcpToken(server) : createUnavailableTagToken("mcp", id, name));
-      cursor = index + match[0].length;
-      continue;
-    }
-    const id = target.startsWith("agent:") ? target.slice("agent:".length) : target;
-    const agent = agents.find((candidate) => candidate.id === id);
-    editor.append(agent ? createMentionToken(agent) : createUnavailableTagToken("agent", id, name));
-    cursor = index + match[0].length;
-  }
-  if (cursor < value.length) editor.append(document.createTextNode(value.slice(cursor)));
-}
-
-function scheduleStaticMentionAvatar(avatar: HTMLElement, agent: AgentProfile): void {
-  queueMicrotask(() => {
-    if (!avatar.isConnected) return;
-    avatar.replaceChildren(createStaticAvatarSvg(agent.avatarSeed, agent.avatarHue));
-  });
-}
-
-function serializeEditor(editor: HTMLDivElement): string {
-  if (
-    editor.textContent === "" &&
-    !editor.querySelector("[data-mention-id], [data-skill-id], [data-mcp-id], [data-attachment-reference-id]")
-  )
-    return "";
-  return Array.from(editor.childNodes).map(serializeNode).join("");
-}
-
-function serializeNode(node: Node): string {
-  if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? "";
-  if (!(node instanceof HTMLElement)) return "";
-  if (node.dataset.composerTrailingLine !== undefined) return "";
-  const attachmentId = node.dataset.attachmentReferenceId;
-  const attachmentName = node.dataset.attachmentReferenceName;
-  if (attachmentId && attachmentName) {
-    return serializeAttachmentReference(attachmentName, attachmentId);
-  }
-  const mentionId = node.dataset.mentionId;
-  const mentionName = node.dataset.mentionName;
-  if (mentionId && mentionName) return serializeChatTagReference("agent", mentionName, mentionId);
-  const skillId = node.dataset.skillId;
-  const skillName = node.dataset.skillName;
-  if (skillId && skillName) return serializeChatTagReference("skill", skillName, skillId);
-  const mcpId = node.dataset.mcpId;
-  const mcpName = node.dataset.mcpName;
-  if (mcpId && mcpName) return serializeChatTagReference("mcp", mcpName, mcpId);
-  if (node.tagName === "BR") return "\n";
-  const content = Array.from(node.childNodes).map(serializeNode).join("");
-  return node.tagName === "DIV" || node.tagName === "P" ? `${content}\n` : content;
-}
-
-/*
- * Writes through the browser's own editing command, so the change joins the undo stack: Ctrl+Z
- * still takes typing back, and still restores text a keystroke replaced. A range edit writes
- * nothing there. The command needs the caret inside this editor, and jsdom has no such command,
- * so it reports what it did and `insertPlainText` keeps a range edit for both cases.
- */
-function insertTextThroughBrowser(editor: HTMLDivElement, text: string): boolean {
-  // The command answers a newline with a block split, which serializes as two line breaks.
-  if (text.includes("\n") || typeof document.execCommand !== "function") return false;
-  const selection = window.getSelection();
-  const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
-  if (!range || !editor.contains(range.commonAncestorContainer)) return false;
-  return document.execCommand("insertText", false, text);
-}
-
-function insertPlainText(editor: HTMLDivElement, text: string): void {
-  if (insertTextThroughBrowser(editor, text)) return;
-  /*
-   * The browser leaves a placeholder `<br>` behind when it empties the editable, and drops it only
-   * when it writes text itself. The range edit below writes the text instead, so it drops the
-   * placeholder: left in place beside the new text, it would serialize as a line break the user
-   * never typed.
-   */
-  if (!editor.textContent) editor.querySelector(":scope > br:last-child")?.remove();
-  const selection = window.getSelection();
-  let range: Range;
-  const selectedRange = selection?.rangeCount ? selection.getRangeAt(0) : null;
-  if (selectedRange && editor.contains(selectedRange.commonAncestorContainer)) {
-    range = selectedRange.cloneRange();
-  } else {
-    range = document.createRange();
-    range.selectNodeContents(editor);
-    range.collapse(false);
-  }
-
-  const prefix = range.cloneRange();
-  prefix.selectNodeContents(editor);
-  prefix.setEnd(range.startContainer, range.startOffset);
-  const caretOffset = prefix.toString().length + text.length;
-  range.deleteContents();
-  range.insertNode(document.createTextNode(text));
-  editor.normalize();
-  syncTrailingLineSentinel(editor);
-  const caretRange = rangeFromTextOffsets(editor, caretOffset, caretOffset);
-  if (!caretRange) return;
-  selection?.removeAllRanges();
-  selection?.addRange(caretRange);
-}
-
-/*
- * Continues or ends a Markdown list, as `markdownListLineBreak` describes. The edit works in the
- * editor's text offsets, where a chip counts as its visible text, and it changes only the current
- * line, so chips stay in place.
- */
-function insertLineBreak(editor: HTMLDivElement): void {
-  const selection = window.getSelection();
-  const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
-  if (!range?.collapsed || !editor.contains(range.commonAncestorContainer)) {
-    insertPlainText(editor, "\n");
-    return;
-  }
-  const before = range.cloneRange();
-  before.selectNodeContents(editor);
-  before.setEnd(range.startContainer, range.startOffset);
-  const after = range.cloneRange();
-  after.selectNodeContents(editor);
-  after.setStart(range.endContainer, range.endOffset);
-  const text = before.toString() + after.toString();
-  const caret = before.toString().length;
-  const edit = markdownListLineBreak(text, caret);
-  if (!edit) {
-    insertPlainText(editor, "\n");
-    return;
-  }
-  if (edit.caret > caret) {
-    insertPlainText(editor, edit.text.slice(caret, edit.caret));
-    return;
-  }
-  const marker = rangeFromTextOffsets(editor, edit.caret, edit.caret + text.length - edit.text.length);
-  if (!marker) return;
-  selection?.removeAllRanges();
-  selection?.addRange(marker);
-  insertPlainText(editor, "");
-}
-
-function syncTrailingLineSentinel(editor: HTMLDivElement, value = serializeEditor(editor)): void {
-  const existing = editor.querySelector<HTMLElement>("[data-composer-trailing-line]");
-  existing?.remove();
-  if (!value.endsWith("\n")) return;
-
-  const sentinel = document.createElement("span");
-  sentinel.className = "composer-trailing-line";
-  sentinel.dataset.composerTrailingLine = "";
-  sentinel.contentEditable = "false";
-  sentinel.setAttribute("aria-hidden", "true");
-  editor.append(sentinel);
-}
-
-function placeCaretAtEnd(editor: HTMLDivElement): void {
-  const range = document.createRange();
-  range.selectNodeContents(editor);
-  range.collapse(false);
-  const selection = window.getSelection();
-  selection?.removeAllRanges();
-  selection?.addRange(range);
-}
-
-function placeCaretAtChildOffset(container: Node, offset: number): void {
-  const range = document.createRange();
-  range.setStart(container, offset);
-  range.collapse(true);
-  const selection = window.getSelection();
-  selection?.removeAllRanges();
-  selection?.addRange(range);
-}
-
-function mentionTokenAtCaretBoundary(
-  editor: HTMLDivElement,
-  range: Range,
-  key: "Backspace" | "Delete",
-): HTMLElement | null {
-  const tokenAtCaret = closestMentionToken(range.startContainer, editor);
-  if (tokenAtCaret) return tokenAtCaret;
-
-  let candidate: Node | null = null;
-  const container = range.startContainer;
-  if (container === editor) {
-    candidate = editor.childNodes[key === "Backspace" ? range.startOffset - 1 : range.startOffset] ?? null;
-  } else if (container.nodeType === Node.TEXT_NODE) {
-    const length = container.textContent?.length ?? 0;
-    const atBoundary = key === "Backspace" ? range.startOffset === 0 : range.startOffset === length;
-    if (!atBoundary) return null;
-    const directChild = directChildOf(editor, container);
-    candidate = key === "Backspace" ? (directChild?.previousSibling ?? null) : (directChild?.nextSibling ?? null);
-  } else if (container instanceof HTMLElement) {
-    candidate =
-      container.childNodes[key === "Backspace" ? range.startOffset - 1 : range.startOffset] ??
-      (key === "Backspace" ? container.previousSibling : container.nextSibling);
-  }
-
-  while (candidate?.nodeType === Node.TEXT_NODE && !candidate.textContent) {
-    candidate = key === "Backspace" ? candidate.previousSibling : candidate.nextSibling;
-  }
-  return candidate ? closestMentionToken(candidate, editor) : null;
-}
-
-function closestMentionToken(node: Node, editor: HTMLDivElement): HTMLElement | null {
-  const element = node instanceof HTMLElement ? node : node.parentElement;
-  const token = element?.closest<HTMLElement>("[data-mention-id], [data-skill-id], [data-mcp-id]") ?? null;
-  return token && editor.contains(token) ? token : null;
-}
-
-function directChildOf(editor: HTMLDivElement, node: Node): Node | null {
-  let current: Node | null = node;
-  while (current?.parentNode && current.parentNode !== editor) current = current.parentNode;
-  return current?.parentNode === editor ? current : null;
-}
-
-function automaticMentionSpaceAtCaretBoundary(
-  editor: HTMLDivElement,
-  range: Range,
-): { text: Text; offset: number; token: HTMLElement } | null {
-  const container = range.startContainer;
-  let text: Text | null = null;
-  let offset = 0;
-  if (isTextNode(container)) {
-    text = container;
-    offset = range.startOffset;
-    if (!offset && !text.data) {
-      const candidate = previousNonemptySibling(text.previousSibling);
-      if (!candidate || !isTextNode(candidate)) return null;
-      text = candidate;
-      offset = candidate.data.length;
-    }
-  } else if (container === editor) {
-    const candidate = previousNonemptySibling(editor.childNodes[range.startOffset - 1] ?? null);
-    if (!candidate || !isTextNode(candidate)) return null;
-    text = candidate;
-    offset = candidate.data.length;
-  }
-
-  if (!text || offset !== 1 || text.data[0] !== " ") return null;
-  let previous = text.previousSibling;
-  while (previous && isTextNode(previous) && !previous.data) previous = previous.previousSibling;
-  const token = previous ? closestMentionToken(previous, editor) : null;
-  return token ? { text, offset, token } : null;
-}
-
-function isTextNode(node: Node): node is Text {
-  return node.nodeType === Node.TEXT_NODE;
-}
-
-function previousNonemptySibling(node: Node | null): Node | null {
-  let candidate = node;
-  while (candidate?.nodeType === Node.TEXT_NODE && !candidate.textContent) candidate = candidate.previousSibling;
-  return candidate;
-}
-
-function rangeFromTextOffsets(root: HTMLElement, start: number, end: number): Range | null {
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  const range = document.createRange();
-  let offset = 0;
-  let startSet = false;
-  let node = walker.nextNode();
-  while (node) {
-    const length = node.textContent?.length ?? 0;
-    if (!startSet && start <= offset + length) {
-      range.setStart(node, Math.max(0, start - offset));
-      startSet = true;
-    }
-    if (startSet && end <= offset + length) {
-      range.setEnd(node, Math.max(0, end - offset));
-      return range;
-    }
-    offset += length;
-    node = walker.nextNode();
-  }
-  if (!startSet) range.setStart(root, root.childNodes.length);
-  range.setEnd(root, root.childNodes.length);
-  return range;
 }

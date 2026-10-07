@@ -29,6 +29,7 @@
         "@tanstack/virtual-core": "catalog:",
         "class-variance-authority": "catalog:",
         "cuelume": "0.2.4",
+        "effect": "catalog:",
         "electron-updater": "6.8.9",
         "fflate": "catalog:",
         "jose": "catalog:",
@@ -87,6 +88,7 @@
         "@tanstack/solid-router": "2.0.0-rc.0",
         "@tanstack/solid-start": "2.0.0-rc.0",
         "class-variance-authority": "catalog:",
+        "effect": "catalog:",
         "fflate": "catalog:",
         "jose": "catalog:",
         "solid-js": "2.0.0-rc.0",
@@ -126,6 +128,7 @@
         "@shopify/react-native-skia": "2.6.2",
         "@speed-highlight/core": "catalog:",
         "@tanstack/react-query": "^5.102.8",
+        "effect": "catalog:",
         "expo": "~57.0.24",
         "expo-application": "~57.0.3",
         "expo-blur": "~57.0.3",
@@ -174,6 +177,7 @@
         "react-native-screens": "~4.26.0",
         "react-native-svg": "15.15.4",
         "react-native-web": "^0.21.2",
+        "react-native-webview": "13.16.1",
         "react-native-worklets": "0.10.1",
         "tailwind-merge": "^3.6.0",
         "tailwind-variants": "^3.3.1",
@@ -194,6 +198,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@openbot/contracts": "workspace:*",
+        "effect": "catalog:",
       },
       "devDependencies": {
         "@cloudflare/workers-types": "catalog:",
@@ -265,6 +270,7 @@
         "@noble/hashes": "catalog:",
         "@openbot/contracts": "workspace:*",
         "@openbot/i18n": "workspace:*",
+        "effect": "catalog:",
       },
       "devDependencies": {
         "typescript": "catalog:",
@@ -317,6 +323,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@openbot/contracts": "workspace:*",
+        "effect": "catalog:",
         "elysia": "1.4.30",
         "jose": "catalog:",
         "zod": "catalog:",
@@ -338,6 +345,7 @@
     "lucide-solid@1.33.0": "patches/lucide-solid@1.33.0.patch",
     "solid-recharts@1.0.1": "patches/solid-recharts@1.0.1.patch",
     "dmg-builder@26.15.7": "patches/dmg-builder@26.15.7.patch",
+    "expo@57.0.24": "patches/expo@57.0.24.patch",
     "expo-router@57.0.22": "patches/expo-router@57.0.22.patch",
     "@kobalte/core@2.0.0-alpha.0": "patches/@kobalte%2Fcore@2.0.0-alpha.0.patch",
     "@solidjs/signals@2.0.0-rc.0": "patches/@solidjs%2Fsignals@2.0.0-rc.0.patch",
@@ -362,6 +370,7 @@
     "@testing-library/jest-dom": "7.0.1",
     "@types/node": "24.13.3",
     "class-variance-authority": "0.7.1",
+    "effect": "4.0.0",
     "fflate": "0.8.2",
     "jose": "6.2.10",
     "jsdom": "30.0.1",
@@ -1939,6 +1948,8 @@
 
     "ee-first": ["ee-first@1.1.1", "", {}, "sha512-WMwm9LhRUo+WUaRN+vRuETqG89IgZphVSNkdFgeb6sS/E4OrDIN7t48CAewSHXc6C8lefD8KKfr5vY61brQlow=="],
 
+    "effect": ["effect@4.0.0", "", {}, "sha512-ooc1TG5t+FfzgYnFz2ff6BBKyZ7EwBRVXC7c4RhQUAD6/TZ2gTXXMeb4WX7a19ozQo4J73/QW+S00YAIresoMQ=="],
+
     "ejs": ["ejs@3.1.10", "", { "dependencies": { "jake": "^10.8.5" }, "bin": { "ejs": "bin/cli.js" } }, "sha512-UeJmFfOrAQS8OJWPZ4qtgHyWExa088/MtK5UEyoJGFH67cDEXkZSviOiKRCZ4Xij0zxI3JECgYs3oKx+AizQBA=="],
 
     "electron": ["electron@44.0.0", "", { "dependencies": { "@electron-internal/extract-zip": "^1.0.1", "@electron/get": "^5.0.0", "@types/node": "^24.9.0" }, "bin": { "electron": "cli.js", "install-electron": "install.js" } }, "sha512-FkTqPrFPZYljdPI5b7KORGsJTd6FgUQDefl5MrU3Xz9R87pAj9JLreIjDqcRN8hJIkFHIou0o8kKzvcpT9qiRQ=="],
@@ -2708,6 +2719,8 @@
     "react-native-svg": ["react-native-svg@15.15.4", "", { "dependencies": { "css-select": "^5.1.0", "css-tree": "^1.1.3", "warn-once": "0.1.1" }, "peerDependencies": { "react": "*", "react-native": "*" } }, "sha512-boT/vIRgj6zZKBpfTPJJiYWMbZE9duBMOwPK6kCSTgxsS947IFMOq9OgIFkpWZTB7t229H24pDRkh3W9ZK/J1A=="],
 
     "react-native-web": ["react-native-web@0.21.2", "", { "dependencies": { "@babel/runtime": "^7.18.6", "@react-native/normalize-colors": "^0.74.1", "fbjs": "^3.0.4", "inline-style-prefixer": "^7.0.1", "memoize-one": "^6.0.0", "nullthrows": "^1.1.1", "postcss-value-parser": "^4.2.0", "styleq": "^0.1.3" }, "peerDependencies": { "react": "^18.0.0 || ^19.0.0", "react-dom": "^18.0.0 || ^19.0.0" } }, "sha512-SO2t9/17zM4iEnFvlu2DA9jqNbzNhoUP+AItkoCOyFmDMOhUnBBznBDCYN92fGdfAkfQlWzPoez6+zLxFNsZEg=="],
+
+    "react-native-webview": ["react-native-webview@13.16.1", "", { "dependencies": { "escape-string-regexp": "^4.0.0", "invariant": "2.2.4" }, "peerDependencies": { "react": "*", "react-native": "*" } }, "sha512-If0eHhoEdOYDcHsX+xBFwHMbWBGK1BvGDQDQdVkwtSIXiq1uiqjkpWVP2uQ1as94J0CzvFE9PUNDuhiX0Z6ubw=="],
 
     "react-native-worklets": ["react-native-worklets@0.10.1", "", { "dependencies": { "@babel/plugin-transform-arrow-functions": "^7.27.1", "@babel/plugin-transform-class-properties": "^7.28.6", "@babel/plugin-transform-classes": "^7.28.6", "@babel/plugin-transform-nullish-coalescing-operator": "^7.28.6", "@babel/plugin-transform-optional-chaining": "^7.28.6", "@babel/plugin-transform-shorthand-properties": "^7.27.1", "@babel/plugin-transform-template-literals": "^7.27.1", "@babel/plugin-transform-unicode-regex": "^7.27.1", "@babel/preset-typescript": "^7.28.5", "@babel/types": "^7.27.1", "convert-source-map": "^2.0.0", "semver": "^7.7.4" }, "peerDependencies": { "@babel/core": "*", "@react-native/metro-config": "*", "react": "*", "react-native": "0.83 - 0.86" } }, "sha512-62mRM19bDpfpdI8HLkEErcdOsrAPDtE9lA/sw+5lLRpzBHNhxaoj9QyY2KjXqUmirelxkX4zuPGTC3VdA0feJA=="],
 

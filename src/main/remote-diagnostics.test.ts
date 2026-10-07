@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
 import { afterEach, describe, expect, it } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { appendRemoteDiagnosticLog, forwardDiagnosticLines } from "./remote-diagnostics";
 
 const roots: string[] = [];
@@ -19,7 +20,9 @@ async function logOf(chunks: Array<string | Buffer>): Promise<string> {
   roots.push(root);
   const stream = new PassThrough();
   const writes: Promise<void>[] = [];
-  forwardDiagnosticLines(stream, (text) => writes.push(appendRemoteDiagnosticLog(root, "sunshine", text)));
+  forwardDiagnosticLines(stream, (text) =>
+    writes.push(runCauseEffect(appendRemoteDiagnosticLog(root, "sunshine", text))),
+  );
   const ended = new Promise((resolve) => stream.once("end", resolve));
   for (const chunk of chunks) stream.write(chunk);
   stream.end();

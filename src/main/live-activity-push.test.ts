@@ -1,8 +1,9 @@
 import type { AgentEvent, AgentRuntimeSnapshot } from "@openbot/contracts/ipc";
 import type { LiveActivityRelayPush } from "@openbot/contracts/live-activity-relay";
 import type { LiveActivityPushRegistration } from "@openbot/contracts/team-protocol/live-activity-push-v1";
+import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { type LiveActivityPushAgents, LiveActivityPushService } from "./live-activity-push";
+import { type LiveActivityPushAgents, LiveActivityPushService, LiveActivitySendFailure } from "./live-activity-push";
 
 const agent = (id: string, name: string) => ({
   id,
@@ -53,7 +54,7 @@ const agents: LiveActivityPushAgents = {
 };
 
 beforeEach(() => {
-  vi.useFakeTimers();
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"] });
   listener = null;
   memberActive = true;
   snapshot = {
@@ -78,7 +79,8 @@ let memberActive = true;
 function service(send: (push: LiveActivityRelayPush) => Promise<"sent" | "gone">) {
   return new LiveActivityPushService({
     agents,
-    send,
+    send: (push) =>
+      Effect.tryPromise({ try: () => send(push), catch: (cause) => new LiveActivitySendFailure({ cause }) }),
     randomBytes: (size) => new Uint8Array(size).fill(4),
     memberActive: () => memberActive,
   });
@@ -110,7 +112,7 @@ describe("LiveActivityPushService", () => {
     expect(sent).toMatchObject({ token: registration.token, event: "update", priority: 10 });
     // The relay and Apple see sealed bytes only.
     expect(JSON.stringify(sent)).not.toMatch(/npm test|Ada|hidden-secret|approval/iu);
-    push.dispose();
+    await Effect.runPromise(push.dispose());
   });
 
   it("ends the activity when nothing needs the member, and forgets a token that Apple refused", async () => {

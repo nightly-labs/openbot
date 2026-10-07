@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { checkAcpAgent } from "./acp-agent-check";
+import { runCauseEffect } from "./effect-boundary";
 
 // A fake ACP agent. `MODE` picks what it does with `initialize`; it writes its pid so the test can
 // prove that the check stopped it.
@@ -55,12 +56,14 @@ afterEach(async () => {
 });
 
 function check(mode: string, timeoutMs = 5_000) {
-  return checkAcpAgent({
-    executable,
-    args: [],
-    env: { MODE: mode, PID_FILE: pidFile, SECRET_VALUE: "sk-check-secret-value" },
-    timeoutMs,
-  });
+  return runCauseEffect(
+    checkAcpAgent({
+      executable,
+      args: [],
+      env: { MODE: mode, PID_FILE: pidFile, SECRET_VALUE: "sk-check-secret-value" },
+      timeoutMs,
+    }),
+  );
 }
 
 /** The agent process is gone: a signal 0 to its pid fails. */

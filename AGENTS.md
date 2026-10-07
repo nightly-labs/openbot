@@ -34,7 +34,7 @@ and state which default you set aside. Do not argue by citing this file.
 - **Keep PolyForm Noncommercial 1.0.0.** Do not add incompatible dependencies or relicense files.
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md#security-sensitive-changes) when a change touches the trust
-boundary or a security test, and [architecture change rules](docs/ARCHITECTURE.md#change-rules) when
+boundary or a security test, and [architecture change rules](docs/architecture/change-rules.md#change-rules) when
 adding a module or moving ownership between workspaces.
 
 ## Product constraints
@@ -46,6 +46,31 @@ adding a module or moving ownership between workspaces.
 - The user's SQLite database is the source of truth, not a remote cache.
 - Agents keep their workspace, thread, and identity across provider switches and restarts.
   Do not reset an agent to simplify state.
+
+## Effect
+
+- Use Effect 4.0.0 for migrated server and desktop domain services, schemas, typed errors,
+  asynchronous workflows, and external I/O. Keep the Bun catalog and lockfile aligned.
+- Read the installed Effect source and documentation. Do not use v3 compatibility aliases.
+- Prefer named `Effect.fn`, `Effect.gen`, `Context.Service`, explicit layers, and `Schema.TaggedError`.
+- Derive validated domain types from schemas. Decode untrusted values at their boundary;
+  preserve released decoder behavior. Do not validate trusted internal values again.
+- Wrap expected I/O failures with `Effect.tryPromise` or `Effect.try` at the adapter.
+  Keep causes private and safe. Preserve public error codes and localized messages.
+- Run Effects at framework boundaries. Keep routing, request schemas, rendering, and callbacks native.
+  Expose one Effect-returning operation per async service method. Do not add paired Promise methods
+  or run an Effect only to wrap its Promise in another Effect. Adapt browser and mobile native
+  callbacks at their call sites; preserve released wire and event contracts.
+- Reuse process-owned managed runtimes and await disposal in existing shutdown paths. Preserve
+  desktop teardown ordinals. Worker bindings and background I/O belong to their invocation;
+  retain `waitUntil` and streaming lifetimes rather than adding a process shutdown hook.
+- Tie owned resources to finalizers. Preserve existing deadlines and retries, and forward cancellation
+  where the API supports it. Do not add generic retry, fallback, or service-wrapper policies.
+- Keep business authorization and validation in domain operations, and centralize public error mapping.
+- The database host may import `effect` in addition to `node:*`. It remains a separate killable process
+  and must not import Electron or the application database. Effect cannot interrupt blocked SQLite.
+- Test through injected boundaries and include affected tests in CI selections. Mobile and browser
+  application workflow migration is outside this change; shared package consumers still need checks.
 
 ## Shared UI
 
@@ -77,7 +102,9 @@ as a routine completion or PR step.
 
 1. In a fresh worktree, run `bun install --frozen-lockfile` first.
 2. Run only the narrowest relevant test file and lint the changed files. Run checks one at a time, with one test worker where supported.
-   Use `bun run test:desktop -- <path>` for one desktop or mobile test file.
+   Use `bun run test:changed` by default: it runs, on one worker, only the desktop and mobile test
+   files that import a file you changed since `origin/main`. Use `bun run test:related -- <source>`
+   for the tests of named source files, and `bun run test:desktop -- <path>` for one test file.
 3. To check types, run one project for the code you changed, one at a time:
    `bun run typecheck:node` (`src/main`, `src/backend`, `src/preload`, `scripts`),
    `bun run typecheck:renderer` (`src/renderer`, `packages/ui`), or the `typecheck` script of the
@@ -87,10 +114,13 @@ as a routine completion or PR step.
 4. Do not run `bun run format`: it rewrites the whole repository. Use
    `biome check --write --max-diagnostics=none <paths>` for changed files.
 5. The pre-commit hook (`.githooks/pre-commit`) runs `check:staged`, `check:ui`, and
-   `bun run typecheck` when the commit stages code. This is the only exception to rule 3. Do not run
-   these checks by hand, and do not bypass the hook with `--no-verify`. The hook also runs the schema
-   parity test when a database schema file in `src/backend` is staged. It stops the commit if Biome
-   fixes a file that also has unstaged changes; stage the fixes you want and commit again.
+   `scripts/staged-typecheck.ts` when the commit stages code. The script runs, one at a time, only
+   the `typecheck:*` projects that can see a staged file; a root `package.json`, `tsconfig*.json` or
+   `bun.lock` selects all of them. `--dry-run [<path>...]` shows the selection. This is the only
+   exception to rule 3. Do not run these checks by hand, and do not bypass the hook with
+   `--no-verify`. The hook also runs the schema parity test when a database schema file in
+   `src/backend` is staged. It stops the commit if Biome fixes a file that also has unstaged
+   changes; stage the fixes you want and commit again.
 
 [Check design notes](docs/development-checks.md#check-coverage) explain CI coverage, command aliases,
 and the separate Node and Bun type environments. Read them when changing checks or dependencies.
@@ -105,7 +135,7 @@ State which surfaces a change touches. Check all affected consumers and reverse 
   (`src/renderer/src/preview/mock-openbot.ts`).
 - Reverse actions: snooze/unsnooze, pause/resume, revoke/reconnect, mute/unmute.
 - Migrations and the separate latest schema for new databases.
-- Documentation: `README.md` commands, `docs/ARCHITECTURE.md`, and `PRIVACY.md` when outbound data
+- Documentation: `README.md` commands, `docs/architecture/`, and `PRIVACY.md` when outbound data
   changes.
 
 ## Development data and processes
@@ -120,11 +150,11 @@ State which surfaces a change touches. Check all affected consumers and reverse 
 - Do not delete a dead stack record you did not resolve. Stop keeps the record and exits non-zero
   when it cannot confirm a PID's identity; resolve the process, then `bun run dev:forget`. Dead
   records do not reserve ports.
-- Reuse a running dev instance, or use `bun run dev --isolated` for a profile tied to this worktree.
-  Use the ports the stack reports rather than a fixed port.
+- Reuse a running dev instance. `bun run dev` opens a profile tied to this worktree; `--shared`
+  opens the shared `OpenBot Dev` profile. Use the ports the stack reports rather than a fixed port.
 
 See [README.md — Commands](README.md#commands) for the flags these commands take, and
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for why the registry works this way, when a dev command
+[docs/architecture/change-rules.md](docs/architecture/change-rules.md#change-rules) for why the registry works this way, when a dev command
 does not behave as expected.
 
 ## Terms
@@ -139,7 +169,7 @@ string, or when a term in the code disagrees with the UI.
 ## Task-specific instructions
 
 Read the instruction file for each directory you change. Use the
-[workspace map](docs/ARCHITECTURE.md#workspace-map) to find its owner.
+[workspace map](docs/architecture/structure.md#workspace-map) to find its owner.
 
 | File | Scope |
 | --- | --- |

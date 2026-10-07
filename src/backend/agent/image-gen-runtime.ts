@@ -1,6 +1,8 @@
-import type { ImageGenerationInfo } from "@openbot/contracts/ipc";
+import type { AttachmentSummary, ImageGenerationInfo } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
+import { Effect, Exit, Fiber, Result, Schema, Scope } from "effect";
 import { newAssistantMessage } from "../conversation-snapshots";
+import { causeHelpers } from "../effect-boundary";
 import type { MailboxStore } from "../mailbox-store";
 import { getString, type ThreadItem } from "../protocol";
 import type { ConversationRuntime } from "./conversation-runtime";
@@ -15,7 +17,7 @@ import {
 
 interface ImageGenerationOperation {
   interrupted: boolean;
-  promise: Promise<void> | null;
+  fiber: Fiber.Fiber<void, GeneratedImageFailed> | null;
 }
 
 export interface ImageGenHooks {
@@ -42,6 +44,7 @@ export class ImageGenRuntime {
   readonly #conversation: ConversationRuntime;
   readonly #mailbox: MailboxStore;
   readonly #hooks: ImageGenHooks;
+  #scope = Scope.makeUnsafe();
   readonly #operations = new Map<string, ImageGenerationOperation>();
   readonly #interruptedTurns = new Set<string>();
 
@@ -55,18 +58,27 @@ export class ImageGenRuntime {
    * Handles one streaming item when it is an image-generation item.
    * Returns true when handled, so the caller can fall through for the rest.
    */
-  handleItem(agentId: string, threadId: string, turnId: string, item: ThreadItem, completed: boolean): boolean {
+  readonly handleItem = Effect.fn("ImageGenRuntime.handleItem")(function* (
+    this: ImageGenRuntime,
+    agentId: string,
+    threadId: string,
+    turnId: string,
+    item: ThreadItem,
+    completed: boolean,
+  ) {
     if (!isImageGenerationItem(item)) return false;
     const operationKey = `${threadId}:${turnId}:${item.id}`;
     const state = this.#operations.get(operationKey) ?? {
       interrupted: this.#interruptedTurns.has(`${threadId}:${turnId}`),
-      promise: null,
+      fiber: null,
     };
     state.interrupted ||= this.#interruptedTurns.has(`${threadId}:${turnId}`);
     this.#operations.set(operationKey, state);
-    state.promise = this.#applyImageGenerationItem(agentId, threadId, turnId, item, completed, state);
+    state.fiber = yield* this.#applyItem(agentId, threadId, turnId, item, completed, state).pipe(
+      Effect.forkIn(this.#scope, { startImmediately: true }),
+    );
     return true;
-  }
+  }).bind(this);
 
   interrupt(agentId: string, threadId: string, turnId: string): void {
     this.#interruptedTurns.add(`${threadId}:${turnId}`);
@@ -93,38 +105,47 @@ export class ImageGenRuntime {
     if (changed) this.#conversation.emitConversation(snapshot, "image-generation.interrupted", { turnId });
   }
 
-  async waitForOperations(threadId: string, turnId: string): Promise<void> {
+  readonly waitForOperations = Effect.fn("ImageGenRuntime.waitForOperations")(function* (
+    this: ImageGenRuntime,
+    threadId: string,
+    turnId: string,
+  ) {
     const entries = [...this.#operations.entries()].filter(([key]) => key.startsWith(`${threadId}:${turnId}:`));
     const operations = entries
-      .map(([, operation]) => operation.promise)
-      .filter((promise): promise is Promise<void> => promise !== null);
-    if (operations.length > 0) await Promise.allSettled(operations);
-    for (const [key] of entries) {
-      if (this.#operations.has(key)) this.#operations.delete(key);
-    }
+      .map(([, operation]) => operation.fiber)
+      .filter((fiber): fiber is Fiber.Fiber<void, GeneratedImageFailed> => fiber !== null);
+    yield* Effect.forEach(operations, (operation) => Fiber.join(operation).pipe(Effect.ignore), {
+      concurrency: "unbounded",
+      discard: true,
+    });
+    for (const [key] of entries) this.#operations.delete(key);
     this.#interruptedTurns.delete(`${threadId}:${turnId}`);
-  }
+  }, Effect.uninterruptible).bind(this);
 
-  /** Promises the facade awaits during stop() before clearing. */
-  pendingPromises(): Promise<void>[] {
+  /** Work the facade awaits during stop() before clearing. */
+  pendingOperations(): Effect.Effect<void, GeneratedImageFailed>[] {
     return [...this.#operations.values()]
-      .map((operation) => operation.promise)
-      .filter((promise): promise is Promise<void> => promise !== null);
+      .map((operation) => operation.fiber)
+      .filter((fiber): fiber is Fiber.Fiber<void, GeneratedImageFailed> => fiber !== null)
+      .map(Fiber.join);
   }
 
-  dispose(): void {
+  readonly dispose = Effect.fn("ImageGenRuntime.dispose")(function* (this: ImageGenRuntime) {
+    yield* Scope.close(this.#scope, Exit.void);
+    this.#scope = Scope.makeUnsafe();
     this.#operations.clear();
     this.#interruptedTurns.clear();
-  }
+  }).bind(this);
 
-  async #applyImageGenerationItem(
+  readonly #applyItem = Effect.fn("ImageGenRuntime.applyItem")(function* (
+    this: ImageGenRuntime,
     agentId: string,
     threadId: string,
     turnId: string,
     item: ThreadItem,
     completed: boolean,
     operation: ImageGenerationOperation,
-  ): Promise<void> {
+  ) {
     if (!isString(item.id)) return;
     const snapshot = this.#conversation.ensureSnapshot(agentId, threadId);
     let message = snapshot.messages.find((candidate) => candidate.id === item.id);
@@ -171,62 +192,77 @@ export class ImageGenRuntime {
 
     const savedPath = getString(item, "saved_path");
     const result = getString(item, "result");
-    try {
-      let attachment: Awaited<ReturnType<MailboxStore["storeGeneratedAttachment"]>>;
-      if (savedPath) {
-        try {
-          attachment = await this.#mailbox.storeGeneratedAttachment({
-            sourcePath: savedPath,
-            name: generatedImageName(savedPath),
-            ownerAgentId: agentId,
-            ownerThreadId: threadId,
-          });
-        } catch (error) {
-          if (!result) throw error;
-          attachment = await this.#mailbox.storeGeneratedAttachment({
-            bytes: decodeGeneratedImage(result),
+    yield* Effect.gen({ self: this }, function* () {
+      let attachment: AttachmentSummary;
+      const storeBytes = Effect.gen({ self: this }, function* () {
+        if (!result)
+          return yield* new GeneratedImageFailed({ cause: new Error("Image generation did not return an image.") });
+        const bytes = yield* imageStep(() => decodeGeneratedImage(result));
+        return yield* this.#mailbox
+          .storeGeneratedAttachment({
+            bytes,
             name: "generated-image.png",
             mimeType: "image/png",
             ownerAgentId: agentId,
             ownerThreadId: threadId,
-          });
+          })
+          .pipe(toGeneratedImageFailed);
+      });
+      if (savedPath) {
+        const saved = yield* Effect.result(
+          this.#mailbox
+            .storeGeneratedAttachment({
+              sourcePath: savedPath,
+              name: generatedImageName(savedPath),
+              ownerAgentId: agentId,
+              ownerThreadId: threadId,
+            })
+            .pipe(toGeneratedImageFailed),
+        );
+        if (Result.isSuccess(saved)) attachment = saved.success;
+        else {
+          if (!result) return yield* saved.failure;
+          attachment = yield* storeBytes;
         }
-      } else if (result) {
-        attachment = await this.#mailbox.storeGeneratedAttachment({
-          bytes: decodeGeneratedImage(result),
-          name: "generated-image.png",
-          mimeType: "image/png",
-          ownerAgentId: agentId,
-          ownerThreadId: threadId,
-        });
-      } else {
-        throw new Error("Image generation did not return an image.");
-      }
-      if (operation.interrupted) {
-        const interruptedSnapshot = this.#conversation.ensureSnapshot(agentId, threadId);
-        const interruptedMessage = interruptedSnapshot.messages.find((candidate) => candidate.id === item.id);
-        if (interruptedMessage?.imageGeneration) {
-          interruptedMessage.status = "interrupted";
-          interruptedMessage.imageGeneration.error ??= "Image generation was interrupted.";
-          this.#conversation.emitConversation(interruptedSnapshot);
+      } else attachment = yield* storeBytes;
+      yield* imageStep(() => {
+        if (operation.interrupted) {
+          const interruptedSnapshot = this.#conversation.ensureSnapshot(agentId, threadId);
+          const interruptedMessage = interruptedSnapshot.messages.find((candidate) => candidate.id === item.id);
+          if (interruptedMessage?.imageGeneration) {
+            interruptedMessage.status = "interrupted";
+            interruptedMessage.imageGeneration.error ??= "Image generation was interrupted.";
+            this.#conversation.emitConversation(interruptedSnapshot);
+          }
+          return;
         }
+        const latestSnapshot = this.#conversation.ensureSnapshot(agentId, threadId);
+        const latestMessage = latestSnapshot.messages.find((candidate) => candidate.id === item.id);
+        if (!latestMessage?.imageGeneration) return;
+        latestMessage.attachments = [attachment];
+        latestMessage.status = "completed";
+        delete latestMessage.imageGeneration.error;
+        this.#conversation.emitConversation(latestSnapshot);
         return;
-      }
-      const latestSnapshot = this.#conversation.ensureSnapshot(agentId, threadId);
-      const latestMessage = latestSnapshot.messages.find((candidate) => candidate.id === item.id);
-      if (!latestMessage?.imageGeneration) return;
-      latestMessage.attachments = [attachment];
-      latestMessage.status = "completed";
-      delete latestMessage.imageGeneration.error;
-      this.#conversation.emitConversation(latestSnapshot);
-      return;
-    } catch (error) {
-      const latestSnapshot = this.#conversation.ensureSnapshot(agentId, threadId);
-      const latestMessage = latestSnapshot.messages.find((candidate) => candidate.id === item.id);
-      if (!latestMessage?.imageGeneration) return;
-      latestMessage.status = "failed";
-      latestMessage.imageGeneration.error = error instanceof Error ? error.message : String(error);
-      this.#conversation.emitConversation(latestSnapshot);
-    }
-  }
+      });
+    }).pipe(
+      Effect.catch((failure) =>
+        Effect.sync(() => {
+          const error = failure.cause;
+          const latestSnapshot = this.#conversation.ensureSnapshot(agentId, threadId);
+          const latestMessage = latestSnapshot.messages.find((candidate) => candidate.id === item.id);
+          if (!latestMessage?.imageGeneration) return;
+          latestMessage.status = "failed";
+          latestMessage.imageGeneration.error = error instanceof Error ? error.message : String(error);
+          this.#conversation.emitConversation(latestSnapshot);
+        }),
+      ),
+    );
+  }, Effect.uninterruptible);
 }
+
+export class GeneratedImageFailed extends Schema.TaggedError<GeneratedImageFailed>()("GeneratedImageFailed", {
+  cause: Schema.Defect(),
+}) {}
+
+const { sync: imageStep, rewrap: toGeneratedImageFailed } = causeHelpers(GeneratedImageFailed);

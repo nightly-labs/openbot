@@ -21,7 +21,10 @@ import type {
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
+import { Deferred, Effect, Result, Schema } from "effect";
+import { causeHelpers } from "../backend/effect-boundary";
 import { isMissingFileError } from "../backend/file-errors";
+import type { CentralAuthOperationError } from "./central-auth-effects";
 
 const PATH_PROBLEM_KEYS = {
   invalid: "error.site.unsafePath",
@@ -54,11 +57,16 @@ interface PendingUpload {
   session: UploadSession | null;
   uploadedPaths: Set<string>;
   createdAt: number;
-  inFlight: Promise<HostedSiteSummary> | null;
+  inFlight: Deferred.Deferred<HostedSiteSummary, HostedSiteFailure> | null;
 }
 
 export interface HostedSiteAuthClient {
-  requestAuthorized<T>(path: string, init: RequestInit, decoder: (value: unknown) => T, timeoutMs?: number): Promise<T>;
+  requestAuthorized<T>(
+    path: string,
+    init: RequestInit,
+    decoder: (value: unknown) => T,
+    timeoutMs?: number,
+  ): Effect.Effect<T, CentralAuthOperationError>;
 }
 
 /** The registered server of this computer and its machine token. The token is a secret: never log it. */
@@ -82,85 +90,103 @@ export class HostedSiteDesktopService {
     private readonly serverCredential: () => HostedSiteServerCredential | null = () => null,
   ) {}
 
-  async list(): Promise<HostedSiteList> {
-    const credential = this.serverCredential();
-    const unlinked = this.auth.requestAuthorized(`/v1/sites/${UNLINKED_SCOPE}`, { method: "GET" }, decodeSiteList);
-    if (!credential) return unlinked;
-    const [server, account] = await Promise.all([
-      this.auth.requestAuthorized("/v1/sites/", { method: "GET", headers: serverHeaders(credential) }, decodeSiteList),
-      unlinked,
-    ]);
-    // A Worker older than server scopes returns every site to both reads. Show each site once.
-    const shown = new Set(server.sites.map((site) => site.id));
-    const unlinkedSites = account.sites.filter((site) => !shown.has(site.id));
-    return { sites: [...server.sites, ...unlinkedSites], limit: server.limit, used: server.used };
+  list(): Effect.Effect<HostedSiteList, HostedSiteFailure> {
+    return Effect.gen({ self: this }, function* () {
+      const credential = this.serverCredential();
+      const unlinked = this.auth
+        .requestAuthorized(`/v1/sites/${UNLINKED_SCOPE}`, { method: "GET" }, decodeSiteList)
+        .pipe(toHostedSiteFailure);
+      if (!credential) return yield* unlinked;
+      const [server, account] = yield* Effect.all(
+        [
+          this.auth
+            .requestAuthorized("/v1/sites/", { method: "GET", headers: serverHeaders(credential) }, decodeSiteList)
+            .pipe(toHostedSiteFailure),
+          unlinked,
+        ],
+        { concurrency: "unbounded" },
+      );
+      const shown = new Set(server.sites.map((site) => site.id));
+      const unlinkedSites = account.sites.filter((site) => !shown.has(site.id));
+      return { sites: [...server.sites, ...unlinkedSites], limit: server.limit, used: server.used };
+    });
   }
 
-  publish(input: PublishHostedSiteInput, allowedRoots?: readonly string[]): Promise<HostedSiteSummary> {
+  publish(
+    input: PublishHostedSiteInput,
+    allowedRoots?: readonly string[],
+  ): Effect.Effect<HostedSiteSummary, HostedSiteFailure> {
     return this.upload(input, null, allowedRoots);
   }
 
-  replace(input: ReplaceHostedSiteInput, allowedRoots?: readonly string[]): Promise<HostedSiteSummary> {
+  replace(
+    input: ReplaceHostedSiteInput,
+    allowedRoots?: readonly string[],
+  ): Effect.Effect<HostedSiteSummary, HostedSiteFailure> {
     return this.upload(input, input.siteId, allowedRoots);
   }
 
   /** Deletes a site of this server, or an unlinked site of this account. Only for this computer's own user. */
-  async delete(siteId: string): Promise<void> {
-    const key = operationKey("delete");
-    const credential = this.serverCredential();
-    if (credential) {
-      try {
-        await this.deleteSite(siteId, key, serverHeaders(credential));
-        return;
-      } catch (error) {
-        // An unlinked site is not the server's. The Worker refuses it before it claims the key.
-        if (!(error instanceof Error && "code" in error && error.code === "site_other_server")) throw error;
+  delete(siteId: string): Effect.Effect<void, HostedSiteFailure> {
+    return Effect.gen({ self: this }, function* () {
+      const key = operationKey("delete");
+      const credential = this.serverCredential();
+      if (credential) {
+        const result = yield* Effect.result(this.deleteSite(siteId, key, serverHeaders(credential)));
+        if (Result.isSuccess(result)) return;
+        const error = result.failure.cause;
+        if (!(error instanceof Error && "code" in error && error.code === "site_other_server"))
+          return yield* result.failure;
       }
-    }
-    await this.deleteSite(siteId, key, {}, UNLINKED_SCOPE);
+      yield* this.deleteSite(siteId, key, {}, UNLINKED_SCOPE);
+    });
   }
 
   /**
    * The sites of this server only, for a member on a joined server. The unlinked sites belong to the owner's
    * account, not to the server, so a member never sees or deletes them.
    */
-  async listServerSites(): Promise<HostedSiteList> {
-    const credential = this.requireServerCredential();
-    const list = await this.auth.requestAuthorized(
-      "/v1/sites/",
-      { method: "GET", headers: serverHeaders(credential) },
-      decodeSiteList,
-    );
-    // A Worker older than server scopes ignores the credential and returns every site of the account.
-    if (list.sites.some((site) => site.serverId !== credential.hostId))
-      throw new Error(sourceText("error.team.hostedSitesUnsupported"));
-    return list;
+
+  listServerSites(): Effect.Effect<HostedSiteList, HostedSiteFailure> {
+    return Effect.gen({ self: this }, function* () {
+      const credential = yield* siteSync(() => this.requireServerCredential());
+      const list = yield* this.auth
+        .requestAuthorized("/v1/sites/", { method: "GET", headers: serverHeaders(credential) }, decodeSiteList)
+        .pipe(toHostedSiteFailure);
+      if (list.sites.some((site) => site.serverId !== credential.hostId))
+        return yield* new HostedSiteFailure({ cause: new Error(sourceText("error.team.hostedSitesUnsupported")) });
+      return list;
+    });
   }
 
-  async deleteServerSite(siteId: string): Promise<void> {
-    // A Worker that ignores the credential deletes any site of the owner, also one that its list does not show.
-    const { sites } = await this.listServerSites();
-    if (!sites.some((site) => site.id === siteId)) throw new Error(sourceText("error.team.hostedSiteNotFound"));
-    return this.deleteSite(siteId, operationKey("delete"), serverHeaders(this.requireServerCredential()));
+  deleteServerSite(siteId: string): Effect.Effect<void, HostedSiteFailure> {
+    return Effect.gen({ self: this }, function* () {
+      const { sites } = yield* this.listServerSites();
+      if (!sites.some((site) => site.id === siteId))
+        return yield* new HostedSiteFailure({ cause: new Error(sourceText("error.team.hostedSiteNotFound")) });
+      const credential = yield* siteSync(() => this.requireServerCredential());
+      return yield* this.deleteSite(siteId, operationKey("delete"), serverHeaders(credential));
+    });
   }
 
   /**
    * A site that this computer published before it was a registered server is in the account's unlinked
    * bucket. The Worker refuses it in the server scope before it claims the key, so the same key can update it.
    */
-  private async createSession(
-    create: (headers: Record<string, string>, query?: string) => Promise<UploadSession>,
+  private createSession(
+    create: (headers: Record<string, string>, query?: string) => Effect.Effect<UploadSession, HostedSiteFailure>,
     siteId: string | null,
-  ): Promise<UploadSession> {
-    const credential = this.serverCredential();
-    if (!credential) return create({});
-    try {
-      return await create(serverHeaders(credential));
-    } catch (error) {
+  ): Effect.Effect<UploadSession, HostedSiteFailure> {
+    return Effect.gen({ self: this }, function* () {
+      const credential = this.serverCredential();
+      if (!credential) return yield* create({});
+      const result = yield* Effect.result(create(serverHeaders(credential)));
+      if (Result.isSuccess(result)) return result.success;
+      const error = result.failure.cause;
       if (siteId === null || !(error instanceof Error && "code" in error && error.code === "site_other_server"))
-        throw error;
-      return create({}, UNLINKED_SCOPE);
-    }
+        return yield* result.failure;
+      return yield* create({}, UNLINKED_SCOPE);
+    });
   }
 
   private requireServerCredential(): HostedSiteServerCredential {
@@ -169,20 +195,28 @@ export class HostedSiteDesktopService {
     return credential;
   }
 
-  private async deleteSite(siteId: string, key: string, headers: Record<string, string>, query = ""): Promise<void> {
-    await this.auth.requestAuthorized(
-      `/v1/sites/${encodeURIComponent(siteId)}${query}`,
-      { method: "DELETE", headers: { "Idempotency-Key": key, ...headers } },
-      decodeDeleteResult,
-    );
+  private deleteSite(
+    siteId: string,
+    key: string,
+    headers: Record<string, string>,
+    query = "",
+  ): Effect.Effect<void, HostedSiteFailure> {
+    return this.auth
+      .requestAuthorized(
+        `/v1/sites/${encodeURIComponent(siteId)}${query}`,
+        { method: "DELETE", headers: { "Idempotency-Key": key, ...headers } },
+        decodeDeleteResult,
+      )
+      .pipe(toHostedSiteFailure);
   }
 
-  private async upload(
+  private readonly upload = Effect.fn("HostedSite.upload")(function* (
+    this: HostedSiteDesktopService,
     input: PublishHostedSiteInput,
     siteId: string | null,
     allowedRoots?: readonly string[],
-  ): Promise<HostedSiteSummary> {
-    const prepared = await prepareSite(input.sourcePath, allowedRoots);
+  ) {
+    const prepared = yield* prepareSite(input.sourcePath, allowedRoots);
     this.prunePendingUploads();
     const signature = uploadSignature(input, siteId, prepared);
     let pending = this.#pendingUploads.get(signature);
@@ -197,77 +231,83 @@ export class HostedSiteDesktopService {
       };
       this.#pendingUploads.set(signature, pending);
     }
-    if (!pending.inFlight) pending.inFlight = this.performUpload(input, siteId, prepared, pending);
-    try {
-      const site = await pending.inFlight;
-      this.#pendingUploads.delete(signature);
-      return site;
-    } catch (error) {
-      pending.inFlight = null;
-      throw error;
-    }
-  }
+    if (pending.inFlight) return yield* Deferred.await(pending.inFlight);
+    const done = Deferred.makeUnsafe<HostedSiteSummary, HostedSiteFailure>();
+    pending.inFlight = done;
+    const entry = pending;
+    return yield* this.performUpload(input, siteId, prepared, entry).pipe(
+      Effect.tap(() => Effect.sync(() => this.#pendingUploads.delete(signature))),
+      Effect.onExit((exit) => Deferred.done(done, exit)),
+      Effect.ensuring(
+        Effect.sync(() => {
+          entry.inFlight = null;
+        }),
+      ),
+    );
+  }).bind(this);
 
-  private async performUpload(
+  private performUpload(
     input: PublishHostedSiteInput,
     siteId: string | null,
     prepared: PreparedSite,
     pending: PendingUpload,
-  ): Promise<HostedSiteSummary> {
-    const createSession = (headers: Record<string, string>, query = "") =>
-      retryTransport(() =>
-        this.auth.requestAuthorized(
-          `/v1/sites/${query}`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Idempotency-Key": pending.uploadKey,
-              ...headers,
+  ): Effect.Effect<HostedSiteSummary, HostedSiteFailure> {
+    return Effect.gen({ self: this }, function* () {
+      const createSession = (headers: Record<string, string>, query = "") =>
+        retryTransport(() =>
+          this.auth.requestAuthorized(
+            `/v1/sites/${query}`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Idempotency-Key": pending.uploadKey,
+                ...headers,
+              },
+              body: JSON.stringify({
+                title: input.title,
+                description: input.description,
+                framework: prepared.framework,
+                ...(siteId === null || input.spaFallback !== undefined
+                  ? { spaFallback: input.spaFallback ?? false }
+                  : {}),
+                siteId,
+                files: prepared.files.map(({ path, size, mimeType }) => ({ path, size, mimeType })),
+              }),
             },
-            body: JSON.stringify({
-              title: input.title,
-              description: input.description,
-              framework: prepared.framework,
-              ...(siteId === null || input.spaFallback !== undefined
-                ? { spaFallback: input.spaFallback ?? false }
-                : {}),
-              siteId,
-              files: prepared.files.map(({ path, size, mimeType }) => ({ path, size, mimeType })),
-            }),
-          },
-          decodeUploadSession,
-        ),
-      );
-    const session = pending.session ?? (await this.createSession(createSession, siteId));
-    pending.session = session;
-    for (const file of prepared.files) {
-      if (pending.uploadedPaths.has(file.path)) continue;
-      await retryTransport(() =>
-        this.auth.requestAuthorized(
-          `/v1/sites/uploads/${encodeURIComponent(session.uploadId)}/file?path=${encodeURIComponent(file.path)}`,
-          {
-            method: "PUT",
-            headers: {
-              "Content-Type": file.mimeType,
-              "Content-Length": String(file.size),
+            decodeUploadSession,
+          ),
+        );
+      const session = pending.session ?? (yield* this.createSession(createSession, siteId));
+      pending.session = session;
+      for (const file of prepared.files) {
+        if (pending.uploadedPaths.has(file.path)) continue;
+        yield* retryTransport(() =>
+          this.auth.requestAuthorized(
+            `/v1/sites/uploads/${encodeURIComponent(session.uploadId)}/file?path=${encodeURIComponent(file.path)}`,
+            {
+              method: "PUT",
+              headers: {
+                "Content-Type": file.mimeType,
+                "Content-Length": String(file.size),
+              },
+              body: arrayBuffer(file.bytes),
             },
-            body: arrayBuffer(file.bytes),
-          },
-          decodeUploadResult,
+            decodeUploadResult,
+            30_000,
+          ),
+        );
+        pending.uploadedPaths.add(file.path);
+      }
+      return yield* retryTransport(() =>
+        this.auth.requestAuthorized(
+          `/v1/sites/uploads/${encodeURIComponent(session.uploadId)}/activate`,
+          { method: "POST", headers: { "Idempotency-Key": pending.activationKey } },
+          decodeSite,
           30_000,
         ),
       );
-      pending.uploadedPaths.add(file.path);
-    }
-    return retryTransport(() =>
-      this.auth.requestAuthorized(
-        `/v1/sites/uploads/${encodeURIComponent(session.uploadId)}/activate`,
-        { method: "POST", headers: { "Idempotency-Key": pending.activationKey } },
-        decodeSite,
-        30_000,
-      ),
-    );
+    });
   }
 
   private prunePendingUploads(): void {
@@ -282,125 +322,170 @@ export class HostedSiteDesktopService {
   }
 }
 
-export async function prepareSite(sourcePath: string, allowedRoots?: readonly string[]): Promise<PreparedSite> {
-  if (!isAbsolute(sourcePath)) throw new Error(sourceText("error.site.absolutePath"));
+export const prepareSite = Effect.fn("HostedSite.prepare")(function* (
+  sourcePath: string,
+  allowedRoots?: readonly string[],
+): Effect.fn.Return<PreparedSite, HostedSiteFailure> {
+  if (!isAbsolute(sourcePath))
+    return yield* new HostedSiteFailure({ cause: new Error(sourceText("error.site.absolutePath")) });
   const selectedRoot = resolve(sourcePath);
-  const selectedRootStats = await lstat(selectedRoot);
-  if (selectedRootStats.isSymbolicLink()) throw new Error(sourceText("error.site.rootSymlink"));
-  if (!selectedRootStats.isDirectory()) throw new Error(sourceText("error.site.notDirectory"));
-  const root = await realpath(selectedRoot);
+  const selectedRootStats = yield* siteIO(() => lstat(selectedRoot));
+  if (selectedRootStats.isSymbolicLink())
+    return yield* new HostedSiteFailure({ cause: new Error(sourceText("error.site.rootSymlink")) });
+  if (!selectedRootStats.isDirectory())
+    return yield* new HostedSiteFailure({ cause: new Error(sourceText("error.site.notDirectory")) });
+  const root = yield* siteIO(() => realpath(selectedRoot));
   if (allowedRoots?.length) {
-    const roots = await Promise.all(allowedRoots.map((candidate) => realpath(resolve(candidate))));
+    const roots = yield* Effect.forEach(allowedRoots, (candidate) => siteIO(() => realpath(resolve(candidate))), {
+      concurrency: "unbounded",
+    });
     if (!roots.some((candidate) => isInside(candidate, root))) {
-      throw new Error(sourceText("error.site.outsideWorkspace"));
+      return yield* new HostedSiteFailure({ cause: new Error(sourceText("error.site.outsideWorkspace")) });
     }
   }
-  const framework = await detectFramework(root);
-  const output = framework === "astro" ? await staticAstroOutput(root) : root;
-  return { framework, files: await collectFiles(output) };
-}
+  const framework = yield* detectFramework(root);
+  const output = framework === "astro" ? yield* staticAstroOutput(root) : root;
+  return { framework, files: yield* collectFiles(output) };
+});
 
-async function detectFramework(root: string): Promise<HostedSiteFramework> {
+const detectFramework = Effect.fn("HostedSite.detectFramework")(function* (
+  root: string,
+): Effect.fn.Return<HostedSiteFramework, HostedSiteFailure> {
   const packagePath = join(root, "package.json");
-  try {
-    const value = JSON.parse(await readFile(packagePath, "utf8"));
+  const parsed = yield* Effect.result(
+    siteIO(() => readFile(packagePath, "utf8")).pipe(Effect.flatMap((text) => siteSync(() => JSON.parse(text)))),
+  );
+  if (Result.isSuccess(parsed)) {
+    const value = parsed.success;
     if (
       isDynamicRecord(value) &&
       [value.dependencies, value.devDependencies].some((group) => isDynamicRecord(group) && isString(group.astro))
-    ) {
+    )
       return "astro";
-    }
-  } catch (error) {
-    if (!isMissingFileError(error)) throw new Error(sourceText("error.site.packageJsonInvalid"));
-  }
+  } else if (!isMissingFileError(parsed.failure.cause))
+    return yield* new HostedSiteFailure({ cause: new Error(sourceText("error.site.packageJsonInvalid")) });
   for (const name of ["astro.config.mjs", "astro.config.js", "astro.config.ts"]) {
-    try {
-      await lstat(join(root, name));
-      return "astro";
-    } catch (error) {
-      if (!isMissingFileError(error)) throw error;
-    }
+    const found = yield* Effect.result(siteIO(() => lstat(join(root, name))));
+    if (Result.isSuccess(found)) return "astro";
+    if (!isMissingFileError(found.failure.cause)) return yield* found.failure;
   }
   return "vanilla";
-}
+});
 
-async function staticAstroOutput(root: string): Promise<string> {
-  const configPath = await firstExisting(
+const staticAstroOutput = Effect.fn("HostedSite.staticAstroOutput")(function* (
+  root: string,
+): Effect.fn.Return<string, HostedSiteFailure> {
+  const configPath = yield* firstExisting(
     ["astro.config.mjs", "astro.config.js", "astro.config.ts"].map((name) => join(root, name)),
   );
   if (configPath) {
-    const config = await readFile(configPath, "utf8");
+    const config = yield* siteIO(() => readFile(configPath, "utf8"));
     if (/output\s*:\s*["'](?:server|hybrid)["']/u.test(config))
-      throw new Error(sourceText("error.site.astroServerOutput"));
+      return yield* new HostedSiteFailure({ cause: new Error(sourceText("error.site.astroServerOutput")) });
     if (/adapter|@astrojs\/react|integrations\s*:\s*\[[^\]]*react/isu.test(config)) {
-      throw new Error(sourceText("error.site.astroAdapter"));
+      return yield* new HostedSiteFailure({ cause: new Error(sourceText("error.site.astroAdapter")) });
     }
   }
   const forbidden = [join(root, "src", "pages", "api"), join(root, "src", "actions")];
   for (const path of forbidden) {
-    if (await exists(path)) throw new Error(sourceText("error.site.astroApiRoutes"));
+    if (yield* exists(path))
+      return yield* new HostedSiteFailure({ cause: new Error(sourceText("error.site.astroApiRoutes")) });
   }
-  const sourceEntries = await readdir(join(root, "src"), { recursive: true }).catch(() => []);
+  const sourceEntries = yield* siteIO(() => readdir(join(root, "src"), { recursive: true }).catch(() => []));
   if (sourceEntries.some((entry) => /(^|\/)(?:middleware|[^/]+\.server)\.[cm]?[jt]s$/u.test(String(entry)))) {
-    throw new Error(sourceText("error.site.astroMiddleware"));
+    return yield* new HostedSiteFailure({ cause: new Error(sourceText("error.site.astroMiddleware")) });
   }
   const output = join(root, "dist");
-  const stats = await lstat(output).catch((error: unknown) => {
-    if (isMissingFileError(error)) throw new Error(sourceText("error.site.astroNotBuilt"));
-    throw error;
-  });
-  if (stats.isSymbolicLink() || !stats.isDirectory()) throw new Error(sourceText("error.site.astroDistNotDirectory"));
-  const canonicalOutput = await realpath(output);
-  if (!isInside(root, canonicalOutput)) throw new Error(sourceText("error.site.astroDistOutside"));
+  const stats = yield* siteIO(() =>
+    lstat(output).catch((error: unknown) => {
+      if (isMissingFileError(error)) throw new Error(sourceText("error.site.astroNotBuilt"));
+      throw error;
+    }),
+  );
+  if (stats.isSymbolicLink() || !stats.isDirectory())
+    return yield* new HostedSiteFailure({ cause: new Error(sourceText("error.site.astroDistNotDirectory")) });
+  const canonicalOutput = yield* siteIO(() => realpath(output));
+  if (!isInside(root, canonicalOutput))
+    return yield* new HostedSiteFailure({ cause: new Error(sourceText("error.site.astroDistOutside")) });
   return canonicalOutput;
-}
+});
 
-async function collectFiles(root: string): Promise<PreparedFile[]> {
+const collectFiles = Effect.fn("HostedSite.collectFiles")(function* (
+  root: string,
+): Effect.fn.Return<PreparedFile[], HostedSiteFailure> {
   const files: PreparedFile[] = [];
   let total = 0;
-  async function visit(directory: string): Promise<void> {
-    const canonicalDirectory = await realpath(directory);
-    if (!isInside(root, canonicalDirectory)) throw new Error(sourceText("error.site.directoryOutsideRoot"));
-    const entries = await readdir(directory, { withFileTypes: true });
-    entries.sort((left, right) => left.name.localeCompare(right.name));
-    for (const entry of entries) {
-      const absolute = join(directory, entry.name);
-      const stats = await lstat(absolute);
-      if (stats.isSymbolicLink()) throw new Error(sourceText("error.site.symlink", { name: entry.name }));
-      if (stats.isDirectory()) {
-        await visit(absolute);
-        continue;
-      }
-      if (!stats.isFile()) throw new Error(sourceText("error.site.unsupportedEntry", { name: entry.name }));
-      if (files.length >= HOSTED_SITE_UPLOAD_LIMITS.files) {
-        throw new Error(sourceText("error.site.tooManyFiles", { limit: HOSTED_SITE_UPLOAD_LIMITS.files }));
-      }
-      const path = relative(root, absolute).split("\\").join("/");
-      const checked = checkHostedSitePath(path);
-      if ("problem" in checked) throw new Error(sourceText(PATH_PROBLEM_KEYS[checked.problem], { path }));
-      const mimeType = HOSTED_SITE_MIME_TYPES[extname(path).slice(1).toLowerCase()]?.[0];
-      if (!mimeType) throw new Error(sourceText("error.site.fileType", { path }));
-      const handle = await open(absolute, constants.O_RDONLY | constants.O_NOFOLLOW);
-      try {
-        const openedStats = await handle.stat();
-        const canonicalFile = await realpath(absolute);
-        if (!openedStats.isFile() || !isInside(root, canonicalFile) || canonicalFile !== absolute) {
-          throw new Error(sourceText("error.site.fileOutsideRoot", { path }));
+  function visit(directory: string): Effect.Effect<void, HostedSiteFailure> {
+    return Effect.gen(function* () {
+      const canonicalDirectory = yield* siteIO(() => realpath(directory));
+      if (!isInside(root, canonicalDirectory))
+        return yield* new HostedSiteFailure({ cause: new Error(sourceText("error.site.directoryOutsideRoot")) });
+      const entries = yield* siteIO(() => readdir(directory, { withFileTypes: true }));
+      entries.sort((left, right) => left.name.localeCompare(right.name));
+      for (const entry of entries) {
+        const absolute = join(directory, entry.name);
+        const stats = yield* siteIO(() => lstat(absolute));
+        if (stats.isSymbolicLink())
+          return yield* new HostedSiteFailure({
+            cause: new Error(sourceText("error.site.symlink", { name: entry.name })),
+          });
+        if (stats.isDirectory()) {
+          yield* visit(absolute);
+          continue;
         }
-        if (openedStats.size > HOSTED_SITE_UPLOAD_LIMITS.fileBytes)
-          throw new Error(sourceText("error.site.fileTooLarge", { path }));
-        total += openedStats.size;
-        if (total > HOSTED_SITE_UPLOAD_LIMITS.totalBytes) throw new Error(sourceText("error.site.siteTooLarge"));
-        files.push({ path, size: openedStats.size, mimeType, bytes: new Uint8Array(await handle.readFile()) });
-      } finally {
-        await handle.close();
+        if (!stats.isFile())
+          return yield* new HostedSiteFailure({
+            cause: new Error(sourceText("error.site.unsupportedEntry", { name: entry.name })),
+          });
+        if (files.length >= HOSTED_SITE_UPLOAD_LIMITS.files) {
+          return yield* new HostedSiteFailure({
+            cause: new Error(sourceText("error.site.tooManyFiles", { limit: HOSTED_SITE_UPLOAD_LIMITS.files })),
+          });
+        }
+        const path = relative(root, absolute).split("\\").join("/");
+        const checked = checkHostedSitePath(path);
+        if ("problem" in checked)
+          return yield* new HostedSiteFailure({
+            cause: new Error(sourceText(PATH_PROBLEM_KEYS[checked.problem], { path })),
+          });
+        const mimeType = HOSTED_SITE_MIME_TYPES[extname(path).slice(1).toLowerCase()]?.[0];
+        if (!mimeType)
+          return yield* new HostedSiteFailure({ cause: new Error(sourceText("error.site.fileType", { path })) });
+        yield* Effect.acquireUseRelease(
+          siteIO(() => open(absolute, constants.O_RDONLY | constants.O_NOFOLLOW)),
+          (handle) =>
+            Effect.gen(function* () {
+              const openedStats = yield* siteIO(() => handle.stat());
+              const canonicalFile = yield* siteIO(() => realpath(absolute));
+              if (!openedStats.isFile() || !isInside(root, canonicalFile) || canonicalFile !== absolute) {
+                return yield* new HostedSiteFailure({
+                  cause: new Error(sourceText("error.site.fileOutsideRoot", { path })),
+                });
+              }
+              if (openedStats.size > HOSTED_SITE_UPLOAD_LIMITS.fileBytes)
+                return yield* new HostedSiteFailure({
+                  cause: new Error(sourceText("error.site.fileTooLarge", { path })),
+                });
+              total += openedStats.size;
+              if (total > HOSTED_SITE_UPLOAD_LIMITS.totalBytes)
+                return yield* new HostedSiteFailure({ cause: new Error(sourceText("error.site.siteTooLarge")) });
+              files.push({
+                path,
+                size: openedStats.size,
+                mimeType,
+                bytes: new Uint8Array(yield* siteIO(() => handle.readFile())),
+              });
+            }),
+          (handle) => siteIO(() => handle.close()).pipe(Effect.orDie),
+        );
       }
-    }
+    });
   }
-  await visit(root);
-  if (!files.some((file) => file.path === "index.html")) throw new Error(sourceText("error.site.missingIndex"));
+  yield* visit(root);
+  if (!files.some((file) => file.path === "index.html"))
+    return yield* new HostedSiteFailure({ cause: new Error(sourceText("error.site.missingIndex")) });
   return files;
-}
+});
 
 function decodeSiteList(value: unknown): HostedSiteList {
   const list = parseHostedSiteList(value);
@@ -456,13 +541,11 @@ function uploadSignature(input: PublishHostedSiteInput, siteId: string | null, p
   return hash.digest("hex");
 }
 
-async function retryTransport<T>(request: () => Promise<T>): Promise<T> {
-  try {
-    return await request();
-  } catch (error) {
-    if (!isTransportFailure(error)) throw error;
-    return request();
-  }
+function retryTransport<A>(
+  request: () => Effect.Effect<A, CentralAuthOperationError>,
+): Effect.Effect<A, HostedSiteFailure> {
+  const operation = Effect.suspend(request).pipe(toHostedSiteFailure);
+  return operation.pipe(Effect.catch((error) => (isTransportFailure(error.cause) ? operation : Effect.fail(error))));
 }
 
 function isTransportFailure(error: unknown): boolean {
@@ -483,17 +566,22 @@ function isInside(root: string, target: string): boolean {
   return path === "" || (!path.startsWith("..") && !isAbsolute(path));
 }
 
-async function firstExisting(paths: string[]): Promise<string | null> {
-  for (const path of paths) if (await exists(path)) return path;
+const firstExisting = Effect.fn("HostedSite.firstExisting")(function* (
+  paths: string[],
+): Effect.fn.Return<string | null, HostedSiteFailure> {
+  for (const path of paths) if (yield* exists(path)) return path;
   return null;
-}
+});
 
-async function exists(path: string): Promise<boolean> {
-  try {
-    await lstat(path);
-    return true;
-  } catch (error) {
-    if (isMissingFileError(error)) return false;
-    throw error;
-  }
-}
+const exists = Effect.fn("HostedSite.exists")((path: string) =>
+  siteIO(() => lstat(path)).pipe(
+    Effect.as(true),
+    Effect.catch((error) => (isMissingFileError(error.cause) ? Effect.succeed(false) : Effect.fail(error))),
+  ),
+);
+
+export class HostedSiteFailure extends Schema.TaggedError<HostedSiteFailure>()("HostedSiteFailure", {
+  cause: Schema.Defect(),
+}) {}
+
+const { io: siteIO, sync: siteSync, rewrap: toHostedSiteFailure } = causeHelpers(HostedSiteFailure);

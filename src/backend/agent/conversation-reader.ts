@@ -2,16 +2,15 @@ import type {
   AgentEvent,
   AgentSummary,
   ConversationFileSearchPage,
-  ConversationPage,
   ConversationPageAnchor,
   ConversationReadState,
   ConversationSearchPage,
-  ConversationSnapshot,
-  ConversationWithReadState,
 } from "@openbot/contracts/ipc";
+import { Effect, Schema } from "effect";
 import type { AgentStore } from "../agent-store";
 import { type ConversationMarkerExclusions, ConversationReadStore } from "../conversation-read-store";
 import { mergeConversationSnapshots } from "../conversation-snapshots";
+import { causeHelpers } from "../effect-boundary";
 import type { ConversationRuntime } from "./conversation-runtime";
 import type { MailboxSync } from "./mailbox-sync";
 
@@ -48,39 +47,50 @@ export class ConversationReader {
     this.#hooks = options.hooks;
   }
 
-  async read(agentId: string): Promise<ConversationSnapshot> {
-    const agent = await this.#store.getOrCreate(agentId);
-    const persisted = this.#store.database.readConversation(agentId, agent.threadId);
-    const live = this.#conversation.snapshot(agentId);
-    const snapshot = live?.activeTurnId ? mergeConversationSnapshots(persisted, live) : persisted;
-    this.#mailboxSync.syncMailboxMessages(snapshot);
-    this.#conversation.setSnapshot(agentId, snapshot);
-    return structuredClone(snapshot);
-  }
+  readonly read = Effect.fn("ConversationReader.read")(function* (this: ConversationReader, agentId: string) {
+    const agent = yield* this.#store.getOrCreate(agentId).pipe(toConversationReadFailed);
+    return yield* readerStep(() => {
+      const persisted = this.#store.database.readConversation(agentId, agent.threadId);
+      const live = this.#conversation.snapshot(agentId);
+      const snapshot = live?.activeTurnId ? mergeConversationSnapshots(persisted, live) : persisted;
+      this.#mailboxSync.syncMailboxMessages(snapshot);
+      this.#conversation.setSnapshot(agentId, snapshot);
+      return structuredClone(snapshot);
+    });
+  }, Effect.uninterruptible);
 
-  async readFor(agentId: string, memberId: string): Promise<ConversationWithReadState> {
-    const snapshot = await this.read(agentId);
-    return {
-      ...snapshot,
-      readState: this.#reads.readState(memberId, snapshot),
-    };
-  }
+  readonly readFor = Effect.fn("ConversationReader.readFor")(function* (
+    this: ConversationReader,
+    agentId: string,
+    memberId: string,
+  ) {
+    const snapshot = yield* this.read(agentId);
+    return yield* readerStep(() => {
+      return {
+        ...snapshot,
+        readState: this.#reads.readState(memberId, snapshot),
+      };
+    });
+  }, Effect.uninterruptible);
 
-  async readPageFor(
+  readonly readPageFor = Effect.fn("ConversationReader.readPageFor")(function* (
+    this: ConversationReader,
     agentId: string,
     memberId: string,
     anchor: ConversationPageAnchor = { type: "latest" },
     limit = 50,
     options: ConversationMarkerExclusions = {},
-  ): Promise<ConversationPage> {
-    const agent = await this.#store.getOrCreate(agentId);
-    this.#mailboxSync.reconcilePersistedMailboxMessages(agent);
-    const page = this.#store.database.readConversationPage(agentId, agent.threadId, anchor, limit, options);
-    return {
-      ...page,
-      readState: this.#reads.readStateForThread(memberId, agent.threadId, options),
-    };
-  }
+  ) {
+    const agent = yield* this.#store.getOrCreate(agentId).pipe(toConversationReadFailed);
+    return yield* readerStep(() => {
+      this.#mailboxSync.reconcilePersistedMailboxMessages(agent);
+      const page = this.#store.database.readConversationPage(agentId, agent.threadId, anchor, limit, options);
+      return {
+        ...page,
+        readState: this.#reads.readStateForThread(memberId, agent.threadId, options),
+      };
+    });
+  }, Effect.uninterruptible);
 
   search(query: string, agentId?: string, cursor?: string, limit = 100): ConversationSearchPage {
     return this.#store.database.searchConversationMessages(query, agentId, cursor, limit);
@@ -98,27 +108,42 @@ export class ConversationReader {
     this.#reads.adoptMemberState(sourceMemberId, targetMemberId);
   }
 
-  async markRead(
+  readonly markRead = Effect.fn("ConversationReader.markRead")(function* (
+    this: ConversationReader,
     agentId: string,
     memberId: string,
     throughMessageId: string | null,
     options: ConversationMarkerExclusions = {},
-  ): Promise<ConversationReadState> {
-    const snapshot = await this.read(agentId);
-    const previous = this.#reads.readState(memberId, snapshot).throughMessageId;
-    const state = this.#reads.markRead(memberId, snapshot, throughMessageId, options);
-    if (this.#reads.readState(memberId, snapshot).throughMessageId !== previous) {
-      // Read cursors are shared by a member's devices, not by every team member.
-      // Invalidate without broadcasting a reader's cursor; each client reloads its own state.
-      this.#hooks.emit({ type: "conversation-invalidated", agentId, revision: snapshot.revision });
-    }
-    return state;
-  }
+  ) {
+    const snapshot = yield* this.read(agentId);
+    return yield* readerStep(() => {
+      const previous = this.#reads.readState(memberId, snapshot).throughMessageId;
+      const state = this.#reads.markRead(memberId, snapshot, throughMessageId, options);
+      if (this.#reads.readState(memberId, snapshot).throughMessageId !== previous) {
+        // Read cursors are shared by a member's devices, not by every team member.
+        // Invalidate without broadcasting a reader's cursor; each client reloads its own state.
+        this.#hooks.emit({ type: "conversation-invalidated", agentId, revision: snapshot.revision });
+      }
+      return state;
+    });
+  }, Effect.uninterruptible);
 
-  async markUnread(agentId: string, memberId: string): Promise<ConversationReadState> {
-    const snapshot = await this.read(agentId);
-    const state = this.#reads.markUnread(memberId, snapshot);
-    this.#hooks.emit({ type: "conversation-invalidated", agentId, revision: snapshot.revision });
-    return state;
-  }
+  readonly markUnread = Effect.fn("ConversationReader.markUnread")(function* (
+    this: ConversationReader,
+    agentId: string,
+    memberId: string,
+  ) {
+    const snapshot = yield* this.read(agentId);
+    return yield* readerStep(() => {
+      const state = this.#reads.markUnread(memberId, snapshot);
+      this.#hooks.emit({ type: "conversation-invalidated", agentId, revision: snapshot.revision });
+      return state;
+    });
+  }, Effect.uninterruptible);
 }
+
+class ConversationReadFailed extends Schema.TaggedError<ConversationReadFailed>()("ConversationReadFailed", {
+  cause: Schema.Defect(),
+}) {}
+
+const { sync: readerStep, rewrap: toConversationReadFailed } = causeHelpers(ConversationReadFailed);

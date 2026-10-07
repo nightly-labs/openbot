@@ -2,6 +2,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { extname, resolve } from "node:path";
 import { supportedBunVersion } from "./prepare-dev-environment";
+import { readScriptArguments } from "./script-arguments";
 
 export type VerificationSurface = "desktop" | "renderer" | "mobile" | "api" | "remote" | "contracts" | "docs";
 
@@ -246,7 +247,7 @@ function createVerificationCommandPlan(
     commands.push("bun run check:ui");
     runnableCommandArgs.push(["run", "check:ui"]);
   }
-  if (surfaces.includes("renderer") && !isolatedApp) commands.push("bun run dev --isolated");
+  if (surfaces.includes("renderer") && !isolatedApp) commands.push("bun run dev");
   if (surfaces.includes("renderer")) {
     qaCommands.push("bun run dev:automation snapshot", "bun run dev:automation screenshot");
     commands.push(...qaCommands);
@@ -299,7 +300,9 @@ export function qaReadinessReasons(
   if (runtime.ambiguousApp) reasons.push("More than one app instance matches this worktree.");
   if (!runtime.appRunning && !runtime.ambiguousApp) reasons.push("No running app matches this worktree.");
   if (runtime.appRunning && !runtime.isolatedApp) {
-    reasons.push("The running app uses the default profile. Start bun run dev --isolated for isolated renderer QA.");
+    reasons.push(
+      "The running app uses the shared profile. Start bun run dev without --shared for isolated renderer QA.",
+    );
   }
   return reasons;
 }
@@ -381,9 +384,19 @@ function runRecommendedChecks(commandArgs: string[][], projectRoot: string): voi
   for (const args of commandArgs) runBun(projectRoot, args);
 }
 
+const USAGE = [
+  "Usage: bun run dev:verify [--run]",
+  "",
+  "Prints a JSON verification plan for the uncommitted changes in this worktree.",
+  "  --run  Also run the safe checks in the plan that change nothing.",
+].join("\n");
+
 if (import.meta.main) {
-  const projectRoot = process.cwd();
-  const { report, runnableCommandArgs, setupReady } = await createDevVerificationState(projectRoot);
-  process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
-  if (process.argv.includes("--run") && setupReady) runRecommendedChecks(runnableCommandArgs, projectRoot);
+  const parsed = readScriptArguments({ usage: USAGE, options: { run: { type: "boolean" } } });
+  if (parsed !== null) {
+    const projectRoot = process.cwd();
+    const { report, runnableCommandArgs, setupReady } = await createDevVerificationState(projectRoot);
+    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+    if (parsed.values.run && setupReady) runRecommendedChecks(runnableCommandArgs, projectRoot);
+  }
 }

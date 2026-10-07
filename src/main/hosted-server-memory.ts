@@ -1,4 +1,6 @@
 import { readdir, readFile, readlink, writeFile } from "node:fs/promises";
+import { Deferred, Effect, Schema } from "effect";
+import { causeHelpers } from "../backend/effect-boundary";
 import type { HostMemory, HostMemoryLevel } from "../backend/host-memory";
 
 const SAMPLE_INTERVAL_MS = 5_000;
@@ -37,7 +39,7 @@ export class HostedServerMemory implements HostMemory {
   /** The start times of the turns reserved in the last `TURN_RESERVE_MS`. Each one is its own object, so its release removes only it. */
   readonly #reservations = new Set<{ at: number }>();
   #timer: ReturnType<typeof setInterval> | null = null;
-  #pending: Promise<void> | null = null;
+  #pending: Deferred.Deferred<void> | null = null;
   #sample: MemorySample | null = null;
   #level: HostMemoryLevel = "ok";
   #readErrorLogged = false;
@@ -48,14 +50,17 @@ export class HostedServerMemory implements HostMemory {
 
   start(): void {
     if (this.#timer) return;
-    void this.tick();
-    this.#timer = setInterval(() => void this.tick(), SAMPLE_INTERVAL_MS);
+    void Effect.runPromise(this.tick());
+    this.#timer = setInterval(() => void Effect.runPromise(this.tick()), SAMPLE_INTERVAL_MS);
     this.#timer.unref();
   }
 
-  stop(): void {
-    if (this.#timer) clearInterval(this.#timer);
-    this.#timer = null;
+  stop(): Effect.Effect<void> {
+    return Effect.suspend(() => {
+      if (this.#timer) clearInterval(this.#timer);
+      this.#timer = null;
+      return this.#pending ? Deferred.await(this.#pending) : Effect.void;
+    });
   }
 
   level(): HostMemoryLevel {
@@ -84,17 +89,26 @@ export class HostedServerMemory implements HostMemory {
     return () => this.#listeners.delete(listener);
   }
 
-  tick(): Promise<void> {
-    this.#pending ??= this.#tick().finally(() => {
-      this.#pending = null;
-    });
-    return this.#pending;
+  tick(): Effect.Effect<void> {
+    return Effect.suspend(() => {
+      if (this.#pending) return Deferred.await(this.#pending);
+      const pending = Deferred.makeUnsafe<void>();
+      this.#pending = pending;
+      return this.#tick().pipe(
+        Effect.onExit((exit) =>
+          Effect.gen({ self: this }, function* () {
+            this.#pending = null;
+            yield* Deferred.done(pending, exit);
+          }),
+        ),
+      );
+    }).pipe(Effect.uninterruptible);
   }
 
-  async #tick(): Promise<void> {
-    this.#sample = await this.#read();
+  #tick = Effect.fn("HostedServerMemory.tick")(function* (this: HostedServerMemory) {
+    this.#sample = yield* this.#read();
     this.#level = this.#nextLevel();
-    await raiseChildOomScores();
+    yield* raiseChildOomScores();
     for (const listener of this.#listeners) {
       try {
         listener();
@@ -102,25 +116,31 @@ export class HostedServerMemory implements HostMemory {
         this.#options.onError("A hosted server memory listener failed.", error);
       }
     }
-  }
+  });
 
-  async #read(): Promise<MemorySample | null> {
-    try {
-      const machine = parseMeminfo(await readFile("/proc/meminfo", "utf8"));
-      const unit = await readUnitMemory();
-      if (!unit) return machine;
-      return {
-        total: Math.min(machine.total, unit.max),
-        available: Math.min(machine.available, Math.max(0, unit.max - unit.current)),
-      };
-    } catch (error) {
-      if (!this.#readErrorLogged) {
-        this.#readErrorLogged = true;
-        this.#options.onError("The hosted server could not read its memory use.", error);
-      }
-      return null;
+  #read = Effect.fn("HostedServerMemory.read")(function* (this: HostedServerMemory) {
+    const result = yield* Effect.result(
+      Effect.gen(function* () {
+        const text = yield* memoryIO(() => readFile("/proc/meminfo", "utf8"));
+        const machine = yield* Effect.try({
+          try: () => parseMeminfo(text),
+          catch: (cause) => new HostMemoryFailure({ cause }),
+        });
+        const unit = yield* readUnitMemory();
+        if (!unit) return machine;
+        return {
+          total: Math.min(machine.total, unit.max),
+          available: Math.min(machine.available, Math.max(0, unit.max - unit.current)),
+        };
+      }),
+    );
+    if (result._tag === "Success") return result.success;
+    if (!this.#readErrorLogged) {
+      this.#readErrorLogged = true;
+      this.#options.onError("The hosted server could not read its memory use.", result.failure.cause);
     }
-  }
+    return null;
+  });
 
   #nextLevel(): HostMemoryLevel {
     const sample = this.#sample;
@@ -155,18 +175,22 @@ function parseMeminfo(text: string): MemorySample {
  * The limit and the use of the unit's cgroup, with no reclaimable file cache, or null when the unit
  * has no limit or no cgroup v2.
  */
-async function readUnitMemory(): Promise<{ max: number; current: number } | null> {
-  const cgroup = (await readFile("/proc/self/cgroup", "utf8")).split("\n").find((line) => line.startsWith("0::"));
+const readUnitMemory = Effect.fn("HostedServerMemory.readUnit")(function* () {
+  const cgroup = (yield* memoryIO(() => readFile("/proc/self/cgroup", "utf8")))
+    .split("\n")
+    .find((line) => line.startsWith("0::"));
   if (!cgroup) return null;
   const root = `/sys/fs/cgroup${cgroup.slice(3)}`;
-  const max = (await readFile(`${root}/memory.max`, "utf8")).trim();
+  const max = (yield* memoryIO(() => readFile(`${root}/memory.max`, "utf8"))).trim();
   if (max === "max") return null;
-  const current = Number((await readFile(`${root}/memory.current`, "utf8")).trim());
+  const current = Number((yield* memoryIO(() => readFile(`${root}/memory.current`, "utf8"))).trim());
   // `memory.current` counts the file cache too. The kernel takes the inactive part back before the
   // OOM killer acts, so it is free memory, as it is in `MemAvailable`.
-  const inactiveFile = /^inactive_file (\d+)$/m.exec(await readFile(`${root}/memory.stat`, "utf8"))?.[1];
+  const inactiveFile = /^inactive_file (\d+)$/m.exec(
+    yield* memoryIO(() => readFile(`${root}/memory.stat`, "utf8")),
+  )?.[1];
   return { max: Number(max), current: current - Number(inactiveFile ?? 0) };
-}
+});
 
 /**
  * Gives each descendant of main, other than the Electron processes, at least `CHILD_OOM_SCORE_ADJ`.
@@ -177,22 +201,25 @@ async function readUnitMemory(): Promise<{ max: number; current: number } | null
  * not list the zygotes or the broker, so the binary is the test: with 500, the OOM killer could kill a
  * zygote, and then no new renderer can start.
  */
-async function raiseChildOomScores(): Promise<void> {
-  const electron = await readlink("/proc/self/exe").catch(() => null);
+const raiseChildOomScores = Effect.fn("HostedServerMemory.raiseChildOomScores")(function* () {
+  const electron = yield* optionalMemoryIO(() => readlink("/proc/self/exe"));
   const children = new Map<number, number[]>();
-  const entries = await readdir("/proc").catch(() => []);
-  await Promise.all(
-    entries.map(async (entry) => {
-      if (!/^\d+$/.test(entry)) return;
-      const stat = await readFile(`/proc/${entry}/stat`, "utf8").catch(() => null);
-      if (stat === null) return;
-      // The name in parentheses can hold spaces, so the fields start after the last ")".
-      const parent = Number(stat.slice(stat.lastIndexOf(")") + 2).split(" ")[1]);
-      if (!Number.isInteger(parent)) return;
-      const siblings = children.get(parent) ?? [];
-      siblings.push(Number(entry));
-      children.set(parent, siblings);
-    }),
+  const entries = yield* optionalMemoryIO(() => readdir("/proc"));
+  yield* Effect.forEach(
+    entries ?? [],
+    (entry) =>
+      Effect.gen(function* () {
+        if (!/^\d+$/.test(entry)) return;
+        const stat = yield* optionalMemoryIO(() => readFile(`/proc/${entry}/stat`, "utf8"));
+        if (stat === null) return;
+        // The name can hold spaces, so the fields start after the last ")".
+        const parent = Number(stat.slice(stat.lastIndexOf(")") + 2).split(" ")[1]);
+        if (!Number.isInteger(parent)) return;
+        const siblings = children.get(parent) ?? [];
+        siblings.push(Number(entry));
+        children.set(parent, siblings);
+      }),
+    { concurrency: "unbounded", discard: true },
   );
   const descendants: number[] = [];
   const pending = [...(children.get(process.pid) ?? [])];
@@ -200,14 +227,27 @@ async function raiseChildOomScores(): Promise<void> {
     descendants.push(pid);
     pending.push(...(children.get(pid) ?? []));
   }
-  await Promise.all(
-    descendants.map(async (pid) => {
-      if (electron === null || (await readlink(`/proc/${pid}/exe`).catch(() => null)) === electron) return;
-      const path = `/proc/${pid}/oom_score_adj`;
-      const text = await readFile(path, "utf8").catch(() => null);
-      if (text !== null && Number(text.trim()) < CHILD_OOM_SCORE_ADJ) {
-        await writeFile(path, String(CHILD_OOM_SCORE_ADJ)).catch(() => undefined);
-      }
-    }),
+  yield* Effect.forEach(
+    descendants,
+    (pid) =>
+      Effect.gen(function* () {
+        if (electron === null || (yield* optionalMemoryIO(() => readlink(`/proc/${pid}/exe`))) === electron) return;
+        const path = `/proc/${pid}/oom_score_adj`;
+        const text = yield* optionalMemoryIO(() => readFile(path, "utf8"));
+        if (text !== null && Number(text.trim()) < CHILD_OOM_SCORE_ADJ) {
+          yield* optionalMemoryIO(() => writeFile(path, String(CHILD_OOM_SCORE_ADJ)));
+        }
+      }),
+    { concurrency: "unbounded", discard: true },
   );
+});
+
+class HostMemoryFailure extends Schema.TaggedError<HostMemoryFailure>()("HostMemoryFailure", {
+  cause: Schema.Defect(),
+}) {}
+
+const { io: memoryIO } = causeHelpers(HostMemoryFailure);
+
+function optionalMemoryIO<A>(operation: () => Promise<A>): Effect.Effect<A | null> {
+  return memoryIO(operation).pipe(Effect.catch(() => Effect.succeed(null)));
 }

@@ -3,35 +3,47 @@ import { join, relative } from "node:path";
 import { SKILL_DESCRIPTION_MAX_LENGTH, type SkillPackagePreview } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
+import { Effect, Schema } from "effect";
 import { unzipSync, zipSync } from "fflate";
 import { parse as parseYaml } from "yaml";
+import { causeHelpers } from "../backend/effect-boundary";
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const MAX_FILES = 200;
-export async function archiveDirectory(root: string): Promise<Uint8Array> {
+export const archiveDirectory = Effect.fn("SkillPackage.archiveDirectory")(function* (root: string) {
   const files: Record<string, Uint8Array> = {};
   let expandedSize = 0;
-  async function visit(directory: string): Promise<void> {
-    for (const entry of await readdir(directory, { withFileTypes: true })) {
-      if (entry.name === ".git" || entry.name === "node_modules" || entry.name === ".DS_Store") continue;
-      const path = join(directory, entry.name);
-      if (entry.isSymbolicLink()) throw new Error(sourceText("error.skill.symlinks"));
-      if (entry.isDirectory()) await visit(path);
-      else if (entry.isFile()) {
-        const name = relative(root, path).replaceAll("\\", "/");
-        expandedSize += (await lstat(path)).size;
-        if (expandedSize > MAX_BYTES) throw new Error(sourceText("error.skill.expandedTooLarge"));
-        files[name] = new Uint8Array(await readFile(path));
-        if (Object.keys(files).length > MAX_FILES)
-          throw new Error(sourceText("error.skill.tooManyFiles", { limit: MAX_FILES }));
-      } else throw new Error(sourceText("error.skill.irregularEntry"));
-    }
+  function visit(directory: string): Effect.Effect<void, SkillArchiveFailure> {
+    return Effect.gen(function* () {
+      for (const entry of yield* archiveIO(() => readdir(directory, { withFileTypes: true }))) {
+        if (entry.name === ".git" || entry.name === "node_modules" || entry.name === ".DS_Store") continue;
+        const path = join(directory, entry.name);
+        if (entry.isSymbolicLink())
+          return yield* new SkillArchiveFailure({ cause: new Error(sourceText("error.skill.symlinks")) });
+        if (entry.isDirectory()) yield* visit(path);
+        else if (entry.isFile()) {
+          const name = relative(root, path).replaceAll("\\", "/");
+          expandedSize += (yield* archiveIO(() => lstat(path))).size;
+          if (expandedSize > MAX_BYTES)
+            return yield* new SkillArchiveFailure({ cause: new Error(sourceText("error.skill.expandedTooLarge")) });
+          files[name] = new Uint8Array(yield* archiveIO(() => readFile(path)));
+          if (Object.keys(files).length > MAX_FILES)
+            return yield* new SkillArchiveFailure({
+              cause: new Error(sourceText("error.skill.tooManyFiles", { limit: MAX_FILES })),
+            });
+        } else return yield* new SkillArchiveFailure({ cause: new Error(sourceText("error.skill.irregularEntry")) });
+      }
+    });
   }
-  await visit(root);
-  const bytes = zipSync(files, { level: 6 });
-  if (bytes.byteLength > MAX_BYTES) throw new Error(sourceText("error.skill.packageTooLarge"));
+  yield* visit(root);
+  const bytes = yield* Effect.try({
+    try: () => zipSync(files, { level: 6 }),
+    catch: (cause) => new SkillArchiveFailure({ cause }),
+  });
+  if (bytes.byteLength > MAX_BYTES)
+    return yield* new SkillArchiveFailure({ cause: new Error(sourceText("error.skill.packageTooLarge")) });
   return bytes;
-}
+});
 
 /** One `SKILL.md` on its own, as an agent template carries it; publish and install both read it here. */
 export function inspectSkillMarkdown(markdown: string): Omit<SkillPackagePreview, "draftId" | "size"> {
@@ -113,3 +125,9 @@ function slugify(name: string): string {
   if (!value) throw new Error(sourceText("error.skill.slugInvalid"));
   return value;
 }
+
+export class SkillArchiveFailure extends Schema.TaggedError<SkillArchiveFailure>()("SkillArchiveFailure", {
+  cause: Schema.Defect(),
+}) {}
+
+const { io: archiveIO } = causeHelpers(SkillArchiveFailure);

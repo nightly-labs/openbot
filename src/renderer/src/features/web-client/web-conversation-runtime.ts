@@ -1,5 +1,6 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AgentEvent, AttachmentImportEvent, AttachmentSummary, TeamRealtimeEvent } from "@openbot/contracts/ipc";
+import { runTeamEffect } from "@openbot/team-client";
 import {
   deleteSharedTable,
   installAgentSkill,
@@ -14,6 +15,7 @@ import {
 } from "@openbot/team-client/team-admin-requests";
 import { listInstalledSkills, type TeamApiRequest } from "@openbot/team-client/team-api-requests";
 import { currentText } from "@openbot/ui/text";
+import { Effect } from "effect";
 import { onCleanup } from "solid-js";
 import type { ConversationRuntime } from "../conversation/conversation-runtime";
 import { createWebAttachmentFiles, openWebLink } from "./web-attachments";
@@ -29,10 +31,14 @@ function webHostAdmin(
 ): NonNullable<ConversationRuntime["admin"]> {
   return {
     skills: {
-      listInstalled: (agentId) => listAgentSkills(request(), agentId),
-      install: (input) => installAgentSkill(request(), input),
-      uninstall: (input) => uninstallAgentSkill(request(), input),
-      setEnabled: (input) => setAgentSkillEnabled(request(), input),
+      listInstalled: (agentId) =>
+        runTeamEffect(listAgentSkills(request(), agentId).pipe(Effect.mapError((error) => error.cause))),
+      install: (input) =>
+        runTeamEffect(installAgentSkill(request(), input).pipe(Effect.mapError((error) => error.cause))),
+      uninstall: (input) =>
+        runTeamEffect(uninstallAgentSkill(request(), input).pipe(Effect.mapError((error) => error.cause))),
+      setEnabled: (input) =>
+        runTeamEffect(setAgentSkillEnabled(request(), input).pipe(Effect.mapError((error) => error.cause))),
       ...(onHostEvent
         ? {
             onChanged: (listener: (agentId: string) => void) =>
@@ -43,13 +49,17 @@ function webHostAdmin(
         : {}),
     },
     sharedTables: {
-      listTables: () => listSharedTables(request()),
-      deleteTable: ({ name }) => deleteSharedTable(request(), name),
+      listTables: () => runTeamEffect(listSharedTables(request()).pipe(Effect.mapError((error) => error.cause))),
+      deleteTable: ({ name }) =>
+        runTeamEffect(deleteSharedTable(request(), name).pipe(Effect.mapError((error) => error.cause))),
     },
     agentTemplates: {
-      preview: (agentId) => previewAgentTemplate(request(), agentId),
-      publish: (input) => publishAgentTemplate(request(), input),
-      unpublish: (agentId) => unpublishAgentTemplate(request(), agentId),
+      preview: (agentId) =>
+        runTeamEffect(previewAgentTemplate(request(), agentId).pipe(Effect.mapError((error) => error.cause))),
+      publish: (input) =>
+        runTeamEffect(publishAgentTemplate(request(), input).pipe(Effect.mapError((error) => error.cause))),
+      unpublish: (agentId) =>
+        runTeamEffect(unpublishAgentTemplate(request(), agentId).pipe(Effect.mapError((error) => error.cause))),
     },
   };
 }
@@ -91,11 +101,19 @@ export function createWebConversationRuntime(
         return remote.editQueue(input);
       },
       // The skills store asks only a host that serves `installed-skills`, and the MCP store only as an admin.
-      listInstalledSkills: async (agentId) => (adminRequest ? listInstalledSkills(adminRequest(), agentId) : []),
+      listInstalledSkills: async (agentId) =>
+        adminRequest
+          ? Effect.runPromise(
+              listInstalledSkills(adminRequest(), agentId).pipe(Effect.mapError((error) => error.cause)),
+            )
+          : [],
       listMcpServers: async (serverId) => {
         if (serverId !== hostId()) throw new Error(currentText().t("webClient.error.hostChanged"));
-        return adminRequest ? listMcpServers(adminRequest()) : [];
+        return adminRequest
+          ? runTeamEffect(listMcpServers(adminRequest()).pipe(Effect.mapError((error) => error.cause)))
+          : [];
       },
+      listWorkspaceDirectory: ({ agentId, path }) => remote.workspaceDirectory(agentId, path),
       onAttachmentImport(listener) {
         listeners.add(listener);
         return () => {

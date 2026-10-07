@@ -6,19 +6,12 @@ import type {
   AvatarImageInput,
   CentralAuthUser,
   ConfigureHostInput,
-  ConversationFileSearchPage,
   ConversationMessageSender,
-  ConversationPage,
   ConversationPageAnchor,
-  ConversationReadState,
-  ConversationSearchPage,
-  ConversationWithReadState,
   CreateTeamInviteInput,
   DirectConversationPage,
   DirectConversationPageAnchor,
-  DirectConversationReadState,
   DirectConversationSnapshot,
-  DirectMessage,
   DirectMessageRealtimeEvent,
   DirectThreadSummary,
   DirectTypingInput,
@@ -32,7 +25,6 @@ import type {
   RemoteDesktopSetupAction,
   SendDirectMessageInput,
   SetTeamTypingInput,
-  TeamInviteSummary,
   TeamMemberSummary,
   TeamPresenceSnapshot,
   TeamSessionSummary,
@@ -44,17 +36,19 @@ import type { LiveActivityRelayPush } from "@openbot/contracts/live-activity-rel
 import type { HostRestartState } from "@openbot/contracts/team-protocol/host-update-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
+import { Cause, Context, Deferred, Effect, Fiber, Layer, ManagedRuntime, Result } from "effect";
 import type { AgentService } from "../backend/agent-service";
 import type { ChannelService } from "../backend/channel-service";
 import type { TeamChatStore } from "../backend/team-chat-store";
 import { BrowserViewGateway } from "./browser-view-gateway";
 import type { VerifiedRemoteSessionTicket } from "./central-auth-manager";
-import { LiveActivityPushService } from "./live-activity-push";
+import { LiveActivityPushService, LiveActivitySendFailure } from "./live-activity-push";
 import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifact";
 import { appendRemoteDiagnosticLog } from "./remote-diagnostics";
 import { RemoteScreenGateway, type RemoteScreenGatewayCreateRuntime } from "./remote-screen-gateway";
+import { RemoteWorkflowError, remoteDecode } from "./remote-service-effects";
 import { TeamApiServer } from "./team-api-server";
-import type { AuthenticatedMember, RemoteDirectoryMember, TeamIdentity, TeamStore } from "./team-store";
+import type { RemoteDirectoryMember, TeamIdentity, TeamStore } from "./team-store";
 import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcHostGateway } from "./team-webrtc-host-gateway";
 
@@ -99,23 +93,26 @@ interface HostServiceOptions {
    */
   localDevelopmentHost?: boolean;
   logDirectory?: string;
-  removeLegacyRemoteDesktopCredential?: () => Promise<void>;
+  removeLegacyRemoteDesktopCredential?: () => Effect.Effect<void, RemoteWorkflowError>;
   getSignedInUser: () => CentralAuthUser;
-  redeemCentralTicket: (ticket: string, serverId: string) => Promise<CentralAuthUser | null>;
+  redeemCentralTicket: (ticket: string, serverId: string) => Effect.Effect<CentralAuthUser | null, RemoteWorkflowError>;
   sendTeamInviteEmail: (input: {
     email: string;
     serverName: string;
     inviteUrl: string;
     role: "admin" | "member";
-  }) => Promise<void>;
-  openRemoteDesktopSetup?: (action: RemoteDesktopSetupAction, appPath: string) => Promise<void>;
+  }) => Effect.Effect<void, RemoteWorkflowError>;
+  openRemoteDesktopSetup?: (
+    action: RemoteDesktopSetupAction,
+    appPath: string,
+  ) => Effect.Effect<void, RemoteWorkflowError>;
   remoteDesktopRuntimePaths?: RemoteDesktopRuntimePaths | null;
   remoteDesktopStateDirectory?: string;
   /** Only a test supplies this. The gateway builds the real Sunshine and Moonlight runtime itself. */
   createRemoteDesktopRuntime?: RemoteScreenGatewayCreateRuntime;
-  getRemoteDesktopRuntimeCredentials?: () => Promise<{ username: string; password: string }>;
+  getRemoteDesktopRuntimeCredentials?: () => Effect.Effect<{ username: string; password: string }, RemoteWorkflowError>;
   getRemoteDesktopDisplays?: () => RemoteDesktopDisplay[];
-  getRemoteDesktopIceServers?: () => Promise<RemoteDesktopIceServer[]>;
+  getRemoteDesktopIceServers?: () => Effect.Effect<RemoteDesktopIceServer[], RemoteWorkflowError>;
   platform?: "darwin" | "win32" | "linux";
   unattended?: boolean;
   teamWebRtcBridge?: TeamWebRtcBridge;
@@ -124,18 +121,26 @@ interface HostServiceOptions {
     name: string;
     ownerMembershipId: string;
     devicePublicKey?: string | null;
-  }) => Promise<unknown>;
-  issueRemoteHostTicket?: (hostId: string) => Promise<{ ticket: string; signalUrl: string; expiresAt: number }>;
+  }) => Effect.Effect<unknown, RemoteWorkflowError>;
+  issueRemoteHostTicket?: (
+    hostId: string,
+  ) => Effect.Effect<{ ticket: string; signalUrl: string; expiresAt: number }, RemoteWorkflowError>;
   /** Sends one sealed Live Activity update through the account service. `gone` means Apple refused the token. */
-  sendLiveActivityPush?: (hostId: string, push: LiveActivityRelayPush) => Promise<"sent" | "gone">;
-  verifyRemoteSessionTicket?: (ticket: string) => Promise<VerifiedRemoteSessionTicket>;
-  endRemoteSession?: (sessionId: string) => Promise<void>;
+  sendLiveActivityPush?: (
+    hostId: string,
+    push: LiveActivityRelayPush,
+  ) => Effect.Effect<"sent" | "gone", RemoteWorkflowError>;
+  verifyRemoteSessionTicket?: (ticket: string) => Effect.Effect<VerifiedRemoteSessionTicket, RemoteWorkflowError>;
+  endRemoteSession?: (sessionId: string) => Effect.Effect<void, RemoteWorkflowError>;
   remoteControlPlaneUrl?: string;
   createRemoteInvite?: (
     hostId: string,
     input: { role: "admin" | "member"; email?: string; permanent?: boolean },
-  ) => Promise<{ inviteId: string; token: string; expiresAt: number; permanent: boolean; useCount: number }>;
-  listRemoteInvites?: (hostId: string) => Promise<
+  ) => Effect.Effect<
+    { inviteId: string; token: string; expiresAt: number; permanent: boolean; useCount: number },
+    RemoteWorkflowError
+  >;
+  listRemoteInvites?: (hostId: string) => Effect.Effect<
     Array<{
       inviteId: string;
       role: "admin" | "member";
@@ -145,28 +150,39 @@ interface HostServiceOptions {
       revokedAt: number | null;
       permanent: boolean;
       useCount: number;
-    }>
+    }>,
+    RemoteWorkflowError
   >;
-  revokeRemoteInvite?: (inviteId: string) => Promise<void>;
-  listRemoteMembers?: (hostId: string) => Promise<RemoteDirectoryMember[]>;
+  revokeRemoteInvite?: (inviteId: string) => Effect.Effect<void, RemoteWorkflowError>;
+  listRemoteMembers?: (hostId: string) => Effect.Effect<RemoteDirectoryMember[], RemoteWorkflowError>;
   updateRemoteMember?: (
     hostId: string,
     membershipId: string,
     role: "admin" | "member",
     reactivate?: boolean,
-  ) => Promise<void>;
-  removeRemoteMember?: (hostId: string, membershipId: string) => Promise<void>;
+  ) => Effect.Effect<void, RemoteWorkflowError>;
+  removeRemoteMember?: (hostId: string, membershipId: string) => Effect.Effect<void, RemoteWorkflowError>;
   updateRemoteHostLogo?: (
     hostId: string,
     image: AvatarImageInput | null,
     version?: string | null,
-  ) => Promise<string | null>;
+  ) => Effect.Effect<string | null, RemoteWorkflowError>;
 }
+
+class HostApiRuntime extends Context.Service<
+  HostApiRuntime,
+  {
+    start(): Effect.Effect<number, RemoteWorkflowError>;
+  }
+>()("openbot/main/HostApiRuntime") {}
 
 export class HostService extends EventEmitter<HostEvents> {
   readonly #options: Required<Pick<HostServiceOptions, "localDevelopmentHost">> &
     Omit<HostServiceOptions, "localDevelopmentHost">;
   readonly #api: TeamApiServer;
+  readonly #runtime: ManagedRuntime.ManagedRuntime<HostApiRuntime, never>;
+  readonly #operations = new Set<Deferred.Deferred<void>>();
+  #shutdown: Deferred.Deferred<void, RemoteWorkflowError> | null = null;
   readonly #remoteScreen: RemoteScreenGateway;
   readonly #browserView: BrowserViewGateway;
   #lastBrowserViewInputAt: number | null = null;
@@ -174,7 +190,7 @@ export class HostService extends EventEmitter<HostEvents> {
   readonly #liveActivityPush: LiveActivityPushService | undefined;
   #status: HostStatus;
   #runtimeGeneration = 0;
-  #startOperation: Promise<HostStatus> | null = null;
+  #startOperation: Fiber.Fiber<HostStatus, RemoteWorkflowError> | null = null;
   #webRtcOnline = false;
   /** `undefined` until the account service first reports, so the first report always binds. */
   #boundAccountId: string | null | undefined = undefined;
@@ -195,18 +211,16 @@ export class HostService extends EventEmitter<HostEvents> {
       runtimeStateDirectory: options.remoteDesktopStateDirectory ?? ".openbot-remote-desktop",
       getRuntimeCredentials:
         options.getRemoteDesktopRuntimeCredentials ??
-        (async () => ({ username: "openbot", password: "development-runtime-not-for-release" })),
+        (() => Effect.succeed({ username: "openbot", password: "development-runtime-not-for-release" })),
       getDisplays: options.getRemoteDesktopDisplays,
       getIceServers:
         options.getRemoteDesktopIceServers ??
-        (async () => {
-          throw new Error(sourceText("error.host.iceServersMissing"));
-        }),
+        (() => Effect.fail(new RemoteWorkflowError({ cause: new Error(sourceText("error.host.iceServersMissing")) }))),
       ...(options.createRemoteDesktopRuntime ? { createRuntime: options.createRemoteDesktopRuntime } : {}),
       ...(logDirectory
         ? {
             onDiagnostic: (source: "sunshine" | "moonlight", message: string) => {
-              void appendRemoteDiagnosticLog(logDirectory, `remote-screen-${source}`, message);
+              Effect.runFork(appendRemoteDiagnosticLog(logDirectory, `remote-screen-${source}`, message));
             },
           }
         : {}),
@@ -215,7 +229,9 @@ export class HostService extends EventEmitter<HostEvents> {
       onScreenRecordingDenied: () => this.emit("changed", this.getStatus()),
       audit: (event) => {
         if (options.logDirectory) {
-          void appendRemoteDiagnosticLog(options.logDirectory, "remote-screen", `${JSON.stringify(event)}\n`);
+          Effect.runFork(
+            appendRemoteDiagnosticLog(options.logDirectory, "remote-screen", `${JSON.stringify(event)}\n`),
+          );
         }
         if (
           event.event === "started" &&
@@ -223,9 +239,16 @@ export class HostService extends EventEmitter<HostEvents> {
           options.removeLegacyRemoteDesktopCredential
         ) {
           this.#legacyCredentialRemoved = true;
-          void options.removeLegacyRemoteDesktopCredential().catch(() => {
-            this.#legacyCredentialRemoved = false;
-          });
+          const remove = options.removeLegacyRemoteDesktopCredential;
+          this.#dispatch(
+            remove().pipe(
+              Effect.catch(() =>
+                Effect.sync(() => {
+                  this.#legacyCredentialRemoved = false;
+                }),
+              ),
+            ),
+          );
         }
       },
     });
@@ -242,8 +265,13 @@ export class HostService extends EventEmitter<HostEvents> {
           agents: options.agents,
           send: (push) => {
             const hostId = options.store.getIdentity()?.serverId;
-            if (!hostId) throw new Error(sourceText("error.auth.hostCredentialUnavailable"));
-            return sendLiveActivityPush(hostId, push);
+            if (!hostId)
+              return Effect.fail(
+                new LiveActivitySendFailure({ cause: new Error(sourceText("error.auth.hostCredentialUnavailable")) }),
+              );
+            return sendLiveActivityPush(hostId, push).pipe(
+              Effect.mapError(({ cause }) => new LiveActivitySendFailure({ cause })),
+            );
           },
           randomBytes: (size) => new Uint8Array(randomBytes(size)),
           memberActive: (memberId) => {
@@ -265,7 +293,10 @@ export class HostService extends EventEmitter<HostEvents> {
       agentImport: options.agentImport,
       // The identity route changes this host's name and logo through `updateIdentity`, so a change
       // from a joined admin runs every step a local one does.
-      admin: { ...options.admin, identity: { updateIdentity: (input) => this.updateIdentity(input) } },
+      admin: {
+        ...options.admin,
+        identity: { updateIdentity: (input) => this.updateIdentity(input).pipe(Effect.asVoid) },
+      },
       skills: options.skills,
       sidebarLayout: options.sidebarLayout,
       mailbox: options.mailbox,
@@ -281,16 +312,29 @@ export class HostService extends EventEmitter<HostEvents> {
       onSessionRevoked: (sessionId) => this.#revokeWebRtcSession(sessionId),
       liveActivityPush: this.#liveActivityPush,
     });
+    this.#runtime = ManagedRuntime.make(
+      Layer.succeed(
+        HostApiRuntime,
+        HostApiRuntime.of({
+          start: () => this.#api.start(),
+        }),
+      ),
+    );
     this.#webrtcGateway = options.teamWebRtcBridge
       ? new TeamWebRtcHostGateway({
           bridge: options.teamWebRtcBridge,
           store: options.store,
           appVersion: options.appVersion,
           transferDirectory: join(options.logDirectory ?? ".openbot-remote", "transfers"),
-          renewSignal: async (hostId) => {
-            if (!options.issueRemoteHostTicket) throw new Error(sourceText("error.host.webRtcNotConfigured"));
-            return options.issueRemoteHostTicket(hostId);
-          },
+          renewSignal: (hostId) =>
+            Effect.gen(function* () {
+              const issueTicket = options.issueRemoteHostTicket;
+              if (!issueTicket)
+                return yield* new RemoteWorkflowError({
+                  cause: new Error(sourceText("error.host.webRtcNotConfigured")),
+                });
+              return yield* issueTicket(hostId);
+            }),
           onSignalRecoveryFailure: (error) => {
             this.#setStatus({
               phase: "error",
@@ -298,11 +342,12 @@ export class HostService extends EventEmitter<HostEvents> {
               message: error.message,
             });
           },
-          closeSession: async (sessionId) => {
-            this.#liveActivityPush?.remove(sessionId);
-            await this.#remoteScreen.revokeTeamSession(sessionId);
-            await this.#browserView.revokeTeamSession(sessionId);
-          },
+          closeSession: (sessionId) =>
+            Effect.gen({ self: this }, function* () {
+              this.#liveActivityPush?.remove(sessionId);
+              yield* this.#remoteScreen.revokeTeamSession(sessionId);
+              yield* this.#browserView.revokeTeamSession(sessionId);
+            }),
           verifyClientTicket: options.verifyRemoteSessionTicket,
         })
       : null;
@@ -342,19 +387,29 @@ export class HostService extends EventEmitter<HostEvents> {
     return this.#remoteScreen.closeLocalTestSession(sessionId);
   }
 
-  async openRemoteDesktopSetup(action: RemoteDesktopSetupAction): Promise<void> {
-    if (process.platform !== "darwin") throw new Error(sourceText("status.remote.setupMacOnly"));
-    const executable = this.#options.remoteDesktopRuntimePaths?.sunshine;
-    if (!executable) throw new Error(sourceText("error.host.runtimeNotInstalled"));
-    const appPath = dirname(dirname(dirname(executable)));
-    if (!this.#options.openRemoteDesktopSetup) throw new Error(sourceText("error.host.setupUnavailable"));
-    await this.#options.openRemoteDesktopSetup(action, appPath);
-  }
+  readonly openRemoteDesktopSetup = Effect.fn("HostService.openRemoteDesktopSetup")(
+    function* (this: HostService, action: RemoteDesktopSetupAction): Effect.fn.Return<void, RemoteWorkflowError> {
+      const optionalOpenRemoteDesktopSetup = this.#options.openRemoteDesktopSetup;
+      if (process.platform !== "darwin")
+        return yield* new RemoteWorkflowError({ cause: new Error(sourceText("status.remote.setupMacOnly")) });
+      const executable = this.#options.remoteDesktopRuntimePaths?.sunshine;
+      if (!executable)
+        return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.host.runtimeNotInstalled")) });
+      const appPath = dirname(dirname(dirname(executable)));
+      if (!optionalOpenRemoteDesktopSetup)
+        return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.host.setupUnavailable")) });
+      yield* optionalOpenRemoteDesktopSetup(action, appPath);
+    },
+    (operation) => this.#provide(operation),
+  ).bind(this);
 
-  async recheckScreenRecording(): Promise<HostStatus> {
-    await this.#remoteScreen.recheckScreenRecording();
-    return this.getStatus();
-  }
+  readonly recheckScreenRecording = Effect.fn("HostService.recheckScreenRecording")(
+    function* (this: HostService): Effect.fn.Return<HostStatus, RemoteWorkflowError> {
+      yield* this.#remoteScreen.recheckScreenRecording();
+      return this.getStatus();
+    },
+    (operation) => this.#provide(operation),
+  ).bind(this);
 
   /**
    * Why the Team host half of this instance must not restart right now. A session still
@@ -395,55 +450,62 @@ export class HostService extends EventEmitter<HostEvents> {
     this.emit("changed", this.getStatus());
   }
 
-  async applySignedInAccount(user: CentralAuthUser | null): Promise<void> {
-    const nextAccountId = user?.id ?? null;
-    // `unbindChangedAccount` may have cleared the store since this account was bound, to
-    // stop it answering for an account that was on its way out. Reporting the same account
-    // again then has to activate it, not take it for the host that is already running.
-    const stillBound = this.#options.store.configured || nextAccountId === null;
-    if (this.#boundAccountId === nextAccountId && stillBound) {
-      // The same account, reported again - a renamed profile or a new avatar. Rebinding
-      // here would stop a host that is happily online.
-      if (user && this.#options.store.configured && (await this.#options.store.syncAccount(user))) {
-        this.#api.refreshPresence();
-      }
-      return;
-    }
-    const previousServerId = this.#status.serverId;
-    if (this.#boundAccountId !== undefined) {
-      this.#runtimeGeneration += 1;
-      // The same three steps as `stop`, and for the same reason: a start still in flight
-      // belongs to the previous account. The bumped generation makes it abort at its next
-      // checkpoint, and draining it here is what stops `start()` from handing the new
-      // account that superseded operation instead of starting its own host. Each step is
-      // attempted on its own, so a gateway that will not come down cannot skip the drain.
-      await this.#attemptTeardown(() => this.#stopRuntime());
-      await this.#attemptTeardown(() => this.#startOperation);
-      await this.#attemptTeardown(() => this.#stopRuntime());
-    }
-    let activated = false;
-    try {
-      if (user && this.#signedInAccountId() !== user.id) {
-        // Another account was announced while the runtime was being torn down. Binding this
-        // one now would hand its host, members and invitations to whoever is signed in
-        // instead - and the switch queued for them is what binds theirs.
+  readonly applySignedInAccount = Effect.fn("HostService.applySignedInAccount")(
+    function* (this: HostService, user: CentralAuthUser | null): Effect.fn.Return<void, RemoteWorkflowError> {
+      const nextAccountId = user?.id ?? null;
+      // `unbindChangedAccount` may have cleared the store since this account was bound, to
+      // stop it answering for an account that was on its way out. Reporting the same account
+      // again then has to activate it, not take it for the host that is already running.
+      const stillBound = this.#options.store.configured || nextAccountId === null;
+      if (this.#boundAccountId === nextAccountId && stillBound) {
+        // The same account, reported again - a renamed profile or a new avatar. Rebinding
+        // here would stop a host that is happily online.
+        if (user && this.#options.store.configured && (yield* this.#options.store.syncAccount(user))) {
+          this.#api.refreshPresence();
+        }
         return;
       }
-      if (user) await this.#options.store.activateAccount(user);
-      else await this.#options.store.deactivate();
-      activated = true;
-    } finally {
-      // Publish even when activation failed. The previous account is gone either way, and a
-      // status still naming its host would offer the rail a server this process can no
-      // longer answer for - the store has already unbound it.
-      //
-      // A failure leaves the binding unknown rather than recorded, so the next report of the
-      // same account runs activation again instead of short-circuiting into an unconfigured
-      // store the user cannot get out of without restarting.
-      this.#boundAccountId = activated ? nextAccountId : undefined;
-      this.#publishActiveHost(previousServerId);
-    }
-  }
+      const previousServerId = this.#status.serverId;
+      if (this.#boundAccountId !== undefined) {
+        this.#runtimeGeneration += 1;
+        // The same three steps as `stop`, and for the same reason: a start still in flight
+        // belongs to the previous account. The bumped generation makes it abort at its next
+        // checkpoint, and draining it here is what stops `start()` from handing the new
+        // account that superseded operation instead of starting its own host. Each step is
+        // attempted on its own, so a gateway that will not come down cannot skip the drain.
+        yield* this.#attemptTeardown(this.#stopRuntime());
+        yield* this.#attemptTeardown(this.#startOperation ? Fiber.join(this.#startOperation) : Effect.void);
+        yield* this.#attemptTeardown(this.#stopRuntime());
+      }
+      let activated = false;
+      return yield* Effect.gen({ self: this }, function* () {
+        if (user && this.#signedInAccountId() !== user.id) {
+          // Another account was announced while the runtime was being torn down. Binding this
+          // one now would hand its host, members and invitations to whoever is signed in
+          // instead - and the switch queued for them is what binds theirs.
+          return;
+        }
+        if (user) yield* this.#options.store.activateAccount(user);
+        else yield* this.#options.store.deactivate();
+        activated = true;
+      }).pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            // Publish even when activation failed. The previous account is gone either way, and a
+            // status still naming its host would offer the rail a server this process can no
+            // longer answer for - the store has already unbound it.
+            //
+            // A failure leaves the binding unknown rather than recorded, so the next report of the
+            // same account runs activation again instead of short-circuiting into an unconfigured
+            // store the user cannot get out of without restarting.
+            this.#boundAccountId = activated ? nextAccountId : undefined;
+            this.#publishActiveHost(previousServerId);
+          }),
+        ),
+      );
+    },
+    (operation) => this.#provide(operation),
+  ).bind(this);
 
   #publishActiveHost(previousServerId: string | null): void {
     const identity = this.#options.store.getIdentity();
@@ -471,89 +533,105 @@ export class HostService extends EventEmitter<HostEvents> {
     return identity ? { hostId: identity.serverId, fingerprint: identity.fingerprint } : null;
   }
 
-  async configure(input: ConfigureHostInput): Promise<HostStatus> {
-    const account = this.#options.getSignedInUser();
-    const identity = await this.#options.store.configureWithAccount(input.serverName, account, input.logo);
-    // Nothing is bound while the first host is being written, so neither the store's
-    // `activeAccountId` nor `unbindChangedAccount` can see a switch announced during the
-    // write. Central authentication has the new account the moment it is announced, which
-    // is what the renderer was told, so that is what this is checked against.
-    if (this.#signedInAccountId() !== account.id) {
-      // The store bound the host as it created it, and refusing the call is not enough on
-      // its own: the members and identity behind it would still answer the new account.
-      this.#options.store.unbindActiveHost();
-      this.#status = initialHostStatus(null, this.#options.unattended ?? false);
-      this.emit("changed", this.getStatus());
-      throw new Error(sourceText("error.team.accountChangedDuringCreate"));
-    }
-    // The store checked the account before it resolved; the switch can still land between
-    // there and here, and publishing then would show A's server to B.
-    if (!this.#isActiveHost(identity.serverId)) return this.getStatus();
-    this.#setStatus({
-      phase: "idle",
-      configured: true,
-      serverId: identity.serverId,
-      serverName: identity.serverName,
-      logoUrl: identity.logoVersion ? serverLogoUrl(identity.logoVersion) : null,
-      enabledOnLaunch: false,
-      message: null,
-    });
-    this.#api.refreshPresence();
-    this.#api.refreshIdentity();
-    const ownerMembershipId = this.#requiredOwnerMemberId();
-    try {
+  readonly configure = Effect.fn("HostService.configure")(
+    function* (this: HostService, input: ConfigureHostInput): Effect.fn.Return<HostStatus, RemoteWorkflowError> {
+      const optionalRegisterRemoteHost = this.#options.registerRemoteHost;
+      const optionalUpdateRemoteHostLogo = this.#options.updateRemoteHostLogo;
+      const account = yield* remoteDecode(() => this.#options.getSignedInUser());
+      const identity = yield* this.#options.store.configureWithAccount(input.serverName, account, input.logo);
+      // Nothing is bound while the first host is being written, so neither the store's
+      // `activeAccountId` nor `unbindChangedAccount` can see a switch announced during the
+      // write. Central authentication has the new account the moment it is announced, which
+      // is what the renderer was told, so that is what this is checked against.
+      if (this.#signedInAccountId() !== account.id) {
+        // The store bound the host as it created it, and refusing the call is not enough on
+        // its own: the members and identity behind it would still answer the new account.
+        this.#options.store.unbindActiveHost();
+        this.#status = initialHostStatus(null, this.#options.unattended ?? false);
+        this.emit("changed", this.getStatus());
+        return yield* new RemoteWorkflowError({
+          cause: new Error(sourceText("error.team.accountChangedDuringCreate")),
+        });
+      }
+      // The store checked the account before it resolved; the switch can still land between
+      // there and here, and publishing then would show A's server to B.
       if (!this.#isActiveHost(identity.serverId)) return this.getStatus();
-      await this.#options.registerRemoteHost?.({
+      this.#setStatus({
+        phase: "idle",
+        configured: true,
+        serverId: identity.serverId,
+        serverName: identity.serverName,
+        logoUrl: identity.logoVersion ? serverLogoUrl(identity.logoVersion) : null,
+        enabledOnLaunch: false,
+        message: null,
+      });
+      this.#api.refreshPresence();
+      this.#api.refreshIdentity();
+      const ownerMembershipId = yield* remoteDecode(() => this.#requiredOwnerMemberId());
+      const attempt0 = yield* Effect.gen({ self: this }, function* () {
+        if (!this.#isActiveHost(identity.serverId)) return this.getStatus();
+        yield* optionalRegisterRemoteHost?.({
+          hostId: identity.serverId,
+          name: identity.serverName,
+          ownerMembershipId,
+          devicePublicKey: identity.publicKey,
+        }) ?? Effect.succeed(undefined);
+        if (input.logo !== undefined && this.#isActiveHost(identity.serverId)) {
+          yield* optionalUpdateRemoteHostLogo?.(identity.serverId, input.logo ?? null, identity.logoVersion) ??
+            Effect.succeed(undefined);
+        }
+        if (!this.#isActiveHost(identity.serverId)) return this.getStatus();
+        this.#setStatus({
+          apiUrl: null,
+          message: sourceText("status.host.registered"),
+        });
+      }).pipe(Effect.result);
+      if (Result.isFailure(attempt0)) {
+        const error = attempt0.failure.cause;
+        // A failure that arrives after another account signed in belongs to the host that is
+        // gone, so it must not overwrite the status the new account is looking at.
+        if (this.#isActiveHost(identity.serverId)) {
+          this.#setStatus({
+            phase: "error",
+            message: error instanceof Error ? error.message : sourceText("error.host.reserveAddressFailed"),
+          });
+        }
+      } else if (attempt0.success !== undefined) return attempt0.success;
+      return this.getStatus();
+    },
+    (operation) => this.#provide(operation),
+  ).bind(this);
+
+  readonly updateIdentity = Effect.fn("HostService.updateIdentity")(
+    function* (this: HostService, input: UpdateHostIdentityInput): Effect.fn.Return<HostStatus, RemoteWorkflowError> {
+      const optionalRegisterRemoteHost = this.#options.registerRemoteHost;
+      const optionalUpdateRemoteHostLogo = this.#options.updateRemoteHostLogo;
+      yield* remoteDecode(() => this.#options.store.assertOwnerAccount(this.#options.getSignedInUser()));
+      const identity = yield* this.#options.store.updateIdentity(input);
+      // Before anything is published: the store checked the account before it resolved, and a
+      // switch landing in this gap would show the previous account's name and logo.
+      if (!this.#isActiveHost(identity.serverId)) return this.getStatus();
+      this.#setStatus({
+        serverName: identity.serverName,
+        logoUrl: identity.logoVersion ? serverLogoUrl(identity.logoVersion) : null,
+        message: sourceText("status.host.identityUpdated"),
+      });
+      this.#api.refreshIdentity();
+      const ownerMembershipId = yield* remoteDecode(() => this.#requiredOwnerMemberId());
+      yield* optionalRegisterRemoteHost?.({
         hostId: identity.serverId,
         name: identity.serverName,
         ownerMembershipId,
         devicePublicKey: identity.publicKey,
-      });
+      }) ?? Effect.succeed(undefined);
       if (input.logo !== undefined && this.#isActiveHost(identity.serverId)) {
-        await this.#options.updateRemoteHostLogo?.(identity.serverId, input.logo ?? null, identity.logoVersion);
+        yield* optionalUpdateRemoteHostLogo?.(identity.serverId, input.logo ?? null, identity.logoVersion) ??
+          Effect.succeed(undefined);
       }
-      if (!this.#isActiveHost(identity.serverId)) return this.getStatus();
-      this.#setStatus({
-        apiUrl: null,
-        message: sourceText("status.host.registered"),
-      });
-    } catch (error) {
-      // A failure that arrives after another account signed in belongs to the host that is
-      // gone, so it must not overwrite the status the new account is looking at.
-      if (this.#isActiveHost(identity.serverId)) {
-        this.#setStatus({
-          phase: "error",
-          message: error instanceof Error ? error.message : sourceText("error.host.reserveAddressFailed"),
-        });
-      }
-    }
-    return this.getStatus();
-  }
-
-  async updateIdentity(input: UpdateHostIdentityInput): Promise<HostStatus> {
-    this.#options.store.assertOwnerAccount(this.#options.getSignedInUser());
-    const identity = await this.#options.store.updateIdentity(input);
-    // Before anything is published: the store checked the account before it resolved, and a
-    // switch landing in this gap would show the previous account's name and logo.
-    if (!this.#isActiveHost(identity.serverId)) return this.getStatus();
-    this.#setStatus({
-      serverName: identity.serverName,
-      logoUrl: identity.logoVersion ? serverLogoUrl(identity.logoVersion) : null,
-      message: sourceText("status.host.identityUpdated"),
-    });
-    this.#api.refreshIdentity();
-    const ownerMembershipId = this.#requiredOwnerMemberId();
-    await this.#options.registerRemoteHost?.({
-      hostId: identity.serverId,
-      name: identity.serverName,
-      ownerMembershipId,
-      devicePublicKey: identity.publicKey,
-    });
-    if (input.logo !== undefined && this.#isActiveHost(identity.serverId)) {
-      await this.#options.updateRemoteHostLogo?.(identity.serverId, input.logo ?? null, identity.logoVersion);
-    }
-    return this.getStatus();
-  }
+      return this.getStatus();
+    },
+    (operation) => this.#provide(operation),
+  ).bind(this);
 
   /**
    * Every remote step runs under the signed-in account's authentication, so one that started
@@ -579,96 +657,113 @@ export class HostService extends EventEmitter<HostEvents> {
     return this.#options.store.getIdentity()?.serverId === serverId;
   }
 
-  start(): Promise<HostStatus> {
-    if (this.#startOperation) return this.#startOperation;
-    const operation = this.#startRuntimeOperation().finally(() => {
-      if (this.#startOperation === operation) this.#startOperation = null;
+  readonly start = Effect.fn("HostService.start")(function* (this: HostService) {
+    if (this.#startOperation) return yield* Fiber.join(this.#startOperation);
+    const operation = yield* Effect.forkIn(this.#provide(this.#startRuntimeOperation()), this.#runtime.scope, {
+      startImmediately: false,
     });
     this.#startOperation = operation;
-    return operation;
-  }
+    operation.addObserver(() => {
+      if (this.#startOperation === operation) this.#startOperation = null;
+    });
+    return yield* Fiber.join(operation);
+  }).bind(this);
 
-  async #startRuntimeOperation(): Promise<HostStatus> {
-    if (!this.#options.store.configured) throw new Error(sourceText("error.host.nameBeforePublish"));
+  readonly #startRuntimeOperation = Effect.fn("HostService.startRuntimeOperation")(function* (
+    this: HostService,
+  ): Effect.fn.Return<HostStatus, RemoteWorkflowError, HostApiRuntime> {
+    const gateway = this.#webrtcGateway;
+    const optionalRegisterRemoteHost = this.#options.registerRemoteHost;
+    const optionalIssueRemoteHostTicket = this.#options.issueRemoteHostTicket;
+    const optionalListRemoteMembers = this.#options.listRemoteMembers;
+    if (!this.#options.store.configured)
+      return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.host.nameBeforePublish")) });
     if ((this.#status.phase === "online" && this.#webRtcOnline) || this.#status.phase === "starting") {
       return this.getStatus();
     }
     if (this.#status.phase === "stopping") return this.getStatus();
     const generation = ++this.#runtimeGeneration;
-    const signedInUser = this.#options.getSignedInUser();
-    this.#options.store.assertOwnerAccount(signedInUser);
-    if (await this.#options.store.syncAccount(signedInUser)) this.#api.refreshPresence();
+    const signedInUser = yield* remoteDecode(() => this.#options.getSignedInUser());
+    yield* remoteDecode(() => this.#options.store.assertOwnerAccount(signedInUser));
+    if (yield* this.#options.store.syncAccount(signedInUser)) this.#api.refreshPresence();
     this.#setStatus({ phase: "starting", message: sourceText("status.host.starting") });
 
-    try {
-      const apiPort = await this.#api.start();
-      if (await this.#cancelSupersededStart(generation)) return this.getStatus();
+    const attempt1 = yield* Effect.gen({ self: this }, function* () {
+      const apiPort = yield* HostApiRuntime.use((api) => api.start());
+      if (yield* this.#cancelSupersededStartEffect(generation)) return this.getStatus();
       const identity = this.#options.store.getIdentity();
-      if (!identity) throw new Error(sourceText("error.host.nameBeforePublish"));
-      if (!this.#webrtcGateway || !this.#options.registerRemoteHost || !this.#options.issueRemoteHostTicket) {
-        throw new Error(sourceText("error.host.webRtcNotConfigured"));
+      if (!identity)
+        return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.host.nameBeforePublish")) });
+      if (!gateway || !optionalRegisterRemoteHost || !optionalIssueRemoteHostTicket) {
+        return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.host.webRtcNotConfigured")) });
       }
-      await this.#options.registerRemoteHost({
+      yield* optionalRegisterRemoteHost({
         hostId: identity.serverId,
         name: identity.serverName,
-        ownerMembershipId: this.#requiredOwnerMemberId(),
+        ownerMembershipId: yield* remoteDecode(() => this.#requiredOwnerMemberId()),
         devicePublicKey: identity.publicKey,
       });
-      if (await this.#cancelSupersededStart(generation)) return this.getStatus();
-      if (this.#usesAccountDirectory() && this.#options.listRemoteMembers) {
-        await this.#options.store.syncRemoteDirectory(
-          identity.serverId,
-          await this.#options.listRemoteMembers(identity.serverId),
-        );
-        if (await this.#cancelSupersededStart(generation)) return this.getStatus();
+      if (yield* this.#cancelSupersededStartEffect(generation)) return this.getStatus();
+      if (this.#usesAccountDirectory() && optionalListRemoteMembers) {
+        const members = yield* optionalListRemoteMembers(identity.serverId);
+        yield* this.#options.store.syncRemoteDirectory(identity.serverId, members);
+        if (yield* this.#cancelSupersededStartEffect(generation)) return this.getStatus();
       }
-      const bootstrap = await this.#options.issueRemoteHostTicket(identity.serverId);
-      if (await this.#cancelSupersededStart(generation)) return this.getStatus();
-      await this.#webrtcGateway.start({
+      const bootstrap = yield* optionalIssueRemoteHostTicket(identity.serverId);
+      if (yield* this.#cancelSupersededStartEffect(generation)) return this.getStatus();
+      yield* gateway.start({
         hostId: identity.serverId,
         signalUrl: bootstrap.signalUrl,
         ticket: bootstrap.ticket,
         localApiPort: apiPort,
       });
       this.#webRtcOnline = true;
-      if (await this.#cancelSupersededStart(generation)) return this.getStatus();
+      if (yield* this.#cancelSupersededStartEffect(generation)) return this.getStatus();
       this.#setStatus({
         apiUrl: bootstrap.signalUrl,
         apiOnline: true,
         message: sourceText("status.host.ready"),
       });
-      if (await this.#cancelSupersededStart(generation)) return this.getStatus();
-      await this.#options.store.setEnabledOnLaunch(identity.serverId, true);
-      if (await this.#cancelSupersededStart(generation)) return this.getStatus();
+      if (yield* this.#cancelSupersededStartEffect(generation)) return this.getStatus();
+      yield* this.#options.store.setEnabledOnLaunch(identity.serverId, true);
+      if (yield* this.#cancelSupersededStartEffect(generation)) return this.getStatus();
       this.#setStatus({ phase: "online", enabledOnLaunch: true });
-    } catch (error) {
+    }).pipe(Effect.result);
+    if (Result.isFailure(attempt1)) {
+      const error = attempt1.failure.cause;
       if (generation !== this.#runtimeGeneration) {
-        await this.#stopRuntime();
+        yield* this.#stopRuntime();
         return this.getStatus();
       }
-      await this.#stopRuntime();
+      yield* this.#stopRuntime();
       this.#setStatus({
         phase: "error",
         apiOnline: false,
         apiUrl: null,
         message: error instanceof Error ? error.message : sourceText("error.host.publishFailed"),
       });
-    }
+    } else if (attempt1.success !== undefined) return attempt1.success;
     return this.getStatus();
-  }
+  });
 
-  async startDevelopmentLocal(): Promise<HostStatus> {
-    if (!this.#options.store.configured) throw new Error("Name this OpenBot before starting local development.");
-    if (this.#status.phase === "online") return this.getStatus();
-    const apiPort = await this.#api.start();
-    this.#setStatus({
-      phase: "online",
-      apiUrl: `http://localhost:${apiPort}`,
-      apiOnline: true,
-      message: "Local development host is ready.",
-    });
-    return this.getStatus();
-  }
+  readonly startDevelopmentLocal = Effect.fn("HostService.startDevelopmentLocal")(
+    function* (this: HostService): Effect.fn.Return<HostStatus, RemoteWorkflowError, HostApiRuntime> {
+      if (!this.#options.store.configured)
+        return yield* new RemoteWorkflowError({
+          cause: new Error("Name this OpenBot before starting local development."),
+        });
+      if (this.#status.phase === "online") return this.getStatus();
+      const apiPort = yield* HostApiRuntime.use((api) => api.start());
+      this.#setStatus({
+        phase: "online",
+        apiUrl: `http://localhost:${apiPort}`,
+        apiOnline: true,
+        message: "Local development host is ready.",
+      });
+      return this.getStatus();
+    },
+    (operation) => this.#provide(operation),
+  ).bind(this);
 
   // Where this host's Team API listens on this machine, which is not what `#status.apiUrl` reports:
   // that is how a member reaches the host, and for a published one it is the Signal service.
@@ -676,79 +771,95 @@ export class HostService extends EventEmitter<HostEvents> {
     return this.#api.port === null ? null : `http://localhost:${this.#api.port}`;
   }
 
-  async createDevelopmentConnection(): Promise<{
-    serverId: string;
-    serverName: string;
-    apiUrl: string;
-    fingerprint: string;
-    publicKey: string;
-    username: string;
-    sessionToken: string;
-  }> {
-    const identity = this.#options.store.getIdentity();
-    const apiUrl = this.#localApiUrl();
-    if (!identity || !apiUrl) throw new Error("The local development host is not ready.");
-    const username = DEVELOPMENT_REMOTE_CLIENT_USERNAME;
-    const password = "openbot-local-development-client";
-    let authenticated: AuthenticatedMember;
-    try {
-      authenticated = await this.#options.store.login(username, password);
-    } catch {
-      // Before a development host kept its members in its own team file, publishing reconciled them
-      // against the control plane, and that disabled the technical client -- it is password-only,
-      // owned by no account. `login` skips a disabled member and `acceptInvite` refuses a username
-      // that already exists, so a profile published then fails here. Replacing the member lets such
-      // a profile recover: it is a fixture, and nothing outside this file reads it.
-      const existing = this.#options.store.listMembers().find((member) => member.username === username);
-      if (existing && existing.role !== "owner") await this.#options.store.removeMember(existing.id);
-      const invite = await this.#options.store.createInvite("member");
-      authenticated = await this.#options.store.acceptInvite(invite.token, username, password);
-    }
-    this.#api.refreshPresence();
-    return {
-      serverId: identity.serverId,
-      serverName: identity.serverName,
-      apiUrl,
-      fingerprint: identity.fingerprint,
-      publicKey: identity.publicKey,
-      username,
-      sessionToken: authenticated.sessionToken,
-    };
-  }
+  readonly createDevelopmentConnection = Effect.fn("HostService.createDevelopmentConnection")(
+    function* (this: HostService): Effect.fn.Return<
+      {
+        serverId: string;
+        serverName: string;
+        apiUrl: string;
+        fingerprint: string;
+        publicKey: string;
+        username: string;
+        sessionToken: string;
+      },
+      RemoteWorkflowError,
+      HostApiRuntime
+    > {
+      const identity = this.#options.store.getIdentity();
+      const apiUrl = this.#localApiUrl();
+      if (!identity || !apiUrl)
+        return yield* new RemoteWorkflowError({ cause: new Error("The local development host is not ready.") });
+      const username = DEVELOPMENT_REMOTE_CLIENT_USERNAME;
+      const password = "openbot-local-development-client";
+      const authenticated = yield* this.#options.store.login(username, password).pipe(
+        Effect.catch(() =>
+          Effect.gen({ self: this }, function* () {
+            // Before a development host kept its members in its own team file, publishing reconciled them
+            // against the control plane, and that disabled the technical client -- it is password-only,
+            // owned by no account. `login` skips a disabled member and `acceptInvite` refuses a username
+            // that already exists, so a profile published then fails here. Replacing the member lets such
+            // a profile recover: it is a fixture, and nothing outside this file reads it.
+            const existing = this.#options.store.listMembers().find((member) => member.username === username);
+            if (existing && existing.role !== "owner") yield* this.#options.store.removeMember(existing.id);
+            const invite = yield* this.#options.store.createInvite("member");
+            return yield* this.#options.store.acceptInvite(invite.token, username, password);
+          }),
+        ),
+      );
+      this.#api.refreshPresence();
+      return {
+        serverId: identity.serverId,
+        serverName: identity.serverName,
+        apiUrl,
+        fingerprint: identity.fingerprint,
+        publicKey: identity.publicKey,
+        username,
+        sessionToken: authenticated.sessionToken,
+      };
+    },
+    (operation) => this.#provide(operation),
+  ).bind(this);
 
-  async stop(persistPreference = true): Promise<HostStatus> {
-    if (this.#status.phase === "unconfigured") return this.getStatus();
-    const serverId = this.#options.store.getIdentity()?.serverId;
-    this.#runtimeGeneration += 1;
-    if (persistPreference) this.#options.store.assertOwnerAccount(this.#options.getSignedInUser());
-    this.#setStatus({ phase: "stopping", message: sourceText("status.host.stopping") });
-    await this.#stopRuntime();
-    await this.#startOperation;
-    await this.#stopRuntime();
-    // The awaits above can outlive this host. An account switch in between makes both the
-    // preference and the status below the previous account's, and the account that just
-    // became active already has its own status from `applySignedInAccount`.
-    if (this.#options.store.getIdentity()?.serverId !== serverId) return this.getStatus();
-    if (persistPreference && serverId) await this.#options.store.setEnabledOnLaunch(serverId, false);
-    this.#setStatus({
-      phase: "idle",
-      enabledOnLaunch: persistPreference ? false : this.#status.enabledOnLaunch,
-      apiUrl: null,
-      apiOnline: false,
-      message: sourceText("status.host.private"),
-    });
-    return this.getStatus();
-  }
+  readonly stop = Effect.fn("HostService.stop")(
+    function* (this: HostService, persistPreference = true): Effect.fn.Return<HostStatus, RemoteWorkflowError> {
+      if (this.#status.phase === "unconfigured") return this.getStatus();
+      const serverId = this.#options.store.getIdentity()?.serverId;
+      this.#runtimeGeneration += 1;
+      if (persistPreference)
+        yield* remoteDecode(() => this.#options.store.assertOwnerAccount(this.#options.getSignedInUser()));
+      this.#setStatus({ phase: "stopping", message: sourceText("status.host.stopping") });
+      yield* this.#stopRuntime();
+      if (this.#startOperation) yield* Fiber.join(this.#startOperation);
+      yield* this.#stopRuntime();
+      // The awaits above can outlive this host. An account switch in between makes both the
+      // preference and the status below the previous account's, and the account that just
+      // became active already has its own status from `applySignedInAccount`.
+      if (this.#options.store.getIdentity()?.serverId !== serverId) return this.getStatus();
+      if (persistPreference && serverId) yield* this.#options.store.setEnabledOnLaunch(serverId, false);
+      this.#setStatus({
+        phase: "idle",
+        enabledOnLaunch: persistPreference ? false : this.#status.enabledOnLaunch,
+        apiUrl: null,
+        apiOnline: false,
+        message: sourceText("status.host.private"),
+      });
+      return this.getStatus();
+    },
+    (operation, _persistPreference?: boolean) => this.#provide(operation),
+  ).bind(this);
 
-  listMembers(): TeamMemberSummary[] | Promise<TeamMemberSummary[]> {
-    const hostId = this.#options.store.getIdentity()?.serverId;
-    if (hostId && this.#usesAccountDirectory() && this.#options.listRemoteMembers) {
-      return this.#options.listRemoteMembers(hostId).then(async (members) => {
+  readonly listMembers = Effect.fn("HostService.listMembers")(
+    function* (this: HostService) {
+      const hostId = this.#options.store.getIdentity()?.serverId;
+      if (hostId && this.#usesAccountDirectory() && this.#options.listRemoteMembers) {
+        const list = this.#options.listRemoteMembers;
+
+        const members = yield* list(hostId);
         // An account switch while the directory loaded makes this list the previous
         // account's. Answer with the now-active host's own members rather than failing a
         // read with the store's cross-account guard.
         if (!this.#isActiveHost(hostId)) return this.#options.store.listMembers();
-        await this.#options.store.syncRemoteDirectory(hostId, members);
+        yield* this.#options.store.syncRemoteDirectory(hostId, members);
         // Recording the directory is a write, and the switch can land during it. The names,
         // addresses and roles below are the previous account's if it did.
         if (!this.#isActiveHost(hostId)) return this.#options.store.listMembers();
@@ -762,10 +873,11 @@ export class HostService extends EventEmitter<HostEvents> {
           createdAt: new Date(member.createdAt).toISOString(),
           disabled: member.status !== "active",
         }));
-      });
-    }
-    return this.#options.store.listMembers();
-  }
+      }
+      return this.#options.store.listMembers();
+    },
+    (operation) => this.#provide(operation),
+  ).bind(this);
 
   getPresence(): TeamPresenceSnapshot {
     return this.#api.getPresence();
@@ -791,40 +903,35 @@ export class HostService extends EventEmitter<HostEvents> {
     this.#api.setLocalTyping(input.agentId, input.typing);
   }
 
-  readAgentConversation(agentId: string): Promise<ConversationWithReadState> {
-    return this.#options.agents.readConversationFor(agentId, this.#currentAgentReaderId());
+  readAgentConversation(agentId: string) {
+    return remoteDecode(() => this.#currentAgentReaderId()).pipe(
+      Effect.flatMap((readerId) => this.#options.agents.readConversationFor(agentId, readerId)),
+    );
   }
 
-  readAgentConversationPage(
-    agentId: string,
-    anchor: ConversationPageAnchor = { type: "latest" },
-    limit = 50,
-  ): Promise<ConversationPage> {
-    return this.#options.agents.readConversationPageFor(agentId, this.#currentAgentReaderId(), anchor, limit);
+  readAgentConversationPage(agentId: string, anchor: ConversationPageAnchor = { type: "latest" }, limit = 50) {
+    return remoteDecode(() => this.#currentAgentReaderId()).pipe(
+      Effect.flatMap((readerId) => this.#options.agents.readConversationPageFor(agentId, readerId, anchor, limit)),
+    );
   }
 
-  searchAgentConversationMessages(
-    query: string,
-    agentId?: string,
-    cursor?: string,
-    limit = 100,
-  ): ConversationSearchPage {
+  searchAgentConversationMessages(query: string, agentId?: string, cursor?: string, limit = 100) {
     return this.#options.agents.searchConversationMessages(query, agentId, cursor, limit);
   }
 
-  searchAgentConversationFiles(query: string, cursor?: string, limit = 50): ConversationFileSearchPage {
+  searchAgentConversationFiles(query: string, cursor?: string, limit = 50) {
     return this.#options.agents.searchConversationFiles(query, cursor, limit);
   }
 
-  listAgentConversationReads(): Record<string, ConversationReadState> {
+  listAgentConversationReads() {
     return this.#options.agents.listConversationReads(this.#currentAgentReaderId());
   }
 
-  markAgentConversationRead(input: MarkConversationReadInput): Promise<ConversationReadState> {
-    return this.#options.agents.markConversationRead(
-      input.agentId,
-      this.#currentAgentReaderId(),
-      input.throughMessageId,
+  markAgentConversationRead(input: MarkConversationReadInput) {
+    return remoteDecode(() => this.#currentAgentReaderId()).pipe(
+      Effect.flatMap((readerId) =>
+        this.#options.agents.markConversationRead(input.agentId, readerId, input.throughMessageId),
+      ),
     );
   }
 
@@ -846,11 +953,11 @@ export class HostService extends EventEmitter<HostEvents> {
     return this.#api.readDirectConversationPage(this.#currentMemberId(), memberId, anchor, limit);
   }
 
-  sendDirectMessage(input: SendDirectMessageInput): DirectMessage {
+  sendDirectMessage(input: SendDirectMessageInput) {
     return this.#api.sendDirectMessage(this.#currentMemberId(), input);
   }
 
-  markDirectRead(input: MarkDirectReadInput): DirectConversationReadState {
+  markDirectRead(input: MarkDirectReadInput) {
     return this.#api.markDirectRead(this.#currentMemberId(), input.memberId, input.throughSequence);
   }
 
@@ -858,10 +965,13 @@ export class HostService extends EventEmitter<HostEvents> {
     this.#api.setLocalDirectTyping(this.#currentMemberId(), input.memberId, input.typing);
   }
 
-  listInvites(): TeamInviteSummary[] | Promise<TeamInviteSummary[]> {
-    const hostId = this.#options.store.getIdentity()?.serverId;
-    if (hostId && this.#remoteInviteApiUrl() && this.#options.listRemoteInvites) {
-      return this.#options.listRemoteInvites(hostId).then((invites) => {
+  readonly listInvites = Effect.fn("HostService.listInvites")(
+    function* (this: HostService) {
+      const hostId = this.#options.store.getIdentity()?.serverId;
+      if (hostId && this.#remoteInviteApiUrl() && this.#options.listRemoteInvites) {
+        const list = this.#options.listRemoteInvites;
+
+        const invites = yield* list(hostId);
         // As in `listMembers`: a switch while the directory loaded makes these the previous
         // account's invitations, their email addresses included. Answer with the now-active
         // host's own rather than handing them to whoever is signed in.
@@ -877,94 +987,117 @@ export class HostService extends EventEmitter<HostEvents> {
             permanent: invite.permanent,
             useCount: invite.useCount,
           }));
-      });
-    }
-    return this.#options.store.listInvites();
-  }
+      }
+      return this.#options.store.listInvites();
+    },
+    (operation) => this.#provide(operation),
+  ).bind(this);
 
   listSessions(): TeamSessionSummary[] {
     return this.#options.store.listSessions();
   }
 
-  async updateMember(input: UpdateTeamMemberInput): Promise<TeamMemberSummary> {
-    const hostId = this.#options.store.getIdentity()?.serverId;
-    if (
-      hostId &&
-      this.#usesAccountDirectory() &&
-      this.#options.updateRemoteMember &&
-      this.#options.removeRemoteMember &&
-      this.#options.listRemoteMembers
-    ) {
-      const current = (await this.#options.listRemoteMembers(hostId)).find(
-        (member) => member.membershipId === input.memberId,
-      );
-      if (!current || current.role === "owner") throw new Error(sourceText("error.host.memberNotFound"));
-      // The directory read is a round trip, and the account can change during it. Mutating
-      // the previous account's host with the new account's authorization is what this guard
-      // stops; the same check runs again before the result is written back.
-      this.#assertStillActiveHost(hostId);
-      if (input.disabled) await this.#options.removeRemoteMember(hostId, input.memberId);
-      else
-        await this.#options.updateRemoteMember(
-          hostId,
-          input.memberId,
-          input.role ?? current.role,
-          input.disabled === false,
+  readonly updateMember = Effect.fn("HostService.updateMember")(
+    function* (
+      this: HostService,
+      input: UpdateTeamMemberInput,
+    ): Effect.fn.Return<TeamMemberSummary, RemoteWorkflowError> {
+      const optionalListRemoteMembers = this.#options.listRemoteMembers;
+      const optionalUpdateRemoteMember = this.#options.updateRemoteMember;
+      const optionalRemoveRemoteMember = this.#options.removeRemoteMember;
+      const hostId = this.#options.store.getIdentity()?.serverId;
+      if (
+        hostId &&
+        this.#usesAccountDirectory() &&
+        optionalUpdateRemoteMember &&
+        optionalRemoveRemoteMember &&
+        optionalListRemoteMembers
+      ) {
+        const current = (yield* optionalListRemoteMembers(hostId)).find(
+          (member) => member.membershipId === input.memberId,
         );
-      this.#assertStillActiveHost(hostId);
-      const members = await this.#options.listRemoteMembers(hostId);
-      const updated = members.find((member) => member.membershipId === input.memberId);
-      if (!updated) throw new Error(sourceText("error.host.memberNotFound"));
-      await this.#options.store.syncRemoteDirectory(hostId, members);
-      // Recording the directory is a write too, so the switch can land inside it and the
-      // member below would be the previous account's.
-      this.#assertStillActiveHost(hostId);
-      return {
-        id: updated.membershipId,
-        username: updated.email,
-        email: updated.email,
-        name: updated.name,
-        avatarUrl: updated.avatarUrl,
-        role: updated.role,
-        createdAt: new Date(updated.createdAt).toISOString(),
-        disabled: updated.status !== "active",
-      };
-    }
-    const member = await this.#options.store.updateMember(input.memberId, {
-      ...(input.role ? { role: input.role } : {}),
-      ...(input.disabled === undefined ? {} : { disabled: input.disabled }),
-    });
-    if (member.disabled) await this.#remoteScreen.revokeMember(member.id);
-    this.#api.refreshPresence();
-    return member;
-  }
-
-  async removeMember(memberId: string): Promise<void> {
-    const hostId = this.#options.store.getIdentity()?.serverId;
-    if (hostId && this.#usesAccountDirectory() && this.#options.removeRemoteMember) {
-      await this.#options.removeRemoteMember(hostId, memberId);
-      if (this.#options.listRemoteMembers) {
-        await this.#options.store.syncRemoteDirectory(hostId, await this.#options.listRemoteMembers(hostId));
+        if (!current || current.role === "owner")
+          return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.host.memberNotFound")) });
+        // The directory read is a round trip, and the account can change during it. Mutating
+        // the previous account's host with the new account's authorization is what this guard
+        // stops; the same check runs again before the result is written back.
+        yield* remoteDecode(() => this.#assertStillActiveHost(hostId));
+        const role = input.role ?? current.role;
+        if (input.disabled) yield* optionalRemoveRemoteMember(hostId, input.memberId);
+        else yield* optionalUpdateRemoteMember(hostId, input.memberId, role, input.disabled === false);
+        yield* remoteDecode(() => this.#assertStillActiveHost(hostId));
+        const members = yield* optionalListRemoteMembers(hostId);
+        const updated = members.find((member) => member.membershipId === input.memberId);
+        if (!updated)
+          return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.host.memberNotFound")) });
+        yield* this.#options.store.syncRemoteDirectory(hostId, members);
+        // Recording the directory is a write too, so the switch can land inside it and the
+        // member below would be the previous account's.
+        yield* remoteDecode(() => this.#assertStillActiveHost(hostId));
+        return {
+          id: updated.membershipId,
+          username: updated.email,
+          email: updated.email,
+          name: updated.name,
+          avatarUrl: updated.avatarUrl,
+          role: updated.role,
+          createdAt: new Date(updated.createdAt).toISOString(),
+          disabled: updated.status !== "active",
+        };
       }
-      return;
-    }
-    await this.#options.store.removeMember(memberId);
-    await this.#remoteScreen.revokeMember(memberId);
-    this.#api.refreshPresence();
-  }
+      const member = yield* this.#options.store.updateMember(input.memberId, {
+        ...(input.role ? { role: input.role } : {}),
+        ...(input.disabled === undefined ? {} : { disabled: input.disabled }),
+      });
+      if (member.disabled) yield* this.#remoteScreen.revokeMember(member.id);
+      this.#api.refreshPresence();
+      return member;
+    },
+    (operation) => this.#provide(operation),
+  ).bind(this);
 
-  async revokeSession(sessionId: string): Promise<void> {
-    await this.#revokeWebRtcSession(sessionId);
-    await this.#options.store.revokeSession(sessionId);
-    await this.#remoteScreen.revokeTeamSession(sessionId);
-    await this.#browserView.revokeTeamSession(sessionId);
-    this.#api.refreshPresence();
-  }
+  readonly removeMember = Effect.fn("HostService.removeMember")(
+    function* (this: HostService, memberId: string): Effect.fn.Return<void, RemoteWorkflowError> {
+      const optionalListRemoteMembers = this.#options.listRemoteMembers;
+      const optionalRemoveRemoteMember = this.#options.removeRemoteMember;
+      const hostId = this.#options.store.getIdentity()?.serverId;
+      if (hostId && this.#usesAccountDirectory() && optionalRemoveRemoteMember) {
+        yield* optionalRemoveRemoteMember(hostId, memberId);
+        if (optionalListRemoteMembers) {
+          const members = yield* optionalListRemoteMembers(hostId);
+          yield* this.#options.store.syncRemoteDirectory(hostId, members);
+        }
+        return;
+      }
+      yield* this.#options.store.removeMember(memberId);
+      yield* this.#remoteScreen.revokeMember(memberId);
+      this.#api.refreshPresence();
+    },
+    (operation) => this.#provide(operation),
+  ).bind(this);
 
-  async #revokeWebRtcSession(sessionId: string): Promise<void> {
+  readonly revokeSession = Effect.fn("HostService.revokeSession")(
+    function* (this: HostService, sessionId: string): Effect.fn.Return<void, RemoteWorkflowError> {
+      yield* this.#revokeWebRtcSession(sessionId);
+      yield* this.#options.store.revokeSession(sessionId);
+      yield* this.#remoteScreen.revokeTeamSession(sessionId);
+      yield* this.#browserView.revokeTeamSession(sessionId);
+      this.#api.refreshPresence();
+    },
+    (operation) => this.#provide(operation),
+  ).bind(this);
+
+  readonly #revokeWebRtcSession = Effect.fn("HostService.revokeWebRtcSession")(function* (
+    this: HostService,
+    sessionId: string,
+  ): Effect.fn.Return<void, RemoteWorkflowError> {
     this.#liveActivityPush?.remove(sessionId);
-    await Promise.all([this.#options.endRemoteSession?.(sessionId), this.#webrtcGateway?.revokeSession(sessionId)]);
-  }
+    const end = this.#options.endRemoteSession;
+    const gateway = this.#webrtcGateway;
+    yield* Effect.all([end ? end(sessionId) : Effect.void, gateway ? gateway.revokeSession(sessionId) : Effect.void], {
+      concurrency: "unbounded",
+    });
+  });
 
   /**
    * Whether members and invitations live in the account directory. A local development host keeps
@@ -979,143 +1112,200 @@ export class HostService extends EventEmitter<HostEvents> {
     return this.#usesAccountDirectory() ? this.#options.remoteControlPlaneUrl || null : null;
   }
 
-  revokeInvite(inviteId: string): Promise<void> {
+  revokeInvite(inviteId: string) {
     if (this.#remoteInviteApiUrl() && this.#options.revokeRemoteInvite)
       return this.#options.revokeRemoteInvite(inviteId);
     return this.#options.store.revokeInvite(inviteId);
   }
 
-  async createInvite(input: CreateTeamInviteInput): Promise<InviteSummary> {
-    const identity = this.#options.store.getIdentity();
-    if (!identity) throw new Error(sourceText("error.host.nameBeforePublish"));
-    const remoteInviteApiUrl = this.#remoteInviteApiUrl();
-    if (remoteInviteApiUrl && this.#options.createRemoteInvite) {
-      // The account service sends only an openbot.run link, and a self-hosted invitation is not one.
-      if (input.email && selfHostedApiOrigin(remoteInviteApiUrl))
-        throw new Error(sourceText("error.remote.selfHostedInviteNoEmail"));
-      const invite = await this.#options.createRemoteInvite(identity.serverId, input);
-      // The invitation belongs to the account that asked for it, so it stays on that host
-      // and shows up in its invite list. What must not happen is emailing it under the new
-      // account's authorization, or handing it back to the renderer the new account sees.
-      this.#assertStillActiveHost(identity.serverId);
+  readonly createInvite = Effect.fn("HostService.createInvite")(
+    function* (this: HostService, input: CreateTeamInviteInput): Effect.fn.Return<InviteSummary, RemoteWorkflowError> {
+      const optionalCreateRemoteInvite = this.#options.createRemoteInvite;
+      const optionalRevokeRemoteInvite = this.#options.revokeRemoteInvite;
+      const identity = this.#options.store.getIdentity();
+      if (!identity)
+        return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.host.nameBeforePublish")) });
+      const remoteInviteApiUrl = this.#remoteInviteApiUrl();
+      if (remoteInviteApiUrl && optionalCreateRemoteInvite) {
+        // The account service cannot email links for a self-hosted service.
+        if (input.email && selfHostedApiOrigin(remoteInviteApiUrl))
+          return yield* new RemoteWorkflowError({
+            cause: new Error(sourceText("error.remote.selfHostedInviteNoEmail")),
+          });
+        const invite = yield* optionalCreateRemoteInvite(identity.serverId, input);
+        // The invitation belongs to the account that asked for it, so it stays on that host
+        // and shows up in its invite list. What must not happen is emailing it under the new
+        // account's authorization, or handing it back to the renderer the new account sees.
+        yield* remoteDecode(() => this.#assertStillActiveHost(identity.serverId));
+        const inviteUrl = yield* remoteDecode(() =>
+          createInviteUrl(
+            {
+              apiUrl: remoteInviteApiUrl,
+              serverId: identity.serverId,
+              fingerprint: identity.fingerprint,
+              token: invite.token,
+            },
+            { selfHostedApiOrigin: selfHostedApiOrigin(remoteInviteApiUrl) },
+          ),
+        );
+        const result: InviteSummary = {
+          id: invite.inviteId,
+          role: input.role,
+          expiresAt: new Date(invite.expiresAt).toISOString(),
+          usedAt: null,
+          inviteUrl,
+          email: input.email ?? null,
+          permanent: invite.permanent,
+          useCount: invite.useCount,
+        };
+        if (input.email) {
+          const email = input.email;
+          const attempt4 = yield* Effect.gen({ self: this }, function* () {
+            yield* this.#options.sendTeamInviteEmail({
+              email,
+              serverName: identity.serverName,
+              inviteUrl,
+              role: input.role,
+            });
+          }).pipe(Effect.result);
+          if (Result.isFailure(attempt4)) {
+            const error = attempt4.failure.cause;
+            // Revoking spends authorization on a host, so it only happens while that host is
+            // still this account's. Otherwise the invitation stays for the account that owns it.
+            if (this.#isActiveHost(identity.serverId))
+              yield* optionalRevokeRemoteInvite?.(invite.inviteId) ?? Effect.succeed(undefined);
+            return yield* new RemoteWorkflowError({ cause: error });
+          }
+        }
+        // Sending is a round trip of its own, and the link must not come back to a renderer
+        // that has meanwhile been told about another account.
+        yield* remoteDecode(() => this.#assertStillActiveHost(identity.serverId));
+        return result;
+      }
+      // This branch mints a link to this machine's own Team API, so it asks the server where it
+      // listens rather than reading the status. They are the same URL for a host that is private or
+      // local-development, and for a published one the status carries the Signal service's `ws://`
+      // address -- which `createInviteUrl` rejects, so a developer who had published this host could
+      // not create an invite at all.
+      const localApiUrl = this.#localApiUrl();
+      if (!localApiUrl)
+        return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.host.publishBeforeInvite")) });
+      const invite = yield* this.#options.store.createInvite(input.role, input.email, { permanent: input.permanent });
       const inviteUrl = createInviteUrl(
         {
-          apiUrl: remoteInviteApiUrl,
+          apiUrl: localApiUrl,
           serverId: identity.serverId,
           fingerprint: identity.fingerprint,
           token: invite.token,
         },
-        { selfHostedApiOrigin: selfHostedApiOrigin(remoteInviteApiUrl) },
+        { allowLocalDevelopmentApiUrl: this.#options.localDevelopmentHost },
       );
       const result: InviteSummary = {
-        id: invite.inviteId,
+        id: invite.id,
         role: input.role,
-        expiresAt: new Date(invite.expiresAt).toISOString(),
+        expiresAt: invite.expiresAt,
         usedAt: null,
         inviteUrl,
-        email: input.email ?? null,
+        email: invite.email,
         permanent: invite.permanent,
         useCount: invite.useCount,
       };
-      if (input.email) {
-        try {
-          await this.#options.sendTeamInviteEmail({
-            email: input.email,
+      if (invite.email) {
+        const email = invite.email;
+        const attempt3 = yield* Effect.gen({ self: this }, function* () {
+          yield* this.#options.sendTeamInviteEmail({
+            email,
             serverName: identity.serverName,
-            inviteUrl,
+            inviteUrl: result.inviteUrl,
             role: input.role,
           });
-        } catch (error) {
-          // Revoking spends authorization on a host, so it only happens while that host is
-          // still this account's. Otherwise the invitation stays for the account that owns it.
-          if (this.#isActiveHost(identity.serverId)) await this.#options.revokeRemoteInvite?.(invite.inviteId);
-          throw error;
+        }).pipe(Effect.result);
+        if (Result.isFailure(attempt3)) {
+          const error = attempt3.failure.cause;
+          yield* this.#options.store.revokeInvite(invite.id);
+          return yield* new RemoteWorkflowError({ cause: error });
         }
       }
-      // Sending is a round trip of its own, and the link must not come back to a renderer
-      // that has meanwhile been told about another account.
-      this.#assertStillActiveHost(identity.serverId);
       return result;
-    }
-    // This branch mints a link to this machine's own Team API, so it asks the server where it
-    // listens rather than reading the status. They are the same URL for a host that is private or
-    // local-development, and for a published one the status carries the Signal service's `ws://`
-    // address -- which `createInviteUrl` rejects, so a developer who had published this host could
-    // not create an invite at all.
-    const localApiUrl = this.#localApiUrl();
-    if (!localApiUrl) throw new Error(sourceText("error.host.publishBeforeInvite"));
-    const invite = await this.#options.store.createInvite(input.role, input.email, { permanent: input.permanent });
-    const inviteUrl = createInviteUrl(
-      {
-        apiUrl: localApiUrl,
-        serverId: identity.serverId,
-        fingerprint: identity.fingerprint,
-        token: invite.token,
-      },
-      { allowLocalDevelopmentApiUrl: this.#options.localDevelopmentHost },
+    },
+    (operation) => this.#provide(operation),
+  ).bind(this);
+
+  #provide<A>(operation: Effect.Effect<A, RemoteWorkflowError, HostApiRuntime>): Effect.Effect<A, RemoteWorkflowError> {
+    return Effect.suspend(() => {
+      const completed = Deferred.makeUnsafe<void>();
+      this.#operations.add(completed);
+      return Effect.flatMap(this.#runtime.contextEffect, (context) =>
+        operation.pipe(Effect.provideContext(context)),
+      ).pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            this.#operations.delete(completed);
+            Deferred.doneUnsafe(completed, Effect.void);
+          }),
+        ),
+      );
+    });
+  }
+
+  // Native audit callbacks own these background operations; shutdown drains them.
+  #dispatch(operation: Effect.Effect<void, RemoteWorkflowError>): void {
+    this.#runtime.runFork(this.#provide(operation));
+  }
+
+  readonly shutdown = Effect.fn("HostService.shutdown")(function* (this: HostService) {
+    if (this.#shutdown) return yield* Deferred.await(this.#shutdown);
+    const stopped = Deferred.makeUnsafe<void, RemoteWorkflowError>();
+    this.#shutdown = stopped;
+    return yield* Effect.acquireUseRelease(
+      Effect.void,
+      () => this.stop(false).pipe(Effect.asVoid),
+      () =>
+        Effect.acquireUseRelease(
+          Effect.void,
+          () => this.#webrtcGateway?.dispose() ?? Effect.void,
+          () =>
+            Effect.gen({ self: this }, function* () {
+              while (this.#operations.size > 0) {
+                yield* Effect.all([...this.#operations].map(Deferred.await), { concurrency: "unbounded" });
+              }
+              yield* this.#runtime.disposeEffect;
+            }),
+        ),
+    ).pipe(Effect.onExit((exit) => Effect.sync(() => Deferred.doneUnsafe(stopped, exit))));
+  }, Effect.uninterruptible).bind(this);
+
+  /** Keep later teardown steps running so an account switch cannot retain the old listener. */
+  #attemptTeardown<A>(step: Effect.Effect<A, RemoteWorkflowError>): Effect.Effect<void> {
+    return step.pipe(
+      Effect.asVoid,
+      Effect.catchCause((cause) =>
+        Effect.sync(() => {
+          logger.error("Unable to stop the host runtime while switching accounts:", toLogValue(Cause.squash(cause)));
+        }),
+      ),
     );
-    const result: InviteSummary = {
-      id: invite.id,
-      role: input.role,
-      expiresAt: invite.expiresAt,
-      usedAt: null,
-      inviteUrl,
-      email: invite.email,
-      permanent: invite.permanent,
-      useCount: invite.useCount,
-    };
-    if (invite.email) {
-      try {
-        await this.#options.sendTeamInviteEmail({
-          email: invite.email,
-          serverName: identity.serverName,
-          inviteUrl: result.inviteUrl,
-          role: input.role,
-        });
-      } catch (error) {
-        await this.#options.store.revokeInvite(invite.id);
-        throw error;
-      }
-    }
-    return result;
   }
 
-  async shutdown(): Promise<void> {
-    await this.stop(false);
-  }
-
-  /**
-   * Isolation cannot depend on a teardown step succeeding: a WebRTC disconnect rejects on a
-   * command error or a timeout, and leaving the previous account's host bound is by far the
-   * worse failure. Reported, and the steps after it still run.
-   */
-  async #attemptTeardown(step: () => PromiseLike<unknown> | null): Promise<void> {
-    try {
-      await step();
-    } catch (error) {
-      logger.error("Unable to stop the host runtime while switching accounts:", toLogValue(error));
-    }
-  }
-
-  async #stopRuntime(): Promise<void> {
+  readonly #stopRuntime = Effect.fn("HostService.stopRuntime")(function* (this: HostService) {
     this.#webRtcOnline = false;
     // The phones register again when they connect to the next runtime.
-    this.#liveActivityPush?.dispose();
-    try {
-      await this.#webrtcGateway?.stop();
-    } finally {
-      // A failed gateway teardown must not leave the local API listening: the callers that
-      // swallow that failure go on to rebind the store, and a server still up would serve
-      // the previous account's authenticated requests against the new account's data.
-      await this.#api.stop();
-    }
-  }
+    const pendingPushes = yield* Effect.forkChild(this.#liveActivityPush?.dispose() ?? Effect.void);
+    return yield* Effect.acquireUseRelease(
+      Effect.void,
+      () => this.#webrtcGateway?.stop() ?? Effect.void,
+      () => this.#api.stop().pipe(Effect.ensuring(Fiber.await(pendingPushes))),
+    );
+  }, Effect.uninterruptible);
 
-  async #cancelSupersededStart(generation: number): Promise<boolean> {
+  readonly #cancelSupersededStartEffect = Effect.fn("HostService.cancelSupersededStart")(function* (
+    this: HostService,
+    generation: number,
+  ): Effect.fn.Return<boolean, RemoteWorkflowError> {
     if (generation === this.#runtimeGeneration) return false;
-    await this.#stopRuntime();
+    yield* this.#stopRuntime();
     return true;
-  }
+  });
 
   #setStatus(patch: Partial<HostStatus>): void {
     this.#status = { ...this.#status, ...patch };

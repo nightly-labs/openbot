@@ -37,6 +37,7 @@ import {
 } from "./current-adapter-routes";
 import { toCurrentAgentKeys, toCurrentAgentKeysObjectForPath, toWireAgentKeys } from "./current-agent-keys";
 import { decodeHostAnalyticsV1Response } from "./host-analytics-v1";
+import { decodeMessageClientId } from "./message-client-id-v1";
 import { decodeProfileV5Request, decodeProfileV5Response } from "./profile-v5";
 import { decodeQueueEditRequest, isQueueEditRoute } from "./queue-edit-v1";
 import {
@@ -193,7 +194,7 @@ export function encodeTeamProtocolV5CurrentHttpRequest(
     }
     if (isAgentMessageRoute(method, path)) {
       const projected = JSON.parse(encodeTeamProtocolV5BaseCurrentHttpRequest(method, path, value, options));
-      return JSON.stringify({ ...projected, ...messageTimezone(value) });
+      return JSON.stringify({ ...projected, ...messageTimezone(value), ...decodeMessageClientId(value) });
     }
     return encodeTeamProtocolV5BaseCurrentHttpRequest(method, path, value, options);
   }
@@ -236,7 +237,8 @@ export function decodeTeamProtocolV5CurrentHttpRequest(
     if (isAgentCreateRoute(method, path) && options.agentCreateModel) {
       return { ...decoded, ...decodeAgentCreateModel(value) };
     }
-    if (isAgentMessageRoute(method, path)) return { ...decoded, ...messageTimezone(value) };
+    if (isAgentMessageRoute(method, path))
+      return { ...decoded, ...messageTimezone(value), ...decodeMessageClientId(value) };
     return decoded;
   }
   return toCurrentAgentKeysObjectForPath(path, structuredClone(decodeTeamProtocolV5HttpRequest(method, path, value)));

@@ -7,8 +7,23 @@ const PLACEHOLDER = /\b(TODO|TBD|FIXME|XXX)\b/;
 
 export const UNRELEASED = "Unreleased";
 
+/**
+ * The date of a mobile release that the store has not approved yet: `## [1.2.0] - In review`.
+ * `/changelog` does not show it. `bun run mobile:release:published` writes the real date.
+ */
+export const IN_REVIEW = "In review";
+
+interface ReleaseNotesOptions {
+  /** Also accept `In review` as the date. Only the mobile app waits for store review. */
+  inReview?: boolean;
+}
+
 /** What stops `version` from being released. Empty when its section is ready. */
-export function releaseNotesProblems(changelog: string, version: string): string[] {
+export function releaseNotesProblems(
+  changelog: string,
+  version: string,
+  { inReview = false }: ReleaseNotesOptions = {},
+): string[] {
   const lines = changelog.split(/\r?\n/);
   const start = lines.findIndex((line) => line.startsWith(`## [${version}]`));
   if (start === -1) return [`CHANGELOG.md has no "## [${version}]" section.`];
@@ -19,9 +34,18 @@ export function releaseNotesProblems(changelog: string, version: string): string
   }
   const heading = lines[start] ?? "";
   const date = /^## \[[^\]]+\] - (\d{4}-\d{2}-\d{2})$/.exec(heading)?.[1];
+  const waitsForReview = inReview && heading === `## [${version}] - ${IN_REVIEW}`;
   // The page formats the date, and an impossible one such as 2026-13-45 stops it from rendering.
-  if (version !== UNRELEASED && (date === undefined || Number.isNaN(Date.parse(`${date}T00:00:00Z`)))) {
-    problems.push(`"${heading}" must be "## [${version}] - YYYY-MM-DD" with a real date.`);
+  if (
+    version !== UNRELEASED &&
+    !waitsForReview &&
+    (date === undefined || Number.isNaN(Date.parse(`${date}T00:00:00Z`)))
+  ) {
+    problems.push(
+      inReview
+        ? `"${heading}" must be "## [${version}] - YYYY-MM-DD" with a real date, or "## [${version}] - ${IN_REVIEW}".`
+        : `"${heading}" must be "## [${version}] - YYYY-MM-DD" with a real date.`,
+    );
   }
 
   const end = lines.findIndex((line, index) => index > start && line.startsWith("## "));

@@ -1,6 +1,7 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AgentSummary } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
+import { Effect } from "effect";
 import { z } from "zod";
 import type { AgentStore } from "../agent-store";
 import type { ChannelService } from "../channel-service";
@@ -9,7 +10,8 @@ import type { DynamicToolCallParams } from "../protocol";
 import type { ConversationRuntime } from "./conversation-runtime";
 import type { DrainScheduler } from "./drain-scheduler";
 import type { MailboxSync } from "./mailbox-sync";
-import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from "./routine-tools";
+import { openBotToolFailure, openBotToolResult } from "./routine-tools";
+import { ToolOperationFailed, toolStep, toToolOperationFailed } from "./tool-operation";
 
 export const interruptAgentToolSchema = z.strictObject({
   agentId: z.string().trim().min(1).max(INPUT_LIMITS.identifier),
@@ -22,7 +24,7 @@ export interface AgentInterruptHooks {
    * `mayStop` is asked again right before the stop is sent. `false` when the turn no longer runs or
    * `mayStop` refuses, so no stop was sent.
    */
-  interrupt(agentId: string, turnId: string, mayStop: () => boolean): Promise<boolean>;
+  interrupt(agentId: string, turnId: string, mayStop: () => boolean): Effect.Effect<boolean, ToolOperationFailed>;
 }
 
 export interface AgentInterruptToolOptions {
@@ -63,16 +65,23 @@ export class AgentInterruptTool {
     this.#hooks = options.hooks;
   }
 
-  async handle(params: DynamicToolCallParams, callerAgentId: string): Promise<OpenBotToolResponse> {
-    const { agentId, reason } = interruptAgentToolSchema.parse(params.arguments);
+  readonly handle = Effect.fn("AgentInterruptTool.handle")(function* (
+    this: AgentInterruptTool,
+    params: DynamicToolCallParams,
+    callerAgentId: string,
+  ) {
+    const { agentId, reason } = yield* toolStep(() => interruptAgentToolSchema.parse(params.arguments));
     if (agentId === callerAgentId) return openBotToolFailure(sourceText("error.backend.interruptSelf"));
     if (!this.#hooks.listAgents().some((agent) => agent.id === agentId)) {
-      throw new Error(`Unknown OpenBot agent: ${agentId}`);
+      return yield* new ToolOperationFailed({ cause: new Error(`Unknown OpenBot agent: ${agentId}`) });
     }
 
     // A delivery on its way to a turn has no turn id yet. Wait for the drain that starts it, as
     // routine deletion does, so the turn it starts can be checked and stopped.
-    if (this.#mailbox.startingDeliveryForAgent(agentId)) await this.#drain.taskFor(agentId);
+    if (this.#mailbox.startingDeliveryForAgent(agentId)) {
+      const task = this.#drain.taskFor(agentId);
+      if (task) yield* task.pipe(toToolOperationFailed);
+    }
     if (this.#mailbox.startingDeliveryForAgent(agentId)) {
       return openBotToolFailure(sourceText("error.backend.interruptStarting"));
     }
@@ -98,18 +107,18 @@ export class AgentInterruptTool {
 
     // Before the interrupt: the interrupted turn schedules the next drain as it completes, and that
     // drain would start the next of these messages.
-    const cancelledMessages = this.#cancelQueuedFrom(agentId, callerAgentId);
+    const cancelledMessages = yield* toolStep(() => this.#cancelQueuedFrom(agentId, callerAgentId));
     if (!turnId) return openBotToolResult({ interruptedTurnId: null, cancelledMessages });
 
     // The turn can end, or the user can steer a message into it, while the stop is on its way. The
     // check then runs again on the deliveries the turn has at that moment. No stop, no notice.
     const mayStop = () => ownedBy(this.#mailbox.findDeliveriesByTurn(agentId, turnId), callerAgentId);
-    if (!(await this.#hooks.interrupt(agentId, turnId, mayStop))) {
+    if (!(yield* this.#hooks.interrupt(agentId, turnId, mayStop).pipe(toToolOperationFailed))) {
       return openBotToolResult({ interruptedTurnId: null, cancelledMessages });
     }
-    await this.#notify(params, callerAgentId, agentId, deliveries[0]?.delivery.messageId ?? null, reason);
+    yield* this.#notifyEffect(params, callerAgentId, agentId, deliveries[0]?.delivery.messageId ?? null, reason);
     return openBotToolResult({ interruptedTurnId: turnId, cancelledMessages });
-  }
+  }, Effect.uninterruptible);
 
   #activeTurnId(agentId: string): string | null {
     const snapshotTurnId = this.#conversation.workingSnapshot(agentId)?.activeTurnId;
@@ -151,13 +160,14 @@ export class AgentInterruptTool {
    * then records the stop, and a later turn does not pick the abandoned work up again. It queues
    * after work that others sent, as every message does.
    */
-  async #notify(
+  readonly #notifyEffect = Effect.fn("AgentInterruptTool.notify")(function* (
+    this: AgentInterruptTool,
     params: DynamicToolCallParams,
     callerAgentId: string,
     agentId: string,
     messageId: string | null,
     reason: string | undefined,
-  ): Promise<void> {
+  ) {
     const text = [
       messageId
         ? `I interrupted your turn for my message ${messageId}.`
@@ -167,17 +177,19 @@ export class AgentInterruptTool {
     ]
       .filter(Boolean)
       .join("\n");
-    await this.#mailbox.enqueue({
-      sender: { kind: "agent", agentId: callerAgentId },
-      recipientAgentIds: [agentId],
-      text,
-      replyToMessageId: null,
-      expectsReply: false,
-      idempotencyKey: `${params.threadId}:${params.turnId}:${params.callId}`,
-    });
+    yield* this.#mailbox
+      .enqueue({
+        sender: { kind: "agent", agentId: callerAgentId },
+        recipientAgentIds: [agentId],
+        text,
+        replyToMessageId: null,
+        expectsReply: false,
+        idempotencyKey: `${params.threadId}:${params.turnId}:${params.callId}`,
+      })
+      .pipe(toToolOperationFailed);
     this.#mailboxSync.emitQueue(agentId);
     this.#drain.scheduleDrain(agentId);
-  }
+  });
 }
 
 /** Every delivery the turn runs came from the caller, and it runs at least one. */

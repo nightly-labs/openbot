@@ -1,3 +1,5 @@
+import { Effect } from "effect";
+
 // @vitest-environment node
 
 import { mkdtemp, rm } from "node:fs/promises";
@@ -9,6 +11,7 @@ import { stores } from "./agent-service-test-harness";
 import { ChannelRoutineScheduler, channelRunStatusForTasks } from "./channel-routine-scheduler";
 import { ChannelRoutineStore } from "./channel-routine-store";
 import { ChannelService } from "./channel-service";
+import { runCauseEffect } from "./effect-boundary";
 import { OpenBotDatabase } from "./openbot-database";
 
 let root: string;
@@ -18,7 +21,7 @@ let scheduler: ChannelRoutineScheduler;
 let routine: ChannelRoutine;
 const actor = { id: "human-1", name: "Alex" };
 const errors: string[] = [];
-const generate = vi.fn(async () => JSON.stringify({ agentId: "agent-a" }));
+const generate = vi.fn(() => Effect.succeed(JSON.stringify({ agentId: "agent-a" })));
 let count = 0;
 const operationId = () => `command-${++count}`;
 /** Whether a spent plan holds the members, as the usage-limit gate reports it. */
@@ -31,18 +34,18 @@ beforeEach(async () => {
   limited = false;
   busy = false;
   generate.mockReset();
-  generate.mockImplementation(async () => JSON.stringify({ agentId: "agent-a" }));
+  generate.mockImplementation(() => Effect.succeed(JSON.stringify({ agentId: "agent-a" })));
   root = await mkdtemp(join(tmpdir(), "openbot-channel-routines-"));
   data = stores(root);
-  await data.store.initialize();
-  await data.mailbox.initialize();
-  await data.store.getOrCreate("agent-a");
-  await data.store.getOrCreate("agent-b");
+  await runCauseEffect(data.store.initialize());
+  await runCauseEffect(data.mailbox.initialize());
+  await runCauseEffect(data.store.getOrCreate("agent-a"));
+  await runCauseEffect(data.store.getOrCreate("agent-b"));
   service = new ChannelService(data.store.database, data.mailbox, {
     agents: () => data.store.list(),
     generate,
     schedule: () => undefined,
-    interrupt: async () => undefined,
+    interrupt: () => Effect.void,
     busy: () => busy,
     usageLimited: () => limited,
     skipAtLimit: (task) => scheduler.skipAtLimit(task.channelId, task.requestMessageId),
@@ -53,20 +56,22 @@ beforeEach(async () => {
     },
   });
   scheduler = newScheduler();
-  await service.command(
-    {
-      type: "save",
-      channelId: "channel-1",
-      operationId: operationId(),
-      draft: {
-        name: "Project",
-        title: "Release coordination",
-        instructions: "Ship the project",
-        members: data.store.list().map((agent) => ({ agentId: agent.id })),
-        leadAgentId: "agent-a",
+  await runCauseEffect(
+    service.command(
+      {
+        type: "save",
+        channelId: "channel-1",
+        operationId: operationId(),
+        draft: {
+          name: "Project",
+          title: "Release coordination",
+          instructions: "Ship the project",
+          members: data.store.list().map((agent) => ({ agentId: agent.id })),
+          leadAgentId: "agent-a",
+        },
       },
-    },
-    actor,
+      actor,
+    ),
   );
   routine = scheduler.create({
     channelId: "channel-1",
@@ -79,7 +84,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await service.stop();
+  await runCauseEffect(service.stop());
   data.store.database.close();
   await rm(root, { recursive: true, force: true });
 });
@@ -102,7 +107,7 @@ function currentRun(runId: string, from: ChannelRoutineScheduler = scheduler): C
 
 /** Fires the routine and waits for the request to reach a member. */
 async function fire(): Promise<ChannelRoutineRun> {
-  const run = await scheduler.test({ channelId: "channel-1", routineId: routine.id });
+  const run = await runCauseEffect(scheduler.test({ channelId: "channel-1", routineId: routine.id }));
   await vi.waitFor(() => expect(service.store.assignments("channel-1").some((item) => item.deliveryId)).toBe(true));
   return run;
 }
@@ -122,15 +127,15 @@ async function begin(taskId: string, turnId: string): Promise<void> {
       .at(-1),
   );
   const deliveryId = required(assignment.deliveryId);
-  await service.prepare(required(data.mailbox.getDelivery(deliveryId)));
-  await data.mailbox.markStarting(deliveryId);
-  await data.mailbox.markRunning(deliveryId, turnId);
-  service.accepted(deliveryId, `session-${taskId}`, turnId);
+  await runCauseEffect(service.prepare(required(data.mailbox.getDelivery(deliveryId))));
+  await runCauseEffect(data.mailbox.markStarting(deliveryId));
+  await runCauseEffect(data.mailbox.markRunning(deliveryId, turnId));
+  await runCauseEffect(service.accepted(deliveryId, `session-${taskId}`, turnId));
 }
 
 async function finish(turnId: string, status: "completed" | "failed"): Promise<void> {
   const assignment = required(service.store.assignments("channel-1").find((item) => item.turnId === turnId));
-  await data.mailbox.markTerminal(required(assignment.deliveryId), status);
+  await runCauseEffect(data.mailbox.markTerminal(required(assignment.deliveryId), status));
   const threadId = service.store.context("channel-1", assignment.agentId).threadId;
   service.event({ type: "turn-completed", agentId: assignment.agentId, threadId, turnId, status });
 }
@@ -188,32 +193,36 @@ describe("ChannelRoutineScheduler", () => {
   });
 
   it("stays open until every task of the fan-out is done", async () => {
-    await data.store.getOrCreate("agent-c");
-    await service.command(
-      {
-        type: "save",
-        channelId: "channel-1",
-        operationId: operationId(),
-        draft: {
-          name: "Project",
-          title: "Release coordination",
-          instructions: "Ship the project",
-          members: data.store.list().map((agent) => ({ agentId: agent.id })),
-          leadAgentId: "agent-a",
+    await runCauseEffect(data.store.getOrCreate("agent-c"));
+    await runCauseEffect(
+      service.command(
+        {
+          type: "save",
+          channelId: "channel-1",
+          operationId: operationId(),
+          draft: {
+            name: "Project",
+            title: "Release coordination",
+            instructions: "Ship the project",
+            members: data.store.list().map((agent) => ({ agentId: agent.id })),
+            leadAgentId: "agent-a",
+          },
         },
-      },
-      actor,
+        actor,
+      ),
     );
     const run = await fire();
     const rootTask = required(service.store.tasks("channel-1")[0]);
     await begin(rootTask.id, "turn-root");
-    await service.tool("channel-1", "agent-a", "turn-root", "child-1", "channel_assign", {
-      recipientAgentId: "agent-b",
-      task: "Collect the numbers",
-      expectedResult: "The numbers",
-      sourceMessageIds: [rootTask.requestMessageId],
-      resources: ["workspace:/work/b"],
-    });
+    await runCauseEffect(
+      service.tool("channel-1", "agent-a", "turn-root", "child-1", "channel_assign", {
+        recipientAgentId: "agent-b",
+        task: "Collect the numbers",
+        expectedResult: "The numbers",
+        sourceMessageIds: [rootTask.requestMessageId],
+        resources: ["workspace:/work/b"],
+      }),
+    );
     await finish("turn-root", "completed");
     // The root only waits on its child, so the run must not report success yet - and with nothing
     // picked up it reads as queued again, which is the honest state for the reader.
@@ -223,7 +232,9 @@ describe("ChannelRoutineScheduler", () => {
     expect(child.requestMessageId).toBe(run.requestMessageId);
     await begin(child.id, "turn-child");
     expect(currentRun(run.id).status).toBe("running");
-    await service.tool("channel-1", "agent-b", "turn-child", "result-1", "channel_result", { text: "The numbers" });
+    await runCauseEffect(
+      service.tool("channel-1", "agent-b", "turn-child", "result-1", "channel_result", { text: "The numbers" }),
+    );
     await finish("turn-child", "completed");
     expect(currentRun(run.id).status).not.toBe("succeeded");
     await begin(rootTask.id, "turn-root-2");
@@ -248,15 +259,17 @@ describe("ChannelRoutineScheduler", () => {
     await begin(rootTask.id, "turn-1");
     await finish("turn-1", "failed");
     expect(currentRun(run.id).status).toBe("failed");
-    await service.command(
-      {
-        type: "resume",
-        channelId: "channel-1",
-        operationId: operationId(),
-        taskId: rootTask.id,
-        recipientAgentId: null,
-      },
-      actor,
+    await runCauseEffect(
+      service.command(
+        {
+          type: "resume",
+          channelId: "channel-1",
+          operationId: operationId(),
+          taskId: rootTask.id,
+          recipientAgentId: null,
+        },
+        actor,
+      ),
     );
     // Continue restarts the task under the request the run already holds. A history that stopped
     // at the failure would report Failed for work the reader has since seen finish.
@@ -270,13 +283,13 @@ describe("ChannelRoutineScheduler", () => {
     const assignment = required(service.store.assignments("channel-1")[0]);
 
     // The hold gives the task back, and the routine drops it rather than run it late.
-    expect(service.requeueForLimit(required(assignment.deliveryId))).toBe(true);
+    expect(await runCauseEffect(service.requeueForLimit(required(assignment.deliveryId)))).toBe(true);
     expect(currentRun(run.id).status).toBe("cancelled");
     expect(service.store.tasks("channel-1")).toEqual([expect.objectContaining({ state: "cancelled" })]);
 
     // A run that arrives during the hold is dropped at once and sends no request.
     limited = true;
-    const late = await scheduler.test({ channelId: "channel-1", routineId: routine.id });
+    const late = await runCauseEffect(scheduler.test({ channelId: "channel-1", routineId: routine.id }));
     expect(late.status).toBe("cancelled");
     expect(service.store.tasks("channel-1")).toHaveLength(1);
   });
@@ -285,7 +298,7 @@ describe("ChannelRoutineScheduler", () => {
     routine = scheduler.update({ channelId: "channel-1", routineId: routine.id, limitPolicy: "skip" });
     // Its owner runs other work, so the task waits in the channel without an assignment.
     busy = true;
-    const run = await scheduler.test({ channelId: "channel-1", routineId: routine.id });
+    const run = await runCauseEffect(scheduler.test({ channelId: "channel-1", routineId: routine.id }));
     await vi.waitFor(() => expect(service.store.tasks("channel-1")[0]?.ownerAgentId).toBeTruthy());
     expect(service.store.assignments("channel-1")).toEqual([]);
     // A task the first one delegated shares its request.
@@ -295,7 +308,7 @@ describe("ChannelRoutineScheduler", () => {
     });
 
     limited = true;
-    service.wake("channel-1");
+    await runCauseEffect(service.wake("channel-1"));
     await vi.waitFor(() => expect(currentRun(run.id).status).toBe("cancelled"));
     expect(service.store.tasks("channel-1")).toEqual([
       expect.objectContaining({ id: parent.id, state: "cancelled" }),
@@ -305,29 +318,31 @@ describe("ChannelRoutineScheduler", () => {
   });
 
   it("waits for a human when the lead cannot route, then follows the resumed task", async () => {
-    generate.mockImplementation(async () => JSON.stringify({ question: "Which report do you mean?" }));
-    const run = await scheduler.test({ channelId: "channel-1", routineId: routine.id });
+    generate.mockImplementation(() => Effect.succeed(JSON.stringify({ question: "Which report do you mean?" })));
+    const run = await runCauseEffect(scheduler.test({ channelId: "channel-1", routineId: routine.id }));
     await vi.waitFor(() => expect(currentRun(run.id).status).toBe("needs-attention"));
     expect(currentRun(run.id).error).toBe("Which report do you mean?");
 
-    generate.mockImplementation(async () => JSON.stringify({ agentId: "agent-a" }));
+    generate.mockImplementation(() => Effect.succeed(JSON.stringify({ agentId: "agent-a" })));
     const paused = required(service.store.tasks("channel-1")[0]);
-    await service.command(
-      {
-        type: "resume",
-        channelId: "channel-1",
-        operationId: operationId(),
-        taskId: paused.id,
-        recipientAgentId: null,
-      },
-      actor,
+    await runCauseEffect(
+      service.command(
+        {
+          type: "resume",
+          channelId: "channel-1",
+          operationId: operationId(),
+          taskId: paused.id,
+          recipientAgentId: null,
+        },
+        actor,
+      ),
     );
     await vi.waitFor(() => expect(currentRun(run.id).status).toBe("running"));
     expect(currentRun(run.id).error).toBeNull();
   });
 
   it("keeps a run open while its request command is still in flight", async () => {
-    const pending = scheduler.test({ channelId: "channel-1", routineId: routine.id });
+    const pending = runCauseEffect(scheduler.test({ channelId: "channel-1", routineId: routine.id }));
     // The run row is written before its command commits, and other channel work publishes in that
     // window. The reconcile of that publish reads a request that no task holds yet, which is not
     // the same as a request that every task has dropped.
@@ -350,7 +365,7 @@ describe("ChannelRoutineScheduler", () => {
         .get(`channels:routine:${routine.id}:channel-routine-run:${run.id}`),
     ).toBeUndefined();
 
-    await scheduler.resumePendingRuns();
+    await runCauseEffect(scheduler.resumePendingRuns());
 
     await vi.waitFor(() =>
       expect(service.store.tasks("channel-1").some((task) => task.requestMessageId === "request-after-restart")).toBe(
@@ -363,24 +378,26 @@ describe("ChannelRoutineScheduler", () => {
         .get(`channels:routine:${routine.id}:channel-routine-run:${run.id}`),
     ).toMatchObject({ command_id: `channels:routine:${routine.id}:channel-routine-run:${run.id}` });
 
-    await scheduler.resumePendingRuns();
+    await runCauseEffect(scheduler.resumePendingRuns());
     expect(
       service.store.tasks("channel-1").filter((task) => task.requestMessageId === "request-after-restart"),
     ).toHaveLength(1);
   });
 
   it("keeps tracking a request the lead merged into another task", async () => {
-    const open = await service.command(
-      {
-        type: "send",
-        channelId: "channel-1",
-        operationId: operationId(),
-        text: "Prepare the report",
-        recipientAgentId: "agent-a",
-        replyToMessageId: null,
-        attachmentDraftIds: [],
-      },
-      actor,
+    const open = await runCauseEffect(
+      service.command(
+        {
+          type: "send",
+          channelId: "channel-1",
+          operationId: operationId(),
+          text: "Prepare the report",
+          recipientAgentId: "agent-a",
+          replyToMessageId: null,
+          attachmentDraftIds: [],
+        },
+        actor,
+      ),
     );
     expect(open.id).toBe("channel-1");
     await vi.waitFor(() => expect(service.store.tasks("channel-1")).toHaveLength(1));
@@ -388,8 +405,8 @@ describe("ChannelRoutineScheduler", () => {
     // The lead folds the routine's request into the task already in flight. That cancels the
     // routine's own root task and moves its request id onto a task with a different id, which is
     // why the run tracks the request message and not the root task.
-    generate.mockImplementation(async () => JSON.stringify({ taskId: existing.id }));
-    const run = await scheduler.test({ channelId: "channel-1", routineId: routine.id });
+    generate.mockImplementation(() => Effect.succeed(JSON.stringify({ taskId: existing.id })));
+    const run = await runCauseEffect(scheduler.test({ channelId: "channel-1", routineId: routine.id }));
     await vi.waitFor(() => {
       const merged = required(service.store.tasks("channel-1").find((item) => item.id === existing.id));
       expect(merged.requestMessageId).toBe(run.requestMessageId);
@@ -411,16 +428,16 @@ describe("ChannelRoutineScheduler", () => {
     data.store.database.connection
       .prepare("UPDATE projection_channel_routine_runs SET status = 'running' WHERE run_id = ?")
       .run(run.id);
-    await service.stop();
+    await runCauseEffect(service.stop());
     data.store.database.close();
 
     const reopened = new OpenBotDatabase(userDataPath);
-    await reopened.initialize();
+    await runCauseEffect(reopened.initialize());
     const restarted = new ChannelService(reopened, data.mailbox, {
       agents: () => [],
       generate,
       schedule: () => undefined,
-      interrupt: async () => undefined,
+      interrupt: () => Effect.void,
       busy: () => false,
       changed: () => undefined,
       error: () => undefined,
@@ -437,7 +454,7 @@ describe("ChannelRoutineScheduler", () => {
     cold.reconcileAll();
     expect(currentRun(run.id, cold).status).toBe("succeeded");
     expect(errors).toEqual([]);
-    await restarted.stop();
+    await runCauseEffect(restarted.stop());
     reopened.close();
     // The shared afterEach closes the original handle; reopening is enough for it to be a no-op.
     data.store.database.close();

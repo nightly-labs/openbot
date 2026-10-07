@@ -9,6 +9,7 @@ import { AgentReadTrackingProvider } from "./features/agents/agent-read-tracking
 import { AgentsProvider } from "./features/agents/agents-context";
 import { BrowserTabsProvider } from "./features/browser/browser-context";
 import { ChannelsProvider } from "./features/channels/channels-context";
+import { readStoredComposerDrafts } from "./features/conversation/composer-draft-storage";
 import { ConversationProvider } from "./features/conversation/conversation-context";
 import {
   createServerConversationState,
@@ -82,7 +83,11 @@ export interface AppProps {
  * where they already are, in the view.
  */
 export function AppProviders(props: ParentProps<AppProps>): JSX.Element {
-  const stableConversation = createStableConversationState({ onTypingChange: notifyTeamTyping });
+  const stableConversation = createStableConversationState(
+    { onTypingChange: notifyTeamTyping },
+    true,
+    readStoredComposerDrafts(),
+  );
   return (
     <PlatformProvider landingPreview={props.landingPreview} peopleEnabled={props.peopleEnabled}>
       <I18nProvider>

@@ -15,6 +15,7 @@ import {
   loadCuaDriverLock,
 } from "./cua-driver-lock";
 import { sha256 } from "./remote-desktop-runtime-release";
+import { isCurrentInstallation } from "./runtime-install";
 
 const logger = createOpenBotLogger("install-cua-driver");
 
@@ -36,7 +37,7 @@ export async function installCuaDriver(
   const lock = await loadCuaDriverLock(sourceRoot);
   const artifact = lock.artifacts[target];
 
-  if (await isCurrentInstallation(outputRoot, target, lock)) {
+  if (await isCurrentInstallation(() => verifyCuaDriverTree(outputRoot, target, lock))) {
     logger.info(`The ${target} cua-driver ${lock.version} build is current.`);
     return "current";
   }
@@ -122,15 +123,6 @@ async function stageValidatedFiles(
     await mkdir(dirname(destination), { recursive: true });
     await copyFile(source, destination);
     await chmod(destination, file.executable ? 0o755 : 0o644);
-  }
-}
-
-async function isCurrentInstallation(root: string, target: CuaDriverTarget, lock: CuaDriverLock): Promise<boolean> {
-  try {
-    await verifyCuaDriverTree(root, target, lock);
-    return true;
-  } catch {
-    return false;
   }
 }
 

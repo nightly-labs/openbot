@@ -105,6 +105,7 @@ import type {
   OpenAttachmentInput,
   OpenSharedFileInput,
   OpenWorkspaceFileInput,
+  WorkspaceDirectory,
 } from "./ipc-attachments";
 import type {
   BrowserBounds,
@@ -240,6 +241,7 @@ import type {
   Routine,
   RoutineCalendar,
   RoutineCalendarInput,
+  RoutineFeed,
   RoutineRun,
   TestRoutineInput,
   UpdateRoutineInput,
@@ -652,6 +654,12 @@ export const IPC_ENDPOINTS = {
   },
   // The account's Stripe subscription. The main process gets the Checkout or Portal URL from the
   // account server and opens it in the browser, so the renderer never sends a URL.
+  // The iCalendar feed of this computer's routines. `create` also replaces the URL of a feed that is on.
+  routineFeed: {
+    get: request<undefined, RoutineFeed>()("routine-feed:get"),
+    create: request<undefined, RoutineFeed>()("routine-feed:create"),
+    remove: request<undefined, RoutineFeed>()("routine-feed:remove"),
+  },
   billing: {
     getState: request<undefined, BillingState>()("billing:get-state"),
     openPortal: request<BillingPortalRequest, void>()("billing:open-portal"),
@@ -829,6 +837,9 @@ export const IPC_ENDPOINTS = {
     openWorkspaceFile: scopedRequest<OpenWorkspaceFileInput, void>()("agent:open-workspace-file"),
     previewSharedFile: scopedRequest<OpenSharedFileInput, FilePreview>()("agent:preview-shared-file"),
     previewWorkspaceFile: scopedRequest<OpenWorkspaceFileInput, FilePreview>()("agent:preview-workspace-file"),
+    listWorkspaceDirectory: scopedRequest<OpenWorkspaceFileInput, WorkspaceDirectory>()(
+      "agent:list-workspace-directory",
+    ),
   },
   // Not part of `agentAttachments`: the preload sends the paths of dropped and pasted files, and the
   // renderer must never name a path to import. So this group is never bridged to the renderer.
@@ -1002,6 +1013,63 @@ export const IPC_ENDPOINTS = {
 
 export type IpcEndpoints = typeof IPC_ENDPOINTS;
 
+/**
+ * Where each group sits on `window.openbot`. The empty path is the top level, and several groups can
+ * share one path: the agent groups are spread into `agent`. Null keeps a group off the page; only the
+ * preload calls it. A new group does not compile until it has a place here, so the author decides
+ * what the page can call. `OpenBotDesktopApi`, the built-preload verifier and the test harness all
+ * read this table; the preload and the preview mock are checked against it through the type.
+ */
+export const IPC_GROUP_PATHS = {
+  app: "",
+  maintenance: "maintenance",
+  providers: "",
+  providerRuntimes: "providerRuntimes",
+  voice: "voice",
+  dynamicIsland: "dynamicIsland",
+  computerUse: "computerUse",
+  skills: "skills",
+  customProviders: "customProviders",
+  providerDetection: "providerDetection",
+  customAgents: "customAgents",
+  providerAdmin: "providerAdmin",
+  messaging: "messaging",
+  hostAdmin: "hostAdmin",
+  githubConnector: "githubConnector",
+  onePasswordConnector: "onePasswordConnector",
+  hostedSites: "hostedSites",
+  routineFeed: "routineFeed",
+  billing: "billing",
+  hostedServers: "hostedServers",
+  marketplaceAgents: "marketplaceAgents",
+  agentTemplates: "agentTemplates",
+  auth: "auth",
+  update: "update",
+  notifications: "notifications",
+  agent: "agent",
+  agentMemories: "agent",
+  sharedTables: "agent",
+  agentRoutines: "agent",
+  channelMemories: "agent",
+  channelRoutines: "agent",
+  agentAttachments: "agent",
+  // The preload calls it from its own drop, paste, and file input handlers.
+  attachmentImports: null,
+  browser: "browser",
+  browserInput: "browser",
+  servers: "servers",
+  agentAdmin: "agent",
+  mcpServers: "agent",
+  storage: "storage",
+  agentImport: "agentImport",
+  plugins: "plugins",
+  host: "host",
+  remoteDesktop: "remoteDesktop",
+} as const satisfies { readonly [Group in keyof IpcEndpoints]: string | null };
+
+export type IpcGroupName = keyof IpcEndpoints;
+type IpcGroupPaths = typeof IPC_GROUP_PATHS;
+
 // What a typed endpoint looks like to the renderer. A payload that may be `undefined` is an optional
 // argument. A server-scoped payload loses its scope and takes the server last instead, because the
 // preload builds the scope; left out, it is the selected server. A scope that carries nothing takes
@@ -1049,6 +1117,30 @@ export type GroupApi<Group extends IpcEndpointGroup> = {
     ? Subscribe<Group[Key]>
     : Invoke<Group[Key]>;
 };
+
+type GroupsAt<Path extends string> = {
+  [Group in IpcGroupName]: IpcGroupPaths[Group] extends Path ? Group : never;
+}[IpcGroupName];
+
+type UnionToIntersection<Union> = (Union extends unknown ? (value: Union) => void : never) extends (
+  value: infer Intersection,
+) => void
+  ? Intersection
+  : never;
+
+// Distributes over a union of groups, one `GroupApi` each.
+type GroupApis<Group extends IpcGroupName> = Group extends IpcGroupName ? GroupApi<IpcEndpoints[Group]> : never;
+
+/** Every group at one path of `window.openbot`, as one surface: `PathApi<"agent">` is all nine agent groups. */
+export type PathApi<Path extends string> = UnionToIntersection<GroupApis<GroupsAt<Path>>>;
+
+type NestedPath = Exclude<IpcGroupPaths[IpcGroupName], "" | null>;
+
+/**
+ * `window.openbot` as `IPC_GROUP_PATHS` lays it out, with every method passed straight through.
+ * `OpenBotDesktopApi` is this, except for the few members the preload writes by hand.
+ */
+export type BridgedDesktopApi = PathApi<""> & { [Path in NestedPath]: PathApi<Path> };
 
 /** The runtime twin of `GroupApi`'s method names, for the preload bridge and the test harness. */
 export function groupApiMethodName(key: string, endpoint: IpcEndpoint): string {

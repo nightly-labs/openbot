@@ -18,8 +18,10 @@ import {
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
+import { Deferred, Effect, Exit, Result } from "effect";
 import { CuaDriverActionTap, type ObservedAction, type ObservedPointer } from "./cua-driver-action-tap";
 import { CUA_DRIVER_VENDOR_CALLS_OFF } from "./cua-driver-artifact";
+import { CuaDriverFailure, cuaIO, cuaSync, toCuaDriverFailure } from "./cua-driver-effects";
 import { LifecycleGate } from "./lifecycle-gate";
 import { forwardDiagnosticLines, stopRemoteProcess } from "./remote-diagnostics";
 
@@ -188,8 +190,10 @@ export interface CuaDriverEndpointInput {
  * be taken before the driver starts. It is kept in the profile so that it is random once rather than
  * once per launch: only a process that can already read this user's profile can read it back.
  */
-export async function resolveCuaDriverEndpoint(input: CuaDriverEndpointInput): Promise<CuaDriverEndpoint> {
-  if (input.platform === "win32") return { kind: "windows-pipe", name: await windowsPipeName(input.userDataPath) };
+export const resolveCuaDriverEndpoint = Effect.fn("CuaDriver.endpoint")(function* (
+  input: CuaDriverEndpointInput,
+): Effect.fn.Return<CuaDriverEndpoint, CuaDriverFailure> {
+  if (input.platform === "win32") return { kind: "windows-pipe", name: yield* windowsPipeName(input.userDataPath) };
   const runtimeDirectory = input.runtimeDirectory?.trim();
   const parent =
     input.platform === "linux" && runtimeDirectory && isAbsolute(runtimeDirectory)
@@ -197,22 +201,23 @@ export async function resolveCuaDriverEndpoint(input: CuaDriverEndpointInput): P
       : input.temporaryDirectory;
   const digest = createHash("sha256").update(input.userDataPath).digest("hex").slice(0, 12);
   return { kind: "unix-socket", directory: join(parent, `openbot-cua-${digest}`) };
-}
+});
 
 /** Only this shape is read back, so a truncated or edited file is replaced rather than served. */
 const WINDOWS_PIPE_NAME = /^\\\\\.\\pipe\\openbot-cua-[0-9a-f-]{36}$/;
 
-async function windowsPipeName(userDataPath: string): Promise<string> {
+const windowsPipeName = Effect.fn("CuaDriver.windowsPipeName")(function* (userDataPath: string) {
   const file = join(userDataPath, ...PIPE_NAME_FILE);
-  const stored = await readFile(file, "utf8")
-    .then((text) => text.trim())
-    .catch(() => "");
+  const stored = yield* cuaIO(() => readFile(file, "utf8")).pipe(
+    Effect.map((text) => text.trim()),
+    Effect.catch(() => Effect.succeed("")),
+  );
   if (WINDOWS_PIPE_NAME.test(stored)) return stored;
   const name = `\\\\.\\pipe\\openbot-cua-${randomUUID()}`;
-  await mkdir(dirname(file), { recursive: true, mode: 0o700 });
-  await writeFile(file, name, { mode: 0o600 });
+  yield* cuaIO(() => mkdir(dirname(file), { recursive: true, mode: 0o700 }));
+  yield* cuaIO(() => writeFile(file, name, { mode: 0o600 }));
   return name;
-}
+});
 
 export interface CuaDriverCommandAliasInput {
   platform: NodeJS.Platform;
@@ -249,7 +254,7 @@ export interface CuaDriverRuntimeOptions {
    * read the filesystem rather than the answer from startup: otherwise the only way to finish the
    * installation is to restart OpenBot.
    */
-  resolveExecutable?: () => Promise<string | null>;
+  resolveExecutable?: () => Effect.Effect<string | null, CuaDriverFailure>;
   /**
    * Where to link the executable, so the MCP command is the same at each launch.
    *
@@ -288,7 +293,7 @@ export class CuaDriverRuntime {
   /** What the proxies are told to run: the alias once it is linked, the executable otherwise. */
   #command: string | null = null;
   #child: ChildProcess | null = null;
-  readonly #lifecycle = new LifecycleGate<void>();
+  readonly #lifecycle = new LifecycleGate<void, CuaDriverFailure>();
   #state: ComputerUseState;
   /** Mutable, because a user may install the driver while OpenBot runs. */
   #executable: string | null;
@@ -423,68 +428,61 @@ export class CuaDriverRuntime {
    * agent that reaches for the tools, and `warmUp`, which keeps it only for a user who granted
    * them already.
    */
-  start(): Promise<void> {
-    // The gate starts only after a stop that is still running. Both own the socket path: a start
-    // that overtook a stop would have its own socket removed by it, and the daemon would then serve
-    // an address no client can reach, with nothing to say it had happened.
-    return this.#lifecycle.start(async () => {
-      if (this.running()) return;
-      await this.#start();
-      this.#announceMcpServer();
-    });
+  start(): Effect.Effect<void, CuaDriverFailure> {
+    return this.#lifecycle.start(() =>
+      Effect.gen({ self: this }, function* () {
+        if (this.running()) return;
+        yield* this.#start();
+        this.#announceMcpServer();
+      }),
+    );
   }
 
-  stop(): Promise<void> {
+  stop(): Effect.Effect<void, CuaDriverFailure> {
     return this.#lifecycle.stop(() => this.#stop());
   }
 
-  /** The panel's answer: starts the daemon if it is not running, then asks it what it may do. */
-  async state(): Promise<ComputerUseState> {
+  readonly state = Effect.fn("CuaDriver.state")(function* (
+    this: CuaDriverRuntime,
+  ): Effect.fn.Return<ComputerUseState, CuaDriverFailure> {
     if (!this.#options.supported) return this.#publish(this.#initialState());
-    // Read the filesystem again when there was nothing at startup, so that "Check again" finishes
-    // an installation the user has just made.
-    if (!this.#executable) this.#executable = (await this.#options.resolveExecutable?.()) ?? null;
+    if (!this.#executable) {
+      const resolve = this.#options.resolveExecutable;
+      this.#executable = resolve ? yield* resolve() : null;
+    }
     if (!this.#executable) return this.#publish(this.#initialState());
-
-    try {
-      await this.start();
-    } catch (error) {
+    const started = yield* Effect.result(this.start());
+    if (Result.isFailure(started))
       return this.#publish({
         status: "error",
         permissions: ungranted(this.#options.platform),
-        message: sourceText("status.computerUse.driverNotStarted", { reason: describe(error) }),
+        message: sourceText("status.computerUse.driverNotStarted", { reason: describe(started.failure.cause) }),
       });
-    }
-
     const config = this.mcpServerConfig();
-    if (!config) {
+    if (!config)
       return this.#publish({
         status: "error",
         permissions: ungranted(this.#options.platform),
         message: sourceText("status.computerUse.driverStoppedBeforeAnswer"),
       });
-    }
-
-    try {
-      const required = requiredPermissions(this.#options.platform);
-      const permissions = await (this.#options.readPermissions ?? readPermissionsOverMcp)(
-        config,
-        this.#options.platform,
-      );
-      const granted = required.every((id) => permissions.some((p) => p.id === id && p.granted));
-      return this.#publish({
-        status: granted ? "ready" : "permissions-required",
-        permissions,
-        message: null,
-      });
-    } catch (error) {
+    const injected = this.#options.readPermissions;
+    const result = yield* Effect.result(
+      injected
+        ? cuaIO(() => injected(config, this.#options.platform))
+        : readPermissionsOverMcpEffect(config, this.#options.platform),
+    );
+    if (Result.isFailure(result))
       return this.#publish({
         status: "error",
         permissions: ungranted(this.#options.platform),
-        message: sourceText("status.computerUse.driverNoAnswer", { reason: describe(error) }),
+        message: sourceText("status.computerUse.driverNoAnswer", { reason: describe(result.failure.cause) }),
       });
-    }
-  }
+    const permissions = result.success;
+    const granted = requiredPermissions(this.#options.platform).every((id) =>
+      permissions.some((p) => p.id === id && p.granted),
+    );
+    return this.#publish({ status: granted ? "ready" : "permissions-required", permissions, message: null });
+  }).bind(this);
 
   /**
    * Starts the daemon at startup for a user who granted the permissions already, and stops it again
@@ -496,80 +494,84 @@ export class CuaDriverRuntime {
    * opens a window — without them at all. Asking the driver what it may do raises no prompt, so a
    * user who never granted anything sees nothing and keeps no process.
    */
-  async warmUp(): Promise<void> {
+  readonly warmUp = Effect.fn("CuaDriver.warmUp")(function* (this: CuaDriverRuntime) {
     if (!this.#options.supported) return;
     this.#quiet = true;
-    try {
-      const state = await this.state();
-      if (state.status !== "ready") await this.stop().catch(() => undefined);
-    } finally {
-      this.#quiet = false;
-    }
-  }
+    yield* Effect.gen({ self: this }, function* () {
+      const state = yield* this.state();
+      if (state.status !== "ready") yield* this.stop().pipe(Effect.catch(() => Effect.void));
+    }).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          this.#quiet = false;
+        }),
+      ),
+    );
+  }).bind(this);
 
-  async #stop(): Promise<void> {
+  #stop = Effect.fn("CuaDriver.stop")(function* (this: CuaDriverRuntime): Effect.fn.Return<void, CuaDriverFailure> {
     const child = this.#child;
     this.#child = null;
-    await this.#tap.close();
-    if (child) await stopRemoteProcess(child);
-    await this.#removeSocket();
+    yield* this.#tap.close();
+    if (child) yield* stopRemoteProcess(child).pipe(toCuaDriverFailure);
+    yield* this.#removeSocket();
     // No announcement: a stop this process asked for is the teardown, and telling the providers
     // there would deactivate the very sessions the next run resumes.
     this.#announcedMcpServer = "";
-  }
+  });
 
-  async #start(): Promise<void> {
+  #start = Effect.fn("CuaDriver.start")(function* (this: CuaDriverRuntime): Effect.fn.Return<void, CuaDriverFailure> {
     const executable = this.#executable;
-    if (!executable) throw new Error(sourceText("error.computerUse.noDriver"));
+    if (!executable) return yield* new CuaDriverFailure({ cause: new Error(sourceText("error.computerUse.noDriver")) });
 
     const socketPath = this.socketPath();
     const endpoint = this.#options.endpoint;
     if (endpoint.kind === "unix-socket") {
       const limit = MAX_SOCKET_PATH_LENGTH[this.#options.platform];
       if (limit !== undefined && socketPath.length > limit) {
-        throw new Error(sourceText("error.computerUse.socketPathTooLong", { length: socketPath.length, limit }));
+        return yield* new CuaDriverFailure({
+          cause: new Error(sourceText("error.computerUse.socketPathTooLong", { length: socketPath.length, limit })),
+        });
       }
 
       // `0o700`, because the socket inside is a control channel to a process that can drive the
       // whole desktop. The per-user runtime directory is already private; this keeps it private if
       // the caller ever names somewhere else. The mode applies only to a directory this call
       // creates, which is why what is already there is inspected below rather than trusted.
-      await mkdir(endpoint.directory, { recursive: true, mode: 0o700 });
-      await assertPrivateDirectory(endpoint.directory);
+      yield* cuaIO(() => mkdir(endpoint.directory, { recursive: true, mode: 0o700 }));
+      yield* assertPrivateDirectoryEffect(endpoint.directory);
     }
-    await this.#stopOrphanedDaemon(socketPath);
-    await this.#removeSocket();
-    this.#command = await this.#linkCommandAlias(executable);
+    yield* this.#stopOrphanedDaemon(socketPath);
+    yield* this.#removeSocket();
+    this.#command = yield* this.#linkCommandAlias(executable);
     // OpenBot owns the cursor on every display, including displays connected after startup.
-    const child = this.#spawn(executable, ["serve", "--socket", socketPath, "--no-overlay"], {
-      cwd: dirname(executable),
-      env: {
-        ...process.env,
-        [EMBEDDED_ENV]: "1",
-        [PARENT_LIVENESS_ENV]: "1",
-        ...CUA_DRIVER_VENDOR_CALLS_OFF,
-        [HOST_BUNDLE_ID_ENV]: this.#options.hostBundleId,
-        ...waylandEnvironment(this.#options.platform),
-      },
-      // Nothing is written to standard input. It stays open only so that it closes when OpenBot ends.
-      stdio: ["pipe", "pipe", "pipe"],
-      windowsHide: true,
-    });
+    const child = yield* cuaSync(() =>
+      this.#spawn(executable, ["serve", "--socket", socketPath, "--no-overlay"], {
+        cwd: dirname(executable),
+        env: {
+          ...process.env,
+          [EMBEDDED_ENV]: "1",
+          [PARENT_LIVENESS_ENV]: "1",
+          ...CUA_DRIVER_VENDOR_CALLS_OFF,
+          [HOST_BUNDLE_ID_ENV]: this.#options.hostBundleId,
+          ...waylandEnvironment(this.#options.platform),
+        },
+        // Nothing is written to standard input. It stays open only so that it closes when OpenBot ends.
+        stdio: ["pipe", "pipe", "pipe"],
+        windowsHide: true,
+      }),
+    );
     this.#child = child;
     this.#pipeDiagnostics(child);
     // `spawn` reports a missing or unreadable executable through this event, after it returns. An
     // unhandled `error` event on a child process throws in the main process, and Computer Use is
     // an optional function, so it is caught here and reported as a state instead.
-    const spawnFailure = new Promise<never>((_resolve, reject) => {
-      child.once("error", (error: Error) => {
-        if (this.#child === child) this.#child = null;
-        this.#options.onDiagnostic?.(`OpenBot: the Computer Use driver could not start. ${error.message}\n`);
-        reject(error);
-      });
+    const spawnFailure = Deferred.makeUnsafe<never, CuaDriverFailure>();
+    child.once("error", (error: Error) => {
+      if (this.#child === child) this.#child = null;
+      this.#options.onDiagnostic?.(`OpenBot: the Computer Use driver could not start. ${error.message}\n`);
+      Deferred.doneUnsafe(spawnFailure, Exit.fail(new CuaDriverFailure({ cause: error })));
     });
-    // The race below drops the loser, and the child may still report an error after the daemon is
-    // up. This keeps that late rejection handled rather than an unhandled one.
-    spawnFailure.catch(() => undefined);
     child.once("exit", (code) => {
       if (this.#child !== child) return;
       this.#child = null;
@@ -582,15 +584,15 @@ export class CuaDriverRuntime {
       });
     });
 
-    try {
-      await Promise.race([(this.#options.waitForSocket ?? waitForSocket)(socketPath), spawnFailure]);
-    } catch (error) {
-      // `#stop`, not `stop`: this runs inside the start that `stop()` waits for.
-      await this.#stop();
-      throw error;
+    const ready = yield* Effect.result(
+      Effect.raceFirst(waitForDriverSocket(this.#options.waitForSocket, socketPath), Deferred.await(spawnFailure)),
+    );
+    if (Result.isFailure(ready)) {
+      yield* this.#stop();
+      return yield* ready.failure;
     }
-    await this.#startTap(socketPath);
-  }
+    yield* this.#startTap(socketPath);
+  });
 
   /**
    * The address the agents are handed, once the daemon answers on its own.
@@ -599,21 +601,24 @@ export class CuaDriverRuntime {
    * worth less than the tools. The address is only ever inside the private state directory, which
    * the daemon's own socket already proved is private.
    */
-  async #startTap(socketPath: string): Promise<void> {
+  #startTap = Effect.fn("CuaDriver.startTap")(function* (
+    this: CuaDriverRuntime,
+    socketPath: string,
+  ): Effect.fn.Return<void, CuaDriverFailure> {
     const endpoint = this.#options.endpoint;
     const address =
       endpoint.kind === "windows-pipe" ? `${endpoint.name}-tap` : join(endpoint.directory, TAP_SOCKET_FILE);
     // A daemon that stops on its own leaves the tap listening, and `listen` returns at once while it
     // does. Without this, the restart would unlink the address below and then hand the providers a
     // path nothing answers on, with no way back except restarting OpenBot.
-    await this.#tap.close();
-    if (endpoint.kind === "unix-socket") await rm(address, { force: true }).catch(() => undefined);
-    try {
-      await this.#tap.listen({ upstream: socketPath, tap: address });
-    } catch (error) {
-      this.#options.onDiagnostic?.(`OpenBot: the Computer Use tap could not listen. ${describe(error)}\n`);
-    }
-  }
+    yield* this.#tap.close();
+    if (endpoint.kind === "unix-socket") yield* cuaIO(() => rm(address, { force: true }).catch(() => undefined));
+    const listening = yield* Effect.result(this.#tap.listen({ upstream: socketPath, tap: address }));
+    if (Result.isFailure(listening))
+      this.#options.onDiagnostic?.(
+        `OpenBot: the Computer Use tap could not listen. ${describe(listening.failure.cause)}\n`,
+      );
+  });
 
   /**
    * Stops a daemon that a previous run left on this profile's endpoint.
@@ -623,23 +628,28 @@ export class CuaDriverRuntime {
    * belongs to this profile, and the single-instance lock keeps a second OpenBot off the profile, so
    * a daemon that answers here serves no other run.
    */
-  async #stopOrphanedDaemon(socketPath: string): Promise<void> {
-    if (!(await accepts(socketPath, `${JSON.stringify({ method: "shutdown" })}\n`))) return;
+  #stopOrphanedDaemon = Effect.fn("CuaDriver.stopOrphanedDaemon")(function* (
+    this: CuaDriverRuntime,
+    socketPath: string,
+  ): Effect.fn.Return<void, CuaDriverFailure> {
+    if (!(yield* acceptsEffect(socketPath, `${JSON.stringify({ method: "shutdown" })}\n`))) return;
     this.#options.onDiagnostic?.("OpenBot: stopping a Computer Use driver that a previous run left running.\n");
     const deadline = Date.now() + ORPHAN_STOP_TIMEOUT_MS;
     while (Date.now() < deadline) {
-      await new Promise((resolve) => setTimeout(resolve, READY_POLL_MS / 4));
-      if (!(await accepts(socketPath))) return;
+      yield* Effect.sleep(READY_POLL_MS / 4);
+      if (!(yield* acceptsEffect(socketPath))) return;
     }
     this.#options.onDiagnostic?.("OpenBot: the Computer Use driver left by a previous run did not stop.\n");
-  }
+  });
 
-  async #removeSocket(): Promise<void> {
+  #removeSocket = Effect.fn("CuaDriver.removeSocket")(function* (
+    this: CuaDriverRuntime,
+  ): Effect.fn.Return<void, CuaDriverFailure> {
     // A socket file left by a previous run refuses the bind, so it goes before the daemon starts.
     // A Windows pipe has no file: it is released when the process that owns it exits.
     if (this.#options.endpoint.kind !== "unix-socket") return;
-    await rm(this.socketPath(), { force: true }).catch(() => undefined);
-  }
+    yield* cuaIO(() => rm(this.socketPath(), { force: true }).catch(() => undefined));
+  });
 
   #pipeDiagnostics(child: ChildProcess): void {
     for (const stream of [child.stdout, child.stderr]) {
@@ -653,21 +663,27 @@ export class CuaDriverRuntime {
    * A link that cannot be made is not fatal: a driver reachable by its real path is better than no
    * Computer Use at all, and the cost is the replacement session this alias exists to avoid.
    */
-  async #linkCommandAlias(executable: string): Promise<string> {
+  #linkCommandAlias = Effect.fn("CuaDriver.linkCommandAlias")(function* (
+    this: CuaDriverRuntime,
+    executable: string,
+  ): Effect.fn.Return<string, CuaDriverFailure> {
     const alias = this.#options.commandAlias;
     if (!alias) return executable;
-    try {
-      await mkdir(dirname(alias), { recursive: true, mode: 0o700 });
-      await rm(alias, { force: true });
-      await symlink(executable, alias);
-      return alias;
-    } catch (error) {
+    const linked = yield* Effect.result(
+      Effect.gen(function* () {
+        yield* cuaIO(() => mkdir(dirname(alias), { recursive: true, mode: 0o700 }));
+        yield* cuaIO(() => rm(alias, { force: true }));
+        yield* cuaIO(() => symlink(executable, alias));
+      }),
+    );
+    if (Result.isFailure(linked)) {
       this.#options.onDiagnostic?.(
-        `OpenBot: the Computer Use driver link could not be written. ${error instanceof Error ? error.message : String(error)}\n`,
+        `OpenBot: the Computer Use driver link could not be written. ${describe(linked.failure.cause)}\n`,
       );
       return executable;
     }
-  }
+    return alias;
+  });
 
   #announceMcpServer(): void {
     const config = this.mcpServerForProviders();
@@ -770,20 +786,26 @@ function waylandEnvironment(platform: NodeJS.Platform): NodeJS.ProcessEnv {
  *
  * Windows reaches none of this: a named pipe has a security descriptor rather than a directory.
  */
-async function assertPrivateDirectory(directory: string): Promise<void> {
-  const stats = await lstat(directory);
+const assertPrivateDirectoryEffect = Effect.fn("CuaDriver.privateDirectory")(function* (directory: string) {
+  const stats = yield* cuaIO(() => lstat(directory));
   if (!stats.isDirectory()) {
-    throw new Error(sourceText("error.computerUse.socketDirectoryNotDirectory", { path: directory }));
+    return yield* new CuaDriverFailure({
+      cause: new Error(sourceText("error.computerUse.socketDirectoryNotDirectory", { path: directory })),
+    });
   }
   // `getuid` is absent on Windows, which never calls this.
   const uid = process.getuid?.();
   if (uid !== undefined && stats.uid !== uid) {
-    throw new Error(sourceText("error.computerUse.socketDirectoryOtherOwner", { path: directory }));
+    return yield* new CuaDriverFailure({
+      cause: new Error(sourceText("error.computerUse.socketDirectoryOtherOwner", { path: directory })),
+    });
   }
   if ((stats.mode & 0o077) !== 0) {
-    throw new Error(sourceText("error.computerUse.socketDirectoryShared", { path: directory }));
+    return yield* new CuaDriverFailure({
+      cause: new Error(sourceText("error.computerUse.socketDirectoryShared", { path: directory })),
+    });
   }
-}
+});
 
 /**
  * Whether something accepts on `path`. `message` is sent to it, and then the connection closes.
@@ -791,27 +813,24 @@ async function assertPrivateDirectory(directory: string): Promise<void> {
  * A connect that does not finish in time counts as refused, so a daemon that hangs cannot hold the
  * start past the deadline of its caller.
  */
-function accepts(path: string, message = ""): Promise<boolean> {
-  return new Promise((resolve) => {
+const acceptsEffect = Effect.fn("CuaDriver.accepts")((path: string, message = "") =>
+  Effect.callback<boolean>((resume) => {
     const socket = connect(path);
-    const timer = setTimeout(() => {
-      socket.destroy();
-      resolve(false);
-    }, READY_POLL_MS);
     socket.once("connect", () => {
-      clearTimeout(timer);
-      resolve(true);
-      // The reply is not read. The message is in the daemon's buffer once it is written.
-      socket.end(message, () => socket.destroy());
+      socket.end(message, () => {
+        socket.destroy();
+        resume(Effect.succeed(true));
+      });
     });
-    // An error after the connection is up also ends up here, and changes nothing.
     socket.on("error", () => {
-      clearTimeout(timer);
       socket.destroy();
-      resolve(false);
+      resume(Effect.succeed(false));
     });
-  });
-}
+    return Effect.sync(() => {
+      socket.destroy();
+    });
+  }).pipe(Effect.timeoutOrElse({ duration: READY_POLL_MS, orElse: () => Effect.succeed(false) })),
+);
 
 /**
  * Waits until the daemon accepts on its socket.
@@ -819,29 +838,38 @@ function accepts(path: string, message = ""): Promise<boolean> {
  * The file appearing is not enough: the driver creates it and then binds, so a client that connects
  * between the two is refused. Connecting is the only condition that means "ready".
  */
-async function waitForSocket(path: string): Promise<void> {
+const waitForSocketEffect = Effect.fn("CuaDriver.waitForSocket")(function* (path: string) {
   const deadline = Date.now() + READY_TIMEOUT_MS;
   let lastError: unknown;
   while (Date.now() < deadline) {
-    try {
-      await new Promise<void>((resolve, reject) => {
+    const result = yield* Effect.result(
+      Effect.callback<void, CuaDriverFailure>((resume) => {
         const socket = connect(path);
         socket.once("connect", () => {
           socket.end();
-          resolve();
+          resume(Effect.void);
         });
-        socket.once("error", reject);
-      });
-      return;
-    } catch (error) {
-      lastError = error;
-      await new Promise((resolve) => setTimeout(resolve, READY_POLL_MS));
-    }
+        socket.on("error", (cause) => resume(Effect.fail(new CuaDriverFailure({ cause }))));
+        return Effect.sync(() => {
+          socket.destroy();
+        });
+      }).pipe(
+        Effect.timeoutOrElse({
+          duration: Math.max(1, deadline - Date.now()),
+          orElse: () => Effect.fail(new CuaDriverFailure({ cause: new Error("Socket connection timed out") })),
+        }),
+      ),
+    );
+    if (Result.isSuccess(result)) return;
+    lastError = result.failure.cause;
+    yield* Effect.sleep(READY_POLL_MS);
   }
-  throw new Error(
-    sourceText("error.computerUse.socketNotReady", { seconds: READY_TIMEOUT_MS / 1000, reason: describe(lastError) }),
-  );
-}
+  return yield* new CuaDriverFailure({
+    cause: new Error(
+      sourceText("error.computerUse.socketNotReady", { seconds: READY_TIMEOUT_MS / 1000, reason: describe(lastError) }),
+    ),
+  });
+});
 
 /**
  * Asks the driver what it may do, over one short-lived MCP connection.
@@ -850,42 +878,50 @@ async function waitForSocket(path: string): Promise<void> {
  * the tool list is the probe: it proves the same connection without assuming a tool that a
  * non-macOS build may not publish.
  */
-async function readPermissionsOverMcp(
-  config: McpServerConfig,
-  platform: NodeJS.Platform,
-): Promise<readonly ComputerUsePermission[]> {
-  const client = new Client({ name: "openbot-computer-use", version: "1" }, { capabilities: {} });
-  const transport = new StdioClientTransport({
-    command: config.command,
-    args: config.args,
-    env: {
-      ...getDefaultEnvironment(),
-      [EMBEDDED_ENV]: "1",
-      ...CUA_DRIVER_VENDOR_CALLS_OFF,
-    },
-    stderr: "ignore",
-  });
-  const timer = new AbortController();
-  const deadline = setTimeout(() => timer.abort(), PERMISSION_TIMEOUT_MS);
-  try {
-    // The handshake is inside the deadline, not before it. A proxy that starts and then never
-    // answers `initialize` would otherwise wait for nothing, and the warm-up holds the agents back
-    // until this returns, so a driver that never speaks would keep every agent down.
-    await client.connect(transport, { signal: timer.signal });
-    if (requiredPermissions(platform).length === 0) {
-      await client.listTools(undefined, { signal: timer.signal });
-      return [];
-    }
-    const result = await client.callTool({ name: "check_permissions", arguments: {} }, undefined, {
-      signal: timer.signal,
-    });
-    return readPermissionResult(result, platform);
-  } finally {
-    clearTimeout(deadline);
-    await client.close().catch(() => undefined);
-    await transport.close().catch(() => undefined);
-  }
-}
+const readPermissionsOverMcpEffect = Effect.fn("CuaDriver.permissions")(
+  (config: McpServerConfig, platform: NodeJS.Platform) =>
+    Effect.acquireUseRelease(
+      cuaSync(() => ({
+        client: new Client({ name: "openbot-computer-use", version: "1" }, { capabilities: {} }),
+        transport: new StdioClientTransport({
+          command: config.command,
+          args: config.args,
+          env: { ...getDefaultEnvironment(), [EMBEDDED_ENV]: "1", ...CUA_DRIVER_VENDOR_CALLS_OFF },
+          stderr: "ignore",
+        }),
+        timer: new AbortController(),
+      })),
+      ({ client, transport, timer }) =>
+        Effect.gen(function* () {
+          yield* cuaIO((signal) => client.connect(transport, { signal: AbortSignal.any([signal, timer.signal]) }));
+          if (requiredPermissions(platform).length === 0) {
+            yield* cuaIO((signal) => client.listTools(undefined, { signal: AbortSignal.any([signal, timer.signal]) }));
+            return [];
+          }
+          const result = yield* cuaIO((signal) =>
+            client.callTool({ name: "check_permissions", arguments: {} }, undefined, {
+              signal: AbortSignal.any([signal, timer.signal]),
+            }),
+          );
+          return readPermissionResult(result, platform);
+        }).pipe(
+          Effect.timeoutOrElse({
+            duration: PERMISSION_TIMEOUT_MS,
+            orElse: () =>
+              cuaSync(() => {
+                timer.abort();
+                throw timer.signal.reason;
+              }),
+          }),
+        ),
+      ({ client, transport, timer }) =>
+        Effect.gen(function* () {
+          timer.abort();
+          yield* cuaIO(() => client.close()).pipe(Effect.catch(() => Effect.void));
+          yield* cuaIO(() => transport.close()).pipe(Effect.catch(() => Effect.void));
+        }),
+    ),
+);
 
 /**
  * The grants inside a `check_permissions` answer.
@@ -912,4 +948,11 @@ function grantedIn(source: DynamicRecord, id: MacPermissionId): boolean {
     if (isDynamicRecord(value) && typeof value.granted === "boolean") return value.granted;
   }
   return false;
+}
+
+function waitForDriverSocket(
+  injected: CuaDriverRuntimeOptions["waitForSocket"],
+  path: string,
+): Effect.Effect<void, CuaDriverFailure> {
+  return injected ? cuaIO(() => injected(path)) : waitForSocketEffect(path);
 }

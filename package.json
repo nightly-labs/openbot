@@ -68,7 +68,8 @@
       "solid-sonner": "0.3.2",
       "solid-recharts": "1.0.1",
       "qrcode": "^1.5.4",
-      "@tanstack/virtual-core": "3.17.8"
+      "@tanstack/virtual-core": "3.17.8",
+      "effect": "4.0.0"
     }
   },
   "main": "./out/main/index.js",
@@ -78,7 +79,7 @@
   },
   "scripts": {
     "prepare": "bun scripts/install-git-hooks.ts",
-    "postinstall": "install-electron && bun run --cwd apps/mobile setup:skia",
+    "postinstall": "install-electron && bun scripts/setup-mobile-skia.ts && bun scripts/stamp-install.ts",
     "api:start": "bun run --cwd apps/auth-api start",
     "api:build": "bun run --cwd apps/auth-api build",
     "api:images": "bun run --cwd apps/auth-api images",
@@ -114,6 +115,8 @@
     "mobile:go": "bun run --cwd apps/mobile start:go",
     "mobile:go:tunnel": "bun run --cwd apps/mobile start:go:tunnel",
     "mobile:android": "bun run --cwd apps/mobile android",
+    "mobile:android:build:local": "bun run --cwd apps/mobile android:build:local",
+    "mobile:android:release:play": "bun run --cwd apps/mobile android:release:play",
     "mobile:ios": "bun run --cwd apps/mobile ios",
     "mobile:ios:rocketsim": "bun run --cwd apps/mobile ios:rocketsim",
     "mobile:ios:build:local": "bun run --cwd apps/mobile ios:build:local",
@@ -121,6 +124,7 @@
     "mobile:release:patch": "bun scripts/prepare-release.ts patch --mobile",
     "mobile:release:minor": "bun scripts/prepare-release.ts minor --mobile",
     "mobile:release:major": "bun scripts/prepare-release.ts major --mobile",
+    "mobile:release:published": "bun scripts/publish-mobile-release.ts",
     "mobile:lint": "bun run --cwd apps/mobile lint",
     "mobile:typecheck": "bun run typecheck:mobile",
     "mobile:doctor": "bun run --cwd apps/mobile doctor",
@@ -170,13 +174,14 @@
     "typecheck": "bun run --parallel 'typecheck:*'",
     "lint": "biome check --max-diagnostics=none .",
     "i18n:check": "bun scripts/i18n-check.ts",
-    "lint:ratchet": "bun scripts/lint-ratchet.ts",
     "types:ratchet": "bun scripts/type-ratchet.ts",
     "format": "biome check --write --max-diagnostics=none .",
     "knip:check": "knip",
     "check:staged": "biome check --write --staged --files-ignore-unknown=true --no-errors-on-unmatched",
     "test": "bun run test:desktop && bun run test:api && bun run test:sites && bun run test:remote",
     "test:desktop": "vitest run",
+    "test:changed": "git merge-base origin/main HEAD > /dev/null && vitest run --changed origin/main --maxWorkers=1",
+    "test:related": "vitest related --run --maxWorkers=1",
     "test:durations": "bun scripts/test-durations.ts",
     "test:api": "bun run --cwd apps/auth-api test",
     "test:contracts": "bun run --cwd packages/contracts test",
@@ -219,6 +224,7 @@
     "api:build:check": "CLOUDFLARE_ENV=preview bun run api:build",
     "check:ui": "bun scripts/ui-foundation-check.ts",
     "check:assets": "bun scripts/check-image-assets.ts",
+    "check:doc-links": "bun scripts/check-doc-links.ts",
     "verify:preload": "bun scripts/verify-preload-bundle.ts",
     "package": "bun run voice:prepare-runtime && bun run prepare:remote-desktop-runtime && bun run verify:remote-desktop-runtime && bun run prepare:cua-driver && bun run build && electron-builder --dir --mac --config.mac.identity=null --config.mac.notarize=false",
     "verify:package": "bun scripts/verify-macos-package.ts",
@@ -275,7 +281,8 @@
     "ws": "8.21.3",
     "yaml": "catalog:",
     "zod": "catalog:",
-    "@openbot/ui": "workspace:*"
+    "@openbot/ui": "workspace:*",
+    "effect": "catalog:"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.9",
@@ -312,7 +319,8 @@
     "react-native-keyboard-controller@1.21.9": "patches/react-native-keyboard-controller@1.21.9.patch",
     "solid-recharts@1.0.1": "patches/solid-recharts@1.0.1.patch",
     "@solidjs/signals@2.0.0-rc.0": "patches/@solidjs%2Fsignals@2.0.0-rc.0.patch",
-    "@solidjs/web@2.0.0-rc.0": "patches/@solidjs%2Fweb@2.0.0-rc.0.patch"
+    "@solidjs/web@2.0.0-rc.0": "patches/@solidjs%2Fweb@2.0.0-rc.0.patch",
+    "expo@57.0.24": "patches/expo@57.0.24.patch"
   },
   "trustedDependencies": [
     "electron-winstaller",

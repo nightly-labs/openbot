@@ -3,6 +3,9 @@
 // than a curve per keyframe. The card turns in 3D to its back face; the moment it is edge-on is hidden
 // by a small blur, from how fast it turns, and a small scale dip.
 
+import { springProgress } from "@openbot/ui/spring-motion";
+import { clamp } from "@openbot/ui/utils";
+
 export type IdleGreetingMotionName = "wave" | "smile" | "cheer" | "sparkles";
 
 interface IdleGreetingParts {
@@ -229,16 +232,6 @@ function edgeScale(theta: number): number {
 
 /** A damped spring from 0 to 1, for a time in milliseconds; 0 before it starts. */
 function spring(dampingRatio: number, responseSeconds: number): (t: number) => number {
-  const omega = (2 * Math.PI) / responseSeconds;
-  const damped = omega * Math.sqrt(1 - dampingRatio * dampingRatio);
-  return (t) => {
-    if (t <= 0) return 0;
-    const seconds = t / 1000;
-    const decay = Math.exp(-dampingRatio * omega * seconds);
-    return 1 - decay * (Math.cos(damped * seconds) + ((dampingRatio * omega) / damped) * Math.sin(damped * seconds));
-  };
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
+  const settings = { response: responseSeconds, dampingFraction: dampingRatio };
+  return (t) => (t <= 0 ? 0 : springProgress(t / 1000, settings));
 }

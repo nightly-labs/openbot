@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { expoGoDomOptions } from "@/shared/lib/expo-go-dom";
 import { receiveMermaidResult, useMermaidJobs } from "../model/mermaid-diagrams";
 import MermaidRenderer from "./mermaid-renderer.dom";
 
@@ -16,6 +17,7 @@ export function MermaidRendererHost() {
       jobs={jobs}
       onResult={async (result) => receiveMermaidResult(result)}
       dom={{
+        ...expoGoDomOptions,
         containerStyle: { flex: 0, height: 1, left: 0, opacity: 0, position: "absolute", top: 0, width: 1 },
         pointerEvents: "none",
         scrollEnabled: false,

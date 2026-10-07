@@ -23,12 +23,12 @@ type ComparisonSection<Side extends string = ComparisonSide> = {
   better?: Side;
 } & Record<Side, string>;
 
-interface ComparisonQuestion {
+export interface ComparisonQuestion {
   question: string;
   answer: string;
 }
 
-interface ComparisonSource {
+export interface ComparisonSource {
   label: string;
   url: string;
 }
@@ -51,6 +51,7 @@ export const OPENBOT_PLANS: readonly OpenBotPlan[] = [
   { provider: "grok", name: "Grok", plan: "Your Grok account or an xAI API key." },
   { provider: "cursor", name: "Cursor", plan: "Your Cursor plan, or a Cursor API key." },
   { provider: "opencode", name: "OpenCode", plan: "Free models, or an OpenCode Go key." },
+  { provider: "cline", name: "Cline", plan: "Your Cline account, or a Cline API key." },
   { provider: "custom", name: "Your own model", plan: "Any OpenAI-compatible server, also one on your computer." },
 ];
 

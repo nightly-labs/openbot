@@ -197,11 +197,6 @@
   }
 }
 
-.web-connection-notice {
-  margin: var(--openbot-space-4);
-  flex: 0 0 auto;
-}
-
 /* Takes the conversation-panel grid cell, so it follows the same desktop and mobile placement. */
 .web-connect.conversation-panel {
   display: grid;

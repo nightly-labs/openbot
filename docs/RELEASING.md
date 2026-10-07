@@ -1,8 +1,10 @@
 # Releasing OpenBot
 
 For iOS builds uploaded to TestFlight through GitHub Actions, see
-[the mobile release guide](../apps/mobile/README.md#github-actions-testflight-release).
-The mobile workflow is separate from the desktop tag release described below.
+[the mobile release guide](../apps/mobile/README.md#github-actions-testflight-release). For Android
+builds uploaded to Google Play, see
+[the Google Play release guide](../apps/mobile/README.md#github-actions-google-play-release).
+The mobile workflows are separate from the desktop tag release described below.
 
 OpenBot updates are published through GitHub Releases and installed with `electron-updater`.
 macOS requires every auto-updatable build to be signed with a Developer ID Application certificate.
@@ -21,7 +23,7 @@ OpenBot. Linux has no code-signature contract to check, so its provider artifact
 SHA-256 and version only.
 
 Installed apps do not wait for a release to get a new provider CLI: they offer the latest upstream
-release (see [Provider CLI updates](ARCHITECTURE.md#provider-cli-updates)). The pinned version is the
+release (see [Provider CLI updates](architecture/providers.md#provider-cli-updates)). The pinned version is the
 first-install fallback. To stop a broken upstream release, add its version to the provider's list in
 `provider-runtime-blocklist.json` and merge it to `main`. Apps read the list at their next check. A
 blocked version is no longer offered, but it stays on the computers that already installed it.
@@ -230,7 +232,7 @@ entry and re-run it with that exact version: the command reports `already pins O
 when the committed block matches byte for byte.
 
 Run it on a version bump only. A bump also needs the Windows checks in
-[the OpenCode notes](ARCHITECTURE.md#opencode-and-acp): the `win32-x64` values come from the
+[the OpenCode notes](architecture/providers.md#opencode-and-acp): the `win32-x64` values come from the
 published tarball read on macOS, so a staged `opencode.exe --version` must be confirmed on Windows
 before release.
 
@@ -314,7 +316,8 @@ A change to the desktop app or the web client and the iPhone app gets one file i
 `bun run mobile:release:patch`, `mobile:release:minor` and `mobile:release:major` move these files
 into `apps/mobile/CHANGELOG.md` and set the version in `apps/mobile/app.json`,
 `apps/mobile/package.json` and the copy of it in `bun.lock`. The pre-commit hook checks the new section when a commit changes the
-`app.json` version.
+`app.json` version. The new section is `## [x.y.z] - In review`, and `/changelog` does not show it
+until the store makes the build available. Then `bun run mobile:release:published` writes the date.
 
 `scripts/check-release-notes.ts` stops a release when the section is missing, empty or appears two
 times, or when it has an unknown group, a group with no items, an item with no text or outside a

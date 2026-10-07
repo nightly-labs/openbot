@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // @vitest-environment node
 
 import type { ComputerUseState, MacPermissionId } from "@openbot/contracts/ipc";
@@ -13,6 +14,7 @@ vi.mock("electron", () => ({
 }));
 
 const { computerUseIpcHandlers } = await import("./computer-use-handlers");
+const { PermissionHelpFailed } = await import("../computer-use-permission-help-window");
 
 const APP_FRAME = { sender: { id: 99 }, senderFrame: { url: "openbot-app://app/index.html" } };
 const HELP_WINDOW_FRAME = { ...APP_FRAME, sender: { id: 7 } };
@@ -26,16 +28,24 @@ const READY: ComputerUseState = {
 function bind(options: { show?: (permission: MacPermissionId) => Promise<void> } = {}) {
   const opened: string[] = [];
   const shown: MacPermissionId[] = [];
-  const startDrag = vi.fn(async (sender: { id: number }) => {
-    if (sender.id !== 7) throw new Error("The Computer Use drag must start in the help window.");
-  });
+  const startDrag = vi.fn((sender: { id: number }) =>
+    sender.id === 7
+      ? Effect.void
+      : Effect.fail(
+          new PermissionHelpFailed({ cause: new Error("The Computer Use drag must start in the help window.") }),
+        ),
+  );
   const reveal = vi.fn();
-  const permissionApp = vi.fn(async () => ({ name: "Electron", iconDataUrl: null }));
+  const permissionApp = vi.fn(() => Effect.succeed({ name: "Electron", iconDataUrl: null }));
   const permissionHelp = {
-    show: async (permission: MacPermissionId) => {
-      shown.push(permission);
-      await options.show?.(permission);
-    },
+    show: (permission: MacPermissionId) =>
+      Effect.tryPromise({
+        try: async () => {
+          shown.push(permission);
+          await options.show?.(permission);
+        },
+        catch: (cause) => new PermissionHelpFailed({ cause }),
+      }),
     close: vi.fn(),
     permissionApp,
     startDrag,
@@ -43,7 +53,7 @@ function bind(options: { show?: (permission: MacPermissionId) => Promise<void> }
   };
   bound.clear();
   const { computerUse: endpoints } = computerUseIpcHandlers({
-    cuaDriver: { state: async () => READY },
+    cuaDriver: { state: () => Effect.sync(() => READY) },
     openExternal: async (url) => {
       opened.push(url);
     },
