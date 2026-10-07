@@ -29,6 +29,13 @@
   padding: 0 var(--openbot-space-3);
 }
 
+/* The chevron that closes routine details has no open fill: it is a close action, not a lit toggle. */
+.diagram-view .diagram-view-header .header-panel-toggle[aria-expanded="true"]:not(:hover) {
+  border-color: transparent;
+  background: transparent;
+  color: var(--openbot-text-muted);
+}
+
 .diagram-view-icon {
   display: grid;
   width: 18px;
