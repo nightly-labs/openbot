@@ -1,6 +1,12 @@
 import { join, resolve } from "node:path";
 import { parseInviteUrl, selfHostedApiOrigin } from "@openbot/contracts/invite-links";
-import { type AgentEvent, type AppLogoColor, type CentralAuthState, IPC_ENDPOINTS } from "@openbot/contracts/ipc";
+import {
+  type AgentEvent,
+  type AppLogoColor,
+  type CentralAuthState,
+  type HostStatus,
+  IPC_ENDPOINTS,
+} from "@openbot/contracts/ipc";
 import { createFormat, resolveLocale, translateFor } from "@openbot/i18n";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { createRemoteDirectoryRefresh } from "@openbot/team-client/remote-directory";
@@ -949,18 +955,29 @@ if (!hasSingleInstanceLock) {
       };
       // Routes belong to the signed-in account. A token refresh does not change them.
       let webhookPrincipalId = centralAuthPrincipalId(built.centralAuth.getState());
+      built.eventsRuntime.setAccountPrincipal(webhookPrincipalId);
       const refreshWebhookRoutes = (state: CentralAuthState): void => {
         const principalId = centralAuthPrincipalId(state);
         if (principalId === webhookPrincipalId) return;
         webhookPrincipalId = principalId;
-        built.eventsRuntime.setAccountActive(principalId !== null);
+        built.eventsRuntime.setAccountPrincipal(principalId);
         if (principalId !== null) built.eventsRuntime.syncRoutes({ all: true });
       };
       service.on("event", onRoutineEvent);
       built.centralAuth.on("changed", refreshWebhookRoutes);
+      let webhookHostId = host.getStatus().serverId;
+      const onHostChanged = (status: HostStatus): void => {
+        const hostIdentityChanged = status.serverId !== webhookHostId;
+        webhookHostId = status.serverId;
+        forwardHostStatus(status);
+        const principalId = centralAuthPrincipalId(built.centralAuth.getState());
+        if (hostIdentityChanged && principalId !== null && status.serverId !== null)
+          built.eventsRuntime.syncRoutes({ all: true });
+      };
       teardown.push(0, "event service listeners", () => {
         service.off("event", onRoutineEvent);
         built.centralAuth.off("changed", refreshWebhookRoutes);
+        host.off("changed", onHostChanged);
       });
       // Internal usage signals for analytics only. They are not agent events, so the renderer and
       // Team API clients never receive them.
@@ -972,7 +989,7 @@ if (!hasSingleInstanceLock) {
           sendToRenderer(window, IPC_ENDPOINTS.app.approvalAutomation, preference);
         }
       });
-      host.on("changed", forwardHostStatus);
+      host.on("changed", onHostChanged);
       host.on("presence", (snapshot) => forwardTeamPresence("local", snapshot));
       host.on("directMessage", (event) => forwardDirectMessage("local", event));
       host.on("directTyping", (event) => forwardDirectTyping("local", event));

@@ -55,8 +55,8 @@ export class HostEventsRuntime {
     );
   }
 
-  setAccountActive(active: boolean): void {
-    this.#service.setAccountActive(active);
+  setAccountPrincipal(principalId: string | null): void {
+    this.#service.setAccountPrincipal(principalId);
   }
 
   stop(): Effect.Effect<void> {

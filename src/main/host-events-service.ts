@@ -46,7 +46,7 @@ export interface HostEventsServiceOptions {
   routines: RoutineRecords;
   cipher: SecretCipher;
   relay: HostWebhookRelay;
-  accountActive: () => boolean;
+  accountPrincipal: () => string | null;
 }
 
 const { sync: eventStep, rewrap: toHostEventsFailure } = causeHelpers(HostEventsFailure);
@@ -101,6 +101,8 @@ function decodeWebhookBody(body: Uint8Array): DecodedWebhookBody | null {
  */
 export class HostEventsService implements HostEventsApi {
   readonly #options: HostEventsServiceOptions;
+  #accountPrincipal: string | null;
+  #accountGeneration = 0;
   /** Serializes routine writes, so the route limit check and the write are one step. */
   readonly #writes = Semaphore.makeUnsafe(1);
   /** Serializes relay calls, so a revoke and a register of one route cannot cross. */
@@ -108,6 +110,7 @@ export class HostEventsService implements HostEventsApi {
 
   constructor(options: HostEventsServiceOptions) {
     this.#options = options;
+    this.#accountPrincipal = options.accountPrincipal();
   }
 
   getStatus() {
@@ -178,7 +181,7 @@ export class HostEventsService implements HostEventsApi {
     this: HostEventsService,
     input: WebhookIngressDelivery,
   ): Effect.fn.Return<{ status: WebhookDeliveryStatus }, HostEventsFailure> {
-    if (!this.#options.accountActive()) return { status: 503 };
+    if (this.#options.accountPrincipal() === null) return { status: 503 };
     if (input.body.byteLength > WEBHOOK_DELIVERY_BODY_BYTES_LIMIT) return { status: 413 };
     const route = yield* eventStep(() => this.#options.routines.routes.find(input.routeId));
     if (!route) return { status: 404 };
@@ -234,7 +237,14 @@ export class HostEventsService implements HostEventsApi {
   readonly syncRoutes = Effect.fn("HostEvents.syncRoutes")(
     function* (this: HostEventsService, options: { all: boolean }) {
       const { relay } = this.#options;
-      if (!this.#options.accountActive()) {
+      const syncPrincipal = this.#accountPrincipal;
+      const syncGeneration = this.#accountGeneration;
+      const isCurrent = () =>
+        syncGeneration === this.#accountGeneration &&
+        syncPrincipal === this.#accountPrincipal &&
+        syncPrincipal === this.#options.accountPrincipal();
+      if (!isCurrent()) return true;
+      if (this.#options.accountPrincipal() === null) {
         relay.setEnabled(false);
         return true;
       }
@@ -242,11 +252,13 @@ export class HostEventsService implements HostEventsApi {
       let failed = false;
       let changed = false;
       for (const routeId of yield* eventStep(() => routes.pendingRevocations())) {
-        if (!this.#options.accountActive()) {
+        if (!isCurrent()) return true;
+        if (this.#options.accountPrincipal() === null) {
           relay.setEnabled(false);
           return true;
         }
         const revoked = yield* Effect.result(relay.revokeRoute(routeId));
+        if (!isCurrent()) return true;
         if (revoked._tag === "Failure") failed = true;
         else {
           changed = true;
@@ -256,7 +268,8 @@ export class HostEventsService implements HostEventsApi {
       const current = yield* eventStep(() => routes.list());
       const updatedOwners = new Map<string, EventRoutineOwner>();
       for (const route of current) {
-        if (!this.#options.accountActive()) {
+        if (!isCurrent()) return true;
+        if (this.#options.accountPrincipal() === null) {
           relay.setEnabled(false);
           return true;
         }
@@ -264,6 +277,7 @@ export class HostEventsService implements HostEventsApi {
         const ownerKey = `${route.owner.kind}:${route.owner.id}`;
         let { routeId, url } = route;
         let registered = yield* Effect.result(relay.registerRoute(routeId));
+        if (!isCurrent()) return true;
         if (registered._tag === "Failure" && registered.failure instanceof WebhookRouteConflict) {
           // The relay keeps a refused route ID for good. A new ID gets a new URL, and the secret stays.
           const replacement = yield* eventStep(() => routes.replaceRouteId(route.routeId));
@@ -272,6 +286,7 @@ export class HostEventsService implements HostEventsApi {
           url = null;
           updatedOwners.set(ownerKey, route.owner);
           registered = yield* Effect.result(relay.registerRoute(routeId));
+          if (!isCurrent()) return true;
         }
         if (registered._tag === "Failure") failed = true;
         else if (registered.success !== url) {
@@ -281,7 +296,8 @@ export class HostEventsService implements HostEventsApi {
           updatedOwners.set(ownerKey, route.owner);
         }
       }
-      if (!this.#options.accountActive()) {
+      if (!isCurrent()) return true;
+      if (this.#options.accountPrincipal() === null) {
         relay.setEnabled(false);
         return true;
       }
@@ -306,8 +322,11 @@ export class HostEventsService implements HostEventsApi {
   ).bind(this);
 
   /** Closes stale route claims and leaves local route rows ready for the next account sync. */
-  setAccountActive(active: boolean): void {
-    this.#options.relay.setAccountActive(active);
+  setAccountPrincipal(principalId: string | null): void {
+    if (principalId === this.#accountPrincipal) return;
+    this.#accountPrincipal = principalId;
+    this.#accountGeneration += 1;
+    this.#options.relay.setAccountActive(principalId !== null);
   }
 
   /** Writes the routine under the write lock, so the route limit check and the write are one step. */
