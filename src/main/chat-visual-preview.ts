@@ -5,6 +5,7 @@ import {
   chatVisualAppTheme,
   chatVisualFrameUrl,
 } from "@openbot/contracts/chat-visual";
+import { redactText } from "@openbot/logging";
 import { Effect, Semaphore } from "effect";
 import { BrowserWindow, session as electronSession, type NativeImage, type Session } from "electron";
 import {
@@ -139,7 +140,8 @@ export class ChatVisualPreviewer implements ChatVisualPreviewHost {
       // A development build warns about its own policy on every page; the agent did not write it.
       if (console.length >= CONSOLE_LINE_LIMIT || event.message.startsWith("%cElectron Security Warning")) return;
       const level = CONSOLE_LEVELS[event.level] ?? "log";
-      console.push(`[${level}] ${event.message.slice(0, CONSOLE_LINE_LENGTH)}`);
+      // The lines go to the provider, so a key that the page logs is removed first.
+      console.push(`[${level}] ${redactText(event.message).slice(0, CONSOLE_LINE_LENGTH)}`);
     });
     contents.setWindowOpenHandler(() => ({ action: "deny" }));
     contents.on("will-navigate", (event) => event.preventDefault());

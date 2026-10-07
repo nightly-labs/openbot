@@ -537,7 +537,8 @@ export function ConversationTimeline() {
                   );
                 }
                 const initialVisual = untrack(() => chatVisualReply(initialMessage));
-                if (initialVisual) {
+                // The web client cannot load the page, so there the message shows its title and file.
+                if (initialVisual && chatVisualPageUrl(initialVisual.attachment.previewUrl)) {
                   // A visual reply is the agent's page. It shows above the final reply, with no bubble.
                   const visual = () => chatVisualReply(message() ?? initialMessage) ?? initialVisual;
                   const pageUrl = () => chatVisualPageUrl(visual().attachment.previewUrl);
