@@ -596,7 +596,14 @@ class McpOAuthClientProvider implements OAuthClientProvider {
 
   discoveryState(): OAuthDiscoveryState | undefined {
     const stored = this.#record().discovery;
-    const discovery = this.#discoveryState ?? stored;
+    const discovery =
+      this.#discoveryState ??
+      (stored
+        ? {
+            authorizationServerUrl: stored.authorizationServerUrl,
+            ...(stored.resourceMetadataUrl ? { resourceMetadataUrl: stored.resourceMetadataUrl } : {}),
+          }
+        : undefined);
     this.#discoveryState = discovery;
     this.#activeIssuer = discovery?.authorizationServerUrl;
     return discovery;
@@ -647,7 +654,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     return this.#options.storage.read(this.#options.resource) ?? {};
   }
 
-  #credential<T extends { issuer?: string }>(credential: T | undefined): T | undefined {
+  #credential<T extends Pick<OAuthTokens, "issuer">>(credential: T | undefined): T | undefined {
     if (!credential) return undefined;
     if (typeof credential.issuer === "string") return credential;
     // Let SDK 1.31 stamp a trusted legacy value when the exchange succeeds. Returning a copy
@@ -714,7 +721,7 @@ function hasUnboundCredentials(record: McpOAuthRecord | null): boolean {
   );
 }
 
-function credentialIssuer(credential: { issuer?: string }, record: McpOAuthRecord): string | undefined {
+function credentialIssuer(credential: Pick<OAuthTokens, "issuer">, record: McpOAuthRecord): string | undefined {
   return typeof credential.issuer === "string" ? credential.issuer : legacyIssuer(record);
 }
 
