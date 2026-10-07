@@ -8,6 +8,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { TEAM_CONVERSATION_UNREAD_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
 import { HOST_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/host-admin-v1";
 import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "@openbot/contracts/team-protocol/live-activity-push-v1";
 import { SKILLS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/skills-admin-v1";
@@ -1028,6 +1029,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         await refreshHosts();
       },
       canEditServerIdentity: (serverId) => administers(serverId, HOST_ADMIN_CAPABILITY),
+      canManageEvents: (serverId) => administers(serverId, EVENTS_CAPABILITY),
       canManageAgentSkills: (serverId) => administers(serverId, SKILLS_ADMIN_CAPABILITY),
       updateServerIdentity: async (serverId, input) => {
         const server = serversRef.current.find((candidate) => candidate.id === serverId);

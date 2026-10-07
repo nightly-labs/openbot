@@ -41,6 +41,7 @@ export function WorkspaceChannelConversation() {
       browserTabs={browserTabs()}
       onSelectAgent={selectAgent}
       localHost={activeServer()?.kind === "local"}
+      serverId={activeServer()?.id}
     />
   );
 }

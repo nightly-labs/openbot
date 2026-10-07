@@ -174,6 +174,22 @@ import type {
   SetDynamicIslandInteractiveInput,
   SetDynamicIslandPreferenceInput,
 } from "./ipc-dynamic-island";
+import type {
+  DeleteEventRoutineInput,
+  EventActivity,
+  EventDeliveryIdInput,
+  EventResourceIdInput,
+  EventRoutine,
+  EventSource,
+  EventStatus,
+  ListEventActivityInput,
+  ListEventRoutinesInput,
+  SaveEventRoutineInput,
+  SaveEventSourceInput,
+  SaveWebhookDestinationInput,
+  TestEventRoutineInput,
+  WebhookDestination,
+} from "./ipc-events";
 import type { GitHubConnectorRepositories, GitHubConnectorStatus } from "./ipc-github-connector";
 import type { HostAnalytics, HostAnalyticsInput } from "./ipc-host-analytics";
 import type {
@@ -1013,6 +1029,23 @@ export const IPC_ENDPOINTS = {
     revokeSession: request<string, void>()("host:revoke-session"),
     event: event<HostStatus>()("host:event"),
   },
+  events: {
+    getStatus: scopedQuery<EventStatus, "required">()("events:get-status"),
+    listSources: scopedQuery<EventSource[], "required">()("events:list-sources"),
+    saveSource: scopedRequest<SaveEventSourceInput, EventSource, "required">()("events:save-source"),
+    deleteSource: scopedRequest<EventResourceIdInput, void, "required">()("events:delete-source"),
+    listDestinations: scopedQuery<WebhookDestination[], "required">()("events:list-destinations"),
+    saveDestination: scopedRequest<SaveWebhookDestinationInput, WebhookDestination, "required">()(
+      "events:save-destination",
+    ),
+    deleteDestination: scopedRequest<EventResourceIdInput, void, "required">()("events:delete-destination"),
+    listActivity: scopedRequest<ListEventActivityInput, EventActivity[], "required">()("events:list-activity"),
+    retryDelivery: scopedRequest<EventDeliveryIdInput, void, "required">()("events:retry-delivery"),
+    listRoutines: scopedRequest<ListEventRoutinesInput, EventRoutine[], "required">()("events:list-routines"),
+    saveRoutine: scopedRequest<SaveEventRoutineInput, EventRoutine, "required">()("events:save-routine"),
+    deleteRoutine: scopedRequest<DeleteEventRoutineInput, void, "required">()("events:delete-routine"),
+    testRoutine: scopedRequest<TestEventRoutineInput, void, "required">()("events:test-routine"),
+  },
   remoteDesktop: {
     checkSetup: request<string, RemoteDesktopSetupStatus>()("remote-desktop:check-setup"),
     openSetup: request<RemoteDesktopSetupAction, void>()("remote-desktop:open-setup"),
@@ -1078,6 +1111,7 @@ export const IPC_GROUP_PATHS = {
   agentImport: "agentImport",
   plugins: "plugins",
   host: "host",
+  events: "events",
   remoteDesktop: "remoteDesktop",
 } as const satisfies { readonly [Group in keyof IpcEndpoints]: string | null };
 

@@ -470,6 +470,68 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     (operation) => this.#owned(operation),
   ).bind(this);
 
+  /** The generic webhook route ticket for this host's sources. */
+  readonly issueWebhookRoute = Effect.fn("CentralAuth.issueWebhookRoute")(
+    function* (
+      this: CentralAuthManager,
+      hostId: string,
+    ): Effect.fn.Return<string, CentralAuthOperationError, CentralAuthTransport> {
+      const machineToken = yield* this.#hostMachineToken(hostId);
+      return yield* this.#requestEffect(
+        `/v2/remote/hosts/${encodeURIComponent(hostId)}/webhook-route`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ machineToken }) },
+        (value) => requiredString(decodeRecord(value, "Webhook route"), "ticket"),
+      );
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  /** Registers one opaque source route in account metadata. */
+  readonly registerWebhookRoute = Effect.fn("CentralAuth.registerWebhookRoute")(
+    function* (
+      this: CentralAuthManager,
+      hostId: string,
+      routeId: string,
+    ): Effect.fn.Return<{ routeId: string }, CentralAuthOperationError, CentralAuthTransport> {
+      const machineToken = yield* this.#hostMachineToken(hostId);
+      const result = yield* this.#requestEffect(
+        `/v2/remote/hosts/${encodeURIComponent(hostId)}/webhook-routes`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ machineToken, routeId }),
+        },
+        (value) => {
+          const record = decodeRecord(value, "Webhook route");
+          return { routeId: requiredString(record, "routeId") };
+        },
+      );
+      return result;
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  /** Revokes one source route in account metadata. */
+  readonly revokeWebhookRoute = Effect.fn("CentralAuth.revokeWebhookRoute")(
+    function* (
+      this: CentralAuthManager,
+      hostId: string,
+      routeId: string,
+    ): Effect.fn.Return<void, CentralAuthOperationError, CentralAuthTransport> {
+      const machineToken = yield* this.#hostMachineToken(hostId);
+      yield* this.#requestEffect(
+        `/v2/remote/hosts/${encodeURIComponent(hostId)}/webhook-routes`,
+        {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ machineToken, routeId }),
+        },
+        decodeVoid,
+      );
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
   /**
    * The Slack route ticket of this host: the workspaces that the account service links to it, which
    * Signal routes to its `ingress` socket.

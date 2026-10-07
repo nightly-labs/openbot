@@ -6,7 +6,17 @@ import {
   type DiscordApiRequest,
 } from "@openbot/contracts/signal-protocol/discord-api";
 import { DISCORD_API_PATH } from "@openbot/contracts/signal-protocol/discord-route";
+import {
+  WEBHOOK_DELIVERY_BODY_BYTES_LIMIT,
+  type WebhookDeliveryStatus,
+} from "@openbot/contracts/signal-protocol/messages";
 import { SLACK_EVENTS_PATH } from "@openbot/contracts/signal-protocol/slack-route";
+import {
+  WEBHOOK_DELIVERY_ID_HEADER,
+  WEBHOOK_EVENTS_PATH,
+  WEBHOOK_SIGNATURE_HEADER,
+  WEBHOOK_TIMESTAMP_HEADER,
+} from "@openbot/contracts/signal-protocol/webhook-route";
 import { Effect, type ManagedRuntime, Result } from "effect";
 import { Elysia } from "elysia";
 import { z } from "zod";
@@ -57,6 +67,11 @@ const authEventSchema = z.discriminatedUnion("type", [
     guildId: z.string().min(1),
     through: z.number().int().nonnegative(),
   }),
+  z.object({
+    type: z.literal("webhook-route-revoked"),
+    routeId: z.string().min(1),
+    through: z.number().int().nonnegative(),
+  }),
 ]) satisfies z.ZodType<RemoteAuthEvent>;
 
 export function createRemoteApiApp(
@@ -87,6 +102,7 @@ export function createRemoteApiApp(
       else if (event.type === "account-servers-changed") signal.serversChanged(event.userId);
       else if (event.type === "slack-route-revoked") signal.revokeSlackRoute(event.appId, event.teamId, event.through);
       else if (event.type === "discord-route-revoked") signal.revokeDiscordRoute(event.guildId, event.through);
+      else if (event.type === "webhook-route-revoked") signal.revokeWebhookRoute(event.routeId, event.through);
       else signal.revokeSession(event.sessionId);
       return new Response(null, { status: 204 });
     })
@@ -140,6 +156,45 @@ export function createRemoteApiApp(
             { signal: request.signal },
           ),
         );
+      },
+      { parse: "none" },
+    )
+    // Generic webhook requests are authenticated by the host with its local source secret. Signal
+    // only bounds the body, limits ingress and relays the exact bytes plus signed header values.
+    .post(
+      `${WEBHOOK_EVENTS_PATH}/:routeId`,
+      async ({ request, params, server }) => {
+        const routeId = params.routeId;
+        if (!/^[A-Za-z0-9_-]{1,128}$/u.test(routeId)) return webhookResponse(404);
+        const declaredLength = Number(request.headers.get("content-length") ?? "0");
+        if (!Number.isFinite(declaredLength) || declaredLength > WEBHOOK_DELIVERY_BODY_BYTES_LIMIT) {
+          return webhookResponse(413);
+        }
+        const mediaType = request.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();
+        if (mediaType !== "application/json") return webhookResponse(415);
+        const address = signalClientIp(
+          server?.requestIP(request)?.address,
+          request.headers.get("x-forwarded-for"),
+          config.trustProxy,
+        );
+        if (!signal.acceptWebhookRequest(`${routeId}:${address}`)) return webhookResponse(429);
+        const body = await readBounded(request, WEBHOOK_DELIVERY_BODY_BYTES_LIMIT);
+        if (!body) return webhookResponse(413);
+        const timestamp = request.headers.get(WEBHOOK_TIMESTAMP_HEADER) ?? "";
+        const deliveryId = request.headers.get(WEBHOOK_DELIVERY_ID_HEADER) ?? "";
+        const signature = request.headers.get(WEBHOOK_SIGNATURE_HEADER) ?? "";
+        if (
+          !/^[0-9]{1,12}$/u.test(timestamp) ||
+          !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/u.test(deliveryId) ||
+          !/^sha256=[A-Fa-f0-9]{64}$/u.test(signature)
+        ) {
+          return webhookResponse(401);
+        }
+        const result = await runtime.runPromise(
+          signal.deliverWebhook(routeId, { timestamp, deliveryId, signature, body }),
+          { signal: request.signal },
+        );
+        return webhookResponse(result.status);
       },
       { parse: "none" },
     )
@@ -269,6 +324,10 @@ function slackResponse(response: SlackDeliveryResponse | { status: 413 | 415 | 4
     return new Response(response.body, { status: response.status, headers });
   }
   return new Response(null, { status: response.status, headers });
+}
+
+function webhookResponse(status: WebhookDeliveryStatus | 415): Response {
+  return new Response(null, { status, headers: { "Cache-Control": "no-store" } });
 }
 
 /**

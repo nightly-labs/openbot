@@ -2,6 +2,10 @@ import { Host, Switch } from "@expo/ui";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type CreateRoutineInput,
+  type EventFilter,
+  type EventRoutine,
+  type EventRoutineTrigger,
+  type EventRoutineTriggerInput,
   isRoutineSchedule,
   type MemoryEntry,
   type RoutineFields,
@@ -15,7 +19,7 @@ import {
   routineScheduleFromDraft,
   routineScheduleToDraft,
 } from "@openbot/team-client/routine-schedule-draft";
-import { type QueryKey, useQueryClient } from "@tanstack/react-query";
+import { type QueryKey, useQuery, useQueryClient } from "@tanstack/react-query";
 import { router, useNavigation } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
@@ -23,14 +27,34 @@ import { useEffect, useRef, useState } from "react";
 import { Alert, View } from "react-native";
 import { useUniwind } from "uniwind";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
+import { SettingsPicker } from "@/features/settings/components/settings-controls";
 import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { RoutineScheduleFields } from "./routine-schedule-fields";
+import { RoutineWebhookNotifications } from "./routine-webhook-notifications";
+import { RoutineWebhookSource } from "./routine-webhook-source";
 
 const DEFAULT_SCHEDULE: RoutineSchedule = { kind: "daily", time: "09:00" };
+
+type RoutineRecord = RoutineFields | EventRoutine;
+
+function eventFilterValue(text: string): EventFilter["value"] {
+  const trimmed = text.trim();
+  if (trimmed === "null") return null;
+  if (trimmed === "true") return true;
+  if (trimmed === "false") return false;
+  if (/^-?(?:0|[1-9]\d*)(?:\.\d+)?$/.test(trimmed)) return Number(trimmed);
+  return text;
+}
+
+function isEventRoutineRecord(
+  routine: RoutineRecord | undefined,
+): routine is EventRoutine & { trigger: EventRoutineTrigger } {
+  return Boolean(routine && "owner" in routine && routine.trigger.kind === "event");
+}
 
 function useRecordDraftGuard(dirty: boolean, pending: boolean) {
   const navigation = useNavigation();
@@ -180,13 +204,24 @@ export function RoutineEditor({
   port,
 }: {
   agent: Pick<MobileAgent, "id" | "serverId">;
-  routine?: RoutineFields;
+  routine?: RoutineRecord;
   available: boolean;
   port?: {
     create(input: Omit<CreateRoutineInput, "agentId">): Promise<void>;
     update(input: Omit<UpdateRoutineInput, "agentId">): Promise<void>;
     delete(id: string): Promise<void>;
     test(id: string): Promise<void>;
+    saveEvent(input: {
+      id?: string;
+      owner: { kind: "agent" | "channel"; id: string };
+      name: string;
+      instruction: string;
+      active: boolean;
+      timezone: string;
+      trigger: EventRoutineTriggerInput;
+    }): Promise<void>;
+    deleteEvent(input: { id: string; owner: { kind: "agent" | "channel"; id: string } }): Promise<void>;
+    testEvent(input: { id: string; owner: { kind: "agent" | "channel"; id: string } }): Promise<void>;
     queryKey: QueryKey;
   };
 }) {
@@ -205,7 +240,19 @@ export function RoutineEditor({
     setActiveOverride(active);
     void toggle.run(async () => {
       try {
-        if (port) await port.update({ routineId: routine.id, active });
+        if (eventRoutine) {
+          const input = {
+            id: eventRoutine.id,
+            owner: eventOwner,
+            name: eventRoutine.name,
+            instruction: eventRoutine.instruction,
+            active,
+            timezone: eventRoutine.timezone,
+            trigger: eventRoutine.trigger,
+          };
+          if (port) await port.saveEvent(input);
+          else await workspace.saveEventRoutine(input, agent.serverId);
+        } else if (port) await port.update({ routineId: routine.id, active });
         else await workspace.updateAgentRoutine({ agentId: agent.id, routineId: routine.id, active }, agent.serverId);
       } catch (cause) {
         setActiveOverride(null);
@@ -216,10 +263,32 @@ export function RoutineEditor({
   const { theme } = useUniwind();
   const [finished, setFinished] = useState(false);
   const [savedDraft, setSavedDraft] = useState<string | null>(null);
-  const [edits, setEdits] = useState<{ name?: string; instruction?: string; schedule?: RoutineScheduleDraft }>({});
+  const [edits, setEdits] = useState<{
+    name?: string;
+    instruction?: string;
+    schedule?: RoutineScheduleDraft;
+    trigger?: "schedule" | "event";
+    sourceId?: string;
+    eventType?: string;
+    filters?: EventFilter[];
+  }>({});
   const name = edits.name ?? routine?.name ?? "";
   const instruction = edits.instruction ?? routine?.instruction ?? "";
-  const savedSchedule = routine?.trigger.schedule ?? DEFAULT_SCHEDULE;
+  const eventRoutine = isEventRoutineRecord(routine) ? routine : undefined;
+  const savedSchedule = routine && "schedule" in routine.trigger ? routine.trigger.schedule : DEFAULT_SCHEDULE;
+  const savedTrigger = eventRoutine ? "event" : "schedule";
+  const trigger = edits.trigger ?? savedTrigger;
+  const eventSourceId = edits.sourceId ?? eventRoutine?.trigger.sourceId ?? "";
+  const eventType = edits.eventType ?? eventRoutine?.trigger.eventType ?? "";
+  const filters = edits.filters ?? eventRoutine?.trigger.filters ?? [];
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const eventsSupported = workspace.canManageEvents(agent.serverId);
+  const events = useQuery({
+    queryKey: ["event-sources", agent.serverId],
+    enabled: available && eventsSupported,
+    queryFn: () => workspace.listEventSources(agent.serverId),
+    staleTime: 30_000,
+  });
   // The form edits a draft; an untouched schedule saves as it is, so a kind the form cannot show stays.
   const scheduleDraft = edits.schedule ?? routineScheduleToDraft(savedSchedule);
   const scheduleProblem = routineDraftProblemCode(scheduleDraft);
@@ -227,22 +296,43 @@ export function RoutineEditor({
   const setName = (name: string) => setEdits((current) => ({ ...current, name }));
   const setInstruction = (instruction: string) => setEdits((current) => ({ ...current, instruction }));
   const setSchedule = (schedule: RoutineScheduleDraft) => setEdits((current) => ({ ...current, schedule }));
+  const setTrigger = (trigger: "schedule" | "event") => setEdits((current) => ({ ...current, trigger }));
+  const setFilters = (filters: EventFilter[]) => setEdits((current) => ({ ...current, filters }));
   const [timezone, setTimezone] = useState(routine?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone);
   const initialTimezone = useRef(timezone);
-  const draft = JSON.stringify({ name, instruction, schedule: edits.schedule ?? savedSchedule, timezone });
+  const draft = JSON.stringify({
+    name,
+    instruction,
+    trigger,
+    schedule: edits.schedule ?? savedSchedule,
+    eventSourceId,
+    eventType,
+    filters,
+    timezone,
+  });
   const nameChanged = name.trim() !== (routine?.name ?? "");
   const instructionChanged = instruction.trim() !== (routine?.instruction ?? "");
   const scheduleChanged =
+    trigger === "schedule" &&
     edits.schedule !== undefined &&
     (scheduleProblem !== null || JSON.stringify(schedule) !== JSON.stringify(savedSchedule));
+  const eventChanged =
+    trigger !== savedTrigger ||
+    eventSourceId !== (eventRoutine?.trigger.sourceId ?? "") ||
+    eventType !== (eventRoutine?.trigger.eventType ?? "") ||
+    JSON.stringify(filters) !== JSON.stringify(eventRoutine?.trigger.filters ?? []);
   const dirty = routine
-    ? nameChanged || instructionChanged || scheduleChanged
+    ? nameChanged || instructionChanged || scheduleChanged || eventChanged
     : draft !==
       (savedDraft ??
         JSON.stringify({
           name: "",
           instruction: "",
+          trigger: "schedule",
           schedule: DEFAULT_SCHEDULE,
+          eventSourceId: "",
+          eventType: "",
+          filters: [],
           timezone: initialTimezone.current,
         }));
   useRecordDraftGuard(dirty && !finished, action.pending);
@@ -250,8 +340,32 @@ export function RoutineEditor({
     if (finished) router.back();
   }, [finished]);
   const disabled = !available || action.pending || (!routine && savedDraft !== null);
-  const validTime = scheduleProblem === null && isRoutineSchedule(schedule);
+  const validTime =
+    trigger === "event"
+      ? Boolean(eventSourceId.trim() && eventType.trim())
+      : scheduleProblem === null && isRoutineSchedule(schedule);
+  const eventOwner = { kind: port ? "channel" : "agent", id: agent.id } as const;
+  const eventTrigger: EventRoutineTrigger = {
+    kind: "event",
+    sourceId: eventSourceId.trim(),
+    eventType: eventType.trim(),
+    filters,
+  };
   async function save() {
+    if (eventRoutine || trigger === "event") {
+      const input = {
+        ...(routine ? { id: routine.id } : {}),
+        owner: eventOwner,
+        name: name.trim(),
+        instruction: instruction.trim(),
+        active: routine?.active ?? true,
+        timezone,
+        trigger: trigger === "event" ? eventTrigger : { kind: "schedule" as const, schedule },
+      };
+      if (port) await port.saveEvent(input);
+      else await workspace.saveEventRoutine(input, agent.serverId);
+      return;
+    }
     if (port) {
       if (routine)
         await port.update({
@@ -305,25 +419,153 @@ export function RoutineEditor({
         maxLength={INPUT_LIMITS.routineInstruction}
         onChangeText={setInstruction}
       />
-      <RoutineScheduleFields
-        draft={scheduleDraft}
-        disabled={disabled}
-        onChange={setSchedule}
-        footer={
-          routine ? (
-            <SettingsRow
-              trailing={
-                <Typography type="body-sm" className="text-grouped-secondary">
-                  {routine.timezone}
-                </Typography>
-              }
-            >
-              <Typography.Paragraph>{t("mobile.agent.record.timeZone")}</Typography.Paragraph>
-            </SettingsRow>
-          ) : null
-        }
-      />
-      {routine?.trigger.schedule.kind === "interval" && edits.schedule === undefined ? (
+      <SettingsSection title={t("mobile.agent.record.trigger")}>
+        <SettingsRow
+          trailing={
+            <SettingsPicker
+              label={t("mobile.agent.record.trigger")}
+              value={trigger}
+              options={[
+                { value: "schedule" as const, label: t("mobile.agent.record.trigger.schedule") },
+                ...(eventRoutine || eventsSupported
+                  ? [{ value: "event" as const, label: t("mobile.agent.record.trigger.event") }]
+                  : []),
+              ]}
+              enabled={!disabled}
+              dark={theme === "dark"}
+              onChange={setTrigger}
+            />
+          }
+        >
+          <Typography.Paragraph>{t("mobile.agent.record.trigger")}</Typography.Paragraph>
+        </SettingsRow>
+      </SettingsSection>
+      {trigger === "schedule" ? (
+        <RoutineScheduleFields
+          draft={scheduleDraft}
+          disabled={disabled}
+          onChange={setSchedule}
+          footer={
+            routine ? (
+              <SettingsRow
+                trailing={
+                  <Typography type="body-sm" className="text-grouped-secondary">
+                    {routine.timezone}
+                  </Typography>
+                }
+              >
+                <Typography.Paragraph>{t("mobile.agent.record.timeZone")}</Typography.Paragraph>
+              </SettingsRow>
+            ) : null
+          }
+        />
+      ) : (
+        <SettingsSection title={t("mobile.agent.record.trigger.event")}>
+          <SettingsRow
+            trailing={
+              <SettingsPicker
+                label={t("mobile.agent.record.eventSource")}
+                value={eventSourceId}
+                options={[
+                  { value: "", label: t("mobile.agent.record.eventSourcePlaceholder") },
+                  ...(events.data ?? []).map((source) => ({ value: source.id, label: source.name })),
+                ]}
+                enabled={!disabled && !events.isPending}
+                dark={theme === "dark"}
+                onChange={(value) => setEdits((current) => ({ ...current, sourceId: value }))}
+              />
+            }
+          >
+            <Typography.Paragraph>{t("mobile.agent.record.eventSource")}</Typography.Paragraph>
+          </SettingsRow>
+          <RoutineWebhookSource
+            key={eventSourceId}
+            serverId={agent.serverId}
+            source={(events.data ?? []).find((source) => source.id === eventSourceId)}
+            name={name}
+            onChange={(sourceId) => setEdits((current) => ({ ...current, sourceId }))}
+          />
+          <View className="p-4">
+            <SheetFormField
+              appearance="soft"
+              label={t("mobile.agent.record.eventType")}
+              placeholder={t("mobile.agent.record.eventTypePlaceholder")}
+              value={eventType}
+              editable={!disabled}
+              onChangeText={(value) => setEdits((current) => ({ ...current, eventType: value }))}
+            />
+          </View>
+          <SettingsRow
+            disclosure={false}
+            disabled={disabled}
+            onPress={() => setFilters([...filters, { pointer: "", value: "" }])}
+          >
+            <Typography.Paragraph className="text-accent">
+              {t("mobile.agent.record.addEventFilter")}
+            </Typography.Paragraph>
+          </SettingsRow>
+          {filters.map((filter, index) => (
+            <View key={`${filter.pointer}\u0000${String(filter.value)}`} className="gap-2 p-4">
+              <SheetFormField
+                appearance="soft"
+                label={t("mobile.agent.record.eventFilterPointer")}
+                value={filter.pointer}
+                editable={!disabled}
+                onChangeText={(pointer) =>
+                  setFilters(filters.map((item, itemIndex) => (itemIndex === index ? { ...item, pointer } : item)))
+                }
+              />
+              <SheetFormField
+                appearance="soft"
+                label={t("mobile.agent.record.eventFilterValue")}
+                value={filter.value === null ? "null" : String(filter.value)}
+                editable={!disabled}
+                onChangeText={(text) =>
+                  setFilters(
+                    filters.map((item, itemIndex) =>
+                      itemIndex === index
+                        ? {
+                            ...item,
+                            value: eventFilterValue(text),
+                          }
+                        : item,
+                    ),
+                  )
+                }
+              />
+              <SettingsRow
+                disclosure={false}
+                disabled={disabled}
+                onPress={() => setFilters(filters.filter((_, itemIndex) => itemIndex !== index))}
+              >
+                <Typography.Paragraph className="text-danger-text">
+                  {t("mobile.agent.record.removeEventFilter")}
+                </Typography.Paragraph>
+              </SettingsRow>
+            </View>
+          ))}
+        </SettingsSection>
+      )}
+      {eventsSupported && routine ? (
+        <>
+          <SettingsRow disclosure={false} onPress={() => setNotificationsOpen((value) => !value)}>
+            <Typography.Paragraph>{t("mobile.agent.record.webhookNotifications")}</Typography.Paragraph>
+          </SettingsRow>
+          {notificationsOpen ? (
+            <RoutineWebhookNotifications
+              key={routine.id}
+              serverId={agent.serverId}
+              routineId={routine.id}
+              sourceId={eventSourceId}
+            />
+          ) : null}
+        </>
+      ) : null}
+      {trigger === "schedule" &&
+      routine &&
+      "schedule" in routine.trigger &&
+      routine.trigger.schedule.kind === "interval" &&
+      edits.schedule === undefined ? (
         <Typography.Paragraph type="body-xs" className="-mt-3 px-4 text-grouped-secondary">
           {t("mobile.agent.record.scheduleKept")}
         </Typography.Paragraph>
@@ -370,7 +612,14 @@ export function RoutineEditor({
             onPress={() => {
               setTestStarted(false);
               void testRun.run(
-                () => (port ? port.test(routine.id) : workspace.testAgentRoutine(agent.id, routine.id, agent.serverId)),
+                () =>
+                  eventRoutine
+                    ? port
+                      ? port.testEvent({ id: eventRoutine.id, owner: eventOwner })
+                      : workspace.testEventRoutine({ id: eventRoutine.id, owner: eventOwner }, agent.serverId)
+                    : port
+                      ? port.test(routine.id)
+                      : workspace.testAgentRoutine(agent.id, routine.id, agent.serverId),
                 () => setTestStarted(true),
               );
             }}
@@ -391,9 +640,13 @@ export function RoutineEditor({
                   onPress: () =>
                     void action.run(
                       () =>
-                        port
-                          ? port.delete(routine.id)
-                          : workspace.deleteAgentRoutine(agent.id, routine.id, agent.serverId),
+                        eventRoutine
+                          ? port
+                            ? port.deleteEvent({ id: eventRoutine.id, owner: eventOwner })
+                            : workspace.deleteEventRoutine({ id: eventRoutine.id, owner: eventOwner }, agent.serverId)
+                          : port
+                            ? port.delete(routine.id)
+                            : workspace.deleteAgentRoutine(agent.id, routine.id, agent.serverId),
                       () => setFinished(true),
                     ),
                 },

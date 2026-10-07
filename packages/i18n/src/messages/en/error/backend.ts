@@ -1,6 +1,14 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.backend", {
+  "error.backend.eventsUnavailable": "Events are not available on this host.",
+  "error.backend.eventSourceMissing": "This event source no longer exists.",
+  "error.backend.webhookSecretRequired": "Enter a signing secret with at least 32 characters.",
+  "error.backend.webhookSourceLimit": "A host can have at most {limit} active webhook sources.",
+  "error.backend.webhookDestinationMissing": "This webhook destination no longer exists.",
+  "error.backend.webhookSettingsInvalid": "Check the webhook settings and try again.",
+  "error.backend.webhookRouteUnavailable":
+    "The public webhook route is not ready. Check the host connection and try again.",
   // Errors that the backend services send: channels, messages, routines, memories, MCP, browser and remote desktop.
   "error.backend.browserViewRemoteOnly": "A live browser view is only for a remote host.",
   "error.backend.browserViewUnsupported": "This remote host does not support a live browser view.",

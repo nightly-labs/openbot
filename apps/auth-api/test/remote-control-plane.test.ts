@@ -24,6 +24,7 @@ function applyPlanMigrations(database: DatabaseSync): void {
     "0023_hosted_servers.sql",
     "0025_slack_workspace_routes.sql",
     "0026_discord_guild_routes.sql",
+    "0027_webhook_routes.sql",
   ]) {
     database.exec(readFileSync(new URL(`../migrations/${name}`, import.meta.url), "utf8"));
   }
@@ -731,6 +732,62 @@ describe("RemoteControlPlane", () => {
     ).resolves.toEqual([]);
     await runApiEffect(controlPlane.disconnectDiscordGuild("host-1", registration.machineToken, "111"));
     expect(discordRevocations()).toHaveLength(1);
+    // Generic webhook routes keep only opaque ownership metadata in the account service.
+    const webhookRegistration = await runApiEffect(
+      controlPlane.registerWebhookRoute("host-1", registration.machineToken, "source-1"),
+    );
+    expect(webhookRegistration).toEqual({ routeId: "source-1" });
+    const linkedAt = database.prepare("SELECT connected_at FROM webhook_routes WHERE route_id = 'source-1'").get();
+    if (!linkedAt || typeof linkedAt.connected_at !== "number") throw new Error("Missing webhook route timestamp.");
+    await expect(
+      runApiEffect(controlPlane.registerWebhookRoute("host-1", registration.machineToken, "source-1")),
+    ).resolves.toEqual(webhookRegistration);
+    expect(database.prepare("SELECT connected_at FROM webhook_routes WHERE route_id = 'source-1'").get()).toEqual(
+      linkedAt,
+    );
+    const webhookTicket = await runApiEffect(controlPlane.issueWebhookRoute("host-1", registration.machineToken));
+    expect(decodeJwt(webhookTicket.ticket)).toMatchObject({
+      aud: "openbot-webhook-route",
+      hid: "host-1",
+      routes: [{ id: "source-1", linkedAt: expect.any(Number) }],
+    });
+    await expect(
+      runApiEffect(
+        controlPlane.validateWebhookRoute({
+          hostId: "host-1",
+          routes: [{ id: "source-1", linkedAt: linkedAt.connected_at }],
+        }),
+      ),
+    ).resolves.toEqual(["source-1"]);
+    const otherHost = await runApiEffect(
+      controlPlane.registerHost(owner, {
+        hostId: "host-2",
+        name: "Second Mac",
+        ownerMembershipId: "local-owner-2",
+        devicePublicKey: "public-key-b",
+      }),
+    );
+    if (!otherHost.machineToken) throw new Error("The second host credential is missing.");
+    await expect(
+      runApiEffect(controlPlane.registerWebhookRoute("host-2", otherHost.machineToken, "source-1")),
+    ).rejects.toMatchObject({ code: "webhook_route_conflict" });
+    const webhookRevocations = () =>
+      webhookBodies.map((body) => JSON.parse(body)).filter((event) => event.type === "webhook-route-revoked");
+    await runApiEffect(controlPlane.disconnectWebhookRoute("host-1", registration.machineToken, "source-1"));
+    expect(database.prepare("SELECT route_id FROM webhook_routes WHERE route_id = 'source-1'").get()).toBeUndefined();
+    expect(webhookRevocations()).toEqual([{ type: "webhook-route-revoked", routeId: "source-1", through: 1_000 }]);
+    await runApiEffect(controlPlane.disconnectWebhookRoute("host-1", registration.machineToken, "source-1"));
+    expect(webhookRevocations()).toHaveLength(1);
+    await expect(
+      runApiEffect(
+        controlPlane.validateWebhookRoute({
+          hostId: "host-1",
+          routes: [{ id: "source-1", linkedAt: linkedAt.connected_at }],
+        }),
+      ),
+    ).resolves.toEqual([]);
+    // Keep later outbox assertions scoped to the operations after this route-specific fixture.
+    webhookBodies.length = 0;
     // Signal reports that the bot left a guild: the link goes without the host.
     database
       .prepare(

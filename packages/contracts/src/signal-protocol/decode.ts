@@ -17,6 +17,7 @@ import {
   type SignalServerMessage,
   SLACK_DELIVERY_BODY_BYTES_LIMIT,
   type SlackDeliveryKind,
+  WEBHOOK_DELIVERY_BODY_BYTES_LIMIT,
 } from "./messages";
 
 /**
@@ -101,8 +102,21 @@ export function decodeSignalServerMessage(value: unknown): SignalServerMessage |
         retryReason: value.retryReason === null ? null : identifier(value.retryReason),
         bodyBase64: deliveryBody(value.bodyBase64),
       };
+    case "webhook-delivery":
+      return {
+        type: kind,
+        version,
+        requestId: identifier(value.requestId),
+        routeId: identifier(value.routeId),
+        timestamp: identifier(value.timestamp),
+        deliveryId: webhookHeader(value.deliveryId),
+        signature: webhookSignature(value.signature),
+        bodyBase64: webhookBody(value.bodyBase64),
+      };
     case "discord-session":
       return { type: kind, version, token: identifier(value.token), guilds: guildList(value.guilds) };
+    case "webhook-ready":
+      return { type: kind, version, routes: identifierList(value.routes) };
     case "discord-delivery":
       return {
         type: kind,
@@ -185,8 +199,35 @@ function deliveryBody(value: unknown): string {
   return candidate;
 }
 
+function webhookBody(value: unknown): string {
+  const candidate = text(value);
+  if (
+    candidate.length > Math.ceil(WEBHOOK_DELIVERY_BODY_BYTES_LIMIT / 3) * 4 ||
+    !/^[A-Za-z0-9+/]*={0,2}$/u.test(candidate)
+  )
+    invalid();
+  return candidate;
+}
+
+function webhookHeader(value: unknown): string {
+  const candidate = text(value);
+  if (candidate.length > 256 || !/^[A-Za-z0-9][A-Za-z0-9._:-]*$/u.test(candidate)) invalid();
+  return candidate;
+}
+
+function webhookSignature(value: unknown): string {
+  const candidate = text(value);
+  if (!/^sha256=[A-Fa-f0-9]{64}$/u.test(candidate)) invalid();
+  return candidate;
+}
+
 function guildList(value: unknown): string[] {
   if (!Array.isArray(value) || value.length > DISCORD_ROUTE_GUILDS_LIMIT) invalid();
+  return value.map(identifier);
+}
+
+function identifierList(value: unknown): string[] {
+  if (!Array.isArray(value)) invalid();
   return value.map(identifier);
 }
 

@@ -9,6 +9,7 @@ export interface SheetFormFieldProps {
   hint?: string;
   trailing?: ReactNode;
   inputMode?: TextInputProps["inputMode"];
+  keyboardType?: TextInputProps["keyboardType"];
   isRequired?: boolean;
   label: string;
   maxLength?: number;
@@ -20,5 +21,6 @@ export interface SheetFormFieldProps {
   onSubmitEditing?: () => void;
   placeholder?: string;
   returnKeyType?: TextInputProps["returnKeyType"];
+  secureTextEntry?: TextInputProps["secureTextEntry"];
   value: string;
 }

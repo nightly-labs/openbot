@@ -21,6 +21,7 @@ export type {
   SignalServerMessage,
   SlackDeliveryKind,
   SlackDeliveryStatus,
+  WebhookDeliveryStatus,
 } from "@openbot/contracts/signal-protocol/messages";
 export {
   SIGNAL_MESSAGE_BYTES_LIMIT,
@@ -48,6 +49,7 @@ const signalMessageTypeSchema = z.enum([
   "turn-refresh",
   "disconnect",
   "slack-delivery-result",
+  "webhook-delivery-result",
 ]);
 const signalClientMessageSchema = z.discriminatedUnion("type", [
   z.object({
@@ -58,6 +60,7 @@ const signalClientMessageSchema = z.discriminatedUnion("type", [
     multiplex: z.boolean().optional(),
     slackRoute: z.string().min(1).max(8_192).optional(),
     discordRoute: z.string().min(1).max(8_192).optional(),
+    webhookRoute: z.string().min(1).max(8_192).optional(),
   }),
   z.object({
     type: z.enum(["offer", "answer"]),
@@ -98,6 +101,21 @@ const signalClientMessageSchema = z.discriminatedUnion("type", [
     status: z.union([z.literal(200), z.literal(400), z.literal(401), z.literal(404), z.literal(503)]),
     contentType: z.enum(["application/json", "text/plain"]).optional(),
     body: z.string().max(SLACK_DELIVERY_RESPONSE_BYTES_LIMIT).optional(),
+  }),
+  z.object({
+    type: z.literal("webhook-delivery-result"),
+    version: z.literal(1),
+    requestId: identifierSchema,
+    status: z.union([
+      z.literal(200),
+      z.literal(202),
+      z.literal(400),
+      z.literal(401),
+      z.literal(404),
+      z.literal(413),
+      z.literal(429),
+      z.literal(503),
+    ]),
   }),
 ]) satisfies z.ZodType<SignalClientMessage>;
 

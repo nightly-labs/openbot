@@ -464,6 +464,28 @@ Network traffic can also occur when:
 - a Slack workspace is connected. See [Slack connections](#slack-connections).
 - a Discord server is connected. See [Discord connections](#discord-connections).
 
+## Webhooks and event routines
+
+An administrator can configure public webhook sources and outbound webhook destinations for a
+host. The host stores the source settings, accepted events, routine run links, and delivery history
+in its local SQLite database. Signing secrets and custom header values are encrypted with the
+operating system's secret storage. Management screens do not return saved secrets.
+
+Inbound requests pass through OpenBot's Signal service to the connected host. The account service
+keeps route and authorization metadata. Neither cloud service stores or logs request bodies.
+The host verifies the request signature before it accepts the event. If the host is offline, the
+sender receives an error and must retry. There is no cloud event queue.
+
+The host can send routine run notifications to administrator-selected HTTPS destinations. These
+notifications contain routine and run IDs, routine names, status, and times. They do not contain
+instructions, conversation content, result text, or raw errors. The destination receives the host's
+network address and the configured request headers. Failed deliveries can be retried, so a
+destination can receive the same notification more than once.
+
+Event data passed to a routine can reach the routine's selected model provider, as other routine
+input does. Disable a source to stop new receipts, or disable a destination to stop new outbound
+attempts. Disabling does not erase existing local history.
+
 ## Slack connections
 
 A workspace member installs the OpenBot Slack app in their workspace from OpenBot on their computer.

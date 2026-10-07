@@ -490,6 +490,9 @@ export class ChannelStore {
             ...routineIds,
           );
         }
+        db.prepare(
+          "UPDATE projection_event_routine_triggers SET active = 0, updated_at = ? WHERE owner_kind = 'channel' AND owner_id = ?",
+        ).run(new Date().toISOString(), channelId);
 
         for (const table of [
           "projection_channel_contexts",

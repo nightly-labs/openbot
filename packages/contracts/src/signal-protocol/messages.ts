@@ -62,10 +62,18 @@ export const SLACK_DELIVERY_BODY_BYTES_LIMIT = 64 * 1024;
 // an interactivity reply.
 export const SLACK_DELIVERY_RESPONSE_BYTES_LIMIT = 4 * 1024;
 
+// The largest generic webhook body Signal passes to a host. Signal does not inspect or retain it.
+export const WEBHOOK_DELIVERY_BODY_BYTES_LIMIT = 64 * 1024;
+
+// Generic webhook handlers return only a status. Keep a small bound for future response metadata.
+export const WEBHOOK_DELIVERY_RESPONSE_BYTES_LIMIT = 4 * 1024;
+
 // The Slack request that a delivery carries. Slack sends events as JSON and button presses as a form.
 export type SlackDeliveryKind = "events" | "interactivity";
 
 export type SlackDeliveryStatus = 200 | 400 | 401 | 404 | 503;
+
+export type WebhookDeliveryStatus = 200 | 202 | 400 | 401 | 404 | 413 | 429 | 503;
 
 // Which negotiation a relayed frame belongs to. One socket carries both.
 export type SignalChannel = "team" | "remote-desktop";
@@ -129,6 +137,9 @@ export type SignalClientMessage =
       // whose events this socket receives. An `ingress` socket has a Slack route, a Discord route or
       // both.
       discordRoute?: string;
+      // `ingress` only: the generic webhook route ticket (`./webhook-route.ts`) that names the
+      // opaque webhook sources whose requests this socket receives.
+      webhookRoute?: string;
     }
   // An `ingress` socket's answer to one `slack-delivery`. Signal returns it to Slack as the HTTP
   // response, so `body` is only the `url_verification` challenge or an interactivity reply.
@@ -139,6 +150,14 @@ export type SignalClientMessage =
       status: SlackDeliveryStatus;
       contentType?: "application/json" | "text/plain";
       body?: string;
+    }
+  // An ingress socket's answer to one generic webhook delivery. Signal returns this status to the
+  // public webhook caller only after the host has committed the event.
+  | {
+      type: "webhook-delivery-result";
+      version: SignalProtocolVersion;
+      requestId: string;
+      status: WebhookDeliveryStatus;
     }
   | SignalRelayMessage;
 
@@ -190,7 +209,23 @@ export type SignalServerMessage =
   // the guilds routed to this socket: a guild of the host that is not in it was unlinked, or the bot
   // left it.
   | { type: "discord-session"; version: SignalProtocolVersion; token: string; guilds: string[] }
+  // Sent after `ready` when the ingress hello carried a webhook route ticket. An older Signal
+  // service ignores the optional hello field and never emits this frame, so the host can gate the
+  // webhook feature on this acknowledgement.
+  | { type: "webhook-ready"; version: SignalProtocolVersion; routes: string[] }
   // One Discord event of a guild routed to this `ingress` socket. Signal already acknowledged a button
   // press to Discord; nothing is answered.
   | { type: "discord-delivery"; version: SignalProtocolVersion; guildId: string; delivery: DiscordDelivery }
+  // One generic webhook request for a route linked to this host. The HMAC is checked by the host:
+  // Signal forwards the exact body and the three signed header values without reading the body.
+  | {
+      type: "webhook-delivery";
+      version: SignalProtocolVersion;
+      requestId: string;
+      routeId: string;
+      timestamp: string;
+      deliveryId: string;
+      signature: string;
+      bodyBase64: string;
+    }
   | SignalRelayMessage;

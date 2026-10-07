@@ -13,6 +13,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { AGENT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-import-v1";
 import { CONTEXT_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/context-reset-v1";
+import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
 import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-update-v1";
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
 import { runTeamEffect } from "@openbot/team-client";
@@ -480,6 +481,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     () => workspace.state.host?.hostId ?? "",
     workspace.runtime.admin ? () => hostRequest() : undefined,
     workspace.onHostEvent,
+    () => workspace.state.capabilities.includes(EVENTS_CAPABILITY),
   );
   const remoteAgentAdmin = createRemoteAgentAdmin(
     () => {
@@ -630,6 +632,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     workspace.runtime,
     workspace.onHostEvent,
     () => workspace.state.host?.hostId ?? "",
+    () => workspace.state.capabilities.includes(EVENTS_CAPABILITY),
   );
   const channelsSupported = () =>
     workspace.state.status === "online" &&

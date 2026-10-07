@@ -1,12 +1,19 @@
 // The routines twin of `memories-port.ts`: one settings panel, two owners.
 
 import type {
+  EventRoutine,
+  EventRoutineOwner,
+  EventRoutineTriggerInput,
+  EventSource,
   OpenBotDesktopApi,
   RoutineFields,
   RoutineLimitPolicy,
   RoutineRunFields,
   RoutineSchedule,
 } from "@openbot/contracts/ipc";
+
+import type { RoutineWebhooksApi } from "@openbot/ui/features/conversation/RoutineWebhookNotifications";
+import { desktopEventsApi } from "./routine-webhooks-api";
 
 interface RoutineSaveInput {
   routineId: string | null;
@@ -17,6 +24,40 @@ interface RoutineSaveInput {
   schedule: RoutineSchedule;
   /** Left out, an update keeps the saved policy. */
   limitPolicy?: RoutineLimitPolicy;
+  /** Event triggers are supported by the additive event API. Schedule-only adapters ignore this. */
+  trigger?: EventRoutineTriggerInput;
+}
+
+export type RoutineEditorRecord = RoutineFields | EventRoutine;
+
+export interface EventRoutinesApi {
+  webhooks: RoutineWebhooksApi;
+  listSources: () => Promise<EventSource[]>;
+  listRoutines: (input: { owner: EventRoutineOwner }) => Promise<EventRoutine[]>;
+  saveRoutine: (input: {
+    id?: string;
+    owner: EventRoutineOwner;
+    name: string;
+    instruction: string;
+    active: boolean;
+    timezone: string;
+    trigger: EventRoutineTriggerInput;
+    limitPolicy?: RoutineLimitPolicy;
+  }) => Promise<EventRoutine>;
+  deleteRoutine: (input: { id: string; owner: EventRoutineOwner }) => Promise<void>;
+  testRoutine: (input: { id: string; owner: EventRoutineOwner }) => Promise<void>;
+}
+
+/** The desktop adapter for the server-scoped event routine group. */
+export function desktopEventRoutinesApi(serverId: string): EventRoutinesApi {
+  return {
+    webhooks: desktopEventsApi(serverId),
+    listSources: () => window.openbot.events.listSources(serverId),
+    listRoutines: (input) => window.openbot.events.listRoutines(input, serverId),
+    saveRoutine: (input) => window.openbot.events.saveRoutine(input, serverId),
+    deleteRoutine: (input) => window.openbot.events.deleteRoutine(input, serverId),
+    testRoutine: (input) => window.openbot.events.testRoutine(input, serverId),
+  };
 }
 
 export interface RoutinesPort {
@@ -28,14 +69,17 @@ export interface RoutinesPort {
    * released Team API drops the field, so a remote host would ignore the choice.
    */
   limitPolicy: boolean;
-  list: () => Promise<RoutineFields[]>;
+  list: () => Promise<RoutineEditorRecord[]>;
   listRuns: (routineId: string, limit: number) => Promise<RoutineRunFields[]>;
-  save: (input: RoutineSaveInput) => Promise<RoutineFields>;
+  save: (input: RoutineSaveInput) => Promise<RoutineEditorRecord>;
   remove: (routineId: string) => Promise<void>;
   test: (routineId: string) => Promise<void>;
   /** Only for an agent on this computer that allows local scripts. */
   runCommand?: (routineId: string) => Promise<string>;
   subscribe: (reload: () => void) => () => void;
+  /** Event source choices for a host with event support. */
+  eventSources?: () => Promise<EventSource[]>;
+  webhooks?: RoutineWebhooksApi;
 }
 
 export function agentRoutinesPort(agentId: string, automation = false, localHost = false): RoutinesPort {
@@ -102,5 +146,42 @@ export function channelRoutinesPort(
       api.onEvent((event) => {
         if (event.type === "channel-routines-changed" && event.channelId === channelId) reload();
       }),
+  };
+}
+
+/**
+ * Creates a routine port backed by the additive event API.
+ *
+ * The event API carries routine records, while released schedule APIs still own run history and
+ * change notifications. Callers can pass the legacy port so switching to this adapter does not
+ * drop those views for schedule routines.
+ */
+export function eventRoutinesPort(
+  owner: EventRoutineOwner,
+  api: EventRoutinesApi,
+  legacy: Pick<RoutinesPort, "listRuns" | "subscribe">,
+): RoutinesPort {
+  return {
+    ownerId: owner.id,
+    ownerNoun: owner.kind,
+    limitPolicy: true,
+    list: () => api.listRoutines({ owner }),
+    listRuns: (routineId, limit) => legacy.listRuns(routineId, limit),
+    eventSources: api.listSources,
+    webhooks: api.webhooks,
+    save: ({ routineId, name, instruction, active, timezone, schedule, trigger, limitPolicy }) =>
+      api.saveRoutine({
+        ...(routineId ? { id: routineId } : {}),
+        owner,
+        name,
+        instruction,
+        active,
+        timezone,
+        trigger: trigger ?? { kind: "schedule", schedule },
+        ...(limitPolicy ? { limitPolicy } : {}),
+      }),
+    remove: (routineId) => api.deleteRoutine({ id: routineId, owner }),
+    test: (routineId) => api.testRoutine({ id: routineId, owner }),
+    subscribe: (reload) => legacy.subscribe(reload),
   };
 }

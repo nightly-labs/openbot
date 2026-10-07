@@ -1,6 +1,6 @@
 import type { AttachmentSummary, FilePreview, OpenBotDesktopApi } from "@openbot/contracts/ipc";
 import type { ChannelMemoriesApi } from "../conversation/memories-port";
-import type { ChannelRoutinesApi } from "../conversation/routines-port";
+import type { ChannelRoutinesApi, EventRoutinesApi } from "../conversation/routines-port";
 
 /**
  * What the channels domain reaches on its host: channel pages, commands, memories, routines,
@@ -24,6 +24,7 @@ export interface ChannelsPort {
     ChannelMemoriesApi &
     ChannelRoutinesApi &
     Partial<Pick<OpenBotDesktopApi["agent"], "downloadAttachments">>;
+  eventRoutines?: EventRoutinesApi;
   browser: Pick<OpenBotDesktopApi["browser"], "capturePreview">;
   openUrl: OpenBotDesktopApi["openUrl"];
   /** `browser` has no file manager to reveal a file in, so that action is hidden. */

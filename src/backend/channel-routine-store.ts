@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   ChannelRoutine,
@@ -6,6 +7,8 @@ import type {
   CreateChannelRoutineInput,
   UpdateChannelRoutineInput,
 } from "@openbot/contracts/ipc";
+import type { EventRoutine } from "@openbot/contracts/ipc-events";
+import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import type { OpenBotDatabase } from "./openbot-database";
 import {
@@ -93,8 +96,77 @@ export class ChannelRoutineStore extends RoutineStore {
     triggerId: string | null,
     kind: ChannelRoutineRun["kind"],
     scheduledFor: string,
+    runId?: string,
   ): ChannelRoutineRun {
-    return toChannelRun(this.createRunRow(toOwnedRoutine(routine), triggerId, kind, scheduledFor));
+    return toChannelRun(
+      this.createRunRow(toOwnedRoutine(routine), triggerId, kind, scheduledFor, runId ?? randomUUID()),
+    );
+  }
+
+  ensureEventRoutine(routine: EventRoutine): ChannelRoutine {
+    if (routine.owner.kind !== "channel") throw new Error("The event routine owner is invalid.");
+    this.ensureRoutineRecord(routine.owner.id, {
+      id: routine.id,
+      name: routine.name,
+      instruction: routine.instruction,
+      timezone: routine.timezone,
+      ...(routine.limitPolicy === undefined ? {} : { limitPolicy: routine.limitPolicy }),
+    });
+    const trigger: ChannelRoutine["trigger"] = {
+      id: `event:${routine.id}`,
+      routineId: routine.id,
+      schedule: { kind: "custom", expression: "0 0 1 1 *" },
+      nextRunAt: "9999-12-31T23:59:59.999Z",
+      createdAt: routine.createdAt,
+      updatedAt: routine.updatedAt,
+    };
+    return {
+      id: routine.id,
+      channelId: routine.owner.id,
+      name: routine.name,
+      instruction: routine.instruction,
+      active: false,
+      timezone: routine.timezone,
+      trigger,
+      ...(routine.limitPolicy === undefined ? {} : { limitPolicy: routine.limitPolicy }),
+      createdAt: routine.createdAt,
+      updatedAt: routine.updatedAt,
+    };
+  }
+
+  convertEventRoutineToSchedule(input: {
+    channelId: string;
+    routineId: string;
+    name: string;
+    instruction: string;
+    active: boolean;
+    timezone: string;
+    schedule: ChannelRoutine["trigger"]["schedule"];
+    limitPolicy?: ChannelRoutine["limitPolicy"];
+    createdAt?: string;
+  }): ChannelRoutine {
+    return toChannelRoutine(this.convertEventRoutineToScheduleRow(input.channelId, input));
+  }
+
+  deactivateEventRoutine(channelId: string, routineId: string): void {
+    this.database.connection
+      .prepare(
+        "UPDATE projection_channel_routines SET active = 0, updated_at = ? WHERE channel_id = ? AND routine_id = ?",
+      )
+      .run(new Date().toISOString(), channelId, routineId);
+  }
+
+  deleteEventRoutine(channelId: string, routineId: string): void {
+    this.deleteEventRoutineProjection(channelId, routineId);
+  }
+
+  eventLimitPolicy(channelId: string, routineId: string): ChannelRoutine["limitPolicy"] {
+    const row = this.database.connection
+      .prepare("SELECT limit_policy FROM projection_channel_routines WHERE channel_id = ? AND routine_id = ?")
+      .get(channelId, routineId);
+    return isDynamicRecord(row) && (row.limit_policy === "wait" || row.limit_policy === "skip")
+      ? row.limit_policy
+      : undefined;
   }
 
   attachRequest(runId: string, requestMessageId: string): ChannelRoutineRun {

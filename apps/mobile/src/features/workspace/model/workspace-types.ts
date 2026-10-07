@@ -35,6 +35,18 @@ import type {
   UpdateAgentInput,
   UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
+import type {
+  EventActivity,
+  EventRoutine,
+  EventRoutineOwner,
+  EventSource,
+  EventStatus,
+  ListEventActivityInput,
+  SaveEventRoutineInput,
+  SaveEventSourceInput,
+  SaveWebhookDestinationInput,
+  WebhookDestination,
+} from "@openbot/contracts/ipc-events";
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import type { RemoteRecoveryStatus, RemoteTeamDirectoryClient } from "@openbot/team-client";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
@@ -152,6 +164,21 @@ export interface MobileWorkspaceContextValue {
   updateAgentRoutine: (input: UpdateRoutineInput, serverId: string) => Promise<void>;
   deleteAgentRoutine: (agentId: string, routineId: string, serverId: string) => Promise<void>;
   testAgentRoutine: (agentId: string, routineId: string, serverId: string) => Promise<void>;
+  /** Event administration is available only to owners and admins on hosts with events-v1. */
+  canManageEvents: (serverId: string) => boolean;
+  getEventStatus: (serverId: string) => Promise<EventStatus>;
+  listEventSources: (serverId: string) => Promise<EventSource[]>;
+  saveEventSource: (input: SaveEventSourceInput, serverId: string) => Promise<EventSource>;
+  deleteEventSource: (id: string, serverId: string) => Promise<void>;
+  listWebhookDestinations: (serverId: string) => Promise<WebhookDestination[]>;
+  saveWebhookDestination: (input: SaveWebhookDestinationInput, serverId: string) => Promise<WebhookDestination>;
+  deleteWebhookDestination: (id: string, serverId: string) => Promise<void>;
+  listEventActivity: (input: ListEventActivityInput, serverId: string) => Promise<EventActivity[]>;
+  retryEventDelivery: (id: string, serverId: string) => Promise<void>;
+  listEventRoutines: (owner: EventRoutineOwner, serverId: string) => Promise<EventRoutine[]>;
+  saveEventRoutine: (input: SaveEventRoutineInput, serverId: string) => Promise<EventRoutine>;
+  deleteEventRoutine: (input: { id: string; owner: EventRoutineOwner }, serverId: string) => Promise<void>;
+  testEventRoutine: (input: { id: string; owner: EventRoutineOwner }, serverId: string) => Promise<void>;
   loadAgentModels: (serverId: string) => Promise<AgentModelOption[]>;
   loadAgentMemories: (agentId: string, serverId: string) => Promise<AgentMemory[]>;
   loadAgentRoutines: (agentId: string, serverId: string) => Promise<Routine[]>;

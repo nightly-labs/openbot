@@ -30,6 +30,7 @@ import {
   AGENT_PUBLISH_CAPABILITY,
   AGENT_UPDATE_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
+  EVENTS_CAPABILITY,
   HOST_ADMIN_CAPABILITY,
   HOST_UPDATE_CAPABILITY,
   HOSTED_SITES_CAPABILITY,
@@ -117,6 +118,7 @@ import { routeBrowser } from "./team-api/route-browser";
 import { routeChannels } from "./team-api/route-channels";
 import { routeContextReset } from "./team-api/route-context-reset";
 import { routeDirect } from "./team-api/route-direct";
+import { routeEvents } from "./team-api/route-events";
 import { routeFiles } from "./team-api/route-files";
 import { routeHostAdmin } from "./team-api/route-host-admin";
 import { routeHostUpdate } from "./team-api/route-host-update";
@@ -674,6 +676,7 @@ export class TeamApiServer {
       if ((await routeHostUpdate(context, this.#options.admin)) === "handled") return;
       if ((await routeContextReset(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeWorkspaceDirectory(context, this.#options.agents, hidden)) === "handled") return;
+      if ((await this.#routeEvents(context)) === "handled") return;
       if ((await routeAgentImport(context, this.#options.agentImport, newAgentHidden)) === "handled") return;
       if (
         (await routeLiveActivityPush(context, this.#options.liveActivityPush, () =>
@@ -756,6 +759,10 @@ export class TeamApiServer {
       sidebarLayout: this.#options.sidebarLayout,
       duplicateAgent: (agentId, operationId) => this.#duplicateAgent(agentId, operationId),
     });
+  }
+
+  #routeEvents(context: TeamApiRequestContext): Promise<RouteOutcome> {
+    return routeEvents(context, { events: this.#options.events });
   }
 
   #checkRate(request: IncomingMessage, username: string): void {
@@ -1318,6 +1325,7 @@ export class TeamApiServer {
         if (capability === PROVIDERS_SIGN_IN_V3_CAPABILITY) return this.#options.admin?.providers?.pasteSignIn === true;
         if (capability === HOST_ADMIN_CAPABILITY) return this.#options.admin?.identity !== undefined;
         if (capability === HOST_UPDATE_CAPABILITY) return this.#options.admin?.update !== undefined;
+        if (capability === EVENTS_CAPABILITY) return this.#options.events !== undefined;
         if (capability === AGENT_IMPORT_CAPABILITY) return this.#options.agentImport !== undefined;
         if (capability === LIVE_ACTIVITY_PUSH_CAPABILITY) return this.#options.liveActivityPush !== undefined;
         return true;

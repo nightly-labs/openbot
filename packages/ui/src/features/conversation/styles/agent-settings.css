@@ -362,6 +362,25 @@
   line-height: var(--openbot-leading-md);
 }
 
+.agent-routine-trigger-choice,
+.agent-routine-event-trigger,
+.agent-routine-event-filter {
+  display: grid;
+  gap: var(--openbot-space-2);
+}
+
+.agent-routine-trigger-choice {
+  display: flex;
+  width: fit-content;
+  align-items: center;
+  margin-bottom: var(--openbot-space-3);
+}
+
+.agent-routine-event-filter {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: center;
+}
+
 .agent-routine-history h3 {
   margin: 0 0 8px;
   color: var(--openbot-text-muted);
@@ -1144,4 +1163,20 @@
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-sm);
   line-height: 15px;
+}
+
+.agent-routine-webhook-row {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.agent-routine-webhook-row .ui-input,
+.agent-routine-webhook-row .ui-select {
+  flex: 1;
+  min-width: 0;
+}
+
+.agent-routine-disclosure {
+  justify-self: start;
 }

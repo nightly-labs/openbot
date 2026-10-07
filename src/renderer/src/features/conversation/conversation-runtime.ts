@@ -3,6 +3,7 @@ import type { AgentSkillCalls } from "../../skills-port";
 import type { AgentTemplatePublishCalls } from "../agent-templates/agent-templates-port";
 import type { SharedTableCalls } from "./conversation-port";
 import type { ConversationProps } from "./conversation-types";
+import type { EventRoutinesApi } from "./routines-port";
 
 export interface ConversationRuntime {
   agent: Pick<
@@ -40,7 +41,12 @@ export interface ConversationRuntime {
   cancelImportFiles?: () => Promise<void>;
   /** The host admin calls of a client without the desktop port. Absent, skills, tables and publishing are hidden. */
   admin?:
-    | { skills: AgentSkillCalls; sharedTables: SharedTableCalls; agentTemplates: AgentTemplatePublishCalls }
+    | {
+        skills: AgentSkillCalls;
+        sharedTables: SharedTableCalls;
+        agentTemplates: AgentTemplatePublishCalls;
+        eventRoutines?: EventRoutinesApi;
+      }
     | undefined;
 }
 

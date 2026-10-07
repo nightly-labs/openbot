@@ -17,7 +17,7 @@ import { AgentSkillsModal, type AgentSkillsMode, assignedSkillCount } from "./Ag
 import { conversationPort, type SharedTableCalls } from "./conversation-port";
 import type { ConversationRuntime } from "./conversation-runtime";
 import { agentMemoriesPort } from "./memories-port";
-import { agentRoutinesPort } from "./routines-port";
+import { agentRoutinesPort, type EventRoutinesApi, eventRoutinesPort } from "./routines-port";
 import { SharedTablesModal } from "./SharedTablesModal";
 
 interface AgentSettingsPanelProps
@@ -42,6 +42,8 @@ interface AgentSettingsPanelProps
   tablesVisible?: boolean;
   /** Names the agent that keeps each set of records. Threaded like `customProviders`, for the same reason. */
   agents?: readonly AgentProfile[];
+  /** Event routine calls for a host that advertises `events-v1`; absent keeps the released schedule API. */
+  eventRoutines?: EventRoutinesApi;
   onCreateSkill?: () => void;
   onTrySkill?: (skill: MarketplaceSkillDetail) => void;
   onAddFromMarketplace?: (agentId: string) => void;
@@ -62,7 +64,8 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     skills: { count: 0, open: false, reopenAfterMarketplace: false },
   });
   const memoriesPort = createMemo(() => agentMemoriesPort(props.agent.id, props.agent.name));
-  const routinesPort = createMemo(() =>
+  const eventRoutinesApi = () => props.eventRoutines ?? props.adminCalls?.eventRoutines;
+  const legacyRoutinesPort = createMemo(() =>
     agentRoutinesPort(
       props.agent.id,
       props.automationEditable === true && agentAutomationAllowed(props.agent),
@@ -70,6 +73,12 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       props.automationEditable === true,
     ),
   );
+  const routinesPort = createMemo(() => {
+    const eventApi = eventRoutinesApi();
+    return eventApi
+      ? eventRoutinesPort({ kind: "agent", id: props.agent.id }, eventApi, legacyRoutinesPort())
+      : legacyRoutinesPort();
+  });
   const skillsMode = () => props.skillsMode ?? "mutable";
   const tableCalls = (): SharedTableCalls => props.adminCalls?.sharedTables ?? conversationPort().agent;
   const skillCalls = () =>
@@ -117,8 +126,8 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
               state.memories.count = items.length;
             });
           });
-        void conversationPort()
-          .agent.listRoutines(agentId)
+        void routinesPort()
+          .list()
           .catch(() => [])
           .then((items) => {
             setDraft((state) => {

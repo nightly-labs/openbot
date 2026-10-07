@@ -16,7 +16,8 @@ export function ChannelRecordsScreen({ section }: { section: "memories" | "memor
     recordId?: string;
   }>();
   const { session, sessionScope } = useMobileSession();
-  const { servers } = useMobileWorkspace();
+  const workspace = useMobileWorkspace();
+  const { servers } = workspace;
   const { store, channels } = useChannels(serverId);
   const available =
     servers.some((server) => server.id === serverId && server.state === "online") &&
@@ -36,16 +37,35 @@ export function ChannelRecordsScreen({ section }: { section: "memories" | "memor
     queryKey: [...key, "routines"],
     queryFn: () => store.routines(serverId, channelId),
   });
+  const server = servers.find((candidate) => candidate.id === serverId);
+  const eventsEnabled =
+    available &&
+    !memorySection &&
+    (server?.role === "owner" || server?.role === "admin") &&
+    workspace.canManageEvents(serverId);
+  const eventRoutines = useQuery({
+    ...options,
+    enabled: eventsEnabled,
+    queryKey: [...key, "event-routines"],
+    queryFn: () => workspace.listEventRoutines({ kind: "channel", id: channelId }, serverId),
+  });
   const query = memorySection ? memories : routines;
+  const recordsPending = query.isPending || (eventsEnabled && eventRoutines.isPending);
+  const recordsError = query.isError || (eventsEnabled && eventRoutines.isError);
   const target = { id: channelId, serverId };
   const memory = memories.data?.find((item) => item.id === recordId);
   const routine = routines.data?.find((item) => item.id === recordId);
+  const eventRoutine = eventRoutines.data?.find((item) => item.id === recordId);
+  const allRoutines = [
+    ...(routines.data ?? []),
+    ...(eventRoutines.data ?? []).filter((routine) => routine.trigger.kind === "event"),
+  ];
   return (
     <SettingsContent>
       {!available ? <Typography.Paragraph>{t("mobile.channel.records.connect")}</Typography.Paragraph> : null}
-      {query.isPending && (Boolean(recordId) || section === "memories" || section === "routines") ? (
+      {recordsPending && (Boolean(recordId) || section === "memories" || section === "routines") ? (
         <Typography.Paragraph>{t("common.loading")}</Typography.Paragraph>
-      ) : query.isError && !query.data ? (
+      ) : recordsError && !query.data && !eventRoutines.data ? (
         <>
           <Typography.Paragraph accessibilityRole="alert">
             {t("mobile.channel.records.loadFailed")}
@@ -54,7 +74,7 @@ export function ChannelRecordsScreen({ section }: { section: "memories" | "memor
             <Button.Label>{t("common.tryAgain")}</Button.Label>
           </Button>
         </>
-      ) : recordId && !memory && !routine ? (
+      ) : recordId && !memory && !routine && !eventRoutine ? (
         <Typography.Paragraph>{t("mobile.channel.records.gone")}</Typography.Paragraph>
       ) : section === "memory" ? (
         <MemoryEditor
@@ -70,7 +90,7 @@ export function ChannelRecordsScreen({ section }: { section: "memories" | "memor
       ) : section === "routine" ? (
         <RoutineEditor
           agent={target}
-          routine={routine}
+          routine={eventRoutine ?? routine}
           available={available}
           port={{
             queryKey: key,
@@ -78,6 +98,11 @@ export function ChannelRecordsScreen({ section }: { section: "memories" | "memor
             update: (input) => store.updateRoutine(serverId, { ...input, channelId }),
             delete: (id) => store.deleteRoutine(serverId, channelId, id),
             test: (id) => store.testRoutine(serverId, channelId, id),
+            saveEvent: async (input) => {
+              await workspace.saveEventRoutine(input, serverId);
+            },
+            deleteEvent: (input) => workspace.deleteEventRoutine(input, serverId),
+            testEvent: (input) => workspace.testEventRoutine(input, serverId),
           }}
         />
       ) : (
@@ -96,7 +121,7 @@ export function ChannelRecordsScreen({ section }: { section: "memories" | "memor
                   <Typography.Paragraph numberOfLines={2}>{item.text}</Typography.Paragraph>
                 </SettingsRow>
               ))
-            : routines.data?.map((item) => (
+            : allRoutines.map((item) => (
                 <SettingsRow
                   key={item.id}
                   supportingText={t(item.active ? "mobile.channel.records.enabled" : "mobile.channel.records.paused")}
@@ -110,7 +135,7 @@ export function ChannelRecordsScreen({ section }: { section: "memories" | "memor
                   <Typography.Paragraph>{item.name}</Typography.Paragraph>
                 </SettingsRow>
               ))}
-          {!query.data?.length ? (
+          {!memorySection && !allRoutines.length ? (
             <SettingsRow>
               <Typography.Paragraph>
                 {t(memorySection ? "mobile.channel.records.noMemories" : "mobile.channel.records.noRoutines")}

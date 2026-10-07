@@ -16,6 +16,13 @@ import {
   type RoutineCalendarOwner,
   STORAGE_CAPABILITY,
 } from "@openbot/contracts/ipc";
+import type {
+  EventRoutineOwner,
+  ListEventActivityInput,
+  SaveEventRoutineInput,
+  SaveEventSourceInput,
+  SaveWebhookDestinationInput,
+} from "@openbot/contracts/ipc-events";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_ADMIN_CAPABILITY, AGENT_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/agent-admin-v1";
@@ -26,6 +33,7 @@ import {
   TEAM_MEDIA_ATTACHMENTS_CAPABILITY,
   TEAM_SEMANTIC_TAGS_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
+import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
 import { TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { SKILLS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
@@ -34,9 +42,22 @@ import { readHostAnalytics, runTeamEffect } from "@openbot/team-client";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import { buildRoutineCalendar, type RoutineCalendarSource } from "@openbot/team-client/routine-calendar";
 import {
+  deleteEventRoutine,
+  deleteEventSource,
+  deleteWebhookDestination,
+  getEventStatus,
   installAgentTemplate,
   listAgentSkills,
+  listEventActivity,
+  listEventRoutines,
+  listEventSources,
+  listWebhookDestinations,
+  retryEventDelivery,
+  saveEventRoutine,
+  saveEventSource,
+  saveWebhookDestination,
   setAgentSkillEnabled,
+  testEventRoutine,
   uninstallAgentSkill,
 } from "@openbot/team-client/team-admin-requests";
 import { type TeamApiRequest, TeamRequestError } from "@openbot/team-client/team-api-requests";
@@ -72,6 +93,19 @@ type HostRequestActions = Pick<
   | "loadAgentMemories"
   | "loadAgentRoutines"
   | "loadRoutineCalendar"
+  | "getEventStatus"
+  | "listEventSources"
+  | "saveEventSource"
+  | "deleteEventSource"
+  | "listWebhookDestinations"
+  | "saveWebhookDestination"
+  | "deleteWebhookDestination"
+  | "listEventActivity"
+  | "retryEventDelivery"
+  | "listEventRoutines"
+  | "saveEventRoutine"
+  | "deleteEventRoutine"
+  | "testEventRoutine"
   | "loadHostAnalytics"
   | "searchMessages"
   | "loadAgentSkills"
@@ -116,7 +150,39 @@ export function createHostRequestActions({
       throw new Error(currentText().t("mobile.agent.skill.manageUnsupported"));
     return teamApi(serverId);
   }
+  /** The event admin routes are optional and reject members on the host. */
+  function eventsAdmin(serverId: string): TeamApiRequest {
+    if (!capabilities.get(serverId)?.includes(EVENTS_CAPABILITY))
+      throw new Error(currentText().t("mobile.server.events.unsupported"));
+    return teamApi(serverId);
+  }
   return {
+    getEventStatus: (serverId) =>
+      runTeamEffect(getEventStatus(eventsAdmin(serverId)).pipe(Effect.mapError((error) => error.cause))),
+    listEventSources: (serverId) =>
+      runTeamEffect(listEventSources(eventsAdmin(serverId)).pipe(Effect.mapError((error) => error.cause))),
+    saveEventSource: (input: SaveEventSourceInput, serverId: string) =>
+      runTeamEffect(saveEventSource(eventsAdmin(serverId), input).pipe(Effect.mapError((error) => error.cause))),
+    deleteEventSource: (id: string, serverId: string) =>
+      runTeamEffect(deleteEventSource(eventsAdmin(serverId), id).pipe(Effect.mapError((error) => error.cause))),
+    listWebhookDestinations: (serverId) =>
+      runTeamEffect(listWebhookDestinations(eventsAdmin(serverId)).pipe(Effect.mapError((error) => error.cause))),
+    saveWebhookDestination: (input: SaveWebhookDestinationInput, serverId: string) =>
+      runTeamEffect(saveWebhookDestination(eventsAdmin(serverId), input).pipe(Effect.mapError((error) => error.cause))),
+    deleteWebhookDestination: (id: string, serverId: string) =>
+      runTeamEffect(deleteWebhookDestination(eventsAdmin(serverId), id).pipe(Effect.mapError((error) => error.cause))),
+    listEventActivity: (input: ListEventActivityInput, serverId: string) =>
+      runTeamEffect(listEventActivity(eventsAdmin(serverId), input).pipe(Effect.mapError((error) => error.cause))),
+    retryEventDelivery: (id: string, serverId: string) =>
+      runTeamEffect(retryEventDelivery(eventsAdmin(serverId), id).pipe(Effect.mapError((error) => error.cause))),
+    listEventRoutines: (owner: EventRoutineOwner, serverId: string) =>
+      runTeamEffect(listEventRoutines(eventsAdmin(serverId), owner).pipe(Effect.mapError((error) => error.cause))),
+    saveEventRoutine: (input: SaveEventRoutineInput, serverId: string) =>
+      runTeamEffect(saveEventRoutine(eventsAdmin(serverId), input).pipe(Effect.mapError((error) => error.cause))),
+    deleteEventRoutine: (input: { id: string; owner: EventRoutineOwner }, serverId: string) =>
+      runTeamEffect(deleteEventRoutine(eventsAdmin(serverId), input).pipe(Effect.mapError((error) => error.cause))),
+    testEventRoutine: (input: { id: string; owner: EventRoutineOwner }, serverId: string) =>
+      runTeamEffect(testEventRoutine(eventsAdmin(serverId), input).pipe(Effect.mapError((error) => error.cause))),
     saveAgentMemory: async (agentId, text, serverId, memoryId) => {
       await saveAgentRecord(queryClient, ["agent-info", ...queryScope, serverId, agentId, "memories"], () =>
         request(

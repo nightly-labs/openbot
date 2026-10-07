@@ -138,6 +138,17 @@ import {
   decodeDynamicIslandPreference,
   decodeDynamicIslandPresentation,
 } from "./dynamic-island-decoding";
+import {
+  decodeEventActivity,
+  decodeEventDestination,
+  decodeEventDestinations,
+  decodeEventRoutine,
+  decodeEventRoutines,
+  decodeEventSource,
+  decodeEventSources,
+  decodeEventStatus,
+  decodeVoid as decodeEventsVoid,
+} from "./events-decoding";
 import { decodeAddOrchestratorReply, decodeMessagingOverviewReply } from "./messaging-decoding";
 import { decodeProviderRuntimeSnapshot } from "./provider-runtime";
 import {
@@ -840,6 +851,21 @@ const openbotApi: OpenBotDesktopApi = {
     revokeInvite: decodeVoid,
     createInvite: decodeInviteSummary,
     event: decodeHostStatus,
+  }),
+  events: bridgeGroup(IPC_ENDPOINTS.events, {
+    getStatus: decodeEventStatus,
+    listSources: decodeEventSources,
+    saveSource: decodeEventSource,
+    deleteSource: decodeEventsVoid,
+    listDestinations: decodeEventDestinations,
+    saveDestination: decodeEventDestination,
+    deleteDestination: decodeEventsVoid,
+    listActivity: decodeEventActivity,
+    retryDelivery: decodeEventsVoid,
+    listRoutines: decodeEventRoutines,
+    saveRoutine: decodeEventRoutine,
+    deleteRoutine: decodeEventsVoid,
+    testRoutine: decodeEventsVoid,
   }),
   // The shared contract decoder, as MCP does: it already bounds every row, and a remote answer was
   // decoded in main before it reached this point.

@@ -38,8 +38,12 @@ table, IPC channel or product string, or when a term in the code disagrees with 
 - **thread**: durable `projection_threads` record. **conversation**: its read projection, with no
   separate table. **provider session**: private CLI resume state (`projection_provider_sessions`).
   **team session**: authenticated remote connection. **turn**: one exchange in a thread.
-- **routine**: a scheduled instruction for one agent (`projection_agent_routines`), not Claude
-  Code `/schedule`.
+- **routine**: a saved instruction for an agent or channel, with one schedule or event trigger.
+  Scheduled agent routines use `projection_agent_routines`. This is not Claude Code `/schedule`.
+- **event source**: a configured input that supplies verified events to the host. A webhook is one
+  source type. An **event trigger** selects a source, event type, and optional data filters.
+- **webhook destination**: an HTTPS endpoint that receives selected routine status notifications.
+  A **delivery** is one notification, including its retry attempts.
 - **shared table**: a table an agent created in the one file every agent shares
   (`~/OpenBot/Shared/Data/agent-data.db`, `SharedTable`, `AgentTables`). `openbot.db` is the
   application's database and holds none of these. **owner**: the agent whose id

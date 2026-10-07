@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import type { DiscordDelivery } from "@openbot/contracts/signal-protocol/discord-api";
 import { DISCORD_ROUTE_TTL_SECONDS, type DiscordRouteGuild } from "@openbot/contracts/signal-protocol/discord-route";
 import { SLACK_ROUTE_TTL_SECONDS, type SlackRouteTeam } from "@openbot/contracts/signal-protocol/slack-route";
+import { WEBHOOK_ROUTE_TTL_SECONDS, type WebhookRoute } from "@openbot/contracts/signal-protocol/webhook-route";
 import { Context, Effect, Layer, Result } from "effect";
 import {
   decodeSignalClientMessage,
@@ -14,6 +15,7 @@ import {
   type SignalServerMessage,
   type SlackDeliveryKind,
   type SlackDeliveryStatus,
+  type WebhookDeliveryStatus,
 } from "./protocol";
 import { RemoteTokenError } from "./tokens";
 
@@ -25,6 +27,10 @@ interface SlackRoute {
 /** The guilds a verified Discord route ticket names, each with the time it was linked to the host. */
 interface DiscordRoute {
   guilds: DiscordRouteGuild[];
+}
+
+interface WebhookRouteTicket {
+  routes: WebhookRoute[];
 }
 
 export interface RemoteTokenProvider {
@@ -39,6 +45,9 @@ export interface RemoteTokenProvider {
   /** Without a Discord route verifier, an ingress socket cannot name Discord guilds. */
   verifyDiscordRoute?(token: string, hostId: string): Effect.Effect<DiscordRoute, RemoteTokenError>;
   validateDiscordRoute?(hostId: string, guilds: DiscordRouteGuild[]): Effect.Effect<string[], RemoteTokenError>;
+  /** Without a route verifier, an ingress socket cannot name generic webhook routes. */
+  verifyWebhookRoute?(token: string, hostId: string): Effect.Effect<WebhookRouteTicket, RemoteTokenError>;
+  validateWebhookRoute?(hostId: string, routes: WebhookRoute[]): Effect.Effect<string[], RemoteTokenError>;
   revokeHost?(hostId: string, authEpoch: number): void;
   revokeSession?(sessionId: string): void;
 }
@@ -72,6 +81,8 @@ interface AuthenticatedPeer {
   discordGuilds: string[];
   // `ingress` only: the hash of the `discord-session` token sent to this socket.
   discordSession: string | null;
+  // `ingress` only: opaque generic webhook route IDs whose requests this socket receives.
+  webhookRoutes: string[];
 }
 
 interface ActiveConnection {
@@ -96,6 +107,8 @@ export interface SignalMetrics {
   discordDeliveriesUnavailable: number;
   discordApiCalls: number;
   discordApiFailures: number;
+  webhookDeliveries: number;
+  webhookDeliveriesUnavailable: number;
 }
 
 /** The result of the authorization of one Discord API call. */
@@ -128,6 +141,17 @@ export interface SlackDeliveryResponse {
   body?: string;
 }
 
+export interface WebhookDelivery {
+  timestamp: string;
+  deliveryId: string;
+  signature: string;
+  body: Uint8Array;
+}
+
+export interface WebhookDeliveryResponse {
+  status: WebhookDeliveryStatus;
+}
+
 interface PendingDelivery {
   socketId: string;
   hostId: string;
@@ -136,8 +160,24 @@ interface PendingDelivery {
   resolve(response: SlackDeliveryResponse): void;
 }
 
+interface PendingWebhookDelivery {
+  socketId: string;
+  hostId: string;
+  bytes: number;
+  timer: ReturnType<typeof setTimeout>;
+  resolve(response: WebhookDeliveryResponse): void;
+}
+
 export interface SlackDeliveryLimits {
   /** How long Signal waits for the host. Slack gives up after 3 seconds. */
+  timeoutMilliseconds: number;
+  maximumPendingPerHost: number;
+  maximumPendingBytesPerHost: number;
+  maximumPending: number;
+}
+
+export interface WebhookDeliveryLimits {
+  /** How long Signal waits for the host before returning a retryable response. */
   timeoutMilliseconds: number;
   maximumPendingPerHost: number;
   maximumPendingBytesPerHost: number;
@@ -149,6 +189,13 @@ export interface SlackDeliveryLimits {
  * the socket when it is reached. A body travels as base64, a third larger than the body.
  */
 const DEFAULT_SLACK_DELIVERY_LIMITS: SlackDeliveryLimits = {
+  timeoutMilliseconds: 2_500,
+  maximumPendingPerHost: 16,
+  maximumPendingBytesPerHost: 128 * 1024,
+  maximumPending: 1_000,
+};
+
+const DEFAULT_WEBHOOK_DELIVERY_LIMITS: WebhookDeliveryLimits = {
   timeoutMilliseconds: 2_500,
   maximumPendingPerHost: 16,
   maximumPendingBytesPerHost: 128 * 1024,
@@ -187,12 +234,17 @@ export class SignalService {
   readonly #discordGuilds = new Map<string, string>();
   // The oldest link that each guild still accepts, as `#slackRouteFloor` does for Slack.
   readonly #discordRouteFloor = new Map<string, number>();
+  // Generic webhook route ID to the `ingress` socket that said hello last with a route ticket.
+  readonly #webhookRoutes = new Map<string, string>();
+  readonly #webhookRouteFloor = new Map<string, number>();
   // The SHA-256 of each `discord-session` token to its socket. The token itself is not kept.
   readonly #discordSessions = new Map<string, string>();
   readonly #discordEnabled: boolean;
   #discordMembership: DiscordMembership | null = null;
   readonly #pendingDeliveries = new Map<string, PendingDelivery>();
+  readonly #pendingWebhookDeliveries = new Map<string, PendingWebhookDelivery>();
   readonly #slackLimits: SlackDeliveryLimits;
+  readonly #webhookLimits: WebhookDeliveryLimits;
   readonly #connections = new Map<string, ActiveConnection>();
   readonly #connectionDropTimers = new Map<string, ReturnType<typeof setTimeout>>();
   readonly #peerExpirationTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -205,6 +257,7 @@ export class SignalService {
   // expired, the account service confirms each link.
   readonly #validateSlackRoutesUntil = Date.now() + SLACK_ROUTE_TTL_SECONDS * 1_000;
   readonly #validateDiscordRoutesUntil = Date.now() + DISCORD_ROUTE_TTL_SECONDS * 1_000;
+  readonly #validateWebhookRoutesUntil = Date.now() + WEBHOOK_ROUTE_TTL_SECONDS * 1_000;
   #lastRatePruneAt = 0;
   readonly #metrics: SignalMetrics = {
     acceptedConnections: 0,
@@ -219,6 +272,8 @@ export class SignalService {
     discordDeliveriesUnavailable: 0,
     discordApiCalls: 0,
     discordApiFailures: 0,
+    webhookDeliveries: 0,
+    webhookDeliveriesUnavailable: 0,
   };
 
   readonly dependencies: Layer.Layer<SignalTokens>;
@@ -230,6 +285,7 @@ export class SignalService {
     maximumMessagesPerMinute = 600,
     slackLimits: SlackDeliveryLimits = DEFAULT_SLACK_DELIVERY_LIMITS,
     options: SignalServiceOptions = {},
+    webhookLimits: WebhookDeliveryLimits = DEFAULT_WEBHOOK_DELIVERY_LIMITS,
   ) {
     this.#tokens = tokens;
     this.dependencies = SignalTokens.layer(tokens);
@@ -237,6 +293,7 @@ export class SignalService {
     this.#maximumConnectionsPerIp = maximumConnectionsPerIp;
     this.#maximumMessagesPerMinute = maximumMessagesPerMinute;
     this.#slackLimits = slackLimits;
+    this.#webhookLimits = webhookLimits;
     this.#discordEnabled = options.discord === true;
   }
 
@@ -245,6 +302,8 @@ export class SignalService {
     for (const timer of this.#peerExpirationTimers.values()) clearTimeout(timer);
     this.#connectionDropTimers.clear();
     this.#peerExpirationTimers.clear();
+    for (const requestId of [...this.#pendingWebhookDeliveries.keys()])
+      this.#settleWebhookDelivery(requestId, this.#webhookUnavailable());
   }
 
   connect(socket: SignalSocket): boolean {
@@ -323,6 +382,15 @@ export class SignalService {
         });
         return;
       }
+      if (message.type === "webhook-delivery-result") {
+        const pending = this.#pendingWebhookDeliveries.get(message.requestId);
+        if (!pending || pending.socketId !== socket.id) {
+          this.#fail(socket, "permission_denied", "The delivery does not belong to this peer.");
+          return;
+        }
+        this.#settleWebhookDelivery(message.requestId, { status: message.status });
+        return;
+      }
       const connection = this.#connections.get(message.connectionId);
       if (!connection || (connection.client.id !== socket.id && connection.host.id !== socket.id)) {
         this.#fail(socket, "permission_denied", "The connection does not belong to this peer.");
@@ -355,6 +423,12 @@ export class SignalService {
         }
         for (const [requestId, pending] of [...this.#pendingDeliveries]) {
           if (pending.socketId === socket.id) this.#settleDelivery(requestId, this.#unavailable());
+        }
+        for (const route of peer.webhookRoutes) {
+          if (this.#webhookRoutes.get(route) === socket.id) this.#webhookRoutes.delete(route);
+        }
+        for (const [requestId, pending] of [...this.#pendingWebhookDeliveries]) {
+          if (pending.socketId === socket.id) this.#settleWebhookDelivery(requestId, this.#webhookUnavailable());
         }
         for (const guildId of peer.discordGuilds) {
           if (this.#discordGuilds.get(guildId) === socket.id) this.#discordGuilds.delete(guildId);
@@ -442,6 +516,14 @@ export class SignalService {
     this.#discordGuilds.delete(guildId);
   }
 
+  /** The account service disabled, deleted or moved a generic webhook route. */
+  revokeWebhookRoute(routeId: string, through: number): void {
+    const floor = this.#webhookRouteFloor.get(routeId) ?? 0;
+    if (floor > through) return;
+    this.#webhookRouteFloor.set(routeId, through + 1);
+    this.#webhookRoutes.delete(routeId);
+  }
+
   /**
    * Passes one normalized Discord event to the `ingress` socket of the guild's host. Nothing waits
    * for an answer, and nothing is kept: with no socket for the guild, the event is dropped.
@@ -479,6 +561,11 @@ export class SignalService {
     if (this.#acceptRateKey(key, now)) return null;
     const window = this.#rateWindows.get(key);
     return window ? Math.max(1, window.startedAt + RATE_WINDOW_MILLISECONDS - now) : RATE_WINDOW_MILLISECONDS;
+  }
+
+  /** Applies the generic webhook rate limit by route or source address. */
+  acceptWebhookRequest(key: string): boolean {
+    return this.#acceptRateKey(`webhook:${key}`, Date.now());
   }
 
   recordDiscordCall(succeeded: boolean): void {
@@ -560,6 +647,62 @@ export class SignalService {
     }),
   );
 
+  /** Passes one signed generic webhook to the host and waits for its commit acknowledgement. */
+  readonly deliverWebhook = Effect.fn("Signal.deliverWebhook")((routeId: string, delivery: WebhookDelivery) =>
+    Effect.gen({ self: this }, function* () {
+      const socketId = this.#webhookRoutes.get(routeId);
+      const ingress = socketId ? this.#peers.get(socketId) : undefined;
+      if (!ingress) return this.#webhookUnavailable();
+      const hostId = ingress.claims.hostId;
+      let hostPending = 0;
+      let hostBytes = 0;
+      for (const pending of this.#pendingWebhookDeliveries.values()) {
+        if (pending.hostId !== hostId) continue;
+        hostPending += 1;
+        hostBytes += pending.bytes;
+      }
+      const bytes = Math.ceil(delivery.body.byteLength / 3) * 4;
+      if (
+        this.#pendingWebhookDeliveries.size >= this.#webhookLimits.maximumPending ||
+        hostPending >= this.#webhookLimits.maximumPendingPerHost ||
+        hostBytes + bytes > this.#webhookLimits.maximumPendingBytesPerHost
+      ) {
+        return this.#webhookUnavailable();
+      }
+      const requestId = randomIdentifier();
+      return yield* Effect.callback<WebhookDeliveryResponse>((resume) => {
+        const resolve = (response: WebhookDeliveryResponse) => resume(Effect.succeed(response));
+        const timer = setTimeout(
+          () => this.#settleWebhookDelivery(requestId, this.#webhookUnavailable()),
+          this.#webhookLimits.timeoutMilliseconds,
+        );
+        timer.unref?.();
+        this.#pendingWebhookDeliveries.set(requestId, { socketId: ingress.socket.id, hostId, bytes, timer, resolve });
+        this.#metrics.webhookDeliveries += 1;
+        this.#send(ingress.socket, {
+          type: "webhook-delivery",
+          version: 1,
+          requestId,
+          routeId,
+          timestamp: delivery.timestamp,
+          deliveryId: delivery.deliveryId,
+          signature: delivery.signature,
+          bodyBase64: Buffer.from(delivery.body).toString("base64"),
+        });
+      }).pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            const pending = this.#pendingWebhookDeliveries.get(requestId);
+            if (pending) {
+              clearTimeout(pending.timer);
+              this.#pendingWebhookDeliveries.delete(requestId);
+            }
+          }),
+        ),
+      );
+    }),
+  );
+
   /**
    * The rate limit for the Slack route: by workspace for a signed request, by address for a refused
    * one. A signed request is never limited by address, because Slack sends every app's events from
@@ -577,9 +720,22 @@ export class SignalService {
     pending.resolve(response);
   }
 
+  #settleWebhookDelivery(requestId: string, response: WebhookDeliveryResponse): void {
+    const pending = this.#pendingWebhookDeliveries.get(requestId);
+    if (!pending) return;
+    this.#pendingWebhookDeliveries.delete(requestId);
+    clearTimeout(pending.timer);
+    pending.resolve(response);
+  }
+
   #unavailable(): SlackDeliveryResponse {
     this.#metrics.slackDeliveriesUnavailable += 1;
     return UNAVAILABLE;
+  }
+
+  #webhookUnavailable(): WebhookDeliveryResponse {
+    this.#metrics.webhookDeliveriesUnavailable += 1;
+    return { status: 503 };
   }
 
   metrics(): SignalMetrics {
@@ -620,9 +776,10 @@ export class SignalService {
             return yield* new RemoteTokenError({ message: "Member role required." });
           let slackRoute: SlackRoute = { teams: [] };
           let discordRoute: DiscordRoute = { guilds: [] };
+          let webhookRoute: WebhookRouteTicket = { routes: [] };
           if (message.peer === "ingress") {
-            if (!message.slackRoute && !message.discordRoute)
-              return yield* new RemoteTokenError({ message: "A Slack or Discord route is required." });
+            if (!message.slackRoute && !message.discordRoute && !message.webhookRoute)
+              return yield* new RemoteTokenError({ message: "A Slack, Discord or webhook route is required." });
             if (message.slackRoute) {
               if (!tokens.verifySlackRoute) return yield* new RemoteTokenError({ message: "Slack route required." });
               slackRoute = yield* tokens.verifySlackRoute(message.slackRoute, claims.hostId);
@@ -644,11 +801,22 @@ export class SignalService {
                 discordRoute = { guilds: discordRoute.guilds.filter((guild) => linked.has(guild.id)) };
               }
             }
+            if (message.webhookRoute) {
+              if (!tokens.verifyWebhookRoute)
+                return yield* new RemoteTokenError({ message: "Webhook route verification required." });
+              webhookRoute = yield* tokens.verifyWebhookRoute(message.webhookRoute, claims.hostId);
+              if (Date.now() < this.#validateWebhookRoutesUntil) {
+                if (!tokens.validateWebhookRoute)
+                  return yield* new RemoteTokenError({ message: "Webhook route validation required." });
+                const linked = new Set(yield* tokens.validateWebhookRoute(claims.hostId, webhookRoute.routes));
+                webhookRoute = { routes: webhookRoute.routes.filter((route) => linked.has(route.id)) };
+              }
+            }
           }
           this.#pruneReplayCache();
           if (usedInitialTicket && this.#usedTicketIds.has(claims.jti))
             return yield* new RemoteTokenError({ message: "Ticket was already used." });
-          return { claims, slackRoute, discordRoute };
+          return { claims, slackRoute, discordRoute, webhookRoute };
         }).pipe(Effect.result);
         if (Result.isFailure(authentication)) {
           this.#metrics.authenticationFailures += 1;
@@ -657,7 +825,7 @@ export class SignalService {
         }
         // Verification may finish after disconnect removed the socket. Register nothing then.
         if (!this.#sockets.has(socket.id)) return;
-        const { claims, slackRoute, discordRoute } = authentication.success;
+        const { claims, slackRoute, discordRoute, webhookRoute } = authentication.success;
         // A reconnect of the same logical session replaces its old socket below, so that socket does not
         // count. A phone that changes network keeps a half-open socket until the idle timeout.
         const replaced =
@@ -682,6 +850,7 @@ export class SignalService {
           slackTeams: slackRoute.teams.map((team) => slackRouteKey(team.appId, team.id)),
           discordGuilds: discordRoute.guilds.map((guild) => guild.id),
           discordSession: null,
+          webhookRoutes: webhookRoute.routes.map((route) => route.id),
         };
         this.#peers.set(socket.id, peer);
         this.#schedulePeerExpiration(peer);
@@ -714,6 +883,11 @@ export class SignalService {
             this.#discordGuilds.set(guild.id, socket.id);
             heldGuilds.push(guild.id);
           }
+          for (const route of webhookRoute.routes) {
+            if (route.linkedAt < (this.#webhookRouteFloor.get(route.id) ?? 0)) continue;
+            this.#webhookRouteFloor.set(route.id, route.linkedAt);
+            this.#webhookRoutes.set(route.id, socket.id);
+          }
           this.#send(socket, {
             type: "ready",
             version: 1,
@@ -721,6 +895,13 @@ export class SignalService {
             resumeToken,
             iceServers: this.#tokens.iceServers(claims),
           });
+          if (webhookRoute.routes.length > 0) {
+            this.#send(socket, {
+              type: "webhook-ready",
+              version: 1,
+              routes: webhookRoute.routes.map((route) => route.id),
+            });
+          }
           // Without the bot token, Signal cannot make a Discord call: the socket gets no session. The
           // session names the guilds routed here, so the host learns of a guild it lost while off.
           if (this.#discordEnabled && message.discordRoute) {

@@ -228,6 +228,9 @@ export class AgentRoster {
         db.prepare("DELETE FROM projection_agents WHERE agent_id = ?").run(agentId);
         db.prepare("DELETE FROM projection_agent_memories WHERE agent_id = ?").run(agentId);
         db.prepare("DELETE FROM projection_agent_routines WHERE agent_id = ?").run(agentId);
+        db.prepare(
+          "UPDATE projection_event_routine_triggers SET active = 0, updated_at = ? WHERE owner_kind = 'agent' AND owner_id = ?",
+        ).run(new Date().toISOString(), agentId);
         db.prepare("DELETE FROM projection_reactions WHERE agent_id = ?").run(agentId);
         db.prepare("DELETE FROM projection_deliveries WHERE recipient_agent_id = ?").run(agentId);
         db.prepare("DELETE FROM projection_queue_state WHERE agent_id = ?").run(agentId);

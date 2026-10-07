@@ -9,6 +9,11 @@ import {
   SLACK_ROUTE_TEAMS_LIMIT,
   type SlackRouteTeam,
 } from "@openbot/contracts/signal-protocol/slack-route";
+import {
+  WEBHOOK_ROUTE_AUDIENCE,
+  WEBHOOK_ROUTES_LIMIT,
+  type WebhookRoute,
+} from "@openbot/contracts/signal-protocol/webhook-route";
 import { Effect, Result, Schema } from "effect";
 import {
   createLocalJWKSet,
@@ -72,6 +77,12 @@ const discordRouteClaimsSchema = z.object({
     .array(z.object({ id: z.string().regex(/^[0-9]{1,20}$/u), linkedAt: z.number().int().nonnegative() }))
     .max(DISCORD_ROUTE_GUILDS_LIMIT),
 });
+const webhookRouteClaimsSchema = z.object({
+  hid: identifierSchema,
+  routes: z
+    .array(z.object({ id: identifierSchema, linkedAt: z.number().int().nonnegative() }))
+    .max(WEBHOOK_ROUTES_LIMIT),
+});
 const SLACK_SIGNATURE_TOLERANCE_SECONDS = 5 * 60;
 
 export class RemoteTokenError extends Schema.TaggedError<RemoteTokenError>()("RemoteTokenError", {
@@ -99,6 +110,7 @@ export class RemoteTokenService {
     hostId: string,
     guilds: DiscordRouteGuild[],
   ) => Effect.Effect<string[], RemoteTokenError>;
+  readonly #validateWebhookRoute: (hostId: string, routes: WebhookRoute[]) => Effect.Effect<string[], RemoteTokenError>;
   readonly #trustedResumeTokens = new Map<
     string,
     { expiresAt: number; hostId: string; sessionId: string; authEpoch: number }
@@ -117,6 +129,8 @@ export class RemoteTokenService {
       validateSlackRoute?: (hostId: string, teams: SlackRouteTeam[]) => Effect.Effect<string[], RemoteTokenError>;
       // Asks the account service which guild links of a route are current. Without it, none is.
       validateDiscordRoute?: (hostId: string, guilds: DiscordRouteGuild[]) => Effect.Effect<string[], RemoteTokenError>;
+      // Asks the account service which webhook links in a ticket are current. Without it, none is.
+      validateWebhookRoute?: (hostId: string, routes: WebhookRoute[]) => Effect.Effect<string[], RemoteTokenError>;
     } = {},
   ) {
     if (config.ticketJwks) {
@@ -138,6 +152,7 @@ export class RemoteTokenService {
     this.#validateResumeClaims = validateResumeClaims;
     this.#validateSlackRoute = options.validateSlackRoute ?? (() => Effect.succeed([]));
     this.#validateDiscordRoute = options.validateDiscordRoute ?? (() => Effect.succeed([]));
+    this.#validateWebhookRoute = options.validateWebhookRoute ?? (() => Effect.succeed([]));
   }
 
   readonly initialize = Effect.fn("RemoteTokens.initialize")(() =>
@@ -206,6 +221,28 @@ export class RemoteTokenService {
 
   readonly validateDiscordRoute = Effect.fn("RemoteTokens.validateDiscordRoute")(
     (hostId: string, guilds: DiscordRouteGuild[]) => this.#validateDiscordRoute(hostId, guilds),
+  );
+
+  readonly verifyWebhookRoute = Effect.fn("RemoteTokens.verifyWebhookRoute")(
+    (token: string, hostId: string, now = new Date()) =>
+      Effect.gen({ self: this }, function* () {
+        const { payload } = yield* tokenCall(() =>
+          jwtVerify(token, this.#ticketKey, {
+            audience: WEBHOOK_ROUTE_AUDIENCE,
+            algorithms: ["ES256"],
+            requiredClaims: ["exp"],
+            currentDate: now,
+          }),
+        );
+        const claims = yield* tokenDecode(() => webhookRouteClaimsSchema.parse(payload));
+        if (claims.hid !== hostId)
+          return yield* new RemoteTokenError({ message: "The webhook route belongs to another host." });
+        return { routes: claims.routes };
+      }),
+  );
+
+  readonly validateWebhookRoute = Effect.fn("RemoteTokens.validateWebhookRoute")(
+    (hostId: string, routes: WebhookRoute[]) => this.#validateWebhookRoute(hostId, routes),
   );
 
   readonly validateClaims = Effect.fn("RemoteTokens.validateClaims")((claims: RemoteTicketClaims) =>

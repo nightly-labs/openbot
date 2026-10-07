@@ -15,6 +15,7 @@ class ControlPlaneError extends Schema.TaggedError<ControlPlaneError>()("Control
 const ResumeValidation = Schema.Struct({ valid: Schema.Boolean });
 const SlackValidation = Schema.Struct({ teams: Schema.Array(Schema.String) });
 const DiscordValidation = Schema.Struct({ guilds: Schema.Array(Schema.String) });
+const WebhookValidation = Schema.Struct({ routes: Schema.Array(Schema.String) });
 
 class ControlPlane extends Context.Service<
   ControlPlane,
@@ -27,6 +28,10 @@ class ControlPlane extends Context.Service<
     validateDiscordRoute(
       hostId: string,
       guilds: import("@openbot/contracts/signal-protocol/discord-route").DiscordRouteGuild[],
+    ): Effect.Effect<string[], ControlPlaneError>;
+    validateWebhookRoute(
+      hostId: string,
+      routes: import("@openbot/contracts/signal-protocol/webhook-route").WebhookRoute[],
     ): Effect.Effect<string[], ControlPlaneError>;
     discordGuildRemoved(guildId: string): Effect.Effect<void, ControlPlaneError>;
     reconcileDiscordGuilds(guildIds: string[], before: number): Effect.Effect<void, ControlPlaneError>;
@@ -115,6 +120,24 @@ class ControlPlane extends Context.Service<
           releaseResponse,
         ),
       ),
+      validateWebhookRoute: Effect.fn("ControlPlane.validateWebhookRoute")((hostId, routes) =>
+        Effect.acquireUseRelease(
+          ask("/v2/remote/webhook-route/validate", { hostId, routes }),
+          (response) =>
+            Effect.gen(function* () {
+              if (!response.ok)
+                return yield* new ControlPlaneError({
+                  message: "The account service did not confirm the webhook route.",
+                });
+              const result = yield* readJson(response).pipe(
+                Effect.flatMap(Schema.decodeUnknownEffect(WebhookValidation)),
+                Effect.mapError(() => new ControlPlaneError({ message: "The account service response is invalid." })),
+              );
+              return [...result.routes];
+            }),
+          releaseResponse,
+        ),
+      ),
       reconcileDiscordGuilds: Effect.fn("ControlPlane.reconcileDiscordGuilds")((guildIds, before) =>
         Effect.acquireUseRelease(
           ask("/v2/remote/discord-route/reconcile", { guilds: guildIds, before }),
@@ -159,6 +182,10 @@ const tokens = new RemoteTokenService(
     validateDiscordRoute: (hostId, guilds) =>
       controlPlaneService
         .validateDiscordRoute(hostId, guilds)
+        .pipe(Effect.mapError((error) => new RemoteTokenError({ message: error.message }))),
+    validateWebhookRoute: (hostId, routes) =>
+      controlPlaneService
+        .validateWebhookRoute(hostId, routes)
         .pipe(Effect.mapError((error) => new RemoteTokenError({ message: error.message }))),
   },
 );

@@ -91,7 +91,7 @@ export function RoutineChatCard(props: RoutineChatCardProps) {
         timezone: current.timezone,
         schedule,
       });
-      setLastSaved(saved);
+      if (!("owner" in saved)) setLastSaved(saved);
       if (request !== saveRequest) return;
       requested = undefined;
       setSave({ status: "saved" });

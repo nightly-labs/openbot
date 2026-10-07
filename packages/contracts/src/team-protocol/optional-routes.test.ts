@@ -5,6 +5,7 @@ import { AGENT_INSTALL_ROUTES } from "./agent-install-v1";
 import { AGENT_PUBLISH_ROUTES } from "./agent-publish-v1";
 import { AGENT_UPDATE_ROUTES } from "./agent-update-v1";
 import { CONTEXT_RESET_ROUTES } from "./context-reset-v1";
+import { EVENTS_ROUTES } from "./events-v1";
 import { HOST_ADMIN_ROUTES } from "./host-admin-v1";
 import { HOST_UPDATE_ROUTES, hostRestartEvent } from "./host-update-v1";
 import { HOSTED_SITES_ROUTES } from "./hosted-sites-v1";
@@ -58,6 +59,113 @@ describe("agent-admin-v1", () => {
     expect(() => codec(AGENT_ADMIN_ROUTES.update).request({ agentId: "chief", access: "root" })).toThrow();
     expect(() => codec(AGENT_ADMIN_ROUTES.update).response(200, { ...settings, access: "root" })).toThrow();
     expect(() => codec(AGENT_ADMIN_ROUTES.update).response(200, { access: "full" })).toThrow();
+  });
+});
+
+describe("events-v1", () => {
+  const source = {
+    id: "source-1",
+    name: "Webhook",
+    active: true,
+    url: "https://signal.example/events/source-1",
+    createdAt: "2026-10-07T10:00:00.000Z",
+    updatedAt: "2026-10-07T10:00:00.000Z",
+  };
+
+  it("accepts write secrets but never returns them", () => {
+    expect(codec(EVENTS_ROUTES.saveSource).request({ name: "Webhook", active: true, secret: "masked-secret" })).toEqual(
+      {
+        name: "Webhook",
+        active: true,
+        secret: "masked-secret",
+      },
+    );
+    expect(codec(EVENTS_ROUTES.listSources).response(200, [{ ...source, secret: "raw-secret" }])).toEqual([source]);
+    expect(codec(EVENTS_ROUTES.listActivity).request({ limit: 25 })).toEqual({ limit: 25 });
+    expect(codec(EVENTS_ROUTES.listRoutines).request({ owner: { kind: "agent", id: "chief" } })).toEqual({
+      owner: { kind: "agent", id: "chief" },
+    });
+    expect(
+      codec(EVENTS_ROUTES.deleteRoutine).request({ id: "routine-1", owner: { kind: "channel", id: "general" } }),
+    ).toEqual({ id: "routine-1", owner: { kind: "channel", id: "general" } });
+  });
+
+  it("bounds event payloads and rejects malformed event routes", () => {
+    expect(() => codec(EVENTS_ROUTES.saveSource).request({ name: 123, active: true, secret: "secret" })).toThrow();
+    expect(() =>
+      codec(EVENTS_ROUTES.saveDestination).request({
+        name: "Webhook",
+        active: true,
+        url: "https://example.com/hook",
+        method: "POST",
+        eventTypes: ["routine.run.succeeded"],
+        routineIds: [],
+        payloadTemplate: null,
+        headers: { Authorization: 123 },
+      }),
+    ).toThrow();
+    expect(() => codec(EVENTS_ROUTES.deleteSource).request({})).toThrow();
+    expect(() =>
+      codec(EVENTS_ROUTES.saveRoutine).request({
+        owner: { kind: "agent", id: "chief" },
+        name: "Routine",
+        instruction: "Run it",
+        active: true,
+        timezone: "UTC",
+        trigger: {
+          kind: "event",
+          sourceId: "source-1",
+          eventType: "example.received",
+          filters: [{ pointer: "/data/~2key", value: "value" }],
+        },
+      }),
+    ).toThrow();
+    let nested: unknown = "value";
+    for (let index = 0; index < 34; index += 1) nested = { nested };
+    expect(() =>
+      codec(EVENTS_ROUTES.saveRoutine).request({
+        owner: { kind: "agent", id: "chief" },
+        name: "Routine",
+        instruction: "Run it",
+        active: true,
+        timezone: "UTC",
+        trigger: { kind: "schedule", schedule: nested },
+      }),
+    ).toThrow();
+    expect(() =>
+      codec(EVENTS_ROUTES.saveDestination).request({
+        name: "Webhook",
+        active: true,
+        url: "https://example.com/hook",
+        method: "POST",
+        eventTypes: ["routine.run.succeeded"],
+        routineIds: [],
+        payloadTemplate: new Array(10_001).fill(null),
+      }),
+    ).toThrow();
+    expect(() => codec(EVENTS_ROUTES.status).response(200, { supported: true })).toThrow();
+  });
+
+  it("allows the wider delivery identifier bound without widening generic identifiers", () => {
+    const activity = {
+      id: "activity-1",
+      kind: "delivery",
+      status: "queued",
+      eventId: null,
+      sourceId: null,
+      routineId: null,
+      runId: null,
+      destinationId: null,
+      deliveryId: "d".repeat(512),
+      occurredAt: "2026-10-07T10:00:00.000Z",
+      summary: "webhook.queued",
+    };
+    expect(codec(EVENTS_ROUTES.listActivity).response(200, [activity])).toEqual([activity]);
+    expect(() =>
+      codec(EVENTS_ROUTES.listActivity).response(200, [{ ...activity, deliveryId: "d".repeat(513) }]),
+    ).toThrow();
+    expect(() => codec(EVENTS_ROUTES.retryDelivery).request({ id: "" })).toThrow();
+    expect(codec(EVENTS_ROUTES.retryDelivery).request({ id: "d".repeat(512) })).toEqual({ id: "d".repeat(512) });
   });
 });
 

@@ -45,6 +45,7 @@
 @import "./features/computer-use/computer-use.css";
 @import "./features/servers/server-settings-modal.css";
 @import "./features/servers/server-mcp.css";
+@import "@openbot/ui/features/servers/events-settings.css";
 @import "@openbot/ui/features/marketplace/marketplace.css";
 @import "@openbot/ui/features/settings/logo-color-picker.css";
 @import "@openbot/ui/features/settings/sound-theme-picker.css";

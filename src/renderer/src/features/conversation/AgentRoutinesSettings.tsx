@@ -1,11 +1,11 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   ROUTINE_LIMIT_POLICIES,
-  type RoutineFields,
   type RoutineLimitPolicy,
   type RoutineRunFields,
   type RoutineSchedule,
 } from "@openbot/contracts/ipc";
+import type { EventFilter, EventRoutine, EventRoutineTrigger, EventSource } from "@openbot/contracts/ipc-events";
 import type { AppTextKey } from "@openbot/i18n";
 import {
   Button,
@@ -20,13 +20,17 @@ import {
   SelectTrigger,
   SelectValue,
   Switch,
+  Text,
   Textarea,
   toast,
+  X,
 } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
 import { SettingsBackIcon, SettingsForwardIcon } from "@openbot/ui/components/SettingsPanel";
 import { RoutineRunHistory } from "@openbot/ui/features/conversation/RoutineRunHistory";
 import { RoutineSchedulePicker } from "@openbot/ui/features/conversation/RoutineSchedulePicker";
+import { RoutineWebhookNotifications } from "@openbot/ui/features/conversation/RoutineWebhookNotifications";
+import { RoutineWebhookSource } from "@openbot/ui/features/conversation/RoutineWebhookSource";
 import {
   ROUTINE_EVERY_DAY,
   type RoutineScheduleDraft,
@@ -43,7 +47,7 @@ import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, For, onCleanup, Show, untrack } from "solid-js";
 import { type DesktopAnalyticsScope, desktopAnalytics } from "../../analytics";
 import { writeClipboardText } from "../../clipboard";
-import type { RoutinesPort } from "./routines-port";
+import type { RoutineEditorRecord, RoutinesPort } from "./routines-port";
 
 export interface RoutineSelectionRequest {
   routineId: string;
@@ -54,7 +58,7 @@ export interface RoutineSelectionRequest {
 type PendingRoutineExit =
   | "list"
   | "close"
-  | { kind: "routine-selection"; routine: RoutineFields | null; routineName: string }
+  | { kind: "routine-selection"; routine: RoutineEditorRecord | null; routineName: string }
   | { kind: "conversation-message"; messageId: string };
 
 interface RoutineDraft {
@@ -66,6 +70,10 @@ interface RoutineDraft {
   schedule: RoutineSchedule;
   scheduleDraft: RoutineScheduleDraft;
   limitPolicy: RoutineLimitPolicy;
+  triggerKind: "schedule" | "event";
+  eventSourceId: string;
+  eventType: string;
+  eventFilters: EventFilter[];
 }
 
 const LIMIT_POLICY_LABELS = {
@@ -89,9 +97,11 @@ interface AgentRoutinesSettingsProps {
 export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
   const text = useText();
   const { t, errorMessage } = text;
-  const [routines, setRoutines] = createSignal<RoutineFields[]>([]);
+  const [routines, setRoutines] = createSignal<RoutineEditorRecord[]>([]);
   const [draft, setDraft] = createSignal<RoutineDraft | null>(null);
   const [runs, setRuns] = createSignal<RoutineRunFields[]>([]);
+  const [notificationsOpen, setNotificationsOpen] = createSignal(false);
+  const [eventSources, setEventSources] = createSignal<EventSource[]>([]);
   const [loading, setLoading] = createSignal(true);
   const [routinesLoaded, setRoutinesLoaded] = createSignal(false);
   const [saving, setSaving] = createSignal(false);
@@ -103,7 +113,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
   const scrollFades = createScrollFades();
   let draftRevision = 0;
   // The saved routine the open draft started from. A field that still matches it is unedited.
-  let draftBase: RoutineFields | null = null;
+  let draftBase: RoutineEditorRecord | null = null;
 
   onCleanup(scrollFades.stop);
 
@@ -152,10 +162,28 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
   createEffect(
     () => props.port.ownerId,
     () => {
+      setNotificationsOpen(false);
       closeEditor();
       setLoading(true);
       setRoutinesLoaded(false);
       void untrack(loadRoutines);
+    },
+  );
+
+  createEffect(
+    () => Boolean(props.port.eventSources) && draft()?.triggerKind === "event",
+    (visible) => {
+      if (!visible) return;
+      void props.port
+        .eventSources?.()
+        .then(setEventSources, (cause) => setError(errorMessage(cause, t("server.events.loadFailed"))));
+    },
+  );
+
+  createEffect(
+    () => draft()?.id,
+    () => {
+      setNotificationsOpen(false);
     },
   );
 
@@ -187,13 +215,16 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
    * Takes a change saved elsewhere, such as from a chat card, into each field the person did not
    * edit here. Without it, the next Save would write the old values back.
    */
-  function refreshDraft(routine: RoutineFields): void {
+  function refreshDraft(routine: RoutineEditorRecord): void {
     const base = draftBase;
     draftBase = routine;
     if (base?.id !== routine.id) return;
     setDraft((current) => {
       if (current?.id !== routine.id) return current;
-      const scheduleEdited = JSON.stringify(current.schedule) !== JSON.stringify(base.trigger.schedule);
+      const scheduleEdited = JSON.stringify(current.schedule) !== JSON.stringify(routineScheduleOf(base));
+      const eventEdited =
+        current.triggerKind === "event" &&
+        JSON.stringify(eventTriggerOf(current)) !== JSON.stringify(eventTriggerOf(base));
       return {
         ...current,
         name: current.name === base.name ? routine.name : current.name,
@@ -201,17 +232,21 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
         active: current.active === base.active ? routine.active : current.active,
         limitPolicy:
           current.limitPolicy === (base.limitPolicy ?? "wait") ? (routine.limitPolicy ?? "wait") : current.limitPolicy,
-        ...(scheduleEdited
+        ...(scheduleEdited || eventEdited
           ? {}
           : {
-              schedule: structuredClone(routine.trigger.schedule),
-              scheduleDraft: routineScheduleToDraft(routine.trigger.schedule),
+              schedule: structuredClone(routineScheduleOf(routine)),
+              scheduleDraft: routineScheduleToDraft(routineScheduleOf(routine)),
+              triggerKind: routineTriggerKind(routine),
+              eventSourceId: eventTriggerOf(routine)?.sourceId ?? "",
+              eventType: eventTriggerOf(routine)?.eventType ?? "",
+              eventFilters: structuredClone(eventTriggerOf(routine)?.filters ?? []),
             }),
       };
     });
   }
 
-  function openRoutine(routine: RoutineFields): void {
+  function openRoutine(routine: RoutineEditorRecord): void {
     draftBase = routine;
     setConfirmDelete(false);
     setError(null);
@@ -222,9 +257,13 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       name: routine.name,
       instruction: routine.instruction,
       active: routine.active,
-      schedule: structuredClone(routine.trigger.schedule),
-      scheduleDraft: routineScheduleToDraft(routine.trigger.schedule),
+      schedule: structuredClone(routineScheduleOf(routine)),
+      scheduleDraft: routineScheduleToDraft(routineScheduleOf(routine)),
       limitPolicy: routine.limitPolicy ?? "wait",
+      triggerKind: routineTriggerKind(routine),
+      eventSourceId: eventTriggerOf(routine)?.sourceId ?? "",
+      eventType: eventTriggerOf(routine)?.eventType ?? "",
+      eventFilters: structuredClone(eventTriggerOf(routine)?.filters ?? []),
     });
     void loadRuns(routine.id);
   }
@@ -244,6 +283,10 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       schedule: routineScheduleFromDraft(NEW_ROUTINE_SCHEDULE),
       scheduleDraft: NEW_ROUTINE_SCHEDULE,
       limitPolicy: "wait",
+      triggerKind: "schedule",
+      eventSourceId: "",
+      eventType: "",
+      eventFilters: [],
     });
   }
 
@@ -258,7 +301,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     setPendingExit(null);
   }
 
-  function requestRoutineSelection(request: RoutineSelectionRequest, routine: RoutineFields | null): void {
+  function requestRoutineSelection(request: RoutineSelectionRequest, routine: RoutineEditorRecord | null): void {
     const current = draft();
     if (routine && current?.id === routine.id) {
       if (!dirty()) openRoutine(routine);
@@ -325,7 +368,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
 
   async function saveDraft(): Promise<void> {
     const current = draft();
-    if (!current || !dirty() || !validDraft(current) || saving()) return;
+    if (!current || !dirty() || !validDraft(current, eventSources()) || saving()) return;
     const savingRevision = draftRevision;
     setSaving(true);
     setError(null);
@@ -340,6 +383,15 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
         active: current.active,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
         schedule: current.schedule,
+        trigger:
+          current.triggerKind === "event"
+            ? {
+                kind: "event",
+                sourceId: current.eventSourceId,
+                eventType: current.eventType.trim(),
+                filters: current.eventFilters,
+              }
+            : { kind: "schedule", schedule: current.schedule },
         limitPolicy: current.limitPolicy,
       });
       setRoutines((items) => {
@@ -488,9 +540,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                           <span>
                             <strong>{routine.name}</strong>
                             <small>
-                              {routine.active
-                                ? routineListSummary(routine.trigger.schedule, text)
-                                : t("routine.settings.paused")}
+                              {routine.active ? routineListSummary(routine, text) : t("routine.settings.paused")}
                             </small>
                           </span>
                         </Button>
@@ -546,7 +596,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                             type="button"
                             size="sm"
                             class="agent-routine-test"
-                            disabled={!current().id || testing() || !validDraft(current())}
+                            disabled={!current().id || testing() || !validDraft(current(), eventSources())}
                             loading={testing()}
                             loadingLabel={t("routine.settings.starting")}
                             onClick={() => void testRun()}
@@ -559,7 +609,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                       <Button
                         type="button"
                         size="sm"
-                        disabled={saving() || !validDraft(current())}
+                        disabled={saving() || !validDraft(current(), eventSources())}
                         loading={saving()}
                         loadingLabel={t("common.saving")}
                         onClick={() => void saveDraft()}
@@ -582,17 +632,55 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
               </label>
               <section class="agent-routine-when" aria-labelledby="agent-routine-when-heading">
                 <h3 id="agent-routine-when-heading">{t("routine.settings.whenToRun")}</h3>
-                <RoutineSchedulePicker
-                  schedule={current().scheduleDraft}
-                  kinds={ROUTINE_SAVED_DRAFT_KINDS}
-                  onChange={(scheduleDraft) =>
-                    changeDraft((value) => ({
-                      ...value,
-                      schedule: routineScheduleFromDraft(scheduleDraft),
-                      scheduleDraft,
-                    }))
+                <Show when={props.port.eventSources}>
+                  <div class="agent-routine-trigger-choice">
+                    <For each={["schedule", "event"] as const}>
+                      {(kind) => (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={current().triggerKind === kind ? "secondary" : "ghost"}
+                          aria-pressed={current().triggerKind === kind ? "true" : "false"}
+                          onClick={() => changeDraft((value) => ({ ...value, triggerKind: kind }))}
+                        >
+                          {t(kind === "event" ? "routine.settings.triggerEvent" : "routine.settings.triggerSchedule")}
+                        </Button>
+                      )}
+                    </For>
+                  </div>
+                </Show>
+                <Show
+                  when={current().triggerKind === "schedule"}
+                  fallback={
+                    <div class="agent-routine-event-trigger">
+                      <Show when={props.port.webhooks}>
+                        {(api) => (
+                          <RoutineWebhookSource
+                            api={api()}
+                            sources={eventSources()}
+                            sourceId={current().eventSourceId}
+                            name={current().name}
+                            onChange={(eventSourceId) => changeDraft((value) => ({ ...value, eventSourceId }))}
+                            onSourcesChange={setEventSources}
+                          />
+                        )}
+                      </Show>
+                      <EventTriggerFields draft={current()} onChange={changeDraft} />
+                    </div>
                   }
-                />
+                >
+                  <RoutineSchedulePicker
+                    schedule={current().scheduleDraft}
+                    kinds={ROUTINE_SAVED_DRAFT_KINDS}
+                    onChange={(scheduleDraft) =>
+                      changeDraft((value) => ({
+                        ...value,
+                        schedule: routineScheduleFromDraft(scheduleDraft),
+                        scheduleDraft,
+                      }))
+                    }
+                  />
+                </Show>
               </section>
               <label class="settings-field agent-routine-instruction-field">
                 <span>{t("routine.settings.instruction")}</span>
@@ -630,6 +718,30 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                 </div>
               </Show>
 
+              <Show when={props.port.webhooks && current().id}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  class="agent-routine-disclosure"
+                  aria-expanded={notificationsOpen() ? "true" : "false"}
+                  onClick={() => setNotificationsOpen((value) => !value)}
+                >
+                  {t("routine.settings.notifications")}
+                </Button>
+                <Show when={notificationsOpen()}>
+                  <Show when={props.port.webhooks}>
+                    {(api) => (
+                      <RoutineWebhookNotifications
+                        api={api()}
+                        canManage={true}
+                        routineId={current().id ?? ""}
+                        sourceId={current().eventSourceId}
+                      />
+                    )}
+                  </Show>
+                </Show>
+              </Show>
               <RoutineRunHistory runs={runs()} onOpenRun={props.onOpenRun ? requestOpenRun : undefined} />
             </div>
           )}
@@ -660,14 +772,156 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
  * The list row reads the schedule as the chips do. A schedule the chips show only as cron, such
  * as an interval, keeps its own summary: "Every 15 minutes", not the cron text.
  */
-function routineListSummary(schedule: RoutineSchedule, text: RoutineText): string {
+function routineListSummary(routine: RoutineEditorRecord, text: RoutineText): string {
+  const schedule = routineScheduleOf(routine);
+  const event = eventTriggerOf(routine);
+  if (event) return text.t("routine.settings.eventSummary", { eventType: event.eventType });
   const draft = routineScheduleToDraft(schedule);
   if (draft.kind === "custom") return routineScheduleSummary(schedule, false, text);
   return routineDraftSummary(draft, text);
 }
 
-function validDraft(draft: RoutineDraft): boolean {
-  return Boolean(draft.name.trim() && draft.instruction.trim()) && routineDraftProblem(draft.scheduleDraft) === null;
+function isEventRoutine(routine: RoutineEditorRecord): routine is EventRoutine {
+  return "owner" in routine;
+}
+
+function routineTriggerKind(routine: RoutineEditorRecord): "schedule" | "event" {
+  return isEventRoutine(routine) ? (routine.trigger.kind === "event" ? "event" : "schedule") : "schedule";
+}
+
+function routineScheduleOf(routine: RoutineEditorRecord): RoutineSchedule {
+  if (isEventRoutine(routine)) {
+    return routine.trigger.kind === "schedule" ? routine.trigger.schedule : { kind: "daily", time: "09:00" };
+  }
+  return routine.trigger.schedule;
+}
+
+function eventTriggerOf(routine: RoutineEditorRecord | RoutineDraft): EventRoutineTrigger | null {
+  if ("triggerKind" in routine) {
+    return routine.triggerKind === "event"
+      ? { kind: "event", sourceId: routine.eventSourceId, eventType: routine.eventType, filters: routine.eventFilters }
+      : null;
+  }
+  if (!isEventRoutine(routine) || routine.trigger.kind !== "event") return null;
+  return routine.trigger;
+}
+
+function EventTriggerFields(props: {
+  draft: RoutineDraft;
+  onChange: (change: (current: RoutineDraft) => RoutineDraft) => void;
+}) {
+  const { t } = useText();
+  const [filtersOpen, setFiltersOpen] = createSignal(false);
+  return (
+    <div class="agent-routine-event-trigger">
+      <label class="settings-field">
+        <span>{t("routine.settings.eventType")}</span>
+        <Input
+          value={props.draft.eventType}
+          placeholder={t("routine.settings.eventTypePlaceholder")}
+          onValueChange={(eventType) => props.onChange((value) => ({ ...value, eventType }))}
+        />
+      </label>
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        class="agent-routine-disclosure"
+        aria-expanded={filtersOpen() || props.draft.eventFilters.length > 0 ? "true" : "false"}
+        onClick={() => setFiltersOpen((value) => !value)}
+      >
+        {t("routine.settings.eventFilters")}
+      </Button>
+      <Show when={filtersOpen() || props.draft.eventFilters.length > 0}>
+        <div class="settings-field">
+          <Text variant="caption" tone="muted">
+            {t("routine.settings.eventFiltersHint")}
+          </Text>
+          <For each={props.draft.eventFilters}>
+            {(filter, index) => (
+              <div class="agent-routine-event-filter">
+                <Input
+                  aria-label={t("routine.settings.filterPointer")}
+                  value={filter.pointer}
+                  placeholder={t("routine.settings.filterPointer")}
+                  onValueChange={(pointer) =>
+                    props.onChange((value) => ({
+                      ...value,
+                      eventFilters: value.eventFilters.map((item, itemIndex) =>
+                        itemIndex === index() ? { ...item, pointer } : item,
+                      ),
+                    }))
+                  }
+                />
+                <Input
+                  aria-label={t("routine.settings.filterValue")}
+                  value={filter.value === null ? "null" : String(filter.value)}
+                  placeholder={t("routine.settings.filterValue")}
+                  onValueChange={(raw) =>
+                    props.onChange((value) => ({
+                      ...value,
+                      eventFilters: value.eventFilters.map((item, itemIndex) =>
+                        itemIndex === index() ? { ...item, value: parseEventScalar(raw) } : item,
+                      ),
+                    }))
+                  }
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  aria-label={t("routine.settings.removeFilter")}
+                  onClick={() =>
+                    props.onChange((value) => ({
+                      ...value,
+                      eventFilters: value.eventFilters.filter((_, itemIndex) => itemIndex !== index()),
+                    }))
+                  }
+                >
+                  <X aria-hidden="true" />
+                </Button>
+              </div>
+            )}
+          </For>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() =>
+              props.onChange((value) => ({
+                ...value,
+                eventFilters: [...value.eventFilters, { pointer: "", value: "" }],
+              }))
+            }
+          >
+            {t("routine.settings.addFilter")}
+          </Button>
+        </div>
+      </Show>
+    </div>
+  );
+}
+
+function validDraft(draft: RoutineDraft, sources: EventSource[] = []): boolean {
+  if (!draft.name.trim() || !draft.instruction.trim()) return false;
+  if (draft.triggerKind === "event") {
+    return Boolean(
+      draft.eventSourceId.trim() &&
+        sources.some((source) => source.id === draft.eventSourceId) &&
+        draft.eventType.trim() &&
+        draft.eventFilters.every((filter) => filter.pointer === "" || filter.pointer.startsWith("/")),
+    );
+  }
+  return routineDraftProblem(draft.scheduleDraft) === null;
+}
+
+function parseEventScalar(raw: string): EventFilter["value"] {
+  const value = raw.trim();
+  if (value === "null") return null;
+  if (value === "true") return true;
+  if (value === "false") return false;
+  if (value !== "" && Number.isFinite(Number(value))) return Number(value);
+  return raw;
 }
 
 function isBlankNewDraft(draft: RoutineDraft): boolean {
