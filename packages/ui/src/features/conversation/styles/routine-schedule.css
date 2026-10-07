@@ -739,6 +739,24 @@ code.routine-webhook-secret {
   padding-inline: var(--openbot-space-2);
 }
 
+/* A quiet link under the rows. Its text starts under the row labels. */
+.routine-webhook-filter-link {
+  justify-self: start;
+  margin: 0 0 var(--openbot-space-1) calc(var(--routine-card-inset) - var(--openbot-space-2));
+  padding-inline: var(--openbot-space-2);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  font-weight: inherit;
+}
+
+.agent-routine-add-link svg,
+.routine-webhook-add-filter svg,
+.routine-webhook-filter-link svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  stroke-width: var(--openbot-icon-stroke);
+}
+
 /* The trigger menu: a name and one line that tells when the routine runs. */
 .routine-trigger-menu {
   width: 300px;

@@ -19,6 +19,7 @@ import {
   Button,
   Checkbox,
   ConfirmDialog,
+  IconButton,
   Input,
   Item,
   ItemActions,
@@ -26,6 +27,7 @@ import {
   ItemDescription,
   ItemGroup,
   ItemTitle,
+  Pencil,
   Plus,
   Select,
   SelectContent,
@@ -271,10 +273,6 @@ export function RoutineWebhookNotifications(props: RoutineWebhookNotificationsPr
 
   return (
     <div class="agent-routine-notifications">
-      <Text variant="caption" tone="muted">
-        {t("routine.notifications.description")}
-      </Text>
-
       <Show when={error()}>
         {(message) => (
           <Text variant="caption" tone="danger" role="alert">
@@ -291,16 +289,7 @@ export function RoutineWebhookNotifications(props: RoutineWebhookNotificationsPr
           </Text>
         }
       >
-        <Show
-          when={destinations().length > 0}
-          fallback={
-            <Show when={!draft()}>
-              <Text variant="caption" tone="muted">
-                {t("routine.notifications.empty")}
-              </Text>
-            </Show>
-          }
-        >
+        <Show when={destinations().length > 0}>
           <ItemGroup class="agent-routine-webhook-list" surface="subtle">
             <For each={destinations()}>
               {(destination) => (
@@ -315,28 +304,25 @@ export function RoutineWebhookNotifications(props: RoutineWebhookNotificationsPr
                     <Show when={!destination.active}>
                       <Badge variant="secondary">{t("routine.settings.paused")}</Badge>
                     </Show>
-                    <Button
-                      type="button"
-                      size="sm"
+                    <IconButton
                       variant="ghost"
                       disabled={locked()}
+                      label={t("routine.notifications.editLabel", { url: destination.url })}
                       onClick={() => edit(destination)}
                     >
-                      {t("common.edit")}
-                    </Button>
-                    <Button
-                      type="button"
-                      size="icon-sm"
+                      <Pencil aria-hidden="true" />
+                    </IconButton>
+                    <IconButton
                       variant="destructive-ghost"
                       disabled={locked()}
-                      aria-label={t("routine.notifications.deleteLabel", { url: destination.url })}
+                      label={t("routine.notifications.deleteLabel", { url: destination.url })}
                       onClick={() => {
                         setDeleteError(null);
                         setPendingDelete(destination);
                       }}
                     >
                       <Trash2 aria-hidden="true" />
-                    </Button>
+                    </IconButton>
                   </ItemActions>
                 </Item>
               )}
@@ -351,8 +337,8 @@ export function RoutineWebhookNotifications(props: RoutineWebhookNotificationsPr
           <Button
             type="button"
             size="sm"
-            variant="secondary"
-            class="agent-routine-disclosure"
+            variant="ghost"
+            class="agent-routine-add-link"
             disabled={locked()}
             onClick={() => edit()}
           >

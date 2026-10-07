@@ -111,7 +111,7 @@ function ValueRow({ label, action, children }: { label: string; action?: ReactNo
   );
 }
 
-function IconAction({
+export function IconAction({
   label,
   disabled = false,
   onPress,
@@ -130,8 +130,9 @@ function IconAction({
 }
 
 /**
- * The webhook trigger as one card, as on desktop: the trigger picker in `header`, then the endpoint,
- * the signing secret and the events that start the routine. The host makes the endpoint and the
+ * The webhook trigger as one card, as on desktop: the trigger picker in `header`, then the endpoint
+ * and the signing secret. The events row shows only when an event type or a filter is set; else a
+ * "Filter events" action opens it. The host makes the endpoint and the
  * signing secret; the user never types the inbound secret. `url` is undefined before the routine has
  * a saved webhook trigger, and null while the host has not made it yet.
  */
@@ -174,6 +175,7 @@ export function RoutineWebhookTrigger({
   const copyIcon = (kind: "url" | "secret") =>
     copied === kind ? <Check size={18} color={muted} /> : <Copy size={18} color={muted} />;
   const Disclosure = eventsOpen ? ChevronDown : ChevronRight;
+  const showEvents = eventsOpen || Boolean(eventType.trim()) || filters.length > 0;
   // A save that adds the trigger returns the secret before the refreshed routine brings its URL.
   const saved = url !== undefined || secret !== null;
   return (
@@ -263,19 +265,28 @@ export function RoutineWebhookTrigger({
           </Button>
         </View>
       ) : null}
-      <SettingsRow
-        disclosure={false}
-        expanded={eventsOpen}
-        trailing={<Disclosure size={18} color={muted} strokeWidth={1.5} />}
-        onPress={() => setEventsOpen((open) => !open)}
-      >
-        <Typography type="body-xs" className="text-grouped-secondary">
-          {t("mobile.agent.webhook.events")}
-        </Typography>
-        <Typography.Paragraph type="body-sm" numberOfLines={1}>
-          {eventsSummary.join(" · ")}
-        </Typography.Paragraph>
-      </SettingsRow>
+      {showEvents ? null : (
+        <SettingsRow disclosure={false} disabled={disabled} onPress={() => setEventsOpen(true)}>
+          <Typography.Paragraph type="body-sm" className="text-accent">
+            {t("mobile.agent.webhook.filterEvents")}
+          </Typography.Paragraph>
+        </SettingsRow>
+      )}
+      {showEvents ? (
+        <SettingsRow
+          disclosure={false}
+          expanded={eventsOpen}
+          trailing={<Disclosure size={18} color={muted} strokeWidth={1.5} />}
+          onPress={() => setEventsOpen((open) => !open)}
+        >
+          <Typography type="body-xs" className="text-grouped-secondary">
+            {t("mobile.agent.webhook.events")}
+          </Typography>
+          <Typography.Paragraph type="body-sm" numberOfLines={1}>
+            {eventsSummary.join(" · ")}
+          </Typography.Paragraph>
+        </SettingsRow>
+      ) : null}
       {eventsOpen ? (
         <View className="gap-3 p-4">
           <SheetFormField

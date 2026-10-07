@@ -216,23 +216,6 @@
   padding: 9px 2px;
 }
 
-.agent-routine-run-row > span:nth-child(2) {
-  display: grid;
-  gap: 2px;
-}
-
-.agent-routine-run-row strong {
-  color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-sm);
-}
-
-.agent-routine-run-row small,
-.agent-routine-run-row em {
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
-  font-style: normal;
-}
-
 .agent-routines-overlay {
   top: 0;
   overflow: hidden;
@@ -353,8 +336,10 @@
   margin-top: 0;
 }
 
-/* The schedule is a field between Name and Instruction, so its heading matches their labels. */
-.agent-routine-when h3 {
+/* The schedule, notifications and history are fields, so their headings match the field labels. */
+.agent-routine-when h3,
+.agent-routine-field-section h3,
+.agent-routine-history h3 {
   margin: 0 0 var(--openbot-space-1-5) var(--openbot-space-2);
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-md);
@@ -368,13 +353,6 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--openbot-space-2);
-}
-
-.agent-routine-history h3 {
-  margin: 0 0 8px;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
-  line-height: var(--openbot-leading-sm);
 }
 
 .agent-routine-history {
@@ -397,7 +375,7 @@
   gap: 12px;
   border: 0;
   border-radius: var(--openbot-radius-sm);
-  padding: 5px var(--openbot-space-3);
+  padding: 5px var(--openbot-space-2);
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-sm);
   text-align: left;
@@ -405,6 +383,40 @@
 
 .ui-button.agent-routine-run-link {
   cursor: pointer;
+}
+
+/* A webhook request or a notification: the time, then a muted note. */
+.agent-routine-run-text {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  gap: var(--openbot-space-2);
+  white-space: nowrap;
+}
+
+.agent-routine-run-note {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--openbot-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-routine-run-end {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--openbot-space-1);
+}
+
+.agent-routine-run-end .ui-button {
+  color: var(--openbot-text-secondary);
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+.agent-routine-history-error {
+  margin-bottom: var(--openbot-space-2);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -1158,18 +1170,25 @@
   justify-self: start;
 }
 
-/* Notifications and Activity line up with the field labels above them. */
-.agent-routine-section > .agent-routine-disclosure {
-  padding-inline: var(--openbot-space-2);
-}
-
 .agent-routine-webhook-form,
-.agent-routine-webhook-options,
-.agent-routine-notifications,
-.agent-routine-activity,
-.agent-routine-section {
+.agent-routine-webhook-options {
   display: grid;
   gap: var(--openbot-space-3);
+}
+
+.agent-routine-notifications {
+  display: grid;
+  gap: var(--openbot-space-2);
+}
+
+/* "Add notification" is a quiet link whose text starts under the field label. */
+.agent-routine-add-link {
+  justify-self: start;
+  padding-inline: var(--openbot-space-2);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-md);
+  font-weight: inherit;
+  line-height: var(--openbot-leading-md);
 }
 
 .agent-routine-webhook-form {
@@ -1199,8 +1218,7 @@
   gap: var(--openbot-space-2);
 }
 
-.agent-routine-webhook-form-actions,
-.agent-routine-webhook-toolbar {
+.agent-routine-webhook-form-actions {
   display: flex;
   justify-content: flex-end;
   gap: var(--openbot-space-2);

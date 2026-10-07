@@ -9,6 +9,7 @@ import {
   Input,
   Plus,
   RefreshCw,
+  SlidersHorizontal,
   Text,
   Webhook,
   X,
@@ -55,6 +56,8 @@ export function RoutineWebhookTrigger(props: RoutineWebhookTriggerProps) {
   const [eventsOpen, setEventsOpen] = createSignal(false);
   const [confirm, setConfirm] = createSignal<{ pending: boolean; error: string | null } | null>(null);
 
+  // Most webhooks need no filter, so the card hides the events row until the user sets one.
+  const filtered = () => props.eventType.trim() !== "" || props.filters.length > 0;
   const eventsSummary = () => {
     const parts = [props.eventType.trim() || t("routine.webhook.eventsAll")];
     if (props.filters.length > 0) parts.push(t("routine.webhook.filterCount", { count: props.filters.length }));
@@ -178,78 +181,96 @@ export function RoutineWebhookTrigger(props: RoutineWebhookTriggerProps) {
         </Show>
       </Show>
 
-      <Button
-        type="button"
-        variant="ghost"
-        class="routine-webhook-field routine-webhook-events-toggle"
-        aria-expanded={eventsOpen() ? "true" : "false"}
-        onClick={() => setEventsOpen((open) => !open)}
+      <Show
+        when={eventsOpen() || filtered()}
+        fallback={
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            class="routine-webhook-filter-link"
+            onClick={() => setEventsOpen(true)}
+          >
+            <SlidersHorizontal aria-hidden="true" />
+            {t("routine.webhook.filterEvents")}
+          </Button>
+        }
       >
-        <span class="routine-webhook-label">{t("routine.webhook.events")}</span>
-        <span class="routine-webhook-value">{eventsSummary()}</span>
-        <Show when={eventsOpen()} fallback={<ChevronRight aria-hidden="true" />}>
-          <ChevronDown aria-hidden="true" />
-        </Show>
-      </Button>
-      <Show when={eventsOpen()}>
-        <div class="routine-webhook-events">
-          <label class="settings-field">
-            <span>{t("routine.webhook.eventType")}</span>
-            <Input
-              size="sm"
-              value={props.eventType}
-              placeholder={t("routine.webhook.eventTypePlaceholder")}
-              onValueChange={props.onEventTypeChange}
-            />
-            <Text variant="caption" tone="muted">
-              {t("routine.webhook.eventTypeHint")}
-            </Text>
-          </label>
-          <div class="settings-field">
-            <span>{t("routine.webhook.filters")}</span>
-            <For each={props.filters}>
-              {(filter, index) => (
-                <div class="agent-routine-event-filter">
-                  <Input
-                    size="sm"
-                    aria-label={t("routine.webhook.filterPointer")}
-                    value={filter.pointer}
-                    placeholder={t("routine.webhook.filterPointerPlaceholder")}
-                    invalid={!isEventFilterPointer(filter.pointer)}
-                    onValueChange={(pointer) => updateFilter(index(), { pointer })}
-                  />
-                  <Input
-                    size="sm"
-                    aria-label={t("routine.webhook.filterValue")}
-                    value={filter.value}
-                    placeholder={t("routine.webhook.filterValue")}
-                    onValueChange={(value) => updateFilter(index(), { value })}
-                  />
-                  <IconButton
-                    variant="ghost"
-                    label={t("routine.webhook.removeFilter")}
-                    onClick={() => props.onFiltersChange(props.filters.filter((_, itemIndex) => itemIndex !== index()))}
-                  >
-                    <X aria-hidden="true" />
-                  </IconButton>
-                </div>
-              )}
-            </For>
-            <Text variant="caption" tone="muted">
-              {t("routine.webhook.filtersHint")}
-            </Text>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              class="routine-webhook-add-filter"
-              onClick={() => props.onFiltersChange([...props.filters, { pointer: "", value: "" }])}
-            >
-              <Plus aria-hidden="true" />
-              {t("routine.webhook.addFilter")}
-            </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          class="routine-webhook-field routine-webhook-events-toggle"
+          aria-expanded={eventsOpen() ? "true" : "false"}
+          onClick={() => setEventsOpen((open) => !open)}
+        >
+          <span class="routine-webhook-label">{t("routine.webhook.events")}</span>
+          <span class="routine-webhook-value">{eventsSummary()}</span>
+          <Show when={eventsOpen()} fallback={<ChevronRight aria-hidden="true" />}>
+            <ChevronDown aria-hidden="true" />
+          </Show>
+        </Button>
+        <Show when={eventsOpen()}>
+          <div class="routine-webhook-events">
+            <label class="settings-field">
+              <span>{t("routine.webhook.eventType")}</span>
+              <Input
+                size="sm"
+                value={props.eventType}
+                placeholder={t("routine.webhook.eventTypePlaceholder")}
+                onValueChange={props.onEventTypeChange}
+              />
+              <Text variant="caption" tone="muted">
+                {t("routine.webhook.eventTypeHint")}
+              </Text>
+            </label>
+            <div class="settings-field">
+              <span>{t("routine.webhook.filters")}</span>
+              <For each={props.filters}>
+                {(filter, index) => (
+                  <div class="agent-routine-event-filter">
+                    <Input
+                      size="sm"
+                      aria-label={t("routine.webhook.filterPointer")}
+                      value={filter.pointer}
+                      placeholder={t("routine.webhook.filterPointerPlaceholder")}
+                      invalid={!isEventFilterPointer(filter.pointer)}
+                      onValueChange={(pointer) => updateFilter(index(), { pointer })}
+                    />
+                    <Input
+                      size="sm"
+                      aria-label={t("routine.webhook.filterValue")}
+                      value={filter.value}
+                      placeholder={t("routine.webhook.filterValue")}
+                      onValueChange={(value) => updateFilter(index(), { value })}
+                    />
+                    <IconButton
+                      variant="ghost"
+                      label={t("routine.webhook.removeFilter")}
+                      onClick={() =>
+                        props.onFiltersChange(props.filters.filter((_, itemIndex) => itemIndex !== index()))
+                      }
+                    >
+                      <X aria-hidden="true" />
+                    </IconButton>
+                  </div>
+                )}
+              </For>
+              <Text variant="caption" tone="muted">
+                {t("routine.webhook.filtersHint")}
+              </Text>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                class="routine-webhook-add-filter"
+                onClick={() => props.onFiltersChange([...props.filters, { pointer: "", value: "" }])}
+              >
+                <Plus aria-hidden="true" />
+                {t("routine.webhook.addFilter")}
+              </Button>
+            </div>
           </div>
-        </div>
+        </Show>
       </Show>
 
       <ConfirmDialog

@@ -1,4 +1,5 @@
 import type { Routine, RoutineRun } from "@openbot/contracts/ipc";
+import type { EventActivity } from "@openbot/contracts/ipc-events";
 import { onCleanup } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
@@ -110,6 +111,8 @@ function WebhookRoutineStory() {
         await seeded;
         return api.listRoutines(input);
       },
+      // One request that the filter ignored and one failed notification show in the history.
+      listActivity: async () => webhookStoryActivity(),
     },
     agentRoutinesPort("chief"),
   );
@@ -122,6 +125,33 @@ function WebhookRoutineStory() {
       <AgentRoutinesSettings port={port} onCountChange={fn()} onBack={fn()} onClose={fn()} />
     </main>
   );
+}
+
+function webhookStoryActivity(): EventActivity[] {
+  const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
+  return [
+    {
+      kind: "delivery",
+      id: "delivery-story",
+      destinationId: "destination-story",
+      eventType: "routine.run.failed",
+      status: "failed",
+      attempt: 3,
+      statusCode: 502,
+      runId: "run-story",
+      occurredAt: minutesAgo(20),
+    },
+    {
+      kind: "received",
+      id: "received-story",
+      deliveryId: "request-story",
+      eventType: "deployment.created",
+      status: "ignored",
+      reason: "filter",
+      runId: null,
+      occurredAt: minutesAgo(90),
+    },
+  ];
 }
 
 function FullSettingsPanelStory() {

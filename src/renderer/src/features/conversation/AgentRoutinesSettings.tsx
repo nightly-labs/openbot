@@ -9,8 +9,6 @@ import type { EventRoutine, RoutineWebhookTriggerInput } from "@openbot/contract
 import type { AppTextKey } from "@openbot/i18n";
 import {
   Button,
-  ChevronDown,
-  ChevronRight,
   CirclePause,
   Clock3,
   ConfirmDialog,
@@ -31,7 +29,6 @@ import { SettingsBackIcon, SettingsForwardIcon } from "@openbot/ui/components/Se
 import { RoutineRunHistory } from "@openbot/ui/features/conversation/RoutineRunHistory";
 import { RoutineSchedulePicker } from "@openbot/ui/features/conversation/RoutineSchedulePicker";
 import { RoutineTriggerMenu } from "@openbot/ui/features/conversation/RoutineTriggerMenu";
-import { RoutineWebhookActivity } from "@openbot/ui/features/conversation/RoutineWebhookActivity";
 import { RoutineWebhookNotifications } from "@openbot/ui/features/conversation/RoutineWebhookNotifications";
 import {
   type RoutineWebhookFilterDraft,
@@ -89,8 +86,6 @@ interface RoutineDraft {
 interface WebhookEditorState {
   secret: string | null;
   connected: boolean | null;
-  notificationsOpen: boolean;
-  activityOpen: boolean;
 }
 
 const LIMIT_POLICY_LABELS = {
@@ -121,8 +116,6 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
   const [webhook, setWebhook] = createStore<WebhookEditorState>({
     secret: null,
     connected: null,
-    notificationsOpen: false,
-    activityOpen: false,
   });
   const [loading, setLoading] = createSignal(true);
   const [routinesLoaded, setRoutinesLoaded] = createSignal(false);
@@ -302,8 +295,6 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
   function resetWebhookState(): void {
     setWebhook((state) => {
       state.secret = null;
-      state.notificationsOpen = false;
-      state.activityOpen = false;
     });
   }
 
@@ -778,33 +769,17 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
 
               <Show when={routineRef()}>
                 {(ref) => (
-                  <>
-                    <RoutineDisclosure
-                      label={t("routine.settings.notifications")}
-                      open={webhook.notificationsOpen}
-                      onToggle={() =>
-                        setWebhook((state) => {
-                          state.notificationsOpen = !state.notificationsOpen;
-                        })
-                      }
-                    >
-                      <RoutineWebhookNotifications api={ref().api} routine={ref().routine} />
-                    </RoutineDisclosure>
-                    <RoutineDisclosure
-                      label={t("routine.settings.activity")}
-                      open={webhook.activityOpen}
-                      onToggle={() =>
-                        setWebhook((state) => {
-                          state.activityOpen = !state.activityOpen;
-                        })
-                      }
-                    >
-                      <RoutineWebhookActivity api={ref().api} routine={ref().routine} />
-                    </RoutineDisclosure>
-                  </>
+                  <section class="agent-routine-field-section" aria-labelledby="agent-routine-notifications-heading">
+                    <h3 id="agent-routine-notifications-heading">{t("routine.settings.notifications")}</h3>
+                    <RoutineWebhookNotifications api={ref().api} routine={ref().routine} />
+                  </section>
                 )}
               </Show>
-              <RoutineRunHistory runs={runs()} onOpenRun={props.onOpenRun ? requestOpenRun : undefined} />
+              <RoutineRunHistory
+                runs={runs()}
+                onOpenRun={props.onOpenRun ? requestOpenRun : undefined}
+                activity={routineRef() ?? undefined}
+              />
             </div>
           )}
         </Show>
@@ -889,27 +864,6 @@ function webhookTriggerOf(routine: RoutineEditorRecord | RoutineDraft): RoutineW
   }
   if (!isEventRoutine(routine) || routine.trigger.kind !== "webhook") return null;
   return { kind: "webhook", eventType: routine.trigger.eventType, filters: routine.trigger.filters };
-}
-
-function RoutineDisclosure(props: { label: string; open: boolean; onToggle: () => void; children: JSX.Element }) {
-  return (
-    <section class="agent-routine-section">
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        class="agent-routine-disclosure"
-        aria-expanded={props.open ? "true" : "false"}
-        onClick={props.onToggle}
-      >
-        <Show when={props.open} fallback={<ChevronRight aria-hidden="true" />}>
-          <ChevronDown aria-hidden="true" />
-        </Show>
-        {props.label}
-      </Button>
-      <Show when={props.open}>{props.children}</Show>
-    </section>
-  );
 }
 
 function validDraft(draft: RoutineDraft): boolean {

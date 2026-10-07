@@ -47,6 +47,9 @@ The body must be UTF-8 and at most 64 KiB.
 
 ### Event type and filters
 
+In the routine editor, select **Filter events** to add an event type or a filter. With no event type
+and no filter, each signed request starts the routine.
+
 If the routine has an event type, `type` must be equal to it. A filter has a JSON Pointer into `data`
 and a value. The value is a string, number, boolean, or `null`. The value at the pointer must be equal
 to the filter value, with the same JSON type. For example, `/environment` with `production` reads
@@ -105,7 +108,7 @@ if (response.status !== 200 && response.status !== 202) {
 | `429` | Too many requests to this route from your address. | Yes, later |
 | `503` | The host is offline, busy, or did not answer in 2.5 seconds. The relay does not know the route, or the agent or channel cannot take a run now. | Yes, later |
 
-A `202` response does not mean that the run is complete. Look at the routine activity for the run
+A `202` response does not mean that the run is complete. Look at the routine history for the run
 result. The relay does not keep requests while the host is offline. If you do not retry, the event
 is lost.
 
@@ -227,7 +230,8 @@ start within 24 hours of the first attempt. If the next attempt is later than th
 fails. Each attempt, from DNS lookup to the end of the response, must finish in 30 seconds. OpenBot
 does not follow redirects.
 
-The routine activity shows each delivery. You can retry a failed delivery to an active destination.
+The routine history shows each failed delivery and each request that the host ignored. You can
+retry a failed delivery to an active destination.
 A manual retry starts a new series of 6 attempts and a new 24-hour window, with the same body and
 delivery ID.
 

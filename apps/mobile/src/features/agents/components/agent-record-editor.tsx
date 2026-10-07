@@ -35,7 +35,7 @@ import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { RoutineScheduleFields } from "./routine-schedule-fields";
 import { type RoutineTriggerChoice, RoutineTriggerPicker } from "./routine-trigger-picker";
-import { RoutineWebhookNotifications } from "./routine-webhook-notifications";
+import { RoutineWebhookActivity, RoutineWebhookNotifications } from "./routine-webhook-notifications";
 import {
   eventFilters,
   type FilterDraft,
@@ -597,6 +597,14 @@ export function RoutineEditor({
       {eventsSupported && routine ? (
         <RoutineWebhookNotifications
           key={routine.id}
+          serverId={agent.serverId}
+          owner={eventOwner}
+          routineId={routine.id}
+        />
+      ) : null}
+      {eventsSupported && routine ? (
+        <RoutineWebhookActivity
+          key={`${routine.id}-activity`}
           serverId={agent.serverId}
           owner={eventOwner}
           routineId={routine.id}
