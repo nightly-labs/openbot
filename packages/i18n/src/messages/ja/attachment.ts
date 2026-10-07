@@ -4,6 +4,7 @@ import type { messages as source } from "../en/attachment";
 export const messages = {
   "attachment.downloadAll.pending": "ZIP をダウンロードしています…",
   "attachment.downloadAll.label": "すべて ZIP でダウンロード",
+  "attachment.downloadAll.action": "すべてダウンロード",
   "attachment.downloadAll.count": { other: "添付ファイル {count} 件" },
   "attachment.downloadAll.zipping": "圧縮中",
   "attachment.openFile": "ファイルを開く",

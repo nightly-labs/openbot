@@ -4,6 +4,7 @@ import type { messages as source } from "../en/attachment";
 export const messages = {
   "attachment.downloadAll.pending": "ZIP indiriliyor…",
   "attachment.downloadAll.label": "Tümünü ZIP olarak indir",
+  "attachment.downloadAll.action": "Tümünü indir",
   "attachment.downloadAll.count": { one: "{count} ek", other: "{count} ek" },
   "attachment.downloadAll.zipping": "ZIP yapılıyor",
   "attachment.openFile": "Dosyayı aç",

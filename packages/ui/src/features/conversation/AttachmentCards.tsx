@@ -1,54 +1,29 @@
 import { attachmentMimeTypeForName, playableMediaKind } from "@openbot/contracts/attachment-files";
 import { type AttachmentSummary, canPreviewAttachment } from "@openbot/contracts/ipc";
-import { Button, Download, Spinner } from "@openbot/ui";
+import { Button, Download } from "@openbot/ui";
 import { createSignal, createUniqueId, For, Show } from "solid-js";
 import { useText } from "../../text";
 import { AnchoredTooltip } from "./AnchoredTooltip";
 import { attachmentReferenceTone } from "./AttachmentReference";
 import { MediaFilePreview } from "./MediaFilePreview";
 
-/**
- * The whole-list action, shaped like the account update island: a tinted bar
- * that states what is attached, with a light action button beside it. The
- * bottom edge tucks under the first attachment card, so the stack reads as one
- * object rather than a button parked above a list.
- */
 export function AttachmentDownloadAll(props: { count: number; pending: boolean; onDownload: () => void }) {
   const { t } = useText();
-  const label = () => (props.pending ? t("attachment.downloadAll.pending") : t("attachment.downloadAll.label"));
   return (
-    <div class="attachment-download-island">
-      <p class="attachment-download-island__copy">{t("attachment.downloadAll.count", { count: props.count })}</p>
-      <div class="attachment-download-island__action-shell">
-        <Button
-          type="button"
-          size="xs"
-          class="attachment-download-island__action"
-          aria-label={label()}
-          aria-busy={props.pending ? "true" : undefined}
-          disabled={props.pending}
-          onClick={() => props.onDownload()}
-        >
-          <span class="attachment-download-island__action-content">
-            <span class="attachment-download-island__icon t-icon-swap" data-state={props.pending ? "b" : "a"}>
-              <span class="t-icon" data-icon="a" aria-hidden="true">
-                <Download />
-              </span>
-              <span class="t-icon" data-icon="b" aria-hidden="true">
-                <Spinner size="sm" />
-              </span>
-            </span>
-            <span
-              class="attachment-download-island__action-label"
-              data-state={props.pending ? "pending" : "action"}
-              aria-hidden="true"
-            >
-              <span data-text="action">{t("common.download")}</span>
-              <span data-text="pending">{t("attachment.downloadAll.zipping")}</span>
-            </span>
-          </span>
-        </Button>
-      </div>
+    <div class="attachment-download-bar">
+      <span>{t("attachment.downloadAll.count", { count: props.count })}</span>
+      <Button
+        type="button"
+        variant="ghost"
+        size="xs"
+        aria-label={props.pending ? t("attachment.downloadAll.pending") : t("attachment.downloadAll.label")}
+        loading={props.pending}
+        loadingLabel={t("attachment.downloadAll.zipping")}
+        onClick={() => props.onDownload()}
+      >
+        <Download />
+        {t("attachment.downloadAll.action")}
+      </Button>
     </div>
   );
 }
