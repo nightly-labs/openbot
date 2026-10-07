@@ -158,6 +158,8 @@ export const messages = defineMessages("error.provider", {
     "The model provider refused the request because of its rate limit. Wait a few minutes or choose another model, then try again.\n{detail}",
   "error.provider.opencodeBilling":
     "The model provider refused the request because of the account's billing. Waiting does not fix this. Add a payment method or funds in the provider account, or choose another model.\n{detail}",
+  "error.provider.opencodeInvalidUpload":
+    "OpenCode's model provider reported an invalid upload request. Choose another model and continue. Check saved routines before you create them again.\n{detail}",
   "error.provider.opencodeProviderFailed":
     "The model provider failed on its side. Your connection is not the cause. Try again later or choose another model.\n{detail}",
   "error.provider.opencodeNetwork":
