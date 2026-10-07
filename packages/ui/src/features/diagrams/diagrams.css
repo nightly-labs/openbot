@@ -18,6 +18,13 @@
   font-size: var(--openbot-text-md);
 }
 
+/* The Bloub overflows its box. An auto grid track grows to the Bloub and starts at the box's top,
+   and its percentage height then resolves against that track, so the Bloub grows taller than wide
+   and sits low. One track the size of the box keeps every avatar here centred on its line. */
+.diagram-view .agent-avatar {
+  grid-template: 100% / 100%;
+}
+
 /* The same height, avatar and name as the agent chat header, so switching views keeps the bar. */
 .diagram-view-header {
   display: flex;
@@ -50,8 +57,6 @@
 .diagram-view-avatar.agent-avatar {
   width: 18px;
   height: 18px;
-  /* As in the chat avatar below: one track the size of the box keeps the Bloub centred. */
-  grid-template: 100% / 100%;
 }
 
 .diagram-view-icon svg {
@@ -1200,13 +1205,6 @@
 .diagram-chat-avatar.agent-avatar {
   width: 24px;
   height: 24px;
-}
-
-/* The Bloub overflows its box. An auto grid track grows to the Bloub and starts at the box's top,
-   and its percentage height then resolves against that track, so the Bloub grows taller than wide
-   and sits low. One track the size of the box centres it in the pill. */
-.diagram-chat-avatar.agent-avatar {
-  grid-template: 100% / 100%;
 }
 
 .diagram-chat-header {
