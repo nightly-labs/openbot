@@ -90,7 +90,7 @@ export const messages = defineMessages("diagram", {
   "diagram.chat.label": "Diagram assistant",
   "diagram.chat.title": "Edit with {name}",
   "diagram.chat.empty": "Tell {name} what this diagram must do. It adds agents, routines and connections for you.",
-  "diagram.chat.placeholder": "Describe a change, for example: add a reviewer after the researcher",
+  "diagram.chat.placeholder": "Describe a routine change",
   "diagram.chat.send": "Send",
   "diagram.chat.hide": "Hide the assistant",
   "diagram.chat.show": "Ask an agent to edit this diagram",
