@@ -331,9 +331,19 @@ export function ComposerEditor(props: ComposerEditorProps) {
     props.onValueChange(value);
   }
 
-  function insertPrintableKey(key: string) {
-    if (!editor) return;
-    insertPlainText(editor, key);
+  /*
+   * Every plain character takes the same road: this handler cancels the native insert and asks the
+   * browser to insert the text. Letting the default action write some characters and the editor
+   * write the rest raced, and a native insert that landed a task late, or one reported with a
+   * composition input type, was read as "no native input" and the character went in twice.
+   * The text comes from the input event, not from the key: an input method that picks a phrase
+   * with Shift+1 sends the "!" key, and Chromium delivers the phrase as that key's text.
+   */
+  function handleBeforeInput(event: InputEvent) {
+    if (!editor || isComposing || event.isComposing) return;
+    if (event.inputType !== "insertText" || !event.data) return;
+    event.preventDefault();
+    insertPlainText(editor, event.data);
     emitValue();
     updateMention();
     scrollToEndIfCaretAtEnd();
@@ -562,19 +572,6 @@ export function ComposerEditor(props: ComposerEditorProps) {
       return;
     }
 
-    /*
-     * Every plain character takes the same road: this handler cancels the key and asks the browser
-     * to insert the text. Letting the default action write some characters and this handler write
-     * the rest raced, and a native insert that landed a task late, or one reported with a
-     * composition input type, was read as "no native input" and the character went in twice.
-     */
-    const printableKey = event.key.length === 1 && !event.ctrlKey && !event.metaKey;
-    if (printableKey) {
-      event.preventDefault();
-      insertPrintableKey(event.key);
-      return;
-    }
-
     if (event.key === "Enter" && event.shiftKey) {
       event.preventDefault();
       if (!editor) return;
@@ -680,6 +677,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
         }}
         onClick={updateMention}
         onKeyDown={handleKeyDown}
+        onBeforeInput={handleBeforeInput}
         onCompositionStart={() => {
           isComposing = true;
         }}
