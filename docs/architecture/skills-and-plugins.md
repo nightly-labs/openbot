@@ -67,6 +67,29 @@ could read the filled fields. A login matches by 1Password's autofill rule, on t
 with private suffixes such as `github.io` counted. Agents and providers never receive the token, a
 password or a code.
 
+The Bitwarden connector also implements `PasswordVault`. It uses an installed `bw` executable,
+resolved to an absolute path from absolute `PATH` entries or common installation directories.
+It runs fixed arguments without a shell and with an allowlisted environment. The user supplies a
+CLI session key after signing in and unlocking Bitwarden outside OpenBot. OpenBot keeps no
+connection file and never asks for the master password. The CLI owns its encrypted cache and server
+configuration. Each operation has a 30-second deadline and an output limit. Errors discard all
+CLI output. Disconnect cancels active calls, and a late call cannot return a credential from an
+old session. Eight hours without a successful vault call ends the connection.
+
+Connect requires exactly one folder named `Shared with OpenBot`. Its id scopes later reads.
+Each fill syncs and checks the current item, its folder, its saved HTTPS origin, its deleted state,
+and its master-password prompt setting. Default, domain, and host URI rules use exact HTTPS origin
+matching. Other URI rules are not supported; those logins use the manual secret card.
+The session key can decrypt the wider vault; the folder limit is enforced by OpenBot, not Bitwarden.
+All local agents share this grant. Prompt injection can still use an approved account on its own
+site; this feature does not authorize or constrain actions after sign-in.
+
+`password-vault-router.ts` joins metadata from both managers and prefixes Bitwarden ids with
+`bitwarden:`. Existing 1Password ids stay unchanged. A failed list stops automatic account selection
+rather than hiding a source and selecting a different account. Main returns only connection state
+through the local Bitwarden IPC group. The shared panel is used in desktop Marketplace and server
+settings; remote web and mobile clients do not manage this local connection.
+
 The GitHub connector is built in and has no SQLite row. `src/main/github-connector-service.ts` signs
 in to the `openbotgit` GitHub App with the device flow, which needs only the public Client ID, and keeps
 the tokens in `openbot-github-connector-v1.json`, encrypted with `safeStorage`. While it is

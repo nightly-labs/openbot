@@ -1,6 +1,7 @@
 import type { CentralAuthUser, ServerSummary } from "@openbot/contracts/ipc";
 import type { CustomAgentSettingsApi } from "@openbot/ui/features/custom-providers/CustomAgentSettings";
 import { providerDiagnosticsText } from "@openbot/ui/features/provider-diagnostics/provider-diagnostics";
+import type { BitwardenConnectorPanelProps } from "@openbot/ui/features/settings/BitwardenConnectorPanel";
 import type { HostedSiteDeleteResult } from "@openbot/ui/features/settings/stores/hosted-sites-store";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, Loading, Show } from "solid-js";
@@ -10,6 +11,7 @@ import { appPort } from "./app-port";
 import { useAuth } from "./features/account/account-context";
 import { resolveCreationModel } from "./features/agents/agent-creation-model";
 import { useAgents } from "./features/agents/agents-context";
+import { createBitwardenConnector } from "./features/connectors/bitwarden-connector";
 import { createDiscordConnector } from "./features/connectors/discord-connector";
 import { createGitHubConnector, type GitHubConnectorController } from "./features/connectors/github-connector";
 import {
@@ -81,6 +83,8 @@ export function WorkspaceOverlays(props: AccountProps) {
     server?.kind === "local" && github.status().available ? github : undefined;
   /* The 1Password connection of this computer. The browser that fills its logins runs here too. */
   const onePassword = createOnePasswordConnector();
+  const bitwarden = createBitwardenConnector();
+  const bitwardenFor = (server: ServerSummary | undefined) => (server?.kind === "local" ? bitwarden : undefined);
   const onePasswordFor = (server: ServerSummary | undefined) => (server?.kind === "local" ? onePassword : undefined);
   /* The overlays mount with the app. A first read that failed then must not hide GitHub for good, and
      the sign-in can change outside this window, so each window reads the status again when it opens. */
@@ -96,6 +100,7 @@ export function WorkspaceOverlays(props: AccountProps) {
       <SkillsMarketplace
         githubConnector={githubFor(activeServer())}
         onePasswordConnector={onePasswordFor(activeServer())}
+        bitwardenConnector={bitwardenFor(activeServer())}
       />
       <SharedAgentInstall />
       <JoinServer account={props.account} />
@@ -103,6 +108,7 @@ export function WorkspaceOverlays(props: AccountProps) {
       <ServerSettings
         githubConnector={githubFor(serverSettingsTarget())}
         onePasswordConnector={onePasswordFor(serverSettingsTarget())}
+        bitwardenConnector={bitwardenFor(serverSettingsTarget())}
       />
       <AppSettings account={props.account} />
       <GlobalMessageSearch />
@@ -151,6 +157,7 @@ function PermissionsReview(props: AccountProps) {
 function SkillsMarketplace(props: {
   githubConnector: GitHubConnectorController | undefined;
   onePasswordConnector: OnePasswordConnectorController | undefined;
+  bitwardenConnector: BitwardenConnectorPanelProps | undefined;
 }) {
   const {
     skillsMarketplaceOpen,
@@ -183,6 +190,7 @@ function SkillsMarketplace(props: {
       }}
       githubConnector={props.githubConnector}
       onePasswordConnector={props.onePasswordConnector}
+      bitwardenConnector={props.bitwardenConnector}
     />
   );
 }
@@ -260,6 +268,7 @@ function AddServer() {
 function ServerSettings(props: {
   githubConnector: GitHubConnectorController | undefined;
   onePasswordConnector: OnePasswordConnectorController | undefined;
+  bitwardenConnector: BitwardenConnectorPanelProps | undefined;
 }) {
   const platform = usePlatform();
   const { hostStatus, setServerMuted, setServerNotificationLevel, activeServer } = useServers();
@@ -546,6 +555,7 @@ function ServerSettings(props: {
           }
           githubConnector={props.githubConnector}
           onePasswordConnector={props.onePasswordConnector}
+          bitwardenConnector={props.bitwardenConnector}
           // Slack and Discord are connected on the computer that runs the agents: they open this
           // computer's browser and return to its `openbot://` link.
           slackConnector={server().kind === "local" ? slack : undefined}

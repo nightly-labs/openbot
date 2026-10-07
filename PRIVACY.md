@@ -375,6 +375,14 @@ Billing is off, and Stripe receives nothing, when the account service has no Str
   the OpenBot GitHub App's installation tokens in plain text, with mode 0600, for `gh` and `git` in
   agent tools. OpenBot deletes that folder when you disconnect and when the app closes; after a crash
   it stays until the next start. The tokens are redacted from logs, exports and diagnostics.
+- The Bitwarden connection keeps a CLI session key in process memory only. OpenBot does not
+  save it to a file. Disconnect, eight hours without vault use, and app exit stop this connection.
+  The log redactor can retain values in memory until exit to mask later messages.
+  The Bitwarden CLI keeps its own encrypted vault cache. OpenBot reads login items in the folder
+  `Shared with OpenBot`. Agents receive item ids, titles, and usernames; passwords and authenticator
+  codes go through the main process to the browser page. This folder is an OpenBot access rule;
+  the CLI session key can decrypt the wider vault. Use a separate Bitwarden account if you need
+  the password manager itself to enforce that separation.
 - The 1Password connection (Marketplace > 1Password) is kept in
   `~/Library/Application Support/OpenBot/openbot-onepassword-connector-v1.json`, encrypted by the
   operating system's secret storage. It holds the service account token and the account ID only.
@@ -435,6 +443,9 @@ Network traffic can also occur when:
   pins from `cache.agilebits.com`, checks its SHA-256, and keeps it in
   `~/Library/Application Support/OpenBot/provider-state/1password-cli`. The request carries no user
   data;
+- the user connects Bitwarden. OpenBot runs the installed `bw` CLI to sync with the server already
+  configured in that CLI, including a self-hosted server. It syncs before listing or filling logins.
+  These calls send no OpenBot conversations, files, or agent instructions to Bitwarden;
 - the user connects 1Password. Connect runs the user's own 1Password CLI (`op`) on this computer to
   create the vault "Shared with OpenBot" and a service account that can read only it. OpenBot then
   reads that vault from 1Password's servers with the token: the vault names, the login titles and

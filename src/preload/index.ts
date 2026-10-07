@@ -69,6 +69,7 @@ import {
   decodeApprovalAutomationPreference,
   decodeAppSetupState,
   decodeBillingState,
+  decodeBitwardenConnectorStatus,
   decodeBusyMessageModePreference,
   decodeCentralAuthState,
   decodeCustomAgentCheckResult,
@@ -562,6 +563,12 @@ const openbotApi: OpenBotDesktopApi = {
     openVerification: decodeVoid,
     openInstall: decodeVoid,
     changed: decodeGitHubConnectorStatus,
+  }),
+  bitwardenConnector: bridgeGroup(IPC_ENDPOINTS.bitwardenConnector, {
+    status: decodeBitwardenConnectorStatus,
+    connect: decodeBitwardenConnectorStatus,
+    disconnect: decodeBitwardenConnectorStatus,
+    changed: decodeBitwardenConnectorStatus,
   }),
   onePasswordConnector: bridgeGroup(IPC_ENDPOINTS.onePasswordConnector, {
     status: decodeOnePasswordConnectorStatus,

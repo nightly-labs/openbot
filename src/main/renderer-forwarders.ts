@@ -174,6 +174,12 @@ export function createRendererForwarders({
     sendToRenderer(window, IPC_ENDPOINTS.onePasswordConnector.changed, status);
   }
 
+  function forwardBitwardenConnectorStatus(status: import("@openbot/contracts/ipc").BitwardenConnectorStatus): void {
+    const window = getMainWindow();
+    if (!window || window.isDestroyed()) return;
+    sendToRenderer(window, IPC_ENDPOINTS.bitwardenConnector.changed, status);
+  }
+
   function forwardHostStatus(status: import("@openbot/contracts/ipc").HostStatus): void {
     const window = getMainWindow();
     if (!window || window.isDestroyed()) return;
@@ -237,6 +243,7 @@ export function createRendererForwarders({
     forwardProviderRuntimeStatus,
     forwardGitHubConnectorStatus,
     forwardOnePasswordConnectorStatus,
+    forwardBitwardenConnectorStatus,
     forwardHostStatus,
     forwardRemoteDesktopSessions,
     forwardServers,

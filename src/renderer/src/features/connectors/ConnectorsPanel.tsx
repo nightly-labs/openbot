@@ -1,6 +1,10 @@
 import type { GitHubConnectorStatus, MessagingPlatform, OnePasswordConnectorStatus } from "@openbot/contracts/ipc";
-import { Button, ChevronLeft } from "@openbot/ui";
+import { Button, ChevronLeft, Lock } from "@openbot/ui";
 import type { AgentProfile } from "@openbot/ui/data";
+import {
+  BitwardenConnectorPanel,
+  type BitwardenConnectorPanelProps,
+} from "@openbot/ui/features/settings/BitwardenConnectorPanel";
 import { GitHubConnectorPanel } from "@openbot/ui/features/settings/GitHubConnectorPanel";
 import { GitHubMark, type IntegrationStatus, OnePasswordMark } from "@openbot/ui/features/settings/IntegrationLayout";
 import { IntegrationsHub, type IntegrationsHubRow } from "@openbot/ui/features/settings/IntegrationsHub";
@@ -19,7 +23,7 @@ import { type GitHubConnectorController, githubPanelProps } from "./github-conne
 import { type OnePasswordConnectorController, onePasswordPanelProps } from "./onepassword-connector";
 import type { SlackConnectorController } from "./slack-connector";
 
-type View = "hub" | "github" | "onepassword" | MessagingPlatform;
+type View = "hub" | "github" | "onepassword" | "bitwarden" | MessagingPlatform;
 
 const GITHUB_STATUS = {
   disconnected: { status: "idle", label: "connector.github.statusNotSetUp" },
@@ -42,6 +46,7 @@ const ONEPASSWORD_STATUS = {
 export function ConnectorsPanel(props: {
   github?: GitHubConnectorController | undefined;
   onePassword?: OnePasswordConnectorController | undefined;
+  bitwarden?: BitwardenConnectorPanelProps | undefined;
   slack?: SlackConnectorController | undefined;
   discord?: DiscordConnectorController | undefined;
   agents: AgentProfile[];
@@ -128,6 +133,18 @@ export function ConnectorsPanel(props: {
     if (props.discord) list.push(messagingRow("discord", props.discord));
     if (props.github) list.push(githubRow(props.github));
     if (props.onePassword) list.push(onePasswordRow(props.onePassword));
+    if (props.bitwarden)
+      list.push({
+        id: "bitwarden",
+        name: t("connector.bitwarden.title"),
+        logo: <Lock />,
+        status: props.bitwarden.status.connected ? "connected" : "idle",
+        statusLabel: props.bitwarden.status.connected
+          ? t("connector.bitwarden.connected")
+          : t("connector.bitwarden.disconnected"),
+        summary: t("connector.bitwarden.description"),
+        onOpen: () => setView("bitwarden"),
+      });
     return list;
   };
 
@@ -146,6 +163,19 @@ export function ConnectorsPanel(props: {
             <Back />
             <GitHubConnectorPanel {...githubPanelProps(github())} />
           </div>
+        )}
+      </Match>
+      <Match when={view() === "bitwarden" && props.bitwarden}>
+        {(panel) => (
+          <>
+            <Back />
+            <BitwardenConnectorPanel
+              status={panel().status}
+              busy={panel().busy}
+              onConnect={(key) => panel().onConnect(key)}
+              onDisconnect={() => panel().onDisconnect()}
+            />
+          </>
         )}
       </Match>
       <Match when={view() === "onepassword" && props.onePassword}>

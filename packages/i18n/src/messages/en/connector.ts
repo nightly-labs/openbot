@@ -265,4 +265,18 @@ export const messages = defineMessages("connector", {
   "connector.onePassword.statusConnected": "Connected",
   "connector.onePassword.statusConnecting": "Connecting",
   "connector.onePassword.statusNotSetUp": "Not set up",
+  "connector.bitwarden.title": "Bitwarden",
+  "connector.bitwarden.description": "Fill browser logins from Bitwarden.",
+  "connector.bitwarden.setup":
+    "Install the Bitwarden CLI and sign in with bw login. Create a folder named Shared with OpenBot and put only the logins that agents may use in it. Run bw unlock --raw and paste the session key below. Do not paste your master password.",
+  "connector.bitwarden.scope":
+    "All agents on this computer can use matching logins in Shared with OpenBot. OpenBot uses exact HTTPS origins. It does not use items that require a master password prompt or a custom URI match rule.",
+  "connector.bitwarden.session":
+    "The session key stays in memory. Connect again after 8 hours without vault use or after OpenBot exits. Disconnect stops OpenBot access; it does not lock other Bitwarden clients.",
+  "connector.bitwarden.sessionKey": "Bitwarden session key",
+  "connector.bitwarden.connect": "Connect Bitwarden",
+  "connector.bitwarden.disconnect": "Disconnect Bitwarden",
+  "connector.bitwarden.connected": "Connected",
+  "connector.bitwarden.disconnected": "Not connected",
+  "connector.bitwarden.failed": "Could not connect to Bitwarden.",
 });

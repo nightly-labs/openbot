@@ -65,6 +65,7 @@ import { McpOAuth } from "../backend/mcp-oauth-provider";
 import { discordDriver } from "../backend/messaging/discord/discord-driver";
 import { MessagingService } from "../backend/messaging/messaging-service";
 import { slackDriver } from "../backend/messaging/slack/slack-driver";
+import { passwordVaultRouter } from "../backend/password-vault-router";
 import { SidebarLayoutStore } from "../backend/sidebar-layout-store";
 import { StorageUsageScanner, StorageUsageService } from "../backend/storage-usage";
 import { TeamChatStore } from "../backend/team-chat-store";
@@ -79,6 +80,7 @@ import { readAnalyticsPreference } from "./analytics-preference-store";
 import { ApprovalAutomation, readApprovalAutomation } from "./approval-automation-store";
 import { AutomationServer } from "./automation-server";
 import { BillingDesktopService } from "./billing-service";
+import { BitwardenConnectorService } from "./bitwarden-connector-service";
 import { BrowserPictureInPicture } from "./browser-picture-in-picture";
 import { BrowserViewClient } from "./browser-view-client";
 import { BusyMessageModePreferenceStore } from "./busy-message-mode-preference-store";
@@ -267,6 +269,7 @@ const TEARDOWN_ORDER = {
   mcpOAuthRedirect: 105,
   // Before the agent service. It holds no file an agent reads; only a CLI run that waits is stopped.
   onePasswordConnector: 106,
+  bitwardenConnector: 106.5,
   // Before the agent service, so no agent is handed a token file that is being removed.
   githubConnector: 107,
   // Before the agent service, so no script starts a run while the service stops.
@@ -321,6 +324,7 @@ export interface ApplicationServices {
   mcpOAuth: McpOAuth;
   githubConnector: GitHubConnectorService;
   onePasswordConnector: OnePasswordConnectorService;
+  bitwardenConnector: BitwardenConnectorService;
   mailbox: MailboxStore;
   storageUsage: StorageUsageService;
   browser: BrowserHost;
@@ -939,6 +943,11 @@ export async function createApplicationServices({
   teardown.push(TEARDOWN_ORDER.githubConnector, "the GitHub connection", () =>
     runCauseEffect(githubConnector.dispose()),
   );
+  const bitwardenConnector = new BitwardenConnectorService();
+  teardown.push(TEARDOWN_ORDER.bitwardenConnector, "the Bitwarden connection", async () => {
+    await runCauseEffect(bitwardenConnector.dispose());
+  });
+
   /*
    * The 1Password connection. The browser fills logins from it, so the agent service reads it. The
    * login list is read from 1Password in the background; startup does not wait for it.
@@ -1139,7 +1148,7 @@ export async function createApplicationServices({
       mcpServer: () => githubConnector.mcpServer(),
       mcpAuthorization: () => githubConnector.mcpAuthorization().pipe(toMcpGatewayFailed),
     },
-    passwordVault: onePasswordConnector,
+    passwordVault: passwordVaultRouter(onePasswordConnector, bitwardenConnector),
     localSkillTools: () => localSkillTools(skills),
     approvalAutomation,
     busyMessageMode: () => busyMessageMode.get().mode,
@@ -1909,6 +1918,7 @@ export async function createApplicationServices({
     mcpOAuth,
     githubConnector,
     onePasswordConnector,
+    bitwardenConnector,
     mailbox,
     storageUsage,
     browser,

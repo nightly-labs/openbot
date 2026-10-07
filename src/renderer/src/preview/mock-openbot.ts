@@ -101,6 +101,7 @@ import {
 import { mockAgentAnalytics, mockHostAnalytics } from "./mock-agent-analytics";
 import { createMockAuth, type MockAuthOptions } from "./mock-auth";
 import { createMockBilling } from "./mock-billing";
+import { createMockBitwardenConnector } from "./mock-bitwarden-connector";
 import { createMockBrowser, type MockBrowserOptions } from "./mock-browser";
 import { createMockChannels } from "./mock-channels";
 import { createMockGitHubConnector } from "./mock-github-connector";
@@ -622,6 +623,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     },
     githubConnector: createMockGitHubConnector(),
     onePasswordConnector: createMockOnePasswordConnector(),
+    bitwardenConnector: createMockBitwardenConnector(),
     billing: createMockBilling(),
     routineFeed: createMockRoutineFeed(),
     hostedServers: createMockHostedServers(),
