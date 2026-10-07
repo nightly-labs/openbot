@@ -92,17 +92,6 @@ export interface Diagram {
   updatedAt: string;
 }
 
-/** A diagram in the sidebar list. */
-export interface DiagramSummary {
-  id: string;
-  name: string;
-  agentIds: string[];
-  routineNames: string[];
-  lastRunStatus: DiagramRunStatus | null;
-  lastRunAt: string | null;
-  updatedAt: string;
-}
-
 /** One message in the panel where an agent edits the diagram for the user. */
 export interface DiagramChatMessage {
   id: string;

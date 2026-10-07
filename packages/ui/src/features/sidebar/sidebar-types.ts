@@ -9,7 +9,6 @@ import type {
 import type { JSX } from "@solidjs/web";
 import type { AvatarMood } from "../../bloub-avatar";
 import type { AgentProfile } from "../../data";
-import type { DiagramSummary } from "../diagrams/diagram-model";
 import type { ServerMenuProps } from "../servers/ServerMenu";
 import type { SidebarPinnedItem } from "./sidebar-pins";
 
@@ -20,17 +19,16 @@ import type { SidebarPinnedItem } from "./sidebar-pins";
  * Reading them from the entry component made the pure logic depend on the whole
  * view to borrow a name.
  */
-/** What the list under the search shows: the chat list (agents and channels) or the diagrams. */
-export type SidebarView = "agents" | "diagrams";
+/**
+ * What the main area shows for the chat picked in the list: its conversation, or its routines. The
+ * list itself is the same in both.
+ */
+export type SidebarView = "agents" | "routines";
 
 export interface SidebarProps {
   /** The switch over the list is shown only when the caller handles `onViewChange`. */
   view?: SidebarView;
   onViewChange?: ((view: SidebarView) => void) | undefined;
-  diagrams?: DiagramSummary[];
-  activeDiagramId?: string | null;
-  onSelectDiagram?: ((diagramId: string) => void) | undefined;
-  onCreateDiagram?: (() => void) | undefined;
   deleteSupported?: boolean;
   marketplaceSupported?: boolean;
   channels?: ChannelSummary[];

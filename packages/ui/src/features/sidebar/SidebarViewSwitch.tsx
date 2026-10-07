@@ -1,11 +1,11 @@
-/** The switch over the list: the chats, or the diagrams that show how routines start agents. */
+/** The switch over the list: open a chat's conversation, or its routines on the canvas. */
 
 import { Bot, SlidingTabs, Workflow } from "@openbot/ui";
 import { useText } from "../../text";
 import { useSidebarScope } from "./sidebar-scope";
 import type { SidebarView } from "./sidebar-types";
 
-const VIEWS = ["agents", "diagrams"] as const satisfies readonly SidebarView[];
+const VIEWS = ["agents", "routines"] as const satisfies readonly SidebarView[];
 
 function isSidebarView(value: string): value is SidebarView {
   return VIEWS.some((view) => view === value);
@@ -27,9 +27,9 @@ export function SidebarViewSwitch() {
             <Bot aria-hidden="true" />
             {t("sidebar.view.agents")}
           </SlidingTabs.Trigger>
-          <SlidingTabs.Trigger value="diagrams" class="sidebar-view-tab">
+          <SlidingTabs.Trigger value="routines" class="sidebar-view-tab">
             <Workflow aria-hidden="true" />
-            {t("sidebar.view.diagrams")}
+            {t("sidebar.view.routines")}
           </SlidingTabs.Trigger>
         </SlidingTabs.List>
       </SlidingTabs.Root>

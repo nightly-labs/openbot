@@ -1,5 +1,4 @@
 import { Show } from "solid-js";
-import { SidebarDiagramList } from "./SidebarDiagramList";
 import { SidebarDialogs } from "./SidebarDialogs";
 import { SidebarFrame } from "./SidebarFrame";
 import { SidebarNav } from "./SidebarNav";
@@ -22,9 +21,7 @@ export function Sidebar(props: SidebarProps) {
           <SidebarViewSwitch />
         </Show>
 
-        <Show when={props.view === "diagrams"} fallback={<SidebarNav />}>
-          <SidebarDiagramList />
-        </Show>
+        <SidebarNav />
 
         <Show when={!props.compact}>{props.footer}</Show>
 

@@ -27,25 +27,3 @@
   height: var(--openbot-icon-sm);
   flex: none;
 }
-
-.diagram-row-preview svg,
-.diagram-row-preview .ui-spinner {
-  display: inline-block;
-  margin-right: var(--openbot-space-1);
-  vertical-align: -2px;
-}
-
-.diagram-row-preview svg {
-  width: var(--openbot-icon-xs);
-  height: var(--openbot-icon-xs);
-}
-
-.diagram-row-failed {
-  color: var(--openbot-danger-text);
-}
-
-.sidebar-diagram-create.ui-button {
-  justify-content: flex-start;
-  margin-top: var(--openbot-space-1);
-  color: var(--openbot-text-muted);
-}
