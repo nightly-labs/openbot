@@ -31,7 +31,7 @@ export function LeaveServerDialog(props: {
     <ConfirmDialog
       open={props.server !== null}
       initialFocus="cancel"
-      restoreFocusTarget={props.restoreFocusTarget ?? undefined}
+      restoreFocusTarget={props.restoreFocusTarget}
       title={t("server.settings.leaveConfirmTitle", { name: props.server?.name ?? "" })}
       description={t("server.settings.leaveConfirmDescription")}
       confirmLabel={t("server.settings.leaveTitle")}

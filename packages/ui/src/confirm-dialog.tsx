@@ -34,7 +34,7 @@ export interface ConfirmDialogProps {
   /** The button that gets focus when the dialog opens. */
   initialFocus?: "confirm" | "cancel";
   /** Gets focus when the dialog closes, when the element that opened it closes with it, such as a menu item. */
-  restoreFocusTarget?: HTMLElement;
+  restoreFocusTarget?: HTMLElement | null | undefined;
 }
 
 export function ConfirmDialog(props: ConfirmDialogProps): JSX.Element {
