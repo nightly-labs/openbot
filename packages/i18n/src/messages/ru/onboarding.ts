@@ -5,12 +5,9 @@ export const messages = {
   "onboarding.setup.saveFailed": "OpenBot не удалось сохранить локальную настройку.",
   "onboarding.setup.verifyFailed": "OpenBot не удалось проверить это приглашение.",
   "onboarding.setup.connectFailed": "OpenBot не удалось подключиться к этому хосту.",
-  "onboarding.setup.reviewTitle": "Провайдеры и разрешения",
   "onboarding.setup.localTitle": "Настройка этого компьютера",
   "onboarding.setup.remoteTitle": "Подключение к хосту",
   "onboarding.setup.title": "Где будет работать OpenBot?",
-  "onboarding.setup.reviewDescription":
-    "Выберите провайдера по умолчанию для локальных агентов и проверьте разрешения macOS.",
   "onboarding.setup.localDescription": "Агенты, диалоги и файлы остаются на этом компьютере.",
   "onboarding.setup.remoteDescription": "Используйте приглашение от человека, который управляет вашим хостом OpenBot.",
   "onboarding.setup.description":
@@ -32,7 +29,6 @@ export const messages = {
   "onboarding.setup.otherInvitation": "Использовать другое приглашение",
   "onboarding.setup.joinNote":
     "Вы присоединитесь как {email}. Приглашения по почте работают только для адреса, на который они пришли.",
-  "onboarding.setup.saveChanges": "Сохранить изменения",
   "onboarding.setup.connect": "Подключиться к хосту",
   "onboarding.setup.reviewInvitation": "Проверить приглашение",
   "onboarding.setup.continueWith": "Продолжить с {provider}",

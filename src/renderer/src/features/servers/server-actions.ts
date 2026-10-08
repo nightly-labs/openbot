@@ -66,7 +66,7 @@ export function useServerActions() {
     void refreshHostedServersAvailable();
   }
 
-  const callbacks: Required<ServerActionCallbacks> = {
+  const callbacks = {
     onSetMuted: (serverId, muted, durationMs) => void setServerMuted(serverId, muted, durationMs),
     onSetNotificationLevel: (serverId, level) => void setServerNotificationLevel(serverId, level),
     onOpenUsage: openUsage,
@@ -84,7 +84,7 @@ export function useServerActions() {
     onLeave: requestLeaveServer,
     onDelete: openHostedServerDelete,
     canDelete: (serverId) => hostedServerIds().has(serverId),
-  };
+  } satisfies ServerActionCallbacks;
 
   return { orderedServers, select, add, addCreatesServer: hostedServersAvailable, callbacks };
 }

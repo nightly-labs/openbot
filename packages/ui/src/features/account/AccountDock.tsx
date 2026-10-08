@@ -21,7 +21,6 @@ import {
   Popover,
   Puzzle,
   Settings,
-  ShieldCheck,
   SlidersHorizontal,
   Tooltip,
   UserAvatar,
@@ -55,7 +54,6 @@ interface AccountDockProps {
   onUpdateAction: () => Promise<void>;
   onLogout?: () => Promise<void>;
   onOpenExternal: (destination: ExternalDestination) => Promise<void>;
-  onOpenPermissions?: () => void;
   onOpenProfile?: (() => void) | undefined;
   onOpenBilling?: (() => void) | undefined;
   /** The account's own settings, for a client where Settings opens the settings of a host. */
@@ -413,7 +411,7 @@ export function AccountDock(props: AccountDockProps) {
           </section>
           <div class="account-menu-separator" />
         </Show>
-        <Show when={updateRowVisible() || props.onOpenSkills || props.onOpenPermissions}>
+        <Show when={updateRowVisible() || props.onOpenSkills}>
           <section class="account-menu-group" aria-label={PRODUCT_NAME}>
             <Show when={updateRowVisible()}>
               <Button
@@ -445,20 +443,6 @@ export function AccountDock(props: AccountDockProps) {
               >
                 <Puzzle class="account-menu-icon" aria-hidden="true" />
                 <span>{t("account.menu.marketplace")}</span>
-              </Button>
-            </Show>
-            <Show when={props.onOpenPermissions}>
-              <Button
-                variant="ghost"
-                type="button"
-                class="account-menu-row"
-                onClick={() => {
-                  setMenuOpen(false);
-                  props.onOpenPermissions?.();
-                }}
-              >
-                <ShieldCheck class="account-menu-icon" aria-hidden="true" />
-                <span>{t("account.menu.providersPermissions")}</span>
               </Button>
             </Show>
           </section>

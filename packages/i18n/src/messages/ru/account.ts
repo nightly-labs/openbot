@@ -18,7 +18,6 @@ export const messages = {
   "account.menu.billing": "Оплата",
   "account.menu.accountSettings": "Настройки аккаунта",
   "account.menu.marketplace": "Каталог",
-  "account.menu.providersPermissions": "Провайдеры и разрешения",
   "account.menu.help": "Справка",
   "account.menu.sendFeedback": "Отправить отзыв",
   "account.menu.message": "Написать",

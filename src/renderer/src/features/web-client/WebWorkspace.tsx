@@ -282,12 +282,14 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   // True when the account can create hosted servers. The plus button then opens the plans.
   const [hostedServersAvailable, setHostedServersAvailable] = createSignal(false);
   /** The hosted servers of this account. The server menu can delete these. */
+  const [hostedServersLoaded, setHostedServersLoaded] = createSignal(false);
   const [hostedServerIds, setHostedServerIds] = createSignal<ReadonlySet<string>>(new Set());
   async function refreshHostedServersAvailable(): Promise<boolean> {
     // A failed read keeps the last answer: a network error does not turn the plans off.
     const list = await hostedServerCalls.list().catch(() => null);
     if (!list) return hostedServersAvailable();
     setHostedServersAvailable(list.available);
+    setHostedServersLoaded(true);
     setHostedServerIds(new Set(list.servers.map((server) => server.serverId)));
     return list.available;
   }
@@ -569,8 +571,18 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     setBillingOpen(true);
     hostedServers.requestDeleteById(serverId);
   }
+  function canRemoveOwnedServer(serverId: string): boolean {
+    return Boolean(workspace.runtime.removeOwnedHost) && hostedServersLoaded() && !hostedServerIds().has(serverId);
+  }
+  function requestRemoveOwnedServer(hostId: string, trigger: HTMLElement | null): void {
+    setLeaveRequest({ hostId, trigger, removeOwned: true });
+  }
   /** The joined server that the leave confirmation asks about, and the element that asked. */
-  const [leaveRequest, setLeaveRequest] = createSignal<{ hostId: string; trigger: HTMLElement | null } | null>(null);
+  const [leaveRequest, setLeaveRequest] = createSignal<{
+    hostId: string;
+    trigger: HTMLElement | null;
+    removeOwned?: boolean;
+  } | null>(null);
   const leaveServer = createMemo(() => servers().find((item) => item.id === leaveRequest()?.hostId) ?? null);
   // A server that leaves the list in another way ends the request, so it does not open again on a rejoin.
   createEffect(
@@ -581,7 +593,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   );
   async function leaveHost(): Promise<void> {
     const host = workspace.state.hosts.find((item) => item.hostId === leaveRequest()?.hostId);
-    if (host) await workspace.leaveHost(host);
+    if (!host) return;
+    if (leaveRequest()?.removeOwned) await workspace.removeOwnedHost(host);
+    else await workspace.leaveHost(host);
   }
   createEffect(
     () => props.billingReturn,
@@ -1005,6 +1019,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   onSetMuted={setMuted}
                   onSetNotificationLevel={setNotificationLevel}
                   onLeave={(hostId, trigger) => setLeaveRequest({ hostId, trigger })}
+                  onRemove={requestRemoveOwnedServer}
+                  canRemove={canRemoveOwnedServer}
                   onDelete={deleteHostedServer}
                   canDelete={(id) => hostedServerIds().has(id)}
                 />
@@ -1054,6 +1070,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   onSetMuted: setMuted,
                   onSetNotificationLevel: setNotificationLevel,
                   onLeave: (hostId, trigger) => setLeaveRequest({ hostId, trigger }),
+                  onRemove: requestRemoveOwnedServer,
+                  canRemove: canRemoveOwnedServer,
                   onDelete: deleteHostedServer,
                   canDelete: (id) => hostedServerIds().has(id),
                 }}
@@ -1308,6 +1326,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               </Show>
               <LeaveServerDialog
                 server={leaveServer()}
+                removeOwned={leaveRequest()?.removeOwned ?? false}
                 onClose={() => setLeaveRequest(null)}
                 onLeave={leaveHost}
                 restoreFocusTarget={leaveRequest()?.trigger}

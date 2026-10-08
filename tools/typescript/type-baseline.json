@@ -176,7 +176,7 @@
     "src/renderer/src/preview/fixtures.ts": 1,
     "src/renderer/src/preview/mock-openbot.ts": 1,
     "src/renderer/src/preview/mock-web-runtime.ts": 1,
-    "src/renderer/src/WorkspaceOverlays.tsx": 2,
+    "src/renderer/src/WorkspaceOverlays.tsx": 1,
     "src/renderer/src/WorkspaceShell.tsx": 1,
     "src/renderer/stories/AgentSkills.stories.tsx": 1,
     "src/renderer/stories/AgentUsage.stories.tsx": 1,

@@ -18,7 +18,6 @@ export const messages = {
   "account.menu.billing": "お支払い",
   "account.menu.accountSettings": "アカウント設定",
   "account.menu.marketplace": "マーケットプレイス",
-  "account.menu.providersPermissions": "プロバイダーと権限",
   "account.menu.help": "ヘルプ",
   "account.menu.sendFeedback": "フィードバックを送信",
   "account.menu.message": "メッセージ",

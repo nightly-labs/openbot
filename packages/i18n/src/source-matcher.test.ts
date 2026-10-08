@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createSourceLocalizer } from "./source-matcher";
+import { localizeSourceText, matchingSourceKeys, sourceText } from "./source-text";
 
 const source = {
   "error.test.plain": "The skill name is already taken.",
@@ -64,4 +65,13 @@ describe("createSourceLocalizer", () => {
   it("finds exactly one template for each template's own text", () => {
     expect(localizer.matchingKeys("Could not open notes.md.")).toEqual(["error.test.named"]);
   });
+});
+
+// Older hosts still send this text. Keep its source template and translation.
+it("recognizes the released provider setup error from older hosts", () => {
+  const text =
+    "ChatGPT has no model available, and no other signed-in provider has one. Sign in to a provider, or change the default provider in Providers & permissions.";
+  expect(sourceText("error.agent.noStartingModel", { provider: "ChatGPT" })).toBe(text);
+  expect(matchingSourceKeys(text)).toEqual(["error.agent.noStartingModel"]);
+  expect(localizeSourceText(text, "fr")).not.toBe(text);
 });

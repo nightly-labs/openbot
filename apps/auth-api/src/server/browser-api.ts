@@ -37,6 +37,7 @@ export interface BrowserApiServices {
   remote: Pick<
     RemoteControlPlane,
     | "listHosts"
+    | "removeOwnedHost"
     | "startSession"
     | "issueSessionTicket"
     | "endSession"
@@ -194,6 +195,11 @@ const handleBrowserOperation = Effect.fn("BrowserApi.handleOperation")(function*
   if (path === "session" && request.method === "GET") return json({ user });
   if (path === "v2/remote/hosts" && request.method === "GET")
     return json({ hosts: yield* services.remote.listHosts(user.id) });
+  const [, removedHostId] = /^v2\/remote\/hosts\/([^/]+)$/u.exec(path) ?? [];
+  if (removedHostId !== undefined && request.method === "DELETE") {
+    yield* services.remote.removeOwnedHost(user.id, decodeURIComponent(removedHostId));
+    return new Response(null, { status: 204 });
+  }
   const [, encodedLogoHostId] = /^v2\/remote\/hosts\/([^/]+)\/logo$/u.exec(path) ?? [];
   if (encodedLogoHostId !== undefined && request.method === "GET") {
     const hostId = decodeURIComponent(encodedLogoHostId);
