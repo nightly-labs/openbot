@@ -706,6 +706,31 @@ describe.sequential("AgentService: restart", () => {
     expect(events).toContainEqual({ type: "agents-changed", agents: service.listAgents() });
   });
 
+  it("does not recreate a deleted agent when a device reads or marks its conversation", async () => {
+    const { store, mailbox } = stores(root);
+    service = createTestService({ store, mailbox });
+    await runCauseEffect(service.initialize());
+    const agent = await runCauseEffect(store.getOrCreate("deleted-elsewhere"));
+    await runCauseEffect(service.deleteAgent(agent.id));
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    const unknown = `Unknown agent: ${agent.id}`;
+
+    await expect(runCauseEffect(service.readConversation(agent.id))).rejects.toThrow(unknown);
+    await expect(runCauseEffect(service.readConversationFor(agent.id, "member-owner"))).rejects.toThrow(unknown);
+    await expect(runCauseEffect(service.readConversationPageFor(agent.id, "member-owner"))).rejects.toThrow(unknown);
+    await expect(runCauseEffect(service.markConversationRead(agent.id, "member-owner", null))).rejects.toThrow(unknown);
+    await expect(runCauseEffect(service.markConversationUnread(agent.id, "member-owner"))).rejects.toThrow(unknown);
+
+    expect(service.listAgents().some((entry) => entry.id === agent.id)).toBe(false);
+    expect(
+      store.database.connection
+        .prepare("SELECT COUNT(*) AS count FROM projection_agents WHERE agent_id = ?")
+        .get(agent.id),
+    ).toMatchObject({ count: 0 });
+    expect(events).toEqual([]);
+  });
+
   it("holds due routines and rejects messages during deletion, then resumes after failure", async () => {
     const { store, mailbox } = stores(root);
     service = createTestService({

@@ -774,6 +774,20 @@ export class AgentStore {
     }
   }, Effect.uninterruptible).bind(this);
 
+  /**
+   * An agent that is in the roster now. A conversation read or read mark uses this, never `getOrCreate`:
+   * a device can still hold the id of an agent that another device deleted, and its next read must not
+   * bring the agent back. For an agent that exists it does what `getOrCreate` does.
+   */
+  existing = Effect.fn("AgentStore.existing")(function* (
+    this: AgentStore,
+    id: string,
+  ): Effect.fn.Return<AgentSummary, StoredStateFailure> {
+    const agent = yield* storedSync(() => this.#requireAgent(id));
+    yield* storedIO(() => mkdir(agent.workspacePath, { recursive: true, mode: 0o700 }));
+    return { ...agent };
+  }).bind(this);
+
   getOrCreate = Effect.fn("AgentStore.getOrCreate")(function* (
     this: AgentStore,
     id: string,
@@ -1106,7 +1120,7 @@ export class AgentStore {
    * A thread nothing claims is not visible and not reportable: the sidebar is the roster, no foreign key
    * ties `projection_threads` to `projection_agents`, and nothing enumerates threads. The user sees an
    * empty chat, or no chat, while every message is still on disk. Two ways in are covered -- an agent
-   * rebuilt under its own id by the `getOrCreate` on the conversation read path, which comes back with
+   * rebuilt under its own id by a `getOrCreate`, such as a message sent to that id, which comes back with
    * no thread while its old row still names it; and a thread whose `agent_id` kept a pre-rename
    * spelling, which `#agentByEitherSpelling` resolves.
    *
@@ -1209,8 +1223,8 @@ export class AgentStore {
 
   /**
    * Derived from the agent id, never minted at random, and that is what makes losing a roster row
-   * survivable. Both conversation read paths call `getOrCreate`, so reading a chat whose
-   * `projection_agents` row is gone rebuilds the agent with no `threadId` and lands here. A random id
+   * survivable. A `getOrCreate` for an id whose `projection_agents` row is gone, such as a message sent
+   * to it, rebuilds the agent with no `threadId` and lands here. A random id
    * would file the rebuilt agent against an empty thread and leave the user's own thread -- still on
    * disk, with every message in it -- addressable by nothing, because no foreign key ties the two
    * tables and nothing in the app enumerates threads. The stable id re-adopts the row the history is

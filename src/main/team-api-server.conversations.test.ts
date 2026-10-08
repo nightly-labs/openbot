@@ -471,4 +471,42 @@ describe("TeamApiServer conversations", () => {
     expect(forgedReader.status).toBe(400);
     expect(markConversationUnread).toHaveBeenCalledTimes(1);
   });
+
+  it("answers 404 and writes nothing when a device reads or marks an agent that is gone", async () => {
+    const { start, signIn } = await createTeamApiFixture("local-instance", { configure: true });
+    const readConversationFor = vi.fn();
+    const readConversationPageFor = vi.fn();
+    const markConversationRead = vi.fn();
+    const markConversationUnread = vi.fn();
+    const agents = createAgents({
+      listAgents: () => [],
+      readConversationFor,
+      readConversationPageFor,
+      markConversationRead,
+      markConversationUnread,
+    });
+    const { base } = await start({ agents });
+    const token = await signIn();
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      [TEAM_PROTOCOL_VERSION_HEADER]: String(TEAM_PROTOCOL_V3),
+      [TEAM_CAPABILITIES_HEADER]: TEAM_CURRENT_CAPABILITIES.join(","),
+    };
+
+    for (const [method, action, body] of [
+      ["GET", "conversation", undefined],
+      ["GET", "conversation-page?limit=10", undefined],
+      ["POST", "conversation/read", JSON.stringify({ throughMessageId: null })],
+      ["POST", "conversation/unread", "{}"],
+    ] as const) {
+      const response = await fetch(`${base}/v1/agents/deleted-elsewhere/${action}`, { method, headers, body });
+      expect(response.status).toBe(404);
+      await expect(response.json()).resolves.toEqual({ error: "Agent not found." });
+    }
+    expect(readConversationFor).not.toHaveBeenCalled();
+    expect(readConversationPageFor).not.toHaveBeenCalled();
+    expect(markConversationRead).not.toHaveBeenCalled();
+    expect(markConversationUnread).not.toHaveBeenCalled();
+  });
 });
