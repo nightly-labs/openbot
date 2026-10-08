@@ -111,23 +111,50 @@ export type BrowserViewportInput =
 /**
  * The page's selection, read in the automation world so the page's own scripts cannot answer for it.
  * A field's selection is not part of `getSelection()`, and a password field gives nothing, as it does
- * for a user's copy. `cut` deletes the selection only where the user could have typed over it.
+ * for a user's copy. `cut` deletes the selection only where the user could have typed over it, and
+ * only when the text can go back to the member: a selection over `max` answers null and stays.
+ * A field in a frame, or in an `email` or `number` input, has no selection this world can read.
  */
-const SELECTION_TEXT_SCRIPT = `(cut) => {
-  const active = document.activeElement;
+const SELECTION_TEXT_SCRIPT = `(cut, max) => {
+  let active = document.activeElement;
+  while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
   if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) {
     if (active instanceof HTMLInputElement && active.type === "password") return "";
     const start = active.selectionStart;
     const end = active.selectionEnd;
     if (start === null || end === null) return "";
+    if (end - start > max) return null;
     const text = active.value.slice(start, end);
     if (cut && text && !active.readOnly && !active.disabled) document.execCommand("delete");
     return text;
   }
-  const text = window.getSelection()?.toString() ?? "";
+  const root = active?.getRootNode();
+  const selection = root instanceof ShadowRoot && root.getSelection ? root.getSelection() : window.getSelection();
+  const text = selection?.toString() ?? "";
+  if (text.length > max) return null;
   if (cut && text && active instanceof HTMLElement && active.isContentEditable) document.execCommand("delete");
   return text;
 }`;
+
+/**
+ * A paste event on the focused element, carrying the member's text, as a real paste fires one. A page
+ * that handles it - an editor that formats the text, a code form split over several fields - cancels
+ * it, and the text is inserted only when nothing did.
+ */
+const PASTE_EVENT_SCRIPT = `(text) => {
+  let active = document.activeElement;
+  while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
+  const data = new DataTransfer();
+  data.setData("text/plain", text);
+  const event = new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true, composed: true });
+  return (active ?? document.body).dispatchEvent(event);
+}`;
+
+/** The letter of a shortcut. On a layout whose letters are not Latin, it is the key's place. */
+function shortcutLetter(key: string, code: string): string {
+  if (/^[a-z]$/iu.test(key)) return key.toLowerCase();
+  return /^Key[A-Z]$/u.test(code) ? code.slice(3).toLowerCase() : "";
+}
 
 /** Ctrl or Meta: either one is the command modifier, whichever system the client runs. */
 const COMMAND_MODIFIERS = 2 | 4;
@@ -1354,9 +1381,16 @@ export class BrowserCdpEngine {
     yield* this.#leaseEffect(
       (send) =>
         Effect.gen({ self: this }, function* () {
-          // The text arrives as one insertion, as a paste does, and never touches the host's clipboard.
+          // The page sees a paste event first, as with a real paste. The text never touches the
+          // host's clipboard.
           if (input.type === "paste") {
-            yield* send("Input.insertText", { text: input.text });
+            const contextId = yield* automationContextId(send);
+            const result = yield* send("Runtime.evaluate", {
+              expression: `(${PASTE_EVENT_SCRIPT})(${JSON.stringify(input.text)})`,
+              contextId,
+              returnByValue: true,
+            });
+            if (recordValue(result.result)?.value !== false) yield* send("Input.insertText", { text: input.text });
             return;
           }
           if (input.type === "key") {
@@ -1372,7 +1406,7 @@ export class BrowserCdpEngine {
             // command is named instead, which also reads a Mac client's Cmd+A on a Linux host.
             const selectAll =
               input.action === "down" &&
-              input.key.toLowerCase() === "a" &&
+              shortcutLetter(input.key, input.code) === "a" &&
               (input.modifiers & COMMAND_MODIFIERS) !== 0 &&
               (input.modifiers & ~COMMAND_MODIFIERS) === 0;
             yield* send("Input.dispatchKeyEvent", {
@@ -1412,23 +1446,27 @@ export class BrowserCdpEngine {
   });
 
   /**
-   * The text a member's copy takes from the page. It goes back to the member's own clipboard; the
-   * host's clipboard belongs to whoever sits at the host, and a copy must neither read nor replace it.
+   * The text a member's copy takes from the page, or null when it is longer than `max`. It goes back
+   * to the member's own clipboard; the host's clipboard belongs to whoever sits at the host, and a
+   * copy must neither read nor replace it.
    */
   readonly viewportSelectionText = Effect.fn("BrowserCdp.viewportSelectionText")(function* (
     this: BrowserCdpEngine,
     cut: boolean,
-  ): Effect.fn.Return<string, BrowserOperationError> {
+    max: number,
+  ): Effect.fn.Return<string | null, BrowserOperationError> {
     return yield* this.#leaseEffect(
       (send) =>
         Effect.gen(function* () {
           const contextId = yield* automationContextId(send);
           const result = yield* send("Runtime.evaluate", {
-            expression: `(${SELECTION_TEXT_SCRIPT})(${cut})`,
+            expression: `(${SELECTION_TEXT_SCRIPT})(${cut}, ${max})`,
             contextId,
             returnByValue: true,
           });
-          return stringValue(recordValue(result.result)?.value);
+          // Null is a selection longer than `max`, which the page kept.
+          const value = recordValue(result.result)?.value;
+          return value === null ? null : stringValue(value);
         }),
       false,
     );

@@ -2130,7 +2130,25 @@ async function runLiveViewClipboard(browser: BrowserHost, tabId: string, content
   const value = (id: string) => contents.executeJavaScript(`document.getElementById('${id}').value`, true);
 
   await field("live-view-text", "textarea");
+  // The member's Ctrl+V and Cmd+V still reach the page as keys, and must not paste the host's clipboard.
+  for (const modifiers of [2, 4]) {
+    for (const action of ["down", "up"] as const) {
+      await runCauseEffect(
+        browser.dispatchViewInput(tabId, { type: "key", action, key: "v", code: "KeyV", text: "", modifiers }),
+      );
+    }
+  }
+  const afterPasteKeys = await value("live-view-text");
+  if (afterPasteKeys !== "") throw new Error("A live view Ctrl+V or Cmd+V pasted the host clipboard.");
+  await contents.executeJavaScript(
+    `document.getElementById('live-view-text').addEventListener('paste', event => {
+      window.__liveViewPasteEvent = event.clipboardData.getData('text/plain');
+    }, { once: true })`,
+    true,
+  );
   await runCauseEffect(browser.dispatchViewInput(tabId, { type: "paste", text: pasted }));
+  const pasteEvent = await contents.executeJavaScript("window.__liveViewPasteEvent", true);
+  if (pasteEvent !== pasted) throw new Error("A live view paste fired no paste event with the text.");
   const afterPaste = await value("live-view-text");
   if (afterPaste !== pasted) throw new Error(`A live view paste left ${JSON.stringify(afterPaste)} in the field.`);
   // Cmd+A from a Mac client selects all on any host, because the host names the command.
@@ -2143,14 +2161,19 @@ async function runLiveViewClipboard(browser: BrowserHost, tabId: string, content
       browser.dispatchViewInput(tabId, { type: "key", action, key: "a", code: "KeyA", text: "", modifiers: 4 }),
     );
   }
-  const copied = await runCauseEffect(browser.copyViewSelection(tabId, false));
+  const copied = await runCauseEffect(browser.copyViewSelection(tabId, false, 100_000));
   if (copied !== pasted) throw new Error(`A live view copy after select-all returned ${JSON.stringify(copied)}.`);
-  const cut = await runCauseEffect(browser.copyViewSelection(tabId, true));
+  // A cut longer than one answer carries is refused, and the page keeps its text.
+  const tooLarge = await runCauseEffect(browser.copyViewSelection(tabId, true, pasted.length - 1));
+  if (tooLarge !== null || (await value("live-view-text")) !== pasted) {
+    throw new Error("A live view cut too long to send deleted the text.");
+  }
+  const cut = await runCauseEffect(browser.copyViewSelection(tabId, true, 100_000));
   const afterCut = await value("live-view-text");
   if (cut !== pasted || afterCut !== "") throw new Error("A live view cut did not take the selected text.");
 
   await field("live-view-password", "password");
-  const fromPassword = await runCauseEffect(browser.copyViewSelection(tabId, false));
+  const fromPassword = await runCauseEffect(browser.copyViewSelection(tabId, false, 100_000));
   if (fromPassword !== "") throw new Error("A live view copy read a password field.");
   // Whoever sits at the host may copy something meanwhile, so the check is that the member's text
   // never reached the host's clipboard, not that the clipboard stayed the same.
@@ -2161,7 +2184,21 @@ async function runLiveViewClipboard(browser: BrowserHost, tabId: string, content
   await mkdir(reportDirectory, { recursive: true });
   await writeFile(
     join(reportDirectory, "browser-live-view-clipboard.json"),
-    `${JSON.stringify({ afterPaste, copied, cut, afterCut, fromPassword, hostClipboardHasMemberText }, null, 2)}\n`,
+    `${JSON.stringify(
+      {
+        afterPasteKeys,
+        pasteEvent,
+        afterPaste,
+        copied,
+        tooLarge,
+        cut,
+        afterCut,
+        fromPassword,
+        hostClipboardHasMemberText,
+      },
+      null,
+      2,
+    )}\n`,
   );
   await contents.executeJavaScript(
     "document.getElementById('live-view-text')?.remove(); document.getElementById('live-view-password')?.remove();",

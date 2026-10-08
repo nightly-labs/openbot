@@ -147,9 +147,11 @@ mock. The separate web preview implements the browser runtime with that same moc
   with the shape of the host frame.
 - Copy and paste in the live view use the member's clipboard, not the host's, when the host
   advertises `browser-view-clipboard`. The client sends pasted text as one `paste` input; the host
-  inserts it with CDP `Input.insertText`. A `copy` input asks for the page selection, and the host
-  sends it back as the one text message on the view socket. The host never reads or writes its
-  own clipboard. Password fields give no text.
+  fires a `paste` event on the focused element and, when the page does not cancel it, inserts the
+  text with CDP `Input.insertText`. A copy starts in the key press with a `ClipboardItem` that waits
+  for the host's answer, the one text message on the view socket. The host answers every `copy`.
+  The host never reads or writes its own clipboard. Password fields give no text. Copy cannot read a
+  selection in a frame or in an `email` or `number` input; paste works there.
 - No full remote desktop, push notifications, or offline operation is included. See
   [Remote desktop](#remote-desktop) for the reason.
 - These stay desktop only: the application Settings dialog (permissions, app updates),

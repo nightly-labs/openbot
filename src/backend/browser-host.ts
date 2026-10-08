@@ -1210,12 +1210,13 @@ export class BrowserHost {
     this: BrowserHost,
     tabId: string,
     cut: boolean,
-  ): Effect.fn.Return<string, BrowserOperationError> {
+    max: number,
+  ): Effect.fn.Return<string | null, BrowserOperationError> {
     const tab = yield* this.#requireTab(tabId);
     if (tab.secret?.submitted)
       return yield* browserFailure(new Error(sourceText("error.backend.browserInputProtected")));
     if (cut) tab.engine.invalidateReferences();
-    return yield* tab.engine.viewportSelectionText(cut);
+    return yield* tab.engine.viewportSelectionText(cut, max);
   }).bind(this);
 
   readonly #toolHandlers: BrowserToolHandlers = {

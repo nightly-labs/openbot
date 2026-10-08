@@ -409,16 +409,28 @@ describe("OpenBot connected desktop shell", () => {
     );
     vi.mocked(window.openbot.browser.sendLiveViewInput).mockClear();
 
-    // The shortcut is left to this window, which fires its own paste event with the user's clipboard.
+    // A paste is left to this window, which fires its own paste event with the user's clipboard. The
+    // page still gets the key.
     expect(await fireEvent.keyDown(view, { key: "v", code: "KeyV", ctrlKey: true })).toBe(true);
-    expect(window.openbot.browser.sendLiveViewInput).not.toHaveBeenCalled();
+    expect(window.openbot.browser.sendLiveViewInput).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "key", action: "down", key: "v", modifiers: 2 }),
+    );
     await fireEvent.paste(view, { clipboardData: { getData: () => "from the user" } });
     expect(window.openbot.browser.sendLiveViewInput).toHaveBeenCalledWith({ type: "paste", text: "from the user" });
 
-    await fireEvent.copy(view);
+    // A copy on a Russian layout: the key is the Cyrillic letter, its place is still C.
+    await fireEvent.keyDown(view, { key: "с", code: "KeyC", ctrlKey: true });
     expect(window.openbot.browser.sendLiveViewInput).toHaveBeenLastCalledWith({ type: "copy", cut: false });
     emitBrowserLiveView?.({ type: "copied", tabId: tab.id, text: "the host's selection" });
-    expect(writeText).toHaveBeenCalledWith("the host's selection");
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith("the host's selection"));
+
+    // Nothing selected on the host leaves the user's clipboard as it was.
+    await fireEvent.keyDown(view, { key: "c", code: "KeyC", ctrlKey: true });
+    emitBrowserLiveView?.({ type: "copied", tabId: tab.id, text: "" });
+    await fireEvent.keyDown(view, { key: "c", code: "KeyC", ctrlKey: true });
+    emitBrowserLiveView?.({ type: "copied", tabId: tab.id, text: "second selection" });
+    await vi.waitFor(() => expect(writeText).toHaveBeenLastCalledWith("second selection"));
+    expect(writeText).toHaveBeenCalledTimes(2);
   });
 
   it("sends a click on a live view that is letterboxed top and bottom as a point on the frame", async () => {

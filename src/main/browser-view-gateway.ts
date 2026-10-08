@@ -72,7 +72,7 @@ class BrowserViewPort extends Context.Service<
       ...args: Parameters<BrowserHost["startView"]>
     ): Effect.Effect<Effect.Success<ReturnType<BrowserHost["startView"]>>, RemoteWorkflowError>;
     input(...args: Parameters<BrowserHost["dispatchViewInput"]>): Effect.Effect<void, RemoteWorkflowError>;
-    copy(...args: Parameters<BrowserHost["copyViewSelection"]>): Effect.Effect<string, RemoteWorkflowError>;
+    copy(...args: Parameters<BrowserHost["copyViewSelection"]>): Effect.Effect<string | null, RemoteWorkflowError>;
   }
 >()("openbot/main/BrowserViewPort") {
   static layer(browser: BrowserViewGatewayOptions["browser"]) {
@@ -309,17 +309,16 @@ export class BrowserViewGateway {
     }
     this.#options.onInput?.();
     // The selection goes back on the socket that asked for it, and only there. It is page content:
-    // nothing here logs it.
+    // nothing here logs it. Every copy is answered, with no text when there is none to give, because
+    // the client holds its clipboard write open until the answer arrives.
     if (input.type === "copy") {
       const client = session.socket;
       const browser = yield* BrowserViewPort;
-      const text = yield* browser.copy(session.tabId, input.cut).pipe(Effect.catch(() => Effect.succeed("")));
-      if (!text || session.socket !== client || client.readyState !== webSockets.WebSocket.OPEN) return;
-      client.send(
-        encodeBrowserViewCopied(
-          text.length > BROWSER_VIEW_MAX_CLIPBOARD_TEXT ? { type: "copyTooLarge" } : { type: "copied", text },
-        ),
-      );
+      const text = yield* browser
+        .copy(session.tabId, input.cut, BROWSER_VIEW_MAX_CLIPBOARD_TEXT)
+        .pipe(Effect.catch(() => Effect.succeed("")));
+      if (session.socket !== client || client.readyState !== webSockets.WebSocket.OPEN) return;
+      client.send(encodeBrowserViewCopied(text === null ? { type: "copyTooLarge" } : { type: "copied", text }));
       return;
     }
     // Input that arrives before the first frame has no frame to be a fraction of.

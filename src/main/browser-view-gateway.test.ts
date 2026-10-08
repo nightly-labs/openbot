@@ -9,6 +9,7 @@ import { dirname, join } from "node:path";
 import type { Duplex } from "node:stream";
 import {
   BROWSER_VIEW_FRAME_ACK_QUERY,
+  BROWSER_VIEW_MAX_CLIPBOARD_TEXT,
   decodeBrowserViewCopied,
   decodeBrowserViewFrame,
   encodeBrowserViewInput,
@@ -85,16 +86,17 @@ describe("the live browser view on a host", () => {
     }
   });
 
-  // Failure modes: a paste longer than the old 4 KiB input bound is dropped; a copy answers nothing;
-  // a protected tab's selection reaches the member.
-  it("pastes the member's text and answers a copy with the page's selection", async () => {
+  // Failure modes: a paste longer than the old 4 KiB input bound is dropped; a copy gets no answer and
+  // the client's clipboard write waits for ever; a protected tab's selection reaches the member; a
+  // selection too long to send is sent, or is not reported.
+  it("pastes the member's text and answers every copy", async () => {
     const dispatched: BrowserViewportInput[] = [];
-    // The first copy meets a tab whose fields hold a secret; the second one does not.
-    const copySelection = vi.fn((_tabId: string, cut: boolean) =>
-      copySelection.mock.calls.length === 1
-        ? Effect.fail(browserFailure(new Error("protected")))
-        : Effect.succeed(cut ? "cut text" : "copied text"),
-    );
+    // A tab whose fields hold a secret, a selection too long to send, then one that is sent.
+    const copySelection = vi.fn((_tabId: string, cut: boolean, _max: number) => {
+      const call = copySelection.mock.calls.length;
+      if (call === 1) return Effect.fail(browserFailure(new Error("protected")));
+      return Effect.succeed(call === 2 ? null : cut ? "cut text" : "copied text");
+    });
     const gateway = new BrowserViewGateway({
       browser: {
         startView: (_tabId, onFrame) =>
@@ -125,11 +127,16 @@ describe("the live browser view on a host", () => {
     socket.send(encodeBrowserViewInput({ type: "paste", text }));
     await vi.waitFor(() => expect(dispatched).toEqual([{ type: "paste", text }]));
 
-    socket.send(encodeBrowserViewInput({ type: "copy", cut: false }));
-    await vi.waitFor(() => expect(copySelection).toHaveBeenCalledOnce());
-    socket.send(encodeBrowserViewInput({ type: "copy", cut: true }));
-    await vi.waitFor(() => expect(answers).toHaveLength(1));
-    expect(answers.map(decodeBrowserViewCopied)).toEqual([{ type: "copied", text: "cut text" }]);
+    for (const [index, cut] of [false, false, true].entries()) {
+      socket.send(encodeBrowserViewInput({ type: "copy", cut }));
+      await vi.waitFor(() => expect(answers).toHaveLength(index + 1));
+    }
+    expect(answers.map(decodeBrowserViewCopied)).toEqual([
+      { type: "copied", text: "" },
+      { type: "copyTooLarge" },
+      { type: "copied", text: "cut text" },
+    ]);
+    expect(copySelection).toHaveBeenLastCalledWith("tab-1", true, BROWSER_VIEW_MAX_CLIPBOARD_TEXT);
     socket.close();
     await runCauseEffect(gateway.stop());
   });
