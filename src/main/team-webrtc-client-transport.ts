@@ -36,6 +36,7 @@ import type {
 } from "./central-auth-records";
 import type { RemoteConnectTrace } from "./remote-connect-trace";
 import { RemoteWorkflowError, remoteDecode, toRemoteWorkflowError } from "./remote-service-effects";
+import type { RemoteSessionCache } from "./remote-session-cache";
 import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcFileTransfer } from "./team-webrtc-file-transfer";
 
@@ -94,6 +95,11 @@ interface TeamWebRtcClientTransportOptions {
   transferDirectory: string;
   /** Times each connection for the local trace. */
   connectTrace?: RemoteConnectTrace;
+  /**
+   * Keeps each host's session between runs. With it, the next start asks only for a ticket, and
+   * `stop` leaves the sessions open for that start instead of ending them.
+   */
+  sessionCache?: RemoteSessionCache;
 }
 
 interface ActiveHost {
@@ -103,6 +109,8 @@ interface ActiveHost {
   connected: boolean;
   connecting: Deferred.Deferred<void, RemoteWorkflowError> | null;
   cancelled: boolean;
+  /** Closed by `stop` with its session kept for the next run, so nothing may end that session. */
+  released: boolean;
   cancelConnectionWait: (() => void) | null;
   expirationTimer: ReturnType<typeof setTimeout> | null;
   authentication: {
@@ -134,6 +142,7 @@ class TeamClientBridge extends Context.Service<
   TeamClientBridge,
   {
     start(): Effect.Effect<void, RemoteWorkflowError>;
+    prepareSignal(peerId: string, signalUrl: string): Effect.Effect<void, RemoteWorkflowError>;
     send(...args: Parameters<TeamWebRtcBridge["send"]>): Effect.Effect<void, RemoteWorkflowError>;
     connect(...args: Parameters<TeamWebRtcBridge["connect"]>): Effect.Effect<void, RemoteWorkflowError>;
     disconnect(hostId: string): Effect.Effect<void, RemoteWorkflowError>;
@@ -164,6 +173,8 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
   readonly #hostPublicKeys = new Map<string, string>();
   /** Set while the account directory is read at startup. A host without a pinned key waits for it. */
   #hostKeySync: Deferred.Deferred<void> | null = null;
+  /** The Signal address of the last ticket of this run. */
+  #signalUrl: string | null = null;
 
   constructor(options: TeamWebRtcClientTransportOptions) {
     super();
@@ -172,6 +183,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       TeamClientBridge,
       TeamClientBridge.of({
         start: () => options.bridge.start(),
+        prepareSignal: (peerId, signalUrl) => options.bridge.prepareSignal(peerId, signalUrl),
         send: (...args) => options.bridge.send(...args),
         connect: (...args) => options.bridge.connect(...args),
         disconnect: (hostId) => options.bridge.disconnect(hostId),
@@ -189,6 +201,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     options.bridge.on("path", this.#onPath);
     options.bridge.on("error", this.#onError);
     options.bridge.on("signalReady", this.#onSignalReady);
+    options.bridge.on("signalOpen", this.#onSignalOpen);
   }
 
   readonly listHosts = Effect.fn("TeamWebRtcClient.listHosts")(function* (
@@ -473,38 +486,56 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     this: TeamWebRtcClientTransport,
     hostId: string,
   ): Effect.fn.Return<void, RemoteWorkflowError> {
-    return yield* this.#owned(
-      Effect.gen({ self: this }, function* () {
-        const active = this.#active.get(hostId);
-        const sessionId = active?.sessionId || this.#retainedSessions.get(hostId)?.sessionId;
-        if (active) {
-          active.cancelled = true;
-          active.cancelConnectionWait?.();
-        }
-        // A request sent before disconnect may have committed. Fail it without replaying the request.
-        for (const [requestId, pending] of this.#pending) {
-          if (pending.hostId !== hostId) continue;
-          clearTimeout(pending.timer);
-          this.#pending.delete(requestId);
-          pending.reject(
-            new TeamWebRtcRequestError(503, "remote_disconnected", sourceText("error.remote.hostDisconnected")),
-          );
-        }
-        if (active?.expirationTimer) clearTimeout(active.expirationTimer);
-        this.#active.delete(hostId);
-        this.#retainedSessions.delete(hostId);
-        this.#files.setPeerAuthenticated(hostId, false);
-        const disconnected = yield* TeamClientBridge.use((bridge) => bridge.disconnect(hostId)).pipe(Effect.result);
-        const disconnectError = Result.isFailure(disconnected) ? disconnected.failure.cause : undefined;
-        if (sessionId)
-          yield* this.#options
-            .endSession(sessionId)
-            .pipe(toRemoteWorkflowError)
-            .pipe(Effect.catch(() => Effect.void));
-        if (disconnectError) return yield* new RemoteWorkflowError({ cause: disconnectError });
-      }),
-    );
+    return yield* this.#owned(this.#close(hostId, "end"));
   }).bind(this);
+
+  /** Forgets the sessions kept for the next run, such as at sign-out or when another account signs in. */
+  forgetStoredSessions(): Effect.Effect<void> {
+    return this.#options.sessionCache?.clear() ?? Effect.void;
+  }
+
+  /**
+   * Closes the connection to a host. `end` also ends its session, and forgets it for the next run.
+   * `keep` leaves the session open and kept, for the next run of the app.
+   */
+  readonly #close = Effect.fn("TeamWebRtcClient.close")(function* (
+    this: TeamWebRtcClientTransport,
+    hostId: string,
+    session: "end" | "keep",
+  ): Effect.fn.Return<void, RemoteWorkflowError, TeamClientBridge> {
+    const active = this.#active.get(hostId);
+    const sessionId = active?.sessionId || this.#retainedSessions.get(hostId)?.sessionId;
+    if (active) {
+      active.cancelled = true;
+      if (session === "keep") active.released = true;
+      active.cancelConnectionWait?.();
+    }
+    // A request sent before disconnect may have committed. Fail it without replaying the request.
+    for (const [requestId, pending] of this.#pending) {
+      if (pending.hostId !== hostId) continue;
+      clearTimeout(pending.timer);
+      this.#pending.delete(requestId);
+      pending.reject(
+        new TeamWebRtcRequestError(503, "remote_disconnected", sourceText("error.remote.hostDisconnected")),
+      );
+    }
+    if (active?.expirationTimer) clearTimeout(active.expirationTimer);
+    this.#active.delete(hostId);
+    this.#retainedSessions.delete(hostId);
+    this.#files.setPeerAuthenticated(hostId, false);
+    const disconnected = yield* TeamClientBridge.use((bridge) => bridge.disconnect(hostId)).pipe(Effect.result);
+    const disconnectError = Result.isFailure(disconnected) ? disconnected.failure.cause : undefined;
+    if (session === "end") {
+      // Before the session ends: a kept session that ended only costs the next start a request.
+      if (this.#options.sessionCache) yield* this.#options.sessionCache.delete(hostId);
+      if (sessionId)
+        yield* this.#options
+          .endSession(sessionId)
+          .pipe(toRemoteWorkflowError)
+          .pipe(Effect.catch(() => Effect.void));
+    }
+    if (disconnectError) return yield* new RemoteWorkflowError({ cause: disconnectError });
+  });
 
   #owned<A>(operation: Effect.Effect<A, RemoteWorkflowError, TeamClientBridge>): Effect.Effect<A, RemoteWorkflowError> {
     return Effect.suspend(() => {
@@ -529,15 +560,22 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     this.#stopping = done;
     return yield* Effect.gen({ self: this }, function* () {
       const hostIds = new Set([...this.#active.keys(), ...this.#retainedSessions.keys()]);
-      yield* Effect.forEach([...hostIds], (hostId) => this.disconnect(hostId).pipe(Effect.catch(() => Effect.void)), {
-        concurrency: "unbounded",
-      });
+      // The app quits. A session that the next run can read stays open for it: the account service
+      // gives this device the same session again in any case, so ending it only costs the next start
+      // a request. Without a cache, each session ends as before.
+      const session = this.#options.sessionCache?.canPersist() ? "keep" : "end";
+      yield* Effect.forEach(
+        [...hostIds],
+        (hostId) => this.#owned(this.#close(hostId, session)).pipe(Effect.catch(() => Effect.void)),
+        { concurrency: "unbounded" },
+      );
       this.#options.bridge.off("connected", this.#onConnected);
       this.#options.bridge.off("disconnected", this.#onDisconnected);
       this.#options.bridge.off("data", this.#onData);
       this.#options.bridge.off("path", this.#onPath);
       this.#options.bridge.off("error", this.#onError);
       this.#options.bridge.off("signalReady", this.#onSignalReady);
+      this.#options.bridge.off("signalOpen", this.#onSignalOpen);
       // A connect that waits for host keys is cancelled now, but it ends only after this wait.
       this.endHostKeySync();
       yield* this.#files.stop();
@@ -556,9 +594,20 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     this: TeamWebRtcClientTransport,
     hostId: string,
   ): Effect.fn.Return<void, RemoteWorkflowError, TeamClientBridge> {
+    const sessionCache = this.#options.sessionCache;
+    if (sessionCache) yield* sessionCache.load();
     const principalId = this.#options.getPrincipalId();
     let current: ActiveHost | RetainedSession | undefined =
       this.#active.get(hostId) ?? this.#retainedSessions.get(hostId);
+    let storedSession = false;
+    if (!current && sessionCache) {
+      const stored = sessionCache.get(principalId, hostId);
+      // A session of the last run. The account service refuses it if it ended; then a new one starts.
+      if (stored && stored.expiresAt > Date.now() + 30_000) {
+        current = { ...stored, principalId, connected: false, connecting: null };
+        storedSession = true;
+      }
+    }
     if (current?.expiresAt && current.expiresAt <= Date.now() + 30_000) {
       yield* this.disconnect(hostId);
       current = undefined;
@@ -577,6 +626,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       connected: false,
       connecting: null,
       cancelled: false,
+      released: false,
       cancelConnectionWait: null,
       expirationTimer: null,
       authentication: null,
@@ -586,7 +636,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     this.#retainedSessions.delete(hostId);
     this.#active.set(hostId, active);
     this.#options.connectTrace?.begin(hostId);
-    return yield* this.#connect(hostId, active, current?.sessionId || null).pipe(
+    return yield* this.#connect(hostId, active, current?.sessionId || null, storedSession).pipe(
       Effect.onExit((exit) => Deferred.done(done, exit)),
       Effect.onError(() =>
         Effect.sync(() => {
@@ -602,6 +652,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     hostId: string,
     active: ActiveHost,
     existingSessionId: string | null,
+    storedSession: boolean,
   ): Effect.fn.Return<void, RemoteWorkflowError, TeamClientBridge> {
     let hostPublicKey = this.#hostPublicKeys.get(hostId);
     const hostKeySync = this.#hostKeySync;
@@ -624,6 +675,15 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       ),
       { startImmediately: true },
     );
+    // The Signal socket opens while the ticket is made, at the address of the last ticket. The hello
+    // with the ticket goes on it only when the ticket names the same address. A failure is ignored:
+    // `bridge.connect` then opens its own socket, as before.
+    const preparedSignalUrl = this.#options.sessionCache?.signalUrl(active.principalId) ?? this.#signalUrl;
+    if (preparedSignalUrl)
+      yield* Effect.forkChild(
+        TeamClientBridge.use((bridge) => bridge.prepareSignal(hostId, preparedSignalUrl)).pipe(Effect.ignore),
+        { startImmediately: true },
+      );
     const clientKeys = yield* remoteDecode(() =>
       generateKeyPairSync("ed25519", {
         publicKeyEncoding: { type: "spki", format: "pem" },
@@ -642,7 +702,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         startedNewSession = true;
         yield* this.#assertCurrentEffect(hostId, active, sessionId);
         connectTrace?.mark(hostId, "session");
-      } else connectTrace?.mark(hostId, "session", "reused");
+      } else connectTrace?.mark(hostId, "session", storedSession ? "stored" : "reused");
       const ticketSessionId = sessionId;
       return yield* Effect.gen({ self: this }, function* () {
         const ticket = yield* this.#options.issueTicket(ticketSessionId, clientPublicKey).pipe(toRemoteWorkflowError);
@@ -676,7 +736,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       Effect.catch((failure) =>
         Effect.gen({ self: this }, function* () {
           const failedSessionId = sessionId;
-          if (failedSessionId && !this.#retainSession(hostId, active, failedSessionId)) {
+          if (failedSessionId && !active.released && !this.#retainSession(hostId, active, failedSessionId)) {
             yield* this.#options
               .endSession(failedSessionId)
               .pipe(toRemoteWorkflowError)
@@ -688,6 +748,14 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     );
     if (startedNewSession) this.#lastEventSequence.delete(hostId);
     const connectedSessionId = active.sessionId;
+    this.#signalUrl = bootstrap.signalUrl;
+    if (this.#options.sessionCache && this.#active.get(hostId) === active && !active.cancelled)
+      yield* this.#options.sessionCache.set(
+        active.principalId,
+        hostId,
+        { sessionId: connectedSessionId, expiresAt: active.expiresAt },
+        bootstrap.signalUrl,
+      );
     let cleanupConnectionWait: () => void = () => undefined;
     // Subscribe before bridge.connect: a bridge can deliver authentication events before it resolves.
     const connected = Deferred.makeUnsafe<void, RemoteWorkflowError>();
@@ -754,7 +822,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
           const retained = this.#retainSession(hostId, active, connectedSessionId);
           if (this.#active.get(hostId) === active) this.#active.delete(hostId);
           yield* TeamClientBridge.use((bridge) => bridge.disconnect(hostId)).pipe(Effect.catch(() => Effect.void));
-          if (!retained)
+          if (!retained && !active.released)
             yield* this.#options
               .endSession(connectedSessionId)
               .pipe(toRemoteWorkflowError)
@@ -792,10 +860,11 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
   ): Effect.fn.Return<void, RemoteWorkflowError, TeamClientBridge> {
     if (!active.cancelled && this.#active.get(hostId) === active) return;
     yield* TeamClientBridge.use((bridge) => bridge.disconnect(hostId)).pipe(Effect.catch(() => Effect.void));
-    yield* this.#options
-      .endSession(sessionId)
-      .pipe(toRemoteWorkflowError)
-      .pipe(Effect.catch(() => Effect.void));
+    if (!active.released)
+      yield* this.#options
+        .endSession(sessionId)
+        .pipe(toRemoteWorkflowError)
+        .pipe(Effect.catch(() => Effect.void));
     return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.connectionCancelled")) });
   });
 
@@ -840,6 +909,10 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     );
     active.expirationTimer.unref?.();
   }
+
+  readonly #onSignalOpen = (hostId: string): void => {
+    if (this.#active.has(hostId)) this.#options.connectTrace?.mark(hostId, "signal-socket");
+  };
 
   readonly #onSignalReady = (hostId: string): void => {
     if (this.#active.has(hostId)) this.#options.connectTrace?.mark(hostId, "signal");

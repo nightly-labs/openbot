@@ -218,6 +218,15 @@ tickets in D1. It returns a new plaintext secret only to the client that request
 app encrypts its account session token with the operating-system storage protection before it writes
 the token to disk.
 
+The desktop app also keeps, for each joined server, the ID of its logical remote session and the
+Signal address, so that the next start asks only for a new ticket. The file
+(`openbot-remote-sessions-v1.bin`) is encrypted with the same storage protection and is not written
+when that protection is unavailable. It names only the account that signed in. A session ID gives no
+access without that account's session token. The app removes the file at sign-out or when another
+account signs in, and forgets a server's session when it disconnects from the server or removes it.
+When the app quits, the session stays open in the account service for the next start; signing out or
+disconnecting the device's sign-in ends it, as before.
+
 Account avatar URLs are public, long-lived resources. A person who has the complete URL can request
 the avatar without an account session.
 

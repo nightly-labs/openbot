@@ -9,6 +9,7 @@ export type RemoteConnectPhase =
   | "session"
   | "ticket"
   | "bridge"
+  | "signal-socket"
   | "signal"
   | "channels"
   | "auth"

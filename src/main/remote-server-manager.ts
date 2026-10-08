@@ -1658,6 +1658,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       // A copy skips the host's check of the account, so the next account must not see it.
       this.#attachments.clear();
       if (!transport) return;
+      // First: a session kept for the next run belongs to the account that leaves.
+      yield* transport.forgetStoredSessions();
       yield* Effect.forEach(
         this.#store.servers.filter((server) => server.transport === "webrtc-v2"),
         (server) => transport.disconnect(server.id),
