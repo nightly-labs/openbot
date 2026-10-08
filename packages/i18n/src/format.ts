@@ -28,6 +28,8 @@ export interface AppFormat {
   percent: (value: number, options?: Intl.NumberFormatOptions) => string;
   currencyUsd: (value: number, options?: Intl.NumberFormatOptions) => string;
   date: (value: Date | number, options?: Intl.DateTimeFormatOptions) => string;
+  /** The date locale writes a 12-hour clock with AM and PM: true for `en-US`, false for `fr` and `ja`. */
+  readonly hour12: boolean;
   /** A conjunction: "a, b, and c". */
   list: (items: readonly string[]) => string;
   /** Binary units, as the attachment cards show them: 512 B, 12 KB, 3.4 MB. */
@@ -55,6 +57,23 @@ function compactNumber(locale: string | undefined, value: number): string {
   }
 }
 
+/**
+ * Hermes may not give `hourCycle` in the resolved options (not confirmed on a device). Then the
+ * text of 13:00 decides: a 24-hour clock writes "13". If `Intl` fails, keep the 12-hour clock that
+ * the app showed before.
+ */
+function usesHour12(locale: string | undefined): boolean {
+  try {
+    const formatter = new Intl.DateTimeFormat(locale, { hour: "numeric", timeZone: "UTC" });
+    const { hourCycle, hour12 } = formatter.resolvedOptions();
+    if (hourCycle) return hourCycle === "h11" || hourCycle === "h12";
+    if (typeof hour12 === "boolean") return hour12;
+    return !formatter.format(Date.UTC(2024, 0, 1, 13)).includes("13");
+  } catch {
+    return true;
+  }
+}
+
 const formats = new Map<string, AppFormat>();
 
 /**
@@ -79,6 +98,7 @@ export function createFormat(locale: TranslatedLocale, intlLocale: string | null
     currencyUsd: (value, options) =>
       numberFormat(tag, { style: "currency", currency: "USD", ...options }).format(value),
     date: (value, options) => new Intl.DateTimeFormat(tag, options).format(value),
+    hour12: usesHour12(tag),
     list: (items) => {
       if (typeof Intl.ListFormat === "function") {
         return new Intl.ListFormat(locale, { style: "long", type: "conjunction" }).format(items);

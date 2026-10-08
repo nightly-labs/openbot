@@ -22,7 +22,7 @@ import type { VirtualItem } from "@tanstack/virtual-core";
 import { createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import { groupAgentMessageMarkers } from "../agent-message-timeline";
 import type { ConversationProps, ConversationTarget } from "../conversation-types";
-import { summarizeRoutineRunMessages } from "../routine-run-timeline";
+import { groupRoutineRunMarkers, summarizeRoutineRunMessages } from "../routine-run-timeline";
 
 interface ScrollElements {
   scrollElement: () => HTMLDivElement | undefined;
@@ -77,8 +77,13 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     const drawn = new Set(drawnMessages().map((message) => message.id));
     return deps.props.messages.slice(start).find((message) => drawn.has(message.id))?.id ?? null;
   });
-  /* A group of agent messages stops at the unread divider, so the divider keeps its row. */
-  const timelineMessages = createMemo(() => groupAgentMessageMarkers(drawnMessages(), unreadBoundaryMessageId()));
+  /* A group of agent messages or routine runs stops at the unread divider, so the divider keeps its row. */
+  const timelineMessages = createMemo(() =>
+    groupRoutineRunMarkers(
+      groupAgentMessageMarkers(drawnMessages(), unreadBoundaryMessageId()),
+      unreadBoundaryMessageId(),
+    ),
+  );
   /*
    * A row finds its message by id. The virtualizer gives a row its new index one tick after the list
    * changes, so a lookup by index draws the neighbouring message in the row for that tick.

@@ -40,6 +40,7 @@ import {
   type CdpResult,
   clamp,
   exceptionDescription,
+  frameAutomationContextId,
   isFiniteNumber,
   isRecord,
   numberValue,
@@ -105,7 +106,91 @@ export type BrowserViewportInput =
       deltaY: number;
       modifiers: number;
     }
-  | { type: "key"; action: "down" | "up" | "char"; key: string; code: string; text: string; modifiers: number };
+  | { type: "key"; action: "down" | "up" | "char"; key: string; code: string; text: string; modifiers: number }
+  | { type: "paste"; text: string }
+  | { type: "cut"; text: string };
+
+/**
+ * The focused element and its document, past open shadow roots and into frames of the page's own
+ * origin. A frame of another origin is closed to the automation world, so focus there stops at the
+ * frame. An element in a frame belongs to that frame's realm, so it is known by its tag, not by
+ * `instanceof`. A field's selection is not part of `getSelection()`, and a password field gives
+ * nothing, as it does for a user's copy.
+ */
+const FOCUSED_SELECTION = `
+  let doc = document;
+  let active = doc.activeElement;
+  for (;;) {
+    if (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
+    else if (active?.tagName === "IFRAME" && active.contentDocument?.activeElement) {
+      doc = active.contentDocument;
+      active = doc.activeElement;
+    } else break;
+  }
+  const isField = active?.tagName === "TEXTAREA" || active?.tagName === "INPUT";
+  const selected = () => {
+    if (active?.tagName === "INPUT" && active.type === "password") return "";
+    if (isField) {
+      const start = active.selectionStart;
+      const end = active.selectionEnd;
+      return typeof start === "number" && typeof end === "number" ? active.value.slice(start, end) : "";
+    }
+    const root = active?.getRootNode() ?? doc;
+    const selection = typeof root.getSelection === "function" ? root.getSelection() : doc.getSelection();
+    return selection?.toString() ?? "";
+  };`;
+
+/**
+ * The frame element that holds focus when this world cannot look inside it, or null when the focus
+ * is in reach. A same-origin frame is walked into by `FOCUSED_SELECTION` itself.
+ */
+const FOCUSED_FRAME_SCRIPT = `(() => {${FOCUSED_SELECTION}
+  return active?.tagName === "IFRAME" || active?.tagName === "FRAME" ? active : null;
+})()`;
+
+/** Frames inside frames. Past this the focus is treated as in the last frame reached. */
+const MAX_FOCUSED_FRAME_DEPTH = 8;
+
+/**
+ * The page's selection, read in the automation world so the page's own scripts cannot answer for it.
+ * A selection longer than `max` answers null. An `email` or `number` input has no selection to read.
+ */
+const SELECTION_TEXT_SCRIPT = `(max) => {${FOCUSED_SELECTION}
+  const text = selected();
+  return text.length > max ? null : text;
+}`;
+
+/**
+ * The second half of a cut, once its text is on the member's clipboard. It deletes only the same
+ * selection, and only where the user could have typed over it: a selection that changed meanwhile
+ * is not the text the member has.
+ */
+const CUT_SCRIPT = `(expected) => {${FOCUSED_SELECTION}
+  const editable = isField ? !active.readOnly && !active.disabled : active?.isContentEditable === true;
+  if (!editable || selected() !== expected) return false;
+  return doc.execCommand("delete");
+}`;
+
+/**
+ * A paste event on the focused element, carrying the member's text, as a real paste fires one. A page
+ * that handles it - an editor that formats the text, a code form split over several fields - cancels
+ * it, and the text is inserted only when nothing did.
+ */
+const PASTE_EVENT_SCRIPT = `(text) => {${FOCUSED_SELECTION}
+  const data = new DataTransfer();
+  data.setData("text/plain", text);
+  const event = new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true, composed: true });
+  return (active ?? doc.body).dispatchEvent(event);
+}`;
+
+/** The letter of a shortcut. On a layout whose letters are not Latin, it is the key's place. */
+function shortcutLetter(key: string, code: string): string {
+  if (/^[a-z]$/iu.test(key)) return key.toLowerCase();
+  return /^Key[A-Z]$/u.test(code) ? code.slice(3).toLowerCase() : "";
+}
+
+/** Ctrl or Meta: either one is the command modifier, whichever system the client runs. */
+const COMMAND_MODIFIERS = 2 | 4;
 
 export class BrowserCdpEngine {
   readonly #contents: WebContents;
@@ -1329,6 +1414,35 @@ export class BrowserCdpEngine {
     yield* this.#leaseEffect(
       (send) =>
         Effect.gen({ self: this }, function* () {
+          // The page sees a paste event first, as with a real paste. The text never touches the
+          // host's clipboard.
+          if (input.type === "paste") {
+            const world = yield* this.#focusedWorld(send);
+            const result = yield* send(
+              "Runtime.evaluate",
+              {
+                expression: `(${PASTE_EVENT_SCRIPT})(${JSON.stringify(input.text)})`,
+                contextId: world.contextId,
+                returnByValue: true,
+              },
+              world.sessionId,
+            );
+            if (recordValue(result.result)?.value !== false) yield* send("Input.insertText", { text: input.text });
+            return;
+          }
+          if (input.type === "cut") {
+            const world = yield* this.#focusedWorld(send);
+            yield* send(
+              "Runtime.evaluate",
+              {
+                expression: `(${CUT_SCRIPT})(${JSON.stringify(input.text)})`,
+                contextId: world.contextId,
+                returnByValue: true,
+              },
+              world.sessionId,
+            );
+            return;
+          }
           if (input.type === "key") {
             if (input.action === "char") {
               yield* send("Input.dispatchKeyEvent", { type: "char", modifiers: input.modifiers, text: input.text });
@@ -1338,6 +1452,13 @@ export class BrowserCdpEngine {
             // A command modifier gets none, as in `dispatchShortcut`: `Ctrl+Enter` is not a line break.
             const { text, ...keyCodes } = namedKey(input.key);
             const character = input.action === "down" && (input.modifiers & ~SHIFT_MODIFIER) === 0 ? text : undefined;
+            // A letter has no key code here, so Chromium finds no editing command for Ctrl+A. The
+            // command is named instead, which also reads a Mac client's Cmd+A on a Linux host.
+            const selectAll =
+              input.action === "down" &&
+              shortcutLetter(input.key, input.code) === "a" &&
+              (input.modifiers & COMMAND_MODIFIERS) !== 0 &&
+              (input.modifiers & ~COMMAND_MODIFIERS) === 0;
             yield* send("Input.dispatchKeyEvent", {
               type: input.action === "up" ? "keyUp" : character === undefined ? "rawKeyDown" : "keyDown",
               modifiers: input.modifiers,
@@ -1345,6 +1466,7 @@ export class BrowserCdpEngine {
               code: input.code,
               ...keyCodes,
               ...(character === undefined ? {} : { text: character, unmodifiedText: character }),
+              ...(selectAll ? { commands: ["selectAll"] } : {}),
             });
             return;
           }
@@ -1369,8 +1491,65 @@ export class BrowserCdpEngine {
             modifiers: input.modifiers,
           });
         }),
-      false,
+      // A paste or a cut works in the focused frame, which can be a frame in another process.
+      input.type === "paste" || input.type === "cut",
     );
+  });
+
+  /**
+   * The text a member's copy takes from the page, or null when it is longer than `max`. It goes back
+   * to the member's own clipboard; the host's clipboard belongs to whoever sits at the host, and a
+   * copy must neither read nor replace it.
+   */
+  readonly viewportSelectionText = Effect.fn("BrowserCdp.viewportSelectionText")(function* (
+    this: BrowserCdpEngine,
+    max: number,
+  ): Effect.fn.Return<string | null, BrowserOperationError> {
+    return yield* this.#leaseEffect((send) =>
+      Effect.gen({ self: this }, function* () {
+        const world = yield* this.#focusedWorld(send);
+        const result = yield* send(
+          "Runtime.evaluate",
+          { expression: `(${SELECTION_TEXT_SCRIPT})(${max})`, contextId: world.contextId, returnByValue: true },
+          world.sessionId,
+        );
+        // Null is a selection longer than `max`, which is not sent.
+        const value = recordValue(result.result)?.value;
+        return value === null ? null : stringValue(value);
+      }),
+    );
+  });
+
+  /**
+   * The automation world of the frame that holds focus. The page's own world cannot reach into a
+   * frame of another origin, so each frame the focus passes through names the next: the focused
+   * `<iframe>` element gives its frame ID, which is a target of its own when the frame runs in
+   * another process. The lease must attach frames, or such a target has no session.
+   */
+  readonly #focusedWorld = Effect.fn("BrowserCdp.focusedWorld")(function* (this: BrowserCdpEngine, send: SendCommand) {
+    let sessionId: string | undefined;
+    let contextId = yield* automationContextId(send);
+    for (let depth = 0; depth < MAX_FOCUSED_FRAME_DEPTH; depth += 1) {
+      const probe = yield* send(
+        "Runtime.evaluate",
+        { expression: FOCUSED_FRAME_SCRIPT, contextId, returnByValue: false },
+        sessionId,
+      );
+      const objectId = stringValue(recordValue(probe.result)?.objectId);
+      if (!objectId) break;
+      const described = yield* send("DOM.describeNode", { objectId }, sessionId);
+      yield* send("Runtime.releaseObject", { objectId }, sessionId).pipe(Effect.ignore);
+      const frameId = stringValue(recordValue(described.node)?.frameId);
+      if (!frameId) break;
+      const target = this.#targetSessions.get(frameId);
+      if (target) {
+        sessionId = target.sessionId;
+        contextId = yield* automationContextId(send, sessionId);
+      } else {
+        contextId = yield* frameAutomationContextId(send, frameId, sessionId);
+      }
+    }
+    return { contextId, sessionId };
   });
 
   readonly navigate = Effect.fn("BrowserCdp.navigate")(function* (

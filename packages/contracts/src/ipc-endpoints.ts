@@ -22,6 +22,7 @@ import type {
   CreateHostedServerInput,
   DeleteHostedServerInput,
   HostedServerCatalog,
+  HostedServerLifecycleInput,
   HostedServerList,
   HostedServerSummary,
 } from "./hosted-servers";
@@ -252,6 +253,7 @@ import type {
   RemoteDesktopTestInput,
   RemoteDesktopTestStatus,
 } from "./ipc-remote-desktop-setup";
+import type { RemoteSessionReusePreference } from "./ipc-remote-sessions";
 import type {
   RemoteWorkspaceCache,
   RemoteWorkspaceCachePreference,
@@ -444,6 +446,10 @@ export const IPC_ENDPOINTS = {
     getBusyMessageModePreference: request<undefined, BusyMessageModePreference>()("app:get-busy-message-mode"),
     setBusyMessageModePreference: request<BusyMessageModePreference, BusyMessageModePreference>()(
       "app:set-busy-message-mode",
+    ),
+    getRemoteSessionReusePreference: request<undefined, RemoteSessionReusePreference>()("app:get-remote-session-reuse"),
+    setRemoteSessionReusePreference: request<RemoteSessionReusePreference, RemoteSessionReusePreference>()(
+      "app:set-remote-session-reuse",
     ),
     getAppLanguagePreference: request<undefined, AppLanguagePreference>()("app:get-language-preference"),
     setAppLanguagePreference: request<SetAppLanguagePreferenceInput, AppLanguagePreference>()(
@@ -736,6 +742,7 @@ export const IPC_ENDPOINTS = {
     create: request<CreateHostedServerInput, HostedServerSummary>()("hosted-servers:create"),
     openCheckout: request<string, HostedServerSummary>()("hosted-servers:open-checkout"),
     delete: request<DeleteHostedServerInput, void>()("hosted-servers:delete"),
+    lifecycle: request<HostedServerLifecycleInput, void>()("hosted-servers:lifecycle"),
     wake: request<string, HostedServerSummary>()("hosted-servers:wake"),
   },
   marketplaceAgents: {

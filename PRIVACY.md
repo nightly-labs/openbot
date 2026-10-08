@@ -218,6 +218,19 @@ tickets in D1. It returns a new plaintext secret only to the client that request
 app encrypts its account session token with the operating-system storage protection before it writes
 the token to disk.
 
+The desktop app also keeps, for each joined server, the ID of its logical remote session and the
+Signal address, so that the next start asks only for a new ticket. The file
+(`openbot-remote-sessions-v1.bin`) is encrypted with the same storage protection and is not written
+when that protection is unavailable. It names only the account that signed in. A session ID gives no
+access without that account's session token. The app removes the file at sign-out or when another
+account signs in, when it starts with no account signed in, and forgets a server's session when it
+disconnects from the server or removes it. When the app quits, the session stays open in the account
+service for the next start; signing out or disconnecting the device's sign-in ends it, as before.
+Settings → General → Fast connection to servers turns this off. Off, the app removes the file at
+once, keeps nothing on disk, and ends each session when it quits. Turned on during a run, it keeps the
+sessions that are open at that time. The setting is on by default and is stored
+in `openbot-remote-session-reuse-preference-v1.json`.
+
 Account avatar URLs are public, long-lived resources. A person who has the complete URL can request
 the avatar without an account session.
 
@@ -236,7 +249,8 @@ stores nothing. When boat stops the sandbox, boat keeps a snapshot of its disk u
 the server starts again. Deleting the server
 deletes the sandbox. A hosted server updates itself: it downloads the newest release from GitHub
 Releases, as an installed build does, installs the Ubuntu packages that the release needs from the
-Ubuntu package servers, and starts it at its next start.
+Ubuntu package servers, and starts it at its next start, or when a member with update access installs
+it from Server Settings.
 
 For each hosted server, the account service stores the owner, name, size and the size of a pending
 plan change, the plan, billing interval and currency, the open Stripe Checkout session ID, desired
@@ -396,9 +410,10 @@ Billing is off, and Stripe receives nothing, when the account service has no Str
   is never sent to an agent, a provider, a log or a team member. The token and each filled value
   are redacted from logs, exports and diagnostics.
 - `~/Library/Application Support/OpenBot/logs/trace.ndjson` is a local trace of IPC calls,
-  provider turns, and main-process failures. Each line holds a time, the IPC channel name, the turn
-  origin or the failure origin (`uncaughtException` or `unhandledRejection`), the duration, and the
-  outcome word. The failure's error text goes only to the redacted log. The trace holds no payloads,
+  provider turns, main-process failures, and the steps of each connection to a joined server. Each
+  line holds a time, the IPC channel name, the turn origin, the failure origin (`uncaughtException`
+  or `unhandledRejection`) or the connection step (such as `remote-connect:ticket`), the duration,
+  and the outcome word. A connection step does not name the server. The failure's error text goes only to the redacted log. The trace holds no payloads,
   messages, URLs, paths, or identifiers, and it goes through log redaction before it is written. It
   is kept to two files of 2 MB each and is never sent.
 

@@ -23,6 +23,15 @@ export const automationContextId = Effect.fn("Browser.automationContextId")(func
   const tree = yield* send("Page.getFrameTree", {}, sessionId);
   const frameId = frameTreeRootId(tree);
   if (!frameId) return yield* browserFailure(new Error("The browser automation world has no frame."));
+  return yield* frameAutomationContextId(send, frameId, sessionId);
+});
+
+/** The automation world of one frame, which may be a child of the session's root frame. */
+export const frameAutomationContextId = Effect.fn("Browser.frameAutomationContextId")(function* (
+  send: SendCommand,
+  frameId: string,
+  sessionId?: string,
+) {
   const world = yield* send(
     "Page.createIsolatedWorld",
     { frameId, worldName: AUTOMATION_WORLD_NAME, grantUniveralAccess: false },

@@ -67,6 +67,12 @@ const Settings = createSimpleContext({
     const [appSettingsOpen, setAppSettingsOpen] = createSignal(false);
     /** The tab that the next opening shows. Undefined keeps the tab that was open last. */
     const [appSettingsTab, setAppSettingsTab] = createSignal<SettingsTab | undefined>();
+    /** A hosted server that the server menu asked to delete. The nonce repeats a request for the same server. */
+    const [hostedServerDeleteRequest, setHostedServerDeleteRequest] = createSignal<{
+      serverId: string;
+      nonce: number;
+    } | null>(null);
+    let hostedServerDeleteNonce = 0;
     const [generalSettings, setGeneralSettings] = createSignal<GeneralSettingsValue>({
       ...DEFAULT_GENERAL_SETTINGS,
       taskCompletionSound: isCompletionSoundEnabled(),
@@ -100,6 +106,7 @@ const Settings = createSimpleContext({
     let remoteWorkspaceCacheChanged = false;
     /** The saved copy setting as main last confirmed it, or null before main answers. */
     const [savedCopyEnabled, setSavedCopyEnabled] = createSignal<boolean | null>(null);
+    let keepRemoteSessionsChanged = false;
     let turboModeChanged = false;
     const [turboModePending, setTurboModePending] = createSignal(false);
 
@@ -251,6 +258,14 @@ const Settings = createSimpleContext({
           (preference) => preference.mode,
         );
       }
+      if (previous.keepRemoteSessions !== value.keepRemoteSessions) {
+        keepRemoteSessionsChanged = true;
+        persistField(
+          "keepRemoteSessions",
+          settingsPort().setRemoteSessionReusePreference({ keepBetweenRuns: value.keepRemoteSessions }),
+          (preference) => preference.keepBetweenRuns,
+        );
+      }
       if (
         previous.macBookNotch !== value.macBookNotch ||
         previous.macBookNotchHaptics !== value.macBookNotchHaptics ||
@@ -323,6 +338,12 @@ const Settings = createSimpleContext({
       appSettingsRestoreTarget = target;
       setAppSettingsTab(tab);
       setAppSettingsOpen(true);
+    }
+
+    /** Opens the Hosted servers tab with the delete confirmation of one server. */
+    function openHostedServerDelete(serverId: string, trigger?: HTMLElement | null): void {
+      setHostedServerDeleteRequest({ serverId, nonce: ++hostedServerDeleteNonce });
+      openAppSettings(trigger, "hosted-servers");
     }
 
     onSettled(() => {
@@ -405,6 +426,13 @@ const Settings = createSimpleContext({
         })
         .catch(() => undefined);
       void settingsPort()
+        .getRemoteSessionReusePreference()
+        .then((preference) => {
+          if (keepRemoteSessionsChanged) return;
+          setGeneralSettings((current) => ({ ...current, keepRemoteSessions: preference.keepBetweenRuns }));
+        })
+        .catch(() => undefined);
+      void settingsPort()
         .notifications.getPreference()
         .then((preference) => {
           if (desktopNotificationsChanged) return;
@@ -450,6 +478,8 @@ const Settings = createSimpleContext({
       appSettingsRestoreTarget: () => appSettingsRestoreTarget,
       appSettingsTab,
       openAppSettings,
+      hostedServerDeleteRequest,
+      openHostedServerDelete,
       skillsMarketplaceOpen,
       setSkillsMarketplaceOpen,
       pendingPluginSlug,

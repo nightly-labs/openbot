@@ -1,10 +1,13 @@
 import type { AgentSummary, BrowserPreview, BrowserTab, ServerSummary } from "@openbot/contracts/ipc";
-import { TEAM_BROWSER_VIEW_CAPABILITY } from "@openbot/contracts/team-protocol/browser-view-v1";
+import {
+  TEAM_BROWSER_VIEW_CAPABILITY,
+  TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY,
+} from "@openbot/contracts/team-protocol/browser-view-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { toast } from "@openbot/ui";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { createSignal, flush } from "solid-js";
-import { expect, it, type Mock, vi } from "vitest";
+import { expect, it, type Mock, onTestFinished, vi } from "vitest";
 import { App } from "./App";
 import {
   AGENTS,
@@ -46,7 +49,7 @@ const LIVE_VIEW_LABEL = "Live view of the page on the host";
 const nativeCanvasGetContext = HTMLCanvasElement.prototype.getContext;
 
 /** A server list with one host that can stream its browser, which is what a live view needs. */
-function listHostThatStreamsItsBrowser(): void {
+function listHostThatStreamsItsBrowser(...extraCapabilities: string[]): void {
   const studio = testServer("remote-1", true);
   vi.mocked(window.openbot.servers.list).mockResolvedValueOnce([
     testServer("local", false),
@@ -58,7 +61,7 @@ function listHostThatStreamsItsBrowser(): void {
         localProtocol: { minimum: 1, maximum: 4 },
         hostProtocol: { minimum: 1, maximum: 4 },
         negotiatedProtocol: 4,
-        capabilities: ["browser-control", TEAM_BROWSER_VIEW_CAPABILITY],
+        capabilities: ["browser-control", TEAM_BROWSER_VIEW_CAPABILITY, ...extraCapabilities],
       },
     },
   ]);
@@ -383,6 +386,69 @@ describe("OpenBot connected desktop shell", () => {
     expect(window.openbot.browser.sendLiveViewInput).toHaveBeenCalledWith(
       expect.objectContaining({ type: "pointer", action: "down", x: 0.25, y: 0.25 }),
     );
+  });
+
+  it("pastes the user's text into a host's page and puts the page's selection on the user's clipboard", async () => {
+    listHostThatStreamsItsBrowser(TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY);
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    onTestFinished(() => {
+      Reflect.deleteProperty(navigator, "clipboard");
+    });
+    const tab = browserTab("remote-live-tab", "Remote live page");
+    stubCanvasDrawing();
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    emitAgentEvent?.({ type: "browser-changed", tabs: [tab], activeTabId: tab.id });
+    await openComputerAndCard("Remote live page");
+    await vi.waitFor(() => expect(window.openbot.browser.startLiveView).toHaveBeenCalledWith(tab.id));
+    emitBrowserLiveView?.({ type: "frame", tabId: tab.id, sequence: 1, width: 800, height: 600, image: IMAGE });
+    const view = await screen.findByRole("img", { name: LIVE_VIEW_LABEL });
+    await vi.waitFor(() =>
+      expect(window.openbot.browser.sendLiveViewInput).toHaveBeenCalledWith({ type: "ack", sequence: 1 }),
+    );
+    vi.mocked(window.openbot.browser.sendLiveViewInput).mockClear();
+
+    // A paste is left to this window, which fires its own paste event with the user's clipboard. The
+    // page still gets the key.
+    expect(await fireEvent.keyDown(view, { key: "v", code: "KeyV", ctrlKey: true })).toBe(true);
+    expect(window.openbot.browser.sendLiveViewInput).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "key", action: "down", key: "v", modifiers: 2 }),
+    );
+    await fireEvent.paste(view, { clipboardData: { getData: () => "from the user" } });
+    expect(window.openbot.browser.sendLiveViewInput).toHaveBeenCalledWith({ type: "paste", text: "from the user" });
+
+    // A copy on a Russian layout: the key is the Cyrillic letter, its place is still C.
+    await fireEvent.keyDown(view, { key: "с", code: "KeyC", ctrlKey: true });
+    expect(window.openbot.browser.sendLiveViewInput).toHaveBeenLastCalledWith({ type: "copy" });
+    emitBrowserLiveView?.({ type: "copied", tabId: tab.id, text: "the host's selection" });
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith("the host's selection"));
+
+    // Nothing selected on the host leaves the user's clipboard as it was.
+    await fireEvent.keyDown(view, { key: "c", code: "KeyC", ctrlKey: true });
+    emitBrowserLiveView?.({ type: "copied", tabId: tab.id, text: "" });
+    await fireEvent.keyDown(view, { key: "c", code: "KeyC", ctrlKey: true });
+    emitBrowserLiveView?.({ type: "copied", tabId: tab.id, text: "second selection" });
+    await vi.waitFor(() => expect(writeText).toHaveBeenLastCalledWith("second selection"));
+    expect(writeText).toHaveBeenCalledTimes(2);
+
+    // A cut deletes on the host only once the text is on the clipboard.
+    writeText.mockImplementationOnce(() => Promise.reject(new Error("denied")));
+    await fireEvent.keyDown(view, { key: "x", code: "KeyX", metaKey: true });
+    emitBrowserLiveView?.({ type: "copied", tabId: tab.id, text: "kept on the host" });
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalledTimes(3));
+    await fireEvent.keyDown(view, { key: "x", code: "KeyX", metaKey: true });
+    emitBrowserLiveView?.({ type: "copied", tabId: tab.id, text: "cut on the host" });
+    await vi.waitFor(() =>
+      expect(window.openbot.browser.sendLiveViewInput).toHaveBeenLastCalledWith({
+        type: "cut",
+        text: "cut on the host",
+      }),
+    );
+    expect(window.openbot.browser.sendLiveViewInput).not.toHaveBeenCalledWith({
+      type: "cut",
+      text: "kept on the host",
+    });
   });
 
   it("sends a click on a live view that is letterboxed top and bottom as a point on the frame", async () => {

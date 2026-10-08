@@ -1315,7 +1315,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     try {
       return providerResult(yield* Effect.result(providerCall(() => connection.loadSession(request))));
     } catch (error) {
-      if (isSessionNotFound(error, request.sessionId)) {
+      if (isSessionNotFound(error, request.sessionId, this.provider)) {
         return yield* providerFailure(new MissingAcpSessionError(`ACP session not found: ${request.sessionId}`, error));
       }
       if (this.provider !== "opencode" || !isOpenCodeServiceFailure(error)) return yield* providerFailure(error);
@@ -1877,6 +1877,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         params: {
           threadId: thread.id,
           turnId: turn.id,
+          filePaths: update.locations?.map((location) => location.path),
           item,
         },
       });
@@ -2434,9 +2435,15 @@ function contentMessageId(update: SessionNotification["update"]): string | null 
   return update.messageId;
 }
 
-/** The protocol's resource-not-found error, for this session. */
-function isSessionNotFound(error: unknown, sessionId: string): boolean {
-  if (!(error instanceof RequestError) || error.code !== -32002) return false;
+/** A missing session, identified by the protocol or Cursor's exact load error. */
+function isSessionNotFound(error: unknown, sessionId: string, provider: AgentProvider): boolean {
+  if (!(error instanceof RequestError)) return false;
+  // Cursor puts the missing session in data.message and reports only "Invalid params" in
+  // message. Other invalid parameters must not cause a provider session to be replaced.
+  if (provider === "cursor" && error.code === -32602) {
+    return isRecord(error.data) && error.data.message === `Session "${sessionId}" not found`;
+  }
+  if (error.code !== -32002) return false;
   const uri = isRecord(error.data) ? error.data.uri : undefined;
   return uri === sessionId || error.message.includes(sessionId);
 }

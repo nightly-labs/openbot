@@ -62,13 +62,18 @@ function groupableMarker(message: AgentMessage): AgentMessageMarkerModel | null 
   return message.actionMarker;
 }
 
-function startsDay(previous: AgentMessage, current: AgentMessage): boolean {
+/** Whether a message falls on a new day after the previous one, so a day separator comes between them. */
+export function startsDay(previous: AgentMessage, current: AgentMessage): boolean {
   return current.createdAt !== undefined && dayMarkerLabel(previous.createdAt, current.createdAt) !== null;
 }
 
-/** The ids of the messages in a group row, separated by spaces, so a search or focus request finds the row. */
+/**
+ * The ids of the messages in a group row of agent messages or routine runs, separated by spaces, so
+ * a search or focus request finds the row.
+ */
 export function groupedMessageIds(message: AgentMessage | undefined): string | undefined {
   const marker = message?.actionMarker;
-  if (marker?.kind !== "agent-message-group") return undefined;
-  return marker.messages.map((entry) => entry.id).join(" ");
+  if (marker?.kind === "agent-message-group") return marker.messages.map((entry) => entry.id).join(" ");
+  if (marker?.kind === "routine-run-group") return marker.runs.map((entry) => entry.id).join(" ");
+  return undefined;
 }

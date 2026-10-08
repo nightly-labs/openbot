@@ -134,6 +134,10 @@ export const messages = defineMessages("server", {
   "server.rail.usage": "Usage",
   "server.rail.schedule": "Routines",
   "server.rail.settings": "Server settings",
+  // The last items of the server menu. Leave is for a joined server; delete is for a hosted server that the user owns.
+  "server.rail.remove": "Remove server",
+  "server.rail.leave": "Leave server",
+  "server.rail.delete": "Delete server",
   "server.select.failedTitle": "Could not select the server",
   "server.select.failedDescription": "Could not switch servers. Try again.",
   "server.select.openAgentFailed": "Could not open {name}. Find it in the sidebar.",
@@ -239,6 +243,12 @@ export const messages = defineMessages("server", {
   "server.settings.saveIdentityFirst": "Save the server identity before publishing.",
   "server.settings.reachable": "Reachable online. Only invited people can sign in.",
   "server.settings.notReachable": "Not reachable online. Existing members and invitations remain.",
+  "server.settings.removeTitle": "Remove server",
+  "server.settings.removeConfirmTitle": "Remove {name}?",
+  "server.settings.removeConfirmDescription":
+    "This removes the server from the account service for all members and ends remote access. Files and chats on its computer stay intact. To use it again, register it from that computer.",
+  "server.settings.removing": "Removing…",
+  "server.settings.removedTitle": "Removed {name}",
   "server.settings.leaveTitle": "Leave server",
   "server.settings.leaveDescription":
     "Remove this server from your server list. The server and its other members stay.",

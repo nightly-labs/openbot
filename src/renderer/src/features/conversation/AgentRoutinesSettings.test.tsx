@@ -275,6 +275,17 @@ describe("AgentRoutinesSettings", () => {
     expect(await screen.findByText("No routines yet.")).toBeInTheDocument();
   });
 
+  it("tells the user how a routine stays silent when there is nothing to report", async () => {
+    setupOpenBot({ routines: { chief: [routine] } });
+    render(() => <AgentRoutinesSettings port={agentRoutinesPort("chief")} onCountChange={vi.fn()} />);
+
+    await fireEvent.click(await screen.findByRole("button", { name: /Morning brief/ }));
+    const instruction = await screen.findByRole("textbox", { name: "Instruction" });
+    expect(instruction).toHaveAccessibleDescription(
+      "To stay silent when there is nothing to report, ask the agent to answer [[no-update]].",
+    );
+  });
+
   it("blocks editor navigation while Save is running", async () => {
     const mock = setupOpenBot({ routines: { chief: [routine] } });
     let resolveUpdate: ((value: Routine) => void) | undefined;

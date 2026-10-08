@@ -12,7 +12,7 @@ import { encodeTeamWebRtcPayload, TeamWebRtcPayloadDecoder } from "./team-webrtc
 
 export interface BridgeCommand {
   commandId: string;
-  type: "connect" | "disconnect" | "disconnect-peer" | "send" | "restart-ice" | "close";
+  type: "connect" | "prepare-signal" | "disconnect" | "disconnect-peer" | "send" | "restart-ice" | "close";
   peerId: string;
   signalUrl?: string;
   token?: string;
@@ -80,6 +80,20 @@ const SIGNAL_RENEW_DELAY_MS = 8_000;
 const DISCONNECT_GRACE_MS = 15_000;
 
 const peers = new Map<string, PeerState>();
+
+// A Signal socket opened while main waits for the ticket. Its TLS and WebSocket handshakes then do
+// not wait for the ticket. Nothing is sent on it before `connect` names the same address and adds
+// the hello; a socket that no `connect` takes closes.
+interface PreparedSignal {
+  signalUrl: string;
+  socket: WebSocket;
+  /** Signal said something before the hello, which is only a refusal. The socket is not used. */
+  refused: boolean;
+  timer: number;
+  listeners: AbortController;
+}
+const PREPARED_SIGNAL_LIFETIME_MS = 30_000;
+const preparedSignals = new Map<string, PreparedSignal>();
 const dataChannelNames = ["rpc", "events", "files", "desktop"] as const;
 // Chromium keeps the sockets of every earlier ICE generation until the connection closes: one per
 // network interface, and one more per interface for TURN, for each restart. On a host with 10
@@ -118,6 +132,7 @@ async function handleCommand(command: BridgeCommand): Promise<void> {
         (command.iceTransportPolicy !== "all" && command.iceTransportPolicy !== "relay")
       )
         throw new Error("The WebRTC connection command is invalid.");
+      const prepared = takePreparedSignal(command.peerId, command.signalUrl);
       disconnect(command.peerId);
       const state: PeerState = {
         id: command.peerId,
@@ -146,7 +161,10 @@ async function handleCommand(command: BridgeCommand): Promise<void> {
         closed: false,
       };
       peers.set(state.id, state);
-      connectSignal(state);
+      connectSignal(state, prepared);
+    } else if (command.type === "prepare-signal") {
+      if (!command.signalUrl) throw new Error("The WebRTC connection command is invalid.");
+      prepareSignal(command.peerId, command.signalUrl);
     } else if (command.type === "disconnect") {
       disconnect(command.peerId);
     } else if (command.type === "disconnect-peer") {
@@ -162,6 +180,7 @@ async function handleCommand(command: BridgeCommand): Promise<void> {
     } else if (command.type === "restart-ice") {
       await restartIce(requirePeer(command.peerId));
     } else if (command.type === "close") {
+      for (const peerId of [...preparedSignals.keys()]) dropPreparedSignal(peerId);
       for (const peerId of [...peers.keys()]) disconnect(peerId);
     }
     post({ type: "command-complete", commandId: command.commandId });
@@ -174,11 +193,63 @@ async function handleCommand(command: BridgeCommand): Promise<void> {
   }
 }
 
-function connectSignal(state: PeerState): void {
-  if (state.closed || state.socket) return;
-  const socket = new WebSocket(state.signalUrl);
+function prepareSignal(peerId: string, signalUrl: string): void {
+  // A peer that is already connecting has its own socket.
+  if (peers.has(peerId)) return;
+  dropPreparedSignal(peerId);
+  const socket = new WebSocket(signalUrl);
+  const listeners = new AbortController();
+  const prepared: PreparedSignal = {
+    signalUrl,
+    socket,
+    refused: false,
+    timer: window.setTimeout(() => dropPreparedSignal(peerId), PREPARED_SIGNAL_LIFETIME_MS),
+    listeners,
+  };
+  const drop = () => {
+    if (preparedSignals.get(peerId) === prepared) dropPreparedSignal(peerId);
+  };
+  socket.addEventListener("open", () => post({ type: "signal-open", peerId }), { signal: listeners.signal });
+  socket.addEventListener(
+    "message",
+    () => {
+      prepared.refused = true;
+    },
+    { signal: listeners.signal },
+  );
+  socket.addEventListener("close", drop, { signal: listeners.signal });
+  socket.addEventListener("error", drop, { signal: listeners.signal });
+  preparedSignals.set(peerId, prepared);
+}
+
+/** The prepared socket of a peer when it can carry the hello for `signalUrl`, and forgets it either way. */
+function takePreparedSignal(peerId: string, signalUrl: string): WebSocket | null {
+  const prepared = preparedSignals.get(peerId);
+  if (!prepared) return null;
+  preparedSignals.delete(peerId);
+  clearTimeout(prepared.timer);
+  prepared.listeners.abort();
+  const usable =
+    prepared.signalUrl === signalUrl &&
+    !prepared.refused &&
+    (prepared.socket.readyState === WebSocket.CONNECTING || prepared.socket.readyState === WebSocket.OPEN);
+  if (usable) return prepared.socket;
+  prepared.socket.close(1000, "Peer stopped");
+  return null;
+}
+
+function dropPreparedSignal(peerId: string): void {
+  takePreparedSignal(peerId, "")?.close(1000, "Peer stopped");
+}
+
+function connectSignal(state: PeerState, prepared: WebSocket | null = null): void {
+  if (state.closed || state.socket) {
+    prepared?.close(1000, "Peer stopped");
+    return;
+  }
+  const socket = prepared ?? new WebSocket(state.signalUrl);
   state.socket = socket;
-  socket.addEventListener("open", () => {
+  const sendHello = () => {
     state.reconnectAttempt = 0;
     const hello: SignalClientMessage = {
       type: "hello",
@@ -188,7 +259,14 @@ function connectSignal(state: PeerState): void {
       ...(state.role === "host" ? { multiplex: true } : {}),
     };
     socket.send(JSON.stringify(hello));
-  });
+  };
+  // A prepared socket can be open already. It told main when it opened.
+  const open = prepared?.readyState === WebSocket.OPEN;
+  if (!open)
+    socket.addEventListener("open", () => {
+      post({ type: "signal-open", peerId: state.id });
+      sendHello();
+    });
   socket.addEventListener("message", (event) => {
     if (!isString(event.data)) return;
     state.signalChain = state.signalChain
@@ -218,6 +296,7 @@ function connectSignal(state: PeerState): void {
     if (!state.closed) scheduleSignalReconnect(state);
   });
   socket.addEventListener("error", () => socket.close());
+  if (open) sendHello();
 }
 
 async function handleSignal(state: PeerState, message: SignalServerMessage): Promise<void> {
@@ -425,7 +504,8 @@ function createPeerConnection(state: PeerState, iceServers: RTCIceServer[]): RTC
   state.peerConnection = connection;
   state.iceRestarts = 0;
   connection.onicecandidate = (event) => {
-    if (!event.candidate || !state.connectionId) return;
+    // An empty candidate marks the end of gathering. Signal v1 accepts only candidates.
+    if (!event.candidate?.candidate || !state.connectionId) return;
     sendSignal(state, {
       type: "ice-candidate",
       version: SIGNAL_PROTOCOL_VERSION,
@@ -699,6 +779,7 @@ function scheduleTurnRefresh(state: PeerState): void {
 }
 
 function disconnect(peerId: string): void {
+  dropPreparedSignal(peerId);
   const state = peers.get(peerId);
   if (!state) return;
   state.closed = true;

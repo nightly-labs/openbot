@@ -1,12 +1,17 @@
 import { describe, expect, it } from "vitest";
+import { BROWSER_LIVE_VIEW_MAX_PASTE_TEXT } from "../ipc-browser";
 import {
+  BROWSER_VIEW_MAX_CLIPBOARD_TEXT,
   BROWSER_VIEW_MAX_FRAME_BYTES,
   type BrowserViewInput,
   browserViewInputForHost,
+  decodeBrowserViewCopied,
   decodeBrowserViewFrame,
   decodeBrowserViewInput,
+  encodeBrowserViewCopied,
   encodeBrowserViewFrame,
   encodeBrowserViewInput,
+  TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY,
   TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
 } from "./browser-view-v1";
 import { TEAM_CURRENT_CAPABILITIES } from "./current";
@@ -88,16 +93,48 @@ describe("the browser view wire format", () => {
       modifiers: 0,
     };
     expect(TEAM_CURRENT_CAPABILITIES).toContain(TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY);
-    expect(browserViewInputForHost(click, true)).toEqual(click);
-    const released = browserViewInputForHost(click, false);
+    expect(browserViewInputForHost(click, true, true)).toEqual(click);
+    const released = browserViewInputForHost(click, false, true);
     if (!released) throw new Error("A point with no frame name is still a released payload.");
     expect(released).not.toHaveProperty("sequence");
     expect(JSON.parse(encodeBrowserViewInput(released))).not.toHaveProperty("sequence");
     const ack = { type: "ack" as const, sequence: 7 };
     expect(decodeBrowserViewInput(encodeBrowserViewInput(ack))).toEqual(ack);
-    expect(browserViewInputForHost(ack, true)).toEqual(ack);
+    expect(browserViewInputForHost(ack, true, true)).toEqual(ack);
     // An older host closes the socket on an input it does not know, so the acknowledgement stays here.
-    expect(browserViewInputForHost(ack, false)).toBeNull();
+    expect(browserViewInputForHost(ack, false, true)).toBeNull();
+  });
+
+  it("carries a paste, a copy and a cut only to a host that answers them", () => {
+    const paste: BrowserViewInput = { type: "paste", text: "line one\nline two" };
+    const copy: BrowserViewInput = { type: "copy" };
+    const cut: BrowserViewInput = { type: "cut", text: "line one" };
+    expect(TEAM_CURRENT_CAPABILITIES).toContain(TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY);
+    for (const input of [paste, copy, cut]) {
+      expect(decodeBrowserViewInput(encodeBrowserViewInput(input))).toEqual(input);
+      expect(browserViewInputForHost(input, true, true)).toEqual(input);
+      // An older host closes the view on each, which would end the view the user is working in.
+      expect(browserViewInputForHost(input, true, false)).toBeNull();
+    }
+    const longest = "x".repeat(BROWSER_VIEW_MAX_CLIPBOARD_TEXT);
+    expect(decodeBrowserViewInput(encodeBrowserViewInput({ type: "paste", text: longest }))).toEqual({
+      type: "paste",
+      text: longest,
+    });
+    expect(BROWSER_LIVE_VIEW_MAX_PASTE_TEXT).toBe(BROWSER_VIEW_MAX_CLIPBOARD_TEXT);
+
+    const copied = { type: "copied" as const, text: "selected" };
+    expect(decodeBrowserViewCopied(encodeBrowserViewCopied(copied))).toEqual(copied);
+    expect(decodeBrowserViewCopied(encodeBrowserViewCopied({ type: "copyTooLarge" }))).toEqual({
+      type: "copyTooLarge",
+    });
+    for (const invalid of [
+      { type: "copied", text: `${longest}x` },
+      { type: "copied" },
+      { type: "frame", text: "selected" },
+    ]) {
+      expect(() => decodeBrowserViewCopied(JSON.stringify(invalid))).toThrow("Invalid browser view message.");
+    }
   });
 
   it("refuses input that a host would dispatch somewhere it cannot see", () => {
@@ -115,6 +152,10 @@ describe("the browser view wire format", () => {
       { ...click, sequence: 1.5 },
       { type: "key", action: "char", key: "a", code: "KeyA", text: "a whole pasted paragraph" },
       { type: "clipboard", data: "secret" },
+      { type: "paste", text: "" },
+      { type: "paste", text: "x".repeat(BROWSER_VIEW_MAX_CLIPBOARD_TEXT + 1) },
+      { type: "cut", text: "" },
+      { type: "cut" },
     ]) {
       expect(() => decodeBrowserViewInput(JSON.stringify(invalid))).toThrow("Invalid browser view input.");
     }

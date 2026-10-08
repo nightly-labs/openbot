@@ -177,6 +177,10 @@ function handle(message) {
   if (message.method === "session/load") {
     const loadLog = process.env.OPENBOT_FAKE_ACP_LOAD_LOG;
     if (loadLog) fs.appendFileSync(loadLog, JSON.stringify(message.params) + NL);
+    if (process.env.OPENBOT_FAKE_ACP_LOAD_ERROR) {
+      write({ jsonrpc: "2.0", id: message.id, error: JSON.parse(process.env.OPENBOT_FAKE_ACP_LOAD_ERROR) });
+      return;
+    }
     // OpenCode's answer when its internal server fails the lookup, a session missing from its
     // store included.
     loadCount += 1;
@@ -233,6 +237,7 @@ function handle(message) {
             kind: "read",
             status: "in_progress",
             rawInput: { path: "README.md" },
+            locations: [{ path: "/private/tool-history/README.md" }],
           },
         },
       });
@@ -246,6 +251,7 @@ function handle(message) {
             toolCallId: "tool-1",
             status: "completed",
             rawOutput: { text: "OpenBot" },
+            locations: [{ path: "/private/tool-history/updated.md" }],
           },
         },
       });
@@ -885,6 +891,47 @@ describe("OpenCode MCP sign-in", () => {
   });
 });
 
+describe("ACP missing session errors", () => {
+  it.each([
+    { provider: "cursor", code: -32602, data: { message: 'Session "ses_stored" not found' }, missing: true },
+    { provider: "cursor", code: -32602, data: { message: 'Session "ses_other" not found' }, missing: false },
+    { provider: "cursor", code: -32602, data: { message: "Invalid model value: retired-model" }, missing: false },
+    { provider: "cursor", code: -32602, data: null, missing: false },
+    { provider: "cursor", code: -32603, data: { message: 'Session "ses_stored" not found' }, missing: false },
+    { provider: "opencode", code: -32602, data: { message: 'Session "ses_stored" not found' }, missing: false },
+    { provider: "cursor", code: -32002, data: { uri: "ses_stored" }, missing: true },
+  ] as const)("classifies $provider load error $code with $data", async ({ provider, code, data, missing }) => {
+    const fake = await createFakeOpencodeAgent();
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_SESSION", "1");
+    const responseError = { code, message: "Invalid params", data };
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_ERROR", JSON.stringify(responseError));
+    const client = requireProviderDriver(provider).createClient(fake.cli, 10_000, {
+      apiKey: () => null,
+      customProviders: () => [],
+      mcpServers: () => [],
+    });
+    started.push(client);
+    client.start();
+
+    const error = await runCauseEffect(
+      client.request("thread/resume", { threadId: "ses_stored", cwd: fake.directory }, decodeRecordResponse),
+    ).catch((reason: unknown) => reason);
+
+    expect(isMissingProviderSessionError(error, provider)).toBe(missing);
+    if (!missing) expect(error).toMatchObject(responseError);
+    else {
+      const read = await runCauseEffect(
+        client.request(
+          "thread/read",
+          { threadId: "ses_stored", cwd: fake.directory, includeTurns: true },
+          decodeThreadResponse,
+        ),
+      );
+      expect(read.thread.turns).toEqual([]);
+    }
+  });
+});
+
 describe("OpenCode ACP session loading", () => {
   it("keeps a live non-resumable ACP session when provider idle release runs", async () => {
     const fake = await createFakeOpencodeAgent();
@@ -1005,6 +1052,10 @@ describe("OpenCode ACP session loading", () => {
         },
       },
     });
+    const filePaths: unknown[] = [];
+    client.on("notification", (event) => {
+      if (isDynamicRecord(event.params) && event.params.filePaths) filePaths.push(event.params.filePaths);
+    });
     await runCauseEffect(client.request("initialize", {}, decodeRecordResponse));
     const thread = await runCauseEffect(client.request("thread/start", { cwd: fake.directory }, decodeRecordResponse));
     const threadId = isDynamicRecord(thread.thread) ? thread.thread.id : null;
@@ -1017,6 +1068,8 @@ describe("OpenCode ACP session loading", () => {
       ),
     );
     await vi.waitFor(() => expect(appended).toHaveLength(1));
+    expect(filePaths).toEqual([["/private/tool-history/README.md"], ["/private/tool-history/updated.md"]]);
+    expect(JSON.stringify(appended)).not.toContain("/private/tool-history/");
     expect(appended[0]?.[1]).toMatchObject({
       complete: true,
       items: [

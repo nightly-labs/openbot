@@ -22,6 +22,7 @@ import {
   pageAnchor,
   pageLimit,
   readJson,
+  requireListedAgent,
   stringArray,
   stringField,
 } from "./request-helpers";
@@ -29,6 +30,7 @@ import {
 export interface AgentConversationRouteDependencies {
   agents: Pick<
     TeamApiAgents,
+    | "listAgents"
     | "readConversationFor"
     | "readConversationPageFor"
     | "markConversationRead"
@@ -46,10 +48,12 @@ export async function routeAgentConversation(
   const { method, url, request, member, protocol, capabilities, json, empty } = context;
 
   if (method === "GET" && action === "conversation") {
+    requireListedAgent(agents, agentId);
     const conversation = await runCauseEffect(agents.readConversationFor(agentId, member.id));
     return json(200, conversationForCapabilities(conversation, capabilities));
   }
   if (method === "GET" && action === "conversation-page") {
+    requireListedAgent(agents, agentId);
     const page = await runCauseEffect(
       agents.readConversationPageFor(
         agentId,
@@ -69,10 +73,12 @@ export async function routeAgentConversation(
       throw new HttpError(400, sourceText("error.team.markUnreadUnsupported"));
     }
     await readJson(request);
+    requireListedAgent(agents, agentId);
     return json(200, await runCauseEffect(agents.markConversationUnread(agentId, member.id)));
   }
   if (method === "POST" && action === "conversation/read") {
     const body = await readJson(request);
+    requireListedAgent(agents, agentId);
     return json(
       200,
       await runCauseEffect(
@@ -111,6 +117,7 @@ export async function routeAgentConversation(
     const body = await readJson(request);
     const emoji = body.emoji;
     if (emoji !== null && !isMessageReaction(emoji)) throw new HttpError(400, "Invalid emoji.");
+    requireListedAgent(agents, agentId);
     await runCauseEffect(
       agents.setMessageReaction({
         agentId,

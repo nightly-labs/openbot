@@ -211,6 +211,7 @@ export type TeamApiBrowser = Pick<
   // cannot, because frames outlive the request that asked for them.
   | "startView"
   | "dispatchViewInput"
+  | "copyViewSelection"
 >;
 export type TeamApiBrowserView = Pick<
   BrowserViewGateway,
@@ -246,6 +247,11 @@ export interface TeamApiOptions {
   appVersion?: string;
   store: TeamStore;
   agents: TeamApiAgents;
+  /**
+   * Waits for the agent initialization in progress. A host that wakes publishes before its agents
+   * load, and an empty roster then would tell a peer that the server has no agents.
+   */
+  agentsReady?: () => Effect.Effect<void>;
   skills?: Pick<SkillMarketplaceService, "listInstalledForChatTags">;
   sidebarLayout?: TeamApiSidebarLayout;
   mailbox: TeamApiMailbox;

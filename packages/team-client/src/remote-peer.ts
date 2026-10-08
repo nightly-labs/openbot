@@ -786,7 +786,8 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     const connection = new RTCPeerConnection({ iceServers, bundlePolicy: "max-bundle" });
     state.connection = connection;
     connection.onicecandidate = (event) => {
-      if (!event.candidate || !state.connectionId || !canSignal(state)) return;
+      // An empty candidate marks the end of gathering. Signal v1 accepts only candidates.
+      if (!event.candidate?.candidate || !state.connectionId || !canSignal(state)) return;
       sendSignal(state, {
         type: "ice-candidate",
         version: SIGNAL_PROTOCOL_VERSION,

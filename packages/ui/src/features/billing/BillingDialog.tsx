@@ -1,8 +1,6 @@
 import { Dialog, IconButton, Text, X } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { Show } from "solid-js";
 import { useText } from "../../text";
-import { SettingsHostedServersTab } from "../settings/SettingsHostedServersTab";
 import type { SettingsHostedServersStore } from "../settings/stores/hosted-servers-store";
 import { BillingPanel } from "./BillingPanel";
 import type { BillingStore } from "./billing-store";
@@ -41,10 +39,7 @@ export function BillingDialog(props: BillingDialogProps): JSX.Element {
               </Dialog.Description>
             </header>
             <div class="billing-dialog-body">
-              <BillingPanel store={props.store} available />
-              <Show when={props.hostedServers?.state.servers.length ? props.hostedServers : undefined}>
-                {(hostedServers) => <SettingsHostedServersTab store={hostedServers()} />}
-              </Show>
+              <BillingPanel store={props.store} available hostedServers={props.hostedServers} />
             </div>
           </Dialog.Content>
         </Dialog.Overlay>

@@ -710,6 +710,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       threads: this.#threads,
       hooks: {
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
+        // A deleted routine takes its runs with it, so a run without a record counts as scheduled:
+        // otherwise the import would bring back the answers that its quiet turns dropped.
+        quietRoutineDelivery: (deliveryId) => this.#routines.runForDelivery(deliveryId)?.kind !== "manual",
         executionThreads: () => [...this.channels.store.executionThreads(), ...this.messaging.store.executionThreads()],
         deliveryThreadId: (deliveryId) => {
           const assignment = this.channels.store.assignmentForDelivery(deliveryId);
@@ -950,6 +953,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         emitToolUsage: (usage) => this.emit("toolUsage", usage),
         turnModel: (agentId, turnId) => this.#drain.modelForTurn(agentId, turnId),
         requeueChannelDelivery: (deliveryId) => this.#requeueChannelDelivery(deliveryId),
+        quietRoutineDelivery: (deliveryId) => this.#routines.quietRunForDelivery(deliveryId),
+        takeRoutinePreview: (deliveryId) => this.#routines.takePreviewBeforeRun(deliveryId),
       },
     });
     this.#removal = new AgentRemoval({
@@ -1584,7 +1589,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             this.#providers.requireProviderOn(agent.provider);
             if (needsModel)
               throw new Error(
-                sourceText("error.agent.noStartingModel", { provider: providerLabel(this.#preference().provider) }),
+                sourceText("error.agent.noStartingModelInSettings", {
+                  provider: providerLabel(this.#preference().provider),
+                }),
               );
           });
           return agent;
@@ -1937,7 +1944,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     inputPath: string,
   ) {
     const agent = yield* lifecycleStep("find workspace agent", () => this.#agentForFile(agentId));
-    return yield* resolveWorkspaceFile(agent, inputPath, { allowOutside: !workspaceAccessEnforced(agent) }).pipe(
+    return yield* resolveWorkspaceFile(agent, inputPath, {
+      allowOutside: !workspaceAccessEnforced(agent),
+      fileHistory: this.#turn.fileHistory.paths(agent.id, agent.threadId),
+    }).pipe(
       Effect.mapError(
         (failure) => new AgentLifecycleFailed({ operation: "resolve local workspace file", cause: failure.cause }),
       ),
@@ -2730,7 +2740,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     input: SetMessageReactionInput,
   ) {
     const agent = yield* this.#store
-      .getOrCreate(input.agentId)
+      .existing(input.agentId)
       .pipe(
         Effect.mapError(
           (failure) => new AgentLifecycleFailed({ operation: "load reaction agent", cause: failure.cause }),
@@ -2781,7 +2791,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     mayStop?: () => boolean,
   ) {
     const agent = yield* this.#store
-      .getOrCreate(agentId)
+      .existing(agentId)
       .pipe(
         Effect.mapError(
           (failure) => new AgentLifecycleFailed({ operation: "load interrupted agent", cause: failure.cause }),

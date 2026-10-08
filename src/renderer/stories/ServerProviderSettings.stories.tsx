@@ -1,6 +1,7 @@
 import type {
   AgentProviderId,
   AgentStatus,
+  AppSetupState,
   CustomProviderRestart,
   CustomProviderSummary,
   ProviderRuntimeSnapshot,
@@ -140,6 +141,11 @@ function ServerProvidersStory(props: {
     toast.dismiss();
     window.openbot = previousApi;
   });
+  const [preference, setPreference] = createSignal<AppSetupState>({
+    completed: true,
+    preferredProvider: "codex",
+    preferredModel: null,
+  });
   const [open, setOpen] = createSignal(true);
   const codeLogin = createFakeCodeLogin({ finishAfterMs: 0 });
   const [customProviders, setCustomProviders] = createSignal<CustomProviderSummary[]>(
@@ -199,6 +205,21 @@ function ServerProvidersStory(props: {
           props.inactive
             ? undefined
             : {
+                get defaultProvider() {
+                  return {
+                    ...preference(),
+                    save: async (provider: AgentProviderId, model?: string | null) => {
+                      setPreference((current) => ({
+                        completed: true,
+                        preferredProvider: provider,
+                        preferredModel:
+                          model === undefined && current.preferredProvider === provider
+                            ? current.preferredModel
+                            : (model ?? null),
+                      }));
+                    },
+                  };
+                },
                 get agentStatus() {
                   return props.codeSignIn
                     ? codeSignInAgentStatus

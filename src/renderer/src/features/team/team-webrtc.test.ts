@@ -24,12 +24,13 @@ interface TestPort {
 }
 
 class SignalSocket extends EventTarget {
+  static readonly CONNECTING = 0;
   static readonly OPEN = 1;
   static readonly instances: SignalSocket[] = [];
   readyState = 1;
   readonly send = vi.fn<(data: string) => void>();
   readonly close = vi.fn();
-  constructor() {
+  constructor(readonly url = "") {
     super();
     SignalSocket.instances.push(this);
   }
@@ -59,7 +60,7 @@ class PeerConnection {
   localDescription: { type: string; sdp: string } | null = null;
   remoteDescription: { type: string; sdp: string } | null = null;
   ondatachannel: ((event: { channel: DataChannel }) => void) | null = null;
-  onicecandidate: (() => void) | null = null;
+  onicecandidate: ((event: { candidate: RTCIceCandidateInit | null }) => void) | null = null;
   onconnectionstatechange: (() => void) | null = null;
   connectionState = "new";
   readonly close = vi.fn();
@@ -172,6 +173,18 @@ it("routes two phones independently and disconnects or resumes only the addresse
   const [rtc1, rtc2] = PeerConnection.instances;
   if (!rtc1 || !rtc2) throw new Error("Each phone needs its own RTC connection.");
   expect(rtc1.close).not.toHaveBeenCalled();
+  const candidate = {
+    candidate: "candidate:1 1 UDP 2122260223 192.0.2.1 5000 typ host",
+    sdpMid: "0",
+    sdpMLineIndex: 0,
+  };
+  rtc1.onicecandidate?.({ candidate });
+  rtc1.onicecandidate?.({ candidate: { ...candidate, candidate: "" } });
+  rtc1.onicecandidate?.({ candidate: null });
+  expect(signal.send.mock.calls.map(([data]) => JSON.parse(data))).toEqual([
+    { type: "ice-candidate", version: 1, connectionId: "connection-1", channel: "team", ...candidate },
+  ]);
+  signal.send.mockClear();
   for (const index of [1, 2])
     signal.message({
       type: "offer",
@@ -306,6 +319,100 @@ it("renews Signal for a lost client path, and reports the peer when the path doe
   await vi.advanceTimersByTimeAsync(7_000);
   expect(posted("peer-disconnected")).toEqual([{ type: "peer-disconnected", peerId: "host-1" }]);
   expect(rtc.close).toHaveBeenCalled();
+});
+
+// Main opens the client's Signal socket while the account service makes the ticket, so the TLS and
+// WebSocket handshakes do not wait for it. Nothing may go on that socket before the hello of the
+// ticket, and only a `connect` to the same address may use it.
+describe("prepared Signal socket", () => {
+  const signalUrl = "wss://signal.example.test/v1/signal";
+  const connect = {
+    type: "connect" as const,
+    peerId: "host-1",
+    peer: "client" as const,
+    signalUrl,
+    token: "ticket-1",
+    iceTransportPolicy: "all" as const,
+  };
+  const hellos = (socket: SignalSocket) =>
+    socket.send.mock.calls.map(([data]) => JSON.parse(data)).filter((message) => message.type === "hello");
+
+  it("sends the hello of the ticket on the socket that opened before it", async () => {
+    vi.useFakeTimers();
+    const { posted, command } = await startBridge();
+    await command({ type: "prepare-signal", peerId: "host-1", signalUrl });
+    const prepared = SignalSocket.instances[0];
+    if (!prepared) throw new Error("No Signal socket.");
+    expect(prepared.url).toBe(signalUrl);
+    prepared.dispatchEvent(new Event("open"));
+    expect(posted("signal-open")).toEqual([{ type: "signal-open", peerId: "host-1" }]);
+    expect(prepared.send).not.toHaveBeenCalled();
+
+    await command(connect);
+    expect(SignalSocket.instances).toHaveLength(1);
+    expect(hellos(prepared)).toEqual([expect.objectContaining({ peer: "client", token: "ticket-1" })]);
+    prepared.message({
+      type: "ready",
+      version: 1,
+      connectionId: "connection-1",
+      resumeToken: "resume",
+      iceServers: [],
+    });
+    await vi.waitFor(() => expect(posted("signal-ready")).toHaveLength(1));
+    // The lifetime of a prepared socket does not apply to one a peer uses.
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(prepared.close).not.toHaveBeenCalled();
+  });
+
+  it("sends the hello when a socket that is still opening opens", async () => {
+    const { command } = await startBridge();
+    await command({ type: "prepare-signal", peerId: "host-1", signalUrl });
+    const prepared = SignalSocket.instances[0];
+    if (!prepared) throw new Error("No Signal socket.");
+    prepared.readyState = SignalSocket.CONNECTING;
+    await command(connect);
+    expect(prepared.send).not.toHaveBeenCalled();
+    prepared.readyState = SignalSocket.OPEN;
+    prepared.dispatchEvent(new Event("open"));
+    expect(hellos(prepared)).toHaveLength(1);
+    expect(SignalSocket.instances).toHaveLength(1);
+  });
+
+  it("does not use a socket of another address, or one that Signal already answered", async () => {
+    const { command } = await startBridge();
+    await command({ type: "prepare-signal", peerId: "host-1", signalUrl: "wss://old-signal.example.test/v1/signal" });
+    const other = SignalSocket.instances[0];
+    if (!other) throw new Error("No Signal socket.");
+    await command(connect);
+    expect(other.close).toHaveBeenCalled();
+    expect(other.send).not.toHaveBeenCalled();
+    expect(SignalSocket.instances[1]?.url).toBe(signalUrl);
+
+    await command({ type: "disconnect", peerId: "host-1" });
+    await command({ type: "prepare-signal", peerId: "host-1", signalUrl });
+    const refused = SignalSocket.instances[2];
+    if (!refused) throw new Error("No Signal socket.");
+    refused.message({ type: "error", version: 1, code: "rate_limited", message: "Too many." });
+    await command(connect);
+    expect(refused.close).toHaveBeenCalled();
+    expect(refused.send).not.toHaveBeenCalled();
+    expect(SignalSocket.instances).toHaveLength(4);
+  });
+
+  it("closes a socket that no connect takes", async () => {
+    vi.useFakeTimers();
+    const { command } = await startBridge();
+    await command({ type: "prepare-signal", peerId: "host-1", signalUrl });
+    await command({ type: "prepare-signal", peerId: "host-2", signalUrl });
+    const [cancelled, unused] = SignalSocket.instances;
+    if (!cancelled || !unused) throw new Error("No Signal socket.");
+    await command({ type: "disconnect", peerId: "host-1" });
+    expect(cancelled.close).toHaveBeenCalled();
+    expect(unused.close).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(unused.close).toHaveBeenCalled();
+    expect(unused.send).not.toHaveBeenCalled();
+  });
 });
 
 describe("Team WebRTC payload framing", () => {

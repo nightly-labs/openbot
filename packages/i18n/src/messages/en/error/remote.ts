@@ -162,6 +162,7 @@ export const messages = defineMessages("error.remote", {
   "error.remote.dataChannelFailed": "{kind} channel failed.",
   // Channel actions on mobile.
   "error.remote.formUnavailable": "This form is no longer available.",
+  "error.remote.hostedServerRemoval": "Use Billing to delete a hosted server.",
   "error.remote.channelsUnsupported": "Update this desktop server to use channels.",
   "error.remote.channelDeleteUnsupported": "Update this desktop server to delete channels.",
   "error.remote.attachmentUploadCancelled": "Attachment upload cancelled.",

@@ -27,6 +27,7 @@ import {
   WEBHOOK_ROUTES_LIMIT,
   type WebhookRoute,
 } from "@openbot/contracts/signal-protocol/webhook-route";
+import { sourceText } from "@openbot/i18n/source";
 import { Context, Effect, Layer, Result, Schema } from "effect";
 import { importJWK, type JWK, SignJWT } from "jose";
 import { getServerEntitlement } from "./billing-entitlement";
@@ -448,7 +449,7 @@ export class RemoteControlPlane {
           )
         : null;
       const rotateCredential =
-        !existing ||
+        !existing?.machine_token_hash ||
         input.rotateCredential !== false ||
         existing.device_public_key !== devicePublicKey ||
         existing.machine_token_hash !== providedMachineTokenHash ||
@@ -527,7 +528,9 @@ export class RemoteControlPlane {
           // Only for a host this account did not have. Publishing an existing one again rotates its
           // credential without changing anyone's server list, and this owner's other devices would
           // re-read the account for nothing on every start of the host.
-          ...(existing ? [] : [this.#authEventStatement({ type: "account-servers-changed", userId: user.id }, now)]),
+          ...(existing?.machine_token_hash
+            ? []
+            : [this.#authEventStatement({ type: "account-servers-changed", userId: user.id }, now)]),
         ]),
       );
       if (registration.some((result) => (result.meta.changes ?? 0) !== 1)) {
@@ -1461,11 +1464,33 @@ export class RemoteControlPlane {
    * sockets, and each member's devices re-read their server list.
    */
 
+  readonly removeOwnedHost = Effect.fn("RemoteControlPlane.removeOwnedHost")(
+    function* (this: RemoteControlPlane, userId: string, hostId: string) {
+      const dependencies = yield* RemoteDependencies;
+      yield* this.#requireRole(hostId, userId, ["owner"]);
+      const hosted = yield* remoteCall(() =>
+        dependencies.database
+          .prepare("SELECT server_id FROM hosted_servers WHERE server_id = ? LIMIT 1")
+          .bind(hostId)
+          .first<{ server_id: string }>(),
+      );
+      if (hosted)
+        return yield* new RemoteControlPlaneError(
+          409,
+          "hosted_server_removal",
+          sourceText("error.remote.hostedServerRemoval"),
+        );
+      yield* this.deleteHost(userId, hostId, true);
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
   readonly deleteHost = Effect.fn("RemoteControlPlane.deleteHost")(
     function* (
       this: RemoteControlPlane,
       ownerUserId: string,
       hostId: string,
+      retainIdentity = false,
     ): Effect.fn.Return<void, RemoteFailure, RemoteDependencies> {
       const dependencies = yield* RemoteDependencies;
       const now = dependencies.now();
@@ -1507,9 +1532,25 @@ export class RemoteControlPlane {
               "UPDATE webhook_routes SET revoked_at = ? WHERE host_id = ? AND account_id = ? AND revoked_at IS NULL",
             )
             .bind(now, hostId, ownerUserId),
-          dependencies.database
-            .prepare("DELETE FROM remote_hosts WHERE host_id = ? AND owner_user_id = ?")
-            .bind(hostId, ownerUserId),
+          ...(retainIdentity
+            ? [
+                // Signal keeps the revocation epoch. Keep the identity so a later registration
+                // advances that epoch instead of starting at 1 with rejected tickets.
+                dependencies.database
+                  .prepare(
+                    "UPDATE remote_hosts SET machine_token_hash = NULL, device_public_key = NULL WHERE host_id = ? AND owner_user_id = ?",
+                  )
+                  .bind(hostId, ownerUserId),
+                dependencies.database.prepare("DELETE FROM remote_memberships WHERE host_id = ?").bind(hostId),
+                dependencies.database.prepare("DELETE FROM remote_invites WHERE host_id = ?").bind(hostId),
+                dependencies.database.prepare("DELETE FROM slack_workspace_routes WHERE host_id = ?").bind(hostId),
+                dependencies.database.prepare("DELETE FROM discord_guild_routes WHERE host_id = ?").bind(hostId),
+              ]
+            : [
+                dependencies.database
+                  .prepare("DELETE FROM remote_hosts WHERE host_id = ? AND owner_user_id = ?")
+                  .bind(hostId, ownerUserId),
+              ]),
         ]),
       );
       yield* this.#flushAuthEvents();

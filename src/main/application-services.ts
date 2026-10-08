@@ -15,6 +15,7 @@ import { createRoutineFlows, type RoutineFlowsHandle } from "../backend/routine-
 import { type AgentAdminSettingsService, createAgentAdminSettings } from "./agent-admin-settings";
 import { spawnAgentDatabaseHost } from "./agent-database-host-process";
 import { HostReleaseService, readInstallationMode } from "./host-release-service";
+import { HOSTED_UPDATE_TRIGGER, HostedUpdateAdapter } from "./hosted-update-adapter";
 import { LocalSkillLibrary } from "./local-skill-library";
 import { localSkillTools } from "./local-skill-tools";
 import { MAC_PERMISSION_URLS } from "./mac-permission-urls";
@@ -164,12 +165,15 @@ import { startProviderLog } from "./provider-log";
 import { toProviderRuntimeFailure } from "./provider-runtime-effects";
 import { ProviderRuntimeManager, providerRuntimeRoot, runtimeTarget } from "./provider-runtime-manager";
 import { ProviderUseSettingsStore } from "./provider-use-settings-store";
+import { RemoteConnectTrace } from "./remote-connect-trace";
 import { RemoteDesktopManager } from "./remote-desktop-manager";
 import { resolveRemoteDesktopRuntime } from "./remote-desktop-runtime-artifact";
 import { loadOrCreateRemoteDesktopCredentials } from "./remote-desktop-secret-store";
 import { appendRemoteDiagnosticLog } from "./remote-diagnostics";
 import { decodeVoid } from "./remote-host-decoding";
 import { RemoteServerManager } from "./remote-server-manager";
+import { RemoteSessionCache } from "./remote-session-cache";
+import { RemoteSessionReusePreferenceStore } from "./remote-session-reuse-preference-store";
 import { RemoteWorkspaceCacheStore } from "./remote-workspace-cache";
 import { sendToRenderer } from "./renderer-ipc";
 import { RequestedUpdate, RequestedUpdateRefusal } from "./requested-update";
@@ -218,6 +222,7 @@ const NOTIFICATION_PREFERENCE_FILE = "openbot-notification-preference-v1.json";
 const BUSY_MESSAGE_MODE_PREFERENCE_FILE = "openbot-busy-message-mode-v1.json";
 const REMOTE_WORKSPACE_CACHE_PREFERENCE_FILE = "openbot-remote-workspace-cache-v1.json";
 const REMOTE_WORKSPACE_CACHE_DIRECTORY = "remote-workspace-cache";
+const REMOTE_SESSION_REUSE_PREFERENCE_FILE = "openbot-remote-session-reuse-preference-v1.json";
 const DYNAMIC_ISLAND_PREFERENCE_FILE = "openbot-dynamic-island-preference-v1.json";
 const BROWSER_STATE_FILE = "openbot-browser-state-v1.json";
 const SIDEBAR_LAYOUT_FILE = "openbot-sidebar-layout-v1.json";
@@ -226,6 +231,7 @@ const TEAM_FILE = "openbot-team-server-v1.json";
 const TEAM_FILE_V2 = "openbot-team-server-v2.json";
 const REMOTE_SERVERS_FILE = "openbot-remote-servers-v1.json";
 const CENTRAL_AUTH_FILE = "openbot-central-auth-v1.bin";
+const REMOTE_SESSIONS_FILE = "openbot-remote-sessions-v1.bin";
 const LEGACY_REMOTE_DESKTOP_CREDENTIAL_FILE = "openbot-remote-desktop-credential-v1.json";
 const REMOTE_DESKTOP_RUNTIME_SECRET_FILE = "openbot-remote-desktop-runtime-v1.json";
 const CUSTOM_PROVIDERS_FILE = "openbot-custom-providers-v1.json";
@@ -374,6 +380,8 @@ export interface ApplicationServices {
   busyMessageMode: BusyMessageModePreferenceStore;
   /** The optional saved copy of each joined server, for the next launch. */
   remoteWorkspaceCache: RemoteWorkspaceCacheStore;
+  remoteSessionReuse: RemoteSessionReusePreferenceStore;
+  remoteSessionCache: RemoteSessionCache;
   agentInitialization: AgentInitializationGate<AgentLifecycleFailed>;
   sidebarLayout: SidebarLayoutStore;
   host: HostService;
@@ -820,6 +828,22 @@ export async function createApplicationServices({
     cipher: safeStorageCipher("error.app.secretStorageUnavailable"),
   });
   await runCauseEffect(remoteWorkspaceCache.load());
+  const remoteSessionReuse = new RemoteSessionReusePreferenceStore(
+    join(app.getPath("userData"), REMOTE_SESSION_REUSE_PREFERENCE_FILE),
+  );
+  await runCauseEffect(remoteSessionReuse.load());
+  const remoteSessionCache = new RemoteSessionCache({
+    path: join(app.getPath("userData"), REMOTE_SESSIONS_FILE),
+    enabled: remoteSessionReuse.get().keepBetweenRuns,
+    ...safeStorageCipher("error.app.macSecureStorageUnavailable"),
+  });
+  // A kept session is useless without an account, and it names the last one. The listener also
+  // covers a sign-out that settles before the remote services exist.
+  const forgetSignedOutSessions = (state: CentralAuthState) => {
+    if (state.status === "signed_out") void Effect.runPromise(remoteSessionCache.clear());
+  };
+  forgetSignedOutSessions(centralAuth.getState());
+  centralAuth.on("changed", forgetSignedOutSessions);
   const updatePreference = await runCauseEffect(readUpdatePreference(updatePreferenceFile));
   const approvalAutomationFile = join(app.getPath("userData"), APPROVAL_AUTOMATION_FILE);
   const approvalAutomation = new ApprovalAutomation({
@@ -1480,14 +1504,15 @@ export async function createApplicationServices({
   // The host comes before the updater, and the restart readiness reads the host. The routes reach
   // the schedule through this, and a request that arrives before it exists is refused.
   let requestedUpdate: RequestedUpdate | undefined;
+  const installationMode =
+    app.isPackaged && process.platform === "linux" ? await runCauseEffect(readInstallationMode()) : null;
   const hostRelease = new HostReleaseService({
     currentVersion: app.getVersion(),
     packaged: app.isPackaged,
     platform: process.platform,
     arch: process.arch,
     environment: process.env,
-    installationMode:
-      app.isPackaged && process.platform === "linux" ? await runCauseEffect(readInstallationMode()) : null,
+    installationMode,
     updateStatus: () => ({
       phase: requestedUpdate?.snapshot().phase ?? "unsupported",
       managedByHost: requestedUpdate?.snapshot().remoteUpdates === "managed",
@@ -1513,6 +1538,8 @@ export async function createApplicationServices({
     appVersion: app.getVersion(),
     store: teamStore,
     agents: service,
+    // Defined below with the startup it waits for; a request runs only after this returns.
+    agentsReady: () => agentInitialization.awaitSettled(),
     events,
     skills,
     sidebarLayout,
@@ -1730,6 +1757,7 @@ export async function createApplicationServices({
   service.on("failure", (failure) => analytics.handleFailure(failure));
   const trace = new TraceFile({ directory: join(app.getPath("userData"), "logs") });
   teardown.push(TEARDOWN_ORDER.trace, "the trace file", () => Effect.runPromise(trace.close()));
+  const connectTrace = new RemoteConnectTrace((span) => trace.record(span));
   const remoteServers = new RemoteServerManager(
     join(app.getPath("userData"), REMOTE_SERVERS_FILE),
     safeStorageCipher("error.app.macSecureStorageUnavailable"),
@@ -1742,6 +1770,7 @@ export async function createApplicationServices({
       allowLocalDevelopmentInvites: developmentRemoteRole !== null,
       selfHostedApiOrigin: selfHostedApiOrigin(centralAuthApiUrl),
       appVersion: app.getVersion(),
+      connectTrace,
       getLocalHostId: () => teamStore.getIdentity()?.serverId ?? null,
       hostedServers: {
         unavailable: (serverId, wake) => hostedServers.unavailableHost(serverId, wake),
@@ -1766,6 +1795,8 @@ export async function createApplicationServices({
         controlPlaneUrl: centralAuth.resolveApiUrl("/"),
         downloadHostLogo: (hostId, version) => centralAuth.downloadRemoteHostLogo(hostId, version),
         transferDirectory: join(app.getPath("userData"), "remote-transfers"),
+        connectTrace,
+        sessionCache: remoteSessionCache,
       }),
     },
   );
@@ -1778,8 +1809,10 @@ export async function createApplicationServices({
   await runCauseEffect(remoteServers.initialize());
   criticalActionTargets = { agents: service, remoteServers };
   // After `remoteServers.initialize()`. The client half polls for the host's connection file and
-  // throws when it never appears, before any window is shown - see the module it lives in.
+  // throws when it never appears, before any window is shown - see the module it lives in. It reads
+  // the joined servers to choose between WebRTC and HTTP, so it waits for the account's host list.
   if (developmentRemoteRole) {
+    await runCauseEffect(remoteServers.awaitHostDirectory());
     await runCauseEffect(
       startDevelopmentRemoteRole({
         role: developmentRemoteRole,
@@ -1829,17 +1862,25 @@ export async function createApplicationServices({
   const currentVersion = app.getVersion();
   // Skip the file check in dev: unpacked runs never enable updates, so avoid touching resourcesPath.
   const updateMetadataAvailable = app.isPackaged && existsSync(join(process.resourcesPath, "app-update.yml"));
+  // A hosted or self-installed server runs a release that root owns. Root installs updates for it
+  // when openbot-hosted-update has installed its request units. A container has none.
+  const hostedInstaller =
+    app.isPackaged &&
+    process.platform === "linux" &&
+    (process.env.OPENBOT_HOSTED_SERVER === "1" || installationMode === "self") &&
+    existsSync(HOSTED_UPDATE_TRIGGER);
   const updatesEnabled =
     app.isPackaged &&
-    supportsInstalledUpdates(process.platform) &&
-    updateMetadataAvailable &&
+    (hostedInstaller || (supportsInstalledUpdates(process.platform) && updateMetadataAvailable)) &&
     isValidSemver(currentVersion);
   if (app.isPackaged && updateMetadataAvailable && !isValidSemver(currentVersion)) {
     logger.warn(`OpenBot updates are disabled because the application version is not valid SemVer: ${currentVersion}`);
   }
   let updateAdapter: UpdateAdapter = createDisabledUpdateAdapter();
   let updaterEnabled = updatesEnabled;
-  if (updatesEnabled) {
+  if (updatesEnabled && hostedInstaller) {
+    updateAdapter = new HostedUpdateAdapter({ currentVersion, arch: process.arch });
+  } else if (updatesEnabled) {
     try {
       const updaterModule = await import("electron-updater");
       const realAdapter = updaterModule.autoUpdater ?? updaterModule.default?.autoUpdater ?? updaterModule.default;
@@ -2070,6 +2111,8 @@ export async function createApplicationServices({
     notificationPreference,
     busyMessageMode,
     remoteWorkspaceCache,
+    remoteSessionReuse,
+    remoteSessionCache,
     agentInitialization,
     hostUpdateCoordinator,
     requestedUpdate: remoteUpdate,

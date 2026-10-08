@@ -4,6 +4,8 @@ import { DatabaseSync } from "node:sqlite";
 import type { ConversationMessage } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
+import { ROUTINE_NO_UPDATE_MARKER } from "./agent/routine-quiet-runs";
+import type { DeliveryContext } from "./mailbox-store";
 import type { ThreadItem } from "./protocol";
 import { providerFailure } from "./provider-client-effects";
 import type { ProviderHistoryFragment, ReadProviderHistory } from "./provider-history";
@@ -121,6 +123,7 @@ describe("bounded provider history import", () => {
         publicThreadId: "openbot-thread",
         findDelivery: () => null,
         findMessageDelivery: () => null,
+        quietRoutineDelivery: () => false,
       }),
     );
 
@@ -182,6 +185,7 @@ describe("bounded provider history import", () => {
         publicThreadId: "openbot-thread",
         findDelivery: () => null,
         findMessageDelivery: () => null,
+        quietRoutineDelivery: () => false,
       }),
     );
 
@@ -240,6 +244,7 @@ describe("bounded provider history import", () => {
         publicThreadId: "openbot-thread",
         findDelivery: () => null,
         findMessageDelivery: () => null,
+        quietRoutineDelivery: () => false,
       }),
     );
 
@@ -294,6 +299,7 @@ describe("bounded provider history import", () => {
         publicThreadId: "openbot-thread",
         findDelivery: () => null,
         findMessageDelivery: () => null,
+        quietRoutineDelivery: () => false,
       }),
     );
 
@@ -337,6 +343,7 @@ describe("bounded provider history import", () => {
           publicThreadId: "openbot-thread",
           findDelivery: () => null,
           findMessageDelivery: () => null,
+          quietRoutineDelivery: () => false,
         }),
       ),
     ).rejects.toBeDefined();
@@ -353,6 +360,7 @@ describe("bounded provider history import", () => {
         publicThreadId: "openbot-thread",
         findDelivery: () => null,
         findMessageDelivery: () => null,
+        quietRoutineDelivery: () => false,
       }),
     );
     expect(database.state).toBe("complete");
@@ -389,6 +397,7 @@ describe("bounded provider history import", () => {
       publicThreadId: "openbot-thread",
       findDelivery: () => null,
       findMessageDelivery: () => null,
+      quietRoutineDelivery: () => false,
     };
     await Effect.runPromise(importProviderHistory(input));
     expect(database.state).toBe("complete");
@@ -425,6 +434,7 @@ describe("bounded provider history import", () => {
       publicThreadId: "openbot-thread",
       findDelivery: () => null,
       findMessageDelivery: () => null,
+      quietRoutineDelivery: () => false,
     };
 
     await Effect.runPromise(importProviderHistory(input));
@@ -432,5 +442,114 @@ describe("bounded provider history import", () => {
     expect(database.fragments.map((fragment) => fragment.turnId)).toEqual(["codex-turn-1", "codex-turn-2"]);
     expect(database.state).toBe("complete");
     database.close();
+  });
+});
+
+describe("provider history import of routine runs", () => {
+  function routineDelivery(id: string, kind: "routine" | "user"): DeliveryContext {
+    return {
+      delivery: {
+        id,
+        messageId: `message-${id}`,
+        recipientAgentId: "chief",
+        sender:
+          kind === "routine"
+            ? {
+                kind: "routine",
+                routineId: "routine-1",
+                runId: `run-${id}`,
+                routineName: "Alert queue",
+                scheduledFor: "2026-10-08T09:30:00.000Z",
+              }
+            : { kind: "user" },
+        text: "Check the alert queue.",
+        attachments: [],
+        replyToMessageId: null,
+        status: "completed",
+        position: null,
+        turnId: id,
+        error: null,
+        createdAt: "2026-10-08T09:30:00.000Z",
+      },
+      managedAttachments: [],
+    };
+  }
+
+  async function importTurn(
+    provider: "claude" | "codex",
+    kind: "routine" | "test" | "user",
+    answers: Array<{ id: string; text: string; phase?: string }>,
+  ) {
+    const database = new MemoryHistoryDatabase();
+    const items: ThreadItem[] = [
+      {
+        id: "provider-prompt",
+        type: "userMessage",
+        clientId: "delivery-1",
+        content: [{ type: "text", text: "Check." }],
+      },
+      ...answers.map((answer) => ({ type: "agentMessage", ...answer })),
+    ];
+    const readHistory: ReadProviderHistory = (_request, consume) =>
+      Effect.as(consume({ turnId: "delivery-1", status: "completed", items, complete: true }), undefined);
+    const input = {
+      database,
+      readHistory,
+      sessionId: `session-${provider}-${kind}`,
+      provider,
+      externalSessionId: "external-1",
+      agentId: "chief",
+      publicThreadId: "openbot-thread",
+      findDelivery: (id: string) =>
+        id === "delivery-1" ? routineDelivery(id, kind === "user" ? "user" : "routine") : null,
+      findMessageDelivery: () => null,
+      quietRoutineDelivery: () => kind === "routine",
+    };
+    await Effect.runPromise(importProviderHistory(input));
+    const first = new Map(database.imported);
+    // A second scan reads the same turn again and changes nothing.
+    await Effect.runPromise(importProviderHistory(input));
+    expect(new Map(database.imported)).toEqual(first);
+    expect(database.importedPages.every((page) => page.complete)).toBe(true);
+    const texts = [...database.imported.values()].map((message) => [message.author, message.text]);
+    database.close();
+    return texts;
+  }
+
+  it("does not bring back the answers of a quiet routine turn", async () => {
+    for (const provider of ["claude", "codex"] as const) {
+      const texts = await importTurn(provider, "routine", [
+        { id: "provider-note", text: "Reading the queue.", phase: "commentary" },
+        { id: "provider-answer", text: `  ${ROUTINE_NO_UPDATE_MARKER}\n` },
+      ]);
+      expect(texts).toEqual([["user", "Check the alert queue."]]);
+    }
+  });
+
+  it("imports a routine report and drops only a marker answer next to it", async () => {
+    const texts = await importTurn("codex", "routine", [
+      { id: "provider-report", text: "Disk full on db-1." },
+      { id: "provider-answer", text: ROUTINE_NO_UPDATE_MARKER },
+    ]);
+    expect(texts).toEqual([
+      ["user", "Check the alert queue."],
+      ["assistant", "Disk full on db-1."],
+    ]);
+  });
+
+  it("imports the marker answer of a Test run, which the chat keeps", async () => {
+    const texts = await importTurn("codex", "test", [{ id: "provider-answer", text: ROUTINE_NO_UPDATE_MARKER }]);
+    expect(texts).toEqual([
+      ["user", "Check the alert queue."],
+      ["assistant", ROUTINE_NO_UPDATE_MARKER],
+    ]);
+  });
+
+  it("imports a marker answer to a message the user wrote", async () => {
+    const texts = await importTurn("codex", "user", [{ id: "provider-answer", text: ROUTINE_NO_UPDATE_MARKER }]);
+    expect(texts).toEqual([
+      ["user", "Check the alert queue."],
+      ["assistant", ROUTINE_NO_UPDATE_MARKER],
+    ]);
   });
 });

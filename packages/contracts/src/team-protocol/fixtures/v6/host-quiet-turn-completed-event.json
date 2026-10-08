@@ -1,0 +1,9 @@
+{
+  "type": "turn-completed",
+  "botId": "chief",
+  "threadId": "thread-main",
+  "turnId": "turn-7",
+  "status": "completed",
+  "origin": "routine",
+  "quiet": true
+}

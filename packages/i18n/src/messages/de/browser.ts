@@ -61,6 +61,12 @@ export const messages = {
   "browser.liveView.label": "Live-Ansicht der Seite auf dem Host",
   "browser.liveView.connecting": "Verbindung zur Seite auf dem Host wird hergestellt…",
   "browser.liveView.failed": "Diese Seite konnte nicht live angezeigt werden.",
+  "browser.liveView.clipboardUnsupported":
+    "Aktualisieren Sie den Server, um auf dieser Seite zu kopieren und einzufügen.",
+  "browser.liveView.pasteTooLong": "Dieser Text ist zu lang zum Einfügen. Fügen Sie weniger als 100.000 Zeichen ein.",
+  "browser.liveView.copyTooLarge": "Die Auswahl ist zu lang zum Kopieren. Wählen Sie weniger Text aus.",
+  "browser.liveView.copyFailed":
+    "Der Text konnte nicht kopiert werden. Klicken Sie auf die Seite und versuchen Sie es erneut.",
   "browser.previews.label": "Browser-Vorschauen",
   "browser.previews.resize": "Größe des rechten Bereichs ändern",
   "browser.previews.collapse": "Browser-Vorschauen einklappen",

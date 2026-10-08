@@ -144,8 +144,12 @@ export function storedHttpsServer(id: string, overrides: Partial<StoredRemoteSer
  * takes the concrete class, and every control-plane call is a stub: a test wants the object the
  * manager talks to, not a peer connection.
  */
-export function fakeWebRtcTransport(hosts: readonly RemoteHostSummary[] = []): TeamWebRtcClientTransport {
+export function fakeWebRtcTransport(
+  hosts: readonly RemoteHostSummary[] = [],
+  overrides: Partial<ConstructorParameters<typeof TeamWebRtcClientTransport>[0]> = {},
+): TeamWebRtcClientTransport {
   const bridge = new TeamWebRtcBridge();
+  vi.spyOn(bridge, "start").mockReturnValue(Effect.void);
   vi.spyOn(bridge, "connect").mockReturnValue(
     Effect.fail(new RemoteWorkflowError({ cause: new Error("The fake bridge never connects.") })),
   );
@@ -192,6 +196,7 @@ export function fakeWebRtcTransport(hosts: readonly RemoteHostSummary[] = []): T
     controlPlaneUrl: "https://api.example.test",
     downloadHostLogo: () => Effect.sync(() => ({ bytes: new Uint8Array(), mimeType: "image/png" })),
     transferDirectory: join(tmpdir(), "openbot-remote-harness-transfers"),
+    ...overrides,
   });
 }
 
@@ -205,6 +210,8 @@ export interface RemoteManagerOptions {
   readonly storedVersion?: 1 | 2 | 3;
   readonly account?: Partial<ConstructorParameters<typeof RemoteServerManager>[2]>;
   readonly managerOptions?: ConstructorParameters<typeof RemoteServerManager>[3];
+  // False leaves the account's host list unanswered when the fixture returns, as at startup.
+  readonly awaitHostDirectory?: boolean;
 }
 
 export interface RemoteManagerFixture {
@@ -247,6 +254,7 @@ export async function createRemoteManager(options: RemoteManagerOptions = {}): P
   };
   openFixtures.push(fixture);
   await runCauseEffect(manager.initialize());
+  if (options.awaitHostDirectory !== false) await runCauseEffect(manager.awaitHostDirectory());
   return fixture;
 }
 
