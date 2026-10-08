@@ -573,6 +573,7 @@ export function GlobalSearch(props: GlobalSearchProps) {
   const [tab, setTab] = createSignal<SearchTab>("all");
   const [query, setQuery] = createSignal("");
   let input: HTMLInputElement | undefined;
+  let retryButton: HTMLButtonElement | undefined;
   let dialog: HTMLDivElement | undefined;
   let results: HTMLElement | undefined;
   let scrollToKey: ((key: string) => void) | undefined;
@@ -780,7 +781,9 @@ export function GlobalSearch(props: GlobalSearchProps) {
     if (event.isComposing) return;
     if (event.key === "Tab" && !event.metaKey && !event.ctrlKey && !event.altKey) {
       event.preventDefault();
-      cycleTab(event.shiftKey ? -1 : 1);
+      // Tab cycles the filters, so a failed search's Retry is reached here and not in the tab order.
+      if (!event.shiftKey && retryButton?.isConnected) retryButton.focus();
+      else cycleTab(event.shiftKey ? -1 : 1);
       return;
     }
     if (event.key === "Enter" && !input?.getAttribute("aria-activedescendant")) {
@@ -932,7 +935,15 @@ export function GlobalSearch(props: GlobalSearchProps) {
                 <Show when={failed() && !pending()}>
                   <div class="global-search-status global-search-failed" role="alert">
                     <span>{t("conversation.globalSearch.failed")}</span>
-                    <Button type="button" size="xs" variant="ghost" onClick={retry}>
+                    <Button
+                      ref={(element: HTMLButtonElement) => {
+                        retryButton = element;
+                      }}
+                      type="button"
+                      size="xs"
+                      variant="ghost"
+                      onClick={retry}
+                    >
                       {t("common.retry")}
                     </Button>
                   </div>
