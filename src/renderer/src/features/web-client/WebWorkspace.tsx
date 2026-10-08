@@ -292,6 +292,20 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     return list.available;
   }
   void refreshHostedServersAvailable();
+  // A server that the add server dialog creates comes into the host list as an owned host. Each owned
+  // host is read once, so its Delete server item shows without a reload.
+  const readOwnedHostIds = new Set<string>();
+  createEffect(
+    () =>
+      workspace.state.hosts
+        .filter((host) => host.role === "owner" && !readOwnedHostIds.has(host.hostId))
+        .map((host) => host.hostId),
+    (hostIds) => {
+      if (hostIds.length === 0) return;
+      for (const hostId of hostIds) readOwnedHostIds.add(hostId);
+      void refreshHostedServersAvailable();
+    },
+  );
   /**
    * The plus button opens the add server dialog when the account can create hosted servers, else the
    * join dialog. It uses the last answer, so the click does not wait for the network; the read after it
