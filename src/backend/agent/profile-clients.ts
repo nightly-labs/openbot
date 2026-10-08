@@ -19,6 +19,10 @@ export class ProfileClients {
     return this.#clients.size >= PROFILE_CLIENT_LIMIT;
   }
 
+  usesProvider(provider: AgentClient["provider"]): boolean {
+    return [...this.#clients.keys()].some((client) => client.provider === provider);
+  }
+
   /** Runs one generation on `client`, and forgets the client when it ends. */
   run<A, E, R>(
     client: AgentClient,

@@ -54,6 +54,8 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
   readonly #requestTimeoutMs: number;
   #decoder = new JsonLineDecoder();
   readonly #pending = new Map<RequestId, PendingRequest>();
+  readonly #toolRequests = new Map<RequestId, { threadId: string; turnId: string; controller: AbortController }>();
+  readonly #interruptedTurns = new Set<string>();
   #process: ChildProcessWithoutNullStreams | null = null;
   #nextId = 1;
   #stopping = false;
@@ -115,6 +117,7 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
     const child = this.#process;
     if (!child) return;
     this.#stopping = true;
+    this.#cancelToolRequests();
     this.#process = null;
     for (const pending of this.#pending.values()) pending.reject(new Error("Codex App Server stopped."));
     this.#pending.clear();
@@ -257,6 +260,10 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
       });
       try {
         this.#write({ method, id, params: method === "thread/resume" ? metadataOnlyResumeParams(params) : params });
+        if (method === "turn/interrupt" && isRecord(params) && isString(params.threadId) && isString(params.turnId)) {
+          this.#interruptedTurns.add(JSON.stringify([params.threadId, params.turnId]));
+          this.#cancelToolRequests(params.threadId, params.turnId);
+        }
       } catch (cause) {
         resume(Effect.fail(new ProviderClientOperationError({ cause })));
       }
@@ -276,10 +283,12 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
   }
 
   respond(id: RequestId, result: unknown): void {
+    this.#toolRequests.delete(id);
     this.#write({ id, result });
   }
 
   respondError(id: RequestId, error: RpcError): void {
+    this.#toolRequests.delete(id);
     this.#write({ id, error });
   }
 
@@ -293,12 +302,42 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
   #handleMessage(message: RpcMessage): void {
     if ("method" in message) {
       if ("id" in message) {
+        let signal: AbortSignal | undefined;
+        if (
+          message.method === "item/tool/call" &&
+          isRecord(message.params) &&
+          isString(message.params.threadId) &&
+          isString(message.params.turnId)
+        ) {
+          const controller = new AbortController();
+          this.#toolRequests.set(message.id, {
+            threadId: message.params.threadId,
+            turnId: message.params.turnId,
+            controller,
+          });
+          signal = controller.signal;
+          if (this.#interruptedTurns.has(JSON.stringify([message.params.threadId, message.params.turnId]))) {
+            this.#toolRequests.delete(message.id);
+            controller.abort();
+          }
+        }
         this.emit("request", {
+          ...(signal ? { signal } : {}),
           method: message.method,
           id: message.id,
           params: message.params,
         });
       } else {
+        if (
+          message.method === "turn/completed" &&
+          isRecord(message.params) &&
+          isString(message.params.threadId) &&
+          isRecord(message.params.turn) &&
+          isString(message.params.turn.id)
+        ) {
+          this.#cancelToolRequests(message.params.threadId, message.params.turn.id);
+          this.#interruptedTurns.delete(JSON.stringify([message.params.threadId, message.params.turn.id]));
+        }
         this.emit("notification", { method: message.method, params: message.params });
       }
       return;
@@ -319,8 +358,18 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
     pending.resolve(message.result);
   }
 
+  #cancelToolRequests(threadId?: string, turnId?: string): void {
+    if (threadId === undefined) this.#interruptedTurns.clear();
+    for (const [id, request] of this.#toolRequests) {
+      if (threadId !== undefined && (request.threadId !== threadId || request.turnId !== turnId)) continue;
+      this.#toolRequests.delete(id);
+      request.controller.abort();
+    }
+  }
+
   #fail(error: Error, child: ChildProcessWithoutNullStreams): void {
     if (this.#process !== child) return;
+    this.#cancelToolRequests();
     this.#process = null;
 
     for (const pending of this.#pending.values()) {

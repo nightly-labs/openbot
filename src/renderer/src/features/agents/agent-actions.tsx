@@ -1,5 +1,7 @@
+import type { AgentSummary } from "@openbot/contracts/ipc";
 import { TEAM_AGENT_CREATE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { classifyFailure } from "@openbot/telemetry";
+import type { AgentProfile } from "@openbot/ui/data";
 import type { FirstAgentDraft } from "@openbot/ui/features/agents/FirstAgentSetup";
 import { currentText } from "@openbot/ui/text";
 import { actionToast } from "../../action-toast";
@@ -63,6 +65,50 @@ const AgentActions = createSimpleContext({
     const { clearDirectSelection } = useDirectMessages();
     const { selectAgent } = useNavigation();
 
+    /** Asks the host for the agent. A draft without a provider leaves the backend to pick its starting default. */
+    function requestNewAgent(
+      draft: Pick<FirstAgentDraft, "name" | "purpose" | "avatarSeed" | "avatarHue"> &
+        Partial<Pick<FirstAgentDraft, "provider" | "model">>,
+    ) {
+      // The provider and model travel with the creation request: the backend applies them before
+      // the initial message is queued, while a later provider change would be rejected as active
+      // work. A remote host without the capability drops the pair and starts its own default.
+      const createModelSupported =
+        activeServer()?.kind !== "remote" || activeServerSupportsCapability(TEAM_AGENT_CREATE_MODEL_CAPABILITY);
+      return agentsPort().agent.createAgent({
+        name: draft.name.trim(),
+        description: draft.purpose.trim() || "General-purpose assistant",
+        avatarSeed: draft.avatarSeed,
+        avatarHue: draft.avatarHue,
+        ...(createModelSupported && draft.provider && draft.model
+          ? { provider: draft.provider, model: draft.model }
+          : {}),
+        initialMessage: createAgentInitialMessage(draft),
+      });
+    }
+
+    /** Synchronous, so a caller that also selects the agent does both in the same update. */
+    function addNewAgent(stored: AgentSummary): AgentProfile {
+      const newAgent = createStoredProfile(toAgentProfile(stored));
+      setAgentList((current) => [newAgent, ...current.filter((item) => item.id !== newAgent.id)]);
+      initializeConversation(newAgent.id);
+      return newAgent;
+    }
+
+    /** An agent made from another view, such as the routine canvas: the user stays where they are. */
+    async function createAgentInPlace(draft: Parameters<typeof requestNewAgent>[0]) {
+      const analytics = desktopAnalytics.scope();
+      try {
+        const newAgent = addNewAgent(await requestNewAgent(draft));
+        const properties = analyticsAgentProperties(newAgent.id);
+        analytics.track("agent_action", { action: "create", result: "succeeded", ...(properties ?? {}) });
+        return newAgent;
+      } catch (error) {
+        analytics.track("agent_action", { action: "create", result: "failed", failure_code: "create_failed" });
+        throw error;
+      }
+    }
+
     async function createAgent(draft: FirstAgentDraft = agentSetupDraft()) {
       if (creatingAgent()) return;
       const analytics = desktopAnalytics.scope();
@@ -70,22 +116,7 @@ const AgentActions = createSimpleContext({
       setCreatingAgent(true);
       setAgentSetupError(null);
       try {
-        // The provider and model travel with the creation request: the backend applies them before
-        // the initial message is queued, while a later provider change would be rejected as active
-        // work. A remote host without the capability drops the pair and starts its own default.
-        const createModelSupported =
-          activeServer()?.kind !== "remote" || activeServerSupportsCapability(TEAM_AGENT_CREATE_MODEL_CAPABILITY);
-        const stored = await agentsPort().agent.createAgent({
-          name: submitted.name.trim(),
-          description: submitted.purpose.trim() || "General-purpose assistant",
-          avatarSeed: submitted.avatarSeed,
-          avatarHue: submitted.avatarHue,
-          ...(createModelSupported ? { provider: submitted.provider, model: submitted.model } : {}),
-          initialMessage: createAgentInitialMessage(submitted),
-        });
-        const newAgent = createStoredProfile(toAgentProfile(stored));
-        setAgentList((current) => [newAgent, ...current.filter((item) => item.id !== newAgent.id)]);
-        initializeConversation(newAgent.id);
+        const newAgent = addNewAgent(await requestNewAgent(submitted));
         setAgentSetupOpen(false);
         clearDirectSelection();
         setActiveAgentId(newAgent.id);
@@ -187,7 +218,7 @@ const AgentActions = createSimpleContext({
       }
     }
 
-    return { createAgent, editAgent, duplicateAgent, deleteAgent };
+    return { createAgent, createAgentInPlace, editAgent, duplicateAgent, deleteAgent };
   },
 });
 

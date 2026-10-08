@@ -55,8 +55,8 @@ describe("development service runner", () => {
   it("builds the local Signal command with the Auth API development keys", () => {
     const spec = createDevelopmentServiceSpec("remote", { REMOTE_SIGNAL_PORT: "3101" });
 
-    expect(spec.args).toContain(join(projectRoot, "apps", "auth-api", ".env.dev"));
-    expect(spec.args).toContain(join(projectRoot, "remote", "api"));
+    expect(spec.args).toContain(join(projectRoot, "scripts/run-development.ts"));
+    expect(spec.args).toContain("remote");
     expect(spec.env.REMOTE_SIGNAL_PORT).toBe("3101");
   });
 

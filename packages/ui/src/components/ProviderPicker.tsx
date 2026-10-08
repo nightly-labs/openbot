@@ -26,7 +26,7 @@ import {
   X,
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createSignal, createUniqueId, For, Show } from "solid-js";
+import { createEffect, createSignal, createStore, createUniqueId, For, Show } from "solid-js";
 import { providerUpdateAvailable, providerVersionLabel } from "../features/provider-updates/provider-update";
 import { useText } from "../text";
 import { MoreProvidersDialog } from "./MoreProvidersDialog";
@@ -156,7 +156,7 @@ export interface ProviderPickerProps {
 }
 
 export function ProviderPicker(props: ProviderPickerProps) {
-  const { t, format, sourceText } = useText();
+  const { t, format, sourceText, errorMessage } = useText();
   // Rows are keyed by position, so a row's input can show another provider after the list changes.
   // The input is found by its current value, not by the provider it was made for.
   const inputs = new Set<HTMLInputElement>();
@@ -185,6 +185,26 @@ export function ProviderPicker(props: ProviderPickerProps) {
    */
   let moreChoice: AgentProviderId | "custom" | null = null;
   let focused = false;
+  const [useChanges, setUseChanges] = createStore<
+    Partial<Record<AgentProviderId, { pending: boolean; error: string | null }>>
+  >({});
+  async function setProviderOn(provider: AgentProviderId, on: boolean) {
+    if (useChanges[provider]?.pending) return;
+    setUseChanges((state) => {
+      state[provider] = { pending: true, error: null };
+    });
+    try {
+      await props.onSetProviderOn?.(provider, on);
+    } catch (error) {
+      setUseChanges((state) => {
+        state[provider] = { pending: false, error: errorMessage(error, t("error.provider.useChangeFailed")) };
+      });
+      return;
+    }
+    setUseChanges((state) => {
+      state[provider] = { pending: false, error: null };
+    });
+  }
   /**
    * The last switch the user tried to turn off while agents use its provider. Each attempt is a new
    * object, so the message is drawn again and a screen reader announces it again.
@@ -732,7 +752,10 @@ export function ProviderPicker(props: ProviderPickerProps) {
                         size="sm"
                         class="provider-picker-use"
                         checked={!off()}
-                        disabled={Boolean(props.disabled || props.refreshingProviders)}
+                        disabled={Boolean(
+                          props.disabled || props.refreshingProviders || useChanges[option().id]?.pending,
+                        )}
+                        aria-busy={useChanges[option().id]?.pending ? "true" : "false"}
                         aria-label={t("provider.aria.use", { name: option().name })}
                         aria-describedby={refusal() ? usedById() : undefined}
                         onChange={(on: boolean) => {
@@ -741,13 +764,20 @@ export function ProviderPicker(props: ProviderPickerProps) {
                             return;
                           }
                           setRefusedOff(null);
-                          void props.onSetProviderOn?.(option().id, on);
+                          void setProviderOn(option().id, on);
                         }}
                       />
                     </Show>
                   </div>
                   {/* Outside the label: inside it, the message would be part of the radio's name, and
                     a click on it would choose the provider. */}
+                  <Show when={useChanges[option().id]?.error}>
+                    {(message) => (
+                      <small class="provider-picker-check-error provider-picker-used-by" role="alert">
+                        {message()}
+                      </small>
+                    )}
+                  </Show>
                   <Show when={refusal()} keyed>
                     <small id={usedById()} class="provider-picker-check-error provider-picker-used-by" role="alert">
                       {t("provider.use.inUse", {

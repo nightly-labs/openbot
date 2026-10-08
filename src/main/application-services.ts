@@ -6,10 +6,15 @@ import { toAgentRemovalFailed } from "../backend/agent/agent-removal";
 import { toHostedSiteOperationFailed } from "../backend/agent/hosted-site-coordinator";
 import { AgentDatabaseSupervisor } from "../backend/agent-data/agent-database-supervisor";
 import { AgentTables } from "../backend/agent-data/agent-tables";
+import { AgentRoutineStore } from "../backend/agent-routine-store";
 import { DiscordConnectFailed, toDiscordConnectFailed } from "../backend/messaging/discord/discord-connect";
 import { SlackConnectFailed, toSlackConnectFailed } from "../backend/messaging/slack/slack-connect";
+import { routineFlowRoutines } from "../backend/routine-flows/routine-flow-routines";
+import { RoutineFlowStore } from "../backend/routine-flows/routine-flow-store";
+import { createRoutineFlows, type RoutineFlowsHandle } from "../backend/routine-flows/routine-flows";
 import { type AgentAdminSettingsService, createAgentAdminSettings } from "./agent-admin-settings";
 import { spawnAgentDatabaseHost } from "./agent-database-host-process";
+import { HostReleaseService, readInstallationMode } from "./host-release-service";
 import { LocalSkillLibrary } from "./local-skill-library";
 import { localSkillTools } from "./local-skill-tools";
 import { MAC_PERMISSION_URLS } from "./mac-permission-urls";
@@ -48,9 +53,10 @@ import type {
   CentralAuthState,
   ComputerUseState,
   ProviderRuntimeSnapshot,
+  RoutineFlowsChanged,
   VoiceModelStatus,
 } from "@openbot/contracts/ipc";
-import { IPC_ENDPOINTS, isManagedToolRuntime, isUpdateBusyPhase } from "@openbot/contracts/ipc";
+import { IPC_ENDPOINTS, isManagedToolRuntime, isUpdateBusyPhase, latestTurnAnswer } from "@openbot/contracts/ipc";
 import { decodeRecord, requiredString } from "@openbot/contracts/ipc-decoding";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
@@ -157,6 +163,7 @@ import { PROVIDER_DETECTION_SETTINGS_FILE, ProviderDetectionSettingsStore } from
 import { startProviderLog } from "./provider-log";
 import { toProviderRuntimeFailure } from "./provider-runtime-effects";
 import { ProviderRuntimeManager, providerRuntimeRoot, runtimeTarget } from "./provider-runtime-manager";
+import { ProviderUseSettingsStore } from "./provider-use-settings-store";
 import { RemoteConnectTrace } from "./remote-connect-trace";
 import { RemoteDesktopManager } from "./remote-desktop-manager";
 import { resolveRemoteDesktopRuntime } from "./remote-desktop-runtime-artifact";
@@ -272,6 +279,8 @@ const TEARDOWN_ORDER = {
   signalIngress: 86,
   host: 90,
   teamWebRtcBridge: 100,
+  // Before the agent service, so no handoff is sent to an agent while the service stops.
+  routineFlows: 103,
   // Before the agent service, so no calendar read finds it stopping.
   routineFeed: 104,
   mcpOAuthRedirect: 105,
@@ -322,8 +331,14 @@ export interface ApplicationServiceContext {
 }
 
 /** Everything the entry point wires up, registers IPC handlers against, and shuts down. */
+/** The routine flow runtime, and a way to hear which agents' canvases changed. */
+type RoutineFlowsService = RoutineFlowsHandle & {
+  onChanged(listener: (change: RoutineFlowsChanged) => void): void;
+};
+
 export interface ApplicationServices {
   service: AgentService;
+  routineFlows: RoutineFlowsService;
   providerRuntimes: ProviderRuntimeManager;
   providerCredentials: ProviderCredentialStore;
   /** The Slack connections of the agents on this host. */
@@ -818,7 +833,10 @@ export async function createApplicationServices({
    * store is the path it always used. The switch is read here rather than imported from the entry
    * point, which this file may not reach into; both readers read the same immutable value.
    */
+  const providerUse = new ProviderUseSettingsStore(join(app.getPath("userData"), "openbot-provider-use-v1.json"));
+  await runCauseEffect(providerUse.load());
   const providerRuntimes = new ProviderRuntimeManager({
+    isProviderOn: (provider) => !providerUse.off().includes(provider),
     root: providerRuntimeRoot({
       appData: app.getPath("appData"),
       userDataOverride: app.commandLine.getSwitchValue("user-data-dir"),
@@ -1112,6 +1130,13 @@ export async function createApplicationServices({
     visualPreview: new ChatVisualPreviewer(),
     hostMemory,
     requestTimeoutMs: 30_000,
+    offProviders: providerUse.off(),
+    saveProviderUse: (provider, on) =>
+      providerUse
+        .set(provider, on)
+        .pipe(
+          Effect.mapError((error) => new AgentLifecycleFailed({ operation: "saveProviderUse", cause: error.cause })),
+        ),
     preferredProvider: setupState.preferredProvider ?? "codex",
     bundledExecutables: providerRuntimes.bundledExecutables(),
     prepareAgentWorkspace: (agent) =>
@@ -1162,6 +1187,7 @@ export async function createApplicationServices({
     },
     passwordVault: passwordVaultRouter(onePasswordConnector, bitwardenConnector),
     localSkillTools: () => localSkillTools(skills),
+    routineFlowTools: () => routineFlowRuntime,
     approvalAutomation,
     busyMessageMode: () => busyMessageMode.get().mode,
     deleteWithRevokedApproval: (agentId, remove) =>
@@ -1180,6 +1206,38 @@ export async function createApplicationServices({
     if (event.type === "agents-changed") Effect.runFork(automation.requestSync());
   });
   teardown.push(TEARDOWN_ORDER.automation, "the automation server", () => Effect.runPromise(automation.stop()));
+  // An agent routine's answer handed on from agent to agent; see `routine-flows.ts`.
+  const routineFlowListeners = new Set<(change: RoutineFlowsChanged) => void>();
+  const routineFlowRuntime = await Effect.runPromise(
+    createRoutineFlows({
+      store: new RoutineFlowStore({ database: store.database }),
+      routines: routineFlowRoutines(new AgentRoutineStore(store.database)),
+      delivery: (deliveryId) => {
+        const found = mailbox.getDelivery(deliveryId)?.delivery;
+        return found ? { status: found.status, turnId: found.turnId, error: found.error } : null;
+      },
+      turnAnswer: (agentId, turnId) => {
+        const threadId = store.list().find((agent) => agent.id === agentId)?.threadId;
+        if (!threadId) return null;
+        return (
+          latestTurnAnswer(store.database.readTurnAssistantMessages(agentId, threadId, turnId), turnId)?.text ?? null
+        );
+      },
+      agentName: (agentId) => store.list().find((agent) => agent.id === agentId)?.name ?? agentId,
+      sendHandoff: (input) => service.enqueueRoutineHandoff(input),
+      changed: (agentIds) => {
+        for (const listener of routineFlowListeners) listener({ agentIds });
+      },
+    }),
+  );
+  const routineFlows: RoutineFlowsService = {
+    ...routineFlowRuntime,
+    onChanged: (listener) => {
+      routineFlowListeners.add(listener);
+    },
+  };
+  service.on("event", (event) => Effect.runFork(routineFlowRuntime.notice(event)));
+  teardown.push(TEARDOWN_ORDER.routineFlows, "the routine flows", () => Effect.runPromise(routineFlowRuntime.close()));
   // Listens only after the user turns the feed on in Server Settings > Routines.
   const routineFeed = new RoutineFeedServer({
     path: join(app.getPath("userData"), ROUTINE_FEED_FILE),
@@ -1412,6 +1470,19 @@ export async function createApplicationServices({
   // The host comes before the updater, and the restart readiness reads the host. The routes reach
   // the schedule through this, and a request that arrives before it exists is refused.
   let requestedUpdate: RequestedUpdate | undefined;
+  const hostRelease = new HostReleaseService({
+    currentVersion: app.getVersion(),
+    packaged: app.isPackaged,
+    platform: process.platform,
+    arch: process.arch,
+    environment: process.env,
+    installationMode:
+      app.isPackaged && process.platform === "linux" ? await runCauseEffect(readInstallationMode()) : null,
+    updateStatus: () => ({
+      phase: requestedUpdate?.snapshot().phase ?? "unsupported",
+      managedByHost: requestedUpdate?.snapshot().remoteUpdates === "managed",
+    }),
+  });
   const scheduledUpdate = (): RequestedUpdate => {
     if (!requestedUpdate) throw new RequestedUpdateRefusal("unsupported");
     return requestedUpdate;
@@ -1461,10 +1532,12 @@ export async function createApplicationServices({
         customProviders: customProviderChanges,
         pasteSignIn: pasteCodeLoginSupported(),
       },
+      release: hostRelease,
       update: {
         snapshot: () => scheduledUpdate().snapshot(),
         check: () => scheduledUpdate().check(),
         start: (member, mode) => scheduledUpdate().start(member, mode),
+        requestWhenIdle: (member) => scheduledUpdate().requestWhenIdle(member),
         cancel: () => scheduledUpdate().cancel(),
         changeSettings: (change) => scheduledUpdate().changeSettings(change),
       },
@@ -1817,6 +1890,8 @@ export async function createApplicationServices({
       yield* service.initialize({ heldRoutines: takeRoutineHold(routineHoldFile, (message) => logger.warn(message)) });
       yield* eventsRuntime.start();
       yield* automation.sync();
+      // Picks up the flows a restart stopped between one agent's answer and the next agent's message.
+      yield* routineFlowRuntime.sweep();
     }),
   );
   const describeRestartReadiness = (): RestartReadiness =>
@@ -1966,6 +2041,7 @@ export async function createApplicationServices({
 
   return {
     service,
+    routineFlows,
     providerRuntimes,
     providerCredentials,
     messaging,
