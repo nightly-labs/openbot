@@ -18,6 +18,9 @@ import { type RemoteWorkspaceCacheCipher, RemoteWorkspaceCacheStore } from "./re
 // - turning the setting off leaves the copy -> "deletes every copy when the setting is turned off"
 // - newer data does not replace the copy -> "replaces the copy with what the server sent last"
 // - attachments, prompts or plain text reach the disk -> "keeps text only, encrypted"
+// - host paths, thread ids or message data that the saved view does not show reach the disk ->
+//   "keeps only the fields that the saved view shows"
+// - a copy from an earlier version shows its extra fields -> "drops the extra fields of a copy from an earlier version"
 // - a damaged or moved file is shown -> "reads a damaged or moved file as no copy"
 // - no secret storage, and the copy is kept unencrypted -> "keeps nothing without secret storage"
 
@@ -85,6 +88,81 @@ function workspace(serverId: string, agents: AgentSummary[]): SaveRemoteWorkspac
 
 function message(id: string, text: string, overrides: Partial<ConversationMessage> = {}): ConversationMessage {
   return { id, author: "assistant", text, createdAt: "2026-10-08T09:00:00.000Z", status: "completed", ...overrides };
+}
+
+/** A message with every field a host can send. */
+function richMessage(id: string, text: string, overrides: Partial<ConversationMessage> = {}): ConversationMessage {
+  return message(id, text, {
+    author: "user",
+    turnId: "turn-1",
+    itemType: "agentMessage",
+    source: "user",
+    senderAgentId: "scout",
+    senderMember: { id: "member-2", name: "Ada" },
+    replyToMessageId: "m-0",
+    exchange: {
+      direction: "incoming",
+      senderAgentId: "scout",
+      messageId: "exchange-1",
+      recipientAgentIds: ["chief"],
+      replyToMessageId: null,
+      expectsReply: false,
+      deliveries: [],
+    },
+    reaction: "👍",
+    reactions: [{ emoji: "👍", actor: { kind: "user" } }],
+    routine: { routineId: "routine-1", runId: "run-1", name: "Hidden routine", scheduledFor: "2026-10-08" },
+    plan: { explanation: null, steps: [{ id: "step-1", text: "Hidden step", status: "pending" }] },
+    ...overrides,
+  });
+}
+
+/** What the copy keeps of a rich message. */
+function savedRichMessage(id: string, text: string, overrides: Partial<ConversationMessage> = {}) {
+  return {
+    id,
+    author: "user",
+    text,
+    createdAt: "2026-10-08T09:00:00.000Z",
+    status: "completed",
+    turnId: "turn-1",
+    itemType: "agentMessage",
+    senderMember: { id: "member-2", name: "Ada" },
+    replyToMessageId: "m-0",
+    ...overrides,
+  };
+}
+
+const savedChief = {
+  id: "chief",
+  name: "chief",
+  title: "Lead",
+  preview: "Preview of chief",
+  updatedAt: "2026-10-08T09:00:00.000Z",
+  avatarSeed: "chief",
+  avatarHue: 30,
+};
+
+/** Values that only the fields the copy does not keep hold. */
+const hiddenValues = [
+  "/host/workspace",
+  "thread-chief",
+  "Plans the week",
+  "gpt-5.6-luna",
+  "codex",
+  "exchange-1",
+  "👍",
+  "Hidden routine",
+  "Hidden step",
+  "senderAgentId",
+  'workspace"',
+];
+
+/** The plain text of the one copy under `directory`. */
+async function decryptedCopy(directory: string): Promise<string> {
+  const files = (await filesUnder(directory)).filter((name) => name.endsWith(".json"));
+  const file = JSON.parse(await readFile(join(directory, files[0] ?? ""), "utf8"));
+  return testCipher().decrypt(Buffer.from(file.data, "base64"));
 }
 
 async function filesUnder(path: string): Promise<string[]> {
@@ -243,12 +321,72 @@ describe("remote workspace cache", () => {
     const saved = copy?.conversations[0]?.messages ?? [];
     expect(saved).toHaveLength(30);
     expect(saved.at(-1)).toEqual(message("m-39", "Secret plan"));
-    expect(copy?.agents[0]?.avatarUrl).toBeNull();
+    expect(copy?.agents[0]).not.toHaveProperty("avatarUrl");
     const files = (await filesUnder(directory)).filter((name) => name.endsWith(".json"));
     expect(files).toHaveLength(1);
     const onDisk = await readFile(join(directory, files[0] ?? ""), "utf8");
     expect(onDisk).not.toContain("Secret plan");
     expect(onDisk).not.toContain("chief");
+  });
+
+  it("keeps only the fields that the saved view shows", async () => {
+    const { store, directory } = await createStore();
+    await Effect.runPromise(store.setPrincipal("account-a"));
+    await Effect.runPromise(store.setServers(["server-1"]));
+    await Effect.runPromise(
+      store.saveWorkspace(
+        workspace("server-1", [
+          agent("chief", { title: "Lead", description: "Plans the week", avatarHue: 30, access: "workspace" }),
+        ]),
+      ),
+    );
+    await Effect.runPromise(
+      store.saveConversation({
+        serverId: "server-1",
+        agentId: "chief",
+        messages: [richMessage("m-1", "From Ada"), richMessage("m-2", "Done", { author: "assistant" })],
+      }),
+    );
+
+    const copy = await Effect.runPromise(store.read("server-1"));
+    expect(copy?.agents).toEqual([savedChief]);
+    expect(copy?.conversations[0]?.messages).toEqual([
+      savedRichMessage("m-1", "From Ada"),
+      savedRichMessage("m-2", "Done", { author: "assistant" }),
+    ]);
+
+    // The decrypted file holds no host path, thread id or message data that the saved view does not show.
+    const plain = await decryptedCopy(directory);
+    for (const hidden of hiddenValues) expect(plain).not.toContain(hidden);
+  });
+
+  it("drops the extra fields of a copy from an earlier version", async () => {
+    const { store, directory } = await createStore();
+    await Effect.runPromise(store.setPrincipal("account-a"));
+    await Effect.runPromise(store.setServers(["server-1"]));
+    await Effect.runPromise(store.saveWorkspace(workspace("server-1", [agent("chief")])));
+    const [principalDirectory] = await readdir(directory);
+    const [file] = await readdir(join(directory, principalDirectory ?? ""));
+    const path = join(directory, principalDirectory ?? "", file ?? "");
+
+    // An earlier version kept the whole roster row and message.
+    const stored = JSON.parse(await decryptedCopy(directory));
+    const earlier = {
+      ...stored,
+      agents: [agent("chief", { title: "Lead", description: "Plans the week", avatarHue: 30, access: "workspace" })],
+      conversations: [{ agentId: "chief", messages: [richMessage("m-1", "From Ada")] }],
+    };
+    const data = testCipher().encrypt(JSON.stringify(earlier)).toString("base64");
+    await writeFile(path, JSON.stringify({ version: 1, data }));
+
+    const copy = await Effect.runPromise(store.read("server-1"));
+    expect(copy?.agents).toEqual([savedChief]);
+    expect(copy?.conversations[0]?.messages).toEqual([savedRichMessage("m-1", "From Ada")]);
+
+    // The next write keeps only the saved fields too.
+    await Effect.runPromise(store.saveWorkspace(workspace("server-1", [agent("chief")])));
+    const plain = await decryptedCopy(directory);
+    for (const hidden of hiddenValues) expect(plain).not.toContain(hidden);
   });
 
   it("reads a damaged or moved file as no copy and deletes it", async () => {

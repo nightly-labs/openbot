@@ -1,8 +1,10 @@
 import {
+  AGENT_PROVIDERS,
   type ConversationMessage,
   type ConversationReadState,
   REMOTE_WORKSPACE_CACHE_LIMITS,
   type RemoteWorkspaceCache,
+  type RemoteWorkspaceCacheAgent,
   type SaveRemoteWorkspaceInput,
   type SidebarLayoutSnapshot,
 } from "@openbot/contracts/ipc";
@@ -26,6 +28,24 @@ import { createThrottledSave } from "./saved-copy-writer";
 
 /** The shortest time between two saves of one part of the copy. */
 const SAVE_INTERVAL_MS = 2_000;
+
+/**
+ * The profile of a saved roster row. The copy keeps only what the row shows, so the other fields get
+ * neutral values. The saved view shows none of them, and the profile never enters the live state.
+ */
+function savedAgentProfile(agent: RemoteWorkspaceCacheAgent): AgentProfile {
+  return toAgentProfile({
+    ...agent,
+    description: "",
+    notifications: false,
+    provider: AGENT_PROVIDERS[0],
+    model: "",
+    reasoningEffort: "medium",
+    threadId: null,
+    workspacePath: "",
+    avatarUrl: null,
+  });
+}
 
 /**
  * The saved copy of a joined server: what the sidebar and the open chat showed the last time, shown
@@ -58,7 +78,7 @@ const SavedCopy = createSimpleContext({
     const [selectedAgentId, setSelectedAgentId] = createSignal("");
 
     const visible = createMemo(() => copy() !== null && agentListConnecting());
-    const agents = createMemo((): AgentProfile[] => copy()?.agents.map(toAgentProfile) ?? []);
+    const agents = createMemo((): AgentProfile[] => copy()?.agents.map(savedAgentProfile) ?? []);
     const layout = createMemo((): SidebarLayoutSnapshot | null => copy()?.layout ?? null);
     // The agent the user picked here, or else the one open at the last launch, or else the chat that
     // was saved last.

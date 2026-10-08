@@ -425,13 +425,27 @@ Discord.
 
 A member can turn on **Settings → General → Keep a copy of joined servers**. It is off by default.
 When it is on, each member computer keeps a small saved copy of every joined server, so that the next
-launch shows the sidebar and recent messages while the server connects. The copy holds the agent list
-(names, titles, sidebar previews, models), the unread counts, the sidebar sections, the member id,
-and the latest 30 messages of the 5 most recently opened agent chats, as text only. It does not hold
-attachments, generated images, question prompts, queue state, avatar addresses or channels. The
-copy is encrypted with the operating system's secret storage, the same as the server tokens, and is
-not kept when that storage is not available. It stays in the OpenBot profile folder of that computer
-(`remote-workspace-cache`) and is never sent anywhere. Each copy belongs to the signed-in account and
+launch shows the sidebar and recent messages while the server connects. The copy holds only these
+data:
+
+- the server id, the time of the save, and your member id on that server;
+- for each agent, at most 200: its id, name and title, the first 500 characters of its sidebar
+  preview, the time of its latest activity, and its avatar seed and color;
+- for each agent: the unread count, and the ids of the first unread message and of the last read
+  message;
+- the sidebar layout: its revision number, the section ids and names, the section order, and the
+  section and order of each agent;
+- the latest 30 finished messages of the 5 most recently opened agent chats. For each message: its
+  id, the id of its turn, its author kind (a person, the agent, another agent, or the system), its
+  item type, its time, its status, the first 8,000 characters of its text, the id and name of the
+  member who sent it, and the id of the message that it replies to.
+
+It does not hold agent descriptions, providers, models, reasoning effort, thread ids, workspace
+paths, avatar addresses, attachments, generated images, question prompts, queue state, reactions,
+plans, routines, agent exchange data or channels. The copy is encrypted with the operating system's
+secret storage, the same as the server tokens, and is not kept when that storage is not available. It
+stays in the OpenBot profile folder of that computer (`remote-workspace-cache`) and is never sent
+anywhere. Each copy belongs to the signed-in account and
 one server. OpenBot deletes the copies of an account when you sign out or sign in to another
 account, the copy of a server when you leave or remove it, or when it no longer accepts the account,
 and every copy when you turn the setting off. While the copy shows, it is read-only and can be out

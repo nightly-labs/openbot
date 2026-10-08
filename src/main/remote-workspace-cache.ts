@@ -2,14 +2,16 @@ import { createHash } from "node:crypto";
 import { readdir, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import {
-  type AgentSummary,
   type ConversationMessage,
   type ConversationReadState,
   isRemoteWorkspaceCache,
   REMOTE_WORKSPACE_CACHE_LIMITS,
   type RemoteWorkspaceCache,
   type RemoteWorkspaceCacheConversation,
+  type RemoteWorkspaceCacheMessage,
   type RemoteWorkspaceCachePreference,
+  remoteWorkspaceCacheAgent,
+  remoteWorkspaceCacheMessage,
   type SaveRemoteConversationInput,
   type SaveRemoteWorkspaceInput,
 } from "@openbot/contracts/ipc";
@@ -46,8 +48,9 @@ const COPY_VERSION = 1;
  * the latest messages of recent chats while the server connects.
  *
  * A conversation of a joined server otherwise stays only on the computer that runs the server, so the
- * copy is off until the user turns it on, and it keeps little: the roster, the unread counts, the
- * sidebar layout, and the latest messages of the few most recent chats, without attachments. The file
+ * copy is off until the user turns it on, and it keeps little: the roster rows as the sidebar shows
+ * them, the unread counts, the sidebar layout, and the text of the latest messages of the few most
+ * recent chats with their senders, without attachments or other message data. The file
  * is encrypted with the same secret storage as the server tokens, and nothing is kept without it.
  *
  * Main, not the renderer, decides whose copy a request reaches. The account is the signed-in account
@@ -156,7 +159,7 @@ export class RemoteWorkspaceCacheStore {
         const target = this.#target(input.serverId, generation);
         if (!target) return;
         const previous = yield* this.#readCopy(target);
-        const agents = input.agents.slice(0, REMOTE_WORKSPACE_CACHE_LIMITS.agents).map(savedAgent);
+        const agents = input.agents.slice(0, REMOTE_WORKSPACE_CACHE_LIMITS.agents).map(remoteWorkspaceCacheAgent);
         const agentIds = new Set(agents.map((agent) => agent.id));
         yield* this.#writeCopy(target, {
           version: COPY_VERSION,
@@ -302,9 +305,22 @@ function storedCopyFromRecord(
     return "unreadable";
   }
   const { version: _version, principalId: _principalId, ...copy } = stored;
-  return isRemoteWorkspaceCache(copy)
-    ? { ...copy, version: COPY_VERSION, principalId: target.principalId }
-    : "unreadable";
+  if (!isRemoteWorkspaceCache(copy)) return "unreadable";
+  // Only the saved fields are read back. A copy from an earlier version kept more, and that goes.
+  return {
+    version: COPY_VERSION,
+    principalId: target.principalId,
+    serverId: copy.serverId,
+    savedAt: copy.savedAt,
+    memberId: copy.memberId,
+    agents: copy.agents.map(remoteWorkspaceCacheAgent),
+    reads: savedReads(copy.reads, new Set(copy.agents.map((agent) => agent.id))),
+    layout: copy.layout,
+    conversations: copy.conversations.map((conversation) => ({
+      agentId: conversation.agentId,
+      messages: conversation.messages.map(remoteWorkspaceCacheMessage),
+    })),
+  };
 }
 
 function principalKey(principalId: string): string {
@@ -331,11 +347,6 @@ function removePath(path: string): Effect.Effect<void> {
   );
 }
 
-/** The roster row without its avatar address, which names the host, and with a short preview. */
-function savedAgent(agent: AgentSummary): AgentSummary {
-  return { ...agent, avatarUrl: null, preview: agent.preview.slice(0, REMOTE_WORKSPACE_CACHE_LIMITS.preview) };
-}
-
 function savedReads(
   reads: Record<string, ConversationReadState>,
   agentIds: ReadonlySet<string>,
@@ -355,24 +366,14 @@ function savedReads(
 }
 
 /**
- * The latest finished messages, as text. Attachments, generated images, question prompts and queue
- * state stay with the host: the copy is for reading, and each of these would offer an action that only
- * the host can do, or keep a file on this computer.
+ * The latest finished messages, with only the fields that the saved chat shows. Attachments,
+ * generated images, question prompts, queue state, reactions, plans, routines and agent exchange
+ * data stay with the host: the copy is for reading, and each of these would offer an action that only
+ * the host can do, keep a file on this computer, or keep data that the saved chat does not show.
  */
-function savedMessages(messages: readonly ConversationMessage[]): ConversationMessage[] {
+function savedMessages(messages: readonly ConversationMessage[]): RemoteWorkspaceCacheMessage[] {
   return messages
     .filter((message) => message.status !== "streaming")
     .slice(-REMOTE_WORKSPACE_CACHE_LIMITS.messages)
-    .map(
-      ({
-        attachments: _attachments,
-        imageGeneration: _image,
-        questionPrompt: _prompt,
-        delivery: _delivery,
-        ...message
-      }) => ({
-        ...message,
-        text: message.text.slice(0, REMOTE_WORKSPACE_CACHE_LIMITS.messageText),
-      }),
-    );
+    .map(remoteWorkspaceCacheMessage);
 }

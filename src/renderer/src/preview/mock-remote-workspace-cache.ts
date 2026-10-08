@@ -1,4 +1,10 @@
-import type { GroupApi, IpcEndpoints, RemoteWorkspaceCache } from "@openbot/contracts/ipc";
+import {
+  type GroupApi,
+  type IpcEndpoints,
+  type RemoteWorkspaceCache,
+  remoteWorkspaceCacheAgent,
+  remoteWorkspaceCacheMessage,
+} from "@openbot/contracts/ipc";
 import { clone } from "./mock-support";
 
 /**
@@ -23,7 +29,7 @@ export function createMockRemoteWorkspaceCache(): GroupApi<IpcEndpoints["remoteW
         serverId: input.serverId,
         savedAt: new Date().toISOString(),
         memberId: input.memberId,
-        agents: clone(input.agents),
+        agents: input.agents.map(remoteWorkspaceCacheAgent),
         reads: clone(input.reads),
         layout: clone(input.layout),
         conversations: (copies.get(input.serverId)?.conversations ?? []).filter((conversation) =>
@@ -35,7 +41,7 @@ export function createMockRemoteWorkspaceCache(): GroupApi<IpcEndpoints["remoteW
       const copy = copies.get(input.serverId);
       if (!enabled || !copy?.agents.some((agent) => agent.id === input.agentId)) return;
       copy.conversations = [
-        { agentId: input.agentId, messages: clone(input.messages.slice(-30)) },
+        { agentId: input.agentId, messages: input.messages.slice(-30).map(remoteWorkspaceCacheMessage) },
         ...copy.conversations.filter((conversation) => conversation.agentId !== input.agentId),
       ].slice(0, 5);
     },
