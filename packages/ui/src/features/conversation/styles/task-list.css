@@ -249,6 +249,10 @@
 }
 
 .task-list-title[data-showing="task"] .task-list-title-task-text {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: top;
   animation:
     task-list-title-in var(--task-list-open) var(--task-list-ease),
     task-list-pulse 1.6s ease-in-out infinite;
