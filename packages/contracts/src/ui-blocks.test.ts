@@ -82,11 +82,10 @@ const form: UiFormBlock = {
 
 const DEMO_SPECS = { confirm, quickReplies, choice, form };
 
-function spec<T extends UiBlockSpec>(value: unknown): T {
-  const normalized = normalizeUiBlockSpec(value);
-  if (!normalized) throw new Error("invalid spec");
-  // biome-ignore lint/nursery/noUnsafeTypeAssertion: a test fixture of a known type
-  return normalized as T;
+function normalizedConfirmSpec(): UiConfirmBlock {
+  const normalized = normalizeUiBlockSpec(confirm);
+  if (normalized?.type !== "confirm") throw new Error("invalid confirm spec");
+  return normalized;
 }
 
 describe("ui block specs", () => {
@@ -171,7 +170,7 @@ describe("ui block specs", () => {
 });
 
 describe("ui block responses", () => {
-  const confirmSpec = spec<UiConfirmBlock>(confirm);
+  const confirmSpec = normalizedConfirmSpec();
 
   it("accepts a response for every block", () => {
     expect(
@@ -265,7 +264,7 @@ describe("ui block responses", () => {
 });
 
 describe("ui block fallbacks", () => {
-  const blocking: UiBlockSpec[] = [spec(confirm), quickReplies, choice, form];
+  const blocking: UiBlockSpec[] = [normalizedConfirmSpec(), quickReplies, choice, form];
 
   it.each(blocking.map((block) => [block.type, block] as const))(
     "turns a %s block into valid prompt questions",
@@ -279,7 +278,7 @@ describe("ui block fallbacks", () => {
   );
 
   it("asks a confirm as its actions and selects", () => {
-    const [action, from] = uiBlockFallbackQuestions(spec<UiConfirmBlock>(confirm));
+    const [action, from] = uiBlockFallbackQuestions(normalizedConfirmSpec());
     expect(action?.id).toBe("action");
     expect(action?.options?.map((option) => option.label)).toEqual(["Отправить", "Изменить", "Не отправлять"]);
     expect(action?.question).toContain("Кому: tsj_onyx@mail.ru");
@@ -313,7 +312,7 @@ describe("ui block fallbacks", () => {
   });
 
   it("reads the answers of a client that only saw the questions", () => {
-    const confirmSpec = spec<UiConfirmBlock>(confirm);
+    const confirmSpec = normalizedConfirmSpec();
     expect(
       uiBlockResponseFromAnswers(confirmSpec, { action: ["Отправить"], from: ["nekitterekhin@gmail.com"] }),
     ).toEqual({
@@ -384,7 +383,7 @@ describe("ui block fallbacks", () => {
 
   it("round-trips a response through the prompt answers", () => {
     const cases: Array<[UiBlockSpec, unknown]> = [
-      [spec(confirm), { actionId: "send", values: { from: "nekitterekhin@gmail.com" } }],
+      [normalizedConfirmSpec(), { actionId: "send", values: { from: "nekitterekhin@gmail.com" } }],
       [quickReplies, { actionId: "task" }],
       [quickReplies, { actionId: UI_BLOCK_TEXT_ACTION_ID, text: "Позвони мне" }],
       [choice, { actionId: "submit", values: { selected: ["protein90", "vvo"] } }],
@@ -403,7 +402,7 @@ describe("ui block fallbacks", () => {
   });
 
   it("describes the outcome of a response", () => {
-    expect(uiBlockOutcomeText(spec(confirm), { actionId: "send", values: { from: "a@b.c" } })).toBe(
+    expect(uiBlockOutcomeText(normalizedConfirmSpec(), { actionId: "send", values: { from: "a@b.c" } })).toBe(
       "Отправить · a@b.c",
     );
     expect(uiBlockOutcomeText(choice, { actionId: "submit", values: { selected: ["protein90", "vvo"] } })).toBe(
@@ -424,7 +423,7 @@ describe("conversation ui blocks", () => {
   const answered: ConversationUiBlock = {
     version: 1,
     blockId: "mail-tsj",
-    spec: spec(confirm),
+    spec: normalizedConfirmSpec(),
     state: {
       status: "answered",
       response: { actionId: "send", values: { from: "sysrootix@gmail.com" } },
