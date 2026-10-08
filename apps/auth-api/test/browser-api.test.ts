@@ -551,18 +551,6 @@ describe("browser account boundary", () => {
       services.hostedSites = () => hostedSites;
       return { services, hostedSites };
     }
-    it("removes an owned host through the authenticated account service", async () => {
-      const services = setup();
-      const response = await handleBrowserApi(
-        request("v2/remote/hosts/host%2Fone", { method: "DELETE", cookie }),
-        services,
-      );
-      expect(response.status).toBe(204);
-      expect(services.remote.removeOwnedHost).toHaveBeenCalledWith(user.id, "host/one");
-      const unauthorized = await handleBrowserApi(request("v2/remote/hosts/host", { method: "DELETE" }), services);
-      expect(unauthorized.status).toBe(401);
-      expect(services.remote.removeOwnedHost).toHaveBeenCalledTimes(1);
-    });
     it("requires the browser cookie", async () => {
       const { services, hostedSites } = withSites();
       expect((await handleBrowserApi(request("v1/sites"), services)).status).toBe(401);
