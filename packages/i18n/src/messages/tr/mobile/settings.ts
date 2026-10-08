@@ -16,8 +16,6 @@ export const messages = {
   "mobile.settings.about.privacy": "Gizlilik politikası",
   "mobile.settings.home.profile": "Profil",
   "mobile.settings.home.preferences": "Tercihler",
-  "mobile.settings.home.generalHint": "Görünüm ve konuşmalar",
-  "mobile.settings.home.general": "Genel",
   "mobile.settings.home.about": "OpenBot Hakkında",
   "mobile.settings.home.support": "Destek",
   "mobile.settings.home.supportHint": "Yardım alın ve destek günlüğünü kaydedin",
@@ -67,7 +65,22 @@ export const messages = {
   "mobile.settings.appearance.agentColorMessages": "Mesajlarımda ajan rengi",
   "mobile.settings.appearance.agentColorMessagesFooter":
     "Bir ajan sohbetindeki mesajlarınız o ajanın rengini kullanır. Metni okumak zorsa kapatın.",
-  "mobile.settings.feedback.title": "Geri bildirim",
+  "mobile.settings.animations.title": "Animasyonlar",
+  "mobile.settings.animations.footer":
+    "Uygulamanın tamamında hareketi azaltmak için Animasyonlar’ı kapatın. Telefon ayarlarında Hareketi Azalt açıkken uygulama da hareketi azaltır. Bu durumda aşağıdaki animasyonlar kapalı kalır.",
+  "mobile.settings.animations.all": "Animasyonlar",
+  "mobile.settings.animations.chatZoom": "Sohbetlere yakınlaştır",
+  "mobile.settings.animations.chatZoomFooter":
+    "Sohbet, listedeki avatarından açılır ve kapanınca ona geri döner. Kapalıyken sohbet yandan kayarak açılır.",
+  "mobile.settings.animations.agentFaces": "Hareketli ajan yüzleri",
+  "mobile.settings.animations.agentFacesFooter":
+    "Ajanlar çalışırken ve dinlenirken avatarlarının yüzleri hareket eder. Kapalıyken yüzler sabit kalır.",
+  "mobile.settings.animations.composerResize": "Kompakt mesaj alanı",
+  "mobile.settings.animations.composerResizeFooter":
+    "Klavye kapalıyken mesaj alanı küçük bir çubuğa dönüşür. Kapalıyken alan tam boyutunda kalır.",
+  "mobile.settings.animations.textReveal": "Yanıtları canlandır",
+  "mobile.settings.animations.textRevealFooter":
+    "Yanıt kelime kelime yazılır ve balonu yumuşakça büyür. Kapalıyken metin geldiği anda görünür.",
   "mobile.settings.feedback.footer": "Bu cihazdaki uygulamadaki eylemler için dokunma geri bildirimi.",
   "mobile.settings.feedback.haptics": "Dokunsal",
   "mobile.settings.feedback.retry": "Dokunsal ayarını kaydetmeyi tekrar dene",
