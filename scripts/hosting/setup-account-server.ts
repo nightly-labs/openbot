@@ -3,7 +3,7 @@
  * it makes. Run it again at any time: it changes only what differs.
  *
  *   read -rs STRIPE_SECRET_KEY && read -rs BOAT_API_KEY && export STRIPE_SECRET_KEY BOAT_API_KEY
- *   bun run hosting:setup --target=production [--template=<snapshot>]
+ *   bun run hosting:setup --target=production
  *
  *   bun run hosting:setup --target=test
  *
@@ -187,7 +187,6 @@ async function main(args: string[]): Promise<void> {
       target: { type: "string" },
       api: { type: "string" },
       "replace-webhooks": { type: "boolean", default: false },
-      template: { type: "string" },
     },
     strict: true,
   });
@@ -236,21 +235,6 @@ async function main(args: string[]): Promise<void> {
   );
   if (boatSecretValue) await put("BOAT_WEBHOOK_SECRET", boatSecretValue);
 
-  if (values.template) {
-    if (!live) throw new Error("--template is for production. Set the test template on the test Worker.");
-    // A variable, not a secret: the snapshot name is not private.
-    await run("gh", [
-      "variable",
-      "set",
-      "HOSTED_SERVER_TEMPLATE",
-      "--env",
-      GITHUB_ENVIRONMENT,
-      "--body",
-      values.template,
-    ]);
-    written.push("HOSTED_SERVER_TEMPLATE");
-  }
-
   logger.info(written.length ? `Wrote ${written.join(", ")} to ${store.label}.` : `${store.label} did not change.`);
   const next: string[] = [];
   if (written.length > 0) {
@@ -264,8 +248,7 @@ async function main(args: string[]): Promise<void> {
     "Stripe Dashboard: in Revenue recovery → Retries, set 'If all retries for a payment fail' to cancel the subscription or to mark it unpaid.",
   );
   if (live) {
-    if (!values.template)
-      next.push("Set HOSTED_SERVER_TEMPLATE with --template=<snapshot> (bun run hosting:template).");
+    next.push("The desktop release workflow selects HOSTED_SERVER_TEMPLATE directly on the production Worker.");
     if (!(await store.has("OPENPANEL_CLIENT_ID"))) {
       next.push("Optional: set OPENPANEL_CLIENT_ID and OPENPANEL_CLIENT_SECRET with gh secret set --env.");
     }

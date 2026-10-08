@@ -144,7 +144,8 @@ For a deployed Worker, `bun run api:deploy` decrypts `.env.production`. It sends
 `EMAIL_SMTP_PASSWORD`, `SKILLS_ADMIN_TOKEN`, `REMOTE_TICKET_PRIVATE_JWK`,
 `REMOTE_TICKET_PUBLIC_JWKS`, `REMOTE_AUTH_WEBHOOK_SECRET`, and `SITE_REPORT_HASH_SECRET` to
 `wrangler secret put` through standard input, and `GITHUB_APP_PRIVATE_KEY` when it is set. It then
-builds and deploys the Worker.
+builds and deploys the Worker. Production deployment preserves `HOSTED_SERVER_TEMPLATE`; the
+desktop release workflow owns that setting. Test deployment can still set its own template.
 
 `GITHUB_APP_PRIVATE_KEY` is the OpenBot GitHub App's private key as a PKCS #8 PEM. GitHub gives a
 PKCS #1 key; convert it with `openssl pkcs8 -topk8 -nocrypt -in <key>.pem`. With the key, the

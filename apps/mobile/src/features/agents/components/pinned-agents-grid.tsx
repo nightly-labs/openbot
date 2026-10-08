@@ -17,6 +17,7 @@ import { AgentAndroidMenu, useAgentContextMenu } from "@/features/agents/compone
 import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
+import { ChatZoomSource } from "@/features/agents/components/chat-zoom-source";
 import { useAgentUnread } from "@/features/workspace/components/use-live-workspace";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import { isAndroid } from "@/shared/lib/platform";
@@ -99,7 +100,7 @@ function PinnedAgentItem({ agent }: { agent: MobileAgent }) {
           onLongPress={isAndroid ? () => menu.current?.show() : undefined}
           style={({ pressed }) => ({ opacity: pressed ? 0.58 : 1 })}
         >
-          <Link.AppleZoom>
+          <ChatZoomSource>
             <AgentPinAvatar agentId={agent.id} location="pinned" size={64}>
               <BloubAvatar
                 agentId={agent.id}
@@ -116,7 +117,7 @@ function PinnedAgentItem({ agent }: { agent: MobileAgent }) {
                 />
               ) : null}
             </AgentPinAvatar>
-          </Link.AppleZoom>
+          </ChatZoomSource>
           <View className="w-full gap-0.5">
             <Typography.Paragraph
               type="body-xs"

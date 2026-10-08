@@ -16,7 +16,7 @@ import { dirname, join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
-import { createOpenBotLogger, toLogValue } from "@openbot/logging";
+import { createOpenBotLogger, registerSecretValue, toLogValue } from "@openbot/logging";
 
 const logger = createOpenBotLogger("build-boat-template");
 const BOAT_API_URL = "https://boat.dev/api/v1";
@@ -40,6 +40,7 @@ const hostingRoot = dirname(fileURLToPath(import.meta.url));
 
 interface TemplateOptions {
   name: string;
+  version: string;
   appImageUrl: string;
   appImageSha256: string;
   authApiUrl: string;
@@ -60,7 +61,23 @@ async function main(): Promise<void> {
   const options = parseOptions(process.argv.slice(2));
   const apiKey = process.env.BOAT_TEMPLATE_API_KEY?.trim();
   if (!apiKey) throw new Error("Set BOAT_TEMPLATE_API_KEY to a boat key with sandbox and snapshot access.");
+  registerSecretValue(apiKey);
   const boat = boatRequester(apiKey);
+  // A release retry must not replace an artifact that new servers already use.
+  const existing = await findNamedSnapshot(boat, options.name);
+  if (existing) {
+    await waitForNamedSnapshot(boat, options.name, existing);
+    logger.info("The release snapshot is ready.", { name: options.name });
+    return;
+  }
+  const listed = await boat("GET", "/named-snapshots", "Named snapshot list");
+  if (!Array.isArray(listed.snapshots)) throw new Error("boat returned no named snapshot list.");
+  const allowance = isDynamicRecord(listed.allowance) ? listed.allowance : null;
+  const used = typeof allowance?.used === "number" ? allowance.used : listed.snapshots.length;
+  // Keep the agreed limit even when boat permits additional paid snapshots.
+  if (Math.max(used, listed.snapshots.length) >= 10) {
+    throw new Error("The 10-snapshot limit is reached. Remove unused snapshots, then retry the release.");
+  }
 
   const created = await boat("POST", "/sandboxes", "Builder creation", {
     body: { type: "small", noEnv: true, ttlSeconds: 7_200 },
@@ -90,6 +107,7 @@ async function main(): Promise<void> {
       builderId,
       [
         "test -x /opt/OpenBot/app/openbot",
+        `test "$(sed -n 's/^X-AppImage-Version=//p' /opt/OpenBot/app/*.desktop)" = ${shellQuote(options.version)}`,
         "systemctl is-enabled --quiet openbot.service",
         "! systemctl is-active --quiet openbot.service",
         // With more than one unit, `is-enabled` passes when one of them is enabled.
@@ -201,14 +219,30 @@ async function runDetached(boat: BoatRequester, sandboxId: string, command: stri
 async function saveNamedSnapshot(boat: BoatRequester, sandboxId: string, name: string): Promise<void> {
   await boat("POST", "/named-snapshots", "Named snapshot save", { body: { sandboxId, name } });
   logger.info("Saving the named snapshot.", { name });
+  await waitForNamedSnapshot(boat, name);
+}
+
+async function findNamedSnapshot(boat: BoatRequester, name: string): Promise<DynamicRecord | null> {
+  let body: DynamicRecord;
+  try {
+    body = await boat("GET", `/named-snapshots/${encodeURIComponent(name)}`, "Named snapshot status");
+  } catch (error) {
+    if (error instanceof BoatRequestError && error.status === 404) return null;
+    throw error;
+  }
+  if (!isDynamicRecord(body.snapshot)) throw new Error("boat returned no named snapshot.");
+  return body.snapshot;
+}
+
+async function waitForNamedSnapshot(boat: BoatRequester, name: string, initial?: DynamicRecord): Promise<void> {
   for (let attempt = 0; attempt < 180; attempt += 1) {
-    await delay(10_000);
-    const body = await boat("GET", `/named-snapshots/${encodeURIComponent(name)}`, "Named snapshot status");
-    const snapshot = isDynamicRecord(body.snapshot) ? body.snapshot : null;
+    const snapshot = attempt === 0 && initial ? initial : await findNamedSnapshot(boat, name);
     if (snapshot?.status === "ready") return;
     if (snapshot?.status === "failed") {
-      throw new Error(`The named snapshot failed: ${isString(snapshot.error) ? snapshot.error : "no reason"}`);
+      throw new Error("The named snapshot failed. Inspect it in boat before retrying; it was not replaced.");
     }
+    if (snapshot && snapshot.status !== "saving") throw new Error("boat returned an unexpected named snapshot status.");
+    await delay(10_000);
   }
   throw new Error("The named snapshot did not become ready in 30 minutes.");
 }
@@ -252,8 +286,13 @@ function parseOptions(args: string[]): TemplateOptions {
   if (!/^[0-9a-f]{64}$/u.test(appImageSha256)) throw new Error("--appimage-sha256 must be 64 hex digits.");
   const authApiUrl = new URL(read("auth-api-url"));
   if (authApiUrl.protocol !== "https:") throw new Error("--auth-api-url must use HTTPS.");
+  const name =
+    args.find((argument) => argument.startsWith("--name="))?.slice(7) ??
+    `openbot-server-${version.replaceAll(".", "-")}`;
+  if (!/^[a-z0-9][a-z0-9-]{0,62}$/u.test(name)) throw new Error("--name must be a boat snapshot name.");
   return {
-    name: `openbot-server-${version.replaceAll(".", "-")}`,
+    name,
+    version,
     appImageUrl,
     appImageSha256,
     authApiUrl: authApiUrl.origin,

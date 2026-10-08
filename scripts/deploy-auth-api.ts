@@ -25,8 +25,8 @@ async function main(): Promise<void> {
   assertStripeKeyMode();
   await putOptionalSecretSet("STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET");
   await putOptionalSecretSet("BOAT_API_KEY", "BOAT_WEBHOOK_SECRET");
-  // An unset value keeps the value that the Worker has: a new template is set for each release.
-  await putOptionalSecret("HOSTED_SERVER_TEMPLATE");
+  // Production releases own the template. Test deployments keep their separate setting.
+  if (cloudflareEnvironment === "test") await putOptionalSecret("HOSTED_SERVER_TEMPLATE");
   // Without the key, agents act on GitHub as the signed-in user and not as the OpenBot GitHub App.
   await putOptionalSecret("GITHUB_APP_PRIVATE_KEY");
   // Slack is optional: without these, the Slack routes answer 503 slack_not_configured. The test
