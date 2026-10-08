@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { AgentRoutineStore } from "../agent-routine-store";
 import { AgentStore } from "../agent-store";
 import { runCauseEffect } from "../effect-boundary";
+import { routineFlowRoutines } from "./routine-flow-routines";
 import { RoutineFlowStore } from "./routine-flow-store";
 import { createRoutineFlows, type RoutineFlowDelivery, type RoutineFlowsHandle } from "./routine-flows";
 
@@ -48,7 +49,7 @@ async function setup() {
     Effect.runPromise(
       createRoutineFlows({
         store,
-        routines,
+        routines: routineFlowRoutines(routines),
         delivery: (id) => deliveries.get(id) ?? null,
         turnAnswer: (agentId, turnId) => answers.get(`${agentId}:${turnId}`) ?? null,
         agentName: (agentId) => agentId,
@@ -326,5 +327,20 @@ describe("routine flows", () => {
     const morning = canvas.routines.find((entry) => entry.routine.name === "Morning brief");
     expect(morning?.upcomingRuns.length).toBeGreaterThan(0);
     expect(canvas.routines.find((entry) => entry.routine.id === weekly.id)?.upcomingRuns).toEqual([]);
+  });
+
+  it("shows a webhook routine with its trigger and no upcoming runs", async () => {
+    const { flows, routines } = await setup();
+    const hook = routines.saveRecord("research", undefined, {
+      name: "New issue",
+      instruction: "Triage the issue.",
+      active: true,
+      timezone: "UTC",
+      trigger: { kind: "webhook", eventType: "issue.opened", filters: [], secretCiphertext: "sealed" },
+    });
+
+    const entry = (await runCauseEffect(flows.canvas("research"))).routines.find((item) => item.routine.id === hook.id);
+    expect(entry?.routine.trigger).toEqual({ kind: "webhook", url: null, eventType: "issue.opened", filters: [] });
+    expect(entry?.upcomingRuns).toEqual([]);
   });
 });

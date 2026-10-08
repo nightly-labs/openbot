@@ -7,6 +7,8 @@ import type { OpenBotDesktopApi } from "@openbot/contracts/ipc";
 export interface RoutineFlowsPort {
   routineFlows: OpenBotDesktopApi["routineFlows"];
   openUrl: OpenBotDesktopApi["openUrl"];
+  /** Webhook routines: their config, signing secret, relay status and a test run. */
+  events: Pick<OpenBotDesktopApi["events"], "getStatus" | "saveRoutine" | "rotateSecret" | "testRoutine">;
   agent: Pick<
     OpenBotDesktopApi["agent"],
     "testRoutine" | "updateRoutine" | "onScopedEvent" | "sendMessage" | "readConversationPage"

@@ -23,10 +23,10 @@ import type {
   DisconnectRoutineFlowInput,
   QueueDeliveryStatus,
   RemoveRoutineFlowPositionInput,
-  Routine,
   RoutineFlowCanvas,
   RoutineFlowLink,
   RoutineFlowRoutine,
+  RoutineFlowRoutineInfo,
   RoutineFlowStep,
   RoutineRun,
   SaveRoutineFlowPositionInput,
@@ -62,8 +62,9 @@ export interface RoutineFlowDelivery {
 export interface RoutineFlowsDependencies {
   store: RoutineFlowStore;
   routines: {
-    list(agentId: string): Routine[];
-    get(agentId: string, routineId: string): Routine | null;
+    /** Routines of every trigger kind: a schedule or a webhook starts each one. */
+    list(agentId: string): RoutineFlowRoutineInfo[];
+    get(agentId: string, routineId: string): RoutineFlowRoutineInfo | null;
     listRuns(agentId: string, routineId: string, limit?: number): RoutineRun[];
   };
   delivery(deliveryId: string): RoutineFlowDelivery | null;
@@ -110,7 +111,7 @@ class RoutineFlows extends Context.Service<RoutineFlows, RoutineFlowsShape>()("o
         const attempt = <A>(work: () => A) =>
           Effect.try({ try: work, catch: (cause) => new RoutineFlowFailed({ cause }) });
 
-        const ownerOf = (routineId: string): Routine | null => {
+        const ownerOf = (routineId: string): RoutineFlowRoutineInfo | null => {
           const ownerAgentId = store.routineOwner(routineId);
           return ownerAgentId ? dependencies.routines.get(ownerAgentId, routineId) : null;
         };
@@ -127,7 +128,7 @@ class RoutineFlows extends Context.Service<RoutineFlows, RoutineFlowsShape>()("o
           ];
         };
 
-        const flowRoutine = (routine: Routine): RoutineFlowRoutine => {
+        const flowRoutine = (routine: RoutineFlowRoutineInfo): RoutineFlowRoutine => {
           const recentRuns = dependencies.routines.listRuns(routine.agentId, routine.id, RECENT_RUNS);
           const newest = recentRuns[0];
           return {
@@ -146,7 +147,7 @@ class RoutineFlows extends Context.Service<RoutineFlows, RoutineFlowsShape>()("o
               .routineIdsTouching(agentId)
               .filter((routineId) => !ownIds.has(routineId))
               .map(ownerOf)
-              .filter((routine): routine is Routine => routine !== null);
+              .filter((routine): routine is RoutineFlowRoutineInfo => routine !== null);
             const routines = [...own, ...others];
             const positions = store.positions(agentId);
             return {
@@ -415,16 +416,18 @@ function handoffText(
   return `The routine "${routineName}" continues with you.\n\n${parts.join("\n\n---\n\n")}\n\n${task}`;
 }
 
-/** The times a routine fires in the next week, soonest first, from its schedule. */
-function upcoming(routine: Routine, from: Date): string[] {
+/** The times a routine fires in the next week, soonest first, from its schedule. A webhook has none. */
+function upcoming(routine: RoutineFlowRoutineInfo, from: Date): string[] {
+  if (routine.trigger.kind !== "schedule") return [];
+  const schedule = routine.trigger.schedule;
   const end = from.getTime() + UPCOMING_WINDOW_MS;
   const times: string[] = [];
   try {
     for (
-      let next = nextValidRoutineOccurrence(routine.trigger.schedule, routine.timezone, from);
+      let next = nextValidRoutineOccurrence(schedule, routine.timezone, from);
       next.getTime() < end && times.length < UPCOMING_LIMIT;
       // One millisecond on, so an occurrence never answers itself.
-      next = nextValidRoutineOccurrence(routine.trigger.schedule, routine.timezone, new Date(next.getTime() + 1))
+      next = nextValidRoutineOccurrence(schedule, routine.timezone, new Date(next.getTime() + 1))
     )
       times.push(next.toISOString());
   } catch (error) {

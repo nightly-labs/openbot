@@ -1,7 +1,8 @@
 import { INPUT_LIMITS } from "./input-limits";
 import { isBoundedString, isFiniteNumber, isIdentifier } from "./ipc-bounded-values";
-import { isRoutine, isRoutineRun, type Routine, type RoutineRun } from "./ipc-routines";
-import { isDynamicRecord, isOneOf, isString } from "./runtime-values";
+import { type EventRoutine, isEventRoutineTrigger } from "./ipc-events";
+import { isRoutineRun, type RoutineRun } from "./ipc-routines";
+import { isBoolean, isDynamicRecord, isOneOf, isString } from "./runtime-values";
 
 /**
  * Routine flows: what happens after an agent routine's own agent answers. A link hands that answer
@@ -43,8 +44,11 @@ export interface RoutineFlowPosition {
   y: number;
 }
 
+/** A routine on a canvas, with what starts it: a schedule, or a webhook with its URL and filters. */
+export type RoutineFlowRoutineInfo = Omit<EventRoutine, "owner"> & { agentId: string };
+
 export interface RoutineFlowRoutine {
-  routine: Routine;
+  routine: RoutineFlowRoutineInfo;
   /** Newest first. */
   recentRuns: RoutineRun[];
   /** The times it fires in the next seven days, soonest first. Empty while it is paused. */
@@ -155,10 +159,26 @@ function isRoutineFlowPosition(value: unknown): value is RoutineFlowPosition {
   );
 }
 
+function isRoutineFlowRoutineInfo(value: unknown): value is RoutineFlowRoutineInfo {
+  return (
+    isDynamicRecord(value) &&
+    isIdentifier(value.id) &&
+    isIdentifier(value.agentId) &&
+    isString(value.name) &&
+    isString(value.instruction) &&
+    isBoolean(value.active) &&
+    isString(value.timezone) &&
+    isEventRoutineTrigger(value.trigger) &&
+    (value.limitPolicy === undefined || value.limitPolicy === "wait" || value.limitPolicy === "skip") &&
+    isString(value.createdAt) &&
+    isString(value.updatedAt)
+  );
+}
+
 function isRoutineFlowRoutine(value: unknown): value is RoutineFlowRoutine {
   return (
     isDynamicRecord(value) &&
-    isRoutine(value.routine) &&
+    isRoutineFlowRoutineInfo(value.routine) &&
     Array.isArray(value.recentRuns) &&
     value.recentRuns.every(isRoutineRun) &&
     Array.isArray(value.upcomingRuns) &&

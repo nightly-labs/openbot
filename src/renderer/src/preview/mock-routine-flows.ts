@@ -43,10 +43,11 @@ export function mockRoutineFlows(source: MockRoutineFlowsSource): OpenBotDesktop
         agentId,
         routines: routines.map((routine) => {
           const recentRuns = (source.routineRuns.get(routine.id) ?? []).slice(0, 10);
+          const { trigger, ...fields } = routine;
           return {
-            routine,
+            routine: { ...fields, trigger: { kind: "schedule" as const, schedule: trigger.schedule } },
             recentRuns,
-            upcomingRuns: routine.active ? [routine.trigger.nextRunAt] : [],
+            upcomingRuns: routine.active ? [trigger.nextRunAt] : [],
             steps: steps.filter((step) => step.runId === recentRuns[0]?.id),
           };
         }),

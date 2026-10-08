@@ -5,3 +5,4 @@
 - Ask an agent to edit the canvas. The chat panel on the Routines view sends your request to the open agent, which can add or remove routine links, and create or change routines, with its tools.
 - Change an agent's task in a routine from the routine details panel. For the routine's own agent, this changes what the routine asks for.
 - Right-click the routine canvas to add an agent at that spot: one you already have, or a new one with its name, what it does, and its model.
+- Webhook routines show on the routine canvas. Their details set the webhook: copy the endpoint, regenerate the signing secret, and choose the event type and filters that start a run. Run now tests them.

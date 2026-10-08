@@ -789,6 +789,17 @@
   white-space: nowrap;
 }
 
+/* The webhook of a routine in the details panel: the routine settings' card, and Save under it. */
+.diagram-routine-webhook {
+  display: grid;
+  gap: var(--openbot-space-2);
+}
+
+.diagram-routine-webhook-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 /* The routine picker, at the top centre of the canvas. */
 .diagram-view-lens-bar {
   position: absolute;

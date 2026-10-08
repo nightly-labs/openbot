@@ -6,6 +6,16 @@
  */
 
 import type { RoutineSchedule } from "@openbot/contracts/ipc";
+import type { EventFilter } from "@openbot/contracts/ipc-events";
+
+/** A webhook that starts a routine: where requests go, and which of them start a run. */
+export interface DiagramRoutineWebhook {
+  /** Null until the host has made the endpoint. */
+  url: string | null;
+  /** Null starts the routine for every event type. */
+  eventType: string | null;
+  filters: EventFilter[];
+}
 
 export interface DiagramPoint {
   x: number;
@@ -20,7 +30,9 @@ export type DiagramNode =
       name: string;
       /** What the routine asks for. The agents it starts receive it as their input. */
       instruction: string;
-      schedule: RoutineSchedule;
+      /** Null when a webhook starts the routine instead. */
+      schedule: RoutineSchedule | null;
+      webhook?: DiagramRoutineWebhook | undefined;
       active: boolean;
       /**
        * The times it fires next, soonest first. The host expands the schedule, so the canvas never

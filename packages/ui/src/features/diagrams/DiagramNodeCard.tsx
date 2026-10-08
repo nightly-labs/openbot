@@ -5,17 +5,16 @@
  * it and draws connections from its ports, and finds it through the `data-diagram-*` attributes.
  */
 
-import { Button, Check, Clock3, Minus, Play, Spinner, TriangleAlert, X } from "@openbot/ui";
+import { Button, Check, Clock3, Minus, Play, Spinner, TriangleAlert, Webhook, X } from "@openbot/ui";
 import { For, Match, Show, Switch } from "solid-js";
 import type { AvatarMood } from "../../bloub-avatar";
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
-import { routineScheduleSummary } from "../conversation/routine-schedule-ui";
 import { DiagramRoutineRunDots } from "./DiagramRoutineVisuals";
 import { DIAGRAM_NODE_WIDTH, diagramAgentTask } from "./diagram-graph";
 import type { DiagramNode, DiagramStepRun, DiagramStepStatus } from "./diagram-model";
-import { DIAGRAM_STEP_STATUS_KEY, diagramStepSeconds } from "./diagram-text";
+import { DIAGRAM_STEP_STATUS_KEY, diagramRoutineTrigger, diagramStepSeconds } from "./diagram-text";
 
 /** How an input port answers a connection in progress. */
 export type DiagramPortTarget = "none" | "valid" | "invalid";
@@ -81,8 +80,7 @@ export function DiagramNodeCard(props: DiagramNodeCardProps) {
   };
   const label = () => {
     const node = routine();
-    if (node)
-      return t("diagram.node.routineLabel", { name: props.name, schedule: routineScheduleSummary(node.schedule) });
+    if (node) return t("diagram.node.routineLabel", { name: props.name, schedule: diagramRoutineTrigger(node) });
     if (props.unreachable) return t("diagram.node.agentUnreachableLabel", { name: props.name });
     return props.step === undefined ? props.name : t("diagram.node.agentLabel", { name: props.name, step: props.step });
   };
@@ -144,7 +142,9 @@ export function DiagramNodeCard(props: DiagramNodeCardProps) {
             when={props.agent}
             fallback={
               <span class="diagram-node-icon" aria-hidden="true">
-                <Clock3 />
+                <Show when={props.node.kind === "routine" && props.node.webhook} fallback={<Clock3 />}>
+                  <Webhook />
+                </Show>
               </span>
             }
           >
@@ -258,7 +258,7 @@ export function DiagramNodeCard(props: DiagramNodeCardProps) {
       >
         {(node) => (
           <div class="diagram-node-body">
-            <p class="diagram-node-schedule">{routineScheduleSummary(node().schedule)}</p>
+            <p class="diagram-node-schedule">{diagramRoutineTrigger(node())}</p>
             <p class="diagram-routine-instruction">{node().instruction}</p>
             <div class="diagram-node-footer">
               <DiagramRoutineRunDots runs={node().recentRuns} limit={8} />

@@ -166,7 +166,16 @@ export function routineFlowDiagram(
         position: positionOf(key, { x: 0, y: index * ROUTINE_ROW }),
         name: entry.routine.name,
         instruction: entry.routine.instruction,
-        schedule: entry.routine.trigger.schedule,
+        schedule: entry.routine.trigger.kind === "schedule" ? entry.routine.trigger.schedule : null,
+        ...(entry.routine.trigger.kind === "webhook"
+          ? {
+              webhook: {
+                url: entry.routine.trigger.url,
+                eventType: entry.routine.trigger.eventType,
+                filters: entry.routine.trigger.filters,
+              },
+            }
+          : {}),
         active: entry.routine.active,
         upcomingRuns: entry.upcomingRuns,
         recentRuns: entry.recentRuns.map(routineRun),

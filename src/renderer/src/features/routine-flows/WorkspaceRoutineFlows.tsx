@@ -5,7 +5,13 @@
  * The chat panel sends requests to the open agent, which edits the canvas with its tools.
  */
 
-import { type RoutineFlowCanvas, type RoutineFlowLink, routineFlowAgentKey } from "@openbot/contracts/ipc";
+import {
+  type RoutineFlowCanvas,
+  type RoutineFlowLink,
+  type RoutineFlowRoutineInfo,
+  routineFlowAgentKey,
+} from "@openbot/contracts/ipc";
+import type { EventFilter } from "@openbot/contracts/ipc-events";
 import { toast } from "@openbot/ui";
 import type { AgentProfile } from "@openbot/ui/data";
 import type { DiagramModelChoice } from "@openbot/ui/features/diagrams/DiagramNewAgentCard";
@@ -38,6 +44,8 @@ interface RoutineFlowState {
   moved: Record<string, DiagramPoint>;
   /** Connections drawn here, shown at once while the host saves them. */
   pendingLinks: RoutineFlowLink[];
+  /** Whether the host reaches the webhook relay. Null until it answers. */
+  webhookConnected: boolean | null;
 }
 
 export function WorkspaceRoutineFlows(props: { port?: RoutineFlowsPort }) {
@@ -68,6 +76,7 @@ export function WorkspaceRoutineFlows(props: { port?: RoutineFlowsPort }) {
     error: null,
     moved: {},
     pendingLinks: [],
+    webhookConnected: null,
   });
   const assistant = createRoutineFlowAssistant(port, agentId);
   let generation = 0;
@@ -118,6 +127,14 @@ export function WorkspaceRoutineFlows(props: { port?: RoutineFlowsPort }) {
   );
 
   onSettled(() => {
+    port()
+      .events.getStatus("local")
+      .then((status) =>
+        setState((draft) => {
+          draft.webhookConnected = status.connected;
+        }),
+      )
+      .catch(() => undefined);
     const stopChanged = port().routineFlows.onChanged((change) => {
       const id = agentId();
       if (id && change.agentIds.includes(id)) reloadSoon();
@@ -194,6 +211,40 @@ export function WorkspaceRoutineFlows(props: { port?: RoutineFlowsPort }) {
               .catch(failed(t("composer.error.openLink"))),
         }
       : undefined;
+
+  const routineOfNode = (routineNodeId: string) => {
+    const routineId = routineIdOfNode(routineNodeId);
+    return state.canvas?.routines.find((entry) => entry.routine.id === routineId)?.routine ?? null;
+  };
+  const ownerOf = (routine: RoutineFlowRoutineInfo) => ({ kind: "agent" as const, id: routine.agentId });
+  /**
+   * Saves a webhook routine through the events API, as its settings do, with one change: its
+   * instruction, or the events that start it. The host keeps the endpoint and the secret.
+   */
+  const saveWebhookRoutine = (
+    routine: RoutineFlowRoutineInfo,
+    change: { instruction?: string; eventType?: string | null; filters?: EventFilter[] },
+  ) => {
+    const webhook = routine.trigger.kind === "webhook" ? routine.trigger : null;
+    if (!webhook) return Promise.reject(new Error(t("diagram.flows.saveFailed")));
+    return port().events.saveRoutine(
+      {
+        id: routine.id,
+        owner: ownerOf(routine),
+        name: routine.name,
+        instruction: change.instruction ?? routine.instruction,
+        active: routine.active,
+        timezone: routine.timezone,
+        ...(routine.limitPolicy ? { limitPolicy: routine.limitPolicy } : {}),
+        trigger: {
+          kind: "webhook",
+          eventType: change.eventType === undefined ? webhook.eventType : change.eventType,
+          filters: change.filters ?? webhook.filters,
+        },
+      },
+      "local",
+    );
+  };
 
   const savePosition = (canvasAgentId: string, nodeKey: string, point: DiagramPoint) => {
     window.clearTimeout(pendingSaves.get(nodeKey)?.timer);
@@ -332,10 +383,12 @@ export function WorkspaceRoutineFlows(props: { port?: RoutineFlowsPort }) {
                   // links that reach it in this routine ask.
                   const saved =
                     routine.agentId === editedAgentId
-                      ? port().agent.updateRoutine(
-                          { agentId: routine.agentId, routineId: routine.id, instruction: task },
-                          "local",
-                        )
+                      ? routine.trigger.kind === "webhook"
+                        ? saveWebhookRoutine(routine, { instruction: task })
+                        : port().agent.updateRoutine(
+                            { agentId: routine.agentId, routineId: routine.id, instruction: task },
+                            "local",
+                          )
                       : Promise.all(
                           (state.canvas?.links ?? [])
                             .filter((link) => link.routineId === routine.id && link.toAgentId === editedAgentId)
@@ -349,10 +402,30 @@ export function WorkspaceRoutineFlows(props: { port?: RoutineFlowsPort }) {
                   const routineId = routineIdOfNode(nodeId);
                   const routine = state.canvas?.routines.find((entry) => entry.routine.id === routineId)?.routine;
                   if (!routine) return;
-                  port()
-                    .agent.testRoutine({ agentId: routine.agentId, routineId: routine.id }, "local")
-                    .then(() => load(canvasAgentId))
-                    .catch(failed(t("diagram.flows.runFailed")));
+                  // A webhook routine runs a test the way its settings do: through the events API.
+                  const started =
+                    routine.trigger.kind === "webhook"
+                      ? port().events.testRoutine({ id: routine.id, owner: ownerOf(routine) }, "local")
+                      : port().agent.testRoutine({ agentId: routine.agentId, routineId: routine.id }, "local");
+                  started.then(() => load(canvasAgentId)).catch(failed(t("diagram.flows.runFailed")));
+                }}
+                webhooks={{
+                  connected: state.webhookConnected,
+                  onSave: async (routineNodeId, change) => {
+                    const routine = routineOfNode(routineNodeId);
+                    if (!routine) return;
+                    await saveWebhookRoutine(routine, change);
+                    await load(canvasAgentId);
+                  },
+                  onRegenerateSecret: async (routineNodeId) => {
+                    const routine = routineOfNode(routineNodeId);
+                    if (!routine) throw new Error(t("diagram.flows.saveFailed"));
+                    const { secret } = await port().events.rotateSecret(
+                      { id: routine.id, owner: ownerOf(routine) },
+                      "local",
+                    );
+                    return secret;
+                  },
                 }}
               />
             )}

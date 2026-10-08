@@ -10,10 +10,10 @@ import { createEffect, createMemo, createSignal, For, flush, Show } from "solid-
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
-import { routineScheduleSummary } from "../conversation/routine-schedule-ui";
 import { sidebarMessageTime } from "../sidebar/sidebar-filtering";
 import { DiagramStepIcon } from "./DiagramNodeCard";
 import { DiagramRoutineWeek, diagramRunStepStatus } from "./DiagramRoutineVisuals";
+import { DiagramRoutineWebhookConfig, type DiagramWebhookActions } from "./DiagramRoutineWebhookConfig";
 import {
   diagramAgentTask,
   diagramExecutionSteps,
@@ -24,7 +24,12 @@ import {
   diagramRunOf,
 } from "./diagram-graph";
 import type { Diagram, DiagramNode, DiagramStepRun } from "./diagram-model";
-import { DIAGRAM_RUN_STATUS_KEY, DIAGRAM_STEP_STATUS_KEY, diagramStepSeconds } from "./diagram-text";
+import {
+  DIAGRAM_RUN_STATUS_KEY,
+  DIAGRAM_STEP_STATUS_KEY,
+  diagramRoutineTrigger,
+  diagramStepSeconds,
+} from "./diagram-text";
 
 export interface DiagramInspectorProps {
   diagram: Diagram;
@@ -38,6 +43,8 @@ export interface DiagramInspectorProps {
   onFocusRoutine: (routineId: string) => void;
   /** Saves what an agent does in one routine. Without it, the task is read-only. */
   onEditTask?: ((nodeId: string, routineId: string, task: string) => void) | undefined;
+  /** Sets the webhook of a routine that a webhook starts. Without it, the webhook is not shown. */
+  webhooks?: DiagramWebhookActions | undefined;
 }
 
 export function DiagramInspector(props: DiagramInspectorProps) {
@@ -191,6 +198,7 @@ export function DiagramInspector(props: DiagramInspectorProps) {
                   agents={props.agents}
                   now={props.now}
                   onSelectNode={props.onSelectNode}
+                  webhooks={props.webhooks}
                 />
               )}
             </Show>
@@ -385,6 +393,7 @@ function RoutineDetail(props: {
   agents: AgentProfile[];
   now: Date;
   onSelectNode: (nodeId: string | null) => void;
+  webhooks?: DiagramWebhookActions | undefined;
 }) {
   const { t, format } = useText();
   const reach = createMemo(() => diagramRoutineReach(props.diagram.edges, props.routine.id));
@@ -415,7 +424,7 @@ function RoutineDetail(props: {
         <Badge variant={props.routine.active ? "success-light" : "secondary"}>
           {props.routine.active ? t("diagram.routine.active") : t("diagram.node.paused")}
         </Badge>
-        <span>{routineScheduleSummary(props.routine.schedule, true)}</span>
+        <span>{diagramRoutineTrigger(props.routine, true)}</span>
       </div>
 
       <TextBlock title={t("diagram.routine.does")} text={props.routine.instruction} empty="" />
@@ -451,18 +460,42 @@ function RoutineDetail(props: {
         </Show>
       </section>
 
-      <section class="diagram-inspector-section">
-        <h3 class="diagram-inspector-section-title">{t("diagram.routine.week")}</h3>
-        <DiagramRoutineWeek upcomingRuns={props.routine.upcomingRuns} now={props.now} size="panel" />
-        <Show
-          when={thisWeek().length > 0}
-          fallback={<p class="diagram-inspector-empty">{t("diagram.routine.noUpcoming")}</p>}
-        >
-          <ol class="diagram-inspector-times">
-            <For each={thisWeek().slice(0, UPCOMING_LIMIT)}>{(at) => <li>{when(at)}</li>}</For>
-          </ol>
-        </Show>
-      </section>
+      <Show
+        when={props.routine.webhook}
+        fallback={
+          <section class="diagram-inspector-section">
+            <h3 class="diagram-inspector-section-title">{t("diagram.routine.week")}</h3>
+            <DiagramRoutineWeek upcomingRuns={props.routine.upcomingRuns} now={props.now} size="panel" />
+            <Show
+              when={thisWeek().length > 0}
+              fallback={<p class="diagram-inspector-empty">{t("diagram.routine.noUpcoming")}</p>}
+            >
+              <ol class="diagram-inspector-times">
+                <For each={thisWeek().slice(0, UPCOMING_LIMIT)}>{(at) => <li>{when(at)}</li>}</For>
+              </ol>
+            </Show>
+          </section>
+        }
+      >
+        {(webhook) => (
+          <Show when={props.webhooks}>
+            {(actions) => (
+              <section class="diagram-inspector-section">
+                <h3 class="diagram-inspector-section-title">{t("diagram.routine.webhook")}</h3>
+                <Show when={props.routine.id} keyed>
+                  {(routineNodeId) => (
+                    <DiagramRoutineWebhookConfig
+                      routineNodeId={routineNodeId}
+                      webhook={webhook()}
+                      actions={actions()}
+                    />
+                  )}
+                </Show>
+              </section>
+            )}
+          </Show>
+        )}
+      </Show>
 
       <section class="diagram-inspector-section">
         <h3 class="diagram-inspector-section-title">{t("diagram.routine.history")}</h3>
