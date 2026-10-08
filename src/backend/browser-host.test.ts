@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { isBrowserSecretRequest } from "@openbot/contracts/ipc";
-import { Effect } from "effect";
+import { Effect, Fiber } from "effect";
 import {
   BrowserWindow,
   type HandlerDetails,
@@ -158,7 +158,7 @@ vi.mock("electron", async () => {
   };
 });
 
-import type { BrowserScreencastFrame, BrowserScreencastOptions } from "./browser-cdp";
+import { BrowserCdpEngine, type BrowserScreencastFrame, type BrowserScreencastOptions } from "./browser-cdp";
 import { runCauseEffect } from "./effect-boundary";
 
 const viewFrames = vi.hoisted((): Array<(frame: BrowserScreencastFrame) => void> => []);
@@ -172,6 +172,12 @@ vi.mock("./browser-cdp", () => ({
       return Effect.void;
     }
     invalidateReferences() {}
+    cancelPendingCommands() {
+      return true;
+    }
+    click() {
+      return Effect.void;
+    }
     screenshot() {
       return Effect.fail(browserFailure(new Error("Preview unavailable in this fixture.")));
     }
@@ -308,6 +314,77 @@ describe("browser Escape forwarding", () => {
 });
 
 describe("browser address navigation", () => {
+  it.each(["click", "evaluate"] as const)("stops active %s work before the next navigation", async (tool) => {
+    const tab = await runCauseEffect(host.open("https://example.com/tool-cancel", "thread-a", "agent-a"));
+    let started = false;
+    let stopped = false;
+    vi.spyOn(BrowserCdpEngine.prototype, tool).mockImplementationOnce(() =>
+      Effect.gen(function* () {
+        started = true;
+        return yield* Effect.never;
+      }).pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            stopped = true;
+          }),
+        ),
+      ),
+    );
+    const pending = Effect.runFork(
+      host.handleDynamicTool({
+        namespace: "openbot_browser",
+        tool,
+        arguments:
+          tool === "click"
+            ? { tabId: tab.id, target: { kind: "point", x: 1, y: 1 } }
+            : { tabId: tab.id, expression: "1" },
+        threadId: "thread-a",
+        ownerAgentId: "agent-a",
+        turnId: "turn-a",
+        callId: "call-a",
+      }),
+    );
+    await vi.waitFor(() => expect(started).toBe(true));
+    await Effect.runPromise(Fiber.interrupt(pending));
+    await runCauseEffect(host.loadUrl(tab.id, "https://example.com/after-cancel"));
+    expect(stopped).toBe(true);
+    expect(host.listTabs()).toEqual([expect.objectContaining({ id: tab.id, url: "https://example.com/after-cancel" })]);
+  });
+
+  it("closes only the tab whose opening was cancelled", async () => {
+    const existing = await runCauseEffect(host.open("https://example.com/existing"));
+    const prototype = Object.getPrototypeOf(new WebContentsView().webContents);
+    const load = vi.spyOn(prototype, "loadURL").mockImplementationOnce(() => new Promise(() => undefined));
+    const opening = Effect.runFork(host.open("https://example.com/pending", "thread-a", "agent-a"));
+    await vi.waitFor(() => expect(load).toHaveBeenCalled());
+    await Effect.runPromise(Fiber.interrupt(opening));
+    expect(host.listTabs()).toEqual([expect.objectContaining({ id: existing.id })]);
+    await expect(runCauseEffect(host.open("https://example.com/retry"))).resolves.toMatchObject({
+      url: "https://example.com/retry",
+    });
+  });
+
+  it("stops active navigation, skips cancelled queued navigation, and permits a retry", async () => {
+    const tab = await runCauseEffect(host.open("https://example.com/cancel-navigation"));
+    const contents = webContents.getAllWebContents().find((candidate) => candidate.getURL() === tab.url);
+    if (!contents) throw new Error("Browser contents were not created.");
+    const load = vi.spyOn(contents, "loadURL").mockImplementationOnce(() => new Promise(() => undefined));
+    const loading = vi.spyOn(contents, "isLoading").mockReturnValue(true);
+    const stop = vi.spyOn(contents, "stop").mockImplementation(() => {
+      loading.mockReturnValue(false);
+      contents.emit("did-stop-loading");
+    });
+    const active = Effect.runFork(host.loadUrl(tab.id, "https://example.com/pending"));
+    await vi.waitFor(() => expect(load).toHaveBeenCalledOnce());
+    const queued = Effect.runFork(host.loadUrl(tab.id, "https://example.com/cancelled"));
+    await Effect.runPromise(Fiber.interrupt(queued));
+    await Effect.runPromise(Fiber.interrupt(active));
+    await runCauseEffect(host.loadUrl(tab.id, "https://example.com/retry"));
+    expect(stop).toHaveBeenCalledOnce();
+    expect(load.mock.calls.map(([url]) => url)).toEqual(["https://example.com/pending", "https://example.com/retry"]);
+    expect(host.listTabs()).toEqual([expect.objectContaining({ id: tab.id, url: "https://example.com/retry" })]);
+  });
+
   it("releases the tab queue after an address navigation times out", async () => {
     const tab = await runCauseEffect(host.open("https://example.com/timeout-test"));
     const contents = webContents.getAllWebContents().find((candidate) => candidate.getURL() === tab.url);
