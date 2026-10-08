@@ -163,8 +163,11 @@ export function createWebWorkspace(
   let pendingReload = false;
   let reloadPromise: Promise<void> | null = null;
   let hostsRefreshPromise: Promise<void> | null = null;
-  /** The host this account is leaving. Its removal from the list is not an error. */
-  let leftHostId: string | null = null;
+  /**
+   * The hosts this account left. The leave revokes this session and takes the host out of the list;
+   * neither is an error. An id stays until a list without its host arrives.
+   */
+  const leftHostIds = new Set<string>();
   let acceptedInvite: { inviteUrl: string; host: RemoteTeamHost } | null = null;
   /** Set when a revoked session connects again by itself; cleared when the host is online. */
   let revokedReconnect = false;
@@ -207,7 +210,7 @@ export function createWebWorkspace(
         if (disposed || update.hostId !== hostId) return;
         setState((draft) => {
           draft.status = update.state;
-          draft.error = update.message;
+          draft.error = update.code === "session_revoked" && leftHostIds.has(update.hostId) ? null : update.message;
           if (update.state !== "online") {
             draft.approvals = [];
             draft.prompts = [];
@@ -518,7 +521,7 @@ export function createWebWorkspace(
             draft.duplicatingAgentIds = [];
             draft.capabilities = [];
             draft.status = "offline";
-            draft.error = refreshHostId === leftHostId ? null : currentText().t("webClient.error.accessEnded");
+            draft.error = leftHostIds.has(refreshHostId) ? null : currentText().t("webClient.error.accessEnded");
           });
           // First, so the host that left does not get a status connection when it stops being open.
           runtime.hosts?.setHosts(hosts);
@@ -535,6 +538,7 @@ export function createWebWorkspace(
           draft.hostsLoaded = true;
           draft.hostsError = null;
         });
+        for (const left of leftHostIds) if (!hosts.some((host) => host.hostId === left)) leftHostIds.delete(left);
         const first = orderWebHosts(hosts, serverOrder())[0];
         if (!hostId && first) await connect(first);
         // After the opened host, so it takes its Signal connection before the status connections.
@@ -565,17 +569,22 @@ export function createWebWorkspace(
     );
     return promise;
   }
-  /** Leaves a joined host. The host leaves the list as it does when access ends, but without an error. */
+  /**
+   * Leaves a joined host. The host leaves the list as it does when access ends, but without an error.
+   * Resolves when the membership is gone. The list read follows it, so a failed read or the connect
+   * to the next host is not a failed leave.
+   */
   async function leaveHost(host: RemoteTeamHost): Promise<void> {
-    await runtime.leaveHost(host.hostId, host.membershipId);
-    // A read that started before the leave can still list the host, so this read starts after it.
-    await hostsRefreshPromise?.catch(() => undefined);
-    leftHostId = host.hostId;
+    // Before the request: the host revokes this session before the request answers.
+    leftHostIds.add(host.hostId);
     try {
-      await refreshHosts();
-    } finally {
-      leftHostId = null;
+      await runtime.leaveHost(host.hostId, host.membershipId);
+    } catch (error) {
+      leftHostIds.delete(host.hostId);
+      throw error;
     }
+    // A read that started before the leave can still list the host, so this read starts after it.
+    void (hostsRefreshPromise ?? Promise.resolve()).catch(() => undefined).then(retryHosts);
   }
   function retryHosts(): Promise<void> {
     return refreshHosts().catch(() => undefined);

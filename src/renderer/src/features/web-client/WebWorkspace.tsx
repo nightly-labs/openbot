@@ -555,9 +555,18 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     setBillingOpen(true);
     hostedServers.requestDeleteById(serverId);
   }
-  const [leaveHostId, setLeaveHostId] = createSignal<string | null>(null);
+  /** The joined server that the leave confirmation asks about, and the element that asked. */
+  const [leaveRequest, setLeaveRequest] = createSignal<{ hostId: string; trigger: HTMLElement | null } | null>(null);
+  const leaveServer = createMemo(() => servers().find((item) => item.id === leaveRequest()?.hostId) ?? null);
+  // A server that leaves the list in another way ends the request, so it does not open again on a rejoin.
+  createEffect(
+    () => leaveRequest() !== null && leaveServer() === null,
+    (gone) => {
+      if (gone) setLeaveRequest(null);
+    },
+  );
   async function leaveHost(): Promise<void> {
-    const host = workspace.state.hosts.find((item) => item.hostId === leaveHostId());
+    const host = workspace.state.hosts.find((item) => item.hostId === leaveRequest()?.hostId);
     if (host) await workspace.leaveHost(host);
   }
   createEffect(
@@ -981,7 +990,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   onOpenUsage={(id, trigger) => void openUsage(id, trigger)}
                   onSetMuted={setMuted}
                   onSetNotificationLevel={setNotificationLevel}
-                  onLeave={setLeaveHostId}
+                  onLeave={(hostId, trigger) => setLeaveRequest({ hostId, trigger })}
                   onDelete={deleteHostedServer}
                   canDelete={(id) => hostedServerIds().has(id)}
                 />
@@ -1030,7 +1039,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   onOpenUsage: (id, trigger) => void openUsage(id, trigger),
                   onSetMuted: setMuted,
                   onSetNotificationLevel: setNotificationLevel,
-                  onLeave: setLeaveHostId,
+                  onLeave: (hostId, trigger) => setLeaveRequest({ hostId, trigger }),
                   onDelete: deleteHostedServer,
                   canDelete: (id) => hostedServerIds().has(id),
                 }}
@@ -1284,9 +1293,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 )}
               </Show>
               <LeaveServerDialog
-                server={servers().find((item) => item.id === leaveHostId()) ?? null}
-                onClose={() => setLeaveHostId(null)}
+                server={leaveServer()}
+                onClose={() => setLeaveRequest(null)}
                 onLeave={leaveHost}
+                restoreFocusTarget={leaveRequest()?.trigger}
               />
               <BillingDialog
                 open={billingOpen()}

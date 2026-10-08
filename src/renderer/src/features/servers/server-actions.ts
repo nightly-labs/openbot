@@ -82,7 +82,7 @@ export function useServerActions() {
     },
     onOpenSettings: openServerSettings,
     onLeave: requestLeaveServer,
-    onDelete: (serverId) => openHostedServerDelete(serverId),
+    onDelete: openHostedServerDelete,
     canDelete: (serverId) => hostedServerIds().has(serverId),
   };
 

@@ -255,6 +255,12 @@ export function ServerMenu(props: ServerMenuProps) {
                   <span>{t(props.addCreatesServer ? "server.rail.add" : "server.rail.addRemote")}</span>
                 </DropdownMenu.Item>
               </Show>
+              <Show when={props.onOpenMarketplace}>
+                <DropdownMenu.Item onSelect={() => props.onOpenMarketplace?.()}>
+                  <Puzzle class="agent-context-icon size-4" aria-hidden="true" />
+                  <span>{t("sidebar.topbar.marketplace")}</span>
+                </DropdownMenu.Item>
+              </Show>
               <Show when={activeServer()}>
                 {(server) => (
                   <>
@@ -273,12 +279,6 @@ export function ServerMenu(props: ServerMenuProps) {
                     />
                   </>
                 )}
-              </Show>
-              <Show when={props.onOpenMarketplace}>
-                <DropdownMenu.Item onSelect={() => props.onOpenMarketplace?.()}>
-                  <Puzzle class="agent-context-icon size-4" aria-hidden="true" />
-                  <span>{t("sidebar.topbar.marketplace")}</span>
-                </DropdownMenu.Item>
               </Show>
             </Show>
             <DropdownMenu.Separator />

@@ -266,12 +266,13 @@ function AddServer() {
 
 /** The leave confirmation that the server menu opens. */
 function LeaveServer() {
-  const { leaveConfirmServer, requestLeaveServer, leaveConfirmedServer } = useServerSettings();
+  const { leaveConfirmServer, leaveRestoreTarget, cancelLeaveServer, leaveConfirmedServer } = useServerSettings();
   return (
     <LeaveServerDialog
       server={leaveConfirmServer()}
-      onClose={() => requestLeaveServer(null)}
+      onClose={cancelLeaveServer}
       onLeave={leaveConfirmedServer}
+      restoreFocusTarget={leaveRestoreTarget()}
     />
   );
 }

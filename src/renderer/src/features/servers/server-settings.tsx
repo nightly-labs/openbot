@@ -60,10 +60,19 @@ const ServerSettings = createSimpleContext({
     let serverSettingsRestoreTarget: HTMLElement | null = null;
 
     const serverSettingsTarget = createMemo(() => servers().find((server) => server.id === serverSettingsTargetId()));
-    /** The server that the leave confirmation from the server menu asks about. */
-    const [leaveConfirmServerId, setLeaveConfirmServerId] = createSignal<string | null>(null);
+    /** The server that the leave confirmation from the server menu asks about, and the element that asked. */
+    const [leaveRequest, setLeaveRequest] = createSignal<{ serverId: string; trigger: HTMLElement | null } | null>(
+      null,
+    );
     const leaveConfirmServer = createMemo(
-      () => servers().find((server) => server.id === leaveConfirmServerId()) ?? null,
+      () => servers().find((server) => server.id === leaveRequest()?.serverId) ?? null,
+    );
+    // A server that leaves the list in another way ends the request, so it does not open again on a rejoin.
+    createEffect(
+      () => leaveRequest() !== null && leaveConfirmServer() === null,
+      (gone) => {
+        if (gone) setLeaveRequest(null);
+      },
     );
 
     createEffect(
@@ -492,7 +501,9 @@ const ServerSettings = createSimpleContext({
       revokeServerInvite,
       leaveServer,
       leaveConfirmServer,
-      requestLeaveServer: (serverId: string | null) => setLeaveConfirmServerId(serverId),
+      leaveRestoreTarget: () => leaveRequest()?.trigger ?? null,
+      requestLeaveServer: (serverId: string, trigger: HTMLElement | null) => setLeaveRequest({ serverId, trigger }),
+      cancelLeaveServer: () => setLeaveRequest(null),
       leaveConfirmedServer,
       serverSettingsMcp,
       serverSettingsMcpError,

@@ -66,9 +66,9 @@ export interface ServerActionCallbacks {
   onOpenSchedule?: ((serverId: string, trigger: HTMLElement | null) => void) | undefined;
   onOpenSettings?: ((serverId: string, trigger: HTMLElement | null) => void) | undefined;
   /** Asks to leave a joined server. The menu shows it for a remote server that the user does not own. */
-  onLeave?: ((serverId: string) => void) | undefined;
+  onLeave?: ((serverId: string, trigger: HTMLElement | null) => void) | undefined;
   /** Asks to delete a hosted server. The menu shows it only when `canDelete` accepts the server. */
-  onDelete?: ((serverId: string) => void) | undefined;
+  onDelete?: ((serverId: string, trigger: HTMLElement | null) => void) | undefined;
   canDelete?: ((serverId: string) => boolean) | undefined;
 }
 
@@ -186,7 +186,7 @@ export function ServerActionItems(
         <Show when={canLeave()}>
           <Menu.Item
             class="ui-action-menu-danger agent-context-danger"
-            onSelect={() => props.onLeave?.(props.server.id)}
+            onSelect={() => props.onLeave?.(props.server.id, props.trigger())}
           >
             <LogOut class="agent-context-icon size-4" aria-hidden="true" />
             <span>{t("server.rail.leave")}</span>
@@ -195,7 +195,7 @@ export function ServerActionItems(
         <Show when={canDelete()}>
           <Menu.Item
             class="ui-action-menu-danger agent-context-danger"
-            onSelect={() => props.onDelete?.(props.server.id)}
+            onSelect={() => props.onDelete?.(props.server.id, props.trigger())}
           >
             <Trash2 class="agent-context-icon size-4" aria-hidden="true" />
             <span>{t("server.rail.delete")}</span>

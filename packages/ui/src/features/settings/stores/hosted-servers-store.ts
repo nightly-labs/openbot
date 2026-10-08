@@ -78,6 +78,8 @@ export function createSettingsHostedServersStore(props: HostedServersStoreProps,
       if (server) requestDelete(server);
     } catch (error) {
       if (revision !== loadRevision) return;
+      // A failed read ends the request: a later read must not open the confirmation by itself.
+      deleteRequestId = null;
       setPanel((state) => {
         const text = currentText();
         state.error = text.errorMessage(error, text.t("settings.hostedServers.loadFailed"));
@@ -89,6 +91,8 @@ export function createSettingsHostedServersStore(props: HostedServersStoreProps,
     () => props.open && Boolean(props.hostedServersApi),
     (shouldLoad) => {
       if (shouldLoad) void untrack(load);
+      // A closed panel ends the request, so the next open does not show the confirmation.
+      else deleteRequestId = null;
     },
   );
 
