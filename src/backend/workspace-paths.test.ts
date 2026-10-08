@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { homedir, tmpdir } from "node:os";
+import { join, relative } from "node:path";
 import { Effect } from "effect";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -71,6 +71,14 @@ describe("listWorkspaceDirectory", () => {
     expect((await refusal(resolveWorkspaceFile(agent, "secret.env", { fileHistory: [outside] }))).reason).toBe(
       "missing",
     );
+    const explicitTarget = join(agent.workspacePath, "missing", "secret.env");
+    for (const target of [
+      explicitTarget,
+      encodeURIComponent(explicitTarget),
+      `~/${relative(homedir(), explicitTarget)}`,
+    ]) {
+      expect((await refusal(resolveWorkspaceFile(agent, target, options))).reason).toBe("missing");
+    }
     await writeFile(join(agent.workspacePath, "secret.env"), "workspace");
     await expect(Effect.runPromise(resolveWorkspaceFile(agent, "secret.env", options))).resolves.toMatchObject({
       path: join(agent.workspacePath, "secret.env"),

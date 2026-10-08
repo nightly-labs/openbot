@@ -157,6 +157,9 @@ const resolveWorkspacePath = Effect.fn("Workspace.resolveWorkspacePath")(functio
     }),
     Effect.catch((error) => {
       if (!isMissing(error) || !options.allowOutside) return Effect.fail(error);
+      const requestedPath = decodePath(inputPath.trim());
+      // An explicit target must not select a different document with the same name.
+      if (isAbsolute(requestedPath) || requestedPath.replaceAll("\\", "/").startsWith("~/")) return Effect.fail(error);
       const name = basename(candidatePath);
       const withoutLocation = name.replace(LOCATION_SUFFIX, "");
       const historyPath =
