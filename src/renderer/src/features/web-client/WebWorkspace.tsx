@@ -41,6 +41,7 @@ import { computeAgentAvatarMoods } from "@openbot/ui/features/agents/agent-avata
 import { createFirstAgentDraft, type FirstAgentDraft } from "@openbot/ui/features/agents/FirstAgentSetup";
 import { BillingDialog } from "@openbot/ui/features/billing/BillingDialog";
 import { createBillingStore } from "@openbot/ui/features/billing/billing-store";
+import { LeaveServerDialog } from "@openbot/ui/features/servers/LeaveServerDialog";
 import { ServerRail } from "@openbot/ui/features/servers/ServerRail";
 import { createSettingsHostedServersStore } from "@openbot/ui/features/settings/stores/hosted-servers-store";
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
@@ -280,14 +281,15 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const [addServer, setAddServer] = createSignal<{ resume: AddServerResume | null } | null>(null);
   // True when the account can create hosted servers. The plus button then opens the plans.
   const [hostedServersAvailable, setHostedServersAvailable] = createSignal(false);
+  /** The hosted servers of this account. The server menu can delete these. */
+  const [hostedServerIds, setHostedServerIds] = createSignal<ReadonlySet<string>>(new Set());
   async function refreshHostedServersAvailable(): Promise<boolean> {
     // A failed read keeps the last answer: a network error does not turn the plans off.
-    const available = await hostedServerCalls.list().then(
-      (list) => list.available,
-      () => hostedServersAvailable(),
-    );
-    setHostedServersAvailable(available);
-    return available;
+    const list = await hostedServerCalls.list().catch(() => null);
+    if (!list) return hostedServersAvailable();
+    setHostedServersAvailable(list.available);
+    setHostedServerIds(new Set(list.servers.map((server) => server.serverId)));
+    return list.available;
   }
   void refreshHostedServersAvailable();
   /**
@@ -548,6 +550,16 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     },
     billingOpen,
   );
+  /** Billing holds the hosted servers on the web, so the server menu deletes a server there. */
+  function deleteHostedServer(serverId: string): void {
+    setBillingOpen(true);
+    hostedServers.requestDeleteById(serverId);
+  }
+  const [leaveHostId, setLeaveHostId] = createSignal<string | null>(null);
+  async function leaveHost(): Promise<void> {
+    const host = workspace.state.hosts.find((item) => item.hostId === leaveHostId());
+    if (host) await workspace.leaveHost(host);
+  }
   createEffect(
     () => props.billingReturn,
     (billingReturn) => {
@@ -969,6 +981,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   onOpenUsage={(id, trigger) => void openUsage(id, trigger)}
                   onSetMuted={setMuted}
                   onSetNotificationLevel={setNotificationLevel}
+                  onLeave={setLeaveHostId}
+                  onDelete={deleteHostedServer}
+                  canDelete={(id) => hostedServerIds().has(id)}
                 />
               </Show>
               <Sidebar
@@ -1015,6 +1030,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   onOpenUsage: (id, trigger) => void openUsage(id, trigger),
                   onSetMuted: setMuted,
                   onSetNotificationLevel: setNotificationLevel,
+                  onLeave: setLeaveHostId,
+                  onDelete: deleteHostedServer,
+                  canDelete: (id) => hostedServerIds().has(id),
                 }}
                 agents={workspace.profiles()}
                 activeAgentId={channelOpen() ? "" : (workspace.state.selectedId ?? "")}
@@ -1265,6 +1283,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   />
                 )}
               </Show>
+              <LeaveServerDialog
+                server={servers().find((item) => item.id === leaveHostId()) ?? null}
+                onClose={() => setLeaveHostId(null)}
+                onLeave={leaveHost}
+              />
               <BillingDialog
                 open={billingOpen()}
                 onOpenChange={setBillingOpen}
