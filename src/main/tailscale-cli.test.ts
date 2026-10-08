@@ -114,6 +114,10 @@ describe("tailscale commands", () => {
       "/usr/bin/tailscale",
     ]);
     expect(tailscaleCandidates("linux", { PATH: "" })).toContain("/usr/bin/tailscale");
+    // A host in WSL uses the Windows installation, after any Linux one.
+    expect(tailscaleCandidates("linux", { PATH: "/opt/bin" }).at(-1)).toBe(
+      "/mnt/c/Program Files/Tailscale/tailscale.exe",
+    );
     expect(tailscaleCandidates("win32", { PATH: "", ProgramFiles: "C:\\Program Files" })[0]).toMatch(
       /Tailscale\\tailscale\.exe$/u,
     );

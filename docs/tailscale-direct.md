@@ -78,6 +78,14 @@ Client:
   server to WebRTC, and the direct path is not tried again for 5 minutes or until the member retries.
 - The direct token is kept in memory and is renewed before 24 hours with a new account ticket.
 
+## A host in WSL
+
+A host that runs in WSL on Windows uses the Windows Tailscale app: WSL interop runs
+`/mnt/c/Program Files/Tailscale/tailscale.exe` when no Linux `tailscale` is installed in WSL. The
+Windows `tailscale serve` must reach the host's loopback listener, so WSL must use mirrored
+networking (`networkingMode=mirrored` in `%UserProfile%\.wslconfig`). With the default NAT
+networking the direct address does not answer, and members use WebRTC.
+
 ## Limits
 
 - The identity proof is not bound to the TLS session. On the direct path the peer is already

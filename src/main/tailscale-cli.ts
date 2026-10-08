@@ -37,6 +37,9 @@ export type TailscaleLocate = () => Effect.Effect<string | null>;
 
 export type TailscalePlatform = "darwin" | "win32" | "linux";
 
+/** The Windows Tailscale command as WSL mounts the default install directory. */
+export const WSL_WINDOWS_TAILSCALE = "/mnt/c/Program Files/Tailscale/tailscale.exe";
+
 /**
  * Where each platform installs the command. The macOS app keeps its command inside the bundle; the
  * standalone and Homebrew builds and the Linux packages put `tailscale` on the search path.
@@ -61,7 +64,11 @@ export function tailscaleCandidates(platform: TailscalePlatform, env: NodeJS.Pro
     .split(path.delimiter)
     .filter((directory) => path.isAbsolute(directory))
     .map((directory) => path.join(directory, name));
-  return [...new Set([...fixed, ...searchPath])];
+  // A host in WSL runs on Windows, where Tailscale is installed: WSL interop runs the Windows
+  // command, and its `serve` reaches the host's loopback listener when WSL uses mirrored networking.
+  // It comes last, so a Linux installation inside WSL is used first. Elsewhere the file is absent.
+  const windowsFromWsl = platform === "linux" ? [WSL_WINDOWS_TAILSCALE] : [];
+  return [...new Set([...fixed, ...searchPath, ...windowsFromWsl])];
 }
 
 export function locateTailscale(platform: TailscalePlatform, env: NodeJS.ProcessEnv = process.env): TailscaleLocate {
