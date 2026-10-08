@@ -77,6 +77,30 @@ describe("OpenBot tool declarations", () => {
     ["ask_user", { questions: [{ question: "Where?", options: [{ label: "Here" }] }] }, true],
     ["ask_user", { questions: [] }, false],
     ["ask_user", { questions: [{ question: "Where?", options: [{ label: "Here", unexpected: true }] }] }, false],
+    [
+      "ask_ui",
+      {
+        blockId: "letter-1",
+        block: {
+          type: "confirm",
+          title: "Send?",
+          fields: [{ label: "From", select: "from", options: ["a@example.com"] }],
+          actions: [{ id: "send", label: "Send", style: "primary" }],
+        },
+      },
+      true,
+    ],
+    [
+      "ask_ui",
+      {
+        block: { type: "form", title: "Due", fields: [{ id: "due", kind: "date", label: "Due", value: "2026-10-08" }] },
+      },
+      true,
+    ],
+    ["ask_ui", { block: { type: "alert", severity: "info", title: "Display blocks use show_ui" } }, false],
+    ["ask_ui", { block: { type: "choice", title: "Pick", options: [] } }, false],
+    ["ask_ui", { block: { type: "quick_replies", options: [{ id: "_text", label: "Reserved" }] } }, false],
+    ["ask_ui", { block: { type: "quick_replies", options: [{ id: "a", label: "A", unexpected: true }] } }, false],
     ["query_data", { sql: "SELECT 1", params: ["a", 1, true, null] }, true],
     ["query_data", {}, false],
     ["query_data", { sql: "x".repeat(AGENT_DATABASE_LIMITS.maxSqlLength + 1) }, false],

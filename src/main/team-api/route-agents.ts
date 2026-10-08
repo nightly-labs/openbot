@@ -262,11 +262,13 @@ export async function routeAgents(
 
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.respond.prompt) {
     const body = await readJson(request);
+    const sender = memberSender(member);
     await runCauseEffect(
-      agents.respondToPrompt({
-        requestId: promptRequestId(body.requestId),
-        answers: promptAnswers(body.answers),
-      }),
+      agents.respondToPrompt(
+        { requestId: promptRequestId(body.requestId), answers: promptAnswers(body.answers) },
+        // A UI block's privileged action is for the owner and admins only.
+        { ...(sender ? { sender } : {}), privileged: member.role !== "member" },
+      ),
     );
     return empty(204);
   }

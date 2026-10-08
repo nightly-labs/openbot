@@ -8,6 +8,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import { COMPUTER_USE_MCP_SERVER_NAME } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import type { UiBlockResponse } from "@openbot/contracts/ui-blocks";
 import { type DynamicToolResult, getArray, getRecord, getString, isRecord } from "../protocol";
 
 const MCP_ELICITATION_DECISION_ID = "mcp-elicitation-decision";
@@ -254,6 +255,29 @@ export function expiredPromptResult(
     success: false,
     contentItems: [{ type: "inputText", text: "The question expired before the user answered." }],
   };
+}
+
+/** What a blocking UI block (`ask_ui`) ended with. */
+export type UiBlockPromptOutcome =
+  | { status: "answered"; blockId: string; response: UiBlockResponse }
+  | { status: "skipped" | "expired"; blockId: string };
+
+/**
+ * The `ask_ui` result. Only the model reads it: the ids it gave, the values, and the user's words when
+ * the user answered in text. An expired block is a failed call, as an expired question is.
+ */
+export function uiBlockPromptResult(outcome: UiBlockPromptOutcome): DynamicToolResult {
+  const value =
+    outcome.status === "answered"
+      ? { status: outcome.status, blockId: outcome.blockId, ...outcome.response }
+      : outcome.status === "expired"
+        ? {
+            status: outcome.status,
+            blockId: outcome.blockId,
+            next: "The block closed before the user answered. Ask again only if you still need the answer.",
+          }
+        : { status: outcome.status, blockId: outcome.blockId };
+  return { success: outcome.status !== "expired", contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
 }
 
 export function browserTakeoverResult(decision: RespondToBrowserTakeoverInput["decision"]): DynamicToolResult {

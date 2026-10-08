@@ -245,7 +245,11 @@ export class BootRecovery {
         .readConversationRecoveryMessages(agent.id, agent.threadId, turnId)
         .flatMap((message) => {
           const changed = structuredClone(message);
-          if (changed.questionPrompt?.resolution === null) changed.questionPrompt.resolution = { status: "expired" };
+          if (changed.questionPrompt?.resolution === null) {
+            changed.questionPrompt.resolution = { status: "expired" };
+            // An ask_ui block is a question prompt; it freezes with its question.
+            if (changed.uiBlock?.state.status === "pending") changed.uiBlock.state = { status: "expired" };
+          }
           if (turnId && changed.turnId === turnId && changed.status === "streaming") {
             changed.status = "interrupted";
             markIncompleteImageGeneration(changed, "interrupted");

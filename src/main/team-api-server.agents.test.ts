@@ -923,18 +923,20 @@ describe("TeamApiServer agents", () => {
   });
 
   it("responds to authenticated remote interactive requests", async () => {
-    const { start, signIn } = await createTeamApiFixture("approval", { configure: true });
+    const { start, signIn, store } = await createTeamApiFixture("approval", { configure: true });
     const approvals: unknown[] = [];
     const failures: unknown[] = [];
     const takeovers: unknown[] = [];
     const prompts: unknown[] = [];
+    const responders: unknown[] = [];
     const agents = createAgents({
       acknowledgeFailedTurn: (agentId, turnId) => {
         failures.push({ agentId, turnId });
       },
-      respondToPrompt: (input: unknown) =>
+      respondToPrompt: (input: unknown, responder: unknown) =>
         Effect.sync(() => {
           prompts.push(input);
+          responders.push(responder);
         }),
       respondToApproval: (input: unknown) =>
         Effect.sync(() => {
@@ -963,6 +965,17 @@ describe("TeamApiServer agents", () => {
       body: { requestId: "prompt-17", answers: { scope: ["Small"] } },
     });
     expect(prompts).toEqual([{ requestId: "prompt-17", answers: { scope: ["Small"] } }]);
+    // A UI block's privileged action needs the owner or an admin, so the route names who answers.
+    const invite = await Effect.runPromise(store.createInvite("member"));
+    const member = await Effect.runPromise(store.acceptInvite(invite.token, "member", "member password"));
+    await emptyRequest(base, "/v1/prompts/respond", {
+      token: member.sessionToken,
+      body: { requestId: "prompt-member", answers: { scope: ["Small"] } },
+    });
+    expect(responders).toEqual([
+      { sender: expect.objectContaining({ id: expect.any(String) }), privileged: true },
+      { sender: expect.objectContaining({ name: "member" }), privileged: false },
+    ]);
     await emptyRequest(base, "/v1/agents/chief/failures/acknowledge", {
       token: token,
       body: { turnId: "turn-failed" },
@@ -984,7 +997,7 @@ describe("TeamApiServer agents", () => {
       }),
     });
     expect(oversizedPrompt.status).toBe(400);
-    expect(prompts).toHaveLength(1);
+    expect(prompts).toHaveLength(2);
 
     const invalid = await fetch(`${base}/v1/approvals/respond`, {
       method: "POST",
