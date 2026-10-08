@@ -245,7 +245,8 @@ export const runTabAction = Effect.fn("BrowserTab.action")(
           Effect.onInterrupt(() =>
             Effect.sync(() => {
               cancellationConfirmed = tab.engine.cancelPendingCommands();
-              if (cancellationConfirmed || !dispatched) completion.interruptUnsafe();
+              // Target resolution can issue CDP commands before input dispatch.
+              if (cancellationConfirmed) completion.interruptUnsafe();
               keepQueueBlocked(Fiber.await(completion));
             }),
           ),

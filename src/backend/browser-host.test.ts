@@ -351,6 +351,54 @@ describe("browser address navigation", () => {
     expect(host.listTabs()).toEqual([expect.objectContaining({ id: tab.id, url: "https://example.com/after-cancel" })]);
   });
 
+  it("keeps the queue blocked when an external debugger cannot cancel a command before dispatch", async () => {
+    const tab = await runCauseEffect(host.open("https://example.com/external-debugger", "thread-a", "agent-a"));
+    const contents = webContents.getAllWebContents().find((candidate) => candidate.getURL() === tab.url);
+    if (!contents) throw new Error("Browser contents were not created.");
+    let started = false;
+    let inFlight = true;
+    let overlap = false;
+    let resolveCommand: () => void = () => undefined;
+    const command = new Promise<void>((resolve) => {
+      resolveCommand = () => {
+        resolve();
+      };
+    });
+    vi.spyOn(BrowserCdpEngine.prototype, "cancelPendingCommands").mockReturnValue(false);
+    vi.spyOn(BrowserCdpEngine.prototype, "click").mockImplementationOnce(() =>
+      browserCall(() => {
+        started = true;
+        return command;
+      }),
+    );
+    const loadUrl = contents.loadURL.bind(contents);
+    vi.spyOn(contents, "loadURL").mockImplementation((url, options) => {
+      overlap = inFlight;
+      return loadUrl(url, options);
+    });
+    const pending = Effect.runFork(
+      host.handleDynamicTool({
+        namespace: "openbot_browser",
+        tool: "click",
+        arguments: { tabId: tab.id, target: { kind: "point", x: 1, y: 1 } },
+        threadId: "thread-a",
+        ownerAgentId: "agent-a",
+        turnId: "turn-a",
+        callId: "call-a",
+      }),
+    );
+    await vi.waitFor(() => expect(started).toBe(true));
+    await Effect.runPromise(Fiber.interrupt(pending));
+    const next = Effect.runFork(host.loadUrl(tab.id, "https://example.com/after-external"));
+    inFlight = false;
+    resolveCommand();
+    await Effect.runPromise(Fiber.join(next));
+    expect(overlap).toBe(false);
+    expect(host.listTabs()).toEqual([
+      expect.objectContaining({ id: tab.id, url: "https://example.com/after-external" }),
+    ]);
+  });
+
   it("closes only the tab whose opening was cancelled", async () => {
     const existing = await runCauseEffect(host.open("https://example.com/existing"));
     const prototype = Object.getPrototypeOf(new WebContentsView().webContents);
