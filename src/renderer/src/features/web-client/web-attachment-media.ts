@@ -59,15 +59,17 @@ export function createWebAttachmentMedia(
   let total = 0;
   // A clear makes every running download stale, so it cannot store a URL that nothing revokes.
   let generation = 0;
+  let disposed = false;
 
   const publish = () => setShown(new Map([...entries].map(([key, entry]) => [key, entry.url])));
+  // No publish here: a card row calls `load` while it renders, and Solid refuses a write there.
+  // `url` reads only keys of the current host, so the old host's URLs are never shown.
   const clear = () => {
     for (const entry of entries.values()) urls.revoke(entry.url);
     entries.clear();
     loading.clear();
     total = 0;
     generation += 1;
-    publish();
   };
   /** The files of another host are not shown here, so a host switch drops them. */
   const currentHost = () => {
@@ -119,7 +121,7 @@ export function createWebAttachmentMedia(
   return {
     thumbnailLimit: WEB_THUMBNAIL_BYTES,
     mediaLimit: WEB_MEDIA_BYTES,
-    url: (id) => shown().get(`${hostId()}:${id}`),
+    url: (id) => (disposed ? undefined : shown().get(`${hostId()}:${id}`)),
     load(attachment) {
       const host = currentHost();
       const key = `${host}:${attachment.id}`;
@@ -141,7 +143,10 @@ export function createWebAttachmentMedia(
       loading.set(key, job);
       return job;
     },
-    dispose: clear,
+    dispose() {
+      disposed = true;
+      clear();
+    },
   };
 }
 
