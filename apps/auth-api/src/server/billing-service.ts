@@ -19,6 +19,7 @@ import {
 } from "@openbot/contracts/billing";
 import type { HostedServerCatalog, HostedServerCatalogPlan } from "@openbot/contracts/hosted-servers";
 import { isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { Context, Effect, Layer, Schema } from "effect";
 import { type AccountAnalytics, type BillingAction, NO_ACCOUNT_ANALYTICS } from "./account-analytics";
 import type { HostedFailure } from "./hosted-server-service";
@@ -392,6 +393,71 @@ export class BillingService {
           .all<{ stripe_subscription_id: string }>(),
       );
       for (const row of rows.results) yield* this.cancelSubscription(row.stripe_subscription_id);
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
+  readonly setServerRenewal = Effect.fn("BillingService.setServerRenewal")(
+    function* (
+      this: BillingService,
+      userId: string,
+      serverId: string,
+      cancel: boolean,
+    ): Effect.fn.Return<
+      { subscriptionId: string; periodEnd: number },
+      BillingError | BillingOperationError,
+      BillingDependencies
+    > {
+      const dependencies = yield* BillingDependencies;
+      const rows = yield* billingCall(() =>
+        dependencies.database
+          .prepare(
+            `SELECT stripe_subscription_id FROM billing_subscriptions WHERE user_id = ? AND server_id = ? AND status IN ${OPEN_STATUSES_SQL}`,
+          )
+          .bind(userId, serverId)
+          .all<{ stripe_subscription_id: string }>(),
+      );
+      if (rows.results.length !== 1 || !rows.results[0])
+        return yield* new BillingError(409, "billing_plan_unavailable", sourceText("error.billing.lifecycleFailed"));
+      const subscriptionId = rows.results[0].stripe_subscription_id;
+      const subscription = yield* this.#stripeCall(() => dependencies.stripe.setRenewal(subscriptionId, cancel));
+      const periodEnd = subscription.items.data[0]?.current_period_end ?? subscription.current_period_end;
+      if (
+        !periodEnd ||
+        periodEnd * 1000 <= dependencies.now() ||
+        !isOneOf(BILLING_SUBSCRIPTION_STATUSES, subscription.status) ||
+        !isOpenBillingStatus(subscription.status)
+      ) {
+        return yield* new BillingError(409, "billing_plan_unavailable", sourceText("error.billing.lifecycleFailed"));
+      }
+      yield* this.#syncSubscription(subscriptionId);
+      const current = yield* billingCall(() =>
+        dependencies.database
+          .prepare(
+            `SELECT current_period_end, cancel_at_period_end FROM billing_subscriptions WHERE stripe_subscription_id = ? AND status IN ${OPEN_STATUSES_SQL}`,
+          )
+          .bind(subscriptionId)
+          .first<{ current_period_end: number | null; cancel_at_period_end: number }>(),
+      );
+      if (!current?.current_period_end || current.cancel_at_period_end !== Number(cancel)) {
+        return yield* new BillingError(409, "billing_plan_unavailable", sourceText("error.billing.lifecycleFailed"));
+      }
+      return { subscriptionId, periodEnd: current.current_period_end };
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
+  /** A deletion needs a fresh terminal Stripe state, never a stale local expiry date. */
+  readonly subscriptionEnded = Effect.fn("BillingService.subscriptionEnded")(
+    function* (
+      this: BillingService,
+      subscriptionId: string,
+    ): Effect.fn.Return<boolean, BillingError | BillingOperationError, BillingDependencies> {
+      const dependencies = yield* BillingDependencies;
+      const subscription = yield* this.#stripeCall(() => dependencies.stripe.getSubscription(subscriptionId));
+      if (subscription.status !== "canceled") return false;
+      yield* this.#syncSubscription(subscriptionId);
+      return true;
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);

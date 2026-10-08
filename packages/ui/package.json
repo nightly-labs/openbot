@@ -178,6 +178,7 @@
     "./features/settings/PluginUninstallDialog": "./src/features/settings/PluginUninstallDialog.tsx",
     "./features/settings/ProfileNameSaveBar": "./src/features/settings/ProfileNameSaveBar.tsx",
     "./features/settings/SettingsDialogShell": "./src/features/settings/SettingsDialogShell.tsx",
+    "./features/billing/BillingServerLifecycle": "./src/features/billing/BillingServerLifecycle.tsx",
     "./features/settings/SettingsHostedServersTab": "./src/features/settings/SettingsHostedServersTab.tsx",
     "./features/settings/SettingsHostedSitesTab": "./src/features/settings/SettingsHostedSitesTab.tsx",
     "./features/settings/SettingsMobileConnectTab": "./src/features/settings/SettingsMobileConnectTab.tsx",

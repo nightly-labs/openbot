@@ -148,6 +148,21 @@ export class StripeClient {
     );
   }).bind(this);
 
+  readonly setRenewal = Effect.fn("StripeClient.setRenewal")(function* (
+    this: StripeClient,
+    subscriptionId: string,
+    cancelAtPeriodEnd: boolean,
+  ): Effect.fn.Return<StripeSubscription, StripeRequestError | StripeTransportError> {
+    const body = new URLSearchParams({ cancel_at_period_end: String(cancelAtPeriodEnd) });
+    if (!cancelAtPeriodEnd) body.set("cancel_at", "");
+    return yield* this.#requestEffect(
+      "POST",
+      `/v1/subscriptions/${encodeURIComponent(subscriptionId)}`,
+      body,
+      subscriptionSchema,
+    );
+  }).bind(this);
+
   /** The active Prices with these lookup keys, with the amount in each currency. */
 
   readonly listPricesByLookupKeys = Effect.fn("StripeClient.listPricesByLookupKeys")(function* (

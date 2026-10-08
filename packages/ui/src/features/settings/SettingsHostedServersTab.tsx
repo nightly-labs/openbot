@@ -29,6 +29,8 @@ import type { SettingsHostedServersStore } from "./stores/hosted-servers-store";
 
 interface SettingsHostedServersTabProps {
   store: SettingsHostedServersStore;
+  excludedServerIds?: readonly string[];
+  inBilling?: boolean;
   /** Opens the add server dialog, where the user picks a plan and pays. */
   onAddServer?: (() => void) | undefined;
 }
@@ -69,6 +71,7 @@ const STATE_VARIANTS: Record<
 export function SettingsHostedServersTab(props: SettingsHostedServersTabProps) {
   const { t } = useText();
   const state = () => props.store.state;
+  const servers = () => state().servers.filter((server) => !props.excludedServerIds?.includes(server.serverId));
   // Also a server whose setup failed: it has no sandbox to stop, so it stays in `error`.
   const planEnded = (server: HostedServerSummary) => server.error === "plan_ended";
   const description = (server: HostedServerSummary) => {
@@ -86,7 +89,10 @@ export function SettingsHostedServersTab(props: SettingsHostedServersTabProps) {
   };
 
   return (
-    <SettingsSection title={t("settings.hostedServers.title")} description={t("settings.hostedServers.description")}>
+    <SettingsSection
+      title={t(props.inBilling ? "billing.otherServers" : "settings.hostedServers.title")}
+      description={props.inBilling ? undefined : t("settings.hostedServers.description")}
+    >
       <Show when={props.onAddServer}>
         {(addServer) => (
           <div class="hosted-servers-add">
@@ -103,7 +109,7 @@ export function SettingsHostedServersTab(props: SettingsHostedServersTabProps) {
 
       <Show when={state().error}>{(message) => <p class="settings-modal-error">{message()}</p>}</Show>
       <Show
-        when={state().servers.length > 0}
+        when={servers().length > 0}
         fallback={
           <Show
             when={state().loaded}
@@ -120,7 +126,7 @@ export function SettingsHostedServersTab(props: SettingsHostedServersTabProps) {
         }
       >
         <ItemGroup class="settings-modal-card hosted-servers-list" surface="subtle">
-          <For each={state().servers}>
+          <For each={servers()}>
             {(server) => (
               <Item class="hosted-servers-row">
                 <ItemContent>

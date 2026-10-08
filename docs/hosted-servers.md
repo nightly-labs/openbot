@@ -547,3 +547,17 @@ These were not tested on boat. Test them before a user gets access:
   idle provider threads on a server with a signed-in account;
 - whether boat stops a sandbox that runs for weeks. The Worker restarts it, but work in progress
   at that time stops.
+
+
+### Billing and server deletion
+
+Billing lists each paid server separately. Cancel renewal stops the next payment; the
+server stops when its plan ends and keeps its data. Keep server resumes renewal before
+the plan ends and removes any scheduled deletion.
+
+Delete server requires the server name. The owner can delete immediately with no refund
+for unused time, or schedule deletion for the paid-through date. The account Worker stores
+the date and subscription ID. The cron deletes on its next pass after that date only after
+Stripe confirms the subscription has ended and no newer or open plan exists. Failed
+provider deletion is retried through the existing deletion queue. Keep server and deletion
+use the same per-server operation lease.

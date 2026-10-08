@@ -773,16 +773,16 @@ describe("hosted servers", () => {
     };
   }
 
-  it("opens on the Hosted servers tab with a loading status before the list answers", async () => {
+  it("opens on the Billing tab with a loading status before the list answers", async () => {
     const hosted = renderFromManageServers();
-    expect(await screen.findByRole("tab", { name: "Hosted servers", selected: true })).toBeInTheDocument();
+    expect(await screen.findByRole("tab", { name: "Billing", selected: true })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "General", selected: false })).toBeInTheDocument();
     expect(screen.getByRole("status", { name: "Loading hosted servers…" })).toBeInTheDocument();
 
     hosted.answer({ available: true, servers: [server] });
     expect(await screen.findByRole("button", { name: /Delete Research server/ })).toBeInTheDocument();
     expect(screen.queryByRole("status", { name: "Loading hosted servers…" })).not.toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Hosted servers", selected: true })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Billing", selected: true })).toBeInTheDocument();
   });
 
   it("shows the empty text when the account has no server yet", async () => {
@@ -796,14 +796,14 @@ describe("hosted servers", () => {
     const hosted = renderFromManageServers();
     hosted.fail(new Error("Could not load hosted servers."));
     expect(await screen.findByText("Could not load hosted servers.")).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Hosted servers", selected: true })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Billing", selected: true })).toBeInTheDocument();
     expect(screen.queryByRole("status", { name: "Loading hosted servers…" })).not.toBeInTheDocument();
   });
 
-  it("falls back to General when the account cannot use hosted servers", async () => {
+  it("keeps Billing open when the account cannot use hosted servers", async () => {
     const hosted = renderFromManageServers();
     hosted.answer({ available: false, servers: [] });
-    expect(await screen.findByRole("tab", { name: "General", selected: true })).toBeInTheDocument();
+    expect(await screen.findByRole("tab", { name: "Billing", selected: true })).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Hosted servers" })).not.toBeInTheDocument();
   });
 
@@ -815,7 +815,7 @@ describe("hosted servers", () => {
     for (let round = 0; round < 3; round += 1) {
       await fireEvent.click(screen.getByRole("tab", { name: "General" }));
       await screen.findByRole("tab", { name: "General", selected: true });
-      await fireEvent.click(screen.getByRole("tab", { name: "Hosted servers" }));
+      await fireEvent.click(screen.getByRole("tab", { name: "Billing" }));
       expect(await screen.findByRole("button", { name: /Delete Research server/ })).toBeInTheDocument();
       expect(screen.queryByRole("status", { name: "Loading hosted servers…" })).not.toBeInTheDocument();
     }

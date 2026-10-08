@@ -83,6 +83,18 @@ export function createMockHostedServers(): HostedServersDesktopApi {
   };
 
   return {
+    async lifecycle(input) {
+      const server = servers.find((entry) => entry.serverId === input.serverId);
+      if (!server) throw new Error("The hosted server does not exist.");
+      if (input.action === "delete") {
+        if (input.confirmName !== server.name) throw new Error("Type the server name to delete it.");
+        if (input.timing === "now") {
+          servers = servers.filter((entry) => entry.serverId !== input.serverId);
+          return;
+        }
+      }
+      update(input.serverId, { deletionScheduledAt: input.action === "delete" ? Date.UTC(2026, 10, 8, 12) : null });
+    },
     list: async () => {
       const stepStartedBefore = Date.now() - MOCK_STEP_MS;
       const now = new Date().toISOString();
@@ -92,7 +104,7 @@ export function createMockHostedServers(): HostedServersDesktopApi {
           ? { ...server, state: next, updatedAt: now }
           : server;
       });
-      return structuredClone({ available: true, servers, maxServers: MOCK_MAX_SERVERS });
+      return structuredClone({ available: true, lifecycleAvailable: true, servers, maxServers: MOCK_MAX_SERVERS });
     },
     plans: async () => structuredClone(MOCK_HOSTED_SERVER_CATALOG),
     create: async (input) => {

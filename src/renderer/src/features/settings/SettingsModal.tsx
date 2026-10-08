@@ -16,7 +16,6 @@ import { createBillingStore } from "@openbot/ui/features/billing/billing-store";
 import type { GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
 import { ProfileNameSaveBar } from "@openbot/ui/features/settings/ProfileNameSaveBar";
 import { SettingsDialogShell } from "@openbot/ui/features/settings/SettingsDialogShell";
-import { SettingsHostedServersTab } from "@openbot/ui/features/settings/SettingsHostedServersTab";
 import { SettingsMobileConnectTab } from "@openbot/ui/features/settings/SettingsMobileConnectTab";
 import { SettingsProfileTab } from "@openbot/ui/features/settings/SettingsProfileTab";
 import { SettingsUpdatesTab } from "@openbot/ui/features/settings/SettingsUpdatesTab";
@@ -80,7 +79,9 @@ export interface SettingsModalProps {
  */
 export function SettingsModal(props: SettingsModalProps) {
   const i18n = useI18n();
-  const [activeTab, setActiveTab] = createSignal<SettingsTab>(untrack(() => props.initialTab) ?? "general");
+  const [activeTab, setActiveTab] = createSignal<SettingsTab>(
+    untrack(() => (props.initialTab === "hosted-servers" ? "billing" : props.initialTab)) ?? "general",
+  );
   let modalElement: HTMLElement | undefined;
   const profile = createSettingsProfileStore(props, () => activeTab() === "profile");
   const mobileConnect = createSettingsMobileConnectStore(props, () => activeTab() === "mobile-connect");
@@ -89,43 +90,21 @@ export function SettingsModal(props: SettingsModalProps) {
     () => props.billingApi,
     () => props.open && activeTab() === "billing",
   );
-  const hostedServers = createSettingsHostedServersStore(props, () => activeTab() === "hosted-servers");
+  const hostedServers = createSettingsHostedServersStore(props, () => activeTab() === "billing");
 
   // The Dynamic Island exists only on macOS, so other platforms get no tab for it.
   const isMac = () => props.appInfo?.platform === "darwin";
-  // A deep link opens the tab before the first list answers, so the dialog does not show another tab first.
-  const hostedServersPending = () =>
-    Boolean(props.hostedServersApi) &&
-    !hostedServers.state.loaded &&
-    props.open &&
-    (props.openTab === "hosted-servers" || activeTab() === "hosted-servers");
-  // An account that lost access to hosting still sees its servers, so it can delete or start them.
-  const hostedServersShown = () =>
-    hostedServers.state.available || hostedServers.state.servers.length > 0 || hostedServersPending();
-  // An account without hosting, or the last server's delete, can leave the Hosted servers tab open without its panel.
-  createEffect(
-    () =>
-      activeTab() === "hosted-servers" &&
-      !hostedServersShown() &&
-      (hostedServers.state.loaded || !props.hostedServersApi),
-    (hidden) => {
-      if (hidden) setActiveTab("general");
-    },
-  );
   createEffect(
     () => {
       const tab = props.open ? props.openTab : undefined;
-      return tab === "hosted-servers" && !hostedServersShown() ? undefined : tab;
+      return tab === "hosted-servers" ? "billing" : tab;
     },
     (tab) => {
       if (tab) setActiveTab(tab);
     },
   );
   const visibleNavItems = () =>
-    navItems.filter(
-      (item) =>
-        (item.value !== "dynamic-island" || isMac()) && (item.value !== "hosted-servers" || hostedServersShown()),
-    );
+    navItems.filter((item) => (item.value !== "dynamic-island" || isMac()) && item.value !== "hosted-servers");
 
   const title = () => i18n.t(navItem(activeTab()).titleKey);
   const description = () => i18n.t(navItem(activeTab()).descriptionKey);
@@ -142,8 +121,7 @@ export function SettingsModal(props: SettingsModalProps) {
         value === "profile" ||
         value === "billing" ||
         value === "mobile-connect" ||
-        value === "updates" ||
-        (value === "hosted-servers" && hostedServersShown())
+        value === "updates"
       ) {
         setActiveTab(value);
       }
@@ -234,7 +212,12 @@ export function SettingsModal(props: SettingsModalProps) {
         </Tabs.Content>
 
         <Tabs.Content value="billing" class="settings-modal-tab-panel" data-tab="billing">
-          <BillingPanel store={billing} available={Boolean(props.billingApi)} />
+          <BillingPanel
+            store={billing}
+            available={Boolean(props.billingApi)}
+            hostedServers={hostedServers}
+            onAddServer={hostedServers.state.available ? props.onAddHostedServer : undefined}
+          />
         </Tabs.Content>
 
         <Tabs.Content value="mobile-connect" class="settings-modal-tab-panel" data-tab="mobile-connect">
@@ -253,14 +236,6 @@ export function SettingsModal(props: SettingsModalProps) {
             selectMount={modalElement}
           />
         </Tabs.Content>
-        <Show when={hostedServersShown()}>
-          <Tabs.Content value="hosted-servers" class="settings-modal-tab-panel" data-tab="hosted-servers">
-            <SettingsHostedServersTab
-              store={hostedServers}
-              onAddServer={hostedServers.state.available ? props.onAddHostedServer : undefined}
-            />
-          </Tabs.Content>
-        </Show>
       </SettingsDialogShell>
     </Tabs.Root>
   );

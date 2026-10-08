@@ -1,4 +1,8 @@
-import type { HostedServerState, HostedServerSummary } from "@openbot/contracts/hosted-servers";
+import type {
+  HostedServerLifecycleInput,
+  HostedServerState,
+  HostedServerSummary,
+} from "@openbot/contracts/hosted-servers";
 import type { HostedServersDesktopApi } from "@openbot/contracts/ipc";
 import { createEffect, createStore, untrack } from "solid-js";
 import { currentText } from "../../../text";
@@ -21,6 +25,7 @@ interface HostedServersStoreProps {
 interface HostedServersPanel {
   /** False until the account server says that this account can create hosted servers. */
   available: boolean;
+  lifecycleAvailable: boolean;
   loaded: boolean;
   error: string | null;
   servers: HostedServerSummary[];
@@ -43,6 +48,7 @@ interface HostedServersPanel {
 export function createSettingsHostedServersStore(props: HostedServersStoreProps, isActive: () => boolean) {
   const [panel, setPanel] = createStore<HostedServersPanel>({
     available: false,
+    lifecycleAvailable: false,
     loaded: false,
     error: null,
     servers: [],
@@ -66,6 +72,7 @@ export function createSettingsHostedServersStore(props: HostedServersStoreProps,
       if (revision !== loadRevision) return;
       setPanel((state) => {
         state.available = list.available;
+        state.lifecycleAvailable = list.lifecycleAvailable === true;
         state.servers = list.servers;
         state.loaded = true;
         state.error = null;
@@ -235,7 +242,15 @@ export function createSettingsHostedServersStore(props: HostedServersStoreProps,
     }
   }
 
+  async function lifecycle(input: HostedServerLifecycleInput): Promise<void> {
+    const api = props.hostedServersApi;
+    if (!api) throw new Error(currentText().t("billing.unavailable"));
+    await api.lifecycle(input);
+    await load();
+  }
+
   return {
+    lifecycle,
     state: panel,
     load,
     wake,

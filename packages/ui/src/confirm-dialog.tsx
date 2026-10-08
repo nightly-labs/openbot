@@ -1,5 +1,5 @@
 import type { JSX } from "@solidjs/web";
-import { createSignal, Show } from "solid-js";
+import { createSignal, onSettled, Show } from "solid-js";
 import { Alert, AlertContent, AlertDescription, AlertIcon } from "./alert";
 import { Button } from "./button";
 import { AlertDialog } from "./complex";
@@ -45,6 +45,10 @@ export function ConfirmDialog(props: ConfirmDialogProps): JSX.Element {
   let cancelButton: HTMLButtonElement | undefined;
   // A controlled dialog has no Kobalte trigger, so it keeps the element that opened it itself.
   let restoreTarget: HTMLElement | undefined;
+  let restoreFrame: number | undefined;
+  onSettled(() => () => {
+    if (restoreFrame !== undefined) cancelAnimationFrame(restoreFrame);
+  });
 
   async function confirm(): Promise<void> {
     if (pending()) return;
@@ -82,6 +86,12 @@ export function ConfirmDialog(props: ConfirmDialogProps): JSX.Element {
               if (!target?.isConnected) return;
               event.preventDefault();
               target.focus({ preventScroll: true });
+              // The enclosing dialog resumes its focus trap after the child closes.
+              restoreFrame = requestAnimationFrame(() => {
+                restoreFrame = requestAnimationFrame(() => {
+                  if (!props.open && target.isConnected) target.focus({ preventScroll: true });
+                });
+              });
             }}
           >
             <div class="ui-confirm-dialog-main">
