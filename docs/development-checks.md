@@ -299,9 +299,10 @@ underneath, and that is the pattern to follow for a new test that asserts only s
 when a test asserts state; do not convert a test that asserts the badge into one that asserts a
 probe, because the badge is the behaviour.
 
-The development setup script checks Bun, migrates local D1, and creates a missing
-`apps/auth-api/.env.dev`. This file is per-machine and untracked. Only `.env.production` remains
-encrypted; a missing `.env.keys` does not block ordinary local setup.
+The development setup script checks Bun, migrates local D1, and creates missing local state in
+`.openbot/dev-state.json`. The committed `apps/auth-api/.env.dev` is encrypted; a missing
+development key does not block ordinary local setup. Existing state is reused. Values stored only
+in the old generated `.env.dev` are reset on update.
 
 ## Lint and UI rules
 

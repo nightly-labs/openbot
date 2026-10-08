@@ -119,6 +119,7 @@ export const OPENCODE_FREE_MODEL_FALLBACKS: AgentModelOption[] = [
     description: "Free OpenCode model.",
     defaultReasoningEffort: "medium",
     supportedReasoningEfforts: ["medium"],
+    reasoningEffortConfigurable: false,
   },
   {
     provider: "opencode",
@@ -143,6 +144,7 @@ export const OPENCODE_FREE_MODEL_FALLBACKS: AgentModelOption[] = [
     description: "Free OpenCode model.",
     defaultReasoningEffort: "medium",
     supportedReasoningEfforts: ["medium"],
+    reasoningEffortConfigurable: false,
   },
   {
     provider: "opencode",
@@ -159,6 +161,7 @@ export const OPENCODE_FREE_MODEL_FALLBACKS: AgentModelOption[] = [
     description: "Free OpenCode model.",
     defaultReasoningEffort: "medium",
     supportedReasoningEfforts: ["medium"],
+    reasoningEffortConfigurable: false,
   },
   {
     provider: "opencode",
@@ -167,6 +170,7 @@ export const OPENCODE_FREE_MODEL_FALLBACKS: AgentModelOption[] = [
     description: "Free OpenCode model.",
     defaultReasoningEffort: "medium",
     supportedReasoningEfforts: ["medium"],
+    reasoningEffortConfigurable: false,
   },
   {
     provider: "opencode",

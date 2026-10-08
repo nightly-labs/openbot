@@ -140,6 +140,24 @@ State which surfaces a change touches. Check all affected consumers and reverse 
 
 ## Development data and processes
 
+### Account service environment settings
+
+- Maintain only `apps/auth-api/.env.dev` and `apps/auth-api/.env.production` for shared account
+  service settings. Add new settings to these files; do not add another environment file.
+- Keep both files encrypted. Development uses `DOTENV_PRIVATE_KEY_DEV`; production uses
+  `DOTENV_PRIVATE_KEY_PRODUCTION`. Never use production credentials as local development defaults.
+- Use the development loader. It reads the development key from the shell; without the key,
+  local development must work with generated defaults. Commands that need external secrets must
+  stop before remote changes when those secrets are missing. An invalid key must fail safely.
+- Keep generated identity and saved local overrides in ignored `.openbot/dev-state.json`.
+  New manual overrides use shell variables. Do not add `.env.local` or `.env.generated`.
+- `.env.keys` stores decryption keys, not service settings. Keep it ignored. Preserve existing
+  production key handling and CI/GitHub secrets unless the developer requests a change.
+
+See [account service setup](apps/auth-api/README.md) for loading and deployment details.
+
+### Local processes
+
 - `bun run dev:seed --dry-run` is read-only.
 - Never kill by process pattern, such as `pkill -f electron` or `pkill -f bun`. `bun run dev:stop`
   stops only this worktree's stack; name another one with `--pid=<supervisor pid>` or `--all`.

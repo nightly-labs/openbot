@@ -164,6 +164,7 @@ import { decodeRecordResponse } from "./protocol";
 import { NO_PROVIDER_CREDENTIALS, type ProviderClientContext } from "./provider-drivers";
 import { providerHistoryPersistence } from "./provider-history-persistence";
 import { recordAgentRestartActivity } from "./restart-activity";
+import type { RoutineFlowTools } from "./routine-flows/routine-flow-tools";
 import { RoutineRecords } from "./routine-records";
 import type { RoutineHoldWindow } from "./routine-store";
 import { RoutineTimer } from "./routine-timer";
@@ -218,6 +219,8 @@ export interface AgentServiceOptions {
    */
   credentials?: ProviderClientContext;
   localSkillTools?: () => LocalSkillTools;
+  /** Built after the service, so read when a tool call needs it. */
+  routineFlowTools?: () => RoutineFlowTools;
   /**
    * Whose approvals are answered without asking. The main process owns the preference, because it
    * is a property of this computer and never crosses the Team API. Omitted, every approval asks.
@@ -311,6 +314,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #tools: OpenBotToolRouter;
   readonly #sidebarLayout: AgentSidebar | null;
   readonly #localSkillTools?: () => LocalSkillTools;
+  readonly #routineFlowTools: (() => RoutineFlowTools) | undefined;
   readonly #developmentDefaults: boolean;
   readonly #busyMessageMode: () => BusyMessageMode;
   /** The last turn of each agent's chat that the user stopped. One per agent, so it needs no clean-up. */
@@ -334,6 +338,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       sidebarLayout = null,
       credentials = NO_PROVIDER_CREDENTIALS,
       localSkillTools,
+      routineFlowTools,
       developmentDefaults = false,
       computerUseMcpServer = () => null,
       githubConnector = null,
@@ -343,6 +348,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#developmentDefaults = developmentDefaults;
     this.#busyMessageMode = busyMessageMode;
     this.#localSkillTools = localSkillTools;
+    this.#routineFlowTools = routineFlowTools;
     this.#store = store;
     // First of the sub-objects, because `#emitError` reads it to redact and every one of them is
     // given that callback.
@@ -979,6 +985,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       tables: this.#tables,
       sidebarLayout: this.#sidebarLayout,
       localSkillTools: this.#localSkillTools,
+      routineFlowTools: this.#routineFlowTools,
       approvalAutomation: options.approvalAutomation,
       visualPreview: options.visualPreview,
       hooks: {
@@ -1197,6 +1204,22 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#routines
       .test(input)
       .pipe(Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "testRoutine", cause: failure.cause })));
+  }
+
+  /** Hands a routine run's work on to the next agent of its flow; answers the delivery id. */
+  enqueueRoutineHandoff(input: {
+    run: Pick<RoutineRun, "id" | "routineId" | "routineName" | "scheduledFor">;
+    agentId: string;
+    text: string;
+    idempotencyKey: string;
+  }): Effect.Effect<string, AgentLifecycleFailed> {
+    return this.#routines
+      .enqueueHandoff(input)
+      .pipe(
+        Effect.mapError(
+          (failure) => new AgentLifecycleFailed({ operation: "enqueueRoutineHandoff", cause: failure.cause }),
+        ),
+      );
   }
 
   /** A run that a local script starts through the automation server. Only for agents that allow it. */

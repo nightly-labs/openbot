@@ -13,6 +13,7 @@ import {
   createTestService,
   createUpdatableFakeClaude,
   FakeAgentClient,
+  fakeBrowser,
   fakeClaudeCli,
   fakeCodexCli,
   fakeGrokCli,
@@ -1686,6 +1687,109 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
       queue.deliveries.every((delivery) => delivery.status === "completed"),
     );
     expect(service.listAgents().find((agent) => agent.id === "chief")?.provider).toBe("grok");
+  });
+
+  it.each(["open", "navigate", "click"])(
+    "cancels a pending browser %s without a late reply or provider failure",
+    async (tool) => {
+      const { store, mailbox } = stores(root);
+      const client = new FakeAgentClient("codex", "", false);
+      const browser = fakeBrowser();
+      let started = false;
+      let stopped = false;
+      browser.handleDynamicTool = () =>
+        Effect.gen(function* () {
+          started = true;
+          return yield* Effect.never;
+        }).pipe(
+          Effect.ensuring(
+            Effect.sync(() => {
+              stopped = true;
+            }),
+          ),
+        );
+      const endControl = vi.spyOn(browser, "endControl");
+      service = createTestService({ store, mailbox, browser, preferredProvider: "codex", clientFactory: () => client });
+      const running = service;
+      const events: AgentEvent[] = [];
+      service.on("event", (event) => events.push(event));
+      await runCauseEffect(service.initialize());
+      await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Open the browser." }));
+      await waitFor(async () => Boolean((await runCauseEffect(running.readConversation("chief"))).activeTurnId));
+      const turnId = (await runCauseEffect(service.readConversation("chief"))).activeTurnId;
+      const threadId = store.activeProviderSession("chief")?.externalSessionId;
+      if (!threadId || !turnId) throw new Error("The browser turn did not start.");
+      const alreadyCancelled = new AbortController();
+      alreadyCancelled.abort();
+      client.emit("request", {
+        id: "already-cancelled-browser",
+        method: "item/tool/call",
+        signal: alreadyCancelled.signal,
+        params: {
+          namespace: "openbot_browser",
+          tool,
+          arguments: {},
+          threadId,
+          turnId,
+          callId: "already-cancelled-browser",
+        },
+      });
+      expect(started).toBe(false);
+      const controller = new AbortController();
+      client.emit("request", {
+        id: "cancel-browser",
+        method: "item/tool/call",
+        signal: controller.signal,
+        params: { namespace: "openbot_browser", tool, arguments: {}, threadId, turnId, callId: "cancel-browser" },
+      });
+      await waitFor(() => started);
+      controller.abort();
+      await waitFor(() => stopped && endControl.mock.calls.length > 0);
+      client.emit("notification", {
+        method: "turn/completed",
+        params: { threadId, turn: { id: turnId, status: "interrupted" } },
+      });
+      await waitFor(async () => (await runCauseEffect(running.readConversation("chief"))).activeTurnId === null);
+      expect(client.responses.some((response) => response.id === "cancel-browser")).toBe(false);
+      expect(client.errors).toEqual([]);
+      expect(events.filter((event) => event.type === "error")).toEqual([]);
+      browser.handleDynamicTool = () => Effect.succeed({ success: true, contentItems: [] });
+      client.emit("request", {
+        id: "retry-browser",
+        method: "item/tool/call",
+        signal: new AbortController().signal,
+        params: {
+          namespace: "openbot_browser",
+          tool,
+          arguments: {},
+          threadId,
+          turnId: "next-turn",
+          callId: "retry-browser",
+        },
+      });
+      await waitFor(() => client.responses.some((response) => response.id === "retry-browser"));
+      expect(client.responses.find((response) => response.id === "retry-browser")?.result).toEqual({
+        success: true,
+        contentItems: [],
+      });
+    },
+  );
+
+  it("keeps cancelled Codex tool diagnostics out of provider errors but reports unexpected failures", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex");
+    service = createTestService({ store, mailbox, preferredProvider: "codex", clientFactory: () => client });
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    await runCauseEffect(service.initialize());
+    client.emit(
+      "diagnostic",
+      "ERROR codex_core:🛠️:router: error=dynamic tool call was cancelled before receiving a response",
+    );
+    client.emit("diagnostic", "ERROR codex_core:🛠️:router: error=dynamic tool call failed unexpectedly");
+    expect(events.filter((event) => event.type === "error")).toEqual([
+      expect.objectContaining({ message: "ERROR codex_core:🛠️:router: error=dynamic tool call failed unexpectedly" }),
+    ]);
   });
 
   it("keeps Codex's background refresh failures out of the provider error toast", async () => {

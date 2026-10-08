@@ -19,6 +19,7 @@ import {
   ItemTitle,
   Plus,
   SettingsSection,
+  Spinner,
   Text,
   Trash2,
 } from "@openbot/ui";
@@ -104,7 +105,16 @@ export function SettingsHostedServersTab(props: SettingsHostedServersTabProps) {
       <Show
         when={state().servers.length > 0}
         fallback={
-          <Show when={state().loaded}>
+          <Show
+            when={state().loaded}
+            fallback={
+              <Show when={!state().error}>
+                <div class="hosted-servers-loading">
+                  <Spinner label={t("settings.hostedServers.loading")} />
+                </div>
+              </Show>
+            }
+          >
             <Text tone="muted">{t("settings.hostedServers.empty")}</Text>
           </Show>
         }

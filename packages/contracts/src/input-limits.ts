@@ -30,6 +30,8 @@ export const INPUT_LIMITS = {
   routineName: 80,
   routineInstruction: 100_000,
   routineRunsPage: 100,
+  // Handoffs inside one routine. A flow wider than this is no longer readable on one canvas.
+  routineFlowLinks: 50,
   // The text a local script adds to a routine run through the automation server.
   automationPayload: 4_000,
   // Six weeks: the longest range the routine calendar reads, with room for a month view.

@@ -58,7 +58,7 @@ describe("development state seed", () => {
       directThreads: 1,
       queuedDeliveries: 0,
       memories: 7,
-      routines: 5,
+      routines: 6,
       routineRuns: 3,
       channels: 2,
       channelMessages: 12,
@@ -184,6 +184,16 @@ describe("development state seed", () => {
     const routineStore = new AgentRoutineStore(agents.database);
     const routines = summaries.flatMap((agent) => routineStore.list(agent.id));
     expect(routines).toHaveLength(5);
+    const webhooks = summaries
+      .flatMap((agent) => routineStore.listRecords(agent.id))
+      .filter((routine) => routine.trigger.kind === "webhook");
+    expect(webhooks.map((routine) => routine.trigger)).toEqual([
+      expect.objectContaining({
+        kind: "webhook",
+        eventType: "release.published",
+        filters: [{ pointer: "/release/prerelease", value: false }],
+      }),
+    ]);
     expect(routines.some((routine) => routine.active)).toBe(true);
     expect(routines.some((routine) => !routine.active)).toBe(true);
     const runs = routines.flatMap((routine) => routineStore.listRuns(routine.agentId, routine.id, 10));

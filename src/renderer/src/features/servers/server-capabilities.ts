@@ -39,6 +39,8 @@ export function serverSupportsCapability(
       capability === "providers-v4" ||
       capability === "host-admin-v1" ||
       capability === "host-update-v1" ||
+      capability === "host-member-update-v1" ||
+      capability === "host-release-v1" ||
       capability === "events-v1" ||
       capability === "context-reset-v1" ||
       capability === "agent-import-v1") &&
@@ -106,4 +108,12 @@ export function olderAppSide(clientVersion: string, hostVersion: string): "clien
     if (difference !== 0) return difference > 0 ? "host" : "client";
   }
   return null;
+}
+
+/** A joined server with member update access, or the released administrator update API. */
+export function remoteUpdateServer(server: ServerSummary | undefined): ServerSummary | undefined {
+  if (server?.kind !== "remote") return undefined;
+  return serverSupportsCapability(server, "host-member-update-v1")
+    ? server
+    : remoteAdminServer(server, "host-update-v1");
 }

@@ -54,6 +54,24 @@ export const SteerUnsupportedProvider: Story = {
 };
 /** An agent on a remote host: the setting belongs to that host, so the row is hidden. */
 export const RemoteAgent: Story = { args: { accessEditable: false, busyMessageModeEditable: false } };
+/** An OpenCode model with no reasoning setting: OpenCode decides, and the row says so. */
+export const ReasoningSetByProvider: Story = {
+  args: {
+    runtimeSettings: { provider: "opencode", model: "opencode/big-pickle", reasoningEffort: "medium" },
+    modelOptions: [
+      ...STORY_MODELS,
+      {
+        provider: "opencode",
+        id: "opencode/big-pickle",
+        name: "Big Pickle",
+        description: "Free OpenCode model.",
+        defaultReasoningEffort: "medium",
+        supportedReasoningEfforts: ["medium"],
+        reasoningEffortConfigurable: false,
+      },
+    ],
+  },
+};
 export const SaveFailure: Story = {
   args: {
     onUpdateAgent: fn(async () => {
