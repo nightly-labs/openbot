@@ -128,9 +128,7 @@ describe("events-v1 over a real host", () => {
             "OpenBot-Capabilities": TEAM_CURRENT_CAPABILITIES.join(","),
           },
           body:
-            init.body === undefined
-              ? undefined
-              : JSON.stringify(sideRoute ? sideRoute.request(path, init.body) : init.body),
+            init.body === undefined ? null : JSON.stringify(sideRoute ? sideRoute.request(path, init.body) : init.body),
         });
         const body = await response.json();
         if (!response.ok) {
