@@ -29,6 +29,9 @@ export const createMockWebRuntime: WebRuntimeFactory = (_accountId, events) => {
     currentMemberId: async () => "preview",
     respondToTakeover: (input) => agent.respondToBrowserTakeover(input),
     listHosts: async () => [host],
+    leaveHost: async () => {
+      throw new Error("Leaving a host needs a connected account.");
+    },
     previewInvite: async () => {
       throw new Error("No invitation in this fixture.");
     },
