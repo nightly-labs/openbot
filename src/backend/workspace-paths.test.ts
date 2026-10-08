@@ -58,6 +58,34 @@ describe("listWorkspaceDirectory", () => {
     return cause;
   }
 
+  it("uses history only for missing local files with unrestricted access", async () => {
+    const agent = await fixture();
+    const outside = join(agent.workspacePath, "..", "private", "secret.env");
+    const options = { allowOutside: true, fileHistory: [outside] };
+    await expect(Effect.runPromise(resolveWorkspaceFile(agent, "folder/secret.env:4", options))).resolves.toMatchObject(
+      {
+        path: await realpath(outside),
+        insideWorkspace: false,
+      },
+    );
+    expect((await refusal(resolveWorkspaceFile(agent, "secret.env", { fileHistory: [outside] }))).reason).toBe(
+      "missing",
+    );
+    await writeFile(join(agent.workspacePath, "secret.env"), "workspace");
+    await expect(Effect.runPromise(resolveWorkspaceFile(agent, "secret.env", options))).resolves.toMatchObject({
+      path: join(agent.workspacePath, "secret.env"),
+      insideWorkspace: true,
+    });
+    const missing = await refusal(
+      resolveWorkspaceFile(agent, "missing.env", {
+        allowOutside: true,
+        fileHistory: [join(agent.workspacePath, "..", "missing.env")],
+      }),
+    );
+    expect(missing.reason).toBe("missing");
+    expect(missing.memberMessage).toBe("Nothing exists at missing.env in the agent workspace.");
+  });
+
   it("lists a folder chip and keeps a remote caller inside the workspace", async () => {
     const agent = await fixture();
 
