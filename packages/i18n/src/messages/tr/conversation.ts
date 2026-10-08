@@ -15,6 +15,7 @@ export const messages = {
   "conversation.globalSearch.appSettings": "Uygulama ayarları",
   "conversation.globalSearch.results": "Sonuçlar",
   "conversation.globalSearch.empty": "Sonuç yok",
+  "conversation.globalSearch.failed": "Arama tamamlanmadı. Bazı sonuçlar eksik olabilir.",
   "conversation.globalSearch.countMore": "{shown}+",
   "conversation.globalSearch.searching": "Aranıyor…",
   "conversation.globalSearch.you": "Siz",

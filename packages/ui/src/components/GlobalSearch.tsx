@@ -4,6 +4,7 @@ import {
   ArrowDown,
   ArrowRightToLine,
   ArrowUp,
+  Button,
   CalendarClock,
   Combobox,
   Command,
@@ -268,6 +269,10 @@ interface RemoteSearch<T> {
   total: Accessor<number | undefined>;
   hasMore: Accessor<boolean>;
   pending: Accessor<boolean>;
+  /** A page failed. The list holds only the pages before it. */
+  failed: Accessor<boolean>;
+  /** Loads the page that failed again. */
+  retry: () => void;
   /** Loads the next page. It does nothing while a page loads or when no page follows. */
   loadMore: () => void;
 }
@@ -285,11 +290,14 @@ function createRemoteSearch<T>(
   const empty: Loaded = { items: [], cursor: null };
   const [loaded, setLoaded] = createSignal<Loaded>(empty);
   const [pending, setPending] = createSignal(false);
+  const [failed, setFailed] = createSignal(false);
   let timer: ReturnType<typeof setTimeout> | undefined;
   let latest = 0;
   // loadMore runs in an effect, so it reads plain copies, not the signals.
   let active: { search: PagedSearch<T>; query: string } | null = null;
   let cursor: string | null = null;
+  // The cursor of the page that failed; null when the first page failed.
+  let failedCursor: string | null = null;
   let loading = false;
   const show = (next: Loaded) => {
     cursor = next.cursor;
@@ -297,27 +305,35 @@ function createRemoteSearch<T>(
     setLoaded(next);
     setPending(false);
   };
+  function loadFirst(next: { search: PagedSearch<T>; query: string }): void {
+    const current = latest;
+    loading = true;
+    setPending(true);
+    next.search(next.query).then(
+      (page) => {
+        if (current === latest) show({ items: page.results, total: page.total, cursor: page.nextCursor });
+      },
+      () => {
+        if (current !== latest) return;
+        show(empty);
+        failedCursor = null;
+        setFailed(true);
+      },
+    );
+  }
   createEffect(request, (next) => {
     if (timer) clearTimeout(timer);
-    const current = ++latest;
+    ++latest;
     active = next;
     cursor = null;
+    setFailed(false);
     if (!next) {
       show(empty);
       return;
     }
     loading = true;
     setPending(true);
-    timer = setTimeout(() => {
-      next.search(next.query).then(
-        (page) => {
-          if (current === latest) show({ items: page.results, total: page.total, cursor: page.nextCursor });
-        },
-        () => {
-          if (current === latest) show(empty);
-        },
-      );
-    }, SEARCH_DEBOUNCE_MS);
+    timer = setTimeout(() => loadFirst(next), SEARCH_DEBOUNCE_MS);
   });
   onCleanup(() => {
     if (timer) clearTimeout(timer);
@@ -326,6 +342,7 @@ function createRemoteSearch<T>(
   function loadMore(): void {
     if (!active || !cursor || loading) return;
     const current = latest;
+    const requested = cursor;
     loading = true;
     active.search(active.query, cursor).then(
       (page) => {
@@ -346,9 +363,24 @@ function createRemoteSearch<T>(
         // A page that fails is not asked for again, so a scroll does not repeat the error.
         cursor = null;
         loading = false;
+        failedCursor = requested;
         setLoaded((previous) => ({ ...previous, cursor: null }));
+        setFailed(true);
       },
     );
+  }
+
+  function retry(): void {
+    if (!active || loading || !failed()) return;
+    setFailed(false);
+    if (failedCursor === null) {
+      ++latest;
+      loadFirst(active);
+      return;
+    }
+    cursor = failedCursor;
+    setLoaded((previous) => ({ ...previous, cursor: failedCursor }));
+    loadMore();
   }
 
   return {
@@ -356,6 +388,8 @@ function createRemoteSearch<T>(
     total: () => loaded().total,
     hasMore: () => loaded().cursor !== null,
     pending,
+    failed,
+    retry,
     loadMore,
   };
 }
@@ -664,6 +698,12 @@ export function GlobalSearch(props: GlobalSearchProps) {
   const routinesPending = () =>
     props.routinesLoading === true && (tab() === "routines" || (tab() === "all" && normalizedQuery() !== ""));
   const pending = () => messageSearch.pending() || fileSearch.pending() || routinesPending();
+  // A failed search is not an empty one: the user can retry it instead of reading "No results".
+  const failed = () => messageSearch.failed() || fileSearch.failed();
+  const retry = () => {
+    messageSearch.retry();
+    fileSearch.retry();
+  };
   // A source that is still loading and has nothing to show yet gets a spinner under the list.
   const searching = () => {
     const shown = new Set(sections().map((group) => group.key));
@@ -889,7 +929,15 @@ export function GlobalSearch(props: GlobalSearchProps) {
                     <span>{t("conversation.globalSearch.searching")}</span>
                   </div>
                 </Show>
-                <Show when={flatResults().length === 0 && !pending()}>
+                <Show when={failed() && !pending()}>
+                  <div class="global-search-status global-search-failed" role="alert">
+                    <span>{t("conversation.globalSearch.failed")}</span>
+                    <Button type="button" size="xs" variant="ghost" onClick={retry}>
+                      {t("common.retry")}
+                    </Button>
+                  </div>
+                </Show>
+                <Show when={flatResults().length === 0 && !pending() && !failed()}>
                   <div class="global-search-empty">{t("conversation.globalSearch.empty")}</div>
                 </Show>
               </ResultsBody>
