@@ -94,6 +94,7 @@
     "./team-protocol/providers-v4": "./src/team-protocol/providers-v4.ts",
     "./team-protocol/host-admin-v1": "./src/team-protocol/host-admin-v1.ts",
     "./team-protocol/hosted-sites-v1": "./src/team-protocol/hosted-sites-v1.ts",
+    "./team-protocol/host-tailscale-v1": "./src/team-protocol/host-tailscale-v1.ts",
     "./team-protocol/host-update-v1": "./src/team-protocol/host-update-v1.ts",
     "./team-protocol/shared-tables-v1": "./src/team-protocol/shared-tables-v1.ts",
     "./team-protocol/skills-admin-v1": "./src/team-protocol/skills-admin-v1.ts",

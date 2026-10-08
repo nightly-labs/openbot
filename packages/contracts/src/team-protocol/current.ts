@@ -13,6 +13,7 @@ import { CONTEXT_RESET_CAPABILITY } from "./context-reset-v1";
 import { DIRECT_ENDPOINT_CAPABILITY } from "./direct-endpoint-v1";
 import { EVENTS_CAPABILITY } from "./events-v1";
 import { HOST_ADMIN_CAPABILITY } from "./host-admin-v1";
+import { HOST_TAILSCALE_CAPABILITY } from "./host-tailscale-v1";
 import { HOST_UPDATE_CAPABILITY } from "./host-update-v1";
 import { HOSTED_SITES_CAPABILITY } from "./hosted-sites-v1";
 import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "./live-activity-push-v1";
@@ -59,6 +60,7 @@ export {
   DIRECT_ENDPOINT_CAPABILITY,
   EVENTS_CAPABILITY,
   HOST_ADMIN_CAPABILITY,
+  HOST_TAILSCALE_CAPABILITY,
   HOST_UPDATE_CAPABILITY,
   HOSTED_SITES_CAPABILITY,
   LIVE_ACTIVITY_PUSH_CAPABILITY,
@@ -122,6 +124,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   TEAM_MESSAGE_CLIENT_ID_CAPABILITY,
   WORKSPACE_DIRECTORY_CAPABILITY,
   DIRECT_ENDPOINT_CAPABILITY,
+  HOST_TAILSCALE_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];

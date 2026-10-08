@@ -1,0 +1,16 @@
+{
+  "state": "connected",
+  "tailnet": "owner@example.com",
+  "deviceName": "home-server",
+  "dnsName": "home-server.tail4b2c1.ts.net",
+  "httpsCertificates": true,
+  "enabled": true,
+  "url": "https://home-server.tail4b2c1.ts.net:8443",
+  "issue": null,
+  "issueDetail": null,
+  "loginUrl": null,
+  "environment": "linux",
+  "wslNetworking": null,
+  "setupCommand": true,
+  "signInIssue": null
+}
