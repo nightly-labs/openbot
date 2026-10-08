@@ -129,29 +129,62 @@ export function SettingsField(props: SettingsFieldProps): JSX.Element {
   );
 }
 
+export interface SettingsLinkGroupProps {
+  /** A heading above the rows. A titled group is a region with that name. */
+  title?: JSX.Element;
+  /** Draws the rows in one bordered card, for a panel with several groups one after another. */
+  inset?: boolean;
+  class?: string;
+  children: JSX.Element;
+}
+
 /** The bordered stack the link rows sit in; the rows draw the dividers between themselves. */
-export function SettingsLinkGroup(props: { children: JSX.Element }): JSX.Element {
-  return <div class="settings-link-group">{props.children}</div>;
+export function SettingsLinkGroup(props: SettingsLinkGroupProps): JSX.Element {
+  const titleId = createUniqueId();
+  const rows = () => (
+    <div class={["settings-link-group", props.class ?? "", { "settings-link-group-inset": Boolean(props.inset) }]}>
+      {props.children}
+    </div>
+  );
+  return (
+    <Show when={props.title} fallback={rows()}>
+      <section class="settings-link-section" aria-labelledby={titleId}>
+        <h3 id={titleId} class="settings-link-section-title">
+          {props.title}
+        </h3>
+        {rows()}
+      </section>
+    </Show>
+  );
 }
 
 export interface SettingsLinkRowProps {
+  /** A 16 px glyph before the label. Rows in one group either all have one or none do. */
+  icon?: JSX.Element;
   label: JSX.Element;
   /** The state on the right of the row, such as `3 saved`. A row with none shows only the chevron. */
   value?: JSX.Element;
   onClick: (trigger: HTMLButtonElement) => void;
+  ref?: (element: HTMLButtonElement) => void;
 }
 
 /** One row of the group: what it opens on the left, where that stands on the right. */
 export function SettingsLinkRow(props: SettingsLinkRowProps): JSX.Element {
   return (
     <Button
+      ref={(element) => props.ref?.(element)}
       variant="ghost"
       type="button"
       class="settings-link"
       data-cuelume-tap="navigate"
       onClick={(event) => props.onClick(event.currentTarget)}
     >
-      <span class="settings-link-label">{props.label}</span>
+      <span class="settings-link-label">
+        <Show when={props.icon}>
+          <span class="settings-link-icon">{props.icon}</span>
+        </Show>
+        {props.label}
+      </span>
       <span class="settings-link-value">
         {props.value}
         <ChevronRight />
