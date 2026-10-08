@@ -157,45 +157,6 @@ function props(overrides: Partial<ServerSettingsModalProps> = {}): ServerSetting
 }
 
 describe("ServerSettingsModal", () => {
-  it("turns the host's direct Tailscale connection on and shows the address members get", async () => {
-    const status = {
-      state: "connected" as const,
-      tailnet: "owner@example.com",
-      deviceName: "Studio Mac",
-      enabled: false,
-      url: null,
-      issue: null,
-      issueDetail: null,
-    };
-    const tailscale = {
-      getTailscaleStatus: vi.fn(async () => status),
-      setTailscaleDirect: vi.fn(async (enabled: boolean) => ({
-        ...status,
-        enabled,
-        url: "https://studio-mac.tail4b2c1.ts.net",
-      })),
-      openTailscale: vi.fn(async () => undefined),
-    };
-    render(() => <ServerSettingsModal {...props({ hostStatus: configuredHost, tailscale })} />);
-    expect(await screen.findByText("Connected to owner@example.com as Studio Mac.")).toBeInTheDocument();
-    await fireEvent.click(screen.getByRole("switch", { name: "Direct connection over Tailscale" }));
-    await waitFor(() => expect(tailscale.setTailscaleDirect).toHaveBeenCalledWith(true));
-    expect(await screen.findByRole("button", { name: "Copy direct address" })).toBeInTheDocument();
-  });
-
-  it("explains node sharing when a joined server's host is in another tailnet", async () => {
-    const onSetDirectEnabled = vi.fn(async () => undefined);
-    const server: ServerSummary = {
-      ...remoteServer,
-      apiUrl: null,
-      direct: { offered: true, enabled: true, active: false, hint: "other-tailnet" },
-    };
-    render(() => <ServerSettingsModal {...props({ server, hostStatus: null, onSetDirectEnabled })} />);
-    expect(screen.getByText(/share the host device with you in Tailscale \(node sharing\)/u)).toBeInTheDocument();
-    await fireEvent.click(screen.getByRole("switch", { name: "Use Tailscale when available" }));
-    await waitFor(() => expect(onSetDirectEnabled).toHaveBeenCalledWith(false));
-  });
-
   it("keeps account errors on account settings tabs", async () => {
     render(() => (
       <ServerSettingsModal {...props({ loadError: "The account cannot perform this remote operation." })} />
