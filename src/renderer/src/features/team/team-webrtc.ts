@@ -68,6 +68,8 @@ interface PeerState {
   iceRestartPending: boolean;
   iceRestarting: boolean;
   iceRestarts: number;
+  /** Set by `replaceSignal`: after a network change the path can be dead while it still reports `connected`. */
+  restartIceOnReady: boolean;
   signalChain: Promise<void>;
   closed: boolean;
 }
@@ -157,6 +159,7 @@ async function handleCommand(command: BridgeCommand): Promise<void> {
         iceRestartPending: false,
         iceRestarting: false,
         iceRestarts: 0,
+        restartIceOnReady: false,
         signalChain: Promise.resolve(),
         closed: false,
       };
@@ -340,9 +343,18 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
     return;
   }
   if (message.type === "ready") {
-    const shouldRestartWithRefreshedTurn = Boolean(
-      state.role === "client" && state.connectionId && state.peerConnection,
+    // The host replaces a connection after 10 ICE restarts, so a socket that comes back while the
+    // path is still connected keeps the path. A TURN refresh still restarts ICE, so a relayed path
+    // moves to the new credentials.
+    const shouldRestartIce = Boolean(
+      state.role === "client" &&
+        state.connectionId &&
+        state.peerConnection &&
+        (message.connectionId === null ||
+          state.restartIceOnReady ||
+          state.peerConnection.connectionState !== "connected"),
     );
+    state.restartIceOnReady = false;
     state.resumeToken = message.resumeToken;
     // Null on the `ready` that answers a TURN refresh: new credentials for the connection already
     // open, not a new connection.
@@ -366,7 +378,7 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
     scheduleTurnRefresh(state);
     post({ type: "ice-servers", peerId: state.id, iceServers: state.iceServers });
     post({ type: "signal-ready", peerId: state.id });
-    if (shouldRestartWithRefreshedTurn) state.iceRestartPending = true;
+    if (shouldRestartIce) state.iceRestartPending = true;
     if (state.iceRestartPending) await retryPendingIceRestart(state);
     if (state.role === "client" && state.connectionId && !state.peerConnection) {
       const connection = createPeerConnection(state, state.iceServers);
@@ -750,6 +762,7 @@ function replaceSignal(state: PeerState): void {
   if (state.reconnectTimer !== null) clearTimeout(state.reconnectTimer);
   state.reconnectTimer = null;
   state.reconnectAttempt = 0;
+  state.restartIceOnReady = true;
   const socket = state.socket;
   state.socket = null;
   socket?.close(1000, "Network changed");

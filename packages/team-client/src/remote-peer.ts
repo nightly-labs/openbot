@@ -206,6 +206,8 @@ interface PeerState {
   /** When the TURN credentials must be renewed. Background time does not move it. */
   turnRefreshDueAt: number;
   iceServers: RTCIceServer[];
+  /** Set by `renewSignal`: the path can be dead while the connection still reports `connected`. */
+  restartIceOnReady: boolean;
   lastEventSequence: number;
   needsResync: boolean;
   connected: Deferred.Deferred<void, RemotePeerError> | null;
@@ -452,6 +454,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     if (state.reconnectTimer !== null) clearTimeout(state.reconnectTimer);
     state.reconnectTimer = null;
     const socket = state.socket;
+    state.restartIceOnReady = true;
     // Clear it first, so the close handler does not schedule a second reconnect.
     state.socket = null;
     socket?.close();
@@ -608,6 +611,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
         turnRefreshTimer: null,
         turnRefreshDueAt: 0,
         iceServers: [],
+        restartIceOnReady: false,
         lastEventSequence: 0,
         needsResync: false,
         connected: null,
@@ -714,6 +718,11 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
         return yield* new RemotePeerError({ message: message.message });
       }
       if (message.type === "ready") {
+        // The host replaces a connection after 10 ICE restarts, so a socket that comes back while the
+        // path is still online, such as on a return to the foreground, keeps the path. A TURN refresh
+        // still restarts ICE, so a relayed path moves to the new credentials.
+        const restartsIce = message.connectionId === null || state.restartIceOnReady || !isPeerOnline(state);
+        state.restartIceOnReady = false;
         state.resumeToken = message.resumeToken;
         // Null on the `ready` that answers a TURN refresh: the credentials are new, the connection is
         // the one already open.
@@ -730,7 +739,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
           yield* peerDecode(() =>
             connection.setConfiguration({ iceServers: state.iceServers, bundlePolicy: "max-bundle" }),
           );
-          yield* restartIce(state);
+          if (restartsIce) yield* restartIce(state);
         }
         if (!state.connection) {
           const connection = yield* peerDecode(() => createPeerConnection(state, state.iceServers, actions));
