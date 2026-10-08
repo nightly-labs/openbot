@@ -50,8 +50,8 @@ export function tailscaleCandidates(platform: TailscalePlatform, env: NodeJS.Pro
   const fixed =
     platform === "darwin"
       ? [
-          // The app's binary is also its command line, chosen by the lowercase name: started as
-          // `Tailscale` from an app, it tries to open the app's window and prints no status.
+          // The app's binary is also its command line. Started from another app, it opens the
+          // app's window instead, unless TAILSCALE_BE_CLI is set (see `execTailscale`).
           "/Applications/Tailscale.app/Contents/MacOS/tailscale",
           "/opt/homebrew/bin/tailscale",
           "/usr/local/bin/tailscale",
@@ -100,8 +100,8 @@ export const execTailscale: TailscaleExec = (file, args, timeoutMs) =>
         timeout: timeoutMs,
         maxBuffer: TAILSCALE_OUTPUT_LIMIT,
         encoding: "utf8",
-        // The macOS app's binary runs as the command line only when told so, as its own
-        // `/usr/local/bin/tailscale` wrapper does by its name. Other builds ignore the variable.
+        // The macOS app's binary runs as the command line, not as the app, only with this
+        // variable when another app starts it. Other builds ignore it.
         env: { ...process.env, TAILSCALE_BE_CLI: "1" },
       },
       (error, stdout, stderr) => {
