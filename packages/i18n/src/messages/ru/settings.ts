@@ -244,7 +244,7 @@ export const messages = {
   "settings.updates.actionFailed": "Не удалось обновить OpenBot.",
   "settings.updates.autoInstall.title": "Устанавливать обновления автоматически",
   "settings.updates.autoInstall.description":
-    "OpenBot перезапустится с скачанным обновлением, когда агенты простаивают. Участники ваших серверов ненадолго отключатся.",
+    "OpenBot перезапустится со скачанным обновлением, когда агенты простаивают. Участники ваших серверов ненадолго отключатся.",
   "settings.updates.idleRestart.title": "Перезапустить OpenBot",
   "settings.updates.idleRestart.relaunchDescription":
     "OpenBot перезапустится, когда ни один агент не работает. Новые запуски регулярных задач до этого ждут.",

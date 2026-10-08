@@ -285,7 +285,7 @@ export const messages = {
   "mobile.chat.queue.keepEditing": "Продолжить",
   "mobile.chat.queue.leaveAnyway": "Всё равно выйти",
   "mobile.chat.queue.discardTitle": "Отменить изменения?",
-  "mobile.chat.queue.discardMessage": "В очереди останется текст, который агент уже получил.",
+  "mobile.chat.queue.discardMessage": "В очереди останется прежний текст сообщения.",
   "mobile.chat.queue.discard": "Отменить",
   "mobile.chat.queue.alreadyReceived": "Агент уже получил это сообщение, поэтому изменить его нельзя.",
   "mobile.chat.queue.holding": "Удерживаем сообщение для вас…",

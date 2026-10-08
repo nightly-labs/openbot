@@ -20,7 +20,7 @@ export const messages = {
     other: "Ждут {count} агента. Сброс {reset}.",
   },
   "notification.test": "Уведомления работают.",
-  "notification.welcome": "OpenBot сообщит здесь, когда понадобится агенту.",
+  "notification.welcome": "OpenBot сообщит здесь, когда вы понадобитесь агенту.",
   "notification.toast.region": "Уведомления",
   "notification.toast.close": "Закрыть уведомление",
 } as const satisfies PartialTranslation<typeof source>;

@@ -25,7 +25,7 @@ export const messages = {
   "sidebar.empty.firstAgent": "Создайте первого агента",
   "sidebar.view.label": "Вид боковой панели",
   "sidebar.view.agents": "Агенты",
-  "sidebar.view.routines": "Регулярные задачи",
+  "sidebar.view.routines": "Задачи",
   "sidebar.section.layoutUnsupported": "Этот хост не поддерживает изменение раскладки боковой панели.",
   "sidebar.section.actions": "Действия с разделом",
   "sidebar.section.moveUp": "Переместить вверх",
