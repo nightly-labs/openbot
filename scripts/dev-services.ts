@@ -279,7 +279,7 @@ export function parseDevelopmentTarget(args: string[]): DevelopmentInvocation {
 
 /**
  * The test Worker lets an account create servers when the app sends this key. It is in the encrypted
- * `.env.shared`, so only a developer with `DOTENV_PRIVATE_KEY_SHARED` can read it. Never log it.
+ * `.env.dev`, so only a developer with `DOTENV_PRIVATE_KEY_DEV` can read it. Never log it.
  */
 async function readHostingDeveloperKey(): Promise<string> {
   const shared = await loadSharedDevelopmentEnvironment(projectRoot);

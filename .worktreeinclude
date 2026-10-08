@@ -2,5 +2,3 @@
 remote/.env.keys
 # Reuse the local identity. Existing worktree state is never replaced.
 .openbot/dev-state.json
-# Stage one: import legacy identity from an older main checkout.
-apps/auth-api/.env.dev

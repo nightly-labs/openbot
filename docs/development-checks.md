@@ -300,9 +300,9 @@ when a test asserts state; do not convert a test that asserts the badge into one
 probe, because the badge is the behaviour.
 
 The development setup script checks Bun, migrates local D1, and creates missing local state in
-`.openbot/dev-state.json`. A legacy `apps/auth-api/.env.dev` is imported and kept as a recovery
-copy. The stage-one `.env.shared` file remains encrypted; a missing development key does not block
-ordinary local setup.
+`.openbot/dev-state.json`. The committed `apps/auth-api/.env.dev` is encrypted; a missing
+development key does not block ordinary local setup. Existing state is reused. Values stored only
+in the old generated `.env.dev` are reset on update.
 
 ## Lint and UI rules
 

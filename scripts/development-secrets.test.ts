@@ -4,9 +4,9 @@ import { join } from "node:path";
 import { importJWK, jwtVerify, SignJWT } from "jose";
 import { afterEach, describe, expect, it } from "vitest";
 import {
-  createDevelopmentEnvFile,
+  createDevelopmentDefaults,
   createDevelopmentTicketKeyPair,
-  ensureDevelopmentEnvFile,
+  ensureDevelopmentState,
   readDevelopmentState,
   setDevelopmentOverrides,
 } from "./development-secrets";
@@ -38,7 +38,7 @@ describe("generated development secrets", () => {
   });
 
   it("writes secrets the Signal service accepts, and a different set each time", () => {
-    const [first, second] = [readGeneratedValues(), readGeneratedValues()];
+    const [first, second] = [createDevelopmentDefaults(), createDevelopmentDefaults()];
 
     for (const name of ["SKILLS_ADMIN_TOKEN", "SITE_REPORT_HASH_SECRET", "REMOTE_AUTH_WEBHOOK_SECRET"]) {
       expect(new TextEncoder().encode(first[name]).byteLength).toBeGreaterThanOrEqual(32);
@@ -47,7 +47,7 @@ describe("generated development secrets", () => {
   });
 
   it("turns email delivery off and exposes the development sign-in code", () => {
-    const values = readGeneratedValues();
+    const values = createDevelopmentDefaults();
 
     expect(values.AUTH_EXPOSE_DEVELOPMENT_CODE).toBe("true");
     expect([
@@ -59,71 +59,24 @@ describe("generated development secrets", () => {
     ]).toEqual(["", "", "", "", ""]);
   });
 
-  it("imports a legacy env file into private state and keeps a recovery copy", () => {
-    const root = createTemporaryRoot();
-    const path = join(root, "apps", "auth-api", ".env.dev");
-    const legacy = [
-      "SKILLS_ADMIN_TOKEN=the-developer-own-value",
-      "APNS_KEY_ID=ABC1234567",
-      "APNS_PRIVATE_KEY=private-key",
-      "",
-    ].join("\n");
-    writeFileSync(path, legacy);
-
-    expect(ensureDevelopmentEnvFile(root)).toBe("kept");
-    const state = readDevelopmentState(root);
-    expect(state.defaults.SKILLS_ADMIN_TOKEN).toBe("the-developer-own-value");
-    expect(state.overrides).toEqual({ APNS_KEY_ID: "ABC1234567", APNS_PRIVATE_KEY: "private-key" });
-    expect(readFileSync(join(root, ".openbot", "legacy-env.dev.backup"), "utf8")).toBe(legacy);
-    expect(statSync(join(root, ".openbot", "dev-state.json")).mode & 0o777).toBe(0o600);
-    expect(statSync(join(root, ".openbot", "legacy-env.dev.backup")).mode & 0o777).toBe(0o600);
-    expect(readFileSync(path, "utf8")).toBe(legacy);
-  });
-
-  it("keeps explicit SMTP settings as overrides during legacy migration", () => {
-    const root = createTemporaryRoot();
-    const tickets = createDevelopmentTicketKeyPair();
-    writeFileSync(
-      join(root, "apps", "auth-api", ".env.dev"),
-      [
-        "EMAIL_SMTP_HOST=smtp.example.test",
-        "EMAIL_SMTP_PORT=2525",
-        `REMOTE_TICKET_PRIVATE_JWK=${tickets.privateJwk}`,
-        `REMOTE_TICKET_PUBLIC_JWKS=${tickets.publicJwks}`,
-        "",
-      ].join("\n"),
-    );
-
-    const state = readDevelopmentState(root);
-
-    expect(state.overrides.EMAIL_SMTP_HOST).toBe("smtp.example.test");
-    expect(state.overrides.EMAIL_SMTP_PORT).toBe("2525");
-    expect(state.defaults.EMAIL_SMTP_USERNAME).toBe("");
-  });
-
-  it("preserves an encrypted legacy file without importing ciphertext", () => {
+  it("never imports the encrypted development settings into local state", () => {
     const root = createTemporaryRoot();
     const path = join(root, "apps", "auth-api", ".env.dev");
     const source = "REMOTE_TICKET_PRIVATE_JWK=encrypted:fixture\n";
     writeFileSync(path, source);
 
-    expect(() => readDevelopmentState(root)).toThrow(/legacy development env is encrypted/i);
-    expect(exists(join(root, ".openbot", "dev-state.json"))).toBe(false);
+    const state = readDevelopmentState(root);
+    expect(state.defaults.REMOTE_TICKET_PRIVATE_JWK).not.toBe("encrypted:fixture");
+    expect(state.overrides).toEqual({});
+    expect(statSync(join(root, ".openbot", "dev-state.json")).mode & 0o777).toBe(0o600);
     expect(readFileSync(path, "utf8")).toBe(source);
+    expect(existsSync(join(root, ".openbot", "legacy-env.dev.backup"))).toBe(false);
   });
 
-  it("rejects a legacy env with only one remote ticket key", () => {
-    const root = createTemporaryRoot();
-    writeFileSync(join(root, "apps", "auth-api", ".env.dev"), "REMOTE_TICKET_PRIVATE_JWK=private\n");
-
-    expect(() => readDevelopmentState(root)).toThrow(/incomplete remote ticket key pair/i);
-    expect(exists(join(root, ".openbot", "dev-state.json"))).toBe(false);
-  });
-
-  it("generates local defaults into state when the checkout has no legacy file", () => {
+  it("generates local defaults into state when the checkout has no state", () => {
     const root = createTemporaryRoot();
 
-    expect(ensureDevelopmentEnvFile(root)).toBe("created");
+    expect(ensureDevelopmentState(root)).toBe("created");
     const state = readDevelopmentState(root);
     expect(state.version).toBe(1);
     expect(state.defaults.REMOTE_TICKET_PRIVATE_JWK).toBeTruthy();
@@ -141,16 +94,6 @@ describe("generated development secrets", () => {
     expect(second.defaults.REMOTE_TICKET_PRIVATE_JWK).toBe(first.defaults.REMOTE_TICKET_PRIVATE_JWK);
     expect(updated.overrides).toEqual({ APNS_KEY_ID: "ABC1234567", APNS_PRIVATE_KEY: "private-key" });
     expect(setDevelopmentOverrides(root, { APNS_PRIVATE_KEY: null }).overrides).toEqual({ APNS_KEY_ID: "ABC1234567" });
-  });
-
-  it("stops when a legacy file changes after migration", () => {
-    const root = createTemporaryRoot();
-    const path = join(root, "apps", "auth-api", ".env.dev");
-    writeFileSync(path, "CUSTOM_VALUE=one\n");
-    readDevelopmentState(root);
-    writeFileSync(path, "CUSTOM_VALUE=two\n");
-
-    expect(() => readDevelopmentState(root)).toThrow(/legacy .* changed/i);
   });
 
   it("rejects corrupted state without generating a replacement", () => {
@@ -181,16 +124,6 @@ describe("generated development secrets", () => {
 
 function exists(path: string): boolean {
   return existsSync(path);
-}
-
-function readGeneratedValues(): Record<string, string> {
-  const values: Record<string, string> = {};
-  for (const line of createDevelopmentEnvFile().split("\n")) {
-    if (line.startsWith("#") || !line.includes("=")) continue;
-    const separator = line.indexOf("=");
-    values[line.slice(0, separator)] = line.slice(separator + 1);
-  }
-  return values;
 }
 
 function createTemporaryRoot(): string {

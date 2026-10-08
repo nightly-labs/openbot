@@ -16,23 +16,15 @@ export function withoutDecryptionKeys(environment: NodeJS.ProcessEnv): NodeJS.Pr
   return Object.fromEntries(Object.entries(environment).filter(([key]) => !key.startsWith("DOTENV_")));
 }
 
-/** Stage one retains the old shared header. DEV is an alias for the same cryptographic key. */
 export async function loadSharedDevelopmentEnvironment(
   projectRoot: string,
   environment: NodeJS.ProcessEnv = process.env,
 ): Promise<Record<string, string>> {
-  if (
-    environment.DOTENV_PRIVATE_KEY_DEV?.trim() &&
-    environment.DOTENV_PRIVATE_KEY_SHARED?.trim() &&
-    environment.DOTENV_PRIVATE_KEY_DEV.trim() !== environment.DOTENV_PRIVATE_KEY_SHARED.trim()
-  ) {
-    throw new Error("Development key names contain different keys. Set only DOTENV_PRIVATE_KEY_DEV.");
-  }
-  const privateKey = environment.DOTENV_PRIVATE_KEY_DEV ?? environment.DOTENV_PRIVATE_KEY_SHARED;
+  const privateKey = environment.DOTENV_PRIVATE_KEY_DEV;
   if (!privateKey?.trim()) return {};
   return decryptEnvironment(
-    join(projectRoot, "apps/auth-api/.env.shared"),
-    { DOTENV_PRIVATE_KEY_SHARED: privateKey },
+    join(projectRoot, "apps/auth-api/.env.dev"),
+    { DOTENV_PRIVATE_KEY_DEV: privateKey },
     "Cannot decrypt shared development settings. Check the development key.",
   );
 }

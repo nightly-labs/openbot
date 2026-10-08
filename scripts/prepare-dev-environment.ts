@@ -4,7 +4,7 @@ import { constants, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSy
 import { dirname, isAbsolute, join, normalize, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { developmentInstanceIdForWorktree } from "../src/main/development-profile";
-import { type DevelopmentEnvOutcome, ensureDevelopmentEnvFile } from "./development-secrets";
+import { type DevelopmentStateOutcome, ensureDevelopmentState } from "./development-secrets";
 
 const scriptsRoot = dirname(fileURLToPath(import.meta.url));
 export const developmentProjectRoot = dirname(scriptsRoot);
@@ -37,14 +37,14 @@ export interface DevelopmentPreparationInput {
   run?: DevelopmentCommandRunner;
 }
 
-export function prepareDevelopmentEnvironment(input: DevelopmentPreparationInput = {}): DevelopmentEnvOutcome {
+export function prepareDevelopmentEnvironment(input: DevelopmentPreparationInput = {}): DevelopmentStateOutcome {
   const projectRoot = input.projectRoot ?? developmentProjectRoot;
   assertSupportedBunVersion(input.bunVersion ?? process.versions.bun ?? "unknown");
   // Copy state before generation so a new worktree retains the main checkout's identity.
   const copied = copyWorktreeIncludes(projectRoot, input.mainCheckoutRoot ?? findMainCheckoutRoot(projectRoot));
   for (const path of copied) process.stdout.write(`Copied ${path} from the main checkout.\n`);
   // State generation uses Node built-ins and needs no decryption key or installed packages.
-  const envFile = ensureDevelopmentEnvFile(projectRoot);
+  const stateOutcome = ensureDevelopmentState(projectRoot);
 
   const executable = input.executable ?? process.execPath;
   const run = input.run ?? execDevelopmentCommand;
@@ -60,7 +60,7 @@ export function prepareDevelopmentEnvironment(input: DevelopmentPreparationInput
     () => (existsSync(join(projectRoot, LOCAL_D1_STATE)) ? migrationFingerprint(projectRoot) : null),
     () => run(executable, ["run", "api:migrate:local"], options),
   );
-  return envFile;
+  return stateOutcome;
 }
 
 /**
@@ -159,9 +159,9 @@ function fingerprintFiles(projectRoot: string, files: string[], extra: string[])
   return hash.digest("hex");
 }
 
-export function prepareDevelopmentWorktree(input: DevelopmentPreparationInput = {}): DevelopmentEnvOutcome {
+export function prepareDevelopmentWorktree(input: DevelopmentPreparationInput = {}): DevelopmentStateOutcome {
   const projectRoot = input.projectRoot ?? developmentProjectRoot;
-  const envFile = prepareDevelopmentEnvironment({ ...input, projectRoot });
+  const stateOutcome = prepareDevelopmentEnvironment({ ...input, projectRoot });
   const executable = input.executable ?? process.execPath;
   const run = input.run ?? execDevelopmentCommand;
   const options = { cwd: projectRoot, stdio: "inherit" as const };
@@ -172,7 +172,7 @@ export function prepareDevelopmentWorktree(input: DevelopmentPreparationInput = 
     env: { ...process.env, OPENBOT_DEV_INSTANCE_ID: instanceId },
   });
   run(executable, ["run", "marketplace:seed:local"], options);
-  return envFile;
+  return stateOutcome;
 }
 
 /**
@@ -189,8 +189,6 @@ export function copyWorktreeIncludes(projectRoot: string, mainCheckoutRoot: stri
   for (const line of readFileSync(listPath, "utf8").split("\n")) {
     const path = line.trim();
     if (!path || path.startsWith("#") || !isInsideCheckout(path)) continue;
-    if (path === ".openbot/dev-state.json" && existsSync(join(projectRoot, "apps/auth-api/.env.dev"))) continue;
-    if (path === "apps/auth-api/.env.dev" && existsSync(join(projectRoot, ".openbot/dev-state.json"))) continue;
     const source = join(mainCheckoutRoot, path);
     const target = join(projectRoot, path);
     if (!existsSync(source) || existsSync(target)) continue;

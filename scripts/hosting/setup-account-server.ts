@@ -16,7 +16,7 @@
  * deliveries; Stripe retries them, and the Worker cron repairs a missed boat event.
  *
  * The production store is the `cloudflare-production` GitHub Environment (`gh` must be signed in),
- * and the keys come from the shell. The test store is the encrypted `apps/auth-api/.env.shared`,
+ * and the keys come from the shell. The test store is the encrypted `apps/auth-api/.env.dev`,
  * and the keys come from the shared development environment. The script shows no secret value.
  */
 
@@ -95,15 +95,13 @@ function envFileStore(path: string): SecretStore {
     return values[name]?.trim() || null;
   };
   const put = async (name: string, value: string): Promise<void> => {
-    const privateKey = process.env.DOTENV_PRIVATE_KEY_DEV?.trim() ?? process.env.DOTENV_PRIVATE_KEY_SHARED?.trim();
+    const privateKey = process.env.DOTENV_PRIVATE_KEY_DEV?.trim();
     if (!privateKey) {
-      throw new Error(
-        `${name} was not written to ${path}. Set DOTENV_PRIVATE_KEY_SHARED or DOTENV_PRIVATE_KEY_DEV in the shell.`,
-      );
+      throw new Error(`${name} was not written to ${path}. Set DOTENV_PRIVATE_KEY_DEV in the shell.`);
     }
     const keysDirectory = mkdtempSync(join(tmpdir(), "openbot-dotenv-"));
     const keysPath = join(keysDirectory, ".env.keys");
-    writeFileSync(keysPath, `DOTENV_PRIVATE_KEY_SHARED=${privateKey}\n`, { encoding: "utf8", mode: 0o600 });
+    writeFileSync(keysPath, `DOTENV_PRIVATE_KEY_DEV=${privateKey}\n`, { encoding: "utf8", mode: 0o600 });
     try {
       const options = { path: envPath, envKeysFile: keysPath, quiet: true };
       let result: Awaited<ReturnType<typeof dotenvSet>>;
@@ -198,13 +196,11 @@ async function main(args: string[]): Promise<void> {
   const live = target === "production";
   const api = new URL(values.api ?? TARGETS[target].api).origin;
   const replace = values["replace-webhooks"];
-  const store = live ? githubStore() : envFileStore("apps/auth-api/.env.shared");
+  const store = live ? githubStore() : envFileStore("apps/auth-api/.env.dev");
   if (!live) {
-    const privateKey = process.env.DOTENV_PRIVATE_KEY_DEV?.trim() ?? process.env.DOTENV_PRIVATE_KEY_SHARED?.trim();
+    const privateKey = process.env.DOTENV_PRIVATE_KEY_DEV?.trim();
     if (!privateKey) {
-      throw new Error(
-        "Set DOTENV_PRIVATE_KEY_DEV or DOTENV_PRIVATE_KEY_SHARED in the shell before updating the test store.",
-      );
+      throw new Error("Set DOTENV_PRIVATE_KEY_DEV in the shell before updating the test store.");
     }
     await loadSharedDevelopmentEnvironment(repoRoot);
   }

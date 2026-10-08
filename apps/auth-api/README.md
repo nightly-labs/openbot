@@ -8,25 +8,28 @@ and team authentication tickets.
 
 ## Local development
 
-`.env.dev` is a legacy generated file. During the stage-one migration,
-`bun run dev:prepare` imports its local identity and defaults into ignored
-`.openbot/dev-state.json` and keeps the old file as a recovery copy. New starts
-read the state file, so a checkout without shared secrets still starts with
-stable local keys. Generated values never reach production or another machine.
+`.env.dev` is the committed encrypted development file. Local identity keys and saved overrides
+stay in ignored `.openbot/dev-state.json`. A checkout without a development key starts with stable
+generated local defaults. Existing state files remain valid.
 
-`.env.shared` remains the tracked encrypted development file during stage one. It holds
-the Stripe sandbox keys, the development `BOAT_API_KEY`, and the webhook secrets of the `test`
+The update resets values that exist only in the old generated `.env.dev`; it does not import them.
+Local identity and custom settings already saved in `.openbot/dev-state.json` stay unchanged.
+Set new manual overrides in the shell. The load order is shell values, saved local overrides,
+decrypted development settings, then generated defaults. An explicit empty value is an override.
+Shared settings do not replace the local ticket keys, auth webhook secret, report hash secret, or
+skills admin token. Shell values and saved overrides can replace these local values.
+
+The encrypted `.env.dev` holds the Stripe sandbox keys, the development `BOAT_API_KEY`, and the webhook secrets of the `test`
 Worker. The boat key creates real VMs, but only when the Worker also has
 `HOSTED_SERVER_TEMPLATE`. `wrangler.jsonc` sets
 `HOSTED_SERVERS_ENABLED` to `true` and `HOSTED_SERVERS_ALLOWED_USER_IDS` to `*`, so a local Worker
-with a template lets each local account create one; put account IDs in the local development state to
-limit it. A VM cannot reach a local Worker, so use `bun run dev --hosting=test` for a real server (see
+with a template lets each local account create one. Set `HOSTED_SERVERS_ALLOWED_USER_IDS` in the
+shell to limit access. A VM cannot reach a local Worker, so use `bun run dev --hosting=test` for a real server (see
 [Real servers from a development build](../../docs/hosted-servers.md#real-servers-from-a-development-build)).
-Set `DOTENV_PRIVATE_KEY_DEV` in your shell profile to load the shared values in every worktree. The
-legacy name `DOTENV_PRIVATE_KEY_SHARED` is also accepted during stage one; both names must contain the
-same key. Without either key, the Worker starts with generated local defaults and no Stripe or boat
-keys. Shell values override shared values. Do not put development keys in the root `.env.keys`; that
-file remains for production encryption.
+Set `DOTENV_PRIVATE_KEY_DEV` in your shell profile to load the shared values in every worktree.
+Without this key, the Worker starts with generated local defaults and no Stripe or boat keys. Shell
+values override shared values. Development commands do not read the root `.env.keys`; production
+commands continue to use that file.
 
 ### Stripe sandbox
 
@@ -43,17 +46,17 @@ stripe listen --forward-to http://127.0.0.1:3100/v1/stripe/webhook
 ```
 
 For the `test` Worker, `bun run hosting:setup --target=test` makes or updates its Stripe and boat
-webhooks and writes their signing secrets to `.env.shared`. Run it with `DOTENV_PRIVATE_KEY_DEV` (or
-the legacy `DOTENV_PRIVATE_KEY_SHARED`) set in the shell. Then run `bun run api:deploy:test`. It
+webhooks and writes their signing secrets to `.env.dev`. Run it with `DOTENV_PRIVATE_KEY_DEV`
+set in the shell. Then run `bun run api:deploy:test`. It
 also sets the allow list from `HOSTED_SERVERS_TEST_ALLOW_LIST` and the developer key
-`HOSTED_SERVERS_DEVELOPER_KEY` from `.env.shared`.
+`HOSTED_SERVERS_DEVELOPER_KEY` from `.env.dev`.
 
 `scripts/stripe-flows-e2e.ts` checks the plan flows against the sandbox and a local Worker: renewal,
 failed renewal, cancel at the period end, plan change, renew, delete, another account's server, and a
 deleted customer. Each scenario uses a Stripe test clock and deletes it at the end. Start the Worker
 with `HOSTED_SERVERS_ENABLED=true`, `HOSTED_SERVERS_ALLOWED_USER_IDS` set to the output of
 `bun scripts/stripe-flows-e2e.ts --print-user-ids`, and `BOAT_API_KEY=e2e-invalid-key`, and forward
-the webhooks to it. A value in the shell overrides `.env.shared`; without the fake key, each paid
+the webhooks to it. A value in the shell overrides `.env.dev`; without the fake key, each paid
 scenario creates a real boat VM. Then, from the
 repository root:
 
@@ -72,7 +75,7 @@ server. It needs the real `BOAT_API_KEY`, a template from `bun run hosting:templ
 `__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS=.trycloudflare.com`, or Vite refuses the tunnel host. A boat
 trial account allows only `small` and `default`, so use a Starter or Standard plan there.
 
-`bun run api:deploy:test` loads the stage-one `.env.shared` values before `.env.production`. Shell
+`bun run api:deploy:test` loads the `.env.dev` values before `.env.production`. Shell
 values still win, so the test Worker gets the sandbox keys and never live keys.
 
 `.env.production` is the encrypted production file, and its private key stays in the ignored root
@@ -94,8 +97,8 @@ printf '%s' '<APP_PASSWORD>' | bun run env:set:smtp
 bun run env:validate:prod
 ```
 
-Commit `.env.production` and the encrypted `.env.shared` during stage one. Never commit `.env.keys`
-or the legacy `.env.dev` recovery file.
+Commit the encrypted `.env.production` and `.env.dev` files. Never commit `.env.keys` or local
+state from `.openbot/`.
 
 ## Article artwork
 
@@ -250,8 +253,3 @@ sets `APNS_ORIGIN` and forwards the Worker's request to Apple from Node
 the token. Only a loopback caller can use the forwarder, and the Worker accepts only a loopback
 `APNS_ORIGIN`.
 
-Stage-two rollout must wait until existing checkouts use the state-aware scripts and ignore
-`.openbot/`. Old scripts can recreate the legacy `.env.dev`. If a legacy file contains encrypted
-values, migration stops. Recover its matching key and decrypt it before migration; do not replace
-its identity with generated values. Verify saved values and the recovery copy in each checkout
-before approving the tracked-file rename.

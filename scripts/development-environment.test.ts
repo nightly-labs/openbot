@@ -25,13 +25,13 @@ function fixture(): string {
   return root;
 }
 async function encryptedFixture(root: string): Promise<string> {
-  const path = join(root, "apps/auth-api/.env.shared");
+  const path = join(root, "apps/auth-api/.env.dev");
   writeFileSync(path, "");
   const envKeysFile = join(root, ".fixture.keys");
   const options = { path, envKeysFile, quiet: true };
   await set("STRIPE_SECRET_KEY", "sk_test_fixture", options);
   await set("REMOTE_AUTH_WEBHOOK_SECRET", "shared-identity-must-not-win", options);
-  const key = parseEnv(readFileSync(envKeysFile, "utf8")).DOTENV_PRIVATE_KEY_SHARED;
+  const key = parseEnv(readFileSync(envKeysFile, "utf8")).DOTENV_PRIVATE_KEY_DEV;
   if (!key) throw new Error("Fixture key is missing.");
   return key;
 }
@@ -73,19 +73,10 @@ describe("development environment loading", () => {
     ).rejects.toThrow(/^Cannot decrypt shared development settings\. Check the development key\.$/u);
   });
 
-  it("rejects conflicting development key aliases before loading or writing settings", async () => {
-    await expect(
-      loadSharedDevelopmentEnvironment(fixture(), {
-        DOTENV_PRIVATE_KEY_DEV: "first-private-fixture",
-        DOTENV_PRIVATE_KEY_SHARED: "second-private-fixture",
-      }),
-    ).rejects.toThrow("Development key names contain different keys. Set only DOTENV_PRIVATE_KEY_DEV.");
-  });
-
   it("rejects damaged ciphertext even when the shell overrides its value", async () => {
     const root = fixture();
     const key = await encryptedFixture(root);
-    writeFileSync(join(root, "apps/auth-api/.env.shared"), 'STRIPE_SECRET_KEY="encrypted:broken"\n');
+    writeFileSync(join(root, "apps/auth-api/.env.dev"), 'STRIPE_SECRET_KEY="encrypted:broken"\n');
     await expect(
       loadDevelopmentEnvironment(root, { DOTENV_PRIVATE_KEY_DEV: key, STRIPE_SECRET_KEY: "shell" }),
     ).rejects.toThrow("Cannot decrypt shared development settings");
@@ -144,25 +135,36 @@ describe("development environment loading", () => {
       REMOTE_TICKET_PRIVATE_JWK: "production-signer",
       REMOTE_TICKET_PUBLIC_JWKS: "production-verifier",
       REMOTE_AUTH_WEBHOOK_SECRET: "production-webhook",
+      STRIPE_SECRET_KEY: "sk_test_production_fixture",
       STRIPE_WEBHOOK_SECRET: "stripe-webhook",
       BOAT_API_KEY: "boat",
       BOAT_WEBHOOK_SECRET: "boat-webhook",
       HOSTED_SERVERS_DEVELOPER_KEY: "developer",
       HOSTED_SERVERS_TEST_ALLOW_LIST: "account-id",
     };
-    writeFileSync(
-      path,
-      Object.entries(production)
-        .map(([name, value]) => `${name}=${value}`)
-        .join("\n"),
-    );
+    writeFileSync(path, "");
+    const envKeysFile = join(root, ".production-fixture.keys");
+    const options = { path, envKeysFile, quiet: true };
+    for (const [name, value] of Object.entries(production)) await set(name, value, options);
+    const productionKey = parseEnv(readFileSync(envKeysFile, "utf8")).DOTENV_PRIVATE_KEY_PRODUCTION;
+    if (!productionKey) throw new Error("Production fixture key is missing.");
     setDevelopmentOverrides(root, { STRIPE_SECRET_KEY: "local-override", SKILLS_ADMIN_TOKEN: "local-admin" });
-    const result = await loadTestDeploymentEnvironment(root, { DOTENV_PRIVATE_KEY_DEV: key });
+    const result = await loadTestDeploymentEnvironment(root, {
+      DOTENV_PRIVATE_KEY_DEV: key,
+      DOTENV_PRIVATE_KEY_PRODUCTION: productionKey,
+    });
     expect(result.STRIPE_SECRET_KEY).toBe("sk_test_fixture");
     expect(result.SKILLS_ADMIN_TOKEN).toBe("admin");
     expect(result.REMOTE_TICKET_PRIVATE_JWK).toBe("production-signer");
     expect(result.REMOTE_AUTH_WEBHOOK_SECRET).toBe("shared-identity-must-not-win");
     expect(readDevelopmentState(root).overrides.SKILLS_ADMIN_TOKEN).toBe("local-admin");
     expect(result.DOTENV_PRIVATE_KEY_DEV).toBeUndefined();
+    expect(result.DOTENV_PRIVATE_KEY_PRODUCTION).toBeUndefined();
+    const shell = await loadTestDeploymentEnvironment(root, {
+      DOTENV_PRIVATE_KEY_DEV: key,
+      DOTENV_PRIVATE_KEY_PRODUCTION: productionKey,
+      STRIPE_SECRET_KEY: "sk_test_shell_fixture",
+    });
+    expect(shell.STRIPE_SECRET_KEY).toBe("sk_test_shell_fixture");
   });
 });
