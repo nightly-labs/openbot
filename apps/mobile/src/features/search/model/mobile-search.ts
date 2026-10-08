@@ -1,6 +1,6 @@
 import type { ConversationMessage, ConversationSearchPage } from "@openbot/contracts/ipc";
+import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
-import { markdownPreviewText } from "../../chat/model/chat-markdown-parser";
 
 interface MobileSearchAgentResult {
   id: string;

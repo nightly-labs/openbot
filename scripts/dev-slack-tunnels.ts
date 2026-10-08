@@ -5,8 +5,8 @@
 // not an installed OpenBot that owns `openbot://`. The tunnels live as long as this process. Their
 // addresses change at each start: the development app's request and redirect URLs must follow.
 //
-// `.env.slack-dev` in the worktree root holds the signing secret, and `apps/auth-api/.env.dev` the
-// development app's `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET` and `SLACK_STATE_SECRET`. Git ignores
+// `.env.slack-dev` in the worktree root holds the signing secret, and local development state holds
+// the development app's `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET` and `SLACK_STATE_SECRET`. Git ignores
 // both:
 //
 //   OPENBOT_DEV_SLACK_SIGNING_SECRET='…'   (the development app, api.slack.com/apps > Basic Information)
@@ -16,6 +16,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { join } from "node:path";
 import { createOpenBotLogger } from "@openbot/logging";
+
+import { developmentChildEnvironment } from "./development-environment";
 
 const logger = createOpenBotLogger("dev-slack");
 
@@ -77,11 +79,14 @@ export async function attachSlackTunnels(specs: TunnelledSpec[], projectRoot: st
     const tunnelled = {
       REMOTE_SIGNAL_URL: `${signalUrl.replace("https://", "wss://")}/v1/signal`,
       // Signal binds each signing secret to its app.
-      SLACK_SIGNING_SECRET: `${DEVELOPMENT_SLACK_APP_ID}:${values.OPENBOT_DEV_SLACK_SIGNING_SECRET}`,
       SLACK_DEV_PUBLIC_ORIGIN: apiUrl,
       OPENBOT_DEV_SLACK_CALLBACK_PORT: callbackPort,
     };
-    for (const spec of specs) Object.assign(spec.env, tunnelled);
+    for (const spec of specs) {
+      Object.assign(spec.env, tunnelled);
+      if (spec.name === "remote")
+        spec.env.SLACK_SIGNING_SECRET = `${DEVELOPMENT_SLACK_APP_ID}:${values.OPENBOT_DEV_SLACK_SIGNING_SECRET}`;
+    }
     logger.info(
       `Set the development Slack app's request URL to ${signalUrl}/v1/slack/events and its redirect URL to ${apiUrl}/v2/slack/callback.`,
     );
@@ -108,6 +113,7 @@ function freePort(): Promise<number> {
 function openTunnel(port: string, tunnels: ChildProcess[]): Promise<string> {
   const tunnel = spawn("cloudflared", ["tunnel", "--no-autoupdate", "--url", `http://127.0.0.1:${port}`], {
     stdio: ["ignore", "pipe", "pipe"],
+    env: developmentChildEnvironment(process.env, "app"),
   });
   tunnels.push(tunnel);
   return new Promise((resolve, reject) => {

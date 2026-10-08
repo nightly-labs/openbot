@@ -3,7 +3,7 @@ import { createSignal, createUniqueId, For, Show, untrack } from "solid-js";
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
-import { TaskListHeader, TaskMark, type TaskMarkState } from "./TaskList";
+import { createTaskListPlayState, TaskListHeader, TaskMark, type TaskMarkState } from "./TaskList";
 
 export type AwaitingReplyState = "asked" | "working" | "replied" | "failed";
 
@@ -60,6 +60,7 @@ export function AwaitingReplies(props: AwaitingReplyListProps) {
 function AwaitingReplyList(props: AwaitingReplyListProps) {
   const { t } = useText();
   const panelId = createUniqueId();
+  const playState = createTaskListPlayState();
   const [open, setOpen] = createSignal(untrack(() => props.defaultOpen ?? true));
   const total = () => props.items.length;
   const done = () => props.items.filter((item) => item.state === "replied").length;
@@ -70,7 +71,11 @@ function AwaitingReplyList(props: AwaitingReplyListProps) {
   // Every agent replied or failed, so nothing more comes for these rows.
   const settled = () => props.items.every((item) => item.state === "replied" || item.state === "failed");
   return (
-    <section class={["task-list", "awaiting-replies", props.class]} data-open={open() ? "" : undefined}>
+    <section
+      style={{ "--task-list-play-state": playState() }}
+      class={["task-list", "awaiting-replies", props.class]}
+      data-open={open() ? "" : undefined}
+    >
       <div class="awaiting-replies-bar">
         <TaskListHeader
           open={open()}

@@ -8,7 +8,7 @@ import { Effect, Fiber } from "effect";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CodexAppServerClient } from "./app-server-client";
 import { runCauseEffect } from "./effect-boundary";
-import { decodeRecordResponse, isRecord } from "./protocol";
+import { type AppServerRequest, decodeRecordResponse, isRecord } from "./protocol";
 import type { ProviderHistoryFragment } from "./provider-history";
 
 const temporaryRoots: string[] = [];
@@ -31,6 +31,49 @@ describe("CodexAppServerClient", () => {
 
     expect(result).toEqual({ echoed: "hello" });
     await vi.waitFor(() => expect(notifications).toContain("test/notification"));
+  });
+
+  it("cancels only the interrupted turn, including late tools, and accepts tools after restart", async () => {
+    const client = createClient(await createFakeCodex(), 5_000);
+    const requests: AppServerRequest[] = [];
+    client.on("request", (request) => requests.push(request));
+    client.start();
+    const tool = (threadId: string, turnId: string) =>
+      runCauseEffect(client.request("test/tool", { threadId, turnId }, decodeRecordResponse));
+    await tool("thread-a", "turn-a");
+    await tool("thread-b", "turn-a");
+    const first = requests[0]?.signal;
+    const other = requests[1]?.signal;
+    expect(first?.aborted).toBe(false);
+    await runCauseEffect(
+      client.request("turn/interrupt", { threadId: "thread-a", turnId: "turn-a" }, decodeRecordResponse),
+    );
+    expect(first?.aborted).toBe(true);
+    expect(other?.aborted).toBe(false);
+    await tool("thread-a", "turn-a");
+    expect(requests[2]?.signal?.aborted).toBe(true);
+    await tool("thread-a", "turn-next");
+    expect(requests[3]?.signal?.aborted).toBe(false);
+    await runCauseEffect(
+      client.request(
+        "test/complete",
+        { threadId: "thread-a", turn: { id: "turn-next", status: "interrupted" } },
+        decodeRecordResponse,
+      ),
+    );
+    expect(requests[3]?.signal?.aborted).toBe(true);
+    await runCauseEffect(client.stop());
+    expect(other?.aborted).toBe(true);
+    client.start();
+    await tool("thread-a", "turn-a");
+    expect(requests[4]?.signal?.aborted).toBe(false);
+    await expect(runCauseEffect(client.request("test/partial-exit", {}, decodeRecordResponse))).rejects.toThrow(
+      "exited",
+    );
+    expect(requests[4]?.signal?.aborted).toBe(true);
+    client.start();
+    await tool("thread-a", "turn-a");
+    expect(requests[5]?.signal?.aborted).toBe(false);
   });
 
   it("rejects an invalid response without leaving its caller pending", async () => {
@@ -288,6 +331,12 @@ process.stdin.on("data", (chunk) => {
         process.stdout.write(response.slice(0, middle));
         process.stdout.write(response.slice(middle));
         process.stdout.write(JSON.stringify({ method: "test/notification", params: {} }) + "\\n");
+      } else if (message.method === "test/tool") {
+        process.stdout.write(JSON.stringify({ id: "tool-" + message.id, method: "item/tool/call", params: message.params }) + "\\n");
+        process.stdout.write(JSON.stringify({ id: message.id, result: {} }) + "\\n");
+      } else if (message.method === "turn/interrupt" || message.method === "test/complete") {
+        if (message.method === "test/complete") process.stdout.write(JSON.stringify({ method: "turn/completed", params: message.params }) + "\\n");
+        process.stdout.write(JSON.stringify({ id: message.id, result: {} }) + "\\n");
       } else if (message.method === "test/error") {
         process.stdout.write(JSON.stringify({ id: message.id, error: { code: 412, message: "Fake RPC failure" } }) + "\\n");
       } else if (message.method === "thread/unsubscribe") {

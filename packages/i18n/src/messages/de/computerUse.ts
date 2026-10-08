@@ -1,0 +1,43 @@
+import type { PartialTranslation } from "../../message";
+import type { messages as source } from "../en/computerUse";
+
+export const messages = {
+  "computerUse.permission.screenRecording.title": "Bildschirmaufnahme",
+  "computerUse.permission.screenRecording.description": "Erlaubt OpenBot, App-Fenster zu sehen.",
+  "computerUse.permission.screenRecording.pane": "Bildschirm- und Systemaudioaufnahme",
+  "computerUse.permission.accessibility.title": "Bedienungshilfen",
+  "computerUse.permission.accessibility.description": "Erlaubt OpenBot, zu klicken und zu tippen.",
+  "computerUse.permission.accessibility.pane": "Bedienungshilfen",
+  "computerUse.error.check": "OpenBot konnte Computersteuerung nicht prüfen.",
+  "computerUse.error.openSettings": "OpenBot konnte die Systemeinstellungen nicht öffnen.",
+  "computerUse.error.startDriver": "OpenBot konnte den Treiber für die Computersteuerung nicht starten.",
+  "computerUse.checkAgain": "Erneut prüfen",
+  "computerUse.checking": "Computersteuerung wird geprüft",
+  "computerUse.unavailable.title": "Computersteuerung ist noch nicht verfügbar",
+  "computerUse.permissions.title": "Systemberechtigungen",
+  "computerUse.permissions.description": "macOS verwaltet die Berechtigungen.",
+  "computerUse.ready.title": "Die Computersteuerung ist bereit",
+  "computerUse.ready.description":
+    "OpenBot kann Apps auf diesem Computer sehen und bedienen. Dieses System fordert keine zusätzliche Berechtigung an.",
+  "computerUse.openSettingsFailed.title": "Systemeinstellungen konnten nicht geöffnet werden",
+  "computerUse.compact.title": "Computersteuerung aktivieren",
+  "computerUse.compact.description": "Erlaube OpenBot, Apps auf diesem Computer zu sehen und zu bedienen.",
+  "computerUse.granted": "Erteilt",
+  "computerUse.opening": "Wird geöffnet…",
+  "computerUse.manage": "Verwalten",
+  "computerUse.grant": "Erteilen",
+  "computerUse.manageLabel": "{permission} verwalten",
+  "computerUse.grantLabel": "{permission} erteilen",
+  "computerUse.help.title": "{permission} aktivieren",
+  "computerUse.help.paneOpen": "Die Systemeinstellungen sind bei {pane} geöffnet.",
+  "computerUse.help.dragLabel":
+    "Ziehe {name} in die Systemeinstellungen oder drücke darauf, um es im Finder anzuzeigen",
+  "computerUse.help.dragToAdd": "Zum Hinzufügen ziehen",
+  "computerUse.help.findInList": "Suche {name} in der Liste.",
+  "computerUse.help.dragIntoList": "Ziehe {name}.app in die Liste.",
+  "computerUse.help.turnOn": "Schalte den Schalter ein.",
+  "computerUse.help.showInFinder": "Im Finder anzeigen",
+  "computerUse.help.revealFailed": "Die Anwendung konnte nicht im Finder angezeigt werden.",
+  "computerUse.help.dragFailed": "Die Anwendung konnte nicht gezogen werden.",
+  "computerUse.highlight.working": "OpenBot arbeitet in {title}",
+} as const satisfies PartialTranslation<typeof source>;

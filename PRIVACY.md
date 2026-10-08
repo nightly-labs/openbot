@@ -127,8 +127,8 @@ through `analytics.openbot.run`.
 Analytics is enabled in production by default. Desktop users can disable it under **Settings →
 General → Privacy → Share product analytics**. The preference is stored locally and disables both UI
 analytics and lifecycle analytics emitted by the local host. Website analytics does not use the
-desktop preference. Mobile has its own phone-wide **Settings → General → Privacy → Share product
-analytics** preference, independent of desktop and host collection. It defaults to enabled in a
+desktop preference. Mobile has its own phone-wide **Settings → Privacy → Share product analytics**
+preference, independent of desktop and host collection. It defaults to enabled in a
 configured production build, is read before collection starts, and remains disabled if the stored
 preference cannot be read. Disabling it drops pending mobile events; it does not remove previously
 received events or retract an in-flight request. There is no persistent offline analytics queue.
@@ -825,7 +825,7 @@ answer, has a signature made with a key that only the phone and the host have, s
 cannot start the action with an `openbot://` link. The app shows the command again before it
 approves it.
 
-Settings > General > Live Activities turns this off. The phone then removes its token from the
+Settings > Live Activities turns this off. The phone then removes its token from the
 host.
 
 ## Optional macOS Host Manager
@@ -895,3 +895,11 @@ Requests already received by OpenPanel cannot be recalled. Anonymous error repor
 anonymous. The browser app has its own local analytics setting in account settings, separate
 from desktop and mobile. Collection is enabled by default; a malformed or unreadable setting
 keeps it disabled. Existing OpenPanel retention rules apply after delivery.
+
+### Remote host release checks
+
+When a server administrator checks an OpenBot release, the host requests the public stable
+release manifest from GitHub for its operating system and architecture. The request includes no
+account data, chats, files, commands, or credentials. GitHub receives the host IP address as part
+of the connection. Connected administrators receive the installed version, release version,
+check status, and installation method.

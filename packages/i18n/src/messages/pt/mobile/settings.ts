@@ -16,8 +16,6 @@ export const messages = {
   "mobile.settings.about.privacy": "Política de privacidade",
   "mobile.settings.home.profile": "Perfil",
   "mobile.settings.home.preferences": "Preferências",
-  "mobile.settings.home.generalHint": "Aparência e conversas",
-  "mobile.settings.home.general": "Geral",
   "mobile.settings.home.about": "Sobre o OpenBot",
   "mobile.settings.home.support": "Suporte",
   "mobile.settings.home.supportHint": "Obter ajuda e salvar um registro de suporte",
@@ -68,7 +66,22 @@ export const messages = {
   "mobile.settings.appearance.agentColorMessages": "Cor do agente nas minhas mensagens",
   "mobile.settings.appearance.agentColorMessagesFooter":
     "Suas mensagens no chat de um agente usam a cor dele. Desative se o texto ficar difícil de ler.",
-  "mobile.settings.feedback.title": "Resposta tátil",
+  "mobile.settings.animations.title": "Animações",
+  "mobile.settings.animations.footer":
+    "Desative Animações para reduzir o movimento em todo o app. Quando Reduzir Movimento está ativado nos ajustes do celular, o app também reduz o movimento. As animações abaixo ficam desativadas.",
+  "mobile.settings.animations.all": "Animações",
+  "mobile.settings.animations.chatZoom": "Zoom ao abrir conversas",
+  "mobile.settings.animations.chatZoomFooter":
+    "Uma conversa abre a partir do avatar na lista e fecha de volta nele. Quando desativado, a conversa desliza pela lateral.",
+  "mobile.settings.animations.agentFaces": "Rostos animados dos agentes",
+  "mobile.settings.animations.agentFacesFooter":
+    "Os avatares dos agentes mexem o rosto enquanto os agentes trabalham e descansam. Quando desativado, os rostos ficam parados.",
+  "mobile.settings.animations.composerResize": "Campo de mensagem compacto",
+  "mobile.settings.animations.composerResizeFooter":
+    "O campo de mensagem vira uma barra pequena enquanto o teclado está fechado. Quando desativado, o campo fica no tamanho completo.",
+  "mobile.settings.animations.textReveal": "Animar respostas",
+  "mobile.settings.animations.textRevealFooter":
+    "Uma resposta aparece palavra por palavra, e o balão cresce suavemente. Quando desativado, o texto aparece assim que chega.",
   "mobile.settings.feedback.footer": "Resposta ao toque nas ações do app neste dispositivo.",
   "mobile.settings.feedback.haptics": "Resposta tátil",
   "mobile.settings.feedback.retry": "Tentar salvar a configuração de resposta tátil novamente",

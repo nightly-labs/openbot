@@ -3,8 +3,9 @@ import { type AvatarMood, avatarMoodIsBusy } from "@openbot/brand/bloub-avatar-m
 import { useIsFocused } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState } from "react-native";
-import { useDerivedValue, useFrameCallback, useReducedMotion, useSharedValue } from "react-native-reanimated";
+import { useDerivedValue, useFrameCallback, useSharedValue } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
+import { useMotionPreference } from "@/shared/lib/motion";
 
 import {
   type BloubActivityFrame,
@@ -38,7 +39,8 @@ interface Playback {
  */
 export function useBloubActivityFrame(seed: string, mood: AvatarMood, animateIdle = true) {
   const focused = useIsFocused();
-  const reducedMotion = useReducedMotion();
+  // Reduced motion, or the Settings switch for faces, holds the face at rest.
+  const still = !useMotionPreference("agentFaces");
   const [playing, setPlaying] = useState(false);
   const busy = avatarMoodIsBusy(mood);
   const geometry = useMemo(() => bloubActivityGeometry(seed, mood), [seed, mood]);
@@ -87,19 +89,19 @@ export function useBloubActivityFrame(seed: string, mood: AvatarMood, animateIdl
   }, false);
 
   useEffect(() => {
-    const update = () => clock.setActive(playing && focused && !reducedMotion && AppState.currentState === "active");
+    const update = () => clock.setActive(playing && focused && !still && AppState.currentState === "active");
     update();
     const subscription = AppState.addEventListener("change", update);
     return () => {
       subscription.remove();
       clock.setActive(false);
     };
-  }, [clock, focused, playing, reducedMotion]);
+  }, [clock, focused, playing, still]);
 
   useEffect(() => {
     const previous = previousGeometry.current;
     previousGeometry.current = geometry;
-    if (reducedMotion || !focused || (!busy && !animateIdle)) {
+    if (still || !focused || (!busy && !animateIdle)) {
       morph.current = null;
       setPlaying(false);
       playback.set({ frames: [rest], index: 0, loopStart: null });
@@ -143,11 +145,11 @@ export function useBloubActivityFrame(seed: string, mood: AvatarMood, animateIdl
         setPlaying(true);
       });
     }
-  }, [busy, focused, geometry, playback, reducedMotion, rest, startIdle, animateIdle]);
+  }, [busy, focused, geometry, playback, still, rest, startIdle, animateIdle]);
 
   useEffect(() => {
     idleFrames.current = null;
-    if (!animateIdle || busy || reducedMotion || !focused) return;
+    if (!animateIdle || busy || still || !focused) return;
     const cancel = prepareBloubIdleFrames(geometry, (frames) => {
       idleFrames.current = frames;
       const current = playback.get();
@@ -157,7 +159,7 @@ export function useBloubActivityFrame(seed: string, mood: AvatarMood, animateIdl
       cancel();
       idleFrames.current = null;
     };
-  }, [animateIdle, busy, focused, geometry, playback, reducedMotion, startIdle]);
+  }, [animateIdle, busy, focused, geometry, playback, still, startIdle]);
 
   return useDerivedValue(() => {
     const current = playback.get();

@@ -1,4 +1,5 @@
 import type { MenuComponentRef } from "@expo/ui/community/menu";
+import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 import MaskedView from "@react-native-masked-view/masked-view";
 import { BlurView } from "expo-blur";
 import { Link } from "expo-router";
@@ -24,7 +25,7 @@ import { AgentPinSwipeRow } from "@/features/agents/components/agent-pin-swipe-r
 import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
-import { markdownPreviewText } from "@/features/chat/model/chat-markdown-parser";
+import { ChatZoomSource } from "@/features/agents/components/chat-zoom-source";
 import { useAgentUnread } from "@/features/workspace/components/use-live-workspace";
 import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
@@ -128,11 +129,11 @@ export function AgentListRow({
   const avatar = onOpen ? (
     bloub
   ) : (
-    <Link.AppleZoom>
+    <ChatZoomSource>
       <AgentPinAvatar agentId={agent.id} location="row" size={54}>
         {bloub}
       </AgentPinAvatar>
-    </Link.AppleZoom>
+    </ChatZoomSource>
   );
 
   const row = (

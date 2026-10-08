@@ -113,6 +113,7 @@ import { createMockOnePasswordConnector } from "./mock-onepassword-connector";
 import { createMockProviderRuntimes, type MockProviderRuntimeOptions } from "./mock-provider-runtimes";
 import { mockRoutineCalendar } from "./mock-routine-calendar";
 import { createMockRoutineFeed } from "./mock-routine-feed";
+import { mockRoutineFlows } from "./mock-routine-flows";
 import { applySidebarLayoutAction } from "./mock-sidebar-layout";
 import { createMockSkills, type MockSkillsOptions } from "./mock-skills";
 import { createMockStorage } from "./mock-storage";
@@ -246,7 +247,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   const approvalAutomationListeners = new Set<(preference: ApprovalAutomationPreference) => void>();
   let dynamicIslandPreference: DynamicIslandPreference = { ...DEFAULT_DYNAMIC_ISLAND_PREFERENCE };
   let dynamicIslandPresentation: DynamicIslandPresentation = { serverId: "local", mode: "idle" };
-  const agentStatus = clone(options.agentStatus ?? STORY_AGENT_STATUS);
+  let agentStatus = clone(options.agentStatus ?? STORY_AGENT_STATUS);
   let agents = clone(options.agents ?? STORY_AGENT_SUMMARIES);
   let mcpServers = clone(STORY_MCP_SERVERS);
   let sidebarLayout: SidebarLayoutSnapshot = {
@@ -546,6 +547,17 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     updateProviderCli: async () => clone(agentStatus),
     refreshAgentProviders: async () => clone(agentStatus),
     // The preview runs no provider process, so a restart has nothing to wait for.
+    setProviderOn: async ({ provider, on }) => {
+      if (!on && agents.some((agent) => agent.provider === provider))
+        throw new Error(sourceText("error.provider.inUse", { provider }));
+      if (agentStatus.providers)
+        agentStatus = {
+          ...agentStatus,
+          providers: agentStatus.providers.map((row) => (row.id === provider ? { ...row, off: !on } : row)),
+        };
+      emitAgentEvent({ type: "status", status: clone(agentStatus) });
+      return clone(agentStatus);
+    },
     restartProvider: async () => clone(agentStatus),
     cancelProviderRestart: async () => clone(agentStatus),
     // A code that never completes: the preview has no provider to finish the sign-in, so this shows
@@ -578,6 +590,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       transcribe: async () => ({ text: "Mock voice transcript" }),
       onModelStatus: () => () => undefined,
     },
+    routineFlows: mockRoutineFlows({ routines, routineRuns }),
     auth: mockAuth.auth,
     skills: mockSkills.skills,
     hostedSites: {
@@ -967,7 +980,12 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
       // A saved endpoint's models are composed here, not stored, so a removal drops them the way a
       // respawned OpenCode would: it lists what its config names and nothing else.
-      listModels: async () => clone([...models, ...customProviders.flatMap(mockCustomProviderModels)]),
+      listModels: async () =>
+        clone(
+          [...models, ...customProviders.flatMap(mockCustomProviderModels)].filter(
+            (model) => !agentStatus.providers?.some((row) => row.id === model.provider && row.off),
+          ),
+        ),
       listAgents: async () => clone(agents),
       listInstalledSkills: async (agentId) => clone(readInstalledSkills(agentId)),
       ...mockChannels,

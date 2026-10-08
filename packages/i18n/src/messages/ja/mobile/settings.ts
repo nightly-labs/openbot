@@ -16,8 +16,6 @@ export const messages = {
   "mobile.settings.about.privacy": "プライバシーポリシー",
   "mobile.settings.home.profile": "プロフィール",
   "mobile.settings.home.preferences": "環境設定",
-  "mobile.settings.home.generalHint": "外観と会話",
-  "mobile.settings.home.general": "一般",
   "mobile.settings.home.about": "OpenBot について",
   "mobile.settings.home.support": "サポート",
   "mobile.settings.home.supportHint": "ヘルプとサポートログの保存",
@@ -69,7 +67,22 @@ export const messages = {
   "mobile.settings.appearance.agentColorMessages": "自分のメッセージにエージェントの色を使う",
   "mobile.settings.appearance.agentColorMessagesFooter":
     "エージェントとのチャットで、自分のメッセージにそのエージェントの色を使います。文字が読みにくい場合はオフにしてください。",
-  "mobile.settings.feedback.title": "フィードバック",
+  "mobile.settings.animations.title": "アニメーション",
+  "mobile.settings.animations.footer":
+    "アニメーションをオフにすると、アプリ全体の動きを減らします。電話の設定で「視差効果を減らす」がオンのときも、アプリは動きを減らします。その場合、下のアニメーションはオフのままです。",
+  "mobile.settings.animations.all": "アニメーション",
+  "mobile.settings.animations.chatZoom": "チャットへのズーム",
+  "mobile.settings.animations.chatZoomFooter":
+    "チャットはリストのアバターから開き、閉じるとアバターに戻ります。オフにすると、チャットは横からスライドして開きます。",
+  "mobile.settings.animations.agentFaces": "エージェントの表情アニメーション",
+  "mobile.settings.animations.agentFacesFooter":
+    "エージェントが作業中や待機中に、アバターの表情が動きます。オフにすると、表情は動きません。",
+  "mobile.settings.animations.composerResize": "コンパクトなメッセージ欄",
+  "mobile.settings.animations.composerResizeFooter":
+    "キーボードを閉じている間、メッセージ欄は小さなバーになります。オフにすると、メッセージ欄は常に元のサイズのままです。",
+  "mobile.settings.animations.textReveal": "返信のアニメーション",
+  "mobile.settings.animations.textRevealFooter":
+    "返信が一語ずつ表示され、吹き出しがなめらかに大きくなります。オフにすると、テキストは届いた時点で表示されます。",
   "mobile.settings.feedback.footer": "このデバイスでのアプリ操作の触覚フィードバックです。",
   "mobile.settings.feedback.haptics": "触覚フィードバック",
   "mobile.settings.feedback.retry": "触覚フィードバックの設定をもう一度保存",

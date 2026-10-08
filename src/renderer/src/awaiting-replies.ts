@@ -1,4 +1,5 @@
 import { type ChannelTask, isQueuedAgentReply, type QueueDelivery, type QueueSnapshot } from "@openbot/contracts/ipc";
+import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 import type { AgentMessage, AgentProfile } from "@openbot/ui/data";
 import type { AwaitingReplyItem, AwaitingReplyState } from "@openbot/ui/features/conversation/AwaitingReplies";
 import { currentText } from "@openbot/ui/text";
@@ -132,5 +133,5 @@ function replyResult(text: string): string {
 }
 
 function previewText(text: string): string {
-  return text.replace(/\s+/gu, " ").trim().slice(0, PREVIEW_LIMIT);
+  return markdownPreviewText(text).slice(0, PREVIEW_LIMIT);
 }

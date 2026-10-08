@@ -3,7 +3,7 @@ import emojiRegex from "emoji-regex";
 import { INPUT_LIMITS } from "./input-limits";
 import { type AttachmentSummary, isAttachmentSummary } from "./ipc-attachments";
 import { isBoundedString, isIdentifier, isRequestId } from "./ipc-bounded-values";
-import { type ConversationPlan, isConversationPlan } from "./ipc-conversation-plan";
+import { CONVERSATION_PLAN_ITEM_TYPE, type ConversationPlan, isConversationPlan } from "./ipc-conversation-plan";
 import { QUEUE_DELIVERY_STATUSES, type QueueDelivery } from "./ipc-queue";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
 
@@ -260,4 +260,25 @@ function isConversationDelivery(value: unknown): boolean {
     isOneOf(QUEUE_DELIVERY_STATUSES, value.status) &&
     (value.position === null || (isNumber(value.position) && Number.isInteger(value.position) && value.position >= 1))
   );
+}
+
+/**
+ * The answer an agent gave in one turn: its last message of that turn that says something to the
+ * reader. Commentary, a question prompt and a plan are not the answer.
+ */
+export function latestTurnAnswer(
+  messages: readonly ConversationMessage[],
+  turnId: string,
+): ConversationMessage | undefined {
+  return [...messages]
+    .reverse()
+    .find(
+      (message) =>
+        message.author === "assistant" &&
+        message.turnId === turnId &&
+        message.itemType !== "commentary" &&
+        message.itemType !== "question_prompt" &&
+        message.itemType !== CONVERSATION_PLAN_ITEM_TYPE &&
+        message.text.trim(),
+    );
 }

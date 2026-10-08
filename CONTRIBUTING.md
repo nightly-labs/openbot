@@ -23,7 +23,7 @@ bun run dev
 
 Coding agents skip `bun run check`: see [AGENTS.md, Checks](AGENTS.md#checks).
 
-The supported toolchain is pinned in `package.json`. Use stable Bun 1.4.0, TypeScript 7, Vite 7, and the
+The supported toolchain is pinned in `package.json`. Use stable Bun 1.4.2, TypeScript 7, Vite 7, and the
 existing Biome configuration. Biome is the only lint and format tool. Do not add a second linter,
 Prettier, a second state library, or a UI kit without first discussing the architectural cost.
 The Biome configuration also loads the repository-owned GritQL rules in

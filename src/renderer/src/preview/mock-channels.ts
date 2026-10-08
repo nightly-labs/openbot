@@ -1,4 +1,3 @@
-import { expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
 import type {
   AgentEvent,
   Channel,
@@ -22,6 +21,7 @@ import type {
   UpdateChannelRoutineInput,
 } from "@openbot/contracts/ipc";
 import { channelRoutingConversationEventItemType } from "@openbot/contracts/ipc";
+import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 
 export function createMockChannels(emit: (event: AgentEvent) => void, agentName: (agentId: string) => string) {
   const channels = new Map<string, Channel>();
@@ -48,7 +48,7 @@ export function createMockChannels(emit: (event: AgentEvent) => void, agentName:
           lastMessage: latest
             ? {
                 authorName: latest.author.name,
-                text: expandChatTagReferences(latest.message.text),
+                text: markdownPreviewText(latest.message.text),
                 at: latest.message.createdAt,
               }
             : null,
