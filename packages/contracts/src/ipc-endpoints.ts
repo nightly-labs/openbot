@@ -188,6 +188,7 @@ import type {
 } from "./ipc-events";
 import type { GitHubConnectorRepositories, GitHubConnectorStatus } from "./ipc-github-connector";
 import type { HostAnalytics, HostAnalyticsInput } from "./ipc-host-analytics";
+import type { HostReleaseStatus } from "./ipc-host-release";
 import type {
   DeleteHostedSiteInput,
   HostedSiteList,
@@ -634,6 +635,8 @@ export const IPC_ENDPOINTS = {
   // identity result is the server as the list shows it after the change.
   hostAdmin: {
     updateIdentity: scopedRequest<UpdateHostIdentityInput, ServerSummary, "required">()("host-admin:update-identity"),
+    getReleaseStatus: scopedQuery<HostReleaseStatus | null, "required">()("host-admin:get-release-status"),
+    checkRelease: scopedQuery<HostReleaseStatus, "required">()("host-admin:check-release"),
     getUpdateStatus: scopedQuery<HostUpdateStatus, "required">()("host-admin:get-update-status"),
     checkForUpdate: scopedQuery<HostUpdateStatus, "required">()("host-admin:check-for-update"),
     startUpdate: scopedRequest<UpdateRestartMode, HostUpdateStatus, "required">()("host-admin:start-update"),

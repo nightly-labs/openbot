@@ -14,16 +14,19 @@ import {
 import { AGENT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-import-v1";
 import { CONTEXT_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/context-reset-v1";
 import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
+import { HOST_RELEASE_CAPABILITY } from "@openbot/contracts/team-protocol/host-release-v1";
 import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-update-v1";
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import {
   cancelHostUpdate,
   checkHostForUpdate,
+  checkHostRelease,
   clearStorage,
   deleteHostedSite,
   deleteStoredFile,
   getAgentAdminSettings,
+  getHostReleaseStatus,
   getHostUpdateStatus,
   getStorageUsage,
   listHostedSites,
@@ -588,6 +591,12 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     saveFile,
   });
   const hostUpdateCalls: HostUpdateCalls = {
+    getReleaseStatus: async (serverId) =>
+      workspace.state.capabilities.includes(HOST_RELEASE_CAPABILITY)
+        ? runTeamEffect(getHostReleaseStatus(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause)))
+        : null,
+    checkRelease: async (serverId) =>
+      runTeamEffect(checkHostRelease(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
     getUpdateStatus: async (serverId) =>
       runTeamEffect(getHostUpdateStatus(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
     checkForUpdate: async (serverId) =>

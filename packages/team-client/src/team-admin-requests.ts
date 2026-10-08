@@ -1,3 +1,4 @@
+import { HOST_RELEASE_ROUTES } from "@openbot/contracts/team-protocol/host-release-v1";
 // Admin requests to one host: agent settings and skills, shared tables, agent share links, the server name and logo,
 // the app update, MCP servers, storage, hosted sites and providers.
 //
@@ -26,6 +27,7 @@ import {
   decodeHostAddedAgent,
   decodeHostAgentTemplatePreview,
   decodeHostAgentTemplatePublication,
+  decodeHostReleaseStatus,
   decodeHostUpdateStatus,
   decodeInstalledSkills,
   decodeMcpServerConfigs,
@@ -36,6 +38,7 @@ import {
   decodeStorageUsage,
   type GetStorageUsageInput,
   type HostedSiteList,
+  type HostReleaseStatus,
   type HostUpdateSettingsChange,
   type HostUpdateStatus,
   type InstallAgentTemplateInput,
@@ -556,4 +559,12 @@ export function deleteCustomProvider(
   return adminCall(() =>
     request("POST", PROVIDERS_ADMIN_ROUTES.customDelete, decodeCustomProviderResult, { id: input.id }),
   );
+}
+
+export function getHostReleaseStatus(request: TeamApiRequest): Effect.Effect<HostReleaseStatus, TeamAdminRequestError> {
+  return adminCall(() => request("POST", HOST_RELEASE_ROUTES.status, decodeHostReleaseStatus, {}));
+}
+
+export function checkHostRelease(request: TeamApiRequest): Effect.Effect<HostReleaseStatus, TeamAdminRequestError> {
+  return adminCall(() => request("POST", HOST_RELEASE_ROUTES.check, decodeHostReleaseStatus, {}));
 }

@@ -146,6 +146,7 @@ import {
   decodeDynamicIslandPreference,
   decodeDynamicIslandPresentation,
 } from "./dynamic-island-decoding";
+import { decodeHostReleaseStatusFromMain } from "./host-release-decoding";
 import { decodeAddOrchestratorReply, decodeMessagingOverviewReply } from "./messaging-decoding";
 import { decodeProviderRuntimeSnapshot } from "./provider-runtime";
 import {
@@ -656,6 +657,8 @@ const openbotApi: OpenBotDesktopApi = {
   hostAdmin: bridgeGroup(IPC_ENDPOINTS.hostAdmin, {
     updateIdentity: decodeServer,
     getUpdateStatus: decodeHostUpdateStatus,
+    getReleaseStatus: (value) => (value === null ? null : decodeHostReleaseStatusFromMain(value)),
+    checkRelease: decodeHostReleaseStatusFromMain,
     checkForUpdate: decodeHostUpdateStatus,
     startUpdate: decodeHostUpdateStatus,
     cancelUpdate: decodeHostUpdateStatus,

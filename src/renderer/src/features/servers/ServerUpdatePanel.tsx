@@ -1,4 +1,5 @@
 import type {
+  HostReleaseStatus,
   HostUpdateSettingsChange,
   HostUpdateStatus,
   OpenBotDesktopApi,
@@ -37,7 +38,8 @@ import { watchHostUpdate } from "./host-update-toast";
 export type HostUpdateCalls = Pick<
   OpenBotDesktopApi["hostAdmin"],
   "getUpdateStatus" | "checkForUpdate" | "startUpdate" | "cancelUpdate" | "setUpdateSettings"
->;
+> &
+  Partial<Pick<OpenBotDesktopApi["hostAdmin"], "getReleaseStatus" | "checkRelease">>;
 
 export interface ServerUpdateOptions {
   /** The calls of a client with no `window.openbot`, such as the web client. */
@@ -59,6 +61,7 @@ export function ServerUpdatePanel(
 ) {
   const { t, format, errorMessage } = useText();
   const calls = (): HostUpdateCalls => props.calls ?? window.openbot.hostAdmin;
+  const [release, setRelease] = createSignal<HostReleaseStatus | null>(null);
   const [status, setStatus] = createSignal<HostUpdateStatus | null>(null);
   const [loadError, setLoadError] = createSignal<string | null>(null);
   const [busy, setBusy] = createSignal<string | null>(null);
@@ -66,6 +69,7 @@ export function ServerUpdatePanel(
   let timer: ReturnType<typeof setTimeout> | undefined;
   /** Bumped for each server and on unmount, so an answer for an earlier one is dropped. */
   let generation = 0;
+  let revision = 0;
 
   function stopPolling(): void {
     if (timer !== undefined) clearTimeout(timer);
@@ -76,17 +80,24 @@ export function ServerUpdatePanel(
     setStatus(next);
     setLoadError(null);
     stopPolling();
-    if (running(next)) timer = setTimeout(() => void read(), POLL_MS);
+    timer = setTimeout(() => void read(), running(next) || release()?.phase === "checking" ? POLL_MS : 15_000);
   }
 
   async function read(): Promise<void> {
     const current = generation;
+    const request = ++revision;
     const serverId = props.serverId;
     try {
-      const next = await calls().getUpdateStatus(serverId);
-      if (current === generation) show(next);
+      const [next, nextRelease] = await Promise.all([
+        calls().getUpdateStatus(serverId),
+        calls().getReleaseStatus?.(serverId) ?? Promise.resolve(null),
+      ]);
+      if (current === generation && request === revision) {
+        setRelease(nextRelease);
+        show(next);
+      }
     } catch (error) {
-      if (current !== generation) return;
+      if (current !== generation || request !== revision) return;
       setLoadError(errorMessage(error, t("server.update.loadFailed", { name: props.hostName })));
       stopPolling();
       timer = setTimeout(() => void read(), RETRY_MS);
@@ -94,11 +105,14 @@ export function ServerUpdatePanel(
   }
 
   createEffect(
-    () => props.serverId,
+    () => [props.serverId, props.actionsAvailable] as const,
     () => {
       generation += 1;
       stopPolling();
       setStatus(null);
+      setRelease(null);
+      setBusy(null);
+      setConfirmRestart(false);
       setLoadError(null);
       void untrack(read);
     },
@@ -111,11 +125,15 @@ export function ServerUpdatePanel(
   async function act(key: string, call: (serverId: string) => Promise<HostUpdateStatus>): Promise<void> {
     if (busy()) return;
     const current = generation;
+    revision += 1;
+    stopPolling();
     setBusy(key);
     try {
       const next = await call(props.serverId);
       if (current === generation) show(next);
     } catch (error) {
+      if (current !== generation) return;
+      timer = setTimeout(() => void read(), RETRY_MS);
       actionToast.error(t("server.settings.actionFailedTitle"), {
         ...{
           description: errorMessage(error, t("server.settings.actionFailed")),
@@ -123,7 +141,7 @@ export function ServerUpdatePanel(
         report: { operation: "update", source: "action", cause_code: classifyFailure(error) },
       });
     } finally {
-      setBusy(null);
+      if (current === generation) setBusy(null);
     }
   }
 
@@ -140,13 +158,47 @@ export function ServerUpdatePanel(
     const remote = status()?.remoteUpdates;
     return remote === "disabled" || remote === "managed" || status()?.phase === "unsupported";
   };
-  const disabled = () => !props.actionsAvailable || Boolean(busy()) || blocked();
+  const externalRelease = () => (release()?.method !== "self-update" ? release() : null);
+  const checkDisabled = () =>
+    !props.actionsAvailable ||
+    Boolean(busy()) ||
+    Boolean(loadError()) ||
+    (externalRelease() ? externalRelease()?.phase === "unavailable" || !calls().checkRelease : blocked());
+  const disabled = () => !props.actionsAvailable || Boolean(busy()) || Boolean(loadError()) || blocked();
+  const check = () => {
+    const releaseCheck = calls().checkRelease;
+    const current = generation;
+    return act("check", async (serverId) => {
+      if (!externalRelease() || !releaseCheck) return calls().checkForUpdate(serverId);
+      const next = await releaseCheck(serverId);
+      if (current === generation) setRelease(next);
+      return calls().getUpdateStatus(serverId);
+    });
+  };
   const version = (current: HostUpdateStatus) => current.availableVersion ?? current.currentVersion;
   const waitingFor = (current: HostUpdateStatus) =>
     format.list(current.restart?.waitingFor.map((reason) => t(restartReasonKey(reason))) ?? []);
 
   function message(current: HostUpdateStatus): string {
     const name = props.hostName;
+    const checked = externalRelease();
+    if (checked && !running(current) && current.phase !== "ready" && current.errorCode !== "install_failed") {
+      switch (checked.phase) {
+        case "checking":
+          return t("server.update.status.checking");
+        case "available":
+          return t("server.update.status.available", { version: checked.latestVersion ?? "" });
+        case "up-to-date":
+          return t("server.update.status.upToDate", { name });
+        case "error":
+          return t("server.update.releaseCheckFailed", { name });
+        case "unavailable":
+          return t("server.update.releaseUnavailable");
+        default:
+          return t("server.update.status.idle");
+      }
+    }
+    if (current.phase === "unsupported") return t("server.update.releaseUnavailable");
     if (current.errorCode === "install_failed") return t("server.update.status.installFailed", { name });
     switch (current.phase) {
       case "checking":
@@ -191,7 +243,7 @@ export function ServerUpdatePanel(
         <Show when={status()}>
           {(current) => (
             <>
-              <BlockedNotice status={current()} hostName={props.hostName} />
+              <BlockedNotice status={current()} release={externalRelease()} hostName={props.hostName} />
               <ItemGroup class="settings-modal-card">
                 <Item class="settings-modal-row">
                   <ItemContent>
@@ -211,41 +263,49 @@ export function ServerUpdatePanel(
                         type="button"
                         size="sm"
                         variant="outline"
-                        loading={busy() === "check" || current().phase === "checking"}
-                        disabled={disabled()}
-                        onClick={() => void act("check", (serverId) => calls().checkForUpdate(serverId))}
+                        loading={
+                          busy() === "check" ||
+                          current().phase === "checking" ||
+                          externalRelease()?.phase === "checking"
+                        }
+                        disabled={checkDisabled()}
+                        onClick={() => void check()}
                       >
                         {t("server.update.check")}
                       </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        loading={busy() === "start-when-idle"}
-                        // Only a relaunch of the host recovers from a failed install.
-                        disabled={
-                          disabled() || current().phase === "up-to-date" || current().errorCode === "install_failed"
-                        }
-                        onClick={() => void start("when-idle")}
-                      >
-                        {t("server.update.start")}
-                      </Button>
+                      <Show when={!blocked()}>
+                        <Button
+                          type="button"
+                          size="sm"
+                          loading={busy() === "start-when-idle"}
+                          // Only a relaunch of the host recovers from a failed install.
+                          disabled={
+                            disabled() || current().phase === "up-to-date" || current().errorCode === "install_failed"
+                          }
+                          onClick={() => void start("when-idle")}
+                        >
+                          {t("server.update.start")}
+                        </Button>
+                      </Show>
                     </Show>
                   </ItemActions>
                 </Item>
-                <SwitchField
-                  checked={current().autoDownload}
-                  disabled={disabled()}
-                  onChange={(autoDownload) => void changeSettings({ autoDownload })}
-                  label={t("server.update.autoDownloadTitle")}
-                  description={t("server.update.autoDownloadDescription", { name: props.hostName })}
-                />
-                <SwitchField
-                  checked={current().autoInstall}
-                  disabled={disabled()}
-                  onChange={(autoInstall) => void changeSettings({ autoInstall })}
-                  label={t("server.update.autoInstallTitle")}
-                  description={t("server.update.autoInstallDescription", { name: props.hostName })}
-                />
+                <Show when={!blocked()}>
+                  <SwitchField
+                    checked={current().autoDownload}
+                    disabled={disabled()}
+                    onChange={(autoDownload) => void changeSettings({ autoDownload })}
+                    label={t("server.update.autoDownloadTitle")}
+                    description={t("server.update.autoDownloadDescription", { name: props.hostName })}
+                  />
+                  <SwitchField
+                    checked={current().autoInstall}
+                    disabled={disabled()}
+                    onChange={(autoInstall) => void changeSettings({ autoInstall })}
+                    label={t("server.update.autoInstallTitle")}
+                    description={t("server.update.autoInstallDescription", { name: props.hostName })}
+                  />
+                </Show>
               </ItemGroup>
               <Show when={current().restart}>
                 {(restart) => (
@@ -323,10 +383,21 @@ export function ServerUpdatePanel(
 }
 
 /** Why no action can run: the host user turned it off, a Host Manager owns updates, or no updater. */
-function BlockedNotice(props: { status: HostUpdateStatus; hostName: string }) {
+function BlockedNotice(props: { status: HostUpdateStatus; release: HostReleaseStatus | null; hostName: string }) {
   const { t } = useText();
   const notice = (): { title: string; description: string } | null => {
     const name = props.hostName;
+    if (props.release && props.release.method !== "self-update") {
+      const descriptions = {
+        "host-manager": "server.update.path.hostManager",
+        hosted: "server.update.path.hosted",
+        system: "server.update.path.system",
+        container: "server.update.path.container",
+        manual: "server.update.path.manual",
+        unavailable: "server.update.path.unavailable",
+      } as const;
+      return { title: t("server.update.externalTitle"), description: t(descriptions[props.release.method]) };
+    }
     if (props.status.remoteUpdates === "disabled")
       return { title: t("server.update.disabledTitle"), description: t("server.update.disabledDescription", { name }) };
     if (props.status.remoteUpdates === "managed")
@@ -341,7 +412,7 @@ function BlockedNotice(props: { status: HostUpdateStatus; hostName: string }) {
   return (
     <Show when={notice()}>
       {(current) => (
-        <Alert tone="warning" role="status">
+        <Alert tone={props.release && props.release.method !== "unavailable" ? "neutral" : "warning"} role="status">
           <AlertIcon>
             <Info />
           </AlertIcon>

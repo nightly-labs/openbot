@@ -326,6 +326,12 @@ at most 10 named snapshots for each account.
 
 ### Updates
 
+Server Settings > Updates can check the compatible release without installing it. The host must
+support `host-release-v1`. The panel shows the installed version, the latest release after a
+check, and the host-managed update path. It does not offer app self-update controls for the
+extracted AppImage. Older hosts need an administrator to update them before they can provide
+this release check.
+
 The Linux build contains `scripts/hosting/` (without the TypeScript files) in `resources/hosting`.
 On a server, root runs `openbot-hosted-update`:
 

@@ -286,3 +286,17 @@ A self-hosted server uses the same Linux build, scripts and units on the owner's
 (`src/main/server-mode.ts`, `OPENBOT_SERVER=1`), and the `openbot` terminal command signs it in over
 a Unix socket in the 0700 runtime directory of the service user. Main publishes the host after each
 sign-in. See [self-hosted servers](../self-hosted-server.md).
+
+### Remote release checks
+
+`host-release-v1` adds admin-only release status and check routes. It does not change
+`host-update-v1`, which still refuses installation requests and checks when updates are managed
+or disabled. The new check reads only the official stable release manifest for the host platform
+and architecture. It never installs files, restarts the host, or changes update preferences.
+The host checks that the manifest contains a compatible asset and returns only version, phase,
+and installation method. Feed errors return a safe status and can be retried.
+
+`HostReleaseService` owns release discovery. `RequestedUpdate` still owns idle restarts and
+`UpdateService` still owns app updates. Desktop and web use the new capability when available;
+older hosts keep their existing update controls. The status poll is passive and does not keep a
+hosted server awake. Mobile shares the protocol codecs but has no new update screen.

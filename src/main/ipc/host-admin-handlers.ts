@@ -1,3 +1,4 @@
+import { HOST_RELEASE_CAPABILITY, HOST_RELEASE_ROUTES } from "@openbot/contracts/team-protocol/host-release-v1";
 import type { Effect } from "effect";
 import type { RemoteWorkflowError } from "../remote-service-effects";
 // The server name, logo and app update of one server's host. On a joined server the request goes to
@@ -20,7 +21,7 @@ import { HOST_UPDATE_CAPABILITY, HOST_UPDATE_ROUTES } from "@openbot/contracts/t
 import { sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { HostService } from "../host-service";
-import { acceptEmpty, type ResponseDecoder } from "../remote-host-decoding";
+import { acceptEmpty, decodeHostReleaseStatusFromHost, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
 import { parseHostUpdateSettings } from "./app-inputs";
 import type { IpcGroupHandlers } from "./define-ipc-group";
@@ -83,6 +84,30 @@ export function hostAdminIpcHandlers({
           );
           // The host has published the change before it answered, so this reads the new name and logo.
           return runCauseEffect(remoteServers.refreshIdentity(serverId));
+        },
+      }),
+      getReleaseStatus: scopedQueryHandler({
+        local: localUpdate,
+        remote: (serverId) =>
+          remoteServers.supportsCapability(serverId, HOST_RELEASE_CAPABILITY)
+            ? runCauseEffect(
+                remoteServers.request(serverId, HOST_RELEASE_ROUTES.status, decodeHostReleaseStatusFromHost, {
+                  method: "POST",
+                  body: {},
+                }),
+              )
+            : Promise.resolve(null),
+      }),
+      checkRelease: scopedQueryHandler({
+        local: localUpdate,
+        remote: (serverId) => {
+          if (!remoteServers.supportsCapability(serverId, HOST_RELEASE_CAPABILITY)) return localUpdate();
+          return runCauseEffect(
+            remoteServers.request(serverId, HOST_RELEASE_ROUTES.check, decodeHostReleaseStatusFromHost, {
+              method: "POST",
+              body: {},
+            }),
+          );
         },
       }),
       getUpdateStatus: scopedQueryHandler({

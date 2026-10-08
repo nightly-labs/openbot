@@ -5,6 +5,7 @@ import type { AgentMarketplaceService } from "../agent-marketplace-service";
 import type { AgentTemplateService } from "../agent-template-service";
 import type { PeerCustomProviderChanges } from "../custom-provider-changes";
 import type { HostEventsApi } from "../host-events-api";
+import type { HostReleaseService } from "../host-release-service";
 import type { HostService } from "../host-service";
 import type { ProviderCredentialStore } from "../provider-credential-store";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
@@ -143,6 +144,8 @@ export type TeamApiAgentImport = Pick<AgentImportService, "stageUpload" | "apply
  * `#protocolSupport` advertises its capability on; every route behind it requires an owner or admin.
  */
 export interface TeamApiAdmin {
+  /** Read-only release discovery, independent of permission to install. */
+  release?: Pick<HostReleaseService, "snapshot" | "check">;
   /** `agent-admin-v1`: access and auto-approve of one agent. */
   agents?: AgentAdminSettingsService;
   /** `skills-admin-v1`: list, install, remove and enable the skills of one agent. */
