@@ -2770,4 +2770,63 @@ describe.sequential("AgentService: queue", () => {
     expect(JSON.stringify(listResponse?.result)).toContain('\\"title\\":\\"Design\\"');
     expect(JSON.stringify(listResponse?.result)).toContain('\\"description\\":\\"\\"');
   });
+
+  it("keeps a message queued during a Grok turn after that turn's answer on reload (#1540)", async () => {
+    process.env.OPENBOT_GROK_PATH = await fakeGrokCli();
+    const started = await startService(root, {
+      provider: "grok",
+      preferredProvider: "grok",
+      client: (provider) => new FakeAgentClient(provider, "", false),
+    });
+    service = started.service;
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    const turnStarts = () => events.filter((event) => event.type === "turn-started");
+    const answer = (text: string) => {
+      const active = turnStarts().at(-1);
+      const client = started.clientFor("grok");
+      const threadId = started.store.activeProviderSession("chief")?.externalSessionId;
+      if (active?.type !== "turn-started" || !client || !threadId) throw new Error("The Grok turn did not start.");
+      // An ACP agent sends its answer only when the prompt ends.
+      vi.setSystemTime(Date.now() + 60_000);
+      client.emit(
+        "notification",
+        notification("item/completed", {
+          threadId,
+          turnId: active.turnId,
+          item: { id: `${active.turnId}:assistant`, type: "agentMessage", phase: "final_answer", text },
+        }),
+      );
+      client.emit(
+        "notification",
+        notification("turn/completed", { threadId, turn: { id: active.turnId, status: "completed" } }),
+      );
+    };
+
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      await runCauseEffect(service.sendMessage({ agentId: "chief", text: "First question" }));
+      await waitFor(() => turnStarts().length === 1);
+      await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Queued question" }));
+      await waitForQueue(service, "chief", (queue) => queue.deliveries[1]?.status === "queued");
+      answer("First answer");
+      await waitFor(() => turnStarts().length === 2);
+      answer("Second answer");
+      await waitForQueue(service, "chief", (queue) =>
+        queue.deliveries.every((delivery) => delivery.status === "completed"),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+
+    const expected = ["First question", "First answer", "Queued question", "Second answer"];
+    const live = events.findLast((event) => event.type === "conversation");
+    expect(live?.type === "conversation" ? live.snapshot.messages.map((message) => message.text) : []).toEqual(
+      expected,
+    );
+    const page = await runCauseEffect(service.readConversationPageFor("chief", "user", { type: "latest" }, 50));
+    expect(page.messages.map((message) => message.text)).toEqual(expected);
+    const reloaded = await runCauseEffect(service.readConversation("chief"));
+    expect(reloaded.messages.map((message) => message.text)).toEqual(expected);
+  });
 });

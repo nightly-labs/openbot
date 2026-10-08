@@ -5,6 +5,7 @@ import { mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import type { AgentProviderId, AgentSummary, ConversationMessage, ConversationSnapshot } from "@openbot/contracts/ipc";
 import {
   hostedSiteConversationEventItemType,
@@ -632,6 +633,104 @@ describe("OpenBotDatabase", () => {
     expect(search.results.map((result) => result.message.id)).toEqual(["message-00234"]);
     expect(search.nextCursor).toBeNull();
     expect(database.searchConversationMessages("pagination needle")).toEqual(search);
+    database.close();
+  });
+
+  it("pages a conversation in the order the live conversation shows it (#1540)", async () => {
+    const database = await createDatabase();
+    const agent = testAgent();
+    database.replaceAgents("agents-acp-order", [agent], "agents.imported");
+    const at = (seconds: number) => new Date(Date.UTC(2026, 0, 1, 0, 0, seconds)).toISOString();
+    const message = (id: string, seconds: number, fields: Partial<ConversationMessage> = {}): ConversationMessage => ({
+      id,
+      author: "assistant",
+      text: id,
+      createdAt: at(seconds),
+      status: "completed",
+      ...fields,
+    });
+    const messages: ConversationMessage[] = [];
+    for (let turn = 0; turn < 12; turn += 1) {
+      const start = turn * 100;
+      const turnId = `turn-${turn}`;
+      messages.push(
+        // Each later question was queued while the turn before it ran.
+        message(`${turnId}-question`, turn === 0 ? 0 : start - 50, { author: "user", turnId }),
+        message(`${turnId}-thought`, start + 1, { turnId, itemType: "commentary" }),
+        message(`${turnId}-tie`, start + 1, { turnId, itemType: "commentary" }),
+        // An ACP agent sends its answer only when the turn ends.
+        message(`${turnId}-answer`, start + 90, { turnId }),
+      );
+    }
+    // Grok refuses a steer and answers it in the same turn, after the first answer.
+    messages.push(
+      message("steered-question", 2_000, { author: "user", turnId: "steered" }),
+      message("steered-thought", 2_001, { turnId: "steered", itemType: "commentary" }),
+      message("steer", 2_010, { author: "user", turnId: "steered" }),
+      message("steered-first-answer", 2_020, { turnId: "steered" }),
+      message("steered-second-thought", 2_021, { turnId: "steered", itemType: "commentary" }),
+      message("steered-second-answer", 2_030, { turnId: "steered" }),
+      message("marker", 2_015),
+    );
+    // A turn larger than a page.
+    for (let index = 0; index < 120; index += 1) {
+      messages.push(message(`large-${index.toString().padStart(3, "0")}`, 3_000 + index, { turnId: "large" }));
+    }
+    // The live runtime sorts a snapshot before it stores it.
+    sortConversationMessages(messages);
+    const expected = messages.map(({ id }) => id);
+    database.persistConversation(
+      { agentId: agent.id, threadId: agent.threadId, activeTurnId: null, revision: 0, messages },
+      "conversation.acp-order",
+    );
+
+    expect(database.readConversation(agent.id, agent.threadId).messages.map(({ id }) => id)).toEqual(expected);
+    expect(expected.indexOf("turn-1-question")).toBeGreaterThan(expected.indexOf("turn-0-answer"));
+    expect(expected.indexOf("steer")).toBeGreaterThan(expected.indexOf("steered-thought"));
+    expect(expected.indexOf("steered-first-answer")).toBeLessThan(expected.indexOf("steered-second-thought"));
+
+    for (const limit of [1, 5, 50]) {
+      const pages: string[][] = [];
+      let page = database.readConversationPage(agent.id, agent.threadId, { type: "latest" }, limit);
+      pages.unshift(page.messages.map(({ id }) => id));
+      while (page.pageInfo.olderCursor) {
+        page = database.readConversationPage(
+          agent.id,
+          agent.threadId,
+          { type: "before", cursor: page.pageInfo.olderCursor },
+          limit,
+        );
+        expect(page.messages.length).toBeLessThanOrEqual(100);
+        pages.unshift(page.messages.map(({ id }) => id));
+      }
+      expect(pages.flat()).toEqual(expected);
+      const pageOfTurn = new Map<string, number>();
+      pages.forEach((ids, index) => {
+        for (const id of ids) {
+          const turnId = messages.find((candidate) => candidate.id === id)?.turnId;
+          if (!turnId || turnId === "large") continue;
+          expect(pageOfTurn.get(turnId) ?? index).toBe(index);
+          pageOfTurn.set(turnId, index);
+        }
+      });
+    }
+
+    const around = database.readConversationPage(agent.id, agent.threadId, { type: "around", messageId: "steer" }, 4);
+    expect(around.messages.map(({ id }) => id)).toEqual(
+      expected.filter((id) => id.startsWith("steered") || id === "steer"),
+    );
+
+    const ordinal = expected.indexOf("turn-6-question");
+    const legacyCursor = Buffer.from(
+      JSON.stringify({ version: 1, createdAt: at(550), ordinal, messageId: "turn-6-question" }),
+    ).toString("base64url");
+    const legacyPage = database.readConversationPage(
+      agent.id,
+      agent.threadId,
+      { type: "before", cursor: legacyCursor },
+      100,
+    );
+    expect(legacyPage.messages.map(({ id }) => id)).toEqual(expected.slice(0, expected.indexOf("turn-6-question")));
     database.close();
   });
 
