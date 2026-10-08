@@ -149,6 +149,23 @@ describe("UiConfirmBlock", () => {
     expect(lastResponse(onRespond)).toEqual({ actionId: "cancel", values: { from: "work@example.com" } });
   });
 
+  it("asks again before it sends an ordinary button with confirm", async () => {
+    const onRespond: Respond = vi.fn();
+    const spec: UiConfirmSpec = {
+      type: "confirm",
+      title: "Archive the thread?",
+      actions: [{ id: "archive", label: "Archive", style: "secondary", confirm: true }],
+    };
+    render(() => <UiConfirmBlock spec={spec} onRespond={onRespond} />);
+
+    await fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+    expect(screen.getByRole("group", { name: "Confirm: Archive?" })).toBeVisible();
+    expect(onRespond).not.toHaveBeenCalled();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+    expect(lastResponse(onRespond)).toEqual({ actionId: "archive" });
+  });
+
   it("shows the outcome and no buttons once answered", () => {
     const state: UiBlockState = {
       status: "answered",

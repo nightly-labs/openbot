@@ -195,7 +195,6 @@ describe("ui block responses", () => {
   it("drops keys it does not know", () => {
     expect(validateUiBlockResponse(confirmSpec, { actionId: "edit", extra: 1, approved: true })).toEqual({
       actionId: "edit",
-      approved: true,
     });
   });
 

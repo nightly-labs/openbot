@@ -40,9 +40,10 @@ export function UiConfirmBlock(props: UiConfirmBlockProps) {
   const anyHeld = () => props.spec.actions.some(isHeld);
 
   const [selected, setSelected] = createSignal<Record<string, string>>({});
-  // A held action that was clicked instead of held. The card asks for it again before it acts.
+  // A `confirm: true` action, or a held action that was clicked instead of held. The card asks for it
+  // again before it acts.
   const [confirming, setConfirming] = createSignal<UiAction>();
-  const holdButtons = new Map<string, HTMLButtonElement>();
+  const actionButtons = new Map<string, HTMLButtonElement>();
   let confirmButton: HTMLButtonElement | undefined;
 
   function askAgain(action: UiAction): void {
@@ -56,7 +57,7 @@ export function UiConfirmBlock(props: UiConfirmBlockProps) {
     const action = confirming();
     setConfirming(undefined);
     flush();
-    if (action) holdButtons.get(action.id)?.focus();
+    if (action) actionButtons.get(action.id)?.focus();
   }
   const selectValue = (select: string, options: string[]): string =>
     (frozen() ? state().response?.values?.[select] : undefined) !== undefined
@@ -160,7 +161,7 @@ export function UiConfirmBlock(props: UiConfirmBlockProps) {
                     variant={BUTTON_VARIANT[actionStyle(action)]}
                     disabled={locked()}
                     describedBy={hintId}
-                    ref={(element) => holdButtons.set(action.id, element)}
+                    ref={(element) => actionButtons.set(action.id, element)}
                     onComplete={() => respond(action)}
                     onClickWithoutHold={() => askAgain(action)}
                   >
@@ -172,7 +173,10 @@ export function UiConfirmBlock(props: UiConfirmBlockProps) {
                     type="button"
                     variant={BUTTON_VARIANT[actionStyle(action)]}
                     disabled={locked()}
-                    onClick={() => respond(action)}
+                    ref={(element: HTMLButtonElement) => {
+                      actionButtons.set(action.id, element);
+                    }}
+                    onClick={() => (action.confirm === true ? askAgain(action) : respond(action))}
                   >
                     {action.label}
                   </Button>

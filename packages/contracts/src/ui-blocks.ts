@@ -82,8 +82,8 @@ export const UI_ACTION_STYLES = ["primary", "secondary", "ghost", "danger"] as c
 
 /**
  * A button. `style: "danger"` or `confirm: true` makes it a privileged action: only the server owner or
- * an admin may press it (see `uiBlockActionIsPrivileged`), and `confirm` asks the person again in an
- * app sheet first.
+ * an admin may press it (see `uiBlockActionIsPrivileged`), and `confirm` makes the app ask the person
+ * again in the block before it sends the action.
  */
 export interface UiAction {
   id: string;
@@ -226,8 +226,6 @@ export interface UiBlockResponse {
   values?: Record<string, UiBlockValue>;
   /** An answer in words, with `UI_BLOCK_TEXT_ACTION_ID`. */
   text?: string;
-  /** The person confirmed a `confirm: true` action in the app's sheet. Information for the agent only. */
-  approved?: boolean;
 }
 
 /**
@@ -660,8 +658,6 @@ function readResponse(spec: UiBlockSpec, value: unknown, stored = false): UiBloc
   if (values !== undefined) response.values = values;
   if (actionId === UI_BLOCK_TEXT_ACTION_ID) response.text = readString(record.text, UI_BLOCK_LIMITS.fieldValue);
   else check(record.text === undefined);
-  const approved = readOptionalBoolean(record.approved);
-  if (approved !== undefined) response.approved = approved;
   return response;
 }
 
