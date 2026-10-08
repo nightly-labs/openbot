@@ -152,9 +152,11 @@ mock. The separate web preview implements the browser runtime with that same moc
   for the host's answer, the one text message on the view socket. The host answers every `copy`.
   A cut is a copy, then a `cut` input once the text is on the clipboard; the host deletes only the
   same selection. The host runs one input of a view at a time, in order. The host never reads or
-  writes its own clipboard. Password fields give no text. The host reaches focus in open shadow
-  roots and in frames of the page's own origin. In a frame of another origin, or in an `email` or
-  `number` input, copy gets no text and the page gets no paste event; the text is still pasted.
+  writes its own clipboard. Password fields give no text. The host follows focus through open
+  shadow roots and frames: it walks into a frame of the page's own origin, and it finds a frame of
+  another origin through CDP (`DOM.describeNode` on the focused frame element gives its frame ID,
+  and a frame in another process is a target of its own). An `email` or `number` input has no
+  selection to read, so copy gets no text there; paste works.
 - No full remote desktop, push notifications, or offline operation is included. See
   [Remote desktop](#remote-desktop) for the reason.
 - These stay desktop only: the application Settings dialog (permissions, app updates),

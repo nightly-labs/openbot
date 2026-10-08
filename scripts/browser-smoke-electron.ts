@@ -163,6 +163,15 @@ const server = createServer((request, response) => {
     response.end(JSON.stringify(recordedIdentityAgents));
     return;
   }
+  if (url.pathname === "/clipboard-frame") {
+    // An editor in a frame of another origin, which keeps the text of the last paste event.
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.end(`<textarea style="position:fixed;inset:0;width:100%;height:100%"></textarea>
+      <script>document.querySelector('textarea').addEventListener('paste', event => {
+        window.__pasteEvent = event.clipboardData.getData('text/plain');
+      });</script>`);
+    return;
+  }
   if (url.pathname === "/frame") {
     const frameActionLabel = url.searchParams.get("action_label") ?? "Frame action";
     const frameFileLabel = url.searchParams.get("file_label") ?? "Frame files";
@@ -2202,6 +2211,63 @@ async function runLiveViewClipboard(browser: BrowserHost, tabId: string, content
     throw new Error("A live view paste or copy missed a field in a frame of the same origin.");
   }
 
+  // A field in a frame of another origin, which runs in its own process: the page's world cannot
+  // reach it, so the host follows the focus through CDP. The member clicks into it, as a user does.
+  await contents.executeJavaScript(
+    `new Promise(resolve => {
+      document.getElementById('live-view-frame')?.remove();
+      const frame = document.createElement('iframe');
+      frame.id = 'live-view-frame';
+      frame.style.cssText = 'position:fixed;left:10px;top:300px;width:300px;height:80px;border:0;z-index:2147483647';
+      frame.src = 'http://localhost:' + location.port + '/clipboard-frame';
+      frame.onload = () => resolve();
+      document.body.append(frame);
+    })`,
+    true,
+  );
+  const crossOriginFrame = contents.mainFrame.framesInSubtree.find((frame) => frame.url.endsWith("/clipboard-frame"));
+  if (!crossOriginFrame) throw new Error("The cross-origin clipboard frame did not load.");
+  // A frame in another process takes clicks only once it draws, so the click repeats until it lands.
+  const focusDeadline = Date.now() + 10_000;
+  while (!(await crossOriginFrame.executeJavaScript("document.activeElement?.tagName === 'TEXTAREA'"))) {
+    if (Date.now() > focusDeadline) {
+      throw new Error("A live view click did not focus the field in a cross-origin frame.");
+    }
+    for (const action of ["move", "down", "up"] as const) {
+      await runCauseEffect(
+        browser.dispatchViewInput(tabId, {
+          type: "pointer",
+          action,
+          x: 160,
+          y: 340,
+          button: "left",
+          clickCount: action === "move" ? 0 : 1,
+          deltaX: 0,
+          deltaY: 0,
+          modifiers: 0,
+        }),
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  await runCauseEffect(browser.dispatchViewInput(tabId, { type: "paste", text: "across origins" }));
+  const crossOriginPasteEvent = await crossOriginFrame.executeJavaScript("window.__pasteEvent");
+  const crossOriginValue = await crossOriginFrame.executeJavaScript("document.querySelector('textarea').value");
+  await crossOriginFrame.executeJavaScript("document.querySelector('textarea').select()");
+  const fromCrossOriginFrame = await runCauseEffect(browser.copyViewSelection(tabId, 100_000));
+  await runCauseEffect(browser.dispatchViewInput(tabId, { type: "cut", text: "across origins" }));
+  const afterCrossOriginCut = await crossOriginFrame.executeJavaScript("document.querySelector('textarea').value");
+  if (
+    crossOriginPasteEvent !== "across origins" ||
+    crossOriginValue !== "across origins" ||
+    fromCrossOriginFrame !== "across origins" ||
+    afterCrossOriginCut !== ""
+  ) {
+    throw new Error(
+      `A live view paste, copy or cut missed a field in a cross-origin frame: ${JSON.stringify({ crossOriginPasteEvent, crossOriginValue, fromCrossOriginFrame, afterCrossOriginCut })}`,
+    );
+  }
+
   await field("live-view-password", "password");
   const fromPassword = await runCauseEffect(browser.copyViewSelection(tabId, 100_000));
   if (fromPassword !== "") throw new Error("A live view copy read a password field.");
@@ -2225,6 +2291,10 @@ async function runLiveViewClipboard(browser: BrowserHost, tabId: string, content
         afterCut,
         framePasteEvent,
         fromFrame,
+        crossOriginPasteEvent,
+        crossOriginValue,
+        fromCrossOriginFrame,
+        afterCrossOriginCut,
         fromPassword,
         hostClipboardHasMemberText,
       },

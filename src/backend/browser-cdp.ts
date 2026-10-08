@@ -40,6 +40,7 @@ import {
   type CdpResult,
   clamp,
   exceptionDescription,
+  frameAutomationContextId,
   isFiniteNumber,
   isRecord,
   numberValue,
@@ -138,6 +139,17 @@ const FOCUSED_SELECTION = `
     const selection = typeof root.getSelection === "function" ? root.getSelection() : doc.getSelection();
     return selection?.toString() ?? "";
   };`;
+
+/**
+ * The frame element that holds focus when this world cannot look inside it, or null when the focus
+ * is in reach. A same-origin frame is walked into by `FOCUSED_SELECTION` itself.
+ */
+const FOCUSED_FRAME_SCRIPT = `(() => {${FOCUSED_SELECTION}
+  return active?.tagName === "IFRAME" || active?.tagName === "FRAME" ? active : null;
+})()`;
+
+/** Frames inside frames. Past this the focus is treated as in the last frame reached. */
+const MAX_FOCUSED_FRAME_DEPTH = 8;
 
 /**
  * The page's selection, read in the automation world so the page's own scripts cannot answer for it.
@@ -1405,22 +1417,30 @@ export class BrowserCdpEngine {
           // The page sees a paste event first, as with a real paste. The text never touches the
           // host's clipboard.
           if (input.type === "paste") {
-            const contextId = yield* automationContextId(send);
-            const result = yield* send("Runtime.evaluate", {
-              expression: `(${PASTE_EVENT_SCRIPT})(${JSON.stringify(input.text)})`,
-              contextId,
-              returnByValue: true,
-            });
+            const world = yield* this.#focusedWorld(send);
+            const result = yield* send(
+              "Runtime.evaluate",
+              {
+                expression: `(${PASTE_EVENT_SCRIPT})(${JSON.stringify(input.text)})`,
+                contextId: world.contextId,
+                returnByValue: true,
+              },
+              world.sessionId,
+            );
             if (recordValue(result.result)?.value !== false) yield* send("Input.insertText", { text: input.text });
             return;
           }
           if (input.type === "cut") {
-            const contextId = yield* automationContextId(send);
-            yield* send("Runtime.evaluate", {
-              expression: `(${CUT_SCRIPT})(${JSON.stringify(input.text)})`,
-              contextId,
-              returnByValue: true,
-            });
+            const world = yield* this.#focusedWorld(send);
+            yield* send(
+              "Runtime.evaluate",
+              {
+                expression: `(${CUT_SCRIPT})(${JSON.stringify(input.text)})`,
+                contextId: world.contextId,
+                returnByValue: true,
+              },
+              world.sessionId,
+            );
             return;
           }
           if (input.type === "key") {
@@ -1471,7 +1491,8 @@ export class BrowserCdpEngine {
             modifiers: input.modifiers,
           });
         }),
-      false,
+      // A paste or a cut works in the focused frame, which can be a frame in another process.
+      input.type === "paste" || input.type === "cut",
     );
   });
 
@@ -1484,21 +1505,51 @@ export class BrowserCdpEngine {
     this: BrowserCdpEngine,
     max: number,
   ): Effect.fn.Return<string | null, BrowserOperationError> {
-    return yield* this.#leaseEffect(
-      (send) =>
-        Effect.gen(function* () {
-          const contextId = yield* automationContextId(send);
-          const result = yield* send("Runtime.evaluate", {
-            expression: `(${SELECTION_TEXT_SCRIPT})(${max})`,
-            contextId,
-            returnByValue: true,
-          });
-          // Null is a selection longer than `max`, which is not sent.
-          const value = recordValue(result.result)?.value;
-          return value === null ? null : stringValue(value);
-        }),
-      false,
+    return yield* this.#leaseEffect((send) =>
+      Effect.gen({ self: this }, function* () {
+        const world = yield* this.#focusedWorld(send);
+        const result = yield* send(
+          "Runtime.evaluate",
+          { expression: `(${SELECTION_TEXT_SCRIPT})(${max})`, contextId: world.contextId, returnByValue: true },
+          world.sessionId,
+        );
+        // Null is a selection longer than `max`, which is not sent.
+        const value = recordValue(result.result)?.value;
+        return value === null ? null : stringValue(value);
+      }),
     );
+  });
+
+  /**
+   * The automation world of the frame that holds focus. The page's own world cannot reach into a
+   * frame of another origin, so each frame the focus passes through names the next: the focused
+   * `<iframe>` element gives its frame ID, which is a target of its own when the frame runs in
+   * another process. The lease must attach frames, or such a target has no session.
+   */
+  readonly #focusedWorld = Effect.fn("BrowserCdp.focusedWorld")(function* (this: BrowserCdpEngine, send: SendCommand) {
+    let sessionId: string | undefined;
+    let contextId = yield* automationContextId(send);
+    for (let depth = 0; depth < MAX_FOCUSED_FRAME_DEPTH; depth += 1) {
+      const probe = yield* send(
+        "Runtime.evaluate",
+        { expression: FOCUSED_FRAME_SCRIPT, contextId, returnByValue: false },
+        sessionId,
+      );
+      const objectId = stringValue(recordValue(probe.result)?.objectId);
+      if (!objectId) break;
+      const described = yield* send("DOM.describeNode", { objectId }, sessionId);
+      yield* send("Runtime.releaseObject", { objectId }, sessionId).pipe(Effect.ignore);
+      const frameId = stringValue(recordValue(described.node)?.frameId);
+      if (!frameId) break;
+      const target = this.#targetSessions.get(frameId);
+      if (target) {
+        sessionId = target.sessionId;
+        contextId = yield* automationContextId(send, sessionId);
+      } else {
+        contextId = yield* frameAutomationContextId(send, frameId, sessionId);
+      }
+    }
+    return { contextId, sessionId };
   });
 
   readonly navigate = Effect.fn("BrowserCdp.navigate")(function* (
