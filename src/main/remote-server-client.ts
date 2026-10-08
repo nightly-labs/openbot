@@ -80,7 +80,8 @@ export interface RemoteHostRequestTransport {
 
 /** What the client needs from the stored server list: a server, and the token to speak for it. */
 export interface RemoteServerLookup {
-  require: (serverId: string) => StoredRemoteServerView;
+  /** `path`, when given, lets a lookup keep a route on another transport: see `RemoteDirectRoutes`. */
+  require: (serverId: string, path?: string) => StoredRemoteServerView;
   token: (server: StoredRemoteServerView) => string;
 }
 
@@ -144,7 +145,7 @@ export class RemoteServerClient {
     decoder: ResponseDecoder<T>,
     init: RemoteRequestInit = {},
   ): Effect.fn.Return<T, RemoteWorkflowError> {
-    const server = yield* remoteDecode(() => this.#servers.require(serverId));
+    const server = yield* remoteDecode(() => this.#servers.require(serverId, path));
     return yield* Effect.gen({ self: this }, function* () {
       if (server.transport === "webrtc-v2") {
         const compatibility = yield* this.ensureCompatibility(server);

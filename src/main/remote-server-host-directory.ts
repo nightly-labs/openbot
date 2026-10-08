@@ -127,6 +127,12 @@ export function reconcileWebRtcHosts(input: WebRtcHostReconciliationInput): WebR
     if (input.isConnected(server.id) && server.publicKey === refreshed.publicKey) {
       refreshed.remoteDesktopAvailable = server.remoteDesktopAvailable;
     }
+    // The member's choice stays. The direct address stays only with the key it was given under: a
+    // new key is another host, and its address comes from that host.
+    if (server.directDisabled) refreshed.directDisabled = true;
+    if (server.directUrl !== undefined && server.publicKey === refreshed.publicKey) {
+      refreshed.directUrl = server.directUrl;
+    }
     return [refreshed];
   });
   for (const server of listed) {

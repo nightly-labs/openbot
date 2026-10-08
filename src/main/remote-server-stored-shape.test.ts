@@ -1,6 +1,7 @@
 // @vitest-environment node
 
 import { LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
+import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { describe, expect, it } from "vitest";
 import {
   readStoredRemoteServers,
@@ -20,6 +21,53 @@ function storedServer(overrides: Partial<StoredRemoteServer> & { id: string }): 
     ...overrides,
   };
 }
+
+describe("stored direct Tailscale address", () => {
+  const direct = "https://studio-mac.tail4b2c1.ts.net";
+  const file = (server: StoredRemoteServer | DynamicRecord) => ({
+    version: 3,
+    activeServerId: "alpha",
+    servers: [server],
+    hiddenHostIds: [],
+  });
+
+  it("reads and writes back the address and the member's choice", () => {
+    const server = storedServer({ id: "alpha", transport: "webrtc-v2", directUrl: direct, directDisabled: true });
+    const stored = readStoredRemoteServers(file(server));
+    expect(stored?.servers[0]).toEqual(server);
+    expect(stored && serializeStoredRemoteServers(stored).servers[0]).toEqual(server);
+  });
+
+  it("reads an entry without the fields, as a build before them wrote it", () => {
+    const server = storedServer({ id: "alpha", transport: "webrtc-v2" });
+    const stored = readStoredRemoteServers(file(server));
+    expect(stored?.servers[0]).toEqual(server);
+    expect(stored?.servers[0]).not.toHaveProperty("directUrl");
+    expect(stored?.servers[0]).not.toHaveProperty("directDisabled");
+  });
+
+  // A build before these fields reads an entry that has them the way this build reads a field it does
+  // not know: it keeps the server and drops the field on its next write.
+  it("keeps the server when an entry carries a field this build does not know", () => {
+    const server = storedServer({ id: "alpha", transport: "webrtc-v2" });
+    const stored = readStoredRemoteServers(file({ ...server, directRelayFromTheFuture: { url: "x" } }));
+    expect(stored?.servers).toEqual([server]);
+    expect(stored?.unreadableServers).toEqual([]);
+  });
+
+  it("drops only a bad address or choice, never the server", () => {
+    for (const directUrl of [
+      "https://example.com",
+      "http://studio-mac.tail4b2c1.ts.net",
+      "https://studio-mac.tail4b2c1.ts.net/path",
+      42,
+    ]) {
+      const server = storedServer({ id: "alpha", transport: "webrtc-v2" });
+      const stored = readStoredRemoteServers(file({ ...server, directUrl, directDisabled: "yes" }));
+      expect(stored?.servers).toEqual([server]);
+    }
+  });
+});
 
 describe("stored remote servers", () => {
   // What the store does with an unreadable entry once it is on disk is `remote-server-store.test.ts`.

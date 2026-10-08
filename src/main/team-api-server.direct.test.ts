@@ -149,8 +149,8 @@ describe("TeamApiServer direct Tailscale listener", () => {
     const { direct } = await directFixture();
     const { sessionToken } = await directSignIn(direct);
     for (const path of [
-      TEAM_API_ROUTES.remoteScreen.capabilities,
       TEAM_API_ROUTES.remoteScreen.sessions,
+      TEAM_API_ROUTES.remoteScreen.setup,
       TEAM_API_ROUTES.remoteScreen.viewer("session-1"),
       TEAM_API_ROUTES.browser.viewSessions,
     ]) {
