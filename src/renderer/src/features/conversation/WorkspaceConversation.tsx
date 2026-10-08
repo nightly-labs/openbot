@@ -219,9 +219,9 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   );
   /** Custom endpoints are added in the Providers section that this computer, or an administered host, shows. */
   const manageProviders = createMemo(() => activeServer()?.kind === "local" || providerAdminServerId() !== undefined);
-  const openProviderSettings = () => {
+  const openProviderSettings = (trigger: HTMLElement) => {
     const server = activeServer();
-    if (server) openServerSettings(server.id, null, "providers");
+    if (server) openServerSettings(server.id, trigger, "providers");
   };
   /** The browser sign-in opens on this computer, so it stays local. */
   const localProviderDownloads = createMemo(

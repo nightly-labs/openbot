@@ -96,9 +96,9 @@ export function WorkspaceAgentSetup() {
       onConnectProvider={localProviderDownloads() ? connectProvider : undefined}
       onAddCustomProvider={
         activeServer()?.kind === "local" || providerAdminServerId() !== undefined
-          ? () => {
+          ? (trigger: HTMLElement) => {
               const server = activeServer();
-              if (server) openServerSettings(server.id, null, "providers");
+              if (server) openServerSettings(server.id, trigger, "providers");
             }
           : undefined
       }

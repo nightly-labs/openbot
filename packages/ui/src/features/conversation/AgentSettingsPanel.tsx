@@ -97,7 +97,7 @@ export interface AgentSettingsPanelProps {
   onDownloadProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onCancelProviderDownload?: (provider: AgentProviderId) => void | Promise<void>;
   onConnectProvider?: (provider: AgentProviderId) => void | Promise<void>;
-  onAddCustomProvider?: () => void;
+  onAddCustomProvider?: (trigger: HTMLElement) => void;
   maxWidth: () => number;
   onClose: () => void;
   width: number;

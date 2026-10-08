@@ -1465,9 +1465,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               onCancelProviderDownload={providerSettings()?.onCancelProviderDownload}
               onManageProviders={
                 providerSettings()
-                  ? () => {
+                  ? (trigger: HTMLElement) => {
                       const current = server();
-                      if (current) void openServerSettings(current.id, null, "providers");
+                      if (current) void openServerSettings(current.id, trigger, "providers");
                     }
                   : undefined
               }

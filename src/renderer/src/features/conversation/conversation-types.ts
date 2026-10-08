@@ -90,7 +90,7 @@ export interface ConversationProps {
    */
   onSignInProvider?: (provider: AgentProviderId) => void | Promise<void>;
   /** Open the Providers section of this server's settings, where the user adds an endpoint. */
-  onManageProviders?: () => void;
+  onManageProviders?: (trigger: HTMLElement) => void;
   agent: AgentProfile | undefined;
   agents: AgentProfile[];
   availableRoutineIds?: readonly string[];
