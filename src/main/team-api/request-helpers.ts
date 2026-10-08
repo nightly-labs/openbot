@@ -163,6 +163,16 @@ export function requireOwner(member: TeamMemberSummary): void {
 }
 
 /**
+ * An action on one agent never creates it. A device can still hold the id of an agent that another
+ * device deleted; it gets the same 404 as for an agent hidden from it.
+ */
+export function requireListedAgent(agents: { listAgents(): readonly { id: string }[] }, agentId: string): void {
+  if (!agents.listAgents().some((agent) => agent.id === agentId)) {
+    throw new HttpError(404, sourceText("error.team.agentNotFound"));
+  }
+}
+
+/**
  * The router checks the agent ID in the path and the query. A module that reads it from the body
  * checks it here: an agent hidden from the caller answers as a missing agent does.
  */

@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { homedir, tmpdir } from "node:os";
+import { join, relative } from "node:path";
 import { Effect } from "effect";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -57,6 +57,42 @@ describe("listWorkspaceDirectory", () => {
     if (!(cause instanceof WorkspacePathRefused)) throw cause;
     return cause;
   }
+
+  it("uses history only for missing local files with unrestricted access", async () => {
+    const agent = await fixture();
+    const outside = join(agent.workspacePath, "..", "private", "secret.env");
+    const options = { allowOutside: true, fileHistory: [outside] };
+    await expect(Effect.runPromise(resolveWorkspaceFile(agent, "folder/secret.env:4", options))).resolves.toMatchObject(
+      {
+        path: await realpath(outside),
+        insideWorkspace: false,
+      },
+    );
+    expect((await refusal(resolveWorkspaceFile(agent, "secret.env", { fileHistory: [outside] }))).reason).toBe(
+      "missing",
+    );
+    const explicitTarget = join(agent.workspacePath, "missing", "secret.env");
+    for (const target of [
+      explicitTarget,
+      encodeURIComponent(explicitTarget),
+      `~/${relative(homedir(), explicitTarget)}`,
+    ]) {
+      expect((await refusal(resolveWorkspaceFile(agent, target, options))).reason).toBe("missing");
+    }
+    await writeFile(join(agent.workspacePath, "secret.env"), "workspace");
+    await expect(Effect.runPromise(resolveWorkspaceFile(agent, "secret.env", options))).resolves.toMatchObject({
+      path: join(agent.workspacePath, "secret.env"),
+      insideWorkspace: true,
+    });
+    const missing = await refusal(
+      resolveWorkspaceFile(agent, "missing.env", {
+        allowOutside: true,
+        fileHistory: [join(agent.workspacePath, "..", "missing.env")],
+      }),
+    );
+    expect(missing.reason).toBe("missing");
+    expect(missing.memberMessage).toBe("Nothing exists at missing.env in the agent workspace.");
+  });
 
   it("lists a folder chip and keeps a remote caller inside the workspace", async () => {
     const agent = await fixture();

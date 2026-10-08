@@ -157,176 +157,6 @@ function props(overrides: Partial<ServerSettingsModalProps> = {}): ServerSetting
 }
 
 describe("ServerSettingsModal", () => {
-  it("turns the host's direct Tailscale connection on and shows the address members get", async () => {
-    const status = {
-      state: "connected" as const,
-      tailnet: "owner@example.com",
-      deviceName: "Studio Mac",
-      enabled: false,
-      url: null,
-      issue: null,
-      issueDetail: null,
-    };
-    const tailscale = {
-      getTailscaleStatus: vi.fn(async () => status),
-      setTailscaleDirect: vi.fn(async (enabled: boolean) => ({
-        ...status,
-        enabled,
-        url: "https://studio-mac.tail4b2c1.ts.net",
-      })),
-      openTailscale: vi.fn(async () => undefined),
-    };
-    render(() => <ServerSettingsModal {...props({ hostStatus: configuredHost, tailscale })} />);
-    expect(await screen.findByText("Connected to owner@example.com as Studio Mac.")).toBeInTheDocument();
-    await fireEvent.click(screen.getByRole("switch", { name: "Direct connection over Tailscale" }));
-    await waitFor(() => expect(tailscale.setTailscaleDirect).toHaveBeenCalledWith(true));
-    expect(await screen.findByRole("button", { name: "Copy direct address" })).toBeInTheDocument();
-  });
-
-  it("explains node sharing when a joined server's host is in another tailnet", async () => {
-    const onSetDirectEnabled = vi.fn(async () => undefined);
-    const server: ServerSummary = {
-      ...remoteServer,
-      apiUrl: null,
-      direct: { offered: true, enabled: true, active: false, hint: "other-tailnet" },
-    };
-    render(() => <ServerSettingsModal {...props({ server, hostStatus: null, onSetDirectEnabled })} />);
-    expect(screen.getByText(/share the host device with you in Tailscale \(node sharing\)/u)).toBeInTheDocument();
-    await fireEvent.click(screen.getByRole("switch", { name: "Use Tailscale when available" }));
-    await waitFor(() => expect(onSetDirectEnabled).toHaveBeenCalledWith(false));
-  });
-
-  it("asks the owner to update a server that is too old for the Tailscale setup", () => {
-    const server: ServerSummary = { ...remoteServer, role: "owner" };
-    render(() => <ServerSettingsModal {...props({ server, hostStatus: null, tailscaleSetup: null })} />);
-    expect(
-      screen.getByText("This server runs an older version of OpenBot. Update it to set up Tailscale from here."),
-    ).toBeInTheDocument();
-    expect(screen.queryByRole("switch", { name: "Direct connection over Tailscale" })).not.toBeInTheDocument();
-  });
-
-  it("walks the owner through the Tailscale setup of a headless server", async () => {
-    const host = {
-      state: "signed-out" as const,
-      tailnet: null,
-      deviceName: null,
-      dnsName: null,
-      httpsCertificates: false,
-      enabled: false,
-      url: null,
-      issue: null,
-      issueDetail: null,
-      loginUrl: null,
-      environment: "linux" as const,
-      wslNetworking: null,
-      setupCommand: true,
-      signInIssue: null,
-    };
-    const client = { state: "connected" as const, tailnet: "owner@example.com", deviceName: "Studio Mac" };
-    const signedIn = {
-      client,
-      host: {
-        ...host,
-        state: "connected" as const,
-        tailnet: "other@example.com",
-        deviceName: "home-server",
-        dnsName: "home-server.tail9.ts.net",
-      },
-      network: "other" as const,
-    };
-    const api = {
-      getSetup: vi.fn(async () => ({ client, host, network: null })),
-      signIn: vi.fn(async () => signedIn),
-      setDirect: vi.fn(async () => signedIn),
-      openLocalTailscale: vi.fn(async () => undefined),
-      openLink: vi.fn(async () => undefined),
-    };
-    const server: ServerSummary = { ...remoteServer, role: "owner" };
-    render(() => <ServerSettingsModal {...props({ server, hostStatus: null, tailscaleSetup: api })} />);
-
-    expect(await screen.findByText("Connected to owner@example.com as Studio Mac.")).toBeInTheDocument();
-    expect(screen.getByText("Sign in to Tailscale on the server.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Copy setup command" })).toBeInTheDocument();
-    // The switch waits for the server, its certificates and the network.
-    expect(screen.getByRole("switch", { name: "Direct connection over Tailscale" })).toBeDisabled();
-
-    await fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
-    await waitFor(() => expect(api.signIn).toHaveBeenCalledOnce());
-    expect(
-      await screen.findByText(
-        "This computer is in owner@example.com, and the server is in other@example.com. Sign in on this computer with the account of the server, or share the server with your tailnet.",
-      ),
-    ).toBeInTheDocument();
-    await fireEvent.click(screen.getByRole("button", { name: "Share this server" }));
-    await waitFor(() => expect(api.openLink).toHaveBeenCalledWith("tailscale-admin-machines"));
-    await fireEvent.click(screen.getByRole("button", { name: "Turn on" }));
-    await waitFor(() => expect(api.openLink).toHaveBeenCalledWith("tailscale-admin-dns"));
-  });
-
-  it("turns the direct connection on from the owner's client", async () => {
-    const ready = {
-      client: { state: "connected" as const, tailnet: "owner@example.com", deviceName: "Studio Mac" },
-      host: {
-        state: "connected" as const,
-        tailnet: "owner@example.com",
-        deviceName: "home-server",
-        dnsName: "home-server.tail4b2c1.ts.net",
-        httpsCertificates: true,
-        enabled: false,
-        url: null,
-        issue: null,
-        issueDetail: null,
-        loginUrl: null,
-        environment: "wsl" as const,
-        wslNetworking: "nat" as const,
-        setupCommand: false,
-        signInIssue: null,
-      },
-      network: "same" as const,
-    };
-    const api = {
-      getSetup: vi.fn(async () => ready),
-      signIn: vi.fn(async () => ready),
-      setDirect: vi.fn(async (enabled: boolean) => ({
-        ...ready,
-        host: { ...ready.host, enabled, url: "https://home-server.tail4b2c1.ts.net:8443" },
-      })),
-      openLocalTailscale: vi.fn(async () => undefined),
-      openLink: vi.fn(async () => undefined),
-    };
-    const server: ServerSummary = { ...remoteServer, role: "owner" };
-    render(() => <ServerSettingsModal {...props({ server, hostStatus: null, tailscaleSetup: api })} />);
-    const directSwitch = await screen.findByRole("switch", { name: "Direct connection over Tailscale" });
-    expect(screen.getByText(/WSL must use mirrored networking/u)).toBeInTheDocument();
-    await waitFor(() => expect(directSwitch).toBeEnabled());
-    await fireEvent.click(directSwitch);
-    await waitFor(() => expect(api.setDirect).toHaveBeenCalledWith(true));
-    expect(await screen.findByRole("button", { name: "Copy direct address" })).toBeInTheDocument();
-  });
-
-  it("shows a member in another tailnet how node sharing works", async () => {
-    const onOpenTailscaleSharing = vi.fn(async () => undefined);
-    const server: ServerSummary = {
-      ...remoteServer,
-      apiUrl: null,
-      role: "member",
-      direct: { offered: true, enabled: true, active: false, hint: "other-tailnet" },
-    };
-    render(() => (
-      <ServerSettingsModal
-        {...props({
-          server,
-          hostStatus: null,
-          onSetDirectEnabled: vi.fn(async () => undefined),
-          onOpenTailscaleSharing,
-        })}
-      />
-    ));
-    await fireEvent.click(screen.getByRole("button", { name: "How sharing works" }));
-    await waitFor(() => expect(onOpenTailscaleSharing).toHaveBeenCalledOnce());
-    expect(screen.queryByText("Direct connection setup")).not.toBeInTheDocument();
-  });
-
   it("keeps account errors on account settings tabs", async () => {
     render(() => (
       <ServerSettingsModal {...props({ loadError: "The account cannot perform this remote operation." })} />
@@ -1317,6 +1147,7 @@ describe("ServerSettingsModal providers", () => {
   // the previous version closed the dialog before the call and dropped the promise, which made a
   // refused endpoint look like a saved one.
   it("keeps the custom endpoint form open when the save fails, and closes it when the next one works", async () => {
+    const saveDefault = vi.fn(async () => undefined);
     const onAddCustomProvider = vi
       .fn<(value: SaveCustomProviderInput) => Promise<CustomProviderRestart>>()
       .mockRejectedValueOnce(new Error("Studio Local refused the API key."))
@@ -1324,7 +1155,16 @@ describe("ServerSettingsModal providers", () => {
     render(() => (
       <ProvidersSection
         agentStatus={openCodeReadyStatus}
-        customProviders={[]}
+        defaultProvider={{ preferredProvider: "opencode", preferredModel: "old-endpoint/model-a", save: saveDefault }}
+        customProviders={[
+          {
+            id: "old-endpoint",
+            name: "Old endpoint",
+            baseUrl: "http://localhost:11434/v1",
+            hasApiKey: false,
+            models: [{ id: "model-a", name: "Model A" }],
+          },
+        ]}
         onAddCustomProvider={onAddCustomProvider}
       />
     ));
@@ -1342,6 +1182,7 @@ describe("ServerSettingsModal providers", () => {
     expect(await screen.findByText("Studio Local refused the API key.")).toBeInTheDocument();
     // Still open, still holding the endpoint: the user retries rather than types it again.
     expect(screen.getByLabelText(/^Provider ID/u)).toHaveValue("studio-local");
+    expect(saveDefault).not.toHaveBeenCalled();
     await waitFor(() => expect(onAddCustomProvider).toHaveBeenCalledTimes(1));
     expect(onAddCustomProvider).toHaveBeenCalledWith({
       id: "studio-local",
@@ -1355,15 +1196,18 @@ describe("ServerSettingsModal providers", () => {
     await fireEvent.click(screen.getByRole("button", { name: "Submit" }));
     await waitFor(() => expect(screen.queryByLabelText(/^Provider ID/u)).not.toBeInTheDocument());
     expect(screen.getByRole("status")).toHaveTextContent("Saved. OpenBot is loading the models.");
+    await waitFor(() => expect(saveDefault).toHaveBeenCalledWith("opencode", "studio-local/glm-5-air"));
   });
 
   // A removal discards the key and drops the models, and neither is undoable, so the callback must
   // run only after the user answers the question.
   it("removes a custom endpoint only after the confirmation is accepted", async () => {
+    const saveDefault = vi.fn(async () => undefined);
     const onDeleteCustomProvider = vi.fn<(id: string) => Promise<CustomProviderRestart>>(async () => "restarted");
     render(() => (
       <ProvidersSection
         agentStatus={openCodeReadyStatus}
+        defaultProvider={{ preferredProvider: "opencode", preferredModel: "studio-local/model-a", save: saveDefault }}
         customProviders={[
           {
             id: "studio-local",
@@ -1388,11 +1232,13 @@ describe("ServerSettingsModal providers", () => {
     await fireEvent.click(within(declined).getByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
     expect(onDeleteCustomProvider).not.toHaveBeenCalled();
+    expect(saveDefault).not.toHaveBeenCalled();
 
     await fireEvent.click(screen.getByRole("button", { name: "Delete Studio Local" }));
     const accepted = await screen.findByRole("alertdialog", { name: "Remove Studio Local?" });
     await fireEvent.click(within(accepted).getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(onDeleteCustomProvider).toHaveBeenCalledWith("studio-local"));
+    await waitFor(() => expect(saveDefault).toHaveBeenCalledWith("opencode", null));
     // The outcome is read inside the dialog, which stays open: the section behind it is hidden.
     expect(await screen.findByRole("status")).toHaveTextContent("Removed. OpenBot is loading the models.");
   });

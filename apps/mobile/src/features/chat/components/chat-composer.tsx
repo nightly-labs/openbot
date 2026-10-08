@@ -23,7 +23,6 @@ import Animated, {
   type SharedValue,
   useAnimatedStyle,
   useDerivedValue,
-  useReducedMotion,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
@@ -33,6 +32,7 @@ import { showFailureAlert } from "@/features/analytics/failure-reports";
 import type { ChatBubbleMessage } from "@/features/chat/context/message-actions-context";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { haptics } from "@/shared/lib/haptics";
+import { useMotionPreference, useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
 import { editMentionDraft, insertMention, mentionDraft, mentionQuery } from "../model/chat-mentions";
 import { markdownListReturn } from "../model/composer-lists";
@@ -279,6 +279,8 @@ export function ChatComposer({
   const attachmentsOpen = !sending && attachments.items.length > 0;
   const reducedMotion = useReducedMotion();
   const shapeDuration = reducedMotion ? 0 : SHAPE_DURATION;
+  // Settings can keep the composer open, and reduced motion always does.
+  const resizes = useMotionPreference("composerResize");
 
   // At rest the composer is a smaller bar: narrower, shorter, with the plus on
   // the left, the placeholder centred and send on the right. It opens into the
@@ -332,9 +334,7 @@ export function ChatComposer({
   // dropping the resting shape altogether: the composer stays open, and the
   // keyboard changes nothing about it. Two discrete states would still jump
   // on every keyboard, which is the motion the setting asks us to remove.
-  const expansion = useDerivedValue(() =>
-    reducedMotion ? 1 : Math.max(Math.min(1, keyboardProgress.get()), held.get()),
-  );
+  const expansion = useDerivedValue(() => (resizes ? Math.max(Math.min(1, keyboardProgress.get()), held.get()) : 1));
   const cardStyle = useAnimatedStyle(() => {
     const voiced = morph.get();
     const width = interpolate(expansion.get(), [0, 1], [restWidth, cardWidth]);
@@ -540,7 +540,7 @@ export function ChatComposer({
   // plus and the composer around it both carry Reanimated transforms that
   // never reach it. `focused` and `hasDraft` are the React mirror of the two
   // things that open the composer, and both change once per interaction.
-  const restingPlus = !hasDraft && !focused;
+  const restingPlus = resizes && !hasDraft && !focused;
   const plusDrawn = CONTROL_SIZE * (restingPlus ? REST_CONTROL_SCALE : 1);
   const plusInset = (CONTROL_SIZE - plusDrawn) / 2;
   const attachmentAnchor = {

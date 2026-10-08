@@ -1,12 +1,7 @@
 import { Canvas, Fill, Shader, Skia } from "@shopify/react-native-skia";
 import { useEffect } from "react";
-import {
-  type SharedValue,
-  useDerivedValue,
-  useFrameCallback,
-  useReducedMotion,
-  useSharedValue,
-} from "react-native-reanimated";
+import { type SharedValue, useDerivedValue, useFrameCallback, useSharedValue } from "react-native-reanimated";
+import { useReducedMotion } from "@/shared/lib/motion";
 import type { VoicePalette } from "../model/voice-palette";
 
 // Four soft lobes rise from the bottom edge and sweep from side to side. Each

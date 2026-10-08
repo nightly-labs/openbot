@@ -2,6 +2,7 @@ import type { CentralAuthUser, ServerSummary } from "@openbot/contracts/ipc";
 import { classifyFailure } from "@openbot/telemetry";
 import type { CustomAgentSettingsApi } from "@openbot/ui/features/custom-providers/CustomAgentSettings";
 import { providerDiagnosticsText } from "@openbot/ui/features/provider-diagnostics/provider-diagnostics";
+import { LeaveServerDialog } from "@openbot/ui/features/servers/LeaveServerDialog";
 import type { BitwardenConnectorPanelProps } from "@openbot/ui/features/settings/BitwardenConnectorPanel";
 import type { HostedSiteDeleteResult } from "@openbot/ui/features/settings/stores/hosted-sites-store";
 import { currentText } from "@openbot/ui/text";
@@ -25,7 +26,6 @@ import { useCustomProviders } from "./features/custom-providers/custom-providers
 import { useProviderDetection } from "./features/custom-providers/provider-detection-context";
 import type { ServerStorageOptions } from "./features/files/ServerStoragePanel";
 import { useSetup } from "./features/onboarding/onboarding-context";
-import { useSetupProviderProps } from "./features/onboarding/setup-provider-props";
 import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-context";
 import { AddServerOverlay } from "./features/servers/AddServerOverlay";
 import { mcpToolRuntimeNote } from "./features/servers/mcp-servers";
@@ -46,7 +46,7 @@ import { useSettings } from "./features/settings/settings-context";
 import { useSidebar } from "./features/sidebar/sidebar-context";
 import { useUpdates } from "./features/updates/updates-context";
 import { useGlobalSearchSources } from "./global-search-sources";
-import { InitialSetup, RemoteDesktopWorkspace, SettingsModal } from "./lazy-views";
+import { RemoteDesktopWorkspace, SettingsModal } from "./lazy-views";
 import { useNavigation } from "./navigation";
 import { usePlatform } from "./platform";
 import { useProviders } from "./providers";
@@ -103,7 +103,6 @@ export function WorkspaceOverlays(props: AccountProps) {
   );
   return (
     <>
-      <PermissionsReview account={props.account} />
       <SkillsMarketplace
         githubConnector={githubFor(activeServer())}
         onePasswordConnector={onePasswordFor(activeServer())}
@@ -112,6 +111,7 @@ export function WorkspaceOverlays(props: AccountProps) {
       <SharedAgentInstall />
       <JoinServer account={props.account} />
       <AddServer />
+      <LeaveServer />
       <ServerSettings
         githubConnector={githubFor(serverSettingsTarget())}
         onePasswordConnector={onePasswordFor(serverSettingsTarget())}
@@ -122,35 +122,6 @@ export function WorkspaceOverlays(props: AccountProps) {
       <RemoteDesktop />
       <ChannelCreateOverlay />
     </>
-  );
-}
-
-/** The permissions half of first-run setup, reopened after the fact. */
-function PermissionsReview(props: AccountProps) {
-  const platform = usePlatform();
-  const auth = useAuth();
-  const setup = useSetup();
-  const { activeServer } = useServers();
-  const { joinRemoteDuringSetup } = useServerSelection();
-  const setupProviders = useSetupProviderProps(() => activeServer()?.kind === "local");
-
-  return (
-    <Show when={setup.permissionsOpen()}>
-      <Loading>
-        <InitialSetup
-          {...setupProviders}
-          reviewing
-          state={setup.setupState() ?? { completed: true, preferredProvider: "codex", preferredModel: null }}
-          platform={platform.appInfo()?.platform ?? "darwin"}
-          accountEmail={props.account().email}
-          onSave={setup.saveSetup}
-          onPreviewInvite={setup.previewInvite}
-          onJoinRemote={joinRemoteDuringSetup}
-          onLogout={platform.landingPreview ? undefined : auth.logoutCentralAccount}
-          onClose={() => setup.setPermissionsOpen(false)}
-        />
-      </Loading>
-    </Show>
   );
 }
 
@@ -268,6 +239,19 @@ function AddServer() {
   );
 }
 
+/** The leave confirmation that the server menu opens. */
+function LeaveServer() {
+  const { leaveConfirmServer, leaveRestoreTarget, cancelLeaveServer, leaveConfirmedServer } = useServerSettings();
+  return (
+    <LeaveServerDialog
+      server={leaveConfirmServer()}
+      onClose={cancelLeaveServer}
+      onLeave={leaveConfirmedServer}
+      restoreFocusTarget={leaveRestoreTarget()}
+    />
+  );
+}
+
 /**
  * Settings for one server, which is any server on the rail rather than the
  * active one - hence the target held by the domain instead of `activeServer()`.
@@ -298,7 +282,7 @@ function ServerSettings(props: {
   const { selectServer } = useServerSelection();
   const { setPendingAgentSelection } = useServerSwitch();
   const { agentList, agentStatus, modelOptions, serverSetupChoice } = useAgents();
-  const { setupState } = useSetup();
+  const { setupState, saveSetup } = useSetup();
   const {
     toolRuntimeStatuses,
     providerAdminServerId,
@@ -310,6 +294,7 @@ function ServerSettings(props: {
     cancelProviderRuntimeDownload,
     connectProvider,
     openProviderInstallGuide,
+    setProviderOn,
     restartProvider,
     cancelProviderRestart,
     codeLogin,
@@ -420,6 +405,10 @@ function ServerSettings(props: {
      */
     const endpoints = local ? localEndpoints : hostCustomProviders;
     return {
+      get defaultProvider() {
+        const state = setupState();
+        return local && state ? { ...state, save: saveSetup } : undefined;
+      },
       get agentStatus() {
         return agentStatus();
       },
@@ -455,6 +444,17 @@ function ServerSettings(props: {
       },
       get onInstallProvider() {
         return local && providerRuntimeDownloadsAvailable() ? openProviderInstallGuide : undefined;
+      },
+      onSetProviderOn: local ? setProviderOn : undefined,
+      get providerUsers() {
+        return Object.fromEntries(
+          (agentStatus().providers ?? []).map((provider) => [
+            provider.id,
+            agentList()
+              .filter((agent) => agent.provider === provider.id)
+              .map((agent) => agent.name),
+          ]),
+        );
       },
       onRestartProvider: local ? restartProvider : undefined,
       onCancelProviderRestart: local ? cancelProviderRestart : undefined,
@@ -628,6 +628,7 @@ function AppSettings(props: AccountProps) {
     appSettingsOpen,
     setAppSettingsOpen,
     appSettingsTab,
+    hostedServerDeleteRequest,
     generalSettings,
     builtInDisplayGeometry,
     updateGeneralSettings,
@@ -669,6 +670,7 @@ function AppSettings(props: AccountProps) {
         onOpenNotificationSettings={openNotificationSettings}
         restoreFocusTarget={appSettingsRestoreTarget()}
         openTab={appSettingsTab()}
+        hostedServerDeleteRequest={hostedServerDeleteRequest()}
       />
     </Loading>
   );

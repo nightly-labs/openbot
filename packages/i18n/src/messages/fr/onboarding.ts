@@ -5,12 +5,9 @@ export const messages = {
   "onboarding.setup.saveFailed": "OpenBot n’a pas pu enregistrer votre configuration locale.",
   "onboarding.setup.verifyFailed": "OpenBot n’a pas pu vérifier cette invitation.",
   "onboarding.setup.connectFailed": "OpenBot n’a pas pu se connecter à cet hôte.",
-  "onboarding.setup.reviewTitle": "Fournisseurs et autorisations",
   "onboarding.setup.localTitle": "Configurer cet ordinateur",
   "onboarding.setup.remoteTitle": "Se connecter à un hôte",
   "onboarding.setup.title": "Où OpenBot va-t-il s’exécuter ?",
-  "onboarding.setup.reviewDescription":
-    "Choisissez le fournisseur par défaut des agents locaux et vérifiez les autorisations macOS.",
   "onboarding.setup.localDescription": "Les agents, les conversations et les fichiers restent sur cet ordinateur.",
   "onboarding.setup.remoteDescription": "Utilisez une invitation de la personne qui gère votre hôte OpenBot.",
   "onboarding.setup.description":
@@ -32,7 +29,6 @@ export const messages = {
   "onboarding.setup.otherInvitation": "Utiliser une autre invitation",
   "onboarding.setup.joinNote":
     "Vous rejoindrez l’hôte en tant que {email}. Les invitations par e-mail ne fonctionnent que pour l’adresse qui les a reçues.",
-  "onboarding.setup.saveChanges": "Enregistrer les modifications",
   "onboarding.setup.connect": "Se connecter à l’hôte",
   "onboarding.setup.reviewInvitation": "Vérifier l’invitation",
   "onboarding.setup.continueWith": "Continuer avec {provider}",

@@ -114,6 +114,133 @@ export const messages = defineMessages("marketplace", {
   "marketplace.app.remove.confirmTitle": "Remove {name}?",
   "marketplace.app.remove.keep": "Keep",
 
+  // The catalog apps' listing text, by slug. Each English text is the catalog's own text, byte for
+  // byte: a key whose English no longer matches the catalog is not used. The prompts are requests that
+  // the user sends to an agent.
+  "marketplace.plugin.aave.tagline": "Aave data and transactions",
+  "marketplace.plugin.aave.description":
+    "Aave helps users explore live Aave V3 and V4 markets, review wallet positions and DAO governance, simulate lending actions, and prepare non-custodial transactions. Every transaction is returned unsigned: the plugin reads the markets and writes the call, and the wallet stays with the user.",
+  "marketplace.plugin.aave.app":
+    "Live V3 and V4 markets, wallet positions, DAO governance, and prepared transactions, over one MCP server.",
+  "marketplace.plugin.aave.prompt.stablecoinYield": "Where can I earn the most on stablecoins across Aave right now?",
+  "marketplace.plugin.aave.prompt.usdcRates": "Which pays more for USDC right now, Aave V3 or V4 on Ethereum?",
+  "marketplace.plugin.aave.prompt.healthFactor":
+    "What's the health factor of 0x0a42b2f3a0d54157dbd7cc346335a4f1909fc02c, and how far from liquidation?",
+  "marketplace.plugin.canva.tagline": "Designs, assets and exports",
+  "marketplace.plugin.canva.description":
+    "Canva lets users create and edit designs in words, search their own design library, upload and organize assets, export in the format a channel needs, and leave comments where the work is. Each user signs in to their own Canva account, and the agent can do what that account can do.",
+  "marketplace.plugin.canva.app":
+    "Design creation and editing, library search, asset and brand management, exports, and comments, over one MCP server.",
+  "marketplace.plugin.canva.prompt.recentDesign": "Show me my most recently edited Canva design.",
+  "marketplace.plugin.canva.prompt.socialResize": "Resize my launch poster for Instagram and export both as PNG.",
+  "marketplace.plugin.canva.prompt.deckFromNotes": "Turn these release notes into a six-slide Canva presentation.",
+  "marketplace.plugin.linear.tagline": "Issues and project triage",
+  "marketplace.plugin.linear.description":
+    "Linear lets agents list assigned issues, triage the backlog, update statuses, and draft new issues in the workspace the signed-in account belongs to. Each user signs in to their own Linear account through the browser.",
+  "marketplace.plugin.linear.app":
+    "Issue search, triage, status updates, and issue creation, over Linear's MCP server with browser sign-in.",
+  "marketplace.plugin.linear.prompt.myWeek": "What is assigned to me this week?",
+  "marketplace.plugin.linear.prompt.backlog": "Triage the backlog: what is stale, blocked, or missing an owner?",
+  "marketplace.plugin.linear.prompt.newIssue": "File an issue for the crash in the sync queue with reproduction steps.",
+  "marketplace.plugin.notion.tagline": "Docs and knowledge base",
+  "marketplace.plugin.notion.description":
+    "Notion lets agents read and write pages, search the workspace, and keep meeting notes and specs where the team already works. Each user signs in to their own Notion account through the browser.",
+  "marketplace.plugin.notion.app":
+    "Page search, reading, writing, and workspace navigation, over Notion's MCP server with browser sign-in.",
+  "marketplace.plugin.notion.prompt.findSpec": "Find the current launch spec and summarize the open questions.",
+  "marketplace.plugin.notion.prompt.meetingNotes":
+    "Turn these bullets into a structured meeting note in my team space.",
+  "marketplace.plugin.notion.prompt.updateDoc": "Update the onboarding doc with the new release checklist.",
+  "marketplace.plugin.figma.tagline": "Designs and prototypes",
+  "marketplace.plugin.figma.description":
+    "Figma lets agents read design files, inspect components, styles and variables, and hand production specs to engineers. It connects to the MCP server in the Figma desktop app, on this computer. The server can read designs only; write support is in progress.",
+  "marketplace.plugin.figma.app":
+    "Design context, metadata, variables and screenshots, over the MCP server in the Figma desktop app. Read-only for now.",
+  "marketplace.plugin.figma.prompt.handoff": "Hand off the checkout file: list screens, components, and styles.",
+  "marketplace.plugin.figma.prompt.audit": "Audit this file for inconsistent spacing and color use.",
+  "marketplace.plugin.figma.prompt.assets": "Extract the marketing icons at 2x for the app bundle.",
+  "marketplace.plugin.paper.tagline": "Design canvas built on HTML and CSS",
+  "marketplace.plugin.paper.description":
+    "Paper lets agents read and write the design file that is open in Paper Desktop: inspect artboards, selections, computed styles, JSX and tokens, and create or change frames, text and styles. Install Paper Desktop, open it once, and open a file before you start. OpenBot starts the Paper CLI that Paper Desktop installs. Paper needs no key. Write tools change the open file, so review each write before you approve it.",
+  "marketplace.plugin.paper.app":
+    "Reads and writes the open Paper Desktop file, over the local MCP server that the Paper CLI relays. Needs Paper Desktop with a file open.",
+  "marketplace.plugin.paper.prompt.implement":
+    "Implement the selected Paper frame in this codebase, with our code conventions.",
+  "marketplace.plugin.paper.prompt.codeToDesign":
+    "Use the styles in this repository and design a settings page in Paper.",
+  "marketplace.plugin.paper.prompt.tokens":
+    "List the design tokens in the open Paper file and compare them with our theme.",
+  "marketplace.plugin.sentry.tagline": "Errors and crash triage",
+  "marketplace.plugin.sentry.description":
+    "Sentry lets agents search recent errors, inspect stack traces and affected releases, and summarize what broke after a deploy. Each user signs in to their own Sentry account through the browser.",
+  "marketplace.plugin.sentry.app":
+    "Error search, issue inspection, and release health, over Sentry's MCP server with browser sign-in.",
+  "marketplace.plugin.sentry.prompt.newErrors": "What new errors appeared since yesterday's deploy?",
+  "marketplace.plugin.sentry.prompt.topCrash": "Explain the top crash in the mobile project and its likely cause.",
+  "marketplace.plugin.sentry.prompt.releaseHealth": "How healthy is the current release compared to the last one?",
+  "marketplace.plugin.context7.tagline": "Current library documentation",
+  "marketplace.plugin.context7.description":
+    "Context7 fetches current documentation and API references for libraries and frameworks, so answers use the version the project actually runs. It needs no account and no key.",
+  "marketplace.plugin.context7.app":
+    "Current library documentation lookup, over the Context7 MCP server with no sign-in.",
+  "marketplace.plugin.context7.prompt.apiCheck": "What is the current API for virtualized lists in this framework?",
+  "marketplace.plugin.context7.prompt.migrate": "What changed between v2 and v3 of this router?",
+  "marketplace.plugin.context7.prompt.example": "Show a current example for authenticated file uploads.",
+  "marketplace.plugin.stripe.tagline": "Payments and billing review",
+  "marketplace.plugin.stripe.description":
+    "Stripe lets agents look up payments, customers, and invoices, and draft payment links, in the account the signed-in user can reach. Each user signs in to their own Stripe account through the browser.",
+  "marketplace.plugin.stripe.app":
+    "Payment, customer, and invoice lookup, over Stripe's MCP server with browser sign-in.",
+  "marketplace.plugin.stripe.prompt.payment": "Look up this payment and explain why it failed.",
+  "marketplace.plugin.stripe.prompt.customer": "Summarize this customer's invoices and outstanding balance.",
+  "marketplace.plugin.stripe.prompt.link": "Draft a payment link for the Pro plan at 49 per month.",
+  "marketplace.plugin.posthog.tagline": "Product analytics and flags",
+  "marketplace.plugin.posthog.description":
+    "PostHog lets agents query events and funnels, inspect feature flags, and summarize what changed after a release. A personal API key from the project settings goes into one Authorization header.",
+  "marketplace.plugin.posthog.app":
+    "Event, funnel, and feature-flag access, over PostHog's MCP server with a personal API key.",
+  "marketplace.plugin.posthog.prompt.funnel": "How does the signup funnel look for the last 14 days?",
+  "marketplace.plugin.posthog.prompt.flag": "Which feature flags are enabled for this user?",
+  "marketplace.plugin.posthog.prompt.release": "Did activation change after last week's release?",
+  "marketplace.plugin.airtable.tagline": "Bases and records",
+  "marketplace.plugin.airtable.description":
+    "Airtable lets agents list bases, read and update records, and summarize table contents. An API key from the account page is passed to the local server as one environment variable.",
+  "marketplace.plugin.airtable.app":
+    "Base listing and record access, over a local MCP server with an Airtable API key.",
+  "marketplace.plugin.airtable.prompt.bases": "What bases do I have access to?",
+  "marketplace.plugin.airtable.prompt.records": "Summarize the launch tracker table.",
+  "marketplace.plugin.airtable.prompt.update": "Mark the shipped features as done in the roadmap base.",
+  "marketplace.plugin.firecrawl.tagline": "Web extraction and search",
+  "marketplace.plugin.firecrawl.description":
+    "Firecrawl lets agents scrape pages, extract structured data, and search the web through one API. An API key from the Firecrawl dashboard is passed to the local server as one environment variable.",
+  "marketplace.plugin.firecrawl.app":
+    "Page scraping, extraction, and web search, over a local MCP server with a Firecrawl API key.",
+  "marketplace.plugin.firecrawl.prompt.scrape": "Extract the pricing table from this page as structured data.",
+  "marketplace.plugin.firecrawl.prompt.research": "Research competitor pricing and cite each source page.",
+  "marketplace.plugin.firecrawl.prompt.monitor": "What changed on our changelog page this month?",
+  "marketplace.plugin.braveSearch.tagline": "Private web search",
+  "marketplace.plugin.braveSearch.description":
+    "Brave Search lets agents search the web and local results without tracking. An API key from the Brave Search API dashboard is passed to the local server as one environment variable.",
+  "marketplace.plugin.braveSearch.app": "Web and local search, over a local MCP server with a Brave API key.",
+  "marketplace.plugin.braveSearch.prompt.search": "What are reviewers saying about this framework version?",
+  "marketplace.plugin.braveSearch.prompt.news": "Find today's announcements for this product area.",
+  "marketplace.plugin.braveSearch.prompt.compare": "Compare these two vendors with cited sources.",
+  "marketplace.plugin.resend.tagline": "Transactional email",
+  "marketplace.plugin.resend.description":
+    "Resend lets agents send transactional email and check delivery through one API. An API key from the Resend dashboard is passed to the local server as one environment variable.",
+  "marketplace.plugin.resend.app": "Email sending and delivery checks, over a local MCP server with a Resend API key.",
+  "marketplace.plugin.resend.prompt.send": "Send the launch announcement draft to the beta list.",
+  "marketplace.plugin.resend.prompt.status": "Did the invoice email reach the customer?",
+  "marketplace.plugin.resend.prompt.template": "Draft a password-reset email for the new flow.",
+  "marketplace.plugin.composio.tagline": "Many apps through your own Composio link",
+  "marketplace.plugin.composio.description":
+    "Composio connects agents to Gmail, Slack, GitHub, and hundreds of other apps through one MCP server. Create the server in your Composio account, add the apps you want to it, and paste its link here. Add an API key only if your server requires one.",
+  "marketplace.plugin.composio.app":
+    "The apps you add to your Composio MCP server, over the link from your Composio account.",
+  "marketplace.plugin.composio.prompt.inbox": "Summarize my unread email and draft replies to the urgent ones.",
+  "marketplace.plugin.composio.prompt.handoff": "Post a summary of this pull request to our team channel.",
+  "marketplace.plugin.composio.prompt.apps": "Which apps and actions can you use through Composio?",
+
   // Skills. {label} is the install button text: an agent name, "All agents" or "2 agents".
   "marketplace.skill.installMenu.install": "Install",
   "marketplace.skill.installMenu.installNamed": "Install {name}",

@@ -37,6 +37,7 @@ import { type GitHubConnectorController, githubPanelProps } from "../connectors/
 import { type OnePasswordConnectorController, onePasswordPanelProps } from "../connectors/onepassword-connector";
 import { desktopMarketplaceCalls, type MarketplaceCalls } from "./marketplace-calls";
 import { createPluginAppConfig } from "./marketplace-plugin-catalog";
+import { localizedPlugin } from "./marketplace-plugin-text";
 import { agentHomeCache, marketplaceErrorMessage, skillHomeCache } from "./marketplace-shared";
 
 /** An agent of the server that the Marketplace is for. */
@@ -351,8 +352,11 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     return connector ? onePasswordPanelProps(connector) : undefined;
   });
 
+  /** The catalog listings in the reader's language. Made once per language, not on each status change. */
+  const localPlugins = createMemo(() => (props.plugins ?? []).map((plugin) => localizedPlugin(plugin, t)));
+
   const apps = createMemo((): MarketplaceApp[] => {
-    const plugins = props.plugins ?? [];
+    const plugins = localPlugins();
     const github = props.githubConnector;
     const githubState = github?.status().state;
     return [

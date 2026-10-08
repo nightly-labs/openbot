@@ -22,6 +22,7 @@ import type {
   CreateHostedServerInput,
   DeleteHostedServerInput,
   HostedServerCatalog,
+  HostedServerLifecycleInput,
   HostedServerList,
   HostedServerSummary,
 } from "./hosted-servers";
@@ -469,6 +470,7 @@ export const IPC_ENDPOINTS = {
     exportDiagnostics: request<undefined, ExportResult>()("maintenance:export-diagnostics"),
   },
   providers: {
+    setProviderOn: request<{ provider: AgentProviderId; on: boolean }, AgentStatus>()("app:set-provider-on"),
     connectProvider: request<AgentProviderId, AgentStatus>()("app:connect-provider"),
     refreshAgentProviders: request<undefined, AgentStatus>()("app:refresh-agent-providers"),
     /**
@@ -727,6 +729,7 @@ export const IPC_ENDPOINTS = {
     create: request<CreateHostedServerInput, HostedServerSummary>()("hosted-servers:create"),
     openCheckout: request<string, HostedServerSummary>()("hosted-servers:open-checkout"),
     delete: request<DeleteHostedServerInput, void>()("hosted-servers:delete"),
+    lifecycle: request<HostedServerLifecycleInput, void>()("hosted-servers:lifecycle"),
     wake: request<string, HostedServerSummary>()("hosted-servers:wake"),
   },
   marketplaceAgents: {

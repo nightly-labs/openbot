@@ -1,5 +1,6 @@
 import type { AppTextKey } from "@openbot/i18n";
 import {
+  Bell,
   CircleArrowDown,
   CreditCard,
   MousePointer2,
@@ -12,6 +13,7 @@ import {
 
 export type SettingsTab =
   | "general"
+  | "notifications"
   | "dynamic-island"
   | "computer-use"
   | "profile"
@@ -38,6 +40,12 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
     titleKey: "settings.tab.general.title",
     descriptionKey: "settings.tab.general.description",
     icon: Settings,
+  },
+  {
+    value: "notifications",
+    titleKey: "settings.tab.notifications.title",
+    descriptionKey: "settings.tab.notifications.description",
+    icon: Bell,
   },
   {
     value: "dynamic-island",

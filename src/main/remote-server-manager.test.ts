@@ -1,5 +1,6 @@
 import { Effect } from "effect";
 import { authCall, CentralAuthOperationError } from "./central-auth-effects";
+import type { RemoteHostSummary } from "./central-auth-records";
 import { RemoteWorkflowError, remoteCall } from "./remote-service-effects";
 // @vitest-environment node
 
@@ -135,6 +136,7 @@ describe("remote server links", () => {
     inviteUrl.searchParams.set("invite", "b".repeat(43));
     try {
       await runCauseEffect(manager.initialize());
+      await runCauseEffect(manager.awaitHostDirectory());
       await expect(runCauseEffect(manager.join({ inviteUrl: inviteUrl.toString() }))).rejects.toThrow("identity");
       expect(acceptInvite).not.toHaveBeenCalled();
     } finally {
@@ -161,6 +163,7 @@ describe("remote server links", () => {
     inviteUrl.searchParams.set("invite", "b".repeat(43));
     try {
       await runCauseEffect(manager.initialize());
+      await runCauseEffect(manager.awaitHostDirectory());
       const input = { inviteUrl: inviteUrl.toString() };
       await expect(runCauseEffect(manager.previewInvite(input))).rejects.toThrow("another OpenBot service");
       await expect(runCauseEffect(manager.join(input))).rejects.toThrow("another OpenBot service");
@@ -250,6 +253,7 @@ describe("remote server links", () => {
 
     try {
       await runCauseEffect(manager.initialize());
+      await runCauseEffect(manager.awaitHostDirectory());
       expect(disconnect).toHaveBeenCalledWith(hostId);
       expect(manager.list().map((server) => server.id)).toEqual(["local"]);
       expect(manager.activeServerId).toBe("local");
@@ -257,6 +261,111 @@ describe("remote server links", () => {
       await runCauseEffect(manager.stop());
       await rm(directory, { recursive: true, force: true });
     }
+  });
+
+  it("connects the selected host before the host directory answers, and a host without a pinned key after it", async () => {
+    const activeId = "00000000-0000-4000-8000-000000000001";
+    const otherId = "00000000-0000-4000-8000-000000000002";
+    const listed = (hostId: string): RemoteHostSummary => ({
+      hostId,
+      name: hostId,
+      logoKey: null,
+      devicePublicKey: `${hostId}-public-key`,
+      authEpoch: 1,
+      membershipId: `${hostId}-member`,
+      role: "member",
+    });
+    const order: string[] = [];
+    let answerDirectory: () => void = () => undefined;
+    const directoryAnswered = new Promise<void>((resolve) => {
+      answerDirectory = resolve;
+    });
+    const transport = fakeWebRtcTransport([], {
+      listHosts: () =>
+        Effect.promise(async () => {
+          await directoryAnswered;
+          order.push("directory");
+          return [listed(activeId), listed(otherId)];
+        }),
+      startSession: (hostId) =>
+        Effect.sync(() => {
+          order.push(hostId);
+          return { sessionId: `session-${hostId}`, hostId, expiresAt: Date.now() + 86_400_000 };
+        }),
+    });
+    const connect = vi.spyOn(transport, "connect");
+    const webrtcServer = (id: string, pinned: boolean) =>
+      storedHttpsServer(id, {
+        apiUrl: `webrtc://${id}`,
+        transport: "webrtc-v2",
+        encryptedToken: "",
+        fingerprint: fingerprint(`${id}-public-key`),
+        ...(pinned ? { publicKey: `${id}-public-key` } : {}),
+      });
+    // The window must not wait for the account service: the fixture returns with the directory unanswered.
+    const fixture = await createRemoteManager({
+      servers: [webrtcServer(otherId, false), webrtcServer(activeId, true)],
+      activeServerId: activeId,
+      storedVersion: 3,
+      managerOptions: { webrtcTransport: transport },
+      awaitHostDirectory: false,
+    });
+    fixture.manager.connectActiveServer();
+    await vi.waitFor(() => expect(order).toEqual([activeId]));
+    void runCauseEffect(fixture.manager.startEventConnections());
+    await vi.waitFor(() => expect(connect).toHaveBeenCalledWith(otherId));
+    expect(order).toEqual([activeId]);
+    answerDirectory();
+    await vi.waitFor(() => expect(order).toEqual([activeId, "directory", otherId]));
+    expect(connect.mock.calls[0]).toEqual([activeId]);
+  });
+
+  it("connects a host the directory adds after the event connections started", async () => {
+    const activeId = "00000000-0000-4000-8000-000000000001";
+    const addedId = "00000000-0000-4000-8000-000000000003";
+    const listed = (hostId: string): RemoteHostSummary => ({
+      hostId,
+      name: hostId,
+      logoKey: null,
+      devicePublicKey: `${hostId}-public-key`,
+      authEpoch: 1,
+      membershipId: `${hostId}-member`,
+      role: "member",
+    });
+    let answerDirectory: () => void = () => undefined;
+    const directoryAnswered = new Promise<void>((resolve) => {
+      answerDirectory = resolve;
+    });
+    const transport = fakeWebRtcTransport([], {
+      listHosts: () =>
+        Effect.promise(async () => {
+          await directoryAnswered;
+          return [listed(activeId), listed(addedId)];
+        }),
+    });
+    const connect = vi.spyOn(transport, "connect");
+    const fixture = await createRemoteManager({
+      servers: [
+        storedHttpsServer(activeId, {
+          apiUrl: `webrtc://${activeId}`,
+          transport: "webrtc-v2",
+          encryptedToken: "",
+          fingerprint: fingerprint(`${activeId}-public-key`),
+          publicKey: `${activeId}-public-key`,
+        }),
+      ],
+      activeServerId: activeId,
+      storedVersion: 3,
+      managerOptions: { webrtcTransport: transport },
+      awaitHostDirectory: false,
+    });
+    await runCauseEffect(fixture.manager.startEventConnections());
+    await vi.waitFor(() => expect(connect).toHaveBeenCalledWith(activeId));
+    expect(connect).not.toHaveBeenCalledWith(addedId);
+
+    answerDirectory();
+    await runCauseEffect(fixture.manager.awaitHostDirectory());
+    await vi.waitFor(() => expect(connect).toHaveBeenCalledWith(addedId));
   });
 
   it("keeps a WebRTC host when the development bootstrap offers the same host over HTTP", async () => {
@@ -404,6 +513,7 @@ describe("remote server links", () => {
 
     try {
       await runCauseEffect(manager.initialize());
+      await runCauseEffect(manager.awaitHostDirectory());
       expect(
         manager
           .list()
@@ -564,6 +674,7 @@ describe("remote server links", () => {
 
     try {
       await runCauseEffect(manager.initialize());
+      await runCauseEffect(manager.awaitHostDirectory());
       const authorization = await runCauseEffect(
         manager.fetchRemoteViewerResource(hostId, "/v1/remote-screen/sessions/desktop-1/authorize", {
           method: "POST",
@@ -634,6 +745,7 @@ describe("remote server order", () => {
 
     try {
       await runCauseEffect(manager.initialize());
+      await runCauseEffect(manager.awaitHostDirectory());
       await rename(directory, unavailableDirectory);
       await expect(runCauseEffect(manager.select("server-1"))).rejects.toThrow();
       expect(manager.activeServerId).toBe("local");
@@ -683,6 +795,7 @@ describe("remote server order", () => {
         },
       );
       await runCauseEffect(manager.initialize());
+      await runCauseEffect(manager.awaitHostDirectory());
 
       const reordered = await runCauseEffect(manager.reorder(["server-2", "server-1"]));
       expect(reordered.map((server) => server.id)).toEqual(["local", "server-2", "server-1"]);
@@ -756,6 +869,7 @@ describe("remote server order", () => {
         },
       );
       await runCauseEffect(manager.initialize());
+      await runCauseEffect(manager.awaitHostDirectory());
 
       await expect(
         runCauseEffect(manager.downloadSharedFile("~/OpenBot/Shared/report.csv", serverId)),
@@ -1071,6 +1185,7 @@ describe("remote control capability discovery", () => {
         },
       );
       await runCauseEffect(manager.initialize());
+      await runCauseEffect(manager.awaitHostDirectory());
 
       await expect(runCauseEffect(manager.join({ inviteUrl: inviteUrl.toString() }))).resolves.toMatchObject({
         id: serverId,

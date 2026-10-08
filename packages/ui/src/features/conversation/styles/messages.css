@@ -895,12 +895,34 @@ button.chat-action-target:active,
   text-align: center;
 }
 
-.chat-action-group-list .chat-action-history-entry {
+/* Only the group's own rows: a routine run in an open group keeps the layout of its own history. */
+.chat-action-group-list > .chat-action-history-entry {
   display: block;
 }
 
 .chat-action-group-list .chat-action-marker {
   width: 100%;
+}
+
+/* A group of routine runs reads "routine · 3 runs · 17:15–18:45". In a narrow chat the count, the
+   time and the toggle move together to a second line, so the routine keeps its whole name. The dots
+   are decoration only. */
+.chat-action-marker-routine-run-group > .chat-action-marker-summary > .chat-action-marker-content {
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.chat-action-run-group-details {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--openbot-space-1);
+}
+
+.chat-action-run-group-count::before,
+.chat-action-run-group-time::before {
+  content: "·" / "";
+  margin-inline-end: var(--openbot-space-1);
 }
 
 /* The shared .ui-action-menu item rule outranks a single class, so the grid template and the

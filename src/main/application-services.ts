@@ -15,6 +15,7 @@ import { createRoutineFlows, type RoutineFlowsHandle } from "../backend/routine-
 import { type AgentAdminSettingsService, createAgentAdminSettings } from "./agent-admin-settings";
 import { spawnAgentDatabaseHost } from "./agent-database-host-process";
 import { HostReleaseService, readInstallationMode } from "./host-release-service";
+import { HOSTED_UPDATE_TRIGGER, HostedUpdateAdapter } from "./hosted-update-adapter";
 import { LocalSkillLibrary } from "./local-skill-library";
 import { localSkillTools } from "./local-skill-tools";
 import { MAC_PERMISSION_URLS } from "./mac-permission-urls";
@@ -163,6 +164,8 @@ import { PROVIDER_DETECTION_SETTINGS_FILE, ProviderDetectionSettingsStore } from
 import { startProviderLog } from "./provider-log";
 import { toProviderRuntimeFailure } from "./provider-runtime-effects";
 import { ProviderRuntimeManager, providerRuntimeRoot, runtimeTarget } from "./provider-runtime-manager";
+import { ProviderUseSettingsStore } from "./provider-use-settings-store";
+import { RemoteConnectTrace } from "./remote-connect-trace";
 import { RemoteDesktopManager } from "./remote-desktop-manager";
 import { resolveRemoteDesktopRuntime } from "./remote-desktop-runtime-artifact";
 import { loadOrCreateRemoteDesktopCredentials } from "./remote-desktop-secret-store";
@@ -842,7 +845,10 @@ export async function createApplicationServices({
    * store is the path it always used. The switch is read here rather than imported from the entry
    * point, which this file may not reach into; both readers read the same immutable value.
    */
+  const providerUse = new ProviderUseSettingsStore(join(app.getPath("userData"), "openbot-provider-use-v1.json"));
+  await runCauseEffect(providerUse.load());
   const providerRuntimes = new ProviderRuntimeManager({
+    isProviderOn: (provider) => !providerUse.off().includes(provider),
     root: providerRuntimeRoot({
       appData: app.getPath("appData"),
       userDataOverride: app.commandLine.getSwitchValue("user-data-dir"),
@@ -1136,6 +1142,13 @@ export async function createApplicationServices({
     visualPreview: new ChatVisualPreviewer(),
     hostMemory,
     requestTimeoutMs: 30_000,
+    offProviders: providerUse.off(),
+    saveProviderUse: (provider, on) =>
+      providerUse
+        .set(provider, on)
+        .pipe(
+          Effect.mapError((error) => new AgentLifecycleFailed({ operation: "saveProviderUse", cause: error.cause })),
+        ),
     preferredProvider: setupState.preferredProvider ?? "codex",
     bundledExecutables: providerRuntimes.bundledExecutables(),
     prepareAgentWorkspace: (agent) =>
@@ -1469,14 +1482,15 @@ export async function createApplicationServices({
   // The host comes before the updater, and the restart readiness reads the host. The routes reach
   // the schedule through this, and a request that arrives before it exists is refused.
   let requestedUpdate: RequestedUpdate | undefined;
+  const installationMode =
+    app.isPackaged && process.platform === "linux" ? await runCauseEffect(readInstallationMode()) : null;
   const hostRelease = new HostReleaseService({
     currentVersion: app.getVersion(),
     packaged: app.isPackaged,
     platform: process.platform,
     arch: process.arch,
     environment: process.env,
-    installationMode:
-      app.isPackaged && process.platform === "linux" ? await runCauseEffect(readInstallationMode()) : null,
+    installationMode,
     updateStatus: () => ({
       phase: requestedUpdate?.snapshot().phase ?? "unsupported",
       managedByHost: requestedUpdate?.snapshot().remoteUpdates === "managed",
@@ -1532,6 +1546,8 @@ export async function createApplicationServices({
       }),
     store: teamStore,
     agents: service,
+    // Defined below with the startup it waits for; a request runs only after this returns.
+    agentsReady: () => agentInitialization.awaitSettled(),
     events,
     skills,
     sidebarLayout,
@@ -1749,6 +1765,7 @@ export async function createApplicationServices({
   service.on("failure", (failure) => analytics.handleFailure(failure));
   const trace = new TraceFile({ directory: join(app.getPath("userData"), "logs") });
   teardown.push(TEARDOWN_ORDER.trace, "the trace file", () => Effect.runPromise(trace.close()));
+  const connectTrace = new RemoteConnectTrace((span) => trace.record(span));
   const remoteServers = new RemoteServerManager(
     join(app.getPath("userData"), REMOTE_SERVERS_FILE),
     safeStorageCipher("error.app.macSecureStorageUnavailable"),
@@ -1767,6 +1784,7 @@ export async function createApplicationServices({
       allowLocalDevelopmentInvites: developmentRemoteRole !== null,
       selfHostedApiOrigin: selfHostedApiOrigin(centralAuthApiUrl),
       appVersion: app.getVersion(),
+      connectTrace,
       getLocalHostId: () => teamStore.getIdentity()?.serverId ?? null,
       localTailscale: () => tailscale.status(),
       directSessions: new RemoteDirectSessionStore({
@@ -1796,6 +1814,7 @@ export async function createApplicationServices({
         controlPlaneUrl: centralAuth.resolveApiUrl("/"),
         downloadHostLogo: (hostId, version) => centralAuth.downloadRemoteHostLogo(hostId, version),
         transferDirectory: join(app.getPath("userData"), "remote-transfers"),
+        connectTrace,
       }),
     },
   );
@@ -1808,8 +1827,10 @@ export async function createApplicationServices({
   await runCauseEffect(remoteServers.initialize());
   criticalActionTargets = { agents: service, remoteServers };
   // After `remoteServers.initialize()`. The client half polls for the host's connection file and
-  // throws when it never appears, before any window is shown - see the module it lives in.
+  // throws when it never appears, before any window is shown - see the module it lives in. It reads
+  // the joined servers to choose between WebRTC and HTTP, so it waits for the account's host list.
   if (developmentRemoteRole) {
+    await runCauseEffect(remoteServers.awaitHostDirectory());
     await runCauseEffect(
       startDevelopmentRemoteRole({
         role: developmentRemoteRole,
@@ -1859,17 +1880,25 @@ export async function createApplicationServices({
   const currentVersion = app.getVersion();
   // Skip the file check in dev: unpacked runs never enable updates, so avoid touching resourcesPath.
   const updateMetadataAvailable = app.isPackaged && existsSync(join(process.resourcesPath, "app-update.yml"));
+  // A hosted or self-installed server runs a release that root owns. Root installs updates for it
+  // when openbot-hosted-update has installed its request units. A container has none.
+  const hostedInstaller =
+    app.isPackaged &&
+    process.platform === "linux" &&
+    (process.env.OPENBOT_HOSTED_SERVER === "1" || installationMode === "self") &&
+    existsSync(HOSTED_UPDATE_TRIGGER);
   const updatesEnabled =
     app.isPackaged &&
-    supportsInstalledUpdates(process.platform) &&
-    updateMetadataAvailable &&
+    (hostedInstaller || (supportsInstalledUpdates(process.platform) && updateMetadataAvailable)) &&
     isValidSemver(currentVersion);
   if (app.isPackaged && updateMetadataAvailable && !isValidSemver(currentVersion)) {
     logger.warn(`OpenBot updates are disabled because the application version is not valid SemVer: ${currentVersion}`);
   }
   let updateAdapter: UpdateAdapter = createDisabledUpdateAdapter();
   let updaterEnabled = updatesEnabled;
-  if (updatesEnabled) {
+  if (updatesEnabled && hostedInstaller) {
+    updateAdapter = new HostedUpdateAdapter({ currentVersion, arch: process.arch });
+  } else if (updatesEnabled) {
     try {
       const updaterModule = await import("electron-updater");
       const realAdapter = updaterModule.autoUpdater ?? updaterModule.default?.autoUpdater ?? updaterModule.default;

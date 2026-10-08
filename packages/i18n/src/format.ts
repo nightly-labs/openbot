@@ -1,9 +1,12 @@
 import type { TranslatedLocale } from "./locale";
 import { createTranslate } from "./message";
+import { messages as de } from "./messages/de/format";
 import { messages as en } from "./messages/en/format";
+import { messages as es } from "./messages/es/format";
 import { messages as fr } from "./messages/fr/format";
 import { messages as ja } from "./messages/ja/format";
 import { messages as pt } from "./messages/pt/format";
+import { messages as ru } from "./messages/ru/format";
 import { messages as tr } from "./messages/tr/format";
 
 /**
@@ -25,13 +28,15 @@ export interface AppFormat {
   percent: (value: number, options?: Intl.NumberFormatOptions) => string;
   currencyUsd: (value: number, options?: Intl.NumberFormatOptions) => string;
   date: (value: Date | number, options?: Intl.DateTimeFormatOptions) => string;
+  /** The date locale writes a 12-hour clock with AM and PM: true for `en-US`, false for `fr` and `ja`. */
+  readonly hour12: boolean;
   /** A conjunction: "a, b, and c". */
   list: (items: readonly string[]) => string;
   /** Binary units, as the attachment cards show them: 512 B, 12 KB, 3.4 MB. */
   fileSize: (bytes: number) => string;
 }
 
-const catalogs = { en, fr, ja, pt, tr } as const;
+const catalogs = { en, de, es, fr, ja, pt, ru, tr } as const;
 
 const numberFormats = new Map<string, Intl.NumberFormat>();
 
@@ -49,6 +54,23 @@ function compactNumber(locale: string | undefined, value: number): string {
     return numberFormat(locale, { notation: "compact", maximumFractionDigits: 1 }).format(value);
   } catch {
     return numberFormat(locale, { maximumFractionDigits: 0 }).format(value);
+  }
+}
+
+/**
+ * Hermes may not give `hourCycle` in the resolved options (not confirmed on a device). Then the
+ * text of 13:00 decides: a 24-hour clock writes "13". If `Intl` fails, keep the 12-hour clock that
+ * the app showed before.
+ */
+function usesHour12(locale: string | undefined): boolean {
+  try {
+    const formatter = new Intl.DateTimeFormat(locale, { hour: "numeric", timeZone: "UTC" });
+    const { hourCycle, hour12 } = formatter.resolvedOptions();
+    if (hourCycle) return hourCycle === "h11" || hourCycle === "h12";
+    if (typeof hour12 === "boolean") return hour12;
+    return !formatter.format(Date.UTC(2024, 0, 1, 13)).includes("13");
+  } catch {
+    return true;
   }
 }
 
@@ -76,6 +98,7 @@ export function createFormat(locale: TranslatedLocale, intlLocale: string | null
     currencyUsd: (value, options) =>
       numberFormat(tag, { style: "currency", currency: "USD", ...options }).format(value),
     date: (value, options) => new Intl.DateTimeFormat(tag, options).format(value),
+    hour12: usesHour12(tag),
     list: (items) => {
       if (typeof Intl.ListFormat === "function") {
         return new Intl.ListFormat(locale, { style: "long", type: "conjunction" }).format(items);

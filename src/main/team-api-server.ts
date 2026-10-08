@@ -762,6 +762,10 @@ export class TeamApiServer {
       }
       if (isClientUse(method, url.pathname)) this.#lastClientUseAt = Date.now();
       const context = this.#requestContext(request, response, url, token, authenticated);
+      // Before `hidden`: the response projection must see the agents that the roster sends.
+      if (method === "GET" && url.pathname === TEAM_API_ROUTES.agents.all && this.#options.agentsReady) {
+        await runCauseEffect(this.#options.agentsReady());
+      }
       const hidden = this.#hiddenAgentIds(context.protocol, context.capabilities);
       // Every protocol gets the projection, also with no hidden agent: a provider status row, a
       // model or an auth state of a local-only provider can be in the response.
@@ -965,8 +969,8 @@ export class TeamApiServer {
     const primaryAgent = this.#options.agents.listAgents().find((agent) => agent.id === event.snapshot.agentId);
     if (!primaryAgent || primaryAgent.threadId !== event.snapshot.threadId) {
       // Execution and channel threads are consumed by their owners before this listener. A stale
-      // event for a deleted agent must also never enter readConversation, whose released endpoint
-      // can recreate an agent from its id.
+      // event for a deleted agent must also never enter readConversation, which fails for an
+      // agent that is gone.
       this.#broadcastAgentEventToClients(event, "modern");
       return;
     }
@@ -988,8 +992,8 @@ export class TeamApiServer {
     const next: PendingLegacyConversationRead = { event, retries };
     this.#pendingLegacyConversationReads.set(agentId, next);
     const materialize = Effect.gen({ self: this }, function* () {
-      // `readConversation` uses getOrCreate for the released HTTP endpoint. Do not let a delayed
-      // event read recreate an agent that was deleted after the event was emitted.
+      // `readConversation` fails for an agent that is gone. Skip a delayed event read for an agent
+      // that was deleted after the event was emitted.
       if (!this.#options.agents.listAgents().some((agent) => agent.id === agentId)) {
         this.#pendingLegacyConversationReads.delete(agentId);
         return;

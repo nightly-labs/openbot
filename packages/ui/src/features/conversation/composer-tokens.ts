@@ -1,6 +1,5 @@
 import { type ChatTagKind, chatTagReferences } from "@openbot/contracts/chat-tag-references";
 import type { DraftAttachment, InstalledSkill, McpServerConfig } from "@openbot/contracts/ipc";
-import { Blocks, Puzzle } from "@openbot/ui";
 import { referenceChipClasses } from "@openbot/ui/reference-chip";
 import { usesTouchLayout } from "@openbot/ui/utils";
 import { createStaticAvatarSvg } from "../../bloub-avatar";
@@ -129,13 +128,54 @@ function updateSkillToken(token: HTMLSpanElement, skill: InstalledSkill): void {
   const iconWrap = document.createElement("span");
   iconWrap.className = referenceChipClasses.icon;
   iconWrap.setAttribute("aria-hidden", "true");
-  const icon = Puzzle({ class: "skill-chip-glyph" });
-  if (!(icon instanceof Node)) throw new Error("Puzzle icon did not render to a DOM node");
-  iconWrap.append(icon);
+  iconWrap.append(createChipGlyph("puzzle", PUZZLE_GLYPH));
   const name = document.createElement("span");
   name.className = referenceChipClasses.name;
   name.textContent = skill.name;
   token.replaceChildren(iconWrap, name);
+}
+
+/* The lucide-solid 1.33.0 `Puzzle` and `Blocks` shapes, drawn without the icon components. A token
+   is built in effects and event handlers, where a production build has no Solid owner, and lucide's
+   `Icon` reads a context there: it throws `NoOwnerError` and halts the renderer. */
+type GlyphShape = ["path" | "rect", Record<string, string>];
+
+const PUZZLE_GLYPH: GlyphShape[] = [
+  [
+    "path",
+    {
+      d: "M15.39 4.39a1 1 0 0 0 1.68-.474 2.5 2.5 0 1 1 3.014 3.015 1 1 0 0 0-.474 1.68l1.683 1.682a2.414 2.414 0 0 1 0 3.414L19.61 15.39a1 1 0 0 1-1.68-.474 2.5 2.5 0 1 0-3.014 3.015 1 1 0 0 1 .474 1.68l-1.683 1.682a2.414 2.414 0 0 1-3.414 0L8.61 19.61a1 1 0 0 0-1.68.474 2.5 2.5 0 1 1-3.014-3.015 1 1 0 0 0 .474-1.68l-1.683-1.682a2.414 2.414 0 0 1 0-3.414L4.39 8.61a1 1 0 0 1 1.68.474 2.5 2.5 0 1 0 3.014-3.015 1 1 0 0 1-.474-1.68l1.683-1.682a2.414 2.414 0 0 1 3.414 0z",
+    },
+  ],
+];
+
+const BLOCKS_GLYPH: GlyphShape[] = [
+  ["path", { d: "M10 22V7a1 1 0 0 0-1-1H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5a1 1 0 0 0-1-1H2" }],
+  ["rect", { x: "14", y: "2", width: "8", height: "8", rx: "1" }],
+];
+
+const GLYPH_ATTRIBUTES = {
+  width: "24",
+  height: "24",
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  "stroke-width": "2",
+  "stroke-linecap": "round",
+  "stroke-linejoin": "round",
+  "aria-hidden": "true",
+};
+
+function createChipGlyph(name: string, shapes: GlyphShape[]): SVGSVGElement {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  for (const [attribute, value] of Object.entries(GLYPH_ATTRIBUTES)) svg.setAttribute(attribute, value);
+  svg.setAttribute("class", `lucide lucide-icon lucide-${name} skill-chip-glyph`);
+  for (const [tag, attributes] of shapes) {
+    const shape = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (const [attribute, value] of Object.entries(attributes)) shape.setAttribute(attribute, value);
+    svg.append(shape);
+  }
+  return svg;
 }
 
 export function createMcpToken(server: McpServerConfig): HTMLSpanElement {
@@ -155,9 +195,7 @@ function updateMcpToken(token: HTMLSpanElement, server: McpServerConfig): void {
   const iconWrap = document.createElement("span");
   iconWrap.className = referenceChipClasses.icon;
   iconWrap.setAttribute("aria-hidden", "true");
-  const icon = Blocks({ class: "skill-chip-glyph" });
-  if (!(icon instanceof Node)) throw new Error("Blocks icon did not render to a DOM node");
-  iconWrap.append(icon);
+  iconWrap.append(createChipGlyph("blocks", BLOCKS_GLYPH));
   const name = document.createElement("span");
   name.className = referenceChipClasses.name;
   name.textContent = server.name;

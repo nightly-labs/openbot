@@ -5,6 +5,7 @@ import {
   type DeleteHostedServerInput,
   parseCreateHostedServerInput,
   parseDeleteHostedServerInput,
+  parseHostedServerLifecycleInput,
 } from "@openbot/contracts/hosted-servers";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { runCauseEffect } from "../../backend/effect-boundary";
@@ -21,6 +22,14 @@ export function hostedServerIpcHandlers({
 }: HostedServerIpcDependencies): Pick<IpcGroupHandlers, "hostedServers"> {
   return {
     hostedServers: {
+      lifecycle: payloadHandler(
+        (value) => {
+          const input = parseHostedServerLifecycleInput(value);
+          if (!input) throw new Error("Invalid hosted server lifecycle request.");
+          return input;
+        },
+        (input) => runCauseEffect(hostedServers.lifecycle(input)),
+      ),
       list: handler(() => runCauseEffect(hostedServers.list())),
       plans: handler(() => runCauseEffect(hostedServers.plans())),
       create: payloadHandler(parseCreate, (input) => runCauseEffect(hostedServers.create(input))),

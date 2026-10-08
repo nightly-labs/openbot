@@ -1,0 +1,203 @@
+.billing-lifecycle-panel {
+  container-type: inline-size;
+}
+
+.billing-lifecycle-card {
+  overflow: hidden;
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-surface);
+  box-shadow: 0 0 0 1px var(--openbot-border);
+}
+
+.billing-lifecycle-identity {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-3);
+  padding: var(--openbot-space-4);
+}
+
+.billing-lifecycle-server-icon,
+.billing-lifecycle-dialog-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: var(--openbot-control-xl);
+  height: var(--openbot-control-xl);
+  border-radius: var(--openbot-radius-md);
+  color: var(--openbot-text-secondary);
+  background: var(--openbot-bg-control-hover);
+}
+
+.billing-lifecycle-server-icon svg,
+.billing-lifecycle-dialog-icon svg {
+  width: var(--openbot-icon-lg);
+  height: var(--openbot-icon-lg);
+}
+
+.billing-lifecycle-server-copy {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: var(--openbot-space-1);
+}
+
+.billing-lifecycle-billing {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-3);
+  padding: var(--openbot-space-4);
+  border-top: 1px solid var(--openbot-border);
+}
+
+.billing-lifecycle-billing[data-scheduled] {
+  background: color-mix(in srgb, var(--openbot-warning-soft) 35%, transparent);
+}
+
+.billing-lifecycle-billing-copy {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: var(--openbot-space-1);
+}
+
+.billing-lifecycle-calendar {
+  flex-shrink: 0;
+  width: var(--openbot-icon-lg);
+  height: var(--openbot-icon-lg);
+  color: var(--openbot-warning-text);
+}
+
+.billing-lifecycle-receipt {
+  display: grid;
+  gap: var(--openbot-space-3);
+  padding: var(--openbot-space-4);
+  margin-bottom: var(--openbot-space-4);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-surface);
+}
+
+.billing-lifecycle-receipt > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--openbot-space-4);
+}
+
+.billing-lifecycle-receipt > div > :last-child {
+  text-align: right;
+  text-wrap: pretty;
+}
+
+.billing-lifecycle-receipt > div > :first-child {
+  flex-shrink: 0;
+}
+
+@container (max-width: 450px) {
+  .billing-lifecycle-identity {
+    flex-wrap: wrap;
+    gap: var(--openbot-space-2);
+  }
+
+  .billing-lifecycle-server-icon {
+    display: none;
+  }
+
+  .billing-lifecycle-server-copy {
+    flex-basis: 60%;
+  }
+
+  .billing-lifecycle-billing {
+    flex-wrap: wrap;
+  }
+
+  .billing-lifecycle-billing-copy {
+    flex-basis: 70%;
+  }
+}
+
+@media (max-width: 700px) {
+  .billing-lifecycle-receipt > div {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--openbot-space-1);
+  }
+
+  .billing-lifecycle-receipt > div > :last-child {
+    text-align: left;
+  }
+}
+
+.billing-lifecycle-menu.ui-action-menu {
+  z-index: var(--openbot-layer-dialog-host);
+}
+
+.billing-lifecycle-list {
+  display: grid;
+  gap: var(--openbot-space-3);
+}
+
+.billing-lifecycle-price {
+  display: grid;
+  justify-items: end;
+  gap: var(--openbot-space-1);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.billing-lifecycle-timing {
+  display: grid;
+  gap: var(--openbot-space-2);
+  margin-bottom: var(--openbot-space-4);
+  font-size: var(--openbot-text-sm);
+}
+
+.billing-lifecycle-timing-option {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  padding: var(--openbot-space-3);
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-md);
+}
+
+.billing-lifecycle-timing-option[data-checked] {
+  border-color: var(--openbot-accent);
+  background: var(--openbot-bg-surface);
+}
+
+.billing-lifecycle-timing-option[data-focus-visible] {
+  outline: 1px solid var(--openbot-accent);
+}
+
+.billing-lifecycle-timing-option label {
+  flex: 1;
+  cursor: pointer;
+}
+
+.billing-lifecycle-radio {
+  flex-shrink: 0;
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-pill);
+}
+
+.billing-lifecycle-radio[data-checked] {
+  border-color: var(--openbot-accent);
+  background: var(--openbot-accent);
+  box-shadow: inset 0 0 0 var(--openbot-space-1) var(--openbot-bg-canvas);
+}
+
+@container (max-width: 450px) {
+  .billing-lifecycle-price {
+    order: 2;
+    width: 100%;
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+    justify-items: start;
+  }
+
+  .billing-lifecycle-price > :last-child {
+    justify-self: end;
+  }
+}

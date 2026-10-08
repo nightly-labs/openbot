@@ -1,0 +1,36 @@
+import type { PartialTranslation } from "../../../message";
+import type { messages as source } from "../../en/status/messaging";
+
+export const messages = {
+  "status.messaging.working": "Trabajando en ello…",
+  "status.messaging.queued": "En espera: OpenBot está trabajando en otra solicitud. La respuesta llegará aquí.",
+  "status.messaging.busy": "Hay demasiadas solicitudes en espera. Inténtalo más tarde.",
+  "status.messaging.failed": "OpenBot no pudo completar esta solicitud. El host de OpenBot tiene los detalles.",
+  "status.messaging.noAnswer": "OpenBot terminó sin una respuesta escrita.",
+  "status.messaging.noAgent": "Aún no puede responder ningún agente aquí. Añade el coordinador de Slack en OpenBot.",
+  "status.messaging.delegated": "Un compañero está trabajando en ello. La respuesta llegará aquí.",
+  "status.messaging.stopped": "Detenido.",
+  "status.messaging.stop": "Detener",
+  "status.messaging.approvalTitle": "OpenBot pide aprobación para continuar.",
+  "status.messaging.approvalCommand": "Ejecutar un comando",
+  "status.messaging.approvalFileChange": "Cambiar archivos",
+  "status.messaging.approvalPermissions": "Obtener más permisos",
+  "status.messaging.approve": "Aprobar",
+  "status.messaging.deny": "Rechazar",
+  "status.messaging.approvedBy": "Aprobado por {user}.",
+  "status.messaging.deniedBy": "Rechazado por {user}.",
+  "status.messaging.answeredOnHost": "Respondido en el host de OpenBot.",
+  "status.messaging.requestInactive": "Esta solicitud ya no está activa.",
+  "status.messaging.onlyRequester": "Solo {user} puede hacerlo. El host de OpenBot también puede responder.",
+  "status.messaging.hostOnly": "Solo el host de OpenBot puede responder a esta solicitud.",
+  "status.messaging.filesSkipped": "Algunos archivos no se enviaron: {names}.",
+  "status.messaging.orchestratorName": "Coordinador de Slack",
+  "status.messaging.orchestratorTitle": "Responde en Slack y consulta al equipo",
+  "status.messaging.discordNoAgent":
+    "Aún no puede responder ningún agente aquí. Añade el coordinador de Discord en OpenBot.",
+  "status.messaging.discordOrchestratorName": "Coordinador de Discord",
+  "status.messaging.discordOrchestratorTitle": "Responde en Discord y consulta al equipo",
+  "status.messaging.integrationsSection": "Integraciones",
+  "status.messaging.signInReceived": "OpenBot recibió la instalación de Slack. Puedes cerrar esta pestaña.",
+  "status.messaging.signInUnknown": "OpenBot no inició esta instalación de Slack. Iníciala de nuevo en OpenBot.",
+} as const satisfies PartialTranslation<typeof source>;

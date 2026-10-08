@@ -62,6 +62,7 @@ function setup() {
     avatarBucket: () => avatars,
     hostedSites: () => ({ list: vi.fn(), delete: vi.fn() }),
     remote: {
+      removeOwnedHost: vi.fn().mockReturnValue(Effect.succeed(undefined)),
       listHosts: vi.fn().mockReturnValue(Effect.succeed([])),
       startSession: vi.fn().mockReturnValue(Effect.succeed({ sessionId: "session", hostId: "host", expiresAt: 100 })),
       issueSessionTicket: vi.fn().mockReturnValue(Effect.succeed({ ticket: "short-ticket" })),
@@ -81,6 +82,7 @@ function setup() {
       .mockReturnValue(Effect.succeed(new Response("logo", { headers: { "Content-Type": "image/png" } }))),
     billing: () => billing,
     hosting: () => ({
+      lifecycle: vi.fn(),
       list: vi.fn(),
       plans: vi.fn(),
       create: vi.fn(),
@@ -209,6 +211,7 @@ describe("browser account boundary", () => {
       ["PATCH", "v2/remote/hosts/host/members/membership", { role: "admin" }],
       ["DELETE", "v2/remote/hosts/host/members/membership", undefined],
       ["DELETE", "v2/remote/invites/invite", undefined],
+      ["DELETE", "v2/remote/hosts/host", undefined],
       ["POST", "v2/remote/hosts/host/invites", { role: "member" }],
     ])("refuses a cross-origin %s %s before calling a service", async (method, path, body) => {
       const services = setup();
@@ -218,7 +221,20 @@ describe("browser account boundary", () => {
       }
       expect(services.remote.changeMembership).not.toHaveBeenCalled();
       expect(services.remote.revokeInvite).not.toHaveBeenCalled();
+      expect(services.remote.removeOwnedHost).not.toHaveBeenCalled();
       expect(services.remote.createInvite).not.toHaveBeenCalled();
+    });
+    it("removes an owned host through the authenticated account service", async () => {
+      const services = setup();
+      const response = await handleBrowserApi(
+        request("v2/remote/hosts/host%2Fone", { method: "DELETE", cookie }),
+        services,
+      );
+      expect(response.status).toBe(204);
+      expect(services.remote.removeOwnedHost).toHaveBeenCalledWith(user.id, "host/one");
+      const unauthorized = await handleBrowserApi(request("v2/remote/hosts/host", { method: "DELETE" }), services);
+      expect(unauthorized.status).toBe(401);
+      expect(services.remote.removeOwnedHost).toHaveBeenCalledTimes(1);
     });
     it("requires the browser cookie", async () => {
       const services = setup();
@@ -450,6 +466,26 @@ describe("browser account boundary", () => {
       expect(services.auth.revokeAccountSession).toHaveBeenCalledWith(token, sessionId);
     });
   });
+  it("validates and protects hosted server lifecycle mutations", async () => {
+    const services = setup();
+    const lifecycle = vi.fn().mockReturnValue(Effect.void);
+    const hosting = services.hosting();
+    services.hosting = () => ({ ...hosting, lifecycle });
+    const path = "v2/hosting/servers/server-one/lifecycle";
+    const cookie = `__Host-openbot-web=${token}`;
+    const body = { action: "delete", timing: "period-end", confirmName: "One" };
+    expect((await handleBrowserApi(request(path, { body }), services)).status).toBe(401);
+    expect(
+      (await handleBrowserApi(request(path, { body, cookie, origin: "https://attacker.test" }), services)).status,
+    ).toBe(403);
+    expect((await handleBrowserApi(request(path, { body: { action: "delete" }, cookie }), services)).status).toBe(400);
+    expect(lifecycle).not.toHaveBeenCalled();
+    expect(
+      (await handleBrowserApi(request(path, { body: { ...body, serverId: "other" }, cookie }), services)).status,
+    ).toBe(204);
+    expect(lifecycle).toHaveBeenCalledWith(user, "server-one", { ...body, serverId: "server-one" });
+  });
+
   describe("billing", () => {
     const cookie = `__Host-openbot-web=${token}`;
     const cancel = { flow: "cancel", subscriptionId: "sub_1" };

@@ -32,6 +32,8 @@ const TEMPLATE_FILES = [
   "openbot-update.service",
   "openbot-update.timer",
   "openbot-update-apply.service",
+  "openbot-update-request.path",
+  "openbot-update-request.service",
 ];
 const REMOTE_DIRECTORY = "/tmp/openbot-template";
 const READY_STATES = new Set(["ready", "idle", "running"]);
@@ -113,6 +115,7 @@ async function main(): Promise<void> {
         // With more than one unit, `is-enabled` passes when one of them is enabled.
         "systemctl is-enabled --quiet openbot-update.timer",
         "systemctl is-enabled --quiet openbot-update-apply.service",
+        "systemctl is-enabled --quiet openbot-update-request.path",
         "! systemctl is-active --quiet openbot-update.timer",
         'test ! -e "$HOME/.config/OpenBot"',
         'test ! -e "$HOME/.config/openbot-hosted"',

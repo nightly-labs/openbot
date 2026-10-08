@@ -85,6 +85,7 @@ interface HostServiceOptions {
   appVersion: string;
   store: TeamStore;
   agents: ForwardedApiOptions["agents"] & Pick<AgentService, "adoptConversationReads" | "searchConversationFiles">;
+  agentsReady: NonNullable<ForwardedApiOptions["agentsReady"]>;
   skills: NonNullable<ForwardedApiOptions["skills"]>;
   sidebarLayout: NonNullable<ForwardedApiOptions["sidebarLayout"]>;
   mailbox: ForwardedApiOptions["mailbox"];
@@ -295,6 +296,7 @@ export class HostService extends EventEmitter<HostEvents> {
       appVersion: options.appVersion,
       store: options.store,
       agents: options.agents,
+      agentsReady: options.agentsReady,
       channels: options.channels,
       mcpServers: options.mcpServers,
       mcpToolRuntimePreparation: options.mcpToolRuntimePreparation,
