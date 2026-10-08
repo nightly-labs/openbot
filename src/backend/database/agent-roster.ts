@@ -230,6 +230,14 @@ export class AgentRoster {
         db.prepare("DELETE FROM projection_agent_memories WHERE agent_id = ?").run(agentId);
         revokeRoutineWebhooks(db, "agent", routineIds, { forget: true });
         db.prepare("DELETE FROM projection_agent_routines WHERE agent_id = ?").run(agentId);
+        // Agent ids carry no foreign key, so the routine flows lose a deleted agent by hand. Its own
+        // routines' links and steps go with the routines above, through their foreign keys.
+        db.prepare("DELETE FROM routine_flow_links WHERE from_agent_id = ? OR to_agent_id = ?").run(agentId, agentId);
+        db.prepare("DELETE FROM routine_flow_positions WHERE canvas_agent_id = ? OR node_key = ?").run(
+          agentId,
+          `agent:${agentId}`,
+        );
+        db.prepare("DELETE FROM routine_flow_steps WHERE agent_id = ?").run(agentId);
         db.prepare("DELETE FROM projection_reactions WHERE agent_id = ?").run(agentId);
         db.prepare("DELETE FROM projection_deliveries WHERE recipient_agent_id = ?").run(agentId);
         db.prepare("DELETE FROM projection_queue_state WHERE agent_id = ?").run(agentId);

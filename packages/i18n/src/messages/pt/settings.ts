@@ -266,6 +266,7 @@ export const messages = {
   "settings.hostedServers.usageNote":
     "Um servidor para cerca de 15 minutos após a última mensagem ou alteração, mesmo com um app aberto. Uma tecla ou um clique no app, uma mensagem ou uma rotina agendada o inicia novamente. Seus agentes e rotinas funcionam quando este computador está desligado.",
   "settings.hostedServers.empty": "Você ainda não tem um servidor hospedado.",
+  "settings.hostedServers.loading": "Carregando servidores hospedados…",
   "settings.hostedServers.state.awaitingPayment": "Aguardando pagamento",
   "settings.hostedServers.state.planEnded": "Plano encerrado",
   "settings.hostedServers.state.creating": "Criando",

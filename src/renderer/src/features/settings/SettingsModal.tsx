@@ -93,19 +93,25 @@ export function SettingsModal(props: SettingsModalProps) {
 
   // The Dynamic Island exists only on macOS, so other platforms get no tab for it.
   const isMac = () => props.appInfo?.platform === "darwin";
+  // A deep link opens the tab before the first list answers, so the dialog does not show another tab first.
+  const hostedServersPending = () =>
+    Boolean(props.hostedServersApi) &&
+    !hostedServers.state.loaded &&
+    props.open &&
+    (props.openTab === "hosted-servers" || activeTab() === "hosted-servers");
   // An account that lost access to hosting still sees its servers, so it can delete or start them.
-  const hostedServersShown = () => hostedServers.state.available || hostedServers.state.servers.length > 0;
-  // A deep link, or the last server's delete, can leave the Hosted servers tab open without its panel.
+  const hostedServersShown = () =>
+    hostedServers.state.available || hostedServers.state.servers.length > 0 || hostedServersPending();
+  // An account without hosting, or the last server's delete, can leave the Hosted servers tab open without its panel.
   createEffect(
     () =>
       activeTab() === "hosted-servers" &&
       !hostedServersShown() &&
-      (hostedServers.state.loaded || hostedServers.state.error !== null || !props.hostedServersApi),
+      (hostedServers.state.loaded || !props.hostedServersApi),
     (hidden) => {
       if (hidden) setActiveTab("general");
     },
   );
-  // The Hosted servers tab exists only after its list loads. A tab with no trigger falls back to General.
   createEffect(
     () => {
       const tab = props.open ? props.openTab : undefined;

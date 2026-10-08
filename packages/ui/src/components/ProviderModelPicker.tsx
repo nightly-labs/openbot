@@ -287,7 +287,8 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   const triggerEffort = () => {
     const effort = props.reasoningEffort;
     if (!showsReasoningEffort() || !effort || selectedHasVariants()) return;
-    if (!selectedModel()?.supportedReasoningEfforts.includes(effort)) return;
+    const model = selectedModel();
+    if (!model?.supportedReasoningEfforts.includes(effort) || model.reasoningEffortConfigurable === false) return;
     return reasoningLabel(effort, t);
   };
   const triggerSummary = () => [triggerModelName(), triggerEffort()].filter(Boolean).join(" · ");
@@ -450,7 +451,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                 const effortOptions = createMemo(() => {
                   if (!ownsSelection()) return [];
                   if (selected()?.variants.length) return selected()?.variants ?? [];
-                  return showsReasoningEffort()
+                  return showsReasoningEffort() && selectedModel()?.reasoningEffortConfigurable !== false
                     ? (selectedModel()?.supportedReasoningEfforts ?? []).map((effort) => ({
                         id: effort,
                         name: reasoningLabel(effort, t),
