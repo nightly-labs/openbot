@@ -91,7 +91,7 @@ import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-ed
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { classifyFailure } from "@openbot/telemetry";
-import { Deferred, Effect, Exit, Fiber, Result, Schema, Scope } from "effect";
+import { Deferred, Effect, Exit, Fiber, Result, Schema, Scope, Semaphore } from "effect";
 import { AgentMemories } from "./agent/agent-memories";
 import { AgentRemoval, type AgentRemovalFailed } from "./agent/agent-removal";
 import type { ApprovalAutomationPolicy } from "./agent/approval-automation";
@@ -218,6 +218,8 @@ export interface AgentServiceOptions {
    * renderer or the database.
    */
   credentials?: ProviderClientContext;
+  offProviders?: readonly AgentProvider[];
+  saveProviderUse?: (provider: AgentProvider, on: boolean) => Effect.Effect<void, AgentLifecycleFailed>;
   localSkillTools?: () => LocalSkillTools;
   /** Built after the service, so read when a tool call needs it. */
   routineFlowTools?: () => RoutineFlowTools;
@@ -291,6 +293,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly routineRecords: RoutineRecords;
   readonly #mcp: McpGateway;
   readonly #providers: ProviderRuntime;
+  readonly #providerUseChanges = Semaphore.makeUnsafe(1);
   readonly #endpoints: CustomEndpoints;
   readonly #prepareAgentWorkspace: (agent: AgentSummary) => Effect.Effect<void, AgentLifecycleFailed>;
   readonly #hostedSites: HostedSiteCoordinator;
@@ -438,6 +441,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       isStopping: () => this.#stopping,
     });
     this.#providers = new ProviderRuntime({
+      offProviders: options.offProviders ?? [],
+      saveProviderUse: (provider, on) =>
+        (options.saveProviderUse?.(provider, on) ?? Effect.void).pipe(toProviderOperationFailed),
       conversation: this.#conversation,
       hooks: {
         bindClient: (client) => {
@@ -506,6 +512,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         sharedRoot: () => this.#store.sharedRoot,
         isStopping: () => this.#stopping,
         isProviderBusy: (provider) =>
+          this.#profileClients.usesProvider(provider) ||
           this.#drain.hasStartingDeliveries(provider) ||
           this.#store.list().some((agent) => providerForAgent(agent) === provider && this.#runsTurn(agent.id)),
         isAgentBusy: (agentId) => this.#runsTurn(agentId),
@@ -1456,7 +1463,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         return yield* new ProfileGenerationFailed({
           cause: new Error(sourceText("error.agent.profileGenerationBusy")),
         });
-      const provider = agent?.provider ?? this.#providers.preferredProvider();
+      const provider = agent?.provider ?? this.#startingChoice()?.provider ?? this.#providers.preferredProvider();
       yield* this.#providers.ensureProvider(provider);
       const models = this.#endpoints.available();
       const model = agent
@@ -1532,30 +1539,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const result = yield* Effect.result(
       Effect.gen({ self: this }, function* () {
         yield* this.#prepareAgentWorkspace(agent);
-        const requested = yield* lifecycleStep("select requested model", () =>
-          creationModel(input, this.#endpoints.available(), this.#providers.status().providers),
-        );
-        if (requested) {
-          agent = yield* this.#store.updateAgent({
-            agentId: agent.id,
-            provider: requested.provider,
-            model: requested.model.id,
-            reasoningEffort:
-              input.reasoningEffort && requested.model.supportedReasoningEfforts.includes(input.reasoningEffort)
-                ? input.reasoningEffort
-                : requested.model.defaultReasoningEffort,
-          });
-        } else {
-          const starting = yield* lifecycleStep("select starting model", () => {
-            const choice = this.#startingChoice();
-            if (!choice)
-              throw new Error(
-                sourceText("error.agent.noStartingModel", { provider: providerLabel(this.#preference().provider) }),
-              );
-            return choice;
-          });
-          agent = yield* this.#landOnStartingChoice(agent, starting);
-        }
+        agent = yield* this.#assignNewAgentModel(agent, input, true);
         if (configure) agent = yield* configure(agent);
         yield* this.sendMessage({ agentId: agent.id, text: initialMessage, attachmentDraftIds: [] }, sender);
         return this.#store.list().find((candidate) => candidate.id === agent.id) ?? agent;
@@ -1576,6 +1560,44 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         : result.failure.cause,
     });
   }, Effect.uninterruptible).bind(this);
+
+  #assignNewAgentModel(agent: AgentSummary, input: Omit<CreateAgentInput, "initialMessage">, needsModel: boolean) {
+    return this.#endpoints
+      .runExclusive(() =>
+        Effect.gen({ self: this }, function* () {
+          const requested = yield* lifecycleStep("select requested model", () =>
+            creationModel(input, this.#endpoints.available(), this.#providers.status().providers),
+          );
+          if (requested) {
+            yield* lifecycleStep("check provider switch", () => this.#providers.requireProviderOn(requested.provider));
+            return yield* this.#store.updateAgent({
+              agentId: agent.id,
+              provider: requested.provider,
+              model: requested.model.id,
+              reasoningEffort:
+                input.reasoningEffort && requested.model.supportedReasoningEfforts.includes(input.reasoningEffort)
+                  ? input.reasoningEffort
+                  : requested.model.defaultReasoningEffort,
+            });
+          }
+          const starting = this.#startingChoice();
+          if (starting) return yield* this.#landOnStartingChoice(agent, starting);
+          yield* lifecycleStep("check starting model", () => {
+            this.#providers.requireProviderOn(agent.provider);
+            if (needsModel)
+              throw new Error(
+                sourceText("error.agent.noStartingModel", { provider: providerLabel(this.#preference().provider) }),
+              );
+          });
+          return agent;
+        }),
+      )
+      .pipe(
+        Effect.mapError(
+          (failure) => new AgentLifecycleFailed({ operation: "assignNewAgentModel", cause: failure.cause }),
+        ),
+      );
+  }
 
   /** Where a new agent that names no model starts: the saved choice, else its provider default (Luna 6 for ChatGPT). */
   #startingChoice(): ModelChoice | null {
@@ -1630,27 +1652,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             (failure) => new AgentLifecycleFailed({ operation: "prepare agent workspace", cause: failure.cause }),
           ),
         );
-        const requested = yield* lifecycleStep("select profile model", () =>
-          creationModel(input, this.#endpoints.available(), this.#providers.status().providers),
-        );
-        const starting = requested ? null : this.#startingChoice();
-        if (requested)
-          agent = yield* this.#store
-            .updateAgent({
-              agentId: agent.id,
-              provider: requested.provider,
-              model: requested.model.id,
-              reasoningEffort:
-                input.reasoningEffort && requested.model.supportedReasoningEfforts.includes(input.reasoningEffort)
-                  ? input.reasoningEffort
-                  : requested.model.defaultReasoningEffort,
-            })
-            .pipe(
-              Effect.mapError(
-                (failure) => new AgentLifecycleFailed({ operation: "set profile model", cause: failure.cause }),
-              ),
-            );
-        else if (starting) agent = yield* this.#landOnStartingChoice(agent, starting);
+        agent = yield* this.#assignNewAgentModel(agent, input, false);
         if (input.title)
           agent = yield* this.#store
             .updateAgent({ agentId: agent.id, title: input.title })
@@ -1789,6 +1791,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       input.access !== undefined ||
       input.computerUse !== undefined ||
       input.allowAutomation !== undefined;
+    if (requestedProvider && (input.provider || input.model))
+      yield* lifecycleStep("check provider switch", () => this.#providers.requireProviderOn(requestedProvider));
     const agent = yield* this.#store.updateAgent(
       { ...input, ...(requestedModel && !input.provider ? { provider: requestedModel.provider } : {}) },
       initiatingAgentId,
@@ -2069,6 +2073,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       .ensureProvider(provider)
       .pipe(
         Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "ensureProvider", cause: failure.cause })),
+      );
+  }
+
+  setProviderOn(provider: AgentProvider, on: boolean): Effect.Effect<AgentStatus, AgentLifecycleFailed> {
+    // Turning on can activate models, which takes this same lock. Only off holds it.
+    const change = () => this.#providers.setProviderOn(provider, on);
+    return this.#providerUseChanges
+      .withPermit(on ? change() : this.#endpoints.runExclusive(change))
+      .pipe(
+        Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "setProviderOn", cause: failure.cause })),
       );
   }
 

@@ -1,9 +1,12 @@
 import type { TranslatedLocale } from "./locale";
 import { createTranslate, type MessageParams, type Translate } from "./message";
+import { de } from "./messages/de/index";
 import { type AppMessages, en } from "./messages/en/index";
+import { es } from "./messages/es/index";
 import { fr } from "./messages/fr/index";
 import { ja } from "./messages/ja/index";
 import { pt } from "./messages/pt/index";
+import { ru } from "./messages/ru/index";
 import { tr } from "./messages/tr/index";
 
 export { APP_LANGUAGES, type AppLanguage, DEFAULT_APP_LANGUAGE } from "@openbot/contracts/app-language";
@@ -20,9 +23,9 @@ export {
 } from "./message";
 export type { AppMessages } from "./messages/en/index";
 export { localizeSourceText, type SourceMessages, sourceText } from "./source-text";
-export { en, fr, ja, pt, tr };
+export { de, en, es, fr, ja, pt, ru, tr };
 
-const catalogs = { en, fr, ja, pt, tr } as const;
+const catalogs = { en, de, es, fr, ja, pt, ru, tr } as const;
 
 /** The desktop translator: every key of the desktop catalog, including shared and source keys. */
 export type AppTranslate = Translate<AppMessages>;

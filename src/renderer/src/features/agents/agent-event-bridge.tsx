@@ -86,15 +86,19 @@ export function AgentEventBridge() {
     agentList().some((agent) => agent.id === agentId && agent.notifications),
   );
   let readRefresh = 0;
+  let modelRefresh = 0;
 
   function handleAgentEvent(event: AgentEvent) {
     switch (event.type) {
       case "status":
         applyAgentStatus(event.status);
-        if (event.status.phase === "ready") {
+        if (event.status.phase === "ready" || event.status.phase === "blocked") {
+          const request = ++modelRefresh;
           void agentsPort()
             .agent.listModels()
-            .then(setModelOptions)
+            .then((models) => {
+              if (request === modelRefresh) setModelOptions(models);
+            })
             .catch(() => undefined);
         }
         return;
