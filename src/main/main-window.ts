@@ -517,6 +517,23 @@ export function computerUseDesktopRect(rect: Rectangle): Rectangle {
   return process.platform === "win32" ? screen.screenToDipRect(null, rect) : rect;
 }
 
+/**
+ * The driver ids of OpenBot's windows that cover the rim, such as the conversation.
+ *
+ * The overlays - the rim's own and the dynamic island - can never take focus, and every window the
+ * user reads can. The id in a media source id is the one the driver lists a window by: the
+ * `CGWindowID` on macOS and the `HWND` on Windows.
+ */
+export function computerUseCoveringWindowIds(): Set<number> {
+  const ids = new Set<number>();
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (window.isDestroyed() || !window.isVisible() || window.isMinimized() || !window.isFocusable()) continue;
+    const id = Number(window.getMediaSourceId().split(":")[1]);
+    if (Number.isSafeInteger(id)) ids.add(id);
+  }
+  return ids;
+}
+
 /** One point the driver was asked for, in the same units as `computerUseDesktopRect`. */
 export function computerUseDesktopPoint(point: Point): Point {
   return process.platform === "win32" ? screen.screenToDipPoint(point) : point;

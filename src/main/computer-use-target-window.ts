@@ -108,6 +108,13 @@ export interface TargetChoice {
   action: ObservedAction | null;
   /** OpenBot's own process, whose windows are never the target. */
   ownPid: number;
+  /**
+   * The driver ids of OpenBot's own windows that the user reads, such as the conversation. They are
+   * never the target, but they cover it as any other window does. OpenBot's other windows - the
+   * rim's overlays and the dynamic island - are transparent and let every click through, so they
+   * cover nothing.
+   */
+  ownCoveringWindowIds?: ReadonlySet<number>;
   /** The window the rim is on now, which the choice holds on to while it can. */
   previous: ComputerUseHighlightTarget | null;
   /**
@@ -134,12 +141,13 @@ export function chooseTarget({
   session,
   action,
   ownPid,
+  ownCoveringWindowIds,
   previous,
   toDesktop,
 }: TargetChoice): ComputerUseHighlightTarget | null {
   if (!session) return null;
-  const visible = visibleWindows(windows, ownPid, toDesktop);
-  const candidates = workableWindows(visible);
+  const visible = visibleWindows(windows, ownPid, ownCoveringWindowIds, toDesktop);
+  const candidates = workableWindows(visible, ownPid);
   const acted = actedWindow(candidates, action);
   if (acted) return asTarget(acted, visible);
   const held = previous ? candidates.find((window) => window.windowId === previous.windowId) : undefined;
@@ -167,9 +175,13 @@ function actedWindow(candidates: readonly DriverWindow[], action: ObservedAction
  * Exported for the test: this is the rule the rim starts from, and the one a change of the driver's
  * window order would break first.
  */
-export function frontmostTarget(payload: unknown, ownPid: number): ComputerUseHighlightTarget | null {
-  const visible = visibleWindows(payload, ownPid);
-  const front = frontWindow(workableWindows(visible));
+export function frontmostTarget(
+  payload: unknown,
+  ownPid: number,
+  ownCoveringWindowIds?: ReadonlySet<number>,
+): ComputerUseHighlightTarget | null {
+  const visible = visibleWindows(payload, ownPid, ownCoveringWindowIds);
+  const front = frontWindow(workableWindows(visible, ownPid));
   return front ? asTarget(front, visible) : null;
 }
 
@@ -186,8 +198,9 @@ function asTarget(window: DriverWindow, visible: readonly DriverWindow[]): Compu
  * The parts of one window that the windows in front of it cover.
  *
  * Every window counts, not only those an agent could work in: a palette, a sheet or a notification
- * hides the window under it just as well. OpenBot's own windows and the driver's cursor overlay are
- * already out of the list this reads, so the rim is never cut by the surface that draws it.
+ * hides the window under it just as well, and so does OpenBot's own conversation. OpenBot's overlays
+ * and the driver's cursor overlay are already out of the list this reads, so the rim is never cut by
+ * the surface that draws it.
  *
  * The answer holds no two rectangles that overlap. One cut that is made twice is a cut that is
  * undone, which is what an even-odd rule does with two overlapping holes, so the rectangles are
@@ -255,26 +268,32 @@ function frontWindow(candidates: readonly DriverWindow[]): DriverWindow | null {
 }
 
 /**
- * Every window on screen that is not OpenBot's own and not the driver's full-screen cursor overlay.
+ * Every window on screen, less OpenBot's overlays and the driver's full-screen cursor overlay.
  *
- * Both of those are drawn over the desktop by this feature itself, so either one would otherwise
- * be taken for the window an agent works in.
+ * Those are drawn over the desktop and let every click through, so each one would otherwise cover
+ * the whole rim or be taken for the window an agent works in. OpenBot's windows that the user reads
+ * stay, because the rim must give way where they cover the target.
  */
 function visibleWindows(
   payload: unknown,
   ownPid: number,
+  ownCoveringWindowIds: ReadonlySet<number> = new Set(),
   toDesktop?: (bounds: Rectangle) => Rectangle,
 ): DriverWindow[] {
   const visible = readWindows(payload).filter(
-    (window) => window.pid !== ownPid && window.appName !== DRIVER_OVERLAY_APP && window.onScreen,
+    (window) =>
+      (window.pid !== ownPid || ownCoveringWindowIds.has(window.windowId)) &&
+      window.appName !== DRIVER_OVERLAY_APP &&
+      window.onScreen,
   );
   return toDesktop ? visible.map((window) => ({ ...window, bounds: toDesktop(window.bounds) })) : visible;
 }
 
-/** Of those, the windows an agent could work in: on this Space and big enough to hold work. */
-function workableWindows(visible: readonly DriverWindow[]): DriverWindow[] {
+/** Of those, the windows an agent could work in: not OpenBot's, on this Space and big enough to hold work. */
+function workableWindows(visible: readonly DriverWindow[], ownPid: number): DriverWindow[] {
   return visible.filter(
     (window) =>
+      window.pid !== ownPid &&
       window.onCurrentSpace &&
       window.bounds.width >= MINIMUM_TARGET_SIZE &&
       window.bounds.height >= MINIMUM_TARGET_SIZE,
