@@ -5,3 +5,5 @@
   `[[no-update]]`, the run posts no message, adds no unread message, does not change the chat
   preview and shows no notification. The run marker stays in the chat, and the run stays in the
   routine **History**. Test runs, and script or webhook runs, always show their result.
+  The browser client, the phone, and a desktop connected to a remote server stay silent for a
+  quiet run too. An older client shows the run as finished, as before.

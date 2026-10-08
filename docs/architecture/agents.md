@@ -27,8 +27,16 @@ thinking and plan from the conversation, puts back the agent preview from before
 start shows the task there; memory only, so after a restart the task stays), and its `turn-completed`
 event has `quiet: true`, which stops the desktop notification and the completion sound. The run
 marker and the run history stay. A marker inside a longer answer is a report and is shown. Test runs,
-and script or webhook runs, which are also manual runs, are never quiet. The released Team API event
-projects a fixed key list, so `quiet` stays on this computer.
+and script or webhook runs, which are also manual runs, are never quiet.
+
+`quiet` reaches remote clients too. The released Team API event projects a fixed key list, so the
+current v6 adapter puts `quiet` beside the frozen `turn-completed` projection
+(`packages/contracts/src/team-protocol/turn-quiet-v6.ts`), in the way `plan` and `senderMember` ride
+beside the conversation projection. The browser client, the phone, and a desktop connected to a
+remote server then show no notification, play no completion sound, and the Dynamic Island shows no
+new reply. A client on protocol 1-5, or a v6 client that predates the flag, drops the key without an
+error and shows the run as finished, as before. Only `true` is a value: any other value is a
+`protocol_error`.
 
 A routine run whose last answer is only the marker, also a Test run that shows it in the chat, does
 not put the marker in the preview either. The provider history import

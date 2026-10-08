@@ -218,9 +218,11 @@ export class DynamicIslandCoordinator {
         };
         return;
       case "turn-completed":
+        // A quiet routine run posted no message, so the island has no new reply to show.
         if (
           serverId !== activeServerId &&
           event.status === "completed" &&
+          !event.quiet &&
           runtime.activeTurns[event.agentId] === event.turnId
         ) {
           runtime.completedAgents.add(event.agentId);
