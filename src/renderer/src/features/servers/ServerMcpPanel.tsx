@@ -238,19 +238,41 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
   /** Sign in is offered for an http server, and only where this computer can open the browser. */
   const canSignIn = (config: McpServerConfig) => Boolean(props.signIn) && config.transport === "http";
 
-  async function signInRow(config: McpServerConfig): Promise<void> {
+  /**
+   * Counts each row's tests and sign-ins. A row can start a second one while the first still waits
+   * - a Test during a sign-in, or a second Sign in that cancels the first - and only the newest
+   * answer may describe the row.
+   */
+  const rowRuns: Record<string, number> = {};
+
+  /** A row's test or sign-in: its pending state, then its answer. `null` clears the row. */
+  async function runRow(
+    config: McpServerConfig,
+    pending: "testing" | "signing-in",
+    answer: (config: McpServerConfig) => Promise<SettledTest | null>,
+  ): Promise<void> {
+    const run = (rowRuns[config.id] ?? 0) + 1;
+    rowRuns[config.id] = run;
     const tested = normalizeMcpConfig(config);
     setState((current) => {
-      current.tests[config.id] = { test: { status: "signing-in" }, config: tested };
+      current.tests[config.id] = { test: { status: pending }, config: tested };
     });
-    const test = await runSignIn(tested);
+    const test = await answer(tested);
+    if (rowRuns[config.id] !== run) return;
     setState((current) => {
       if (test) current.tests[config.id] = { test, config: tested };
       else delete current.tests[config.id];
     });
   }
 
-  async function signInDraft(): Promise<void> {
+  const testRow = (config: McpServerConfig) => runRow(config, "testing", runTest);
+  const signInRow = (config: McpServerConfig) => runRow(config, "signing-in", runSignIn);
+
+  /** The form's test or sign-in, which answers for the draft on screen and not for any stored row. */
+  async function runDraft(
+    pending: "testing" | "signing-in",
+    answer: (config: McpServerConfig) => Promise<SettledTest | null>,
+  ): Promise<void> {
     setState((current) => {
       current.touched = true;
     });
@@ -258,10 +280,10 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
     const run = ++draftTestRun;
     const tested = normalizeMcpConfig(state.draft);
     setState((current) => {
-      current.formTest = { status: "signing-in" };
+      current.formTest = { status: pending };
       current.formTestConfig = tested;
     });
-    const test = await runSignIn(tested);
+    const test = await answer(tested);
     if (run !== draftTestRun) return;
     setState((current) => {
       current.formTest = test;
@@ -269,9 +291,19 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
     });
   }
 
+  const testDraft = () => runDraft("testing", runTest);
+  const signInDraft = () => runDraft("signing-in", runSignIn);
+
+  /**
+   * Not behind the busy latch: a save or a toggle elsewhere in the panel must not leave the user
+   * unable to stop a browser wait. The pending sign-in answers "cancelled" and clears itself.
+   */
   function cancelSignIn(url: string): void {
-    const signIn = props.signIn;
-    if (signIn) void run(`cancel:${url}`, () => signIn.cancel(url));
+    props.signIn?.cancel(url).catch((error: unknown) => {
+      setState((current) => {
+        current.error = error instanceof Error ? sourceText(error.message) : t("mcp.panel.saveFailed");
+      });
+    });
   }
 
   function signOut(config: McpServerConfig): void {
@@ -279,38 +311,10 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
     if (!signIn) return;
     void run(`sign-out:${config.id}`, async () => {
       await signIn.signOut(config.id);
+      rowRuns[config.id] = (rowRuns[config.id] ?? 0) + 1;
       setState((current) => {
         delete current.tests[config.id];
       });
-    });
-  }
-
-  async function testRow(config: McpServerConfig): Promise<void> {
-    const tested = normalizeMcpConfig(config);
-    setState((current) => {
-      current.tests[config.id] = { test: { status: "testing" }, config: tested };
-    });
-    const test = await runTest(tested);
-    setState((current) => {
-      current.tests[config.id] = { test, config: tested };
-    });
-  }
-
-  async function testDraft(): Promise<void> {
-    setState((current) => {
-      current.touched = true;
-    });
-    if (!mcpConfigIsValid(state.draft)) return;
-    const run = ++draftTestRun;
-    const tested = normalizeMcpConfig(state.draft);
-    setState((current) => {
-      current.formTest = { status: "testing" };
-      current.formTestConfig = tested;
-    });
-    const test = await runTest(tested);
-    if (run !== draftTestRun) return;
-    setState((current) => {
-      current.formTest = test;
     });
   }
 

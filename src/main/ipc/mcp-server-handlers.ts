@@ -28,7 +28,6 @@ import {
   parseRemoveMcpServer,
   parseSaveMcpServer,
   parseSetMcpServerEnabled,
-  parseSignOutMcpServer,
   parseTestMcpServer,
 } from "./mcp-inputs";
 import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
@@ -203,7 +202,8 @@ export function mcpServerIpcHandlers({
         local: (parsed) => service.cancelMcpSignIn(parsed),
         remote: () => signInOnHost(),
       }),
-      signOutMcpServer: scopedHandler(parseSignOutMcpServer, {
+      // A sign-out names its row the way a removal does, so it is read by the same parser.
+      signOutMcpServer: scopedHandler(parseRemoveMcpServer, {
         local: (parsed) => runCauseEffect(service.signOutMcpServer(parsed)),
         remote: () => signInOnHost(),
       }),

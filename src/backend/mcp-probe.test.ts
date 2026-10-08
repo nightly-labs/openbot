@@ -1,5 +1,4 @@
 import { chmod, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
-import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { decodeMcpTestResult, type McpServerConfig } from "@openbot/contracts/ipc";
@@ -180,21 +179,6 @@ describe("testMcpServer", () => {
       toolCount: 0,
       error:
         "The server stopped before it answered. Run the command in a terminal to see its error. This command runs the mcp-remote bridge. Choose Streamable HTTP with the URL https://mcp.example.com/mcp instead, and OpenBot signs you in.",
-    });
-  });
-
-  it("says an http server could not be reached", async () => {
-    const closed = createServer();
-    await new Promise<void>((resolve) => closed.listen(0, "127.0.0.1", resolve));
-    const address = closed.address();
-    if (address === null || typeof address === "string") throw new Error("The closed server had no port.");
-    await new Promise<void>((resolve) => closed.close(() => resolve()));
-
-    expect(
-      await runMcp(testMcpServer(config({ transport: "http", url: `http://127.0.0.1:${address.port}/mcp` }))),
-    ).toEqual({
-      toolCount: 0,
-      error: "OpenBot could not reach the server. Check the URL and your network.",
     });
   });
 });

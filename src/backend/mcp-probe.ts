@@ -96,16 +96,22 @@ const probeMcpServerEffect = Effect.fnUntraced(function* (
 ): Effect.fn.Return<McpProbeResult> {
   const { config } = server;
   if (server.error !== undefined) return { toolCount: 0, error: boundedError(server.error) };
-  let challenge: McpChallenge | null = null;
+  const seen: { challenge: McpChallenge | null } = { challenge: null };
   const record = (next: McpChallenge) => {
-    challenge = next;
+    seen.challenge = next;
   };
   const failure = (error: unknown): McpProbeResult => {
-    const described = describeProbeFailure(error, config, timeoutMs, signIn, challenge, signInPlace);
+    const described = describeProbeFailure(error, config, timeoutMs, signIn, seen.challenge, signInPlace);
     return { toolCount: 0, error: boundedError(redactMcpValues(described, probeSecrets(server, signIn))) };
   };
   const first = yield* Effect.result(connectAndCountEffect(server, timeoutMs, signIn?.provider, record));
   if (Result.isSuccess(first)) return { toolCount: first.success, error: null };
+  // A server on the 2025-03 MCP authorization spec answers 401 with no challenge at all; its OAuth
+  // metadata at the origin is what says a sign-in, not a key, is wanted. Only a refusal the sentence
+  // would explain is followed up, and only public documents are read: no credential is sent.
+  const unexplained = seen.challenge;
+  if (!signIn && signInPlace !== null && unexplained?.status === 401 && !unexplained.bearer)
+    seen.challenge = { ...unexplained, bearer: yield* advertisesOAuth(config.url, timeoutMs) };
   if (!signIn || !(first.failure.cause instanceof UnauthorizedError)) return failure(first.failure.cause);
   // The person's sign-in has its own deadline; the retried connection gets a fresh transport.
   const retry = yield* Effect.result(
@@ -132,6 +138,7 @@ function describeProbeFailure(
   challenge: McpChallenge | null,
   signInPlace: McpSignInPlace | null,
 ): string {
+  if (signIn?.cancelled()) return sourceText("error.backend.mcpSignInCancelled");
   if (signIn?.registrationFailed() && isRegistrationRefusal(error)) return REGISTRATION_REFUSED;
   if (signIn && httpStatus(error) === 401) return sourceText("error.backend.mcpSignInNotAccepted");
   // A key the user pasted into a header is theirs to fix; the sign-in would not replace it.
@@ -308,13 +315,34 @@ function challengeRecordingFetch(onChallenge: (challenge: McpChallenge) => void)
     if (response.status === 401 || response.status === 403) {
       onChallenge({
         status: response.status,
-        bearer: /^\s*bearer\b/iu.test(response.headers.get("www-authenticate") ?? ""),
+        // `Headers.get` joins several challenges with commas, so Bearer may follow another scheme.
+        bearer: /(?:^|,)\s*bearer\b/iu.test(response.headers.get("www-authenticate") ?? ""),
         url: response.url || input.toString(),
       });
     }
     return response;
   };
 }
+
+/** Whether the server's origin publishes OAuth metadata, read without any credential. */
+const advertisesOAuth = Effect.fnUntraced(function* (url: string, timeoutMs: number) {
+  const { origin } = new URL(url);
+  for (const path of ["/.well-known/oauth-protected-resource", "/.well-known/oauth-authorization-server"]) {
+    const found = yield* Effect.tryPromise({
+      try: async (signal) => {
+        const response = await fetch(`${origin}${path}`, {
+          signal: AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]),
+          headers: { accept: "application/json" },
+        });
+        await response.body?.cancel();
+        return response.ok && (response.headers.get("content-type") ?? "").includes("json");
+      },
+      catch: (cause) => new McpProbeFailure({ cause }),
+    }).pipe(Effect.catch(() => Effect.succeed(false)));
+    if (found) return true;
+  }
+  return false;
+});
 
 /** Close both SDK resources and kill a stdio child if it survives transport close. */
 const closeQuietlyEffect = Effect.fnUntraced(function* (client: Client, transport: Transport) {

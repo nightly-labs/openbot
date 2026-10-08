@@ -264,12 +264,19 @@ export class McpGateway {
 
   /**
    * The test that may open a browser: the user pressed Sign in. A sign-in that ends with a working
-   * connection marks every agent's session for refresh, so the next turn is handed the new token
-   * rather than the tools staying absent until a restart.
+   * connection to an address an enabled row names marks every agent's session for refresh, so the
+   * next turn is handed the new token rather than the tools staying absent until a restart. A draft
+   * no agent uses yet refreshes nothing: its save does that.
    */
   readonly signIn = Effect.fnUntraced(function* (this: McpGateway, input: TestMcpServerInput) {
     const result = yield* this.test(input, { interactive: true, signInPlace: "here" });
-    if (result.error === null) yield* this.#hooks.refreshAllAgentRuntimes();
+    const resource = normalizeResource(input.config.url);
+    const inUse =
+      resource !== null &&
+      this.#servers
+        .listEnabled()
+        .some((config) => config.transport === "http" && normalizeResource(config.url) === resource);
+    if (result.error === null && inUse) yield* this.#hooks.refreshAllAgentRuntimes();
     return result;
   });
 

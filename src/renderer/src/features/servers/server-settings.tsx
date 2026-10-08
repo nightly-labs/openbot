@@ -436,7 +436,11 @@ const ServerSettings = createSimpleContext({
      */
     async function listMcpSignIns(server: ServerSummary): Promise<Record<string, boolean>> {
       if (server.kind !== "local") return {};
-      return mcpSignInRecord(await serversPort().agent.listMcpSignIns(server.id));
+      // A badge beside the list, not the list: a failed read shows no badge rather than failing the
+      // list read, or reporting a save that already landed as failed.
+      return serversPort()
+        .agent.listMcpSignIns(server.id)
+        .then(mcpSignInRecord, () => ({}));
     }
 
     /** Opens the browser when the server asks; the answer comes once the browser came back. */

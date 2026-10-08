@@ -122,6 +122,12 @@ export interface McpSignIn {
    * is not the cause.
    */
   registrationFailed: () => boolean;
+  /**
+   * Whether the user cancelled this attempt. A cancel can land during discovery, registration or
+   * the token exchange, where the step it stops fails with its own words; the reader says
+   * "cancelled" instead, because that is what the user did.
+   */
+  cancelled: () => boolean;
 }
 
 /**
@@ -334,6 +340,7 @@ export class McpOAuth implements McpOAuthAuthority {
       abandon,
       secrets: () => provider.secrets(),
       registrationFailed: () => provider.registrationPending,
+      cancelled: () => cancelled,
     };
   }
 
