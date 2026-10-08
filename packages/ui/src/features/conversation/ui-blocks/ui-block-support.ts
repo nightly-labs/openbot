@@ -19,6 +19,10 @@ export interface UiBlockProps<Spec extends UiBlockSpec> {
   disabled?: boolean | undefined;
   /** An answer is on its way; controls wait for it. */
   busy?: boolean | undefined;
+  /** Why the last answer did not go through, shown in the open block. */
+  error?: string | undefined;
+  /** Closes the open block without an answer. Without it the block has no skip button. */
+  onSkip?: (() => void) | undefined;
   class?: string | undefined;
   elementRef?: ((element: HTMLElement) => void) | undefined;
 }

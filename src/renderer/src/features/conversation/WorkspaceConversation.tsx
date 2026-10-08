@@ -24,6 +24,7 @@ import { usePresence } from "../team/team-context";
 import { useUsage } from "../usage/usage-context";
 import { Conversation } from "./Conversation";
 import { useConversation } from "./conversation-context";
+import { messagePromptRequestKey, promptRequestKey } from "./conversation-keys";
 
 /**
  * The transcript of the active Agent, with everything the composer needs to send
@@ -124,6 +125,17 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     const agent = activeAgent();
     const event = agent ? pendingPrompts()[agent.id] : undefined;
     return event?.type === "prompt" && event.threadId === agent?.threadId ? event : undefined;
+  });
+
+  // The timeline leaves the waiting prompt's message out, so its block is read here.
+  const activePromptUiBlock = createMemo(() => {
+    const agent = activeAgent();
+    const prompt = activePrompt();
+    if (!agent || !prompt) return undefined;
+    const requestKey = promptRequestKey(prompt.turnId, prompt.requestId);
+    return (conversations[agent.id]?.messages ?? []).findLast(
+      (message) => messagePromptRequestKey(message) === requestKey,
+    )?.uiBlock;
   });
 
   const activeApproval = createMemo(() => {
@@ -286,6 +298,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
       remoteDesktopVisible={remoteDesktopWorkspaceVisible()}
       remoteDesktopEnabled={!platform.landingPreview && activeServerSupportsCapability("remote-desktop")}
       prompt={activePrompt()}
+      promptUiBlock={activePromptUiBlock()}
       approval={activeApproval()}
       browserTakeover={activeBrowserTakeover()}
       activeTurnId={activeAgent() ? activeTurns()[activeAgent()?.id ?? ""] : null}

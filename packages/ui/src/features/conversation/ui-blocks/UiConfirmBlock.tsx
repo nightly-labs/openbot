@@ -66,6 +66,8 @@ export function UiConfirmBlock(props: UiConfirmBlockProps) {
       outcome={state().outcome}
       danger={props.spec.danger}
       busy={props.busy}
+      error={props.error}
+      onSkip={props.disabled ? undefined : props.onSkip}
       elementRef={props.elementRef}
     >
       <Show when={(props.spec.fields?.length ?? 0) > 0}>

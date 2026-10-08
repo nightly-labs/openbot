@@ -61,6 +61,8 @@ export function UiFormBlock(props: UiBlockProps<UiFormSpec>) {
       status={state().status}
       outcome={state().outcome}
       busy={props.busy}
+      error={props.error}
+      onSkip={props.disabled ? undefined : props.onSkip}
       elementRef={props.elementRef}
     >
       <form

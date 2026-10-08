@@ -1,6 +1,6 @@
 import type { UiBlockStatus } from "@openbot/contracts/ui-blocks";
 import type { AppTextKey } from "@openbot/i18n";
-import { Badge, Check, CircleCheck, Clock3, LoaderCircle, X } from "@openbot/ui";
+import { Badge, Button, Check, CircleCheck, Clock3, LoaderCircle, X } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createUniqueId, Match, Show, Switch } from "solid-js";
 import { useText } from "../../../text";
@@ -22,6 +22,10 @@ export interface UiBlockCardProps {
   danger?: boolean | undefined;
   /** An answer is on its way. */
   busy?: boolean | undefined;
+  /** Why the last answer did not go through. Shown while the block is open. */
+  error?: string | undefined;
+  /** Closes the open block without an answer. */
+  onSkip?: (() => void) | undefined;
   class?: string | undefined;
   elementRef?: ((element: HTMLElement) => void) | undefined;
   children?: JSX.Element;
@@ -53,6 +57,42 @@ export function UiBlockOutcome(props: { status: UiBlockStatus; outcome?: string 
         </Switch>
         <span class="ui-block-outcome-text">{text()}</span>
       </p>
+    </Show>
+  );
+}
+
+/** The end of an open block: why the last answer failed, and the button that skips the block. */
+export function UiBlockFooter(props: {
+  status: UiBlockStatus;
+  error?: string | undefined;
+  onSkip?: (() => void) | undefined;
+  busy?: boolean | undefined;
+  disabled?: boolean | undefined;
+}) {
+  const { t } = useText();
+  return (
+    <Show when={props.status === "pending" && (props.error || props.onSkip)}>
+      <div class="ui-block-footer">
+        <Show when={props.error}>
+          <p class="ui-block-error" role="alert">
+            {props.error}
+          </p>
+        </Show>
+        <Show when={props.onSkip}>
+          {(skip) => (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              class="ui-block-skip"
+              disabled={props.busy === true || props.disabled === true}
+              onClick={() => skip()()}
+            >
+              {t("uiBlock.skip")}
+            </Button>
+          )}
+        </Show>
+      </div>
     </Show>
   );
 }
@@ -103,6 +143,7 @@ export function UiBlockCard(props: UiBlockCardProps) {
         </Badge>
       </header>
       <div class="ui-block-body">{props.children}</div>
+      <UiBlockFooter status={props.status} error={props.error} onSkip={props.onSkip} busy={props.busy} />
       <UiBlockOutcome status={props.status} outcome={props.outcome} />
     </article>
   );

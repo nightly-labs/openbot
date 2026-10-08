@@ -8,8 +8,9 @@ import type {
 } from "@openbot/contracts/ui-blocks";
 import { validateUiBlockResponse } from "@openbot/contracts/ui-blocks";
 import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
-import { createSignal } from "solid-js";
+import { createSignal, flush } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
+import { UiBlockingBlock } from "./UiBlockingBlock";
 import { UiChoiceBlock } from "./UiChoiceBlock";
 import { UiConfirmBlock } from "./UiConfirmBlock";
 import { UiFormBlock } from "./UiFormBlock";
@@ -238,5 +239,37 @@ describe("UiFormBlock", () => {
     expect(screen.getByRole("textbox", { name: /Subject/ })).toHaveValue("Heating");
     expect(screen.queryByRole("button", { name: "Create" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "High" })).toBeDisabled();
+  });
+});
+
+describe("UiBlockingBlock", () => {
+  it("draws the card for the block type, with a skip button and a refused answer", async () => {
+    const onSkip = vi.fn();
+    render(() => (
+      <UiBlockingBlock
+        spec={choiceSpec}
+        onRespond={vi.fn()}
+        onSkip={onSkip}
+        error="Only the server owner or an admin can choose this action."
+      />
+    ));
+    expect(screen.getByRole("article", { name: "Who gets the offer?" })).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("Only the server owner or an admin can choose this action.");
+    await fireEvent.click(screen.getByRole("button", { name: "Skip" }));
+    expect(onSkip).toHaveBeenCalledOnce();
+  });
+
+  it("offers a skip next to quick replies and none once the block is frozen", () => {
+    const [state, setState] = createSignal<UiBlockState | undefined>();
+    render(() => <UiBlockingBlock spec={quickSpec} state={state()} onRespond={vi.fn()} onSkip={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "Skip" })).toBeEnabled();
+    setState({ status: "closed" });
+    flush();
+    expect(screen.queryByRole("button", { name: "Skip" })).not.toBeInTheDocument();
+  });
+
+  it("disables the skip while an answer is on its way", () => {
+    render(() => <UiBlockingBlock spec={formSpec} busy onRespond={vi.fn()} onSkip={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "Skip" })).toBeDisabled();
   });
 });

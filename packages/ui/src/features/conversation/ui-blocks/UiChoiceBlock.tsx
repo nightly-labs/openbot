@@ -68,6 +68,8 @@ export function UiChoiceBlock(props: UiBlockProps<UiChoiceSpec>) {
       status={state().status}
       outcome={state().outcome}
       busy={props.busy}
+      error={props.error}
+      onSkip={props.disabled ? undefined : props.onSkip}
       elementRef={props.elementRef}
     >
       <fieldset class="ui-block-options" aria-label={props.spec.title} aria-describedby={frozen() ? undefined : hintId}>

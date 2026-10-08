@@ -6,6 +6,7 @@ import { useAnsweredPrompts } from "./answered-prompts";
 import { seededAttentionPrompts } from "./features/agents/agent-runtime-snapshot";
 import { useAgents } from "./features/agents/agents-context";
 import { agentConversationKey, promptRequestKey } from "./features/conversation/conversation-keys";
+import type { PromptAnswerOptions } from "./features/conversation/conversation-types";
 import { useDynamicIsland } from "./features/dynamic-island/dynamic-island-context";
 import { useServers } from "./features/servers/servers-context";
 import { createScopeGuard } from "./scope-lifetime";
@@ -167,17 +168,18 @@ const Turns = createSimpleContext({
       },
     );
 
-    async function answerPrompt(answers: Record<string, string[]>): Promise<boolean> {
+    async function answerPrompt(answers: Record<string, string[]>, options?: PromptAnswerOptions): Promise<boolean> {
       const agent = activeAgent();
       const prompt = agent ? pendingPrompts()[agent.id] : undefined;
       if (!agent || prompt?.type !== "prompt") return false;
-      return submitPromptAnswers(agent.id, prompt, answers);
+      return submitPromptAnswers(agent.id, prompt, answers, options);
     }
 
     async function submitPromptAnswers(
       agentId: string,
       prompt: PromptEvent,
       answers: Record<string, string[]>,
+      options?: PromptAnswerOptions,
     ): Promise<boolean> {
       const serverId = activeServerId();
       const analytics = desktopAnalytics.scope();
@@ -204,7 +206,8 @@ const Turns = createSimpleContext({
           result: "failed",
           failure_code: "response_failed",
         });
-        appendUiError(agentId, error, currentText().t("app.errorStatus.answer"), serverId);
+        if (options?.onError) options.onError(error);
+        else appendUiError(agentId, error, currentText().t("app.errorStatus.answer"), serverId);
         return false;
       }
     }

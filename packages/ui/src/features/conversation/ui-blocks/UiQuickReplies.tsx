@@ -7,7 +7,7 @@ import { Button, Input } from "@openbot/ui";
 import { createSignal, For, Show } from "solid-js";
 import { useText } from "../../../text";
 import { cx } from "../../../utils";
-import { UiBlockOutcome } from "./UiBlockCard";
+import { UiBlockFooter, UiBlockOutcome } from "./UiBlockCard";
 import { sendUiBlockResponse, type UiBlockProps, uiBlockState } from "./ui-block-support";
 
 /**
@@ -21,7 +21,8 @@ export function UiQuickReplies(props: UiBlockProps<UiQuickRepliesSpec>) {
   const locked = () => frozen() || props.disabled === true || props.busy === true;
   const [picked, setPicked] = createSignal<string | undefined>();
   const [draft, setDraft] = createSignal("");
-  const chosen = () => (frozen() ? state().response?.actionId : picked());
+  // A reply the host refused is not chosen: the person picks again.
+  const chosen = () => (frozen() ? state().response?.actionId : props.error ? undefined : picked());
 
   function choose(id: string): void {
     if (locked()) return;
@@ -88,6 +89,12 @@ export function UiQuickReplies(props: UiBlockProps<UiQuickRepliesSpec>) {
           </Button>
         </form>
       </Show>
+      <UiBlockFooter
+        status={state().status}
+        error={props.error}
+        onSkip={props.disabled ? undefined : props.onSkip}
+        busy={props.busy}
+      />
       <Show when={frozen() && (chosen() === UI_BLOCK_TEXT_ACTION_ID || state().status !== "answered")}>
         <UiBlockOutcome status={state().status} outcome={state().outcome} />
       </Show>

@@ -105,6 +105,30 @@
   overflow-wrap: anywhere;
 }
 
+/* The end of an open block: a failed answer and the skip button. */
+.ui-block-footer {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--openbot-space-2);
+}
+
+.ui-block-error {
+  min-width: 0;
+  flex: 1 1 auto;
+  margin: 0;
+  color: var(--openbot-danger-text);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  overflow-wrap: anywhere;
+}
+
+.ui-block-skip {
+  margin-inline-start: auto;
+}
+
 .ui-block-actions {
   display: flex;
   flex-wrap: wrap;

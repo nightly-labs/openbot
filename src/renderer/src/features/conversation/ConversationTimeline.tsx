@@ -1,5 +1,6 @@
 import { chatVisualReply } from "@openbot/contracts/chat-visual";
 import type { ConversationMessageSender } from "@openbot/contracts/ipc";
+import { type ConversationUiBlock, isBlockingUiBlockSpec } from "@openbot/contracts/ui-blocks";
 import { Button } from "@openbot/ui";
 import type { AgentMessage, ChatActionMarkerModel } from "@openbot/ui/data";
 import { AgentActivityIndicator } from "@openbot/ui/features/conversation/AgentActivity";
@@ -31,6 +32,7 @@ import type { ConversationProps } from "./conversation-types";
 import { MarketplaceSuggestionChatCard, marketplaceSuggestionKnown } from "./MarketplaceSuggestionChatCard";
 import { RoutineChatCard } from "./RoutineChatCard";
 import { PENDING_SEND_ID_PREFIX, pendingSendRetrySafe } from "./stores/pending-send-store";
+import type { BlockingUiBlock } from "./UiBlockPrompt";
 
 /**
  * A message that renders only an action marker, with no bubble of its own. A routine instruction is
@@ -38,6 +40,21 @@ import { PENDING_SEND_ID_PREFIX, pendingSendRetrySafe } from "./stores/pending-s
  */
 function markerOnlyMessage(message: AgentMessage): boolean {
   return Boolean(message.actionMarker);
+}
+
+function isBlockingUiBlock(block: ConversationUiBlock): block is BlockingUiBlock {
+  return isBlockingUiBlockSpec(block.spec);
+}
+
+/** The block of a message when it is one the person answers through its question prompt. */
+function blockingUiBlock(block: ConversationUiBlock | undefined): BlockingUiBlock | undefined {
+  return block && isBlockingUiBlock(block) ? block : undefined;
+}
+
+/** A blocking block the history draws: one that is answered, expired or closed. */
+function frozenUiBlock(message: AgentMessage | undefined): BlockingUiBlock | undefined {
+  const block = blockingUiBlock(message?.uiBlock);
+  return block && block.state.status !== "pending" ? block : undefined;
 }
 
 /**
@@ -217,6 +234,11 @@ export function ConversationTimeline() {
     cachedPrompt = { key, prompt };
     return cachedPrompt;
   });
+  /**
+   * The block of the waiting prompt draws it as a card. Until the block's message arrives, or when the
+   * agent asked without one, the prompt's questions draw it.
+   */
+  const pendingPromptBlock = createMemo(() => (keyedPrompt() ? blockingUiBlock(props.promptUiBlock) : undefined));
   return (
     <>
       <span class="sr-only" role="status" aria-live="polite" aria-atomic="true">
@@ -723,13 +745,32 @@ export function ConversationTimeline() {
                         }
                       >
                         {(questionPrompt) => (
-                          <Show when={questionPrompt.resolution} keyed>
-                            {(resolution) => (
+                          <Show
+                            when={frozenUiBlock(message())}
+                            fallback={
+                              <Show when={questionPrompt.resolution} keyed>
+                                {(resolution) => (
+                                  <article
+                                    data-chat-search-message={message()?.id}
+                                    class="question-prompt-history-entry"
+                                  >
+                                    <QuestionPromptBubble
+                                      questions={questionPrompt.questions}
+                                      resolution={resolution}
+                                      onSubmit={async () => false}
+                                    />
+                                  </article>
+                                )}
+                              </Show>
+                            }
+                          >
+                            {(block) => (
                               <article data-chat-search-message={message()?.id} class="question-prompt-history-entry">
-                                <QuestionPromptBubble
-                                  questions={questionPrompt.questions}
-                                  resolution={resolution}
-                                  onSubmit={async () => false}
+                                <UiBlockPrompt
+                                  block={block()}
+                                  agents={props.agents}
+                                  onSelectAgent={props.onSelectAgent}
+                                  onOpenLink={(url) => void openExternalMessageUrl(url)}
                                 />
                               </article>
                             )}
@@ -760,23 +801,38 @@ export function ConversationTimeline() {
             </Show>
           </div>
           <Show when={keyedPrompt()} keyed>
-            {(entry) => (
-              <Loading>
-                <QuestionPromptBubble
-                  questions={entry.prompt.questions}
-                  elementRef={setRequiredInteractionElement}
-                  sendShortcut={deviceSendShortcut(props.platform)}
-                  onSubmit={props.onAnswerPrompt}
-                  onResolutionPresented={() =>
-                    props.onPromptResolutionPresented?.(
-                      entry.prompt.agentId,
-                      entry.prompt.turnId,
-                      entry.prompt.requestId,
-                    )
-                  }
-                />
-              </Loading>
-            )}
+            {(entry) => {
+              const presentResolution = () =>
+                props.onPromptResolutionPresented?.(entry.prompt.agentId, entry.prompt.turnId, entry.prompt.requestId);
+              return (
+                <Loading>
+                  <Show
+                    when={pendingPromptBlock()}
+                    fallback={
+                      <QuestionPromptBubble
+                        questions={entry.prompt.questions}
+                        elementRef={setRequiredInteractionElement}
+                        sendShortcut={deviceSendShortcut(props.platform)}
+                        onSubmit={props.onAnswerPrompt}
+                        onResolutionPresented={presentResolution}
+                      />
+                    }
+                  >
+                    {(block) => (
+                      <UiBlockPrompt
+                        block={block()}
+                        agents={props.agents}
+                        onSelectAgent={props.onSelectAgent}
+                        onOpenLink={(url) => void openExternalMessageUrl(url)}
+                        elementRef={setRequiredInteractionElement}
+                        onAnswer={props.onAnswerPrompt}
+                        onAnswered={presentResolution}
+                      />
+                    )}
+                  </Show>
+                </Loading>
+              );
+            }}
           </Show>
           <Show keyed when={props.approval}>
             {(approval) => (
@@ -834,3 +890,4 @@ const ApprovalCard = lazy(() =>
 const QuestionPromptBubble = lazy(() =>
   import("@openbot/ui/components/QuestionPromptBubble").then((module) => ({ default: module.QuestionPromptBubble })),
 );
+const UiBlockPrompt = lazy(() => import("./UiBlockPrompt").then((module) => ({ default: module.UiBlockPrompt })));

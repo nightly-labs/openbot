@@ -439,6 +439,27 @@ describe("web workspace state", () => {
     expect(view.messages().find((message) => message.id === question.id)?.uiBlock).toEqual(uiBlock);
     expect(view.messages().find((message) => message.id === reply.id)).not.toHaveProperty("uiBlock");
     expect(view.messageReferences()[reference.id]?.uiBlock).toEqual(reference.uiBlock);
+    expect(view.promptUiBlock()).toBeUndefined();
+
+    // The waiting prompt finds its block, so the conversation draws it as a card.
+    app.events().event("host", {
+      type: "prompt",
+      agentId: "chief",
+      threadId: "thread-chief",
+      turnId: "turn",
+      requestId: "request",
+      questions: question.questionPrompt?.questions ?? [],
+    });
+    await waitFor(() => expect(view.promptUiBlock()).toEqual(uiBlock));
+
+    // A card that shows a refused answer itself gets the error instead of a throw.
+    const refusal = new Error("Only the server owner or an admin can choose this action.");
+    vi.mocked(app.runtime.answer).mockRejectedValueOnce(refusal);
+    const onError = vi.fn();
+    expect(await view.answerPrompt({ action: ["Send"] }, { onError })).toBe(false);
+    expect(onError).toHaveBeenCalledWith(refusal);
+    expect(app.runtime.answer).toHaveBeenCalledWith({ requestId: "request", answers: { action: ["Send"] } });
+    expect(view.prompt()?.requestId).toBe("request");
     dispose();
   });
   it("removes questions expired in authoritative history without an input-resolved event", async () => {
