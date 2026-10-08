@@ -9,6 +9,7 @@ import { dirname, join } from "node:path";
 import type { Duplex } from "node:stream";
 import {
   BROWSER_VIEW_FRAME_ACK_QUERY,
+  decodeBrowserViewCopied,
   decodeBrowserViewFrame,
   encodeBrowserViewInput,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
@@ -23,6 +24,8 @@ import { BrowserViewGateway } from "./browser-view-gateway";
 const requireModule = createRequire(import.meta.url);
 const webSockets: typeof Ws = requireModule(join(dirname(requireModule.resolve("ws/package.json")), "index.js"));
 const TEAM_SESSION = "team-session-1";
+/** A page with nothing selected. */
+const noCopy = () => Effect.succeed("");
 
 /** A client that will name the frame it has drawn. The host keeps sizes only for this socket. */
 function acknowledgingViewUrl(origin: string, streamPath: string): string {
@@ -49,6 +52,7 @@ describe("the live browser view on a host", () => {
             onFrame({ sequence: 1, width: 1200, height: 800, image: new Uint8Array([0xff, 0xd8, 0xff]) });
             return stopView;
           }),
+        copyViewSelection: noCopy,
         dispatchViewInput: dispatch,
       },
       authenticate: () => null,
@@ -81,10 +85,60 @@ describe("the live browser view on a host", () => {
     }
   });
 
+  // Failure modes: a paste longer than the old 4 KiB input bound is dropped; a copy answers nothing;
+  // a protected tab's selection reaches the member.
+  it("pastes the member's text and answers a copy with the page's selection", async () => {
+    const dispatched: BrowserViewportInput[] = [];
+    // The first copy meets a tab whose fields hold a secret; the second one does not.
+    const copySelection = vi.fn((_tabId: string, cut: boolean) =>
+      copySelection.mock.calls.length === 1
+        ? Effect.fail(browserFailure(new Error("protected")))
+        : Effect.succeed(cut ? "cut text" : "copied text"),
+    );
+    const gateway = new BrowserViewGateway({
+      browser: {
+        startView: (_tabId, onFrame) =>
+          Effect.sync(() => {
+            onFrame({ sequence: 1, width: 1200, height: 800, image: new Uint8Array([0xff, 0xd8, 0xff]) });
+            return () => Effect.void;
+          }),
+        copyViewSelection: copySelection,
+        dispatchViewInput: (_tabId, input) =>
+          Effect.sync(() => {
+            dispatched.push(input);
+          }),
+      },
+      authenticate: () => null,
+    });
+    const origin = await serve(gateway);
+    const session = gateway.createSession({ memberId: "member-1", teamSessionId: TEAM_SESSION, tabId: "tab-1" });
+    const socket = new webSockets.WebSocket(`${origin}${session.streamPath}`, {
+      headers: { "X-OpenBot-WebRTC-Session": TEAM_SESSION },
+    });
+    const answers: string[] = [];
+    socket.on("message", (data, binary) => {
+      if (!binary) answers.push(data.toString());
+    });
+    await new Promise((resolve) => socket.once("open", resolve));
+
+    const text = "a pasted paragraph ".repeat(1_000);
+    socket.send(encodeBrowserViewInput({ type: "paste", text }));
+    await vi.waitFor(() => expect(dispatched).toEqual([{ type: "paste", text }]));
+
+    socket.send(encodeBrowserViewInput({ type: "copy", cut: false }));
+    await vi.waitFor(() => expect(copySelection).toHaveBeenCalledOnce());
+    socket.send(encodeBrowserViewInput({ type: "copy", cut: true }));
+    await vi.waitFor(() => expect(answers).toHaveLength(1));
+    expect(answers.map(decodeBrowserViewCopied)).toEqual([{ type: "copied", text: "cut text" }]);
+    socket.close();
+    await runCauseEffect(gateway.stop());
+  });
+
   it("redacts a browser start failure before sending its close reason", async () => {
     const gateway = new BrowserViewGateway({
       browser: {
         startView: () => Effect.fail(browserFailure(new Error("CDP failed: token=secret-value-123456"))),
+        copyViewSelection: noCopy,
         dispatchViewInput: () => Effect.void,
       },
       authenticate: () => null,
@@ -112,6 +166,7 @@ describe("the live browser view on a host", () => {
             send = onFrame;
             return () => Effect.void;
           }),
+        copyViewSelection: noCopy,
         dispatchViewInput: (_tabId, input) =>
           Effect.sync(() => {
             dispatched.push(input);
@@ -163,6 +218,7 @@ describe("the live browser view on a host", () => {
             send = onFrame;
             return () => Effect.void;
           }),
+        copyViewSelection: noCopy,
         dispatchViewInput: (_tabId, input) =>
           Effect.sync(() => {
             dispatched.push(input);
@@ -225,6 +281,7 @@ describe("the live browser view on a host", () => {
             send = onFrame;
             return () => Effect.void;
           }),
+        copyViewSelection: noCopy,
         dispatchViewInput: (_tabId, input) =>
           Effect.sync(() => {
             dispatched.push(input);
@@ -276,6 +333,7 @@ describe("the live browser view on a host", () => {
             send = onFrame;
             return () => Effect.void;
           }),
+        copyViewSelection: noCopy,
         dispatchViewInput: (_tabId, input) =>
           Effect.sync(() => {
             dispatched.push(input);
@@ -338,6 +396,7 @@ describe("the live browser view on a host", () => {
             send = onFrame;
             return () => Effect.void;
           }),
+        copyViewSelection: noCopy,
         dispatchViewInput: (_tabId, input) =>
           Effect.sync(() => {
             dispatched.push(input);
@@ -396,6 +455,7 @@ describe("the live browser view on a host", () => {
             send = onFrame;
             return () => Effect.void;
           }),
+        copyViewSelection: noCopy,
         dispatchViewInput: (_tabId, input) =>
           Effect.sync(() => {
             dispatched.push(input);
@@ -446,6 +506,7 @@ describe("the live browser view on a host", () => {
             send = onFrame;
             return () => Effect.void;
           }),
+        copyViewSelection: noCopy,
         dispatchViewInput: () => Effect.void,
       },
       authenticate: () => null,
@@ -479,6 +540,7 @@ describe("the live browser view on a host", () => {
             send = onFrame;
             return () => Effect.void;
           }),
+        copyViewSelection: noCopy,
         dispatchViewInput: (_tabId, input) =>
           Effect.sync(() => {
             dispatched.push(input);
@@ -534,6 +596,7 @@ describe("the live browser view on a host", () => {
             invalidate = onEnded;
             return stop;
           }),
+        copyViewSelection: noCopy,
         dispatchViewInput: dispatch,
       },
       authenticate: () => null,
@@ -563,6 +626,7 @@ describe("the live browser view on a host", () => {
     const gateway = new BrowserViewGateway({
       browser: {
         startView: () => Effect.succeed(() => Effect.void),
+        copyViewSelection: noCopy,
         dispatchViewInput: () => Effect.void,
       },
       authenticate: (token) => (token === "other-member-token" ? { id: "member-2" } : null),
@@ -586,6 +650,7 @@ describe("the live browser view on a host", () => {
     const gateway = new BrowserViewGateway({
       browser: {
         startView: () => Effect.succeed(() => Effect.void),
+        copyViewSelection: noCopy,
         dispatchViewInput: () => Effect.void,
       },
       authenticate: () => null,
@@ -612,6 +677,7 @@ describe("the live browser view on a host", () => {
     const gateway = new BrowserViewGateway({
       browser: {
         startView,
+        copyViewSelection: noCopy,
         dispatchViewInput: () => Effect.void,
       },
       authenticate: () => null,

@@ -105,7 +105,32 @@ export type BrowserViewportInput =
       deltaY: number;
       modifiers: number;
     }
-  | { type: "key"; action: "down" | "up" | "char"; key: string; code: string; text: string; modifiers: number };
+  | { type: "key"; action: "down" | "up" | "char"; key: string; code: string; text: string; modifiers: number }
+  | { type: "paste"; text: string };
+
+/**
+ * The page's selection, read in the automation world so the page's own scripts cannot answer for it.
+ * A field's selection is not part of `getSelection()`, and a password field gives nothing, as it does
+ * for a user's copy. `cut` deletes the selection only where the user could have typed over it.
+ */
+const SELECTION_TEXT_SCRIPT = `(cut) => {
+  const active = document.activeElement;
+  if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) {
+    if (active instanceof HTMLInputElement && active.type === "password") return "";
+    const start = active.selectionStart;
+    const end = active.selectionEnd;
+    if (start === null || end === null) return "";
+    const text = active.value.slice(start, end);
+    if (cut && text && !active.readOnly && !active.disabled) document.execCommand("delete");
+    return text;
+  }
+  const text = window.getSelection()?.toString() ?? "";
+  if (cut && text && active instanceof HTMLElement && active.isContentEditable) document.execCommand("delete");
+  return text;
+}`;
+
+/** Ctrl or Meta: either one is the command modifier, whichever system the client runs. */
+const COMMAND_MODIFIERS = 2 | 4;
 
 export class BrowserCdpEngine {
   readonly #contents: WebContents;
@@ -1329,6 +1354,11 @@ export class BrowserCdpEngine {
     yield* this.#leaseEffect(
       (send) =>
         Effect.gen({ self: this }, function* () {
+          // The text arrives as one insertion, as a paste does, and never touches the host's clipboard.
+          if (input.type === "paste") {
+            yield* send("Input.insertText", { text: input.text });
+            return;
+          }
           if (input.type === "key") {
             if (input.action === "char") {
               yield* send("Input.dispatchKeyEvent", { type: "char", modifiers: input.modifiers, text: input.text });
@@ -1338,6 +1368,13 @@ export class BrowserCdpEngine {
             // A command modifier gets none, as in `dispatchShortcut`: `Ctrl+Enter` is not a line break.
             const { text, ...keyCodes } = namedKey(input.key);
             const character = input.action === "down" && (input.modifiers & ~SHIFT_MODIFIER) === 0 ? text : undefined;
+            // A letter has no key code here, so Chromium finds no editing command for Ctrl+A. The
+            // command is named instead, which also reads a Mac client's Cmd+A on a Linux host.
+            const selectAll =
+              input.action === "down" &&
+              input.key.toLowerCase() === "a" &&
+              (input.modifiers & COMMAND_MODIFIERS) !== 0 &&
+              (input.modifiers & ~COMMAND_MODIFIERS) === 0;
             yield* send("Input.dispatchKeyEvent", {
               type: input.action === "up" ? "keyUp" : character === undefined ? "rawKeyDown" : "keyDown",
               modifiers: input.modifiers,
@@ -1345,6 +1382,7 @@ export class BrowserCdpEngine {
               code: input.code,
               ...keyCodes,
               ...(character === undefined ? {} : { text: character, unmodifiedText: character }),
+              ...(selectAll ? { commands: ["selectAll"] } : {}),
             });
             return;
           }
@@ -1368,6 +1406,29 @@ export class BrowserCdpEngine {
             clickCount: input.action === "move" ? 0 : input.clickCount,
             modifiers: input.modifiers,
           });
+        }),
+      false,
+    );
+  });
+
+  /**
+   * The text a member's copy takes from the page. It goes back to the member's own clipboard; the
+   * host's clipboard belongs to whoever sits at the host, and a copy must neither read nor replace it.
+   */
+  readonly viewportSelectionText = Effect.fn("BrowserCdp.viewportSelectionText")(function* (
+    this: BrowserCdpEngine,
+    cut: boolean,
+  ): Effect.fn.Return<string, BrowserOperationError> {
+    return yield* this.#leaseEffect(
+      (send) =>
+        Effect.gen(function* () {
+          const contextId = yield* automationContextId(send);
+          const result = yield* send("Runtime.evaluate", {
+            expression: `(${SELECTION_TEXT_SCRIPT})(${cut})`,
+            contextId,
+            returnByValue: true,
+          });
+          return stringValue(recordValue(result.result)?.value);
         }),
       false,
     );

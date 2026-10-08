@@ -254,6 +254,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
                 : null
             }
             liveViewRuntime={props.browserRuntime ?? conversationPort().browser}
+            liveViewClipboard={serverSupportsCapability(props.server, "browser-view-clipboard")}
             onBack={() => setActiveRightPanel("browser")}
             onEnterPip={props.runtime ? () => undefined : showBrowserPip}
           />

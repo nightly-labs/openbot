@@ -1,4 +1,9 @@
-import type { BrowserDesktopApi, BrowserLiveViewInput } from "@openbot/contracts/ipc";
+import {
+  BROWSER_LIVE_VIEW_MAX_PASTE_TEXT,
+  type BrowserDesktopApi,
+  type BrowserLiveViewInput,
+} from "@openbot/contracts/ipc";
+import { toast } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, createStore, onCleanup, Show } from "solid-js";
 
@@ -26,6 +31,8 @@ interface BrowserLiveViewProps {
   tabId: string;
   /** False while the panel is closed: a view nobody is looking at still costs the host a screencast. */
   active: boolean;
+  /** Whether the host pastes and copies for this view. An older host closes the view on either. */
+  clipboard: boolean;
   /** The pixel size of the frame on the canvas, so the panel can take the page's shape. */
   onFrameSize?: (size: { width: number; height: number }) => void;
 }
@@ -121,6 +128,14 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
 
   const stopListening = runtime.onLiveViewEvent((event) => {
     if (event.tabId !== props.tabId) return;
+    if (event.type === "copied") {
+      void navigator.clipboard.writeText(event.text).catch(() => toast.error(t("browser.liveView.copyFailed")));
+      return;
+    }
+    if (event.type === "copyTooLarge") {
+      toast.error(t("browser.liveView.copyTooLarge"));
+      return;
+    }
     if (event.type === "stopped") {
       abandonStream();
       setState(() => ({ live: false, message: sourceText(event.reason) }));
@@ -211,12 +226,45 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
   };
 
   const key = (event: KeyboardEvent, action: "down" | "up") => {
-    event.preventDefault();
+    // Copy, cut and paste stay with this window, which fires its own clipboard event at the canvas:
+    // that event holds the user's clipboard, and the host's clipboard is not the user's. A host that
+    // answers clipboard input does not get the key as well, so a paste can never arrive twice.
+    if (isClipboardShortcut(event)) {
+      if (props.clipboard) return;
+    } else {
+      event.preventDefault();
+    }
     send({ type: "key", action, key: event.key, code: event.code, modifiers: modifiers(event) });
     // A printable key is two events on the wire: the key itself, and the character it produces.
     if (action === "down" && event.key.length === 1 && !event.ctrlKey && !event.metaKey) {
       send({ type: "key", action: "char", key: event.key, code: event.code, text: event.key });
     }
+  };
+
+  const paste = (event: ClipboardEvent) => {
+    event.preventDefault();
+    if (!props.clipboard) {
+      toast.error(t("browser.liveView.clipboardUnsupported"));
+      return;
+    }
+    const text = event.clipboardData?.getData("text/plain") ?? "";
+    if (!text) return;
+    if (text.length > BROWSER_LIVE_VIEW_MAX_PASTE_TEXT) {
+      toast.error(t("browser.liveView.pasteTooLong"));
+      return;
+    }
+    send({ type: "paste", text });
+  };
+
+  // The selection is on the host, so the event writes nothing now. The host's answer is a `copied`
+  // event, and that is what reaches the clipboard.
+  const copy = (event: ClipboardEvent, cut: boolean) => {
+    event.preventDefault();
+    if (!props.clipboard) {
+      toast.error(t("browser.liveView.clipboardUnsupported"));
+      return;
+    }
+    send({ type: "copy", cut });
   };
 
   return (
@@ -250,6 +298,9 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
         }}
         onKeyDown={(event) => key(event, "down")}
         onKeyUp={(event) => key(event, "up")}
+        onPaste={paste}
+        onCopy={(event) => copy(event, false)}
+        onCut={(event) => copy(event, true)}
       />
       <Show when={!state.live}>
         <div class="browser-empty-state">
@@ -258,6 +309,11 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
       </Show>
     </div>
   );
+}
+
+function isClipboardShortcut(event: KeyboardEvent): boolean {
+  const key = event.key.toLowerCase();
+  return (event.ctrlKey || event.metaKey) && !event.altKey && (key === "c" || key === "v" || key === "x");
 }
 
 function modifiers(event: MouseEvent | KeyboardEvent): number {

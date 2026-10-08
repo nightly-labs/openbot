@@ -145,6 +145,11 @@ mock. The separate web preview implements the browser runtime with that same moc
   Tabs, back, forward, reload, and the address bar use the same Team API routes as a desktop
   client of a remote host. Picture in Picture is desktop only. The expanded live view is a card
   with the shape of the host frame.
+- Copy and paste in the live view use the member's clipboard, not the host's, when the host
+  advertises `browser-view-clipboard`. The client sends pasted text as one `paste` input; the host
+  inserts it with CDP `Input.insertText`. A `copy` input asks for the page selection, and the host
+  sends it back as the one text message on the view socket. The host never reads or writes its
+  own clipboard. Password fields give no text.
 - No full remote desktop, push notifications, or offline operation is included. See
   [Remote desktop](#remote-desktop) for the reason.
 - These stay desktop only: the application Settings dialog (permissions, app updates),

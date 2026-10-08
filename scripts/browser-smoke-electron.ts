@@ -5,7 +5,7 @@ import { join } from "node:path";
 import type { BrowserBounds } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
-import { app, BrowserWindow, type WebContents, webContents } from "electron";
+import { app, BrowserWindow, clipboard, type WebContents, webContents } from "electron";
 import { BrowserHost } from "../src/backend/browser-host";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { type DynamicToolResult, getString } from "../src/backend/protocol";
@@ -2086,6 +2086,7 @@ async function runLiveViewScenario(browser: BrowserHost, tabId: string, contents
       if (!pressed) await new Promise((resolve) => setTimeout(resolve, 100));
     }
     if (!pressed) throw new Error("A live view click did not reach the page.");
+    await runLiveViewClipboard(browser, tabId, contents);
   } finally {
     await Effect.runPromise(stopView());
   }
@@ -2101,6 +2102,69 @@ async function runLiveViewScenario(browser: BrowserHost, tabId: string, contents
     document.getElementById('live-view-probe')?.remove();
     document.getElementById('live-view-button')?.remove();
   })()`,
+    true,
+  );
+}
+
+/**
+ * A member's paste, select-all, copy and cut in a live view. The text goes in as one insertion and
+ * the selection comes back as text, and the host's own clipboard is neither read nor replaced. The
+ * results go to `.openbot-build/browser-live-view-clipboard.json`.
+ */
+async function runLiveViewClipboard(browser: BrowserHost, tabId: string, contents: WebContents): Promise<void> {
+  const pasted = "pasted by the member\nsecond line";
+  const field = (id: string, type: string) =>
+    contents.executeJavaScript(
+      `(() => {
+      document.getElementById('${id}')?.remove();
+      const field = document.createElement('${type === "textarea" ? "textarea" : "input"}');
+      field.id = '${id}';
+      ${type === "password" ? "field.type = 'password'; field.value = 'host secret';" : ""}
+      field.style.cssText = 'position:fixed;left:10px;top:230px;width:300px;height:60px;z-index:2147483647';
+      document.body.append(field);
+      field.focus();
+      field.select();
+    })()`,
+      true,
+    );
+  const value = (id: string) => contents.executeJavaScript(`document.getElementById('${id}').value`, true);
+
+  await field("live-view-text", "textarea");
+  await runCauseEffect(browser.dispatchViewInput(tabId, { type: "paste", text: pasted }));
+  const afterPaste = await value("live-view-text");
+  if (afterPaste !== pasted) throw new Error(`A live view paste left ${JSON.stringify(afterPaste)} in the field.`);
+  // Cmd+A from a Mac client selects all on any host, because the host names the command.
+  await contents.executeJavaScript(
+    "(field => field.setSelectionRange(field.value.length, field.value.length))(document.getElementById('live-view-text'))",
+    true,
+  );
+  for (const action of ["down", "up"] as const) {
+    await runCauseEffect(
+      browser.dispatchViewInput(tabId, { type: "key", action, key: "a", code: "KeyA", text: "", modifiers: 4 }),
+    );
+  }
+  const copied = await runCauseEffect(browser.copyViewSelection(tabId, false));
+  if (copied !== pasted) throw new Error(`A live view copy after select-all returned ${JSON.stringify(copied)}.`);
+  const cut = await runCauseEffect(browser.copyViewSelection(tabId, true));
+  const afterCut = await value("live-view-text");
+  if (cut !== pasted || afterCut !== "") throw new Error("A live view cut did not take the selected text.");
+
+  await field("live-view-password", "password");
+  const fromPassword = await runCauseEffect(browser.copyViewSelection(tabId, false));
+  if (fromPassword !== "") throw new Error("A live view copy read a password field.");
+  // Whoever sits at the host may copy something meanwhile, so the check is that the member's text
+  // never reached the host's clipboard, not that the clipboard stayed the same.
+  const hostClipboardHasMemberText = (await clipboard.readText()).includes(pasted);
+  if (hostClipboardHasMemberText) throw new Error("A live view copy or paste wrote the host clipboard.");
+
+  const reportDirectory = join(process.cwd(), ".openbot-build");
+  await mkdir(reportDirectory, { recursive: true });
+  await writeFile(
+    join(reportDirectory, "browser-live-view-clipboard.json"),
+    `${JSON.stringify({ afterPaste, copied, cut, afterCut, fromPassword, hostClipboardHasMemberText }, null, 2)}\n`,
+  );
+  await contents.executeJavaScript(
+    "document.getElementById('live-view-text')?.remove(); document.getElementById('live-view-password')?.remove();",
     true,
   );
 }

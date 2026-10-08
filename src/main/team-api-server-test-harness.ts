@@ -162,6 +162,7 @@ export function createBrowser(overrides: Partial<TeamApiBrowser> = {}): TeamApiB
     loadUrl: unimplemented,
     startView: unimplemented,
     dispatchViewInput: unimplemented,
+    copyViewSelection: unimplemented,
     ...overrides,
   };
 }

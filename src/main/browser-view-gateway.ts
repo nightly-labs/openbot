@@ -17,11 +17,13 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import type { Duplex } from "node:stream";
 import {
+  BROWSER_VIEW_MAX_CLIPBOARD_TEXT,
   type BrowserViewSessionResponse,
   browserViewClientAcksFrames,
   browserViewStreamPath,
   browserViewStreamSessionId,
   decodeBrowserViewInput,
+  encodeBrowserViewCopied,
   encodeBrowserViewFrame,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import type * as Ws from "ws";
@@ -51,10 +53,11 @@ function forgetFramesBefore(sizes: Map<number, { width: number; height: number }
   }
 }
 const MAX_SESSIONS = 4;
-const MAX_INPUT_MESSAGE_BYTES = 4 * 1024;
+/** A paste at its longest, with every character escaped, and the rest of the message around it. */
+const MAX_INPUT_MESSAGE_BYTES = 6 * BROWSER_VIEW_MAX_CLIPBOARD_TEXT + 4 * 1024;
 
 export interface BrowserViewGatewayOptions {
-  browser: Pick<BrowserHost, "startView" | "dispatchViewInput">;
+  browser: Pick<BrowserHost, "startView" | "dispatchViewInput" | "copyViewSelection">;
   /** Answers the member a direct socket's token belongs to, for a client that is not tunneled. */
   authenticate: (token: string) => { id: string } | null;
   /** A member pressed a key or moved the pointer in a view. A hosted server counts it as use. */
@@ -69,6 +72,7 @@ class BrowserViewPort extends Context.Service<
       ...args: Parameters<BrowserHost["startView"]>
     ): Effect.Effect<Effect.Success<ReturnType<BrowserHost["startView"]>>, RemoteWorkflowError>;
     input(...args: Parameters<BrowserHost["dispatchViewInput"]>): Effect.Effect<void, RemoteWorkflowError>;
+    copy(...args: Parameters<BrowserHost["copyViewSelection"]>): Effect.Effect<string, RemoteWorkflowError>;
   }
 >()("openbot/main/BrowserViewPort") {
   static layer(browser: BrowserViewGatewayOptions["browser"]) {
@@ -79,6 +83,8 @@ class BrowserViewPort extends Context.Service<
           browser.startView(...args).pipe(Effect.mapError(({ cause }) => new RemoteWorkflowError({ cause }))),
         input: (...args) =>
           browser.dispatchViewInput(...args).pipe(Effect.mapError(({ cause }) => new RemoteWorkflowError({ cause }))),
+        copy: (...args) =>
+          browser.copyViewSelection(...args).pipe(Effect.mapError(({ cause }) => new RemoteWorkflowError({ cause }))),
       }),
     );
   }
@@ -302,6 +308,20 @@ export class BrowserViewGateway {
       return;
     }
     this.#options.onInput?.();
+    // The selection goes back on the socket that asked for it, and only there. It is page content:
+    // nothing here logs it.
+    if (input.type === "copy") {
+      const client = session.socket;
+      const browser = yield* BrowserViewPort;
+      const text = yield* browser.copy(session.tabId, input.cut).pipe(Effect.catch(() => Effect.succeed("")));
+      if (!text || session.socket !== client || client.readyState !== webSockets.WebSocket.OPEN) return;
+      client.send(
+        encodeBrowserViewCopied(
+          text.length > BROWSER_VIEW_MAX_CLIPBOARD_TEXT ? { type: "copyTooLarge" } : { type: "copied", text },
+        ),
+      );
+      return;
+    }
     // Input that arrives before the first frame has no frame to be a fraction of.
     let frame = { width: session.frameWidth, height: session.frameHeight };
     if (input.type === "pointer") {

@@ -203,6 +203,13 @@ export function createMainWindowController({
               active.select();
               return;
             }
+            // A focused canvas is a remote browser page, which selects its own text when it gets the key.
+            if (active instanceof HTMLCanvasElement) {
+              const key = { key: "a", code: "KeyA", ctrlKey: ${input.control}, metaKey: ${input.meta}, bubbles: true };
+              active.dispatchEvent(new KeyboardEvent("keydown", key));
+              active.dispatchEvent(new KeyboardEvent("keyup", key));
+              return;
+            }
             if (!(active instanceof HTMLElement) || !active.isContentEditable) return;
             const range = document.createRange();
             range.selectNodeContents(active);
