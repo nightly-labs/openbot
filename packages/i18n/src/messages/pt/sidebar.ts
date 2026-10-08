@@ -18,8 +18,6 @@ export const messages = {
   "sidebar.topbar.expand": "Expandir barra lateral",
   "sidebar.topbar.openMarketplace": "Abrir loja",
   "sidebar.topbar.marketplace": "Loja",
-  "sidebar.search.label": "Buscar chats",
-  "sidebar.search.expand": "Expandir barra lateral e buscar chats",
   "sidebar.empty.noMatches": "Nenhum resultado",
   "sidebar.empty.noAgents": "Nenhum agente ainda",
   "sidebar.empty.firstAgent": "Crie seu primeiro agente",

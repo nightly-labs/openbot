@@ -1398,9 +1398,24 @@ textarea {
   padding: 8px 12px 6px;
 }
 
-/* The field's gap already spaces the text from the icon, so the input's own padding goes. */
-.sidebar-search-wrap .search-field input {
-  padding-inline: 0;
+/* The field opens the global search, so it is a button drawn as the search field. */
+.sidebar-search-trigger {
+  width: 100%;
+  justify-content: flex-start;
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-regular);
+  line-height: 18px;
+  cursor: pointer;
+}
+
+.sidebar-search-trigger:hover {
+  border-color: var(--openbot-text-dim);
+  background: var(--openbot-bg-surface);
+  color: var(--openbot-text-dim);
+}
+
+.sidebar-search-placeholder {
+  color: var(--openbot-text-muted);
 }
 
 .sidebar-compact-search {

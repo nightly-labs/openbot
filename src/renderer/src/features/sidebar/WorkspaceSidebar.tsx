@@ -52,7 +52,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
   const { unreadReplies, recentReplies, markAllAgentMessagesRead } = useConversation();
   const { directPeople } = usePresence();
   const { activeDirectMember, activeDirectMemberId, directThreads } = useDirectMessages();
-  const { selectAgent, selectDirectMember } = useNavigation();
+  const { selectAgent, selectDirectMember, setGlobalSearchVisibility } = useNavigation();
   const {
     sidebarLayout,
     collapsedSidebarSectionIds,
@@ -197,6 +197,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
       onDeleteAgent={deleteAgent}
       compact={layout.leftPanelCompact()}
       onExpand={layout.expandSidebar}
+      onOpenSearch={() => setGlobalSearchVisibility(true)}
       footer={
         <Show when={!platform.landingPreview && !mobileAppDismissed()}>
           <SidebarMobileAppCard

@@ -18,8 +18,6 @@ export const messages = {
   "sidebar.topbar.expand": "Développer la barre latérale",
   "sidebar.topbar.openMarketplace": "Ouvrir la Marketplace",
   "sidebar.topbar.marketplace": "Marketplace",
-  "sidebar.search.label": "Rechercher des discussions",
-  "sidebar.search.expand": "Développer la barre latérale et rechercher des discussions",
   "sidebar.empty.noMatches": "Aucun résultat",
   "sidebar.empty.noAgents": "Aucun agent pour l’instant",
   "sidebar.empty.firstAgent": "Créez votre premier agent",
