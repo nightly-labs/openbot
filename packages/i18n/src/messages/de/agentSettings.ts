@@ -73,8 +73,6 @@ export const messages = {
   "agentSettings.busyMessage.steerUnsupported":
     "{provider} kann einen laufenden Durchgang nicht steuern. Während der Arbeit gesendete Nachrichten warten in der Warteschlange.",
   "agentSettings.notifications.title": "Benachrichtigungen",
-  "agentSettings.notifications.description":
-    "Erhalte eine Benachrichtigung, wenn dieser Agent fertig ist oder eine Eingabe benötigt",
   "agentSettings.newChat.title": "Neuer Chat",
   "agentSettings.newChat.description": "Der Agent vergisst diesen Chat. Seine Einrichtung bleibt erhalten.",
   "agentSettings.newChat.button": "Starten",

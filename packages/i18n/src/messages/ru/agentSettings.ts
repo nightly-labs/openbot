@@ -78,7 +78,6 @@ export const messages = {
     "{provider} не умеет направлять выполняемый ход. Сообщения, отправленные во время работы, ждут в очереди.",
 
   "agentSettings.notifications.title": "Уведомления",
-  "agentSettings.notifications.description": "Сообщать, когда агент закончил или ему нужен ваш ответ",
 
   "agentSettings.newChat.title": "Новый чат",
   "agentSettings.newChat.description": "Агент забудет этот чат. Настройки сохранятся.",

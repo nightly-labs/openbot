@@ -71,7 +71,6 @@ export const messages = {
   "agentSettings.busyMessage.steerUnsupported":
     "{provider} çalışan bir turu yönlendiremez. Çalışırken gönderilen mesajlar kuyrukta bekler.",
   "agentSettings.notifications.title": "Bildirimler",
-  "agentSettings.notifications.description": "Bu ajan tamamlandığında veya girdi gerektiğinde bildirim alın",
   "agentSettings.newChat.title": "Yeni sohbet",
   "agentSettings.newChat.description": "Ajan bu sohbeti unutur. Yapılandırması kalır.",
   "agentSettings.newChat.button": "Başlat",

@@ -63,6 +63,7 @@ import {
   createMemo,
   createSignal,
   createStore,
+  createUniqueId,
   For,
   onCleanup,
   onSettled,
@@ -230,12 +231,19 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   }
 
   let pageRoot: HTMLDivElement | undefined;
+  const instructionsPreviewId = createUniqueId();
 
-  /** The row that opened the page is gone, so the focus moves to the first control of the page. */
+  /**
+   * The row that opened the page is gone, so the focus moves to the first control of the page.
+   * A page with no control, such as read-only permissions, gives the focus to the back button.
+   */
   function openPage(target: AgentSettingsPage): void {
     setPage(target);
     queueMicrotask(() =>
-      pageRoot?.querySelector<HTMLElement>("button:not(:disabled), input, textarea, select")?.focus(),
+      (
+        pageRoot?.querySelector<HTMLElement>("button:not(:disabled), input, textarea, select") ??
+        pageRoot?.closest("aside")?.querySelector<HTMLElement>(".settings-panel-nav-button")
+      )?.focus(),
     );
   }
 
@@ -744,6 +752,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                 type="button"
                 class="agent-settings-instructions-card"
                 aria-label={t("agentSettings.instructionsEdit")}
+                aria-describedby={instructionsPreviewId}
                 data-cuelume-tap="navigate"
                 onClick={() => openPage("instructions")}
               >
@@ -752,6 +761,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   <ChevronRight class="agent-settings-card-chevron" aria-hidden="true" />
                 </span>
                 <span
+                  id={instructionsPreviewId}
                   class={[
                     "agent-settings-instructions-preview",
                     { "agent-settings-instructions-preview-empty": !draft.fields.description.trim() },

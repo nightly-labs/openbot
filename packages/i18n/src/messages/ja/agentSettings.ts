@@ -77,7 +77,6 @@ export const messages = {
     "{provider} は実行中のターンの方向を修正できません。作業中に送ったメッセージはキューで待ちます。",
 
   "agentSettings.notifications.title": "通知",
-  "agentSettings.notifications.description": "このエージェントが完了したときや入力が必要なときに通知を受け取ります",
 
   "agentSettings.newChat.title": "新しいチャット",
   "agentSettings.newChat.description": "エージェントはこのチャットを忘れます。設定はそのままです。",

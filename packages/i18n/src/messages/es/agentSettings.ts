@@ -72,8 +72,6 @@ export const messages = {
   "agentSettings.busyMessage.steerUnsupported":
     "{provider} no puede orientar un turno en curso. Los mensajes enviados mientras trabaja esperan en la cola.",
   "agentSettings.notifications.title": "Notificaciones",
-  "agentSettings.notifications.description":
-    "Recibe una notificación cuando este agente termine o necesite tu respuesta",
   "agentSettings.newChat.title": "Nuevo chat",
   "agentSettings.newChat.description": "El agente olvida este chat. Se conserva su configuración.",
   "agentSettings.newChat.button": "Iniciar",

@@ -73,8 +73,6 @@ export const messages = {
   "agentSettings.busyMessage.steerUnsupported":
     "{provider} não pode redirecionar um turno em andamento. Mensagens enviadas enquanto ele trabalha esperam na fila.",
   "agentSettings.notifications.title": "Notificações",
-  "agentSettings.notifications.description":
-    "Receba uma notificação quando este agente terminar ou precisar de uma resposta",
   "agentSettings.newChat.title": "Novo chat",
   "agentSettings.newChat.description": "O agente esquece este chat. Sua configuração é mantida.",
   "agentSettings.newChat.button": "Iniciar",

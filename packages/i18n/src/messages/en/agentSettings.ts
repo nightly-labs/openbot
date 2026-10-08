@@ -77,7 +77,6 @@ export const messages = defineMessages("agentSettings", {
     "{provider} cannot steer a running turn. Messages sent while it works wait in the queue.",
 
   "agentSettings.notifications.title": "Notifications",
-  "agentSettings.notifications.description": "Get notified when this agent finishes or needs input",
 
   "agentSettings.newChat.title": "New chat",
   "agentSettings.newChat.description": "The agent forgets this chat. Its setup stays.",

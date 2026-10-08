@@ -78,8 +78,6 @@ export const messages = {
     "{provider} ne peut pas orienter un tour en cours. Les messages envoyés pendant son travail attendent dans la file.",
 
   "agentSettings.notifications.title": "Notifications",
-  "agentSettings.notifications.description":
-    "Recevez une notification quand cet agent termine ou a besoin d’une réponse",
 
   "agentSettings.newChat.title": "Nouvelle discussion",
   "agentSettings.newChat.description": "L’agent oublie cette discussion. Sa configuration reste.",
