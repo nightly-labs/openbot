@@ -263,6 +263,55 @@ export const messages = {
     "Этот компьютер не в сети Tailscale сервера. Попросите владельца сервера поделиться устройством в Tailscale (node sharing) или подключайтесь через облако OpenBot.",
   "server.tailscale.hint.failed":
     "Прямое подключение не ответило, поэтому сервер пока подключается через облако OpenBot.",
+  "server.tailscale.hint.sharingGuide": "Как работает общий доступ",
+  "server.tailscale.hint.sharingDescription":
+    "Владелец сервера делится с вами устройством сервера в консоли Tailscale. Затем вы принимаете приглашение.",
+  "server.tailscale.setup.title": "Настройка прямого подключения",
+  "server.tailscale.setup.description":
+    "Участники из вашей сети Tailscale смогут подключаться к серверу напрямую. Каждый шаг проверяется автоматически.",
+  "server.tailscale.setup.updateServer":
+    "На сервере старая версия OpenBot. Обновите его, чтобы настроить Tailscale отсюда.",
+  "server.tailscale.setup.stepDone": "Готово",
+  "server.tailscale.setup.stepToDo": "Не выполнено",
+  "server.tailscale.setup.clientTitle": "Tailscale на этом компьютере",
+  "server.tailscale.setup.serverTitle": "Tailscale на сервере",
+  "server.tailscale.setup.networkTitle": "Одна сеть Tailscale",
+  "server.tailscale.setup.httpsTitle": "HTTPS-сертификаты",
+  "server.tailscale.setup.serverRunCommand":
+    "Выполните эту команду на сервере. Она установит Tailscale и разрешит OpenBot им пользоваться.",
+  "server.tailscale.setup.serverSignIn": "Войдите в Tailscale на сервере.",
+  "server.tailscale.setup.serverWaitsForSignIn":
+    "Tailscale на сервере ждёт входа. Откройте страницу и подтвердите сервер.",
+  "server.tailscale.setup.serverSignInFailed":
+    "Tailscale на сервере не начал вход. Выполните команду на сервере и проверьте снова.",
+  "server.tailscale.setup.serverInstall": "Установите Tailscale на компьютер сервера и войдите.",
+  "server.tailscale.setup.serverWsl":
+    "Сервер работает в WSL и использует приложение Tailscale для Windows. Установите его в Windows и войдите.",
+  "server.tailscale.setup.wslMirroredRequired":
+    "WSL должен использовать mirrored-сеть: добавьте networkingMode=mirrored в раздел [wsl2] файла %UserProfile%\\.wslconfig, затем выполните wsl --shutdown.",
+  "server.tailscale.setup.wslMirroredCheck":
+    "Убедитесь, что WSL использует mirrored-сеть: networkingMode=mirrored в разделе [wsl2] файла %UserProfile%\\.wslconfig.",
+  "server.tailscale.setup.copyCommand": "Скопировать команду",
+  "server.tailscale.setup.signIn": "Войти",
+  "server.tailscale.setup.openSignIn": "Открыть страницу входа",
+  "server.tailscale.setup.getWindowsApp": "Скачать Tailscale для Windows",
+  "server.tailscale.setup.networkWaiting": "Проверим, когда Tailscale будет работать на обоих компьютерах.",
+  "server.tailscale.setup.networkSame": "Этот компьютер и сервер в сети {tailnet}.",
+  "server.tailscale.setup.networkShared": "Сервер доступен в сети Tailscale этого компьютера.",
+  "server.tailscale.setup.networkOther":
+    "Этот компьютер в сети {client}, а сервер — в {server}. Войдите на этом компьютере в аккаунт сервера или поделитесь сервером с вашей сетью.",
+  "server.tailscale.setup.shareServer": "Поделиться сервером",
+  "server.tailscale.setup.serverFirst": "Проверим, когда Tailscale заработает на сервере.",
+  "server.tailscale.setup.httpsOn": "Включены для сети сервера.",
+  "server.tailscale.setup.httpsOff": "Включите HTTPS-сертификаты на странице DNS в консоли Tailscale.",
+  "server.tailscale.setup.turnOnHttps": "Включить",
+  "server.tailscale.setup.directWaiting": "Станет доступно, когда шаги выше будут выполнены.",
+  "server.tailscale.setup.directDescription":
+    "Участники из вашей сети Tailscale подключаются напрямую, без облака OpenBot. Облако OpenBot остаётся запасным путём.",
+  "server.tailscale.setup.issue.hostOffline": "Включится, когда сервер будет в сети.",
+  "server.tailscale.setup.issue.tailscaleUnavailable": "На сервере Tailscale должен быть запущен и выполнен вход.",
+  "server.tailscale.setup.issue.portInUse":
+    "Tailscale Serve уже использует порты 443 и 8443 на сервере. OpenBot их не меняет.",
   "server.route.label": "Подключение",
   "server.route.direct": "Напрямую · Tailscale",
   "server.route.cloud": "Через облако OpenBot",

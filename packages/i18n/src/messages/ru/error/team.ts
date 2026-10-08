@@ -81,6 +81,8 @@ export const messages = {
   "error.team.storageUnsupported": "Это подключение не поддерживает хранилище.",
   "error.team.hostedSitesUnsupported": "Это подключение не поддерживает сайты.",
   "error.team.directEndpointUnsupported": "Этот сервер не поддерживает прямое подключение.",
+  "error.team.hostTailscaleUnsupported": "Обновите этот сервер, чтобы настроить Tailscale отсюда.",
+  "error.team.ownerRequired": "Это может сделать только владелец сервера.",
   "error.team.directSignInUnavailable":
     "Прямое подключение сейчас не может проверить участников. Используйте облако OpenBot.",
   "error.team.hostedSitesUnregistered": "Этот сервер не зарегистрирован в OpenBot, поэтому у него нет сайтов.",

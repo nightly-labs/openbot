@@ -264,6 +264,55 @@ export const messages = {
     "Dieser Computer ist nicht im Tailnet des Hosts. Bitte den Host-Besitzer, das Host-Gerät in Tailscale mit dir zu teilen (Node Sharing), oder verbinde dich über die OpenBot-Cloud.",
   "server.tailscale.hint.failed":
     "Die direkte Verbindung hat nicht geantwortet, deshalb verbindet sich dieser Server vorerst über die OpenBot-Cloud.",
+  "server.tailscale.hint.sharingGuide": "So funktioniert das Teilen",
+  "server.tailscale.hint.sharingDescription":
+    "Der Host-Besitzer teilt das Host-Gerät in der Tailscale-Adminkonsole mit dir. Danach nimmst du die Freigabe an.",
+  "server.tailscale.setup.title": "Direkte Verbindung einrichten",
+  "server.tailscale.setup.description":
+    "Mitglieder in deinem Tailnet können sich direkt mit diesem Server verbinden. Jeder Schritt prüft sich selbst erneut.",
+  "server.tailscale.setup.updateServer":
+    "Auf diesem Server läuft eine ältere OpenBot-Version. Aktualisiere ihn, um Tailscale von hier aus einzurichten.",
+  "server.tailscale.setup.stepDone": "Erledigt",
+  "server.tailscale.setup.stepToDo": "Nicht erledigt",
+  "server.tailscale.setup.clientTitle": "Tailscale auf diesem Computer",
+  "server.tailscale.setup.serverTitle": "Tailscale auf dem Server",
+  "server.tailscale.setup.networkTitle": "Gleiches Tailnet",
+  "server.tailscale.setup.httpsTitle": "HTTPS-Zertifikate",
+  "server.tailscale.setup.serverRunCommand":
+    "Führe diesen Befehl auf dem Server aus. Er installiert Tailscale und erlaubt OpenBot, es zu verwenden.",
+  "server.tailscale.setup.serverSignIn": "Melde dich auf dem Server bei Tailscale an.",
+  "server.tailscale.setup.serverWaitsForSignIn":
+    "Tailscale auf dem Server wartet auf eine Anmeldung. Öffne die Seite und bestätige den Server.",
+  "server.tailscale.setup.serverSignInFailed":
+    "Tailscale auf dem Server hat keine Anmeldung gestartet. Führe den Befehl auf dem Server aus und prüfe es dann erneut.",
+  "server.tailscale.setup.serverInstall": "Installiere Tailscale auf dem Server-Computer und melde dich an.",
+  "server.tailscale.setup.serverWsl":
+    "Dieser Server läuft in WSL und verwendet die Tailscale-App für Windows. Installiere sie unter Windows und melde dich an.",
+  "server.tailscale.setup.wslMirroredRequired":
+    "WSL muss das gespiegelte Netzwerk verwenden: Füge networkingMode=mirrored unter [wsl2] in %UserProfile%\\.wslconfig hinzu und führe dann wsl --shutdown aus.",
+  "server.tailscale.setup.wslMirroredCheck":
+    "Stelle sicher, dass WSL das gespiegelte Netzwerk verwendet: networkingMode=mirrored unter [wsl2] in %UserProfile%\\.wslconfig.",
+  "server.tailscale.setup.copyCommand": "Einrichtungsbefehl kopieren",
+  "server.tailscale.setup.signIn": "Anmelden",
+  "server.tailscale.setup.openSignIn": "Anmeldeseite öffnen",
+  "server.tailscale.setup.getWindowsApp": "Tailscale für Windows herunterladen",
+  "server.tailscale.setup.networkWaiting": "Wird geprüft, sobald Tailscale auf beiden Computern läuft.",
+  "server.tailscale.setup.networkSame": "Dieser Computer und der Server sind in {tailnet}.",
+  "server.tailscale.setup.networkShared": "Der Server ist mit dem Tailnet dieses Computers geteilt.",
+  "server.tailscale.setup.networkOther":
+    "Dieser Computer ist in {client}, der Server in {server}. Melde dich auf diesem Computer mit dem Konto des Servers an oder teile den Server mit deinem Tailnet.",
+  "server.tailscale.setup.shareServer": "Diesen Server teilen",
+  "server.tailscale.setup.serverFirst": "Wird geprüft, sobald Tailscale auf dem Server läuft.",
+  "server.tailscale.setup.httpsOn": "Für das Tailnet des Servers aktiviert.",
+  "server.tailscale.setup.httpsOff": "Aktiviere HTTPS-Zertifikate auf der DNS-Seite der Tailscale-Adminkonsole.",
+  "server.tailscale.setup.turnOnHttps": "Aktivieren",
+  "server.tailscale.setup.directWaiting": "Verfügbar, sobald die Schritte oben erledigt sind.",
+  "server.tailscale.setup.directDescription":
+    "Mitglieder in deinem Tailnet verbinden sich direkt, ohne die OpenBot-Cloud. Die OpenBot-Cloud bleibt der Ausweichweg.",
+  "server.tailscale.setup.issue.hostOffline": "Dies wird aktiviert, sobald der Server online ist.",
+  "server.tailscale.setup.issue.tailscaleUnavailable": "Tailscale muss auf dem Server laufen und angemeldet sein.",
+  "server.tailscale.setup.issue.portInUse":
+    "Tailscale Serve verwendet die Ports 443 und 8443 auf dem Server bereits. OpenBot ändert sie nicht.",
   "server.route.label": "Verbindung",
   "server.route.direct": "Direkt · Tailscale",
   "server.route.cloud": "Über OpenBot-Cloud",

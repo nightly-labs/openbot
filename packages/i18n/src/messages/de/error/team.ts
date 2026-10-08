@@ -83,6 +83,8 @@ export const messages = {
   "error.team.storageUnsupported": "Diese Verbindung unterstützt keinen Speicher.",
   "error.team.hostedSitesUnsupported": "Diese Verbindung unterstützt keine Websites.",
   "error.team.directEndpointUnsupported": "Dieser Server bietet keine direkte Verbindung an.",
+  "error.team.hostTailscaleUnsupported": "Aktualisiere diesen Server, um Tailscale von hier aus einzurichten.",
+  "error.team.ownerRequired": "Nur der Besitzer dieses Servers kann das tun.",
   "error.team.directSignInUnavailable":
     "Die direkte Verbindung kann Mitglieder gerade nicht prüfen. Verwende die OpenBot-Cloud.",
   "error.team.hostedSitesUnregistered": "Dieser Server ist nicht bei OpenBot registriert und hat daher keine Websites.",
