@@ -548,6 +548,8 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                         name={config().name}
                         mount={props.menuMount}
                         disabled={disabled()}
+                        // A Test would replace the sign-in waiting on this row, and with it Cancel.
+                        testDisabled={test()?.status === "signing-in"}
                         onTest={() => void testRow(config())}
                         signIn={
                           canSignIn(config())
@@ -1057,6 +1059,7 @@ function McpRowMenu(props: {
   name: string;
   mount?: HTMLElement;
   disabled: boolean;
+  testDisabled: boolean;
   onTest: () => void;
   /** Present for an http row on this computer: Sign in, or Sign out once a sign-in is held. */
   signIn?: { signedIn: boolean; busy: boolean; onSignIn: () => void; onSignOut: () => void } | undefined;
@@ -1077,7 +1080,7 @@ function McpRowMenu(props: {
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal mount={props.mount}>
         <DropdownMenu.Content class="server-mcp-row-menu">
-          <DropdownMenu.Item onSelect={() => props.onTest()}>
+          <DropdownMenu.Item disabled={props.testDisabled} onSelect={() => props.onTest()}>
             <Plug aria-hidden="true" />
             {t("mcp.panel.testConnection")}
           </DropdownMenu.Item>

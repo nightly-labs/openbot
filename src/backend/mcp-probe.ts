@@ -104,6 +104,7 @@ const probeMcpServerEffect = Effect.fnUntraced(function* (
     const described = describeProbeFailure(error, config, timeoutMs, signIn, seen.challenge, signInPlace);
     return { toolCount: 0, error: boundedError(redactMcpValues(described, probeSecrets(server, signIn))) };
   };
+  const startedAt = Date.now();
   const first = yield* Effect.result(connectAndCountEffect(server, timeoutMs, signIn?.provider, record));
   if (Result.isSuccess(first)) return { toolCount: first.success, error: null };
   // A server on the 2025-03 MCP authorization spec answers 401 with no challenge at all; its OAuth
@@ -111,7 +112,11 @@ const probeMcpServerEffect = Effect.fnUntraced(function* (
   // would explain is followed up, and only public documents are read: no credential is sent.
   const unexplained = seen.challenge;
   if (!signIn && signInPlace !== null && unexplained?.status === 401 && !unexplained.bearer)
-    seen.challenge = { ...unexplained, bearer: yield* advertisesOAuth(config.url, timeoutMs) };
+    // The same Test deadline covers the lookup: it gets only the time the connection left.
+    seen.challenge = {
+      ...unexplained,
+      bearer: yield* advertisesOAuth(config.url, timeoutMs - (Date.now() - startedAt)),
+    };
   if (!signIn || !(first.failure.cause instanceof UnauthorizedError)) return failure(first.failure.cause);
   // The person's sign-in has its own deadline; the retried connection gets a fresh transport.
   const retry = yield* Effect.result(
@@ -325,23 +330,23 @@ function challengeRecordingFetch(onChallenge: (challenge: McpChallenge) => void)
 }
 
 /** Whether the server's origin publishes OAuth metadata, read without any credential. */
-const advertisesOAuth = Effect.fnUntraced(function* (url: string, timeoutMs: number) {
+const advertisesOAuth = Effect.fnUntraced(function* (url: string, remainingMs: number) {
+  if (remainingMs <= 0) return false;
   const { origin } = new URL(url);
-  for (const path of ["/.well-known/oauth-protected-resource", "/.well-known/oauth-authorization-server"]) {
-    const found = yield* Effect.tryPromise({
+  const lookups = ["/.well-known/oauth-protected-resource", "/.well-known/oauth-authorization-server"].map((path) =>
+    Effect.tryPromise({
       try: async (signal) => {
-        const response = await fetch(`${origin}${path}`, {
-          signal: AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]),
-          headers: { accept: "application/json" },
-        });
+        const response = await fetch(`${origin}${path}`, { signal, headers: { accept: "application/json" } });
         await response.body?.cancel();
         return response.ok && (response.headers.get("content-type") ?? "").includes("json");
       },
       catch: (cause) => new McpProbeFailure({ cause }),
-    }).pipe(Effect.catch(() => Effect.succeed(false)));
-    if (found) return true;
-  }
-  return false;
+    }).pipe(Effect.catch(() => Effect.succeed(false))),
+  );
+  const found = yield* Effect.all(lookups, { concurrency: "unbounded" }).pipe(
+    Effect.timeoutOrElse({ duration: remainingMs, orElse: () => Effect.succeed([false]) }),
+  );
+  return found.some(Boolean);
 });
 
 /** Close both SDK resources and kill a stdio child if it survives transport close. */
@@ -390,7 +395,7 @@ function describeMcpErrorText(error: unknown, config: McpServerConfig, timeoutMs
  * is not that bridge. Covers `npx mcp-remote <url>`, `mcp-remote@<version>` and an installed
  * `mcp-remote` binary.
  */
-export function mcpRemoteBridgeUrl(config: McpServerConfig): string | null {
+function mcpRemoteBridgeUrl(config: McpServerConfig): string | null {
   if (config.transport !== "stdio") return null;
   const words = [basename(config.command), ...config.args];
   const bridge = words.findIndex((word) => /^mcp-remote(@\S*)?$/u.test(word.trim()));
