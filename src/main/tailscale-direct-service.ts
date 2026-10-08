@@ -30,7 +30,7 @@ import {
 const logger = createOpenBotLogger("tailscale-direct");
 
 /** The HTTPS ports tried in order. 443 gives an address without a port. */
-export const TAILSCALE_DIRECT_HTTPS_PORTS = [443, 8443] as const;
+const TAILSCALE_DIRECT_HTTPS_PORTS = [443, 8443] as const;
 
 export interface TailscaleDirectSettings {
   version: 1;

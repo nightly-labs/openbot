@@ -32,7 +32,7 @@ import type { TailscaleLocalState } from "./tailscale-cli";
 import { isWebRtcOnlyTeamPath } from "./team-api-direct-paths";
 
 /** The whole direct attempt, identity check and sign-in together. WebRTC follows a slower one. */
-export const DIRECT_ATTEMPT_TIMEOUT_MS = 4_000;
+const DIRECT_ATTEMPT_TIMEOUT_MS = 4_000;
 /** After a failed attempt, connections use WebRTC for this long before the direct path is tried again. */
 export const DIRECT_RETRY_AFTER_MS = 5 * 60_000;
 /** A session is renewed this long before it ends, with a new account ticket. */
