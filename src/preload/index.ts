@@ -482,6 +482,7 @@ const openbotApi: OpenBotDesktopApi = {
   ...bridgeGroup(IPC_ENDPOINTS.providers, {
     connectProvider: decodeAgentStatusFromMain,
     refreshAgentProviders: decodeAgentStatusFromMain,
+    setProviderOn: decodeAgentStatusFromMain,
     restartProvider: decodeAgentStatusFromMain,
     cancelProviderRestart: decodeAgentStatusFromMain,
     updateProviderCli: decodeAgentStatusFromMain,
@@ -611,6 +612,7 @@ const openbotApi: OpenBotDesktopApi = {
     openPortal: decodeVoid,
   }),
   hostedServers: bridgeGroup(IPC_ENDPOINTS.hostedServers, {
+    lifecycle: decodeVoid,
     list: decodeHostedServerList,
     plans: decodeHostedServerCatalog,
     create: decodeHostedServer,

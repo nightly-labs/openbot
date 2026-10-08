@@ -70,12 +70,24 @@ export function routineScheduleSummary(
   }
 }
 
-/** "9:00 AM". */
+/** "9:00 AM", or "09:00" where the date locale writes a 24-hour clock. */
 export function formatRoutineClock(value: string, text: RoutineText = currentText()): string {
   const [hourText = "0", minuteText = "0"] = value.split(":");
   const hour = Number(hourText);
   const minute = Number(minuteText);
+  if (!text.format.hour12) return routineClock24Text(hour, minute, text);
   return routineClockText(`${hour % 12 || 12}:${String(minute).padStart(2, "0")}`, hour >= 12, text);
+}
+
+/** A wall-clock time on a 24-hour clock, with the separator of the date locale: "16:00", "16.00". */
+function routineClock24Text(hour: number, minute: number, text: RoutineText): string {
+  // UTC, so that no clock change of the local zone moves the time.
+  return text.format.date(Date.UTC(2024, 0, 1, hour, minute), {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: "UTC",
+  });
 }
 
 /** `time` ("9" or "9:30") with its half of the day. */

@@ -94,7 +94,10 @@ describe("hosted server checkout", () => {
       openExternal,
     );
 
-    await expect(runCauseEffect(service.openCheckout("srv_1"))).resolves.toEqual(server);
+    await expect(runCauseEffect(service.openCheckout("srv_1"))).resolves.toEqual({
+      ...server,
+      deletionScheduledAt: null,
+    });
     expect(openExternal).toHaveBeenCalledWith("https://checkout.stripe.com/c/pay/cs_1");
   });
 });

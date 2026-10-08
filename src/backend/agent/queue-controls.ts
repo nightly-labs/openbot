@@ -211,7 +211,7 @@ export class QueueControls {
   }, Effect.uninterruptible);
 
   readonly steer = Effect.fn("QueueControls.steer")(function* (this: QueueControls, input: SteerQueuedMessageInput) {
-    const agent = yield* this.#store.getOrCreate(input.agentId).pipe(toQueueOperationFailed);
+    const agent = yield* this.#store.existing(input.agentId).pipe(toQueueOperationFailed);
     const { client, session, snapshot, context, turnId } = yield* queueStep(() => {
       const client = this.#providers.requireReadyClientForAgent(agent);
       const session = this.#store.activeProviderSession(agent.id);

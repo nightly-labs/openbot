@@ -3,7 +3,7 @@ import { Effect } from "effect";
 // runtimes the providers need.
 
 import { isManagedRuntimeProvider, type ManagedProviderId } from "@openbot/contracts/agent-providers";
-import type { SetProviderApiKeyInput } from "@openbot/contracts/ipc";
+import type { AgentProviderId, SetProviderApiKeyInput } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { shell } from "electron";
@@ -30,6 +30,9 @@ export function providerIpcHandlers({
 }: ProviderIpcDependencies): Pick<IpcGroupHandlers, "providers" | "providerRuntimes"> {
   return {
     providers: {
+      setProviderOn: payloadHandler(parseProviderUseInput, ({ provider, on }) =>
+        runCauseEffect(service.setProviderOn(provider, on)),
+      ),
       connectProvider: payloadHandler(parseProviderId, (provider) =>
         runCauseEffect(
           service.connectProvider(provider, async (value) => {
@@ -117,4 +120,11 @@ export function parseManagedProviderId(value: unknown): ManagedProviderId {
   const provider = parseProviderId(value);
   if (!isManagedRuntimeProvider(provider)) throw new Error("OpenBot does not manage this provider's CLI.");
   return provider;
+}
+
+export function parseProviderUseInput(value: unknown): { provider: AgentProviderId; on: boolean } {
+  if (!isDynamicRecord(value) || typeof value.on !== "boolean") throw new Error("Invalid provider switch.");
+  const provider = parseProviderId(value.provider);
+  if (provider === "acp") throw new Error("Custom agents do not have a built-in provider switch.");
+  return { provider, on: value.on };
 }

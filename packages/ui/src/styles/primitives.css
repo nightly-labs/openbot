@@ -1935,7 +1935,7 @@
 }
 
 /* The standard confirmation: the icon beside a left-aligned title and description, and the actions
- * on a footer below a divider. The surface uses the dialog ring and shadow of the other dialogs.
+ * on a footer below a divider. The surface has a thin border and no shadow.
  * A confirmation always answers the surface that opened it, so it takes the top nested dialog step:
  * it also opens over the marketplace and skills modals on `--openbot-layer-dialog-host`. */
 .ui-confirm-dialog-overlay {
@@ -1958,9 +1958,8 @@
   border-radius: var(--openbot-radius-xl);
   background: var(--openbot-bg-sidebar);
   color: var(--openbot-text-primary);
-  box-shadow:
-    0 0 0 1px var(--openbot-dialog-ring),
-    0 24px 64px var(--openbot-shadow-dialog);
+  border: 1px solid var(--openbot-dialog-ring);
+  box-shadow: none;
   animation: ui-confirm-dialog-in var(--openbot-duration-slow) var(--openbot-ease-out);
 }
 

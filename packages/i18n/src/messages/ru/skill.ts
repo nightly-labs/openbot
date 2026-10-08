@@ -1,0 +1,72 @@
+import type { PartialTranslation } from "../../message";
+import type { messages as source } from "../en/skill";
+
+export const messages = {
+  "skill.title": "Навыки",
+  "skill.close": "Закрыть навыки",
+  "skill.detailsDescription": "Сведения о навыке {name}",
+  "skill.assignedDescription": "Назначенные навыки: {name}",
+  "skill.addFromMarketplace": "Добавить из каталога",
+  "skill.limitReached": "У этого агента достигнут лимит в {limit} навыков. Удалите навык, прежде чем добавлять другой.",
+  "skill.managedOnHost": "Навыками этого агента управляют на хосте.",
+  "skill.loading": "Загрузка навыков…",
+  "skill.loadingDetails": "Загрузка сведений…",
+  "skill.emptyEnabled": "У этого агента нет включённых навыков.",
+  "skill.emptyAssigned": "У этого агента пока нет назначенных навыков.",
+  "skill.folderSkill": "OpenBot не устанавливал этот навык. Измените или удалите его здесь: {location}.",
+  "skill.localOnHost": "Этот локальный навык хранится на хосте. Откройте его сведения на том компьютере.",
+  "skill.moreFor": "Ещё для {name}",
+  "skill.update": "Обновить",
+  "skill.updateName": "Обновить {name}",
+  "skill.enableName": "Включить {name}",
+  "skill.repair": "Исправить",
+  "skill.uninstall": "Удалить",
+  "skill.version": "v{version}",
+  "skill.versionUpdate": "v{installed} · доступна v{available}",
+
+  "skill.loadFailed": "Не удалось загрузить навыки.",
+  "skill.loadDetailsFailed": "Не удалось загрузить сведения о навыке.",
+  "skill.enableFailed": "Не удалось включить навык.",
+  "skill.disableFailed": "Не удалось отключить навык.",
+  "skill.removeFailed": "Не удалось удалить навык.",
+  "skill.updateFailed": "Не удалось обновить навык.",
+
+  "skill.confirm.replaceTitle": "Заменить локальные изменения?",
+  "skill.confirm.removeTitle": "Удалить этот навык?",
+  "skill.confirm.replaceBody":
+    "При обновлении навыка локальные файлы заменяются последним пакетом навыка. Ваши правки в папке этого навыка будут потеряны.",
+  "skill.confirm.removeModifiedBody":
+    "В этом навыке есть локальные изменения в рабочем пространстве агента. Удаление сотрёт эти файлы. Исходные сообщения чата останутся.",
+  "skill.confirm.removeBody": "OpenBot удалит этот навык у агента. История чата сохранится.",
+  "skill.confirm.replace": "Заменить навык",
+  "skill.confirm.remove": "Удалить навык",
+
+  "skill.unavailable.readOnly": "Удалённые навыки доступны только для чтения.",
+  "skill.unavailable.add": "Добавьте этот навык, чтобы попробовать его.",
+  "skill.unavailable.repair": "Исправьте этот навык, чтобы попробовать его.",
+  "skill.unavailable.updateVersion": "Обновите этот навык, чтобы попробовать эту версию.",
+  "skill.unavailable.updateRevision": "Обновите этот навык, чтобы попробовать эту ревизию.",
+  "skill.unavailable.saving": "Дождитесь, пока навык сохранится, затем попробуйте его.",
+  "skill.unavailable.composer": "Поле ввода агента недоступно.",
+
+  "skill.toolbar.source": "Источник навыков",
+  "skill.toolbar.all": "Все",
+  "skill.toolbar.local": "Локальные",
+  "skill.toolbar.enabled": "Включённые",
+  "skill.toolbar.create": "Создать навык",
+
+  "skill.local.loadFailed": "Не удалось загрузить локальные навыки.",
+  "skill.local.toggleFailed": "Не удалось изменить состояние навыка.",
+  "skill.local.addFailed": "Не удалось добавить локальный навык.",
+  "skill.local.back": "Назад к локальным навыкам",
+  "skill.local.added": "Добавлен",
+  "skill.local.add": "Добавить навык",
+  "skill.local.loading": "Загрузка локальных навыков…",
+  "skill.local.empty": "Локальных навыков пока нет.",
+
+  "skill.preview.label": "Превью: {name}",
+  "skill.preview.creator": "Автор: {name}",
+  "skill.preview.examplePrompt": "Помоги мне использовать этот навык.",
+  "skill.preview.try": "Попробовать навык",
+  "skill.preview.linkFailed": "Не удалось открыть ссылку.",
+} as const satisfies PartialTranslation<typeof source>;

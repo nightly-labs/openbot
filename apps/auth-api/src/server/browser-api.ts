@@ -1,6 +1,8 @@
 import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
 import { parseBillingPortalRequest } from "@openbot/contracts/billing";
+import { parseHostedServerLifecycleInput } from "@openbot/contracts/hosted-servers";
 import { type DynamicRecord, isBoolean, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { Cause, Effect } from "effect";
 import { type AuthService, AuthServiceError } from "./auth-service";
 import { AvatarUploadError, readAvatarUpload, removeAccountAvatar, storeAccountAvatar } from "./avatar-storage";
@@ -35,6 +37,7 @@ export interface BrowserApiServices {
   remote: Pick<
     RemoteControlPlane,
     | "listHosts"
+    | "removeOwnedHost"
     | "startSession"
     | "issueSessionTicket"
     | "endSession"
@@ -50,7 +53,10 @@ export interface BrowserApiServices {
   >;
   /** The stored logo of one host version, or null. The handler checks membership and the version first. */
   hostLogo: (hostId: string, version: string) => ReturnType<typeof readHostLogo>;
-  hosting: () => Pick<HostedServerService, "list" | "plans" | "create" | "checkout" | "delete" | "wake" | "status">;
+  hosting: () => Pick<
+    HostedServerService,
+    "list" | "plans" | "create" | "checkout" | "delete" | "wake" | "status" | "lifecycle"
+  >;
   inviteEmailDelivery: () => TeamInviteEmailDelivery | null;
   /** The billing service, or null when this deployment has no Stripe key. */
   billing: () => Pick<BillingService, "getState" | "createPortal"> | null;
@@ -189,6 +195,11 @@ const handleBrowserOperation = Effect.fn("BrowserApi.handleOperation")(function*
   if (path === "session" && request.method === "GET") return json({ user });
   if (path === "v2/remote/hosts" && request.method === "GET")
     return json({ hosts: yield* services.remote.listHosts(user.id) });
+  const [, removedHostId] = /^v2\/remote\/hosts\/([^/]+)$/u.exec(path) ?? [];
+  if (removedHostId !== undefined && request.method === "DELETE") {
+    yield* services.remote.removeOwnedHost(user.id, decodeURIComponent(removedHostId));
+    return new Response(null, { status: 204 });
+  }
   const [, encodedLogoHostId] = /^v2\/remote\/hosts\/([^/]+)\/logo$/u.exec(path) ?? [];
   if (encodedLogoHostId !== undefined && request.method === "GET") {
     const hostId = decodeURIComponent(encodedLogoHostId);
@@ -335,9 +346,17 @@ const handleHosting = Effect.fn("BrowserApi.handleHosting")(function* (
       201,
     );
   }
-  const [, encodedServerId, action] = /^v2\/hosting\/servers\/([^/]+)(?:\/(wake|checkout|status))?$/u.exec(path) ?? [];
+  const [, encodedServerId, action] =
+    /^v2\/hosting\/servers\/([^/]+)(?:\/(wake|checkout|status|lifecycle))?$/u.exec(path) ?? [];
   if (encodedServerId === undefined) return null;
   const serverId = decodeURIComponent(encodedServerId);
+  if (action === "lifecycle" && request.method === "POST") {
+    const body = yield* readJsonObject(request);
+    const input = parseHostedServerLifecycleInput({ ...body, serverId });
+    if (!input) return json({ error: "invalid_request", message: sourceText("error.billing.invalidRequest") }, 400);
+    yield* services.hosting().lifecycle(user, serverId, input);
+    return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
+  }
   if (action === "wake" && request.method === "POST") return json(yield* services.hosting().wake(user, serverId));
   if (action === "status" && request.method === "GET") return json(yield* services.hosting().status(user, serverId));
   if (action === "checkout" && request.method === "POST") {

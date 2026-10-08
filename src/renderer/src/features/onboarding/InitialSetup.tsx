@@ -22,7 +22,6 @@ import {
 } from "./SetupProviderPicker";
 
 interface InitialSetupProps extends SetupProviderProps {
-  reviewing?: boolean;
   state: AppSetupState;
   platform: DesktopPlatform;
   accountEmail: string;
@@ -50,9 +49,7 @@ const TEXT_MARKER = "\u0000";
 export function InitialSetup(props: InitialSetupProps) {
   const { t, errorMessage } = useText();
   const initialInviteUrl = untrack(() => props.inviteUrl?.trim() ?? "");
-  const [route, setRoute] = createSignal<SetupRoute | null>(
-    untrack(() => (props.reviewing ? "local" : initialInviteUrl ? "remote" : null)),
-  );
+  const [route, setRoute] = createSignal<SetupRoute | null>(untrack(() => (initialInviteUrl ? "remote" : null)));
   /**
    * The saved endpoint model, when the saved choice is the custom row. The state is the one saved
    * when the screen opened; the endpoint list can load later.
@@ -170,16 +167,12 @@ export function InitialSetup(props: InitialSetupProps) {
   }
 
   const title = () => {
-    if (props.reviewing) return t("onboarding.setup.reviewTitle");
     if (route() === "local") return t("onboarding.setup.localTitle");
     if (route() === "remote") return t("onboarding.setup.remoteTitle");
     return t("onboarding.setup.title");
   };
 
   const description = () => {
-    if (props.reviewing) {
-      return t("onboarding.setup.reviewDescription");
-    }
     if (route() === "local") {
       return t("onboarding.setup.localDescription");
     }
@@ -195,7 +188,7 @@ export function InitialSetup(props: InitialSetupProps) {
         <Dialog.Content as="section" class="initial-setup" data-dialog-surface="unstyled" ref={setDialogElement}>
           <header class="initial-setup-header">
             <div class="initial-setup-account-row">
-              <Show when={!props.reviewing && route()}>
+              <Show when={route()}>
                 <Button
                   variant="ghost"
                   type="button"
@@ -235,7 +228,7 @@ export function InitialSetup(props: InitialSetupProps) {
             </Dialog.Description>
           </header>
 
-          <Show when={!props.reviewing && route() === null}>
+          <Show when={route() === null}>
             <ul class="setup-route-list" aria-label={t("onboarding.setup.connectionType")}>
               <li>
                 <Button variant="ghost" type="button" class="setup-route-button" onClick={() => chooseRoute("local")}>
@@ -290,7 +283,7 @@ export function InitialSetup(props: InitialSetupProps) {
             </div>
           </Show>
 
-          <Show when={!props.reviewing && route() === "remote"}>
+          <Show when={route() === "remote"}>
             <form
               class="setup-remote-form"
               onSubmit={(event) => {
@@ -356,11 +349,6 @@ export function InitialSetup(props: InitialSetupProps) {
 
           <Show when={route() !== null}>
             <div class="initial-setup-actions">
-              <Show when={props.reviewing}>
-                <Button variant="ghost" type="button" class="initial-setup-secondary" onClick={props.onClose}>
-                  {t("common.cancel")}
-                </Button>
-              </Show>
               <Button
                 variant="default"
                 type="button"
@@ -376,19 +364,17 @@ export function InitialSetup(props: InitialSetupProps) {
                   ? route() === "remote"
                     ? t("common.connecting")
                     : t("common.saving")
-                  : props.reviewing
-                    ? t("onboarding.setup.saveChanges")
-                    : route() === "remote"
-                      ? invitePreview()
-                        ? t("onboarding.setup.connect")
-                        : t("onboarding.setup.reviewInvitation")
-                      : selectedProvider()
-                        ? t("onboarding.setup.continueWith", {
-                            provider: providers.customSelected()
-                              ? t("provider.custom.name")
-                              : providerName(selectedProvider()),
-                          })
-                        : t("onboarding.setup.chooseProvider")}
+                  : route() === "remote"
+                    ? invitePreview()
+                      ? t("onboarding.setup.connect")
+                      : t("onboarding.setup.reviewInvitation")
+                    : selectedProvider()
+                      ? t("onboarding.setup.continueWith", {
+                          provider: providers.customSelected()
+                            ? t("provider.custom.name")
+                            : providerName(selectedProvider()),
+                        })
+                      : t("onboarding.setup.chooseProvider")}
               </Button>
             </div>
           </Show>

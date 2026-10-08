@@ -71,6 +71,7 @@ import { contentDispositionFileName } from "./content-disposition";
 import type { HostedServerDesktopService } from "./hosted-server-service";
 import { decodeAgentSummary, decodeDraftAttachment, decodeDuplicateAgentResultFromHost } from "./remote-agent-decoding";
 import { type RemoteAttachment, RemoteAttachmentCache } from "./remote-attachment-cache";
+import type { RemoteConnectTrace } from "./remote-connect-trace";
 import {
   decodeConversationPageFromHost,
   decodeConversationReadState,
@@ -166,6 +167,8 @@ interface RemoteServerManagerOptions {
   localTailscale?: () => Effect.Effect<TailscaleLocalState>;
   /** Keeps direct Tailscale sessions for the next run. Without it they are in memory only. */
   directSessions?: RemoteDirectSessionStore;
+  /** Times each WebRTC connection for the local trace. */
+  connectTrace?: RemoteConnectTrace;
 }
 
 export interface HostedServerWakeHooks {
@@ -240,6 +243,11 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   #appFocused = true;
   readonly #remoteViewerProxy: RemoteViewerProxy | null;
   #selections = Semaphore.makeUnsafe(1);
+  /** One read of the account's host list at a time, so an older answer cannot replace a newer one. */
+  readonly #directorySync = Semaphore.makeUnsafe(1);
+  /** Done when the first read of the account's host list after `initialize` ends, either way. */
+  readonly #initialDirectory = Deferred.makeUnsafe<void>();
+  readonly #connectTrace: RemoteConnectTrace | null;
   #muteExpiryTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
@@ -267,6 +275,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     this.#webrtcTransport = options.webrtcTransport ?? null;
     this.#getLocalHostId = options.getLocalHostId ?? (() => null);
     this.#hostedServers = options.hostedServers ?? null;
+    this.#connectTrace = options.connectTrace ?? null;
     const localTailscale = options.localTailscale;
     const directSessions = options.directSessions;
     const getPrincipalId = centralAccount.getPrincipalId;
@@ -511,10 +520,16 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
           // transport view stable when both operations finish in the same event-loop turn.
           yield* this.#client.refreshWebRtcCompatibility(serverId).pipe(Effect.catch(() => Effect.void));
           if (server) yield* this.#client.ensureCompatibility(server, true).pipe(Effect.catch(() => Effect.void));
+          this.#connectTrace?.mark(serverId, "compatibility");
           this.#emitChanged();
           yield* Effect.all(
             [
-              this.#refresh.refreshAgentRoster(serverId).pipe(Effect.catch(() => Effect.void)),
+              this.#refresh.refreshAgentRoster(serverId).pipe(
+                Effect.result,
+                Effect.map((result) =>
+                  this.#connectTrace?.mark(serverId, "first-request", Result.isSuccess(result) ? "ok" : "error"),
+                ),
+              ),
               server
                 ? Effect.gen({ self: this }, function* () {
                     const remoteDesktopAvailable = yield* this.#client
@@ -669,20 +684,74 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     });
   }
 
+  /**
+   * Loads the stored servers. The read of the account's host list goes on in the background, so the
+   * window does not wait for the account service: `awaitHostDirectory` waits for it. A stored host
+   * keeps the key it pinned before, and the directory never replaces a pinned key, so that key is
+   * pinned now. A host without one waits in the transport until the directory pins it.
+   */
   readonly initialize = Effect.fn("RemoteManager.initialize")(
     function* (this: RemoteServerManager): Effect.fn.Return<void, RemoteWorkflowError, RemoteRequest> {
       const transport = this.#webrtcTransport;
 
       yield* this.#store.load();
       this.#scheduleMuteExpiry();
-      if (transport) yield* this.#syncWebRtcHosts().pipe(Effect.catch(() => Effect.void));
-      for (const server of this.#store.servers) {
-        this.#connections.setState(server.id, "offline");
-        if (server.transport === "webrtc-v2") this.#connections.startCheckingCompatibility(server.id);
+      this.#initializeConnectionStates();
+      if (!transport) {
+        Deferred.doneUnsafe(this.#initialDirectory, Effect.void);
+        return;
       }
+      for (const server of this.#store.servers) {
+        if (server.transport === "webrtc-v2" && server.publicKey) transport.pinHostKey(server.id, server.publicKey);
+      }
+      transport.beginHostKeySync();
+      const startedAt = performance.now();
+      this.#background(
+        this.#owned(
+          this.#syncWebRtcHosts().pipe(
+            Effect.tap(() => Effect.sync(() => this.#initializeConnectionStates())),
+            // A host the directory added after the event connections started has no connection yet.
+            Effect.tap(() => (this.#events.enabled ? this.startEventConnections() : Effect.void)),
+            Effect.tap(() => Effect.sync(() => this.#emitChanged())),
+            Effect.onExit((exit) =>
+              Effect.sync(() => {
+                this.#connectTrace?.directory(performance.now() - startedAt, Exit.isSuccess(exit) ? "ok" : "error");
+                transport.endHostKeySync();
+                Deferred.doneUnsafe(this.#initialDirectory, Effect.void);
+              }),
+            ),
+          ),
+        ),
+      );
     },
     (operation) => this.#owned(operation),
   ).bind(this);
+
+  /** Waits for the first read of the account's host list. It ends also when the read fails. */
+  readonly awaitHostDirectory = Effect.fn("RemoteManager.awaitHostDirectory")(function* (this: RemoteServerManager) {
+    yield* Deferred.await(this.#initialDirectory);
+  }).bind(this);
+
+  /**
+   * Starts the connection to the selected WebRTC server before the window loads. The other servers
+   * start with the event connections, after the window loads. A failure is dropped here: the event
+   * connections try again and report it.
+   */
+  connectActiveServer(): void {
+    const server = this.#store.find(this.#store.activeServerId);
+    if (!this.#webrtcTransport || server?.transport !== "webrtc-v2") return;
+    // The same choice as every other connect: the direct Tailscale address first, else WebRTC.
+    this.#background(this.#owned(this.#connectHost(server.id)));
+  }
+
+  /** A server that has no connection state yet starts offline, with its compatibility unknown. */
+  #initializeConnectionStates(): void {
+    for (const server of this.#store.servers) {
+      if (this.#connections.stateFor(server.id) !== null) continue;
+      this.#connections.setState(server.id, "offline");
+      if (server.transport === "webrtc-v2") this.#connections.startCheckingCompatibility(server.id);
+    }
+  }
 
   list(): ServerSummary[] {
     return remoteServerSummaries(
@@ -1893,6 +1962,13 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   ): Effect.fn.Return<void, RemoteWorkflowError, RemoteRequest> {
     const transport = this.#webrtcTransport;
     if (!transport) return;
+    yield* this.#directorySync.withPermit(this.#syncWebRtcHostsOnce(transport));
+  });
+
+  readonly #syncWebRtcHostsOnce = Effect.fn("RemoteManager.syncWebRtcHostsOnce")(function* (
+    this: RemoteServerManager,
+    transport: TeamWebRtcClientTransport,
+  ): Effect.fn.Return<void, RemoteWorkflowError, RemoteRequest> {
     const hosts = yield* transport.listHosts();
     const localHostId = this.#getLocalHostId();
     this.#localMemberLimit = hosts.find((host) => host.hostId === localHostId)?.memberLimit ?? null;

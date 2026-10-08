@@ -6,7 +6,6 @@ import { useLayout } from "../../layout";
 import { AccountDock } from "../../lazy-views";
 import { usePlatform } from "../../platform";
 import { useAgents } from "../agents/agents-context";
-import { useSetup } from "../onboarding/onboarding-context";
 import { useServers } from "../servers/servers-context";
 import { useSettings } from "../settings/settings-context";
 import { useUpdates } from "../updates/updates-context";
@@ -22,7 +21,6 @@ export function WorkspaceAccountDock(props: { account: () => CentralAuthUser }) 
   const platform = usePlatform();
   const layout = useLayout();
   const auth = useAuth();
-  const setup = useSetup();
   const updates = useUpdates();
   const { activeAgent, agentStatus } = useAgents();
   const { activeServerId } = useServers();
@@ -81,7 +79,6 @@ export function WorkspaceAccountDock(props: { account: () => CentralAuthUser }) 
         onUpdateAction={updates.runAction}
         onLogout={platform.landingPreview ? undefined : auth.logoutCentralAccount}
         onOpenExternal={(destination) => appPort().openExternal(destination)}
-        onOpenPermissions={() => setup.setPermissionsOpen(true)}
         onOpenSettings={openAppSettings}
         onOpenSkills={() => setSkillsMarketplaceOpen(true)}
       />

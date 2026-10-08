@@ -16,7 +16,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { TeamApiAgents } from "./dependencies";
 import type { AgentRouteTarget, RouteOutcome, TeamApiRequestContext } from "./request-context";
-import { memberSender, readJson, stringArray, stringField } from "./request-helpers";
+import { memberSender, readJson, requireListedAgent, stringArray, stringField } from "./request-helpers";
 
 export interface AgentQueueRouteDependencies {
   agents: Pick<
@@ -29,6 +29,7 @@ export interface AgentQueueRouteDependencies {
     | "editQueuedMessage"
     | "reorderQueue"
     | "interrupt"
+    | "listAgents"
   >;
 }
 
@@ -69,6 +70,7 @@ export async function routeAgentQueue(
   }
   if (method === "POST" && action === "queue/steer") {
     const body = await readJson(request);
+    requireListedAgent(agents, agentId);
     await runCauseEffect(
       agents.steerQueuedMessage({
         agentId,
@@ -106,6 +108,7 @@ export async function routeAgentQueue(
   }
   if (method === "POST" && action === "interrupt") {
     const body = await readJson(request);
+    requireListedAgent(agents, agentId);
     await runCauseEffect(agents.interrupt(agentId, stringField(body, "turnId")));
     return empty(204);
   }

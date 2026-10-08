@@ -6,11 +6,11 @@ import Animated, {
   type SharedValue,
   useAnimatedStyle,
   useDerivedValue,
-  useReducedMotion,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
+import { useReducedMotion } from "@/shared/lib/motion";
 
 const ROW_DURATION = 260;
 const ROW_STAGGER = 32;

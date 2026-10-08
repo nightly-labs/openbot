@@ -127,8 +127,8 @@ through `analytics.openbot.run`.
 Analytics is enabled in production by default. Desktop users can disable it under **Settings →
 General → Privacy → Share product analytics**. The preference is stored locally and disables both UI
 analytics and lifecycle analytics emitted by the local host. Website analytics does not use the
-desktop preference. Mobile has its own phone-wide **Settings → General → Privacy → Share product
-analytics** preference, independent of desktop and host collection. It defaults to enabled in a
+desktop preference. Mobile has its own phone-wide **Settings → Privacy → Share product analytics**
+preference, independent of desktop and host collection. It defaults to enabled in a
 configured production build, is read before collection starts, and remains disabled if the stored
 preference cannot be read. Disabling it drops pending mobile events; it does not remove previously
 received events or retract an in-flight request. There is no persistent offline analytics queue.
@@ -236,7 +236,8 @@ stores nothing. When boat stops the sandbox, boat keeps a snapshot of its disk u
 the server starts again. Deleting the server
 deletes the sandbox. A hosted server updates itself: it downloads the newest release from GitHub
 Releases, as an installed build does, installs the Ubuntu packages that the release needs from the
-Ubuntu package servers, and starts it at its next start.
+Ubuntu package servers, and starts it at its next start, or when a member with update access installs
+it from Server Settings.
 
 For each hosted server, the account service stores the owner, name, size and the size of a pending
 plan change, the plan, billing interval and currency, the open Stripe Checkout session ID, desired
@@ -396,9 +397,10 @@ Billing is off, and Stripe receives nothing, when the account service has no Str
   is never sent to an agent, a provider, a log or a team member. The token and each filled value
   are redacted from logs, exports and diagnostics.
 - `~/Library/Application Support/OpenBot/logs/trace.ndjson` is a local trace of IPC calls,
-  provider turns, and main-process failures. Each line holds a time, the IPC channel name, the turn
-  origin or the failure origin (`uncaughtException` or `unhandledRejection`), the duration, and the
-  outcome word. The failure's error text goes only to the redacted log. The trace holds no payloads,
+  provider turns, main-process failures, and the steps of each connection to a joined server. Each
+  line holds a time, the IPC channel name, the turn origin, the failure origin (`uncaughtException`
+  or `unhandledRejection`) or the connection step (such as `remote-connect:ticket`), the duration,
+  and the outcome word. A connection step does not name the server. The failure's error text goes only to the redacted log. The trace holds no payloads,
   messages, URLs, paths, or identifiers, and it goes through log redaction before it is written. It
   is kept to two files of 2 MB each and is never sent.
 
@@ -849,7 +851,7 @@ answer, has a signature made with a key that only the phone and the host have, s
 cannot start the action with an `openbot://` link. The app shows the command again before it
 approves it.
 
-Settings > General > Live Activities turns this off. The phone then removes its token from the
+Settings > Live Activities turns this off. The phone then removes its token from the
 host.
 
 ## Optional macOS Host Manager

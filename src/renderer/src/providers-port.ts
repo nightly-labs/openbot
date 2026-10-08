@@ -8,6 +8,7 @@ export interface ProvidersPort {
   cancelProviderCodeLogin: OpenBotDesktopApi["cancelProviderCodeLogin"];
   connectProvider: OpenBotDesktopApi["connectProvider"];
   refreshAgentProviders: OpenBotDesktopApi["refreshAgentProviders"];
+  setProviderOn: OpenBotDesktopApi["setProviderOn"];
   restartProvider: OpenBotDesktopApi["restartProvider"];
   cancelProviderRestart: OpenBotDesktopApi["cancelProviderRestart"];
   startProviderCodeLogin: OpenBotDesktopApi["startProviderCodeLogin"];
