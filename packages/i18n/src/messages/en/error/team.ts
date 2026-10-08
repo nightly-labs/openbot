@@ -62,6 +62,8 @@ export const messages = defineMessages("error.team", {
   "error.team.agentUpdateUnsupported": "Updating agents is not supported by this connection.",
   "error.team.contextResetUnsupported": "Starting a new chat is not supported by this connection.",
   "error.team.workspaceDirectoryUnsupported": "Showing folders is not supported by this connection.",
+  "error.team.routineFlowsUnsupported":
+    "This server does not support routine flows. Update OpenBot on the computer that runs it.",
   "error.team.agentImportUnsupported": "Importing agents is not supported by this connection.",
   "error.team.liveActivityUnsupported": "This host cannot update the Live Activity of a phone.",
   "error.team.agentUpdateTargetRequired": "An agent to update is required.",

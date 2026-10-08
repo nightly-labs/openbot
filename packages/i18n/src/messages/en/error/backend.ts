@@ -144,7 +144,6 @@ export const messages = defineMessages("error.backend", {
   "error.backend.routineFlowCycle": "This connection would make a loop.",
   "error.backend.routineFlowLinkLimit": "A routine can have at most {limit} connections.",
   "error.backend.routineFlowHandoffFailed": "The routine could not pass the work on to this agent.",
-  "error.backend.routineFlowRemoteUnsupported": "Routine flows are only available for agents on this computer.",
   "error.backend.mcpServerLimit": "OpenBot keeps up to {limit} MCP servers.",
   "error.backend.mcpServerNameTaken": "An MCP server named {name} already exists.",
   "error.backend.mcpServerNoAnswer": "The server did not answer in {seconds} seconds.",

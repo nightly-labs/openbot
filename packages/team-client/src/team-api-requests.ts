@@ -25,18 +25,28 @@ import {
   decodeRemoteAgentImportResult,
   type InstalledSkill,
   isAttachmentSummary,
+  isRoutine,
+  isRoutineFlowCanvas,
+  isRoutineFlowLink,
+  isRoutineRun,
   type OpenBotDesktopApi,
   type RemoteAgentImportResult,
   type ReorderQueueInput,
   type RespondToBrowserSecretInput,
   type RespondToBrowserTakeoverInput,
+  type Routine,
+  type RoutineRun,
   type SteerQueuedMessageInput,
+  type TestRoutineInput,
   type UpdateQueuedMessageInput,
+  type UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
+import { guardedDecoder } from "@openbot/contracts/ipc-decoding";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_IMPORT_ROUTES, AGENT_IMPORT_UPLOAD_BYTES } from "@openbot/contracts/team-protocol/agent-import-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { CONTEXT_RESET_ROUTES } from "@openbot/contracts/team-protocol/context-reset-v1";
+import { ROUTINE_FLOWS_ROUTES } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import type { RemoteFileUpload } from "./file-upload";
 
@@ -231,5 +241,53 @@ export function teamChannelsApi(request: TeamApiRequest): TeamChannelsApi {
     deleteChannelRoutine: (input) => post(CHANNEL_ROUTES.routineDelete, ignoreResponse, input),
     testChannelRoutine: (input) => post(CHANNEL_ROUTES.routineTest, decodeChannelRoutineRun, input),
     listChannelRoutineRuns: (input) => post(CHANNEL_ROUTES.routineRuns, decodeChannelRoutineRuns, input),
+  };
+}
+
+const decodeRoutine = guardedDecoder(isRoutine, "routine");
+const decodeRoutineRun = guardedDecoder(isRoutineRun, "routine run");
+
+/** Changes an agent routine, such as its instruction. Every host serves this frozen v1 route. */
+export const updateAgentRoutine = Effect.fn("TeamClient.updateAgentRoutine")(function* (
+  request: TeamApiRequest,
+  input: UpdateRoutineInput,
+): Effect.fn.Return<Routine, TeamRequestError> {
+  return yield* teamCall(() =>
+    request(
+      "PATCH",
+      TEAM_API_ROUTES.agent.routine(input.agentId, input.routineId),
+      decodeRoutine,
+      decodeTeamProtocolV2Json(input),
+    ),
+  );
+});
+
+/** Runs an agent routine now. Every host serves this frozen v1 route. */
+export const testAgentRoutine = Effect.fn("TeamClient.testAgentRoutine")(function* (
+  request: TeamApiRequest,
+  { agentId, routineId }: TestRoutineInput,
+): Effect.fn.Return<RoutineRun, TeamRequestError> {
+  return yield* teamCall(() =>
+    request("POST", TEAM_API_ROUTES.agent.routineTest(agentId, routineId), decodeRoutineRun),
+  );
+});
+
+/** The routine canvas calls of the desktop IPC surface. Send them only to a host that serves `routine-flows-v1`. */
+export type TeamRoutineFlowsApi = OpenBotDesktopApi["routineFlows"];
+
+const decodeRoutineFlowCanvas = guardedDecoder(isRoutineFlowCanvas, "routine flow canvas");
+const decodeRoutineFlowLink = guardedDecoder(isRoutineFlowLink, "routine flow link");
+
+/** Every routine flow route is a POST with its input in the body. */
+export function teamRoutineFlowsApi(request: TeamApiRequest): TeamRoutineFlowsApi {
+  const post = <T>(path: string, decode: (value: unknown) => T, body: unknown) =>
+    request("POST", path, decode, decodeTeamProtocolV2Json(body));
+  return {
+    canvas: (agentId) => post(ROUTINE_FLOWS_ROUTES.canvas, decodeRoutineFlowCanvas, { agentId }),
+    savePosition: (input) => post(ROUTINE_FLOWS_ROUTES.savePosition, ignoreResponse, input),
+    removePosition: (input) => post(ROUTINE_FLOWS_ROUTES.removePosition, ignoreResponse, input),
+    connect: (input) => post(ROUTINE_FLOWS_ROUTES.connect, decodeRoutineFlowLink, input),
+    disconnect: (input) => post(ROUTINE_FLOWS_ROUTES.disconnect, ignoreResponse, input),
+    updateLink: (input) => post(ROUTINE_FLOWS_ROUTES.updateLink, decodeRoutineFlowLink, input),
   };
 }

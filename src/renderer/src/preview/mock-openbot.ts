@@ -599,7 +599,9 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       transcribe: async () => ({ text: "Mock voice transcript" }),
       onModelStatus: () => () => undefined,
     },
-    routineFlows: mockRoutineFlows({ routines, routineRuns }),
+    routineFlows: mockRoutineFlows({ routines, routineRuns }, (agentId) =>
+      emitAgentEvent({ type: "routine-flows-changed", agentId }),
+    ),
     auth: mockAuth.auth,
     skills: mockSkills.skills,
     hostedSites: {

@@ -1,14 +1,7 @@
 // The routine flow group of the preview: links and positions in memory, over the mock's routines.
 // It runs no flow, so a step only exists when a story seeds one.
 
-import type {
-  OpenBotDesktopApi,
-  Routine,
-  RoutineFlowLink,
-  RoutineFlowStep,
-  RoutineFlowsChanged,
-  RoutineRun,
-} from "@openbot/contracts/ipc";
+import type { OpenBotDesktopApi, Routine, RoutineFlowLink, RoutineFlowStep, RoutineRun } from "@openbot/contracts/ipc";
 
 interface MockRoutineFlowsSource {
   routines: Map<string, Routine[]>;
@@ -17,15 +10,18 @@ interface MockRoutineFlowsSource {
   steps?: RoutineFlowStep[];
 }
 
-export function mockRoutineFlows(source: MockRoutineFlowsSource): OpenBotDesktopApi["routineFlows"] {
+/** `emit` sends the agent event `routine-flows-changed` for one agent whose canvas changed. */
+export function mockRoutineFlows(
+  source: MockRoutineFlowsSource,
+  emit: (agentId: string) => void,
+): OpenBotDesktopApi["routineFlows"] {
   const links: RoutineFlowLink[] = structuredClone(source.links ?? []);
   const steps: RoutineFlowStep[] = structuredClone(source.steps ?? []);
   const positions = new Map<string, Map<string, { x: number; y: number }>>();
-  const listeners = new Set<(change: RoutineFlowsChanged) => void>();
   const allRoutines = () => [...source.routines.values()].flat();
   const owner = (routineId: string) => allRoutines().find((routine) => routine.id === routineId)?.agentId ?? null;
   const changed = (agentIds: string[]) => {
-    for (const listener of listeners) listener({ agentIds: [...new Set(agentIds)] });
+    for (const agentId of new Set(agentIds)) emit(agentId);
   };
 
   return {
@@ -106,10 +102,6 @@ export function mockRoutineFlows(source: MockRoutineFlowsSource): OpenBotDesktop
       if (index < 0) throw new Error("This connection no longer exists.");
       const [removed] = links.splice(index, 1);
       if (removed) changed([owner(removed.routineId) ?? removed.fromAgentId, removed.fromAgentId, removed.toAgentId]);
-    },
-    onChanged: (listener) => {
-      listeners.add(listener);
-      return () => listeners.delete(listener);
     },
   };
 }

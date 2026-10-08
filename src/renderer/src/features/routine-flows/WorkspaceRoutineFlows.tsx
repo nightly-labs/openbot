@@ -135,17 +135,14 @@ export function WorkspaceRoutineFlows(props: { port?: RoutineFlowsPort }) {
         }),
       )
       .catch(() => undefined);
-    const stopChanged = port().routineFlows.onChanged((change) => {
-      const id = agentId();
-      if (id && change.agentIds.includes(id)) reloadSoon();
-    });
     const stopEvents = port().agent.onScopedEvent(({ serverId, event }) => {
       if (serverId !== "local") return;
-      if (event.type === "routines-changed" || (event.type === "turn-completed" && event.origin === "routine"))
+      if (event.type === "routine-flows-changed") {
+        if (event.agentId === agentId()) reloadSoon();
+      } else if (event.type === "routines-changed" || (event.type === "turn-completed" && event.origin === "routine"))
         reloadSoon();
     });
     return () => {
-      stopChanged();
       stopEvents();
       window.clearTimeout(reloadTimer);
       // A move the user made just before leaving the canvas is saved now, not dropped.

@@ -89,6 +89,12 @@ export interface RoutineFlowsShape {
   connect(input: ConnectRoutineFlowInput): Effect.Effect<RoutineFlowLink, RoutineFlowFailed>;
   disconnect(input: DisconnectRoutineFlowInput): Effect.Effect<void, RoutineFlowFailed>;
   updateLink(input: UpdateRoutineFlowLinkInput): Effect.Effect<RoutineFlowLink, RoutineFlowFailed>;
+  /**
+   * Every agent a routine touches, or the routine of a link touches: its own agent and both agents of
+   * each of its links. Null when the routine or link does not exist. A joined member may change a
+   * flow only when all of them are visible to the member.
+   */
+  agentsOf(ref: { routineId: string } | { linkId: string }): Effect.Effect<string[] | null, RoutineFlowFailed>;
   /** Moves every flow that can move now. */
   sweep(): Effect.Effect<void>;
   /** Asks for a sweep when an agent event may have ended a step. Returns at once. */
@@ -197,6 +203,15 @@ class RoutineFlows extends Context.Service<RoutineFlows, RoutineFlowsShape>()("o
             return { gone, affected };
           });
           dependencies.changed(removed.affected);
+        });
+
+        const agentsOf = Effect.fn("RoutineFlows.agentsOf")(function* (
+          ref: { routineId: string } | { linkId: string },
+        ) {
+          return yield* attempt(() => {
+            const routineId = "routineId" in ref ? ref.routineId : store.link(ref.linkId)?.routineId;
+            return routineId && store.routineOwner(routineId) ? agentsOfRoutine(routineId) : null;
+          });
         });
 
         /** The routine's own agent's part of a run that ended: its answer, or why there is none. */
@@ -383,6 +398,7 @@ class RoutineFlows extends Context.Service<RoutineFlows, RoutineFlowsShape>()("o
           connect,
           disconnect,
           updateLink,
+          agentsOf,
           sweep,
           notice,
         });

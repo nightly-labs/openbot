@@ -87,6 +87,7 @@
     "./team-protocol/context-reset-v1": "./src/team-protocol/context-reset-v1.ts",
     "./team-protocol/events-v1": "./src/team-protocol/events-v1.ts",
     "./team-protocol/workspace-directory-v1": "./src/team-protocol/workspace-directory-v1.ts",
+    "./team-protocol/routine-flows-v1": "./src/team-protocol/routine-flows-v1.ts",
     "./team-protocol/live-activity-push-v1": "./src/team-protocol/live-activity-push-v1.ts",
     "./team-protocol/providers-v1": "./src/team-protocol/providers-v1.ts",
     "./team-protocol/providers-v2": "./src/team-protocol/providers-v2.ts",
