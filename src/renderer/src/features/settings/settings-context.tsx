@@ -98,6 +98,8 @@ const Settings = createSimpleContext({
     let desktopNotificationsChanged = false;
     let busyMessageModeChanged = false;
     let remoteWorkspaceCacheChanged = false;
+    /** The saved copy setting as main last confirmed it, or null before main answers. */
+    const [savedCopyEnabled, setSavedCopyEnabled] = createSignal<boolean | null>(null);
     let turboModeChanged = false;
     const [turboModePending, setTurboModePending] = createSignal(false);
 
@@ -232,7 +234,12 @@ const Settings = createSimpleContext({
         remoteWorkspaceCacheChanged = true;
         persistField(
           "remoteWorkspaceCache",
-          settingsPort().remoteWorkspaceCache.setPreference({ enabled: value.remoteWorkspaceCache }),
+          settingsPort()
+            .remoteWorkspaceCache.setPreference({ enabled: value.remoteWorkspaceCache })
+            .then((preference) => {
+              setSavedCopyEnabled(preference.enabled);
+              return preference;
+            }),
           (preference) => preference.enabled,
         );
       }
@@ -386,6 +393,7 @@ const Settings = createSimpleContext({
         .remoteWorkspaceCache.getPreference()
         .then((preference) => {
           if (remoteWorkspaceCacheChanged) return;
+          setSavedCopyEnabled(preference.enabled);
           setGeneralSettings((current) => ({ ...current, remoteWorkspaceCache: preference.enabled }));
         })
         .catch(() => undefined);
@@ -429,6 +437,7 @@ const Settings = createSimpleContext({
     return {
       analyticsPreferenceLoaded,
       generalSettings,
+      savedCopyEnabled,
       builtInDisplayGeometry,
       turboModePending,
       updateGeneralSettings,

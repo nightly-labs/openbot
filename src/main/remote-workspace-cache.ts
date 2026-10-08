@@ -55,7 +55,8 @@ const COPY_VERSION = 1;
  * The copies of every other account are deleted when the account changes or signs out, a server's copy
  * is deleted when the server leaves the list, and every copy is deleted when the setting is turned off.
  * One permit orders the reads, writes and deletes, so a write that was queued before a delete cannot
- * put the copy back after it.
+ * put the copy back after it. Each request keeps the account generation of the moment it was made, so a
+ * request that was queued for one account cannot reach the copy of the next account.
  *
  * Nothing here logs: a failure deletes the copy it concerns and reads as no copy.
  */
@@ -67,6 +68,8 @@ export class RemoteWorkspaceCacheStore {
   readonly #permit = Semaphore.makeUnsafe(1);
   #enabled = false;
   #principalId: string | null = null;
+  /** Counts the account changes. A request made before a change does not run after it. */
+  #principalGeneration = 0;
   #serverIds: ReadonlySet<string> = new Set();
 
   constructor(options: RemoteWorkspaceCacheOptions) {
@@ -115,9 +118,10 @@ export class RemoteWorkspaceCacheStore {
   /**
    * The signed-in account, or null when nobody is signed in. Another account's copies are deleted, and
    * signing out deletes all of them. The value applies at once to the requests that follow, also
-   * while the delete waits for the permit.
+   * while the delete waits for the permit. The requests made before a change do nothing.
    */
   setPrincipal(principalId: string | null): Effect.Effect<void> {
+    if (principalId !== this.#principalId) this.#principalGeneration += 1;
     this.#principalId = principalId;
     return this.#withPermit(
       principalId === null ? this.#removeAll() : this.#removeOtherPrincipals(principalKey(principalId)),
@@ -132,9 +136,10 @@ export class RemoteWorkspaceCacheStore {
   }
 
   read(serverId: string): Effect.Effect<RemoteWorkspaceCache | null> {
+    const generation = this.#principalGeneration;
     return this.#withPermit(
       Effect.gen({ self: this }, function* () {
-        const target = this.#target(serverId);
+        const target = this.#target(serverId, generation);
         if (!target) return null;
         const stored = yield* this.#readCopy(target);
         if (!stored) return null;
@@ -145,9 +150,10 @@ export class RemoteWorkspaceCacheStore {
   }
 
   saveWorkspace(input: SaveRemoteWorkspaceInput): Effect.Effect<void> {
+    const generation = this.#principalGeneration;
     return this.#withPermit(
       Effect.gen({ self: this }, function* () {
-        const target = this.#target(input.serverId);
+        const target = this.#target(input.serverId, generation);
         if (!target) return;
         const previous = yield* this.#readCopy(target);
         const agents = input.agents.slice(0, REMOTE_WORKSPACE_CACHE_LIMITS.agents).map(savedAgent);
@@ -169,9 +175,10 @@ export class RemoteWorkspaceCacheStore {
 
   /** The latest messages of one chat. A chat of an agent that the saved roster does not list is not kept. */
   saveConversation(input: SaveRemoteConversationInput): Effect.Effect<void> {
+    const generation = this.#principalGeneration;
     return this.#withPermit(
       Effect.gen({ self: this }, function* () {
-        const target = this.#target(input.serverId);
+        const target = this.#target(input.serverId, generation);
         if (!target) return;
         const previous = yield* this.#readCopy(target);
         if (!previous?.agents.some((agent) => agent.id === input.agentId)) return;
@@ -191,10 +198,19 @@ export class RemoteWorkspaceCacheStore {
     );
   }
 
-  /** Where the copy of a server is, or null when this request may not reach a copy. */
-  #target(serverId: string): { path: string; principalId: string; serverId: string } | null {
+  /**
+   * Where the copy of a server is, or null when this request may not reach a copy. `generation` is the
+   * account generation when the request was made: after an account change, the request does nothing.
+   */
+  #target(serverId: string, generation: number): { path: string; principalId: string; serverId: string } | null {
     const principalId = this.#principalId;
-    if (!this.#enabled || principalId === null || !this.#serverIds.has(serverId) || !this.#cipher.canPersist()) {
+    if (
+      generation !== this.#principalGeneration ||
+      !this.#enabled ||
+      principalId === null ||
+      !this.#serverIds.has(serverId) ||
+      !this.#cipher.canPersist()
+    ) {
       return null;
     }
     return {

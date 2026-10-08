@@ -11,6 +11,7 @@ import { type RemoteWorkspaceCacheCipher, RemoteWorkspaceCacheStore } from "./re
 
 // Failure modes, one test each:
 // - another account reads a copy it does not own -> "keeps each account's copy apart..."
+// - a request queued before an account switch writes the next account's copy -> "does not let a request..."
 // - a sign-out leaves a copy on disk -> "deletes every copy at sign-out"
 // - a removed server keeps its copy -> "deletes the copy of a server that leaves the list"
 // - the setting is off and a copy is still written or read -> "keeps nothing while the setting is off"
@@ -104,6 +105,30 @@ describe("remote workspace cache", () => {
 
     // Account A comes back after B: its copy went with the switch and is not restored.
     await Effect.runPromise(store.setPrincipal("account-a"));
+    expect(await Effect.runPromise(store.read("server-1"))).toBeNull();
+  });
+
+  it("does not let a request queued for one account reach the copy of the next account", async () => {
+    const { store, directory } = await createStore();
+    await Effect.runPromise(store.setServers(["server-1"]));
+    await Effect.runPromise(store.setPrincipal("account-a"));
+    await Effect.runPromise(store.saveWorkspace(workspace("server-1", [agent("chief")])));
+
+    // The first save holds the permit, so account A's next requests wait while the account changes to B.
+    const queued = [
+      Effect.runPromise(store.saveWorkspace(workspace("server-1", [agent("chief")]))),
+      Effect.runPromise(store.saveWorkspace(workspace("server-1", [agent("chief")]))),
+      Effect.runPromise(
+        store.saveConversation({ serverId: "server-1", agentId: "chief", messages: [message("m-1", "A's chat")] }),
+      ),
+      Effect.runPromise(store.read("server-1")),
+    ] as const;
+    const switched = Effect.runPromise(store.setPrincipal("account-b"));
+    const [, , , readForA] = await Promise.all(queued);
+    await switched;
+
+    expect(readForA).toBeNull();
+    expect(await filesUnder(directory)).toEqual([]);
     expect(await Effect.runPromise(store.read("server-1"))).toBeNull();
   });
 

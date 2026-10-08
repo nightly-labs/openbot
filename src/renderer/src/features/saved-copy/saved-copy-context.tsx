@@ -1,9 +1,10 @@
-import type {
-  ConversationMessage,
-  ConversationReadState,
-  RemoteWorkspaceCache,
-  SaveRemoteWorkspaceInput,
-  SidebarLayoutSnapshot,
+import {
+  type ConversationMessage,
+  type ConversationReadState,
+  REMOTE_WORKSPACE_CACHE_LIMITS,
+  type RemoteWorkspaceCache,
+  type SaveRemoteWorkspaceInput,
+  type SidebarLayoutSnapshot,
 } from "@openbot/contracts/ipc";
 import type { AgentMessage, AgentProfile } from "@openbot/ui/data";
 import { computeSidebarAgentStates } from "@openbot/ui/features/sidebar/sidebar-agent-states";
@@ -17,6 +18,7 @@ import { useAgents } from "../agents/agents-context";
 import { useConversation } from "../conversation/conversation-context";
 import { serverSupportsCapability } from "../servers/server-capabilities";
 import { useServers } from "../servers/servers-context";
+import { useSettings } from "../settings/settings-context";
 import { useSidebar } from "../sidebar/sidebar-context";
 import { usePresence } from "../team/team-context";
 import { savedCopyPort } from "./saved-copy-port";
@@ -48,6 +50,7 @@ const SavedCopy = createSimpleContext({
     const { conversations, onLatestMessages } = useConversation();
     const { sidebarLayout } = useSidebar();
     const { currentTeamMember } = usePresence();
+    const { savedCopyEnabled } = useSettings();
     const serverId = untrack(activeServerId);
     const scopeIsCurrent = createScopeGuard();
 
@@ -108,39 +111,65 @@ const SavedCopy = createSimpleContext({
     }
 
     // What the server sent, saved for the next launch. Main drops it while the setting is off.
+    function saveWorkspace(input: SaveRemoteWorkspaceInput): Promise<void> {
+      return savedCopyPort()
+        .remoteWorkspaceCache.saveWorkspace(input)
+        .catch(() => undefined);
+    }
+    function saveConversation(agentId: string, messages: ConversationMessage[]): void {
+      void savedCopyPort()
+        .remoteWorkspaceCache.saveConversation({ serverId, agentId, messages })
+        .catch(() => undefined);
+    }
     const workspaceSave = createThrottledSave(
-      (input: SaveRemoteWorkspaceInput) =>
-        void savedCopyPort()
-          .remoteWorkspaceCache.saveWorkspace(input)
-          .catch(() => undefined),
+      (input: SaveRemoteWorkspaceInput) => void saveWorkspace(input),
       SAVE_INTERVAL_MS,
     );
     const conversationSaves = new Map<string, ReturnType<typeof createThrottledSave<ConversationMessage[]>>>();
+    /** The latest messages of the open chat, kept to save them at once when the setting turns on. */
+    let latestConversation: { agentId: string; messages: ConversationMessage[] } | null = null;
 
-    createEffect(
-      () => {
-        const agents = storedAgents();
-        // Only a roster the server sent. A failed read settles the scope too, and saving its empty
-        // roster would delete the copy.
-        if (!agents || activeServer()?.kind !== "remote") return null;
-        const reads: Record<string, ConversationReadState> = {};
-        for (const agent of agents) {
-          const read = conversations[agent.id]?.read;
-          if (read) {
-            reads[agent.id] = {
-              unreadCount: read.unreadCount,
-              firstUnreadMessageId: read.firstUnreadMessageId,
-              throughMessageId: read.throughMessageId,
-            };
-          }
+    const workspaceInput = createMemo((): SaveRemoteWorkspaceInput | null => {
+      const stored = storedAgents();
+      // Only a roster the server sent. A failed read settles the scope too, and saving its empty
+      // roster would delete the copy.
+      if (!stored || activeServer()?.kind !== "remote") return null;
+      // Main accepts and keeps at most this many agents. A larger roster is cut here, so that the copy
+      // still follows the server.
+      const agents = stored.slice(0, REMOTE_WORKSPACE_CACHE_LIMITS.agents);
+      const reads: Record<string, ConversationReadState> = {};
+      for (const agent of agents) {
+        const read = conversations[agent.id]?.read;
+        if (read) {
+          reads[agent.id] = {
+            unreadCount: read.unreadCount,
+            firstUnreadMessageId: read.firstUnreadMessageId,
+            throughMessageId: read.throughMessageId,
+          };
         }
-        const layout = serverSupportsCapability(activeServer(), "sidebar-layout") ? sidebarLayout() : null;
-        return { serverId, memberId: currentTeamMember()?.id ?? null, agents, reads, layout };
-      },
-      (input) => {
-        if (input) workspaceSave.offer(input);
-      },
-    );
+      }
+      const layout = serverSupportsCapability(activeServer(), "sidebar-layout") ? sidebarLayout() : null;
+      return { serverId, memberId: currentTeamMember()?.id ?? null, agents, reads, layout };
+    });
+
+    createEffect(workspaceInput, (input) => {
+      if (input) workspaceSave.offer(input);
+    });
+
+    // Main dropped the saves while the setting was off, and an idle chat sends nothing new. When main
+    // confirms that the setting is on, the roster and the open chat are saved at once.
+    createEffect(savedCopyEnabled, (enabled, previous) => {
+      if (!enabled || previous) return;
+      const input = workspaceInput();
+      if (!input) return;
+      const latest = latestConversation;
+      // Main keeps a chat only of an agent in the saved roster, so the chat follows the roster.
+      void saveWorkspace(input).then(() => {
+        if (latest && scopeIsCurrent() && activeAgent()?.id === latest.agentId) {
+          saveConversation(latest.agentId, latest.messages);
+        }
+      });
+    });
 
     onSettled(() => {
       void initialServersReady.then(load);
@@ -149,15 +178,14 @@ const SavedCopy = createSimpleContext({
         let save = conversationSaves.get(agentId);
         if (!save) {
           save = createThrottledSave(
-            (messages: ConversationMessage[]) =>
-              void savedCopyPort()
-                .remoteWorkspaceCache.saveConversation({ serverId, agentId, messages })
-                .catch(() => undefined),
+            (messages: ConversationMessage[]) => saveConversation(agentId, messages),
             SAVE_INTERVAL_MS,
           );
           conversationSaves.set(agentId, save);
         }
-        save.offer(latest.slice(-60));
+        const messages = latest.slice(-60);
+        latestConversation = { agentId, messages };
+        save.offer(messages);
       });
       return () => {
         stopListening();
