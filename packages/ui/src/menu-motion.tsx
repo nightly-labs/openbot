@@ -105,7 +105,10 @@ function leave(panel: HTMLElement, place: Node | null): void {
   copy.inert = true;
   copy.setAttribute("aria-hidden", "true");
   copy.style.pointerEvents = "none";
-  for (const element of copy.querySelectorAll("[id]")) element.removeAttribute("id");
+  // An SVG keeps its ids: a shape it draws through `url(#id)`, such as an avatar's mask, paints as
+  // its bare box without them. The copy goes in only once the original has left the page.
+  for (const element of copy.querySelectorAll("[id]"))
+    if (!(element instanceof SVGElement)) element.removeAttribute("id");
   copyPanel.removeAttribute("data-expanded");
   delete copyPanel.dataset.menuSwapIn;
 

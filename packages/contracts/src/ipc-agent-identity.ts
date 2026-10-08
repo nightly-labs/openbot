@@ -2,7 +2,7 @@ import { AGENT_PROVIDER_DESCRIPTORS, agentProviderDescriptor } from "./agent-pro
 import { INPUT_LIMITS } from "./input-limits";
 import { type AgentProviderId, isAgentProvider } from "./ipc-agent-status";
 import { isBoundedString } from "./ipc-bounded-values";
-import { isDynamicRecord, isOneOf, isString } from "./runtime-values";
+import { isBoolean, isDynamicRecord, isOneOf, isString } from "./runtime-values";
 
 export type AgentModelId = string;
 
@@ -73,6 +73,11 @@ export interface AgentModelOption {
   description: string;
   defaultReasoningEffort: AgentReasoningEffort;
   supportedReasoningEfforts: AgentReasoningEffort[];
+  /**
+   * False when the provider offers no reasoning setting for this model. `supportedReasoningEfforts`
+   * still holds `medium`, which is what clients that predate this field show and save.
+   */
+  reasoningEffortConfigurable?: boolean;
 }
 
 export function isAgentModelOption(value: unknown): value is AgentModelOption {
@@ -84,6 +89,7 @@ export function isAgentModelOption(value: unknown): value is AgentModelOption {
     isBoundedString(value.description, INPUT_LIMITS.agentDescription) &&
     isReasoningEffort(value.defaultReasoningEffort) &&
     Array.isArray(value.supportedReasoningEfforts) &&
-    value.supportedReasoningEfforts.every(isReasoningEffort)
+    value.supportedReasoningEfforts.every(isReasoningEffort) &&
+    (value.reasoningEffortConfigurable === undefined || isBoolean(value.reasoningEffortConfigurable))
   );
 }

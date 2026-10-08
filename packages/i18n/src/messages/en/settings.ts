@@ -293,6 +293,7 @@ export const messages = defineMessages("settings", {
   "settings.hostedServers.usageNote":
     "A server stops about 15 minutes after the last message or change, also when an app is open. A key press or click in the app, a message, or a scheduled routine starts it again. Its agents and routines work when this computer is off.",
   "settings.hostedServers.empty": "You do not have a hosted server yet.",
+  "settings.hostedServers.loading": "Loading hosted servers…",
   "settings.hostedServers.state.awaitingPayment": "Waiting for payment",
   "settings.hostedServers.state.planEnded": "Plan ended",
   "settings.hostedServers.state.creating": "Creating",
