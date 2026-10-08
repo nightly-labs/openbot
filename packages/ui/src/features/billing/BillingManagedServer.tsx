@@ -151,7 +151,7 @@ export function BillingManagedServer(props: {
           : undefined
       }
       onWake={
-        props.server.state === "stopped" && props.server.error !== "plan_ended"
+        (props.server.state === "stopped" || props.server.state === "error") && props.server.error !== "plan_ended"
           ? () => void props.hosting.wake(props.server)
           : undefined
       }
