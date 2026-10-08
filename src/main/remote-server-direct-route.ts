@@ -24,7 +24,7 @@ import { isValidTailscaleDirectApiUrl } from "@openbot/contracts/invite-links";
 import type { ServerCompatibility, ServerDirectRoute, ServerDirectRouteHint } from "@openbot/contracts/ipc";
 import { decodeRecord } from "@openbot/contracts/ipc-decoding";
 import { isString } from "@openbot/contracts/runtime-values";
-import { Effect } from "effect";
+import { Deferred, Effect, Exit } from "effect";
 import type { StoredDirectSession } from "./remote-direct-session-store";
 import type { RemoteServerDirectory, StoredRemoteServerView } from "./remote-server-store";
 import { RemoteWorkflowError } from "./remote-service-effects";
@@ -85,6 +85,11 @@ export interface RemoteDirectRoutesOptions {
     compatibility: ServerCompatibility,
   ) => Effect.Effect<"valid" | "rejected", RemoteWorkflowError>;
   sessions?: DirectSessionPersistence;
+  /**
+   * Resolves when the signed-in account is known, or when waiting for it has ended. At startup the
+   * account loads in the background; an attempt waits for it before it reads which account it is for.
+   */
+  accountReady?: () => Effect.Effect<void>;
   /** The negotiated HTTPS protocol of the direct address replaces the WebRTC one while it is in use. */
   setCompatibility: (serverId: string, compatibility: ServerCompatibility) => void;
   clearCompatibility: (serverId: string) => void;
@@ -107,6 +112,8 @@ export class RemoteDirectRoutes implements RemoteServerDirectory {
   readonly #active = new Map<string, ActiveRoute>();
   readonly #retryAfter = new Map<string, number>();
   readonly #hints = new Map<string, DirectRouteHint>();
+  /** The attempt that runs for each server. Every caller that comes meanwhile gets its answer. */
+  readonly #attempts = new Map<string, Deferred.Deferred<boolean>>();
   /** Servers whose kept session must not be used, from the moment it was forgotten until it is removed. */
   readonly #forgotten = new Set<string>();
   /** The HTTPS view made for a stored server under one route, and the route of each view. */
@@ -166,17 +173,58 @@ export class RemoteDirectRoutes implements RemoteServerDirectory {
   /**
    * Tries the direct path once. True when requests and events can use it now. It never fails: every
    * failure means "use WebRTC", and the reason is kept for the server settings.
+   *
+   * One attempt per server at a time. A caller that comes while one runs (the event stream, a
+   * reconnect, a renewal) waits for it and gets its answer, instead of starting a second attempt
+   * whose failure would send that caller to WebRTC while the first one made the path active.
    */
-  readonly tryActivate = Effect.fn("RemoteDirectRoutes.tryActivate")(function* (
-    this: RemoteDirectRoutes,
-    serverId: string,
-  ): Effect.fn.Return<boolean> {
-    if (this.#active.has(serverId)) return true;
+  tryActivate(serverId: string): Effect.Effect<boolean> {
+    return Effect.suspend(() => {
+      if (this.#active.has(serverId)) return Effect.succeed(true);
+      const pending = this.#attempts.get(serverId);
+      if (pending) return Deferred.await(pending);
+      if (!this.#mayTry(serverId)) return Effect.succeed(false);
+      const attempt = Deferred.makeUnsafe<boolean>();
+      this.#attempts.set(serverId, attempt);
+      return this.#attempt(serverId).pipe(
+        // An interrupted attempt answers "use WebRTC" to whoever waits for it.
+        Effect.onExit((exit) => Deferred.succeed(attempt, Exit.isSuccess(exit) ? exit.value : false)),
+        Effect.ensuring(
+          Effect.sync(() => {
+            if (this.#attempts.get(serverId) === attempt) this.#attempts.delete(serverId);
+          }),
+        ),
+      );
+    });
+  }
+
+  /**
+   * Waits for the attempt that runs for this server, if one does. A request waits here so that it goes
+   * over the path the attempt chooses, instead of opening WebRTC beside it. It never fails.
+   */
+  awaitAttempt(serverId: string): Effect.Effect<void> {
+    return Effect.suspend(() => {
+      const pending = this.#attempts.get(serverId);
+      return pending ? Effect.asVoid(Deferred.await(pending)) : Effect.void;
+    });
+  }
+
+  /** Whether an attempt can be made now: the address is offered, allowed and not waiting for a retry. */
+  #mayTry(serverId: string): boolean {
     const server = this.#options.servers.find(serverId);
     const url = server?.directUrl;
     if (server?.transport !== "webrtc-v2" || !url || server.directDisabled) return false;
     if (!isValidTailscaleDirectApiUrl(url)) return false;
-    if ((this.#retryAfter.get(serverId) ?? 0) > this.#now()) return false;
+    return (this.#retryAfter.get(serverId) ?? 0) <= this.#now();
+  }
+
+  readonly #attempt = Effect.fn("RemoteDirectRoutes.tryActivate")(function* (
+    this: RemoteDirectRoutes,
+    serverId: string,
+  ): Effect.fn.Return<boolean> {
+    const server = this.#options.servers.find(serverId);
+    const url = server?.directUrl;
+    if (!server || !url || !this.#mayTry(serverId)) return false;
     const local = yield* this.#options.localTailscale();
     if (local.kind !== "connected") {
       this.#hints.set(serverId, "tailscale-unavailable");
@@ -188,7 +236,9 @@ export class RemoteDirectRoutes implements RemoteServerDirectory {
       this.#hints.set(serverId, "other-tailnet");
       return false;
     }
-    // The account the attempt is for. A session is kept and used only for this account.
+    // The account the attempt is for. A session is kept and used only for this account. At startup
+    // the account may still be loading, and "not known yet" would read as another account at the end.
+    if (this.#options.accountReady) yield* this.#options.accountReady();
     const principalId = this.#options.sessions?.principalId() ?? null;
     const kept = yield* this.#keptSession(principalId, serverId, url);
     const attempt = yield* Effect.gen({ self: this }, function* () {
@@ -221,8 +271,10 @@ export class RemoteDirectRoutes implements RemoteServerDirectory {
     );
     // The server can be removed, or the member can turn the path off, while the attempt runs.
     const current = this.#options.servers.find(serverId);
-    // So can the account: a session of the previous account is not used for the next one.
-    const accountChanged = principalId !== (this.#options.sessions?.principalId() ?? null);
+    // So can the account: a session of the previous account is not used for the next one. An account
+    // that was not known at the start (it was still loading) has not changed: nothing kept was read for
+    // it, and nothing is kept for it at the end.
+    const accountChanged = principalId !== null && principalId !== (this.#options.sessions?.principalId() ?? null);
     if (
       attempt._tag === "Failure" ||
       !current ||
@@ -230,6 +282,8 @@ export class RemoteDirectRoutes implements RemoteServerDirectory {
       current.directDisabled ||
       accountChanged
     ) {
+      // A path that is already in use stays in use: this failure does not send it back to WebRTC.
+      if (this.#active.has(serverId)) return true;
       this.#retryAfter.set(serverId, this.#now() + DIRECT_RETRY_AFTER_MS);
       this.#hints.set(serverId, "failed");
       return false;

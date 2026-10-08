@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ServerCompatibility } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
-import { Effect } from "effect";
+import { Deferred, Effect, Fiber } from "effect";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { RemoteDirectSessionStore } from "./remote-direct-session-store";
 import {
@@ -233,6 +233,57 @@ describe("RemoteDirectRoutes", () => {
     expect(view.transport).toBe("webrtc-v2");
     expect(direct.token(view)).toBe("webrtc-token");
   });
+
+  it("makes one attempt for callers that come together, and gives each of them its answer", async () => {
+    const ticket = Deferred.makeUnsafe<string, RemoteWorkflowError>();
+    const createTicket = vi.fn(() => Deferred.await(ticket));
+    const { direct, steps } = routes(webRtcServer(), { createTicket });
+    const first = Effect.runPromise(direct.tryActivate(HOST));
+    const second = Effect.runPromise(direct.tryActivate(HOST));
+    // A request that comes meanwhile waits for the same attempt.
+    let waited = false;
+    const request = Effect.runPromise(direct.awaitAttempt(HOST)).then(() => {
+      waited = true;
+      return direct.require(HOST).apiUrl;
+    });
+    await vi.waitFor(() => expect(createTicket).toHaveBeenCalledOnce());
+    expect(waited).toBe(false);
+    Deferred.doneUnsafe(ticket, Effect.succeed("account-ticket"));
+    expect(await Promise.all([first, second])).toEqual([true, true]);
+    expect(await request).toBe(`${DIRECT}/`);
+    expect(steps).toEqual([`identity ${DIRECT}`, `sign-in ${DIRECT} account-ticket`]);
+    expect(createTicket).toHaveBeenCalledOnce();
+    expect(direct.status(webRtcServer())).toEqual({ offered: true, enabled: true, active: true, hint: null });
+    // Once the path is on, a caller gets it without another attempt.
+    expect(await Effect.runPromise(direct.tryActivate(HOST))).toBe(true);
+    expect(createTicket).toHaveBeenCalledOnce();
+  });
+
+  it("gives every waiting caller the same failure, and tries once", async () => {
+    const identity = Deferred.makeUnsafe<
+      { publicKey: string; compatibility: ServerCompatibility },
+      RemoteWorkflowError
+    >();
+    const verifyIdentity = vi.fn(() => Deferred.await(identity));
+    const { direct } = routes(webRtcServer(), { verifyIdentity });
+    const callers = [Effect.runPromise(direct.tryActivate(HOST)), Effect.runPromise(direct.tryActivate(HOST))];
+    await vi.waitFor(() => expect(verifyIdentity).toHaveBeenCalledOnce());
+    Deferred.doneUnsafe(identity, Effect.fail(new RemoteWorkflowError({ cause: new Error("refused") })));
+    expect(await Promise.all(callers)).toEqual([false, false]);
+    expect(verifyIdentity).toHaveBeenCalledOnce();
+    expect(direct.status(webRtcServer()).hint).toBe("failed");
+  });
+
+  it("answers WebRTC to waiting callers when the attempt is interrupted, and allows the next one", async () => {
+    const createTicket = vi.fn(() => Effect.never);
+    const { direct } = routes(webRtcServer(), { createTicket });
+    const fiber = Effect.runFork(direct.tryActivate(HOST));
+    await vi.waitFor(() => expect(createTicket).toHaveBeenCalledOnce());
+    const waiting = Effect.runPromise(direct.tryActivate(HOST));
+    await Effect.runPromise(Fiber.interrupt(fiber));
+    expect(await waiting).toBe(false);
+    expect(await Effect.runPromise(direct.awaitAttempt(HOST))).toBeUndefined();
+  });
 });
 
 describe("RemoteDirectRoutes with kept sessions", () => {
@@ -401,6 +452,43 @@ describe("RemoteDirectRoutes with kept sessions", () => {
     expect(first.direct.isActive(HOST)).toBe(false);
     expect(await keptToken(first.store, "user-1")).toBeNull();
     expect(await keptToken(first.store, "user-2")).toBeNull();
+  });
+
+  it("waits for the account at startup, then uses its kept session", async () => {
+    const principal: { id: string | null } = { id: "user-1" };
+    const valid = new Set<string>();
+    const first = await run(principal, { valid });
+    expect(await Effect.runPromise(first.direct.tryActivate(HOST))).toBe(true);
+    first.direct.clear();
+
+    // The next start: the account is still loading when the attempt begins.
+    principal.id = null;
+    const loaded = Deferred.makeUnsafe<void>();
+    const accountReady = vi.fn(() => Deferred.await(loaded));
+    const second = await run(principal, { valid, accountReady });
+    const attempt = Effect.runPromise(second.direct.tryActivate(HOST));
+    await vi.waitFor(() => expect(accountReady).toHaveBeenCalledOnce());
+    expect(second.steps).toEqual([]);
+    principal.id = "user-1";
+    Deferred.doneUnsafe(loaded, Effect.void);
+    expect(await attempt).toBe(true);
+    // The kept session: the key is checked, and no ticket follows.
+    expect(second.steps).toEqual([`identity ${DIRECT}`]);
+  });
+
+  it("does not fail when the account was not known at the start and loads during the attempt", async () => {
+    const principal: { id: string | null } = { id: null };
+    const first = await run(principal, {
+      createTicket: () =>
+        Effect.sync(() => {
+          principal.id = "user-1";
+          return "account-ticket";
+        }),
+    });
+    expect(await Effect.runPromise(first.direct.tryActivate(HOST))).toBe(true);
+    expect(first.direct.status(webRtcServer())).toMatchObject({ active: true, hint: null });
+    // Nothing is kept: the attempt did not know which account it was for.
+    expect(await keptToken(first.store, "user-1")).toBeNull();
   });
 
   it("signs in again for a session close to its end, or one for another address", async () => {

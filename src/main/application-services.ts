@@ -1686,6 +1686,8 @@ export async function createApplicationServices({
         const state = centralAuth.getState();
         return state.status === "signed_in" ? state.user.id : null;
       },
+      // Requests to a WebRTC host and a direct attempt wait for the account that loads at startup.
+      ready: () => Effect.ignore(centralAuthInitialization),
       sendTeamInviteEmail: (input) => centralAuth.sendTeamInviteEmail(input),
     },
     {

@@ -116,6 +116,7 @@ import { decodeInvitePreview, decodeJoinResult, decodeTeamPresenceSnapshot } fro
 import { RemoteTeamDirectory } from "./remote-team-directory";
 import { RemoteViewerProxy } from "./remote-viewer-proxy";
 import type { TailscaleLocalState } from "./tailscale-cli";
+import { isWebRtcOnlyTeamPath } from "./team-api-direct-paths";
 import { fingerprint } from "./team-store";
 import {
   TEAM_WEBRTC_REMOTE_REQUEST_TIMEOUT_MILLISECONDS,
@@ -136,6 +137,11 @@ interface CentralAccountSession {
   getEmail: () => string;
   /** The signed-in account, or null. Kept direct sessions belong to it. */
   getPrincipalId?: () => string | null;
+  /**
+   * Resolves once the account has loaded at startup, signed in or not. It never fails. Until then a
+   * WebRTC host cannot be reached and the account of a direct session is not known.
+   */
+  ready?: () => Effect.Effect<void>;
   sendTeamInviteEmail?: (input: {
     email: string;
     serverName: string;
@@ -191,6 +197,9 @@ const HOST_RESTART_RETRY_MS = 10 * 60_000;
 // How long a hosted server keeps the short retry after a wake request. It boots in about a minute; a
 // server that is not back by then is asked about again.
 const HOSTED_SERVER_START_MS = 5 * 60_000;
+// How long a request to a WebRTC host, or a direct attempt, waits for the account to load at startup.
+// The WebRTC connection waits as long for its host before it gives up.
+const REMOTE_ACCOUNT_READY_TIMEOUT_MS = 30_000;
 export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #scope = Scope.makeUnsafe();
   readonly #platform: Layer.Layer<RemoteRequest>;
@@ -291,6 +300,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
           ),
         ),
       sessions,
+      accountReady: () => this.#accountReady(),
       setCompatibility: (serverId, compatibility) => this.#connections.setCompatibility(serverId, compatibility),
       clearCompatibility: (serverId) => this.#connections.clearCompatibility(serverId),
       onRefreshDue: (serverId) => this.#renewDirectRoute(serverId),
@@ -322,6 +332,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       servers: this.#direct,
       connections,
       transport: this.#webrtcTransport,
+      beforeRequest: (serverId, path) => this.#awaitRoute(serverId, path),
     });
     this.#platform = Layer.succeed(
       RemoteRequest,
@@ -487,6 +498,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
    */
   #connectHost(hostId: string): Effect.Effect<void, RemoteWorkflowError> {
     return Effect.gen({ self: this }, function* () {
+      // First, so that a request made meanwhile finds the attempt and waits for it. The attempt waits
+      // for the account itself.
       if (yield* this.#direct.tryActivate(hostId)) {
         this.#emitChanged();
         yield* this.#events.ensure(hostId);
@@ -496,7 +509,33 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       const transport = this.#webrtcTransport;
       if (!transport)
         return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.webRtcUnavailable")) });
+      // A connect that starts with the app waits for the account: WebRTC fails at once before it loads.
+      yield* this.#accountReady();
       yield* transport.connect(hostId);
+    });
+  }
+
+  /**
+   * The account has loaded, or waiting for it ended. Startup loads it in the background, and the
+   * renderer asks its first questions before that is done.
+   */
+  #accountReady(): Effect.Effect<void> {
+    const ready = this.#centralAccount.ready;
+    if (!ready) return Effect.void;
+    return ready().pipe(Effect.timeoutOrElse({ duration: REMOTE_ACCOUNT_READY_TIMEOUT_MS, orElse: () => Effect.void }));
+  }
+
+  /**
+   * Holds a request to a WebRTC host until it can go out: the account has loaded (before that the
+   * WebRTC transport fails at once), and a direct attempt that runs has chosen the route. The request
+   * then goes over the direct path when it is on, else over WebRTC as before.
+   */
+  #awaitRoute(serverId: string, path: string): Effect.Effect<void> {
+    return Effect.suspend(() => {
+      if (this.#store.find(serverId)?.transport !== "webrtc-v2") return Effect.void;
+      // The remote screen and the browser view stay on WebRTC, whatever the attempt chooses.
+      const route = isWebRtcOnlyTeamPath(path) ? Effect.void : this.#direct.awaitAttempt(serverId);
+      return this.#accountReady().pipe(Effect.andThen(route));
     });
   }
 

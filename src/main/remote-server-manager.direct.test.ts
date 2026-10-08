@@ -8,7 +8,7 @@ import { mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
-import { Effect } from "effect";
+import { Deferred, Effect } from "effect";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runCauseEffect } from "../backend/effect-boundary";
 import type { RemoteHostSummary } from "./central-auth-records";
@@ -128,11 +128,13 @@ async function directFixture(
     localTailscale?: TailscaleLocalState;
     sessionsPath?: string;
     principalId?: string;
+    ticket?: () => Effect.Effect<string>;
+    account?: { getPrincipalId?: () => string | null; ready?: () => Effect.Effect<void> };
   } = {},
 ) {
   const transport = fakeWebRtcTransport([listedHost()]);
   const connect = vi.spyOn(transport, "connect").mockReturnValue(Effect.void);
-  const createTeamAuthTicket = vi.fn(() => Effect.succeed("account-ticket"));
+  const createTeamAuthTicket = vi.fn(options.ticket ?? (() => Effect.succeed("account-ticket")));
   const fixture = await createRemoteManager({
     appVersion: "1.0.0",
     servers: [
@@ -145,14 +147,14 @@ async function directFixture(
         ...("directUrl" in options ? { directUrl: options.directUrl } : { directUrl: DIRECT }),
       }),
     ],
-    account: { createTeamAuthTicket, getPrincipalId: () => options.principalId ?? "user-1" },
+    account: { createTeamAuthTicket, getPrincipalId: () => options.principalId ?? "user-1", ...options.account },
     managerOptions: {
       webrtcTransport: transport,
       localTailscale: () => Effect.succeed(options.localTailscale ?? tailnet),
       ...(options.sessionsPath ? { directSessions: sessionStore(options.sessionsPath) } : {}),
     },
   });
-  return { ...fixture, connect, createTeamAuthTicket };
+  return { ...fixture, connect, createTeamAuthTicket, transport };
 }
 
 function sessionStore(path: string): RemoteDirectSessionStore {
@@ -330,6 +332,81 @@ describe("RemoteServerManager direct Tailscale path", () => {
     await runCauseEffect(fixture.manager.setDirectEnabled(HOST, false));
     await vi.waitFor(() => expect(fixture.connect).toHaveBeenCalledWith(HOST));
     expect(fixture.manager.directRouteStatus(HOST)).toMatchObject({ enabled: false, active: false });
+  });
+
+  it("holds a request made during the direct attempt, then sends it over the direct path", async () => {
+    const host = directHost();
+    stubEventSockets();
+    const ticket = Deferred.makeUnsafe<string>();
+    const ready = vi.fn(() => Effect.void);
+    const fixture = await directFixture({ ticket: () => Deferred.await(ticket), account: { ready } });
+    const webRtcRequest = vi.spyOn(fixture.transport, "request");
+    await runCauseEffect(fixture.manager.startEventConnections());
+    await vi.waitFor(() => expect(fixture.createTeamAuthTicket).toHaveBeenCalledOnce());
+
+    let settled = false;
+    const request = runCauseEffect(fixture.manager.request(HOST, TEAM_API_ROUTES.me, (value) => value)).finally(() => {
+      settled = true;
+    });
+    // The attempt asked for the account, and so did the request: it now waits for the attempt.
+    await vi.waitFor(() => expect(ready).toHaveBeenCalledTimes(2));
+    expect(settled).toBe(false);
+    expect(host.requests(TEAM_API_ROUTES.me)).toEqual([]);
+
+    Deferred.doneUnsafe(ticket, Effect.succeed("account-ticket"));
+    expect(await request).toMatchObject({ id: member.id });
+    expect(host.requests(TEAM_API_ROUTES.me).map((call) => call.headers.get("Authorization"))).toEqual([
+      "Bearer direct-session-token",
+    ]);
+    expect(webRtcRequest).not.toHaveBeenCalled();
+    expect(fixture.connect).not.toHaveBeenCalled();
+  });
+
+  it("makes one direct attempt when a retry comes while the event stream connects", async () => {
+    const host = directHost();
+    stubEventSockets();
+    const ticket = Deferred.makeUnsafe<string>();
+    const fixture = await directFixture({ ticket: () => Deferred.await(ticket) });
+    await runCauseEffect(fixture.manager.startEventConnections());
+    await vi.waitFor(() => expect(fixture.createTeamAuthTicket).toHaveBeenCalledOnce());
+    const retry = runCauseEffect(fixture.manager.retryConnection(HOST));
+    Deferred.doneUnsafe(ticket, Effect.succeed("account-ticket"));
+    await retry;
+    await waitForServer(fixture, { state: "online" }, HOST);
+
+    expect(fixture.createTeamAuthTicket).toHaveBeenCalledOnce();
+    expect(host.requests(TEAM_API_ROUTES.auth.account)).toHaveLength(1);
+    expect(fixture.connect).not.toHaveBeenCalled();
+    expect(fixture.manager.directRouteStatus(HOST)).toEqual({ offered: true, enabled: true, active: true, hint: null });
+  });
+
+  it("holds an early request until the account has loaded, instead of failing it at once", async () => {
+    const host = directHost();
+    stubEventSockets();
+    const principal: { id: string | null } = { id: null };
+    const loaded = Deferred.makeUnsafe<void>();
+    const ready = vi.fn(() => Deferred.await(loaded));
+    const fixture = await directFixture({ account: { getPrincipalId: () => principal.id, ready } });
+    // While the account loads, the WebRTC transport cannot reach the host and fails at once.
+    const webRtcRequest = vi
+      .spyOn(fixture.transport, "request")
+      .mockReturnValue(Effect.fail(new RemoteWorkflowError({ cause: new Error("Sign in first.") })));
+
+    // The renderer asks before the event stream starts.
+    const request = runCauseEffect(fixture.manager.request(HOST, TEAM_API_ROUTES.me, (value) => value));
+    await runCauseEffect(fixture.manager.startEventConnections());
+    // The request and the direct attempt both wait for the account.
+    await vi.waitFor(() => expect(ready).toHaveBeenCalledTimes(2));
+    expect(host.calls).toEqual([]);
+    expect(webRtcRequest).not.toHaveBeenCalled();
+
+    principal.id = "user-1";
+    Deferred.doneUnsafe(loaded, Effect.void);
+    expect(await request).toMatchObject({ id: member.id });
+    await waitForServer(fixture, { state: "online" }, HOST);
+    expect(webRtcRequest).not.toHaveBeenCalled();
+    expect(fixture.connect).not.toHaveBeenCalled();
+    expect(fixture.manager.directRouteStatus(HOST)).toMatchObject({ active: true, hint: null });
   });
 
   describe("kept sessions", () => {
