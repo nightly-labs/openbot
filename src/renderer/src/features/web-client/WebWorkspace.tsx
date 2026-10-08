@@ -1463,6 +1463,14 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               customProviders={providerSettings()?.customProviders}
               onDownloadProvider={providerSettings()?.onDownloadProvider}
               onCancelProviderDownload={providerSettings()?.onCancelProviderDownload}
+              onManageProviders={
+                providerSettings()
+                  ? () => {
+                      const current = server();
+                      if (current) void openServerSettings(current.id, null, "providers");
+                    }
+                  : undefined
+              }
               agent={conversationAgent()}
               agents={workspace.profiles()}
               modelOptions={models()}

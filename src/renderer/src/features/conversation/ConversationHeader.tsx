@@ -61,6 +61,7 @@ export function ConversationHeader() {
         onDownloadProvider: props.onDownloadProvider,
         onCancelProviderDownload: props.onCancelProviderDownload,
         onConnectProvider: props.onConnectProvider,
+        onAddCustomProvider: props.onManageProviders,
         modelChangesDisabled: agentActivity() === "Working",
         disabledReason:
           agentActivity() === "Working"

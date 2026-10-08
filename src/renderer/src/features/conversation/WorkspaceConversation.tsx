@@ -41,7 +41,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   const scopeIsCurrent = createScopeGuard();
   const platform = usePlatform();
   const { activeServer, activeServerSupportsCapability, joinServerOpen } = useServers();
-  const { serverSettingsOpen } = useServerSettings();
+  const { serverSettingsOpen, openServerSettings } = useServerSettings();
   const {
     appSettingsOpen,
     skillsMarketplaceOpen,
@@ -217,6 +217,12 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
       (activeServer()?.kind === "local" || providerAdminServerId() !== undefined) &&
       providerRuntimeDownloadsAvailable(),
   );
+  /** Custom endpoints are added in the Providers section that this computer, or an administered host, shows. */
+  const manageProviders = createMemo(() => activeServer()?.kind === "local" || providerAdminServerId() !== undefined);
+  const openProviderSettings = () => {
+    const server = activeServer();
+    if (server) openServerSettings(server.id, null, "providers");
+  };
   /** The browser sign-in opens on this computer, so it stays local. */
   const localProviderDownloads = createMemo(
     () => activeServer()?.kind === "local" && providerRuntimeDownloadsAvailable(),
@@ -243,6 +249,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
       onCancelProviderDownload={providerDownloads() ? cancelProviderRuntimeDownload : undefined}
       onConnectProvider={localProviderDownloads() ? connectProvider : undefined}
       onSignInProvider={activeServer()?.kind === "local" ? connectProvider : undefined}
+      onManageProviders={manageProviders() ? openProviderSettings : undefined}
       agent={conversationAgent()}
       agents={agentList()}
       availableRoutineIds={activeRoutineIds()}

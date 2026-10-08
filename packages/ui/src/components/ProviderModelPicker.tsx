@@ -533,7 +533,15 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                         <span>{railHeadingSummary(provider, status())}</span>
                       </div>
                       <Show when={provider === CUSTOM_RAIL && props.onAddCustomProvider}>
-                        <Button type="button" size="xs" variant="default" onClick={() => props.onAddCustomProvider?.()}>
+                        <Button
+                          type="button"
+                          size="xs"
+                          variant="default"
+                          onClick={() => {
+                            setOpen(false);
+                            props.onAddCustomProvider?.();
+                          }}
+                        >
                           <Plus />
                           {t("provider.picker.addProvider")}
                         </Button>

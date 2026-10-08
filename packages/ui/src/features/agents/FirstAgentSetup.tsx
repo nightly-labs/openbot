@@ -56,6 +56,7 @@ export interface FirstAgentSetupProps {
   onDownloadProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onCancelProviderDownload?: (provider: AgentProviderId) => void | Promise<void>;
   onConnectProvider?: (provider: AgentProviderId) => void | Promise<void>;
+  onAddCustomProvider?: () => void;
   onChange: (value: FirstAgentDraft) => void;
   onSubmit: (value: FirstAgentDraft) => void | Promise<void>;
   onCancel?: () => void;
@@ -455,6 +456,7 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
                       onDownloadProvider={props.onDownloadProvider}
                       onCancelProviderDownload={props.onCancelProviderDownload}
                       onConnectProvider={props.onConnectProvider}
+                      onAddCustomProvider={props.onAddCustomProvider}
                       disabled={props.submitting}
                       onChange={(model, provider) => updateDraft({ model, provider })}
                     />

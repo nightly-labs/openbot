@@ -89,6 +89,8 @@ export interface ConversationProps {
    * needs a way in whether or not OpenBot manages its CLI.
    */
   onSignInProvider?: (provider: AgentProviderId) => void | Promise<void>;
+  /** Open the Providers section of this server's settings, where the user adds an endpoint. */
+  onManageProviders?: () => void;
   agent: AgentProfile | undefined;
   agents: AgentProfile[];
   availableRoutineIds?: readonly string[];
