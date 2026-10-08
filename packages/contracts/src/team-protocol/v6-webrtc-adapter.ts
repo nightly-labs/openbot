@@ -47,7 +47,7 @@ export function encodeTeamProtocolV6WebRtcHttpResponse(
   path: string,
   status: number,
   value: unknown,
-  options: { preserveSemanticTags?: boolean; preserveBrowserSecrets?: boolean } = {},
+  options: { preserveSemanticTags?: boolean; preserveBrowserSecrets?: boolean; historyExtent?: boolean } = {},
 ) {
   if (status === 204) return {};
   if (isRemoteViewerRoute(path)) return encodeTeamProtocolV3WebRtcHttpResponse(method, path, status, value, options);

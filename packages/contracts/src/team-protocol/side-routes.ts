@@ -7,17 +7,34 @@
 // The route sets compare `url.pathname` for equality and share no path, so the order of the checks
 // below does not change which codec a route gets.
 import { channelRequest, channelResponse, isChannelRoute } from "./channels-v1";
+import { isChannelHistoryExtentRoute, withChannelHistoryExtent } from "./history-extent-v1";
 import { isMcpRoute, mcpRequest, mcpResponse } from "./mcp-v1";
 import { optionalRouteCodec } from "./optional-routes";
 import { isStorageRoute, storageRequest, storageResponse } from "./storage-v1";
 import type { TeamProtocolV2Json } from "./v2";
 
-export interface TeamSideRouteCodec {
-  request(path: string, value: unknown): TeamProtocolV2Json;
-  response(path: string, status: number, value: unknown): TeamProtocolV2Json;
+export interface TeamSideRouteOptions {
+  /**
+   * history-extent-v1: a channel page keeps its unloaded length. A host passes the negotiated
+   * capability; a client passes `true`, because a host sends the extent only when it was negotiated.
+   */
+  historyExtent?: boolean;
 }
 
-const CHANNEL_CODEC: TeamSideRouteCodec = { request: channelRequest, response: channelResponse };
+export interface TeamSideRouteCodec {
+  request(path: string, value: unknown): TeamProtocolV2Json;
+  response(path: string, status: number, value: unknown, options?: TeamSideRouteOptions): TeamProtocolV2Json;
+}
+
+const CHANNEL_CODEC: TeamSideRouteCodec = {
+  request: channelRequest,
+  response: (path, status, value, options) => {
+    const projected = channelResponse(path, status, value);
+    return options?.historyExtent && status < 400 && isChannelHistoryExtentRoute(path)
+      ? withChannelHistoryExtent(projected, value)
+      : projected;
+  },
+};
 const MCP_CODEC: TeamSideRouteCodec = { request: mcpRequest, response: mcpResponse };
 const STORAGE_CODEC: TeamSideRouteCodec = { request: storageRequest, response: storageResponse };
 

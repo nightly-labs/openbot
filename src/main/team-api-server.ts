@@ -51,6 +51,7 @@ import {
   supportsTeamSemanticTags,
   TEAM_AGENT_ACTIVITY_CAPABILITY,
   TEAM_CURRENT_CAPABILITIES,
+  TEAM_HISTORY_EXTENT_CAPABILITY,
   type TeamCurrentCapability,
 } from "@openbot/contracts/team-protocol/current";
 import {
@@ -1350,7 +1351,10 @@ export class TeamApiServer {
   #json(response: ServerResponse, status: number, value: object | null): RouteOutcome {
     const route = this.#responseRoutes.get(response);
     if (!route) throw new Error("Team API response route is unavailable.");
-    const options = { preserveSemanticTags: supportsTeamSemanticTags(route.capabilities) };
+    const options = {
+      preserveSemanticTags: supportsTeamSemanticTags(route.capabilities),
+      historyExtent: route.capabilities.has(TEAM_HISTORY_EXTENT_CAPABILITY),
+    };
     // The body is encoded before the head is written. A response the negotiated protocol cannot
     // represent - a route its frozen adapter does not classify - makes the encoder throw, and with
     // the headers already sent that throw could neither answer the caller nor end the request: it
@@ -1364,7 +1368,7 @@ export class TeamApiServer {
         : value;
     const sideRoute = teamSideRouteCodec(route.path);
     const body = sideRoute
-      ? JSON.stringify(sideRoute.response(route.path, status, visibleValue))
+      ? JSON.stringify(sideRoute.response(route.path, status, visibleValue, options))
       : teamHttpCodec(route.protocol).encodeResponse(route.method, route.path, status, visibleValue, options);
     response.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
     response.end(`${body}\n`);

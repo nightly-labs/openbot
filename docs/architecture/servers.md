@@ -111,6 +111,17 @@ only to a connection with the capability and never for a hidden agent. Webhook c
 rotation and webhook test runs stay on `events-v1`. A client without the capability shows a notice
 in the Routines view; the web client shows the view switch only when the host serves it.
 
+### History extent
+
+`history-extent-v1` lets the chat's day rail draw the history that is not loaded on a joined server.
+It adds `olderCount` and `oldestAt` (at most 64 characters) beside the frozen keys of `pageInfo` on
+`GET /v1/agents/:id/conversation-page` and `GET /v1/direct/conversations/:id/page`, and at the top
+level of the `POST /v1/channels/read` page. The host adds them only on protocol 6 and only when the
+request advertises the capability, so a released client reads the same bytes as before. A host
+without the capability never sends them, so a client keeps them whenever they are present, and a
+malformed value fails closed. The WebRTC host peer encodes the local response again with the same
+option, so the fields reach the web client and a joined desktop through the data channel too.
+
 ### Skill events
 
 `skills-events-v1` adds one optional event, `skills-changed { agentId }`. The host sends it after

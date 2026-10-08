@@ -463,7 +463,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
           ? null
           : yield* remoteDecode(() =>
               sideRoute
-                ? sideRoute.response(path, status, envelope.body)
+                ? sideRoute.response(path, status, envelope.body, { historyExtent: true })
                 : decodeTeamProtocolV6WebRtcHttpResponse(method, path, status, envelope.body),
             ).pipe(
               Effect.mapError(

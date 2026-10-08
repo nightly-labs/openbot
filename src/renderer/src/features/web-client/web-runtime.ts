@@ -59,7 +59,7 @@ import {
   isSidebarLayoutSnapshot,
   isTeamPresenceSnapshot,
 } from "@openbot/contracts/ipc";
-import { guardedListDecoder, requiredString } from "@openbot/contracts/ipc-decoding";
+import { guardedListDecoder, optionalHistoryExtent, requiredString } from "@openbot/contracts/ipc-decoding";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
@@ -1071,6 +1071,11 @@ export function decodeWebConversationPage(value: unknown): ConversationPage {
   return {
     ...value,
     references,
-    pageInfo: { hasOlder: value.pageInfo.hasOlder, olderCursor: value.pageInfo.olderCursor },
+    pageInfo: {
+      hasOlder: value.pageInfo.hasOlder,
+      olderCursor: value.pageInfo.olderCursor,
+      // history-extent-v1: the host sends the unloaded length only when it was negotiated.
+      ...optionalHistoryExtent(value.pageInfo),
+    },
   };
 }

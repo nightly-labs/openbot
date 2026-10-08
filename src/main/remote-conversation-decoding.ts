@@ -18,6 +18,7 @@ import {
   decodeRecord,
   guardedListDecoder,
   nullableString,
+  optionalHistoryExtent,
   requiredBoolean,
   requiredNumber,
   requiredString,
@@ -165,10 +166,12 @@ function decodeConversationMessage(value: unknown, label: string): ConversationM
   return value;
 }
 
-function decodePageInfo(value: unknown): { hasOlder: boolean; olderCursor: string | null } {
+function decodePageInfo(value: unknown): ConversationPage["pageInfo"] {
   const record = decodeRecord(value, "conversation page info");
   return {
     hasOlder: requiredBoolean(record, "hasOlder"),
     olderCursor: nullableString(record, "olderCursor"),
+    // history-extent-v1: the host sends the unloaded length only when it was negotiated.
+    ...optionalHistoryExtent(record),
   };
 }

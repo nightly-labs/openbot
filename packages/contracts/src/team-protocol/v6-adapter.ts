@@ -36,6 +36,7 @@ import {
   scopedUsageRoute,
 } from "./current-adapter-routes";
 import { toCurrentAgentKeys, toCurrentAgentKeysObjectForPath, toWireAgentKeys } from "./current-agent-keys";
+import { isHistoryExtentRoute, withPageHistoryExtent } from "./history-extent-v1";
 import { decodeHostAnalyticsV1Response } from "./host-analytics-v1";
 import { decodeMessageClientId } from "./message-client-id-v1";
 import { decodeProfileV6Request, decodeProfileV6Response } from "./profile-v6";
@@ -244,12 +245,29 @@ export function decodeTeamProtocolV6CurrentHttpRequest(
   return toCurrentAgentKeysObjectForPath(path, structuredClone(decodeTeamProtocolV6HttpRequest(method, path, value)));
 }
 
+/**
+ * `historyExtent` is the negotiated history-extent-v1 capability: only then does a page carry its
+ * unloaded length beside the frozen keys. Without it the output is the released projection.
+ */
 export function encodeTeamProtocolV6CurrentHttpResponse(
   method: string,
   path: string,
   status: number,
   value: unknown,
-  options: { preserveSemanticTags?: boolean } = {},
+  options: { preserveSemanticTags?: boolean; historyExtent?: boolean } = {},
+): string {
+  const { historyExtent, ...frozen } = options;
+  const encoded = encodeFrozenResponse(method, path, status, value, frozen);
+  if (!historyExtent || status >= 400 || !isHistoryExtentRoute(method, path)) return encoded;
+  return JSON.stringify(withPageHistoryExtent(JSON.parse(encoded), value));
+}
+
+function encodeFrozenResponse(
+  method: string,
+  path: string,
+  status: number,
+  value: unknown,
+  options: { preserveSemanticTags?: boolean },
 ): string {
   if (isRemoteDesktopSetupRoute(method, path) && status < 400)
     return JSON.stringify(decodeRemoteDesktopSetupResponse(path, value));
@@ -304,7 +322,19 @@ export function encodeTeamProtocolV6CurrentHttpResponse(
   return JSON.stringify(decodeTeamProtocolV6HttpResponse(method, path, status, toWireAgentKeys(currentValue)));
 }
 
+/** A host sends the history extent only under history-extent-v1, so a present one is always kept. */
 export function decodeTeamProtocolV6CurrentHttpResponse(
+  method: string,
+  path: string,
+  status: number,
+  value: unknown,
+): TeamProtocolV6BaseJsonValue {
+  const decoded = decodeFrozenResponse(method, path, status, value);
+  if (status >= 400 || !isHistoryExtentRoute(method, path)) return decoded;
+  return withPageHistoryExtent(decoded, value);
+}
+
+function decodeFrozenResponse(
   method: string,
   path: string,
   status: number,

@@ -43,6 +43,7 @@ import { computeAgentAvatarMoods } from "@openbot/ui/features/agents/agent-avata
 import { createFirstAgentDraft, type FirstAgentDraft } from "@openbot/ui/features/agents/FirstAgentSetup";
 import { BillingDialog } from "@openbot/ui/features/billing/BillingDialog";
 import { createBillingStore } from "@openbot/ui/features/billing/billing-store";
+import { unloadedHistory } from "@openbot/ui/features/conversation/ChatScrollRail";
 import type { DiagramModelChoice } from "@openbot/ui/features/diagrams/DiagramNewAgentCard";
 import { LeaveServerDialog } from "@openbot/ui/features/servers/LeaveServerDialog";
 import { ServerRail } from "@openbot/ui/features/servers/ServerRail";
@@ -1537,6 +1538,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               firstUnreadMessageId={readState()?.firstUnreadMessageId ?? null}
               loaded={Boolean(workspace.conversation()?.page)}
               hasOlder={workspace.conversation()?.page?.pageInfo.hasOlder}
+              unloadedHistory={unloadedHistory(workspace.conversation()?.page?.pageInfo)}
               loadingOlder={workspace.conversation()?.loading}
               activeTurnId={workspace.conversation()?.page?.activeTurnId}
               activityDetail={
