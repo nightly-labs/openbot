@@ -1506,6 +1506,25 @@ describe("webhook route tombstones", () => {
       await expect(runApiEffect(controlPlane.authenticateHost("host-1", ownerToken))).rejects.toMatchObject({
         status: 401,
       });
+      const removedEpoch = database
+        .prepare("SELECT auth_epoch FROM remote_hosts WHERE host_id = 'host-1'")
+        .get()?.auth_epoch;
+      const restored = await runApiEffect(
+        controlPlane.registerHost(account("owner"), {
+          hostId: "host-1",
+          name: "Restored host",
+          ownerMembershipId: "host-1:owner",
+          rotateCredential: false,
+        }),
+      );
+      expect(restored.machineToken).toBeTruthy();
+      expect(restored.authEpoch).toBeGreaterThan(Number(removedEpoch));
+      expect((await runApiEffect(controlPlane.listHosts("owner"))).map((entry) => entry.hostId)).toEqual(["host-1"]);
+      await expect(runApiEffect(controlPlane.authenticateHost("host-1", ownerToken))).rejects.toMatchObject({
+        status: 401,
+      });
+      // Full deletion for hosted-server cleanup still permits a new identity.
+      await runApiEffect(controlPlane.deleteHost("owner", "host-1"));
       const reusedHostToken = await host("stranger", "host-1");
       await expect(
         runApiEffect(controlPlane.registerWebhookRoute("host-1", reusedHostToken, "deleted-host-route")),
