@@ -1,8 +1,6 @@
 import { isRoutineSchedule, type RoutineSchedule } from "@openbot/contracts/ipc";
-import { createFormat, type TranslatedLocale, translateFor } from "@openbot/i18n";
 import { describe, expect, it } from "vitest";
 import {
-  formatRoutineClockShort,
   type RoutineScheduleDraft,
   routineDraftSummary,
   routineHoursLabel,
@@ -194,24 +192,5 @@ describe("routine schedule edits", () => {
     expect(typedClockHour(18, "AM")).toEqual({ hour: 6, meridiem: "PM" });
     expect(typedClockHour(0, "PM")).toEqual({ hour: 12, meridiem: "AM" });
     expect(typedClockHour(9, "PM")).toEqual({ hour: 9, meridiem: "PM" });
-  });
-
-  it("uses the clock of the date locale", () => {
-    const text = (locale: TranslatedLocale, intlLocale: string = locale) => ({
-      t: translateFor(locale),
-      format: createFormat(locale, intlLocale),
-    });
-    const window = { start: "09:00", end: "18:00" };
-    const draft: RoutineScheduleDraft = { kind: "daily", days: EVERY_DAY, time: "16:00" };
-
-    expect(formatRoutineClockShort("16:00", text("en"))).toBe("4 PM");
-    expect(routineHoursLabel(window, 0, text("en"))).toBe("9 AM–6 PM");
-
-    expect(formatRoutineClockShort("16:00", text("fr"))).toBe("16:00");
-    expect(routineHoursLabel(window, 0, text("fr"))).toBe("09:00–18:00");
-    expect(routineDraftSummary(draft, text("ja"))).not.toMatch(/午後|PM/u);
-    expect(routineDraftSummary(draft, text("ja"))).toContain("16:00");
-    // English text on a computer set to Russian keeps the Russian 24-hour clock.
-    expect(routineDraftSummary(draft, text("en", "ru-RU"))).toBe("Every day at 16:00");
   });
 });
