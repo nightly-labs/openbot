@@ -439,12 +439,10 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       this.#background(
         this.#owned(
           this.#syncWebRtcHosts().pipe(
-            Effect.tap(() =>
-              Effect.sync(() => {
-                this.#initializeConnectionStates();
-                this.#emitChanged();
-              }),
-            ),
+            Effect.tap(() => Effect.sync(() => this.#initializeConnectionStates())),
+            // A host the directory added after the event connections started has no connection yet.
+            Effect.tap(() => (this.#events.enabled ? this.startEventConnections() : Effect.void)),
+            Effect.tap(() => Effect.sync(() => this.#emitChanged())),
             Effect.onExit((exit) =>
               Effect.sync(() => {
                 this.#connectTrace?.directory(performance.now() - startedAt, Exit.isSuccess(exit) ? "ok" : "error");

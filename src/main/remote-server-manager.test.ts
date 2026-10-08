@@ -320,6 +320,54 @@ describe("remote server links", () => {
     expect(connect.mock.calls[0]).toEqual([activeId]);
   });
 
+  it("connects a host the directory adds after the event connections started", async () => {
+    const activeId = "00000000-0000-4000-8000-000000000001";
+    const addedId = "00000000-0000-4000-8000-000000000003";
+    const listed = (hostId: string): RemoteHostSummary => ({
+      hostId,
+      name: hostId,
+      logoKey: null,
+      devicePublicKey: `${hostId}-public-key`,
+      authEpoch: 1,
+      membershipId: `${hostId}-member`,
+      role: "member",
+    });
+    let answerDirectory: () => void = () => undefined;
+    const directoryAnswered = new Promise<void>((resolve) => {
+      answerDirectory = resolve;
+    });
+    const transport = fakeWebRtcTransport([], {
+      listHosts: () =>
+        Effect.promise(async () => {
+          await directoryAnswered;
+          return [listed(activeId), listed(addedId)];
+        }),
+    });
+    const connect = vi.spyOn(transport, "connect");
+    const fixture = await createRemoteManager({
+      servers: [
+        storedHttpsServer(activeId, {
+          apiUrl: `webrtc://${activeId}`,
+          transport: "webrtc-v2",
+          encryptedToken: "",
+          fingerprint: fingerprint(`${activeId}-public-key`),
+          publicKey: `${activeId}-public-key`,
+        }),
+      ],
+      activeServerId: activeId,
+      storedVersion: 3,
+      managerOptions: { webrtcTransport: transport },
+      awaitHostDirectory: false,
+    });
+    await runCauseEffect(fixture.manager.startEventConnections());
+    await vi.waitFor(() => expect(connect).toHaveBeenCalledWith(activeId));
+    expect(connect).not.toHaveBeenCalledWith(addedId);
+
+    answerDirectory();
+    await runCauseEffect(fixture.manager.awaitHostDirectory());
+    await vi.waitFor(() => expect(connect).toHaveBeenCalledWith(addedId));
+  });
+
   it("keeps a WebRTC host when the development bootstrap offers the same host over HTTP", async () => {
     const hostId = "00000000-0000-4000-8000-0000000000fd";
     const fixture = await createRemoteManager({
