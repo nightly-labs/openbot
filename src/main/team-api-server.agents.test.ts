@@ -510,6 +510,34 @@ describe("TeamApiServer agents", () => {
     expect(warn).toHaveBeenCalledTimes(2);
   });
 
+  // A host that wakes publishes before its agents load. An empty roster then opens the provider
+  // setup on the peer as if the server had no agents.
+  it("answers the agent list only after the host's agents load", async () => {
+    const source = opencodeFixture[0];
+    if (!isAgentSummary(source)) throw new Error("Invalid agent fixture.");
+    const chief: AgentSummary = { ...source, id: "chief", provider: "claude", model: "claude-opus-5-5" };
+    let roster: AgentSummary[] = [];
+    let finishLoading = (): void => undefined;
+    const loaded = new Promise<void>((resolve) => {
+      finishLoading = resolve;
+    });
+    const agentsReady = vi.fn(() => Effect.promise(() => loaded));
+    const { start, signIn } = await createTeamApiFixture("agents-ready", { configure: true });
+    const { base } = await start({ agentsReady, agents: createAgents({ listAgents: () => roster }) });
+    const token = await signIn();
+
+    const list = fetch(`${base}/v1/agents`, {
+      headers: { Authorization: `Bearer ${token}`, [TEAM_PROTOCOL_VERSION_HEADER]: "3" },
+    });
+    await vi.waitFor(() => expect(agentsReady).toHaveBeenCalled());
+    roster = [chief];
+    finishLoading();
+
+    const response = await list;
+    expect(response.status).toBe(200);
+    expect((await response.json()).map((agent: AgentSummary) => agent.id)).toEqual(["chief"]);
+  });
+
   // A shipped peer's list decoders fail closed on the whole array, and no released protocol knows
   // `=` or `,` in a model id, so neither such a model nor an agent on one may reach a peer.
   it("keeps a model id no released protocol knows off the model and agent lists", async () => {

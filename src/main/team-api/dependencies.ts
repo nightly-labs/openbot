@@ -30,7 +30,7 @@ import type {
   UpdateHostIdentityInput,
 } from "@openbot/contracts/ipc";
 import type { Logger } from "@openbot/logging";
-import type { AgentService } from "../../backend/agent-service";
+import type { AgentLifecycleFailed, AgentService } from "../../backend/agent-service";
 import type { BrowserHost } from "../../backend/browser-host";
 import type { MailboxStore } from "../../backend/mailbox-store";
 import type { SidebarLayoutStore } from "../../backend/sidebar-layout-store";
@@ -246,6 +246,11 @@ export interface TeamApiOptions {
   appVersion?: string;
   store: TeamStore;
   agents: TeamApiAgents;
+  /**
+   * Starts and waits for the first agent initialization. A host that wakes publishes before its
+   * agents load, and an empty roster then would tell a peer that the server has no agents.
+   */
+  agentsReady?: () => Effect.Effect<void, AgentLifecycleFailed>;
   skills?: Pick<SkillMarketplaceService, "listInstalledForChatTags">;
   sidebarLayout?: TeamApiSidebarLayout;
   mailbox: TeamApiMailbox;

@@ -774,6 +774,7 @@ export class TeamApiServer {
   #routeAgents(context: TeamApiRequestContext): Promise<RouteOutcome> {
     return routeAgents(context, {
       agents: this.#options.agents,
+      agentsReady: this.#options.agentsReady,
       skills: this.#options.skills,
       sidebarLayout: this.#options.sidebarLayout,
       duplicateAgent: (agentId, operationId) => this.#duplicateAgent(agentId, operationId),
