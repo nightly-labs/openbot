@@ -312,7 +312,7 @@ export class ConversationQueries {
         .prepare(
           `${ORDERED_THREAD_MESSAGES}
            SELECT message_id FROM ordered
-           WHERE (${ORDER_KEY_COLUMNS}) <= (?, ?, ?, ?, ?, ?)
+           WHERE (${ORDER_KEY_COLUMNS}) <= (?, ?, ?, ?, ?, ?, ?)
              ${conversationMarkerSqlFilter(
                options.excludeRoutineEvents === true,
                options.excludeRoutineRunEvents === true,
@@ -518,7 +518,7 @@ export class ConversationQueries {
           .prepare(
             `${ORDERED_THREAD_MESSAGES}
              SELECT ${ORDER_KEY_COLUMNS} FROM ordered
-             WHERE (${ORDER_KEY_COLUMNS}) < (?, ?, ?, ?, ?, ?)
+             WHERE (${ORDER_KEY_COLUMNS}) < (?, ?, ?, ?, ?, ?, ?)
              ${routineFilter}
              ORDER BY ${ORDER_KEY_DESC} LIMIT ?`,
           )
@@ -542,21 +542,25 @@ export class ConversationQueries {
         .prepare(
           `${ORDERED_THREAD_MESSAGES}
            SELECT ${ORDER_KEY_COLUMNS} FROM ordered
-           WHERE (${ORDER_KEY_COLUMNS}) <= (?, ?, ?, ?, ?, ?)
+           WHERE (${ORDER_KEY_COLUMNS}) <= (?, ?, ?, ?, ?, ?, ?)
            ${routineFilter}
            ORDER BY ${ORDER_KEY_DESC} LIMIT ?`,
         )
         .all(threadId, ...anchorKey, PAGE_MESSAGE_LIMIT + 1),
     );
-    const older = wholeGroups(olderRows, Math.floor(limit / 2) + 1, PAGE_MESSAGE_LIMIT).reverse();
+    // The older half leaves room after the anchor, also when the anchor's turn alone fills a page.
+    const older = wholeGroups(
+      olderRows,
+      Math.floor(limit / 2) + 1,
+      PAGE_MESSAGE_LIMIT - Math.ceil(limit / 2),
+    ).reverse();
     const newerCap = PAGE_MESSAGE_LIMIT - older.length;
-    if (newerCap === 0) return older;
     const newerRows = databaseRows(
       this.#core.connection
         .prepare(
           `${ORDERED_THREAD_MESSAGES}
            SELECT ${ORDER_KEY_COLUMNS} FROM ordered
-           WHERE (${ORDER_KEY_COLUMNS}) > (?, ?, ?, ?, ?, ?)
+           WHERE (${ORDER_KEY_COLUMNS}) > (?, ?, ?, ?, ?, ?, ?)
            ${routineFilter}
            ORDER BY ${ORDER_KEY_COLUMNS} LIMIT ?`,
         )
@@ -575,7 +579,7 @@ export class ConversationQueries {
       this.#core.connection
         .prepare(
           `${ORDERED_THREAD_MESSAGES}
-           SELECT group_start, group_id, turn_rank FROM ordered WHERE message_id = ?`,
+           SELECT group_start, group_first, group_id, turn_rank FROM ordered WHERE message_id = ?`,
         )
         .get(threadId, cursor.messageId),
     );
@@ -583,6 +587,7 @@ export class ConversationQueries {
       ...cursor,
       version: 2,
       groupStart: row ? requiredStringColumn(row, "group_start") : cursor.createdAt,
+      groupFirst: row ? requiredNumberColumn(row, "group_first") : cursor.ordinal,
       groupId: row ? requiredStringColumn(row, "group_id") : `message:${cursor.messageId}`,
       turnRank: row ? requiredNumberColumn(row, "turn_rank") : 0,
     };
@@ -610,7 +615,7 @@ export class ConversationQueries {
              (SELECT created_at FROM projection_thread_messages WHERE thread_id = ? ${routineFilter}
               ORDER BY created_at, ordinal, message_id LIMIT 1) AS oldest_at
            FROM ordered
-           WHERE (${ORDER_KEY_COLUMNS}) < (?, ?, ?, ?, ?, ?)
+           WHERE (${ORDER_KEY_COLUMNS}) < (?, ?, ?, ?, ?, ?, ?)
            ${routineFilter}`,
         )
         .get(threadId, threadId, ...pageKeyValues(cursor)),
@@ -629,8 +634,9 @@ export class ConversationQueries {
  *
  * Inside a turn, `turn_rank` puts the user's and teammates' input first, then commentary and the plan,
  * then the answer. From a steer on, the turn's second input, every row has rank 4 and goes by time.
- * The window runs in time order with its default frame, so it counts the inputs up to and at each
- * row's time, and its minimum is the turn's first time.
+ * One window runs over each turn in time order, so it counts the inputs up to each row and starts at
+ * the turn's first row. Two groups that start at the same time go by the ordinal of their first row,
+ * as the shared order keeps the earlier of two equal groups.
  * Pages, cursors and read state use this one order. The one parameter is the thread id.
  */
 export const ORDERED_THREAD_MESSAGES = `WITH ranked AS (
@@ -645,16 +651,18 @@ export const ORDERED_THREAD_MESSAGES = `WITH ranked AS (
 ), ordered AS (
   SELECT created_at, ordinal, message_id, author, item_type,
     CASE WHEN turn IS NULL THEN created_at ELSE MIN(created_at) OVER turn_by_time END AS group_start,
+    CASE WHEN turn IS NULL THEN ordinal
+      ELSE FIRST_VALUE(ordinal) OVER turn_by_time END AS group_first,
     CASE WHEN turn IS NULL THEN 'message:' || message_id ELSE 'turn:' || turn END AS group_id,
     CASE WHEN turn IS NULL THEN 0
       WHEN SUM(role_rank = 0) OVER turn_by_time >= 2 THEN 4
       ELSE role_rank END AS turn_rank
   FROM ranked
-  WINDOW turn_by_time AS (PARTITION BY turn ORDER BY created_at)
+  WINDOW turn_by_time AS (PARTITION BY turn ORDER BY created_at, ordinal)
 )`;
-export const ORDER_KEY_COLUMNS = "group_start, group_id, turn_rank, created_at, ordinal, message_id";
+export const ORDER_KEY_COLUMNS = "group_start, group_first, group_id, turn_rank, created_at, ordinal, message_id";
 export const ORDER_KEY_DESC =
-  "group_start DESC, group_id DESC, turn_rank DESC, created_at DESC, ordinal DESC, message_id DESC";
+  "group_start DESC, group_first DESC, group_id DESC, turn_rank DESC, created_at DESC, ordinal DESC, message_id DESC";
 
 /** Page decoders on IPC and every Team API version reject a conversation page of more than 100 messages. */
 const PAGE_MESSAGE_LIMIT = 100;
@@ -684,6 +692,7 @@ function wholeGroups(rows: readonly DynamicRecord[], target: number, cap: number
 interface ConversationPageCursor {
   version: 2;
   groupStart: string;
+  groupFirst: number;
   groupId: string;
   turnRank: number;
   createdAt: string;
@@ -691,7 +700,10 @@ interface ConversationPageCursor {
   messageId: string;
 }
 
-type ConversationPageCursorV1 = Omit<ConversationPageCursor, "version" | "groupStart" | "groupId" | "turnRank"> & {
+type ConversationPageCursorV1 = Omit<
+  ConversationPageCursor,
+  "version" | "groupStart" | "groupFirst" | "groupId" | "turnRank"
+> & {
   version: 1;
 };
 
@@ -704,6 +716,7 @@ function conversationRowCursor(row: DynamicRecord): ConversationPageCursor {
   return {
     version: 2,
     groupStart: requiredStringColumn(row, "group_start"),
+    groupFirst: requiredNumberColumn(row, "group_first"),
     groupId: requiredStringColumn(row, "group_id"),
     turnRank: requiredNumberColumn(row, "turn_rank"),
     createdAt: requiredStringColumn(row, "created_at"),
@@ -712,8 +725,16 @@ function conversationRowCursor(row: DynamicRecord): ConversationPageCursor {
   };
 }
 
-function pageKeyValues(cursor: ConversationPageCursor): [string, string, number, string, number, string] {
-  return [cursor.groupStart, cursor.groupId, cursor.turnRank, cursor.createdAt, cursor.ordinal, cursor.messageId];
+function pageKeyValues(cursor: ConversationPageCursor): [string, number, string, number, string, number, string] {
+  return [
+    cursor.groupStart,
+    cursor.groupFirst,
+    cursor.groupId,
+    cursor.turnRank,
+    cursor.createdAt,
+    cursor.ordinal,
+    cursor.messageId,
+  ];
 }
 
 function conversationMarkerSqlFilter(
@@ -753,13 +774,22 @@ function decodeConversationCursor(value: string): ConversationPageCursor | Conve
     if (parsed.version === 1) return { version: 1, ...row };
     if (
       !isString(parsed.groupStart) ||
+      !isNumber(parsed.groupFirst) ||
+      !Number.isInteger(parsed.groupFirst) ||
       !isString(parsed.groupId) ||
       !isNumber(parsed.turnRank) ||
       !Number.isInteger(parsed.turnRank)
     ) {
       throw new Error("invalid cursor");
     }
-    return { version: 2, groupStart: parsed.groupStart, groupId: parsed.groupId, turnRank: parsed.turnRank, ...row };
+    return {
+      version: 2,
+      groupStart: parsed.groupStart,
+      groupFirst: parsed.groupFirst,
+      groupId: parsed.groupId,
+      turnRank: parsed.turnRank,
+      ...row,
+    };
   } catch {
     throw new Error("The conversation page cursor is invalid.");
   }

@@ -679,6 +679,8 @@ describe("OpenBotDatabase", () => {
       message("skewed-thought", 1_501, { turnId: "skewed", itemType: "commentary" }),
       message("skewed-question", 1_502, { author: "user", turnId: "skewed" }),
     );
+    // Two messages alone at one time keep the order they were stored in.
+    messages.push(message("tie-z", 1_600), message("tie-a", 1_600));
     // A turn larger than a page, with a steer on its last page.
     messages.push(
       message("large-question", 2_999, { author: "user", turnId: "large" }),
@@ -704,6 +706,7 @@ describe("OpenBotDatabase", () => {
     expect(expected.indexOf("turn-1-question")).toBeGreaterThan(expected.indexOf("turn-0-answer"));
     expect(expected.indexOf("steer")).toBeGreaterThan(expected.indexOf("steered-thought"));
     expect(expected.indexOf("skewed-answer")).toBeGreaterThan(expected.indexOf("skewed-question"));
+    expect(expected.indexOf("tie-a")).toBeGreaterThan(expected.indexOf("tie-z"));
     expect(expected.indexOf("steered-first-answer")).toBeLessThan(expected.indexOf("steered-second-thought"));
 
     for (const limit of [1, 5, 50]) {
@@ -743,6 +746,16 @@ describe("OpenBotDatabase", () => {
     expect(
       new ConversationReadStore(database).markReadForThread("skew-reader", agent.threadId, "skewed-thought"),
     ).toMatchObject({ firstUnreadMessageId: "skewed-answer" });
+
+    // An anchor late in a turn larger than a page still gets the rows after it.
+    const lateAnchor = database.readConversationPage(
+      agent.id,
+      agent.threadId,
+      { type: "around", messageId: "large-105" },
+      4,
+    );
+    expect(lateAnchor.messages.length).toBeLessThanOrEqual(100);
+    expect(lateAnchor.messages.map(({ id }) => id)).toContain("large-106");
 
     // With limit 2 the turn before the anchor already fills the page; the rest of the turn still comes.
     for (const limit of [2, 4]) {

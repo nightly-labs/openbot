@@ -210,6 +210,7 @@ export class ConversationReadStore {
     if (
       !isDynamicRecord(row) ||
       !isString(row.group_start) ||
+      !isNumber(row.group_first) ||
       !isString(row.group_id) ||
       !isNumber(row.turn_rank) ||
       !isString(row.created_at) ||
@@ -218,7 +219,7 @@ export class ConversationReadStore {
     ) {
       throw new Error("The conversation message order is malformed.");
     }
-    return [row.group_start, row.group_id, row.turn_rank, row.created_at, row.ordinal, row.message_id];
+    return [row.group_start, row.group_first, row.group_id, row.turn_rank, row.created_at, row.ordinal, row.message_id];
   }
 
   #isAfter(threadId: string, candidateMessageId: string, boundary: MessageOrderKey | undefined): boolean {
@@ -228,7 +229,7 @@ export class ConversationReadStore {
         .prepare(
           `${ORDERED_THREAD_MESSAGES}
            SELECT 1 FROM ordered
-           WHERE message_id = ? AND (${ORDER_KEY_COLUMNS}) > (?, ?, ?, ?, ?, ?)`,
+           WHERE message_id = ? AND (${ORDER_KEY_COLUMNS}) > (?, ?, ?, ?, ?, ?, ?)`,
         )
         .get(threadId, candidateMessageId, ...boundary),
     );
@@ -250,7 +251,7 @@ export class ConversationReadStore {
 
   #stateFromDatabase(threadId: string, throughMessageId: string | null): ConversationReadState {
     const boundaryKey = throughMessageId ? this.#messageOrderKey(threadId, throughMessageId) : undefined;
-    const afterBoundary = boundaryKey ? `AND (${ORDER_KEY_COLUMNS}) > (?, ?, ?, ?, ?, ?)` : "";
+    const afterBoundary = boundaryKey ? `AND (${ORDER_KEY_COLUMNS}) > (?, ?, ?, ?, ?, ?, ?)` : "";
     const parameters = boundaryKey ? [threadId, ...boundaryKey] : [threadId];
     const unreadFilter = `author != 'user'
       AND COALESCE(item_type, '') != 'commentary'
@@ -373,9 +374,10 @@ function stateFromSnapshot(snapshot: ConversationSnapshot, throughMessageId: str
   };
 }
 
-/** The shown-order key of a message: its group's start and id, its rank in the turn, then its time, ordinal and id. */
+/** The shown-order key of a message: its group's start, first ordinal and id, its rank in the turn, then its own time, ordinal and id. */
 type MessageOrderKey = [
   groupStart: string,
+  groupFirst: number,
   groupId: string,
   turnRank: number,
   createdAt: string,
