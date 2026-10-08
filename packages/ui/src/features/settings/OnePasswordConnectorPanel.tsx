@@ -299,6 +299,7 @@ export function OnePasswordConnectorPanel(props: OnePasswordConnectorPanelProps)
           description={t("connector.onePassword.disconnectSummary")}
           action={t("connector.onePassword.disconnect")}
           busy={props.busy}
+          confirm
           onAction={props.onDisconnect}
         />
       </Show>

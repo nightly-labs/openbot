@@ -136,6 +136,7 @@ function PluginAppPage(props: { scope: MarketplaceScope; app: PluginApp }) {
           description={t("marketplace.app.disconnect.description", { name: props.app.name })}
           action={t("marketplace.app.disconnect.action")}
           busy={model().appBusy(props.app.id)}
+          confirm
           onAction={() => model().disconnectApp(props.app)}
         />
       </Show>

@@ -271,6 +271,10 @@ export const messages = {
   "server.members.actionsFor": "Acciones para {name}",
   "server.members.makeMember": "Convertir en miembro",
   "server.members.makeAdmin": "Convertir en administrador",
+  "server.members.makeAdminTitle": "¿Convertir a {name} en administrador?",
+  "server.members.makeMemberTitle": "¿Convertir a {name} en miembro?",
+  "server.members.roleChangeDescription":
+    "{name} puede desconectarse de este servidor y tendrá que conectarse de nuevo.",
   "server.invite.invalidEmail": "Introduce una dirección de correo electrónico válida.",
   "server.invite.title": "Invitar personas",
   "server.invite.description":
@@ -315,6 +319,9 @@ export const messages = {
   },
   "server.invite.expires": "Caduca el {date}",
   "server.invite.revoke": "Revocar",
+  "server.invite.revokeTitle": "¿Revocar esta invitación?",
+  "server.invite.revokeDescription":
+    "La invitación deja de funcionar. Quienes se unieron con ella siguen siendo miembros.",
   "server.desktop.accessTitle": "Acceso al escritorio remoto",
   "server.desktop.gatewayDescription":
     "Todos los miembros activos del servidor pueden controlar este host. No hay una contraseña independiente para el escritorio remoto.",

@@ -281,6 +281,10 @@ export const messages = {
   "server.members.actionsFor": "Действия с участником {name}",
   "server.members.makeMember": "Сделать участником",
   "server.members.makeAdmin": "Сделать администратором",
+  "server.members.makeAdminTitle": "Сделать {name} администратором?",
+  "server.members.makeMemberTitle": "Сделать {name} участником?",
+  "server.members.roleChangeDescription":
+    "{name} может быть отключён от этого сервера, и тогда нужно будет подключиться снова.",
   "server.invite.invalidEmail": "Введите корректный адрес почты.",
   "server.invite.title": "Пригласить людей",
   "server.invite.description":
@@ -327,6 +331,9 @@ export const messages = {
   },
   "server.invite.expires": "Истекает {date}",
   "server.invite.revoke": "Отозвать",
+  "server.invite.revokeTitle": "Отозвать это приглашение?",
+  "server.invite.revokeDescription":
+    "Приглашение перестанет работать. Те, кто присоединился по нему, останутся участниками.",
   "server.desktop.accessTitle": "Доступ к удалённому рабочему столу",
   "server.desktop.gatewayDescription":
     "Каждый активный участник сервера может управлять этим хостом. Отдельного пароля для удалённого рабочего стола нет.",

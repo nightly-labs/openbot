@@ -277,6 +277,9 @@ export const messages = {
   "server.members.actionsFor": "Aktionen für {name}",
   "server.members.makeMember": "Zum Mitglied machen",
   "server.members.makeAdmin": "Zum Administrator machen",
+  "server.members.makeAdminTitle": "{name} zum Administrator machen?",
+  "server.members.makeMemberTitle": "{name} zum Mitglied machen?",
+  "server.members.roleChangeDescription": "{name} kann vom Server getrennt werden und muss sich dann erneut verbinden.",
   "server.invite.invalidEmail": "Gib eine gültige E-Mail-Adresse ein.",
   "server.invite.title": "Personen einladen",
   "server.invite.description":
@@ -321,6 +324,9 @@ export const messages = {
   },
   "server.invite.expires": "Läuft am {date} ab",
   "server.invite.revoke": "Widerrufen",
+  "server.invite.revokeTitle": "Diese Einladung widerrufen?",
+  "server.invite.revokeDescription":
+    "Die Einladung funktioniert nicht mehr. Wer damit beigetreten ist, bleibt Mitglied.",
   "server.desktop.accessTitle": "Remotedesktop-Zugriff",
   "server.desktop.gatewayDescription":
     "Jedes aktive Servermitglied kann diesen Host steuern. Es gibt kein separates Remotedesktop-Passwort.",
