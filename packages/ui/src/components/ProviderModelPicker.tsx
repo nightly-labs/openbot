@@ -149,6 +149,11 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   let root: HTMLDivElement | undefined;
   let popover: HTMLElement | undefined;
 
+  const visibleProviders = createMemo(() =>
+    PROVIDERS.filter(
+      (provider) => !props.agentStatus?.providers?.some((status) => status.id === provider && status.off),
+    ),
+  );
   const customIds = createMemo(() => customProviderIds(props.customProviders ?? []));
   const selectedModel = createMemo(() =>
     props.modelOptions.find((option) => option.provider === props.provider && option.id === props.value),
@@ -221,9 +226,10 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   };
 
   createEffect(
-    () => ({ provider: activeProvider(), open: open() }),
-    ({ provider, open }) => {
-      if (!open) setRailProvider(provider);
+    () => ({ provider: activeProvider(), open: open(), visible: visibleProviders(), rail: railProvider() }),
+    ({ provider, open, visible, rail }) => {
+      if (!open || !visible.includes(rail))
+        setRailProvider(visible.includes(provider) ? provider : (visible[0] ?? CUSTOM_RAIL));
     },
   );
 
@@ -253,7 +259,8 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   function setPickerOpen(next: boolean): void {
     if (props.disabled) return;
     if (next) {
-      setRailProvider(activeProvider());
+      const provider = activeProvider();
+      setRailProvider(visibleProviders().includes(provider) ? provider : (visibleProviders()[0] ?? CUSTOM_RAIL));
       setSearch("");
     }
     setOpen(next);
@@ -357,7 +364,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
           <Tabs.Root
             value={railProvider()}
             onChange={(value) => {
-              const provider = PROVIDERS.find((candidate) => candidate === value);
+              const provider = visibleProviders().find((candidate) => candidate === value);
               if (provider) selectRailProvider(provider);
             }}
             orientation="vertical"
@@ -365,7 +372,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
             class="provider-model-layout"
           >
             <Tabs.List class="provider-model-rail" aria-label={t("provider.picker.providers")}>
-              <For each={PROVIDERS}>
+              <For each={visibleProviders()}>
                 {(provider) => {
                   const status = () => railStatus(provider);
                   return (
@@ -406,8 +413,9 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                                   ? -1
                                   : 0;
                             if (!delta) return;
-                            const current = PROVIDERS.indexOf(provider);
-                            const next = PROVIDERS[(current + delta + PROVIDERS.length) % PROVIDERS.length];
+                            const providers = visibleProviders();
+                            const current = providers.indexOf(provider);
+                            const next = providers[(current + delta + providers.length) % providers.length];
                             if (next) providerButtons.get(next)?.focus();
                           }}
                         >
@@ -426,7 +434,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
               </For>
             </Tabs.List>
 
-            <For each={PROVIDERS}>
+            <For each={visibleProviders()}>
               {(provider) => {
                 const status = () => railStatus(provider);
                 const models = createMemo(() => pickerModels(railModelOptions(provider)));
