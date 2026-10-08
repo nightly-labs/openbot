@@ -129,12 +129,31 @@ export function routineFlowDiagram(
       ...canvas.placedAgentIds,
     ]),
   ];
-  const rows = new Map<number, number>();
-  const nextRow = (index: number) => {
-    const row = rows.get(index) ?? 0;
-    rows.set(index, row + 1);
-    return row;
+  // Each agent's row: the row of its first routine, else the row of the first agent that hands work
+  // to it, else the next free one. An edge then runs along its row and not behind another card.
+  const rowOf = new Map<string, number>();
+  const taken = new Set<string>();
+  const routineRow = (agentId: string) => {
+    const index = canvas.routines.findIndex((entry) => entry.routine.agentId === agentId);
+    return index >= 0 ? index : Number.POSITIVE_INFINITY;
   };
+  // Column by column, so the agents that hand work on have their rows; routine owners first.
+  const byColumn = [...agentIds].sort(
+    (a, b) => (column.get(a) ?? 1) - (column.get(b) ?? 1) || routineRow(a) - routineRow(b),
+  );
+  for (const agentId of byColumn) {
+    const from = canvas.links.find((link) => link.toAgentId === agentId && rowOf.has(link.fromAgentId));
+    const wanted = Number.isFinite(routineRow(agentId))
+      ? routineRow(agentId)
+      : from
+        ? (rowOf.get(from.fromAgentId) ?? 0)
+        : 0;
+    const index = column.get(agentId) ?? 1;
+    let row = wanted;
+    while (taken.has(`${index}:${row}`)) row += 1;
+    taken.add(`${index}:${row}`);
+    rowOf.set(agentId, row);
+  }
 
   // What each agent does in each routine: the routine's own agent follows the routine, and every
   // other agent the instruction of a link that reaches it in that routine.
@@ -189,7 +208,7 @@ export function routineFlowDiagram(
         return {
           kind: "agent",
           id: key,
-          position: positionOf(key, { x: index * COLUMN, y: nextRow(index) * AGENT_ROW }),
+          position: positionOf(key, { x: index * COLUMN, y: (rowOf.get(agentId) ?? 0) * AGENT_ROW }),
           agentId,
           task: tasks.get(agentId) ?? "",
           tasks: routineTasks.get(agentId) ?? {},

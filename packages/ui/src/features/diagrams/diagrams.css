@@ -643,8 +643,10 @@
 }
 
 .diagram-node-remove.ui-button,
+/* Stays at the right edge also when the routine has no runs to show. */
 .diagram-node-run.ui-button {
   flex: none;
+  margin-inline-start: auto;
 }
 
 .diagram-node-run.ui-button svg,

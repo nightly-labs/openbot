@@ -467,6 +467,59 @@ const headlineDiagram: Diagram = {
   ],
 };
 
+/** One routine that a webhook starts instead of a schedule: a published release, for one agent. */
+const webhookDiagram: Diagram = {
+  id: "diagram-webhook",
+  name: "Release published",
+  updatedAt: STARTED,
+  nodes: [
+    {
+      kind: "routine",
+      id: "node-release-published",
+      position: { x: 0, y: 0 },
+      name: "Release published",
+      instruction: "Check the published release's notes and assets, then list the three things the team does next.",
+      schedule: null,
+      webhook: {
+        url: "https://relay.openbot.example/v1/webhooks/2e2faecf-ce55-4bb5-9d70-04ff5e40a1fc",
+        eventType: "release.published",
+        filters: [{ pointer: "/release/prerelease", value: false }],
+      },
+      active: true,
+      upcomingRuns: [],
+      recentRuns: pastRuns("release", 6 * 3600, ["succeeded", "succeeded", "failed", "succeeded"]),
+    },
+    {
+      kind: "agent",
+      id: "node-release-agent",
+      position: { x: 360, y: 0 },
+      agentId: "research",
+      task: "Read the release notes and the asset list, and name what the team does next.",
+    },
+  ],
+  edges: [{ id: "edge-release", from: "node-release-published", to: "node-release-agent" }],
+  lastRuns: [
+    {
+      id: "run-release",
+      routineNodeId: "node-release-published",
+      kind: "scheduled",
+      status: "succeeded",
+      startedAt: STARTED,
+      finishedAt: at(24),
+      steps: [
+        step(
+          "node-release-agent",
+          "succeeded",
+          "Check the published release's notes and assets, then list the three things the team does next.",
+          "1. Announce v0.33.0 in the community channel. 2. Update the docs site. 3. Close the release milestone.",
+          0,
+          24,
+        ),
+      ],
+    },
+  ],
+};
+
 const assistantHistory: DiagramChatMessage[] = [
   {
     id: "m1",
@@ -656,6 +709,16 @@ function InteractiveDiagram(props: {
         }))
       }
       onRunRoutine={runNow}
+      webhooks={{
+        connected: true,
+        onSave: async (routineNodeId, change) => {
+          setDiagram((state) => {
+            const node = state.nodes.find((candidate) => candidate.id === routineNodeId);
+            if (node?.kind === "routine" && node.webhook) node.webhook = { ...node.webhook, ...change };
+          });
+        },
+        onRegenerateSecret: async () => `whsec_story_${nextId("secret")}`,
+      }}
     />
   );
 }
@@ -903,6 +966,12 @@ export const NoRunYet: Story = {
 /** One routine and one agent that works alone: a page check every 30 minutes. */
 export const SingleAgentRoutine: Story = {
   render: () => <InteractiveDiagram diagram={headlineDiagram} />,
+  decorators: [(Story) => <div style={{ display: "flex", height: "100vh" }}>{Story()}</div>],
+};
+
+/** A routine that a webhook starts: its card says which events start it, and its details set the webhook. */
+export const WebhookRoutine: Story = {
+  render: () => <InteractiveDiagram diagram={webhookDiagram} />,
   decorators: [(Story) => <div style={{ display: "flex", height: "100vh" }}>{Story()}</div>],
 };
 
