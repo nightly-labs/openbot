@@ -233,6 +233,7 @@ function handle(message) {
             kind: "read",
             status: "in_progress",
             rawInput: { path: "README.md" },
+            locations: [{ path: "/private/tool-history/README.md" }],
           },
         },
       });
@@ -246,6 +247,7 @@ function handle(message) {
             toolCallId: "tool-1",
             status: "completed",
             rawOutput: { text: "OpenBot" },
+            locations: [{ path: "/private/tool-history/updated.md" }],
           },
         },
       });
@@ -1005,6 +1007,10 @@ describe("OpenCode ACP session loading", () => {
         },
       },
     });
+    const filePaths: unknown[] = [];
+    client.on("notification", (event) => {
+      if (isDynamicRecord(event.params) && event.params.filePaths) filePaths.push(event.params.filePaths);
+    });
     await runCauseEffect(client.request("initialize", {}, decodeRecordResponse));
     const thread = await runCauseEffect(client.request("thread/start", { cwd: fake.directory }, decodeRecordResponse));
     const threadId = isDynamicRecord(thread.thread) ? thread.thread.id : null;
@@ -1017,6 +1023,8 @@ describe("OpenCode ACP session loading", () => {
       ),
     );
     await vi.waitFor(() => expect(appended).toHaveLength(1));
+    expect(filePaths).toEqual([["/private/tool-history/README.md"], ["/private/tool-history/updated.md"]]);
+    expect(JSON.stringify(appended)).not.toContain("/private/tool-history/");
     expect(appended[0]?.[1]).toMatchObject({
       complete: true,
       items: [

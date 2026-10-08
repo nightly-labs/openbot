@@ -9,8 +9,7 @@ export const messages = {
   // The logo color setting, General tab.
   "settings.appearance.title": "Apparence",
   "settings.logoColor.title": "Couleur du logo",
-  "settings.logoColor.description":
-    "La couleur du logo OpenBot dans le Dock,\nla barre des tâches et la Dynamic Island.",
+  "settings.logoColor.description": "Affichée dans le Dock, la barre des tâches et la Dynamic Island.",
   "settings.logoColor.buildNote":
     "Cette version garde sa propre couleur de logo. Le choix s’applique à l’application publiée.",
   "settings.logoColor.lavender": "Lavande",
@@ -26,11 +25,11 @@ export const messages = {
   // The Settings window, General tab.
   "settings.providers.title": "Fournisseurs d’IA",
   "settings.appBehavior.title": "Comportement de l’application",
+  "settings.conversations.title": "Conversations",
   "settings.launchAtLogin.title": "Lancer OpenBot à l’ouverture de session",
   "settings.launchAtLogin.description": "Ouvrir l’application lorsque vous vous connectez à cet ordinateur.",
   "settings.keepRunning.title": "Garder OpenBot actif en arrière-plan",
   "settings.keepRunning.description": "Poursuivre les tâches en cours après la fermeture de la fenêtre.",
-  "settings.workspace.title": "Espace de travail",
   "settings.restoreWorkspace.title": "Restaurer le dernier espace de travail au lancement",
   "settings.restoreWorkspace.description": "Rouvrir l’espace de travail et les tâches de votre session précédente.",
   "settings.externalLinks.title": "Ouvrir les liens externes dans",
@@ -40,8 +39,8 @@ export const messages = {
   "settings.externalLinks.openbot": "OpenBot",
   "settings.busyMessage.title": "Orienter les agents pendant leur travail",
   "settings.busyMessage.description":
-    "Un message envoyé pendant le travail d’un agent rejoint son travail en cours à l’étape suivante, au lieu d’attendre dans la file. ChatGPT et Claude peuvent orienter ; les autres fournisseurs mettent le message en attente.",
-  "settings.autonomy.title": "Autonomie de l’agent",
+    "Les nouveaux messages rejoignent le travail en cours de l’agent, pas la file. Fonctionne avec ChatGPT et Claude.",
+  "settings.permissions.title": "Autorisations",
   "settings.turbo.title": "Mode Turbo",
   "settings.turbo.description":
     "Autoriser chaque agent à exécuter des commandes, modifier des fichiers, élargir son propre accès au système de fichiers et au réseau, et publier, mettre à jour ou supprimer des sites publics sans demander.",
@@ -52,6 +51,7 @@ export const messages = {
   "settings.autoApprove.revokeFailed":
     "Impossible de révoquer l’approbation permanente pour {name}. Elle est toujours active. Réessayez.",
   "settings.notifications.title": "Notifications",
+  "settings.alerts.title": "Alertes",
   "settings.desktopNotifications.title": "Notifications du bureau",
   "settings.desktopNotifications.description": "Afficher une notification lorsqu’un agent a besoin d’attention.",
   "settings.testNotification.title": "Notification de test",
@@ -61,6 +61,7 @@ export const messages = {
   "settings.testNotification.failed": "Impossible d’afficher une notification.",
   "settings.testNotification.openSettings": "Ouvrir les réglages du système",
   "settings.testNotification.openSettingsFailed": "Impossible d’ouvrir les réglages du système.",
+  "settings.sounds.title": "Sons",
   "settings.taskSound.title": "Émettre un son à la fin d’une tâche",
   "settings.taskSound.description": "Utiliser un son court pour les tâches terminées.",
   "settings.soundFeedback.title": "Sons des actions",
@@ -95,13 +96,14 @@ export const messages = {
   "settings.notch.size.height": "Hauteur",
   "settings.notch.size.previewNotch": "Écran intégré",
   "settings.notch.size.previewIsland": "Écran externe",
-  "settings.privacy.title": "Confidentialité",
   "settings.analytics.title": "Partager les données analytiques du produit",
   "settings.analytics.description":
     "Envoyer des métadonnées d’utilisation et de fiabilité, avec l’identifiant et l’e-mail de votre compte, aux services analytiques auto-hébergés d’OpenBot.",
   // The Settings window shell: its tab list, headers and save bar.
   "settings.tab.general.title": "Général",
   "settings.tab.general.description": "Contrôler le comportement d’OpenBot sur cet ordinateur.",
+  "settings.tab.notifications.title": "Notifications",
+  "settings.tab.notifications.description": "Choisissez comment OpenBot vous alerte.",
   "settings.tab.computerUse.title": "Computer Use",
   "settings.tab.computerUse.description":
     "Autoriser OpenBot à voir et à interagir avec les applications de cet ordinateur.",

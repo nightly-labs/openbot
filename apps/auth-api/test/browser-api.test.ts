@@ -81,6 +81,7 @@ function setup() {
       .mockReturnValue(Effect.succeed(new Response("logo", { headers: { "Content-Type": "image/png" } }))),
     billing: () => billing,
     hosting: () => ({
+      lifecycle: vi.fn(),
       list: vi.fn(),
       plans: vi.fn(),
       create: vi.fn(),
@@ -450,6 +451,26 @@ describe("browser account boundary", () => {
       expect(services.auth.revokeAccountSession).toHaveBeenCalledWith(token, sessionId);
     });
   });
+  it("validates and protects hosted server lifecycle mutations", async () => {
+    const services = setup();
+    const lifecycle = vi.fn().mockReturnValue(Effect.void);
+    const hosting = services.hosting();
+    services.hosting = () => ({ ...hosting, lifecycle });
+    const path = "v2/hosting/servers/server-one/lifecycle";
+    const cookie = `__Host-openbot-web=${token}`;
+    const body = { action: "delete", timing: "period-end", confirmName: "One" };
+    expect((await handleBrowserApi(request(path, { body }), services)).status).toBe(401);
+    expect(
+      (await handleBrowserApi(request(path, { body, cookie, origin: "https://attacker.test" }), services)).status,
+    ).toBe(403);
+    expect((await handleBrowserApi(request(path, { body: { action: "delete" }, cookie }), services)).status).toBe(400);
+    expect(lifecycle).not.toHaveBeenCalled();
+    expect(
+      (await handleBrowserApi(request(path, { body: { ...body, serverId: "other" }, cookie }), services)).status,
+    ).toBe(204);
+    expect(lifecycle).toHaveBeenCalledWith(user, "server-one", { ...body, serverId: "server-one" });
+  });
+
   describe("billing", () => {
     const cookie = `__Host-openbot-web=${token}`;
     const cancel = { flow: "cancel", subscriptionId: "sub_1" };

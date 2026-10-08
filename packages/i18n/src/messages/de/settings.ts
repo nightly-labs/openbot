@@ -7,7 +7,7 @@ export const messages = {
   "settings.language.system": "Systemstandard",
   "settings.appearance.title": "Darstellung",
   "settings.logoColor.title": "Logofarbe",
-  "settings.logoColor.description": "Die Farbe des OpenBot-Logos im Dock,\nin der Taskleiste und in Dynamic Island.",
+  "settings.logoColor.description": "Im Dock, in der Taskleiste und in Dynamic Island.",
   "settings.logoColor.buildNote":
     "Diese Version behält ihre eigene Logofarbe. Die Auswahl gilt für die veröffentlichte App.",
   "settings.logoColor.lavender": "Lavendel",
@@ -22,11 +22,11 @@ export const messages = {
   "settings.logoColor.white": "Weiß",
   "settings.providers.title": "KI-Anbieter",
   "settings.appBehavior.title": "App-Verhalten",
+  "settings.conversations.title": "Unterhaltungen",
   "settings.launchAtLogin.title": "OpenBot bei der Anmeldung starten",
   "settings.launchAtLogin.description": "Die App öffnen, wenn du dich an diesem Computer anmeldest.",
   "settings.keepRunning.title": "OpenBot im Hintergrund weiter ausführen",
   "settings.keepRunning.description": "Aktive Aufgaben nach dem Schließen des Fensters weiter ausführen.",
-  "settings.workspace.title": "Arbeitsbereich",
   "settings.restoreWorkspace.title": "Letzten Arbeitsbereich beim Start wiederherstellen",
   "settings.restoreWorkspace.description": "Den Arbeitsbereich und die Aufgaben der letzten Sitzung öffnen.",
   "settings.externalLinks.title": "Externe Links öffnen in",
@@ -34,15 +34,17 @@ export const messages = {
   "settings.externalLinks.defaultBrowser": "Standardbrowser",
   "settings.externalLinks.openbot": "OpenBot",
   "settings.sendShortcut.title": "Tastenkürzel zum Senden",
-  "settings.sendShortcut.description":
-    "Wähle die Tasten zum Senden auf diesem Gerät und in diesem Browser. Wenn Enter sendet, fügt Shift+Enter eine neue Zeile ein. Im Modus mit Zusatztaste fügt Enter eine neue Zeile ein.",
+  "settings.sendShortcut.description": "Wähle die Tasten zum Senden auf diesem Gerät und in diesem Browser.",
   "settings.sendShortcut.enter": "Mit Enter senden",
   "settings.sendShortcut.modEnterMac": "Mit ⌘Enter senden",
   "settings.sendShortcut.modEnterWin": "Mit Ctrl+Enter senden",
   "settings.busyMessage.title": "Agenten während der Arbeit steuern",
   "settings.busyMessage.description":
-    "Eine Nachricht an einen arbeitenden Agenten fließt beim nächsten Schritt in seine aktuelle Arbeit ein, statt in der Warteschlange zu warten. ChatGPT und Claude unterstützen dies; andere Anbieter stellen die Nachricht in die Warteschlange.",
-  "settings.autonomy.title": "Autonomie der Agenten",
+    "Neue Nachrichten fließen in die aktuelle Arbeit des Agenten ein, nicht in die Warteschlange. Funktioniert mit ChatGPT und Claude.",
+  "settings.keepRemoteSessions.title": "Schnelle Verbindung zu Servern",
+  "settings.keepRemoteSessions.description":
+    "Die Verbindung zu deinen beigetretenen Servern zwischen Starts beibehalten. OpenBot startet etwa eine Sekunde schneller. Wenn du OpenBot beendest, schließt der OpenBot-Dienst die Verbindung nicht.",
+  "settings.permissions.title": "Berechtigungen",
   "settings.turbo.title": "Turbo-Modus",
   "settings.turbo.description":
     "Allen Agenten erlauben, ohne Rückfrage Befehle auszuführen, Dateien zu ändern, ihren Dateisystem- und Netzwerkzugriff zu erweitern und öffentliche Websites zu veröffentlichen, zu aktualisieren oder zu löschen.",
@@ -53,6 +55,7 @@ export const messages = {
   "settings.autoApprove.revokeFailed":
     "Die dauerhafte Genehmigung für {name} konnte nicht widerrufen werden. Sie ist noch aktiv. Versuche es erneut.",
   "settings.notifications.title": "Benachrichtigungen",
+  "settings.alerts.title": "Hinweise",
   "settings.desktopNotifications.title": "Desktop-Benachrichtigungen",
   "settings.desktopNotifications.description":
     "Eine Benachrichtigung anzeigen, wenn ein Agent Aufmerksamkeit benötigt.",
@@ -63,6 +66,7 @@ export const messages = {
   "settings.testNotification.failed": "Eine Benachrichtigung konnte nicht angezeigt werden.",
   "settings.testNotification.openSettings": "Systemeinstellungen öffnen",
   "settings.testNotification.openSettingsFailed": "Die Systemeinstellungen konnten nicht geöffnet werden.",
+  "settings.sounds.title": "Töne",
   "settings.taskSound.title": "Ton bei Abschluss einer Aufgabe abspielen",
   "settings.taskSound.description": "Einen kurzen Ton für abgeschlossene Aufgaben verwenden.",
   "settings.soundFeedback.title": "Aktionstöne",
@@ -96,7 +100,6 @@ export const messages = {
   "settings.notch.size.height": "Höhe",
   "settings.notch.size.previewNotch": "Integriertes Display",
   "settings.notch.size.previewIsland": "Externes Display",
-  "settings.privacy.title": "Datenschutz",
   "settings.analytics.title": "Nutzungsdaten teilen",
   "settings.analytics.description":
     "Nutzungs- und Zuverlässigkeitsmetadaten mit deiner Konto-ID und E-Mail-Adresse an das von OpenBot selbst betriebene Analysesystem senden.",
@@ -105,6 +108,8 @@ export const messages = {
     "Fehler- und Warncodes mit deiner Konto-ID an das Analysesystem von OpenBot senden. Diese Einstellung gilt für diesen Browser.",
   "settings.tab.general.title": "Allgemein",
   "settings.tab.general.description": "Lege fest, wie sich OpenBot auf diesem Computer verhält.",
+  "settings.tab.notifications.title": "Benachrichtigungen",
+  "settings.tab.notifications.description": "Lege fest, wie OpenBot dich benachrichtigt.",
   "settings.tab.computerUse.title": "Computersteuerung",
   "settings.tab.computerUse.description": "OpenBot erlauben, Apps auf diesem Computer zu sehen und zu bedienen.",
   "settings.tab.profile.title": "Profil",

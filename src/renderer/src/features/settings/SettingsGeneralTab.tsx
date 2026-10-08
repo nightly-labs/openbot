@@ -1,7 +1,6 @@
 import type { AppVariant } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
-  Button,
   ConfirmDialog,
   Item,
   ItemActions,
@@ -16,15 +15,12 @@ import {
   SelectValue,
   SettingsSection,
   SwitchField,
-  toast,
 } from "@openbot/ui";
 import type { GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
 import { LanguageSelect } from "@openbot/ui/features/settings/LanguageSelect";
 import { LogoColorPicker } from "@openbot/ui/features/settings/LogoColorPicker";
 import { SendShortcutSelect } from "@openbot/ui/features/settings/SendShortcutSelect";
-import { SoundThemePicker } from "@openbot/ui/features/settings/SoundThemePicker";
 import { createSignal, Show } from "solid-js";
-import { replayActionSoundChoice } from "../../action-sounds";
 import { useI18n } from "../../i18n-context";
 import { useLogoColorChoice } from "../../logo-color";
 
@@ -50,24 +46,10 @@ interface SettingsGeneralTabProps {
   onUpdateSetting: <Key extends keyof GeneralSettingsValue>(key: Key, value: GeneralSettingsValue[Key]) => void;
   onUpdateSettings: (patch: Partial<GeneralSettingsValue>) => void;
   turboModePending?: boolean;
-  /** Shows one desktop notification now. Absent where there is no operating system to show it. */
-  onTestNotification?: () => void | Promise<void>;
-  /** Opens the operating system notification settings. Absent where the system has no such page. */
-  onOpenNotificationSettings?: () => void | Promise<void>;
 }
 
 export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
   const i18n = useI18n();
-  const runNotificationAction = (
-    action: () => void | Promise<void>,
-    failed: "settings.testNotification.failed" | "settings.testNotification.openSettingsFailed",
-  ) => {
-    void Promise.resolve()
-      .then(action)
-      .catch(() =>
-        toast.error(i18n.t(failed), { report: { operation: "settings", source: "system", cause_code: "unknown" } }),
-      );
-  };
   const linkTargetLabel = (value: GeneralSettingsValue["externalLinkTarget"] | undefined) =>
     value === undefined ? "" : i18n.t(LINK_TARGET_KEYS[value]);
   const [confirmingTurbo, setConfirmingTurbo] = createSignal(false);
@@ -76,12 +58,19 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
     <>
       <SettingsSection title={i18n.t("settings.appearance.title")}>
         <ItemGroup class="settings-modal-card">
+          <Item class="settings-modal-row">
+            <ItemContent>
+              <ItemTitle>{i18n.t("settings.language.title")}</ItemTitle>
+              <ItemDescription>{i18n.t("settings.language.description")}</ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <LanguageSelect value={i18n.language()} onChange={i18n.changeLanguage} mount={props.selectMount} />
+            </ItemActions>
+          </Item>
           <Item class="settings-modal-row settings-logo-color-row">
             <ItemContent>
               <ItemTitle>{i18n.t("settings.logoColor.title")}</ItemTitle>
-              <ItemDescription class="settings-logo-color-description">
-                {i18n.t("settings.logoColor.description")}
-              </ItemDescription>
+              <ItemDescription>{i18n.t("settings.logoColor.description")}</ItemDescription>
               <Show when={props.variant !== "production"}>
                 <ItemDescription>{i18n.t("settings.logoColor.buildNote")}</ItemDescription>
               </Show>
@@ -91,7 +80,7 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
         </ItemGroup>
       </SettingsSection>
 
-      <SettingsSection title={i18n.t("settings.appBehavior.title")}>
+      <SettingsSection title={i18n.t("settings.conversations.title")}>
         <ItemGroup class="settings-modal-card">
           <Item class="settings-modal-row">
             <ItemContent>
@@ -113,44 +102,6 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
             label={i18n.t("settings.busyMessage.title")}
             description={i18n.t("settings.busyMessage.description")}
           />
-          <SwitchField
-            checked={props.value.launchAtLogin}
-            onChange={(checked) => props.onUpdateSetting("launchAtLogin", checked)}
-            label={i18n.t("settings.launchAtLogin.title")}
-            description={i18n.t("settings.launchAtLogin.description")}
-          />
-          <SwitchField
-            checked={props.value.keepRemoteSessions}
-            onChange={(checked) => props.onUpdateSetting("keepRemoteSessions", checked)}
-            label={i18n.t("settings.keepRemoteSessions.title")}
-            description={i18n.t("settings.keepRemoteSessions.description")}
-          />
-          <SwitchField
-            checked={props.value.keepRunningInBackground}
-            onChange={(checked) => props.onUpdateSetting("keepRunningInBackground", checked)}
-            label={i18n.t("settings.keepRunning.title")}
-            description={i18n.t("settings.keepRunning.description")}
-          />
-        </ItemGroup>
-      </SettingsSection>
-
-      <SettingsSection title={i18n.t("settings.workspace.title")}>
-        <ItemGroup class="settings-modal-card">
-          <SwitchField
-            checked={props.value.restoreLastWorkspace}
-            onChange={(checked) => props.onUpdateSetting("restoreLastWorkspace", checked)}
-            label={i18n.t("settings.restoreWorkspace.title")}
-            description={i18n.t("settings.restoreWorkspace.description")}
-          />
-          <Item class="settings-modal-row">
-            <ItemContent>
-              <ItemTitle>{i18n.t("settings.language.title")}</ItemTitle>
-              <ItemDescription>{i18n.t("settings.language.description")}</ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <LanguageSelect value={i18n.language()} onChange={i18n.changeLanguage} mount={props.selectMount} />
-            </ItemActions>
-          </Item>
           <Item class="settings-modal-row">
             <ItemContent>
               <ItemTitle>{i18n.t("settings.externalLinks.title")}</ItemTitle>
@@ -179,7 +130,36 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
         </ItemGroup>
       </SettingsSection>
 
-      <SettingsSection title={i18n.t("settings.autonomy.title")}>
+      <SettingsSection title={i18n.t("settings.appBehavior.title")}>
+        <ItemGroup class="settings-modal-card">
+          <SwitchField
+            checked={props.value.launchAtLogin}
+            onChange={(checked) => props.onUpdateSetting("launchAtLogin", checked)}
+            label={i18n.t("settings.launchAtLogin.title")}
+            description={i18n.t("settings.launchAtLogin.description")}
+          />
+          <SwitchField
+            checked={props.value.keepRemoteSessions}
+            onChange={(checked) => props.onUpdateSetting("keepRemoteSessions", checked)}
+            label={i18n.t("settings.keepRemoteSessions.title")}
+            description={i18n.t("settings.keepRemoteSessions.description")}
+          />
+          <SwitchField
+            checked={props.value.keepRunningInBackground}
+            onChange={(checked) => props.onUpdateSetting("keepRunningInBackground", checked)}
+            label={i18n.t("settings.keepRunning.title")}
+            description={i18n.t("settings.keepRunning.description")}
+          />
+          <SwitchField
+            checked={props.value.restoreLastWorkspace}
+            onChange={(checked) => props.onUpdateSetting("restoreLastWorkspace", checked)}
+            label={i18n.t("settings.restoreWorkspace.title")}
+            description={i18n.t("settings.restoreWorkspace.description")}
+          />
+        </ItemGroup>
+      </SettingsSection>
+
+      <SettingsSection title={i18n.t("settings.permissions.title")}>
         <ItemGroup class="settings-modal-card">
           <SwitchField
             checked={props.value.turboMode}
@@ -192,6 +172,12 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
             }}
             label={i18n.t("settings.turbo.title")}
             description={i18n.t("settings.turbo.description")}
+          />
+          <SwitchField
+            checked={props.value.productAnalytics}
+            onChange={(checked) => props.onUpdateSetting("productAnalytics", checked)}
+            label={i18n.t("settings.analytics.title")}
+            description={i18n.t("settings.analytics.description")}
           />
         </ItemGroup>
       </SettingsSection>
@@ -210,86 +196,6 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
           props.onUpdateSetting("turboMode", true);
         }}
       />
-
-      <SettingsSection title={i18n.t("settings.notifications.title")}>
-        <ItemGroup class="settings-modal-card">
-          <SwitchField
-            checked={props.value.desktopNotifications}
-            onChange={(checked) => props.onUpdateSetting("desktopNotifications", checked)}
-            label={i18n.t("settings.desktopNotifications.title")}
-            description={i18n.t("settings.desktopNotifications.description")}
-          />
-          <Show when={props.onTestNotification}>
-            {(onTestNotification) => (
-              <Item>
-                <ItemContent>
-                  <ItemTitle>{i18n.t("settings.testNotification.title")}</ItemTitle>
-                  <ItemDescription>{i18n.t("settings.testNotification.description")}</ItemDescription>
-                </ItemContent>
-                <ItemActions>
-                  <Show when={props.onOpenNotificationSettings}>
-                    {(onOpenNotificationSettings) => (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        onClick={() =>
-                          runNotificationAction(
-                            onOpenNotificationSettings(),
-                            "settings.testNotification.openSettingsFailed",
-                          )
-                        }
-                      >
-                        {i18n.t("settings.testNotification.openSettings")}
-                      </Button>
-                    )}
-                  </Show>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => runNotificationAction(onTestNotification(), "settings.testNotification.failed")}
-                  >
-                    {i18n.t("settings.testNotification.action")}
-                  </Button>
-                </ItemActions>
-              </Item>
-            )}
-          </Show>
-          <SwitchField
-            checked={props.value.taskCompletionSound}
-            onChange={(checked) => props.onUpdateSetting("taskCompletionSound", checked)}
-            label={i18n.t("settings.taskSound.title")}
-            description={i18n.t("settings.taskSound.description")}
-          />
-          <Item class="settings-modal-row settings-sound-theme-row">
-            <ItemContent>
-              <ItemTitle>{i18n.t("settings.soundFeedback.title")}</ItemTitle>
-              <ItemDescription>{i18n.t("settings.soundFeedback.description")}</ItemDescription>
-            </ItemContent>
-            <SoundThemePicker
-              value={props.value.soundFeedback ? props.value.soundTheme : "off"}
-              onChange={(value) =>
-                props.onUpdateSettings(
-                  value === "off" ? { soundFeedback: false } : { soundFeedback: true, soundTheme: value },
-                )
-              }
-              onReplay={replayActionSoundChoice}
-            />
-          </Item>
-        </ItemGroup>
-      </SettingsSection>
-
-      <SettingsSection title={i18n.t("settings.privacy.title")}>
-        <ItemGroup class="settings-modal-card">
-          <SwitchField
-            checked={props.value.productAnalytics}
-            onChange={(checked) => props.onUpdateSetting("productAnalytics", checked)}
-            label={i18n.t("settings.analytics.title")}
-            description={i18n.t("settings.analytics.description")}
-          />
-        </ItemGroup>
-      </SettingsSection>
     </>
   );
 }

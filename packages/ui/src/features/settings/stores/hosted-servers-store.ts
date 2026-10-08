@@ -1,4 +1,8 @@
-import type { HostedServerState, HostedServerSummary } from "@openbot/contracts/hosted-servers";
+import type {
+  HostedServerLifecycleInput,
+  HostedServerState,
+  HostedServerSummary,
+} from "@openbot/contracts/hosted-servers";
 import type { HostedServersDesktopApi } from "@openbot/contracts/ipc";
 import { createEffect, createStore, untrack } from "solid-js";
 import { currentText } from "../../../text";
@@ -21,6 +25,7 @@ interface HostedServersStoreProps {
 interface HostedServersPanel {
   /** False until the account server says that this account can create hosted servers. */
   available: boolean;
+  lifecycleAvailable: boolean;
   loaded: boolean;
   error: string | null;
   servers: HostedServerSummary[];
@@ -43,6 +48,7 @@ interface HostedServersPanel {
 export function createSettingsHostedServersStore(props: HostedServersStoreProps, isActive: () => boolean) {
   const [panel, setPanel] = createStore<HostedServersPanel>({
     available: false,
+    lifecycleAvailable: false,
     loaded: false,
     error: null,
     servers: [],
@@ -56,6 +62,8 @@ export function createSettingsHostedServersStore(props: HostedServersStoreProps,
   let loadRevision = 0;
   /** A read can take longer than the poll interval. A poll or focus read then skips, so reads do not overlap. */
   let reloading = false;
+  /** The server that the server menu asked to delete. The next list read opens its confirmation. */
+  let deleteRequestId: string | null = null;
 
   async function load(): Promise<void> {
     const api = props.hostedServersApi;
@@ -66,12 +74,19 @@ export function createSettingsHostedServersStore(props: HostedServersStoreProps,
       if (revision !== loadRevision) return;
       setPanel((state) => {
         state.available = list.available;
+        state.lifecycleAvailable = list.lifecycleAvailable === true;
         state.servers = list.servers;
         state.loaded = true;
         state.error = null;
       });
+      const requested = deleteRequestId;
+      deleteRequestId = null;
+      const server = requested ? list.servers.find((entry) => entry.serverId === requested) : undefined;
+      if (server) requestDelete(server);
     } catch (error) {
       if (revision !== loadRevision) return;
+      // A failed read ends the request: a later read must not open the confirmation by itself.
+      deleteRequestId = null;
       setPanel((state) => {
         const text = currentText();
         state.error = text.errorMessage(error, text.t("settings.hostedServers.loadFailed"));
@@ -83,6 +98,8 @@ export function createSettingsHostedServersStore(props: HostedServersStoreProps,
     () => props.open && Boolean(props.hostedServersApi),
     (shouldLoad) => {
       if (shouldLoad) void untrack(load);
+      // A closed panel ends the request, so the next open does not show the confirmation.
+      else deleteRequestId = null;
     },
   );
 
@@ -181,6 +198,15 @@ export function createSettingsHostedServersStore(props: HostedServersStoreProps,
     });
   }
 
+  /**
+   * Opens the confirmation for a server that the server menu names by id. The dialog opens with the
+   * list, so it reads the list first; a server that is not in the list opens nothing.
+   */
+  function requestDeleteById(serverId: string): void {
+    deleteRequestId = serverId;
+    void load();
+  }
+
   function setDeleteConfirmName(value: string): void {
     setPanel((state) => {
       state.deleteConfirmName = value;
@@ -235,12 +261,21 @@ export function createSettingsHostedServersStore(props: HostedServersStoreProps,
     }
   }
 
+  async function lifecycle(input: HostedServerLifecycleInput): Promise<void> {
+    const api = props.hostedServersApi;
+    if (!api) throw new Error(currentText().t("billing.unavailable"));
+    await api.lifecycle(input);
+    await load();
+  }
+
   return {
+    lifecycle,
     state: panel,
     load,
     wake,
     openCheckout,
     requestDelete,
+    requestDeleteById,
     setDeleteConfirmName,
     cancelDelete,
     confirmDelete,

@@ -2723,6 +2723,53 @@ describe.sequential("AgentService: providers", () => {
     });
   });
 
+  it("keeps tool file history local and rechecks access after a permission change", async () => {
+    const started = await startService(root, { provider: "codex" });
+    service = started.service;
+    const { store, client } = started;
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Read a file" }));
+    await waitForQueue(service, "chief", (queue) =>
+      queue.deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    const threadId = store.activeProviderSession("chief")?.externalSessionId;
+    if (!threadId) throw new Error("No provider session.");
+    const path = join(root, "private-report.txt");
+    await writeFile(path, "Private report");
+    client.emit(
+      "notification",
+      notification("item/completed", {
+        threadId,
+        turnId: "file-history-turn",
+        filePaths: [path],
+        item: { id: "file-history-item", type: "toolCall", name: "Read", status: "completed" },
+      }),
+    );
+    await vi.waitFor(async () => {
+      await expect(
+        runCauseEffect(started.service.resolveLocalWorkspaceFile("chief", "private-report.txt")),
+      ).resolves.toMatchObject({
+        path: await realpath(path),
+        insideWorkspace: false,
+      });
+    });
+    await expect(runCauseEffect(service.resolveWorkspaceFile("chief", "private-report.txt"))).rejects.toThrow(
+      "Nothing exists",
+    );
+    expect(JSON.stringify(events)).not.toContain(path);
+    await runCauseEffect(store.updateAgent({ agentId: "chief", access: "workspace" }));
+    await expect(runCauseEffect(service.resolveLocalWorkspaceFile("chief", "private-report.txt"))).rejects.toThrow(
+      "Nothing exists",
+    );
+    await runCauseEffect(store.updateAgent({ agentId: "chief", access: "full" }));
+    await expect(
+      runCauseEffect(service.resolveLocalWorkspaceFile("chief", "private-report.txt")),
+    ).resolves.toMatchObject({
+      path: await realpath(path),
+    });
+  });
+
   it("does not surface the skills context-budget notice as an agent error", async () => {
     process.env.OPENBOT_FAKE_WARNING = "Skill descriptions were shortened to fit the skills context budget.";
     const { store, mailbox } = stores(root);
