@@ -23,7 +23,8 @@ task ("if there is nothing new, answer `[[no-update]]`"); OpenBot adds nothing t
 there is no setting or column. The marker is a fixed token, not a phrase, so the check does not
 depend on the language of the answer (`src/backend/agent/routine-quiet-runs.ts`). When a turn that
 ran only scheduled routine runs completes and every answer is the marker, the turn drops its answers,
-thinking and plan from the conversation, does not change the agent preview, and its `turn-completed`
+thinking and plan from the conversation, puts back the agent preview from before the run (the run
+start shows the task there; memory only, so after a restart the task stays), and its `turn-completed`
 event has `quiet: true`, which stops the desktop notification and the completion sound. The run
 marker and the run history stay. A marker inside a longer answer is a report and is shown. Test runs,
 and script or webhook runs, which are also manual runs, are never quiet. The released Team API event

@@ -938,6 +938,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         turnModel: (agentId, turnId) => this.#drain.modelForTurn(agentId, turnId),
         requeueChannelDelivery: (deliveryId) => this.#requeueChannelDelivery(deliveryId),
         quietRoutineDelivery: (deliveryId) => this.#routines.quietRunForDelivery(deliveryId),
+        takeRoutinePreview: (deliveryId) => this.#routines.takePreviewBeforeRun(deliveryId),
       },
     });
     this.#removal = new AgentRemoval({

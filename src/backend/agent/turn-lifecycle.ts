@@ -90,6 +90,11 @@ export interface TurnHooks {
    * agent answers only the no-update marker.
    */
   quietRoutineDelivery(deliveryId: string): boolean;
+  /**
+   * The agent preview before the scheduled run of this delivery showed its task, and that task, once.
+   * Null after a restart or for any other delivery.
+   */
+  takeRoutinePreview(deliveryId: string): { previous: string; shown: string } | null;
 }
 
 export interface TurnLifecycleOptions {
@@ -625,9 +630,21 @@ export class TurnLifecycle {
         if (delivery.sender.kind === "agent") this.#hooks.scheduleDrain(delivery.sender.agentId);
       }
     }
+    // Each run start saved the earlier preview; a quiet turn puts back the oldest one, unless
+    // something else changed the preview since. Every turn takes its entries, so none stays behind.
+    const savedPreviews = deliveries.flatMap(({ delivery }) =>
+      delivery.sender.kind === "routine" ? (this.#hooks.takeRoutinePreview(delivery.id) ?? []) : [],
+    );
     if (latestAssistant && !this.#conversation.isExecutionThread(snapshot.threadId)) {
       yield* this.#store.updatePreview(agentId, latestAssistant.text).pipe(toTurnOperationFailed);
       this.#hooks.emit({ type: "agents-changed", agents: this.#hooks.listAgents() });
+    } else if (quiet) {
+      const saved = savedPreviews[0];
+      const current = this.#store.list().find((entry) => entry.id === agentId)?.preview;
+      if (saved && current === savedPreviews.at(-1)?.shown) {
+        yield* this.#store.updatePreview(agentId, saved.previous).pipe(toTurnOperationFailed);
+        this.#hooks.emit({ type: "agents-changed", agents: this.#hooks.listAgents() });
+      }
     }
     this.#conversation.emitConversation(snapshot, "turn.completed", { turnId, status: outcome });
     if (deliveries.length > 0) {

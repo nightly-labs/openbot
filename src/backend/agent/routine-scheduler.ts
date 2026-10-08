@@ -107,6 +107,12 @@ export interface RoutineSchedulerOptions {
  * blocked on a question is `needs-attention`, and answering returns it to `running`. That is why a
  * user can tell a stalled routine from a working one.
  */
+/** The agent preview before a scheduled run, and the routine task the run showed in its place. */
+export interface RoutinePreviewBeforeRun {
+  previous: string;
+  shown: string;
+}
+
 export class RoutineScheduler implements RoutineDueSource {
   readonly #store: AgentStore;
   readonly #mailbox: MailboxStore;
@@ -127,6 +133,12 @@ export class RoutineScheduler implements RoutineDueSource {
    * the oldest entry goes.
    */
   readonly #deliveryTimezones = new Map<string, string>();
+  /**
+   * The agent preview before a scheduled run showed its task there, by delivery. A run that ends
+   * quiet puts it back. Memory only: after a restart, the preview keeps the task. Past the cap, the
+   * oldest entry goes.
+   */
+  readonly #previewsBeforeRun = new Map<string, RoutinePreviewBeforeRun>();
 
   constructor(options: RoutineSchedulerOptions) {
     this.#store = options.store;
@@ -194,6 +206,23 @@ export class RoutineScheduler implements RoutineDueSource {
    */
   quietRunForDelivery(deliveryId: string): boolean {
     return this.#routines.runForDelivery(deliveryId)?.kind === "scheduled";
+  }
+
+  /**
+   * The preview before the scheduled run of this delivery, and the one the run showed, once: the
+   * entry goes with the call. Null after a restart, or for a run that saved none.
+   */
+  takePreviewBeforeRun(deliveryId: string): RoutinePreviewBeforeRun | null {
+    const entry = this.#previewsBeforeRun.get(deliveryId) ?? null;
+    this.#previewsBeforeRun.delete(deliveryId);
+    return entry;
+  }
+
+  #rememberPreviewBeforeRun(deliveryId: string, entry: RoutinePreviewBeforeRun): void {
+    this.#previewsBeforeRun.set(deliveryId, entry);
+    if (this.#previewsBeforeRun.size <= DELIVERY_TIMEZONE_LIMIT) return;
+    const [oldest] = this.#previewsBeforeRun.keys();
+    if (oldest !== undefined) this.#previewsBeforeRun.delete(oldest);
   }
 
   duplicate(sourceAgentId: string, targetAgentId: string, now: Date): Map<string, Routine> {
@@ -757,6 +786,12 @@ export class RoutineScheduler implements RoutineDueSource {
         this.#hooks.syncMailboxMessages(current);
         return current;
       });
+      // Only a scheduled run can end quiet and put the earlier preview back.
+      if (run.kind === "scheduled") {
+        const previous = this.#store.list().find((entry) => entry.id === agent.id)?.preview;
+        if (previous !== undefined)
+          this.#rememberPreviewBeforeRun(deliveryId, { previous, shown: run.instruction.slice(0, 180) });
+      }
       yield* this.#store.updatePreview(agent.id, run.instruction).pipe(toRoutineOperationFailed);
       yield* routineStep(() => {
         this.#hooks.emit({ type: "agents-changed", agents: this.#hooks.listAgents() });

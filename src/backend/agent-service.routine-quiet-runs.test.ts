@@ -28,6 +28,7 @@ afterEach(async () => {
 });
 
 const MEMBER = "member-1";
+const PREVIEW_BEFORE = "Deploy finished.";
 
 interface RoutineRunResult {
   routine: Routine;
@@ -70,6 +71,8 @@ async function runRoutine(options: { output: string; kind: "scheduled" | "manual
     timezone: "UTC",
     schedule: { kind: "daily", time: "09:00" },
   });
+  // The last real message the sidebar shows before the run.
+  await runCauseEffect(store.updatePreview(agent.id, PREVIEW_BEFORE));
   // Sets the read cursor of the member, so a later answer counts as unread.
   expect((await runCauseEffect(service.readConversationPageFor(agent.id, MEMBER))).readState?.unreadCount).toBe(0);
 
@@ -132,9 +135,8 @@ describe.sequential("AgentService: routine runs that answer only the no-update m
     expect(result.runs).toEqual([expect.objectContaining({ kind: "scheduled", status: "succeeded" })]);
     expect(result.unreadCount).toBe(0);
     expect(result.completed).toMatchObject({ status: "completed", origin: "routine", quiet: true });
-    // The run start shows the routine task in the preview, as for every run; the quiet turn does not
-    // replace it with its answer.
-    expect(result.preview).toBe(result.routine.instruction);
+    // The run start shows the routine task in the preview; the quiet turn puts the earlier one back.
+    expect(result.preview).toBe(PREVIEW_BEFORE);
   });
 
   it("posts a scheduled run's report as usual, also when the report mentions the marker", async () => {
@@ -145,7 +147,7 @@ describe.sequential("AgentService: routine runs that answer only the no-update m
     expect(result.runStatuses).toContain("succeeded");
     expect(result.unreadCount).toBe(1);
     expect(result.completed.quiet).toBeUndefined();
-    expect(result.preview).toContain("disk full on db-1");
+    expect(result.preview).toBe(report);
   });
 
   it("shows the result of a Test run, which someone waits for", async () => {
