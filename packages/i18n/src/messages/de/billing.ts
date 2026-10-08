@@ -1,0 +1,36 @@
+import type { PartialTranslation } from "../../message";
+import type { messages as source } from "../en/billing";
+
+export const messages = {
+  "billing.title": "Abrechnung",
+  "billing.description": "Jeder Server hat einen eigenen Tarif. Stripe verarbeitet die Zahlung.",
+  "billing.loading": "Abrechnung wird geladen…",
+  "billing.unavailable": "Die Abrechnung ist auf diesem Kontoserver nicht verfügbar.",
+  "billing.loadFailed": "Die Abrechnung konnte nicht geladen werden.",
+  "billing.portalFailed": "Die Abrechnungsverwaltung konnte nicht geöffnet werden.",
+  "billing.servers.title": "Servertarife",
+  "billing.manage": "Zahlungsmethode und Rechnungen",
+  "billing.opening": "Wird geöffnet…",
+  "billing.empty": "Keiner deiner Server hat einen Tarif.",
+  "billing.paymentFailed":
+    "Eine Zahlung ist fehlgeschlagen. Aktualisiere die Zahlungsmethode, um den Tarif zu behalten.",
+  "billing.interval.month": "Monatlich",
+  "billing.interval.year": "Jährlich",
+  "billing.plan.starter": "Starter",
+  "billing.plan.standard": "Standard",
+  "billing.plan.pro": "Pro",
+  "billing.server.unnamed": "Unbenannter Server",
+  "billing.server.summary": "{plan} · {size} GB",
+  "billing.server.price.month": "{amount} / Monat",
+  "billing.server.price.year": "{amount} / Jahr",
+  "billing.server.renews": "Verlängert sich am {date}",
+  "billing.server.ends": "Endet am {date}",
+  "billing.status.trialing": "Testphase",
+  "billing.status.paymentFailed": "Zahlung fehlgeschlagen",
+  "billing.status.paused": "Pausiert",
+  "billing.action.menu": "Tarifaktionen für {server}",
+  "billing.action.change": "Tarif ändern",
+  "billing.action.cancel": "Tarif kündigen",
+  "billing.action.renew": "Tarif verlängern",
+  "billing.action.updatePayment": "Zahlungsmethode aktualisieren",
+} as const satisfies PartialTranslation<typeof source>;
