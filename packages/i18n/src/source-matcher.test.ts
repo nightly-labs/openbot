@@ -14,6 +14,8 @@ const localizer = createSourceLocalizer({
   source,
   translations: {
     en: {},
+    de: {},
+    es: {},
     fr: {
       "error.test.plain": "Ce nom de compétence est déjà utilisé.",
       "error.test.named": "Impossible d’ouvrir {name}.",

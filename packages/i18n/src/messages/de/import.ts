@@ -1,0 +1,86 @@
+import type { PartialTranslation } from "../../message";
+import type { messages as source } from "../en/import";
+
+export const messages = {
+  "import.count.agent": {
+    one: "{count} Agent",
+    other: "{count} Agenten",
+  },
+  "import.count.channel": {
+    one: "{count} Kanal",
+    other: "{count} Kanäle",
+  },
+  "import.count.skill": {
+    one: "{count} Fähigkeit",
+    other: "{count} Fähigkeiten",
+  },
+  "import.count.routine": {
+    one: "{count} Routine",
+    other: "{count} Routinen",
+  },
+  "import.count.memory": {
+    one: "{count} Erinnerung",
+    other: "{count} Erinnerungen",
+  },
+  "import.count.file": {
+    one: "{count} Datei",
+    other: "{count} Dateien",
+  },
+  "import.guide.title": "Deine Agenten von Grok Bot übertragen",
+  "import.guide.lede":
+    "Ein Exportagent in Grok Bot packt Namen, Anweisungen, Avatare, Fähigkeiten, Routinen, Erinnerungen und die von dir eingeschlossenen Dateien in eine .zip-Datei.",
+  "import.guide.openFailed": "Der Export konnte nicht geöffnet werden",
+  "import.guide.step1": "Füge den Exportagenten zu Grok Bot hinzu",
+  "import.guide.setupLabel": "So fügst du den Exportagenten hinzu",
+  "import.guide.setupAgent": "Agent installieren",
+  "import.guide.setupSkill": "Selbst einrichten",
+  "import.guide.agentMeta": "Grok Bot-Agent · enthält die Exportfähigkeit",
+  "import.guide.openAgent": "Exportagent öffnen",
+  "import.guide.agentNote":
+    "Installiere den fertigen Agenten von seiner Grok Bot-Seite. Er wird beim Export ausgelassen.",
+  "import.guide.skillCopied": "Fähigkeit kopiert",
+  "import.guide.saveFile": "Datei speichern…",
+  "import.guide.skillNote":
+    "Füge diese Fähigkeit einem neuen Agenten in Grok Bot hinzu, den du nur für den Export verwendest. Er wird beim Export ausgelassen.",
+  "import.guide.step2": "Sende ihm diese Nachricht",
+  "import.guide.copyMessage": "Nachricht kopieren",
+  "import.guide.messageCopied": "Nachricht kopiert",
+  "import.guide.messageNote":
+    "Er fragt, ob er Dateien aus dem Arbeitsbereich einschließen darf, und speichert dann die .zip-Datei unter Downloads.",
+  "import.guide.step3": "Wähle die .zip-Datei",
+  "import.guide.reading": "Export wird gelesen…",
+  "import.guide.choose": "Exportdatei auswählen",
+  "import.guide.chooseNote": "Du siehst die enthaltenen Agenten, bevor etwas geändert wird.",
+  "import.review.title": "Export aus {source}",
+  "import.review.exported": "Exportiert am {date}",
+  "import.review.fileSize": "{size} Dateien",
+  "import.review.noFiles": "Keine Dateien aus dem Arbeitsbereich",
+  "import.review.importAgents": "{agents} importieren",
+  "import.review.importBoth": "{agents} und {channels} importieren",
+  "import.review.reading": "Wird gelesen…",
+  "import.review.chooseAnother": "Andere auswählen",
+  "import.review.startFailed": "Der Import wurde nicht gestartet",
+  "import.review.warnings": "Einige Elemente werden nicht übertragen",
+  "import.review.agents": "Agenten",
+  "import.review.channels": "Kanäle",
+  "import.review.selected": "{selected} von {total} ausgewählt",
+  "import.review.importItem": "{name} importieren",
+  "import.review.importing": "Wird importiert…",
+  "import.review.channelNeedsMember": "Wähle mindestens einen seiner Agenten aus, um ihn zu importieren.",
+  "import.review.channelWithout": "Wird ohne {names} importiert.",
+  "import.review.nameExists": "Ein Agent namens {name} existiert bereits. Der Import fügt einen weiteren hinzu.",
+  "import.review.duplicatesTitle": "Doppelte Agenten importieren?",
+  "import.review.duplicatesDescription":
+    "Diese Agenten existieren bereits auf diesem Server: {names}. Der Import fügt jeweils eine zweite Kopie hinzu. Jede Kopie ist ein eigener Agent mit eigenen Chats, Dateien und Erinnerungen.",
+  "import.review.duplicatesConfirm": "Duplikate importieren",
+  "import.result.title": "Import abgeschlossen",
+  "import.result.importedAgents": "{agents} importiert",
+  "import.result.importedBoth": "{agents} und {channels} importiert",
+  "import.result.notImported": "{items} wurden nicht importiert.",
+  "import.result.notImportedBoth": "{agents} und {channels} wurden nicht importiert.",
+  "import.result.imported": "Importiert",
+  "import.result.open": "{name} öffnen",
+  "import.result.channel": "Kanal",
+  "import.result.notImportedTitle": "Nicht importiert",
+  "import.result.warnings": "Einige Elemente wurden nicht übertragen",
+} as const satisfies PartialTranslation<typeof source>;
