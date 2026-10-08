@@ -263,7 +263,8 @@ export const messages = {
   "server.members.makeAdmin": "Yönetici yap",
   "server.members.makeAdminTitle": "{name} yönetici yapılsın mı?",
   "server.members.makeMemberTitle": "{name} üye yapılsın mı?",
-  "server.members.roleChangeDescription": "{name} bu sunucudan çıkarılabilir ve yeniden bağlanması gerekebilir.",
+  "server.members.roleChangeDescription":
+    "{name} adlı kişinin bu sunucuyla bağlantısı kesilebilir ve yeniden bağlanması gerekebilir.",
   "server.invite.invalidEmail": "Geçerli bir e-posta adresi girin.",
   "server.invite.title": "Kişileri davet edin",
   "server.invite.description":

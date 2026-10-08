@@ -274,7 +274,7 @@ export const messages = {
   "server.members.makeAdminTitle": "¿Convertir a {name} en administrador?",
   "server.members.makeMemberTitle": "¿Convertir a {name} en miembro?",
   "server.members.roleChangeDescription":
-    "{name} puede desconectarse de este servidor y tendrá que conectarse de nuevo.",
+    "{name} puede quedar desconectado de este servidor y tendrá que conectarse de nuevo.",
   "server.invite.invalidEmail": "Introduce una dirección de correo electrónico válida.",
   "server.invite.title": "Invitar personas",
   "server.invite.description":
