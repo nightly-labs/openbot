@@ -1228,6 +1228,15 @@ export function uiBlockActionIsPrivileged(spec: UiBlockSpec, actionId: string): 
   return spec.type === "confirm" && spec.danger === true && action.style === "primary";
 }
 
+/**
+ * Whether the block has any action that `uiBlockActionIsPrivileged` keeps for the owner or an admin.
+ * On such a block an answer in words (`UI_BLOCK_TEXT_ACTION_ID`) is privileged too, so a member cannot
+ * write "yes" to an action they may not press.
+ */
+export function uiBlockHasPrivilegedAction(spec: UiBlockSpec): boolean {
+  return actionsOf(spec).some((action) => uiBlockActionIsPrivileged(spec, action.id));
+}
+
 // ---------------------------------------------------------------------------------------------------
 // State
 
@@ -1419,6 +1428,33 @@ function matchOption(options: readonly string[], answer: string): string | undef
   return options.find((option) => option.trim().toLowerCase() === text);
 }
 
+/**
+ * The options one typed choice answer names, or null when a part names none. A label may hold a comma
+ * or a semicolon ("Yes, send it"), so the whole answer and then each line are matched first, and only a
+ * line that is no label is split at commas and semicolons.
+ */
+function choiceOptionsIn<T extends { id: string; label: string }>(options: readonly T[], answer: string): T[] | null {
+  if (!answer.trim()) return [];
+  const whole = matchLabel(options, answer);
+  if (whole) return [whole];
+  const found: T[] = [];
+  for (const line of answer.split("\n")) {
+    if (!line.trim()) continue;
+    const option = matchLabel(options, line);
+    if (option) {
+      found.push(option);
+      continue;
+    }
+    for (const token of line.split(/[,;]/u)) {
+      if (!token.trim()) continue;
+      const part = matchLabel(options, token);
+      if (!part) return null;
+      found.push(part);
+    }
+  }
+  return found;
+}
+
 function answersText(questions: readonly AgentPromptQuestion[], answers: Readonly<Record<string, readonly string[]>>) {
   return questions
     .flatMap((item) => {
@@ -1455,13 +1491,11 @@ function structuredResponse(
       return option ? { actionId: option.id } : null;
     }
     case "choice": {
-      const given = (answers[UI_CHOICE_QUESTION_ID] ?? []).flatMap((answer) => answer.split(/[\n,;]/u));
-      const tokens = given.map((token) => token.trim()).filter(Boolean);
       const ids: string[] = [];
-      for (const token of tokens) {
-        const option = matchLabel(spec.options, token);
-        if (!option) return null;
-        if (!ids.includes(option.id)) ids.push(option.id);
+      for (const answer of answers[UI_CHOICE_QUESTION_ID] ?? []) {
+        const options = choiceOptionsIn(spec.options, answer);
+        if (!options) return null;
+        for (const option of options) if (!ids.includes(option.id)) ids.push(option.id);
       }
       return { actionId: UI_BLOCK_SUBMIT_ACTION_ID, values: { [UI_CHOICE_VALUES_KEY]: ids } };
     }

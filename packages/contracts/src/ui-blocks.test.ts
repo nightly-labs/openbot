@@ -25,6 +25,7 @@ import {
   uiBlockAnswersFromResponse,
   uiBlockFallbackQuestions,
   uiBlockFallbackText,
+  uiBlockHasPrivilegedAction,
   uiBlockItemType,
   uiBlockOutcomeText,
   uiBlockResponseFromAnswers,
@@ -436,6 +437,13 @@ describe("ui block responses", () => {
     expect(uiBlockActionIsPrivileged(layout, "save")).toBe(false);
     expect(uiBlockActionIsPrivileged(table, "paid")).toBe(false);
   });
+
+  it("tells whether a block has a privileged action", () => {
+    expect(uiBlockHasPrivilegedAction(confirmSpec)).toBe(true);
+    expect(uiBlockHasPrivilegedAction({ ...confirmSpec, danger: false })).toBe(false);
+    expect(uiBlockHasPrivilegedAction(choice)).toBe(false);
+    expect(uiBlockHasPrivilegedAction(alertSpec)).toBe(true);
+  });
 });
 
 describe("ui block fallbacks", () => {
@@ -503,6 +511,44 @@ describe("ui block fallbacks", () => {
     expect(
       uiBlockResponseFromAnswers(form, { what: ["Течёт кран"], urgency: ["высокая"], due: ["2026-10-09"] }),
     ).toEqual({ actionId: "submit", values: { what: "Течёт кран", urgency: "Высокая", due: "2026-10-09" } });
+  });
+
+  it("reads a choice label that holds a comma or a semicolon", () => {
+    const comma: UiChoiceBlock = {
+      type: "choice",
+      title: "Что делаем?",
+      options: [
+        { id: "send", label: "Да, отправить" },
+        { id: "wait", label: "Нет; подождать" },
+        { id: "draft", label: "Черновик" },
+      ],
+    };
+    expect(uiBlockResponseFromAnswers(comma, { choice: ["Да, отправить"] })).toEqual({
+      actionId: "submit",
+      values: { selected: ["send"] },
+    });
+    expect(uiBlockResponseFromAnswers(comma, { choice: ["send"] })).toEqual({
+      actionId: "submit",
+      values: { selected: ["send"] },
+    });
+    const multi: UiChoiceBlock = { ...comma, multiple: true };
+    expect(uiBlockResponseFromAnswers(multi, { choice: ["Нет; подождать"] })).toEqual({
+      actionId: "submit",
+      values: { selected: ["wait"] },
+    });
+    expect(uiBlockResponseFromAnswers(multi, { choice: ["Да, отправить\nНет; подождать"] })).toEqual({
+      actionId: "submit",
+      values: { selected: ["send", "wait"] },
+    });
+    expect(uiBlockResponseFromAnswers(multi, { choice: ["Черновик, send"] })).toEqual({
+      actionId: "submit",
+      values: { selected: ["draft", "send"] },
+    });
+    for (const selected of [["send"], ["send", "wait"], ["wait", "draft"]]) {
+      const block = selected.length > 1 ? multi : comma;
+      const response = { actionId: "submit", values: { selected } };
+      expect(uiBlockResponseFromAnswers(block, uiBlockAnswersFromResponse(block, response))).toEqual(response);
+    }
   });
 
   it("keeps an unreadable answer as words", () => {
