@@ -115,7 +115,10 @@ function RootNavigator() {
                     <Stack.Screen name="index" options={{ headerShown: false }} />
                     <Stack.Screen
                       name="scan-qr-code"
-                      options={{ animation: "slide_from_right", title: t("mobile.app.route.scanQrCode") }}
+                      options={{
+                        animation: reducedMotion ? "fade" : "slide_from_right",
+                        title: t("mobile.app.route.scanQrCode"),
+                      }}
                     />
                   </Stack.Protected>
                   <Stack.Protected guard={Boolean(session)}>
