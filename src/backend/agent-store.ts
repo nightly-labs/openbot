@@ -775,9 +775,9 @@ export class AgentStore {
   }, Effect.uninterruptible).bind(this);
 
   /**
-   * An agent that is in the roster now. A conversation read or read mark uses this, never `getOrCreate`:
-   * a device can still hold the id of an agent that another device deleted, and its next read must not
-   * bring the agent back. For an agent that exists it does what `getOrCreate` does.
+   * An agent that is in the roster now. A conversation read or read mark, a reaction, a stop, and a steer
+   * use this, never `getOrCreate`: a device can still hold the id of an agent that another device deleted,
+   * and its next action on that id must not bring the agent back. For an agent that exists it does what `getOrCreate` does.
    */
   existing = Effect.fn("AgentStore.existing")(function* (
     this: AgentStore,

@@ -509,4 +509,37 @@ describe("TeamApiServer conversations", () => {
     expect(markConversationRead).not.toHaveBeenCalled();
     expect(markConversationUnread).not.toHaveBeenCalled();
   });
+
+  it("answers 404 and writes nothing when a device reacts, stops, or steers on an agent that is gone", async () => {
+    const { start, signIn } = await createTeamApiFixture("local-instance", { configure: true });
+    const setMessageReaction = vi.fn();
+    const interrupt = vi.fn();
+    const steerQueuedMessage = vi.fn();
+    const agents = createAgents({ listAgents: () => [], setMessageReaction, interrupt, steerQueuedMessage });
+    const { base } = await start({ agents });
+    const token = await signIn();
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      [TEAM_PROTOCOL_VERSION_HEADER]: String(TEAM_PROTOCOL_V3),
+      [TEAM_CAPABILITIES_HEADER]: TEAM_CURRENT_CAPABILITIES.join(","),
+    };
+
+    for (const [action, body] of [
+      ["reactions", { messageId: "message-1", emoji: null }],
+      ["interrupt", { turnId: "turn-1" }],
+      ["queue/steer", { deliveryId: "delivery-1", expectedTurnId: "turn-1" }],
+    ] as const) {
+      const response = await fetch(`${base}/v1/agents/deleted-elsewhere/${action}`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+      });
+      expect(response.status).toBe(404);
+      await expect(response.json()).resolves.toEqual({ error: "Agent not found." });
+    }
+    expect(setMessageReaction).not.toHaveBeenCalled();
+    expect(interrupt).not.toHaveBeenCalled();
+    expect(steerQueuedMessage).not.toHaveBeenCalled();
+  });
 });

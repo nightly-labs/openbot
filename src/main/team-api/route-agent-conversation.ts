@@ -22,6 +22,7 @@ import {
   pageAnchor,
   pageLimit,
   readJson,
+  requireListedAgent,
   stringArray,
   stringField,
 } from "./request-helpers";
@@ -45,21 +46,14 @@ export async function routeAgentConversation(
   { agents }: AgentConversationRouteDependencies,
 ): Promise<RouteOutcome> {
   const { method, url, request, member, protocol, capabilities, json, empty } = context;
-  // A read or a read mark never creates the agent. A device can still hold the id of an agent that
-  // another device deleted; it gets the same 404 as for an agent hidden from it.
-  const requireAgent = () => {
-    if (!agents.listAgents().some((agent) => agent.id === agentId)) {
-      throw new HttpError(404, sourceText("error.team.agentNotFound"));
-    }
-  };
 
   if (method === "GET" && action === "conversation") {
-    requireAgent();
+    requireListedAgent(agents, agentId);
     const conversation = await runCauseEffect(agents.readConversationFor(agentId, member.id));
     return json(200, conversationForCapabilities(conversation, capabilities));
   }
   if (method === "GET" && action === "conversation-page") {
-    requireAgent();
+    requireListedAgent(agents, agentId);
     const page = await runCauseEffect(
       agents.readConversationPageFor(
         agentId,
@@ -79,12 +73,12 @@ export async function routeAgentConversation(
       throw new HttpError(400, sourceText("error.team.markUnreadUnsupported"));
     }
     await readJson(request);
-    requireAgent();
+    requireListedAgent(agents, agentId);
     return json(200, await runCauseEffect(agents.markConversationUnread(agentId, member.id)));
   }
   if (method === "POST" && action === "conversation/read") {
     const body = await readJson(request);
-    requireAgent();
+    requireListedAgent(agents, agentId);
     return json(
       200,
       await runCauseEffect(
@@ -123,6 +117,7 @@ export async function routeAgentConversation(
     const body = await readJson(request);
     const emoji = body.emoji;
     if (emoji !== null && !isMessageReaction(emoji)) throw new HttpError(400, "Invalid emoji.");
+    requireListedAgent(agents, agentId);
     await runCauseEffect(
       agents.setMessageReaction({
         agentId,
