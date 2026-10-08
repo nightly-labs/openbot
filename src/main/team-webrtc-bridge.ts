@@ -15,6 +15,8 @@ interface TeamWebRtcBridgeEvents {
   accountProfileChanged: [peerId: string];
   accountServersChanged: [peerId: string];
   signalReady: [peerId: string];
+  /** The Signal socket of a peer opened. Only the connection trace reads it. */
+  signalOpen: [peerId: string];
   incoming: [
     peerId: string,
     connection: {
@@ -84,6 +86,7 @@ type BridgeCommand =
       peer: "host" | "client";
       iceTransportPolicy: "all" | "relay";
     }
+  | { type: "prepare-signal"; peerId: string; signalUrl: string }
   | { type: "disconnect" | "disconnect-peer" | "restart-ice" | "close"; peerId: string }
   | { type: "send"; peerId: string; channel: TeamWebRtcChannel; data: string | ArrayBuffer };
 
@@ -125,6 +128,20 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
   ) {
     yield* this.start();
     yield* this.#command({ type: "connect", ...input, iceTransportPolicy: this.#options.iceTransportPolicy ?? "all" });
+  }).bind(this);
+
+  /**
+   * Opens the Signal socket of a client peer before its ticket exists. The next `connect` of that
+   * peer sends its hello on this socket when it names the same address. The socket closes if no
+   * `connect` takes it soon. It carries nothing before the hello.
+   */
+  readonly prepareSignal = Effect.fn("TeamWebRtcBridge.prepareSignal")(function* (
+    this: TeamWebRtcBridge,
+    peerId: string,
+    signalUrl: string,
+  ) {
+    yield* this.start();
+    yield* this.#command({ type: "prepare-signal", peerId, signalUrl });
   }).bind(this);
 
   readonly disconnect = Effect.fn("TeamWebRtcBridge.disconnect")(function* (this: TeamWebRtcBridge, peerId: string) {
@@ -309,6 +326,7 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
     } else if (message.type === "account-profile-changed") this.emit("accountProfileChanged", message.peerId);
     else if (message.type === "account-servers-changed") this.emit("accountServersChanged", message.peerId);
     else if (message.type === "signal-ready") this.emit("signalReady", message.peerId);
+    else if (message.type === "signal-open") this.emit("signalOpen", message.peerId);
     else if (message.type === "peer-connected" && message.localFingerprint && message.remoteFingerprint)
       this.emit("connected", message.peerId, {
         localFingerprint: message.localFingerprint,

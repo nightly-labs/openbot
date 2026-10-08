@@ -5,12 +5,9 @@ export const messages = {
   "onboarding.setup.saveFailed": "OpenBot yerel kurulumunuzu kaydedemedi.",
   "onboarding.setup.verifyFailed": "OpenBot bu daveti doğrulayamadı.",
   "onboarding.setup.connectFailed": "OpenBot bu ana makineye bağlanamadı.",
-  "onboarding.setup.reviewTitle": "Sağlayıcılar ve izinler",
   "onboarding.setup.localTitle": "Bu bilgisayarı ayarla",
   "onboarding.setup.remoteTitle": "Bir ana makineye bağlan",
   "onboarding.setup.title": "OpenBot nerede çalışacak?",
-  "onboarding.setup.reviewDescription":
-    "Yerel ajanlar için varsayılan sağlayıcıyı seçin ve macOS izinlerini inceleyin.",
   "onboarding.setup.localDescription": "Ajanlar, konuşmalar ve dosyalar bu bilgisayarda kalır.",
   "onboarding.setup.remoteDescription": "OpenBot ana makinenizi çalıştıran kişiden gelen daveti kullanın.",
   "onboarding.setup.description":
@@ -33,7 +30,6 @@ export const messages = {
   "onboarding.setup.otherInvitation": "Başka bir davet kullan",
   "onboarding.setup.joinNote":
     "{email} olarak katılacaksınız. E-posta davetleri yalnızca onları alan adres için çalışır.",
-  "onboarding.setup.saveChanges": "Değişiklikleri kaydet",
   "onboarding.setup.connect": "Ana makineye bağlan",
   "onboarding.setup.reviewInvitation": "Daveti incele",
   "onboarding.setup.continueWith": "{provider} ile devam et",

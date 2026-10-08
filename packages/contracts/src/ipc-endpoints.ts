@@ -253,6 +253,7 @@ import type {
   RemoteDesktopTestInput,
   RemoteDesktopTestStatus,
 } from "./ipc-remote-desktop-setup";
+import type { RemoteSessionReusePreference } from "./ipc-remote-sessions";
 import type {
   ConnectRoutineFlowInput,
   DisconnectRoutineFlowInput,
@@ -439,6 +440,10 @@ export const IPC_ENDPOINTS = {
     getBusyMessageModePreference: request<undefined, BusyMessageModePreference>()("app:get-busy-message-mode"),
     setBusyMessageModePreference: request<BusyMessageModePreference, BusyMessageModePreference>()(
       "app:set-busy-message-mode",
+    ),
+    getRemoteSessionReusePreference: request<undefined, RemoteSessionReusePreference>()("app:get-remote-session-reuse"),
+    setRemoteSessionReusePreference: request<RemoteSessionReusePreference, RemoteSessionReusePreference>()(
+      "app:set-remote-session-reuse",
     ),
     getAppLanguagePreference: request<undefined, AppLanguagePreference>()("app:get-language-preference"),
     setAppLanguagePreference: request<SetAppLanguagePreferenceInput, AppLanguagePreference>()(

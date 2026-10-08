@@ -44,6 +44,9 @@ export const messages = defineMessages("settings", {
   "settings.busyMessage.title": "Steer agents while they work",
   "settings.busyMessage.description":
     "New messages join the agent’s current work, not the queue. Works with ChatGPT and Claude.",
+  "settings.keepRemoteSessions.title": "Fast connection to servers",
+  "settings.keepRemoteSessions.description":
+    "Keep the connection to your joined servers between launches. OpenBot starts about a second faster. When you quit OpenBot, the OpenBot service does not close the connection.",
   "settings.permissions.title": "Permissions",
   "settings.turbo.title": "Turbo mode",
   "settings.turbo.description":

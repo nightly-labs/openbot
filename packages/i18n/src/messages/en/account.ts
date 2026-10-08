@@ -17,7 +17,6 @@ export const messages = defineMessages("account", {
   "account.menu.billing": "Billing",
   "account.menu.accountSettings": "Account settings",
   "account.menu.marketplace": "Marketplace",
-  "account.menu.providersPermissions": "Providers & permissions",
   "account.menu.help": "Help",
   "account.menu.sendFeedback": "Send feedback",
   "account.menu.message": "Message",

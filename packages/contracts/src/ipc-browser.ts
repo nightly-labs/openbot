@@ -237,9 +237,24 @@ export type BrowserLiveViewInput =
       modifiers?: number;
     }
   | { type: "key"; action: "down" | "up" | "char"; key: string; code: string; text?: string; modifiers?: number }
-  | { type: "ack"; sequence: number };
+  | { type: "ack"; sequence: number }
+  /** Text from the user's own clipboard, inserted where the remote page has focus. */
+  | { type: "paste"; text: string }
+  /** Asks for the remote page's selection; it comes back as a `copied` event. */
+  | { type: "copy" }
+  /** Deletes the remote selection after a cut, once `text` is on the user's clipboard. */
+  | { type: "cut"; text: string };
 
-/** What a live view sends the renderer. The image is the host's own JPEG, not a data URL. */
+/** The longest paste a live view sends, the same bound the Team protocol puts on one. */
+export const BROWSER_LIVE_VIEW_MAX_PASTE_TEXT = 100_000;
+
+/**
+ * What a live view sends the renderer. The image is the host's own JPEG, not a data URL. `copied`
+ * is the remote page's selection, for the renderer to put on the user's clipboard, and
+ * `copyTooLarge` says the selection was longer than one copy carries.
+ */
 export type BrowserLiveViewEvent =
   | { type: "frame"; tabId: string; sequence: number; width: number; height: number; image: Uint8Array }
-  | { type: "stopped"; tabId: string; reason: string };
+  | { type: "stopped"; tabId: string; reason: string }
+  | { type: "copied"; tabId: string; text: string }
+  | { type: "copyTooLarge"; tabId: string };

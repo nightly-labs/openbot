@@ -81,6 +81,8 @@ interface BrowserPanelProps {
   /** The tab to draw here, for a host whose browser is not a view on this screen. Local: `null`. */
   liveViewTabId: string | null;
   liveViewRuntime: BrowserViewRuntime;
+  /** Whether the host pastes and copies for the live view. */
+  liveViewClipboard: boolean;
   canCloseTabs?: boolean;
   /** False where the page cannot leave the window, such as the web app. */
   canEnterPip?: boolean;
@@ -140,6 +142,7 @@ export default function BrowserPanel(props: BrowserPanelProps) {
             runtime={props.liveViewRuntime}
             tabId={tabId()}
             active={props.open}
+            clipboard={props.liveViewClipboard}
             onFrameSize={setFrameSize}
           />
         )}

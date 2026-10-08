@@ -70,11 +70,13 @@ describe("notificationForAgentEvent", () => {
       notificationForAgentEvent(completed("completed"), [{ ...agent, notifications: false }], translate, "all"),
     ).toBeNull();
     expect(notificationForAgentEvent(completed("interrupted"), [agent], translate, "all")).toBeNull();
+    // A quiet routine run posted nothing to look at.
+    expect(notificationForAgentEvent({ ...completed("completed"), quiet: true }, [agent], translate, "all")).toBeNull();
     expect(notificationForAgentEvent({ type: "agents-changed", agents: [] }, [agent], translate, "all")).toBeNull();
   });
 });
 
-function completed(status: string): AgentEvent {
+function completed(status: string): Extract<AgentEvent, { type: "turn-completed" }> {
   return {
     type: "turn-completed",
     agentId: "chief",

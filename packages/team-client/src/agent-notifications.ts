@@ -72,7 +72,8 @@ function notificationSubject(
     const { agentId, threadId } = event.approval;
     return { body: translate("notification.needsApproval"), agentId, threadId };
   }
-  if (event.type !== "turn-completed" || level !== "all") return null;
+  // A quiet routine run posted nothing, so there is nothing to look at.
+  if (event.type !== "turn-completed" || level !== "all" || event.quiet) return null;
   const { agentId, threadId } = event;
   if (event.status === "completed") return { body: translate("notification.finished"), agentId, threadId };
   // An interrupted turn is one the user stopped, so it is not news.

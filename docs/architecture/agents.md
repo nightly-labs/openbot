@@ -16,6 +16,34 @@ changes it, on the computer that runs the agent: the Team API parser and the age
 not accept it, the remote IPC branch refuses it, and duplication does not copy it. When the flag is
 on, the developer instructions name the two file paths, never the token.
 
+## Quiet routine runs
+
+A scheduled run of an agent routine can end without a message. The user asks for it in the routine
+task ("if there is nothing new, answer `[[no-update]]`"); OpenBot adds nothing to the run prompt, and
+there is no setting or column. The marker is a fixed token, not a phrase, so the check does not
+depend on the language of the answer (`src/backend/agent/routine-quiet-runs.ts`). When a turn that
+ran only scheduled routine runs completes and every answer is the marker, the turn drops its answers,
+thinking and plan from the conversation, puts back the agent preview from before the run (the run
+start shows the task there; memory only, so after a restart the task stays), and its `turn-completed`
+event has `quiet: true`, which stops the desktop notification and the completion sound. The run
+marker and the run history stay. A marker inside a longer answer is a report and is shown. Test runs,
+and script or webhook runs, which are also manual runs, are never quiet.
+
+`quiet` reaches remote clients too. The released Team API event projects a fixed key list, so the
+current v6 adapter puts `quiet` beside the frozen `turn-completed` projection
+(`packages/contracts/src/team-protocol/turn-quiet-v6.ts`), in the way `plan` and `senderMember` ride
+beside the conversation projection. The browser client, the phone, and a desktop connected to a
+remote server then show no notification, play no completion sound, and the Dynamic Island shows no
+new reply. A client on protocol 1-5, or a v6 client that predates the flag, drops the key without an
+error and shows the run as finished, as before. Only `true` is a value: any other value is a
+`protocol_error`.
+
+A routine run whose last answer is only the marker, also a Test run that shows it in the chat, does
+not put the marker in the preview either. The provider history import
+(`src/backend/provider-history-import.ts`) decides from the staged items alone: in a turn that a
+routine delivery started, it skips each answer that is only the marker, and when every answer is
+the marker it skips the turn's thinking too, so a later import does not bring a quiet turn back.
+
 ## Routine calendar feed
 
 `src/main/routine-feed-server.ts` is a loopback HTTP listener that serves the routines of this

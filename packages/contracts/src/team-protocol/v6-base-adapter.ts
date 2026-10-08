@@ -12,6 +12,7 @@ import {
   toWireAgentKeys,
   toWireAgentKeysObjectForPath,
 } from "./current-agent-keys";
+import { withQuietTurn } from "./turn-quiet-v6";
 import {
   decodeTeamProtocolV6BaseEvent,
   decodeTeamProtocolV6BaseHttpRequest,
@@ -38,7 +39,10 @@ export function decodeTeamProtocolV6BaseCurrentEvent(value: unknown): TeamProtoc
   const decodedValue: TeamProtocolV6BaseJsonValue = JSON.parse(JSON.stringify(decoded.event));
   let current: unknown;
   try {
-    current = withEventConversationPlans(restoreBrowserSecretMetadata(toCurrentAgentKeys(decodedValue), value), value);
+    current = withQuietTurn(
+      withEventConversationPlans(restoreBrowserSecretMetadata(toCurrentAgentKeys(decodedValue), value), value),
+      value,
+    );
   } catch {
     return { kind: "invalid", type: decoded.event.type };
   }
@@ -59,8 +63,12 @@ export function encodeTeamProtocolV6BaseCurrentEvent(
   const decoded = decodeTeamProtocolV6BaseEvent(downconvertedValue);
   if (decoded.kind !== "known") return null;
   const encoded = encodeTeamProtocolV6BaseEvent(decoded.event);
-  if (!encoded || (!options.preserveBrowserSecrets && !eventConversationKey(event.type))) return encoded;
-  const output = withEventConversationPlans(JSON.parse(encoded), wireValue);
+  if (
+    !encoded ||
+    (!options.preserveBrowserSecrets && !eventConversationKey(event.type) && event.type !== "turn-completed")
+  )
+    return encoded;
+  const output = withQuietTurn(withEventConversationPlans(JSON.parse(encoded), wireValue), wireValue);
   return JSON.stringify(options.preserveBrowserSecrets ? restoreBrowserSecretMetadata(output, wireValue) : output);
 }
 

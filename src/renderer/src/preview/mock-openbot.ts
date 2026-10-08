@@ -32,6 +32,7 @@ import {
   DEFAULT_BUSY_MESSAGE_MODE,
   DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
   DEFAULT_PROVIDER_DETECTION_SETTINGS,
+  DEFAULT_REMOTE_SESSION_REUSE_PREFERENCE,
   type DirectConversationSnapshot,
   type DirectMessageRealtimeEvent,
   type DirectTypingRealtimeEvent,
@@ -52,6 +53,7 @@ import {
   type QueuedMessageReceipt,
   type QueueSnapshot,
   type RemoteDesktopSession,
+  type RemoteSessionReusePreference,
   type ReorderQueueInput,
   type RespondToPromptInput,
   type Routine,
@@ -240,6 +242,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let analyticsPreference = clone<AnalyticsPreference>(options.analyticsPreference ?? { enabled: true });
   let approvalAutomation = clone<ApprovalAutomationPreference>(DEFAULT_APPROVAL_AUTOMATION_PREFERENCE);
   let busyMessageMode: BusyMessageModePreference = { mode: DEFAULT_BUSY_MESSAGE_MODE };
+  let remoteSessionReuse: RemoteSessionReusePreference = { ...DEFAULT_REMOTE_SESSION_REUSE_PREFERENCE };
   let languagePreference = clone<AppLanguagePreference>(options.languagePreference ?? { language: "system" });
   const languageListeners = new Set<(preference: AppLanguagePreference) => void>();
   let logoColorPreference: AppLogoColorPreference = { color: DEFAULT_APP_LOGO_COLOR };
@@ -477,6 +480,11 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       return () => approvalAutomationListeners.delete(listener);
     },
     getBusyMessageModePreference: async () => clone(busyMessageMode),
+    getRemoteSessionReusePreference: async () => clone(remoteSessionReuse),
+    setRemoteSessionReusePreference: async ({ keepBetweenRuns }) => {
+      remoteSessionReuse = { keepBetweenRuns };
+      return clone(remoteSessionReuse);
+    },
     setBusyMessageModePreference: async ({ mode }) => {
       busyMessageMode = { mode };
       return clone(busyMessageMode);

@@ -18,6 +18,11 @@ import type { ThreadLifecycle } from "./thread-lifecycle";
 export interface BootRecoveryHooks {
   executionThreads?(): Array<{ id: string; threadId: string }>;
   deliveryThreadId?(deliveryId: string): string | null;
+  /**
+   * Whether this routine delivery can have ended quiet: a scheduled run, or a run of a deleted
+   * routine, whose record is gone. A Test, script or webhook run cannot.
+   */
+  quietRoutineDelivery(deliveryId: string): boolean;
   emitError(code: string, error: unknown, agentId?: string): void;
 }
 
@@ -308,6 +313,7 @@ export class BootRecovery {
             cwd: typeof params.cwd === "string" ? params.cwd : agent.workspacePath,
             findDelivery: (deliveryId) => this.#mailbox.getDelivery(deliveryId),
             findMessageDelivery: (messageId) => this.#mailbox.deliveryForMessage(messageId, agent.id),
+            quietRoutineDelivery: (deliveryId) => this.#hooks.quietRoutineDelivery(deliveryId),
           }).pipe(toBootRecoveryFailed);
           yield* recoveryStep(() => this.#refreshBackfilledConversation(agent.id, publicThreadId));
         }).pipe(

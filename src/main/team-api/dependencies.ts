@@ -211,6 +211,7 @@ export type TeamApiBrowser = Pick<
   // cannot, because frames outlive the request that asked for them.
   | "startView"
   | "dispatchViewInput"
+  | "copyViewSelection"
 >;
 export type TeamApiBrowserView = Pick<
   BrowserViewGateway,

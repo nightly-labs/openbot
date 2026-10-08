@@ -1,4 +1,9 @@
-import type { BrowserDesktopApi, BrowserLiveViewInput } from "@openbot/contracts/ipc";
+import {
+  BROWSER_LIVE_VIEW_MAX_PASTE_TEXT,
+  type BrowserDesktopApi,
+  type BrowserLiveViewInput,
+} from "@openbot/contracts/ipc";
+import { toast } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, createStore, onCleanup, Show } from "solid-js";
 
@@ -26,6 +31,8 @@ interface BrowserLiveViewProps {
   tabId: string;
   /** False while the panel is closed: a view nobody is looking at still costs the host a screencast. */
   active: boolean;
+  /** Whether the host pastes and copies for this view. An older host closes the view on either. */
+  clipboard: boolean;
   /** The pixel size of the frame on the canvas, so the panel can take the page's shape. */
   onFrameSize?: (size: { width: number; height: number }) => void;
 }
@@ -119,9 +126,30 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
     pendingFrame = drawing;
   };
 
+  /**
+   * The copy that waits for the host's answer. Its clipboard write started in the key press, the one
+   * moment every browser lets a page write, and it holds until the answer settles it.
+   */
+  let pendingCopy: ((answer: CopyAnswer) => void) | undefined;
+  const settleCopy = (answer: CopyAnswer) => {
+    const settle = pendingCopy;
+    pendingCopy = undefined;
+    settle?.(answer);
+  };
+  onCleanup(() => settleCopy(null));
+
   const stopListening = runtime.onLiveViewEvent((event) => {
     if (event.tabId !== props.tabId) return;
+    if (event.type === "copied") {
+      settleCopy({ text: event.text });
+      return;
+    }
+    if (event.type === "copyTooLarge") {
+      settleCopy("tooLarge");
+      return;
+    }
     if (event.type === "stopped") {
+      settleCopy(null);
       abandonStream();
       setState(() => ({ live: false, message: sourceText(event.reason) }));
       return;
@@ -210,13 +238,76 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
     });
   };
 
+  /**
+   * Ask the host for its selection, and write it to the user's clipboard when it comes. The host's
+   * clipboard is not the user's, so the text has to come back here. A copy already waiting is the
+   * same copy: the Edit menu fires one after the key press that started it. A cut deletes the text
+   * on the host only once it is on the clipboard, so a write that fails loses nothing.
+   */
+  const copy = (cut: boolean) => {
+    if (pendingCopy) return;
+    let failure: "empty" | "tooLarge" | undefined;
+    let copied = "";
+    const answer = new Promise<CopyAnswer>((resolve) => {
+      pendingCopy = resolve;
+    });
+    const text = answer.then((reply) => {
+      if (reply === "tooLarge" || !reply?.text) {
+        failure = reply === "tooLarge" ? "tooLarge" : "empty";
+        throw new Error("The host sent no text to copy.");
+      }
+      copied = reply.text;
+      return new Blob([reply.text], { type: "text/plain" });
+    });
+    send({ type: "copy" });
+    // Nothing selected leaves the clipboard as it was, as a copy of nothing does.
+    void writeClipboard(text).then(
+      () => {
+        if (cut) send({ type: "cut", text: copied });
+      },
+      () => {
+        if (failure === "tooLarge") toast.error(t("browser.liveView.copyTooLarge"));
+        else if (failure !== "empty") toast.error(t("browser.liveView.copyFailed"));
+      },
+    );
+  };
+
   const key = (event: KeyboardEvent, action: "down" | "up") => {
-    event.preventDefault();
+    const letter = clipboardLetter(event);
+    // A paste stays with this window, which fires its own paste event with the user's clipboard. The
+    // key still goes to the page, as every other key does: a terminal reads Ctrl+C as an interrupt.
+    if (letter !== "v" || !props.clipboard) event.preventDefault();
     send({ type: "key", action, key: event.key, code: event.code, modifiers: modifiers(event) });
+    if (action === "down" && letter) {
+      if (!props.clipboard) toast.error(t("browser.liveView.clipboardUnsupported"));
+      else if (letter !== "v") copy(letter === "x");
+    }
     // A printable key is two events on the wire: the key itself, and the character it produces.
     if (action === "down" && event.key.length === 1 && !event.ctrlKey && !event.metaKey) {
       send({ type: "key", action: "char", key: event.key, code: event.code, text: event.key });
     }
+  };
+
+  const paste = (event: ClipboardEvent) => {
+    event.preventDefault();
+    if (!props.clipboard) {
+      toast.error(t("browser.liveView.clipboardUnsupported"));
+      return;
+    }
+    const text = event.clipboardData?.getData("text/plain") ?? "";
+    if (!text) return;
+    if (text.length > BROWSER_LIVE_VIEW_MAX_PASTE_TEXT) {
+      toast.error(t("browser.liveView.pasteTooLong"));
+      return;
+    }
+    send({ type: "paste", text });
+  };
+
+  // Copy or Cut from the Edit menu. The event is not cancelled: a cancelled copy with no data would
+  // empty the clipboard before the host's answer arrives.
+  const menuCopy = (cut: boolean) => {
+    if (props.clipboard) copy(cut);
+    else toast.error(t("browser.liveView.clipboardUnsupported"));
   };
 
   return (
@@ -250,6 +341,9 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
         }}
         onKeyDown={(event) => key(event, "down")}
         onKeyUp={(event) => key(event, "up")}
+        onPaste={paste}
+        onCopy={() => menuCopy(false)}
+        onCut={() => menuCopy(true)}
       />
       <Show when={!state.live}>
         <div class="browser-empty-state">
@@ -258,6 +352,34 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
       </Show>
     </div>
   );
+}
+
+/** The host's answer to a copy: its text, a selection too long to send, or no answer at all. */
+type CopyAnswer = { text: string } | "tooLarge" | null;
+
+/**
+ * Ctrl or Cmd with C, V or X. On a layout whose letters are not Latin, such as Russian, the key is
+ * the letter of that layout, so the place of the key decides.
+ */
+function clipboardLetter(event: KeyboardEvent): "c" | "v" | "x" | undefined {
+  if (!(event.ctrlKey || event.metaKey) || event.altKey) return undefined;
+  const letter = /^[a-z]$/iu.test(event.key)
+    ? event.key.toLowerCase()
+    : /^Key[A-Z]$/u.test(event.code)
+      ? event.code.slice(3).toLowerCase()
+      : "";
+  return letter === "c" || letter === "v" || letter === "x" ? letter : undefined;
+}
+
+/**
+ * Write text that is still on its way. A `ClipboardItem` made in the key press keeps that press's
+ * permission while the host answers; Safari allows no later write. Without one, the text is written
+ * when it arrives.
+ */
+function writeClipboard(text: Promise<Blob>): Promise<void> {
+  if (typeof ClipboardItem !== "undefined")
+    return navigator.clipboard.write([new ClipboardItem({ "text/plain": text })]);
+  return text.then((blob) => blob.text()).then((value) => navigator.clipboard.writeText(value));
 }
 
 function modifiers(event: MouseEvent | KeyboardEvent): number {
