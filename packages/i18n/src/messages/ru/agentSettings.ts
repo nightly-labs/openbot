@@ -45,6 +45,7 @@ export const messages = {
   "agentSettings.runtime.reasoning": "Рассуждение",
   "agentSettings.runtime.reasoningLabel": "Уровень рассуждения агента",
   "agentSettings.runtime.selectReasoning": "Выберите рассуждение",
+  "agentSettings.runtime.reasoningSetByProvider": "Задаёт {provider}",
   "agentSettings.runtime.access": "Доступ",
   "agentSettings.runtime.accessLabel": "Доступ агента",
   "agentSettings.runtime.busyMessage": "Во время работы",

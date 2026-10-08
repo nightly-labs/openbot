@@ -138,6 +138,17 @@ export const messages = {
   "error.backend.memoryTextRequired": "Нужен текст записи памяти.",
   "error.backend.memoryTextTooLong": "Текст записи памяти слишком длинный.",
   "error.backend.mcpServerGone": "Этого сервера MCP больше нет.",
+  "error.backend.routineFlowLinkGone": "Этой связи больше нет.",
+  "error.backend.routineFlowSameAgent": "Агент не может передать работу самому себе.",
+  "error.backend.routineFlowIntoOwner":
+    "Регулярная задача начинается со своего агента, поэтому он не может получать работу от другого.",
+  "error.backend.routineFlowNotOnPath": "Этот агент ещё не участвует в задаче. Сначала подключите его к задаче.",
+  "error.backend.routineFlowDuplicate": "Эти агенты уже связаны в этой задаче.",
+  "error.backend.routineFlowCycle": "Эта связь создаст цикл.",
+  "error.backend.routineFlowLinkLimit": "У регулярной задачи может быть не больше {limit} связей.",
+  "error.backend.routineFlowHandoffFailed": "Задаче не удалось передать работу этому агенту.",
+  "error.backend.routineFlowRemoteUnsupported":
+    "Цепочки регулярных задач доступны только для агентов на этом компьютере.",
   "error.backend.mcpServerLimit": "OpenBot хранит не более {limit} серверов MCP.",
   "error.backend.mcpServerNameTaken": "Сервер MCP с именем {name} уже существует.",
   "error.backend.mcpServerNoAnswer": "Сервер не ответил за {seconds} с.",

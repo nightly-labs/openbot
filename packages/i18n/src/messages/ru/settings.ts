@@ -286,6 +286,7 @@ export const messages = {
   "settings.hostedServers.usageNote":
     "Сервер останавливается примерно через 15 минут после последнего сообщения или изменения, в том числе при открытом приложении. Нажатие клавиши или щелчок в приложении, сообщение или регулярная задача по расписанию запускают его снова. Его агенты и регулярные задачи работают, даже когда этот компьютер выключен.",
   "settings.hostedServers.empty": "У вас пока нет облачного сервера.",
+  "settings.hostedServers.loading": "Загрузка облачных серверов…",
   "settings.hostedServers.state.awaitingPayment": "Ожидает оплаты",
   "settings.hostedServers.state.planEnded": "Тариф закончился",
   "settings.hostedServers.state.creating": "Создаётся",
