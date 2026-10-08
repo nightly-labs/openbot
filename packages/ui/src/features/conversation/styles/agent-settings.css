@@ -20,6 +20,7 @@
 }
 
 .agent-settings-avatar .agent-avatar {
+  --agent-avatar-optical-offset: calc(62px * -0.14);
   width: 62px;
   height: 62px;
 }
@@ -1038,6 +1039,7 @@
 }
 
 .agent-settings-profile-card .agent-settings-profile-avatar {
+  --agent-avatar-optical-offset: calc(44px * -0.14);
   width: 44px;
   height: 44px;
   flex: 0 0 auto;
