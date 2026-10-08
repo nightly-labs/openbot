@@ -1505,6 +1505,8 @@ export async function createApplicationServices({
     appVersion: app.getVersion(),
     store: teamStore,
     agents: service,
+    // Defined below with the startup it waits for; a request runs only after this returns.
+    agentsReady: () => agentInitialization.awaitSettled(),
     events,
     skills,
     sidebarLayout,

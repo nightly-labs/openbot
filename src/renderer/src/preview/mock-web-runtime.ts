@@ -14,6 +14,7 @@ export const createMockWebRuntime: WebRuntimeFactory = (_accountId, events) => {
     membershipId: "preview-member",
     role: "owner" as const,
   };
+  let removed = false;
   const unsubscribe = agent.onEvent((event) => events.event(host.hostId, event));
   return {
     browser: mock.api.browser,
@@ -28,7 +29,10 @@ export const createMockWebRuntime: WebRuntimeFactory = (_accountId, events) => {
     // The member the mock channels write as.
     currentMemberId: async () => "preview",
     respondToTakeover: (input) => agent.respondToBrowserTakeover(input),
-    listHosts: async () => [host],
+    listHosts: async () => (removed ? [] : [host]),
+    removeOwnedHost: async () => {
+      removed = true;
+    },
     leaveHost: async () => {
       throw new Error("Leaving a host needs a connected account.");
     },

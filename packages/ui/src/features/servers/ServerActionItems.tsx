@@ -69,6 +69,8 @@ export interface ServerActionCallbacks {
   onLeave?: ((serverId: string, trigger: HTMLElement | null) => void) | undefined;
   /** Asks to delete a hosted server. The menu shows it only when `canDelete` accepts the server. */
   onDelete?: ((serverId: string, trigger: HTMLElement | null) => void) | undefined;
+  onRemove?: ((serverId: string, trigger: HTMLElement | null) => void) | undefined;
+  canRemove?: ((serverId: string) => boolean) | undefined;
   canDelete?: ((serverId: string) => boolean) | undefined;
 }
 
@@ -87,6 +89,11 @@ export function ServerActionItems(
   const canLeave = () => Boolean(props.onLeave) && props.server.kind === "remote" && props.server.role !== "owner";
   const canDelete = () =>
     Boolean(props.onDelete) && props.server.kind === "remote" && Boolean(props.canDelete?.(props.server.id));
+  const canRemove = () =>
+    Boolean(props.onRemove) &&
+    props.server.kind === "remote" &&
+    props.server.role === "owner" &&
+    Boolean(props.canRemove?.(props.server.id));
   // A component, so the JSX below can use it as a tag. The menu does not change after render.
   const Menu = props.menu;
   return (
@@ -181,7 +188,7 @@ export function ServerActionItems(
           <span>{t("server.rail.settings")}</span>
         </Menu.Item>
       </Show>
-      <Show when={canLeave() || canDelete()}>
+      <Show when={canLeave() || canDelete() || canRemove()}>
         <Menu.Separator />
         <Show when={canLeave()}>
           <Menu.Item
@@ -190,6 +197,15 @@ export function ServerActionItems(
           >
             <LogOut class="agent-context-icon size-4" aria-hidden="true" />
             <span>{t("server.rail.leave")}</span>
+          </Menu.Item>
+        </Show>
+        <Show when={canRemove()}>
+          <Menu.Item
+            class="ui-action-menu-danger agent-context-danger"
+            onSelect={() => props.onRemove?.(props.server.id, props.trigger())}
+          >
+            <Trash2 class="agent-context-icon size-4" aria-hidden="true" />
+            <span>{t("server.rail.remove")}</span>
           </Menu.Item>
         </Show>
         <Show when={canDelete()}>

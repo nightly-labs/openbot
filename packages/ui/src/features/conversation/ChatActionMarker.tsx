@@ -19,6 +19,7 @@ import {
   TriangleAlert,
   X,
 } from "@openbot/ui";
+import type { JSX } from "@solidjs/web";
 import { Dynamic } from "@solidjs/web";
 import { createSignal, createUniqueId, For, Show, untrack } from "solid-js";
 import { avatarHeadColor } from "../../bloub-avatar";
@@ -56,41 +57,66 @@ const STATUS_LABELS = {
   unavailable: "chat.marker.status.unavailable",
 } as const satisfies Record<ChatActionMarkerStatus, AppTextKey>;
 
-type SingleChatActionMarkerModel = Exclude<ChatActionMarkerModel, { kind: "agent-message-group" }>;
+type SingleChatActionMarkerModel = Exclude<
+  ChatActionMarkerModel,
+  { kind: "agent-message-group" } | { kind: "routine-run-group" }
+>;
 type AgentMessageGroupMarkerModel = Extract<ChatActionMarkerModel, { kind: "agent-message-group" }>;
+type RoutineRunGroupMarkerModel = Extract<ChatActionMarkerModel, { kind: "routine-run-group" }>;
 
 function agentMessageGroup(marker: ChatActionMarkerModel): AgentMessageGroupMarkerModel | undefined {
   return marker.kind === "agent-message-group" ? marker : undefined;
 }
 
+function routineRunGroup(marker: ChatActionMarkerModel): RoutineRunGroupMarkerModel | undefined {
+  return marker.kind === "routine-run-group" ? marker : undefined;
+}
+
 function singleMarker(marker: ChatActionMarkerModel): SingleChatActionMarkerModel | undefined {
-  return marker.kind === "agent-message-group" ? undefined : marker;
+  return marker.kind === "agent-message-group" || marker.kind === "routine-run-group" ? undefined : marker;
 }
 
 export function ChatActionMarker(props: ChatActionMarkerProps) {
   /*
-   * A single agent message turns into a group when the next one arrives, and this component stays
-   * mounted while it does. A message after the ones drawn at mount joins later and is announced. A new
-   * row announces all of its messages.
+   * A single agent message or routine run turns into a group when the next one arrives, and this
+   * component stays mounted while it does. An entry after the ones drawn at mount joins later and is
+   * announced. A new row announces all of its entries.
    */
-  const drawnMessageCount = untrack(() =>
-    props.announce ? 0 : (agentMessageGroup(props.marker)?.messages.length ?? 1),
-  );
+  const drawnEntryCount = untrack(() => {
+    if (props.announce) return 0;
+    return agentMessageGroup(props.marker)?.messages.length ?? routineRunGroup(props.marker)?.runs.length ?? 1;
+  });
   return (
     <Show
       when={agentMessageGroup(props.marker)}
       fallback={
-        <Show when={singleMarker(props.marker)}>
-          {(marker) => (
-            <SingleChatActionMarker
-              marker={marker()}
+        <Show
+          when={routineRunGroup(props.marker)}
+          fallback={
+            <Show when={singleMarker(props.marker)}>
+              {(marker) => (
+                <SingleChatActionMarker
+                  marker={marker()}
+                  agents={props.agents}
+                  announce={props.announce}
+                  onOpenSkill={props.onOpenSkill}
+                  routineAvailable={props.routineAvailable}
+                  onSelectAgent={props.onSelectAgent}
+                  onOpenRoutine={props.onOpenRoutine}
+                  onOpenHostedSite={props.onOpenHostedSite}
+                />
+              )}
+            </Show>
+          }
+        >
+          {(group) => (
+            <RoutineRunGroupMarker
+              group={group()}
               agents={props.agents}
-              announce={props.announce}
-              onOpenSkill={props.onOpenSkill}
+              drawnRunCount={drawnEntryCount}
               routineAvailable={props.routineAvailable}
               onSelectAgent={props.onSelectAgent}
               onOpenRoutine={props.onOpenRoutine}
-              onOpenHostedSite={props.onOpenHostedSite}
             />
           )}
         </Show>
@@ -100,11 +126,89 @@ export function ChatActionMarker(props: ChatActionMarkerProps) {
         <AgentMessageGroupMarker
           group={group()}
           agents={props.agents}
-          drawnMessageCount={drawnMessageCount}
+          drawnMessageCount={drawnEntryCount}
           onSelectAgent={props.onSelectAgent}
         />
       )}
     </Show>
+  );
+}
+
+/** The open state of a group row, which its summary uses to draw the toggle. */
+interface MarkerGroupToggle {
+  expanded: () => boolean;
+  listId: string;
+  toggle: () => void;
+}
+
+/**
+ * The shared body of a group row: the summary, the list of each entry's own marker that opens under
+ * it, and the live text that announces an entry that joins the group.
+ */
+function MarkerGroup(props: {
+  class: string;
+  label: string;
+  listLabel: string;
+  entries: readonly { id: string; marker: SingleChatActionMarkerModel }[];
+  drawnCount: number;
+  agents: AgentProfile[];
+  routineAvailable?: boolean | undefined;
+  onSelectAgent: (agentId: string) => void;
+  onOpenRoutine?: ((routine: { routineId: string; name: string }) => void) | undefined;
+  summary: (control: MarkerGroupToggle) => JSX.Element;
+}) {
+  const { t } = useText();
+  const [expanded, setExpanded] = createSignal(false);
+  // Same exit rule as the routine history: the list stays mounted until its closing animation ends.
+  const [mounted, setMounted] = createSignal(false);
+  const toggle = (): void => {
+    const opening = !expanded();
+    setExpanded(opening);
+    if (opening || prefersReducedMotion()) setMounted(opening);
+  };
+  const listId = createUniqueId();
+  // An entry that joins the group has no row of its own to announce it. The newest one that joined
+  // gets a new node in the live text, so a reader announces it even when its text is the same.
+  const joinedEntries = () => props.entries.slice(Math.max(props.drawnCount, props.entries.length - 1));
+  return (
+    <Marker class={props.class} role="group" aria-label={props.label}>
+      <div class="chat-action-marker-summary">
+        <MarkerContent class="chat-action-marker-content">{props.summary({ expanded, listId, toggle })}</MarkerContent>
+        <Show when={mounted()}>
+          <div
+            class="chat-action-history-panel"
+            data-state={expanded() ? "open" : "closed"}
+            inert={!expanded()}
+            onAnimationEnd={(event) => {
+              if (event.target === event.currentTarget && !expanded()) setMounted(false);
+            }}
+          >
+            <div class="chat-action-history-clip">
+              <ol id={listId} class="chat-action-history chat-action-group-list" aria-label={props.listLabel}>
+                <For each={props.entries} keyed={(entry) => entry.id}>
+                  {(entry) => (
+                    <li class="chat-action-history-entry">
+                      <SingleChatActionMarker
+                        marker={entry().marker}
+                        agents={props.agents}
+                        routineAvailable={props.routineAvailable}
+                        onSelectAgent={props.onSelectAgent}
+                        onOpenRoutine={props.onOpenRoutine}
+                      />
+                    </li>
+                  )}
+                </For>
+              </ol>
+            </div>
+          </div>
+        </Show>
+      </div>
+      <span class="sr-only" role="status" aria-live="polite">
+        <For each={joinedEntries()} keyed={(entry) => entry.id}>
+          {(entry) => <span>{markerAccessibleLabel(entry().marker, props.agents, t)}</span>}
+        </For>
+      </span>
+    </Marker>
   );
 }
 
@@ -119,15 +223,6 @@ function AgentMessageGroupMarker(props: {
   onSelectAgent: (agentId: string) => void;
 }) {
   const { t, format } = useText();
-  const [expanded, setExpanded] = createSignal(false);
-  // Same exit rule as the routine history: the list stays mounted until its closing animation ends.
-  const [mounted, setMounted] = createSignal(false);
-  const toggle = (): void => {
-    const opening = !expanded();
-    setExpanded(opening);
-    if (opening || prefersReducedMotion()) setMounted(opening);
-  };
-  const listId = createUniqueId();
   const agentIds = () => [
     ...new Set(
       props.group.messages.flatMap(({ marker }) =>
@@ -144,32 +239,31 @@ function AgentMessageGroupMarker(props: {
     if (ids.length !== 1) return t("chat.marker.agentCount", { count: ids.length });
     return agents()[0]?.name ?? t("chat.marker.unavailableAgent");
   };
-  // A message that joins the group has no row of its own to announce it. The newest one that joined
-  // gets a new node in the live text, so a reader announces it even when its text is the same.
-  const joinedMessages = () =>
-    props.group.messages.slice(Math.max(props.drawnMessageCount, props.group.messages.length - 1));
   return (
-    <Marker
+    <MarkerGroup
       class="chat-action-marker chat-action-marker-agent-message chat-action-marker-agent-message-group"
-      role="group"
-      aria-label={t("chat.marker.accessible.messageGroup", { label: label(), agents: agentsLabel() })}
-    >
-      <div class="chat-action-marker-summary">
-        <MarkerContent class="chat-action-marker-content">
+      label={t("chat.marker.accessible.messageGroup", { label: label(), agents: agentsLabel() })}
+      listLabel={t("chat.marker.groupMessages")}
+      entries={props.group.messages}
+      drawnCount={props.drawnMessageCount}
+      agents={props.agents}
+      onSelectAgent={props.onSelectAgent}
+      summary={(control) => (
+        <>
           <span class="chat-action-marker-label">{label()}</span>
           <Button
             variant="ghost"
             type="button"
             class="chat-action-target"
             style={agentTargetsStyle(agents())}
-            aria-expanded={expanded() ? "true" : "false"}
-            aria-controls={listId}
-            aria-label={t(expanded() ? "chat.marker.hideMessages" : "chat.marker.showMessages", {
+            aria-expanded={control.expanded() ? "true" : "false"}
+            aria-controls={control.listId}
+            aria-label={t(control.expanded() ? "chat.marker.hideMessages" : "chat.marker.showMessages", {
               count: props.group.messages.length,
               agents: agentsLabel(),
             })}
-            data-cuelume-tap={expanded() ? "close" : "open"}
-            onClick={toggle}
+            data-cuelume-tap={control.expanded() ? "close" : "open"}
+            onClick={control.toggle}
           >
             <span class="chat-action-avatar-stack" aria-hidden="true">
               <For each={agents().slice(0, 3)}>
@@ -181,44 +275,84 @@ function AgentMessageGroupMarker(props: {
           <time class="chat-action-marker-time" datetime={props.group.timestamp}>
             {formatMarkerTime(props.group.timestamp, t, format)}
           </time>
-        </MarkerContent>
-        <Show when={mounted()}>
-          <div
-            class="chat-action-history-panel"
-            data-state={expanded() ? "open" : "closed"}
-            inert={!expanded()}
-            onAnimationEnd={(event) => {
-              if (event.target === event.currentTarget && !expanded()) setMounted(false);
-            }}
-          >
-            <div class="chat-action-history-clip">
-              <ol
-                id={listId}
-                class="chat-action-history chat-action-group-list"
-                aria-label={t("chat.marker.groupMessages")}
-              >
-                <For each={props.group.messages} keyed={(entry) => entry.id}>
-                  {(entry) => (
-                    <li class="chat-action-history-entry">
-                      <SingleChatActionMarker
-                        marker={entry().marker}
-                        agents={props.agents}
-                        onSelectAgent={props.onSelectAgent}
-                      />
-                    </li>
-                  )}
-                </For>
-              </ol>
-            </div>
-          </div>
-        </Show>
-      </div>
-      <span class="sr-only" role="status" aria-live="polite">
-        <For each={joinedMessages()} keyed={(entry) => entry.id}>
-          {(entry) => <span>{markerAccessibleLabel(entry().marker, props.agents, t)}</span>}
-        </For>
-      </span>
-    </Marker>
+        </>
+      )}
+    />
+  );
+}
+
+/**
+ * Consecutive completed runs of one routine, drawn as one row. The row names the routine, how many
+ * runs there are and the time from the first to the newest, and opens to show each run's own marker.
+ */
+function RoutineRunGroupMarker(props: {
+  group: RoutineRunGroupMarkerModel;
+  agents: AgentProfile[];
+  drawnRunCount: number;
+  routineAvailable?: boolean | undefined;
+  onSelectAgent: (agentId: string) => void;
+  onOpenRoutine?: ((routine: { routineId: string; name: string }) => void) | undefined;
+}) {
+  const { t, format } = useText();
+  const count = () => props.group.runs.length;
+  const firstTimestamp = () => props.group.runs[0]?.marker.timestamp ?? props.group.timestamp;
+  const timeRange = () =>
+    t("chat.marker.runGroup.timeRange", {
+      start: formatMarkerTime(firstTimestamp(), t, format),
+      end: formatRangeEnd(firstTimestamp(), props.group.timestamp, t, format),
+    });
+  return (
+    <MarkerGroup
+      class="chat-action-marker chat-action-marker-routine-run chat-action-marker-routine-run-group"
+      label={t("chat.marker.runGroup.accessible", {
+        count: count(),
+        name: props.group.routineName,
+        time: timeRange(),
+      })}
+      listLabel={t("chat.marker.runGroup.runs")}
+      entries={props.group.runs}
+      drawnCount={props.drawnRunCount}
+      agents={props.agents}
+      routineAvailable={props.routineAvailable}
+      onSelectAgent={props.onSelectAgent}
+      onOpenRoutine={props.onOpenRoutine}
+      summary={(control) => (
+        <>
+          <RoutineTarget
+            routineId={props.group.routineId}
+            routineName={props.group.routineName}
+            icon={CircleCheck}
+            status="completed"
+            available={props.routineAvailable !== false}
+            {...(props.onOpenRoutine ? { onOpenRoutine: props.onOpenRoutine } : {})}
+          />
+          <span class="chat-action-run-group-details">
+            <span class="chat-action-marker-label chat-action-run-group-count">
+              {t("chat.marker.runGroup.count", { count: count() })}
+            </span>
+            <time class="chat-action-marker-time chat-action-run-group-time" datetime={props.group.timestamp}>
+              {timeRange()}
+            </time>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              class="chat-action-history-toggle"
+              type="button"
+              aria-expanded={control.expanded() ? "true" : "false"}
+              aria-controls={control.listId}
+              aria-label={t(control.expanded() ? "chat.marker.runGroup.hide" : "chat.marker.runGroup.show", {
+                count: count(),
+                name: props.group.routineName,
+              })}
+              data-cuelume-tap={control.expanded() ? "close" : "open"}
+              onClick={control.toggle}
+            >
+              <ChevronDown aria-hidden="true" />
+            </Button>
+          </span>
+        </>
+      )}
+    />
   );
 }
 
@@ -756,4 +890,23 @@ function formatMarkerTime(value: string, t: AppTranslate, format: AppFormat): st
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return t("chat.marker.unknownTime");
   return formatChatTimestamp(date, format);
+}
+
+/** The end of a time range names only the time when it is on the same day as the start. */
+function formatRangeEnd(start: string, end: string, t: AppTranslate, format: AppFormat): string {
+  const startDate = new Date(start);
+  const endDate = new Date(end);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || !sameDay(startDate, endDate))
+    return formatMarkerTime(end, t, format);
+  // A time today already shows without a date, in the same form as the start.
+  if (sameDay(endDate, new Date())) return formatChatTimestamp(endDate, format);
+  return format.date(endDate, { timeStyle: "short" });
+}
+
+function sameDay(first: Date, second: Date): boolean {
+  return (
+    first.getFullYear() === second.getFullYear() &&
+    first.getMonth() === second.getMonth() &&
+    first.getDate() === second.getDate()
+  );
 }

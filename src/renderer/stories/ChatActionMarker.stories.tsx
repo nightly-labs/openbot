@@ -213,6 +213,39 @@ export const RoutineRunSummary: Story = {
   ),
 };
 
+export const RoutineRunGroup: Story = {
+  render: () => (
+    <main class="foundation-story">
+      <Heading as="h1" size="lg">
+        Routine run group
+      </Heading>
+      <Text tone="secondary">
+        Consecutive completed runs of one routine show as one row that opens. A failed run keeps its own row.
+      </Text>
+      <section class="chat-primitives-stage chat-primitives-stage-narrow" aria-label="Routine run group">
+        <ChatActionMarker
+          marker={routineRunGroupMarker(["17:15", "17:30", "17:45", "18:00"])}
+          agents={agents}
+          onSelectAgent={onSelectAgent}
+          onOpenRoutine={onOpenRoutine}
+        />
+        <ChatActionMarker
+          marker={{ ...watchRun("18:15"), status: "failed" }}
+          agents={agents}
+          onSelectAgent={onSelectAgent}
+          onOpenRoutine={onOpenRoutine}
+        />
+        <ChatActionMarker
+          marker={routineRunGroupMarker(["18:30", "18:45"])}
+          agents={agents}
+          onSelectAgent={onSelectAgent}
+          onOpenRoutine={onOpenRoutine}
+        />
+      </section>
+    </main>
+  ),
+};
+
 export const AgentMessageGroup: Story = {
   render: () => (
     <main class="foundation-story">
@@ -311,6 +344,30 @@ function routineMarker(
     routineName: "Morning brief",
     status,
     timestamp,
+  };
+}
+
+function watchRun(time: string): Extract<ChatActionMarkerModel, { kind: "routine-run" }> {
+  return {
+    kind: "routine-run",
+    sourceAgentId: "research",
+    routineId: "routine-watch",
+    runId: `watch-${time}`,
+    routineName: "Watchdog",
+    status: "succeeded",
+    timestamp: `2026-09-01T${time}:00.000Z`,
+    previousTransitions: [{ status: "running", timestamp: `2026-09-01T${time}:00.000Z` }],
+  };
+}
+
+function routineRunGroupMarker(times: string[]): Extract<ChatActionMarkerModel, { kind: "routine-run-group" }> {
+  const runs = times.map((time) => ({ id: `watch-${time}`, marker: watchRun(time) }));
+  return {
+    kind: "routine-run-group",
+    routineId: "routine-watch",
+    routineName: "Watchdog",
+    runs,
+    timestamp: runs.at(-1)?.marker.timestamp ?? timestamp,
   };
 }
 
