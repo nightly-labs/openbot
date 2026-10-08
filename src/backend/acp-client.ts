@@ -1037,7 +1037,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
    * in `session/new` has answered already and is not asked again.
    *
    * No probe has to succeed. A model whose probe fails, or that the time does not reach, keeps the
-   * session-wide efforts the catalog held before. `deadline` is when the caller's own `model/list`
+   * session-wide efforts the catalog held before, and the user can still select them. `deadline` is when the caller's own `model/list`
    * times out: a sweep that ran past it would leave the user with no models at all, rather than with
    * imprecise efforts.
    */
@@ -1072,7 +1072,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         selected = model.id;
         answered += 1;
       }
-      probed.push(response ? { ...model, ...reasoningFromConfig(response.configOptions) } : model);
+      // An unanswered model holds the opening model's options, which say nothing about this model.
+      probed.push(
+        response
+          ? { ...model, ...reasoningFromConfig(response.configOptions) }
+          : { ...model, reasoningEffortConfigurable: true },
+      );
     }
     // Back to the model the session opened on. The session is closed next, but an agent that keeps a
     // "last used model" outside the session would otherwise remember the end of this sweep, and the
@@ -2212,11 +2217,8 @@ function modelsFromSessionSetup(response: SessionSetupResponse): AcpModel[] {
       defaultReasoningEffort,
       supportedReasoningEfforts,
       reasoningEffortConfigurable:
-        model.usesModelReasoningEffort === false
-          ? false
-          : model.supportedReasoningEfforts
-            ? true
-            : configReasoning.reasoningEffortConfigurable,
+        model.usesModelReasoningEffort ??
+        (model.supportedReasoningEfforts ? true : configReasoning.reasoningEffortConfigurable),
       reasoningEffortWireValues:
         reasoningEffortWireValues && reasoningEffortWireValues.size > 0
           ? reasoningEffortWireValues

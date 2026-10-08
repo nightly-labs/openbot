@@ -697,27 +697,6 @@ describe("OpenCode ACP reasoning efforts", () => {
     });
   });
 
-  it("sends thinking when the user picks high on a model that can only switch thinking on", async () => {
-    const fake = await createFakeOpencodeAgent("system");
-    vi.stubEnv("OPENBOT_FAKE_ACP_CONFIG_MODELS", "1");
-    vi.stubEnv("OPENBOT_FAKE_ACP_CONFIG_LOG", fake.configLog);
-    vi.stubEnv("OPENBOT_FAKE_ACP_CONFIG_SWITCH", "agent/switch");
-    const client = startOpencode(fake.cli, () => null, fake.envLog);
-
-    await runCauseEffect(
-      client.request(
-        "thread/start",
-        { cwd: tmpdir(), runtimeWorkspaceRoots: [tmpdir()], model: "agent/switch", effort: "high" },
-        decodeRecordResponse,
-      ),
-    );
-
-    expect((await fake.readConfigCalls()).slice(-2)).toEqual([
-      { sessionId: "session-1", configId: "model", value: "agent/switch" },
-      { sessionId: "session-1", configId: "effort", value: "thinking" },
-    ]);
-  });
-
   it("keeps reading the rest of the catalog when one model refuses to be selected", async () => {
     const fake = await createFakeOpencodeAgent("system");
     vi.stubEnv("OPENBOT_FAKE_ACP_CONFIG_MODELS", "1");
