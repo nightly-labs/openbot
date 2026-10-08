@@ -34,7 +34,7 @@ import {
 } from "@openbot/ui/features/custom-providers/ProviderDetectionSettings";
 import { OpenCodeKeyDialog, type ProviderKeyApi } from "@openbot/ui/features/settings/OpenCodeKeyDialog";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createSignal, createStore, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, createStore, Show, untrack } from "solid-js";
 import type { ProviderCodeLoginApi } from "../../components/provider-code-login-api";
 import { createCustomProviderHostState } from "../custom-providers/custom-provider-host-state";
 import { savedCustomModel } from "../onboarding/SetupProviderPicker";
@@ -94,7 +94,11 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
     return choice ? savedCustomModel(choice.preferredProvider, choice.preferredModel, customProviders()) : null;
   };
 
-  async function selectProvider(provider: AgentProviderId, custom = false): Promise<void> {
+  async function selectProvider(
+    provider: AgentProviderId,
+    custom = false,
+    selectedModel?: AgentModelId | null,
+  ): Promise<void> {
     if (saving.pending) return;
     const choice = props.defaultProvider;
     if (!choice) {
@@ -112,7 +116,7 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
         : undefined;
     setSaving(() => ({ pending: { provider, custom }, error: "" }));
     try {
-      await choice.save(provider, model);
+      await choice.save(provider, selectedModel === undefined ? model : selectedModel);
     } catch (error) {
       setSaving((state) => {
         state.error = i18n.errorMessage(error, i18n.t("onboarding.setup.saveFailed"));
@@ -123,6 +127,24 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
       });
     }
   }
+  async function selectSavedEndpoint(value: SaveCustomProviderInput): Promise<void> {
+    const firstModel = value.models[0];
+    if (props.defaultProvider && firstModel) {
+      await selectProvider("opencode", true, `${value.id}/${firstModel.id}`);
+    }
+  }
+  const detectedApi = createMemo((): DetectedProviderApi | undefined => {
+    const api = props.detectedProviderApi;
+    if (!api || !props.defaultProvider) return api;
+    return {
+      ...api,
+      save: async (provider, value) => {
+        const restart = await api.save(provider, value);
+        if (value.kind === "models") await selectSavedEndpoint(value.value);
+        return restart;
+      },
+    };
+  });
   /**
    * With a detection API, Add first asks what to add: a local server, any compatible endpoint, or
    * an ACP agent. Without one, as on a joined server's host, Add opens the endpoint form at once.
@@ -132,7 +154,12 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
   const host = createCustomProviderHostState({
     onAdd: (value) => props.onAddCustomProvider?.(value),
     onDelete: (id) => props.onDeleteCustomProvider?.(id),
-    onRemoved: () => {
+    onSaved: (value) => void selectSavedEndpoint(value),
+    onRemoved: (id) => {
+      const choice = props.defaultProvider;
+      if (choice?.preferredProvider === "opencode" && choice.preferredModel?.startsWith(`${id}/`)) {
+        void selectProvider("opencode", false, null);
+      }
       if (customProviders().length === 0) {
         setCustomSelected(false);
       }
@@ -180,7 +207,7 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
         detected={
           <Show when={props.providerDetection}>
             {(detection) => (
-              <Show when={props.detectedProviderApi}>
+              <Show when={detectedApi()}>
                 {(api) => (
                   <DetectedProviders
                     detection={detection()}
@@ -195,7 +222,7 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
           </Show>
         }
       />
-      <Show when={saving.error}>
+      <Show when={!host.state.manageOpen && saving.error}>
         <Text role="alert">{saving.error}</Text>
       </Show>
       {/* The outcome is shown where the user is looking. While the list is open the section behind
@@ -220,12 +247,12 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
           open={host.state.manageOpen}
           providers={customProviders()}
           removing={host.state.removing}
-          note={host.state.note}
+          note={saving.error || host.state.note}
           onDelete={props.onDeleteCustomProvider ? (provider) => void host.remove(provider) : undefined}
           onClose={host.closeList}
         />
       </Show>
-      <Show when={props.detectedProviderApi}>
+      <Show when={detectedApi()}>
         {(api) => (
           <>
             <CustomProviderPresetDialog
