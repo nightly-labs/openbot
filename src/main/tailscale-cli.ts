@@ -123,7 +123,11 @@ export type TailscaleLocalState =
   | { kind: "not-installed" }
   /** The command exists, but the Tailscale service or app does not answer. */
   | { kind: "not-running" }
-  | { kind: "signed-out" }
+  | {
+      kind: "signed-out";
+      /** The sign-in page Tailscale reports while it waits for a sign-in. Only `login.tailscale.com`. */
+      authUrl: string | null;
+    }
   /** Signed in, with Tailscale turned off. */
   | { kind: "stopped" }
   | {
@@ -149,7 +153,8 @@ export function parseTailscaleStatus(text: string): TailscaleLocalState {
   }
   if (!isDynamicRecord(value)) return { kind: "not-running" };
   const backend = value.BackendState;
-  if (backend === "NeedsLogin" || backend === "NeedsMachineAuth") return { kind: "signed-out" };
+  if (backend === "NeedsLogin" || backend === "NeedsMachineAuth")
+    return { kind: "signed-out", authUrl: backend === "NeedsLogin" ? tailscaleLoginUrl(value.AuthURL) : null };
   if (backend === "Stopped") return { kind: "stopped" };
   if (backend !== "Running") return { kind: "not-running" };
   const self = isDynamicRecord(value.Self) ? value.Self : {};
@@ -166,6 +171,13 @@ export function parseTailscaleStatus(text: string): TailscaleLocalState {
       return name ? [name] : [];
     }),
   };
+}
+
+const TAILSCALE_LOGIN_URL = /^https:\/\/login\.tailscale\.com\/a\/[A-Za-z0-9_-]{1,128}$/u;
+
+/** The Tailscale sign-in page, or null for any other address, such as one of a custom control server. */
+export function tailscaleLoginUrl(value: unknown): string | null {
+  return isString(value) && TAILSCALE_LOGIN_URL.test(value) ? value : null;
 }
 
 function magicDnsName(value: unknown): string | null {
@@ -230,7 +242,16 @@ export const TAILSCALE_COMMANDS = {
     loopbackProxyTarget(loopbackPort),
   ],
   serveOff: (httpsPort: number) => ["serve", `--https=${validPort(httpsPort)}`, "off"],
+  /**
+   * Starts Tailscale and, when it needs a sign-in, its sign-in page. No flag changes a setting, so
+   * Tailscale keeps the operator and every other setting that `sudo openbot tailscale setup` made. It
+   * waits a few seconds and then stops; the sign-in stays open in the Tailscale service.
+   */
+  up: () => ["up", `--timeout=${TAILSCALE_UP_WAIT_SECONDS}s`],
 } as const;
+
+/** How long `tailscale up` waits for a sign-in. It is shorter than the command deadline. */
+export const TAILSCALE_UP_WAIT_SECONDS = 6;
 
 function validPort(port: number): number {
   if (!Number.isSafeInteger(port) || port < 1 || port > 65_535) throw new Error("Invalid port.");
@@ -262,6 +283,11 @@ export class TailscaleCli {
       ),
     );
   });
+
+  /** The `tailscale` command this computer uses, or null when none is installed. */
+  locate(): Effect.Effect<string | null> {
+    return this.#locate();
+  }
 
   run(args: readonly string[]): Effect.Effect<string, TailscaleCommandError> {
     return Effect.gen({ self: this }, function* () {

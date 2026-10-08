@@ -91,6 +91,11 @@ export class TailscaleDirectService {
     return this.#settings.enabled;
   }
 
+  /** What the last `tailscale status` of this service read. `status()` reads it again. */
+  localState(): TailscaleLocalState {
+    return this.#lastState;
+  }
+
   readonly status = Effect.fn("TailscaleDirect.status")(function* (this: TailscaleDirectService) {
     this.#lastState = yield* this.#cli.status();
     return this.#snapshot();

@@ -157,6 +157,11 @@ export function requireAdmin(member: TeamMemberSummary): void {
   if (member.role === "member") throw new HttpError(403, sourceText("error.team.adminRequired"));
 }
 
+/** For a route that changes what only the owner decides, such as the network the host joins. */
+export function requireOwner(member: TeamMemberSummary): void {
+  if (member.role !== "owner") throw new HttpError(403, sourceText("error.team.ownerRequired"));
+}
+
 /**
  * The router checks the agent ID in the path and the query. A module that reads it from the body
  * checks it here: an agent hidden from the caller answers as a missing agent does.

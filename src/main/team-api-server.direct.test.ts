@@ -4,6 +4,7 @@ import {
   DIRECT_ENDPOINT_CAPABILITY,
   DIRECT_ENDPOINT_ROUTES,
 } from "@openbot/contracts/team-protocol/direct-endpoint-v1";
+import { HOST_TAILSCALE_ROUTES } from "@openbot/contracts/team-protocol/host-tailscale-v1";
 import { TEAM_CAPABILITIES_HEADER } from "@openbot/contracts/team-protocol/v1";
 import { Effect } from "effect";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -145,7 +146,7 @@ describe("TeamApiServer direct Tailscale listener", () => {
     expect(await upgradeStatus(base, sessionToken)).toBe(401);
   });
 
-  it("keeps the remote screen and the browser view off the direct listener", async () => {
+  it("keeps the remote screen, the browser view and the Tailscale setup off the direct listener", async () => {
     const { direct } = await directFixture();
     const { sessionToken } = await directSignIn(direct);
     for (const path of [
@@ -155,6 +156,12 @@ describe("TeamApiServer direct Tailscale listener", () => {
       TEAM_API_ROUTES.browser.viewSessions,
     ]) {
       expect((await get(direct, path, sessionToken)).status, path).toBe(404);
+    }
+    // Turning the direct path off over the direct path would close the connection that asks. Without the
+    // gate, this host would answer 400 (it has no Tailscale setup); with it, the path is unknown.
+    for (const path of Object.values(HOST_TAILSCALE_ROUTES)) {
+      const headers = { "OpenBot-Capabilities": "host-tailscale-v1" };
+      expect((await post(direct, path, {}, sessionToken, headers)).status, path).toBe(404);
     }
   });
 

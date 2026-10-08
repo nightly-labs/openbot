@@ -2,6 +2,7 @@
 
 import type { ServerCompatibility } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { HOST_TAILSCALE_ROUTES } from "@openbot/contracts/team-protocol/host-tailscale-v1";
 import { Effect } from "effect";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
@@ -120,6 +121,8 @@ describe("RemoteDirectRoutes", () => {
     // The remote screen and the browser view stay on WebRTC.
     expect(direct.require(HOST, TEAM_API_ROUTES.remoteScreen.sessions).transport).toBe("webrtc-v2");
     expect(direct.require(HOST, TEAM_API_ROUTES.browser.viewSessions).transport).toBe("webrtc-v2");
+    // The owner's Tailscale setup can take the direct path down, so it goes over WebRTC too.
+    expect(direct.require(HOST, HOST_TAILSCALE_ROUTES.direct).transport).toBe("webrtc-v2");
     expect(direct.status(webRtcServer())).toEqual({ offered: true, enabled: true, active: true, hint: null });
   });
 
@@ -195,7 +198,7 @@ describe("RemoteDirectRoutes", () => {
     expect(other.direct.status(webRtcServer()).hint).toBe("other-tailnet");
     expect(other.steps).toEqual([]);
 
-    const off = routes(webRtcServer(), { localTailscale: () => Effect.succeed({ kind: "signed-out" }) });
+    const off = routes(webRtcServer(), { localTailscale: () => Effect.succeed({ kind: "signed-out", authUrl: null }) });
     expect(await Effect.runPromise(off.direct.tryActivate(HOST))).toBe(false);
     expect(off.direct.status(webRtcServer()).hint).toBe("tailscale-unavailable");
   });

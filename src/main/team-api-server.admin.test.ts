@@ -13,6 +13,7 @@ import type {
   AgentTemplatePreview,
   ApprovalAutomationPreference,
   CustomProviderSummary,
+  HostTailscaleSetup,
   HostUpdateSettingsChange,
   HostUpdateStatus,
   InstalledSkill,
@@ -827,5 +828,100 @@ describe("Team API host-update-v1", () => {
 
     const compatibility = await (await fetch(`${base}/v1/compatibility`)).json();
     expect(compatibility.capabilities).toContain("host-update-v1");
+  });
+});
+
+describe("Team API host-tailscale-v1", () => {
+  // The owner decides which network the host's computer joins. An admin is refused like a member.
+  it("lets only the owner read Tailscale, turn the direct path on and start a sign-in", async () => {
+    const calls: string[] = [];
+    let enabled = false;
+    const snapshot = (): HostTailscaleSetup => ({
+      state: "signed-out",
+      tailnet: null,
+      deviceName: null,
+      dnsName: null,
+      httpsCertificates: false,
+      enabled,
+      url: null,
+      issue: null,
+      issueDetail: null,
+      loginUrl: calls.includes("signIn") ? "https://login.tailscale.com/a/1a2b3c" : null,
+      environment: "linux",
+      wslNetworking: null,
+      setupCommand: true,
+      signInIssue: null,
+    });
+    const record = (call: string) =>
+      Effect.sync(() => {
+        calls.push(call);
+        return snapshot();
+      });
+    const tailscale = {
+      status: () => record("status"),
+      setEnabled: (value: boolean) => {
+        enabled = value;
+        return record(`direct:${value}`);
+      },
+      signIn: () => record("signIn"),
+    };
+    const fixture = await createTeamApiFixture("host-tailscale", { configure: true });
+    const { base } = await fixture.start({ admin: { tailscale } });
+    const owner = {
+      Authorization: `Bearer ${await fixture.signIn()}`,
+      "OpenBot-Protocol-Version": "3",
+      "OpenBot-Capabilities": "host-tailscale-v1",
+      "Content-Type": "application/json",
+    };
+    const adminInvite = await Effect.runPromise(fixture.store.createInvite("admin"));
+    const adminSession = await Effect.runPromise(
+      fixture.store.acceptInvite(adminInvite.token, "admin", "admin password"),
+    );
+    const memberInvite = await Effect.runPromise(fixture.store.createInvite("member"));
+    const memberSession = await Effect.runPromise(
+      fixture.store.acceptInvite(memberInvite.token, "member", "member password"),
+    );
+    const post = (path: string, body: unknown, headers: Record<string, string> = owner) =>
+      fetch(`${base}${path}`, { method: "POST", headers, body: JSON.stringify(body) });
+
+    for (const token of [adminSession.sessionToken, memberSession.sessionToken]) {
+      const asOther = { ...owner, Authorization: `Bearer ${token}` };
+      for (const [path, body] of [
+        ["/v1/admin/host/tailscale/status", {}],
+        ["/v1/admin/host/tailscale/direct", { enabled: true }],
+        ["/v1/admin/host/tailscale/sign-in", {}],
+      ] as const) {
+        const refused = await post(path, body, asOther);
+        expect(refused.status).toBe(403);
+        expect(await refused.json()).toEqual({ error: "Only the owner of this server can do this." });
+      }
+    }
+    expect(calls).toEqual([]);
+
+    // A client that did not negotiate the capability gets the "update" answer, not the route.
+    expect((await post("/v1/admin/host/tailscale/status", {}, { ...owner, "OpenBot-Capabilities": "" })).status).toBe(
+      400,
+    );
+    expect((await post("/v1/admin/host/tailscale/direct", { enabled: "yes" })).status).toBe(400);
+    expect(calls).toEqual([]);
+
+    expect(await (await post("/v1/admin/host/tailscale/status", {})).json()).toEqual(snapshot());
+    expect((await (await post("/v1/admin/host/tailscale/direct", { enabled: true })).json()).enabled).toBe(true);
+    expect((await (await post("/v1/admin/host/tailscale/sign-in", {})).json()).loginUrl).toBe(
+      "https://login.tailscale.com/a/1a2b3c",
+    );
+    expect(calls).toEqual(["status", "direct:true", "signIn"]);
+    // A wrong method stays 404, as for every route.
+    expect((await fetch(`${base}/v1/admin/host/tailscale/status`, { headers: owner })).status).toBe(404);
+
+    const compatibility = await (await fetch(`${base}/v1/compatibility`)).json();
+    expect(compatibility.capabilities).toContain("host-tailscale-v1");
+  });
+
+  it("does not offer the capability on a host without Tailscale", async () => {
+    const fixture = await createTeamApiFixture("host-tailscale-off", { configure: true });
+    const { base } = await fixture.start({});
+    const compatibility = await (await fetch(`${base}/v1/compatibility`)).json();
+    expect(compatibility.capabilities).not.toContain("host-tailscale-v1");
   });
 });

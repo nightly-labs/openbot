@@ -79,6 +79,8 @@ export const messages = defineMessages("error.team", {
   "error.team.storageUnsupported": "Storage is not supported by this connection.",
   "error.team.hostedSitesUnsupported": "Sites are not supported by this connection.",
   "error.team.directEndpointUnsupported": "This server does not offer a direct connection.",
+  "error.team.hostTailscaleUnsupported": "Update this server to set up Tailscale from here.",
+  "error.team.ownerRequired": "Only the owner of this server can do this.",
   "error.team.directSignInUnavailable": "The direct connection cannot check members now. Use the OpenBot cloud.",
   "error.team.hostedSitesUnregistered": "This server is not registered with OpenBot, so it has no sites.",
   "error.team.hostedSiteNotFound": "Site not found.",

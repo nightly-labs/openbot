@@ -179,6 +179,7 @@ import { SkillMarketplaceService } from "./skill-marketplace-service";
 import { SLACK_DEV_CALLBACK_PATH, startSlackDevCallbackServer } from "./slack-dev-callback-server";
 import { locateTailscale, TailscaleCli } from "./tailscale-cli";
 import { TailscaleDirectService } from "./tailscale-direct-service";
+import { TailscaleHostSetup } from "./tailscale-host-setup";
 import { TeamStore } from "./team-store";
 import { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcClientTransport } from "./team-webrtc-client-transport";
@@ -375,6 +376,8 @@ export interface ApplicationServices {
   eventsRuntime: HostEventsRuntime;
   /** The terminal control of a self-hosted server. Null in every other build. */
   serverMode: ServerMode | null;
+  /** This computer's Tailscale client, read with its command line. */
+  tailscaleCli: TailscaleCli;
   customProviders: CustomProviderStore;
   customProviderChanges: CustomProviderChanges;
   customAgentChanges: CustomAgentChanges;
@@ -1442,9 +1445,17 @@ export async function createApplicationServices({
     cli: tailscale,
   });
   await Effect.runPromise(tailscaleDirect.load());
+  // The owner's Tailscale setup of this host, from the owner's client (`host-tailscale-v1`).
+  const tailscaleSetup = new TailscaleHostSetup({
+    direct: tailscaleDirect,
+    cli: tailscale,
+    platform: tailscalePlatform,
+    serverMode: serverModeEnvironment !== null,
+  });
   const host = new HostService({
     appVersion: app.getVersion(),
     tailscaleDirect,
+    tailscaleSetup,
     openTailscale: (installed) =>
       Effect.tryPromise({
         try: async () => {
@@ -2029,6 +2040,7 @@ export async function createApplicationServices({
     events,
     eventsRuntime,
     serverMode,
+    tailscaleCli: tailscale,
     customProviders,
     customProviderChanges,
     customAgentChanges,

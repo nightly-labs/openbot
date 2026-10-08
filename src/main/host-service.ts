@@ -48,6 +48,7 @@ import { appendRemoteDiagnosticLog } from "./remote-diagnostics";
 import { RemoteScreenGateway, type RemoteScreenGatewayCreateRuntime } from "./remote-screen-gateway";
 import { RemoteWorkflowError, remoteDecode } from "./remote-service-effects";
 import type { TailscaleDirectService } from "./tailscale-direct-service";
+import type { TailscaleHostSetup } from "./tailscale-host-setup";
 import { TeamApiServer } from "./team-api-server";
 import type { RemoteDirectoryMember, TeamIdentity, TeamStore } from "./team-store";
 import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
@@ -135,6 +136,8 @@ interface HostServiceOptions {
   verifyRemoteSessionTicket?: (ticket: string) => Effect.Effect<VerifiedRemoteSessionTicket, RemoteWorkflowError>;
   /** The direct Tailscale path. Absent where this host does not offer it. */
   tailscaleDirect?: TailscaleDirectService;
+  /** The owner's Tailscale setup of this host from a joined client. Absent where the host does not offer it. */
+  tailscaleSetup?: TailscaleHostSetup;
   /** Opens the Tailscale app when it is installed, and its download page when it is not. */
   openTailscale?: (installed: boolean) => Effect.Effect<void, RemoteWorkflowError>;
   endRemoteSession?: (sessionId: string) => Effect.Effect<void, RemoteWorkflowError>;
@@ -287,6 +290,7 @@ export class HostService extends EventEmitter<HostEvents> {
           logger,
         })
       : undefined;
+    const tailscaleSetup = options.tailscaleSetup;
     this.#api = new TeamApiServer({
       appVersion: options.appVersion,
       store: options.store,
@@ -303,6 +307,13 @@ export class HostService extends EventEmitter<HostEvents> {
       admin: {
         ...options.admin,
         identity: { updateIdentity: (input) => this.updateIdentity(input).pipe(Effect.asVoid) },
+        tailscale: tailscaleSetup
+          ? {
+              status: () => tailscaleSetup.status(),
+              setEnabled: (enabled) => tailscaleSetup.setEnabled(enabled),
+              signIn: () => tailscaleSetup.signIn(),
+            }
+          : undefined,
       },
       skills: options.skills,
       sidebarLayout: options.sidebarLayout,

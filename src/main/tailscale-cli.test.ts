@@ -35,14 +35,40 @@ describe("tailscale status", () => {
   });
 
   it("reads the other backend states and fails closed on bad output", () => {
-    expect(parseTailscaleStatus(JSON.stringify({ BackendState: "NeedsLogin" }))).toEqual({ kind: "signed-out" });
+    expect(parseTailscaleStatus(JSON.stringify({ BackendState: "NeedsLogin" }))).toEqual({
+      kind: "signed-out",
+      authUrl: null,
+    });
     expect(parseTailscaleStatus(JSON.stringify({ BackendState: "NeedsMachineAuth" }))).toEqual({
       kind: "signed-out",
+      authUrl: null,
     });
     expect(parseTailscaleStatus(JSON.stringify({ BackendState: "Stopped" }))).toEqual({ kind: "stopped" });
     expect(parseTailscaleStatus(JSON.stringify({ BackendState: "Starting" }))).toEqual({ kind: "not-running" });
     expect(parseTailscaleStatus("failed to connect to local tailscaled")).toEqual({ kind: "not-running" });
     expect(parseTailscaleStatus("[]")).toEqual({ kind: "not-running" });
+  });
+
+  // The owner's client opens this page in a browser, so only the Tailscale sign-in page is kept.
+  it("keeps only a Tailscale sign-in page while it waits for a sign-in", () => {
+    const status = (AuthURL: unknown, BackendState = "NeedsLogin") =>
+      parseTailscaleStatus(JSON.stringify({ BackendState, AuthURL }));
+    expect(status("https://login.tailscale.com/a/1a2b3c4d")).toEqual({
+      kind: "signed-out",
+      authUrl: "https://login.tailscale.com/a/1a2b3c4d",
+    });
+    for (const url of [
+      "https://headscale.example.com/register/abc",
+      "https://login.tailscale.com/a/1a2b?x=https://evil.example",
+      "http://login.tailscale.com/a/1a2b",
+      42,
+    ]) {
+      expect(status(url), String(url)).toEqual({ kind: "signed-out", authUrl: null });
+    }
+    expect(status("https://login.tailscale.com/a/1a2b", "NeedsMachineAuth")).toEqual({
+      kind: "signed-out",
+      authUrl: null,
+    });
   });
 
   it("does not offer HTTPS without certificate domains, and drops a name outside ts.net", () => {
@@ -93,7 +119,10 @@ describe("tailscale commands", () => {
   it("are fixed lists with only numeric ports, and never Funnel", () => {
     expect(TAILSCALE_COMMANDS.serveOn(443, 51234)).toEqual(["serve", "--bg", "--https=443", "http://127.0.0.1:51234"]);
     expect(TAILSCALE_COMMANDS.serveOff(8443)).toEqual(["serve", "--https=8443", "off"]);
+    // No auth key, no operator, no setting: the sign-in page is the only way in.
+    expect(TAILSCALE_COMMANDS.up()).toEqual(["up", "--timeout=6s"]);
     for (const args of [
+      TAILSCALE_COMMANDS.up(),
       TAILSCALE_COMMANDS.status(),
       TAILSCALE_COMMANDS.serveStatus(),
       TAILSCALE_COMMANDS.serveOn(443, 1),

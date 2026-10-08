@@ -24,6 +24,7 @@ import type {
   CentralAuthUser,
   DirectMessageRealtimeEvent,
   DirectTypingRealtimeEvent,
+  HostTailscaleSetup,
   SidebarLayoutSnapshot,
   TeamPresenceSnapshot,
   UpdateHostIdentityInput,
@@ -173,6 +174,14 @@ export interface TeamApiAdmin {
   identity?: TeamApiHostIdentity;
   /** `host-update-v1`: the app update of this computer. Advertised also when the host user turned it off. */
   update?: Pick<RequestedUpdate, "snapshot" | "check" | "start" | "cancel" | "changeSettings">;
+  /** `host-tailscale-v1`: the Tailscale setup of this host. Unlike the others, only the owner can use it. */
+  tailscale?: TeamApiHostTailscale;
+}
+
+interface TeamApiHostTailscale {
+  status(): Effect.Effect<HostTailscaleSetup>;
+  setEnabled(enabled: boolean): Effect.Effect<HostTailscaleSetup>;
+  signIn(): Effect.Effect<HostTailscaleSetup>;
 }
 
 interface TeamApiHostIdentity {
