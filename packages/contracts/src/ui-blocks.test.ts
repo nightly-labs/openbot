@@ -374,7 +374,7 @@ describe("ui block fallbacks", () => {
     });
     expect(uiBlockResponseFromAnswers(form, { urgency: ["Высокая"] })).toEqual({
       actionId: UI_BLOCK_TEXT_ACTION_ID,
-      text: "urgency (optional): Высокая",
+      text: "urgency: Высокая",
     });
     expect(uiBlockResponseFromAnswers(choice, {})).toBeNull();
     expect(uiBlockResponseFromAnswers(choice, { choice: ["  "] })).toBeNull();

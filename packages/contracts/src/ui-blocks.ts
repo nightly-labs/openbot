@@ -783,7 +783,8 @@ function confirmFieldLine(field: UiConfirmField): string {
  * The questions a blocking block stores in `questionPrompt`. A client that does not know `uiBlock`
  * shows them and can answer; `uiBlockResponseFromAnswers` reads the answer. A question has at most
  * `INPUT_LIMITS.promptOptions` options; a longer list goes into the question text and the question
- * takes a typed answer instead.
+ * takes a typed answer instead. The questions are stored, so they use only the agent's words: app text
+ * here would not follow the language of the person who reads them.
  *
  * - `confirm`: `action` with the action labels, then one question per `select` field (id = `select`).
  * - `quick_replies`: `reply`.
@@ -821,7 +822,7 @@ export function uiBlockFallbackQuestions(spec: UiBlockSpec): AgentPromptQuestion
     case "quick_replies": {
       const labels = spec.options.map((option) => option.label);
       const options = fittingOptions(labels);
-      const title = spec.title ?? "Choose a reply";
+      const title = spec.title ?? labels.join(" / ");
       return [
         question(UI_QUICK_REPLIES_QUESTION_ID, title, options ? title : `${title}\n\n${listText(labels)}`, options),
       ];
@@ -841,19 +842,17 @@ export function uiBlockFallbackQuestions(spec: UiBlockSpec): AgentPromptQuestion
           ),
         ];
       }
-      const hint = spec.multiple ? "Reply with one or more of these, one per line:" : "Reply with one of these:";
-      return [question(UI_CHOICE_QUESTION_ID, spec.title, `${spec.title}\n\n${hint}\n${listText(labels)}`, null)];
+      return [question(UI_CHOICE_QUESTION_ID, spec.title, `${spec.title}\n\n${listText(labels)}`, null)];
     }
     case "form":
       return spec.fields.map((field) => {
         const label = field.label ?? field.id;
-        const header = field.required ? label : `${label} (optional)`;
         if (field.kind === "select" || field.kind === "segmented") {
           const options = fittingOptions(field.options);
-          return question(field.id, header, options ? label : `${label}\n\n${listText(field.options)}`, options);
+          return question(field.id, label, options ? label : `${label}\n\n${listText(field.options)}`, options);
         }
-        if (field.kind === "date") return question(field.id, header, `${label} (YYYY-MM-DD)`, null);
-        return question(field.id, header, label, null, isSecretFormField(field));
+        if (field.kind === "date") return question(field.id, label, `${label} (YYYY-MM-DD)`, null);
+        return question(field.id, label, label, null, isSecretFormField(field));
       });
   }
 }
