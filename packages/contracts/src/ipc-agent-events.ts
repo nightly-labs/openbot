@@ -69,7 +69,8 @@ export type AgentEvent =
       origin?: AgentTurnOrigin;
       /**
        * A routine run that had nothing to report and posted no message. It is not news, so it shows
-       * no notification. Local only: the released Team API event projects a fixed key list.
+       * no notification. The Team API carries it on protocol 6 beside the frozen projection; see
+       * `team-protocol/turn-quiet-v6.ts`.
        */
       quiet?: true;
     }
