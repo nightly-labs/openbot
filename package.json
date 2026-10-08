@@ -288,7 +288,7 @@
     "@openbot/telemetry": "workspace:*"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.9",
+    "@biomejs/biome": "2.5.13",
     "@dotenvx/dotenvx": "^2.21.0",
     "@electron/fuses": "1.8.0",
     "@solidjs/testing-library": "catalog:",
