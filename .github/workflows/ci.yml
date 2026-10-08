@@ -397,6 +397,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: cloudflare-production
+    # Template selection changes Worker settings. Do not race a Worker deployment.
+    concurrency:
+      group: cloudflare-production-worker
+      cancel-in-progress: false
+      queue: max
     permissions:
       contents: read
     steps:
@@ -443,7 +448,6 @@ jobs:
           OPENPANEL_CLIENT_SECRET: ${{ secrets.OPENPANEL_CLIENT_SECRET }}
           # GitHub refuses an Actions secret name that starts with GITHUB_. The Worker name is GITHUB_APP_PRIVATE_KEY.
           OPENBOT_GITHUB_APP_PRIVATE_KEY: ${{ secrets.OPENBOT_GITHUB_APP_PRIVATE_KEY }}
-          HOSTED_SERVER_TEMPLATE: ${{ vars.HOSTED_SERVER_TEMPLATE }}
           APNS_PRIVATE_KEY: ${{ secrets.APNS_PRIVATE_KEY }}
           APNS_KEY_ID: ${{ secrets.APNS_KEY_ID }}
         run: |
@@ -476,7 +480,6 @@ jobs:
               ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"],
               ["BOAT_API_KEY", "BOAT_WEBHOOK_SECRET"],
               ["OPENPANEL_CLIENT_ID", "OPENPANEL_CLIENT_SECRET"],
-              ["HOSTED_SERVER_TEMPLATE"],
               // The Live Activity relay stays off until both are set.
               ["APNS_PRIVATE_KEY", "APNS_KEY_ID"],
             ]) {

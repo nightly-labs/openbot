@@ -112,6 +112,8 @@ interface ProviderRuntimeManagerEvents {
 }
 
 export interface ProviderRuntimeManagerOptions {
+  /** An off provider must not run even for a managed runtime version check. */
+  isProviderOn?: (provider: ManagedProviderId) => boolean;
   /** The installed runtimes, shared by every profile on this computer. See `providerRuntimeRoot`. */
   root: string;
   /**
@@ -158,6 +160,7 @@ export function providerRuntimeRoot(input: { appData: string; userDataOverride: 
 }
 
 export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerEvents> {
+  readonly #isProviderOn: (provider: ManagedProviderId) => boolean;
   readonly #root: string;
   readonly #downloads: string;
   readonly #target: RuntimeTarget | null;
@@ -189,6 +192,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
 
   constructor(options: ProviderRuntimeManagerOptions) {
     super();
+    this.#isProviderOn = options.isProviderOn ?? (() => true);
     this.#root = options.root;
     this.#downloads = options.downloadRoot ?? join(options.root, ".downloads");
     this.#updateRuntime = options.updateRuntime ?? ((_runtime, install) => install().pipe(Effect.asVoid));
@@ -755,11 +759,11 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
                   downloadSmallFile: (url, hash) => this.#downloadSmallFileEffect(url, hash),
                 });
                 if (spec.source === "latest") yield* writeInstallRecord(staging, spec);
-                yield* verifyInstalledRuntime(staging, spec, this.#lock);
+                yield* verifyInstalledRuntime(staging, spec, this.#lock, this.#isProviderOn);
                 const destination = this.#installRoot(spec);
                 yield* runtimeIO(() => mkdir(dirname(destination), { recursive: true }));
                 committed = yield* this.#commitEffect(staging, destination, spec);
-                yield* verifyInstalledRuntime(destination, spec, this.#lock);
+                yield* verifyInstalledRuntime(destination, spec, this.#lock, this.#isProviderOn);
                 return committed;
               }),
             );
@@ -916,7 +920,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   }
 
   #verifiesEffect(installRoot: string, spec: RuntimeSpec): Effect.Effect<boolean, ProviderRuntimeFailure> {
-    return verifyInstalledRuntime(installRoot, spec, this.#lock).pipe(
+    return verifyInstalledRuntime(installRoot, spec, this.#lock, this.#isProviderOn).pipe(
       Effect.as(true),
       Effect.catch(() => Effect.succeed(false)),
     );
@@ -1119,12 +1123,14 @@ const verifyInstalledRuntime = Effect.fn("ProviderRuntime.verifyInstalledRuntime
   root: string,
   spec: RuntimeSpec,
   lock: AgentRuntimeLock,
+  isProviderOn: (provider: ManagedProviderId) => boolean,
 ): Effect.fn.Return<void, ProviderRuntimeFailure> {
   const descriptor = providerRuntimeDescriptor(spec.runtime);
   const executable = join(root, "bin", spec.executableName);
   yield* runtimeIO(() => access(executable));
   if (spec.source === "lock") yield* descriptor.verify(root, spec, lock);
   else yield* verifyInstallRecord(root, spec);
+  if (!isManagedToolRuntime(spec.runtime) && !isProviderOn(spec.runtime)) return;
   const versionFile = descriptor.versionFile;
   const output = versionFile
     ? yield* runtimeIO(() => readFile(join(root, versionFile), "utf8"))

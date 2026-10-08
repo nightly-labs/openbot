@@ -1,4 +1,5 @@
 import type { ConversationMessage, QueueDelivery } from "@openbot/contracts/ipc";
+import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 
 /**
  * The rows of the waiting block: which teammates this agent asked, and where each answer is.
@@ -68,6 +69,6 @@ function deliveryState(status: QueueDelivery["status"]): Exclude<AwaitingReplySt
  */
 function replyPreview(reply: QueueDelivery): string {
   const result = /^\s*Result:[ \t]*(.*?)(?=^\s*Evidence:|(?![\s\S]))/imsu.exec(reply.text)?.[1]?.trim();
-  const text = (result || reply.text).replace(/\s+/gu, " ").trim();
+  const text = markdownPreviewText(result || reply.text);
   return text || reply.attachments.map((file) => file.name).join(", ");
 }

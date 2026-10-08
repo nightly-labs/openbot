@@ -1,5 +1,6 @@
 import type { AppInfo } from "@openbot/contracts/ipc";
 import type { ServerView } from "@openbot/ui/features/servers/ServerMenu";
+import type { SidebarView } from "@openbot/ui/features/sidebar/sidebar-types";
 import { createEffect, createMemo, createSignal, onSettled } from "solid-js";
 import { readPanelWidth } from "./components/panel-width-storage";
 import {
@@ -13,6 +14,7 @@ import {
   NARROW_SERVER_RAIL_WIDTH,
   SERVER_RAIL_WIDTH,
   SERVER_VIEW_STORAGE_KEY,
+  SIDEBAR_VIEW_STORAGE_KEY,
 } from "./layout-constants";
 import { usePlatform } from "./platform";
 import { createSimpleContext } from "./simple-context";
@@ -72,6 +74,9 @@ const Layout = createSimpleContext({
     const [serverView, setServerViewSignal] = createSignal<ServerView>(
       window.localStorage.getItem(SERVER_VIEW_STORAGE_KEY) === "menu" ? "menu" : "rail",
     );
+    const [sidebarView, setSidebarViewSignal] = createSignal<SidebarView>(
+      window.localStorage.getItem(SIDEBAR_VIEW_STORAGE_KEY) === "routines" ? "routines" : "agents",
+    );
     const [leftPanelAutoCompact, setLeftPanelAutoCompact] = createSignal(false);
     const leftPanelCompact = createMemo(() => leftPanelCollapsed() || leftPanelAutoCompact());
     /**
@@ -107,6 +112,11 @@ const Layout = createSimpleContext({
       window.localStorage.setItem(SERVER_VIEW_STORAGE_KEY, view);
     }
 
+    function setSidebarView(view: SidebarView): void {
+      setSidebarViewSignal(view);
+      window.localStorage.setItem(SIDEBAR_VIEW_STORAGE_KEY, view);
+    }
+
     function expandSidebar(): void {
       setSidebarCollapsed(false);
       setLeftPanelAutoCompact(false);
@@ -121,6 +131,8 @@ const Layout = createSimpleContext({
       serverView,
       setServerView,
       serverRailVisible,
+      sidebarView,
+      setSidebarView,
     };
   },
 });

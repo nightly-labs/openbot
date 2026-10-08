@@ -456,6 +456,10 @@ vi.mock("@/features/agents/components/bloub-avatar", () => ({
   BloubAvatarThumbnail: () => null,
   AvatarThumbnail: () => null,
 }));
+vi.mock("@/features/agents/components/agent-color-glow", () => ({
+  AgentColorGlow: () => null,
+  useAgentColorTransition: (color: string) => color,
+}));
 vi.mock("@/features/agents/components/agent-pin-avatar", () => ({
   AgentPinAvatar: ({ children }: PropsWithChildren) => children,
 }));

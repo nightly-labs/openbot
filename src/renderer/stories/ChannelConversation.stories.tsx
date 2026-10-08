@@ -1,16 +1,16 @@
 import { ArrowUp, Button, Plus, X } from "@openbot/ui";
-import type { AgentMessage } from "@openbot/ui/data";
-import { ChannelActivityIndicator, type ChannelWorker } from "@openbot/ui/features/channels/ChannelActivityIndicator";
 import { ChannelStoppedTasks } from "@openbot/ui/features/channels/ChannelStoppedTasks";
 import { AwaitingReplies, type AwaitingReplyItem } from "@openbot/ui/features/conversation/AwaitingReplies";
 import { ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
 import { ComposerEditor } from "@openbot/ui/features/conversation/ComposerEditor";
-import { MessageActions } from "@openbot/ui/features/conversation/MessageRendering";
-import { UnreadMessagesDivider } from "@openbot/ui/features/conversation/UnreadMessages";
-import type { JSX } from "@solidjs/web";
-import { createStore, For, Show } from "solid-js";
+import { createStore, Show } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
+import {
+  channelStoryMessage as agentMessage,
+  ChannelTranscript,
+  CHANNEL_STORY_ROWS as rows,
+} from "./channel-story-support";
 import { requireFixture, STORY_AGENTS } from "./fixtures";
 
 /*
@@ -31,114 +31,6 @@ import { requireFixture, STORY_AGENTS } from "./fixtures";
 const chief = requireFixture(STORY_AGENTS[0], "Story agent 0");
 const sales = requireFixture(STORY_AGENTS[1], "Story agent 1");
 const research = requireFixture(STORY_AGENTS[2], "Story agent 2");
-
-interface Row {
-  id: string;
-  author: { kind: "you" | "agent"; name: string; agent?: (typeof STORY_AGENTS)[number] };
-  showAuthor: boolean;
-  dayMarker?: string;
-  unread?: boolean;
-  message: AgentMessage;
-}
-
-function agentMessage(id: string, body: string, time: string, streaming = false): AgentMessage {
-  return { id, author: "agent", body, time, streaming };
-}
-
-const rows: Row[] = [
-  {
-    id: "m1",
-    author: { kind: "agent", name: chief.name, agent: chief },
-    showAuthor: true,
-    dayMarker: "Mon, Sep 7 11:12 PM",
-    message: agentMessage("m1", "I read the brief. I will split it into three tasks.", "11:12 PM"),
-  },
-  {
-    id: "m2",
-    author: { kind: "agent", name: chief.name, agent: chief },
-    showAuthor: false,
-    message: agentMessage("m2", "Sales Outbound takes the first, I take the other two.", "11:13 PM"),
-  },
-  {
-    id: "m3",
-    author: { kind: "you", name: "You" },
-    showAuthor: true,
-    dayMarker: "Today 12:59 PM",
-    message: { id: "m3", author: "you", body: "Good. Start with the numbers.", time: "12:59 PM" },
-  },
-  {
-    id: "m4",
-    author: { kind: "agent", name: sales.name, agent: sales },
-    showAuthor: true,
-    unread: true,
-    message: agentMessage("m4", "Last quarter closed 12% over plan. The detail is in the sheet.", "1:04 PM"),
-  },
-  {
-    id: "m5",
-    author: { kind: "agent", name: research.name, agent: research },
-    showAuthor: true,
-    message: agentMessage("m5", "I am checking the source of the 12%…", "1:05 PM", true),
-  },
-];
-
-function ChannelTranscript(props: { rows: Row[]; workers: ChannelWorker[]; children?: JSX.Element }) {
-  return (
-    <main class="conversation-panel" aria-label="Channel conversation" style={{ height: "100dvh" }}>
-      <section class="conversation-scroll" aria-label="Shared messages">
-        <div class="virtual-chat-list virtual-chat-list-static">
-          <For each={props.rows}>
-            {(row) => (
-              <div class="virtual-chat-row" data-grouped={row.showAuthor ? undefined : "sender"}>
-                <Show when={row.dayMarker}>
-                  <div class="time-marker">
-                    <span>{row.dayMarker}</span>
-                  </div>
-                </Show>
-                <Show when={row.unread}>
-                  <UnreadMessagesDivider />
-                </Show>
-                <ChatMessageRow
-                  message={row.message}
-                  author={row.author}
-                  showAuthor={row.showAuthor}
-                  showTime={row.showAuthor}
-                  agents={STORY_AGENTS}
-                  onSelectAgent={fn()}
-                  onOpenLink={fn()}
-                  onPreview={fn()}
-                  onAttachmentAction={fn()}
-                  actions={
-                    <MessageActions
-                      message={row.message}
-                      authorName={row.author.name}
-                      reactions={false}
-                      pickerOpen={false}
-                      moreOpen={false}
-                      expandedEmoji={false}
-                      copied={false}
-                      onTogglePicker={fn()}
-                      onToggleMore={fn()}
-                      onExpandEmoji={fn()}
-                      onReact={fn()}
-                      onReply={fn()}
-                      onCopy={fn()}
-                    />
-                  }
-                />
-              </div>
-            )}
-          </For>
-        </div>
-        <div class="agent-activity-slot" data-reserved={props.workers.length > 0 ? "true" : "false"}>
-          <Show when={props.workers.length > 0}>
-            <ChannelActivityIndicator workers={props.workers} />
-          </Show>
-        </div>
-      </section>
-      {props.children}
-    </main>
-  );
-}
 
 const meta = {
   title: "Conversation/Channel Transcript",
