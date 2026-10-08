@@ -23,7 +23,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { collapseMissedOccurrences, RoutineInputError } from "@openbot/team-client/routine-schedule";
 import { Effect, Schema } from "effect";
 import { AgentRoutineStore } from "../agent-routine-store";
-import type { AgentStore } from "../agent-store";
+import { AGENT_PREVIEW_MAX_LENGTH, type AgentStore } from "../agent-store";
 import { causeHelpers } from "../effect-boundary";
 import type { MailboxStore } from "../mailbox-store";
 import type { DynamicToolCallParams } from "../protocol";
@@ -84,6 +84,11 @@ export interface RoutineHooks {
 
 /** Enough for every message a busy host queues between restarts; each entry is a few bytes. */
 const DELIVERY_TIMEZONE_LIMIT = 10_000;
+/**
+ * Enough for every routine run a busy host starts between restarts; each entry holds two previews of
+ * at most `AGENT_PREVIEW_MAX_LENGTH` characters.
+ */
+const PREVIEW_BEFORE_RUN_LIMIT = 10_000;
 
 export interface RoutineSchedulerOptions {
   store: AgentStore;
@@ -92,6 +97,12 @@ export interface RoutineSchedulerOptions {
   hooks: RoutineHooks;
   /** Shared with every other routine owner, so one wake time is derived across all of them. */
   timer: RoutineTimer;
+}
+
+/** The agent preview before a routine run, and the routine task the run showed in its place. */
+export interface RoutinePreviewBeforeRun {
+  previous: string;
+  shown: string;
 }
 
 /**
@@ -107,12 +118,6 @@ export interface RoutineSchedulerOptions {
  * blocked on a question is `needs-attention`, and answering returns it to `running`. That is why a
  * user can tell a stalled routine from a working one.
  */
-/** The agent preview before a routine run, and the routine task the run showed in its place. */
-export interface RoutinePreviewBeforeRun {
-  previous: string;
-  shown: string;
-}
-
 export class RoutineScheduler implements RoutineDueSource {
   readonly #store: AgentStore;
   readonly #mailbox: MailboxStore;
@@ -135,8 +140,8 @@ export class RoutineScheduler implements RoutineDueSource {
   readonly #deliveryTimezones = new Map<string, string>();
   /**
    * The agent preview before a routine run showed its task there, by delivery. A run that ends
-   * quiet, or whose last answer is only the no-update marker, puts it back. Memory only: after a restart, the preview keeps the task. Past the cap, the
-   * oldest entry goes.
+   * quiet, or whose last answer is only the no-update marker, puts it back. Memory only: after a
+   * restart, the preview keeps the task. Past the cap, the oldest entry goes.
    */
   readonly #previewsBeforeRun = new Map<string, RoutinePreviewBeforeRun>();
 
@@ -220,7 +225,7 @@ export class RoutineScheduler implements RoutineDueSource {
 
   #rememberPreviewBeforeRun(deliveryId: string, entry: RoutinePreviewBeforeRun): void {
     this.#previewsBeforeRun.set(deliveryId, entry);
-    if (this.#previewsBeforeRun.size <= DELIVERY_TIMEZONE_LIMIT) return;
+    if (this.#previewsBeforeRun.size <= PREVIEW_BEFORE_RUN_LIMIT) return;
     const [oldest] = this.#previewsBeforeRun.keys();
     if (oldest !== undefined) this.#previewsBeforeRun.delete(oldest);
   }
@@ -841,7 +846,10 @@ export class RoutineScheduler implements RoutineDueSource {
       // A run that ends quiet, or answers only the no-update marker, puts the earlier preview back.
       const previous = this.#store.list().find((entry) => entry.id === agent.id)?.preview;
       if (previous !== undefined)
-        this.#rememberPreviewBeforeRun(deliveryId, { previous, shown: run.instruction.slice(0, 180) });
+        this.#rememberPreviewBeforeRun(deliveryId, {
+          previous,
+          shown: run.instruction.slice(0, AGENT_PREVIEW_MAX_LENGTH),
+        });
       yield* this.#store.updatePreview(agent.id, run.instruction).pipe(toRoutineOperationFailed);
       yield* routineStep(() => {
         this.#hooks.emit({ type: "agents-changed", agents: this.#hooks.listAgents() });
