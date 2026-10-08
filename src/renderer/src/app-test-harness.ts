@@ -655,6 +655,8 @@ export function installOpenbotStub(): void {
     agentTemplates: stubGroup("agentTemplates", {
       takePendingLink: vi.fn().mockResolvedValue(null),
     }),
+    // No renderer test reaches routine flows yet; a request rejects as not stubbed.
+    routineFlows: stubGroup("routineFlows", {}),
     voice: stubGroup("voice", {
       getModelStatus: vi.fn().mockResolvedValue({ phase: "ready", progress: 100, message: null }),
       prepareModel: vi.fn().mockResolvedValue({ phase: "ready", progress: 100, message: null }),

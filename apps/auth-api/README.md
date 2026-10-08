@@ -8,23 +8,28 @@ and team authentication tickets.
 
 ## Local development
 
-`.env.dev` is generated, not committed. `bun run dev` and `bun run dev:api` call
-`scripts/development-secrets.ts`, which writes one on first run: a fresh ES256
-ticket key pair plus random admin, report and webhook secrets, all local to the
-checkout. Nothing in it is shared with production or with another machine, so a
-fork needs no key from anyone. Delete the file and rerun to get a fresh set.
+`.env.dev` is the committed encrypted development file. Local identity keys and saved overrides
+stay in ignored `.openbot/dev-state.json`. A checkout without a development key starts with stable
+generated local defaults. Existing state files remain valid.
 
-`.env.shared` holds encrypted development values that all maintainers share: the Stripe
-sandbox keys, the development `BOAT_API_KEY`, and the webhook secrets of the `test` Worker. The boat key creates real
-VMs, but only when the Worker also has `HOSTED_SERVER_TEMPLATE`. `wrangler.jsonc` sets
+The update resets values that exist only in the old generated `.env.dev`; it does not import them.
+Local identity and custom settings already saved in `.openbot/dev-state.json` stay unchanged.
+Set new manual overrides in the shell. The load order is shell values, saved local overrides,
+decrypted development settings, then generated defaults. An explicit empty value is an override.
+Shared settings do not replace the local ticket keys, auth webhook secret, report hash secret, or
+skills admin token. Shell values and saved overrides can replace these local values.
+
+The encrypted `.env.dev` holds the Stripe sandbox keys, the development `BOAT_API_KEY`, and the webhook secrets of the `test`
+Worker. The boat key creates real VMs, but only when the Worker also has
+`HOSTED_SERVER_TEMPLATE`. `wrangler.jsonc` sets
 `HOSTED_SERVERS_ENABLED` to `true` and `HOSTED_SERVERS_ALLOWED_USER_IDS` to `*`, so a local Worker
-with a template lets each local account create one; put account IDs in `.env.dev` to limit it. A VM
-cannot reach a local Worker, so use `bun run dev --hosting=test` for a real server (see
-[Real servers from a development build](../../docs/hosted-servers.md#real-servers-from-a-development-build)). `bun run dev:api` decrypts it in memory. Ask a maintainer for
-`DOTENV_PRIVATE_KEY_SHARED`, then export it in your shell profile or add it to the root
-`.env.keys`. The shell profile works in every worktree. Without the key, the Worker runs with no
-Stripe or boat keys. A value in `.env.dev` overrides the shared value. To change a value, run
-`bunx dotenvx set <NAME> <value> -f apps/auth-api/.env.shared -fk .env.keys`.
+with a template lets each local account create one. Set `HOSTED_SERVERS_ALLOWED_USER_IDS` in the
+shell to limit access. A VM cannot reach a local Worker, so use `bun run dev --hosting=test` for a real server (see
+[Real servers from a development build](../../docs/hosted-servers.md#real-servers-from-a-development-build)).
+Set `DOTENV_PRIVATE_KEY_DEV` in your shell profile to load the shared values in every worktree.
+Without this key, the Worker starts with generated local defaults and no Stripe or boat keys. Shell
+values override shared values. Development commands do not read the root `.env.keys`; production
+commands continue to use that file.
 
 ### Stripe sandbox
 
@@ -33,30 +38,30 @@ and the Customer Portal settings in the Stripe account of `STRIPE_SECRET_KEY`. I
 again: a changed amount makes a new Price and moves the lookup key to it. In the Portal, an upgrade
 is charged at once, and a downgrade or a shorter interval starts at the next period.
 
-For a local Worker, forward the webhooks and put the secret that `stripe listen` prints in your
-own `.env.dev` as `STRIPE_WEBHOOK_SECRET`:
+For a local Worker, forward the webhooks and set the secret that `stripe listen` prints in your
+shell as `STRIPE_WEBHOOK_SECRET`:
 
 ```bash
 stripe listen --forward-to http://127.0.0.1:3100/v1/stripe/webhook
 ```
 
 For the `test` Worker, `bun run hosting:setup --target=test` makes or updates its Stripe and boat
-webhooks and writes their signing secrets to `.env.shared`. Then run `bun run api:deploy:test`. It
+webhooks and writes their signing secrets to `.env.dev`. Run it with `DOTENV_PRIVATE_KEY_DEV`
+set in the shell. Then run `bun run api:deploy:test`. It
 also sets the allow list from `HOSTED_SERVERS_TEST_ALLOW_LIST` and the developer key
-`HOSTED_SERVERS_DEVELOPER_KEY` from `.env.shared`.
+`HOSTED_SERVERS_DEVELOPER_KEY` from `.env.dev`.
 
 `scripts/stripe-flows-e2e.ts` checks the plan flows against the sandbox and a local Worker: renewal,
 failed renewal, cancel at the period end, plan change, renew, delete, another account's server, and a
 deleted customer. Each scenario uses a Stripe test clock and deletes it at the end. Start the Worker
 with `HOSTED_SERVERS_ENABLED=true`, `HOSTED_SERVERS_ALLOWED_USER_IDS` set to the output of
 `bun scripts/stripe-flows-e2e.ts --print-user-ids`, and `BOAT_API_KEY=e2e-invalid-key`, and forward
-the webhooks to it. A value in the shell overrides `.env.shared`; without the fake key, each paid
+the webhooks to it. A value in the shell overrides `.env.dev`; without the fake key, each paid
 scenario creates a real boat VM. Then, from the
 repository root:
 
 ```bash
-bunx dotenvx run -q -f apps/auth-api/.env.shared -fk .env.keys -- \
-  bun scripts/stripe-flows-e2e.ts --api http://127.0.0.1:<port> [scenario ...]
+bun scripts/stripe-flows-e2e.ts --api http://127.0.0.1:<port> [scenario ...]
 ```
 
 The `portal` scenario prints a Customer Portal cancel page and then an update page, and waits until
@@ -70,12 +75,13 @@ server. It needs the real `BOAT_API_KEY`, a template from `bun run hosting:templ
 `__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS=.trycloudflare.com`, or Vite refuses the tunnel host. A boat
 trial account allows only `small` and `default`, so use a Starter or Standard plan there.
 
-`bun run api:deploy:test` reads `.env.shared` before `.env.production`. The first file wins, so the
-test Worker gets the sandbox keys, never live keys.
+`bun run api:deploy:test` loads the `.env.dev` values before `.env.production`. Shell
+values still win, so the test Worker gets the sandbox keys and never live keys.
 
-`.env.production` is the only encrypted production file, and its private key stays in the
-ignored root `.env.keys`. Dotenvx decrypts it only in process memory, and only
-the deploy and secret-rotation commands read it.
+`.env.production` is the encrypted production file, and its private key stays in the ignored root
+`.env.keys`. Production commands decrypt it only in process memory. Development commands use the
+shell key described above and never read the root key file. New worktrees do not copy root
+`.env.keys`; run production commands from a checkout that has the existing production key file.
 
 ```bash
 bun run api:migrate:local
@@ -92,7 +98,8 @@ printf '%s' '<APP_PASSWORD>' | bun run env:set:smtp
 bun run env:validate:prod
 ```
 
-Commit `.env.production`. Never commit `.env.keys` or `.env.dev`.
+Commit the encrypted `.env.production` and `.env.dev` files. Never commit `.env.keys` or local
+state from `.openbot/`.
 
 ## Article artwork
 
@@ -115,7 +122,7 @@ is missing, out of date, or belongs to no article.
 Private Email SMTP is the primary delivery method. Use a separate app password.
 Do not use the mailbox password.
 
-Local development sends no email at all. `.env.dev` blanks all five SMTP
+Local development sends no email at all. Generated local defaults blank all five SMTP
 variables, which is what turns delivery off - `wrangler.jsonc` sets four of them
 in the top-level `vars` that local `vite dev` reads, and four out of five is the
 partial configuration `readSmtpConfig` rejects. The team-invitation endpoint then
@@ -241,7 +248,7 @@ encrypted environment and to the `cloudflare-production` GitHub environment. `AP
 `APNS_TOPIC` are in `wrangler.jsonc`.
 
 For local development, run `bun run dev:apns-key -- ~/Downloads/AuthKey_<KEY_ID>.p8`. It saves the
-key in `.env.dev`. The local Worker runtime cannot open HTTP/2, which APNs requires, so `vite dev`
+key in ignored development state. The local Worker runtime cannot open HTTP/2, which APNs requires, so `vite dev`
 sets `APNS_ORIGIN` and forwards the Worker's request to Apple from Node
 (`dev-apns-proxy.ts`). The Worker still checks the host and the limit, makes the payload and signs
 the token. Only a loopback caller can use the forwarder, and the Worker accepts only a loopback

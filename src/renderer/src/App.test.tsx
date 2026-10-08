@@ -138,6 +138,34 @@ describe("OpenBot connected desktop shell", () => {
     expect(JSON.parse(window.localStorage.getItem(AGENT_SELECTION_STORAGE_KEY) ?? "{}")).toEqual({ team: "other" });
   });
 
+  // Failure mode: after a launch a joined server answered seconds later, and until then the empty
+  // roster offered the first agent and asked for a local CLI setup that the server does not need.
+  it("shows that a joined server connects until its agents come back", async () => {
+    // Main reports a joined host as offline until its first connection after a launch is up.
+    vi.mocked(window.openbot.servers.list).mockResolvedValue([
+      testServer("local", false),
+      { ...testServer("remote-1", true), state: "offline" },
+    ]);
+    let resolveAgents: (agents: AgentSummary[]) => void = () => undefined;
+    vi.mocked(window.openbot.agent.listAgents).mockReturnValue(
+      new Promise((resolve) => {
+        resolveAgents = resolve;
+      }),
+    );
+    // The host answers the status read over the same connection, so it waits too.
+    vi.mocked(window.openbot.agent.getStatus).mockReturnValue(new Promise(() => undefined));
+    render(() => <App />);
+
+    expect(await screen.findByText("Connecting…", { selector: ".empty-search" })).toBeInTheDocument();
+    expect(screen.getByText("Connecting…", { selector: ".composer-editor-placeholder" })).toBeInTheDocument();
+    expect(screen.queryByText("Complete agent CLI setup to start")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Create your first agent" })).not.toBeInTheDocument();
+
+    resolveAgents(AGENTS);
+    expect(await screen.findByRole("heading", { name: "Chief" })).toBeVisible();
+    expect(screen.queryByText("Connecting…", { selector: ".empty-search" })).not.toBeInTheDocument();
+  });
+
   it("keeps a saved selection after a failed agent load and restores it on retry", async () => {
     window.localStorage.setItem(AGENT_SELECTION_STORAGE_KEY, JSON.stringify({ local: "sales-outbound" }));
     vi.mocked(window.openbot.agent.listAgents).mockRejectedValueOnce(new Error("Offline"));

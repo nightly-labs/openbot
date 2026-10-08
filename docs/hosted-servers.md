@@ -196,10 +196,10 @@ with `getServerEntitlement` when a member joins or is reactivated, and refuses a
 ## Configure the test Worker
 
 `HOSTED_SERVERS_ENABLED` is `true` in `env.test` of `apps/auth-api/wrangler.jsonc`.
-`bun run api:deploy:test` sets `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `BOAT_API_KEY` and
-`BOAT_WEBHOOK_SECRET` from the encrypted `apps/auth-api/.env.shared` on each deploy, so a value that
-you set by hand for these four is replaced. `bun run hosting:setup --target=test` makes the two
-webhooks and writes their secrets to that file. It also sets the allow list from
+`bun run api:deploy:test` loads `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `BOAT_API_KEY` and
+`BOAT_WEBHOOK_SECRET` from the encrypted `apps/auth-api/.env.dev` on each deploy, so a
+value that you set by hand for these four is replaced. Set `DOTENV_PRIVATE_KEY_DEV` in the shell.
+`bun run hosting:setup --target=test` makes the two webhooks and writes their secrets to that file. It also sets the allow list from
 `HOSTED_SERVERS_TEST_ALLOW_LIST` in that file. Set the template with
 `wrangler secret put HOSTED_SERVER_TEMPLATE --env test` from `apps/auth-api`:
 
@@ -208,7 +208,7 @@ webhooks and writes their secrets to that file. It also sets the allow list from
 | `HOSTED_SERVER_TEMPLATE` | The named snapshot from the template build, such as `openbot-server-0-9-0`. |
 | `HOSTED_SERVERS_ALLOWED_USER_IDS` | Comma-separated account IDs or emails that can create servers. `api:deploy:test` sets it from `HOSTED_SERVERS_TEST_ALLOW_LIST` and refuses `*`: the test Worker is public, and it shares its boat account with production. |
 
-The `BOAT_API_KEY` in `.env.shared` is the development key of the boat test account. It also has
+The `BOAT_API_KEY` in `.env.dev` is the development key of the boat test account. It also has
 command access, because the e2e script (`scripts/stripe-flows-e2e.ts`) reads the VM with it. Use it
 only with test data. The production key must be a boat key limited to sandbox create, get, list,
 update, stop, resume and delete. The Worker uses update (`PATCH`) for the lease and the name. Do not
@@ -226,15 +226,18 @@ signs in to the test Worker, and the test Worker makes the VM. The local Worker 
 start, but the app does not use them for its account. The app uses its own profile for the test
 Worker, and all worktrees share it, so you sign in one time.
 
-Each developer who has `DOTENV_PRIVATE_KEY_SHARED` can create a server with any account. The
-command decrypts `HOSTED_SERVERS_DEVELOPER_KEY` from `.env.shared`, and main sends it in the
+Each developer who has `DOTENV_PRIVATE_KEY_DEV` can create a server with any account.
+The command decrypts
+`HOSTED_SERVERS_DEVELOPER_KEY` from `.env.dev`, and main sends it in the
 `OpenBot-Hosting-Developer-Key` header of each hosted server request. The test Worker has the same
 key and lets the account create servers. A clone of the repository cannot decrypt the key. Main
 removes the key from its environment at the start, so agents do not get it, and a packaged build
-never sends it. To change the key, set a new one and deploy:
+never sends it. To change the key, update `HOSTED_SERVERS_DEVELOPER_KEY` in `.env.dev` with a
+temporary 0600 dotenvx key file containing the matching development key, remove that temporary file,
+and run:
 
 ```bash
-bunx dotenvx set HOSTED_SERVERS_DEVELOPER_KEY "$(openssl rand -hex 32)" -f apps/auth-api/.env.shared -fk .env.keys
+bun run hosting:setup --target=test
 bun run api:deploy:test
 ```
 
@@ -325,6 +328,12 @@ The builder never starts OpenBot, so the template has no host identity and no se
 at most 10 named snapshots for each account.
 
 ### Updates
+
+Server Settings > Updates can check the compatible release without installing it. The host must
+support `host-release-v1`. The panel shows the installed version, the latest release after a
+check, and the host-managed update path. It does not offer app self-update controls for the
+extracted AppImage. Older hosts need an administrator to update them before they can provide
+this release check.
 
 The Linux build contains `scripts/hosting/` (without the TypeScript files) in `resources/hosting`.
 On a server, root runs `openbot-hosted-update`:

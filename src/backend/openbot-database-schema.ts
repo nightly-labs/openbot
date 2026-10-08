@@ -7,6 +7,7 @@ import { CHANNEL_SCHEMA_SQL, CHANNEL_SETTINGS_SCHEMA_SQL } from "./channel-schem
 import { PROVIDER_HISTORY_SCHEMA_SQL } from "./database/provider-history-schema";
 import { MCP_SERVERS_SCHEMA_SQL } from "./mcp-schema";
 import { MESSAGING_SCHEMA_SQL } from "./messaging/messaging-schema";
+import { ROUTINE_FLOW_SCHEMA_SQL } from "./routine-flows/routine-flow-schema";
 
 const BASELINE_SCHEMA_VERSION = 8;
 
@@ -463,7 +464,8 @@ const LATEST_SCHEMA_SQL =
   MCP_SERVERS_SCHEMA_SQL +
   MESSAGING_SCHEMA_SQL +
   PROVIDER_HISTORY_SCHEMA_SQL +
-  WEBHOOK_SCHEMA_SQL;
+  WEBHOOK_SCHEMA_SQL +
+  ROUTINE_FLOW_SCHEMA_SQL;
 
 /** The end of a routine table with the migration 27 column after its last one. */
 function withRoutineLimitPolicy(tableEnd: string): string {
@@ -616,6 +618,12 @@ const MIGRATIONS: readonly OpenBotMigration[] = [
     version: 30,
     // Only creates tables, so no foreign-key pause and no vacuum. Existing routines and runs stay as they are.
     up: (db) => db.exec(WEBHOOK_SCHEMA_SQL),
+  },
+  {
+    version: 31,
+    // Only creates tables, so no foreign-key pause and no vacuum. Existing routines have no links,
+    // so every routine keeps running only its own agent, which is what it did before.
+    up: (db) => db.exec(ROUTINE_FLOW_SCHEMA_SQL),
   },
 ];
 

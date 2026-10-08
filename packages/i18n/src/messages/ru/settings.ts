@@ -252,9 +252,9 @@ export const messages = {
     "OpenBot установит {target}, когда ни один агент не работает. Новые запуски регулярных задач до этого ждут.",
   "settings.updates.idleRestart.relaunch": "Перезапустить при простое",
   "settings.updates.idleRestart.update": "Установить при простое",
-  "settings.updates.allowRemote.title": "Разрешить обновления от администраторов сервера",
+  "settings.updates.allowRemote.title": "Разрешить обновления от участников сервера",
   "settings.updates.allowRemote.description":
-    "Владельцы и администраторы этого сервера смогут скачать обновление и перезапустить OpenBot на этом компьютере.",
+    "Все вошедшие участники сервера могут запросить обновление, когда этот компьютер простаивает. Владельцы и администраторы могут также принудительно перезапустить OpenBot.",
   "settings.hostedSites.title": "Опубликованные сайты",
   "settings.hostedSites.unavailable": "Размещение сайтов недоступно.",
   "settings.hostedSites.usage": {
@@ -286,6 +286,7 @@ export const messages = {
   "settings.hostedServers.usageNote":
     "Сервер останавливается примерно через 15 минут после последнего сообщения или изменения, в том числе при открытом приложении. Нажатие клавиши или щелчок в приложении, сообщение или регулярная задача по расписанию запускают его снова. Его агенты и регулярные задачи работают, даже когда этот компьютер выключен.",
   "settings.hostedServers.empty": "У вас пока нет облачного сервера.",
+  "settings.hostedServers.loading": "Загрузка облачных серверов…",
   "settings.hostedServers.state.awaitingPayment": "Ожидает оплаты",
   "settings.hostedServers.state.planEnded": "Тариф закончился",
   "settings.hostedServers.state.creating": "Создаётся",
