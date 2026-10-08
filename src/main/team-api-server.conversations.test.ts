@@ -495,8 +495,8 @@ describe("TeamApiServer conversations", () => {
     };
 
     for (const [method, action, body] of [
-      ["GET", "conversation", undefined],
-      ["GET", "conversation-page?limit=10", undefined],
+      ["GET", "conversation", null],
+      ["GET", "conversation-page?limit=10", null],
       ["POST", "conversation/read", JSON.stringify({ throughMessageId: null })],
       ["POST", "conversation/unread", "{}"],
     ] as const) {
