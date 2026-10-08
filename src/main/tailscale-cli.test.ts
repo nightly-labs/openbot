@@ -93,11 +93,13 @@ describe("tailscale commands", () => {
   it("are fixed lists with only numeric ports, and never Funnel", () => {
     expect(TAILSCALE_COMMANDS.serveOn(443, 51234)).toEqual(["serve", "--bg", "--https=443", "http://127.0.0.1:51234"]);
     expect(TAILSCALE_COMMANDS.serveOff(8443)).toEqual(["serve", "--https=8443", "off"]);
+    expect(TAILSCALE_COMMANDS.serveRootOff(8443)).toEqual(["serve", "--https=8443", "--set-path=/", "off"]);
     for (const args of [
       TAILSCALE_COMMANDS.status(),
       TAILSCALE_COMMANDS.serveStatus(),
       TAILSCALE_COMMANDS.serveOn(443, 1),
       TAILSCALE_COMMANDS.serveOff(443),
+      TAILSCALE_COMMANDS.serveRootOff(443),
     ]) {
       expect(args.join(" ")).not.toMatch(/funnel/iu);
     }

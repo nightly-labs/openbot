@@ -241,6 +241,11 @@ export const TAILSCALE_COMMANDS = {
     loopbackProxyTarget(loopbackPort),
   ],
   serveOff: (httpsPort: number) => ["serve", `--https=${validPort(httpsPort)}`, "off"],
+  /**
+   * Removes only the root path of the port. Other paths and the port stay; when the root was the
+   * port's only path, Tailscale removes the port too.
+   */
+  serveRootOff: (httpsPort: number) => ["serve", `--https=${validPort(httpsPort)}`, "--set-path=/", "off"],
 } as const;
 
 function validPort(port: number): number {
