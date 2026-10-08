@@ -113,4 +113,29 @@ describe("RemoteSessionCache", () => {
     expect(partial.get("user-1", "host-2")).toBeNull();
     expect(partial.signalUrl("user-1")).toBeNull();
   });
+
+  it("keeps nothing while the user's setting is off, and applies a change at once", async () => {
+    const path = await cachePath();
+    await Effect.runPromise(createCache(path).set("user-1", "host-1", session, SIGNAL_URL));
+
+    // Off at start: the file of the earlier run goes, and nothing is read or written.
+    const off = createCache(path, { enabled: false });
+    await Effect.runPromise(off.load());
+    await expect(readFile(path)).rejects.toMatchObject({ code: "ENOENT" });
+    expect(off.canPersist()).toBe(false);
+    await Effect.runPromise(off.set("user-1", "host-1", session, SIGNAL_URL));
+    expect(off.get("user-1", "host-1")).toBeNull();
+    expect(off.signalUrl("user-1")).toBeNull();
+    await expect(readFile(path)).rejects.toMatchObject({ code: "ENOENT" });
+
+    // On again during the run: the next session is kept.
+    await Effect.runPromise(off.setEnabled(true));
+    await Effect.runPromise(off.set("user-1", "host-1", session, SIGNAL_URL));
+    expect((await loaded(path)).get("user-1", "host-1")).toEqual(session);
+
+    // Off during the run: the file is removed now, not at quit.
+    await Effect.runPromise(off.setEnabled(false));
+    await expect(readFile(path)).rejects.toMatchObject({ code: "ENOENT" });
+    expect(off.get("user-1", "host-1")).toBeNull();
+  });
 });

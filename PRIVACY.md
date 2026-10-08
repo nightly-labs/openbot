@@ -223,9 +223,12 @@ Signal address, so that the next start asks only for a new ticket. The file
 (`openbot-remote-sessions-v1.bin`) is encrypted with the same storage protection and is not written
 when that protection is unavailable. It names only the account that signed in. A session ID gives no
 access without that account's session token. The app removes the file at sign-out or when another
-account signs in, and forgets a server's session when it disconnects from the server or removes it.
-When the app quits, the session stays open in the account service for the next start; signing out or
-disconnecting the device's sign-in ends it, as before.
+account signs in, when it starts with no account signed in, and forgets a server's session when it
+disconnects from the server or removes it. When the app quits, the session stays open in the account
+service for the next start; signing out or disconnecting the device's sign-in ends it, as before.
+Settings → General → Fast connection to servers turns this off. Off, the app removes the file at
+once, keeps nothing, and ends each session when it quits. The setting is on by default and is stored
+in `openbot-remote-session-reuse-preference-v1.json`.
 
 Account avatar URLs are public, long-lived resources. A person who has the complete URL can request
 the avatar without an account session.

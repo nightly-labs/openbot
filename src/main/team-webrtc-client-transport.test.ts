@@ -965,6 +965,66 @@ describe("TeamWebRtcClientTransport", () => {
       }
     });
 
+    it("ends the session at quit when the user turned the setting off, also during the run", async () => {
+      const files = await sessionCache();
+      const { bridge } = connectingBridge();
+      const calls = sessionCalls();
+      const disabled = createTransport(bridge, {
+        ...calls,
+        sessionCache: new RemoteSessionCache({
+          path: join(tmpdir(), "openbot-unused-sessions.bin"),
+          canPersist: () => true,
+          encrypt: (value) => Buffer.from(value),
+          decrypt: (value) => value.toString(),
+          enabled: false,
+        }),
+      });
+      disabled.pinHostKey("host-1", hostKeys.publicKey);
+      await runCauseEffect(disabled.connect("host-1"));
+      await runCauseEffect(disabled.stop());
+      expect(calls.endSession).toHaveBeenCalledWith("session-new");
+
+      const second = connectingBridge();
+      const cache = files.create();
+      const turnedOff = createTransport(second.bridge, { ...calls, sessionCache: cache });
+      turnedOff.pinHostKey("host-1", hostKeys.publicKey);
+      try {
+        await runCauseEffect(turnedOff.connect("host-1"));
+        expect(cache.get("user-1", "host-1")?.sessionId).toBe("session-new");
+        calls.endSession.mockClear();
+        await Effect.runPromise(cache.setEnabled(false));
+        await runCauseEffect(turnedOff.stop());
+        expect(calls.endSession).toHaveBeenCalledWith("session-new");
+        const next = files.create();
+        await Effect.runPromise(next.load());
+        expect(next.get("user-1", "host-1")).toBeNull();
+      } finally {
+        await files.remove();
+      }
+    });
+
+    it("ends at quit a session of this run that the setting, turned on later, did not keep", async () => {
+      const cache = new RemoteSessionCache({
+        path: join(tmpdir(), `openbot-sessions-${crypto.randomUUID()}.bin`),
+        canPersist: () => true,
+        encrypt: (value) => Buffer.from(value),
+        decrypt: (value) => value.toString(),
+        enabled: false,
+      });
+      const { bridge } = connectingBridge();
+      const calls = sessionCalls();
+      const transport = createTransport(bridge, { ...calls, sessionCache: cache });
+      transport.pinHostKey("host-1", hostKeys.publicKey);
+      try {
+        await runCauseEffect(transport.connect("host-1"));
+        await Effect.runPromise(cache.setEnabled(true));
+        await runCauseEffect(transport.stop());
+        expect(calls.endSession).toHaveBeenCalledWith("session-new");
+      } finally {
+        await Effect.runPromise(cache.clear());
+      }
+    });
+
     it("ends the session at quit when the next run cannot read it", async () => {
       const files = await sessionCache(false);
       const { bridge } = connectingBridge();

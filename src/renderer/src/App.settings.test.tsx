@@ -76,6 +76,23 @@ describe("OpenBot connected desktop shell", () => {
     expect(restored).toBeEnabled();
   });
 
+  it("shows the stored remote session choice and saves a change, and restores it when the save fails", async () => {
+    vi.mocked(window.openbot.getRemoteSessionReusePreference).mockResolvedValue({ keepBetweenRuns: false });
+    vi.mocked(window.openbot.setRemoteSessionReusePreference).mockRejectedValueOnce(new Error("Write failed"));
+    render(() => <App />);
+    await fireEvent.click(await screen.findByRole("button", { name: "Settings" }));
+    const toggle = await screen.findByRole("switch", { name: "Fast connection to servers" });
+    await waitFor(() => expect(toggle).not.toBeChecked());
+    await fireEvent.click(toggle);
+    await waitFor(() =>
+      expect(window.openbot.setRemoteSessionReusePreference).toHaveBeenCalledWith({ keepBetweenRuns: true }),
+    );
+    await waitFor(() => expect(toggle).not.toBeChecked());
+    await fireEvent.click(toggle);
+    await waitFor(() => expect(window.openbot.setRemoteSessionReusePreference).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(toggle).toBeChecked());
+  });
+
   it.each<ApprovalAutomationPreference & { enabled: boolean }>([
     { defaultAutoApprove: true, autoApproveOverrides: {}, turbo: false, enabled: true },
     { defaultAutoApprove: false, autoApproveOverrides: {}, turbo: false, enabled: false },

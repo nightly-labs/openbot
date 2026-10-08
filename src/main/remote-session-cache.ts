@@ -14,6 +14,8 @@ export interface RemoteSessionCacheOptions {
   canPersist: () => boolean;
   encrypt: (value: string) => Buffer;
   decrypt: (value: Buffer) => string;
+  /** The user's choice to keep sessions between runs. Off, nothing is read or written. */
+  enabled?: boolean;
 }
 
 interface CacheState {
@@ -33,6 +35,9 @@ const CACHE_VERSION = 1;
  * the operating-system storage all the same, as the other account records are. It holds one
  * account; a record of another account is not used.
  *
+ * The user can turn this off in the settings. Off, the file is removed and nothing is kept: each
+ * start makes a new session, and quitting ends it, as before this cache.
+ *
  * Every failure is ignored. A missing or unreadable file only means that the next connect starts a
  * new session, as it did before this cache.
  */
@@ -41,18 +46,34 @@ export class RemoteSessionCache {
   readonly #writes = Semaphore.makeUnsafe(1);
   #state: CacheState | null = null;
   #loaded: Effect.Effect<void> | null = null;
+  #enabled: boolean;
 
   constructor(options: RemoteSessionCacheOptions) {
     this.#options = options;
+    this.#enabled = options.enabled ?? true;
   }
 
   /** Whether a session kept now can be read by the next run. */
   canPersist(): boolean {
+    if (!this.#enabled) return false;
     try {
       return this.#options.canPersist();
     } catch {
       return false;
     }
+  }
+
+  /** Applies the user's choice. Off forgets every session and removes the file at once. */
+  setEnabled(enabled: boolean): Effect.Effect<void> {
+    return this.#writes.withPermit(
+      Effect.gen({ self: this }, function* () {
+        yield* this.load();
+        this.#enabled = enabled;
+        if (enabled) return;
+        this.#state = null;
+        yield* this.#remove();
+      }),
+    );
   }
 
   /** Reads the file once. Later calls wait for the same read. */
@@ -62,12 +83,12 @@ export class RemoteSessionCache {
   }
 
   get(principalId: string, hostId: string): CachedRemoteSession | null {
-    if (this.#state?.principalId !== principalId) return null;
+    if (!this.#enabled || this.#state?.principalId !== principalId) return null;
     return this.#state.sessions.get(hostId) ?? null;
   }
 
   signalUrl(principalId: string): string | null {
-    return this.#state?.principalId === principalId ? this.#state.signalUrl : null;
+    return this.#enabled && this.#state?.principalId === principalId ? this.#state.signalUrl : null;
   }
 
   set(principalId: string, hostId: string, session: CachedRemoteSession, signalUrl: string): Effect.Effect<void> {
@@ -100,6 +121,8 @@ export class RemoteSessionCache {
   }
 
   #read(): Effect.Effect<void> {
+    // Off at start: a file of an earlier run, when the setting was on, goes now.
+    if (!this.#enabled) return this.#remove();
     return Effect.tryPromise(() => readFile(this.#options.path, "utf8")).pipe(
       Effect.flatMap((encrypted) =>
         Effect.try(() => decodeCache(JSON.parse(this.#options.decrypt(Buffer.from(encrypted, "base64"))))),
@@ -119,7 +142,7 @@ export class RemoteSessionCache {
     return this.#writes.withPermit(
       Effect.gen({ self: this }, function* () {
         yield* this.load();
-        if (update() === false) return;
+        if (!this.#enabled || update() === false) return;
         yield* this.#write();
       }),
     );
@@ -127,8 +150,7 @@ export class RemoteSessionCache {
 
   #write(): Effect.Effect<void> {
     const state = this.#state;
-    if (!state || state.sessions.size === 0 || !this.canPersist())
-      return Effect.tryPromise(() => rm(this.#options.path, { force: true })).pipe(Effect.ignore);
+    if (!state || state.sessions.size === 0 || !this.canPersist()) return this.#remove();
     return Effect.try(() =>
       this.#options
         .encrypt(
@@ -144,6 +166,10 @@ export class RemoteSessionCache {
       Effect.flatMap((content) => writeFileAtomically(this.#options.path, content, { createDirectory: true })),
       Effect.ignore,
     );
+  }
+
+  #remove(): Effect.Effect<void> {
+    return Effect.tryPromise(() => rm(this.#options.path, { force: true })).pipe(Effect.ignore);
   }
 }
 

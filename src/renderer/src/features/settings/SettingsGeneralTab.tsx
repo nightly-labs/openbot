@@ -120,6 +120,12 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
             description={i18n.t("settings.launchAtLogin.description")}
           />
           <SwitchField
+            checked={props.value.keepRemoteSessions}
+            onChange={(checked) => props.onUpdateSetting("keepRemoteSessions", checked)}
+            label={i18n.t("settings.keepRemoteSessions.title")}
+            description={i18n.t("settings.keepRemoteSessions.description")}
+          />
+          <SwitchField
             checked={props.value.keepRunningInBackground}
             onChange={(checked) => props.onUpdateSetting("keepRunningInBackground", checked)}
             label={i18n.t("settings.keepRunning.title")}

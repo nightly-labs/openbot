@@ -562,11 +562,14 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       const hostIds = new Set([...this.#active.keys(), ...this.#retainedSessions.keys()]);
       // The app quits. A session that the next run can read stays open for it: the account service
       // gives this device the same session again in any case, so ending it only costs the next start
-      // a request. Without a cache, each session ends as before.
-      const session = this.#options.sessionCache?.canPersist() ? "keep" : "end";
+      // a request. Every other session ends, as before: without a cache, with the setting off, or
+      // when the cache does not hold it.
       yield* Effect.forEach(
         [...hostIds],
-        (hostId) => this.#owned(this.#close(hostId, session)).pipe(Effect.catch(() => Effect.void)),
+        (hostId) =>
+          this.#owned(this.#close(hostId, this.#keptForNextRun(hostId) ? "keep" : "end")).pipe(
+            Effect.catch(() => Effect.void),
+          ),
         { concurrency: "unbounded" },
       );
       this.#options.bridge.off("connected", this.#onConnected);
@@ -838,6 +841,13 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       ),
     );
   });
+
+  #keptForNextRun(hostId: string): boolean {
+    const cache = this.#options.sessionCache;
+    const current = this.#active.get(hostId) ?? this.#retainedSessions.get(hostId);
+    if (!cache?.canPersist() || !current?.sessionId) return false;
+    return cache.get(current.principalId, hostId)?.sessionId === current.sessionId;
+  }
 
   /** Keeps the session of an attempt that failed on its own. A cancelled attempt ends its session. */
   #retainSession(hostId: string, active: ActiveHost, sessionId: string): boolean {

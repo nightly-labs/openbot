@@ -97,6 +97,7 @@ const Settings = createSimpleContext({
     let autoInstallUpdatesChanged = false;
     let desktopNotificationsChanged = false;
     let busyMessageModeChanged = false;
+    let keepRemoteSessionsChanged = false;
     let turboModeChanged = false;
     const [turboModePending, setTurboModePending] = createSignal(false);
 
@@ -233,6 +234,14 @@ const Settings = createSimpleContext({
           "busyMessageMode",
           settingsPort().setBusyMessageModePreference({ mode: value.busyMessageMode }),
           (preference) => preference.mode,
+        );
+      }
+      if (previous.keepRemoteSessions !== value.keepRemoteSessions) {
+        keepRemoteSessionsChanged = true;
+        persistField(
+          "keepRemoteSessions",
+          settingsPort().setRemoteSessionReusePreference({ keepBetweenRuns: value.keepRemoteSessions }),
+          (preference) => preference.keepBetweenRuns,
         );
       }
       if (
@@ -378,6 +387,13 @@ const Settings = createSimpleContext({
         .then((preference) => {
           if (busyMessageModeChanged) return;
           setGeneralSettings((current) => ({ ...current, busyMessageMode: preference.mode }));
+        })
+        .catch(() => undefined);
+      void settingsPort()
+        .getRemoteSessionReusePreference()
+        .then((preference) => {
+          if (keepRemoteSessionsChanged) return;
+          setGeneralSettings((current) => ({ ...current, keepRemoteSessions: preference.keepBetweenRuns }));
         })
         .catch(() => undefined);
       void settingsPort()
