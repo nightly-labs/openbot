@@ -1003,7 +1003,7 @@ describe("TeamWebRtcClientTransport", () => {
       }
     });
 
-    it("ends at quit a session of this run that the setting, turned on later, did not keep", async () => {
+    it("keeps at quit a session of this run when the setting is turned on during the run", async () => {
       const cache = new RemoteSessionCache({
         path: join(tmpdir(), `openbot-sessions-${crypto.randomUUID()}.bin`),
         canPersist: () => true,
@@ -1019,9 +1019,32 @@ describe("TeamWebRtcClientTransport", () => {
         await runCauseEffect(transport.connect("host-1"));
         await Effect.runPromise(cache.setEnabled(true));
         await runCauseEffect(transport.stop());
-        expect(calls.endSession).toHaveBeenCalledWith("session-new");
+        expect(calls.endSession).not.toHaveBeenCalled();
       } finally {
         await Effect.runPromise(cache.clear());
+      }
+    });
+
+    it("closes the prepared Signal socket when the ticket request fails", async () => {
+      const files = await sessionCache();
+      await Effect.runPromise(files.create().set("user-1", "host-1", storedSession, signalUrl));
+      const { bridge, prepareSignal, connect } = connectingBridge();
+      const disconnect = vi.mocked(bridge.disconnect);
+      const calls = sessionCalls();
+      calls.issueTicket.mockReturnValueOnce(
+        Effect.fail(new CentralAuthOperationError({ cause: new Error("offline") })),
+      );
+      const transport = createTransport(bridge, { ...calls, sessionCache: files.create() });
+      transport.pinHostKey("host-1", hostKeys.publicKey);
+      try {
+        await expect(runCauseEffect(transport.connect("host-1"))).rejects.toThrow();
+        expect(prepareSignal).toHaveBeenCalledWith("host-1", signalUrl);
+        expect(connect).not.toHaveBeenCalled();
+        expect(disconnect).toHaveBeenCalledWith("host-1");
+        expect(disconnect.mock.invocationCallOrder[0]).toBeGreaterThan(prepareSignal.mock.invocationCallOrder[0] ?? 0);
+      } finally {
+        await runCauseEffect(transport.stop());
+        await files.remove();
       }
     });
 

@@ -25,7 +25,7 @@ import {
   encodeTeamProtocolV6WebRtcHttpRequest,
 } from "@openbot/contracts/team-protocol/v6-webrtc-adapter";
 import { sourceText } from "@openbot/i18n/source";
-import { Context, Deferred, Effect, Layer, Result, Schema } from "effect";
+import { Context, Deferred, Effect, Fiber, Layer, Result, Schema } from "effect";
 import type { CentralAuthOperationError } from "./central-auth-effects";
 import type { RemoteConnectionBootstrap } from "./central-auth-manager";
 import type {
@@ -682,11 +682,12 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     // with the ticket goes on it only when the ticket names the same address. A failure is ignored:
     // `bridge.connect` then opens its own socket, as before.
     const preparedSignalUrl = this.#options.sessionCache?.signalUrl(active.principalId) ?? this.#signalUrl;
-    if (preparedSignalUrl)
-      yield* Effect.forkChild(
-        TeamClientBridge.use((bridge) => bridge.prepareSignal(hostId, preparedSignalUrl)).pipe(Effect.ignore),
-        { startImmediately: true },
-      );
+    const preparingSignal = preparedSignalUrl
+      ? yield* Effect.forkChild(
+          TeamClientBridge.use((bridge) => bridge.prepareSignal(hostId, preparedSignalUrl)).pipe(Effect.ignore),
+          { startImmediately: true },
+        )
+      : null;
     const clientKeys = yield* remoteDecode(() =>
       generateKeyPairSync("ed25519", {
         publicKeyEncoding: { type: "spki", format: "pem" },
@@ -738,6 +739,12 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     }).pipe(
       Effect.catch((failure) =>
         Effect.gen({ self: this }, function* () {
+          // The prepared Signal socket would stay open until its lifetime ends. `disconnect` closes
+          // it. A newer attempt for this host owns the peer, so only the current attempt closes it.
+          // The prepare stops first, so that its command cannot arrive after the disconnect.
+          if (preparingSignal) yield* Fiber.interrupt(preparingSignal);
+          if (preparingSignal && this.#active.get(hostId) === active)
+            yield* TeamClientBridge.use((bridge) => bridge.disconnect(hostId)).pipe(Effect.catch(() => Effect.void));
           const failedSessionId = sessionId;
           if (failedSessionId && !active.released && !this.#retainSession(hostId, active, failedSessionId)) {
             yield* this.#options
