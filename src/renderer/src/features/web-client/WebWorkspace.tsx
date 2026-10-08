@@ -1121,6 +1121,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 onDeleteAgent={workspace.deleteAgent}
                 compact={compact()}
                 onExpand={layout.expandSidebar}
+                onOpenSearch={() => setSearchOpen(true)}
                 onOpenMarketplace={() => setMarketplaceOpen(true)}
                 emptyAction={
                   firstAgent()

@@ -27,6 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
   Switch,
+  Text,
   Textarea,
   toast,
 } from "@openbot/ui";
@@ -732,9 +733,10 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                   />
                 </Show>
               </section>
-              <label class="settings-field agent-routine-instruction-field">
-                <span>{t("routine.settings.instruction")}</span>
+              <div class="settings-field agent-routine-instruction-field">
+                <span id="agent-routine-instruction-label">{t("routine.settings.instruction")}</span>
                 <Textarea
+                  aria-labelledby="agent-routine-instruction-label"
                   value={current().instruction}
                   placeholder={
                     props.port.ownerNoun === "channel"
@@ -742,9 +744,16 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                       : t("routine.settings.instructionPlaceholderAgent")
                   }
                   maxlength={INPUT_LIMITS.routineInstruction}
+                  aria-describedby={props.port.ownerNoun === "channel" ? undefined : "agent-routine-no-update-hint"}
                   onValueChange={(instruction) => changeDraft((value) => ({ ...value, instruction }))}
                 />
-              </label>
+                {/* A scheduled run of an agent routine that answers only the marker posts nothing. */}
+                <Show when={props.port.ownerNoun !== "channel"}>
+                  <Text id="agent-routine-no-update-hint" variant="caption" tone="muted">
+                    {t("routine.settings.instructionNoUpdateHint")}
+                  </Text>
+                </Show>
+              </div>
               <Show when={props.port.limitPolicy}>
                 <div class="settings-field">
                   <span id="agent-routine-limit-policy-label">{t("routine.settings.limitPolicy")}</span>

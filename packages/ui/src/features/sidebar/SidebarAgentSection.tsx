@@ -1,7 +1,6 @@
 /**
  * One section - the unassigned one included. A custom section stays visible while empty so it can
- * be dropped into, but only when nothing is being searched for: during a search an empty section is
- * noise, not a target.
+ * be dropped into.
  *
  * The unassigned section keeps its heading only once a custom section exists. Before that it is the
  * whole list, and "Unassigned" names it against nothing.
@@ -16,15 +15,8 @@ import { SidebarSectionHeader } from "./SidebarSectionHeader";
 import { useSidebarScope } from "./sidebar-scope";
 
 export function SidebarAgentSection(sectionProps: { sectionId: string }) {
-  const {
-    customSectionById,
-    dragOffset,
-    filteredChatsBySection,
-    normalizedQuery,
-    props,
-    sectionDragClasses,
-    sectionIsCollapsed,
-  } = useSidebarScope();
+  const { customSectionById, dragOffset, filteredChatsBySection, props, sectionDragClasses, sectionIsCollapsed } =
+    useSidebarScope();
   const { t } = useText();
   const sectionId = () => sectionProps.sectionId;
   const chats = () => filteredChatsBySection().get(sectionId()) ?? [];
@@ -34,7 +26,7 @@ export function SidebarAgentSection(sectionProps: { sectionId: string }) {
   const headed = () => Boolean(custom()) || props.layout.sections.length > 0;
   const collapsed = () => headed() && sectionIsCollapsed(sectionId());
   return (
-    <Show when={name() && (chats().length > 0 || (custom() && !normalizedQuery()))}>
+    <Show when={name() && (chats().length > 0 || custom())}>
       <section
         class={["sidebar-chat-group sidebar-section", sectionDragClasses(sectionId())]}
         style={`--sidebar-drag-y: ${dragOffset(sectionId()).y}px;`}

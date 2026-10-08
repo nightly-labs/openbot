@@ -41,6 +41,7 @@ import type { MailboxSync } from "./mailbox-sync";
 import { PLAN_UPDATED_METHOD, planFromNotification } from "./plan-updates";
 import { isBalanceDiagnostic, isPlanLimitDiagnostic, isUsageLimitDiagnostic } from "./provider-diagnostics";
 import type { ProviderRuntime } from "./provider-runtime";
+import { isNoUpdateAnswer, settleQuietRoutineTurn } from "./routine-quiet-runs";
 import { ThreadFileHistory } from "./thread-file-history";
 import {
   isForeignReasoningError,
@@ -87,6 +88,16 @@ export interface TurnHooks {
    * when the delivery is not an active channel assignment that can go back.
    */
   requeueChannelDelivery(deliveryId: string): Effect.Effect<boolean>;
+  /**
+   * Whether this delivery is a routine run that may end without a message: a scheduled run whose
+   * agent answers only the no-update marker.
+   */
+  quietRoutineDelivery(deliveryId: string): boolean;
+  /**
+   * The agent preview before the routine run of this delivery showed its task, and that task, once.
+   * Null after a restart or for any other delivery.
+   */
+  takeRoutinePreview(deliveryId: string): { previous: string; shown: string } | null;
 }
 
 export interface TurnLifecycleOptions {
@@ -589,6 +600,16 @@ export class TurnLifecycle {
     if (deliveries.some((delivery) => delivery.delivery.sender.kind === "agent")) {
       dropPlaceholderAnswers(snapshot, turnId);
     }
+    // Only a turn that ran nothing but scheduled routine runs: a person who wrote in the same turn,
+    // or who started a Test, script or webhook run, waits for the answer.
+    const quiet =
+      outcome === "completed" &&
+      deliveries.length > 0 &&
+      !this.#conversation.isExecutionThread(snapshot.threadId) &&
+      deliveries.every(
+        ({ delivery }) => delivery.sender.kind === "routine" && this.#hooks.quietRoutineDelivery(delivery.id),
+      ) &&
+      settleQuietRoutineTurn(snapshot, turnId);
     const latestAssistant = latestTurnAnswer(snapshot.messages, turnId);
     if (deliveries.length > 0) {
       const terminal = outcome === "failed" ? "failed" : outcome === "interrupted" ? "interrupted" : "completed";
@@ -610,9 +631,27 @@ export class TurnLifecycle {
         if (delivery.sender.kind === "agent") this.#hooks.scheduleDrain(delivery.sender.agentId);
       }
     }
-    if (latestAssistant && !this.#conversation.isExecutionThread(snapshot.threadId)) {
+    // Each run start saved the earlier preview; a quiet turn puts back the oldest one, unless
+    // something else changed the preview since. Every turn takes its entries, so none stays behind.
+    const savedPreviews = deliveries.flatMap(({ delivery }) =>
+      delivery.sender.kind === "routine" ? (this.#hooks.takeRoutinePreview(delivery.id) ?? []) : [],
+    );
+    // A routine run that answered only the no-update marker, also a Test run that shows it in the
+    // chat, does not put the marker in the preview.
+    const markerAnswer =
+      latestAssistant !== undefined &&
+      deliveries.some(({ delivery }) => delivery.sender.kind === "routine") &&
+      isNoUpdateAnswer(latestAssistant.text);
+    if (latestAssistant && !markerAnswer && !this.#conversation.isExecutionThread(snapshot.threadId)) {
       yield* this.#store.updatePreview(agentId, latestAssistant.text).pipe(toTurnOperationFailed);
       this.#hooks.emit({ type: "agents-changed", agents: this.#hooks.listAgents() });
+    } else if (quiet || (markerAnswer && !this.#conversation.isExecutionThread(snapshot.threadId))) {
+      const saved = savedPreviews[0];
+      const current = this.#store.list().find((entry) => entry.id === agentId)?.preview;
+      if (saved && current === savedPreviews.at(-1)?.shown) {
+        yield* this.#store.updatePreview(agentId, saved.previous).pipe(toTurnOperationFailed);
+        this.#hooks.emit({ type: "agents-changed", agents: this.#hooks.listAgents() });
+      }
     }
     this.#conversation.emitConversation(snapshot, "turn.completed", { turnId, status: outcome });
     if (deliveries.length > 0) {
@@ -630,6 +669,7 @@ export class TurnLifecycle {
       turnId,
       status: outcome,
       origin: deliveries[0]?.delivery.sender.kind ?? "unknown",
+      ...(quiet ? { quiet: true as const } : {}),
     });
     if (shouldCompact) yield* this.#compaction.request(agentId, threadId);
     else this.#hooks.scheduleDrain(agentId);

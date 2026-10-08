@@ -19,7 +19,7 @@ export function SidebarNav() {
     draggingKind,
     dropSidebarNativeDrag,
     filteredChats,
-    filteredPeople,
+    orderedPeople,
     handleListDragLeave,
     layoutMutable,
     pending,
@@ -50,7 +50,7 @@ export function SidebarNav() {
             resolvedPinnedItems().length === 0 &&
             waitingAgents().length === 0 &&
             filteredChats().length === 0 &&
-            (props.showPeople === false || filteredPeople().length === 0) &&
+            (props.showPeople === false || orderedPeople().length === 0) &&
             pending.sectionEditor?.target.kind !== "create"
           }
         >

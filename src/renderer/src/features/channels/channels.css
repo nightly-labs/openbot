@@ -305,9 +305,9 @@
   line-height: var(--openbot-leading-sm);
 }
 /*
- * The shared `.search-field` row from `app-shell.css`, which the sidebar search also uses: it
- * carries the borderless input and the calm focus treatment (a dim border, and the focus ring only
- * for keyboard focus). Only the size is local, to match the name field above it.
+ * The shared `.search-field` row from `app-shell.css`: it carries the borderless input and the calm
+ * focus treatment (a dim border, and the focus ring only for keyboard focus). Only the size is local,
+ * to match the name field above it.
  */
 .channel-create-form .channel-member-search {
   height: var(--openbot-control-lg);

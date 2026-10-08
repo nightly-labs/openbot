@@ -1,5 +1,5 @@
 import { agentAutomationAllowed, type MarketplaceSkillDetail } from "@openbot/contracts/ipc";
-import { BookMarked, CalendarClock, Folder, Gauge, Puzzle, Table2 } from "@openbot/ui";
+import { BookMarked, CalendarClock, Folder, Gauge, Puzzle, Table2, Upload } from "@openbot/ui";
 import { SettingsLinkGroup, SettingsLinkRow } from "@openbot/ui/components/SettingsPanel";
 import type { AgentProfile } from "@openbot/ui/data";
 import SharedAgentSettingsPanel, {
@@ -28,8 +28,9 @@ interface AgentSettingsPanelProps
     "width" | "onResize" | "onResizeEnd" | "links" | "detailOpen" | "children"
   > {
   remoteClient?: boolean;
-  /** The web client's host calls. A remote client shows only Skills and Tables, and only with these. */
+  /** The web client's host calls for the settings that its server supports. */
   adminCalls?: ConversationRuntime["admin"];
+  onPublish?: () => void;
   onOpenUsage?: (trigger: HTMLButtonElement) => void;
   onWidthChange: (width: number) => void;
   skillSelectionRequest?: { skillId: string } | null;
@@ -267,23 +268,32 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
               </Show>
             </SettingsLinkGroup>
           </Show>
-          <Show when={!props.remoteClient}>
+          <Show when={!props.remoteClient || props.onPublish}>
             <SettingsLinkGroup inset title={t("agentSettings.groups.does")}>
-              <SettingsLinkRow
-                icon={<CalendarClock aria-hidden="true" />}
-                label={t("agentSettings.links.routines")}
-                value={t("agentSettings.links.routinesCount", { count: draft.routines.count })}
-                onClick={() =>
-                  setDraft((state) => {
-                    state.routines.open = true;
-                  })
-                }
-              />
-              <Show when={props.onOpenUsage}>
+              <Show when={!props.remoteClient}>
+                <SettingsLinkRow
+                  icon={<CalendarClock aria-hidden="true" />}
+                  label={t("agentSettings.links.routines")}
+                  value={t("agentSettings.links.routinesCount", { count: draft.routines.count })}
+                  onClick={() =>
+                    setDraft((state) => {
+                      state.routines.open = true;
+                    })
+                  }
+                />
+              </Show>
+              <Show when={!props.remoteClient && props.onOpenUsage}>
                 <SettingsLinkRow
                   icon={<Gauge aria-hidden="true" />}
                   label={t("agentSettings.links.usage")}
                   onClick={(trigger) => props.onOpenUsage?.(trigger)}
+                />
+              </Show>
+              <Show when={props.onPublish}>
+                <SettingsLinkRow
+                  icon={<Upload aria-hidden="true" />}
+                  label={t("conversation.header.publish")}
+                  onClick={() => props.onPublish?.()}
                 />
               </Show>
             </SettingsLinkGroup>
