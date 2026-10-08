@@ -1,0 +1,12 @@
+# Stages the newest release, or stops OpenBot, moves the staged release into place and starts OpenBot
+# again, when an owner, an admin or a permitted member asks for it in Server Settings > Updates.
+[Unit]
+Description=Update OpenBot on request
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/OpenBot/hosted/openbot-hosted-update request
+# A download and an apply: the limits of openbot-update.service and openbot-update-apply.service.
+TimeoutStartSec=45min

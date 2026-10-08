@@ -134,6 +134,9 @@ export const messages = defineMessages("server", {
   "server.rail.usage": "Usage",
   "server.rail.schedule": "Routines",
   "server.rail.settings": "Server settings",
+  // The last items of the server menu. Leave is for a joined server; delete is for a hosted server that the user owns.
+  "server.rail.leave": "Leave server",
+  "server.rail.delete": "Delete server",
   "server.select.failedTitle": "Could not select the server",
   "server.select.failedDescription": "Could not switch servers. Try again.",
   "server.select.openAgentFailed": "Could not open {name}. Find it in the sidebar.",

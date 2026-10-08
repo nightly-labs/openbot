@@ -132,6 +132,8 @@ export const messages = {
   "server.rail.usage": "Nutzung",
   "server.rail.schedule": "Routinen",
   "server.rail.settings": "Servereinstellungen",
+  "server.rail.leave": "Server verlassen",
+  "server.rail.delete": "Server löschen",
   "server.select.failedTitle": "Server konnte nicht ausgewählt werden",
   "server.select.failedDescription": "Der Server konnte nicht gewechselt werden. Versuche es erneut.",
   "server.select.openAgentFailed": "{name} konnte nicht geöffnet werden. Suche ihn in der Seitenleiste.",

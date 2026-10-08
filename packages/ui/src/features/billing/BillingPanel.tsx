@@ -37,6 +37,9 @@ import {
 import type { JSX } from "@solidjs/web";
 import { For, Match, Show, Switch } from "solid-js";
 import { useText } from "../../text";
+import { SettingsHostedServersTab } from "../settings/SettingsHostedServersTab";
+import type { SettingsHostedServersStore } from "../settings/stores/hosted-servers-store";
+import { BillingManagedServer } from "./BillingManagedServer";
 import { type BillingStore, billingActionKey } from "./billing-store";
 
 const PLAN_NAME = {
@@ -66,6 +69,8 @@ function paymentFailed(server: BillingServerPlan): boolean {
 
 export interface BillingPanelProps {
   store: BillingStore;
+  hostedServers?: SettingsHostedServersStore | undefined;
+  onAddServer?: (() => void) | undefined;
   /** False when this surface has no billing calls. */
   available: boolean;
 }
@@ -80,6 +85,18 @@ export function BillingPanel(props: BillingPanelProps): JSX.Element {
   const billing = () => props.store.state.billing;
   const unavailable = () => !props.available || billing()?.available === false;
   const managing = () => props.store.state.pending === "manage";
+  const managedServers = () =>
+    props.hostedServers?.state.lifecycleAvailable
+      ? props.hostedServers.state.servers.filter((server) =>
+          billing()?.servers.some(
+            (plan) =>
+              plan.serverId === server.serverId &&
+              plan.currentPeriodEnd !== null &&
+              (plan.status === "active" || plan.status === "trialing"),
+          ),
+        )
+      : [];
+  const managedIds = () => managedServers().map((server) => server.serverId);
 
   return (
     <div class="billing-panel" aria-busy={props.store.state.loading ? "true" : undefined}>
@@ -148,16 +165,51 @@ export function BillingPanel(props: BillingPanelProps): JSX.Element {
                   </Button>
                 </Show>
               </div>
+              <Show when={props.onAddServer}>
+                {(add) => (
+                  <Button variant="outline" onClick={() => add()()}>
+                    {t("settings.hostedServers.add")}
+                  </Button>
+                )}
+              </Show>
+              <For each={managedServers()} keyed={(server) => server.serverId}>
+                {(server) => {
+                  const plan = () => state().servers.find((entry) => entry.serverId === server().serverId);
+                  return (
+                    <Show when={plan()}>
+                      {(current) => (
+                        <Show when={props.hostedServers}>
+                          {(hosting) => (
+                            <BillingManagedServer
+                              server={server()}
+                              plan={current()}
+                              paidThrough={current().currentPeriodEnd ?? 0}
+                              billing={props.store}
+                              hosting={hosting()}
+                            />
+                          )}
+                        </Show>
+                      )}
+                    </Show>
+                  );
+                }}
+              </For>
               <Show
-                when={state().servers.length > 0}
+                when={state().servers.some((server) => !server.serverId || !managedIds().includes(server.serverId))}
                 fallback={
-                  <div class="billing-empty">
-                    <Text tone="muted">{t("billing.empty")}</Text>
-                  </div>
+                  <Show when={state().servers.length === 0}>
+                    <div class="billing-empty">
+                      <Text tone="muted">{t("billing.empty")}</Text>
+                    </div>
+                  </Show>
                 }
               >
                 <ItemGroup class="billing-servers" role="list">
-                  <For each={state().servers}>
+                  <For
+                    each={state().servers.filter(
+                      (server) => !server.serverId || !managedIds().includes(server.serverId),
+                    )}
+                  >
                     {(server) => <BillingServerRow server={server} store={props.store} />}
                   </For>
                 </ItemGroup>
@@ -171,6 +223,20 @@ export function BillingPanel(props: BillingPanelProps): JSX.Element {
           </div>
         </Match>
       </Switch>
+      <Show when={props.hostedServers}>
+        {(hosting) => (
+          <Show
+            when={
+              !hosting().state.loaded ||
+              hosting().state.error ||
+              (hosting().state.available && hosting().state.servers.length === 0) ||
+              hosting().state.servers.some((server) => !managedIds().includes(server.serverId))
+            }
+          >
+            <SettingsHostedServersTab store={hosting()} excludedServerIds={managedIds()} inBilling />
+          </Show>
+        )}
+      </Show>
     </div>
   );
 }

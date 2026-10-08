@@ -118,6 +118,7 @@ import { Route as V1SkillsAdminSubmissionsVersionIdRouteImport } from './routes/
 import { Route as V2HostingServersServerIdIndexRouteImport } from './routes/v2/hosting/servers/$serverId/index'
 import { Route as V2HostingServersServerIdActivityRouteImport } from './routes/v2/hosting/servers/$serverId/activity'
 import { Route as V2HostingServersServerIdCheckoutRouteImport } from './routes/v2/hosting/servers/$serverId/checkout'
+import { Route as V2HostingServersServerIdLifecycleRouteImport } from './routes/v2/hosting/servers/$serverId/lifecycle'
 import { Route as V2HostingServersServerIdStatusRouteImport } from './routes/v2/hosting/servers/$serverId/status'
 import { Route as V2HostingServersServerIdWakeRouteImport } from './routes/v2/hosting/servers/$serverId/wake'
 import { Route as V2RemoteHostsHostIdDiscordDisconnectRouteImport } from './routes/v2/remote/hosts/$hostId/discord-disconnect'
@@ -709,6 +710,12 @@ const V2HostingServersServerIdCheckoutRoute =
     path: '/v2/hosting/servers/$serverId/checkout',
     getParentRoute: () => rootRouteImport,
   } as any)
+const V2HostingServersServerIdLifecycleRoute =
+  V2HostingServersServerIdLifecycleRouteImport.update({
+    id: '/v2/hosting/servers/$serverId/lifecycle',
+    path: '/v2/hosting/servers/$serverId/lifecycle',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const V2HostingServersServerIdStatusRoute =
   V2HostingServersServerIdStatusRouteImport.update({
     id: '/v2/hosting/servers/$serverId/status',
@@ -932,6 +939,7 @@ export interface FileRoutesByFullPath {
   '/v1/skills/admin/submissions/$versionId': typeof V1SkillsAdminSubmissionsVersionIdRoute
   '/v2/hosting/servers/$serverId/activity': typeof V2HostingServersServerIdActivityRoute
   '/v2/hosting/servers/$serverId/checkout': typeof V2HostingServersServerIdCheckoutRoute
+  '/v2/hosting/servers/$serverId/lifecycle': typeof V2HostingServersServerIdLifecycleRoute
   '/v2/hosting/servers/$serverId/status': typeof V2HostingServersServerIdStatusRoute
   '/v2/hosting/servers/$serverId/wake': typeof V2HostingServersServerIdWakeRoute
   '/v2/remote/hosts/$hostId/discord-disconnect': typeof V2RemoteHostsHostIdDiscordDisconnectRoute
@@ -1062,6 +1070,7 @@ export interface FileRoutesByTo {
   '/v1/skills/admin/submissions/$versionId': typeof V1SkillsAdminSubmissionsVersionIdRoute
   '/v2/hosting/servers/$serverId/activity': typeof V2HostingServersServerIdActivityRoute
   '/v2/hosting/servers/$serverId/checkout': typeof V2HostingServersServerIdCheckoutRoute
+  '/v2/hosting/servers/$serverId/lifecycle': typeof V2HostingServersServerIdLifecycleRoute
   '/v2/hosting/servers/$serverId/status': typeof V2HostingServersServerIdStatusRoute
   '/v2/hosting/servers/$serverId/wake': typeof V2HostingServersServerIdWakeRoute
   '/v2/remote/hosts/$hostId/discord-disconnect': typeof V2RemoteHostsHostIdDiscordDisconnectRoute
@@ -1193,6 +1202,7 @@ export interface FileRoutesById {
   '/v1/skills/admin/submissions/$versionId': typeof V1SkillsAdminSubmissionsVersionIdRoute
   '/v2/hosting/servers/$serverId/activity': typeof V2HostingServersServerIdActivityRoute
   '/v2/hosting/servers/$serverId/checkout': typeof V2HostingServersServerIdCheckoutRoute
+  '/v2/hosting/servers/$serverId/lifecycle': typeof V2HostingServersServerIdLifecycleRoute
   '/v2/hosting/servers/$serverId/status': typeof V2HostingServersServerIdStatusRoute
   '/v2/hosting/servers/$serverId/wake': typeof V2HostingServersServerIdWakeRoute
   '/v2/remote/hosts/$hostId/discord-disconnect': typeof V2RemoteHostsHostIdDiscordDisconnectRoute
@@ -1325,6 +1335,7 @@ export interface FileRouteTypes {
     | '/v1/skills/admin/submissions/$versionId'
     | '/v2/hosting/servers/$serverId/activity'
     | '/v2/hosting/servers/$serverId/checkout'
+    | '/v2/hosting/servers/$serverId/lifecycle'
     | '/v2/hosting/servers/$serverId/status'
     | '/v2/hosting/servers/$serverId/wake'
     | '/v2/remote/hosts/$hostId/discord-disconnect'
@@ -1455,6 +1466,7 @@ export interface FileRouteTypes {
     | '/v1/skills/admin/submissions/$versionId'
     | '/v2/hosting/servers/$serverId/activity'
     | '/v2/hosting/servers/$serverId/checkout'
+    | '/v2/hosting/servers/$serverId/lifecycle'
     | '/v2/hosting/servers/$serverId/status'
     | '/v2/hosting/servers/$serverId/wake'
     | '/v2/remote/hosts/$hostId/discord-disconnect'
@@ -1585,6 +1597,7 @@ export interface FileRouteTypes {
     | '/v1/skills/admin/submissions/$versionId'
     | '/v2/hosting/servers/$serverId/activity'
     | '/v2/hosting/servers/$serverId/checkout'
+    | '/v2/hosting/servers/$serverId/lifecycle'
     | '/v2/hosting/servers/$serverId/status'
     | '/v2/hosting/servers/$serverId/wake'
     | '/v2/remote/hosts/$hostId/discord-disconnect'
@@ -1702,6 +1715,7 @@ export interface RootRouteChildren {
   V1SkillsAdminFeaturedSkillIdRoute: typeof V1SkillsAdminFeaturedSkillIdRoute
   V2HostingServersServerIdActivityRoute: typeof V2HostingServersServerIdActivityRoute
   V2HostingServersServerIdCheckoutRoute: typeof V2HostingServersServerIdCheckoutRoute
+  V2HostingServersServerIdLifecycleRoute: typeof V2HostingServersServerIdLifecycleRoute
   V2HostingServersServerIdStatusRoute: typeof V2HostingServersServerIdStatusRoute
   V2HostingServersServerIdWakeRoute: typeof V2HostingServersServerIdWakeRoute
   V2RemoteHostsHostIdDiscordDisconnectRoute: typeof V2RemoteHostsHostIdDiscordDisconnectRoute
@@ -2487,6 +2501,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof V2HostingServersServerIdCheckoutRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/v2/hosting/servers/$serverId/lifecycle': {
+      id: '/v2/hosting/servers/$serverId/lifecycle'
+      path: '/v2/hosting/servers/$serverId/lifecycle'
+      fullPath: '/v2/hosting/servers/$serverId/lifecycle'
+      preLoaderRoute: typeof V2HostingServersServerIdLifecycleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/v2/hosting/servers/$serverId/status': {
       id: '/v2/hosting/servers/$serverId/status'
       path: '/v2/hosting/servers/$serverId/status'
@@ -2846,6 +2867,8 @@ const rootRouteChildren: RootRouteChildren = {
   V1SkillsAdminFeaturedSkillIdRoute: V1SkillsAdminFeaturedSkillIdRoute,
   V2HostingServersServerIdActivityRoute: V2HostingServersServerIdActivityRoute,
   V2HostingServersServerIdCheckoutRoute: V2HostingServersServerIdCheckoutRoute,
+  V2HostingServersServerIdLifecycleRoute:
+    V2HostingServersServerIdLifecycleRoute,
   V2HostingServersServerIdStatusRoute: V2HostingServersServerIdStatusRoute,
   V2HostingServersServerIdWakeRoute: V2HostingServersServerIdWakeRoute,
   V2RemoteHostsHostIdDiscordDisconnectRoute:

@@ -61,6 +61,9 @@ export function createWebHostedServerCalls(
   const serverPath = (serverId: string, action: string) => `servers/${encodeURIComponent(serverId)}/${action}`;
 
   return {
+    async lifecycle(input) {
+      await send(serverPath(input.serverId, "lifecycle"), { body: JSON.stringify(input) });
+    },
     list: () => request("servers", parseHostedServerList),
     plans: () => request("plans", parseHostedServerCatalog),
     async create({ requestId, ...input }) {

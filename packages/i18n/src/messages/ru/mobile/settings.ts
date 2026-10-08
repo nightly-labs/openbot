@@ -70,6 +70,22 @@ export const messages = {
   "mobile.settings.appearance.agentColorMessages": "Цвет агента на моих сообщениях",
   "mobile.settings.appearance.agentColorMessagesFooter":
     "Ваши сообщения в чате с агентом окрашиваются в цвет этого агента. Отключите, если текст плохо читается.",
+  "mobile.settings.animations.title": "Анимации",
+  "mobile.settings.animations.footer":
+    "Выключите «Анимации», чтобы убрать движение во всём приложении. Если в настройках телефона включено «Уменьшение движения», приложение тоже уменьшает движение, и анимации ниже остаются выключенными.",
+  "mobile.settings.animations.all": "Анимации",
+  "mobile.settings.animations.chatZoom": "Увеличение чатов",
+  "mobile.settings.animations.chatZoomFooter":
+    "Чат открывается из своего аватара в списке и сворачивается обратно в него. Если выключить, чат выезжает сбоку.",
+  "mobile.settings.animations.agentFaces": "Живые лица агентов",
+  "mobile.settings.animations.agentFacesFooter":
+    "Аватары агентов двигаются, пока агенты работают и отдыхают. Если выключить, лица останутся неподвижными.",
+  "mobile.settings.animations.composerResize": "Компактное поле сообщения",
+  "mobile.settings.animations.composerResizeFooter":
+    "Пока клавиатура закрыта, поле сообщения превращается в узкую полоску. Если выключить, поле остаётся полного размера.",
+  "mobile.settings.animations.textReveal": "Анимация ответов",
+  "mobile.settings.animations.textRevealFooter":
+    "Ответ появляется слово за словом, а его облачко плавно растёт. Если выключить, текст показывается сразу по мере поступления.",
   "mobile.settings.feedback.footer": "Тактильный отклик на действия в приложении на этом устройстве.",
   "mobile.settings.feedback.haptics": "Вибрация",
   "mobile.settings.feedback.retry": "Повторить сохранение настройки вибрации",

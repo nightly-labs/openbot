@@ -8,6 +8,7 @@ import { useText } from "@openbot/ui/text";
 import { createMemo, createSignal, onSettled, untrack } from "solid-js";
 import { githubConnectorPort } from "../connectors/github-connector-port";
 import { MARKETPLACE_PLUGINS } from "../settings/marketplace-plugin-catalog";
+import { localizedPlugin } from "../settings/marketplace-plugin-text";
 import { dismissMarketplaceSuggestion, marketplaceSuggestionDismissed } from "./marketplace-suggestion-dismissals";
 
 export interface MarketplaceSuggestionChatCardProps {
@@ -30,6 +31,10 @@ export function marketplaceSuggestionKnown(appId: string): boolean {
 export function MarketplaceSuggestionChatCard(props: MarketplaceSuggestionChatCardProps) {
   const { t } = useText();
   const plugin = createMemo(() => MARKETPLACE_PLUGINS.find((candidate) => candidate.slug === props.appId));
+  const localizedTagline = () => {
+    const listing = plugin();
+    return listing ? localizedPlugin(listing, t).tagline : undefined;
+  };
   const github = () => props.appId === GITHUB_MARKETPLACE_APP_ID;
   // Only the desktop app of the computer that runs OpenBot has this connection, and `window.openbot`.
   const githubStatus = createGitHubStatus(untrack(() => github() && props.localServer));
@@ -46,7 +51,7 @@ export function MarketplaceSuggestionChatCard(props: MarketplaceSuggestionChatCa
     <MarketplaceSuggestionCard
       kind="app"
       name={github() ? t("connector.github.title") : (plugin()?.name ?? props.appId)}
-      description={github() ? t("marketplace.app.githubTagline") : (plugin()?.tagline ?? "")}
+      description={github() ? t("marketplace.app.githubTagline") : (localizedTagline() ?? "")}
       iconUrl={plugin()?.iconUrl ?? null}
       mark={github() ? <GitHubMark /> : undefined}
       state={state()}
