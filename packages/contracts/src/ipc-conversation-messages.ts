@@ -6,6 +6,7 @@ import { isBoundedString, isIdentifier, isRequestId } from "./ipc-bounded-values
 import { CONVERSATION_PLAN_ITEM_TYPE, type ConversationPlan, isConversationPlan } from "./ipc-conversation-plan";
 import { QUEUE_DELIVERY_STATUSES, type QueueDelivery } from "./ipc-queue";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
+import { type ConversationUiBlock, isConversationUiBlock } from "./ui-blocks";
 
 export type ConversationMessageAuthor = "user" | "assistant" | "agent" | "system";
 
@@ -207,6 +208,12 @@ export interface ConversationMessage {
   questionPrompt?: ConversationQuestionPrompt;
   /** Set on the one `plan` message of a turn. The text holds the same plan as a checklist. */
   plan?: ConversationPlan;
+  /**
+   * An interactive block from `ask_ui` or `show_ui` (see `ui-blocks.ts`). A blocking block rides on a
+   * `question_prompt` message beside `questionPrompt`; a display block's message has the `ui-block:`
+   * item type and its fallback text. Absent on a message from an older host.
+   */
+  uiBlock?: ConversationUiBlock;
 }
 
 export function isConversationMessage(value: unknown): value is ConversationMessage {
@@ -249,7 +256,8 @@ export function isConversationMessage(value: unknown): value is ConversationMess
         isBoundedString(value.routine.scheduledFor, 160))) &&
     (value.imageGeneration === undefined || isImageGenerationInfo(value.imageGeneration)) &&
     (value.questionPrompt === undefined || isConversationQuestionPrompt(value.questionPrompt)) &&
-    (value.plan === undefined || isConversationPlan(value.plan))
+    (value.plan === undefined || isConversationPlan(value.plan)) &&
+    (value.uiBlock === undefined || isConversationUiBlock(value.uiBlock))
   );
 }
 
