@@ -6,6 +6,7 @@ export const messages = defineMessages("attachment", {
   "attachment.notFound": "File not found",
   "attachment.download": "Download {name}",
   "attachment.open": "Open {name}",
+  "attachment.loadMedia": "Play {name}",
   "attachment.previewUnavailable": "Preview is unavailable.",
   "attachment.error.preview": "Could not preview {name}. Try again.",
   "attachment.error.download": "Could not download attachments. Try again.",

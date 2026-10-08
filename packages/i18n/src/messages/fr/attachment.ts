@@ -7,6 +7,7 @@ export const messages = {
   "attachment.notFound": "Fichier introuvable",
   "attachment.download": "Télécharger {name}",
   "attachment.open": "Ouvrir {name}",
+  "attachment.loadMedia": "Lire {name}",
   "attachment.previewUnavailable": "L’aperçu n’est pas disponible.",
   "attachment.error.preview": "Impossible d’afficher l’aperçu de {name}. Réessayez.",
   "attachment.error.download": "Impossible de télécharger les pièces jointes. Réessayez.",

@@ -6,7 +6,7 @@ import { prefersReducedMotion } from "@openbot/ui/utils";
 import { createEffect, createMemo, createSignal, For, Match, onCleanup, Show, Switch, untrack } from "solid-js";
 import type { AgentMessage, AgentProfile } from "../../data";
 import { useText } from "../../text";
-import { AttachmentCards } from "./AttachmentCards";
+import { AttachmentCards, type AttachmentMediaSource } from "./AttachmentCards";
 import { CodeBlock } from "./CodeBlock";
 import { CodePreview } from "./CodePreview";
 import { ComparisonTable } from "./ComparisonTable";
@@ -244,6 +244,7 @@ export function MessageBody(props: {
   onOpenSharedFile?: (path: string) => void;
   onOpenWorkspaceFile?: (path: string) => void;
   onDownload?: (attachment: AttachmentSummary) => void;
+  mediaSource?: AttachmentMediaSource | undefined;
 }) {
   const { t } = useText();
   const streamingBody = createStreamingBody(
@@ -523,6 +524,7 @@ export function MessageBody(props: {
         <div class="message-attachments-group">
           <AttachmentCards
             attachments={standaloneFileAttachments()}
+            mediaSource={props.mediaSource}
             onPreview={openAttachment}
             onAction={props.onAttachmentAction}
           />

@@ -7,6 +7,7 @@ export const messages = {
   "attachment.notFound": "Arquivo não encontrado",
   "attachment.download": "Baixar {name}",
   "attachment.open": "Abrir {name}",
+  "attachment.loadMedia": "Reproduzir {name}",
   "attachment.previewUnavailable": "A prévia está indisponível.",
   "attachment.error.preview": "Não foi possível visualizar {name}. Tente novamente.",
   "attachment.error.download": "Não foi possível baixar os anexos. Tente novamente.",

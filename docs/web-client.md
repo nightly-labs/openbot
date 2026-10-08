@@ -123,8 +123,15 @@ mock. The separate web preview implements the browser runtime with that same moc
   and host preview URLs are not used as browser attachment links. Blob URLs are released when the
   preview closes, the host changes, or the workspace unmounts. A shared or workspace file link
   reads the file through the host's `/v1/shared-files` or `/v1/workspace-files` route and opens the
-  same panel. "Open" on a file card opens the panel; "Download" saves the file. Images show as
-  file cards, not inline: the browser reads no image bytes until a card is opened.
+  same panel. "Open" on a file card opens the panel; "Download" saves the file.
+- Inline media (`web-attachment-media.ts`): an image card of 2 MB or less downloads its file when
+  the chat shows the card, and shows it as a thumbnail. An MP3 or MOV card of 10 MB or less gets a
+  play button; the click downloads the whole file, then the player starts. Larger files keep only
+  Download. Only PNG, JPEG, GIF, WebP, AVIF, MP3 and MOV get an object URL, typed from that list and
+  not from the host's file type: an object URL has the app origin, so HTML, SVG and XHTML never get
+  one. At most 2 files download at the same time. The URLs share a 64 MB cache, and the least
+  recently used URL is revoked first. A host change or an unmount revokes all of them. An image
+  thumbnail opens the preview panel, not the image viewer.
 - Pinned agents and channels and collapsed sections are kept in local storage for each account and
   host, with the same storage modules as desktop. Only ids are stored. Pins do not delete
   conversations. Notification changes use the host's existing settings and include

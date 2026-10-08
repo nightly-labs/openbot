@@ -1,8 +1,10 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AgentEvent, AttachmentSummary, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 import { currentText } from "@openbot/ui/text";
+import { onCleanup } from "solid-js";
 import type { ChannelsPort } from "../channels/channels-port";
 import { webEventRoutinesApi } from "../conversation/routine-webhooks-api";
+import { createWebAttachmentMedia } from "./web-attachment-media";
 import { createWebAttachmentFiles, openWebLink } from "./web-attachments";
 import type { WebWorkspaceRuntime } from "./web-runtime";
 
@@ -39,6 +41,8 @@ export function createWebChannelsPort(
   const channels = remote.channels;
   const admin = remote.admin;
   const eventRoutines = admin ? webEventRoutinesApi(admin.request) : undefined;
+  const attachmentMedia = createWebAttachmentMedia(remote, hostId);
+  onCleanup(() => attachmentMedia.dispose());
   async function importAttachments(chosen: File[]): Promise<AttachmentSummary[]> {
     if (chosen.length > INPUT_LIMITS.attachments)
       throw new Error(currentText().t("webClient.error.attachmentLimit", { limit: INPUT_LIMITS.attachments }));
@@ -87,6 +91,7 @@ export function createWebChannelsPort(
     openUrl: openWebLink,
     fileActions: "browser",
     previewAttachment: files.preview,
+    attachmentMedia,
     importAttachments,
   };
 }

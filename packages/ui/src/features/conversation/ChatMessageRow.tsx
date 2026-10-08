@@ -16,6 +16,7 @@ import { avatarHeadColor } from "../../bloub-avatar";
 import type { AgentMessage, AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
+import type { AttachmentMediaSource } from "./AttachmentCards";
 import { conversationBubbleVariant, MessageBody } from "./MessageRendering";
 
 /**
@@ -68,6 +69,8 @@ export interface ChatMessageRowProps {
   onOpenSharedFile?: (path: string) => void;
   onOpenWorkspaceFile?: (path: string) => void;
   onDownload?: (attachment: AttachmentSummary) => void;
+  /** Loads the images and media of a client that gets no `previewUrl`. */
+  mediaSource?: AttachmentMediaSource | undefined;
 }
 
 /**
@@ -184,6 +187,7 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
                 onOpenSharedFile={props.onOpenSharedFile}
                 onOpenWorkspaceFile={props.onOpenWorkspaceFile}
                 onDownload={props.onDownload}
+                mediaSource={props.mediaSource}
               />
               {props.children}
             </BubbleContent>

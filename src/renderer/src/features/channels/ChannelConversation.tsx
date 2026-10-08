@@ -792,6 +792,7 @@ export function ChannelConversation(props: ChannelConversationProps) {
                               onPreview={(attachment) => void previewChannelAttachment(attachment)}
                               onAttachmentAction={channelAttachmentAction}
                               onDownload={(attachment) => channelAttachmentAction(attachment, "download")}
+                              mediaSource={runtime().attachmentMedia}
                               actions={
                                 <MessageActions
                                   message={entry()?.message ?? initialEntry.message}

@@ -478,6 +478,7 @@ export function ConversationTimeline() {
                             <div class="chat-action-attachments">
                               <AttachmentCards
                                 attachments={message()?.attachments ?? []}
+                                mediaSource={runtime.attachmentMedia}
                                 onPreview={(attachment) => void previewAttachment(attachment)}
                                 onAction={attachmentAction}
                               />
@@ -653,6 +654,7 @@ export function ConversationTimeline() {
                             onOpenSharedFile={openSharedFile}
                             onOpenWorkspaceFile={openWorkspaceFile}
                             onDownload={(attachment) => attachmentAction(attachment, "download")}
+                            mediaSource={runtime.attachmentMedia}
                             class={pending() ? "message-entry-pending" : undefined}
                             footer={
                               pending() ? (
