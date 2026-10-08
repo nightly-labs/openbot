@@ -117,10 +117,12 @@ export class AgentMemories {
   handleTool(params: DynamicToolCallParams, senderAgentId: string): OpenBotToolResponse | null {
     if (params.tool === "remember") {
       const args = params.arguments;
-      if (!isRecord(args) || !isString(args.text)) return openBotToolFailure("Memory text is required.");
+      if (!isRecord(args) || !isString(args.text))
+        return openBotToolFailure(sourceText("error.backend.memoryTextRequired"));
       const text = args.text.trim();
-      if (!text) return openBotToolFailure("Memory text is required.");
-      if (text.length > INPUT_LIMITS.agentMemoryText) return openBotToolFailure("Memory text is too long.");
+      if (!text) return openBotToolFailure(sourceText("error.backend.memoryTextRequired"));
+      if (text.length > INPUT_LIMITS.agentMemoryText)
+        return openBotToolFailure(sourceText("error.backend.memoryTextTooLong"));
       const memoryId = args.memoryId;
       if (
         memoryId !== undefined &&

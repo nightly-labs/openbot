@@ -1874,13 +1874,21 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
       "diagnostic",
       "E1007 18:11:18.606862 917 errorreport.go:224] error executing cascade step: CORTEX_STEP_TYPE_MODEL: Error: model request failed",
     );
+    client.emit(
+      "diagnostic",
+      'E1007 18:11:18.606862 917 errorreport.go:224] error executing cascade step: CORTEX_STEP_TYPE_MCP_TOOL: failed to connect to server "openbot_browser": connection refused',
+    );
     client.emit("diagnostic", "ERROR grok: the model endpoint could not be reached");
 
-    await waitFor(() => events.filter((event) => event.type === "error").length >= 2);
+    await waitFor(() => events.filter((event) => event.type === "error").length >= 3);
     expect(events.filter((event) => event.type === "error")).toEqual([
       expect.objectContaining({
         message:
           "E1007 18:11:18.606862 917 errorreport.go:224] error executing cascade step: CORTEX_STEP_TYPE_MODEL: Error: model request failed",
+      }),
+      expect.objectContaining({
+        message:
+          'E1007 18:11:18.606862 917 errorreport.go:224] error executing cascade step: CORTEX_STEP_TYPE_MCP_TOOL: failed to connect to server "openbot_browser": connection refused',
       }),
       expect.objectContaining({ message: "ERROR grok: the model endpoint could not be reached" }),
     ]);
