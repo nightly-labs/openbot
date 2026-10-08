@@ -315,6 +315,7 @@ import type {
   ScopedTeamPresenceSnapshot,
   SendDirectMessageInput,
   ServerSummary,
+  SetServerDirectInput,
   SetServerMutedInput,
   SetServerNotificationLevelInput,
   SetTeamTypingInput,
@@ -912,6 +913,8 @@ export const IPC_ENDPOINTS = {
     reorder: request<ReorderServersInput, ServerSummary[]>()("servers:reorder"),
     setMuted: request<SetServerMutedInput, ServerSummary[]>()("servers:set-muted"),
     setNotificationLevel: request<SetServerNotificationLevelInput, ServerSummary[]>()("servers:set-notification-level"),
+    /** The member's "Use Tailscale when available" choice for one joined server. */
+    setDirectEnabled: request<SetServerDirectInput, ServerSummary[]>()("servers:set-direct-enabled"),
     join: request<JoinServerInput, ServerSummary>()("servers:join"),
     previewInvite: request<JoinServerInput, InvitePreview>()("servers:preview-invite"),
     takePendingInvite: request<undefined, string | null>()("servers:take-pending-invite"),

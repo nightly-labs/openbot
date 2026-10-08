@@ -1,6 +1,16 @@
 import type { ServerNotificationLevel, ServerSummary } from "@openbot/contracts/ipc";
 import type { AppFormat, AppTextKey, AppTranslate } from "@openbot/i18n";
-import { Bell, BellOff, CalendarClock, ChartArea, Check, ChevronRight, type ContextMenu } from "@openbot/ui";
+import {
+  Bell,
+  BellOff,
+  CalendarClock,
+  ChartArea,
+  Check,
+  ChevronRight,
+  Cloud,
+  type ContextMenu,
+  Link,
+} from "@openbot/ui";
 import { For, Show } from "solid-js";
 import { useText } from "../../text";
 
@@ -70,8 +80,28 @@ export function ServerActionItems(
   const muteDescription = () => serverMuteDescription(props.server, t, format);
   // A component, so the JSX below can use it as a tag. The menu does not change after render.
   const Menu = props.menu;
+  // Only for a server whose host offers the direct Tailscale path: which way this computer reaches it now.
+  const route = () => (props.server.direct?.offered && props.server.state === "online" ? props.server.direct : null);
   return (
     <>
+      <Show when={route()}>
+        {(direct) => (
+          <>
+            <Menu.Item class="server-rail-menu-detail-item" disabled>
+              <Show when={direct().active} fallback={<Cloud class="agent-context-icon size-4" aria-hidden="true" />}>
+                <Link class="agent-context-icon size-4" aria-hidden="true" />
+              </Show>
+              <span class="server-rail-menu-label">
+                <span>{t("server.route.label")}</span>
+                <span class="server-rail-menu-detail">
+                  {direct().active ? t("server.route.direct") : t("server.route.cloud")}
+                </span>
+              </span>
+            </Menu.Item>
+            <Menu.Separator />
+          </>
+        )}
+      </Show>
       <Show when={props.onSetMuted}>
         <Show
           when={!props.server.notificationsMuted}

@@ -35,6 +35,7 @@ import { useServerSelection } from "./features/servers/server-selection";
 import { useServerSettings } from "./features/servers/server-settings";
 import { useServerSwitch } from "./features/servers/server-switch";
 import { useServers } from "./features/servers/servers-context";
+import { serversPort } from "./features/servers/servers-port";
 import type { HostProviderSettings } from "./features/settings/ProviderSettingsSection";
 import { useSettings } from "./features/settings/settings-context";
 import { useSidebar } from "./features/sidebar/sidebar-context";
@@ -272,7 +273,7 @@ function ServerSettings(props: {
   bitwardenConnector: BitwardenConnectorPanelProps | undefined;
 }) {
   const platform = usePlatform();
-  const { hostStatus, setServerMuted, setServerNotificationLevel, activeServer } = useServers();
+  const { hostStatus, setServerMuted, setServerNotificationLevel, setServerDirectEnabled, activeServer } = useServers();
   const { selectAgent, selectGlobalSearchMessage } = useNavigation();
   const { selectServer } = useServerSelection();
   const { setPendingAgentSelection } = useServerSwitch();
@@ -510,6 +511,8 @@ function ServerSettings(props: {
           onSetPublished={setServerPublished}
           onSetMuted={(muted) => setServerMuted(server().id, muted)}
           onSetNotificationLevel={(level) => setServerNotificationLevel(server().id, level)}
+          tailscale={server().kind === "local" ? serversPort().host : undefined}
+          onSetDirectEnabled={(enabled) => setServerDirectEnabled(server().id, enabled)}
           onCreateInvite={createServerInvite}
           onUpdateMember={updateServerMember}
           onRemoveMember={removeServerMember}

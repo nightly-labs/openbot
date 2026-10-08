@@ -87,6 +87,12 @@ Updates work as on a hosted server (see [Updates](hosted-servers.md#updates)): t
 new release, and it starts at the next boot. `sudo openbot update` stages, stops the service,
 applies and starts the service again.
 
+## Direct connection over Tailscale
+
+A home server and the computers of its members are often in one Tailscale network. The host can then
+offer a direct connection that does not go through the OpenBot cloud at each start. See
+[Direct connection over Tailscale](tailscale-direct.md).
+
 ## Control socket
 
 The `openbot` command talks to main over HTTP on a Unix socket, with form bodies and `key=value`

@@ -20,9 +20,11 @@ import {
   type ScopedDirectMessageEvent,
   type ScopedDirectTypingEvent,
   type ScopedTeamPresenceSnapshot,
+  SERVER_DIRECT_ROUTE_HINTS,
   SERVER_NOTIFICATION_LEVELS,
   type ServerCompatibility,
   type ServerConnectionIssue,
+  type ServerDirectRoute,
   type ServerSummary,
   TAILSCALE_DIRECT_ISSUES,
   TAILSCALE_LOCAL_STATES,
@@ -287,6 +289,7 @@ function server(summary: DynamicRecord): ServerSummary {
     hostRestart,
     hostedSleep,
     memberLimit,
+    direct,
   } = summary;
   if (!isOneOf(SERVER_NOTIFICATION_LEVELS, notificationLevel)) throw new Error("Invalid notificationLevel.");
   if (!isOneOf(SERVER_KINDS, kind)) throw new Error("Invalid kind.");
@@ -319,6 +322,18 @@ function server(summary: DynamicRecord): ServerSummary {
       ? {}
       : { hostedSleep: hostedSleep === "sleeping" || hostedSleep === "waking" ? hostedSleep : null }),
     ...(memberLimit === undefined ? {} : { memberLimit }),
+    ...(direct === undefined ? {} : { direct: serverDirectRoute(direct) }),
+  };
+}
+
+function serverDirectRoute(value: unknown): ServerDirectRoute {
+  const route = decodeRecord(value, "server direct route");
+  if (route.hint !== null && !isOneOf(SERVER_DIRECT_ROUTE_HINTS, route.hint)) throw new Error("Invalid direct hint.");
+  return {
+    offered: requiredBoolean(route, "offered"),
+    enabled: requiredBoolean(route, "enabled"),
+    active: requiredBoolean(route, "active"),
+    hint: route.hint,
   };
 }
 

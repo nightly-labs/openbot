@@ -142,6 +142,14 @@ export function createMockTeam(
       servers = servers.map((server) => (server.id === serverId ? { ...server, notificationLevel: level } : server));
       return clone(servers);
     },
+    // The preview has no Tailscale: the choice is kept, and the server stays on the OpenBot cloud.
+    setDirectEnabled: async ({ serverId, enabled }) => {
+      if (!servers.some((server) => server.id === serverId)) throw new Error("Remote server not found.");
+      servers = servers.map((server) =>
+        server.id === serverId && server.direct ? { ...server, direct: { ...server.direct, enabled } } : server,
+      );
+      return clone(servers);
+    },
     list: async () => clone(servers),
     select: async (serverId) => {
       servers = servers.map((server) => ({ ...server, active: server.id === serverId }));

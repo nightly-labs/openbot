@@ -18,7 +18,7 @@
 // The token is kept in memory only. A restart of this app or of the host asks for a new one.
 
 import { isValidTailscaleDirectApiUrl } from "@openbot/contracts/invite-links";
-import type { ServerCompatibility } from "@openbot/contracts/ipc";
+import type { ServerCompatibility, ServerDirectRoute, ServerDirectRouteHint } from "@openbot/contracts/ipc";
 import { decodeRecord } from "@openbot/contracts/ipc-decoding";
 import { isString } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
@@ -36,18 +36,8 @@ export const DIRECT_REFRESH_MARGIN_MS = 10 * 60_000;
 /** The client never keeps a direct session longer than this, whatever the host answers. */
 const DIRECT_SESSION_MAXIMUM_MS = 24 * 60 * 60_000;
 
-/** Why the direct path is not in use for a server that offers it. */
-export type DirectRouteHint = "tailscale-unavailable" | "other-tailnet" | "failed" | null;
-
-export interface DirectRouteStatus {
-  /** The host told this computer a direct address. */
-  offered: boolean;
-  /** The member's "Use Tailscale when available" choice for this server. */
-  enabled: boolean;
-  /** Requests and events use the direct address now. */
-  active: boolean;
-  hint: DirectRouteHint;
-}
+export type DirectRouteHint = ServerDirectRouteHint | null;
+export type DirectRouteStatus = ServerDirectRoute;
 
 export interface DirectSignIn {
   sessionToken: string;

@@ -432,6 +432,24 @@ another device, the host sends the provider's sign-in link, and for Codex, Grok 
 one-time code, to that computer or browser, which shows them and opens the link only when the admin
 asks. The provider's CLI on the host receives the login; no token travels to the admin.
 
+### Direct connection over Tailscale
+
+The host owner can turn on a direct connection over Tailscale in the server settings. OpenBot then
+runs the `tailscale` command of the Tailscale app that is installed on the host, to forward an
+address inside the owner's tailnet (`https://<device>.<tailnet>.ts.net`) to a Team API listener on
+`127.0.0.1`. OpenBot never uses Tailscale Funnel, so the address is not on the internet. OpenBot
+does not sign in to Tailscale and stores no Tailscale credential. It stores the switch and the
+ports it set up in the app data.
+
+The host gives this address to signed-in members over the existing encrypted connection. A member's
+OpenBot stores it with the saved server and runs `tailscale status` on that computer to see whether
+the host device is reachable. Before it sends anything secret to the address, it checks the host's
+pinned key. It then sends one account ticket, which the host checks with the account service, and
+receives a session token that lasts 24 hours and is kept only in memory. Team API data then travels
+through Tailscale (WireGuard), not through Signal or a relay. The remote desktop and the live
+browser view still use WebRTC. The tailnet name and the device names stay on the computer that
+reads them; the only value that crosses to members is the address.
+
 ## Other network connections
 
 Network traffic can also occur when:

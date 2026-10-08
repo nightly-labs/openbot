@@ -21,6 +21,7 @@ import {
   parseRemoteDesktopTest,
   parseReorderServers,
   parseSendDirectMessage,
+  parseSetServerDirect,
   parseSetServerMuted,
   parseSetServerNotificationLevel,
   parseSetTeamTyping,
@@ -50,6 +51,11 @@ export function teamIpcHandlers({
       ),
       setNotificationLevel: payloadHandler(parseSetServerNotificationLevel, ({ serverId, level }) =>
         runCauseEffect(remoteServers.setNotificationLevel(serverId, level)).then((servers) =>
+          withLocalHostSummary(servers, host.getStatus()),
+        ),
+      ),
+      setDirectEnabled: payloadHandler(parseSetServerDirect, ({ serverId, enabled }) =>
+        runCauseEffect(remoteServers.setDirectEnabled(serverId, enabled)).then((servers) =>
           withLocalHostSummary(servers, host.getStatus()),
         ),
       ),

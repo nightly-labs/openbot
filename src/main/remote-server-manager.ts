@@ -593,11 +593,13 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       this.#localMemberLimit,
     ).map((server) => {
       const mute = this.#store.muteState(server.id);
+      const stored = this.#store.find(server.id);
       return {
         ...server,
         notificationsMuted: mute.muted,
         notificationsMutedUntil: mute.mutedUntil,
         notificationLevel: this.#store.notificationLevel(server.id),
+        ...(stored?.transport === "webrtc-v2" ? { direct: this.#direct.status(stored) } : {}),
       };
     });
   }

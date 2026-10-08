@@ -420,6 +420,7 @@ const serversGroup = bridgeGroup(IPC_ENDPOINTS.servers, {
   reorder: decodeServers,
   setMuted: decodeServers,
   setNotificationLevel: decodeServers,
+  setDirectEnabled: decodeServers,
   join: decodeServer,
   previewInvite: decodeInvitePreview,
   takePendingInvite: decodePendingInvite,
@@ -818,6 +819,7 @@ const openbotApi: OpenBotDesktopApi = {
     reorder: async (input) => rememberActiveServer(await serversGroup.reorder(input)),
     setMuted: async (input) => rememberActiveServer(await serversGroup.setMuted(input)),
     setNotificationLevel: async (input) => rememberActiveServer(await serversGroup.setNotificationLevel(input)),
+    setDirectEnabled: async (input) => rememberActiveServer(await serversGroup.setDirectEnabled(input)),
     join: async (input) => selectJoinedServer(await serversGroup.join(input)),
     login: async (input) => selectJoinedServer(await serversGroup.login(input)),
     onPresence: (listener, serverId) =>

@@ -84,9 +84,30 @@ export interface ServerSummary {
    * user's input (`waking`). Cleared when the connection comes back.
    */
   hostedSleep?: HostedServerSleep | null;
+  /** The direct Tailscale path of a joined WebRTC server. Absent for every other server. */
+  direct?: ServerDirectRoute;
 }
 
 export type HostedServerSleep = "sleeping" | "waking";
+
+export const SERVER_DIRECT_ROUTE_HINTS = ["tailscale-unavailable", "other-tailnet", "failed"] as const;
+/** Why a server that offers the direct Tailscale path uses the OpenBot cloud now. */
+export type ServerDirectRouteHint = (typeof SERVER_DIRECT_ROUTE_HINTS)[number];
+
+export interface ServerDirectRoute {
+  /** The host told this computer a direct Tailscale address. */
+  offered: boolean;
+  /** The member's "Use Tailscale when available" choice for this server. */
+  enabled: boolean;
+  /** This computer reaches the host over Tailscale now, not through the OpenBot cloud. */
+  active: boolean;
+  hint: ServerDirectRouteHint | null;
+}
+
+export interface SetServerDirectInput {
+  serverId: string;
+  enabled: boolean;
+}
 
 export interface JoinServerInput {
   inviteUrl: string;

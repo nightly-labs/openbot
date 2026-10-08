@@ -520,6 +520,9 @@ cannot access `window.openbot` or managed local attachments.
 
 To run your own account service, Signal and TURN, see [Self-hosted remote access](docs/self-hosting.md).
 
+When the host and a member are in the same Tailscale network, the host owner can turn on a direct
+connection that does not go through Signal; see [Direct connection over Tailscale](docs/tailscale-direct.md).
+
 To trigger routines from external services, see
 [Webhooks](docs/webhooks.md). Public webhook requests require the host to be online.
 
