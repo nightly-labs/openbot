@@ -362,7 +362,31 @@
       "win32-x64": ["sunshine.exe", "web-server.exe", "streamer.exe"],
       "linux-x64": ["sunshine", "web-server", "streamer"]
     },
-    "releaseArtifacts": {}
+    "releaseArtifacts": {
+      "darwin-arm64": {
+        "asset": "remote-desktop-runtime-darwin-arm64.tar.gz",
+        "sha256": "762c303817145d903f96875b6900278cce1a8a4b2577b5a9dc6e73274e6d6123"
+      },
+      "darwin-x64": {
+        "asset": "remote-desktop-runtime-darwin-x64.tar.gz",
+        "sha256": "50d527080f5df676032b90ac5e83c45d024583359102070efc5055f0b83acac5"
+      },
+      "win32-x64": {
+        "asset": "remote-desktop-runtime-win32-x64.tar.gz",
+        "sha256": "43bf54ab83c60f5aba1dfd03dd923345f954fec1c81f8fe98c9bb8ad8aa72e1f"
+      },
+      "linux-x64": {
+        "asset": "remote-desktop-runtime-linux-x64.tar.gz",
+        "sha256": "ff6c27cb6551e7ae2637bb6a3b8703cc69a8572347d9dda429bc7663872a6a9f"
+      }
+    },
+    "artifactRelease": {
+      "repository": "nightly-labs/openbot",
+      "tag": "remote-desktop-runtime-44482c62cb605693ca1b753a7763e0f090457eafde09d89b169a19b221e0ab99",
+      "inputDigest": "44482c62cb605693ca1b753a7763e0f090457eafde09d89b169a19b221e0ab99",
+      "manifestAsset": "remote-desktop-runtime-manifest.json",
+      "manifestSha256": "f47a91eae9668689137b35aa016d37a1b1a9054103382417a1030f1678f618e9"
+    }
   },
   "bun": {
     "registry": "https://registry.npmjs.org",
