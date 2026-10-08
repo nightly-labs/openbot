@@ -1010,8 +1010,19 @@ if (!hasSingleInstanceLock) {
       remoteServers.on("directMessage", forwardDirectMessage);
       remoteServers.on("directTyping", forwardDirectTyping);
       // The selected server connects while the window loads. Its WebRTC setup takes seconds, and
-      // the first screen waits for it. The other servers start after the load, below.
-      remoteServers.connectActiveServer();
+      // the first screen waits for it. The other servers start after the load, below. The connection
+      // needs the signed-in account, so it starts only after the account loads. A failed account
+      // load is logged where it starts, and the event connections try again later.
+      void Effect.runPromise(
+        built.centralAuthInitialization.pipe(
+          Effect.flatMap(() =>
+            Effect.sync(() => {
+              if (built.centralAuth.getState().status === "signed_in") remoteServers.connectActiveServer();
+            }),
+          ),
+          Effect.catch(() => Effect.void),
+        ),
+      ).catch((error) => logger.warn("Unable to start the selected server's connection:", toLogValue(error)));
       updater.on("status", forwardUpdateStatus);
       built.requestedUpdate.on("preference", forwardUpdatePreference);
       updater.start();
