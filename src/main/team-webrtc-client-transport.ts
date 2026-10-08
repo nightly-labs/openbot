@@ -34,6 +34,7 @@ import type {
   RemoteInviteRecord,
   RemoteMemberRecord,
 } from "./central-auth-records";
+import type { RemoteConnectTrace } from "./remote-connect-trace";
 import { RemoteWorkflowError, remoteDecode, toRemoteWorkflowError } from "./remote-service-effects";
 import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcFileTransfer } from "./team-webrtc-file-transfer";
@@ -91,6 +92,8 @@ interface TeamWebRtcClientTransportOptions {
     version: string,
   ) => Effect.Effect<{ bytes: Uint8Array; mimeType: string }, CentralAuthOperationError>;
   transferDirectory: string;
+  /** Times each connection for the local trace. */
+  connectTrace?: RemoteConnectTrace;
 }
 
 interface ActiveHost {
@@ -130,6 +133,7 @@ interface RetainedSession {
 class TeamClientBridge extends Context.Service<
   TeamClientBridge,
   {
+    start(): Effect.Effect<void, RemoteWorkflowError>;
     send(...args: Parameters<TeamWebRtcBridge["send"]>): Effect.Effect<void, RemoteWorkflowError>;
     connect(...args: Parameters<TeamWebRtcBridge["connect"]>): Effect.Effect<void, RemoteWorkflowError>;
     disconnect(hostId: string): Effect.Effect<void, RemoteWorkflowError>;
@@ -158,6 +162,8 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
   >();
   readonly #lastEventSequence = new Map<string, number>();
   readonly #hostPublicKeys = new Map<string, string>();
+  /** Set while the account directory is read at startup. A host without a pinned key waits for it. */
+  #hostKeySync: Deferred.Deferred<void> | null = null;
 
   constructor(options: TeamWebRtcClientTransportOptions) {
     super();
@@ -165,6 +171,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     this.#platform = Layer.succeed(
       TeamClientBridge,
       TeamClientBridge.of({
+        start: () => options.bridge.start(),
         send: (...args) => options.bridge.send(...args),
         connect: (...args) => options.bridge.connect(...args),
         disconnect: (hostId) => options.bridge.disconnect(hostId),
@@ -181,6 +188,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     options.bridge.on("data", this.#onData);
     options.bridge.on("path", this.#onPath);
     options.bridge.on("error", this.#onError);
+    options.bridge.on("signalReady", this.#onSignalReady);
   }
 
   readonly listHosts = Effect.fn("TeamWebRtcClient.listHosts")(function* (
@@ -191,6 +199,21 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
 
   pinHostKey(hostId: string, publicKey: string): void {
     this.#hostPublicKeys.set(hostId, publicKey);
+  }
+
+  /**
+   * The keys of the account directory are not known yet. Until `endHostKeySync`, a connect to a host
+   * without a pinned key waits instead of failing. A host with a pinned key does not wait: the
+   * directory never replaces a pinned key.
+   */
+  beginHostKeySync(): void {
+    this.#hostKeySync ??= Deferred.makeUnsafe<void>();
+  }
+
+  endHostKeySync(): void {
+    const pending = this.#hostKeySync;
+    this.#hostKeySync = null;
+    if (pending) Deferred.doneUnsafe(pending, Effect.void);
   }
 
   get controlPlaneUrl(): string {
@@ -514,6 +537,9 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       this.#options.bridge.off("data", this.#onData);
       this.#options.bridge.off("path", this.#onPath);
       this.#options.bridge.off("error", this.#onError);
+      this.#options.bridge.off("signalReady", this.#onSignalReady);
+      // A connect that waits for host keys is cancelled now, but it ends only after this wait.
+      this.endHostKeySync();
       yield* this.#files.stop();
       while (this.#operations.size)
         yield* Effect.forEach([...this.#operations], Deferred.await, { concurrency: "unbounded" });
@@ -559,10 +585,12 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     active.connecting = done;
     this.#retainedSessions.delete(hostId);
     this.#active.set(hostId, active);
+    this.#options.connectTrace?.begin(hostId);
     return yield* this.#connect(hostId, active, current?.sessionId || null).pipe(
       Effect.onExit((exit) => Deferred.done(done, exit)),
       Effect.onError(() =>
         Effect.sync(() => {
+          this.#options.connectTrace?.fail(hostId, active.cancelled ? "cancelled" : "error");
           if (this.#active.get(hostId) === active) this.#active.delete(hostId);
         }),
       ),
@@ -575,9 +603,27 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     active: ActiveHost,
     existingSessionId: string | null,
   ): Effect.fn.Return<void, RemoteWorkflowError, TeamClientBridge> {
-    const hostPublicKey = this.#hostPublicKeys.get(hostId);
+    let hostPublicKey = this.#hostPublicKeys.get(hostId);
+    const hostKeySync = this.#hostKeySync;
+    if (!hostPublicKey && hostKeySync) {
+      yield* Deferred.await(hostKeySync);
+      if (active.cancelled || this.#active.get(hostId) !== active)
+        return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.connectionCancelled")) });
+      hostPublicKey = this.#hostPublicKeys.get(hostId);
+    }
     if (!hostPublicKey)
       return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.pinnedKeyMissing")) });
+    const connectTrace = this.#options.connectTrace;
+    // The hidden window of the bridge loads while the control plane makes the session and the ticket.
+    // `bridge.connect` below waits for the same start. A failure here is not this attempt's failure:
+    // `bridge.connect` starts the window again and reports its own error.
+    yield* Effect.forkChild(
+      TeamClientBridge.use((bridge) => bridge.start()).pipe(
+        Effect.tap(() => Effect.sync(() => connectTrace?.mark(hostId, "bridge"))),
+        Effect.ignore,
+      ),
+      { startImmediately: true },
+    );
     const clientKeys = yield* remoteDecode(() =>
       generateKeyPairSync("ed25519", {
         publicKeyEncoding: { type: "spki", format: "pem" },
@@ -595,11 +641,13 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         active.expiresAt = session.expiresAt;
         startedNewSession = true;
         yield* this.#assertCurrentEffect(hostId, active, sessionId);
-      }
+        connectTrace?.mark(hostId, "session");
+      } else connectTrace?.mark(hostId, "session", "reused");
       const ticketSessionId = sessionId;
       return yield* Effect.gen({ self: this }, function* () {
         const ticket = yield* this.#options.issueTicket(ticketSessionId, clientPublicKey).pipe(toRemoteWorkflowError);
         yield* this.#assertCurrentEffect(hostId, active, ticketSessionId);
+        connectTrace?.mark(hostId, "ticket");
         return ticket;
       }).pipe(
         Effect.catch((failure) =>
@@ -793,7 +841,12 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     active.expirationTimer.unref?.();
   }
 
+  readonly #onSignalReady = (hostId: string): void => {
+    if (this.#active.has(hostId)) this.#options.connectTrace?.mark(hostId, "signal");
+  };
+
   readonly #onConnected = (hostId: string, binding?: { localFingerprint: string; remoteFingerprint: string }): void => {
+    if (this.#active.has(hostId)) this.#options.connectTrace?.mark(hostId, "channels");
     void Effect.runPromise(this.#owned(this.#beginAuthenticationEffect(hostId, binding))).catch(() => undefined);
   };
   readonly #beginAuthenticationEffect = Effect.fn("TeamWebRtcClient.beginAuthentication")(function* (
@@ -843,6 +896,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     this.#files.setPeerAuthenticated(hostId, true);
     active.connected = true;
     active.connecting = null;
+    this.#options.connectTrace?.mark(hostId, "auth");
     this.#sendRecoverable(
       hostId,
       "events",

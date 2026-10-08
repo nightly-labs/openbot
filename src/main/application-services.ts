@@ -157,6 +157,7 @@ import { PROVIDER_DETECTION_SETTINGS_FILE, ProviderDetectionSettingsStore } from
 import { startProviderLog } from "./provider-log";
 import { toProviderRuntimeFailure } from "./provider-runtime-effects";
 import { ProviderRuntimeManager, providerRuntimeRoot, runtimeTarget } from "./provider-runtime-manager";
+import { RemoteConnectTrace } from "./remote-connect-trace";
 import { RemoteDesktopManager } from "./remote-desktop-manager";
 import { resolveRemoteDesktopRuntime } from "./remote-desktop-runtime-artifact";
 import { loadOrCreateRemoteDesktopCredentials } from "./remote-desktop-secret-store";
@@ -1646,6 +1647,7 @@ export async function createApplicationServices({
   service.on("failure", (failure) => analytics.handleFailure(failure));
   const trace = new TraceFile({ directory: join(app.getPath("userData"), "logs") });
   teardown.push(TEARDOWN_ORDER.trace, "the trace file", () => Effect.runPromise(trace.close()));
+  const connectTrace = new RemoteConnectTrace((span) => trace.record(span));
   const remoteServers = new RemoteServerManager(
     join(app.getPath("userData"), REMOTE_SERVERS_FILE),
     safeStorageCipher("error.app.macSecureStorageUnavailable"),
@@ -1658,6 +1660,7 @@ export async function createApplicationServices({
       allowLocalDevelopmentInvites: developmentRemoteRole !== null,
       selfHostedApiOrigin: selfHostedApiOrigin(centralAuthApiUrl),
       appVersion: app.getVersion(),
+      connectTrace,
       getLocalHostId: () => teamStore.getIdentity()?.serverId ?? null,
       hostedServers: {
         unavailable: (serverId, wake) => hostedServers.unavailableHost(serverId, wake),
@@ -1682,6 +1685,7 @@ export async function createApplicationServices({
         controlPlaneUrl: centralAuth.resolveApiUrl("/"),
         downloadHostLogo: (hostId, version) => centralAuth.downloadRemoteHostLogo(hostId, version),
         transferDirectory: join(app.getPath("userData"), "remote-transfers"),
+        connectTrace,
       }),
     },
   );
@@ -1694,8 +1698,10 @@ export async function createApplicationServices({
   await runCauseEffect(remoteServers.initialize());
   criticalActionTargets = { agents: service, remoteServers };
   // After `remoteServers.initialize()`. The client half polls for the host's connection file and
-  // throws when it never appears, before any window is shown - see the module it lives in.
+  // throws when it never appears, before any window is shown - see the module it lives in. It reads
+  // the joined servers to choose between WebRTC and HTTP, so it waits for the account's host list.
   if (developmentRemoteRole) {
+    await runCauseEffect(remoteServers.awaitHostDirectory());
     await runCauseEffect(
       startDevelopmentRemoteRole({
         role: developmentRemoteRole,

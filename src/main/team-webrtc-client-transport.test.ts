@@ -16,8 +16,10 @@ import {
 } from "@openbot/contracts/team-protocol/v2";
 import { describe, expect, it, vi } from "vitest";
 import { runCauseEffect } from "../backend/effect-boundary";
+import { RemoteConnectTrace } from "./remote-connect-trace";
 import { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcClientTransport } from "./team-webrtc-client-transport";
+import type { TraceSpan } from "./trace-file";
 
 const hostKeys = generateKeyPairSync("ed25519", {
   publicKeyEncoding: { type: "spki", format: "pem" },
@@ -162,6 +164,77 @@ function sentRequestId(send: { mock: { calls: unknown[][] } }): string | null {
 }
 
 describe("TeamWebRtcClientTransport", () => {
+  it("waits for the host directory only for a host without a pinned key, and still refuses one it does not pin", async () => {
+    const bridge = new TeamWebRtcBridge();
+    vi.spyOn(bridge, "start").mockReturnValue(Effect.void);
+    vi.spyOn(bridge, "connect").mockImplementation(({ peerId }) =>
+      remoteCall(async () => {
+        queueMicrotask(() => bridge.emit("connected", peerId, channelBinding));
+      }),
+    );
+    vi.spyOn(bridge, "disconnect").mockReturnValue(Effect.void);
+    mockAuthenticatedSend(bridge);
+    const startSession = vi.fn((hostId: string) =>
+      authCall(async () => ({ sessionId: `session-${hostId}`, hostId, expiresAt: Date.now() + 86_400_000 })),
+    );
+    const transport = createTransport(bridge, { startSession });
+    transport.pinHostKey("host-1", hostKeys.publicKey);
+    try {
+      transport.beginHostKeySync();
+      await runCauseEffect(transport.connect("host-1"));
+      const pinnedByDirectory = runCauseEffect(transport.connect("host-2"));
+      const unpinned = runCauseEffect(transport.connect("host-3"));
+      const refused = expect(unpinned).rejects.toThrow("pinned device key");
+      expect(startSession.mock.calls.map(([hostId]) => hostId)).toEqual(["host-1"]);
+      transport.pinHostKey("host-2", hostKeys.publicKey);
+      transport.endHostKeySync();
+      await pinnedByDirectory;
+      await refused;
+      expect(startSession.mock.calls.map(([hostId]) => hostId)).toEqual(["host-1", "host-2"]);
+    } finally {
+      await runCauseEffect(transport.stop());
+    }
+  });
+
+  it("traces each connection phase without a host, session, ticket or key", async () => {
+    const bridge = new TeamWebRtcBridge();
+    vi.spyOn(bridge, "start").mockReturnValue(Effect.void);
+    vi.spyOn(bridge, "connect").mockImplementation(({ peerId }) =>
+      remoteCall(async () => {
+        queueMicrotask(() => {
+          bridge.emit("signalReady", peerId);
+          bridge.emit("connected", peerId, channelBinding);
+        });
+      }),
+    );
+    vi.spyOn(bridge, "disconnect").mockReturnValue(Effect.void);
+    mockAuthenticatedSend(bridge);
+    const spans: TraceSpan[] = [];
+    const transport = createTransport(bridge, { connectTrace: new RemoteConnectTrace((span) => spans.push(span)) });
+    transport.pinHostKey("host-1", hostKeys.publicKey);
+    try {
+      await runCauseEffect(transport.connect("host-1"));
+      await vi.waitFor(() => expect(spans.map((span) => span.name)).toContain("remote-connect:auth"));
+      expect(spans.map((span) => span.name)).toEqual(
+        expect.arrayContaining([
+          "remote-connect:start",
+          "remote-connect:session",
+          "remote-connect:ticket",
+          "remote-connect:bridge",
+          "remote-connect:signal",
+          "remote-connect:channels",
+          "remote-connect:auth",
+        ]),
+      );
+      const written = JSON.stringify(spans);
+      for (const secret of ["host-1", "session-1", "signal.example.test", hostKeys.publicKey.slice(30, 60)]) {
+        expect(written).not.toContain(secret);
+      }
+    } finally {
+      await runCauseEffect(transport.stop());
+    }
+  });
+
   it("ends a pending mutation on stop without replaying it", async () => {
     const bridge = new TeamWebRtcBridge();
     vi.spyOn(bridge, "connect").mockImplementation(({ peerId }) =>

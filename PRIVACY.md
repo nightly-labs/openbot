@@ -396,9 +396,10 @@ Billing is off, and Stripe receives nothing, when the account service has no Str
   is never sent to an agent, a provider, a log or a team member. The token and each filled value
   are redacted from logs, exports and diagnostics.
 - `~/Library/Application Support/OpenBot/logs/trace.ndjson` is a local trace of IPC calls,
-  provider turns, and main-process failures. Each line holds a time, the IPC channel name, the turn
-  origin or the failure origin (`uncaughtException` or `unhandledRejection`), the duration, and the
-  outcome word. The failure's error text goes only to the redacted log. The trace holds no payloads,
+  provider turns, main-process failures, and the steps of each connection to a joined server. Each
+  line holds a time, the IPC channel name, the turn origin, the failure origin (`uncaughtException`
+  or `unhandledRejection`) or the connection step (such as `remote-connect:ticket`), the duration,
+  and the outcome word. A connection step does not name the server. The failure's error text goes only to the redacted log. The trace holds no payloads,
   messages, URLs, paths, or identifiers, and it goes through log redaction before it is written. It
   is kept to two files of 2 MB each and is never sent.
 
