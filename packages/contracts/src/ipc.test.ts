@@ -9,6 +9,7 @@ import {
   canPreviewAttachment,
   channelRoutingConversationEvent,
   channelRoutingConversationEventItemType,
+  decodeAccountUsage,
   decodeChannel,
   decodeMcpServerConfigs,
   hostedSiteConversationEvent,
@@ -821,6 +822,38 @@ describe("renderer-to-main boundary guards", () => {
     expect(isAccountUsage({ limits: [{ ...limit, primary: { ...window, resetsAt: Number.POSITIVE_INFINITY } }] })).toBe(
       false,
     );
+  });
+
+  it("keeps a usage reading whose optional windows are missing or malformed", () => {
+    const window = { usedPercent: 25, windowDurationMins: 300, resetsAt: null };
+    const limit = { id: "claude", primary: window, secondary: null };
+    const fable = { ...window, kind: "model", label: "Fable", windowDurationMins: 10_080 };
+
+    // An older host sends no windows.
+    expect(decodeAccountUsage({ limits: [limit] })).toEqual({ limits: [limit] });
+    expect(isAccountUsage({ limits: [{ ...limit, windows: [fable] }] })).toBe(true);
+
+    // A member this build cannot read is dropped; the gating windows stay.
+    const decoded = decodeAccountUsage({
+      limits: [
+        {
+          ...limit,
+          windows: [fable, { ...window, kind: "future-kind", label: null }, { ...fable, usedPercent: "91" }],
+          credits: [
+            { kind: "credits", balance: 10, unlimited: false },
+            { kind: "credits", balance: "10" },
+          ],
+        },
+      ],
+    });
+    expect(decoded).toEqual({
+      limits: [{ ...limit, windows: [fable], credits: [{ kind: "credits", balance: 10, unlimited: false }] }],
+    });
+    expect(isAccountUsage({ limits: [{ ...limit, windows: [{ ...fable, kind: "future-kind" }] }] })).toBe(false);
+
+    // The gating windows stay strict.
+    expect(decodeAccountUsage({ limits: [{ ...limit, primary: { ...window, usedPercent: Number.NaN } }] })).toBeNull();
+    expect(decodeAccountUsage({ limits: [{ ...limit, windows: "not a list" }] })).toEqual({ limits: [limit] });
   });
 
   it("validates every delivery inside a queue snapshot and a queued message receipt", () => {

@@ -532,7 +532,32 @@ describe.sequential("GrokAgentClient", () => {
         client.request("account/rateLimits/read", { model: "grok-4.5" }, decodeAccountRateLimitsReadResult),
       ),
     ).resolves.toMatchObject({
-      rateLimits: { secondary: { usedPercent: 0, windowDurationMins: 10_080, resetsAt: 1_788_825_600 } },
+      rateLimits: {
+        secondary: { usedPercent: 0, windowDurationMins: 10_080, resetsAt: 1_788_825_600 },
+        // A $0 on-demand cap is no on-demand budget, so the list shows no extra-usage window.
+        windows: [{ kind: "window", usedPercent: 0, windowDurationMins: 10_080 }],
+      },
+    });
+  });
+
+  it("lists on-demand use as a share of its cap beside the billing period", async () => {
+    process.env.OPENBOT_FAKE_GROK_MODE = "on-demand-billing";
+    client = new GrokAgentClient({ executable, version: "1.0.13" }, 5_000);
+    client.start();
+    await runCauseEffect(client.request("initialize", {}, decodeRecordResponse));
+
+    await expect(
+      runCauseEffect(
+        client.request("account/rateLimits/read", { model: "grok-4.5" }, decodeAccountRateLimitsReadResult),
+      ),
+    ).resolves.toMatchObject({
+      rateLimits: {
+        secondary: { usedPercent: 100, windowDurationMins: 10_080 },
+        windows: [
+          { kind: "window", usedPercent: 100, windowDurationMins: 10_080, resetsAt: 1_788_825_600 },
+          { kind: "extra", usedPercent: 25, windowDurationMins: null, resetsAt: 1_788_825_600 },
+        ],
+      },
     });
   });
 
@@ -1109,7 +1134,9 @@ createInterface({ input: process.stdin }).on("line", (line) => {
         config: {
           ...(mode === "unified-billing"
             ? { onDemandCap: {}, onDemandUsed: {}, prepaidBalance: {}, isUnifiedBillingUser: true }
-            : { creditUsagePercent: 8 }),
+            : mode === "on-demand-billing"
+              ? { creditUsagePercent: 100, onDemandCap: { val: 2000 }, onDemandUsed: { val: 500 } }
+              : { creditUsagePercent: 8 }),
           currentPeriod: mode === "monthly-billing"
             ? { periodType: "USAGE_PERIOD_TYPE_MONTHLY", start: "2026-09-01T00:00:00Z", end: "2026-10-01T00:00:00Z" }
             : {

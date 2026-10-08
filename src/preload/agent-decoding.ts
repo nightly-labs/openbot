@@ -11,9 +11,9 @@ import {
   type AgentStatus,
   type AgentSummary,
   type DuplicateAgentResult,
+  decodeAccountUsage,
   decodeOptionalAgentAnalytics,
   decodeOptionalHostAnalytics,
-  isAccountUsage,
   isAgentMemory,
   isAgentModelOption,
   isAgentProvider,
@@ -90,8 +90,9 @@ export function decodeAgentStatusFromMain(value: unknown): AgentStatus {
 }
 
 export function decodeAccountUsageFromMain(value: unknown): AccountUsage {
-  if (!isAccountUsage(value)) throw new Error("Invalid agent usage response.");
-  return value;
+  const usage = decodeAccountUsage(value);
+  if (!usage) throw new Error("Invalid agent usage response.");
+  return usage;
 }
 
 // Fails closed on a member for the same reason as `decodeAgentModelOptions` in the main process, and

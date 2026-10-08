@@ -126,6 +126,59 @@ describe("ClaudeAgentClient", () => {
     await runCauseEffect(client.stop());
   });
 
+  it("lists every usage window, skips a malformed one and keeps spend only in US dollars", async () => {
+    const usage = (extraCurrency: string | null) => ({
+      rate_limits_available: true,
+      rate_limits: {
+        five_hour: { utilization: 12, resets_at: "2026-09-03T16:00:00Z" },
+        seven_day: { utilization: 34, resets_at: "2026-09-08T00:00:00Z" },
+        seven_day_oauth_apps: { utilization: 5, resets_at: null },
+        seven_day_opus: { utilization: 40, resets_at: null },
+        seven_day_sonnet: { utilization: null, resets_at: null },
+        model_scoped: [
+          { display_name: "Fable", utilization: 91, resets_at: "2026-09-09T00:00:00Z" },
+          { display_name: "opus", utilization: 50, resets_at: null },
+          { display_name: "", utilization: 10, resets_at: null },
+          { utilization: 10 },
+          "not a window",
+        ],
+        extra_usage: {
+          is_enabled: true,
+          monthly_limit: 5_000,
+          used_credits: 1_250,
+          utilization: 25,
+          currency: extraCurrency,
+        },
+      },
+    });
+    let currency: string | null = null;
+    const client = new ClaudeAgentClient(
+      { executable: "/bin/true", version: "2.1.246" },
+      () => new TestQuery(new TestQueue<TestStreamMessage>(), [], usage(currency)),
+    );
+    client.start();
+
+    const read = () =>
+      runCauseEffect(
+        client.request("account/rateLimits/read", { model: "claude-sonnet-4-6" }, decodeAccountRateLimitsReadResult),
+      );
+    const usd = await read();
+    expect(usd.rateLimits?.windows).toEqual([
+      expect.objectContaining({ kind: "window", label: null, usedPercent: 12, windowDurationMins: 300 }),
+      expect.objectContaining({ kind: "window", label: null, usedPercent: 34, windowDurationMins: 10_080 }),
+      expect.objectContaining({ kind: "model", label: "Opus", usedPercent: 40 }),
+      expect.objectContaining({ kind: "model", label: "Fable", usedPercent: 91, windowDurationMins: 10_080 }),
+      expect.objectContaining({ kind: "extra", usedPercent: 25, spentUsd: 12.5, limitUsd: 50 }),
+    ]);
+    // The gate's two windows do not change.
+    expect(usd.rateLimits).toMatchObject({ primary: { usedPercent: 12 }, secondary: { usedPercent: 34 } });
+
+    currency = "eur";
+    const euro = await read();
+    expect(euro.rateLimits?.windows?.at(-1)).toMatchObject({ kind: "extra", usedPercent: 25, spentUsd: null });
+    await runCauseEffect(client.stop());
+  });
+
   it("starts no MCP server to list models or read usage", async () => {
     const probes: DynamicRecord[] = [];
     const client = new ClaudeAgentClient({ executable: "/bin/true", version: "2.1.251" }, (params) => {

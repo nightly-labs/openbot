@@ -59,9 +59,9 @@ export const readOpenCodeGoUsage = Effect.fn("OpenCode.readGoUsage")(function* (
 const UsageWindow = Schema.Struct({ percent: Schema.Finite, resetsAt: Schema.NullOr(Schema.String) });
 
 /**
- * The account usage contract holds two windows, so the monthly and weekly readings share the second
- * one: whichever is closer to its limit, since that is the one that stops a turn first. When both
- * are spent, the one that resets later, since turns stay stopped until then.
+ * The gate reads two windows, so the monthly and weekly readings share the second one: whichever
+ * is closer to its limit, since that is the one that stops a turn first. When both are spent, the
+ * one that resets later, since turns stay stopped until then.
  */
 function openCodeGoRateLimits(value: unknown): AccountRateLimitsReadResult {
   const usage = getRecord(value, "usage");
@@ -70,8 +70,12 @@ function openCodeGoRateLimits(value: unknown): AccountRateLimitsReadResult {
   const monthly = usageWindow(getRecord(usage, "monthly"), MONTHLY_WINDOW_MINS);
   const secondary = weekly && monthly ? bindingWindow(weekly, monthly) : (weekly ?? monthly);
   if (!rolling && !secondary) return NO_USAGE;
+  // The usage list shows all three windows; `primary` and `secondary` stay the two that gate turns.
+  const windows = [rolling, weekly, monthly].flatMap((window) =>
+    window ? [{ ...window, kind: "window" as const, label: null }] : [],
+  );
   return {
-    rateLimits: { limitId: "opencode", primary: rolling, secondary },
+    rateLimits: { limitId: "opencode", primary: rolling, secondary, windows },
     rateLimitsByLimitId: null,
   };
 }

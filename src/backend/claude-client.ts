@@ -14,7 +14,7 @@ import {
   tool,
 } from "@anthropic-ai/claude-agent-sdk";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { defaultProviderModel } from "@openbot/contracts/ipc";
+import { type AccountUsageWindowKind, defaultProviderModel } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Exit, Fiber, Scope } from "effect";
@@ -61,6 +61,7 @@ import {
 import { OPENBOT_TOOL_DEFINITIONS } from "./openbot-tools";
 import { PendingServerRequests } from "./pending-server-requests";
 import {
+  type AccountRateLimitNamedWindowResult,
   type AccountRateLimitsReadResult,
   type AccountRateLimitWindowResult,
   type AccountReadResult,
@@ -1498,8 +1499,61 @@ function claudeRateLimits(value: unknown, model: string | null): AccountRateLimi
   const secondary = claudeModelWeeklyWindow(rateLimits, model) ?? claudeUsageWindow(rateLimits.seven_day, 10_080);
   if (!primary && !secondary) return { rateLimits: null, rateLimitsByLimitId: null };
   return {
-    rateLimits: { limitId: "claude", primary, secondary },
+    rateLimits: { limitId: "claude", primary, secondary, windows: claudeUsageWindows(rateLimits) },
     rateLimitsByLimitId: null,
+  };
+}
+
+/**
+ * Every window the usage method reports, for the usage list. The method is experimental, so each
+ * field is read on its own and a field this build does not know is ignored. `seven_day_oauth_apps`
+ * counts third-party apps, not this app's turns, so the list leaves it out.
+ */
+function claudeUsageWindows(rateLimits: DynamicRecord): AccountRateLimitNamedWindowResult[] {
+  const windows: AccountRateLimitNamedWindowResult[] = [];
+  const add = (window: AccountRateLimitWindowResult | null, kind: AccountUsageWindowKind, label: string | null) => {
+    if (!window) return;
+    const name = label?.toLowerCase();
+    if (name && windows.some((item) => item.label?.toLowerCase() === name)) return;
+    windows.push({ ...window, kind, label });
+  };
+  add(claudeUsageWindow(rateLimits.five_hour, 300), "window", null);
+  add(claudeUsageWindow(rateLimits.seven_day, 10_080), "window", null);
+  add(claudeUsageWindow(rateLimits.seven_day_opus, 10_080), "model", "Opus");
+  add(claudeUsageWindow(rateLimits.seven_day_sonnet, 10_080), "model", "Sonnet");
+  if (Array.isArray(rateLimits.model_scoped)) {
+    for (const item of rateLimits.model_scoped) {
+      const label = isDynamicRecord(item) ? stringValue(item.display_name) : null;
+      // The SDK documents these as per-model weekly windows.
+      if (label) add(claudeUsageWindow(item, 10_080), "model", label);
+    }
+  }
+  const extra = claudeExtraUsageWindow(rateLimits.extra_usage);
+  if (extra) windows.push(extra);
+  return windows;
+}
+
+/**
+ * Paid usage over the plan for the billing period. The amounts are in minor units of `currency`
+ * (cents for USD), so they are kept only for US dollars; another currency shows its percentage.
+ */
+function claudeExtraUsageWindow(value: unknown): AccountRateLimitNamedWindowResult | null {
+  if (!isDynamicRecord(value) || value.is_enabled !== true) return null;
+  const used = numberValue(value.used_credits);
+  const limit = numberValue(value.monthly_limit);
+  const usedPercent =
+    numberValue(value.utilization) ?? (used !== null && limit !== null && limit > 0 ? (used / limit) * 100 : null);
+  if (usedPercent === null) return null;
+  const currency = stringValue(value.currency)?.toUpperCase() ?? "USD";
+  const usd = currency === "USD";
+  return {
+    kind: "extra",
+    label: null,
+    usedPercent,
+    windowDurationMins: null,
+    resetsAt: null,
+    spentUsd: usd && used !== null ? used / 100 : null,
+    limitUsd: usd && limit !== null ? limit / 100 : null,
   };
 }
 

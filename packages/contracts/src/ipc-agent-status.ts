@@ -105,28 +105,116 @@ function isAccountUsageWindow(value: unknown): value is AccountUsageWindow {
   );
 }
 
+/**
+ * What a named window counts: the whole plan (`window`), one model or model family (`model`), or
+ * paid usage over the plan (`extra`).
+ */
+export const ACCOUNT_USAGE_WINDOW_KINDS = ["window", "model", "extra"] as const;
+export type AccountUsageWindowKind = (typeof ACCOUNT_USAGE_WINDOW_KINDS)[number];
+
+/** One quota window as the provider reports it, beside the two that `primary` and `secondary` keep. */
+export interface AccountUsageNamedWindow extends AccountUsageWindow {
+  kind: AccountUsageWindowKind;
+  /** The provider's own name for the bucket, such as a model name. It is shown as sent. */
+  label: string | null;
+  /** Spend in US dollars, for an `extra` window that reports it. */
+  spentUsd?: number | null;
+  limitUsd?: number | null;
+}
+
+/** A credit balance. `credits` counts provider credits. */
+export interface AccountUsageCredits {
+  kind: "credits";
+  balance: number | null;
+  unlimited: boolean;
+}
+
+const ACCOUNT_USAGE_DETAIL_LIMIT = 32;
+const ACCOUNT_USAGE_LABEL_LIMIT = 160;
+
 export interface AccountUsageLimit {
   id: string;
   primary: AccountUsageWindow | null;
   secondary: AccountUsageWindow | null;
+  /**
+   * Every window the provider reports, in its order. Optional: an older host, and the Team API,
+   * send only `primary` and `secondary`, which stay the reading that gates turns.
+   */
+  windows?: AccountUsageNamedWindow[];
+  credits?: AccountUsageCredits[];
 }
 
 export interface AccountUsage {
   limits: AccountUsageLimit[];
 }
 
-export function isAccountUsage(value: unknown): value is AccountUsage {
+function isOptionalFiniteNumber(value: unknown): boolean {
+  return value === undefined || value === null || isFiniteNumber(value);
+}
+
+function isAccountUsageNamedWindow(value: unknown): value is AccountUsageNamedWindow {
+  return (
+    isAccountUsageWindow(value) &&
+    isDynamicRecord(value) &&
+    isOneOf(ACCOUNT_USAGE_WINDOW_KINDS, value.kind) &&
+    isNullableBoundedString(value.label, ACCOUNT_USAGE_LABEL_LIMIT) &&
+    isOptionalFiniteNumber(value.spentUsd) &&
+    isOptionalFiniteNumber(value.limitUsd)
+  );
+}
+
+function isAccountUsageCredits(value: unknown): value is AccountUsageCredits {
   return (
     isDynamicRecord(value) &&
-    Array.isArray(value.limits) &&
-    value.limits.every(
-      (limit) =>
-        isDynamicRecord(limit) &&
-        isBoundedString(limit.id, INPUT_LIMITS.identifier) &&
-        (limit.primary === null || isAccountUsageWindow(limit.primary)) &&
-        (limit.secondary === null || isAccountUsageWindow(limit.secondary)),
-    )
+    value.kind === "credits" &&
+    (value.balance === null || isFiniteNumber(value.balance)) &&
+    typeof value.unlimited === "boolean"
   );
+}
+
+function isAccountUsageLimit(limit: unknown): limit is AccountUsageLimit {
+  return (
+    isDynamicRecord(limit) &&
+    isBoundedString(limit.id, INPUT_LIMITS.identifier) &&
+    (limit.primary === null || isAccountUsageWindow(limit.primary)) &&
+    (limit.secondary === null || isAccountUsageWindow(limit.secondary)) &&
+    (limit.windows === undefined ||
+      (Array.isArray(limit.windows) &&
+        limit.windows.length <= ACCOUNT_USAGE_DETAIL_LIMIT &&
+        limit.windows.every(isAccountUsageNamedWindow))) &&
+    (limit.credits === undefined ||
+      (Array.isArray(limit.credits) &&
+        limit.credits.length <= ACCOUNT_USAGE_DETAIL_LIMIT &&
+        limit.credits.every(isAccountUsageCredits)))
+  );
+}
+
+export function isAccountUsage(value: unknown): value is AccountUsage {
+  return isDynamicRecord(value) && Array.isArray(value.limits) && value.limits.every(isAccountUsageLimit);
+}
+
+/**
+ * Checks a usage reading at a trust boundary. `primary` and `secondary` stay strict, as before.
+ * The optional `windows` and `credits` are details only: a member this build cannot read, such as a
+ * kind a newer host added, is dropped, and does not reject the reading that gates turns.
+ */
+export function decodeAccountUsage(value: unknown): AccountUsage | null {
+  if (!isDynamicRecord(value) || !Array.isArray(value.limits)) return null;
+  const limits = value.limits.map((limit: unknown) => {
+    if (!isDynamicRecord(limit)) return limit;
+    const { windows, credits, ...rest } = limit;
+    return {
+      ...rest,
+      ...(Array.isArray(windows)
+        ? { windows: windows.filter(isAccountUsageNamedWindow).slice(0, ACCOUNT_USAGE_DETAIL_LIMIT) }
+        : {}),
+      ...(Array.isArray(credits)
+        ? { credits: credits.filter(isAccountUsageCredits).slice(0, ACCOUNT_USAGE_DETAIL_LIMIT) }
+        : {}),
+    };
+  });
+  const decoded = { ...value, limits };
+  return isAccountUsage(decoded) ? decoded : null;
 }
 
 export interface AgentStatus {

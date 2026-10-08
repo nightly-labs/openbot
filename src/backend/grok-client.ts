@@ -83,18 +83,39 @@ function grokRateLimits(value: unknown): AccountRateLimitsReadResult {
   const durationMins = Number.isFinite(start) && Number.isFinite(end) ? (end - start) / 60_000 : Number.NaN;
   const periodType = getString(period, "type") ?? getString(period, "periodType");
   const weekly = periodType ? periodType.toLowerCase().includes("weekly") : nearWeeklyDuration(durationMins);
+  const resetsAt = Number.isFinite(end) ? end / 1_000 : null;
+  const secondary = {
+    usedPercent,
+    windowDurationMins: Number.isFinite(durationMins) ? Math.round(durationMins) : weekly ? 10_080 : null,
+    resetsAt,
+  };
+  const onDemand = grokOnDemandPercent(config);
   return {
     rateLimits: {
       limitId: "grok",
       primary: null,
-      secondary: {
-        usedPercent,
-        windowDurationMins: Number.isFinite(durationMins) ? durationMins : weekly ? 10_080 : null,
-        resetsAt: Number.isFinite(end) ? end / 1_000 : null,
-      },
+      secondary,
+      windows: [
+        { ...secondary, kind: "window", label: null },
+        ...(onDemand === null
+          ? []
+          : [{ kind: "extra" as const, label: null, usedPercent: onDemand, windowDurationMins: null, resetsAt }]),
+      ],
     },
     rateLimitsByLimitId: null,
   };
+}
+
+/**
+ * Pay-as-you-go use over the plan, as a share of its cap. Only the ratio is shown: the amounts are
+ * Cent messages, and their unit is not confirmed, so the list does not print them as money.
+ */
+function grokOnDemandPercent(config: DynamicRecord): number | null {
+  const cap = grokCentValue(config, "onDemandCap");
+  if (cap === undefined || cap === null || cap <= 0) return null;
+  const used = grokCentValue(config, "onDemandUsed");
+  if (used === null) return null;
+  return Math.max(0, Math.min(100, ((used ?? 0) / cap) * 100));
 }
 
 /**

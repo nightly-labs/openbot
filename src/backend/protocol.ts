@@ -1,5 +1,13 @@
+import { ACCOUNT_USAGE_WINDOW_KINDS, type AccountUsageWindowKind } from "@openbot/contracts/ipc";
 import { decodeRecord, requiredString } from "@openbot/contracts/ipc-decoding";
-import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import {
+  type DynamicRecord,
+  isBoolean,
+  isDynamicRecord,
+  isNumber,
+  isOneOf,
+  isString,
+} from "@openbot/contracts/runtime-values";
 
 export type RequestId = string | number;
 
@@ -100,12 +108,30 @@ export interface AccountRateLimitWindowResult {
   resetsAt?: number | null;
 }
 
+/** A window a provider client names itself: Claude, Grok and OpenCode build these. */
+export interface AccountRateLimitNamedWindowResult extends AccountRateLimitWindowResult {
+  kind: AccountUsageWindowKind;
+  label?: string | null;
+  spentUsd?: number | null;
+  limitUsd?: number | null;
+}
+
+/** Codex's credits snapshot. `balance` is a decimal string. */
+export interface AccountRateLimitCreditsResult {
+  hasCredits?: boolean | null;
+  unlimited?: boolean | null;
+  balance?: string | null;
+}
+
 export interface AccountRateLimitResult {
   limitId?: string | null;
   limitName?: string | null;
   normalModelSlug?: string | null;
   primary?: AccountRateLimitWindowResult | null;
   secondary?: AccountRateLimitWindowResult | null;
+  /** Every window, when the client reports more than `primary` and `secondary`. */
+  windows?: AccountRateLimitNamedWindowResult[] | null;
+  credits?: AccountRateLimitCreditsResult | null;
 }
 
 export interface AccountRateLimitsReadResult {
@@ -338,7 +364,43 @@ function decodeRateLimit(value: unknown): AccountRateLimitResult | null | undefi
     normalModelSlug: optionalString(record, "normalModelSlug"),
     primary: decodeRateLimitWindow(record.primary),
     secondary: decodeRateLimitWindow(record.secondary),
+    ...(Array.isArray(record.windows) ? { windows: record.windows.flatMap(decodeNamedRateLimitWindow) } : {}),
+    ...(isDynamicRecord(record.credits) ? { credits: decodeRateLimitCredits(record.credits) } : {}),
   };
+}
+
+/**
+ * The extra windows and credits are details beside `primary` and `secondary`, from sources that may
+ * change (Claude's usage method is experimental). A member this build cannot read is dropped; it
+ * does not fail the reading that gates turns.
+ */
+function decodeNamedRateLimitWindow(value: unknown): AccountRateLimitNamedWindowResult[] {
+  if (!isDynamicRecord(value) || !isOneOf(ACCOUNT_USAGE_WINDOW_KINDS, value.kind)) return [];
+  const usedPercent = finiteOrNull(value.usedPercent);
+  if (usedPercent === null) return [];
+  return [
+    {
+      kind: value.kind,
+      label: isString(value.label) ? value.label : null,
+      usedPercent,
+      windowDurationMins: finiteOrNull(value.windowDurationMins),
+      resetsAt: finiteOrNull(value.resetsAt),
+      spentUsd: finiteOrNull(value.spentUsd),
+      limitUsd: finiteOrNull(value.limitUsd),
+    },
+  ];
+}
+
+function decodeRateLimitCredits(record: DynamicRecord): AccountRateLimitCreditsResult {
+  return {
+    hasCredits: isBoolean(record.hasCredits) ? record.hasCredits : null,
+    unlimited: isBoolean(record.unlimited) ? record.unlimited : null,
+    balance: isString(record.balance) ? record.balance : null,
+  };
+}
+
+function finiteOrNull(value: unknown): number | null {
+  return isNumber(value) && Number.isFinite(value) ? value : null;
 }
 
 function decodeRateLimitWindow(value: unknown): AccountRateLimitWindowResult | null | undefined {

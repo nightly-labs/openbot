@@ -134,12 +134,14 @@ function logProviderStateChanges(
 }
 
 /**
- * True once a window of a kept reading has passed its reset time, so the reading is stale. Only
+ * True once any window of a kept reading has passed its reset time, so the reading is stale. Only
  * then does a usage read start a released provider again. `resetsAt` is in seconds.
  */
 function usageWindowHasReset(limit: AccountUsage["limits"][number]): boolean {
   const now = Date.now() / 1_000;
-  return [limit.primary, limit.secondary].some((window) => window?.resetsAt != null && window.resetsAt <= now);
+  return [limit.primary, limit.secondary, ...(limit.windows ?? [])].some(
+    (window) => window?.resetsAt != null && window.resetsAt <= now,
+  );
 }
 
 export type AgentClientFactory = (
