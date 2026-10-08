@@ -394,7 +394,7 @@ export const messages = {
   "server.update.autoDownloadDescription": "{name} скачивает каждую новую версию OpenBot, как только она выходит.",
   "server.update.autoInstallTitle": "Устанавливать обновления автоматически",
   "server.update.autoInstallDescription":
-    "{name} перезапустится с скачанным обновлением, когда его агенты простаивают. Участники ненадолго отключатся и подключатся снова автоматически.",
+    "{name} перезапустится со скачанным обновлением, когда его агенты простаивают. Участники ненадолго отключатся и подключатся снова автоматически.",
   "server.update.waitingFor": "Ожидание: {reasons}.",
   "server.update.disabledTitle": "Удалённые обновления отключены",
   "server.update.disabledDescription":

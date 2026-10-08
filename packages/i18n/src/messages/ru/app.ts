@@ -11,7 +11,7 @@ export const messages = {
   "app.error.actionFailed": "Не удалось выполнить действие. Повторите попытку.",
   "app.errorStatus.queueLoad": "Не удалось загрузить очередь",
   "app.errorStatus.answer": "Не удалось ответить",
-  "app.errorStatus.approval": "Не удалось подтвердить",
+  "app.errorStatus.approval": "Ошибка подтверждения",
   "app.errorStatus.browserTakeover": "Не удалось перехватить браузер",
   "app.errorStatus.cancel": "Не удалось отменить",
   "app.errorStatus.steer": "Не удалось направить",

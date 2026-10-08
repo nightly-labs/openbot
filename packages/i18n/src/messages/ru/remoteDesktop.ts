@@ -19,7 +19,7 @@ export const messages = {
   "remoteDesktop.openFailed": "Не удалось открыть рабочий стол",
   "remoteDesktop.notSharingTitle": "{name} не показывает свой экран",
   "remoteDesktop.notSharingDescription":
-    "Хост не разрешает OpenBot записывать экран. На этом компьютере откройте «Системные настройки» → «Конфиденциальность и безопасность» → «Запись экрана», включите OpenBot и повторите попытку здесь.",
+    "Хост не разрешает OpenBot записывать экран. На компьютере-хосте откройте «Системные настройки» → «Конфиденциальность и безопасность» → «Запись экрана», включите OpenBot и повторите попытку здесь.",
   "remoteDesktop.setup.check.screenRecording": "Запись экрана",
   "remoteDesktop.setup.check.accessibility": "Универсальный доступ",
   "remoteDesktop.setup.check.service": "Служба Sunshine",
