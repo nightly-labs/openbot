@@ -24,7 +24,7 @@ import {
 import { agentProviderName } from "@openbot/contracts/agent-providers";
 import { type DynamicRecord, isBoolean, isString } from "@openbot/contracts/runtime-values";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
-import { redactText } from "@openbot/logging";
+import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { Deferred, Effect, Exit, Fiber, Scope } from "effect";
 import { acpPlanSteps, PLAN_UPDATED_METHOD } from "./agent/plan-updates";
 import { elicitationOptions, elicitationValue, secretElicitationField } from "./agent/prompts";
@@ -79,6 +79,8 @@ import type {
 import { createDiagnosticStream } from "./stderr-diagnostics";
 import { stopWindowsProcessTree } from "./windows-process-tree";
 import { TimeoutError } from "./with-timeout";
+
+const logger = createOpenBotLogger("provider-runtime");
 
 /**
  * How long model discovery may spend on asking an agent for each model's reasoning efforts. One
@@ -219,6 +221,11 @@ interface AcpModel {
   description: string;
   defaultReasoningEffort: string;
   supportedReasoningEfforts: string[];
+  /**
+   * False when the agent offers no effort setting for the model: `supportedReasoningEfforts` is then
+   * a placeholder, nothing is sent for it, and the agent decides the model's reasoning.
+   */
+  reasoningEffortConfigurable: boolean;
   reasoningEffortWireValues: Map<string, string>;
   usesModelReasoningEffort: boolean | null;
 }
@@ -790,6 +797,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               supportedReasoningEfforts: model.supportedReasoningEfforts.map((reasoningEffort) => ({
                 reasoningEffort,
               })),
+              ...(model.reasoningEffortConfigurable ? {} : { reasoningEffortConfigurable: false }),
             })),
           }),
         );
@@ -1050,7 +1058,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     // where the caller's deadline still holds the cleanup. One agent that never answers then costs
     // its own model's efforts, and not the whole catalog.
     const sweepEnd = Math.min(Date.now() + MODEL_REASONING_PROBE_BUDGET_MS, deadline - MODEL_REASONING_CLEANUP_MS);
+    const startedAt = performance.now();
     const probed: AcpModel[] = [];
+    let answered = 0;
     let selected = option.currentValue;
     for (const model of models) {
       const response = yield* this.#requestBeforeEffect(
@@ -1058,7 +1068,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         Math.min(sweepEnd, Date.now() + MODEL_REASONING_PROBE_TIMEOUT_MS),
         "session/set_config_option",
       );
-      if (response) selected = model.id;
+      if (response) {
+        selected = model.id;
+        answered += 1;
+      }
       probed.push(response ? { ...model, ...reasoningFromConfig(response.configOptions) } : model);
     }
     // Back to the model the session opened on. The session is closed next, but an agent that keeps a
@@ -1076,6 +1089,13 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         "session/set_config_option",
       );
     }
+    logger.info("An agent reported the reasoning efforts of its models.", {
+      provider: this.provider,
+      models: models.length,
+      probed: answered,
+      withoutEffort: probed.filter((model) => !model.reasoningEffortConfigurable).length,
+      durationMs: Math.round(performance.now() - startedAt),
+    });
     return yield* providerSync(() => probed);
   });
 
@@ -2191,6 +2211,12 @@ function modelsFromSessionSetup(response: SessionSetupResponse): AcpModel[] {
       description: model.description ?? "Model discovered from ACP CLI through ACP.",
       defaultReasoningEffort,
       supportedReasoningEfforts,
+      reasoningEffortConfigurable:
+        model.usesModelReasoningEffort === false
+          ? false
+          : model.supportedReasoningEfforts
+            ? true
+            : configReasoning.reasoningEffortConfigurable,
       reasoningEffortWireValues:
         reasoningEffortWireValues && reasoningEffortWireValues.size > 0
           ? reasoningEffortWireValues
@@ -2218,7 +2244,10 @@ function modelsFromConfig(options: SessionConfigOption[]): AcpModel[] {
 
 function reasoningFromConfig(
   options: SessionConfigOption[],
-): Pick<AcpModel, "defaultReasoningEffort" | "supportedReasoningEfforts" | "reasoningEffortWireValues"> {
+): Pick<
+  AcpModel,
+  "defaultReasoningEffort" | "supportedReasoningEfforts" | "reasoningEffortConfigurable" | "reasoningEffortWireValues"
+> {
   const thought = options.find((option) => option.category === "thought_level" && option.type === "select");
   const wireValues = reasoningEffortWireValues(
     thought && thought.type === "select" ? selectValues(thought).map((option) => option.value) : ["medium"],
@@ -2229,6 +2258,9 @@ function reasoningFromConfig(
   return {
     defaultReasoningEffort: supported.includes(currentEffort) ? currentEffort : (supported[0] ?? "medium"),
     supportedReasoningEfforts: supported.length > 0 ? supported : ["medium"],
+    // With no effort option, `medium` only keeps the catalog shape that older clients read. OpenCode
+    // has none for Big Pickle, Kimi or MiMo, and the user reads "Medium" where the agent decides.
+    reasoningEffortConfigurable: thought?.type === "select" && supported.length > 0,
     reasoningEffortWireValues: wireValues.size > 0 ? wireValues : new Map([["medium", "medium"]]),
   };
 }
@@ -2324,6 +2356,9 @@ function normalizeEffort(value: string): string | null {
   const normalized = value.toLowerCase().replaceAll("-", "_");
   if (["low", "medium", "high", "xhigh", "max"].includes(normalized)) return normalized;
   if (["minimal", "none", "off"].includes(normalized)) return "low";
+  // OpenCode offers MiniMax M3 `none` and `thinking` only. Without this the model listed `low`, which
+  // turns thinking off, as its one effort.
+  if (normalized === "thinking") return "high";
   if (["extra_high", "very_high"].includes(normalized)) return "xhigh";
   return null;
 }
