@@ -8,8 +8,9 @@ import { analyticsIO } from "./analytics-effects";
 
 /**
  * One timed operation. The name is a fixed string - an IPC channel, a turn origin, a crash origin, a
- * remote connection phase - and the outcome is a status word. A span holds no payload, message, path, URL or identifier, so the
- * file can go into a diagnostics export under the same promise as the rest of it.
+ * remote connection phase - and the outcome is a status word. A span holds no payload, message, path,
+ * URL or identifier, so the file can go into a diagnostics export under the same promise as the rest of
+ * it.
  */
 export interface TraceSpan {
   kind: "ipc" | "turn" | "crash" | "connect";
