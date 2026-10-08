@@ -111,8 +111,8 @@ export interface TargetChoice {
   /**
    * The driver ids of OpenBot's own windows that the user reads, such as the conversation. They are
    * never the target, but they cover it as any other window does. OpenBot's other windows - the
-   * rim's overlays and the dynamic island - are transparent and let every click through, so they
-   * cover nothing.
+   * rim's overlays and the dynamic island - cannot take focus and are left out, because the rim
+   * overlays cover the whole display and would hide all of the rim.
    */
   ownCoveringWindowIds?: ReadonlySet<number>;
   /** The window the rim is on now, which the choice holds on to while it can. */
