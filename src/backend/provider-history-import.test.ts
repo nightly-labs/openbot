@@ -123,6 +123,7 @@ describe("bounded provider history import", () => {
         publicThreadId: "openbot-thread",
         findDelivery: () => null,
         findMessageDelivery: () => null,
+        quietRoutineDelivery: () => false,
       }),
     );
 
@@ -184,6 +185,7 @@ describe("bounded provider history import", () => {
         publicThreadId: "openbot-thread",
         findDelivery: () => null,
         findMessageDelivery: () => null,
+        quietRoutineDelivery: () => false,
       }),
     );
 
@@ -242,6 +244,7 @@ describe("bounded provider history import", () => {
         publicThreadId: "openbot-thread",
         findDelivery: () => null,
         findMessageDelivery: () => null,
+        quietRoutineDelivery: () => false,
       }),
     );
 
@@ -296,6 +299,7 @@ describe("bounded provider history import", () => {
         publicThreadId: "openbot-thread",
         findDelivery: () => null,
         findMessageDelivery: () => null,
+        quietRoutineDelivery: () => false,
       }),
     );
 
@@ -339,6 +343,7 @@ describe("bounded provider history import", () => {
           publicThreadId: "openbot-thread",
           findDelivery: () => null,
           findMessageDelivery: () => null,
+          quietRoutineDelivery: () => false,
         }),
       ),
     ).rejects.toBeDefined();
@@ -355,6 +360,7 @@ describe("bounded provider history import", () => {
         publicThreadId: "openbot-thread",
         findDelivery: () => null,
         findMessageDelivery: () => null,
+        quietRoutineDelivery: () => false,
       }),
     );
     expect(database.state).toBe("complete");
@@ -391,6 +397,7 @@ describe("bounded provider history import", () => {
       publicThreadId: "openbot-thread",
       findDelivery: () => null,
       findMessageDelivery: () => null,
+      quietRoutineDelivery: () => false,
     };
     await Effect.runPromise(importProviderHistory(input));
     expect(database.state).toBe("complete");
@@ -427,6 +434,7 @@ describe("bounded provider history import", () => {
       publicThreadId: "openbot-thread",
       findDelivery: () => null,
       findMessageDelivery: () => null,
+      quietRoutineDelivery: () => false,
     };
 
     await Effect.runPromise(importProviderHistory(input));
@@ -469,7 +477,7 @@ describe("provider history import of routine runs", () => {
 
   async function importTurn(
     provider: "claude" | "codex",
-    kind: "routine" | "user",
+    kind: "routine" | "test" | "user",
     answers: Array<{ id: string; text: string; phase?: string }>,
   ) {
     const database = new MemoryHistoryDatabase();
@@ -492,8 +500,10 @@ describe("provider history import of routine runs", () => {
       externalSessionId: "external-1",
       agentId: "chief",
       publicThreadId: "openbot-thread",
-      findDelivery: (id: string) => (id === "delivery-1" ? routineDelivery(id, kind) : null),
+      findDelivery: (id: string) =>
+        id === "delivery-1" ? routineDelivery(id, kind === "user" ? "user" : "routine") : null,
       findMessageDelivery: () => null,
+      quietRoutineDelivery: () => kind === "routine",
     };
     await Effect.runPromise(importProviderHistory(input));
     const first = new Map(database.imported);
@@ -524,6 +534,14 @@ describe("provider history import of routine runs", () => {
     expect(texts).toEqual([
       ["user", "Check the alert queue."],
       ["assistant", "Disk full on db-1."],
+    ]);
+  });
+
+  it("imports the marker answer of a Test run, which the chat keeps", async () => {
+    const texts = await importTurn("codex", "test", [{ id: "provider-answer", text: ROUTINE_NO_UPDATE_MARKER }]);
+    expect(texts).toEqual([
+      ["user", "Check the alert queue."],
+      ["assistant", ROUTINE_NO_UPDATE_MARKER],
     ]);
   });
 

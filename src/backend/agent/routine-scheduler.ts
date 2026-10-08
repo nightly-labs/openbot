@@ -143,7 +143,7 @@ export class RoutineScheduler implements RoutineDueSource {
    * quiet, or whose last answer is only the no-update marker, puts it back. Memory only: after a
    * restart, the preview keeps the task. Past the cap, the oldest entry goes.
    */
-  readonly #previewsBeforeRun = new Map<string, RoutinePreviewBeforeRun>();
+  readonly #previewsBeforeRun = new Map<string, RoutinePreviewBeforeRun & { agentId: string }>();
 
   constructor(options: RoutineSchedulerOptions) {
     this.#store = options.store;
@@ -218,13 +218,19 @@ export class RoutineScheduler implements RoutineDueSource {
    * entry goes with the call. Null after a restart, or for a run that saved none.
    */
   takePreviewBeforeRun(deliveryId: string): RoutinePreviewBeforeRun | null {
-    const entry = this.#previewsBeforeRun.get(deliveryId) ?? null;
+    const entry = this.#previewsBeforeRun.get(deliveryId);
     this.#previewsBeforeRun.delete(deliveryId);
-    return entry;
+    return entry ? { previous: entry.previous, shown: entry.shown } : null;
   }
 
-  #rememberPreviewBeforeRun(deliveryId: string, entry: RoutinePreviewBeforeRun): void {
-    this.#previewsBeforeRun.set(deliveryId, entry);
+  #rememberPreviewBeforeRun(deliveryId: string, agentId: string, preview: string, shown: string): void {
+    // A run queued while an earlier run of the agent still shows its task keeps the preview from
+    // before that run, so the last quiet run puts that one back, not the earlier task.
+    let previous = preview;
+    for (const entry of this.#previewsBeforeRun.values()) {
+      if (entry.agentId === agentId && entry.shown === preview) previous = entry.previous;
+    }
+    this.#previewsBeforeRun.set(deliveryId, { agentId, previous, shown });
     if (this.#previewsBeforeRun.size <= PREVIEW_BEFORE_RUN_LIMIT) return;
     const [oldest] = this.#previewsBeforeRun.keys();
     if (oldest !== undefined) this.#previewsBeforeRun.delete(oldest);
@@ -846,10 +852,12 @@ export class RoutineScheduler implements RoutineDueSource {
       // A run that ends quiet, or answers only the no-update marker, puts the earlier preview back.
       const previous = this.#store.list().find((entry) => entry.id === agent.id)?.preview;
       if (previous !== undefined)
-        this.#rememberPreviewBeforeRun(deliveryId, {
+        this.#rememberPreviewBeforeRun(
+          deliveryId,
+          agent.id,
           previous,
-          shown: run.instruction.slice(0, AGENT_PREVIEW_MAX_LENGTH),
-        });
+          run.instruction.slice(0, AGENT_PREVIEW_MAX_LENGTH),
+        );
       yield* this.#store.updatePreview(agent.id, run.instruction).pipe(toRoutineOperationFailed);
       yield* routineStep(() => {
         this.#hooks.emit({ type: "agents-changed", agents: this.#hooks.listAgents() });

@@ -56,6 +56,8 @@ export interface ProviderHistoryImportInput {
   cwd?: string;
   findDelivery(deliveryId: string): DeliveryContext | null;
   findMessageDelivery(messageId: string): DeliveryContext | null;
+  /** Whether this delivery is a scheduled routine run, the only run that can end quiet. */
+  quietRoutineDelivery(deliveryId: string): boolean;
 }
 
 export interface ProviderHistoryImportResult {
@@ -162,7 +164,11 @@ function importCompletedTurn(
   fragment: ProviderHistoryFragment,
 ): Effect.Effect<number, ProviderClientOperationError> {
   return Effect.gen(function* () {
-    const routine = yield* routineTurnAnswers(input, fragment.turnId);
+    // Only a completed turn can end quiet; a failed or interrupted turn keeps its answers.
+    const routine =
+      fragment.status === undefined || fragment.status === "completed"
+        ? yield* routineTurnAnswers(input, fragment.turnId)
+        : "none";
     let importedCount = 0;
     let afterIndex = -1;
     let complete = false;
@@ -249,9 +255,10 @@ function importCompletedTurn(
 }
 
 /**
- * How a turn that a routine run started answered: `quiet` when each answer is only the no-update
- * marker, so the turn completion dropped all of them with the turn's thinking, `answered` for any
- * other routine turn, and `none` for a turn that no routine run started. Decided from the staged
+ * How a turn that a scheduled routine run started answered: `quiet` when each answer is only the
+ * no-update marker, so the turn completion dropped all of them with the turn's thinking, `answered`
+ * for any other such turn, and `none` for a turn that no scheduled routine run started. A Test,
+ * script or webhook run keeps its answers, as the turn completion does. Decided from the staged
  * items alone, one bounded page at a time, so it needs no stored state.
  */
 type RoutineTurnAnswers = "none" | "answered" | "quiet";
@@ -271,7 +278,9 @@ function routineTurnAnswers(
       );
       for (const { item } of page) {
         if (routine === undefined && item.type === "userMessage" && typeof item.clientId === "string")
-          routine = input.findDelivery(item.clientId)?.delivery.sender.kind === "routine";
+          routine =
+            input.findDelivery(item.clientId)?.delivery.sender.kind === "routine" &&
+            input.quietRoutineDelivery(item.clientId);
         if (item.type === "agentMessage" && typeof item.text === "string" && item.text && item.phase !== "commentary") {
           if (isNoUpdateAnswer(item.text)) markers += 1;
           else reported = true;
