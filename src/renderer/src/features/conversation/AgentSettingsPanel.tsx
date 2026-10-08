@@ -27,8 +27,9 @@ interface AgentSettingsPanelProps
     "width" | "onResize" | "onResizeEnd" | "links" | "detailOpen" | "children"
   > {
   remoteClient?: boolean;
-  /** The web client's host calls. A remote client shows only Skills and Tables, and only with these. */
+  /** The web client's host calls for the settings that its server supports. */
   adminCalls?: ConversationRuntime["admin"];
+  onPublish?: () => void;
   onOpenUsage?: (trigger: HTMLButtonElement) => void;
   onWidthChange: (width: number) => void;
   skillSelectionRequest?: { skillId: string } | null;
@@ -213,7 +214,9 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       onResizeEnd={saveSettingsPanelWidth}
       detailOpen={draft.routines.open || draft.files.open}
       links={
-        <Show when={!props.remoteClient || skillsMode() !== "hidden" || props.tablesVisible !== false}>
+        <Show
+          when={!props.remoteClient || skillsMode() !== "hidden" || props.tablesVisible !== false || props.onPublish}
+        >
           <SettingsLinkGroup>
             <Show when={!props.remoteClient && props.onOpenUsage}>
               <SettingsLinkRow
@@ -275,6 +278,9 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   })
                 }
               />
+            </Show>
+            <Show when={props.onPublish}>
+              <SettingsLinkRow label={t("conversation.header.publish")} onClick={() => props.onPublish?.()} />
             </Show>
           </SettingsLinkGroup>
         </Show>

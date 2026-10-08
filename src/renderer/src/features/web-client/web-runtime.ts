@@ -60,6 +60,7 @@ import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
   decodeBrowserViewInputValue,
+  TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY,
   TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
@@ -468,6 +469,7 @@ export function createWebWorkspaceRuntime(
     (data) => peer.sendHostStreamData(data),
     request,
     () => capabilities.includes(TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY),
+    () => capabilities.includes(TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY),
   );
   let liveView: RemoteBrowserView | null = null;
   let liveViewGeneration = 0;
@@ -498,6 +500,7 @@ export function createWebWorkspaceRuntime(
             (frame) => emitView({ type: "frame", tabId, ...frame }),
             (reason) =>
               emitView({ type: "stopped", tabId, reason: reason || currentText().t("webClient.error.viewEnded") }),
+            (copied) => emitView({ ...copied, tabId }),
           ),
         );
         if (currentGeneration !== liveViewGeneration) {
