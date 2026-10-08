@@ -5,5 +5,5 @@ export const unstable_settings = { initialRouteName: "index" };
 
 export default function AddAgentLayout() {
   const { t } = useText();
-  return <SheetPageStack title={t("mobile.app.route.createAgent")} />;
+  return <SheetPageStack title={t("mobile.app.route.createAgent")} clearHeader />;
 }
