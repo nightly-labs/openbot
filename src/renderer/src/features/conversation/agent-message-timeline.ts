@@ -62,7 +62,8 @@ function groupableMarker(message: AgentMessage): AgentMessageMarkerModel | null 
   return message.actionMarker;
 }
 
-function startsDay(previous: AgentMessage, current: AgentMessage): boolean {
+/** Whether a message falls on a new day after the previous one, so a day separator comes between them. */
+export function startsDay(previous: AgentMessage, current: AgentMessage): boolean {
   return current.createdAt !== undefined && dayMarkerLabel(previous.createdAt, current.createdAt) !== null;
 }
 

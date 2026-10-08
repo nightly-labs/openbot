@@ -1,5 +1,5 @@
 import type { AgentMessage, RoutineRunMarkerModel, RoutineRunMarkerTransition } from "@openbot/ui/data";
-import { dayMarkerLabel } from "@openbot/ui/features/conversation/chat-day-markers";
+import { startsDay } from "./agent-message-timeline";
 
 type RoutineRunMarker = RoutineRunMarkerModel;
 
@@ -118,8 +118,4 @@ export function groupRoutineRunMarkers(
 function completedRunMarker(message: AgentMessage): RoutineRunMarker | null {
   const marker = routineRunMarker(message);
   return marker?.status === "succeeded" ? marker : null;
-}
-
-function startsDay(previous: AgentMessage, current: AgentMessage): boolean {
-  return current.createdAt !== undefined && dayMarkerLabel(previous.createdAt, current.createdAt) !== null;
 }
