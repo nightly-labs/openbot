@@ -27,6 +27,8 @@ export function UiFormBlock(props: UiBlockProps<UiFormSpec>) {
     Object.fromEntries(props.spec.fields.map((field) => [field.id, field.value ?? ""])),
   );
   const [failed, setFailed] = createSignal<ReadonlySet<string>>(new Set());
+  // The answer did not pass the block's checks, such as a date that is not a real date.
+  const [rejected, setRejected] = createSignal(false);
 
   // A frozen block shows the stored answer; an open one shows what the person has typed.
   const currentValue = (field: UiFormField): string => {
@@ -37,6 +39,7 @@ export function UiFormBlock(props: UiBlockProps<UiFormSpec>) {
 
   function setValue(field: UiFormField, value: string): void {
     setDraft((current) => ({ ...current, [field.id]: value }));
+    setRejected(false);
     if (failed().has(field.id) && value.trim() !== "") {
       setFailed((current) => new Set([...current].filter((id) => id !== field.id)));
     }
@@ -52,7 +55,7 @@ export function UiFormBlock(props: UiBlockProps<UiFormSpec>) {
       const value = currentValue(field);
       if (value.trim() !== "") values[field.id] = field.kind === "date" ? value.trim() : value;
     }
-    sendUiBlockResponse(props.spec, { actionId: UI_BLOCK_SUBMIT_ACTION_ID, values }, props.onRespond);
+    setRejected(!sendUiBlockResponse(props.spec, { actionId: UI_BLOCK_SUBMIT_ACTION_ID, values }, props.onRespond));
   }
 
   return (
@@ -62,7 +65,7 @@ export function UiFormBlock(props: UiBlockProps<UiFormSpec>) {
       status={state().status}
       outcome={state().outcome}
       busy={props.busy}
-      error={props.error}
+      error={rejected() ? t("uiBlock.form.invalid") : props.error}
       onSkip={props.disabled ? undefined : props.onSkip}
       elementRef={props.elementRef}
     >

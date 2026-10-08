@@ -23,6 +23,7 @@ export const messages = defineMessages("uiBlock", {
   "uiBlock.form.required": "This field is required",
   "uiBlock.form.choose": "Choose an option",
   "uiBlock.form.notSet": "Not set",
+  "uiBlock.form.invalid": "Some answers are not correct. Check them and try again.",
   "uiBlock.skip": "Skip",
   "uiBlock.error.answerFailed": "Could not send your answer. Try again.",
 });
