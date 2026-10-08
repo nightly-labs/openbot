@@ -23,6 +23,8 @@ export type AgentProviderState =
   | "error";
 
 export interface AgentProviderStatus {
+  /** Local switch only. Released Team API adapters omit it. */
+  off?: boolean;
   /**
    * One of `AgentProviderId`, but treated as an open string at the trust boundary for the same
    * reason as `state`. Consumers look this up in a map or compare it, so one they do not know
@@ -68,6 +70,7 @@ function isAgentProviderStatus(value: unknown): value is AgentProviderStatus {
     (value.connectionState === undefined || isBoundedString(value.connectionState, INPUT_LIMITS.identifier)) &&
     (value.checkError === undefined || isNullableBoundedString(value.checkError, INPUT_LIMITS.messageText)) &&
     (value.cliSource === undefined || isBoundedString(value.cliSource, INPUT_LIMITS.identifier)) &&
+    (value.off === undefined || typeof value.off === "boolean") &&
     (value.restartPending === undefined || typeof value.restartPending === "boolean") &&
     (value.lastError === undefined || isNullableBoundedString(value.lastError, INPUT_LIMITS.messageText)) &&
     (value.lastErrorAt === undefined || isFiniteNumber(value.lastErrorAt))

@@ -57,6 +57,8 @@ export interface SettingsModalProps {
   hostedServersApi?: HostedServersDesktopApi;
   /** Opens the add server dialog from the Hosted servers tab. */
   onAddHostedServer?: () => void;
+  /** A hosted server that the server menu asked to delete. Each nonce opens its confirmation once. */
+  hostedServerDeleteRequest?: { serverId: string; nonce: number } | null;
   /** The agents granted a standing approval, so the user can see and undo each one. */
   turboModePending?: boolean;
   onTestNotification?: () => void | Promise<void>;
@@ -91,6 +93,15 @@ export function SettingsModal(props: SettingsModalProps) {
     () => props.open && activeTab() === "billing",
   );
   const hostedServers = createSettingsHostedServersStore(props, () => activeTab() === "billing");
+  let handledHostedServerDeleteNonce = 0;
+  createEffect(
+    () => (props.open ? props.hostedServerDeleteRequest : null),
+    (request) => {
+      if (!request || request.nonce === handledHostedServerDeleteNonce) return;
+      handledHostedServerDeleteNonce = request.nonce;
+      hostedServers.requestDeleteById(request.serverId);
+    },
+  );
 
   // The Dynamic Island exists only on macOS, so other platforms get no tab for it.
   const isMac = () => props.appInfo?.platform === "darwin";

@@ -260,21 +260,19 @@ servers, their webhooks and the cron continue.
    `small` $0.018, `default` $0.036 and `large` $0.072 each hour (see
    [boat pricing](https://docs.boat.dev/pricing)). `GET /limits` shows the balance in `default`
    seconds.
-2. **Template.** Build it from the release AppImage with the production account service:
-   `bun run hosting:template --version=<v> --appimage-url=<release AppImage URL>
-   --appimage-sha256=<hex> --auth-api-url=https://api.openbot.run`. A server updates itself to
-   each new release ([Updates](#updates)), so a new template only makes the first start of a new
-   server faster.
+2. **Template.** Configure the [hosted release job](RELEASING.md#hosted-server-snapshots).
+   Each stable desktop release builds and selects a production snapshot. Existing servers keep
+   their data and use their own [update process](#updates).
 3. **Webhooks and secrets.** Put the live Stripe key and the Worker boat key in the shell, so they
    are not in the history, and run the setup with `gh` signed in:
 
    ```sh
    read -rs STRIPE_SECRET_KEY && read -rs BOAT_API_KEY && export STRIPE_SECRET_KEY BOAT_API_KEY
-   bun run hosting:setup --target=production --template=<snapshot from step 2>
+   bun run hosting:setup --target=production
    ```
 
    It makes the six Prices, the Customer Portal settings, the Stripe webhook endpoint and the boat
-   webhook. It writes the two keys, the two webhook signing secrets and the template to the `cloudflare-production` GitHub Environment. Run it again at any time: it keeps
+   webhook. It writes the two keys and the two webhook signing secrets to the `cloudflare-production` GitHub Environment. Run it again at any time: it keeps
    a secret that the Environment has. `--replace-webhooks` makes new signing secrets.
 4. **Stripe Dashboard.** In live mode, in the failed-payment settings for subscriptions (Revenue
    recovery → Retries), set "If all retries for a payment fail" to cancel the subscription or to
@@ -291,7 +289,9 @@ servers, their webhooks and the cron continue.
    | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | secrets, a pair | Step 3 writes them |
    | `BOAT_API_KEY`, `BOAT_WEBHOOK_SECRET` | secrets, a pair | Step 3 writes them |
    | `OPENPANEL_CLIENT_ID`, `OPENPANEL_CLIENT_SECRET` | secrets, a pair | The client from step 5 |
-   | `HOSTED_SERVER_TEMPLATE` | variable | Step 3 (`--template`) writes the snapshot name from step 2 |
+
+   The release job sets `HOSTED_SERVER_TEMPLATE` directly on the production Worker. Normal
+   deployments preserve it. A GitHub variable with that name is no longer used.
 
    The CI deploy is the production path: `.env.production` does not have all the values that it
    needs, such as `SITE_REPORT_HASH_SECRET`. `bun run api:deploy` sends the same names from
@@ -304,7 +304,8 @@ use, and the checks that repair a missed webhook run at most 5 minutes late.
 
 ## Build the server template
 
-The template is a boat named snapshot. Build one from a release; each server then updates itself:
+The template is a boat named snapshot. The desktop release workflow builds and selects production
+snapshots automatically. For a separate test template, build one from a release:
 
 ```sh
 BOAT_TEMPLATE_API_KEY=... bun run hosting:template --version=0.9.0 \
@@ -321,11 +322,19 @@ named snapshot access. The script:
    libraries), checks the AppImage SHA-256, unpacks the AppImage to `/opt/OpenBot/app`, adds an
    AppArmor profile that lets Chromium make user namespaces, and enables `openbot.service` and the
    [update](#updates) units;
-3. checks that OpenBot did not start and that no profile or claim exists;
-4. saves the builder as `openbot-server-<version>` and deletes the builder.
+3. checks the installed version, that OpenBot did not start, and that no profile or claim exists;
+4. saves the builder as `openbot-server-<version>` (or `--name=<snapshot>`) and deletes the builder.
 
-The builder never starts OpenBot, so the template has no host identity and no session. boat keeps
-at most 10 named snapshots for each account.
+The builder never starts OpenBot, so the template has no host identity and no session. A retry
+reuses a ready snapshot with the same name or waits for a save in progress. It refuses a failed
+snapshot and never replaces an existing name. Automatic production releases reserve the prefix
+`openbot-server-production-` to avoid test snapshots in the same account. Keep each name tied to
+one release and account-service origin; do not use that production prefix for manual test builds.
+
+The builder stops before creating an eleventh snapshot. This is our automation limit:
+[boat permits additional paid snapshots](https://docs.boat.dev/api/reference/snapshots/list-named-snapshots).
+No snapshot is deleted automatically. Before removing one, check both Workers and pending server
+creation records (`provider_template`); a pending retry still needs its original snapshot.
 
 ### Updates
 

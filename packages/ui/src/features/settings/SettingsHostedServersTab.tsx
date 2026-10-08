@@ -189,7 +189,9 @@ export function SettingsHostedServersTab(props: SettingsHostedServersTabProps) {
       </Show>
 
       <ConfirmDialog
-        open={state().pendingDelete !== null}
+        open={
+          state().pendingDelete !== null && !props.excludedServerIds?.includes(state().pendingDelete?.serverId ?? "")
+        }
         title={t("settings.hostedServers.deleteTitle", { name: state().pendingDelete?.name ?? "" })}
         description={t("settings.hostedServers.deleteDescription")}
         confirmLabel={t("common.delete")}

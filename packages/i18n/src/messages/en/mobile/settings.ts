@@ -15,8 +15,6 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.about.privacy": "Privacy policy",
   "mobile.settings.home.profile": "Profile",
   "mobile.settings.home.preferences": "Preferences",
-  "mobile.settings.home.generalHint": "Appearance and conversations",
-  "mobile.settings.home.general": "General",
   "mobile.settings.home.about": "About OpenBot",
   "mobile.settings.home.support": "Support",
   "mobile.settings.home.supportHint": "Get help and save a support log",
@@ -66,7 +64,22 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.appearance.agentColorMessages": "Agent color on my messages",
   "mobile.settings.appearance.agentColorMessagesFooter":
     "Your messages in an agent chat use that agent’s color. Turn off if the text is hard to read.",
-  "mobile.settings.feedback.title": "Feedback",
+  "mobile.settings.animations.title": "Animations",
+  "mobile.settings.animations.footer":
+    "Turn off Animations to reduce motion in the whole app. When Reduce Motion is on in your phone settings, the app also reduces motion. The animations below then stay off.",
+  "mobile.settings.animations.all": "Animations",
+  "mobile.settings.animations.chatZoom": "Zoom into chats",
+  "mobile.settings.animations.chatZoomFooter":
+    "A chat opens out of its avatar in the list and closes back into it. When this is off, a chat slides in from the side.",
+  "mobile.settings.animations.agentFaces": "Animated agent faces",
+  "mobile.settings.animations.agentFacesFooter":
+    "Agent avatars move their faces while the agents work and rest. When this is off, the faces stay still.",
+  "mobile.settings.animations.composerResize": "Compact message field",
+  "mobile.settings.animations.composerResizeFooter":
+    "The message field becomes a small bar while the keyboard is closed. When this is off, the field stays full size.",
+  "mobile.settings.animations.textReveal": "Animate replies",
+  "mobile.settings.animations.textRevealFooter":
+    "A reply types out word by word, and its bubble grows smoothly. When this is off, the text shows as it arrives.",
   "mobile.settings.feedback.footer": "Touch feedback for actions in the app on this device.",
   "mobile.settings.feedback.haptics": "Haptics",
   "mobile.settings.feedback.retry": "Retry saving haptics setting",

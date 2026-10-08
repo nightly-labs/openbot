@@ -10,7 +10,6 @@ export const messages = {
   "mobile.app.route.newSection": "Yeni bölüm",
   "mobile.app.route.settings": "Ayarlar",
   "mobile.app.route.profile": "Profil",
-  "mobile.app.route.general": "Genel",
   "mobile.app.route.accountSessions": "Hesap oturumları",
   "mobile.app.route.about": "Hakkında",
   "mobile.app.route.support": "Destek",

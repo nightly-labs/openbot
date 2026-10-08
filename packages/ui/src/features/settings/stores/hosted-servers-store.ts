@@ -62,6 +62,8 @@ export function createSettingsHostedServersStore(props: HostedServersStoreProps,
   let loadRevision = 0;
   /** A read can take longer than the poll interval. A poll or focus read then skips, so reads do not overlap. */
   let reloading = false;
+  /** The server that the server menu asked to delete. The next list read opens its confirmation. */
+  let deleteRequestId: string | null = null;
 
   async function load(): Promise<void> {
     const api = props.hostedServersApi;
@@ -77,8 +79,14 @@ export function createSettingsHostedServersStore(props: HostedServersStoreProps,
         state.loaded = true;
         state.error = null;
       });
+      const requested = deleteRequestId;
+      deleteRequestId = null;
+      const server = requested ? list.servers.find((entry) => entry.serverId === requested) : undefined;
+      if (server) requestDelete(server);
     } catch (error) {
       if (revision !== loadRevision) return;
+      // A failed read ends the request: a later read must not open the confirmation by itself.
+      deleteRequestId = null;
       setPanel((state) => {
         const text = currentText();
         state.error = text.errorMessage(error, text.t("settings.hostedServers.loadFailed"));
@@ -90,6 +98,8 @@ export function createSettingsHostedServersStore(props: HostedServersStoreProps,
     () => props.open && Boolean(props.hostedServersApi),
     (shouldLoad) => {
       if (shouldLoad) void untrack(load);
+      // A closed panel ends the request, so the next open does not show the confirmation.
+      else deleteRequestId = null;
     },
   );
 
@@ -188,6 +198,15 @@ export function createSettingsHostedServersStore(props: HostedServersStoreProps,
     });
   }
 
+  /**
+   * Opens the confirmation for a server that the server menu names by id. The dialog opens with the
+   * list, so it reads the list first; a server that is not in the list opens nothing.
+   */
+  function requestDeleteById(serverId: string): void {
+    deleteRequestId = serverId;
+    void load();
+  }
+
   function setDeleteConfirmName(value: string): void {
     setPanel((state) => {
       state.deleteConfirmName = value;
@@ -256,6 +275,7 @@ export function createSettingsHostedServersStore(props: HostedServersStoreProps,
     wake,
     openCheckout,
     requestDelete,
+    requestDeleteById,
     setDeleteConfirmName,
     cancelDelete,
     confirmDelete,

@@ -1,6 +1,6 @@
 import { BILLING_PLANS, type BillingServerPlan } from "@openbot/contracts/billing";
 import type { HostedServerSummary } from "@openbot/contracts/hosted-servers";
-import { createStore } from "solid-js";
+import { createEffect, createStore } from "solid-js";
 import { useText } from "../../text";
 import type { SettingsHostedServersStore } from "../settings/stores/hosted-servers-store";
 import { BillingServerLifecycle, type BillingServerLifecycleAction } from "./BillingServerLifecycle";
@@ -21,6 +21,19 @@ export function BillingManagedServer(props: {
     pending: boolean;
     error: string | null;
   }>({ action: null, timing: "period-end", name: "", pending: false, error: null });
+  createEffect(
+    () => props.hosting.state.pendingDelete?.serverId === props.server.serverId,
+    (requested) => {
+      if (!requested) return;
+      props.hosting.cancelDelete();
+      setDialog((draft) => {
+        draft.action = "delete";
+        draft.name = "";
+        draft.error = null;
+        draft.timing = "period-end";
+      });
+    },
+  );
   async function confirm() {
     const action = dialog.action;
     if (!action || dialog.pending) return;

@@ -467,6 +467,7 @@ export const IPC_ENDPOINTS = {
     exportDiagnostics: request<undefined, ExportResult>()("maintenance:export-diagnostics"),
   },
   providers: {
+    setProviderOn: request<{ provider: AgentProviderId; on: boolean }, AgentStatus>()("app:set-provider-on"),
     connectProvider: request<AgentProviderId, AgentStatus>()("app:connect-provider"),
     refreshAgentProviders: request<undefined, AgentStatus>()("app:refresh-agent-providers"),
     /**

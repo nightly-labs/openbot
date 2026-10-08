@@ -149,6 +149,7 @@
     "./features/servers/add-server-dialog.css": "./src/features/servers/add-server-dialog.css",
     "./features/servers/JoinServerDialog": "./src/features/servers/JoinServerDialog.tsx",
     "./features/servers/join-server-dialog.css": "./src/features/servers/join-server-dialog.css",
+    "./features/servers/LeaveServerDialog": "./src/features/servers/LeaveServerDialog.tsx",
     "./features/servers/ServerLogo": "./src/features/servers/ServerLogo.tsx",
     "./features/servers/ServerActionItems": "./src/features/servers/ServerActionItems.tsx",
     "./features/servers/ServerMenu": "./src/features/servers/ServerMenu.tsx",

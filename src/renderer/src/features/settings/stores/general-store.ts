@@ -69,7 +69,7 @@ export function createSettingsGeneralStore(props: GeneralStoreProps) {
         diagnostics: agent ? providerDiagnosticsText(agent) : undefined,
         availableVersion: props.providerAvailableVersions?.[provider] ?? null,
         keyStatus: provider === "opencode" ? props.openCodeKeyStatus?.() : undefined,
-        off: props.offProviders?.includes(provider),
+        off: agent?.off ?? props.offProviders?.includes(provider),
         usedBy: props.providerUsers?.[provider],
         /*
          * A CLI the user installed themselves is the one the provider runs, whatever the managed
