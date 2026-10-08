@@ -15,6 +15,7 @@ import {
   type TeamProtocolV2AuthFrame,
   teamProtocolV2AuthenticationTranscript,
 } from "@openbot/contracts/team-protocol/v2";
+import { sourceText } from "@openbot/i18n/source";
 import { describe, expect, it, vi } from "vitest";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { RemoteConnectTrace } from "./remote-connect-trace";
@@ -645,6 +646,53 @@ describe("TeamWebRtcClientTransport", () => {
   // that is not a response at all: the host is talking a protocol this build cannot read. It has to
   // carry the same code, because an ordinary request error leaves the caller reconnecting to a host
   // that will answer the next request with the same nonsense.
+  it("connects again and sends a request once more when the bridge finds the channel closed", async () => {
+    const bridge = new TeamWebRtcBridge();
+    const connect = vi.spyOn(bridge, "connect").mockImplementation(({ peerId }) =>
+      remoteCall(async () => {
+        queueMicrotask(() => bridge.emit("connected", peerId, channelBinding));
+      }),
+    );
+    vi.spyOn(bridge, "disconnect").mockReturnValue(Effect.void);
+    const authentication = mockAuthenticatedSend(bridge);
+    const authenticatedSend = authentication.send.getMockImplementation();
+    let refusals = 0;
+    authentication.send.mockImplementation((hostId, channel, data) =>
+      sentRequestId({ mock: { calls: [[hostId, channel, data]] } }) && refusals++ === 0
+        ? remoteCall(async () => {
+            throw new Error(sourceText("error.remote.channelNotOpen"));
+          })
+        : (authenticatedSend?.(hostId, channel, data) ?? Effect.void),
+    );
+    const transport = createTransport(bridge);
+    transport.pinHostKey("host-1", hostKeys.publicKey);
+    try {
+      await runCauseEffect(transport.connect("host-1"));
+      const pending = runCauseEffect(
+        transport.request("host-1", "/v1/agents/research/interrupt", {
+          method: "POST",
+          body: { turnId: "turn-1" },
+        }),
+      );
+      await vi.waitFor(() => expect(refusals).toBe(2));
+      expect(connect).toHaveBeenCalledTimes(2);
+      bridge.emit(
+        "data",
+        "host-1",
+        "rpc",
+        JSON.stringify({
+          version: 2,
+          type: "response",
+          requestId: sentRequestId(authentication.send),
+          result: { status: 204, body: null },
+        }),
+      );
+      await expect(pending).resolves.toBeUndefined();
+    } finally {
+      await runCauseEffect(transport.stop());
+    }
+  });
+
   it("reports an undecodable response body as a protocol failure", async () => {
     const bridge = new TeamWebRtcBridge();
     vi.spyOn(bridge, "connect").mockImplementation(({ peerId }) =>

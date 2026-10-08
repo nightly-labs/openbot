@@ -488,7 +488,7 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
   if (message.type === "offer") {
     const connection = state.peerConnection ?? createPeerConnection(state, state.iceServers);
     if (restartsIce(connection, message.sdp) && ++state.iceRestarts > maximumIceRestarts) {
-      dropRestartedConnection(state);
+      dropConnection(state);
       return;
     }
     await connection.setRemoteDescription({ type: "offer", sdp: message.sdp });
@@ -609,6 +609,13 @@ function bindDataChannel(
       code: "data_channel_error",
       message: sourceText("error.remote.dataChannelFailed", { kind }),
     });
+  // The host can close the connection while this computer sleeps. The path can still read
+  // `connected` and Signal does not tell this end, but the channels close. Without this, main reads
+  // the host as connected and each request fails on a closed channel.
+  channel.onclose = () => {
+    if (state.closed || state.role !== "client" || state.channels[kind] !== channel) return;
+    dropConnection(state);
+  };
 }
 
 function descriptionFingerprint(description: RTCSessionDescription | null): string {
@@ -655,7 +662,7 @@ function waitForWritableChannel(channel: RTCDataChannel): Promise<void> {
 async function restartIce(state: PeerState): Promise<void> {
   const connection = state.peerConnection;
   if (!connection || !state.connectionId || state.role !== "client") return;
-  if (++state.iceRestarts > maximumIceRestarts) return dropRestartedConnection(state);
+  if (++state.iceRestarts > maximumIceRestarts) return dropConnection(state);
   connection.restartIce();
   const offer = await connection.createOffer({ iceRestart: true });
   await connection.setLocalDescription(offer);
@@ -701,10 +708,10 @@ function iceUfrag(sdp: string): string | undefined {
 }
 
 /**
- * Closes a connection that has used up its ICE restarts. Signal tells the other end, which closes
- * its own connection, and the client connects again with a new one.
+ * Closes a connection that has used up its ICE restarts or lost a data channel. Signal tells the
+ * other end, which closes its own connection, and the client connects again with a new one.
  */
-function dropRestartedConnection(state: PeerState): void {
+function dropConnection(state: PeerState): void {
   if (state.signalHost) {
     disconnect(state.id);
     return;
