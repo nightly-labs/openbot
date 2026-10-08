@@ -21,9 +21,9 @@ interface SettingsNotificationsTabProps {
   onUpdateSetting: <Key extends keyof GeneralSettingsValue>(key: Key, value: GeneralSettingsValue[Key]) => void;
   onUpdateSettings: (patch: Partial<GeneralSettingsValue>) => void;
   /** Shows one desktop notification now. Absent where there is no operating system to show it. */
-  onTestNotification?: () => void | Promise<void>;
+  onTestNotification?: (() => void | Promise<void>) | undefined;
   /** Opens the operating system notification settings. Absent where the system has no such page. */
-  onOpenNotificationSettings?: () => void | Promise<void>;
+  onOpenNotificationSettings?: (() => void | Promise<void>) | undefined;
 }
 
 export function SettingsNotificationsTab(props: SettingsNotificationsTabProps) {
