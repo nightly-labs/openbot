@@ -1939,7 +1939,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     inputPath: string,
   ) {
     const agent = yield* lifecycleStep("find workspace agent", () => this.#agentForFile(agentId));
-    return yield* resolveWorkspaceFile(agent, inputPath, { allowOutside: !workspaceAccessEnforced(agent) }).pipe(
+    return yield* resolveWorkspaceFile(agent, inputPath, {
+      allowOutside: !workspaceAccessEnforced(agent),
+      fileHistory: this.#turn.fileHistory.paths(agent.id, agent.threadId),
+    }).pipe(
       Effect.mapError(
         (failure) => new AgentLifecycleFailed({ operation: "resolve local workspace file", cause: failure.cause }),
       ),

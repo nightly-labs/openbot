@@ -45,7 +45,7 @@ describe("mobile agent mentions", () => {
   it("recognizes mentions in prose without changing code", () => {
     const tokens = parseChatMarkdown(`${git}\n\n\`${git}\`\n\n\`\`\`js\n${git}\n\`\`\``);
     const types: string[] = [];
-    markdown.walkTokens(tokens, (token) => {
+    void markdown.walkTokens(tokens, (token) => {
       types.push(token.type);
     });
     expect(types.filter((type) => ["agentMention", "codespan", "code"].includes(type))).toEqual([

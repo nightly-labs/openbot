@@ -236,7 +236,8 @@ stores nothing. When boat stops the sandbox, boat keeps a snapshot of its disk u
 the server starts again. Deleting the server
 deletes the sandbox. A hosted server updates itself: it downloads the newest release from GitHub
 Releases, as an installed build does, installs the Ubuntu packages that the release needs from the
-Ubuntu package servers, and starts it at its next start.
+Ubuntu package servers, and starts it at its next start, or when a member with update access installs
+it from Server Settings.
 
 For each hosted server, the account service stores the owner, name, size and the size of a pending
 plan change, the plan, billing interval and currency, the open Stripe Checkout session ID, desired

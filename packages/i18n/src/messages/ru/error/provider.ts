@@ -241,4 +241,10 @@ export const messages = {
   "error.provider.customAgentNotSaved": "Этот свой агент не сохранён. Обновите список и повторите попытку.",
   "error.provider.customAgentTooMany": "Можно сохранить не более {count} своих агентов.",
   "error.provider.customAgentEnvValueMissing": "Введите значение для {name}.",
+  "error.provider.off": "{provider} выключен в OpenBot. Сначала включите его в настройках провайдеров.",
+  "error.provider.inUse": "{provider} использует агент. Смените его модель, прежде чем выключать этого провайдера.",
+  "error.provider.useBusy": "Дождитесь окончания проверки провайдера или входа и попробуйте ещё раз.",
+  "error.provider.useSettingsReadOnly":
+    "Не удаётся прочитать сохранённые настройки провайдеров. Обновите OpenBot, прежде чем их менять.",
+  "error.provider.useChangeFailed": "OpenBot не удалось изменить настройку провайдера.",
 } as const satisfies PartialTranslation<typeof source>;

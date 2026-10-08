@@ -2,8 +2,8 @@ import { isDynamicRecord } from "../runtime-values";
 import type { TeamProtocolV6BaseJsonValue } from "./v6-base";
 
 /**
- * `quiet` rides beside the frozen `turn-completed` projection, in the way `plan`, `senderMember` and
- * `uiBlock` ride beside the frozen conversation projection: the shipped key list drops it, so a client
+ * `quiet` rides beside the frozen `turn-completed` projection, in the way `plan` and `senderMember`
+ * ride beside the frozen conversation projection: the shipped key list drops it, so a client
  * on protocol 1-5, or a v6 client that predates it, reads a completed turn as before and can show a
  * notification for it. Only the current v6 adapter carries the flag, so no protocol bump and no
  * capability are needed: a peer that does not know it loses only the silence.

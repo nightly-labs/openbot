@@ -338,11 +338,25 @@ creation records (`provider_template`); a pending retry still needs its original
 
 ### Updates
 
-Server Settings > Updates can check the compatible release without installing it. The host must
-support `host-release-v1`. The panel shows the installed version, the latest release after a
-check, and the host-managed update path. It does not offer app self-update controls for the
-extracted AppImage. Older hosts need an administrator to update them before they can provide
-this release check.
+Server Settings > Updates has the same controls as on a computer that updates itself: download,
+**Update when idle**, **Restart now**, automatic updates, and the switch that lets members update.
+OpenBot runs as the service user from a release that root owns, so it asks root to do the work
+(`src/main/hosted-update-adapter.ts`). It makes an empty file in its runtime directory:
+`/run/openbot/update-stage` to download, and `/run/openbot/update-install` to install.
+`openbot-update-request.path` then starts `openbot-update-request.service`, which runs
+`openbot-hosted-update request` as root. That removes the file without reading it and runs `stage`.
+For an install, it then stops OpenBot, runs `apply` and starts OpenBot again, also after a failure.
+A request that comes during a timer download waits for it while OpenBot runs. While a request runs,
+root writes the step to `/run/openbot-update.state` and changes its time every 5 seconds. OpenBot
+reads each change as download progress, so the download deadline finds a request that root never
+takes or that stops.
+
+The release that an older script moves into place has these units, but that script installs only
+the units it knows. So `openbot.service` runs `openbot-hosted-update trigger` as root before OpenBot
+starts; it installs and starts the request units when they are missing. OpenBot offers the controls
+only when `/etc/systemd/system/openbot-update-request.path` is there at its start. Otherwise, and on
+hosts older than this release, the panel checks the release (`host-release-v1`) and shows the
+host-managed update path. A container has no request units.
 
 The Linux build contains `scripts/hosting/` (without the TypeScript files) in `resources/hosting`.
 On a server, root runs `openbot-hosted-update`:
@@ -556,3 +570,17 @@ These were not tested on boat. Test them before a user gets access:
   idle provider threads on a server with a signed-in account;
 - whether boat stops a sandbox that runs for weeks. The Worker restarts it, but work in progress
   at that time stops.
+
+
+### Billing and server deletion
+
+Billing lists each paid server separately. Cancel renewal stops the next payment; the
+server stops when its plan ends and keeps its data. Keep server resumes renewal before
+the plan ends and removes any scheduled deletion.
+
+Delete server requires the server name. The owner can delete immediately with no refund
+for unused time, or schedule deletion for the paid-through date. The account Worker stores
+the date and subscription ID. The cron deletes on its next pass after that date only after
+Stripe confirms the subscription has ended and no newer or open plan exists. Failed
+provider deletion is retried through the existing deletion queue. Keep server and deletion
+use the same per-server operation lease.
