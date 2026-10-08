@@ -20,8 +20,56 @@ off, or connected (with the tailnet and the device name). While the host is publ
 is on, the section shows the direct address, for example `https://studio-mac.tail4b2c1.ts.net`.
 
 On Linux, `tailscale serve` needs operator rights for the user that runs OpenBot:
-`sudo tailscale set --operator=$USER`. If the command is refused, the section shows the first line
-of its error.
+`sudo tailscale set --operator=$USER`. On a self-hosted server, `sudo openbot tailscale setup` does
+this. If the command is refused, the section shows the first line of its error.
+
+## Set it up from your client (owner)
+
+A self-hosted server has no window. Its owner sets up Tailscale from OpenBot on another computer,
+for example a Mac: **Server settings > General > Tailscale** of the server shows five steps. Each step
+checks itself again every few seconds, and **Check again** checks at once. Only the owner of the
+server sees the steps. An admin or a member does not.
+
+1. **Tailscale on this computer.** Install Tailscale on the computer that runs OpenBot now and sign
+   in. **Get Tailscale** opens the download page, or the Tailscale app when it is installed.
+2. **Tailscale on the server.**
+   - A self-hosted Linux server: run the command that the step shows in a terminal on the server,
+     `sudo openbot tailscale setup`. It installs Tailscale with the official script
+     (`https://tailscale.com/install.sh`), makes the OpenBot service user the Tailscale operator, and
+     prints a sign-in link. Open the link on any computer and approve the server in your tailnet.
+     You can also press **Sign in** in the step: the server starts Tailscale and OpenBot opens its
+     sign-in page in your browser.
+   - A server in WSL: install the Tailscale app for Windows (**Get Tailscale for Windows**) and sign
+     in. When WSL does not use mirrored networking, the step shows the line to add to
+     `%UserProfile%\.wslconfig` under `[wsl2]`: `networkingMode=mirrored`. Then run `wsl --shutdown`.
+   - Another server, such as a Mac: install Tailscale on that computer and sign in.
+3. **Same tailnet.** The step compares the tailnet of this computer with the tailnet of the server.
+   When they differ, sign in on this computer with the account of the server, or press **Share this
+   server**: it opens the machines page of the Tailscale admin console, where you share the server
+   device with your tailnet. A shared device also completes the step.
+4. **HTTPS certificates.** **Turn on** opens the DNS page of the Tailscale admin console
+   (`https://login.tailscale.com/admin/dns`). Turn on MagicDNS and HTTPS certificates there.
+5. **Direct connection.** Turn on the switch. The server runs `tailscale serve`, and the step shows
+   the direct address.
+
+A server with an older version of OpenBot shows "Update it to set up Tailscale from here". Update the
+server (`sudo openbot update`), then open the settings again.
+
+What runs on the server:
+
+- OpenBot on the server runs as the service user, without root. It never installs Tailscale and never
+  changes a Tailscale setting. Only `sudo openbot tailscale setup` does, as root, in a terminal that
+  the owner opened. No other process asks root for anything: the server has no privileged helper.
+- **Sign in** runs `tailscale up --timeout=6s` as the service user, with no other flag, no auth key and
+  no shell. Tailscale allows this only for its operator, so the step asks for the setup command first
+  when Tailscale refuses. The sign-in page that Tailscale reports goes to the owner only, and the
+  client opens only an address of the form `https://login.tailscale.com/a/<code>`. A server with a
+  custom control server gives no link: sign in in the terminal.
+- The routes are the optional capability `host-tailscale-v1` (`POST /v1/admin/host/tailscale/status`,
+  `/direct` and `/sign-in`), frozen in `packages/contracts/src/team-protocol/host-tailscale-v1.ts`. The
+  host answers them only for the owner (403 for an admin or a member), and only over the OpenBot
+  cloud connection: on the direct listener they answer 404, because turning the path off there would
+  close the connection that asks.
 
 ## Use it (member)
 

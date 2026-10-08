@@ -45,6 +45,7 @@ open a database that a newer one migrated. It also refuses a computer that is a 
 | `openbot logs [-f]` | Show the journal of `openbot.service`. |
 | `sudo openbot start\|stop\|restart` | Control `openbot.service`. |
 | `sudo openbot update` | Download, check and install the newest release now. |
+| `sudo openbot tailscale setup` | Install Tailscale and let OpenBot use it for the [direct connection](tailscale-direct.md#set-it-up-from-your-client-owner). |
 | `sudo openbot uninstall` | Sign out and remove OpenBot. The data stays (see [Remove](#remove)). |
 | `openbot version` | Show the installed version. |
 
@@ -90,8 +91,9 @@ applies and starts the service again.
 ## Direct connection over Tailscale
 
 A home server and the computers of its members are often in one Tailscale network. The host can then
-offer a direct connection that does not go through the OpenBot cloud at each start. See
-[Direct connection over Tailscale](tailscale-direct.md).
+offer a direct connection that does not go through the OpenBot cloud at each start. The owner sets
+it up from OpenBot on another computer, in the server settings. See
+[Direct connection over Tailscale](tailscale-direct.md#set-it-up-from-your-client-owner).
 
 ## Control socket
 
