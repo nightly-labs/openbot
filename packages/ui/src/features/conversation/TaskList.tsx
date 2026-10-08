@@ -1,5 +1,5 @@
 import { Button, ChevronDown } from "@openbot/ui";
-import { createMemo, createSignal, createUniqueId, For, Show, untrack } from "solid-js";
+import { createMemo, createSignal, createUniqueId, For, onSettled, Show, untrack } from "solid-js";
 import { createDigitRoll } from "../../digit-roll";
 import { useText } from "../../text";
 
@@ -41,12 +41,17 @@ const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
 export function TaskList(props: TaskListProps) {
   const { t } = useText();
   const panelId = createUniqueId();
+  const playState = createTaskListPlayState();
   const [open, setOpen] = createSignal(untrack(() => props.defaultOpen ?? true));
   const total = () => props.items.length;
   const done = () => props.items.filter((item) => item.state === "done").length;
   const active = () => props.items.find((item) => item.state === "active");
   return (
-    <section class={["task-list", props.class]} data-open={open() ? "" : undefined}>
+    <section
+      style={{ "--task-list-play-state": playState() }}
+      class={["task-list", props.class]}
+      data-open={open() ? "" : undefined}
+    >
       <TaskListHeader
         open={open()}
         onToggle={() => setOpen((value) => !value)}
@@ -224,4 +229,16 @@ export function TaskMark(props: { state: TaskMarkState }) {
       <path class="task-list-mark-cross" d="M5.6 5.6 10.4 10.4M10.4 5.6 5.6 10.4" pathLength="1" />
     </svg>
   );
+}
+
+/** Pause task motion while the document is hidden, including in shared web consumers. */
+export function createTaskListPlayState() {
+  const [playState, setPlayState] = createSignal(document.hidden ? "paused" : "running");
+  onSettled(() => {
+    const refresh = () => setPlayState(document.hidden ? "paused" : "running");
+    refresh();
+    document.addEventListener("visibilitychange", refresh);
+    return () => document.removeEventListener("visibilitychange", refresh);
+  });
+  return playState;
 }
