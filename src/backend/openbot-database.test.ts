@@ -673,6 +673,12 @@ describe("OpenBotDatabase", () => {
       message("steered-second-answer", 2_030, { turnId: "steered" }),
       message("marker", 2_015),
     );
+    // The shared order puts a turn's question first even when its answer has an earlier time.
+    messages.push(
+      message("skewed-answer", 1_500, { turnId: "skewed" }),
+      message("skewed-thought", 1_501, { turnId: "skewed", itemType: "commentary" }),
+      message("skewed-question", 1_502, { author: "user", turnId: "skewed" }),
+    );
     // A turn larger than a page, with a steer on its last page.
     messages.push(
       message("large-question", 2_999, { author: "user", turnId: "large" }),
@@ -697,6 +703,7 @@ describe("OpenBotDatabase", () => {
     expect(database.readConversation(agent.id, agent.threadId).messages.map(({ id }) => id)).toEqual(expected);
     expect(expected.indexOf("turn-1-question")).toBeGreaterThan(expected.indexOf("turn-0-answer"));
     expect(expected.indexOf("steer")).toBeGreaterThan(expected.indexOf("steered-thought"));
+    expect(expected.indexOf("skewed-answer")).toBeGreaterThan(expected.indexOf("skewed-question"));
     expect(expected.indexOf("steered-first-answer")).toBeLessThan(expected.indexOf("steered-second-thought"));
 
     for (const limit of [1, 5, 50]) {
@@ -732,6 +739,10 @@ describe("OpenBotDatabase", () => {
       firstUnreadMessageId: "large-answer",
       throughMessageId: "marker",
     });
+    // Read through the thought, the answer shown after it is still unread.
+    expect(
+      new ConversationReadStore(database).markReadForThread("skew-reader", agent.threadId, "skewed-thought"),
+    ).toMatchObject({ firstUnreadMessageId: "skewed-answer" });
 
     // With limit 2 the turn before the anchor already fills the page; the rest of the turn still comes.
     for (const limit of [2, 4]) {

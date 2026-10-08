@@ -10,7 +10,6 @@ import type {
   ConversationSnapshot,
 } from "@openbot/contracts/ipc";
 import {
-  AGENT_EXCHANGE_ITEM_TYPE,
   HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX,
   isAttachmentSummary,
   MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX,
@@ -230,16 +229,10 @@ export class ConversationQueries {
       options.excludeRoutineRunEvents === true,
       options.excludeHostedSiteEvents === true,
     );
-    // The rows come in group order, which a cursor follows. Inside a turn, the shared order puts the
-    // user's message before commentary and the answer, as the live conversation shows them.
-    const pageMessages = rows.map((row) => decodeConversationMessageJson(requiredStringColumn(row, "message_json")));
-    const messageIds = new Set(pageMessages.map((message) => message.id));
-    // A turn larger than a page is split. The order finds a steer by the turn's earlier input, so the
-    // sort also reads the inputs that are on another page and then drops them.
-    const messages = sortConversationMessages([
-      ...pageMessages,
-      ...this.#turnInputsOutside(threadId, pageMessages, messageIds),
-    ]).filter((message) => messageIds.has(message.id));
+    // The rows come in the shown order, which a cursor follows. A page of a split turn is not sorted
+    // again: it does not hold the turn's first input, which the shared order needs to find a steer.
+    const messages = rows.map((row) => decodeConversationMessageJson(requiredStringColumn(row, "message_json")));
+    const messageIds = new Set(messages.map((message) => message.id));
     const referenceIdSet = new Set<string>();
     for (const message of messages) {
       const referenceId = message.replyToMessageId;
@@ -319,7 +312,7 @@ export class ConversationQueries {
         .prepare(
           `${ORDERED_THREAD_MESSAGES}
            SELECT message_id FROM ordered
-           WHERE (${ORDER_KEY_COLUMNS}) <= (?, ?, ?, ?, ?)
+           WHERE (${ORDER_KEY_COLUMNS}) <= (?, ?, ?, ?, ?, ?)
              ${conversationMarkerSqlFilter(
                options.excludeRoutineEvents === true,
                options.excludeRoutineRunEvents === true,
@@ -525,7 +518,7 @@ export class ConversationQueries {
           .prepare(
             `${ORDERED_THREAD_MESSAGES}
              SELECT ${ORDER_KEY_COLUMNS} FROM ordered
-             WHERE (${ORDER_KEY_COLUMNS}) < (?, ?, ?, ?, ?)
+             WHERE (${ORDER_KEY_COLUMNS}) < (?, ?, ?, ?, ?, ?)
              ${routineFilter}
              ORDER BY ${ORDER_KEY_DESC} LIMIT ?`,
           )
@@ -549,7 +542,7 @@ export class ConversationQueries {
         .prepare(
           `${ORDERED_THREAD_MESSAGES}
            SELECT ${ORDER_KEY_COLUMNS} FROM ordered
-           WHERE (${ORDER_KEY_COLUMNS}) <= (?, ?, ?, ?, ?)
+           WHERE (${ORDER_KEY_COLUMNS}) <= (?, ?, ?, ?, ?, ?)
            ${routineFilter}
            ORDER BY ${ORDER_KEY_DESC} LIMIT ?`,
         )
@@ -563,7 +556,7 @@ export class ConversationQueries {
         .prepare(
           `${ORDERED_THREAD_MESSAGES}
            SELECT ${ORDER_KEY_COLUMNS} FROM ordered
-           WHERE (${ORDER_KEY_COLUMNS}) > (?, ?, ?, ?, ?)
+           WHERE (${ORDER_KEY_COLUMNS}) > (?, ?, ?, ?, ?, ?)
            ${routineFilter}
            ORDER BY ${ORDER_KEY_COLUMNS} LIMIT ?`,
         )
@@ -574,27 +567,6 @@ export class ConversationQueries {
     return [...older, ...wholeGroups(newerRows, Math.max(limit - older.length, 1), newerCap)];
   }
 
-  /** The user and teammate messages of the page's turns that are not on the page. */
-  #turnInputsOutside(
-    threadId: string,
-    messages: readonly ConversationMessage[],
-    messageIds: ReadonlySet<string>,
-  ): ConversationMessage[] {
-    const turnIds = [...new Set(messages.flatMap((message) => (message.turnId ? [message.turnId] : [])))];
-    if (turnIds.length === 0) return [];
-    return databaseRows(
-      this.#core.connection
-        .prepare(
-          `SELECT message_id, message_json FROM projection_thread_messages
-           WHERE thread_id = ? AND turn_id IN (${turnIds.map(() => "?").join(", ")})
-             AND (author = 'user' OR item_type = ?)`,
-        )
-        .all(threadId, ...turnIds, AGENT_EXCHANGE_ITEM_TYPE),
-    )
-      .filter((row) => !messageIds.has(requiredStringColumn(row, "message_id")))
-      .map((row) => decodeConversationMessageJson(requiredStringColumn(row, "message_json")));
-  }
-
   /** A page cursor from a client. A version 1 cursor, from before pages kept turns whole, gets its row's group. */
   #pageCursor(threadId: string, value: string): ConversationPageCursor {
     const cursor = decodeConversationCursor(value);
@@ -603,7 +575,7 @@ export class ConversationQueries {
       this.#core.connection
         .prepare(
           `${ORDERED_THREAD_MESSAGES}
-           SELECT group_start, group_id FROM ordered WHERE message_id = ?`,
+           SELECT group_start, group_id, turn_rank FROM ordered WHERE message_id = ?`,
         )
         .get(threadId, cursor.messageId),
     );
@@ -612,6 +584,7 @@ export class ConversationQueries {
       version: 2,
       groupStart: row ? requiredStringColumn(row, "group_start") : cursor.createdAt,
       groupId: row ? requiredStringColumn(row, "group_id") : `message:${cursor.messageId}`,
+      turnRank: row ? requiredNumberColumn(row, "turn_rank") : 0,
     };
   }
 
@@ -637,7 +610,7 @@ export class ConversationQueries {
              (SELECT created_at FROM projection_thread_messages WHERE thread_id = ? ${routineFilter}
               ORDER BY created_at, ordinal, message_id LIMIT 1) AS oldest_at
            FROM ordered
-           WHERE (${ORDER_KEY_COLUMNS}) < (?, ?, ?, ?, ?)
+           WHERE (${ORDER_KEY_COLUMNS}) < (?, ?, ?, ?, ?, ?)
            ${routineFilter}`,
         )
         .get(threadId, threadId, ...pageKeyValues(cursor)),
@@ -650,22 +623,38 @@ export class ConversationQueries {
 }
 
 /**
- * A thread's messages with the group each one is shown in: its turn, or the message alone. A group
- * starts at its earliest message, so ordering by group start and then by row keeps each turn
- * together, as `sortConversationMessages` shows it. A message queued while a turn ran then stays
+ * A thread's messages in the order `sortConversationMessages` shows them. A group is a turn, or a
+ * message alone, and starts at its earliest message. A message queued while a turn ran then stays
  * after that turn's answer, which an ACP agent sends only when the turn ends (#1540).
- * Pages and read state use this one order. The one parameter is the thread id.
+ *
+ * Inside a turn, `turn_rank` puts the user's and teammates' input first, then commentary and the plan,
+ * then the answer. From a steer on, the turn's second input, every row has rank 4 and goes by time.
+ * The window runs in time order with its default frame, so it counts the inputs up to and at each
+ * row's time, and its minimum is the turn's first time.
+ * Pages, cursors and read state use this one order. The one parameter is the thread id.
  */
-export const ORDERED_THREAD_MESSAGES = `WITH ordered AS (
-  SELECT created_at, ordinal, message_id, author, item_type,
-    CASE WHEN NULLIF(turn_id, '') IS NULL THEN created_at
-      ELSE MIN(created_at) OVER (PARTITION BY NULLIF(turn_id, '')) END AS group_start,
-    CASE WHEN NULLIF(turn_id, '') IS NULL THEN 'message:' || message_id
-      ELSE 'turn:' || turn_id END AS group_id
+export const ORDERED_THREAD_MESSAGES = `WITH ranked AS (
+  SELECT created_at, ordinal, message_id, author, item_type, NULLIF(turn_id, '') AS turn,
+    CASE
+      WHEN author = 'user' THEN 0
+      WHEN author = 'assistant' THEN CASE WHEN item_type IN ('commentary', 'plan') THEN 1 ELSE 3 END
+      WHEN json_extract(message_json, '$.exchange.direction') = 'incoming' THEN 0
+      ELSE 2
+    END AS role_rank
   FROM projection_thread_messages WHERE thread_id = ?
+), ordered AS (
+  SELECT created_at, ordinal, message_id, author, item_type,
+    CASE WHEN turn IS NULL THEN created_at ELSE MIN(created_at) OVER turn_by_time END AS group_start,
+    CASE WHEN turn IS NULL THEN 'message:' || message_id ELSE 'turn:' || turn END AS group_id,
+    CASE WHEN turn IS NULL THEN 0
+      WHEN SUM(role_rank = 0) OVER turn_by_time >= 2 THEN 4
+      ELSE role_rank END AS turn_rank
+  FROM ranked
+  WINDOW turn_by_time AS (PARTITION BY turn ORDER BY created_at)
 )`;
-export const ORDER_KEY_COLUMNS = "group_start, group_id, created_at, ordinal, message_id";
-export const ORDER_KEY_DESC = "group_start DESC, group_id DESC, created_at DESC, ordinal DESC, message_id DESC";
+export const ORDER_KEY_COLUMNS = "group_start, group_id, turn_rank, created_at, ordinal, message_id";
+export const ORDER_KEY_DESC =
+  "group_start DESC, group_id DESC, turn_rank DESC, created_at DESC, ordinal DESC, message_id DESC";
 
 /** Page decoders on IPC and every Team API version reject a conversation page of more than 100 messages. */
 const PAGE_MESSAGE_LIMIT = 100;
@@ -696,12 +685,15 @@ interface ConversationPageCursor {
   version: 2;
   groupStart: string;
   groupId: string;
+  turnRank: number;
   createdAt: string;
   ordinal: number;
   messageId: string;
 }
 
-type ConversationPageCursorV1 = Omit<ConversationPageCursor, "version" | "groupStart" | "groupId"> & { version: 1 };
+type ConversationPageCursorV1 = Omit<ConversationPageCursor, "version" | "groupStart" | "groupId" | "turnRank"> & {
+  version: 1;
+};
 
 function pageLimit(value: number): number {
   if (!Number.isInteger(value) || value < 1) throw new Error("The conversation page limit is invalid.");
@@ -713,14 +705,15 @@ function conversationRowCursor(row: DynamicRecord): ConversationPageCursor {
     version: 2,
     groupStart: requiredStringColumn(row, "group_start"),
     groupId: requiredStringColumn(row, "group_id"),
+    turnRank: requiredNumberColumn(row, "turn_rank"),
     createdAt: requiredStringColumn(row, "created_at"),
     ordinal: requiredNumberColumn(row, "ordinal"),
     messageId: requiredStringColumn(row, "message_id"),
   };
 }
 
-function pageKeyValues(cursor: ConversationPageCursor): [string, string, string, number, string] {
-  return [cursor.groupStart, cursor.groupId, cursor.createdAt, cursor.ordinal, cursor.messageId];
+function pageKeyValues(cursor: ConversationPageCursor): [string, string, number, string, number, string] {
+  return [cursor.groupStart, cursor.groupId, cursor.turnRank, cursor.createdAt, cursor.ordinal, cursor.messageId];
 }
 
 function conversationMarkerSqlFilter(
@@ -758,8 +751,15 @@ function decodeConversationCursor(value: string): ConversationPageCursor | Conve
     }
     const row = { createdAt: parsed.createdAt, ordinal: parsed.ordinal, messageId: parsed.messageId };
     if (parsed.version === 1) return { version: 1, ...row };
-    if (!isString(parsed.groupStart) || !isString(parsed.groupId)) throw new Error("invalid cursor");
-    return { version: 2, groupStart: parsed.groupStart, groupId: parsed.groupId, ...row };
+    if (
+      !isString(parsed.groupStart) ||
+      !isString(parsed.groupId) ||
+      !isNumber(parsed.turnRank) ||
+      !Number.isInteger(parsed.turnRank)
+    ) {
+      throw new Error("invalid cursor");
+    }
+    return { version: 2, groupStart: parsed.groupStart, groupId: parsed.groupId, turnRank: parsed.turnRank, ...row };
   } catch {
     throw new Error("The conversation page cursor is invalid.");
   }
