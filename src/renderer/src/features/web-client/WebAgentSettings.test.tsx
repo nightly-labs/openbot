@@ -56,6 +56,7 @@ function runtimeFixture(
     closeBrowserTab: async () => {},
     respondToTakeover: async () => {},
     listHosts: async () => [],
+    leaveHost: async () => {},
     previewInvite: async () => {
       throw new Error("unused");
     },

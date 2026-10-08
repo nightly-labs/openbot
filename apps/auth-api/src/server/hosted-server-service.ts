@@ -14,6 +14,7 @@ import {
   type HostedServerCheckout,
   type HostedServerClaim,
   type HostedServerError,
+  type HostedServerLifecycleInput,
   type HostedServerList,
   type HostedServerSize,
   type HostedServerState,
@@ -22,6 +23,7 @@ import {
   parseHostedServerName,
 } from "@openbot/contracts/hosted-servers";
 import { isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { Context, Effect, Layer, Result, Schema } from "effect";
 import { type AccountAnalytics, type AccountAnalyticsEvent, NO_ACCOUNT_ANALYTICS } from "./account-analytics";
 import { getServerEntitlement } from "./billing-entitlement";
@@ -170,16 +172,25 @@ interface HostedServerRow {
   next_run_at: number | null;
   created_at: number;
   updated_at: number;
+  deletion_scheduled_at: number | null;
+  deletion_subscription_id: string | null;
 }
 
 const ROW_COLUMNS = `server_id, owner_user_id, name, provider_sandbox_id, provider_template, size, pending_size, plan, billing_interval, currency,
   checkout_session_id, idempotency_key, desired_state, observed_state, observed_error, provider_event_at, auth_session_id,
-  last_active_at, lease_until, next_run_at, created_at, updated_at`;
+  last_active_at, lease_until, next_run_at, created_at, updated_at, deletion_scheduled_at, deletion_subscription_id`;
 
 /** The billing calls that hosted servers use. */
 export type HostedServerBilling = Pick<
   BillingService,
-  "catalog" | "createCheckout" | "closeCheckout" | "cancelServerPlans" | "cancelSubscription" | "refreshLapsedPlans"
+  | "catalog"
+  | "createCheckout"
+  | "closeCheckout"
+  | "cancelServerPlans"
+  | "cancelSubscription"
+  | "refreshLapsedPlans"
+  | "setServerRenewal"
+  | "subscriptionEnded"
 >;
 
 export interface HostedServerServiceOptions {
@@ -313,6 +324,7 @@ export class HostedServerService {
       );
       return {
         available: this.isAvailableFor(user),
+        lifecycleAvailable: true,
         servers: rows.results.map(summary),
         maxServers: MAX_SERVERS_PER_ACCOUNT,
       };
@@ -467,6 +479,21 @@ export class HostedServerService {
           yield* dependencies.billing.cancelSubscription(sync.subscriptionId).pipe(Effect.mapError(hostedFailure));
         return;
       }
+      // A renewed or replacement plan invalidates the old deletion instruction.
+      yield* hostedCall(() =>
+        dependencies.database
+          .prepare(
+            `UPDATE hosted_servers SET deletion_scheduled_at = NULL, deletion_subscription_id = NULL
+         WHERE server_id = ? AND deletion_scheduled_at IS NOT NULL AND EXISTS(
+           SELECT 1 FROM billing_subscriptions s WHERE s.server_id = hosted_servers.server_id
+           AND s.status IN ${OPEN_STATUSES_SQL} AND (s.cancel_at_period_end = 0
+             OR s.stripe_subscription_id != hosted_servers.deletion_subscription_id
+             OR (s.stripe_subscription_id = hosted_servers.deletion_subscription_id
+             AND s.current_period_end > hosted_servers.deletion_scheduled_at)))`,
+          )
+          .bind(row.server_id)
+          .run(),
+      );
       if (isOpenBillingStatus(sync.status)) yield* this.#followPlan(row, sync);
       yield* this.#applyPlan(yield* this.#requireRow(row.server_id));
       yield* this.#resize(yield* this.#requireRow(row.server_id));
@@ -474,7 +501,175 @@ export class HostedServerService {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
+  readonly lifecycle = Effect.fn("HostedServerService.lifecycle")(
+    function* (
+      this: HostedServerService,
+      user: AuthUser,
+      serverId: string,
+      input: HostedServerLifecycleInput,
+    ): Effect.fn.Return<void, HostedFailure, HostedServerDependencies> {
+      const dependencies = yield* HostedServerDependencies;
+      const row = yield* hostedCall(() =>
+        dependencies.database
+          .prepare(
+            `SELECT ${ROW_COLUMNS} FROM hosted_servers WHERE server_id = ? AND owner_user_id = ? AND desired_state != 'deleted'`,
+          )
+          .bind(serverId, user.id)
+          .first<HostedServerRow>(),
+      );
+      if (!row) return yield* notFound();
+      if (input.action === "delete" && input.confirmName !== row.name) {
+        return yield* new HostedServerServiceError(
+          400,
+          "hosted_server_confirm_mismatch",
+          sourceText("error.billing.confirmMismatch"),
+        );
+      }
+      const token = crypto.randomUUID();
+      const claimed = yield* this.#claimLifecycle(serverId, token);
+      if (!claimed) return yield* lifecycleFailure();
+      yield* Effect.gen({ self: this }, function* () {
+        if (input.action === "delete" && input.timing === "now") {
+          yield* this.#deleteNow(user, serverId, input.confirmName);
+          return;
+        }
+        if (!dependencies.billing) return yield* lifecycleFailure();
+        const plan = yield* dependencies.billing
+          .setServerRenewal(
+            user.id,
+            serverId,
+            input.action !== "keep",
+            input.action === "delete" ? input.expectedPeriodEnd : undefined,
+          )
+          .pipe(Effect.mapError(hostedFailure));
+        if (
+          input.action === "delete" &&
+          input.expectedPeriodEnd !== undefined &&
+          plan.periodEnd !== input.expectedPeriodEnd
+        ) {
+          return yield* lifecycleFailure();
+        }
+        const stored = yield* hostedCall(() =>
+          dependencies.database
+            .prepare(
+              `UPDATE hosted_servers SET
+           deletion_scheduled_at = CASE WHEN ? = 'cancel' THEN deletion_scheduled_at ELSE ? END,
+           deletion_subscription_id = CASE WHEN ? = 'cancel' THEN deletion_subscription_id ELSE ? END,
+           updated_at = ?
+           WHERE server_id = ? AND desired_state != 'deleted' AND lifecycle_token = ? AND lifecycle_lease_until > ?`,
+            )
+            .bind(
+              input.action,
+              input.action === "delete" ? plan.periodEnd : null,
+              input.action,
+              input.action === "delete" ? plan.subscriptionId : null,
+              dependencies.now(),
+              serverId,
+              token,
+              dependencies.now(),
+            )
+            .run(),
+        );
+        if (stored.meta.changes !== 1) return yield* lifecycleFailure();
+      }).pipe(Effect.ensuring(this.#releaseLifecycle(serverId, token).pipe(Effect.orDie)));
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
+  readonly #claimLifecycle = Effect.fn("HostedServerService.claimLifecycle")(function* (
+    this: HostedServerService,
+    serverId: string,
+    token: string,
+  ) {
+    const dependencies = yield* HostedServerDependencies;
+    const now = dependencies.now();
+    const claimed = yield* hostedCall(() =>
+      dependencies.database
+        .prepare(
+          `UPDATE hosted_servers SET lifecycle_token = ?, lifecycle_lease_until = ?
+       WHERE server_id = ? AND desired_state != 'deleted' AND (lifecycle_token IS NULL OR lifecycle_lease_until <= ?)`,
+        )
+        .bind(token, now + 120_000, serverId, now)
+        .run(),
+    );
+    return claimed.meta.changes === 1;
+  });
+
+  readonly #releaseLifecycle = Effect.fn("HostedServerService.releaseLifecycle")(function* (
+    this: HostedServerService,
+    serverId: string,
+    token: string,
+  ) {
+    const dependencies = yield* HostedServerDependencies;
+    yield* hostedCall(() =>
+      dependencies.database
+        .prepare(
+          "UPDATE hosted_servers SET lifecycle_token = NULL, lifecycle_lease_until = NULL WHERE server_id = ? AND lifecycle_token = ?",
+        )
+        .bind(serverId, token)
+        .run(),
+    );
+  });
+
+  readonly #deleteScheduled = Effect.fn("HostedServerService.deleteScheduled")(function* (
+    this: HostedServerService,
+    row: HostedServerRow,
+  ) {
+    const dependencies = yield* HostedServerDependencies;
+    const billing = dependencies.billing;
+    const subscriptionId = row.deletion_subscription_id;
+    if (!billing || !subscriptionId) return;
+    const token = crypto.randomUUID();
+    if (!(yield* this.#claimLifecycle(row.server_id, token))) return;
+    yield* Effect.gen({ self: this }, function* () {
+      if (!(yield* billing.subscriptionEnded(subscriptionId).pipe(Effect.mapError(hostedFailure)))) return;
+      const claimed = yield* hostedCall(() =>
+        dependencies.database
+          .prepare(
+            `UPDATE hosted_servers SET desired_state = 'deleted', updated_at = ?
+         WHERE server_id = ? AND desired_state != 'deleted' AND lifecycle_token = ? AND lifecycle_lease_until > ?
+         AND deletion_scheduled_at = ? AND deletion_scheduled_at <= ? AND deletion_subscription_id = ?
+         AND NOT EXISTS(SELECT 1 FROM billing_subscriptions s WHERE s.server_id = hosted_servers.server_id
+           AND (s.status IN ${OPEN_STATUSES_SQL} OR (s.stripe_subscription_id = hosted_servers.deletion_subscription_id
+             AND s.current_period_end > hosted_servers.deletion_scheduled_at)))`,
+          )
+          .bind(
+            dependencies.now(),
+            row.server_id,
+            token,
+            dependencies.now(),
+            row.deletion_scheduled_at,
+            dependencies.now(),
+            row.deletion_subscription_id,
+          )
+          .run(),
+      );
+      if (claimed.meta.changes === 1) yield* this.#finishDelete(yield* this.#requireRow(row.server_id));
+    }).pipe(Effect.ensuring(this.#releaseLifecycle(row.server_id, token).pipe(Effect.orDie)));
+  });
+
   readonly delete = Effect.fn("HostedServerService.delete")(
+    function* (
+      this: HostedServerService,
+      user: AuthUser,
+      serverId: string,
+      confirmName: unknown,
+    ): Effect.fn.Return<void, HostedFailure, HostedServerDependencies> {
+      if (typeof confirmName !== "string")
+        return yield* new HostedServerServiceError(
+          400,
+          "hosted_server_confirm_mismatch",
+          sourceText("error.billing.confirmMismatch"),
+        );
+      const row = yield* this.#requireRow(serverId);
+      // Preserve retries of the released DELETE route after deletion has started.
+      if (row.desired_state === "deleted") return yield* this.#deleteNow(user, serverId, confirmName);
+      yield* this.lifecycle(user, serverId, { serverId, action: "delete", timing: "now", confirmName });
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
+  readonly #deleteNow = Effect.fn("HostedServerService.deleteNow")(
     function* (
       this: HostedServerService,
       user: AuthUser,
@@ -956,6 +1151,15 @@ export class HostedServerService {
           .all<HostedServerRow>(),
       );
       result.resized = yield* run(resizing.results, (row) => this.#resize(row));
+      const scheduledDeletes = yield* hostedCall(() =>
+        dependencies.database
+          .prepare(
+            `SELECT ${ROW_COLUMNS} FROM hosted_servers WHERE desired_state != 'deleted' AND deletion_scheduled_at <= ? LIMIT ?`,
+          )
+          .bind(now, TICK_BATCH_SIZE)
+          .all<HostedServerRow>(),
+      );
+      yield* run(scheduledDeletes.results, (row) => this.#deleteScheduled(row));
       const deleting = yield* hostedCall(() =>
         dependencies.database
           .prepare(
@@ -980,6 +1184,8 @@ export class HostedServerService {
     returnTo: CheckoutReturn,
   ): Effect.fn.Return<HostedServerCheckout, HostedFailure, HostedServerDependencies> {
     const dependencies = yield* HostedServerDependencies;
+    // A scheduled deletion must be withdrawn before a replacement plan can be purchased.
+    if (row.deletion_scheduled_at !== null) return yield* lifecycleFailure();
     // A new server waits for its first payment. A server whose plan was cancelled gets a new plan.
     const awaiting = row.observed_state === "awaiting_payment" && row.desired_state === "running";
     // Only the end of a plan sets `stopped`. A provider error on the way can replace the reason.
@@ -1971,6 +2177,7 @@ export class HostedServerService {
 function summary(row: HostedServerRow): HostedServerSummary {
   return {
     serverId: row.server_id,
+    deletionScheduledAt: row.deletion_scheduled_at,
     name: row.name,
     size: row.size,
     plan: row.plan,
@@ -2106,4 +2313,12 @@ function notFound(): HostedServerServiceError {
 
 function invalidClaim(): HostedServerServiceError {
   return new HostedServerServiceError(401, "hosted_claim_invalid", "The server claim is invalid or used.");
+}
+
+function lifecycleFailure() {
+  return new HostedServerServiceError(
+    409,
+    "hosted_server_lifecycle_failed",
+    sourceText("error.billing.lifecycleFailed"),
+  );
 }

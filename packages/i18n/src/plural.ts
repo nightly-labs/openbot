@@ -15,6 +15,13 @@ const english: PluralRule = (count) => (count === 1 ? "one" : "other");
 
 const BUILT_IN_RULES: Readonly<Record<string, PluralRule>> = {
   en: english,
+  de: (count) => (Math.abs(count) === 1 ? "one" : "other"),
+  // CLDR Spanish: one for 1; many for nonzero integer multiples of one million.
+  es: (count) => {
+    const absolute = Math.abs(count);
+    if (absolute === 1) return "one";
+    return absolute !== 0 && Number.isInteger(absolute) && absolute % 1_000_000 === 0 ? "many" : "other";
+  },
   // CLDR: one is every number from 0 up to, but not including, 2.
   fr: (count) => (count >= 0 && count < 2 ? "one" : "other"),
   // Japanese has one form for every count.

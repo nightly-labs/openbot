@@ -1,4 +1,4 @@
-// Switches a running dev app to Japanese and then French through Settings, and checks that the
+// Switches a running dev app through the selected languages in Settings, and checks that the
 // window shows no catalog keys or placeholders, and that a host error reads in the new language.
 // Restores the saved language at the end. Writes .openbot-build/i18n-e2e/report.json and one
 // screenshot per language. Needs `--allow-mutations`, because it changes the language setting.
@@ -23,7 +23,7 @@ declare global {
 }
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/i18n-e2e");
-const LOCALES = ["ja", "fr"] as const satisfies readonly TranslatedLocale[];
+const LOCALES = ["ja", "fr", "es", "de"] as const satisfies readonly TranslatedLocale[];
 const KEYS = new Set(Object.keys(en));
 const PLACEHOLDER = /\{[a-zA-Z]\w*\}/g;
 

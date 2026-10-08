@@ -10,7 +10,6 @@ export const messages = {
   "mobile.app.route.newSection": "Новый раздел",
   "mobile.app.route.settings": "Настройки",
   "mobile.app.route.profile": "Профиль",
-  "mobile.app.route.general": "Основные",
   "mobile.app.route.accountSessions": "Сеансы аккаунта",
   "mobile.app.route.about": "О приложении",
   "mobile.app.route.support": "Поддержка",

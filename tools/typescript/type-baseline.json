@@ -19,7 +19,6 @@
     "packages/team-client/src/team-api-requests.test.ts": 1,
     "packages/ui/src/components/ProviderModelPicker.tsx": 3,
     "packages/ui/src/components/ProviderPicker.tsx": 2,
-    "packages/ui/src/components/StandingApprovalConfirmation.tsx": 1,
     "packages/ui/src/confirm-dialog.tsx": 1,
     "packages/ui/src/dynamic-island.tsx": 2,
     "packages/ui/src/features/account/AccountUsageDetails.tsx": 1,

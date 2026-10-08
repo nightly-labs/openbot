@@ -153,6 +153,8 @@ export interface WebWorkspaceRuntime {
   currentMemberId?: () => Promise<string>;
   respondToTakeover(input: RespondToBrowserTakeoverInput): Promise<void>;
   listHosts(): Promise<RemoteTeamHost[]>;
+  /** Ends this account's membership of a host. The account service refuses the owner. */
+  leaveHost(hostId: string, membershipId: string): Promise<void>;
   previewInvite(url: string): Promise<InvitePreview>;
   acceptInvite(url: string): Promise<RemoteTeamHost>;
   connect(host: RemoteTeamHost): Promise<string[]>;
@@ -590,6 +592,7 @@ export function createWebWorkspaceRuntime(
     respondToTakeover: (input) =>
       Effect.runPromise(respondToBrowserTakeover(teamApi, input).pipe(Effect.mapError((error) => error.cause))),
     listHosts: () => runTeamEffect(directory.listHosts()),
+    leaveHost: (hostId, membershipId) => runTeamEffect(directory.leaveHost(hostId, membershipId)),
     async previewInvite(url) {
       const value = await runTeamEffect(directory.previewInvite(url));
       return {
