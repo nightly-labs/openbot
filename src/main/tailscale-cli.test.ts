@@ -119,6 +119,7 @@ describe("tailscale commands", () => {
   it("are fixed lists with only numeric ports, and never Funnel", () => {
     expect(TAILSCALE_COMMANDS.serveOn(443, 51234)).toEqual(["serve", "--bg", "--https=443", "http://127.0.0.1:51234"]);
     expect(TAILSCALE_COMMANDS.serveOff(8443)).toEqual(["serve", "--https=8443", "off"]);
+    expect(TAILSCALE_COMMANDS.serveRootOff(8443)).toEqual(["serve", "--https=8443", "--set-path=/", "off"]);
     // No auth key, no operator, no setting: the sign-in page is the only way in.
     expect(TAILSCALE_COMMANDS.up()).toEqual(["up", "--timeout=6s"]);
     for (const args of [
@@ -127,6 +128,7 @@ describe("tailscale commands", () => {
       TAILSCALE_COMMANDS.serveStatus(),
       TAILSCALE_COMMANDS.serveOn(443, 1),
       TAILSCALE_COMMANDS.serveOff(443),
+      TAILSCALE_COMMANDS.serveRootOff(443),
     ]) {
       expect(args.join(" ")).not.toMatch(/funnel/iu);
     }
@@ -137,7 +139,7 @@ describe("tailscale commands", () => {
 
   it("looks in each platform's install places and on the search path", () => {
     expect(tailscaleCandidates("darwin", { PATH: "/usr/bin:relative" })).toEqual([
-      "/Applications/Tailscale.app/Contents/MacOS/Tailscale",
+      "/Applications/Tailscale.app/Contents/MacOS/tailscale",
       "/opt/homebrew/bin/tailscale",
       "/usr/local/bin/tailscale",
       "/usr/bin/tailscale",

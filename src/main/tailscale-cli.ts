@@ -50,7 +50,9 @@ export function tailscaleCandidates(platform: TailscalePlatform, env: NodeJS.Pro
   const fixed =
     platform === "darwin"
       ? [
-          "/Applications/Tailscale.app/Contents/MacOS/Tailscale",
+          // The app's binary is also its command line. Started from another app, it opens the
+          // app's window instead, unless TAILSCALE_BE_CLI is set (see `execTailscale`).
+          "/Applications/Tailscale.app/Contents/MacOS/tailscale",
           "/opt/homebrew/bin/tailscale",
           "/usr/local/bin/tailscale",
         ]
@@ -92,7 +94,16 @@ export const execTailscale: TailscaleExec = (file, args, timeoutMs) =>
     const child = execFile(
       file,
       [...args],
-      { shell: false, windowsHide: true, timeout: timeoutMs, maxBuffer: TAILSCALE_OUTPUT_LIMIT, encoding: "utf8" },
+      {
+        shell: false,
+        windowsHide: true,
+        timeout: timeoutMs,
+        maxBuffer: TAILSCALE_OUTPUT_LIMIT,
+        encoding: "utf8",
+        // The macOS app's binary runs as the command line, not as the app, only with this
+        // variable when another app starts it. Other builds ignore it.
+        env: { ...process.env, TAILSCALE_BE_CLI: "1" },
+      },
       (error, stdout, stderr) => {
         if (!error) {
           resume(Effect.succeed(stdout));
@@ -242,6 +253,11 @@ export const TAILSCALE_COMMANDS = {
     loopbackProxyTarget(loopbackPort),
   ],
   serveOff: (httpsPort: number) => ["serve", `--https=${validPort(httpsPort)}`, "off"],
+  /**
+   * Removes only the root path of the port. Other paths and the port stay; when the root was the
+   * port's only path, Tailscale removes the port too.
+   */
+  serveRootOff: (httpsPort: number) => ["serve", `--https=${validPort(httpsPort)}`, "--set-path=/", "off"],
   /**
    * Starts Tailscale and, when it needs a sign-in, its sign-in page. No flag changes a setting, so
    * Tailscale keeps the operator and every other setting that `sudo openbot tailscale setup` made. It

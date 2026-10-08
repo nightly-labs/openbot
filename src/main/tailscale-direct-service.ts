@@ -202,7 +202,10 @@ export class TailscaleDirectService {
     logger.info(`Direct Tailscale path is on at HTTPS port ${httpsPort}.`);
   });
 
-  /** Takes down only a `tailscale serve` port that still forwards to the address this service set. */
+  /**
+   * Takes down only a `tailscale serve` root path that still forwards to the address this service set.
+   * The port goes too only when it holds nothing else.
+   */
   readonly #unserve = Effect.fn("TailscaleDirect.unserve")(function* (this: TailscaleDirectService) {
     this.#url = null;
     this.#issue = null;
@@ -217,7 +220,9 @@ export class TailscaleDirectService {
           Effect.orElseSucceed(() => null),
         );
         if (current?.rootProxy === loopbackProxyTarget(loopbackPort)) {
-          const removed = yield* this.#cli.run(TAILSCALE_COMMANDS.serveOff(httpsPort)).pipe(Effect.result);
+          // A path that the user added on this port meanwhile stays: only the root path is removed then.
+          const off = current.otherHandlers ? TAILSCALE_COMMANDS.serveRootOff : TAILSCALE_COMMANDS.serveOff;
+          const removed = yield* this.#cli.run(off(httpsPort)).pipe(Effect.result);
           if (removed._tag === "Failure") logger.warn("Could not stop tailscale serve:", removed.failure.detail);
         }
       }

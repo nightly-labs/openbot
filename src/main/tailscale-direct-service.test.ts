@@ -47,6 +47,18 @@ function fakeTailscale(options: { status?: object; serve?: ServeState; failServe
         delete serve.AllowFunnel[`${DNS}:${off[1]}`];
         return Effect.succeed("");
       }
+      // As Tailscale does: one path goes, and the port goes with its last path.
+      const pathOff = /^serve --https=(\d+) --set-path=\/ off$/u.exec(line);
+      const web = pathOff?.[1] ? serve.Web[`${DNS}:${pathOff[1]}`] : undefined;
+      if (pathOff?.[1] && web) {
+        delete web.Handlers["/"];
+        if (Object.keys(web.Handlers).length === 0) {
+          delete serve.TCP[pathOff[1]];
+          delete serve.Web[`${DNS}:${pathOff[1]}`];
+          delete serve.AllowFunnel[`${DNS}:${pathOff[1]}`];
+        }
+        return Effect.succeed("");
+      }
       return Effect.fail(new TailscaleCommandError({ reason: "failed", detail: `unexpected: ${line}` }));
     });
   return {
@@ -99,6 +111,22 @@ describe("TailscaleDirectService", () => {
     expect(fake.calls).toContainEqual(["serve", "--https=443", "off"]);
     expect(fake.serve.Web).toEqual({});
     expect(api.stop).toHaveBeenCalled();
+  });
+
+  it("keeps a path that the user adds on its port while it runs", async () => {
+    const fake = fakeTailscale({});
+    const direct = service(fake);
+    direct.attach(listener());
+    await Effect.runPromise(direct.hostOnline());
+    await Effect.runPromise(direct.setEnabled(true));
+    const own = fake.serve.Web[`${DNS}:443`];
+    if (!own) throw new Error("Port 443 is not served.");
+    own.Handlers["/grafana"] = { Proxy: "http://127.0.0.1:3000" };
+
+    await Effect.runPromise(direct.setEnabled(false));
+    expect(fake.calls).not.toContainEqual(["serve", "--https=443", "off"]);
+    expect(fake.serve.Web[`${DNS}:443`]?.Handlers).toEqual({ "/grafana": { Proxy: "http://127.0.0.1:3000" } });
+    expect(fake.serve.TCP["443"]).toEqual({ HTTPS: true });
   });
 
   it("keeps the user's own configuration on 443 and uses 8443", async () => {
