@@ -44,6 +44,7 @@ export const messages = defineMessages("agentSettings", {
   "agentSettings.runtime.reasoning": "Reasoning",
   "agentSettings.runtime.reasoningLabel": "Agent reasoning level",
   "agentSettings.runtime.selectReasoning": "Select reasoning",
+  "agentSettings.runtime.reasoningSetByProvider": "Set by {provider}",
   "agentSettings.runtime.access": "Access",
   "agentSettings.runtime.accessLabel": "Agent access",
   "agentSettings.runtime.busyMessage": "While working",

@@ -94,18 +94,8 @@
 }
 
 .awaiting-replies-item[data-state="active"] .awaiting-replies-state-label {
-  background: linear-gradient(
-    90deg,
-    var(--openbot-text-muted) 0%,
-    var(--openbot-text-muted) 35%,
-    var(--openbot-text-primary) 50%,
-    var(--openbot-text-muted) 65%,
-    var(--openbot-text-muted) 100%
-  );
-  background-size: 300% 100%;
-  background-clip: text;
-  color: transparent;
-  animation: task-list-shine 1.6s linear infinite;
+  animation: task-list-pulse 1.6s ease-in-out infinite;
+  animation-play-state: var(--task-list-play-state, running);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -114,8 +104,6 @@
   }
 
   .awaiting-replies-item[data-state="active"] .awaiting-replies-state-label {
-    background: none;
-    color: var(--openbot-text-muted);
     animation: none;
   }
 }

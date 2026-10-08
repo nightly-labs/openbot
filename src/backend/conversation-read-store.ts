@@ -15,6 +15,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
+import { ORDER_KEY_COLUMNS, ORDER_KEY_DESC, ORDERED_THREAD_MESSAGES } from "./database/conversation-queries";
 import type { OpenBotDatabase } from "./openbot-database";
 
 export interface ConversationMarkerExclusions {
@@ -197,36 +198,38 @@ export class ConversationReadStore {
     );
   }
 
-  #messageOrderKey(
-    threadId: string,
-    messageId: string,
-  ): [createdAt: string, ordinal: number, messageId: string] | undefined {
+  /** Where a message is in the shown order, which pages use too: a cursor is read through what was shown. */
+  #messageOrderKey(threadId: string, messageId: string): MessageOrderKey | undefined {
     const row = this.database.connection
       .prepare(
-        `SELECT created_at, ordinal, message_id FROM projection_thread_messages
-         WHERE thread_id = ? AND message_id = ? LIMIT 1`,
+        `${ORDERED_THREAD_MESSAGES}
+         SELECT ${ORDER_KEY_COLUMNS} FROM ordered WHERE message_id = ?`,
       )
       .get(threadId, messageId);
     if (row === undefined) return undefined;
-    if (!isDynamicRecord(row) || !isString(row.created_at) || !isNumber(row.ordinal) || !isString(row.message_id)) {
+    if (
+      !isDynamicRecord(row) ||
+      !isString(row.group_start) ||
+      !isNumber(row.group_first) ||
+      !isString(row.group_id) ||
+      !isNumber(row.turn_rank) ||
+      !isString(row.created_at) ||
+      !isNumber(row.ordinal) ||
+      !isString(row.message_id)
+    ) {
       throw new Error("The conversation message order is malformed.");
     }
-    return [row.created_at, row.ordinal, row.message_id];
+    return [row.group_start, row.group_first, row.group_id, row.turn_rank, row.created_at, row.ordinal, row.message_id];
   }
 
-  #isAfter(
-    threadId: string,
-    candidateMessageId: string,
-    boundary: [createdAt: string, ordinal: number, messageId: string] | undefined,
-  ): boolean {
+  #isAfter(threadId: string, candidateMessageId: string, boundary: MessageOrderKey | undefined): boolean {
     if (!boundary) return false;
     return Boolean(
       this.database.connection
         .prepare(
-          `SELECT 1 FROM projection_thread_messages
-           WHERE thread_id = ? AND message_id = ?
-             AND (created_at, ordinal, message_id) > (?, ?, ?)
-           LIMIT 1`,
+          `${ORDERED_THREAD_MESSAGES}
+           SELECT 1 FROM ordered
+           WHERE message_id = ? AND (${ORDER_KEY_COLUMNS}) > (?, ?, ?, ?, ?, ?, ?)`,
         )
         .get(threadId, candidateMessageId, ...boundary),
     );
@@ -235,10 +238,8 @@ export class ConversationReadStore {
   #latestMessageId(threadId: string): string | null {
     const row = this.database.connection
       .prepare(
-        `SELECT message_id FROM projection_thread_messages
-         WHERE thread_id = ?
-         ORDER BY created_at DESC, ordinal DESC, message_id DESC
-         LIMIT 1`,
+        `${ORDERED_THREAD_MESSAGES}
+         SELECT message_id FROM ordered ORDER BY ${ORDER_KEY_DESC} LIMIT 1`,
       )
       .get(threadId);
     if (row === undefined) return null;
@@ -249,22 +250,9 @@ export class ConversationReadStore {
   }
 
   #stateFromDatabase(threadId: string, throughMessageId: string | null): ConversationReadState {
-    const boundary = throughMessageId
-      ? this.database.connection
-          .prepare(
-            `SELECT created_at, ordinal, message_id FROM projection_thread_messages
-             WHERE thread_id = ? AND message_id = ?`,
-          )
-          .get(threadId, throughMessageId)
-      : undefined;
-    let boundaryKey: [createdAt: string, ordinal: number] | null = null;
-    if (boundary !== undefined) {
-      if (!isDynamicRecord(boundary) || !isString(boundary.created_at) || !isNumber(boundary.ordinal))
-        throw new Error("The conversation read boundary is malformed.");
-      boundaryKey = [boundary.created_at, boundary.ordinal];
-    }
-    const afterBoundary = boundaryKey ? `AND (created_at, ordinal, message_id) > (?, ?, ?)` : "";
-    const parameters = boundaryKey ? [threadId, ...boundaryKey, throughMessageId] : [threadId];
+    const boundaryKey = throughMessageId ? this.#messageOrderKey(threadId, throughMessageId) : undefined;
+    const afterBoundary = boundaryKey ? `AND (${ORDER_KEY_COLUMNS}) > (?, ?, ?, ?, ?, ?, ?)` : "";
+    const parameters = boundaryKey ? [threadId, ...boundaryKey] : [threadId];
     const unreadFilter = `author != 'user'
       AND COALESCE(item_type, '') != 'commentary'
       AND COALESCE(item_type, '') != 'plan'
@@ -276,30 +264,22 @@ export class ConversationReadStore {
       AND COALESCE(item_type, '') NOT LIKE '${HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX}%'
       AND COALESCE(item_type, '') NOT LIKE '${MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX}%'
       AND COALESCE(item_type, '') != '${CONTEXT_RESET_ITEM_TYPE}'`;
-    const countRow = this.database.connection
-      .prepare(
-        `SELECT COUNT(*) AS unread_count FROM projection_thread_messages
-         WHERE thread_id = ? ${afterBoundary} AND ${unreadFilter}`,
-      )
-      .get(...parameters);
+    // One pass over the ordered thread: the first unread row carries the count of all of them.
     const firstRow = this.database.connection
       .prepare(
-        `SELECT message_id FROM projection_thread_messages
-         WHERE thread_id = ? ${afterBoundary} AND ${unreadFilter}
-         ORDER BY created_at, ordinal, message_id LIMIT 1`,
+        `${ORDERED_THREAD_MESSAGES}
+         SELECT message_id, COUNT(*) OVER () AS unread_count FROM ordered
+         WHERE 1 = 1 ${afterBoundary} AND ${unreadFilter}
+         ORDER BY ${ORDER_KEY_COLUMNS} LIMIT 1`,
       )
       .get(...parameters);
-    if (!isDynamicRecord(countRow) || !isNumber(countRow.unread_count)) {
+    if (firstRow === undefined) return { unreadCount: 0, firstUnreadMessageId: null, throughMessageId };
+    if (!isDynamicRecord(firstRow) || !isString(firstRow.message_id) || !isNumber(firstRow.unread_count)) {
       throw new Error("The conversation unread count is malformed.");
     }
-    if (firstRow !== undefined && (!isDynamicRecord(firstRow) || !isString(firstRow.message_id))) {
-      throw new Error("The first unread conversation message is malformed.");
-    }
-    const firstUnreadMessageId =
-      firstRow !== undefined && isDynamicRecord(firstRow) && isString(firstRow.message_id) ? firstRow.message_id : null;
     return {
-      unreadCount: countRow.unread_count,
-      firstUnreadMessageId,
+      unreadCount: firstRow.unread_count,
+      firstUnreadMessageId: firstRow.message_id,
       throughMessageId,
     };
   }
@@ -393,6 +373,17 @@ function stateFromSnapshot(snapshot: ConversationSnapshot, throughMessageId: str
     throughMessageId,
   };
 }
+
+/** The shown-order key of a message: its group's start, first ordinal and id, its rank in the turn, then its own time, ordinal and id. */
+type MessageOrderKey = [
+  groupStart: string,
+  groupFirst: number,
+  groupId: string,
+  turnRank: number,
+  createdAt: string,
+  ordinal: number,
+  messageId: string,
+];
 
 function emptyReadState(): ConversationReadState {
   return { unreadCount: 0, firstUnreadMessageId: null, throughMessageId: null };

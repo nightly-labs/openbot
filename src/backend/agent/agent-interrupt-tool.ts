@@ -11,6 +11,7 @@ import type { ConversationRuntime } from "./conversation-runtime";
 import type { DrainScheduler } from "./drain-scheduler";
 import type { MailboxSync } from "./mailbox-sync";
 import { openBotToolFailure, openBotToolResult } from "./routine-tools";
+import { toolCallIdempotencyKey } from "./tool-call-idempotency";
 import { ToolOperationFailed, toolStep, toToolOperationFailed } from "./tool-operation";
 
 export const interruptAgentToolSchema = z.strictObject({
@@ -184,7 +185,7 @@ export class AgentInterruptTool {
         text,
         replyToMessageId: null,
         expectsReply: false,
-        idempotencyKey: `${params.threadId}:${params.turnId}:${params.callId}`,
+        idempotencyKey: toolCallIdempotencyKey(params),
       })
       .pipe(toToolOperationFailed);
     this.#mailboxSync.emitQueue(agentId);

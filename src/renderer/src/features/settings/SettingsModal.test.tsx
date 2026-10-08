@@ -1,3 +1,4 @@
+import type { HostedServerList, HostedServerSummary } from "@openbot/contracts/hosted-servers";
 import type {
   AccountSession,
   AppLogoColor,
@@ -12,6 +13,7 @@ import { DEFAULT_GENERAL_SETTINGS } from "@openbot/ui/features/settings/app-sett
 import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createMockHostedServers } from "../../preview/mock-hosted-servers";
 import { SettingsModal } from "./SettingsModal";
 import { isOpenSettingsShortcut } from "./settings-shortcut";
 
@@ -717,5 +719,112 @@ describe("notification settings", () => {
     );
     await screen.findByRole("button", { name: "Send test" });
     expect(screen.queryByRole("button", { name: "Open system settings" })).not.toBeInTheDocument();
+  });
+});
+
+describe("hosted servers", () => {
+  const server: HostedServerSummary = {
+    serverId: "6f1c2d3e-4b5a-4c6d-8e7f-9a0b1c2d3e4f",
+    name: "Research server",
+    size: "small",
+    plan: "starter",
+    interval: "month",
+    currency: "eur",
+    state: "stopped",
+    error: null,
+    createdAt: "2026-09-20T09:30:00.000Z",
+    updatedAt: "2026-09-20T09:30:00.000Z",
+  };
+
+  /** Opens Settings from "Manage servers", with a list that answers only when the test says so. */
+  function renderFromManageServers() {
+    let answer: (list: HostedServerList) => void = () => undefined;
+    let fail: (error: Error) => void = () => undefined;
+    const list = vi.fn(
+      () =>
+        new Promise<HostedServerList>((resolve, reject) => {
+          answer = resolve;
+          fail = reject;
+        }),
+    );
+    const [open, setOpen] = createSignal(true);
+    render(() => (
+      <SettingsModal
+        open={open()}
+        onOpenChange={setOpen}
+        value={DEFAULT_GENERAL_SETTINGS}
+        onValueChange={() => undefined}
+        appInfo={null}
+        updateStatus={idleUpdateStatus}
+        onUpdateAction={vi.fn(async () => undefined)}
+        account={account}
+        onUpdateAccountName={vi.fn(async () => undefined)}
+        onUpdateAccountAvatar={vi.fn(async () => undefined)}
+        hostedServersApi={{ ...createMockHostedServers(), list }}
+        onAddHostedServer={() => undefined}
+        openTab="hosted-servers"
+      />
+    ));
+    return {
+      list,
+      setOpen,
+      answer: (value: Omit<HostedServerList, "maxServers">) => answer({ ...value, maxServers: 3 }),
+      fail: (error: Error) => fail(error),
+    };
+  }
+
+  it("opens on the Hosted servers tab with a loading status before the list answers", async () => {
+    const hosted = renderFromManageServers();
+    expect(await screen.findByRole("tab", { name: "Hosted servers", selected: true })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "General", selected: false })).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Loading hosted servers…" })).toBeInTheDocument();
+
+    hosted.answer({ available: true, servers: [server] });
+    expect(await screen.findByRole("button", { name: /Delete Research server/ })).toBeInTheDocument();
+    expect(screen.queryByRole("status", { name: "Loading hosted servers…" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Hosted servers", selected: true })).toBeInTheDocument();
+  });
+
+  it("shows the empty text when the account has no server yet", async () => {
+    const hosted = renderFromManageServers();
+    hosted.answer({ available: true, servers: [] });
+    expect(await screen.findByText("You do not have a hosted server yet.")).toBeInTheDocument();
+    expect(screen.queryByRole("status", { name: "Loading hosted servers…" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the tab open with the error when the first list fails", async () => {
+    const hosted = renderFromManageServers();
+    hosted.fail(new Error("Could not load hosted servers."));
+    expect(await screen.findByText("Could not load hosted servers.")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Hosted servers", selected: true })).toBeInTheDocument();
+    expect(screen.queryByRole("status", { name: "Loading hosted servers…" })).not.toBeInTheDocument();
+  });
+
+  it("falls back to General when the account cannot use hosted servers", async () => {
+    const hosted = renderFromManageServers();
+    hosted.answer({ available: false, servers: [] });
+    expect(await screen.findByRole("tab", { name: "General", selected: true })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Hosted servers" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the loaded rows across tab changes and a reopen", async () => {
+    const hosted = renderFromManageServers();
+    hosted.answer({ available: true, servers: [server] });
+    await screen.findByRole("button", { name: /Delete Research server/ });
+
+    for (let round = 0; round < 3; round += 1) {
+      await fireEvent.click(screen.getByRole("tab", { name: "General" }));
+      await screen.findByRole("tab", { name: "General", selected: true });
+      await fireEvent.click(screen.getByRole("tab", { name: "Hosted servers" }));
+      expect(await screen.findByRole("button", { name: /Delete Research server/ })).toBeInTheDocument();
+      expect(screen.queryByRole("status", { name: "Loading hosted servers…" })).not.toBeInTheDocument();
+    }
+    expect(hosted.list).toHaveBeenCalledOnce();
+
+    hosted.setOpen(false);
+    hosted.setOpen(true);
+    await waitFor(() => expect(hosted.list).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole("button", { name: /Delete Research server/ })).toBeInTheDocument();
+    expect(screen.queryByRole("status", { name: "Loading hosted servers…" })).not.toBeInTheDocument();
   });
 });

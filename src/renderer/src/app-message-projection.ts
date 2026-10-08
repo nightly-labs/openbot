@@ -9,6 +9,7 @@ import {
   routineRunConversationEvent,
   skillConversationEvent,
 } from "@openbot/contracts/ipc";
+import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
 import type {
   AgentDeliveryMarkerStatus,
@@ -369,7 +370,8 @@ export function withoutAgent<T>(values: Record<string, T>, agentId: string): Rec
 }
 
 function cleanPreview(preview: string): string {
-  const cleaned = cleanAgentMessageText(preview)
+  // The stored preview is the start of the message as written, Markdown and all.
+  const cleaned = markdownPreviewText(cleanAgentMessageText(preview))
     .replace(/\binbox\s+at\s+zero\b[:,]?\s*/gi, "")
     .replace(/\s{2,}/g, " ")
     .trim();

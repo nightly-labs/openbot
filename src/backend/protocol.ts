@@ -155,6 +155,7 @@ export interface ModelListResponse {
     displayName?: string;
     defaultReasoningEffort?: string;
     supportedReasoningEfforts?: Array<{ reasoningEffort?: string }>;
+    reasoningEffortConfigurable?: boolean;
     hidden?: boolean;
   }>;
 }
@@ -169,6 +170,9 @@ export function decodeModelListResponse(value: unknown): ModelListResponse {
       ...(isString(item.displayName) ? { displayName: item.displayName } : {}),
       ...(isString(item.defaultReasoningEffort) ? { defaultReasoningEffort: item.defaultReasoningEffort } : {}),
       ...(isBoolean(item.hidden) ? { hidden: item.hidden } : {}),
+      ...(isBoolean(item.reasoningEffortConfigurable)
+        ? { reasoningEffortConfigurable: item.reasoningEffortConfigurable }
+        : {}),
       ...(Array.isArray(item.supportedReasoningEfforts)
         ? {
             supportedReasoningEfforts: item.supportedReasoningEfforts

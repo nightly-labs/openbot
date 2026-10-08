@@ -58,7 +58,7 @@ async function signedIn(name: string, options: Partial<TeamApiOptions>) {
     Authorization: `Bearer ${await fixture.signIn()}`,
     "OpenBot-Protocol-Version": "3",
     "OpenBot-Capabilities":
-      "agent-admin-v1, skills-admin-v1, shared-tables-v1, agent-install-v1, agent-update-v1, providers-v1, host-admin-v1, host-update-v1, agent-publish-v1",
+      "agent-admin-v1, skills-admin-v1, shared-tables-v1, agent-install-v1, agent-update-v1, providers-v1, host-admin-v1, host-update-v1, host-member-update-v1, agent-publish-v1",
     "Content-Type": "application/json",
   };
   const invite = await Effect.runPromise(fixture.store.createInvite("member"));
@@ -66,7 +66,7 @@ async function signedIn(name: string, options: Partial<TeamApiOptions>) {
   const asMember = { ...admin, Authorization: `Bearer ${member.sessionToken}` };
   const post = (path: string, body: unknown, headers: Record<string, string> = admin) =>
     fetch(`${base}${path}`, { method: "POST", headers, body: JSON.stringify(body) });
-  return { base, admin, asMember, post };
+  return { base, admin, asMember, post, fixture, member };
 }
 
 describe("Team API agent-admin-v1", () => {
@@ -787,6 +787,7 @@ describe("Team API host-update-v1", () => {
           },
           catch: (cause) => new RemoteWorkflowError({ cause }),
         }),
+      requestWhenIdle: () => Effect.sync(snapshot),
       changeSettings: (change: HostUpdateSettingsChange) =>
         Effect.sync(() => {
           if (!allowed) throw new RequestedUpdateRefusal("disabled");
@@ -923,5 +924,73 @@ describe("Team API host-tailscale-v1", () => {
     const { base } = await fixture.start({});
     const compatibility = await (await fetch(`${base}/v1/compatibility`)).json();
     expect(compatibility.capabilities).not.toContain("host-tailscale-v1");
+  });
+});
+
+describe("Team API host-member-update-v1", () => {
+  it("allows active members to request only idle updates and keeps administrator routes closed", async () => {
+    let allowed = true;
+    let restart: HostUpdateStatus["restart"] = null;
+    const snapshot = (): HostUpdateStatus => ({
+      phase: "ready",
+      currentVersion: "0.24.0",
+      availableVersion: "0.25.0",
+      progress: 100,
+      errorCode: null,
+      remoteUpdates: allowed ? "allowed" : "disabled",
+      autoDownload: true,
+      autoInstall: false,
+      restart,
+    });
+    const requestWhenIdle = (member: { name: string }) =>
+      Effect.try({
+        try: () => {
+          if (!allowed) throw new RequestedUpdateRefusal("disabled");
+          restart ??= { requestedBy: member.name, mode: "when-idle", waitingFor: ["agent-turn"] };
+          return snapshot();
+        },
+        catch: (cause) => new RemoteWorkflowError({ cause }),
+      });
+    const { base, asMember, post, fixture, member } = await signedIn("member-update", {
+      admin: {
+        update: {
+          snapshot,
+          check: () => Effect.sync(snapshot),
+          requestWhenIdle,
+          start: () => Effect.sync(snapshot),
+          cancel: snapshot,
+          changeSettings: () => Effect.sync(snapshot),
+        },
+      },
+    });
+    const paths = ["status", "check", "start"];
+    for (const path of paths) {
+      expect((await post(`/v1/host/update/${path}`, {}, { ...asMember, Authorization: "" })).status).toBe(401);
+      expect(
+        (await post(`/v1/host/update/${path}`, {}, { ...asMember, "OpenBot-Capabilities": "host-update-v1" })).status,
+      ).toBe(400);
+    }
+    for (const path of ["status", "check", "cancel", "settings", "start"]) {
+      expect(
+        (await post(`/v1/admin/host/update/${path}`, { restart: "now", autoInstall: true }, asMember)).status,
+      ).toBe(403);
+    }
+    expect(restart).toBeNull();
+    expect((await post("/v1/host/update/status", {}, asMember)).status).toBe(200);
+    expect((await post("/v1/host/update/check", {}, asMember)).status).toBe(200);
+    // The member API accepts no restart mode. An extra forced mode cannot reach the service.
+    const started = await post("/v1/host/update/start", { restart: "now" }, asMember);
+    expect(started.status).toBe(200);
+    expect((await started.json()).restart).toEqual({
+      requestedBy: "member",
+      mode: "when-idle",
+      waitingFor: ["agent-turn"],
+    });
+    allowed = false;
+    expect((await post("/v1/host/update/start", {}, asMember)).status).toBe(403);
+    await Effect.runPromise(fixture.store.updateMember(member.member.id, { disabled: true }));
+    for (const path of paths) expect((await post(`/v1/host/update/${path}`, {}, asMember)).status).toBe(401);
+    const compatibility = await (await fetch(`${base}/v1/compatibility`)).json();
+    expect(compatibility.capabilities).toContain("host-member-update-v1");
   });
 });

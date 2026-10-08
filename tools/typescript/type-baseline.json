@@ -185,7 +185,7 @@
     "src/renderer/stories/BrowserSecretCard.stories.tsx": 1,
     "src/renderer/stories/ChatPrimitives.stories.tsx": 2,
     "src/renderer/stories/ComputerUsePermissionHelp.stories.tsx": 1,
-    "src/renderer/stories/Conversation.stories.tsx": 2,
+    "src/renderer/stories/Conversation.stories.tsx": 1,
     "src/renderer/stories/DynamicIsland.stories.tsx": 1,
     "src/renderer/stories/FilesStorage.stories.tsx": 1,
     "src/renderer/stories/LanguageSelect.stories.tsx": 1,

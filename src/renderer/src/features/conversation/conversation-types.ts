@@ -62,6 +62,8 @@ export interface ConversationProps {
   platform?: import("@openbot/contracts/ipc").AppInfo["platform"];
 
   agentStatus: AgentStatus;
+  /** A joined server's agents are still on their way, so the composer says that it connects. */
+  agentsConnecting?: boolean;
   /**
    * The plan windows for the active agent's provider and model, when the account dock has them.
    * The composer reads them for one thing only: a window at 100% means the next send is refused by

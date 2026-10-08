@@ -188,6 +188,7 @@ import type {
 } from "./ipc-events";
 import type { GitHubConnectorRepositories, GitHubConnectorStatus } from "./ipc-github-connector";
 import type { HostAnalytics, HostAnalyticsInput } from "./ipc-host-analytics";
+import type { HostReleaseStatus } from "./ipc-host-release";
 import type {
   DeleteHostedSiteInput,
   HostedSiteList,
@@ -251,6 +252,16 @@ import type {
   RemoteDesktopTestInput,
   RemoteDesktopTestStatus,
 } from "./ipc-remote-desktop-setup";
+import type {
+  ConnectRoutineFlowInput,
+  DisconnectRoutineFlowInput,
+  RemoveRoutineFlowPositionInput,
+  RoutineFlowCanvas,
+  RoutineFlowLink,
+  RoutineFlowsChanged,
+  SaveRoutineFlowPositionInput,
+  UpdateRoutineFlowLinkInput,
+} from "./ipc-routine-flows";
 import type {
   CreateRoutineInput,
   DeleteRoutineInput,
@@ -637,6 +648,8 @@ export const IPC_ENDPOINTS = {
   // identity result is the server as the list shows it after the change.
   hostAdmin: {
     updateIdentity: scopedRequest<UpdateHostIdentityInput, ServerSummary, "required">()("host-admin:update-identity"),
+    getReleaseStatus: scopedQuery<HostReleaseStatus | null, "required">()("host-admin:get-release-status"),
+    checkRelease: scopedQuery<HostReleaseStatus, "required">()("host-admin:check-release"),
     getUpdateStatus: scopedQuery<HostUpdateStatus, "required">()("host-admin:get-update-status"),
     checkForUpdate: scopedQuery<HostUpdateStatus, "required">()("host-admin:check-for-update"),
     startUpdate: scopedRequest<UpdateRestartMode, HostUpdateStatus, "required">()("host-admin:start-update"),
@@ -869,6 +882,20 @@ export const IPC_ENDPOINTS = {
       "agent:channel-routines:runs",
     ),
   },
+  /**
+   * Routine flows: an agent routine's answer handed on from agent to agent, and the canvas that shows
+   * it. Only this computer's host keeps them; a remote server answers that it cannot.
+   */
+  routineFlows: {
+    canvas: scopedRequest<string, RoutineFlowCanvas>()("routine-flows:canvas"),
+    savePosition: scopedRequest<SaveRoutineFlowPositionInput, void>()("routine-flows:save-position"),
+    removePosition: scopedRequest<RemoveRoutineFlowPositionInput, void>()("routine-flows:remove-position"),
+    connect: scopedRequest<ConnectRoutineFlowInput, RoutineFlowLink>()("routine-flows:connect"),
+    disconnect: scopedRequest<DisconnectRoutineFlowInput, void>()("routine-flows:disconnect"),
+    updateLink: scopedRequest<UpdateRoutineFlowLinkInput, RoutineFlowLink>()("routine-flows:update-link"),
+    /** The local agents whose canvases changed. */
+    changed: event<RoutineFlowsChanged>()("routine-flows:changed"),
+  },
   agentAttachments: {
     chooseAttachments: scopedRequest<ChooseAttachmentsInput, DraftAttachment[]>()("agent:choose-attachments"),
     discardDraftAttachment: scopedRequest<string, void>()("agent:discard-draft-attachment"),
@@ -1099,6 +1126,7 @@ export const IPC_GROUP_PATHS = {
   bitwardenConnector: "bitwardenConnector",
   hostedSites: "hostedSites",
   routineFeed: "routineFeed",
+  routineFlows: "routineFlows",
   billing: "billing",
   hostedServers: "hostedServers",
   marketplaceAgents: "marketplaceAgents",

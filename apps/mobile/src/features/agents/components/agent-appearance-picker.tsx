@@ -6,11 +6,17 @@ import { useThemeColor } from "heroui-native/hooks";
 import { Shuffle } from "lucide-react-native";
 import { memo, type ReactNode, useCallback, useState } from "react";
 import { View } from "react-native";
+import { AgentColorGlow, useAgentColorTransition } from "@/features/agents/components/agent-color-glow";
 import { AvatarThumbnail, BloubAvatarPreview } from "@/features/agents/components/bloub-avatar";
 import { createAvatarCandidates } from "@/features/agents/model/avatar-candidates";
+import { getBloubAvatarColor } from "@/features/agents/model/bloub-activity";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import type { AgentPhotoProps } from "./agent-photo";
+
+const PREVIEW_SIZE = 144;
+// Centred on the avatar. In a sheet with a clear header it reaches up behind the header's blur.
+const GLOW_HEIGHT = 340;
 
 const HUE_LABELS = {
   0: "mobile.agent.appearance.hue.red",
@@ -32,6 +38,8 @@ interface AgentAppearancePickerProps extends AgentPhotoProps {
   nameField: ReactNode;
   photoField?: ReactNode;
   showFaces?: boolean;
+  /** A glow in the agent colour behind the preview. */
+  colorGlow?: boolean;
   disabled: boolean;
   onSeedChange: (seed: string) => void;
   onHueChange: (hue: AvatarHue | null) => void;
@@ -47,6 +55,7 @@ export function AgentAppearancePicker({
   nameField,
   photoField,
   showFaces = true,
+  colorGlow = false,
   disabled,
   onSeedChange,
   onHueChange,
@@ -54,6 +63,7 @@ export function AgentAppearancePicker({
   const { t } = useText();
   const [candidates, setCandidates] = useState(() => createAvatarCandidates(seed));
   const shuffle = useCallback(() => setCandidates((current) => createAvatarCandidates(seed, current)), [seed]);
+  const color = useAgentColorTransition(getBloubAvatarColor(seed, hue));
 
   return (
     <View className="gap-4">
@@ -64,13 +74,15 @@ export function AgentAppearancePicker({
           name: name.trim() || t("mobile.agent.appearance.newAgent"),
         })}
       >
+        {colorGlow ? <AgentColorGlow color={color} centerY={PREVIEW_SIZE / 2} height={GLOW_HEIGHT} /> : null}
         <BloubAvatarPreview
           agentId={agentId}
           serverId={serverId}
           imageUrl={imageUrl}
           seed={seed}
           hue={hue}
-          size={144}
+          size={PREVIEW_SIZE}
+          animatedColor={color}
         />
       </View>
       {nameField}
@@ -133,7 +145,7 @@ const AvatarFaceOptions = memo(function AvatarFaceOptions({
             onSeedChange(candidate);
           }}
         >
-          <AvatarThumbnail seed={candidate} hue={hue} size={36} />
+          <AvatarThumbnail seed={candidate} hue={hue} size={36} animateColor />
         </Button>
       ))}
       <Button
