@@ -733,7 +733,9 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
         const connectionId = state.connectionId;
         state.signalReady = true;
         yield* notify(diagnosticCall(state, "signal-ready", `${state.iceServers.length} ICE servers`));
-        scheduleTurnRefresh(state);
+        // A kept path still uses the credentials of its last ICE restart, so keep their deadline.
+        if (state.connection && !restartsIce) resumeTurnRefresh(state);
+        else scheduleTurnRefresh(state);
         if (state.connection) {
           const connection = state.connection;
           yield* peerDecode(() =>
@@ -1334,8 +1336,14 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
 
   function scheduleTurnRefresh(state: PeerState, delay = SIGNAL_TURN_REFRESH_INTERVAL_MS): void {
     if (!active || state.closed || peer !== state) return;
-    if (state.turnRefreshTimer !== null) clearTimeout(state.turnRefreshTimer);
     state.turnRefreshDueAt = Date.now() + delay;
+    armTurnRefresh(state, delay);
+  }
+
+  /** Keeps `turnRefreshDueAt`: until a `ready` answers, the path still uses the old credentials. */
+  function armTurnRefresh(state: PeerState, delay: number): void {
+    if (!active || state.closed || peer !== state) return;
+    if (state.turnRefreshTimer !== null) clearTimeout(state.turnRefreshTimer);
     state.turnRefreshTimer = setTimeout(() => {
       state.turnRefreshTimer = null;
       if (canSignal(state)) {
@@ -1349,7 +1357,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
           // The reconnect path will request fresh TURN credentials.
         }
       }
-      scheduleTurnRefresh(state);
+      armTurnRefresh(state, SIGNAL_TURN_REFRESH_INTERVAL_MS);
     }, delay);
   }
 

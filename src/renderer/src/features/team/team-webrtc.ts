@@ -61,6 +61,8 @@ interface PeerState {
   reconnectAttempt: number;
   reconnectTimer: number | null;
   turnRefreshTimer: number | null;
+  /** When the credentials of the current path must be renewed. */
+  turnRefreshDueAt: number;
   /** Opens a new Signal socket when a lost path did not come back. */
   signalRenewTimer: number | null;
   /** Reports a lost path that did not come back as a disconnected peer. */
@@ -154,6 +156,7 @@ async function handleCommand(command: BridgeCommand): Promise<void> {
         reconnectAttempt: 0,
         reconnectTimer: null,
         turnRefreshTimer: null,
+        turnRefreshDueAt: 0,
         signalRenewTimer: null,
         disconnectedTimer: null,
         iceRestartPending: false,
@@ -375,7 +378,10 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
         bundlePolicy: "max-bundle",
         iceTransportPolicy: state.iceTransportPolicy,
       });
-    scheduleTurnRefresh(state);
+    // A kept path still uses the credentials of its last ICE restart, so keep their deadline.
+    if (state.role === "client" && state.peerConnection && !shouldRestartIce)
+      scheduleTurnRefresh(state, Math.max(0, state.turnRefreshDueAt - Date.now()));
+    else scheduleTurnRefresh(state);
     post({ type: "ice-servers", peerId: state.id, iceServers: state.iceServers });
     post({ type: "signal-ready", peerId: state.id });
     if (shouldRestartIce) state.iceRestartPending = true;
@@ -417,6 +423,7 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
         payloadDecoders: {},
         reconnectTimer: null,
         turnRefreshTimer: null,
+        turnRefreshDueAt: 0,
         signalRenewTimer: null,
         disconnectedTimer: null,
         signalChain: Promise.resolve(),
@@ -778,17 +785,24 @@ function scheduleSignalReconnect(state: PeerState): void {
   }, delay);
 }
 
-function scheduleTurnRefresh(state: PeerState): void {
+function scheduleTurnRefresh(state: PeerState, delay = SIGNAL_TURN_REFRESH_INTERVAL_MS): void {
+  state.turnRefreshDueAt = Date.now() + delay;
+  armTurnRefresh(state, delay);
+}
+
+/** Keeps `turnRefreshDueAt`: until a `ready` answers, the path still uses the old credentials. */
+function armTurnRefresh(state: PeerState, delay: number): void {
   if (state.turnRefreshTimer !== null) clearTimeout(state.turnRefreshTimer);
   state.turnRefreshTimer = window.setTimeout(() => {
     state.turnRefreshTimer = null;
-    if (!state.socket || state.socket.readyState !== WebSocket.OPEN) return scheduleTurnRefresh(state);
+    if (!state.socket || state.socket.readyState !== WebSocket.OPEN)
+      return armTurnRefresh(state, SIGNAL_TURN_REFRESH_INTERVAL_MS);
     try {
       sendSignal(state, { type: "turn-refresh", version: SIGNAL_PROTOCOL_VERSION, connectionId: state.connectionId });
     } catch {
-      scheduleTurnRefresh(state);
+      armTurnRefresh(state, SIGNAL_TURN_REFRESH_INTERVAL_MS);
     }
-  }, SIGNAL_TURN_REFRESH_INTERVAL_MS);
+  }, delay);
 }
 
 function disconnect(peerId: string): void {
