@@ -289,6 +289,7 @@ function ServerSettings(props: {
     cancelProviderRuntimeDownload,
     connectProvider,
     openProviderInstallGuide,
+    setProviderOn,
     restartProvider,
     cancelProviderRestart,
     codeLogin,
@@ -434,6 +435,17 @@ function ServerSettings(props: {
       },
       get onInstallProvider() {
         return local && providerRuntimeDownloadsAvailable() ? openProviderInstallGuide : undefined;
+      },
+      onSetProviderOn: local ? setProviderOn : undefined,
+      get providerUsers() {
+        return Object.fromEntries(
+          (agentStatus().providers ?? []).map((provider) => [
+            provider.id,
+            agentList()
+              .filter((agent) => agent.provider === provider.id)
+              .map((agent) => agent.name),
+          ]),
+        );
       },
       onRestartProvider: local ? restartProvider : undefined,
       onCancelProviderRestart: local ? cancelProviderRestart : undefined,

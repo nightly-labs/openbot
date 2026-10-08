@@ -16,8 +16,6 @@ export const messages = {
   "mobile.settings.about.privacy": "Politique de confidentialité",
   "mobile.settings.home.profile": "Profil",
   "mobile.settings.home.preferences": "Préférences",
-  "mobile.settings.home.generalHint": "Apparence et conversations",
-  "mobile.settings.home.general": "Général",
   "mobile.settings.home.about": "À propos d’OpenBot",
   "mobile.settings.home.support": "Assistance",
   "mobile.settings.home.supportHint": "Obtenir de l’aide et enregistrer un journal d’assistance",
@@ -69,7 +67,22 @@ export const messages = {
   "mobile.settings.appearance.agentColorMessages": "Couleur de l’agent sur mes messages",
   "mobile.settings.appearance.agentColorMessagesFooter":
     "Vos messages dans une conversation avec un agent prennent la couleur de cet agent. Désactivez cette option si le texte est difficile à lire.",
-  "mobile.settings.feedback.title": "Retour",
+  "mobile.settings.animations.title": "Animations",
+  "mobile.settings.animations.footer":
+    "Désactivez Animations pour réduire les mouvements dans toute l’app. Quand Réduire les animations est activé dans les réglages du téléphone, l’app réduit aussi les mouvements. Les animations ci-dessous restent alors désactivées.",
+  "mobile.settings.animations.all": "Animations",
+  "mobile.settings.animations.chatZoom": "Zoom vers les discussions",
+  "mobile.settings.animations.chatZoomFooter":
+    "Une discussion s’ouvre depuis son avatar dans la liste et s’y referme. Désactivé, la discussion glisse depuis le côté.",
+  "mobile.settings.animations.agentFaces": "Visages animés des agents",
+  "mobile.settings.animations.agentFacesFooter":
+    "Les avatars des agents bougent leur visage pendant que les agents travaillent et se reposent. Désactivé, les visages restent immobiles.",
+  "mobile.settings.animations.composerResize": "Champ de message compact",
+  "mobile.settings.animations.composerResizeFooter":
+    "Le champ de message devient une petite barre quand le clavier est fermé. Désactivé, le champ garde sa taille complète.",
+  "mobile.settings.animations.textReveal": "Animer les réponses",
+  "mobile.settings.animations.textRevealFooter":
+    "Une réponse s’écrit mot par mot, et sa bulle grandit en douceur. Désactivé, le texte s’affiche dès son arrivée.",
   "mobile.settings.feedback.footer": "Retour tactile pour les actions de l’app sur cet appareil.",
   "mobile.settings.feedback.haptics": "Retour haptique",
   "mobile.settings.feedback.retry": "Réessayer d’enregistrer le réglage haptique",

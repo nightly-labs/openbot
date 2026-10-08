@@ -8,11 +8,11 @@ import Animated, {
   Easing,
   useAnimatedProps,
   useAnimatedStyle,
-  useReducedMotion,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
 import Svg, { Circle } from "react-native-svg";
+import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
 
 // Between two reported percents the value glides for this long, so it never ticks.
