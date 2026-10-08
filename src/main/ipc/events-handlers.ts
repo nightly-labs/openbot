@@ -16,8 +16,7 @@ import {
   parseListEventRoutines,
   parseSaveEventRoutine,
 } from "../host-events-inputs";
-import type { ResponseDecoder } from "../remote-host-decoding";
-import { decodeVoid } from "../remote-host-decoding";
+import { acceptEmpty, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
 import type { RemoteWorkflowError } from "../remote-service-effects";
 import type { IpcGroupHandlers } from "./define-ipc-group";
@@ -63,11 +62,11 @@ export function eventsIpcHandlers({ events, remoteServers }: EventsIpcDependenci
       }),
       deleteRoutine: scopedHandler(parseEventRoutineRef, {
         local: (input) => runCauseEffect(events.deleteRoutine(input)),
-        remote: (input, serverId) => remote(serverId, EVENTS_ROUTES.deleteRoutine, decodeVoid, input),
+        remote: (input, serverId) => remote(serverId, EVENTS_ROUTES.deleteRoutine, acceptEmpty, input),
       }),
       testRoutine: scopedHandler(parseEventRoutineRef, {
         local: (input) => runCauseEffect(events.testRoutine(input)),
-        remote: (input, serverId) => remote(serverId, EVENTS_ROUTES.testRoutine, decodeVoid, input),
+        remote: (input, serverId) => remote(serverId, EVENTS_ROUTES.testRoutine, acceptEmpty, input),
       }),
       rotateSecret: scopedHandler(parseEventRoutineRef, {
         local: (input) => runCauseEffect(events.rotateSecret(input)),
