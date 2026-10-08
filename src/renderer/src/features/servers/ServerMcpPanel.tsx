@@ -167,7 +167,14 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
     state.formTestConfig && !mcpConfigChanged(state.draft, state.formTestConfig) ? state.formTest : null,
   );
   /** A test or a sign-in of the form is running; the form's two buttons wait for it. */
-  const formWaiting = () => formTest()?.status === "testing" || formTest()?.status === "signing-in";
+  const formWaiting = () => formSignIn() !== null || formTest()?.status === "testing";
+  /**
+   * The config of a form sign-in still waiting for the browser. Unlike a test result it outlives
+   * edits to the draft: the browser is still out, so Cancel stays bound to the address it signs in to.
+   */
+  function formSignIn(): McpServerConfig | null {
+    return state.formTest?.status === "signing-in" ? state.formTestConfig : null;
+  }
   /** Row test result while it still describes the row; the enabled switch is not compared. */
   const rowTest = (config: McpServerConfig): McpTestState | undefined => {
     const entry = state.tests[config.id];
@@ -342,7 +349,14 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
     });
   }
 
+  /** Leaving or resetting the form drops its Cancel, so a sign-in still waiting ends with it. */
+  function endFormSignIn(): void {
+    const pending = formSignIn();
+    if (pending) cancelSignIn(pending.url);
+  }
+
   function backToList(): void {
+    endFormSignIn();
     props.onDetailChange?.(null);
     setState((current) => {
       current.view = "list";
@@ -369,6 +383,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
 
   /** Puts the form back to what is stored, the way the General tab's save bar resets its fields. */
   function resetForm(): void {
+    endFormSignIn();
     setState((current) => {
       current.draft = mcpConfigDraft(current.baseline);
       current.touched = false;
@@ -939,7 +954,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
           }
         >
           <Show
-            when={formTest()}
+            when={formSignIn() ? state.formTest : formTest()}
             fallback={
               <Text variant="caption" tone="muted">
                 {t("mcp.panel.notTested")}
@@ -951,18 +966,20 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                 <Text class="server-mcp-test-result" variant="caption" tone={mcpTestTone(test())} role="status">
                   {mcpTestMessage(test(), t)}
                 </Text>
-                <Show when={test().status === "signing-in"}>
-                  <div class="server-mcp-row-next">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      disabled={!props.canManage}
-                      onClick={() => cancelSignIn(state.formTestConfig?.url ?? state.draft.url)}
-                    >
-                      {t("mcp.panel.cancelSignIn")}
-                    </Button>
-                  </div>
+                <Show when={formSignIn()}>
+                  {(pending) => (
+                    <div class="server-mcp-row-next">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={!props.canManage}
+                        onClick={() => cancelSignIn(pending().url)}
+                      >
+                        {t("mcp.panel.cancelSignIn")}
+                      </Button>
+                    </div>
+                  )}
                 </Show>
               </>
             )}
