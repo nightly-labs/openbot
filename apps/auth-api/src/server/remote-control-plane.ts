@@ -27,6 +27,7 @@ import {
   WEBHOOK_ROUTES_LIMIT,
   type WebhookRoute,
 } from "@openbot/contracts/signal-protocol/webhook-route";
+import { sourceText } from "@openbot/i18n/source";
 import { Context, Effect, Layer, Result, Schema } from "effect";
 import { importJWK, type JWK, SignJWT } from "jose";
 import { getServerEntitlement } from "./billing-entitlement";
@@ -1460,6 +1461,27 @@ export class RemoteControlPlane {
    * Removes a host and its memberships, invites and sessions. Signal closes the host and client
    * sockets, and each member's devices re-read their server list.
    */
+
+  readonly removeOwnedHost = Effect.fn("RemoteControlPlane.removeOwnedHost")(
+    function* (this: RemoteControlPlane, userId: string, hostId: string) {
+      const dependencies = yield* RemoteDependencies;
+      yield* this.#requireRole(hostId, userId, ["owner"]);
+      const hosted = yield* remoteCall(() =>
+        dependencies.database
+          .prepare("SELECT server_id FROM hosted_servers WHERE server_id = ? LIMIT 1")
+          .bind(hostId)
+          .first<{ server_id: string }>(),
+      );
+      if (hosted)
+        return yield* new RemoteControlPlaneError(
+          409,
+          "hosted_server_removal",
+          sourceText("error.remote.hostedServerRemoval"),
+        );
+      yield* this.deleteHost(userId, hostId);
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
 
   readonly deleteHost = Effect.fn("RemoteControlPlane.deleteHost")(
     function* (

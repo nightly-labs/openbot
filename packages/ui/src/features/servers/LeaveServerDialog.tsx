@@ -10,6 +10,7 @@ import { useText } from "../../text";
 export function LeaveServerDialog(props: {
   server: Pick<ServerSummary, "name"> | null;
   onClose: () => void;
+  removeOwned?: boolean;
   onLeave: () => Promise<void>;
   /** The element that opened the dialog. A menu item is gone when the dialog closes. */
   restoreFocusTarget?: HTMLElement | null | undefined;
@@ -32,15 +33,20 @@ export function LeaveServerDialog(props: {
       open={props.server !== null}
       initialFocus="cancel"
       restoreFocusTarget={props.restoreFocusTarget}
-      title={t("server.settings.leaveConfirmTitle", { name: props.server?.name ?? "" })}
-      description={t("server.settings.leaveConfirmDescription")}
-      confirmLabel={t("server.settings.leaveTitle")}
-      pendingLabel={t("server.settings.leaving")}
+      title={t(props.removeOwned ? "server.settings.removeConfirmTitle" : "server.settings.leaveConfirmTitle", {
+        name: props.server?.name ?? "",
+      })}
+      description={t(
+        props.removeOwned ? "server.settings.removeConfirmDescription" : "server.settings.leaveConfirmDescription",
+      )}
+      confirmLabel={t(props.removeOwned ? "server.settings.removeTitle" : "server.settings.leaveTitle")}
+      pendingLabel={t(props.removeOwned ? "server.settings.removing" : "server.settings.leaving")}
       error={error() ?? undefined}
       onCancel={close}
       onConfirm={async () => {
         // Read now: a successful leave takes the server out of the list.
         const name = props.server?.name ?? "";
+        const removeOwned = props.removeOwned;
         setError(null);
         try {
           await props.onLeave();
@@ -49,7 +55,7 @@ export function LeaveServerDialog(props: {
           return;
         }
         close();
-        toast.success(t("server.settings.leftTitle", { name }));
+        toast.success(t(removeOwned ? "server.settings.removedTitle" : "server.settings.leftTitle", { name }));
       }}
     />
   );

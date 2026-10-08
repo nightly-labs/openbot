@@ -575,10 +575,18 @@ export function createWebWorkspace(
    * to the next host is not a failed leave.
    */
   async function leaveHost(host: RemoteTeamHost): Promise<void> {
+    await departHost(host, () => runtime.leaveHost(host.hostId, host.membershipId));
+  }
+  async function removeOwnedHost(host: RemoteTeamHost): Promise<void> {
+    const remove = runtime.removeOwnedHost;
+    if (!remove) throw new Error(currentText().t("server.settings.actionFailed"));
+    await departHost(host, () => remove(host.hostId));
+  }
+  async function departHost(host: RemoteTeamHost, operation: () => Promise<void>): Promise<void> {
     // Before the request: the host revokes this session before the request answers.
     leftHostIds.add(host.hostId);
     try {
-      await runtime.leaveHost(host.hostId, host.membershipId);
+      await operation();
     } catch (error) {
       leftHostIds.delete(host.hostId);
       throw error;
@@ -1051,6 +1059,7 @@ export function createWebWorkspace(
     run,
     refreshHosts,
     leaveHost,
+    removeOwnedHost,
     retryHosts,
     reconnect,
     joinInvite,

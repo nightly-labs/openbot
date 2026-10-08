@@ -62,6 +62,7 @@ function setup() {
     avatarBucket: () => avatars,
     hostedSites: () => ({ list: vi.fn(), delete: vi.fn() }),
     remote: {
+      removeOwnedHost: vi.fn().mockReturnValue(Effect.succeed(undefined)),
       listHosts: vi.fn().mockReturnValue(Effect.succeed([])),
       startSession: vi.fn().mockReturnValue(Effect.succeed({ sessionId: "session", hostId: "host", expiresAt: 100 })),
       issueSessionTicket: vi.fn().mockReturnValue(Effect.succeed({ ticket: "short-ticket" })),
@@ -210,6 +211,7 @@ describe("browser account boundary", () => {
       ["PATCH", "v2/remote/hosts/host/members/membership", { role: "admin" }],
       ["DELETE", "v2/remote/hosts/host/members/membership", undefined],
       ["DELETE", "v2/remote/invites/invite", undefined],
+      ["DELETE", "v2/remote/hosts/host", undefined],
       ["POST", "v2/remote/hosts/host/invites", { role: "member" }],
     ])("refuses a cross-origin %s %s before calling a service", async (method, path, body) => {
       const services = setup();
@@ -219,7 +221,20 @@ describe("browser account boundary", () => {
       }
       expect(services.remote.changeMembership).not.toHaveBeenCalled();
       expect(services.remote.revokeInvite).not.toHaveBeenCalled();
+      expect(services.remote.removeOwnedHost).not.toHaveBeenCalled();
       expect(services.remote.createInvite).not.toHaveBeenCalled();
+    });
+    it("removes an owned host through the authenticated account service", async () => {
+      const services = setup();
+      const response = await handleBrowserApi(
+        request("v2/remote/hosts/host%2Fone", { method: "DELETE", cookie }),
+        services,
+      );
+      expect(response.status).toBe(204);
+      expect(services.remote.removeOwnedHost).toHaveBeenCalledWith(user.id, "host/one");
+      const unauthorized = await handleBrowserApi(request("v2/remote/hosts/host", { method: "DELETE" }), services);
+      expect(unauthorized.status).toBe(401);
+      expect(services.remote.removeOwnedHost).toHaveBeenCalledTimes(1);
     });
     it("requires the browser cookie", async () => {
       const services = setup();
@@ -536,6 +551,18 @@ describe("browser account boundary", () => {
       services.hostedSites = () => hostedSites;
       return { services, hostedSites };
     }
+    it("removes an owned host through the authenticated account service", async () => {
+      const services = setup();
+      const response = await handleBrowserApi(
+        request("v2/remote/hosts/host%2Fone", { method: "DELETE", cookie }),
+        services,
+      );
+      expect(response.status).toBe(204);
+      expect(services.remote.removeOwnedHost).toHaveBeenCalledWith(user.id, "host/one");
+      const unauthorized = await handleBrowserApi(request("v2/remote/hosts/host", { method: "DELETE" }), services);
+      expect(unauthorized.status).toBe(401);
+      expect(services.remote.removeOwnedHost).toHaveBeenCalledTimes(1);
+    });
     it("requires the browser cookie", async () => {
       const { services, hostedSites } = withSites();
       expect((await handleBrowserApi(request("v1/sites"), services)).status).toBe(401);

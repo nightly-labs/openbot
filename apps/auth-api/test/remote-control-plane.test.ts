@@ -1484,7 +1484,28 @@ describe("webhook route tombstones", () => {
       ).rejects.toMatchObject({ code: "webhook_route_conflict" });
 
       // A deleted host frees its host ID, but not its route IDs.
-      await runApiEffect(controlPlane.deleteHost("owner", "host-1"));
+      await expect(runApiEffect(controlPlane.removeOwnedHost("stranger", "host-1"))).rejects.toMatchObject({
+        status: 403,
+      });
+      await expect(runApiEffect(controlPlane.authenticateHost("host-1", ownerToken))).resolves.toMatchObject({
+        host_id: "host-1",
+      });
+      database
+        .prepare(`INSERT INTO hosted_servers(
+        server_id, owner_user_id, name, size, plan, billing_interval, currency,
+        desired_state, observed_state, idempotency_key, created_at, updated_at
+      ) VALUES ('host-1', 'owner', 'Paid host', 'small', 'starter', 'month', 'usd',
+        'stopped', 'stopped', 'test', 1000, 1000)`)
+        .run();
+      await expect(runApiEffect(controlPlane.removeOwnedHost("owner", "host-1"))).rejects.toMatchObject({
+        code: "hosted_server_removal",
+      });
+      database.prepare("DELETE FROM hosted_servers WHERE server_id = 'host-1'").run();
+      await runApiEffect(controlPlane.removeOwnedHost("owner", "host-1"));
+      await expect(runApiEffect(controlPlane.listHosts("owner"))).resolves.toEqual([]);
+      await expect(runApiEffect(controlPlane.authenticateHost("host-1", ownerToken))).rejects.toMatchObject({
+        status: 401,
+      });
       const reusedHostToken = await host("stranger", "host-1");
       await expect(
         runApiEffect(controlPlane.registerWebhookRoute("host-1", reusedHostToken, "deleted-host-route")),

@@ -263,6 +263,8 @@ export function ServerRail(props: ServerRailProps) {
               onLeave={props.onLeave}
               onDelete={props.onDelete}
               canDelete={props.canDelete}
+              onRemove={props.onRemove}
+              canRemove={props.canRemove}
               onSetMuted={props.onSetMuted}
               onSetNotificationLevel={props.onSetNotificationLevel}
               onOpenUsage={props.onOpenUsage}
@@ -313,6 +315,8 @@ export function ServerRail(props: ServerRailProps) {
                     onLeave={props.onLeave}
                     onDelete={props.onDelete}
                     canDelete={props.canDelete}
+                    onRemove={props.onRemove}
+                    canRemove={props.canRemove}
                     onSetMuted={props.onSetMuted}
                     onSetNotificationLevel={props.onSetNotificationLevel}
                     onOpenUsage={props.onOpenUsage}
@@ -457,6 +461,8 @@ function ServerRailButton(
                 onLeave={props.onLeave}
                 onDelete={props.onDelete}
                 canDelete={props.canDelete}
+                onRemove={props.onRemove}
+                canRemove={props.canRemove}
               />
             </ContextMenu.Content>
           </ContextMenu.Portal>
