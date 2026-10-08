@@ -227,7 +227,8 @@ account signs in, when it starts with no account signed in, and forgets a server
 disconnects from the server or removes it. When the app quits, the session stays open in the account
 service for the next start; signing out or disconnecting the device's sign-in ends it, as before.
 Settings → General → Fast connection to servers turns this off. Off, the app removes the file at
-once, keeps nothing, and ends each session when it quits. The setting is on by default and is stored
+once, keeps nothing on disk, and ends each session when it quits. Turned on during a run, it keeps the
+sessions that are open at that time. The setting is on by default and is stored
 in `openbot-remote-session-reuse-preference-v1.json`.
 
 Account avatar URLs are public, long-lived resources. A person who has the complete URL can request

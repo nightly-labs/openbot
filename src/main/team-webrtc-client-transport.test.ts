@@ -1003,7 +1003,7 @@ describe("TeamWebRtcClientTransport", () => {
       }
     });
 
-    it("ends at quit a session of this run that the setting, turned on later, did not keep", async () => {
+    it("keeps at quit a session of this run when the setting is turned on during the run", async () => {
       const cache = new RemoteSessionCache({
         path: join(tmpdir(), `openbot-sessions-${crypto.randomUUID()}.bin`),
         canPersist: () => true,
@@ -1019,7 +1019,7 @@ describe("TeamWebRtcClientTransport", () => {
         await runCauseEffect(transport.connect("host-1"));
         await Effect.runPromise(cache.setEnabled(true));
         await runCauseEffect(transport.stop());
-        expect(calls.endSession).toHaveBeenCalledWith("session-new");
+        expect(calls.endSession).not.toHaveBeenCalled();
       } finally {
         await Effect.runPromise(cache.clear());
       }

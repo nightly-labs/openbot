@@ -14,7 +14,7 @@ export interface RemoteSessionCacheOptions {
   canPersist: () => boolean;
   encrypt: (value: string) => Buffer;
   decrypt: (value: Buffer) => string;
-  /** The user's choice to keep sessions between runs. Off, nothing is read or written. */
+  /** The user's choice to keep sessions between runs. Off, no file is read or written. */
   enabled?: boolean;
 }
 
@@ -36,7 +36,8 @@ const CACHE_VERSION = 1;
  * account; a record of another account is not used.
  *
  * The user can turn this off in the settings. Off, the file is removed and nothing is kept: each
- * start makes a new session, and quitting ends it, as before this cache.
+ * start makes a new session, and quitting ends it, as before this cache. The open sessions are still
+ * followed in memory, so that the setting, turned on again during the run, keeps them at once.
  *
  * Every failure is ignored. A missing or unreadable file only means that the next connect starts a
  * new session, as it did before this cache.
@@ -63,15 +64,16 @@ export class RemoteSessionCache {
     }
   }
 
-  /** Applies the user's choice. Off forgets every session and removes the file at once. */
+  /**
+   * Applies the user's choice at once. Off removes the file. On writes the sessions that are open
+   * now, so that a session of this run stays open at quit too.
+   */
   setEnabled(enabled: boolean): Effect.Effect<void> {
     return this.#writes.withPermit(
       Effect.gen({ self: this }, function* () {
         yield* this.load();
         this.#enabled = enabled;
-        if (enabled) return;
-        this.#state = null;
-        yield* this.#remove();
+        yield* this.#write();
       }),
     );
   }
@@ -142,7 +144,8 @@ export class RemoteSessionCache {
     return this.#writes.withPermit(
       Effect.gen({ self: this }, function* () {
         yield* this.load();
-        if (!this.#enabled || update() === false) return;
+        // Off, the sessions are still followed in memory, but not written. On again, they are written.
+        if (update() === false || !this.#enabled) return;
         yield* this.#write();
       }),
     );

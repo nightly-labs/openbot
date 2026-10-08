@@ -128,8 +128,9 @@ describe("RemoteSessionCache", () => {
     expect(off.signalUrl("user-1")).toBeNull();
     await expect(readFile(path)).rejects.toMatchObject({ code: "ENOENT" });
 
-    // On again during the run: the next session is kept.
+    // On again during the run: the session that is open now is kept at once, and the next one too.
     await Effect.runPromise(off.setEnabled(true));
+    expect((await loaded(path)).get("user-1", "host-1")).toEqual(session);
     await Effect.runPromise(off.set("user-1", "host-1", session, SIGNAL_URL));
     expect((await loaded(path)).get("user-1", "host-1")).toEqual(session);
 
