@@ -38,7 +38,7 @@ export type TailscaleLocate = () => Effect.Effect<string | null>;
 export type TailscalePlatform = "darwin" | "win32" | "linux";
 
 /** The Windows Tailscale command as WSL mounts the default install directory. */
-const WSL_WINDOWS_TAILSCALE = "/mnt/c/Program Files/Tailscale/tailscale.exe";
+export const WSL_WINDOWS_TAILSCALE = "/mnt/c/Program Files/Tailscale/tailscale.exe";
 
 /**
  * Where each platform installs the command. The macOS app keeps its command inside the bundle; the
@@ -267,7 +267,7 @@ export const TAILSCALE_COMMANDS = {
 } as const;
 
 /** How long `tailscale up` waits for a sign-in. It is shorter than the command deadline. */
-export const TAILSCALE_UP_WAIT_SECONDS = 6;
+const TAILSCALE_UP_WAIT_SECONDS = 6;
 
 function validPort(port: number): number {
   if (!Number.isSafeInteger(port) || port < 1 || port > 65_535) throw new Error("Invalid port.");

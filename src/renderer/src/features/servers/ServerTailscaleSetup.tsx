@@ -30,7 +30,7 @@ import {
 } from "./tailscale-setup-steps";
 
 /** The Tailscale pages the setup links to. Main opens them from a closed table. */
-export type TailscaleSetupLink =
+type TailscaleSetupLink =
   | "tailscale-windows-download"
   | "tailscale-download"
   | "tailscale-admin-dns"
@@ -48,7 +48,7 @@ export interface ServerTailscaleSetupApi {
 }
 
 /** Each step checks itself again at this interval until all steps are done. */
-export const TAILSCALE_SETUP_POLL_MS = 5_000;
+const TAILSCALE_SETUP_POLL_MS = 5_000;
 
 const STEP_TITLE = {
   client: "server.tailscale.setup.clientTitle",

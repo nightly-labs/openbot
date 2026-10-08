@@ -38,11 +38,11 @@ export const OS_RELEASE_PATH = "/proc/sys/kernel/osrelease";
 /** `openbot-server-setup` writes `self` here on a self-hosted server. */
 export const HOSTED_MODE_PATH = "/opt/OpenBot/hosted/mode";
 /** WSL 2 puts `wslinfo` here. Only absolute paths: nothing is looked up on the search path. */
-export const WSL_INFO_CANDIDATES = ["/usr/bin/wslinfo", "/bin/wslinfo"] as const;
-export const WSL_INFO_ARGS = ["--networking-mode"] as const;
+const WSL_INFO_CANDIDATES = ["/usr/bin/wslinfo", "/bin/wslinfo"] as const;
+const WSL_INFO_ARGS = ["--networking-mode"] as const;
 const WSL_INFO_TIMEOUT_MS = 3_000;
 
-export function isWslKernel(osRelease: string | null): boolean {
+function isWslKernel(osRelease: string | null): boolean {
   return osRelease !== null && /microsoft/iu.test(osRelease);
 }
 

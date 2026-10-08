@@ -9,10 +9,7 @@ import type { TailscaleLocalState } from "./tailscale-cli";
  * another tailnet, as node sharing gives it; `other` when it cannot see the host. Null until both
  * are connected.
  */
-export function tailscaleNetworkMatch(
-  local: TailscaleLocalState,
-  host: HostTailscaleSetup,
-): TailscaleNetworkMatch | null {
+function tailscaleNetworkMatch(local: TailscaleLocalState, host: HostTailscaleSetup): TailscaleNetworkMatch | null {
   if (local.kind !== "connected" || host.state !== "connected") return null;
   if (local.tailnet && host.tailnet && local.tailnet === host.tailnet) return "same";
   if (host.dnsName && local.peerDnsNames.includes(host.dnsName)) return "shared";

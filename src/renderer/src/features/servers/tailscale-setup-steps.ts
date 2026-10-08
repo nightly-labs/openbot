@@ -1,10 +1,10 @@
 import type { TailscaleSetupStatus } from "@openbot/contracts/ipc";
 
-export const TAILSCALE_SETUP_STEP_IDS = ["client", "server", "network", "https", "direct"] as const;
+const TAILSCALE_SETUP_STEP_IDS = ["client", "server", "network", "https", "direct"] as const;
 export type TailscaleSetupStepId = (typeof TAILSCALE_SETUP_STEP_IDS)[number];
 
 /** `waiting`: an earlier step must be done first, so this one cannot be checked yet. */
-export type TailscaleSetupStepState = "done" | "action" | "waiting";
+type TailscaleSetupStepState = "done" | "action" | "waiting";
 
 export interface TailscaleSetupStep {
   id: TailscaleSetupStepId;
