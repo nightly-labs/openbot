@@ -72,6 +72,7 @@ import {
   parseOnePasswordConnectorStatus,
   type RemoteDesktopSetupStatus,
   type RemoteDesktopTestStatus,
+  type RemoteSessionReusePreference,
   UPDATE_PHASES,
   type UpdatePreference,
   type UpdateStatus,
@@ -256,6 +257,12 @@ export function decodeUpdatePreference(value: unknown): UpdatePreference {
     autoDownload: requiredBoolean(preference, "autoDownload"),
     allowRemoteUpdates: requiredBoolean(preference, "allowRemoteUpdates"),
     autoInstall: requiredBoolean(preference, "autoInstall"),
+  };
+}
+
+export function decodeRemoteSessionReusePreference(value: unknown): RemoteSessionReusePreference {
+  return {
+    keepBetweenRuns: requiredBoolean(decodeRecord(value, "remote session preference"), "keepBetweenRuns"),
   };
 }
 

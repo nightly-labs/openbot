@@ -26,7 +26,6 @@ import { useCustomProviders } from "./features/custom-providers/custom-providers
 import { useProviderDetection } from "./features/custom-providers/provider-detection-context";
 import type { ServerStorageOptions } from "./features/files/ServerStoragePanel";
 import { useSetup } from "./features/onboarding/onboarding-context";
-import { useSetupProviderProps } from "./features/onboarding/setup-provider-props";
 import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-context";
 import { AddServerOverlay } from "./features/servers/AddServerOverlay";
 import { mcpToolRuntimeNote } from "./features/servers/mcp-servers";
@@ -41,7 +40,7 @@ import { useSettings } from "./features/settings/settings-context";
 import { useSidebar } from "./features/sidebar/sidebar-context";
 import { useUpdates } from "./features/updates/updates-context";
 import { useGlobalSearchSources } from "./global-search-sources";
-import { InitialSetup, RemoteDesktopWorkspace, SettingsModal } from "./lazy-views";
+import { RemoteDesktopWorkspace, SettingsModal } from "./lazy-views";
 import { useNavigation } from "./navigation";
 import { usePlatform } from "./platform";
 import { useProviders } from "./providers";
@@ -98,7 +97,6 @@ export function WorkspaceOverlays(props: AccountProps) {
   );
   return (
     <>
-      <PermissionsReview account={props.account} />
       <SkillsMarketplace
         githubConnector={githubFor(activeServer())}
         onePasswordConnector={onePasswordFor(activeServer())}
@@ -118,35 +116,6 @@ export function WorkspaceOverlays(props: AccountProps) {
       <RemoteDesktop />
       <ChannelCreateOverlay />
     </>
-  );
-}
-
-/** The permissions half of first-run setup, reopened after the fact. */
-function PermissionsReview(props: AccountProps) {
-  const platform = usePlatform();
-  const auth = useAuth();
-  const setup = useSetup();
-  const { activeServer } = useServers();
-  const { joinRemoteDuringSetup } = useServerSelection();
-  const setupProviders = useSetupProviderProps(() => activeServer()?.kind === "local");
-
-  return (
-    <Show when={setup.permissionsOpen()}>
-      <Loading>
-        <InitialSetup
-          {...setupProviders}
-          reviewing
-          state={setup.setupState() ?? { completed: true, preferredProvider: "codex", preferredModel: null }}
-          platform={platform.appInfo()?.platform ?? "darwin"}
-          accountEmail={props.account().email}
-          onSave={setup.saveSetup}
-          onPreviewInvite={setup.previewInvite}
-          onJoinRemote={joinRemoteDuringSetup}
-          onLogout={platform.landingPreview ? undefined : auth.logoutCentralAccount}
-          onClose={() => setup.setPermissionsOpen(false)}
-        />
-      </Loading>
-    </Show>
   );
 }
 
@@ -292,7 +261,7 @@ function ServerSettings(props: {
   const { selectServer } = useServerSelection();
   const { setPendingAgentSelection } = useServerSwitch();
   const { agentList, agentStatus, modelOptions, serverSetupChoice } = useAgents();
-  const { setupState } = useSetup();
+  const { setupState, saveSetup } = useSetup();
   const {
     toolRuntimeStatuses,
     providerAdminServerId,
@@ -415,6 +384,10 @@ function ServerSettings(props: {
      */
     const endpoints = local ? localEndpoints : hostCustomProviders;
     return {
+      get defaultProvider() {
+        const state = setupState();
+        return local && state ? { ...state, save: saveSetup } : undefined;
+      },
       get agentStatus() {
         return agentStatus();
       },

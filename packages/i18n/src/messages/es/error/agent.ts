@@ -34,6 +34,8 @@ export const messages = {
     "No hay ningún modelo de {provider} disponible ahora. Llama a list_models para ver los modelos disponibles.",
   "error.agent.reasoningEffortUnsupported":
     "El modelo «{model}» no admite el nivel de razonamiento «{effort}». Niveles admitidos: {efforts}.",
+  "error.agent.noStartingModelInSettings":
+    "{provider} no tiene ningún modelo disponible, y ningún otro proveedor conectado tiene uno. Inicia sesión en un proveedor o cambia el proveedor predeterminado en Ajustes del servidor → Proveedores.",
   "error.agent.noStartingModel":
     "{provider} no tiene ningún modelo disponible, ni tampoco los demás proveedores con sesión iniciada. Inicia sesión en un proveedor o cambia el proveedor predeterminado en Proveedores y permisos.",
   "error.agent.waitBeforeProviderChange":

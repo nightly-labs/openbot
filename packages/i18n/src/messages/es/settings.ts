@@ -41,6 +41,9 @@ export const messages = {
   "settings.busyMessage.title": "Dar instrucciones a los agentes mientras trabajan",
   "settings.busyMessage.description":
     "Los mensajes nuevos se incorporan al trabajo actual del agente, no a la cola. Funciona con ChatGPT y Claude.",
+  "settings.keepRemoteSessions.title": "Conexión rápida a servidores",
+  "settings.keepRemoteSessions.description":
+    "Mantener la conexión con los servidores entre inicios. OpenBot se abre aproximadamente un segundo más rápido. Al cerrar OpenBot, el servicio de OpenBot no cierra la conexión.",
   "settings.permissions.title": "Permisos",
   "settings.turbo.title": "Modo Turbo",
   "settings.turbo.description":

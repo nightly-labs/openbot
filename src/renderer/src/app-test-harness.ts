@@ -571,6 +571,8 @@ export function installOpenbotStub(): void {
       setApprovalAutomation: vi.fn(async () => ({ turbo: false, defaultAutoApprove: false, autoApproveOverrides: {} })),
       getBusyMessageModePreference: vi.fn().mockResolvedValue({ mode: "queue" }),
       setBusyMessageModePreference: vi.fn(async ({ mode }) => ({ mode })),
+      getRemoteSessionReusePreference: vi.fn().mockResolvedValue({ keepBetweenRuns: true }),
+      setRemoteSessionReusePreference: vi.fn(async ({ keepBetweenRuns }) => ({ keepBetweenRuns })),
       getAppLanguagePreference: vi.fn().mockResolvedValue({ language: "system" }),
       setAppLanguagePreference: vi.fn(async ({ language }) => ({ language })),
       openExternal: vi.fn().mockResolvedValue(undefined),

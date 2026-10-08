@@ -30,6 +30,8 @@ export interface GeneralSettingsValue {
   sendShortcut: SendShortcutMode;
   /** What a message sent to a busy agent does, unless the agent or the message sets its own. */
   busyMessageMode: BusyMessageMode;
+  /** Keep each joined server's connection between runs of the app, so the start is faster. */
+  keepRemoteSessions: boolean;
   /** Short sounds that confirm the user's own actions, such as a click or a sent message. */
   soundFeedback: boolean;
   soundTheme: SoundTheme;
@@ -61,6 +63,7 @@ export const DEFAULT_GENERAL_SETTINGS: GeneralSettingsValue = {
   taskCompletionSound: true,
   sendShortcut: "enter",
   busyMessageMode: "queue",
+  keepRemoteSessions: true,
   soundFeedback: false,
   soundTheme: "default",
   turboMode: false,

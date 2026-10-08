@@ -1587,7 +1587,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             this.#providers.requireProviderOn(agent.provider);
             if (needsModel)
               throw new Error(
-                sourceText("error.agent.noStartingModel", { provider: providerLabel(this.#preference().provider) }),
+                sourceText("error.agent.noStartingModelInSettings", {
+                  provider: providerLabel(this.#preference().provider),
+                }),
               );
           });
           return agent;

@@ -5,12 +5,9 @@ export const messages = {
   "onboarding.setup.saveFailed": "OpenBot konnte die lokale Einrichtung nicht speichern.",
   "onboarding.setup.verifyFailed": "OpenBot konnte diese Einladung nicht prüfen.",
   "onboarding.setup.connectFailed": "OpenBot konnte keine Verbindung zu diesem Host herstellen.",
-  "onboarding.setup.reviewTitle": "Anbieter und Berechtigungen",
   "onboarding.setup.localTitle": "Diesen Computer einrichten",
   "onboarding.setup.remoteTitle": "Mit einem Host verbinden",
   "onboarding.setup.title": "Wo soll OpenBot laufen?",
-  "onboarding.setup.reviewDescription":
-    "Wähle den Standardanbieter für lokale Agenten und prüfe die macOS-Berechtigungen.",
   "onboarding.setup.localDescription": "Agenten, Unterhaltungen und Dateien bleiben auf diesem Computer.",
   "onboarding.setup.remoteDescription": "Verwende eine Einladung der Person, die deinen OpenBot-Host betreibt.",
   "onboarding.setup.description":
@@ -32,7 +29,6 @@ export const messages = {
   "onboarding.setup.otherInvitation": "Andere Einladung verwenden",
   "onboarding.setup.joinNote":
     "Du trittst als {email} bei. E-Mail-Einladungen funktionieren nur für die Adresse, die sie erhalten hat.",
-  "onboarding.setup.saveChanges": "Änderungen speichern",
   "onboarding.setup.connect": "Mit Host verbinden",
   "onboarding.setup.reviewInvitation": "Einladung prüfen",
   "onboarding.setup.continueWith": "Mit {provider} fortfahren",
