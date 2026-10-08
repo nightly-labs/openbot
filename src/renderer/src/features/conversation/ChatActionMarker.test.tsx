@@ -1,6 +1,6 @@
 import type { ChatActionMarkerModel } from "@openbot/ui/data";
 import { ChatActionMarker } from "@openbot/ui/features/conversation/ChatActionMarker";
-import { fireEvent, render, screen } from "@solidjs/testing-library";
+import { fireEvent, render, screen, within } from "@solidjs/testing-library";
 import { describe, expect, it, vi } from "vitest";
 
 describe("ChatActionMarker routine history", () => {
@@ -35,6 +35,47 @@ describe("ChatActionMarker routine history", () => {
     expect(screen.queryByRole("button", { name: /history for Morning brief/ })).not.toBeInTheDocument();
   });
 });
+
+describe("ChatActionMarker routine run group", () => {
+  it("shows the run count and time range until the user opens the runs", async () => {
+    render(() => (
+      <ChatActionMarker marker={runGroupMarker()} agents={[]} onSelectAgent={vi.fn()} onOpenRoutine={vi.fn()} />
+    ));
+
+    expect(screen.getByText("3 runs")).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Completed runs" })).not.toBeInTheDocument();
+    const toggle = screen.getByRole("button", { name: "Show 3 runs of Watchdog" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+    await fireEvent.click(toggle);
+
+    const list = screen.getByRole("list", { name: "Completed runs" });
+    expect(within(list).getAllByRole("listitem")).toHaveLength(3);
+    expect(screen.getAllByRole("group", { name: "Completed routine, Watchdog" })).toHaveLength(3);
+    expect(screen.getByRole("button", { name: "Hide 3 runs of Watchdog" })).toHaveAttribute("aria-expanded", "true");
+  });
+});
+
+function runGroupMarker(): Extract<ChatActionMarkerModel, { kind: "routine-run-group" }> {
+  const runs = [1, 2, 3].map((index) => {
+    const marker: Extract<ChatActionMarkerModel, { kind: "routine-run" }> = {
+      ...completedMarker(),
+      routineId: "routine-watch",
+      runId: `run-${index}`,
+      routineName: "Watchdog",
+      timestamp: `2026-09-01T08:${String(index * 15).padStart(2, "0")}:00.000Z`,
+      previousTransitions: [],
+    };
+    return { id: `message-${index}`, marker };
+  });
+  return {
+    kind: "routine-run-group",
+    routineId: "routine-watch",
+    routineName: "Watchdog",
+    runs,
+    timestamp: "2026-09-01T08:45:00.000Z",
+  };
+}
 
 function completedMarker(): Extract<ChatActionMarkerModel, { kind: "routine-run" }> {
   return {
