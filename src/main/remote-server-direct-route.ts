@@ -225,23 +225,22 @@ export class RemoteDirectRoutes implements RemoteServerDirectory {
     const server = this.#options.servers.find(serverId);
     const url = server?.directUrl;
     if (!server || !url || !this.#mayTry(serverId)) return false;
-    const local = yield* this.#options.localTailscale();
-    if (local.kind !== "connected") {
-      this.#hints.set(serverId, "tailscale-unavailable");
-      return false;
-    }
-    // The device must be one this computer's Tailscale lists: in the same tailnet, or shared into it.
-    const hostname = new URL(url).hostname;
-    if (local.dnsName !== hostname && !local.peerDnsNames.includes(hostname)) {
-      this.#hints.set(serverId, "other-tailnet");
-      return false;
-    }
     // The account the attempt is for. A session is kept and used only for this account. At startup
     // the account may still be loading, and "not known yet" would read as another account at the end.
+    // This wait has its own deadline, and WebRTC waits for the account too, so it is not in the
+    // attempt's deadline.
     if (this.#options.accountReady) yield* this.#options.accountReady();
     const principalId = this.#options.sessions?.principalId() ?? null;
-    const kept = yield* this.#keptSession(principalId, serverId, url);
+    // One deadline for the local Tailscale check and the network steps together: a local Tailscale
+    // that does not answer must not hold WebRTC, or the requests that wait for this attempt, longer.
     const attempt = yield* Effect.gen({ self: this }, function* () {
+      const local = yield* this.#options.localTailscale();
+      if (local.kind !== "connected") return { skipped: "tailscale-unavailable" as const };
+      // The device must be one this computer's Tailscale lists: in the same tailnet, or shared into it.
+      const hostname = new URL(url).hostname;
+      if (local.dnsName !== hostname && !local.peerDnsNames.includes(hostname))
+        return { skipped: "other-tailnet" as const };
+      const kept = yield* this.#keptSession(principalId, serverId, url);
       const identity = yield* this.#options.verifyIdentity(url, server.id, server.fingerprint);
       // `verifyIdentity` checks the key against the pinned fingerprint. A pinned key is checked too.
       if (server.publicKey !== undefined && identity.publicKey !== server.publicKey)
@@ -251,12 +250,19 @@ export class RemoteDirectRoutes implements RemoteServerDirectory {
       if (kept && checkSession) {
         const answer = yield* checkSession(url, kept.token, identity.compatibility);
         if (answer === "valid")
-          return { token: kept.token, expiresAt: kept.expiresAt, kept: true, compatibility: identity.compatibility };
+          return {
+            skipped: null,
+            token: kept.token,
+            expiresAt: kept.expiresAt,
+            kept: true,
+            compatibility: identity.compatibility,
+          };
         yield* this.#forgetKept(serverId);
       }
       const ticket = yield* this.#options.createTicket(server.id);
       const session = yield* this.#options.signIn(url, ticket, identity.compatibility);
       return {
+        skipped: null,
         token: session.sessionToken,
         expiresAt: this.#expiresAt(session.sessionExpiresAt),
         kept: false,
@@ -269,26 +275,26 @@ export class RemoteDirectRoutes implements RemoteServerDirectory {
       }),
       Effect.result,
     );
+    const result = attempt._tag === "Success" ? attempt.success : null;
+    // Tailscale on this computer cannot reach the device: WebRTC, and the next connection checks again.
+    if (result?.skipped) {
+      this.#hints.set(serverId, result.skipped);
+      return false;
+    }
     // The server can be removed, or the member can turn the path off, while the attempt runs.
     const current = this.#options.servers.find(serverId);
     // So can the account: a session of the previous account is not used for the next one. An account
     // that was not known at the start (it was still loading) has not changed: nothing kept was read for
     // it, and nothing is kept for it at the end.
     const accountChanged = principalId !== null && principalId !== (this.#options.sessions?.principalId() ?? null);
-    if (
-      attempt._tag === "Failure" ||
-      !current ||
-      current.directUrl !== url ||
-      current.directDisabled ||
-      accountChanged
-    ) {
+    if (result === null || !current || current.directUrl !== url || current.directDisabled || accountChanged) {
       // A path that is already in use stays in use: this failure does not send it back to WebRTC.
       if (this.#active.has(serverId)) return true;
       this.#retryAfter.set(serverId, this.#now() + DIRECT_RETRY_AFTER_MS);
       this.#hints.set(serverId, "failed");
       return false;
     }
-    const { token, expiresAt } = attempt.success;
+    const { token, expiresAt } = result;
     const now = this.#now();
     const refresh = setTimeout(
       () => this.#options.onRefreshDue(serverId),
@@ -298,9 +304,9 @@ export class RemoteDirectRoutes implements RemoteServerDirectory {
     this.#active.set(serverId, { url, token, expiresAt, refresh });
     this.#retryAfter.delete(serverId);
     this.#hints.delete(serverId);
-    this.#options.setCompatibility(serverId, attempt.success.compatibility);
+    this.#options.setCompatibility(serverId, result.compatibility);
     // A new session is kept for the next run. A failed write only means a new sign-in then.
-    if (!attempt.success.kept && principalId !== null && this.#options.sessions)
+    if (!result.kept && principalId !== null && this.#options.sessions)
       yield* this.#options.sessions.write(principalId, serverId, { url, token, expiresAt });
     return true;
   });

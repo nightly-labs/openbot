@@ -157,6 +157,13 @@ describe("RemoteDirectRoutes", () => {
     expect(direct.isActive(HOST)).toBe(false);
   });
 
+  it("counts a local Tailscale that does not answer against the same deadline", async () => {
+    const { direct, steps } = routes(webRtcServer(), { attemptTimeoutMs: 20, localTailscale: () => Effect.never });
+    expect(await Effect.runPromise(direct.tryActivate(HOST))).toBe(false);
+    expect(steps).toEqual([]);
+    expect(direct.status(webRtcServer()).hint).toBe("failed");
+  });
+
   it("does not retry a failed address until later, unless the member asks", async () => {
     let now = 1_000;
     const verifyIdentity = vi.fn(() => Effect.fail(new RemoteWorkflowError({ cause: new Error("down") })));
