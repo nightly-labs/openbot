@@ -504,7 +504,8 @@ function createPeerConnection(state: PeerState, iceServers: RTCIceServer[]): RTC
   state.peerConnection = connection;
   state.iceRestarts = 0;
   connection.onicecandidate = (event) => {
-    if (!event.candidate || !state.connectionId) return;
+    // An empty candidate marks the end of gathering. Signal v1 accepts only candidates.
+    if (!event.candidate?.candidate || !state.connectionId) return;
     sendSignal(state, {
       type: "ice-candidate",
       version: SIGNAL_PROTOCOL_VERSION,
