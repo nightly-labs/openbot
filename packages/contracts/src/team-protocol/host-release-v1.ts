@@ -1,4 +1,4 @@
-// Optional host-release-v1 contract. Owners and admins can read release status and check the
+// Optional host-release-v1 contract. All signed-in server members can read release status and check the
 // official stable feed for the host's platform and architecture. This never downloads application
 // files, changes update preferences, or restarts the host. It is available even when remote
 // installation is disabled or a host administrator controls installation. host-update-v1 is unchanged.
@@ -6,8 +6,8 @@ import { adminRoute, empty, fields, nullable, type OptionalRouteCodec, oneOf, st
 
 export const HOST_RELEASE_CAPABILITY = "host-release-v1";
 export const HOST_RELEASE_ROUTES = {
-  status: "/v1/admin/host/release/status",
-  check: "/v1/admin/host/release/check",
+  status: "/v1/host/release/status",
+  check: "/v1/host/release/check",
 } as const;
 
 const snapshot = fields({

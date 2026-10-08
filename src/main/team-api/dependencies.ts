@@ -164,7 +164,7 @@ export interface TeamApiAdmin {
   /** `host-admin-v1`: the server name and logo. */
   identity?: TeamApiHostIdentity;
   /** `host-update-v1`: the app update of this computer. Advertised also when the host user turned it off. */
-  update?: Pick<RequestedUpdate, "snapshot" | "check" | "start" | "cancel" | "changeSettings">;
+  update?: Pick<RequestedUpdate, "snapshot" | "check" | "start" | "requestWhenIdle" | "cancel" | "changeSettings">;
 }
 
 interface TeamApiHostIdentity {

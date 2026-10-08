@@ -29,6 +29,23 @@ afterEach(() => {
 });
 
 describe("remote release checks", () => {
+  it("lets a member request an idle update without administrator controls", async () => {
+    const calls = createMockHostUpdate({
+      hostUpdate: { ...unsupported, phase: "ready", availableVersion: "0.26.0" },
+      hostRelease: { ...available, method: "self-update" },
+    });
+    const start = vi.spyOn(calls, "startUpdate");
+    render(() => (
+      <ServerUpdatePanel serverId="host" hostName="Host" actionsAvailable canManage={false} calls={calls} />
+    ));
+    await fireEvent.click(await screen.findByRole("button", { name: "Update when idle" }));
+    await waitFor(() => expect(start).toHaveBeenCalledWith("when-idle", "host"));
+    expect(await screen.findByRole("status")).toHaveTextContent("Host restarts when its agents are idle");
+    expect(screen.queryByRole("switch")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cancel update" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Restart now" })).not.toBeInTheDocument();
+  });
+
   it("checks a hosted box without offering installation controls", async () => {
     const calls = createMockHostUpdate({ hostUpdate: unsupported, hostRelease: { ...available, phase: "idle" } });
     const check = vi.spyOn(calls, "checkRelease");
@@ -42,15 +59,18 @@ describe("remote release checks", () => {
     expect(await screen.findByText("0.26.0 is available.")).toBeInTheDocument();
   });
 
-  it("offers read-only checks when the host manager owns installation", async () => {
-    const calls = createMockHostUpdate({
-      hostUpdate: { ...unsupported, remoteUpdates: "managed" },
-      hostRelease: { ...available, method: "host-manager" },
-    });
-    render(() => <ServerUpdatePanel serverId="host" hostName="Host" actionsAvailable calls={calls} />);
-    expect(await screen.findByRole("button", { name: "Check for updates" })).toBeEnabled();
-    expect(screen.queryByRole("button", { name: "Update when idle" })).not.toBeInTheDocument();
-  });
+  it.each(["managed", "disabled"] as const)(
+    "offers read-only checks when installation is %s",
+    async (remoteUpdates) => {
+      const calls = createMockHostUpdate({
+        hostUpdate: { ...unsupported, phase: "idle", remoteUpdates },
+        hostRelease: { ...available, method: remoteUpdates === "managed" ? "host-manager" : "self-update" },
+      });
+      render(() => <ServerUpdatePanel serverId="host" hostName="Host" actionsAvailable calls={calls} />);
+      expect(await screen.findByRole("button", { name: "Check for updates" })).toBeEnabled();
+      expect(screen.queryByRole("button", { name: "Update when idle" })).not.toBeInTheDocument();
+    },
+  );
 
   it("lets an admin retry a failed release check", async () => {
     const calls = createMockHostUpdate({ hostUpdate: unsupported, hostRelease: { ...available, phase: "idle" } });

@@ -262,9 +262,9 @@ export const messages = defineMessages("settings", {
     "OpenBot installs {target} when no agent works. New routine runs wait until then.",
   "settings.updates.idleRestart.relaunch": "Restart when idle",
   "settings.updates.idleRestart.update": "Install when idle",
-  "settings.updates.allowRemote.title": "Allow updates from server admins",
+  "settings.updates.allowRemote.title": "Allow updates from server members",
   "settings.updates.allowRemote.description":
-    "Owners and admins of this server can download an update and restart OpenBot on this computer.",
+    "All signed-in server members can request an update when this computer is idle. Owners and admins can also force a restart.",
   // The Hosted sites tab.
   "settings.hostedSites.title": "Published sites",
   "settings.hostedSites.unavailable": "Site hosting is unavailable.",

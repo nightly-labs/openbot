@@ -62,19 +62,25 @@ async function setup(
 }
 
 describe("host-release-v1", () => {
-  it("allows release discovery only for admins that negotiated the capability", async () => {
+  it("allows release discovery for active members that negotiated the capability", async () => {
     const requestFeed = vi.fn(async () => manifest("0.26.0"));
     const { fixture, base, headers, post, check } = await setup({ fetch: requestFeed });
     const invite = await Effect.runPromise(fixture.store.createInvite("member"));
     const member = await Effect.runPromise(fixture.store.acceptInvite(invite.token, "member", "member password"));
     for (const route of Object.values(HOST_RELEASE_ROUTES)) {
-      expect((await post(route, { ...headers, Authorization: `Bearer ${member.sessionToken}` })).status).toBe(403);
       expect((await post(route, { ...headers, "OpenBot-Capabilities": "" })).status).toBe(400);
       expect((await post(route, { ...headers, Authorization: "" })).status).toBe(401);
     }
     expect(requestFeed).not.toHaveBeenCalled();
     const compatibility = await (await fetch(`${base}/v1/compatibility`)).json();
     expect(compatibility.capabilities).toContain(HOST_RELEASE_CAPABILITY);
+    for (const route of Object.values(HOST_RELEASE_ROUTES)) {
+      expect((await post(route, { ...headers, Authorization: `Bearer ${member.sessionToken}` })).status).toBe(200);
+    }
+    await Effect.runPromise(fixture.store.updateMember(member.member.id, { disabled: true }));
+    expect(
+      (await post(HOST_RELEASE_ROUTES.check, { ...headers, Authorization: `Bearer ${member.sessionToken}` })).status,
+    ).toBe(401);
     const status = await check();
     expect(status).toEqual({ currentVersion: "0.25.2", latestVersion: "0.26.0", phase: "available", method: "hosted" });
     report.push({ scenario: "hosted update available", status });

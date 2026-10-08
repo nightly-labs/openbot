@@ -1479,6 +1479,7 @@ export async function createApplicationServices({
         snapshot: () => scheduledUpdate().snapshot(),
         check: () => scheduledUpdate().check(),
         start: (member, mode) => scheduledUpdate().start(member, mode),
+        requestWhenIdle: (member) => scheduledUpdate().requestWhenIdle(member),
         cancel: () => scheduledUpdate().cancel(),
         changeSettings: (change) => scheduledUpdate().changeSettings(change),
       },

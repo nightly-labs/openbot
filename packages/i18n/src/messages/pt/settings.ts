@@ -237,9 +237,9 @@ export const messages = {
   "settings.updates.autoInstall.title": "Instalar atualizações automaticamente",
   "settings.updates.autoInstall.description":
     "O OpenBot reinicia para aplicar uma atualização baixada quando os agentes estão ociosos. Os membros dos seus servidores são desconectados por um breve período.",
-  "settings.updates.allowRemote.title": "Permitir atualizações por administradores do servidor",
+  "settings.updates.allowRemote.title": "Permitir atualizações por membros do servidor",
   "settings.updates.allowRemote.description":
-    "Os proprietários e administradores deste servidor podem baixar uma atualização e reiniciar o OpenBot neste computador.",
+    "Todos os membros conectados ao servidor podem solicitar uma atualização quando este computador estiver ocioso. Proprietários e administradores também podem forçar uma reinicialização.",
   "settings.hostedSites.title": "Sites publicados",
   "settings.hostedSites.unavailable": "A hospedagem de sites está indisponível.",
   "settings.hostedSites.usage": { one: "{used} de {count} site", other: "{used} de {count} sites" },

@@ -1,3 +1,4 @@
+import { HOST_MEMBER_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-member-update-v1";
 import { HOST_RELEASE_ROUTES } from "@openbot/contracts/team-protocol/host-release-v1";
 // Admin requests to one host: agent settings and skills, shared tables, agent share links, the server name and logo,
 // the app update, MCP servers, storage, hosted sites and providers.
@@ -326,21 +327,49 @@ export function updateHostIdentity(
   return adminCall(() => request("POST", HOST_ADMIN_ROUTES.identity, ignoreResponse, body));
 }
 
-export function getHostUpdateStatus(request: TeamApiRequest): Effect.Effect<HostUpdateStatus, TeamAdminRequestError> {
-  return adminCall(() => request("POST", HOST_UPDATE_ROUTES.status, decodeHostUpdateStatus, {}));
+export function getHostUpdateStatus(
+  request: TeamApiRequest,
+  memberAccess = false,
+): Effect.Effect<HostUpdateStatus, TeamAdminRequestError> {
+  return adminCall(() =>
+    request(
+      "POST",
+      memberAccess ? HOST_MEMBER_UPDATE_ROUTES.status : HOST_UPDATE_ROUTES.status,
+      decodeHostUpdateStatus,
+      {},
+    ),
+  );
 }
 
 /** The host starts the check and answers at once; read the status again for the outcome. */
-export function checkHostForUpdate(request: TeamApiRequest): Effect.Effect<HostUpdateStatus, TeamAdminRequestError> {
-  return adminCall(() => request("POST", HOST_UPDATE_ROUTES.check, decodeHostUpdateStatus, {}));
+export function checkHostForUpdate(
+  request: TeamApiRequest,
+  memberAccess = false,
+): Effect.Effect<HostUpdateStatus, TeamAdminRequestError> {
+  return adminCall(() =>
+    request(
+      "POST",
+      memberAccess ? HOST_MEMBER_UPDATE_ROUTES.check : HOST_UPDATE_ROUTES.check,
+      decodeHostUpdateStatus,
+      {},
+    ),
+  );
 }
 
 /** A second start replaces the restart mode of the first, which is how an admin skips the wait. */
 export function startHostUpdate(
   request: TeamApiRequest,
   restart: UpdateRestartMode,
+  memberAccess = false,
 ): Effect.Effect<HostUpdateStatus, TeamAdminRequestError> {
-  return adminCall(() => request("POST", HOST_UPDATE_ROUTES.start, decodeHostUpdateStatus, { restart }));
+  return adminCall(() =>
+    request(
+      "POST",
+      memberAccess ? HOST_MEMBER_UPDATE_ROUTES.start : HOST_UPDATE_ROUTES.start,
+      decodeHostUpdateStatus,
+      memberAccess ? {} : { restart },
+    ),
+  );
 }
 
 export function cancelHostUpdate(request: TeamApiRequest): Effect.Effect<HostUpdateStatus, TeamAdminRequestError> {

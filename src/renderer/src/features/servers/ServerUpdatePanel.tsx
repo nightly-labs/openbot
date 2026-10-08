@@ -42,6 +42,8 @@ export type HostUpdateCalls = Pick<
   Partial<Pick<OpenBotDesktopApi["hostAdmin"], "getReleaseStatus" | "checkRelease">>;
 
 export interface ServerUpdateOptions {
+  /** Only administrators can change preferences, cancel, or force a restart. */
+  canManage?: boolean;
   /** The calls of a client with no `window.openbot`, such as the web client. */
   calls?: HostUpdateCalls;
 }
@@ -54,7 +56,7 @@ const RETRY_MS = 5000;
 /**
  * Server Settings > Updates: the OpenBot update of a joined server's host (`host-update-v1`). The
  * host sends no progress event, so the panel reads the status again while something runs there.
- * The host checks the admin role again on every call.
+ * The host checks permissions again on every call.
  */
 export function ServerUpdatePanel(
   props: ServerUpdateOptions & { serverId: string; hostName: string; actionsAvailable: boolean },
@@ -158,18 +160,18 @@ export function ServerUpdatePanel(
     const remote = status()?.remoteUpdates;
     return remote === "disabled" || remote === "managed" || status()?.phase === "unsupported";
   };
-  const externalRelease = () => (release()?.method !== "self-update" ? release() : null);
+  const readOnlyRelease = () => (release()?.method !== "self-update" || blocked() ? release() : null);
   const checkDisabled = () =>
     !props.actionsAvailable ||
     Boolean(busy()) ||
     Boolean(loadError()) ||
-    (externalRelease() ? externalRelease()?.phase === "unavailable" || !calls().checkRelease : blocked());
+    (readOnlyRelease() ? readOnlyRelease()?.phase === "unavailable" || !calls().checkRelease : blocked());
   const disabled = () => !props.actionsAvailable || Boolean(busy()) || Boolean(loadError()) || blocked();
   const check = () => {
     const releaseCheck = calls().checkRelease;
     const current = generation;
     return act("check", async (serverId) => {
-      if (!externalRelease() || !releaseCheck) return calls().checkForUpdate(serverId);
+      if (!readOnlyRelease() || !releaseCheck) return calls().checkForUpdate(serverId);
       const next = await releaseCheck(serverId);
       if (current === generation) setRelease(next);
       return calls().getUpdateStatus(serverId);
@@ -181,7 +183,7 @@ export function ServerUpdatePanel(
 
   function message(current: HostUpdateStatus): string {
     const name = props.hostName;
-    const checked = externalRelease();
+    const checked = readOnlyRelease();
     if (checked && !running(current) && current.phase !== "ready" && current.errorCode !== "install_failed") {
       switch (checked.phase) {
         case "checking":
@@ -243,7 +245,7 @@ export function ServerUpdatePanel(
         <Show when={status()}>
           {(current) => (
             <>
-              <BlockedNotice status={current()} release={externalRelease()} hostName={props.hostName} />
+              <BlockedNotice status={current()} release={readOnlyRelease()} hostName={props.hostName} />
               <ItemGroup class="settings-modal-card">
                 <Item class="settings-modal-row">
                   <ItemContent>
@@ -266,7 +268,7 @@ export function ServerUpdatePanel(
                         loading={
                           busy() === "check" ||
                           current().phase === "checking" ||
-                          externalRelease()?.phase === "checking"
+                          readOnlyRelease()?.phase === "checking"
                         }
                         disabled={checkDisabled()}
                         onClick={() => void check()}
@@ -290,7 +292,7 @@ export function ServerUpdatePanel(
                     </Show>
                   </ItemActions>
                 </Item>
-                <Show when={!blocked()}>
+                <Show when={props.canManage !== false && !blocked()}>
                   <SwitchField
                     checked={current().autoDownload}
                     disabled={disabled()}
@@ -329,7 +331,7 @@ export function ServerUpdatePanel(
                         </Show>
                       </AlertDescription>
                     </AlertContent>
-                    <Show when={current().phase !== "installing"}>
+                    <Show when={props.canManage !== false && current().phase !== "installing"}>
                       <AlertActions>
                         <Button
                           type="button"
@@ -361,7 +363,7 @@ export function ServerUpdatePanel(
           )}
         </Show>
       </SettingsSection>
-      <Show when={confirmRestart()}>
+      <Show when={props.canManage !== false && confirmRestart()}>
         <ConfirmDialog
           open
           tone="destructive"

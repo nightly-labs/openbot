@@ -32,6 +32,7 @@ import {
   CHANNEL_DELETE_CAPABILITY,
   EVENTS_CAPABILITY,
   HOST_ADMIN_CAPABILITY,
+  HOST_MEMBER_UPDATE_CAPABILITY,
   HOST_RELEASE_CAPABILITY,
   HOST_UPDATE_CAPABILITY,
   HOSTED_SITES_CAPABILITY,
@@ -446,7 +447,11 @@ export class TeamApiServer {
   }
 
   #sendHostRestart(client: Ws.WebSocket, connection: EventClientState): void {
-    if (!connection.capabilities.has(HOST_UPDATE_CAPABILITY)) return;
+    if (
+      !connection.capabilities.has(HOST_UPDATE_CAPABILITY) &&
+      !connection.capabilities.has(HOST_MEMBER_UPDATE_CAPABILITY)
+    )
+      return;
     if (client.readyState === webSockets.WebSocket.OPEN) client.send(JSON.stringify(this.#hostRestart));
   }
 
@@ -1078,7 +1083,9 @@ export class TeamApiServer {
           if (acceptsCapabilityDeclaration) {
             if (!event.capabilities) throw new Error("Invalid client capabilities.");
             const snapshotsWereEnabled = connection.capabilities.has("agent-runtime-snapshots");
-            const restartWasSent = connection.capabilities.has(HOST_UPDATE_CAPABILITY);
+            const restartWasSent =
+              connection.capabilities.has(HOST_UPDATE_CAPABILITY) ||
+              connection.capabilities.has(HOST_MEMBER_UPDATE_CAPABILITY);
             connection.capabilities = new Set(event.capabilities.filter(isTeamCurrentCapability));
             if (connection.capabilities.has("agent-runtime-snapshots") && !snapshotsWereEnabled) {
               this.#sendRuntimeSnapshot(client, connection, false);
@@ -1431,7 +1438,8 @@ export class TeamApiServer {
         if (capability === PROVIDERS_SIGN_IN_V3_CAPABILITY) return this.#options.admin?.providers?.pasteSignIn === true;
         if (capability === HOST_ADMIN_CAPABILITY) return this.#options.admin?.identity !== undefined;
         if (capability === HOST_RELEASE_CAPABILITY) return this.#options.admin?.release !== undefined;
-        if (capability === HOST_UPDATE_CAPABILITY) return this.#options.admin?.update !== undefined;
+        if (capability === HOST_UPDATE_CAPABILITY || capability === HOST_MEMBER_UPDATE_CAPABILITY)
+          return this.#options.admin?.update !== undefined;
         if (capability === EVENTS_CAPABILITY) return this.#options.events !== undefined;
         if (capability === AGENT_IMPORT_CAPABILITY) return this.#options.agentImport !== undefined;
         if (capability === LIVE_ACTIVITY_PUSH_CAPABILITY) return this.#options.liveActivityPush !== undefined;
