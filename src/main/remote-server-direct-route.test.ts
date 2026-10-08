@@ -40,6 +40,10 @@ const connected: TailscaleLocalState = {
   peerDnsNames: ["studio-mac.tail4b2c1.ts.net"],
 };
 
+function withoutTransport({ transport: _transport, ...server }: StoredRemoteServer): StoredRemoteServer {
+  return server;
+}
+
 function webRtcServer(overrides: Partial<StoredRemoteServer> = {}): StoredRemoteServer {
   return {
     id: HOST,
@@ -195,7 +199,7 @@ describe("RemoteDirectRoutes", () => {
     for (const server of [
       webRtcServer({ directDisabled: true }),
       webRtcServer({ directUrl: "https://example.com" }),
-      webRtcServer({ transport: undefined }),
+      withoutTransport(webRtcServer()),
     ]) {
       const { direct, steps } = routes(server);
       expect(await Effect.runPromise(direct.tryActivate(HOST))).toBe(false);

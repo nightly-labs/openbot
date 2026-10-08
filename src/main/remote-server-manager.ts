@@ -304,7 +304,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
               : Effect.fail(new RemoteWorkflowError({ cause: failure })),
           ),
         ),
-      sessions,
+      ...(sessions ? { sessions } : {}),
       accountReady: () => this.#accountReady(),
       setCompatibility: (serverId, compatibility) => this.#connections.setCompatibility(serverId, compatibility),
       clearCompatibility: (serverId) => this.#connections.clearCompatibility(serverId),

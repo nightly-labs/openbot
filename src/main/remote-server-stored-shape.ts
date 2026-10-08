@@ -55,9 +55,9 @@ export interface StoredRemoteServer {
    * authenticated connection. Not an identity: each direct connection checks the pinned host key
    * there before it sends anything else. Optional, so an older build reads the entry and drops it.
    */
-  directUrl?: string;
+  directUrl?: string | undefined;
   /** The member turned "Use Tailscale when available" off for this server. Absent means on. */
-  directDisabled?: true;
+  directDisabled?: true | undefined;
 }
 
 // An entry this build cannot read, and where it sat in `servers`. The slot is named by the entry
