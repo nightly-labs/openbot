@@ -60,7 +60,7 @@ class PeerConnection {
   localDescription: { type: string; sdp: string } | null = null;
   remoteDescription: { type: string; sdp: string } | null = null;
   ondatachannel: ((event: { channel: DataChannel }) => void) | null = null;
-  onicecandidate: (() => void) | null = null;
+  onicecandidate: ((event: { candidate: RTCIceCandidateInit | null }) => void) | null = null;
   onconnectionstatechange: (() => void) | null = null;
   connectionState = "new";
   readonly close = vi.fn();
@@ -173,6 +173,18 @@ it("routes two phones independently and disconnects or resumes only the addresse
   const [rtc1, rtc2] = PeerConnection.instances;
   if (!rtc1 || !rtc2) throw new Error("Each phone needs its own RTC connection.");
   expect(rtc1.close).not.toHaveBeenCalled();
+  const candidate = {
+    candidate: "candidate:1 1 UDP 2122260223 192.0.2.1 5000 typ host",
+    sdpMid: "0",
+    sdpMLineIndex: 0,
+  };
+  rtc1.onicecandidate?.({ candidate });
+  rtc1.onicecandidate?.({ candidate: { ...candidate, candidate: "" } });
+  rtc1.onicecandidate?.({ candidate: null });
+  expect(signal.send.mock.calls.map(([data]) => JSON.parse(data))).toEqual([
+    { type: "ice-candidate", version: 1, connectionId: "connection-1", channel: "team", ...candidate },
+  ]);
+  signal.send.mockClear();
   for (const index of [1, 2])
     signal.message({
       type: "offer",

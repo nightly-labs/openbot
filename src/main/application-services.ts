@@ -15,6 +15,7 @@ import { createRoutineFlows, type RoutineFlowsHandle } from "../backend/routine-
 import { type AgentAdminSettingsService, createAgentAdminSettings } from "./agent-admin-settings";
 import { spawnAgentDatabaseHost } from "./agent-database-host-process";
 import { HostReleaseService, readInstallationMode } from "./host-release-service";
+import { HOSTED_UPDATE_TRIGGER, HostedUpdateAdapter } from "./hosted-update-adapter";
 import { LocalSkillLibrary } from "./local-skill-library";
 import { localSkillTools } from "./local-skill-tools";
 import { MAC_PERMISSION_URLS } from "./mac-permission-urls";
@@ -1492,14 +1493,15 @@ export async function createApplicationServices({
   // The host comes before the updater, and the restart readiness reads the host. The routes reach
   // the schedule through this, and a request that arrives before it exists is refused.
   let requestedUpdate: RequestedUpdate | undefined;
+  const installationMode =
+    app.isPackaged && process.platform === "linux" ? await runCauseEffect(readInstallationMode()) : null;
   const hostRelease = new HostReleaseService({
     currentVersion: app.getVersion(),
     packaged: app.isPackaged,
     platform: process.platform,
     arch: process.arch,
     environment: process.env,
-    installationMode:
-      app.isPackaged && process.platform === "linux" ? await runCauseEffect(readInstallationMode()) : null,
+    installationMode,
     updateStatus: () => ({
       phase: requestedUpdate?.snapshot().phase ?? "unsupported",
       managedByHost: requestedUpdate?.snapshot().remoteUpdates === "managed",
@@ -1847,17 +1849,25 @@ export async function createApplicationServices({
   const currentVersion = app.getVersion();
   // Skip the file check in dev: unpacked runs never enable updates, so avoid touching resourcesPath.
   const updateMetadataAvailable = app.isPackaged && existsSync(join(process.resourcesPath, "app-update.yml"));
+  // A hosted or self-installed server runs a release that root owns. Root installs updates for it
+  // when openbot-hosted-update has installed its request units. A container has none.
+  const hostedInstaller =
+    app.isPackaged &&
+    process.platform === "linux" &&
+    (process.env.OPENBOT_HOSTED_SERVER === "1" || installationMode === "self") &&
+    existsSync(HOSTED_UPDATE_TRIGGER);
   const updatesEnabled =
     app.isPackaged &&
-    supportsInstalledUpdates(process.platform) &&
-    updateMetadataAvailable &&
+    (hostedInstaller || (supportsInstalledUpdates(process.platform) && updateMetadataAvailable)) &&
     isValidSemver(currentVersion);
   if (app.isPackaged && updateMetadataAvailable && !isValidSemver(currentVersion)) {
     logger.warn(`OpenBot updates are disabled because the application version is not valid SemVer: ${currentVersion}`);
   }
   let updateAdapter: UpdateAdapter = createDisabledUpdateAdapter();
   let updaterEnabled = updatesEnabled;
-  if (updatesEnabled) {
+  if (updatesEnabled && hostedInstaller) {
+    updateAdapter = new HostedUpdateAdapter({ currentVersion, arch: process.arch });
+  } else if (updatesEnabled) {
     try {
       const updaterModule = await import("electron-updater");
       const realAdapter = updaterModule.autoUpdater ?? updaterModule.default?.autoUpdater ?? updaterModule.default;
