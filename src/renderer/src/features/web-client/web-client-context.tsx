@@ -39,6 +39,7 @@ import {
   type WebWorkspaceRuntime,
 } from "./web-runtime";
 import { orderWebHosts, readWebServerOrder, writeWebServerOrder } from "./web-server-order";
+import { readWebServerSelection, writeWebServerSelection } from "./web-server-selection";
 
 interface WebConversation {
   page: ConversationPage | null;
@@ -539,8 +540,12 @@ export function createWebWorkspace(
           draft.hostsError = null;
         });
         for (const left of leftHostIds) if (!hosts.some((host) => host.hostId === left)) leftHostIds.delete(left);
-        const first = orderWebHosts(hosts, serverOrder())[0];
-        if (!hostId && first) await connect(first);
+        if (!hostId) {
+          const savedHostId = readWebServerSelection(props.accountId);
+          const initialHost =
+            hosts.find((host) => host.hostId === savedHostId) ?? orderWebHosts(hosts, serverOrder())[0];
+          if (initialHost) await connect(initialHost);
+        }
         // After the opened host, so it takes its Signal connection before the status connections.
         if (!disposed) runtime.hosts?.setHosts(hosts);
       } catch (error) {
@@ -621,6 +626,7 @@ export function createWebWorkspace(
     const keepWorkspace = sameHost && state.hostedSleep !== null;
     const previousSelected = sameHost ? selectedId : null;
     hostId = host.hostId;
+    writeWebServerSelection(props.accountId, host.hostId);
     if (!keepWorkspace) selectedId = null;
     if (!sameHost) hostLifecycle.endSleep();
     setState((draft) => {
