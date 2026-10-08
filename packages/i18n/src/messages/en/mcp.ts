@@ -30,6 +30,14 @@ export const messages = defineMessages("mcp", {
   "mcp.status.failed": "Failed",
   "mcp.status.enabled": "Enabled",
   "mcp.status.disabled": "Disabled",
+  "mcp.status.signedIn": "Signed in",
+  "mcp.status.signingIn": "Signing in…",
+  "mcp.status.signInNeeded": "Sign-in needed",
+  "mcp.status.refused": "Refused",
+  "mcp.status.checkUrl": "Check the URL",
+  "mcp.status.noAnswer": "No answer",
+  "mcp.status.didNotStart": "Did not start",
+  "mcp.status.unreachable": "Unreachable",
   "mcp.server.providerLimitNote": "Claude only: a server with a working directory is not given to the other providers.",
   "mcp.server.runtimeDownloading":
     "Downloading the runtime a STDIO server is started with. One may not start until it finishes.",
@@ -93,4 +101,11 @@ export const messages = defineMessages("mcp", {
   "mcp.panel.removeConfirm": "Remove MCP server",
   "mcp.panel.actionsFor": "Actions for {name}",
   "mcp.panel.testUnavailable": "This server cannot be tested here.",
+  "mcp.panel.signIn": "Sign in",
+  "mcp.panel.signOut": "Sign out",
+  "mcp.panel.cancelSignIn": "Cancel sign-in",
+  "mcp.panel.signInWaiting": {
+    one: "Finish the sign-in in your browser. OpenBot stops waiting after {count} minute.",
+    other: "Finish the sign-in in your browser. OpenBot stops waiting after {count} minutes.",
+  },
 });

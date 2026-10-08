@@ -11,4 +11,5 @@ export const messages = {
   "error.mcp.signInFileUnreadable": "O arquivo de autenticação MCP não pode ser lido.",
   "error.mcp.signInFileTooLarge": "O arquivo de autenticação MCP é muito grande.",
   "error.mcp.unsupported": "Este servidor não oferece suporte a servidores MCP.",
+  "error.mcp.signInOnHost": "A autenticação em um servidor MCP só funciona no OpenBot do computador anfitrião.",
 } as const satisfies PartialTranslation<typeof source>;

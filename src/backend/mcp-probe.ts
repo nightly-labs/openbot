@@ -1,16 +1,18 @@
+import { basename } from "node:path";
 import { type OAuthClientProvider, UnauthorizedError } from "@modelcontextprotocol/sdk/client/auth.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { getDefaultEnvironment, StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { AccessDeniedError, UnauthorizedClientError } from "@modelcontextprotocol/sdk/server/auth/errors.js";
-import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import type { FetchLike, Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result, Schema } from "effect";
 import { causeHelpers } from "./effect-boundary";
-import { type McpOAuthAuthority, type McpSignIn, secureOAuthFetch } from "./mcp-oauth-provider";
+import { type McpOAuthAuthority, type McpSignIn, normalizeResource, secureOAuthFetch } from "./mcp-oauth-provider";
 import {
   clearMcpCommandCache,
   type McpToolRuntimes,
@@ -46,11 +48,19 @@ export class McpProbeFailure extends Schema.TaggedError<McpProbeFailure>()("McpP
 
 const { io: probeIo, rewrap: toMcpProbeFailure } = causeHelpers(McpProbeFailure);
 
+/**
+ * Where the person who could finish a sign-in is, for a test that cannot open a browser itself.
+ * `here`: on this computer, one Sign in away. `host`: a remote caller, whose host must sign in.
+ * `null`: nobody asked, and the server's refusal is reported as it is.
+ */
+export type McpSignInPlace = "here" | "host";
+
 export const testMcpServer = Effect.fnUntraced(function* (
   config: McpServerConfig,
   timeoutMs = MCP_PROBE_TIMEOUT_MS,
   tools: McpToolRuntimes = NO_MCP_TOOL_RUNTIMES,
-  oauth?: McpOAuthAuthority,
+  oauth?: Pick<McpOAuthAuthority, "accessToken" | "signIn">,
+  signInPlace: McpSignInPlace | null = null,
 ) {
   clearMcpCommandCache();
   return yield* Effect.acquireUseRelease(
@@ -62,36 +72,103 @@ export const testMcpServer = Effect.fnUntraced(function* (
           tools,
           oauth ? (subject) => oauth.accessToken(subject.url) : undefined,
         );
-        return yield* probeMcpServerEffect(server, timeoutMs, signIn);
+        return yield* probeMcpServerEffect(server, timeoutMs, signIn, signInPlace);
       }),
     (signIn) => Effect.sync(() => signIn?.abandon()),
   );
 });
+
+/** The last refusal an http server answered a connection without a sign-in provider. */
+interface McpChallenge {
+  status: number;
+  /** Whether `WWW-Authenticate` names the Bearer scheme, which is what an OAuth server asks for. */
+  bearer: boolean;
+  /** Where the request ended up after any redirect. */
+  url: string;
+}
 
 /** Connect, count, and close; a requested OAuth sign-in gets one fresh connection. */
 const probeMcpServerEffect = Effect.fnUntraced(function* (
   server: UsableMcpServer,
   timeoutMs: number,
   signIn: McpSignIn | null,
+  signInPlace: McpSignInPlace | null,
 ): Effect.fn.Return<McpProbeResult> {
   const { config } = server;
   if (server.error !== undefined) return { toolCount: 0, error: boundedError(server.error) };
+  let challenge: McpChallenge | null = null;
+  const record = (next: McpChallenge) => {
+    challenge = next;
+  };
   const failure = (error: unknown): McpProbeResult => {
-    const refused = signIn?.registrationFailed() && isRegistrationRefusal(error);
-    const described = refused ? REGISTRATION_REFUSED : describeMcpError(error, config, timeoutMs);
+    const described = describeProbeFailure(error, config, timeoutMs, signIn, challenge, signInPlace);
     return { toolCount: 0, error: boundedError(redactMcpValues(described, probeSecrets(server, signIn))) };
   };
-  const first = yield* Effect.result(connectAndCountEffect(server, timeoutMs, signIn?.provider));
+  const first = yield* Effect.result(connectAndCountEffect(server, timeoutMs, signIn?.provider, record));
   if (Result.isSuccess(first)) return { toolCount: first.success, error: null };
   if (!signIn || !(first.failure.cause instanceof UnauthorizedError)) return failure(first.failure.cause);
   // The person's sign-in has its own deadline; the retried connection gets a fresh transport.
   const retry = yield* Effect.result(
     signIn
       .complete()
-      .pipe(toMcpProbeFailure, Effect.andThen(connectAndCountEffect(server, timeoutMs, signIn.provider))),
+      .pipe(toMcpProbeFailure, Effect.andThen(connectAndCountEffect(server, timeoutMs, signIn.provider, record))),
   );
   return Result.isFailure(retry) ? failure(retry.failure.cause) : { toolCount: retry.success, error: null };
 });
+
+/**
+ * The sentence for a failed probe, before secrets are removed.
+ *
+ * The SDK reports a token the server refused right after a sign-in as a bare 401, which would read
+ * as "check the API key" to someone who has just signed in. And a server that answers a Bearer
+ * challenge to a probe that could not sign in wants a sign-in, not a key: that is what Granola
+ * answers, and the header fields alone gave the user no way forward.
+ */
+function describeProbeFailure(
+  error: unknown,
+  config: McpServerConfig,
+  timeoutMs: number,
+  signIn: McpSignIn | null,
+  challenge: McpChallenge | null,
+  signInPlace: McpSignInPlace | null,
+): string {
+  if (signIn?.registrationFailed() && isRegistrationRefusal(error)) return REGISTRATION_REFUSED;
+  if (signIn && httpStatus(error) === 401) return sourceText("error.backend.mcpSignInNotAccepted");
+  // A key the user pasted into a header is theirs to fix; the sign-in would not replace it.
+  if (challenge?.status === 401 && challenge.bearer && !hasAuthorizationHeader(config)) {
+    const described = describeSignInChallenge(config.url, challenge.url, signInPlace);
+    if (described) return described;
+  }
+  return describeMcpError(error, config, timeoutMs);
+}
+
+/**
+ * What to say to a server that wants an OAuth sign-in the probe could not start, or `null` when
+ * nobody asked and the refusal is reported as it is.
+ *
+ * A plain-http address is not upgraded behind the user's back: the agents reach the server at the
+ * address the row holds, so a test that passed over https would hide that every agent still fails.
+ * The sentence names the https address instead, without its query, which can carry a key.
+ */
+export function describeSignInChallenge(url: string, finalUrl: string, place: McpSignInPlace | null): string | null {
+  if (place === null) return null;
+  if (!normalizeResource(url))
+    return sourceText("error.backend.mcpSignInNeedsHttps", { url: httpsAddress(finalUrl, url) });
+  return place === "host" ? sourceText("error.backend.mcpSignInOnHost") : sourceText("error.backend.mcpSignInRequired");
+}
+
+/** The https form of the address a redirect reached, or of the one the user typed. */
+function httpsAddress(finalUrl: string, url: string): string {
+  const target = URL.canParse(finalUrl) && finalUrl.startsWith("https:") ? new URL(finalUrl) : new URL(url);
+  target.protocol = "https:";
+  target.search = "";
+  target.hash = "";
+  return target.toString();
+}
+
+function hasAuthorizationHeader(config: McpServerConfig): boolean {
+  return config.headers.some(({ key }) => key.trim().toLowerCase() === "authorization");
+}
 
 /**
  * Every secret this probe could have sent.
@@ -114,12 +191,13 @@ const connectAndCountEffect = Effect.fnUntraced(function* (
   server: ResolvedMcpServer,
   timeoutMs: number,
   authProvider: OAuthClientProvider | undefined,
+  onChallenge: (challenge: McpChallenge) => void,
 ) {
   return yield* Effect.acquireUseRelease(
     Effect.try({
       try: () => ({
         client: new Client({ name: "openbot-probe", version: "1" }, { capabilities: {} }),
-        transport: createTransport(server, authProvider),
+        transport: createTransport(server, authProvider, onChallenge),
       }),
       catch: (cause) => new McpProbeFailure({ cause }),
     }),
@@ -166,7 +244,11 @@ function boundedError(text: string): string {
   return `${text.slice(0, INPUT_LIMITS.mcpErrorText - 1)}…`;
 }
 
-function createTransport(server: ResolvedMcpServer, authProvider?: OAuthClientProvider): Transport {
+function createTransport(
+  server: ResolvedMcpServer,
+  authProvider: OAuthClientProvider | undefined,
+  onChallenge: (challenge: McpChallenge) => void,
+): Transport {
   const { config } = server;
   if (config.transport === "http") {
     /*
@@ -189,7 +271,8 @@ function createTransport(server: ResolvedMcpServer, authProvider?: OAuthClientPr
      * passed `normalizeResource`, so the guard refuses nothing this probe could otherwise reach.
      */
     return new StreamableHTTPClientTransport(new URL(config.url), {
-      ...(authProvider ? { authProvider, fetch: secureOAuthFetch() } : {}),
+      fetch: authProvider ? secureOAuthFetch() : challengeRecordingFetch(onChallenge),
+      ...(authProvider ? { authProvider } : {}),
       requestInit: { headers },
     });
   }
@@ -214,6 +297,25 @@ function createTransport(server: ResolvedMcpServer, authProvider?: OAuthClientPr
   });
 }
 
+/**
+ * The platform fetch, noting each refusal on the way past. Without a sign-in provider the SDK keeps
+ * only the status of a refusal, and the `WWW-Authenticate` header is what tells a server that wants
+ * an OAuth sign-in apart from one that wants a key.
+ */
+function challengeRecordingFetch(onChallenge: (challenge: McpChallenge) => void): FetchLike {
+  return async (input, init) => {
+    const response = await fetch(input, init);
+    if (response.status === 401 || response.status === 403) {
+      onChallenge({
+        status: response.status,
+        bearer: /^\s*bearer\b/iu.test(response.headers.get("www-authenticate") ?? ""),
+        url: response.url || input.toString(),
+      });
+    }
+    return response;
+  };
+}
+
 /** Close both SDK resources and kill a stdio child if it survives transport close. */
 const closeQuietlyEffect = Effect.fnUntraced(function* (client: Client, transport: Transport) {
   yield* probeIo(() => client.close()).pipe(Effect.catch(() => Effect.void));
@@ -233,15 +335,67 @@ class McpTimeout extends Error {
 
 /** The failure, in the words the panel shows. Secrets are removed before the text leaves here. */
 export function describeMcpError(error: unknown, config: McpServerConfig, timeoutMs: number): string {
+  const described = describeMcpErrorText(error, config, timeoutMs);
+  // A bridge that never answers is the case the native connection replaces: say where to go.
+  const bridgeUrl = mcpRemoteBridgeUrl(config);
+  if (bridgeUrl === null || !(error instanceof McpTimeout || isConnectionClosed(error))) return described;
+  return sourceText("error.backend.mcpRemoteBridge", { reason: described, url: bridgeUrl });
+}
+
+function describeMcpErrorText(error: unknown, config: McpServerConfig, timeoutMs: number): string {
   if (error instanceof McpTimeout)
     return sourceText("error.backend.mcpServerNoAnswer", { seconds: Math.round(timeoutMs / 1000) });
   // Only a sign-in reaches this: without an `authProvider` the transport reports the raw 401 below.
   if (error instanceof UnauthorizedError) return sourceText("error.backend.mcpSignInNotAccepted");
+  // The child exited before the handshake: the process failed to start, not the network.
+  if (config.transport === "stdio" && isConnectionClosed(error)) return sourceText("error.backend.mcpServerExited");
   const status = httpStatus(error);
   if (status !== null) return httpStatusMessage(status);
+  if (config.transport === "http" && isNetworkFailure(error)) return sourceText("error.backend.mcpServerUnreachable");
   const message = error instanceof Error ? error.message : String(error);
   if (message.includes("ENOENT")) return sourceText("error.backend.mcpCommandNotFound", { command: config.command });
   return redactMcpSecrets(message, config);
+}
+
+/**
+ * The address an `mcp-remote` bridge forwards to, as origin and path, or `null` when the command
+ * is not that bridge. Covers `npx mcp-remote <url>`, `mcp-remote@<version>` and an installed
+ * `mcp-remote` binary.
+ */
+export function mcpRemoteBridgeUrl(config: McpServerConfig): string | null {
+  if (config.transport !== "stdio") return null;
+  const words = [basename(config.command), ...config.args];
+  const bridge = words.findIndex((word) => /^mcp-remote(@\S*)?$/u.test(word.trim()));
+  if (bridge === -1) return null;
+  for (const word of words.slice(bridge + 1)) {
+    if (!URL.canParse(word.trim())) continue;
+    const url = new URL(word.trim());
+    if (url.protocol === "http:" || url.protocol === "https:") return `${url.origin}${url.pathname}`;
+  }
+  return null;
+}
+
+function isConnectionClosed(error: unknown): boolean {
+  return error instanceof McpError && error.code === ErrorCode.ConnectionClosed;
+}
+
+const NETWORK_ERROR_CODES = new Set([
+  "ECONNREFUSED",
+  "ECONNRESET",
+  "ENOTFOUND",
+  "EAI_AGAIN",
+  "ETIMEDOUT",
+  "EHOSTUNREACH",
+]);
+
+/** A request that never reached a server: Node's fetch rejects with `fetch failed` and the system code as the cause. */
+function isNetworkFailure(error: unknown): boolean {
+  for (let current = error, depth = 0; current instanceof Error && depth < 4; current = current.cause, depth++) {
+    const code = isDynamicRecord(current) ? current.code : undefined;
+    if (typeof code === "string" && NETWORK_ERROR_CODES.has(code)) return true;
+    if (current instanceof TypeError && current.message === "fetch failed") return true;
+  }
+  return false;
 }
 
 /**

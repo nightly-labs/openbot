@@ -364,6 +364,10 @@ function ServerSettings(props: {
     revokeServerInvite,
     serverSettingsMcp,
     serverSettingsMcpError,
+    serverSettingsMcpSignIns,
+    signInMcpServer,
+    cancelMcpSignIn,
+    signOutMcpServer,
     refreshMcpServers,
     saveMcpServer,
     removeMcpServer,
@@ -555,6 +559,17 @@ function ServerSettings(props: {
           onRemoveMcpServer={removeMcpServer}
           onSetMcpServerEnabled={setMcpServerEnabled}
           onTestMcpServer={testMcpServer}
+          // A sign-in opens this computer's browser, so only this computer's server offers one.
+          mcpSignIn={
+            server().kind === "local"
+              ? {
+                  signedIn: serverSettingsMcpSignIns(),
+                  start: signInMcpServer,
+                  cancel: cancelMcpSignIn,
+                  signOut: signOutMcpServer,
+                }
+              : undefined
+          }
           storage={storageOptions(server())}
           providers={providerSettings(server())}
           onSwitchToManageProviders={

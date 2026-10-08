@@ -23,6 +23,7 @@ export interface SkillsPort {
     | "removeMcpServer"
     | "saveMcpServer"
     | "setAgentSkillEnabled"
+    | "signInMcpServer"
     | "testMcpServer"
     | "uninstallAgentSkill"
   >;

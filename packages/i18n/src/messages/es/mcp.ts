@@ -34,6 +34,14 @@ export const messages = {
   "mcp.status.failed": "Error",
   "mcp.status.enabled": "Activado",
   "mcp.status.disabled": "Desactivado",
+  "mcp.status.signedIn": "Sesión iniciada",
+  "mcp.status.signingIn": "Iniciando sesión…",
+  "mcp.status.signInNeeded": "Requiere inicio de sesión",
+  "mcp.status.refused": "Rechazado",
+  "mcp.status.checkUrl": "Revisa la URL",
+  "mcp.status.noAnswer": "Sin respuesta",
+  "mcp.status.didNotStart": "No se inició",
+  "mcp.status.unreachable": "Inaccesible",
   "mcp.server.providerLimitNote":
     "Solo Claude: un servidor con un directorio de trabajo no se proporciona a los otros proveedores.",
   "mcp.server.runtimeDownloading":
@@ -99,4 +107,11 @@ export const messages = {
   "mcp.panel.removeConfirm": "Eliminar servidor MCP",
   "mcp.panel.actionsFor": "Acciones para {name}",
   "mcp.panel.testUnavailable": "Este servidor no se puede probar aquí.",
+  "mcp.panel.signIn": "Iniciar sesión",
+  "mcp.panel.signOut": "Cerrar sesión",
+  "mcp.panel.cancelSignIn": "Cancelar inicio de sesión",
+  "mcp.panel.signInWaiting": {
+    one: "Completa el inicio de sesión en tu navegador. OpenBot deja de esperar después de {count} minuto.",
+    other: "Completa el inicio de sesión en tu navegador. OpenBot deja de esperar después de {count} minutos.",
+  },
 } as const satisfies PartialTranslation<typeof source>;

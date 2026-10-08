@@ -74,6 +74,7 @@ function setup(options: { ensureToolRuntimesReady?: () => Effect.Effect<void, Pr
   remoteCalls: RemoteRequestInit[];
   test: (config: McpServerConfig) => Promise<McpTestResult>;
   testRemote: (config: McpServerConfig) => Promise<McpTestResult>;
+  signInRemote: (config: McpServerConfig) => Promise<unknown>;
 } {
   registrations.clear();
   const testMcpServer = vi.fn((): Effect.Effect<McpTestResult> => Effect.sync(() => ({ toolCount: 2, error: null })));
@@ -83,6 +84,10 @@ function setup(options: { ensureToolRuntimesReady?: () => Effect.Effect<void, Pr
     removeMcpServer: () => Effect.succeed([]),
     setMcpServerEnabled: () => Effect.succeed([]),
     testMcpServer,
+    signInMcpServer: () => Effect.succeed({ toolCount: 0, error: null }),
+    cancelMcpSignIn: () => undefined,
+    signOutMcpServer: () => Effect.succeed([]),
+    listMcpSignIns: () => [],
   };
   const remoteCalls: RemoteRequestInit[] = [];
   const remoteServers = {
@@ -111,8 +116,10 @@ function setup(options: { ensureToolRuntimesReady?: () => Effect.Effect<void, Pr
     }).mcpServers,
   );
   const listener = registrations.get(IPC_ENDPOINTS.mcpServers.testMcpServer.channel);
-  if (!listener) throw new Error("The MCP test handler was not registered.");
+  const signInListener = registrations.get(IPC_ENDPOINTS.mcpServers.signInMcpServer.channel);
+  if (!listener || !signInListener) throw new Error("The MCP test handlers were not registered.");
   return {
+    signInRemote: async (config) => signInListener(TRUSTED_EVENT, { serverId: "remote-1", payload: { config } }),
     ensureToolRuntimesReady,
     testMcpServer,
     remoteCalls,
@@ -145,6 +152,18 @@ describe("mcpServerIpcHandlers test", () => {
     await expect(test(httpConfig())).resolves.toEqual({ toolCount: 2, error: null });
     expect(ensureToolRuntimesReady).not.toHaveBeenCalled();
     expect(testMcpServer).toHaveBeenCalledOnce();
+    // Test spends the stored sign-in and never opens a browser; only Sign in does.
+    expect(testMcpServer).toHaveBeenCalledWith(expect.anything(), { storedCredentials: true, signInPlace: "here" });
+  });
+
+  it("refuses a sign-in for a remote server without asking the host", async () => {
+    // Nobody sits in front of the host's browser, and the Team API has no sign-in route.
+    const { remoteCalls, signInRemote } = setup({});
+
+    await expect(signInRemote(httpConfig())).rejects.toThrow(
+      "Sign-in to an MCP server works only in OpenBot on the host computer.",
+    );
+    expect(remoteCalls).toHaveLength(0);
   });
 
   it("waits for the download before probing a command nothing names", async () => {

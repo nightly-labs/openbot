@@ -165,6 +165,20 @@ export const messages = {
   "error.backend.mcpSignInAbandoned": "Se abandonó el inicio de sesión de MCP.",
   "error.backend.mcpSignInNoBrowser": "Este inicio de sesión de MCP no puede abrir un navegador.",
   "error.backend.mcpSignInNotWebPage": "La dirección de inicio de sesión no es una página web.",
+  "error.backend.mcpSignInRequired":
+    "Este servidor pide que inicies sesión. Elige Iniciar sesión para continuar en tu navegador.",
+  "error.backend.mcpSignInOnHost":
+    "Este servidor pide un inicio de sesión. Inicia sesión en él desde OpenBot en el equipo anfitrión.",
+  "error.backend.mcpSignInNeedsHttps":
+    "Este servidor pide un inicio de sesión, y OpenBot solo inicia sesión por https. Cambia la URL a {url}.",
+  "error.backend.mcpSignInCancelled": "Se canceló el inicio de sesión.",
+  "error.backend.mcpSignInTimedOut": "El inicio de sesión no se completó en el navegador.",
+  "error.backend.mcpSignInResponseTimedOut": "La respuesta del inicio de sesión no llegó a tiempo.",
+  "error.backend.mcpServerExited":
+    "El servidor se detuvo antes de responder. Ejecuta el comando en una terminal para ver su error.",
+  "error.backend.mcpServerUnreachable": "OpenBot no pudo conectar con el servidor. Revisa la URL y tu red.",
+  "error.backend.mcpRemoteBridge":
+    "{reason} Este comando ejecuta el puente mcp-remote. Elige Streamable HTTP con la URL {url} y OpenBot iniciará tu sesión.",
   "error.backend.oauthNotHttps": "El endpoint OAuth {origin} no usa https, por lo que no se enviaron las credenciales.",
   "error.backend.oauthTooManyRedirects": "El endpoint OAuth redirigió demasiadas veces.",
   "error.backend.oauthRedirectOrigin":

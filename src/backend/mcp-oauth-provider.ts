@@ -28,6 +28,7 @@ import {
   OAuthTokensSchema,
 } from "@modelcontextprotocol/sdk/shared/auth.js";
 import type { FetchLike } from "@modelcontextprotocol/sdk/shared/transport.js";
+import { MCP_SIGN_IN_TIMEOUT_MS } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { z } from "zod";
 import { runCauseEffect } from "./effect-boundary";
@@ -86,9 +87,6 @@ export interface McpOAuthOptions {
   refreshTimeoutMs?: number;
 }
 
-/** Long enough to find the right account and read a consent page, short enough to end by itself. */
-const MCP_SIGN_IN_TIMEOUT_MS = 5 * 60 * 1000;
-
 /**
  * How long a token exchange may hold a thread start or a test. The probe and the hand-off both
  * resolve every token before they connect, so an authorization server that accepts a connection
@@ -132,6 +130,10 @@ export interface McpSignIn {
 export interface McpOAuthAuthority {
   accessToken: (url: string) => Effect.Effect<string | null, McpOperationError>;
   signIn: (url: string) => McpSignIn | null;
+  /** Ends the sign-in waiting for this URL's browser, if one is. Answers whether one was. */
+  cancelSignIn: (url: string) => boolean;
+  /** Whether this computer holds a token for this URL. Never the token itself. */
+  signedIn: (url: string) => boolean;
   forget: (url: string) => Effect.Effect<void, McpOperationError>;
 }
 
@@ -145,6 +147,12 @@ export class McpOAuth implements McpOAuthAuthority {
    * `openbot://mcp-auth` link do nothing.
    */
   readonly #waiting = new Map<string, (code: string) => void>();
+  /**
+   * The cancel of the sign-in still running for each server. A user who presses Cancel names the
+   * server, not the `state`, and one attempt per server is kept: a second Sign in replaces the
+   * first rather than leaving two browser tabs that race to answer.
+   */
+  readonly #attempts = new Map<string, () => void>();
   /** The refresh already running for a server, so two hand-offs share one exchange. See `#refresh`. */
   readonly #scope = Scope.makeUnsafe();
   readonly #refreshing = new Map<string, Fiber.Fiber<void>>();
@@ -241,30 +249,48 @@ export class McpOAuth implements McpOAuthAuthority {
   );
 
   readonly close = Effect.fn("McpOAuth.close")(() =>
-    Scope.close(this.#scope, Exit.void).pipe(Effect.ensuring(Effect.sync(() => this.#waiting.clear()))),
+    Scope.close(this.#scope, Exit.void).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          for (const cancel of [...this.#attempts.values()]) cancel();
+          this.#waiting.clear();
+        }),
+      ),
+    ),
   );
 
   /** A sign-in the user asked for, or `null` when the URL is not one this can sign in to. */
   signIn(url: string): McpSignIn | null {
     const resource = normalizeResource(url);
     if (!resource) return null;
+    this.#attempts.get(resource)?.();
     const state = randomUUID();
-    const grant = Deferred.makeUnsafe<string>();
+    const grant = Deferred.makeUnsafe<string, Error>();
     this.#waiting.set(state, (code) => {
       Deferred.doneUnsafe(grant, Effect.succeed(code));
     });
     // Set when the probe moves on: a discovery slow enough to outlast it must neither open a
     // browser afterwards nor wait out a grant nobody will answer.
     let abandoned = false;
+    let cancelled = false;
     const provider = this.#provider(resource, state, () => abandoned);
     const abandon = () => {
       abandoned = true;
       this.#waiting.delete(state);
+      if (this.#attempts.get(resource) === cancel) this.#attempts.delete(resource);
     };
+    // The user said stop: the wait ends now rather than at its deadline, with its own sentence.
+    const cancel = () => {
+      cancelled = true;
+      Deferred.doneUnsafe(grant, Effect.fail(new Error(sourceText("error.backend.mcpSignInCancelled"))));
+      abandon();
+    };
+    this.#attempts.set(resource, cancel);
     return {
       provider,
       complete: () =>
         Effect.gen({ self: this }, function* () {
+          if (cancelled) return yield* mcpFailure(new Error(sourceText("error.backend.mcpSignInCancelled")));
           if (abandoned) return yield* mcpFailure(new Error(sourceText("error.backend.mcpSignInAbandonedGeneric")));
           // Aborts with the wait: a token endpoint that never completes must not keep a request
           // running after this attempt ends, or its late response would write credentials a later
@@ -274,7 +300,7 @@ export class McpOAuth implements McpOAuthAuthority {
             const code = yield* withTimeout(
               Deferred.await(grant),
               this.#options.signInTimeoutMs ?? MCP_SIGN_IN_TIMEOUT_MS,
-              "The sign-in was not finished in the browser.",
+              sourceText("error.backend.mcpSignInTimedOut"),
             ).pipe(Effect.mapError(mcpFailure));
             // The grant is a credential until it is spent, and a token endpoint that refuses it
             // commonly quotes it back in `error_description`.
@@ -294,7 +320,7 @@ export class McpOAuth implements McpOAuthAuthority {
                 }),
               ),
               this.#options.refreshTimeoutMs ?? MCP_TOKEN_TIMEOUT_MS,
-              "The sign-in response did not arrive in time.",
+              sourceText("error.backend.mcpSignInResponseTimedOut"),
             ).pipe(Effect.mapError(mcpFailure));
           }).pipe(
             Effect.ensuring(
@@ -323,7 +349,19 @@ export class McpOAuth implements McpOAuthAuthority {
     return true;
   }
 
-  /** Forgets one server's registration and tokens. Used when the row that named it is removed. */
+  cancelSignIn(url: string): boolean {
+    const resource = normalizeResource(url);
+    const cancel = resource ? this.#attempts.get(resource) : undefined;
+    cancel?.();
+    return cancel !== undefined;
+  }
+
+  signedIn(url: string): boolean {
+    const resource = normalizeResource(url);
+    return resource !== null && Boolean(this.#options.storage.read(resource)?.tokens);
+  }
+
+  /** Forgets one server's registration and tokens. Used when the row is removed or signed out. */
   readonly forget = Effect.fn("McpOAuth.forget")(function* (this: McpOAuth, url: string) {
     const resource = normalizeResource(url);
     if (!resource) return;

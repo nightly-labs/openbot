@@ -1,9 +1,10 @@
 import { chmod, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { decodeMcpTestResult, type McpServerConfig } from "@openbot/contracts/ipc";
 import { afterEach, describe, expect, it } from "vitest";
-import { describeMcpError, testMcpServer } from "./mcp-probe";
+import { describeMcpError, describeSignInChallenge, testMcpServer } from "./mcp-probe";
 import { runMcp } from "./mcp-test-runtime";
 
 // A newline-delimited JSON-RPC server, written here rather than built on the SDK so the child is
@@ -164,6 +165,54 @@ describe("testMcpServer", () => {
     const result = await runMcp(testMcpServer(await scriptConfig("process.stdin.resume();\n"), 200));
     expect(result.toolCount).toBe(0);
     expect(result.error).toContain("The server did not answer in");
+  });
+
+  it("says a server stopped rather than timed out, and points an mcp-remote bridge at Streamable HTTP", async () => {
+    const exited = await scriptConfig("process.exit(3);\n");
+    expect(await runMcp(testMcpServer(exited))).toEqual({
+      toolCount: 0,
+      error: "The server stopped before it answered. Run the command in a terminal to see its error.",
+    });
+
+    // The query can carry a key, so the address the hint names leaves it out.
+    const bridge = { ...exited, args: [...exited.args, "mcp-remote", "https://mcp.example.com/mcp?token=private"] };
+    expect(await runMcp(testMcpServer(bridge))).toEqual({
+      toolCount: 0,
+      error:
+        "The server stopped before it answered. Run the command in a terminal to see its error. This command runs the mcp-remote bridge. Choose Streamable HTTP with the URL https://mcp.example.com/mcp instead, and OpenBot signs you in.",
+    });
+  });
+
+  it("says an http server could not be reached", async () => {
+    const closed = createServer();
+    await new Promise<void>((resolve) => closed.listen(0, "127.0.0.1", resolve));
+    const address = closed.address();
+    if (address === null || typeof address === "string") throw new Error("The closed server had no port.");
+    await new Promise<void>((resolve) => closed.close(() => resolve()));
+
+    expect(
+      await runMcp(testMcpServer(config({ transport: "http", url: `http://127.0.0.1:${address.port}/mcp` }))),
+    ).toEqual({
+      toolCount: 0,
+      error: "OpenBot could not reach the server. Check the URL and your network.",
+    });
+  });
+});
+
+describe("describeSignInChallenge", () => {
+  it("names the https address instead of signing in over plain http", () => {
+    // Granola redirects plain http to https and then asks for a sign-in; the agents would still use
+    // the http address, so the user is asked to change it rather than have it changed silently.
+    expect(
+      describeSignInChallenge(
+        "http://mcp.granola.ai/mcp?key=private",
+        "https://mcp.granola.ai/mcp?key=private",
+        "here",
+      ),
+    ).toBe(
+      "This server asks for a sign-in, and OpenBot signs in only over https. Change the URL to https://mcp.granola.ai/mcp.",
+    );
+    expect(describeSignInChallenge("https://mcp.granola.ai/mcp", "https://mcp.granola.ai/mcp", null)).toBeNull();
   });
 });
 

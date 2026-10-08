@@ -103,6 +103,14 @@
   flex-wrap: wrap;
 }
 
+/* The one action a row's sentence asks for: Sign in after a challenge, Cancel during the wait. */
+.server-mcp-row-next {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  margin-top: var(--openbot-space-1);
+}
+
 .server-mcp-row-menu {
   min-width: 180px;
 }

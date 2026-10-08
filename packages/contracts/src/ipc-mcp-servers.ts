@@ -118,6 +118,30 @@ export interface TestMcpServerInput {
   config: McpServerConfig;
 }
 
+/**
+ * How long a sign-in waits for the browser to come back. Long enough to find the right account and
+ * read a consent page, short enough to end by itself. The panel states it beside its Cancel button.
+ */
+export const MCP_SIGN_IN_TIMEOUT_MS = 5 * 60 * 1000;
+
+/** The sign-in to stop, named by the address it signs in to: a draft has no id yet. */
+export interface CancelMcpSignInInput {
+  url: string;
+}
+
+export interface SignOutMcpServerInput {
+  mcpServerId: string;
+}
+
+/**
+ * Whether this computer holds a sign-in for one http row. A yes or no only: the token itself never
+ * leaves the main process.
+ */
+export interface McpSignInState {
+  mcpServerId: string;
+  signedIn: boolean;
+}
+
 export function createMcpServerId(): string {
   return `mcp-${crypto.randomUUID()}`;
 }
@@ -205,6 +229,16 @@ export function decodeMcpServerConfigs(value: unknown): McpServerConfig[] {
 export function decodeMcpTestResult(value: unknown): McpTestResult {
   if (!isMcpTestResult(value)) throw new Error("Invalid MCP server response.");
   return value;
+}
+
+export function decodeMcpSignInStates(value: unknown): McpSignInState[] {
+  if (!Array.isArray(value) || value.length > INPUT_LIMITS.mcpServers || !value.every(isMcpSignInState))
+    throw new Error("Invalid MCP server response.");
+  return value;
+}
+
+function isMcpSignInState(value: unknown): value is McpSignInState {
+  return isDynamicRecord(value) && isBounded(value.mcpServerId, INPUT_LIMITS.identifier) && isBoolean(value.signedIn);
 }
 
 /**

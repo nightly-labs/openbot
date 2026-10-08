@@ -6,11 +6,13 @@
 
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
+  CancelMcpSignInInput,
   McpKeyValue,
   McpServerConfig,
   RemoveMcpServerInput,
   SaveMcpServerInput,
   SetMcpServerEnabledInput,
+  SignOutMcpServerInput,
   TestMcpServerInput,
 } from "@openbot/contracts/ipc";
 import { isBoolean, isString } from "@openbot/contracts/runtime-values";
@@ -28,6 +30,16 @@ export function parseTestMcpServer(value: unknown): TestMcpServerInput {
 }
 
 export function parseRemoveMcpServer(value: unknown): RemoveMcpServerInput {
+  if (!isObject(value)) throw new Error("An MCP server is required.");
+  return { mcpServerId: requireString(value.mcpServerId, "MCP server") };
+}
+
+export function parseCancelMcpSignIn(value: unknown): CancelMcpSignInInput {
+  if (!isObject(value)) throw new Error("An MCP server is required.");
+  return { url: requireString(value.url, "Address", INPUT_LIMITS.mcpUrl) };
+}
+
+export function parseSignOutMcpServer(value: unknown): SignOutMcpServerInput {
   if (!isObject(value)) throw new Error("An MCP server is required.");
   return { mcpServerId: requireString(value.mcpServerId, "MCP server") };
 }

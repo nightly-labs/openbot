@@ -452,6 +452,8 @@ describe("signing in to an http MCP server", () => {
     const silent: McpOAuthAuthority = {
       accessToken: (url) => oauth.accessToken(url),
       signIn: () => null,
+      cancelSignIn: () => false,
+      signedIn: () => false,
       forget: (url) => oauth.forget(url),
     };
 
@@ -578,6 +580,8 @@ describe("signing in to an http MCP server", () => {
     const silent: McpOAuthAuthority = {
       accessToken: (url) => oauth.accessToken(url),
       signIn: () => null,
+      cancelSignIn: () => false,
+      signedIn: () => false,
       forget: (url) => oauth.forget(url),
     };
     expect(await runMcp(testMcpServer(config(server.url), 10_000, undefined, silent))).toEqual({
@@ -624,6 +628,8 @@ describe("signing in to an http MCP server", () => {
     const silent: McpOAuthAuthority = {
       accessToken: (url) => restarted.accessToken(url),
       signIn: () => null,
+      cancelSignIn: () => false,
+      signedIn: () => false,
       forget: (url) => restarted.forget(url),
     };
     expect(await runMcp(testMcpServer(config(server.url), 10_000, undefined, silent))).toEqual({
@@ -977,6 +983,76 @@ describe("signing in to an http MCP server", () => {
     await runMcp(oauth.forget(server.url));
     expect(storage.records.size).toBe(0);
     expect(await runMcp(oauth.accessToken(server.url))).toBeNull();
+  });
+
+  it.each([
+    ["here", "This server asks you to sign in. Choose Sign in to continue in your browser."],
+    ["host", "This server asks for a sign-in. Sign in to it in OpenBot on the host computer."],
+  ] as const)(
+    "asks for a sign-in, not a key, when a test that opens no browser is challenged (%s)",
+    async (place, error) => {
+      const server = await fakeServer();
+      const oauth = createOAuth({
+        storage: memoryStorage(),
+        redirectUrl: "openbot://mcp-auth",
+        openExternal: async () => expect.unreachable("A test must never open a browser."),
+      });
+      const silent = { accessToken: (url: string) => oauth.accessToken(url), signIn: () => null };
+
+      expect(await runMcp(testMcpServer(config(server.url), 10_000, undefined, silent, place))).toEqual({
+        toolCount: 0,
+        error,
+      });
+    },
+  );
+
+  it("signs in once, reconnects with the stored session, and asks again after sign-out", async () => {
+    const server = await fakeServer();
+    const opened: string[] = [];
+    const oauth = createOAuth({
+      storage: memoryStorage(),
+      redirectUrl: "openbot://mcp-auth",
+      openExternal: async (url) => {
+        opened.push(url);
+        oauth.receiveAuthorizationCode(new URL(url).searchParams.get("state") ?? "", GRANT);
+      },
+      signInTimeoutMs: 10_000,
+    });
+    const silent = { accessToken: (url: string) => oauth.accessToken(url), signIn: () => null };
+
+    expect(await runMcp(testMcpServer(config(server.url), 10_000, undefined, oauth, "here"))).toEqual({
+      toolCount: 1,
+      error: null,
+    });
+    expect(oauth.signedIn(server.url)).toBe(true);
+    // The next Test, and every thread start, spends the stored session without a browser.
+    expect(await runMcp(testMcpServer(config(server.url), 10_000, undefined, silent, "here"))).toEqual({
+      toolCount: 1,
+      error: null,
+    });
+    expect(opened).toHaveLength(1);
+
+    await runMcp(oauth.forget(server.url));
+    expect(oauth.signedIn(server.url)).toBe(false);
+    expect(await runMcp(testMcpServer(config(server.url), 10_000, undefined, silent, "here"))).toEqual({
+      toolCount: 0,
+      error: "This server asks you to sign in. Choose Sign in to continue in your browser.",
+    });
+  });
+
+  it("ends a sign-in the user cancels and keeps no token", async () => {
+    const server = await fakeServer();
+    const storage = memoryStorage();
+    const openExternal = vi.fn(async () => undefined);
+    const oauth = createOAuth({ storage, redirectUrl: "openbot://mcp-auth", openExternal, signInTimeoutMs: 60_000 });
+
+    const pending = runMcp(testMcpServer(config(server.url), 10_000, undefined, oauth, "here"));
+    await vi.waitFor(() => expect(openExternal).toHaveBeenCalledOnce());
+    expect(oauth.cancelSignIn(server.url)).toBe(true);
+
+    expect(await pending).toEqual({ toolCount: 0, error: "The sign-in was cancelled." });
+    expect(storage.read(server.url)?.tokens).toBeUndefined();
+    expect(oauth.cancelSignIn(server.url)).toBe(false);
   });
 
   it("ignores a grant for a sign-in this run never started", async () => {

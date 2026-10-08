@@ -1,8 +1,10 @@
 import type {
   McpServerConfig,
+  McpSignInState,
   RemoveMcpServerInput,
   SaveMcpServerInput,
   SetMcpServerEnabledInput,
+  SignOutMcpServerInput,
   TestMcpServerInput,
 } from "@openbot/contracts/ipc";
 import { GITHUB_CONNECTOR_MCP_SERVER_ID, mcpConfigErrors, normalizeMcpConfig } from "@openbot/contracts/ipc";
@@ -12,7 +14,7 @@ import type { AgentProvider } from "../agent-client";
 import { causeHelpers } from "../effect-boundary";
 import { McpHandoffLog } from "../mcp-handoff-log";
 import { type McpOAuthAuthority, normalizeResource } from "../mcp-oauth-provider";
-import { testMcpServer } from "../mcp-probe";
+import { type McpSignInPlace, testMcpServer } from "../mcp-probe";
 import {
   type McpServerDrop,
   type McpToolRuntimeSource,
@@ -36,6 +38,8 @@ export interface TestMcpServerOptions {
   interactive?: boolean;
   /** Spend stored credentials without opening a browser. Implied by `interactive`. */
   storedCredentials?: boolean;
+  /** Who can finish a sign-in this test cannot start, for the sentence a sign-in challenge gets. */
+  signInPlace?: McpSignInPlace;
 }
 
 export interface McpGatewayHooks {
@@ -248,17 +252,55 @@ export class McpGateway {
     // token, and a remote administrator gets a false 401 for a server local agents use. `signIn`
     // stays `null`, so a 401 the stored token cannot fix is reported rather than waited on.
     const stored = this.#oauth;
-    const silent: McpOAuthAuthority | undefined =
+    const silent: Pick<McpOAuthAuthority, "accessToken" | "signIn"> | undefined =
       !options.interactive && options.storedCredentials && stored
-        ? {
-            accessToken: (url) => stored.accessToken(url),
-            signIn: () => null,
-            forget: (url) => stored.forget(url),
-          }
+        ? { accessToken: (url) => stored.accessToken(url), signIn: () => null }
         : undefined;
     const oauth = options.interactive ? (stored ?? undefined) : silent;
-    return yield* testMcpServer(config, undefined, this.#toolRuntimes(), oauth).pipe(toMcpGatewayFailed);
+    return yield* testMcpServer(config, undefined, this.#toolRuntimes(), oauth, options.signInPlace ?? null).pipe(
+      toMcpGatewayFailed,
+    );
   });
+
+  /**
+   * The test that may open a browser: the user pressed Sign in. A sign-in that ends with a working
+   * connection marks every agent's session for refresh, so the next turn is handed the new token
+   * rather than the tools staying absent until a restart.
+   */
+  readonly signIn = Effect.fnUntraced(function* (this: McpGateway, input: TestMcpServerInput) {
+    const result = yield* this.test(input, { interactive: true, signInPlace: "here" });
+    if (result.error === null) yield* this.#hooks.refreshAllAgentRuntimes();
+    return result;
+  });
+
+  /** Stops the sign-in waiting for this address's browser. Nothing happens when none is waiting. */
+  cancelSignIn(url: string): void {
+    this.#oauth?.cancelSignIn(url);
+  }
+
+  /**
+   * Forgets the sign-in of one http row, and every agent's session is refreshed so the old bearer
+   * stops being handed out. Rows with the same address share that account, so they are signed out
+   * too; the answer says so, row by row.
+   */
+  readonly signOut = Effect.fn("McpGateway.signOut")(function* (this: McpGateway, input: SignOutMcpServerInput) {
+    const config = this.#servers.list().find((row) => row.id === input.mcpServerId && row.transport === "http");
+    if (config && this.#oauth) {
+      this.#oauth.cancelSignIn(config.url);
+      yield* this.#oauth.forget(config.url).pipe(toMcpGatewayFailed);
+      yield* this.#hooks.refreshAllAgentRuntimes();
+    }
+    return this.signIns();
+  }, Effect.uninterruptible);
+
+  /** Whether each http row has a sign-in on this computer. Yes or no only, never a token. */
+  signIns(): McpSignInState[] {
+    const oauth = this.#oauth;
+    return this.#servers
+      .list()
+      .filter((config) => config.transport === "http")
+      .map((config) => ({ mcpServerId: config.id, signedIn: oauth?.signedIn(config.url) ?? false }));
+  }
 
   /**
    * What the providers are given at spawn. They connect for themselves; a test is not used.

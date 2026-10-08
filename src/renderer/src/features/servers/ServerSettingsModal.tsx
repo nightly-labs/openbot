@@ -57,7 +57,7 @@ import type { McpServerConfig, McpTestResult } from "./mcp-servers";
 import { ServerDesktopPanel } from "./ServerDesktopPanel";
 import { createServerGeneralSection } from "./ServerGeneralSection";
 import { type ServerImportOptions, ServerImportPanel } from "./ServerImportPanel";
-import { type McpPanelDetail, ServerMcpPanel } from "./ServerMcpPanel";
+import { type McpPanelDetail, type McpPanelSignIn, ServerMcpPanel } from "./ServerMcpPanel";
 import { createServerMembersSection } from "./ServerMembersSection";
 import { type ServerRoutineFeedOptions, ServerRoutineFeedPanel } from "./ServerRoutineFeedPanel";
 import { type ServerUpdateOptions, ServerUpdatePanel } from "./ServerUpdatePanel";
@@ -114,6 +114,8 @@ export interface ServerSettingsModalProps {
   onRemoveMcpServer?: (id: string) => Promise<void>;
   onSetMcpServerEnabled?: (id: string, enabled: boolean) => Promise<void>;
   onTestMcpServer?: (config: McpServerConfig) => Promise<McpTestResult>;
+  /** Browser sign-in for http MCP servers. Only the server on this computer gets it. */
+  mcpSignIn?: McpPanelSignIn | undefined;
   /**
    * Fired when the MCP section becomes visible. The list is read then, not when the dialog opens,
    * because most visits to this dialog never reach that section.
@@ -626,6 +628,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                   props.onTestMcpServer?.(config) ??
                   Promise.resolve({ toolCount: 0, error: t("mcp.panel.testUnavailable") })
                 }
+                signIn={props.mcpSignIn}
               />
             </Tabs.Content>
           )}

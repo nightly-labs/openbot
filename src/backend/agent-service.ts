@@ -14,6 +14,7 @@ import type {
   AgentSummary,
   AttachmentDataInput,
   AvatarImageInput,
+  CancelMcpSignInInput,
   CapabilityState,
   ChannelMemory,
   ChannelRoutine,
@@ -45,6 +46,7 @@ import type {
   ListChannelRoutineRunsInput,
   ListRoutineRunsInput,
   McpServerConfig,
+  McpSignInState,
   McpTestResult,
   ProviderCodeLoginStart,
   QueuedMessageReceipt,
@@ -66,6 +68,7 @@ import type {
   SharedTable,
   SidebarLayoutSnapshot,
   SidebarSection,
+  SignOutMcpServerInput,
   SteerQueuedMessageInput,
   TestChannelRoutineInput,
   TestMcpServerInput,
@@ -1377,6 +1380,30 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       .pipe(
         Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "testMcpServer", cause: failure.cause })),
       );
+  }
+
+  signInMcpServer(input: TestMcpServerInput): Effect.Effect<McpTestResult, AgentLifecycleFailed> {
+    return this.#mcp
+      .signIn(input)
+      .pipe(
+        Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "signInMcpServer", cause: failure.cause })),
+      );
+  }
+
+  cancelMcpSignIn(input: CancelMcpSignInInput): void {
+    this.#mcp.cancelSignIn(input.url);
+  }
+
+  signOutMcpServer(input: SignOutMcpServerInput): Effect.Effect<McpSignInState[], AgentLifecycleFailed> {
+    return this.#mcp
+      .signOut(input)
+      .pipe(
+        Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "signOutMcpServer", cause: failure.cause })),
+      );
+  }
+
+  listMcpSignIns(): McpSignInState[] {
+    return this.#mcp.signIns();
   }
 
   enabledMcpServers(): McpServerConfig[] {

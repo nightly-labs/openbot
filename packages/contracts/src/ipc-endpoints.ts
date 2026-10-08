@@ -208,11 +208,14 @@ import type {
   SubmitMarketplaceAgentInput,
 } from "./ipc-marketplace-agents";
 import type {
+  CancelMcpSignInInput,
   McpServerConfig,
+  McpSignInState,
   McpTestResult,
   RemoveMcpServerInput,
   SaveMcpServerInput,
   SetMcpServerEnabledInput,
+  SignOutMcpServerInput,
   TestMcpServerInput,
 } from "./ipc-mcp-servers";
 import type {
@@ -1008,6 +1011,13 @@ export const IPC_ENDPOINTS = {
     ),
     // A test connects once and reports what it found. Nothing is stored, and no agent uses it.
     testMcpServer: scopedRequest<TestMcpServerInput, McpTestResult, "required">()("servers:mcp:test"),
+    // A test never opens a browser; a sign-in does, and answers once the browser came back and the
+    // server took the token. These four act on the computer that runs OpenBot only: nobody sits in
+    // front of a remote host's browser.
+    signInMcpServer: scopedRequest<TestMcpServerInput, McpTestResult, "required">()("servers:mcp:sign-in"),
+    cancelMcpSignIn: scopedRequest<CancelMcpSignInInput, void, "required">()("servers:mcp:cancel-sign-in"),
+    signOutMcpServer: scopedRequest<SignOutMcpServerInput, McpSignInState[], "required">()("servers:mcp:sign-out"),
+    listMcpSignIns: scopedQuery<McpSignInState[], "required">()("servers:mcp:list-sign-ins"),
   },
   // Bound against the storage service, not `AgentService`, so it is its own group.
   storage: {

@@ -485,6 +485,13 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     return calls().mcp.testMcpServer({ config }, serverId);
   }
 
+  /** A browser sign-in for a "link" listing: opens the browser when the server asks for one. */
+  async function signInPluginApp(config: McpServerConfig) {
+    const serverId = props.pluginServerId;
+    if (!serverId) throw new Error(t("marketplace.error.connectNoServer"));
+    return calls().mcp.signInMcpServer({ config }, serverId);
+  }
+
   /** Takes back only what this attempt installed. A skill the agent already had is the user's. */
   async function undoSkills(agentId: string, skillIds: readonly string[]) {
     for (const skillId of skillIds)
@@ -765,6 +772,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     uninstallBusy: (plugin: MarketplacePluginDetail) => Boolean(busy[`app:${plugin.slug}`]),
     cancelUninstall: () => setUninstalling(null),
     testPluginApp,
+    signInPluginApp,
     openPluginUrl,
   };
 }
