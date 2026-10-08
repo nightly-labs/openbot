@@ -1205,7 +1205,9 @@ export async function createApplicationServices({
       turnAnswer: (agentId, turnId) => {
         const threadId = store.list().find((agent) => agent.id === agentId)?.threadId;
         if (!threadId) return null;
-        return latestTurnAnswer(store.database.readConversation(agentId, threadId).messages, turnId)?.text ?? null;
+        return (
+          latestTurnAnswer(store.database.readTurnAssistantMessages(agentId, threadId, turnId), turnId)?.text ?? null
+        );
       },
       agentName: (agentId) => store.list().find((agent) => agent.id === agentId)?.name ?? agentId,
       sendHandoff: (input) => service.enqueueRoutineHandoff(input),
