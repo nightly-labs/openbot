@@ -68,11 +68,14 @@ let buffer = "";
 // works this way, and \`minimal\` next to \`low\` is its own naming.
 const FAILING_MODEL = process.env.OPENBOT_FAKE_ACP_CONFIG_FAIL ?? null;
 const HANGING_MODEL = process.env.OPENBOT_FAKE_ACP_CONFIG_HANG ?? null;
+// OpenCode's MiniMax M3: thinking is on or off, and there is no other level.
+const SWITCH_MODEL = process.env.OPENBOT_FAKE_ACP_CONFIG_SWITCH ?? null;
 const CONFIG_MODELS = [
   ...(FAILING_MODEL ? [FAILING_MODEL] : []),
   "agent/thinker",
   ...(HANGING_MODEL ? [HANGING_MODEL] : []),
   "agent/plain",
+  ...(SWITCH_MODEL ? [SWITCH_MODEL] : []),
 ];
 const THOUGHT_LEVELS = ["minimal", "low", "medium", "high", "xhigh", "default"];
 let selected = CONFIG_MODELS[0];
@@ -104,7 +107,18 @@ const configOptions = () => [
           options: THOUGHT_LEVELS.map((value) => ({ value, name: value })),
         },
       ]
-    : []),
+    : selected === SWITCH_MODEL
+      ? [
+          {
+            id: "effort",
+            name: "Effort",
+            category: "thought_level",
+            type: "select",
+            currentValue: "none",
+            options: ["none", "thinking", "default"].map((value) => ({ value, name: value })),
+          },
+        ]
+      : []),
 ];
 const write = (message) => process.stdout.write(JSON.stringify(message) + NL);
 process.stdout.on("error", (error) => {
@@ -652,6 +666,7 @@ describe("OpenCode ACP reasoning efforts", () => {
     const fake = await createFakeOpencodeAgent("system");
     vi.stubEnv("OPENBOT_FAKE_ACP_CONFIG_MODELS", "1");
     vi.stubEnv("OPENBOT_FAKE_ACP_CONFIG_LOG", fake.configLog);
+    vi.stubEnv("OPENBOT_FAKE_ACP_CONFIG_SWITCH", "agent/switch");
     const client = startOpencode(fake.cli, () => null, fake.envLog);
 
     const models = await runCauseEffect(client.request("model/list", {}, decodeModelListResponse));
@@ -663,11 +678,15 @@ describe("OpenCode ACP reasoning efforts", () => {
       models.data.map((model) => [
         model.model,
         model.supportedReasoningEfforts?.map((effort) => effort.reasoningEffort),
+        model.reasoningEffortConfigurable,
       ]),
     ).toEqual([
-      ["agent/thinker", ["low", "medium", "high", "xhigh"]],
-      // A model the agent gives no `thought_level` for has one effort, which is what it had before.
-      ["agent/plain", ["medium"]],
+      ["agent/thinker", ["low", "medium", "high", "xhigh"], undefined],
+      // A model the agent gives no `thought_level` for keeps `medium` for older clients, and says
+      // that the agent, not the user, decides its reasoning: nothing is sent for it.
+      ["agent/plain", ["medium"], false],
+      // `low` alone was thinking off, with no way to turn it on.
+      ["agent/switch", ["low", "high"], undefined],
     ]);
     // The sweep ends on the model the session opened on. An agent that remembers a last used model
     // outside the session would otherwise start the user's own next session on `agent/plain`.

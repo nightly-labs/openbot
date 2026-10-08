@@ -225,6 +225,8 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     ),
   );
   const reasoningOptions = createMemo(() => selectedModel()?.supportedReasoningEfforts ?? ["medium" as const]);
+  // The provider has no reasoning setting for this model, and the `medium` it lists is never sent.
+  const reasoningSetByProvider = () => selectedModel()?.reasoningEffortConfigurable === false;
   const avatarCandidates = createMemo(() =>
     avatarCandidateSeeds(props.agent.id, draft.avatar.candidateSeed, draft.avatar.batch),
   );
@@ -892,6 +894,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                 class="agent-settings-runtime-select"
                 options={reasoningOptions()}
                 value={draft.runtime.reasoningEffort}
+                disabled={reasoningSetByProvider()}
                 onChange={(nextReasoning) => {
                   if (!nextReasoning || nextReasoning === draft.runtime.reasoningEffort) return;
                   void selectReasoning(nextReasoning);
@@ -905,6 +908,11 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   <span class="agent-settings-runtime-label">{t("agentSettings.runtime.reasoning")}</span>
                   <SelectValue<AgentReasoningEffort>>
                     {(state) => {
+                      if (reasoningSetByProvider()) {
+                        return t("agentSettings.runtime.reasoningSetByProvider", {
+                          provider: agentProviderName(draft.runtime.provider),
+                        });
+                      }
                       const effort = state.selectedOption();
                       return effort ? reasoningLabel(effort) : t("agentSettings.runtime.selectReasoning");
                     }}

@@ -175,6 +175,10 @@ export class OpenBotDatabase {
     return this.#conversations.readConversation(agentId, threadId);
   }
 
+  readTurnAssistantMessages(agentId: string, threadId: string, turnId: string): ConversationMessage[] {
+    return this.#conversations.readTurnAssistantMessages(agentId, threadId, turnId);
+  }
+
   readActiveTurnId(agentId: string, threadId: string | null): string | null {
     return this.#conversations.readActiveTurnId(agentId, threadId);
   }

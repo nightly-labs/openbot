@@ -129,6 +129,8 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
         void channels.markAllRead();
       }}
       hasUnread={agentList().some((agent) => (unreadReplies()[agent.id] ?? 0) > 0) || channels.hasUnread()}
+      view={layout.sidebarView()}
+      onViewChange={layout.setSidebarView}
       serverName={activeServer()?.name ?? "Local"}
       onOpenServerSettings={(trigger) => {
         const server = activeServer();

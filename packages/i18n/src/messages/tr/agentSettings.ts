@@ -42,6 +42,7 @@ export const messages = {
   "agentSettings.runtime.reasoning": "Akıl Yürütme",
   "agentSettings.runtime.reasoningLabel": "Ajan akıl yürütme düzeyi",
   "agentSettings.runtime.selectReasoning": "Akıl yürütmeyi seçin",
+  "agentSettings.runtime.reasoningSetByProvider": "{provider} belirler",
   "agentSettings.runtime.access": "Erişim",
   "agentSettings.runtime.accessLabel": "Ajan erişimi",
   "agentSettings.runtime.busyMessage": "Çalışırken",
