@@ -176,7 +176,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
                 onOpenWorkspaceFolder={openWorkspaceFolder}
                 onBack={sidebarFileBack() === null ? undefined : openSidebarFileBack}
                 sourceUrl={attached()?.previewUrl ?? null}
-                pageUrl={htmlAttachmentPageUrl(attached())}
+                pageUrl={htmlAttachmentPageUrl(attached()) ?? file().preview?.pageUrl}
                 onOpenExternally={openSidebarFileExternally}
                 onDownload={downloadSidebarFile}
                 /* A browser cannot show a file in the file manager. */

@@ -171,6 +171,15 @@ export interface FilePreview {
   mimeType: string;
   previewKind: FilePreviewKind;
   bytes: Uint8Array | null;
+  /** Temporary HTML page on this client. Never a workspace path or a Team API field. */
+  pageUrl?: string;
+}
+
+export function isFilePreviewPageUrl(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    /^openbot-visual:\/\/preview\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u.test(value)
+  );
 }
 
 /**

@@ -7,6 +7,7 @@ import { ATTACHMENT_LIMITS } from "@openbot/contracts/input-limits";
 import { afterEach, describe, expect, it } from "vitest";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { filePreviewFromBytes, localFilePreview, mimeTypeForName } from "./file-preview";
+import { filePreviewPages } from "./file-preview-pages";
 
 const temporaryDirectories: string[] = [];
 
@@ -15,6 +16,21 @@ afterEach(async () => {
 });
 
 describe("file previews", () => {
+  it("gives an authorized local HTML preview a page containing the same bytes as its source", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "openbot-html-preview-"));
+    temporaryDirectories.push(directory);
+    const bytes = new TextEncoder().encode("<h1>Local report</h1><script>drawChart()</script>");
+    const path = join(directory, "report.html");
+    await writeFile(path, bytes);
+
+    const preview = await runCauseEffect(localFilePreview(path, "report.html", bytes.byteLength));
+    expect(preview.bytes).toEqual(bytes);
+    expect(preview.pageUrl).toBeDefined();
+    expect(filePreviewPages.get(new URL(preview.pageUrl ?? ""))).toEqual(bytes);
+    expect(filePreviewFromBytes("downloaded.html", bytes).pageUrl).toBeDefined();
+    expect(filePreviewFromBytes("source.txt", bytes)).not.toHaveProperty("pageUrl");
+  });
+
   it("classifies Markdown, common source files, images, and PDFs", () => {
     expect(filePreviewFromBytes("recipe.md", new Uint8Array([35]))).toMatchObject({
       mimeType: "text/markdown",
