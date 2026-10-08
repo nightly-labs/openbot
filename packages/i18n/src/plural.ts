@@ -15,6 +15,13 @@ const english: PluralRule = (count) => (count === 1 ? "one" : "other");
 
 const BUILT_IN_RULES: Readonly<Record<string, PluralRule>> = {
   en: english,
+  de: (count) => (Math.abs(count) === 1 ? "one" : "other"),
+  // CLDR Spanish: one for 1; many for nonzero integer multiples of one million.
+  es: (count) => {
+    const absolute = Math.abs(count);
+    if (absolute === 1) return "one";
+    return absolute !== 0 && Number.isInteger(absolute) && absolute % 1_000_000 === 0 ? "many" : "other";
+  },
   // CLDR: one is every number from 0 up to, but not including, 2.
   fr: (count) => (count >= 0 && count < 2 ? "one" : "other"),
   // Japanese has one form for every count.
@@ -24,6 +31,16 @@ const BUILT_IN_RULES: Readonly<Record<string, PluralRule>> = {
     const absolute = Math.abs(count);
     if (absolute < 2) return "one";
     return Number.isInteger(absolute) && absolute % 1_000_000 === 0 ? "many" : "other";
+  },
+  // CLDR Russian: one for 1, 21, 31…; few for 2–4, 22–24…; many for 0, 5–20, 25–30…; other for fractions.
+  ru: (count) => {
+    const absolute = Math.abs(count);
+    if (!Number.isInteger(absolute)) return "other";
+    const lastDigit = absolute % 10;
+    const lastTwo = absolute % 100;
+    if (lastDigit === 1 && lastTwo !== 11) return "one";
+    if (lastDigit >= 2 && lastDigit <= 4 && (lastTwo < 12 || lastTwo > 14)) return "few";
+    return "many";
   },
   // CLDR: one is the integer 1.
   tr: (count) => (count === 1 ? "one" : "other"),

@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 // anything reaches `shell`, so an empty stand-in is enough.
 vi.mock("electron", () => ({ shell: {} }));
 
-const { parseProviderApiKeyInput } = await import("./provider-handlers");
+const { parseProviderApiKeyInput, parseProviderUseInput } = await import("./provider-handlers");
 
 /*
  * The only place a renderer-supplied secret enters the main process. Everything this decoder accepts
@@ -53,5 +53,21 @@ describe("parseProviderApiKeyInput", () => {
     expect(() => parseProviderApiKeyInput({ provider: "opencode", key: "k".repeat(513) })).toThrowError(
       "The provider key is too long.",
     );
+  });
+});
+
+describe("parseProviderUseInput", () => {
+  it("accepts both switch directions for a built-in provider", () => {
+    for (const on of [true, false])
+      expect(parseProviderUseInput({ provider: "codex", on })).toEqual({ provider: "codex", on });
+  });
+  it.each([
+    null,
+    {},
+    { provider: "codex", on: "false" },
+    { provider: "unknown", on: false },
+    { provider: "acp", on: false },
+  ])("refuses a malformed or unsupported switch: %j", (input) => {
+    expect(() => parseProviderUseInput(input)).toThrow();
   });
 });

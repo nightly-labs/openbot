@@ -10,13 +10,13 @@ import Animated, {
   ReduceMotion,
   type SharedValue,
   useAnimatedStyle,
-  useReducedMotion,
   useSharedValue,
   withSpring,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
 import { haptics } from "@/shared/lib/haptics";
+import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
 import { ChatCameraContent } from "./chat-camera-panel";
 import type { ChatAttachmentAnchor, ChatAttachments } from "./use-chat-attachments";

@@ -1,9 +1,12 @@
 import type { TranslatedLocale } from "./locale";
 import { createTranslate } from "./message";
+import { messages as de } from "./messages/de/format";
 import { messages as en } from "./messages/en/format";
+import { messages as es } from "./messages/es/format";
 import { messages as fr } from "./messages/fr/format";
 import { messages as ja } from "./messages/ja/format";
 import { messages as pt } from "./messages/pt/format";
+import { messages as ru } from "./messages/ru/format";
 import { messages as tr } from "./messages/tr/format";
 
 /**
@@ -31,7 +34,7 @@ export interface AppFormat {
   fileSize: (bytes: number) => string;
 }
 
-const catalogs = { en, fr, ja, pt, tr } as const;
+const catalogs = { en, de, es, fr, ja, pt, ru, tr } as const;
 
 const numberFormats = new Map<string, Intl.NumberFormat>();
 
