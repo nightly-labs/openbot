@@ -302,7 +302,7 @@ describe.sequential("GrokAgentClient", () => {
         return [];
       return event.params.item.type === "toolCall" ? [event.params.item.name] : [];
     });
-    expect(tools).toEqual(["Read files", "Check results"]);
+    expect(tools).toEqual(["Read files", "Read more", "Check results"]);
   });
 
   it("starts profile generation with no built-in tools and denies approval requests", async () => {
@@ -385,6 +385,8 @@ describe.sequential("GrokAgentClient", () => {
         expect.objectContaining({ phase: "commentary", text: "Planning inspection." }),
         expect.objectContaining({ phase: "commentary", text: "Inspecting files." }),
         expect.objectContaining({ phase: "commentary", text: "Reviewing findings." }),
+        // A tool call between two thoughts keeps them apart (#1540).
+        expect.objectContaining({ phase: "commentary", text: "Comparing results." }),
         expect.objectContaining({ phase: "commentary", text: "Checking results." }),
         expect.objectContaining({
           phase: "final_answer",
@@ -425,7 +427,7 @@ describe.sequential("GrokAgentClient", () => {
           }
         }
       }
-      expect([...texts.values()]).toEqual(["Planning inspection.", "Reviewing findings."]);
+      expect([...texts.values()]).toEqual(["Planning inspection.", "Reviewing findings.", "Comparing results."]);
       expect(streamedThoughts).toEqual(["Reviewing findings."]);
       expect(completedAnswers).toEqual(["The final answer."]);
       expect([...phases.values()].filter((phase) => phase === "final_answer")).toHaveLength(1);
@@ -1197,6 +1199,9 @@ createInterface({ input: process.stdin }).on("line", (line) => {
         { sessionUpdate: "tool_call", toolCallId: "read-1", title: "Read files", status: "in_progress" },
         { sessionUpdate: "tool_call_update", toolCallId: "read-1", status: "completed" },
         { sessionUpdate: "agent_thought_chunk", content: { type: "text", text: "Reviewing findings." } },
+        { sessionUpdate: "tool_call", toolCallId: "read-3", title: "Read more", status: "in_progress" },
+        { sessionUpdate: "tool_call_update", toolCallId: "read-3", status: "completed" },
+        { sessionUpdate: "agent_thought_chunk", content: { type: "text", text: "Comparing results." } },
         { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "Checking results." } },
         { sessionUpdate: "tool_call", toolCallId: "read-2", title: "Check results", status: "in_progress" },
         { sessionUpdate: "tool_call_update", toolCallId: "read-2", status: "completed" },

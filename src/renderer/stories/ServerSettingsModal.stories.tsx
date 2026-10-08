@@ -1,4 +1,4 @@
-import type { HostStatus, HostUpdateStatus } from "@openbot/contracts/ipc";
+import type { HostReleaseStatus, HostStatus, HostUpdateStatus } from "@openbot/contracts/ipc";
 import { createSignal, onSettled, snapshot } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
@@ -260,13 +260,18 @@ export const RemoteUpdateDisabled: Story = {
   ),
 };
 
-function RemoteSetupStory(props: { settings: ServerSettingsModalProps; hostUpdate?: HostUpdateStatus }) {
+function RemoteSetupStory(props: {
+  settings: ServerSettingsModalProps;
+  hostUpdate?: HostUpdateStatus;
+  hostRelease?: HostReleaseStatus;
+}) {
   const previous = window.openbot;
   // Storybook passes the args as a store, and the mock copies its options with `structuredClone`.
   const hostStatus = props.settings.hostStatus;
   const mock = createMockOpenBot({
     ...(hostStatus ? { hostStatus: snapshot(hostStatus) } : {}),
     ...(props.hostUpdate ? { hostUpdate: props.hostUpdate } : {}),
+    ...(props.hostRelease ? { hostRelease: props.hostRelease } : {}),
   });
   window.openbot = mock.api;
   onSettled(() => () => {
@@ -280,4 +285,26 @@ export const SmallViewport: Story = {
   parameters: {
     viewport: { defaultViewport: "serverMobile" },
   },
+};
+
+export const HostedReleaseAvailable: Story = {
+  args: remoteUpdateArgs,
+  render: (args) => (
+    <RemoteSetupStory
+      settings={args}
+      hostUpdate={{ ...STORY_HOST_UPDATE, currentVersion: "0.25.2", phase: "unsupported", availableVersion: null }}
+      hostRelease={{ currentVersion: "0.25.2", latestVersion: "0.26.0", phase: "available", method: "hosted" }}
+    />
+  ),
+};
+
+export const ContainerReleaseAvailable: Story = {
+  args: remoteUpdateArgs,
+  render: (args) => (
+    <RemoteSetupStory
+      settings={args}
+      hostUpdate={{ ...STORY_HOST_UPDATE, currentVersion: "0.25.2", phase: "unsupported", availableVersion: null }}
+      hostRelease={{ currentVersion: "0.25.2", latestVersion: "0.26.0", phase: "available", method: "container" }}
+    />
+  ),
 };

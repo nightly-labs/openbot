@@ -343,15 +343,17 @@ export function ConversationComposer() {
               disabled={submitting() || voicePhase() === "transcribing" || !agentReady() || savePending()}
               placeholder={
                 !agentReady()
-                  ? props.runtime
-                    ? props.server?.state === "online"
-                      ? t("composer.placeholder.hostSetup")
-                      : props.server?.hostedSleep === "sleeping"
-                        ? t("composer.placeholder.hostSleeping")
-                        : props.server?.hostedSleep === "waking"
-                          ? t("composer.placeholder.hostWaking")
-                          : t("composer.placeholder.connectHost")
-                    : t("composer.placeholder.cliSetup")
+                  ? props.agentsConnecting
+                    ? t("common.connecting")
+                    : props.runtime
+                      ? props.server?.state === "online"
+                        ? t("composer.placeholder.hostSetup")
+                        : props.server?.hostedSleep === "sleeping"
+                          ? t("composer.placeholder.hostSleeping")
+                          : props.server?.hostedSleep === "waking"
+                            ? t("composer.placeholder.hostWaking")
+                            : t("composer.placeholder.connectHost")
+                      : t("composer.placeholder.cliSetup")
                   : replyTarget()
                     ? t("composer.placeholder.reply")
                     : messageLabel()

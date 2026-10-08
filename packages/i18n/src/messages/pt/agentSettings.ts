@@ -42,6 +42,7 @@ export const messages = {
   "agentSettings.runtime.reasoning": "Raciocínio",
   "agentSettings.runtime.reasoningLabel": "Nível de raciocínio do agente",
   "agentSettings.runtime.selectReasoning": "Selecionar raciocínio",
+  "agentSettings.runtime.reasoningSetByProvider": "Definido pelo {provider}",
   "agentSettings.runtime.access": "Acesso",
   "agentSettings.runtime.accessLabel": "Acesso do agente",
   "agentSettings.runtime.busyMessage": "Durante o trabalho",

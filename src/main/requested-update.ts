@@ -181,6 +181,16 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
     return this.snapshot();
   }).bind(this);
 
+  /** A member can request an idle update but cannot replace an existing schedule. */
+  readonly requestWhenIdle = Effect.fn("RequestedUpdate.requestWhenIdle")(function* (
+    this: RequestedUpdate,
+    member: RequestedUpdateMember,
+  ) {
+    yield* remoteDecode(() => this.#assertAllowed());
+    if (this.#schedule) return this.snapshot();
+    return yield* this.start(member, "when-idle");
+  }).bind(this);
+
   readonly changeSettings = Effect.fn("RequestedUpdate.changeSettings")(function* (
     this: RequestedUpdate,
     change: HostUpdateSettingsChange,
