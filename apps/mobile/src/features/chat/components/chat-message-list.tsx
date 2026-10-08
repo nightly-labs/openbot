@@ -36,7 +36,6 @@ import Animated, {
   FadeInDown,
   ReduceMotion,
   useAnimatedStyle,
-  useReducedMotion,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
@@ -58,6 +57,7 @@ import { useConnectionAppearance } from "@/features/workspace/components/use-con
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import { agentActivityMood, type MobileAgentActivity } from "@/features/workspace/model/agent-activity";
 import { haptics } from "@/shared/lib/haptics";
+import { useMotionPreference, useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
 import type { ChatBubbleMessage } from "../context/message-actions-context";
 import { CHAT_HISTORY_BATCH, type ChatHistoryBoundary, chatHistoryStart } from "../model/chat-layout";
@@ -125,11 +125,14 @@ function ChatBubble({
   children,
   agent,
   collapsed = false,
+  animateSize,
   className,
   style,
 }: PropsWithChildren<{
   agent: boolean;
   collapsed?: boolean;
+  /** Off when Settings turns reply animation off: the bubble takes each new size at once. */
+  animateSize: boolean;
   className: string;
   style: ComponentProps<typeof Animated.View>["style"];
 }>) {
@@ -141,10 +144,11 @@ function ChatBubble({
   const background = useAnimatedStyle(() => {
     const { width, height, measured } = size.get();
     // The first measurement is adopted without motion; only later growth during streaming animates.
+    const animate = measured && animateSize;
     return {
       opacity: shown.get(),
-      width: measured ? withTiming(width, REPLY_SIZE) : width,
-      height: measured ? withTiming(height, REPLY_SIZE) : height,
+      width: animate ? withTiming(width, REPLY_SIZE) : width,
+      height: animate ? withTiming(height, REPLY_SIZE) : height,
     };
   });
   return (
@@ -261,6 +265,8 @@ interface MessageRowShared {
   animationActive: boolean;
   /** Arriving replies also play back word by word: motion and screen reader settings allow it. */
   playbackActive: boolean;
+  /** Replies animate as they arrive: Settings and reduced motion allow it. */
+  textReveal: boolean;
   replySession: { progress: Map<string, number>; revealed: Set<string> };
   /** Changes when a reply reveals its first word, so a waiting row renders its bubble. */
   revealedCount: number;
@@ -554,6 +560,7 @@ const MessageRow = memo(function MessageRow({
           <ChatBubble
             agent={message.author === "agent"}
             collapsed={waiting}
+            animateSize={shared.textReveal}
             className={
               message.author === "user"
                 ? `self-end rounded-[30px] px-4 py-3 ${userBubbleStyle || memberColor ? "" : "bg-control/60"} ${message.attachments?.length ? "max-w-[88%]" : "max-w-full"}`
@@ -719,6 +726,7 @@ export function ChatMessageList({
   const themeForeground = String(themeForegroundColor);
   const themeMuted = String(themeMutedColor);
   const reducedMotion = useReducedMotion();
+  const textReveal = useMotionPreference("textReveal");
   const animateMessages = isFocused && online && appActive;
   const replyHaptics = useReplyHaptics(animateMessages && historyState === "ready" && motion.responseVisible);
   const conversationKey = JSON.stringify([target.serverId, target.kind, target.id]);
@@ -801,7 +809,8 @@ export function ChatMessageList({
       screenReaderEnabled,
       arrivals,
       animationActive,
-      playbackActive: animationActive && !reducedMotion && !screenReaderEnabled,
+      playbackActive: animationActive && textReveal && !screenReaderEnabled,
+      textReveal,
       replySession,
       revealedCount,
       markRevealed,
@@ -827,7 +836,7 @@ export function ChatMessageList({
       screenReaderEnabled,
       arrivals,
       animationActive,
-      reducedMotion,
+      textReveal,
       replySession,
       revealedCount,
       markRevealed,

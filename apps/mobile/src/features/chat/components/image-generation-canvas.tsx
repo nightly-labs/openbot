@@ -1,7 +1,8 @@
 import { Canvas, Fill, Shader, Skia } from "@shopify/react-native-skia";
 import { useEffect, useState } from "react";
 import { AppState, type ColorValue } from "react-native";
-import { useDerivedValue, useFrameCallback, useReducedMotion, useSharedValue } from "react-native-reanimated";
+import { useDerivedValue, useFrameCallback, useSharedValue } from "react-native-reanimated";
+import { useReducedMotion } from "@/shared/lib/motion";
 
 // A dot grid with rings that travel out from the centre: the canvas the image is painted on.
 // The dots near a crest brighten toward the accent, so the motion reads as work in progress

@@ -25,6 +25,7 @@ import { AgentPinSwipeRow } from "@/features/agents/components/agent-pin-swipe-r
 import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
+import { ChatZoomSource } from "@/features/agents/components/chat-zoom-source";
 import { useAgentUnread } from "@/features/workspace/components/use-live-workspace";
 import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
@@ -128,11 +129,11 @@ export function AgentListRow({
   const avatar = onOpen ? (
     bloub
   ) : (
-    <Link.AppleZoom>
+    <ChatZoomSource>
       <AgentPinAvatar agentId={agent.id} location="row" size={54}>
         {bloub}
       </AgentPinAvatar>
-    </Link.AppleZoom>
+    </ChatZoomSource>
   );
 
   const row = (
