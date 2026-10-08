@@ -80,6 +80,9 @@ export const messages = {
   "error.team.mcpUnsupported": "Esta conexión no admite servidores MCP.",
   "error.team.storageUnsupported": "Esta conexión no admite almacenamiento.",
   "error.team.hostedSitesUnsupported": "Esta conexión no admite sitios.",
+  "error.team.directEndpointUnsupported": "Este servidor no ofrece una conexión directa.",
+  "error.team.directSignInUnavailable":
+    "La conexión directa no puede comprobar a los miembros ahora. Usa la nube de OpenBot.",
   "error.team.hostedSitesUnregistered": "Este servidor no está registrado en OpenBot, por lo que no tiene sitios.",
   "error.team.hostedSiteNotFound": "No se encontró el sitio.",
   "error.team.markUnreadUnsupported": "Este cliente no permite marcar conversaciones como no leídas.",

@@ -9,6 +9,7 @@ import {
   isNeverExpiringInvite,
   isPermanentInvite,
   isValidRemoteApiUrl,
+  isValidTailscaleDirectApiUrl,
   PERMANENT_INVITE_EXPIRES_AT_MS,
   parseInviteUrl,
   permanentInviteExpiresAt,
@@ -67,6 +68,32 @@ describe("OpenBot invite links", () => {
     expect(isValidRemoteApiUrl("http://team-host.trycloudflare.com/")).toBe(false);
     expect(isValidRemoteApiUrl("https://example.com/")).toBe(false);
     expect(isValidRemoteApiUrl(`${payload.apiUrl}path`)).toBe(false);
+  });
+
+  // The direct Tailscale path is its own validator: invitations and the HTTPS server list still refuse it.
+  it("accepts a tailnet HTTPS name only on the direct path", () => {
+    const direct = "https://studio-mac.tail4b2c1.ts.net";
+    expect(isValidTailscaleDirectApiUrl(direct)).toBe(true);
+    expect(isValidTailscaleDirectApiUrl(`${direct}/`)).toBe(true);
+    expect(isValidTailscaleDirectApiUrl(`${direct}:8443`)).toBe(true);
+    expect(isValidRemoteApiUrl(`${direct}/`)).toBe(false);
+    expect(() => createInviteUrl({ ...payload, apiUrl: `${direct}/` })).toThrow();
+    for (const value of [
+      "http://studio-mac.tail4b2c1.ts.net",
+      `${direct}/v1`,
+      `${direct}?a=1`,
+      `${direct}#a`,
+      "https://user@studio-mac.tail4b2c1.ts.net",
+      "https://STUDIO-MAC.tail4b2c1.ts.net",
+      "https://studio-mac.tail4b2c1.ts.net:443",
+      "https://tail4b2c1.ts.net",
+      "https://a.b.tail4b2c1.ts.net",
+      "https://studio-mac.tail4b2c1.ts.net.example.com",
+      "https://100.101.102.103",
+      "not a url",
+    ]) {
+      expect(isValidTailscaleDirectApiUrl(value), value).toBe(false);
+    }
   });
 
   it("accepts only the configured self-hosted account service, through the app scheme", () => {

@@ -328,9 +328,11 @@ import type {
   ScopedTeamPresenceSnapshot,
   SendDirectMessageInput,
   ServerSummary,
+  SetServerDirectInput,
   SetServerMutedInput,
   SetServerNotificationLevelInput,
   SetTeamTypingInput,
+  TailscaleHostStatus,
   TeamInviteSummary,
   TeamMemberSummary,
   TeamPresenceSnapshot,
@@ -946,6 +948,8 @@ export const IPC_ENDPOINTS = {
     reorder: request<ReorderServersInput, ServerSummary[]>()("servers:reorder"),
     setMuted: request<SetServerMutedInput, ServerSummary[]>()("servers:set-muted"),
     setNotificationLevel: request<SetServerNotificationLevelInput, ServerSummary[]>()("servers:set-notification-level"),
+    /** The member's "Use Tailscale when available" choice for one joined server. */
+    setDirectEnabled: request<SetServerDirectInput, ServerSummary[]>()("servers:set-direct-enabled"),
     join: request<JoinServerInput, ServerSummary>()("servers:join"),
     previewInvite: request<JoinServerInput, InvitePreview>()("servers:preview-invite"),
     takePendingInvite: request<undefined, string | null>()("servers:take-pending-invite"),
@@ -1064,6 +1068,12 @@ export const IPC_ENDPOINTS = {
     removeMember: request<string, void>()("host:remove-member"),
     listSessions: request<undefined, TeamSessionSummary[]>()("host:list-sessions"),
     revokeSession: request<string, void>()("host:revoke-session"),
+    /** The local Tailscale client and the direct Tailscale path of this host. Runs the `tailscale` command. */
+    getTailscaleStatus: request<undefined, TailscaleHostStatus>()("host:get-tailscale-status"),
+    /** The owner's switch for the direct Tailscale path. On, it runs `tailscale serve` while the host is online. */
+    setTailscaleDirect: request<boolean, TailscaleHostStatus>()("host:set-tailscale-direct"),
+    /** Opens the Tailscale app, or its download page when it is not installed. */
+    openTailscale: request<undefined, void>()("host:open-tailscale"),
     event: event<HostStatus>()("host:event"),
   },
   events: {

@@ -27,4 +27,5 @@ export const messages = {
   "error.host.tenantShutdownTimeout": "Время остановки тенантов истекло. Замена приложения не начата.",
   "error.host.tenantHealthMissing":
     "После перезапуска отчёты о состоянии тенантов отсутствуют или показывают сбой. Проверьте сессии тенантов, прежде чем обновлять снова.",
+  "error.host.tailscaleUnavailable": "Tailscale недоступен в этой версии OpenBot.",
 } as const satisfies PartialTranslation<typeof source>;

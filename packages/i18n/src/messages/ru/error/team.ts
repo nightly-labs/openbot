@@ -80,6 +80,9 @@ export const messages = {
   "error.team.mcpUnsupported": "Это подключение не поддерживает серверы MCP.",
   "error.team.storageUnsupported": "Это подключение не поддерживает хранилище.",
   "error.team.hostedSitesUnsupported": "Это подключение не поддерживает сайты.",
+  "error.team.directEndpointUnsupported": "Этот сервер не поддерживает прямое подключение.",
+  "error.team.directSignInUnavailable":
+    "Прямое подключение сейчас не может проверить участников. Используйте облако OpenBot.",
   "error.team.hostedSitesUnregistered": "Этот сервер не зарегистрирован в OpenBot, поэтому у него нет сайтов.",
   "error.team.hostedSiteNotFound": "Сайт не найден.",
   "error.team.markUnreadUnsupported": "Этот клиент не поддерживает отметку диалогов как непрочитанных.",

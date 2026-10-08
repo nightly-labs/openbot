@@ -2,7 +2,12 @@ import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { basename } from "node:path";
 import { isValidAvatarImage } from "@openbot/contracts/avatar-images";
-import { type InviteLinkOptions, type InviteLinkPayload, parseInviteUrl } from "@openbot/contracts/invite-links";
+import {
+  type InviteLinkOptions,
+  type InviteLinkPayload,
+  isValidTailscaleDirectApiUrl,
+  parseInviteUrl,
+} from "@openbot/contracts/invite-links";
 import type {
   AgentEvent,
   AgentImportPreview,
@@ -32,6 +37,7 @@ import type {
   MarkDirectReadInput,
   RemoteDesktopSession,
   SendDirectMessageInput,
+  ServerCompatibility,
   ServerNotificationLevel,
   ServerSummary,
   SetTeamTypingInput,
@@ -47,10 +53,15 @@ import {
   REMOTE_DESKTOP_SETUP_CAPABILITY,
   type RemoteDesktopTestInput,
 } from "@openbot/contracts/ipc";
+import { decodeRecord } from "@openbot/contracts/ipc-decoding";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/agent-import-v1";
 import { decodeBrowserViewSessionResponse } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { TEAM_MEMBER_LEAVE_CAPABILITY, type TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
+import {
+  DIRECT_ENDPOINT_CAPABILITY,
+  DIRECT_ENDPOINT_ROUTES,
+} from "@openbot/contracts/team-protocol/direct-endpoint-v1";
 import type { HostRestartEvent } from "@openbot/contracts/team-protocol/host-update-v1";
 import { decodeTeamProtocolV1CurrentHttpResponse } from "@openbot/contracts/team-protocol/v1-adapter";
 import { sourceText } from "@openbot/i18n/source";
@@ -75,9 +86,16 @@ import {
 } from "./remote-conversation-decoding";
 import { decodeRemoteDesktopSetupFromHost, decodeRemoteDesktopTestFromHost } from "./remote-desktop-setup-decoding";
 import { decodeRemoteDesktopSession } from "./remote-device-decoding";
+import type { RemoteDirectSessionStore } from "./remote-direct-session-store";
 import { decodeVoid, type ResponseDecoder } from "./remote-host-decoding";
 import { type RemoteRequestInit, RemoteServerClient } from "./remote-server-client";
 import { RemoteServerConnections } from "./remote-server-connections";
+import {
+  type DirectRouteStatus,
+  type DirectSessionPersistence,
+  decodeDirectSignIn,
+  RemoteDirectRoutes,
+} from "./remote-server-direct-route";
 import { RemoteProtocolError, RemoteRequestError } from "./remote-server-errors";
 import { RemoteEventRefresh } from "./remote-server-event-refresh";
 import { RemoteEventStream } from "./remote-server-event-stream";
@@ -98,6 +116,8 @@ import {
 import { decodeInvitePreview, decodeJoinResult, decodeTeamPresenceSnapshot } from "./remote-team-decoding";
 import { RemoteTeamDirectory } from "./remote-team-directory";
 import { RemoteViewerProxy } from "./remote-viewer-proxy";
+import type { TailscaleLocalState } from "./tailscale-cli";
+import { isWebRtcOnlyTeamPath } from "./team-api-direct-paths";
 import { fingerprint } from "./team-store";
 import {
   TEAM_WEBRTC_REMOTE_REQUEST_TIMEOUT_MILLISECONDS,
@@ -116,6 +136,13 @@ interface RemoteServerEvents {
 interface CentralAccountSession {
   createTeamAuthTicket: (serverId: string) => Effect.Effect<string, CentralAuthOperationError>;
   getEmail: () => string;
+  /** The signed-in account, or null. Kept direct sessions belong to it. */
+  getPrincipalId?: () => string | null;
+  /**
+   * Resolves once the account has loaded at startup, signed in or not. It never fails. Until then a
+   * WebRTC host cannot be reached and the account of a direct session is not known.
+   */
+  ready?: () => Effect.Effect<void>;
   sendTeamInviteEmail?: (input: {
     email: string;
     serverName: string;
@@ -133,6 +160,13 @@ interface RemoteServerManagerOptions {
   getLocalHostId?: () => string | null;
   /** The account service's hosted servers. Each joined host can be one. */
   hostedServers?: HostedServerWakeHooks;
+  /**
+   * This computer's Tailscale client. Without it, or when it cannot reach a host, the direct
+   * Tailscale path is not tried and the server uses WebRTC.
+   */
+  localTailscale?: () => Effect.Effect<TailscaleLocalState>;
+  /** Keeps direct Tailscale sessions for the next run. Without it they are in memory only. */
+  directSessions?: RemoteDirectSessionStore;
   /** Times each WebRTC connection for the local trace. */
   connectTrace?: RemoteConnectTrace;
 }
@@ -166,6 +200,9 @@ const HOST_RESTART_RETRY_MS = 10 * 60_000;
 // How long a hosted server keeps the short retry after a wake request. It boots in about a minute; a
 // server that is not back by then is asked about again.
 const HOSTED_SERVER_START_MS = 5 * 60_000;
+// How long a request to a WebRTC host, or a direct attempt, waits for the account to load at startup.
+// The WebRTC connection waits as long for its host before it gives up.
+const REMOTE_ACCOUNT_READY_TIMEOUT_MS = 30_000;
 export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #scope = Scope.makeUnsafe();
   readonly #platform: Layer.Layer<RemoteRequest>;
@@ -175,6 +212,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #store: RemoteServerStore;
   readonly #connections: RemoteServerConnections;
   readonly #client: RemoteServerClient;
+  /** The direct Tailscale path, and the server list as the request client and the event stream see it. */
+  readonly #direct: RemoteDirectRoutes;
   readonly #refresh: RemoteEventRefresh;
   readonly #events: RemoteEventStream;
   readonly #presence: RemotePresenceCache;
@@ -196,6 +235,11 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #hostedStartAt = new Map<string, number>();
   /** Hosted servers that did not come online in the start time. Only the user's next wake starts them again. */
   readonly #hostedStartExpired = new Set<string>();
+  /**
+   * WebRTC connections that opened while the direct path was in use, such as for the remote screen.
+   * Their `connected` event did not run the connection setup, and a later `connect` raises none.
+   */
+  readonly #webRtcConnectedBesideDirect = new Set<string>();
   #appFocused = true;
   readonly #remoteViewerProxy: RemoteViewerProxy | null;
   #selections = Semaphore.makeUnsafe(1);
@@ -232,11 +276,77 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     this.#getLocalHostId = options.getLocalHostId ?? (() => null);
     this.#hostedServers = options.hostedServers ?? null;
     this.#connectTrace = options.connectTrace ?? null;
+    const localTailscale = options.localTailscale;
+    const directSessions = options.directSessions;
+    const getPrincipalId = centralAccount.getPrincipalId;
+    const sessions: DirectSessionPersistence | undefined =
+      directSessions && getPrincipalId
+        ? {
+            principalId: getPrincipalId,
+            read: (principalId, serverId) =>
+              directSessions.load().pipe(Effect.map(() => directSessions.get(principalId, serverId))),
+            write: (principalId, serverId, session) => directSessions.set(principalId, serverId, session),
+            remove: (serverId) => directSessions.delete(serverId),
+            clear: () => directSessions.clear(),
+          }
+        : undefined;
+    this.#direct = new RemoteDirectRoutes({
+      servers: this.#store,
+      localTailscale: localTailscale ?? (() => Effect.succeed<TailscaleLocalState>({ kind: "not-installed" })),
+      verifyIdentity: (apiUrl, serverId, fingerprint) => this.#client.verifyIdentity(apiUrl, serverId, fingerprint),
+      createTicket: (serverId) => this.#centralAccount.createTeamAuthTicket(serverId).pipe(toRemoteWorkflowError),
+      signIn: (apiUrl, accountTicket, compatibility) =>
+        requestJson(apiUrl, TEAM_API_ROUTES.auth.account, decodeDirectSignIn, {
+          method: "POST",
+          body: { accountTicket },
+          ...this.#client.requestProtocol(compatibility),
+        }).pipe(Effect.mapError((failure) => new RemoteWorkflowError({ cause: failure }))),
+      checkSession: (apiUrl, token, compatibility) =>
+        requestJson(apiUrl, TEAM_API_ROUTES.me, (value) => decodeRecord(value, "team member"), {
+          token,
+          ...this.#client.requestProtocol(compatibility),
+        }).pipe(
+          Effect.as("valid" as const),
+          Effect.catch((failure) =>
+            failure instanceof RemoteRequestError && (failure.status === 401 || failure.status === 403)
+              ? Effect.succeed("rejected" as const)
+              : Effect.fail(new RemoteWorkflowError({ cause: failure })),
+          ),
+        ),
+      ...(sessions ? { sessions } : {}),
+      accountReady: () => this.#accountReady(),
+      setCompatibility: (serverId, compatibility) => this.#connections.setCompatibility(serverId, compatibility),
+      clearCompatibility: (serverId) => this.#connections.clearCompatibility(serverId),
+      onRefreshDue: (serverId) => this.#renewDirectRoute(serverId),
+    });
+    // What a request or the event stream reports. A direct session the host no longer accepts is not
+    // "sign in again": the next connection gets a new one, or uses WebRTC.
+    const connections = {
+      compatibilityFor: (serverId: string) => this.#connections.compatibilityFor(serverId),
+      issueFor: (serverId: string) => this.#connections.issueFor(serverId),
+      setCompatibility: (serverId: string, compatibility: ServerCompatibility) =>
+        this.#connections.setCompatibility(serverId, compatibility),
+      clearStaleIssue: (serverId: string, issue: { code: string; message: string } | null) =>
+        this.#connections.clearStaleIssue(serverId, issue),
+      markConnected: (serverId: string) => this.#connections.markConnected(serverId),
+      setState: (serverId: string, state: ServerSummary["state"]) => this.#connections.setState(serverId, state),
+      reportUnreachable: (serverId: string) => this.#connections.reportUnreachable(serverId),
+      reportError: (serverId: string, error: unknown) => {
+        if (this.#direct.isActive(serverId) && error instanceof RemoteRequestError && error.status === 401) {
+          // The reconnect signs in again and does not use the kept session.
+          this.#background(this.#direct.forgetSession(serverId));
+          this.#renewDirectRoute(serverId);
+          return;
+        }
+        this.#connections.reportError(serverId, error);
+      },
+    };
     this.#client = new RemoteServerClient({
       appVersion: this.#appVersion,
-      servers: this.#store,
-      connections: this.#connections,
+      servers: this.#direct,
+      connections,
       transport: this.#webrtcTransport,
+      beforeRequest: (serverId, path) => this.#awaitRoute(serverId, path),
     });
     this.#platform = Layer.succeed(
       RemoteRequest,
@@ -264,13 +374,20 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         return this.#centralAccount.sendTeamInviteEmail(input);
       },
     });
+    const webrtcTransport = this.#webrtcTransport;
     this.#events = new RemoteEventStream({
       appVersion: this.#appVersion,
-      servers: this.#store,
+      servers: this.#direct,
       client: this.#client,
-      connections: this.#connections,
+      connections,
       agents: this.#refresh,
-      transport: this.#webrtcTransport,
+      // A WebRTC host is first tried over its direct Tailscale address, when it has one.
+      transport: webrtcTransport
+        ? {
+            connect: (hostId) => this.#connectHost(hostId),
+            requestRuntimeSnapshot: (hostId) => webrtcTransport.requestRuntimeSnapshot(hostId),
+          }
+        : null,
       // The stream reports facts and this is where they become state: an identity is written, a
       // presence snapshot is cached, and the rest are forwarded to the renderer.
       onServerIdentity: (serverId, identity) => this.#applyServerIdentity(serverId, identity),
@@ -278,7 +395,14 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       onDirectMessage: (serverId, event) => this.emit("directMessage", serverId, event),
       onDirectTyping: (serverId, event) => this.emit("directTyping", serverId, event),
       onHostRestart: (serverId, event) => this.#applyHostRestart(serverId, event),
-      onOffline: (serverId) => this.#presence.markOffline(serverId),
+      onOffline: (serverId) => {
+        // The direct address stopped answering. The reconnect the stream schedules uses WebRTC.
+        if (this.#direct.isActive(serverId)) {
+          this.#direct.deactivate(serverId, true);
+          this.#emitChanged();
+        }
+        this.#presence.markOffline(serverId);
+      },
       onChanged: () => this.#emitChanged(),
     });
     this.#remoteViewerProxy = this.#webrtcTransport
@@ -288,47 +412,17 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         })
       : null;
     this.#webrtcTransport?.on("connected", (serverId) => {
-      this.#events.clearReconnectBackoff(serverId);
-      this.#hostRestartAway.delete(serverId);
-      this.#hostedStartAt.delete(serverId);
-      this.#hostedStartExpired.delete(serverId);
-      this.#connections.markConnected(serverId);
-      this.#emitChanged();
-      const server = this.#store.find(serverId);
-      this.#background(
-        this.#owned(
-          Effect.gen({ self: this }, function* () {
-            // Read the host report before negotiating the fixed WebRTC transport. This keeps the
-            // transport view stable when both operations finish in the same event-loop turn.
-            yield* this.#client.refreshWebRtcCompatibility(serverId).pipe(Effect.catch(() => Effect.void));
-            if (server) yield* this.#client.ensureCompatibility(server, true).pipe(Effect.catch(() => Effect.void));
-            this.#connectTrace?.mark(serverId, "compatibility");
-            this.#emitChanged();
-            yield* Effect.all(
-              [
-                this.#refresh.refreshAgentRoster(serverId).pipe(
-                  Effect.result,
-                  Effect.map((result) =>
-                    this.#connectTrace?.mark(serverId, "first-request", Result.isSuccess(result) ? "ok" : "error"),
-                  ),
-                ),
-                server
-                  ? Effect.gen({ self: this }, function* () {
-                      const remoteDesktopAvailable = yield* this.#client
-                        .probeRemoteDesktop(server)
-                        .pipe(Effect.catch(() => Effect.succeed(false)));
-                      yield* this.#store.update(serverId, { remoteDesktopAvailable });
-                      this.#emitChanged();
-                    }).pipe(Effect.catch(() => Effect.void))
-                  : Effect.void,
-              ],
-              { concurrency: "unbounded" },
-            );
-          }),
-        ),
-      );
+      // A WebRTC connection opened only for the remote screen while the direct path carries the rest.
+      // A fallback to WebRTC runs the setup later: see `#connectHost`.
+      if (this.#direct.isActive(serverId)) {
+        this.#webRtcConnectedBesideDirect.add(serverId);
+        return;
+      }
+      this.#webRtcConnected(serverId);
     });
     this.#webrtcTransport?.on("disconnected", (serverId) => {
+      this.#webRtcConnectedBesideDirect.delete(serverId);
+      if (this.#direct.isActive(serverId)) return;
       const wasOnline = this.#connections.statusFor(serverId).state === "online";
       // A host the app has stopped reconnecting to is not merely offline. The recorded failure is
       // the reason it will not come back, and this disconnect is that failure's own tail -- the one
@@ -340,8 +434,12 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       this.#events.scheduleReconnect(serverId);
       if (wasOnline) this.emit("directoryInvalidated");
     });
-    this.#webrtcTransport?.on("event", (serverId, event) => this.#handleWebRtcEvent(serverId, event));
+    // While the direct path is in use, its event stream delivers the host's events.
+    this.#webrtcTransport?.on("event", (serverId, event) => {
+      if (!this.#direct.isActive(serverId)) this.#handleWebRtcEvent(serverId, event);
+    });
     this.#webrtcTransport?.on("error", (serverId, code, message) => {
+      if (this.#direct.isActive(serverId)) return;
       // Each failure checks the start time, so a start that fails for another reason also ends.
       const hostedStarting = this.#awaitsHostedStart(serverId);
       if (code === "host_unavailable" && !this.#awaitsHostRestart(serverId) && !hostedStarting) {
@@ -379,6 +477,178 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     }
     return invite;
   }
+
+  /**
+   * Connects a WebRTC host: over its direct Tailscale address when that works, else over WebRTC. On
+   * the direct path the event stream sees an HTTPS server, so `ensure` opens its socket.
+   */
+  #connectHost(hostId: string): Effect.Effect<void, RemoteWorkflowError> {
+    return Effect.gen({ self: this }, function* () {
+      // First, so that a request made meanwhile finds the attempt and waits for it. The attempt waits
+      // for the account itself.
+      if (yield* this.#direct.tryActivate(hostId)) {
+        this.#emitChanged();
+        yield* this.#events.ensure(hostId);
+        this.#background(this.#owned(this.#probeDirectRemoteDesktop(hostId)));
+        return;
+      }
+      const transport = this.#webrtcTransport;
+      if (!transport)
+        return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.webRtcUnavailable")) });
+      // A connect that starts with the app waits for the account: WebRTC fails at once before it loads.
+      yield* this.#accountReady();
+      yield* transport.connect(hostId);
+      // The connection was already open beside the direct path, so `connect` raised no event.
+      if (this.#webRtcConnectedBesideDirect.delete(hostId) && transport.isConnected(hostId))
+        this.#webRtcConnected(hostId);
+    });
+  }
+
+  /** The WebRTC data channel to a host is up: the server is online, and its details are read again. */
+  #webRtcConnected(serverId: string): void {
+    this.#events.clearReconnectBackoff(serverId);
+    this.#hostRestartAway.delete(serverId);
+    this.#hostedStartAt.delete(serverId);
+    this.#hostedStartExpired.delete(serverId);
+    this.#connections.markConnected(serverId);
+    this.#emitChanged();
+    const server = this.#store.find(serverId);
+    this.#background(
+      this.#owned(
+        Effect.gen({ self: this }, function* () {
+          // Read the host report before negotiating the fixed WebRTC transport. This keeps the
+          // transport view stable when both operations finish in the same event-loop turn.
+          yield* this.#client.refreshWebRtcCompatibility(serverId).pipe(Effect.catch(() => Effect.void));
+          if (server) yield* this.#client.ensureCompatibility(server, true).pipe(Effect.catch(() => Effect.void));
+          this.#connectTrace?.mark(serverId, "compatibility");
+          this.#emitChanged();
+          yield* Effect.all(
+            [
+              this.#refresh.refreshAgentRoster(serverId).pipe(
+                Effect.result,
+                Effect.map((result) =>
+                  this.#connectTrace?.mark(serverId, "first-request", Result.isSuccess(result) ? "ok" : "error"),
+                ),
+              ),
+              server
+                ? Effect.gen({ self: this }, function* () {
+                    const remoteDesktopAvailable = yield* this.#client
+                      .probeRemoteDesktop(server)
+                      .pipe(Effect.catch(() => Effect.succeed(false)));
+                    yield* this.#store.update(serverId, { remoteDesktopAvailable });
+                    this.#emitChanged();
+                  }).pipe(Effect.catch(() => Effect.void))
+                : Effect.void,
+              this.#refreshDirectEndpoint(serverId).pipe(Effect.catch(() => Effect.void)),
+            ],
+            { concurrency: "unbounded" },
+          );
+        }),
+      ),
+    );
+  }
+
+  /**
+   * The account has loaded, or waiting for it ended. Startup loads it in the background, and the
+   * renderer asks its first questions before that is done.
+   */
+  #accountReady(): Effect.Effect<void> {
+    const ready = this.#centralAccount.ready;
+    if (!ready) return Effect.void;
+    return ready().pipe(Effect.timeoutOrElse({ duration: REMOTE_ACCOUNT_READY_TIMEOUT_MS, orElse: () => Effect.void }));
+  }
+
+  /**
+   * Holds a request to a WebRTC host until it can go out: the account has loaded (before that the
+   * WebRTC transport fails at once), and a direct attempt that runs has chosen the route. The request
+   * then goes over the direct path when it is on, else over WebRTC as before.
+   */
+  #awaitRoute(serverId: string, path: string): Effect.Effect<void> {
+    return Effect.suspend(() => {
+      if (this.#store.find(serverId)?.transport !== "webrtc-v2") return Effect.void;
+      // The remote screen and the browser view stay on WebRTC, whatever the attempt chooses.
+      const route = isWebRtcOnlyTeamPath(path) ? Effect.void : this.#direct.awaitAttempt(serverId);
+      return this.#accountReady().pipe(Effect.andThen(route));
+    });
+  }
+
+  /**
+   * The direct session is close to its end, or the host no longer accepts it. The event stream opens
+   * again, which signs in with a new account ticket, or uses WebRTC when that fails.
+   */
+  #renewDirectRoute(serverId: string): void {
+    if (!this.#direct.isActive(serverId)) return;
+    this.#direct.deactivate(serverId, false);
+    this.#emitChanged();
+    this.#background(this.#owned(this.#events.restart(serverId)));
+  }
+
+  /** The screen sharing readiness, read over the direct path: the WebRTC `connected` handler does not run. */
+  readonly #probeDirectRemoteDesktop = Effect.fn("RemoteManager.probeDirectRemoteDesktop")(function* (
+    this: RemoteServerManager,
+    serverId: string,
+  ) {
+    const server = this.#direct.find(serverId);
+    if (!server) return;
+    const remoteDesktopAvailable = yield* this.#client
+      .probeRemoteDesktop(server)
+      .pipe(Effect.catch(() => Effect.succeed(false)));
+    yield* this.#store.update(serverId, { remoteDesktopAvailable });
+    this.#emitChanged();
+  });
+
+  /**
+   * Asks a connected host for its direct Tailscale address (`direct-endpoint-v1`) and keeps it. A host
+   * without the capability, or with the path off, leaves none. The next connection uses it.
+   */
+  readonly #refreshDirectEndpoint = Effect.fn("RemoteManager.refreshDirectEndpoint")(function* (
+    this: RemoteServerManager,
+    serverId: string,
+  ) {
+    if (this.#store.find(serverId)?.transport !== "webrtc-v2") return;
+    let directUrl: string | undefined;
+    if (this.supportsCapability(serverId, DIRECT_ENDPOINT_CAPABILITY)) {
+      const answer = yield* this.request(serverId, DIRECT_ENDPOINT_ROUTES.read, decodeDirectEndpoint, {
+        method: "POST",
+        body: {},
+      });
+      directUrl = answer !== null && isValidTailscaleDirectApiUrl(answer) ? answer : undefined;
+    }
+    if (this.#store.find(serverId)?.directUrl === directUrl) return;
+    // A session belongs to one address.
+    yield* this.#direct.forgetSession(serverId);
+    yield* this.#store.update(serverId, { directUrl });
+    this.#emitChanged();
+  });
+
+  /** The direct Tailscale path of one server, for its menu and its settings. */
+  directRouteStatus(serverId: string): DirectRouteStatus | null {
+    const server = this.#store.find(serverId);
+    return server ? this.#direct.status(server) : null;
+  }
+
+  /**
+   * The member's "Use Tailscale when available" choice for one server. Turning it off moves a server
+   * that is on the direct path back to WebRTC at once.
+   */
+  readonly setDirectEnabled = Effect.fn("RemoteManager.setDirectEnabled")(function* (
+    this: RemoteServerManager,
+    serverId: string,
+    enabled: boolean,
+  ): Effect.fn.Return<ServerSummary[], RemoteWorkflowError> {
+    const server = yield* remoteDecode(() => this.#store.require(serverId));
+    if (server.transport === "webrtc-v2") {
+      yield* this.#store.update(serverId, { directDisabled: enabled ? undefined : true });
+      this.#direct.clearRetry(serverId);
+      if (!enabled) yield* this.#direct.forgetSession(serverId);
+      if (!enabled && this.#direct.isActive(serverId)) {
+        this.#direct.deactivate(serverId, false);
+        yield* this.#events.restart(serverId);
+      }
+      this.#emitChanged();
+    }
+    return this.list();
+  });
 
   #suspendServer(serverId: string): void {
     this.#events.suspendReconnect(serverId);
@@ -468,10 +738,10 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
    * connections try again and report it.
    */
   connectActiveServer(): void {
-    const transport = this.#webrtcTransport;
     const server = this.#store.find(this.#store.activeServerId);
-    if (!transport || server?.transport !== "webrtc-v2") return;
-    this.#background(this.#owned(transport.connect(server.id)));
+    if (!this.#webrtcTransport || server?.transport !== "webrtc-v2") return;
+    // The same choice as every other connect: the direct Tailscale address first, else WebRTC.
+    this.#background(this.#owned(this.#connectHost(server.id)));
   }
 
   /** A server that has no connection state yet starts offline, with its compatibility unknown. */
@@ -491,11 +761,13 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       this.#localMemberLimit,
     ).map((server) => {
       const mute = this.#store.muteState(server.id);
+      const stored = this.#store.find(server.id);
       return {
         ...server,
         notificationsMuted: mute.muted,
         notificationsMutedUntil: mute.mutedUntil,
         notificationLevel: this.#store.notificationLevel(server.id),
+        ...(stored?.transport === "webrtc-v2" ? { direct: this.#direct.status(stored) } : {}),
       };
     });
   }
@@ -918,9 +1190,17 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         ? (this.#connections.stateFor(serverId) ?? "error")
         : "error";
       const attempt1 = yield* Effect.gen({ self: this }, function* () {
+        if (server.transport === "webrtc-v2" && this.#direct.isActive(serverId)) {
+          this.#connections.setState(serverId, "connecting");
+          this.#emitChanged();
+          yield* this.#events.restart(serverId, true);
+          return yield* remoteDecode(() => requiredServerSummary(this.list(), serverId));
+        }
         if (server.transport === "webrtc-v2") {
           if (!transport)
             return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.webRtcUnavailable")) });
+          // The user asked again, so the direct path may be tried again at once.
+          this.#direct.clearRetry(serverId);
           // The user retrying is what lifts the suspension a protocol or credential failure left
           // behind. Without this the connection comes up and the next disconnect never reconnects,
           // because `scheduleReconnect` still sees the host paused -- the HTTPS arm below gets the
@@ -928,7 +1208,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
           this.#events.resumeReconnect(serverId);
           this.#connections.setState(serverId, "connecting");
           this.#emitChanged();
-          yield* transport.connect(serverId);
+          yield* this.#connectHost(serverId);
           // The `connected` handler is what turns that "connecting" back into "online", and a host
           // that was already connected raises no such event -- the session it would announce is the
           // one still running. Retrying a host whose channel had never actually dropped therefore
@@ -1052,6 +1332,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   }
 
   #clearServerConnectionState(serverId: string): void {
+    this.#direct.forget(serverId);
+    this.#background(this.#direct.forgetSession(serverId));
     this.#hostedStartAt.delete(serverId);
     this.#hostedStartExpired.delete(serverId);
     this.#events.forget(serverId);
@@ -1181,7 +1463,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       if (server.transport === "webrtc-v2" && transport) {
         yield* this.#syncWebRtcHosts();
         this.#connections.clearCompatibility(serverId);
-        yield* this.#client.ensureCompatibility(server, true);
+        // The direct view while the direct path is in use, so its HTTPS protocol is what is negotiated.
+        yield* this.#client.ensureCompatibility(this.#direct.require(serverId), true);
         this.#connections.clearIssue(serverId);
         this.#emitChanged();
         return yield* remoteDecode(() => requiredServerSummary(this.list(), serverId));
@@ -1228,7 +1511,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     input: SetTeamTypingInput,
     serverId = this.#store.activeServerId,
   ) {
-    const server = this.#store.find(serverId);
+    const server = this.#direct.find(serverId);
     if (server?.transport === "webrtc-v2") {
       const transport = this.#webrtcTransport;
       if (transport)
@@ -1292,7 +1575,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     input: DirectTypingInput,
     serverId = this.#store.activeServerId,
   ) {
-    const server = this.#store.find(serverId);
+    const server = this.#direct.find(serverId);
     if (server?.transport === "webrtc-v2") {
       const transport = this.#webrtcTransport;
       if (transport)
@@ -1442,7 +1725,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       bytes: Uint8Array,
       serverId = this.#store.activeServerId,
     ): Effect.fn.Return<DraftAttachment, RemoteWorkflowError, RemoteRequest> {
-      const server = yield* remoteDecode(() => this.#store.require(serverId));
+      const server = yield* remoteDecode(() => this.#direct.require(serverId));
       const url = new URL(TEAM_API_ROUTES.attachments, server.apiUrl);
       url.searchParams.set("name", name);
       url.searchParams.set("mime", mimeType || "application/octet-stream");
@@ -1472,7 +1755,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       serverId: string,
       bytes: Uint8Array,
     ): Effect.fn.Return<AgentImportPreview, RemoteWorkflowError, RemoteRequest> {
-      const server = yield* remoteDecode(() => this.#store.require(serverId));
+      const server = yield* remoteDecode(() => this.#direct.require(serverId));
       const url = new URL(AGENT_IMPORT_ROUTES.stage, server.apiUrl);
       const response = yield* this.#client.fetch(
         server,
@@ -1494,7 +1777,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       image: AvatarImageInput | null,
       serverId = this.#store.activeServerId,
     ): Effect.fn.Return<AgentSummary, RemoteWorkflowError, RemoteRequest> {
-      const server = yield* remoteDecode(() => this.#store.require(serverId));
+      const server = yield* remoteDecode(() => this.#direct.require(serverId));
       const url = new URL(TEAM_API_ROUTES.agent.avatar(agentId), server.apiUrl);
       const headers = new Headers();
       if (image) headers.set("Content-Type", image.mimeType);
@@ -1519,7 +1802,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       serverId = this.#store.activeServerId,
       version?: string,
     ): Effect.fn.Return<{ bytes: Uint8Array; mimeType: string }, RemoteWorkflowError, RemoteRequest> {
-      const server = yield* remoteDecode(() => this.#store.require(serverId));
+      const server = yield* remoteDecode(() => this.#direct.require(serverId));
       const url = new URL(TEAM_API_ROUTES.agent.avatar(agentId), server.apiUrl);
       if (version) url.searchParams.set("v", version);
       const response = yield* this.#client.fetch(server, url);
@@ -1566,7 +1849,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       attachmentId: string,
       serverId = this.#store.activeServerId,
     ): Effect.fn.Return<RemoteAttachment, RemoteWorkflowError, RemoteRequest> {
-      const server = yield* remoteDecode(() => this.#store.require(serverId));
+      const server = yield* remoteDecode(() => this.#direct.require(serverId));
       return yield* this.#attachments.get(server.id, attachmentId, () =>
         this.#owned(
           Effect.gen({ self: this }, function* () {
@@ -1592,7 +1875,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       sharedPath: string,
       serverId = this.#store.activeServerId,
     ): Effect.fn.Return<{ bytes: Uint8Array; name: string }, RemoteWorkflowError, RemoteRequest> {
-      const server = yield* remoteDecode(() => this.#store.require(serverId));
+      const server = yield* remoteDecode(() => this.#direct.require(serverId));
       const url = new URL(TEAM_API_ROUTES.sharedFiles, server.apiUrl);
       url.searchParams.set("path", sharedPath);
       const response = yield* this.#client.fetch(server, url);
@@ -1611,7 +1894,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       workspacePath: string,
       serverId = this.#store.activeServerId,
     ): Effect.fn.Return<{ bytes: Uint8Array; name: string }, RemoteWorkflowError, RemoteRequest> {
-      const server = yield* remoteDecode(() => this.#store.require(serverId));
+      const server = yield* remoteDecode(() => this.#direct.require(serverId));
       const url = new URL(TEAM_API_ROUTES.workspaceFiles, server.apiUrl);
       // A query parameter never reaches the JSON adapters, so it keeps the released spelling.
       url.searchParams.set("botId", agentId);
@@ -1631,6 +1914,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     this.#stopping = done;
     return yield* Effect.gen({ self: this }, function* () {
       yield* this.#events.stop();
+      this.#direct.clear();
       this.#refresh.clear();
       this.#client.clear();
       this.#attachments.clear();
@@ -1655,6 +1939,14 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
 
       // A copy skips the host's check of the account, so the next account must not see it.
       this.#attachments.clear();
+      // A direct session is this account's too. Its socket closes, and the reconnect signs in again.
+      // The kept sessions go with it.
+      yield* this.#direct.forgetAllSessions();
+      for (const server of this.#store.servers) {
+        if (!this.#direct.isActive(server.id)) continue;
+        this.#direct.deactivate(server.id, false);
+        yield* this.#events.restart(server.id);
+      }
       if (!transport) return;
       // First: a session kept for the next run belongs to the account that leaves.
       yield* transport.forgetStoredSessions();
@@ -1684,7 +1976,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     this.#localMemberLimit = hosts.find((host) => host.hostId === localHostId)?.memberLimit ?? null;
     const { servers, removedHostIds, staleTransportHostIds, pinnedKeys } = reconcileWebRtcHosts({
       hosts,
-      isConnected: (hostId) => transport.isConnected(hostId),
+      isConnected: (hostId) => transport.isConnected(hostId) || this.#direct.isActive(hostId),
       servers: this.#store.servers,
       preservedIdentities: this.#store.preservedIdentities,
       localHostId,
@@ -1755,4 +2047,12 @@ function requiredServerSummary(servers: ServerSummary[], serverId: string): Serv
   const server = servers.find((candidate) => candidate.id === serverId);
   if (!server) throw new Error("Remote server summary is missing.");
   return server;
+}
+
+/** The address `direct-endpoint-v1` answers. The side-route codec has already checked its form. */
+function decodeDirectEndpoint(value: unknown): string | null {
+  if (typeof value !== "object" || value === null || !("url" in value)) throw new Error("Invalid direct endpoint.");
+  const url = value.url;
+  if (url !== null && typeof url !== "string") throw new Error("Invalid direct endpoint.");
+  return url;
 }

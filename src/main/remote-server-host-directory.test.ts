@@ -71,6 +71,18 @@ describe("reconcileWebRtcHosts", () => {
     ]);
   });
 
+  it("keeps the direct Tailscale address and the member's choice through a directory sync", () => {
+    const directUrl = "https://studio-mac.tail4b2c1.ts.net";
+    const result = reconcile({
+      hosts: [listedHost("pinned"), listedHost("off")],
+      servers: [storedHost("pinned", { directUrl }), storedHost("off", { directDisabled: true })],
+    });
+    expect(result.servers.map((server) => [server.id, server.directUrl, server.directDisabled])).toEqual([
+      ["pinned", directUrl, undefined],
+      ["off", undefined, true],
+    ]);
+  });
+
   it("keeps the order the user arranged and appends hosts they have not seen", () => {
     const result = reconcile({
       hosts: [listedHost("first"), listedHost("second"), listedHost("third")],

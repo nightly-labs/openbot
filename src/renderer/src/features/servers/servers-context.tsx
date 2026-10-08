@@ -341,6 +341,11 @@ const Servers = createSimpleContext({
       }
     }
 
+    /** The member's "Use Tailscale when available" choice. A failure reaches the settings panel that asked. */
+    async function setServerDirectEnabled(serverId: string, enabled: boolean): Promise<void> {
+      applyServerSummaries(await serversPort().servers.setDirectEnabled({ serverId, enabled }));
+    }
+
     async function setServerNotificationLevel(serverId: string, level: ServerNotificationLevel): Promise<void> {
       try {
         applyServerSummaries(await serversPort().servers.setNotificationLevel({ serverId, level }));
@@ -408,6 +413,7 @@ const Servers = createSimpleContext({
       reorderServers,
       setServerMuted,
       setServerNotificationLevel,
+      setServerDirectEnabled,
       retryServerConnection,
       serverLoadRequest,
       initialServersReady,

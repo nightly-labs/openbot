@@ -30,4 +30,5 @@ export const messages = {
     "Die Zeit für das Herunterfahren der Mandanten ist abgelaufen. Der Austausch der Anwendung wurde nicht gestartet.",
   "error.host.tenantHealthMissing":
     "Nach dem Neustart fehlen Zustandsberichte der Mandanten oder sie melden Probleme. Prüfe die Mandantensitzungen vor einer weiteren Aktualisierung.",
+  "error.host.tailscaleUnavailable": "Tailscale ist in dieser OpenBot-Version nicht verfügbar.",
 } as const satisfies PartialTranslation<typeof source>;

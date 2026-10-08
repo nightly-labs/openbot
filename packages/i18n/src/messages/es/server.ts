@@ -218,6 +218,53 @@ export const messages = {
   "server.settings.editLogo": "Editar logotipo del servidor",
   "server.settings.addLogo": "Añadir logotipo del servidor",
   "server.settings.removeLogo": "Eliminar logotipo del servidor",
+  "server.tailscale.title": "Tailscale",
+  "server.tailscale.localTitle": "Tailscale en este equipo",
+  "server.tailscale.checking": "Comprobando Tailscale…",
+  "server.tailscale.loadFailed": "No se pudo leer el estado de Tailscale.",
+  "server.tailscale.notInstalled":
+    "Tailscale no está instalado. Instálalo para que los miembros se conecten directamente.",
+  "server.tailscale.notRunning": "Tailscale no responde. Abre la aplicación de Tailscale y vuelve a comprobarlo.",
+  "server.tailscale.signedOut": "Tailscale está instalado, pero no has iniciado sesión.",
+  "server.tailscale.stopped": "Tailscale está desactivado.",
+  "server.tailscale.connected": "Conectado a {tailnet} como {device}.",
+  "server.tailscale.unknownTailnet": "tu tailnet",
+  "server.tailscale.unknownDevice": "este dispositivo",
+  "server.tailscale.install": "Obtener Tailscale",
+  "server.tailscale.open": "Abrir Tailscale",
+  "server.tailscale.checkAgain": "Volver a comprobar",
+  "server.tailscale.directLabel": "Conexión directa por Tailscale",
+  "server.tailscale.directDescription":
+    "Los miembros cuyos equipos están en tu tailnet se conectan directamente, sin la nube de OpenBot. Solo los dispositivos de tu tailnet pueden acceder. La nube de OpenBot sigue siendo la alternativa.",
+  "server.tailscale.addressTitle": "Dirección directa",
+  "server.tailscale.addressDescription":
+    "Los miembros reciben esta dirección a través de su conexión con sesión iniciada.",
+  "server.tailscale.copyAddress": "Copiar dirección directa",
+  "server.tailscale.issue.hostOffline": "Se activará cuando el servidor esté publicado.",
+  "server.tailscale.issue.tailscaleUnavailable":
+    "Tailscale debe estar en ejecución y con la sesión iniciada en este equipo.",
+  "server.tailscale.issue.httpsOff":
+    "Activa los certificados HTTPS para tu tailnet en la consola de administración de Tailscale y vuelve a activar esta opción.",
+  "server.tailscale.issue.portInUse":
+    "Tailscale Serve ya usa los puertos 443 y 8443 en este equipo. OpenBot no los cambia.",
+  "server.tailscale.issue.funnelOn":
+    "Tailscale Funnel publica este puerto en internet, por lo que OpenBot desactivó la conexión directa.",
+  "server.tailscale.issue.serveFailed": "Tailscale no pudo servir la conexión directa.",
+  "server.tailscale.issue.serveFailedDetail": "Tailscale no pudo servir la conexión directa: {detail}",
+  "server.tailscale.useLabel": "Usar Tailscale cuando esté disponible",
+  "server.tailscale.useDescription": "Este servidor se conecta a través de la nube de OpenBot.",
+  "server.tailscale.routeDirect": "Conectado directamente por Tailscale.",
+  "server.tailscale.routeCloud":
+    "Conectado a través de la nube de OpenBot. La próxima conexión probará primero Tailscale.",
+  "server.tailscale.hint.tailscaleUnavailable":
+    "Tailscale no se está ejecutando en este equipo, por lo que este servidor se conecta a través de la nube de OpenBot.",
+  "server.tailscale.hint.otherTailnet":
+    "Este equipo no está en la tailnet del host. Pide al propietario del host que comparta contigo el dispositivo del host en Tailscale (uso compartido de nodos) o conéctate a través de la nube de OpenBot.",
+  "server.tailscale.hint.failed":
+    "La conexión directa no respondió, por lo que este servidor se conecta por ahora a través de la nube de OpenBot.",
+  "server.route.label": "Conexión",
+  "server.route.direct": "Directa · Tailscale",
+  "server.route.cloud": "Por la nube de OpenBot",
   "server.settings.access": "Acceso",
   "server.settings.publish": "Publicar este servidor",
   "server.settings.published": "El servidor está publicado",

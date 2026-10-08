@@ -84,9 +84,30 @@ export interface ServerSummary {
    * user's input (`waking`). Cleared when the connection comes back.
    */
   hostedSleep?: HostedServerSleep | null;
+  /** The direct Tailscale path of a joined WebRTC server. Absent for every other server. */
+  direct?: ServerDirectRoute;
 }
 
 export type HostedServerSleep = "sleeping" | "waking";
+
+export const SERVER_DIRECT_ROUTE_HINTS = ["tailscale-unavailable", "other-tailnet", "failed"] as const;
+/** Why a server that offers the direct Tailscale path uses the OpenBot cloud now. */
+export type ServerDirectRouteHint = (typeof SERVER_DIRECT_ROUTE_HINTS)[number];
+
+export interface ServerDirectRoute {
+  /** The host told this computer a direct Tailscale address. */
+  offered: boolean;
+  /** The member's "Use Tailscale when available" choice for this server. */
+  enabled: boolean;
+  /** This computer reaches the host over Tailscale now, not through the OpenBot cloud. */
+  active: boolean;
+  hint: ServerDirectRouteHint | null;
+}
+
+export interface SetServerDirectInput {
+  serverId: string;
+  enabled: boolean;
+}
 
 export interface JoinServerInput {
   inviteUrl: string;
@@ -129,6 +150,36 @@ export interface HostStatus {
   remoteDesktopActiveSessions: number;
   remoteDesktopMaxSessions: number;
   message: string | null;
+}
+
+/** What the local Tailscale client reports. Read with its command line; OpenBot holds no Tailscale credential. */
+export const TAILSCALE_LOCAL_STATES = ["not-installed", "not-running", "signed-out", "stopped", "connected"] as const;
+export type TailscaleLocalStateKind = (typeof TAILSCALE_LOCAL_STATES)[number];
+
+/** Why the direct Tailscale path of this host is not serving although the owner turned it on. */
+export const TAILSCALE_DIRECT_ISSUES = [
+  "host-offline",
+  "tailscale-unavailable",
+  "https-certificates-off",
+  "port-in-use",
+  "funnel-on",
+  "serve-failed",
+] as const;
+export type TailscaleDirectIssue = (typeof TAILSCALE_DIRECT_ISSUES)[number];
+
+/** The host side of the direct Tailscale path, for the "Tailscale" section of the server settings. */
+export interface TailscaleHostStatus {
+  state: TailscaleLocalStateKind;
+  /** The tailnet name. It stays on this computer: members never receive it. */
+  tailnet: string | null;
+  deviceName: string | null;
+  /** The owner's choice. It is kept while Tailscale is not available. */
+  enabled: boolean;
+  /** The address members use, while `tailscale serve` forwards it to this host. */
+  url: string | null;
+  issue: TailscaleDirectIssue | null;
+  /** The first line of the Tailscale command's error, when `issue` is `serve-failed`. */
+  issueDetail: string | null;
 }
 
 export interface ConfigureHostInput {

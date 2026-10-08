@@ -16,6 +16,7 @@ import type {
   SendDirectMessageInput,
   ServerSummary,
   SetTeamTypingInput,
+  TailscaleHostStatus,
   TeamInviteSummary,
   TeamMemberSummary,
   TeamPresenceSnapshot,
@@ -139,6 +140,14 @@ export function createMockTeam(
     setNotificationLevel: async ({ serverId, level }) => {
       if (!servers.some((server) => server.id === serverId)) throw new Error("Remote server not found.");
       servers = servers.map((server) => (server.id === serverId ? { ...server, notificationLevel: level } : server));
+      return clone(servers);
+    },
+    // The preview has no Tailscale: the choice is kept, and the server stays on the OpenBot cloud.
+    setDirectEnabled: async ({ serverId, enabled }) => {
+      if (!servers.some((server) => server.id === serverId)) throw new Error("Remote server not found.");
+      servers = servers.map((server) =>
+        server.id === serverId && server.direct ? { ...server, direct: { ...server.direct, enabled } } : server,
+      );
       return clone(servers);
     },
     list: async () => clone(servers),
@@ -330,8 +339,28 @@ export function createMockTeam(
     },
   };
 
+  // The preview has a connected Tailscale and a host that serves the direct path once it is on.
+  let tailscaleStatus: TailscaleHostStatus = {
+    state: "connected",
+    tailnet: "story-tailnet.ts.net",
+    deviceName: "Studio Mac",
+    enabled: false,
+    url: null,
+    issue: null,
+    issueDetail: null,
+  };
   const host: OpenBotDesktopApi["host"] = {
     getStatus: async () => clone(hostStatus),
+    getTailscaleStatus: async () => clone(tailscaleStatus),
+    setTailscaleDirect: async (enabled) => {
+      tailscaleStatus = {
+        ...tailscaleStatus,
+        enabled,
+        url: enabled ? "https://studio-mac.story-tailnet.ts.net" : null,
+      };
+      return clone(tailscaleStatus);
+    },
+    openTailscale: async () => undefined,
     configure: async (input: ConfigureHostInput) => {
       hostStatus = {
         ...hostStatus,

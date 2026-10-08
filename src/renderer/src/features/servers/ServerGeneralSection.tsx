@@ -34,6 +34,7 @@ import { useText } from "@openbot/ui/text";
 import { truncateMiddle } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
 import { type Accessor, createStore, Show, snapshot } from "solid-js";
+import { ClientTailscaleSettings, HostTailscaleSettings } from "./ServerTailscaleSettings";
 import { serverCanAdminister } from "./server-capabilities";
 import type { ServerSettingsSectionHost } from "./server-settings-section";
 
@@ -439,6 +440,20 @@ export function createServerGeneralSection(
             </Item>
           </ItemGroup>
         </SettingsSection>
+        <Show when={local() ? props.tailscale : undefined}>
+          {(api) => <HostTailscaleSettings host={host} api={api()} />}
+        </Show>
+        <Show
+          when={!local() && props.onSetDirectEnabled && props.server.direct?.offered ? props.server.direct : undefined}
+        >
+          {(direct) => (
+            <ClientTailscaleSettings
+              host={host}
+              direct={direct()}
+              onSetDirectEnabled={(enabled) => props.onSetDirectEnabled?.(enabled) ?? Promise.resolve()}
+            />
+          )}
+        </Show>
         <Show when={panels.offerRemoteDesktopSetup}>
           <ItemGroup class="settings-modal-card">
             <Item>
