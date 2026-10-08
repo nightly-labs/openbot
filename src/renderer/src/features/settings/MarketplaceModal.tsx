@@ -121,7 +121,7 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
               <McpSignInDialog
                 open={true}
                 subject={pending.subject}
-                onTest={controller.testPluginApp}
+                onTest={controller.signInPluginApp}
                 onConnected={(config) => pending.settle(config)}
                 onCancel={() => pending.settle(null)}
               />

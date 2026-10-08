@@ -384,8 +384,8 @@ Billing is off, and Stripe receives nothing, when the account service has no Str
   or manage Claude credentials.
 - The MCP sign-ins are kept in `~/Library/Application Support/OpenBot`, encrypted by the operating
   system's secret storage in the same way as provider API keys. One record per server address holds
-  the client registration and the access and refresh tokens. Removing the server in settings deletes
-  its record. These values are redacted from logs, exports and diagnostics.
+  the client registration and the access and refresh tokens. Removing the server in settings, or
+  choosing Sign out on it, deletes its record. These values are redacted from logs, exports and diagnostics.
 - The GitHub connection (Server settings > Connectors) is kept in
   `~/Library/Application Support/OpenBot/openbot-github-connector-v1.json`, encrypted by the operating
   system's secret storage. It holds the GitHub access and refresh tokens, the account name, ID and

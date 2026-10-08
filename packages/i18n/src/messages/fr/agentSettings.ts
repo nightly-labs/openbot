@@ -6,6 +6,16 @@ export const messages = {
   "agentSettings.title": "Réglages",
   "agentSettings.backToDetails": "Retour aux détails",
   "agentSettings.closeDetails": "Fermer les détails",
+  "agentSettings.backToSettings": "Retour aux paramètres",
+  "agentSettings.profile.title": "Profil",
+  "agentSettings.profile.open": "Modifier le profil de {name}",
+  "agentSettings.instructionsEdit": "Modifier les instructions",
+  "agentSettings.permissions.title": "Autorisations",
+  "agentSettings.advanced.title": "Avancé",
+  "agentSettings.groups.brain": "Cerveau",
+  "agentSettings.groups.knows": "Sait",
+  "agentSettings.groups.does": "Fait",
+  "agentSettings.groups.rules": "Règles",
   "agentSettings.saveFailed": "Impossible d’enregistrer les réglages de l’agent.",
 
   "agentSettings.name": "Nom",
@@ -38,7 +48,6 @@ export const messages = {
   "agentSettings.avatar.saveFailed": "Impossible d’enregistrer l’avatar de l’agent.",
   "agentSettings.avatar.processFailed": "Impossible de traiter l’avatar de l’agent.",
 
-  "agentSettings.runtime.title": "Exécution",
   "agentSettings.runtime.model": "Modèle de l’agent",
   "agentSettings.runtime.modelBusy": "Attendez la fin du travail en cours avant de changer de modèle.",
   "agentSettings.runtime.modelUnavailable": "Les modèles sont disponibles après la connexion d’une CLI d’agent.",
@@ -69,8 +78,6 @@ export const messages = {
     "{provider} ne peut pas orienter un tour en cours. Les messages envoyés pendant son travail attendent dans la file.",
 
   "agentSettings.notifications.title": "Notifications",
-  "agentSettings.notifications.description":
-    "Recevez une notification quand cet agent termine ou a besoin d’une réponse",
 
   "agentSettings.newChat.title": "Nouvelle discussion",
   "agentSettings.newChat.description": "L’agent oublie cette discussion. Sa configuration reste.",

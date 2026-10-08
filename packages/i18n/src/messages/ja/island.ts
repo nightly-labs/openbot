@@ -35,6 +35,7 @@ export const messages = {
   "island.action.later": "後で",
   "island.action.dismiss": "閉じる",
   "island.action.answerInOpenBot": "OpenBot で回答",
+  "island.action.failed": "うまくいきませんでした。もう一度お試しください。",
   "island.failure.fallback": "タスクは完了する前に停止しました。",
   "island.failure.title": "タスクが失敗しました",
   "island.failure.detail": "タスクは完了する前に停止しました。会話を開いて、もう一度お試しください。",

@@ -9,6 +9,7 @@ import {
   Badge,
   Button,
   Check,
+  ConfirmDialog,
   Dialog,
   Heading,
   IconButton,
@@ -23,7 +24,7 @@ import {
   X,
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { For, Show } from "solid-js";
+import { createSignal, For, Show } from "solid-js";
 import { useText } from "../../text";
 
 const GITHUB_MARK_PATH =
@@ -136,9 +137,12 @@ export function DangerZone(props: {
   description: string;
   action: string;
   busy?: boolean;
+  /** Ask before the action, in a dialog with the same title, description and action. */
+  confirm?: boolean;
   onAction: () => void;
 }) {
   const { t } = useText();
+  const [confirming, setConfirming] = createSignal(false);
   return (
     <SettingsSection title={t("connector.dangerZone")}>
       <ItemGroup class="settings-modal-card">
@@ -153,13 +157,27 @@ export function DangerZone(props: {
               size="sm"
               variant="destructive-ghost"
               loading={props.busy ?? false}
-              onClick={props.onAction}
+              onClick={() => (props.confirm ? setConfirming(true) : props.onAction())}
             >
               {props.action}
             </Button>
           </ItemActions>
         </Item>
       </ItemGroup>
+      <Show when={props.confirm}>
+        <ConfirmDialog
+          open={confirming()}
+          initialFocus="cancel"
+          title={props.title}
+          description={props.description}
+          confirmLabel={props.action}
+          onCancel={() => setConfirming(false)}
+          onConfirm={() => {
+            setConfirming(false);
+            props.onAction();
+          }}
+        />
+      </Show>
     </SettingsSection>
   );
 }

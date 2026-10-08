@@ -241,7 +241,6 @@
     "./features/sidebar/stores/drag-state-store": "./src/features/sidebar/stores/drag-state-store.ts",
     "./features/sidebar/stores/layout-actions": "./src/features/sidebar/stores/layout-actions.ts",
     "./features/sidebar/stores/pending-store": "./src/features/sidebar/stores/pending-store.ts",
-    "./features/sidebar/stores/search-store": "./src/features/sidebar/stores/search-store.ts",
     "./features/team/TeamPersonAvatar": "./src/features/team/TeamPersonAvatar.tsx",
     "./features/updates/restart-reasons": "./src/features/updates/restart-reasons.ts",
     "./features/updates/update-status": "./src/features/updates/update-status.ts",

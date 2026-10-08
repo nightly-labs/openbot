@@ -894,6 +894,9 @@ describe("ServerSettingsModal", () => {
     expect(screen.queryByText("Server Owner")).not.toBeInTheDocument();
 
     await fireEvent.click(screen.getByRole("button", { name: "Revoke" }));
+    const revokeDialog = await screen.findByRole("alertdialog", { name: "Revoke this invitation?" });
+    expect(onRevokeInvite).not.toHaveBeenCalled();
+    await fireEvent.click(within(revokeDialog).getByRole("button", { name: "Revoke" }));
     await waitFor(() => expect(onRevokeInvite).toHaveBeenCalledWith("invite-old"));
     const memberActions = screen.getByRole("button", { name: "Actions for Alice Chen" });
     await fireEvent.pointerDown(memberActions, { button: 0 });
@@ -901,6 +904,9 @@ describe("ServerSettingsModal", () => {
     expect(screen.queryByRole("menuitem", { name: "Pause access" })).not.toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "Restore access" })).not.toBeInTheDocument();
     await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Make admin" }), { button: 0 });
+    const roleDialog = await screen.findByRole("alertdialog", { name: "Make Alice Chen an admin?" });
+    expect(onUpdateMember).not.toHaveBeenCalled();
+    await fireEvent.click(within(roleDialog).getByRole("button", { name: "Make admin" }));
     await waitFor(() => expect(onUpdateMember).toHaveBeenCalledWith({ memberId: "alice-1", role: "admin" }));
   });
 

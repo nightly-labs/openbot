@@ -840,6 +840,7 @@ function sidebarArgs(): Parameters<typeof Sidebar>[0] {
     onDeleteAgent: async () => undefined,
     compact: false,
     onExpand: fn(),
+    onOpenSearch: fn(),
     onOpenMarketplace: fn(),
     channels: storyChannels,
     onSelectChannel: fn(),

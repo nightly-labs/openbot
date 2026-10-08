@@ -11,4 +11,5 @@ export const messages = {
   "error.mcp.signInFileUnreadable": "Файл входа MCP не читается.",
   "error.mcp.signInFileTooLarge": "Файл входа MCP слишком большой.",
   "error.mcp.unsupported": "Этот сервер не поддерживает серверы MCP.",
+  "error.mcp.signInOnHost": "Войти в сервер MCP можно только в OpenBot на компьютере-хосте.",
 } as const satisfies PartialTranslation<typeof source>;

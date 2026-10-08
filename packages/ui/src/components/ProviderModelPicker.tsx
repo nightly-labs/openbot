@@ -39,6 +39,7 @@ import {
 } from "@openbot/ui";
 import { ContentExitMotion } from "@openbot/ui/menu-motion";
 import { cx } from "@openbot/ui/utils";
+import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, For, onCleanup, onSettled, Show, untrack } from "solid-js";
 import { currentText, type TextValue, useText } from "../text";
 import { createScrollFades } from "./createScrollFades";
@@ -61,6 +62,8 @@ interface ProviderModelPickerProps {
   variant?: "pill" | "field";
   ariaLabel?: string;
   label?: string;
+  /** A glyph before the field label. The `field` variant only. */
+  icon?: JSX.Element;
   reasoningEffort?: AgentReasoningEffort;
   onReasoningEffortChange?: (effort: AgentReasoningEffort) => void;
   disabled?: boolean;
@@ -324,6 +327,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
             setPickerOpen(true);
           }}
         >
+          <Show when={field() && props.icon}>{props.icon}</Show>
           <Show when={field()}>
             <span class="provider-model-field-label">{props.label ?? t("provider.picker.model")}</span>
           </Show>

@@ -253,6 +253,12 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let agentStatus = clone(options.agentStatus ?? STORY_AGENT_STATUS);
   let agents = clone(options.agents ?? STORY_AGENT_SUMMARIES);
   let mcpServers = clone(STORY_MCP_SERVERS);
+  let mcpSignedIn = new Set<string>();
+  let cancelPendingMcpSignIn: (() => void) | null = null;
+  const mcpSignInStates = () =>
+    mcpServers
+      .filter((server) => server.transport === "http")
+      .map((server) => ({ mcpServerId: server.id, signedIn: mcpSignedIn.has(server.id) }));
   let sidebarLayout: SidebarLayoutSnapshot = {
     revision: 0,
     sections: [],
@@ -1066,6 +1072,28 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           return { toolCount: 0, error: `Command not found: ${command}` };
         return { toolCount: MOCK_MCP_TOOL_COUNTS[config.name] ?? 4, error: null };
       },
+      /** The browser is pretended: the sign-in lands after a moment unless Cancel comes first. */
+      signInMcpServer: ({ config }) =>
+        new Promise((resolve) => {
+          let settled = false;
+          const settle = (error: string | null) => {
+            if (settled) return;
+            settled = true;
+            cancelPendingMcpSignIn = null;
+            if (!error && config.id) mcpSignedIn = new Set(mcpSignedIn).add(config.id);
+            resolve({ toolCount: error ? 0 : (MOCK_MCP_TOOL_COUNTS[config.name] ?? 4), error });
+          };
+          cancelPendingMcpSignIn = () => settle(sourceText("error.backend.mcpSignInCancelled"));
+          schedule(() => settle(null), 1500);
+        }),
+      cancelMcpSignIn: async () => {
+        cancelPendingMcpSignIn?.();
+      },
+      signOutMcpServer: async ({ mcpServerId }) => {
+        mcpSignedIn = new Set([...mcpSignedIn].filter((id) => id !== mcpServerId));
+        return mcpSignInStates();
+      },
+      listMcpSignIns: async () => mcpSignInStates(),
       getSidebarLayout: async () => clone(sidebarLayout),
       mutateSidebarLayout: async (action) => {
         sidebarLayout = applySidebarLayoutAction(sidebarLayout, action);

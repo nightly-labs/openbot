@@ -113,8 +113,9 @@ describe("Team API MCP server access", () => {
     });
     expect(decodeMcpTestResult(await tested.json())).toEqual({ toolCount: 3, error: null });
     expect(mcpServers.tested).toEqual([draft]);
-    // The host spends its stored sign-ins for the administrator's test, and opens no browser.
-    expect(mcpServers.testOptions).toEqual([{ storedCredentials: true }]);
+    // The host spends its stored sign-ins for the administrator's test, and opens no browser; a
+    // server that wants a sign-in is reported as one to finish on the host.
+    expect(mcpServers.testOptions).toEqual([{ storedCredentials: true, signInPlace: "host" }]);
     expect(
       (
         await fetch(`${base}/v1/mcp-servers/test`, {

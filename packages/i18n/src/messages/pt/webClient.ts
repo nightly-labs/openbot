@@ -3,6 +3,7 @@ import type { messages as source } from "../en/webClient";
 
 export const messages = {
   "webClient.loading": "Carregando o OpenBot…",
+  "webClient.hostWaking": "Acordando o servidor…",
   "webClient.loadingLine.wake": "Acordando os agentes…",
   "webClient.loadingLine.coffee": "Servindo café para os agentes…",
   "webClient.loadingLine.tokens": "Contando tokens nos dedos…",

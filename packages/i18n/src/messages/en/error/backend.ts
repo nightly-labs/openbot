@@ -157,6 +157,18 @@ export const messages = defineMessages("error.backend", {
   "error.backend.mcpSignInAbandoned": "The MCP sign-in was abandoned.",
   "error.backend.mcpSignInNoBrowser": "This MCP sign-in cannot open a browser.",
   "error.backend.mcpSignInNotWebPage": "The sign-in address is not a web page.",
+  "error.backend.mcpSignInRequired": "This server asks you to sign in. Choose Sign in to continue in your browser.",
+  "error.backend.mcpSignInOnHost": "This server asks for a sign-in. Sign in to it in OpenBot on the host computer.",
+  "error.backend.mcpSignInNeedsHttps":
+    "This server asks for a sign-in, and OpenBot signs in only over https. Change the URL to {url}.",
+  "error.backend.mcpSignInCancelled": "The sign-in was cancelled.",
+  "error.backend.mcpSignInTimedOut": "The sign-in was not finished in the browser.",
+  "error.backend.mcpSignInResponseTimedOut": "The sign-in response did not arrive in time.",
+  "error.backend.mcpServerExited":
+    "The server stopped before it answered. Run the command in a terminal to see its error.",
+  "error.backend.mcpServerUnreachable": "OpenBot could not reach the server. Check the URL and your network.",
+  "error.backend.mcpRemoteBridge":
+    "{reason} This command runs the mcp-remote bridge. Choose Streamable HTTP with the URL {url} instead, and OpenBot signs you in.",
   "error.backend.oauthNotHttps": "The OAuth endpoint {origin} is not https, so the credentials were not sent.",
   "error.backend.oauthTooManyRedirects": "The OAuth endpoint redirected too many times.",
   "error.backend.oauthRedirectOrigin":

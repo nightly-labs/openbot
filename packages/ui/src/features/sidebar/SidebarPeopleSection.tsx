@@ -16,7 +16,7 @@ export function SidebarPeopleSection(sectionProps: { sectionId: string }) {
   const {
     directThreadByMember,
     dragOffset,
-    filteredPeople,
+    orderedPeople,
     movePersonByKeyboard,
     props,
     sectionDragClasses,
@@ -29,7 +29,7 @@ export function SidebarPeopleSection(sectionProps: { sectionId: string }) {
   const presence = (online: boolean) => (online ? t("sidebar.people.online") : t("sidebar.people.offline"));
   const sectionId = () => sectionProps.sectionId;
   return (
-    <Show when={props.showPeople !== false && filteredPeople().length > 0}>
+    <Show when={props.showPeople !== false && orderedPeople().length > 0}>
       <section
         class={["sidebar-chat-group sidebar-section", sectionDragClasses(sectionId())]}
         style={`--sidebar-drag-y: ${dragOffset(sectionId()).y}px;`}
@@ -46,7 +46,7 @@ export function SidebarPeopleSection(sectionProps: { sectionId: string }) {
           inert={sectionIsCollapsed(sectionId()) ? true : undefined}
         >
           <div id={`sidebar-section-body-${sectionId()}`} class="sidebar-section-body">
-            <For each={filteredPeople()}>
+            <For each={orderedPeople()}>
               {(member) => {
                 const thread = () => directThreadByMember().get(member.id);
                 return (

@@ -15,6 +15,7 @@ export const messages = {
   "conversation.globalSearch.appSettings": "アプリの設定",
   "conversation.globalSearch.results": "結果",
   "conversation.globalSearch.empty": "結果はありません",
+  "conversation.globalSearch.failed": "検索が完了しませんでした。一部の結果が表示されていない可能性があります。",
   "conversation.globalSearch.countMore": "{shown}+",
   "conversation.globalSearch.searching": "検索中…",
   "conversation.globalSearch.you": "あなた",

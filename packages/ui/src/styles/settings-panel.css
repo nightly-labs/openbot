@@ -209,9 +209,29 @@
 }
 
 .settings-link-label {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--openbot-space-2);
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-md);
   font-weight: var(--openbot-weight-medium);
+}
+
+/* A fixed square, so every label in a group starts on one line whatever the glyph's shape. */
+.settings-link-icon {
+  display: grid;
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex: 0 0 auto;
+  place-items: center;
+  color: var(--openbot-text-secondary);
+}
+
+.settings-link-icon > svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 .settings-link-value {
@@ -238,4 +258,49 @@
   .settings-link:hover .settings-link-value {
     color: var(--openbot-text-secondary);
   }
+}
+
+/* Named groups of rows, one card each. Used where one panel holds several groups. */
+.settings-link-section {
+  display: grid;
+  gap: var(--openbot-space-1-5);
+}
+
+.settings-link-section-title {
+  margin: 0 0 0 var(--openbot-space-1);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+  line-height: var(--openbot-leading-sm);
+}
+
+.settings-link-group-inset {
+  margin: 0;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-surface);
+}
+
+.settings-link-group-inset > * + * {
+  border-top: 1px solid var(--openbot-border);
+}
+
+/* The card does not clip its rows, because a row can hold an inline popover. The end rows round
+   their own hover background instead. A wrapper row rounds the trigger button inside it. */
+.settings-link-group-inset > :first-child,
+.settings-link-group-inset > :first-child > button {
+  border-top-left-radius: calc(var(--openbot-radius-md) - 1px);
+  border-top-right-radius: calc(var(--openbot-radius-md) - 1px);
+}
+
+.settings-link-group-inset > :last-child,
+.settings-link-group-inset > :last-child > button {
+  border-bottom-left-radius: calc(var(--openbot-radius-md) - 1px);
+  border-bottom-right-radius: calc(var(--openbot-radius-md) - 1px);
+}
+
+.settings-link-group-inset .settings-link {
+  min-height: 40px;
+  gap: var(--openbot-space-2);
+  padding: 0 var(--openbot-space-3);
 }

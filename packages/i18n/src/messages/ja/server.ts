@@ -190,6 +190,9 @@ export const messages = {
   "server.members.actionsFor": "{name} の操作",
   "server.members.makeMember": "メンバーにする",
   "server.members.makeAdmin": "管理者にする",
+  "server.members.makeAdminTitle": "{name} を管理者にしますか？",
+  "server.members.makeMemberTitle": "{name} をメンバーにしますか？",
+  "server.members.roleChangeDescription": "{name} はこのサーバーから切断されることがあり、その場合は再接続が必要です。",
   "server.invite.invalidEmail": "有効なメールアドレスを入力してください。",
   "server.invite.title": "ユーザーを招待",
   "server.invite.description":
@@ -231,6 +234,8 @@ export const messages = {
   "server.invite.neverExpires": { other: "期限なし · 参加 {count} 件" },
   "server.invite.expires": "有効期限 {date}",
   "server.invite.revoke": "取り消す",
+  "server.invite.revokeTitle": "この招待を取り消しますか？",
+  "server.invite.revokeDescription": "この招待は使えなくなります。この招待で参加したユーザーはメンバーのままです。",
   "server.desktop.accessTitle": "リモートデスクトップへのアクセス",
   "server.desktop.gatewayDescription":
     "サーバーのすべてのアクティブなメンバーがこのホストを操作できます。リモートデスクトップ用の別のパスワードはありません。",

@@ -1,3 +1,4 @@
+import { sourceText } from "@openbot/i18n";
 import { runTeamEffect } from "@openbot/team-client";
 import { createMarketplaceCatalog } from "@openbot/team-client/marketplace-catalog";
 import {
@@ -62,6 +63,10 @@ export function createWebMarketplaceCalls(
         runTeamEffect(saveMcpServer(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
       removeMcpServer: async (input, serverId) =>
         runTeamEffect(removeMcpServer(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
+      // A sign-in opens the browser of the computer that runs OpenBot; the Team API has no route for it.
+      signInMcpServer: async () => {
+        throw new Error(sourceText("error.mcp.signInOnHost"));
+      },
     },
     addAgent: async (input, serverId) => {
       if (!serverId) throw new Error(noAgentInstall());

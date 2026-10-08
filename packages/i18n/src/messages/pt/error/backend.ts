@@ -152,6 +152,19 @@ export const messages = {
   "error.backend.mcpSignInAbandoned": "A autenticação MCP foi abandonada.",
   "error.backend.mcpSignInNoBrowser": "Esta autenticação MCP não consegue abrir um navegador.",
   "error.backend.mcpSignInNotWebPage": "O endereço de autenticação não é uma página da web.",
+  "error.backend.mcpSignInRequired":
+    "Este servidor pede que você se autentique. Escolha Entrar para continuar no navegador.",
+  "error.backend.mcpSignInOnHost": "Este servidor pede autenticação. Entre nele pelo OpenBot no computador anfitrião.",
+  "error.backend.mcpSignInNeedsHttps":
+    "Este servidor pede autenticação, e o OpenBot só se autentica por https. Altere a URL para {url}.",
+  "error.backend.mcpSignInCancelled": "A autenticação foi cancelada.",
+  "error.backend.mcpSignInTimedOut": "A autenticação não foi concluída no navegador.",
+  "error.backend.mcpSignInResponseTimedOut": "A resposta da autenticação não chegou a tempo.",
+  "error.backend.mcpServerExited":
+    "O servidor parou antes de responder. Execute o comando em um terminal para ver o erro.",
+  "error.backend.mcpServerUnreachable": "O OpenBot não conseguiu acessar o servidor. Verifique a URL e sua rede.",
+  "error.backend.mcpRemoteBridge":
+    "{reason} Este comando executa a ponte mcp-remote. Escolha Streamable HTTP com a URL {url} e o OpenBot faz a autenticação para você.",
   "error.backend.oauthNotHttps": "O endpoint OAuth {origin} não usa https, por isso as credenciais não foram enviadas.",
   "error.backend.oauthTooManyRedirects": "O endpoint OAuth redirecionou vezes demais.",
   "error.backend.oauthRedirectOrigin":

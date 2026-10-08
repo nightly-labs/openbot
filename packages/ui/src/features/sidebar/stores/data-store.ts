@@ -1,5 +1,5 @@
 /**
- * Every read projection the sidebar renders and drags against: the props filtered, sorted, grouped
+ * Every read projection the sidebar renders and drags against: the props sorted, grouped
  * and indexed. Nothing here mutates and nothing here calls a prop callback, which is what makes it
  * safe for the drag engine to hold - it satisfies the engine's list model and can do nothing else.
  */
@@ -9,19 +9,17 @@ import { createMemo } from "solid-js";
 import type { AgentProfile } from "../../../data";
 import { currentText } from "../../../text";
 import { teamMemberName } from "../../team/TeamPersonAvatar";
-import { agentMatchesQuery, channelMatchesQuery, personMatchesQuery } from "../sidebar-filtering";
 import { sidebarPinnedItemKey } from "../sidebar-pins";
 import type { ResolvedPinnedItem, SidebarChatItem, SidebarProps } from "../sidebar-types";
 
 type PinnedItemSource = SidebarProps["agents"][number] | NonNullable<SidebarProps["channels"]>[number];
 
 export function createSidebarDataStore(deps: {
-  normalizedQuery: () => string;
   props: SidebarProps;
   /** True while a sidebar drag is in flight. */
   dragActive: () => boolean;
 }) {
-  const { normalizedQuery, props } = deps;
+  const { props } = deps;
 
   const directThreadByMember = createMemo(
     () => new Map(props.directThreads.map((thread) => [thread.otherMemberId, thread])),
@@ -32,10 +30,8 @@ export function createSidebarDataStore(deps: {
   const pinnedKeys = createMemo(() => new Set(chatPinnedItems().map(sidebarPinnedItemKey)));
   const agentById = createMemo(() => new Map(props.agents.map((agent) => [agent.id, agent])));
   const personById = createMemo(() => new Map(props.people.map((member) => [member.id, member])));
-  const matchingChannels = createMemo(() =>
-    (props.channels ?? []).filter((channel) => channelMatchesQuery(channel, normalizedQuery())),
-  );
-  const channelById = createMemo(() => new Map(matchingChannels().map((channel) => [channel.id, channel])));
+  const channels = () => props.channels ?? [];
+  const channelById = createMemo(() => new Map(channels().map((channel) => [channel.id, channel])));
   let pinnedItemCache = new Map<string, { source: PinnedItemSource; item: ResolvedPinnedItem }>();
   /** Both kinds of pinned chat, resolved against the chats the sidebar has: a pin that names none is
    * kept in storage and simply not drawn, because the chat can be absent for a passing reason.
@@ -56,9 +52,7 @@ export function createSidebarDataStore(deps: {
     for (const ref of chatPinnedItems()) {
       if (ref.kind === "agent") {
         const agent = agentById().get(ref.id);
-        if (agent && agentMatchesQuery(agent, normalizedQuery())) {
-          items.push(resolve(ref, agent, { ref, chat: { kind: "agent", id: agent.id, agent } }));
-        }
+        if (agent) items.push(resolve(ref, agent, { ref, chat: { kind: "agent", id: agent.id, agent } }));
       }
       if (ref.kind === "channel") {
         const channel = channelById().get(ref.id);
@@ -69,11 +63,7 @@ export function createSidebarDataStore(deps: {
     return items;
   });
   const listedAgents = createMemo(() =>
-    props.agents.filter(
-      (agent) =>
-        !pinnedKeys().has(sidebarPinnedItemKey({ kind: "agent", id: agent.id })) &&
-        agentMatchesQuery(agent, normalizedQuery()),
-    ),
+    props.agents.filter((agent) => !pinnedKeys().has(sidebarPinnedItemKey({ kind: "agent", id: agent.id }))),
   );
   /**
    * Agents that wait for the user leave their section for the "Needs you" group, the same way a
@@ -101,9 +91,7 @@ export function createSidebarDataStore(deps: {
   const waitingAgents = createMemo(() => sortByLayoutOrder(listedAgents().filter((agent) => agentWaits(agent.id))));
   const filteredAgents = createMemo(() => listedAgents().filter((agent) => !agentWaits(agent.id)));
   const filteredChannels = createMemo(() =>
-    matchingChannels().filter(
-      (channel) => !pinnedKeys().has(sidebarPinnedItemKey({ kind: "channel", id: channel.id })),
-    ),
+    channels().filter((channel) => !pinnedKeys().has(sidebarPinnedItemKey({ kind: "channel", id: channel.id }))),
   );
   function sortByLayoutOrder<T extends { id: string }>(items: T[]): T[] {
     const orderIndex = new Map(props.layout.agentOrder.map((chatId, index) => [chatId, index]));
@@ -156,12 +144,6 @@ export function createSidebarDataStore(deps: {
         (orderIndex.get(right.id) ?? props.peopleOrder.length + (naturalIndex.get(right.id) ?? 0)),
     );
   });
-  const filteredPeople = createMemo(() =>
-    orderedPeople().filter((member) => {
-      const thread = directThreadByMember().get(member.id);
-      return personMatchesQuery(member, thread, normalizedQuery());
-    }),
-  );
   const customSectionById = createMemo(() => new Map(props.layout.sections.map((section) => [section.id, section])));
   const collapsedSectionIds = createMemo(() => new Set(props.collapsedSectionIds));
   const orderedSectionIds = createMemo(() => new Set(props.layout.order));
@@ -185,17 +167,15 @@ export function createSidebarDataStore(deps: {
   });
   const visibleSectionIds = createMemo(() =>
     props.layout.order.filter((sectionId) => {
-      if (sectionId === SIDEBAR_PEOPLE_SECTION_ID) return props.showPeople !== false && filteredPeople().length > 0;
-      if (customSectionById().has(sectionId)) {
-        return !normalizedQuery() || (filteredChatsBySection().get(sectionId)?.length ?? 0) > 0;
-      }
+      if (sectionId === SIDEBAR_PEOPLE_SECTION_ID) return props.showPeople !== false && orderedPeople().length > 0;
+      if (customSectionById().has(sectionId)) return true;
       if (sectionId !== SIDEBAR_UNASSIGNED_SECTION_ID) return false;
       return (filteredChatsBySection().get(sectionId)?.length ?? 0) > 0;
     }),
   );
 
   function sectionIsCollapsed(sectionId: string): boolean {
-    return !normalizedQuery() && collapsedSectionIds().has(sectionId);
+    return collapsedSectionIds().has(sectionId);
   }
 
   function sectionPosition(sectionId: string): number {
@@ -254,7 +234,6 @@ export function createSidebarDataStore(deps: {
     filteredChannels,
     filteredChats,
     filteredChatsBySection,
-    filteredPeople,
     orderedPeople,
     personById,
     resolvedPinnedItems,
