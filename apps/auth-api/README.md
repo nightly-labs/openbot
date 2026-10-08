@@ -80,7 +80,8 @@ values still win, so the test Worker gets the sandbox keys and never live keys.
 
 `.env.production` is the encrypted production file, and its private key stays in the ignored root
 `.env.keys`. Production commands decrypt it only in process memory. Development commands use the
-shell key described above and never read the root key file.
+shell key described above and never read the root key file. New worktrees do not copy root
+`.env.keys`; run production commands from a checkout that has the existing production key file.
 
 ```bash
 bun run api:migrate:local
@@ -252,4 +253,3 @@ sets `APNS_ORIGIN` and forwards the Worker's request to Apple from Node
 (`dev-apns-proxy.ts`). The Worker still checks the host and the limit, makes the payload and signs
 the token. Only a loopback caller can use the forwarder, and the Worker accepts only a loopback
 `APNS_ORIGIN`.
-
