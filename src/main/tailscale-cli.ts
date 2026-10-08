@@ -16,7 +16,7 @@ import { posix, win32 } from "node:path";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { Effect, Schema } from "effect";
 
-export const TAILSCALE_COMMAND_TIMEOUT_MS = 10_000;
+const TAILSCALE_COMMAND_TIMEOUT_MS = 10_000;
 const TAILSCALE_OUTPUT_LIMIT = 8 * 1024 * 1024;
 
 export class TailscaleCommandError extends Schema.TaggedError<TailscaleCommandError>()("TailscaleCommandError", {
@@ -38,7 +38,7 @@ export type TailscaleLocate = () => Effect.Effect<string | null>;
 export type TailscalePlatform = "darwin" | "win32" | "linux";
 
 /** The Windows Tailscale command as WSL mounts the default install directory. */
-export const WSL_WINDOWS_TAILSCALE = "/mnt/c/Program Files/Tailscale/tailscale.exe";
+const WSL_WINDOWS_TAILSCALE = "/mnt/c/Program Files/Tailscale/tailscale.exe";
 
 /**
  * Where each platform installs the command. The macOS app keeps its command inside the bundle; the
