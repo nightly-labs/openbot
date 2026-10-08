@@ -1,6 +1,8 @@
 import type {
+  AgentModelId,
   AgentProviderId,
   AgentStatus,
+  AppSetupState,
   CustomProviderRestart,
   CustomProviderSummary,
   ProviderApiKeyStatus,
@@ -31,13 +33,19 @@ import {
   type ProviderDetectionSettingsValue,
 } from "@openbot/ui/features/custom-providers/ProviderDetectionSettings";
 import { OpenCodeKeyDialog, type ProviderKeyApi } from "@openbot/ui/features/settings/OpenCodeKeyDialog";
-import { createEffect, createSignal, Show, untrack } from "solid-js";
+import { useText } from "@openbot/ui/text";
+import { createEffect, createSignal, createStore, Show, untrack } from "solid-js";
 import type { ProviderCodeLoginApi } from "../../components/provider-code-login-api";
-import { useI18n } from "../../i18n-context";
 import { createCustomProviderHostState } from "../custom-providers/custom-provider-host-state";
+import { savedCustomModel } from "../onboarding/SetupProviderPicker";
 import { createSettingsGeneralStore, type SettingsGeneralStore } from "./stores/general-store";
 
+interface DefaultProviderSettings extends Pick<AppSetupState, "preferredProvider" | "preferredModel"> {
+  save: (provider: AgentProviderId, model?: AgentModelId | null) => Promise<void>;
+}
+
 interface ProviderSettingsSectionProps {
+  defaultProvider?: DefaultProviderSettings | undefined;
   store: SettingsGeneralStore;
   /** The dialog element the Select popovers portal into, captured when the section was created. */
   selectMount: HTMLElement | undefined;
@@ -74,14 +82,47 @@ interface ProviderSettingsSectionProps {
 
 /** The provider list of the computer the agents run on, with its custom endpoint dialogs. */
 function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
-  const i18n = useI18n();
+  const i18n = useText();
   const customProviders = () => props.customProviders ?? [];
-  /**
-   * Which row holds the check here. Nothing stores it: the whole Settings picker is local state
-   * today, so this row matches its neighbours and no more. Do not wire it to a saved default without
-   * first deciding what a saved default means for the four rows beside it.
-   */
   const [customSelected, setCustomSelected] = createSignal(false);
+  const [saving, setSaving] = createStore<{
+    pending: { provider: AgentProviderId; custom: boolean } | null;
+    error: string;
+  }>({ pending: null, error: "" });
+  const defaultCustomModel = () => {
+    const choice = props.defaultProvider;
+    return choice ? savedCustomModel(choice.preferredProvider, choice.preferredModel, customProviders()) : null;
+  };
+
+  async function selectProvider(provider: AgentProviderId, custom = false): Promise<void> {
+    if (saving.pending) return;
+    const choice = props.defaultProvider;
+    if (!choice) {
+      setCustomSelected(custom);
+      props.store.setSelectedProvider(provider);
+      return;
+    }
+    // A custom row uses its saved model, or the first model of the first saved endpoint.
+    const endpoint = customProviders().find((item) => item.models.length > 0);
+    const firstModel = endpoint?.models[0];
+    const model = custom
+      ? (defaultCustomModel() ?? (endpoint && firstModel ? `${endpoint.id}/${firstModel.id}` : null))
+      : defaultCustomModel()
+        ? null
+        : undefined;
+    setSaving(() => ({ pending: { provider, custom }, error: "" }));
+    try {
+      await choice.save(provider, model);
+    } catch (error) {
+      setSaving((state) => {
+        state.error = i18n.errorMessage(error, i18n.t("onboarding.setup.saveFailed"));
+      });
+    } finally {
+      setSaving((state) => {
+        state.pending = null;
+      });
+    }
+  }
   /**
    * With a detection API, Add first asks what to add: a local server, any compatible endpoint, or
    * an ACP agent. Without one, as on a joined server's host, Add opens the endpoint form at once.
@@ -102,17 +143,23 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
     // The tab title already names this list, so it has no heading of its own.
     <div class="settings-provider-section">
       <ProviderPicker
-        value={props.store.selectedProvider()}
+        value={
+          props.defaultProvider
+            ? (saving.pending?.provider ?? props.defaultProvider.preferredProvider)
+            : props.store.selectedProvider()
+        }
         options={props.store.providerOptions()}
-        ariaLabel={i18n.t("settings.providers.title")}
+        ariaLabel={i18n.t(props.defaultProvider ? "onboarding.setup.defaultProvider" : "settings.providers.title")}
+        label={props.defaultProvider ? i18n.t("onboarding.setup.defaultProvider") : undefined}
+        hint={props.defaultProvider ? i18n.t("onboarding.setup.defaultProviderHint") : undefined}
+        disabled={Boolean(saving.pending)}
         embedded
         allowUnavailableSelection
         customProviders={customProviders()}
-        customSelected={customSelected()}
-        onChange={(provider) => {
-          setCustomSelected(false);
-          props.store.setSelectedProvider(provider);
-        }}
+        customSelected={
+          props.defaultProvider ? (saving.pending?.custom ?? Boolean(defaultCustomModel())) : customSelected()
+        }
+        onChange={(provider) => void selectProvider(provider)}
         onDownloadProvider={props.onDownloadProvider}
         onCancelProviderDownload={props.onCancelProviderDownload}
         onUpdateProvider={props.onUpdateProvider}
@@ -124,7 +171,7 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
         onAddCustomProvider={
           props.onAddCustomProvider ? (props.detectedProviderApi ? () => setChoosing(true) : host.openForm) : undefined
         }
-        onSelectCustomProvider={props.onAddCustomProvider ? () => setCustomSelected(true) : undefined}
+        onSelectCustomProvider={props.onAddCustomProvider ? () => void selectProvider("opencode", true) : undefined}
         onManageCustomProviders={props.onAddCustomProvider ? host.openList : undefined}
         onSignInProvider={props.onSignInProvider}
         onSignInWithCodeProvider={props.onSignInWithCodeProvider}
@@ -148,6 +195,9 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
           </Show>
         }
       />
+      <Show when={saving.error}>
+        <Text role="alert">{saving.error}</Text>
+      </Show>
       {/* The outcome is shown where the user is looking. While the list is open the section behind
         it is hidden from assistive technology, so a status left here could not be read. */}
       <Show when={host.state.manageOpen ? null : host.state.note}>
@@ -288,6 +338,8 @@ function ProviderSettingsDialogs(props: {
 
 /** The providers of one server's computer, as its server settings section takes them. */
 export interface HostProviderSettings {
+  /** Saved default for new local agents. Remote host settings do not change this computer's default. */
+  defaultProvider?: DefaultProviderSettings | undefined;
   agentStatus: AgentStatus;
   providerRuntimeStatuses?: Partial<Record<AgentProviderId, ProviderRuntimeStatus>> | undefined;
   providerAvailableVersions?: Partial<Record<AgentProviderId, string | null>> | undefined;
@@ -361,6 +413,7 @@ export function HostProviderSettingsPanel(
   return (
     <>
       <ProviderSettingsSection
+        defaultProvider={props.defaultProvider}
         store={store}
         selectMount={props.selectMount}
         onDownloadProvider={props.onDownloadProvider}

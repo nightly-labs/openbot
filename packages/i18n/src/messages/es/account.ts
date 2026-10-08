@@ -18,7 +18,6 @@ export const messages = {
   "account.menu.billing": "Facturación",
   "account.menu.accountSettings": "Ajustes de la cuenta",
   "account.menu.marketplace": "Marketplace",
-  "account.menu.providersPermissions": "Proveedores y permisos",
   "account.menu.help": "Ayuda",
   "account.menu.sendFeedback": "Enviar comentarios",
   "account.menu.message": "Mensaje",

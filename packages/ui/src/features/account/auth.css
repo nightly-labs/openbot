@@ -1011,8 +1011,7 @@
   margin-top: 20px;
 }
 
-.initial-setup-save,
-.initial-setup-secondary {
+.initial-setup-save {
   min-height: 40px;
   border: 1px solid var(--openbot-border-strong);
   border-radius: var(--openbot-radius-md);
@@ -1043,15 +1042,6 @@
   transform: scale(0.992);
 }
 
-.initial-setup-secondary {
-  background: transparent;
-  color: var(--text-secondary);
-}
-
-.initial-setup-secondary:hover {
-  background: var(--openbot-hover);
-}
-
 @media (max-width: 620px) {
   .initial-setup-screen {
     place-items: start center;
@@ -1063,8 +1053,7 @@
   }
 
   .initial-setup-actions,
-  .initial-setup-save,
-  .initial-setup-secondary {
+  .initial-setup-save {
     width: 100%;
   }
 
