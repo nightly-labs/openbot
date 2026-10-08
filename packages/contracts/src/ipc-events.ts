@@ -198,7 +198,7 @@ export function isEventRoutineTriggerInput(value: unknown): value is EventRoutin
   return isRoutineWebhookTriggerInput(value) || isRoutineScheduleTrigger(value);
 }
 
-function isEventRoutineTrigger(value: unknown): value is EventRoutineTrigger {
+export function isEventRoutineTrigger(value: unknown): value is EventRoutineTrigger {
   return (
     isRoutineScheduleTrigger(value) ||
     (isDynamicRecord(value) && isNullableString(value.url) && isRoutineWebhookTriggerInput(value))

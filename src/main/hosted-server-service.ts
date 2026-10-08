@@ -33,7 +33,7 @@ const RUNNING_REFRESH_INTERVAL_MS = 15_000;
 export type HostedServerAuthClient = AccountRequestClient;
 
 /**
- * `bun run dev --hosting=test` sets the shared developer key from the encrypted `.env.shared`. This
+ * `bun run dev --hosting=test` sets the shared developer key from the encrypted `.env.dev`. This
  * removes it from `environment`, because agents and their tools inherit the environment of this
  * process. A packaged build never sends it.
  */

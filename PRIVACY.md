@@ -919,3 +919,11 @@ Requests already received by OpenPanel cannot be recalled. Anonymous error repor
 anonymous. The browser app has its own local analytics setting in account settings, separate
 from desktop and mobile. Collection is enabled by default; a malformed or unreadable setting
 keeps it disabled. Existing OpenPanel retention rules apply after delivery.
+
+### Remote host release checks
+
+When a server administrator checks an OpenBot release, the host requests the public stable
+release manifest from GitHub for its operating system and architecture. The request includes no
+account data, chats, files, commands, or credentials. GitHub receives the host IP address as part
+of the connection. Connected administrators receive the installed version, release version,
+check status, and installation method.

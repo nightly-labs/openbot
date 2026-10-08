@@ -98,8 +98,18 @@ afterEach(async () => {
 });
 
 describe("RequestedUpdate", () => {
+  it("keeps the current requester and restart mode after another member asks", async () => {
+    updater.status = { ...updater.status, phase: "ready", availableVersion: "0.25.0" };
+    await runCauseEffect(create().start(ADA, "now"));
+    await runCauseEffect(requested.requestWhenIdle({ id: "member-other", name: "Other" }));
+    expect(requested.snapshot().restart).toEqual({ requestedBy: "Ada", mode: "now", waitingFor: [] });
+    requested.cancel();
+    await runCauseEffect(requested.requestWhenIdle({ id: "member-other", name: "Other" }));
+    expect(requested.snapshot().restart).toEqual({ requestedBy: "Other", mode: "when-idle", waitingFor: [] });
+  });
+
   it("checks, downloads, waits for idle work, then installs", async () => {
-    await runCauseEffect(create().start(ADA, "when-idle"));
+    await runCauseEffect(create().requestWhenIdle(ADA));
     expect(updater.checkForUpdates).toHaveBeenCalledOnce();
     expect(updater.scheduled).toEqual({ requestedBy: "Ada", mode: "when-idle", waitingFor: [] });
 

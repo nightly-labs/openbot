@@ -242,24 +242,21 @@
 
 .task-list-item[data-state="active"] .task-list-item-text,
 .task-list-title[data-showing="task"] .task-list-title-task-text {
-  background: linear-gradient(
-    90deg,
-    var(--openbot-text-primary) 0%,
-    var(--openbot-text-primary) 35%,
-    var(--openbot-text-muted) 50%,
-    var(--openbot-text-primary) 65%,
-    var(--openbot-text-primary) 100%
-  );
-  background-size: 300% 100%;
-  background-clip: text;
-  color: transparent;
-  animation: task-list-shine 1.6s linear infinite;
+  display: inline-block;
+  color: var(--openbot-text-primary);
+  animation: task-list-pulse 1.6s ease-in-out infinite;
+  animation-play-state: var(--task-list-play-state, running);
 }
 
 .task-list-title[data-showing="task"] .task-list-title-task-text {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: top;
   animation:
     task-list-title-in var(--task-list-open) var(--task-list-ease),
-    task-list-shine 1.6s linear infinite;
+    task-list-pulse 1.6s ease-in-out infinite;
+  animation-play-state: var(--task-list-play-state, running);
 }
 
 /* The same roll as the update island: each settled value lifts in from below and sharpens. */
@@ -351,8 +348,10 @@
   opacity: 1;
 }
 
-.task-list-mark[data-state="active"] .task-list-mark-arc {
+/* Rotate the outer SVG so Chromium can composite the animation. */
+.task-list-mark[data-state="active"] {
   animation: task-list-turn 0.9s linear infinite;
+  animation-play-state: var(--task-list-play-state, running);
 }
 
 .task-list-mark[data-state="done"] .task-list-mark-fill,
@@ -385,13 +384,16 @@
   }
 }
 
-@keyframes task-list-shine {
-  from {
-    background-position: 100% 0;
+/* Opacity avoids the per-frame text paint of an animated clipped gradient. */
+@keyframes task-list-pulse {
+  50% {
+    opacity: 0.6;
   }
-  to {
-    background-position: 0% 0;
-  }
+}
+
+/* Closed rows remain mounted for the close transition, but need no idle animation. */
+.task-list:not([data-open]) .task-list-panel {
+  --task-list-play-state: paused;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -411,16 +413,10 @@
     transition: none;
   }
 
-  .task-list-mark[data-state="active"] .task-list-mark-arc,
+  .task-list-mark[data-state="active"],
   .task-list-item[data-state="active"] .task-list-item-text,
   .task-list-title-task-text,
   .task-list-title[data-showing="task"] .task-list-title-task-text {
     animation: none;
-  }
-
-  .task-list-item[data-state="active"] .task-list-item-text,
-  .task-list-title[data-showing="task"] .task-list-title-task-text {
-    background: none;
-    color: var(--openbot-text-primary);
   }
 }

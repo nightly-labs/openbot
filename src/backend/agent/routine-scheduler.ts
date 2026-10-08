@@ -701,6 +701,58 @@ export class RoutineScheduler implements RoutineDueSource {
     });
   }
 
+  /**
+   * Hands a routine run's work on to another agent: the next step of the routine's flow. The
+   * delivery names the same routine and run, so the agent reads it as that routine, but the run
+   * keeps its own delivery and status: `reconcileDelivery` finds a run by its delivery only. An agent
+   * that no longer exists fails the handoff rather than coming back.
+   */
+  readonly enqueueHandoff = Effect.fn("RoutineScheduler.enqueueHandoff")(function* (
+    this: RoutineScheduler,
+    input: {
+      run: Pick<RoutineRun, "id" | "routineId" | "routineName" | "scheduledFor">;
+      agentId: string;
+      text: string;
+      idempotencyKey: string;
+    },
+  ) {
+    const agent = yield* routineStep(() => {
+      const found = this.#hooks.listAgents().find((candidate) => candidate.id === input.agentId);
+      if (!found) throw new Error(sourceText("error.agent.unknown", { id: input.agentId }));
+      return found;
+    });
+    const validateRecipient = yield* routineStep(() => this.#mailbox.prepareDelivery([agent.id]));
+    yield* routineStep(validateRecipient);
+    const receipt = yield* this.#mailbox
+      .enqueue({
+        sender: {
+          kind: "routine",
+          routineId: input.run.routineId,
+          runId: input.run.id,
+          routineName: input.run.routineName,
+          scheduledFor: input.run.scheduledFor,
+        },
+        recipientAgentIds: [agent.id],
+        text: input.text,
+        draftIds: [],
+        replyToMessageId: null,
+        idempotencyKey: input.idempotencyKey,
+      })
+      .pipe(Effect.mapError((failure) => new RoutineOperationFailed({ cause: failure.cause })));
+    const deliveryId = receipt.deliveries[0]?.id;
+    if (!deliveryId)
+      return yield* new RoutineOperationFailed({ cause: new Error("Unable to create the routine handoff delivery.") });
+    yield* routineStep(() => {
+      const snapshot = this.#conversation.ensureSnapshot(agent.id, agent.threadId);
+      this.#hooks.syncMailboxMessages(snapshot);
+      this.#hooks.emit({ type: "agents-changed", agents: this.#hooks.listAgents() });
+      this.#conversation.emitConversation(snapshot);
+      this.#hooks.emitQueue(agent.id);
+      this.#hooks.scheduleDrain(agent.id);
+    });
+    return deliveryId;
+  }, Effect.uninterruptible);
+
   readonly #enqueueRunEffect = Effect.fn("RoutineScheduler.enqueueRun")(function* (
     this: RoutineScheduler,
     run: RoutineRun,

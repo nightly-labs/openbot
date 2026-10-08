@@ -28,6 +28,7 @@
     "./invite-links": "./src/invite-links.ts",
     "./landing-preview-messages": "./src/landing-preview-messages.ts",
     "./markdown-lists": "./src/markdown-lists.ts",
+    "./markdown-preview-text": "./src/markdown-preview-text.ts",
     "./ipc": "./src/ipc.ts",
     "./ipc-events": "./src/ipc-events.ts",
     "./ipc-skills": "./src/ipc-skills.ts",
@@ -94,6 +95,8 @@
     "./team-protocol/providers-v4": "./src/team-protocol/providers-v4.ts",
     "./team-protocol/host-admin-v1": "./src/team-protocol/host-admin-v1.ts",
     "./team-protocol/hosted-sites-v1": "./src/team-protocol/hosted-sites-v1.ts",
+    "./team-protocol/host-release-v1": "./src/team-protocol/host-release-v1.ts",
+    "./team-protocol/host-member-update-v1": "./src/team-protocol/host-member-update-v1.ts",
     "./team-protocol/host-update-v1": "./src/team-protocol/host-update-v1.ts",
     "./team-protocol/shared-tables-v1": "./src/team-protocol/shared-tables-v1.ts",
     "./team-protocol/skills-admin-v1": "./src/team-protocol/skills-admin-v1.ts",
@@ -106,7 +109,8 @@
     "test": "vitest run --config vitest.config.ts src"
   },
   "dependencies": {
-    "emoji-regex": "10.6.0"
+    "emoji-regex": "10.6.0",
+    "marked": "catalog:"
   },
   "devDependencies": {
     "typescript": "catalog:",

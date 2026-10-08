@@ -1,6 +1,5 @@
 import type { HostStatus, ServerNotificationLevel, ServerSummary } from "@openbot/contracts/ipc";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
-import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-update-v1";
 import { WAKE_RECONNECT_STATES } from "@openbot/team-client/hosted-server-wake";
 import { classifyFailure } from "@openbot/telemetry";
 import { toast } from "@openbot/ui";
@@ -11,7 +10,7 @@ import { FALLBACK_HOST_STATUS } from "../../app-defaults";
 import { createSimpleContext } from "../../simple-context";
 import { createHostRestartToasts } from "../updates/host-restart-toast";
 import { watchHostUpdate } from "./host-update-toast";
-import { olderAppSide, remoteAdminServer, serverSupportsCapability } from "./server-capabilities";
+import { olderAppSide, remoteUpdateServer, serverSupportsCapability } from "./server-capabilities";
 import { serversPort } from "./servers-port";
 
 /**
@@ -147,7 +146,7 @@ const Servers = createSimpleContext({
         const sequence = server.connectionSequence ?? 0;
         const previousSequence = previous.get(server.id)?.connectionSequence ?? 0;
         const compatibility = server.compatibility;
-        const administersUpdate = server.kind === "remote" && remoteAdminServer(server, HOST_UPDATE_CAPABILITY);
+        const canUpdate = remoteUpdateServer(server);
         if (
           server.kind === "remote" &&
           sequence > previousSequence &&
@@ -165,7 +164,7 @@ const Servers = createSimpleContext({
             hostVersion: compatibility.hostAppVersion,
           };
           // The host action does not help when this app is the older side.
-          const offerUpdate = opener && administersUpdate && older !== "client";
+          const offerUpdate = opener && canUpdate && older !== "client";
           toast.warning(t("server.compatibility.versionMismatchTitle", { name: server.name }), {
             ...{
               description:
@@ -184,7 +183,7 @@ const Servers = createSimpleContext({
           if (offerUpdate) mismatchOffers.add(`${serverId}:${sequence}`);
         }
         // An admin learns about a new version, or sees the download that runs, when the host connects.
-        if (administersUpdate && server.state === "online" && updateChecks.get(server.id) !== sequence) {
+        if (canUpdate && server.state === "online" && updateChecks.get(server.id) !== sequence) {
           updateChecks.set(server.id, sequence);
           const opener = openHostUpdate;
           const serverId = server.id;

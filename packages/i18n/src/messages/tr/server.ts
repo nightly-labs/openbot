@@ -360,7 +360,7 @@ export const messages = {
   "server.update.waitingFor": "{reasons} bekleniyor.",
   "server.update.disabledTitle": "Uzaktan güncellemeler kapalı",
   "server.update.disabledDescription":
-    "{name} kullanıcısı, sunucu yöneticilerinden gelen güncellemeleri kapattı. Onlardan OpenBot'u güncellemelerini veya bu ayarı açmalarını isteyin.",
+    "{name} kullanıcısı sunucu üyelerinin güncelleme yapmasını kapattı. OpenBot uygulamasını güncellemesini veya ayarı açmasını isteyin.",
   "server.update.managedTitle": "Güncellemeleri bir Ana Makine Yöneticisi kontrol ediyor",
   "server.update.managedDescription":
     "OpenBot Ana Makine Yöneticisi {name} makinesini günceller. Ana makine yöneticisiyle iletişime geçin.",

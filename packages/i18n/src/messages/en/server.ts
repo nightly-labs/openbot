@@ -388,6 +388,23 @@ export const messages = defineMessages("server", {
   "server.update.status.downloadFailed": "{name} could not download the update. Try again.",
   "server.update.status.installFailed":
     "{name} could not install the update. Make sure that no other user of that computer runs OpenBot, then try again.",
+  "server.update.releaseCheckFailed":
+    "{name} could not read the release feed. Check the host network connection, then try again.",
+  "server.update.releaseUnavailable":
+    "Release checks are not available for this build. Ask the host administrator to check for a compatible release.",
+  "server.update.externalTitle": "The host controls installation",
+  "server.update.path.hostManager":
+    "OpenBot Host Manager installs updates when all users are idle. Ask the host administrator to check the Host Manager status if an update does not start.",
+  "server.update.path.hosted":
+    "The hosted service downloads updates in the background. A downloaded update starts when the server next starts. Wait for active work to finish before you stop and resume the server. If it stays on an old version, contact the host administrator.",
+  "server.update.path.system":
+    "On the host, run sudo openbot update to install the latest release. This command stops OpenBot. Wait for active work to finish first. Automatic downloads install at the next boot.",
+  "server.update.path.container":
+    "On the Docker host, pull the new OpenBot image and create the container again with the same data volumes. Wait for active work to finish first. Keep the existing volumes to preserve your data.",
+  "server.update.path.manual":
+    "This installation cannot replace itself. Ask the host administrator to install the compatible release from github.com/nightly-labs/openbot/releases. Keep the existing OpenBot data.",
+  "server.update.path.unavailable":
+    "This is a development build. Use an installed OpenBot release to check for updates.",
   "server.update.check": "Check for updates",
   "server.update.start": "Update when idle",
   "server.update.restartNow": "Restart now",
@@ -404,7 +421,7 @@ export const messages = defineMessages("server", {
   "server.update.waitingFor": "Waiting for {reasons}.",
   "server.update.disabledTitle": "Remote updates are off",
   "server.update.disabledDescription":
-    "The user of {name} turned off updates from server admins. Ask them to update OpenBot or to turn the setting on.",
+    "The user of {name} turned off updates from server members. Ask them to update OpenBot or to turn the setting on.",
   "server.update.managedTitle": "A Host Manager controls updates",
   "server.update.managedDescription": "OpenBot Host Manager updates {name}. Contact the host administrator.",
   "server.update.unsupportedTitle": "{name} cannot update itself",
