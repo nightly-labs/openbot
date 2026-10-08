@@ -282,6 +282,12 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
             label={i18n.t("settings.analytics.title")}
             description={i18n.t("settings.analytics.description")}
           />
+          <SwitchField
+            checked={props.value.remoteWorkspaceCache}
+            onChange={(checked) => props.onUpdateSetting("remoteWorkspaceCache", checked)}
+            label={i18n.t("settings.savedCopy.title")}
+            description={i18n.t("settings.savedCopy.description")}
+          />
         </ItemGroup>
       </SettingsSection>
     </>

@@ -24,6 +24,7 @@ import { DynamicIslandBridge } from "./features/dynamic-island/dynamic-island-br
 import { DynamicIslandProvider } from "./features/dynamic-island/dynamic-island-context";
 import { SetupProvider } from "./features/onboarding/onboarding-context";
 import { RemoteDesktopProvider } from "./features/remote-desktop/remote-desktop-context";
+import { SavedCopyProvider } from "./features/saved-copy/saved-copy-context";
 import { ServerScopeProvider } from "./features/servers/server-scope";
 import { ServerSelectionProvider } from "./features/servers/server-selection";
 import { ServerSettingsProvider } from "./features/servers/server-settings";
@@ -171,11 +172,13 @@ function ScopedProviders(props: ParentProps<ScopedConversationProps>): JSX.Eleme
                         <NavigationProvider>
                           <ServerSelectionProvider>
                             <AgentActionsProvider>
-                              <ServerScopeProvider>
-                                <AgentEventBridge />
-                                <DynamicIslandBridge />
-                                {props.children}
-                              </ServerScopeProvider>
+                              <SavedCopyProvider>
+                                <ServerScopeProvider>
+                                  <AgentEventBridge />
+                                  <DynamicIslandBridge />
+                                  {props.children}
+                                </ServerScopeProvider>
+                              </SavedCopyProvider>
                             </AgentActionsProvider>
                           </ServerSelectionProvider>
                         </NavigationProvider>

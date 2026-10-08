@@ -166,6 +166,75 @@ describe("OpenBot connected desktop shell", () => {
     expect(screen.queryByText("Connecting…", { selector: ".empty-search" })).not.toBeInTheDocument();
   });
 
+  // Failure modes of the saved copy in the renderer:
+  // - the copy enters the live roster, and a request for an agent only the copy names makes the host
+  //   create that agent again -> no agent request is made while the copy shows
+  // - the copy stays after the server answers -> the server's roster and chat replace it
+  // - the copy is never saved -> the server's roster is offered to main for the next launch
+  // - a computer's own server asks for a copy -> it does not
+  it("shows the saved copy of a joined server while it connects, then the server's data", async () => {
+    vi.mocked(window.openbot.servers.list).mockResolvedValue([
+      testServer("local", false),
+      { ...testServer("remote-1", true), state: "offline" },
+    ]);
+    let resolveAgents: (agents: AgentSummary[]) => void = () => undefined;
+    vi.mocked(window.openbot.agent.listAgents).mockReturnValue(
+      new Promise((resolve) => {
+        resolveAgents = resolve;
+      }),
+    );
+    vi.mocked(window.openbot.agent.getStatus).mockReturnValue(new Promise(() => undefined));
+    const archivist: AgentSummary = { ...AGENTS[1], id: "archivist", name: "Archivist", preview: "Filed it" };
+    vi.mocked(window.openbot.remoteWorkspaceCache.read).mockResolvedValue({
+      serverId: "remote-1",
+      savedAt: "2026-10-07T20:00:00.000Z",
+      memberId: "member-self",
+      agents: [archivist],
+      reads: { archivist: { unreadCount: 3, firstUnreadMessageId: "saved-1", throughMessageId: null } },
+      layout: null,
+      conversations: [
+        {
+          agentId: "archivist",
+          messages: [
+            {
+              id: "saved-1",
+              author: "assistant",
+              text: "Saved reply from yesterday",
+              createdAt: "2026-10-07T19:00:00.000Z",
+              status: "completed",
+            },
+          ],
+        },
+      ],
+    });
+    const saveWorkspace = vi.mocked(window.openbot.remoteWorkspaceCache.saveWorkspace).mockResolvedValue(undefined);
+    render(() => <App />);
+
+    expect(await screen.findByText("Saved reply from yesterday")).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Archivist" })).toBeVisible();
+    expect(screen.getByText("Connecting… This is a saved copy and can be out of date.")).toBeVisible();
+    expect(window.openbot.remoteWorkspaceCache.read).toHaveBeenCalledWith("remote-1");
+    expect(window.openbot.agent.readConversationPage).not.toHaveBeenCalled();
+    expect(window.openbot.agent.listQueue).not.toHaveBeenCalled();
+    expect(window.openbot.agent.listRoutines).not.toHaveBeenCalled();
+
+    resolveAgents(AGENTS);
+    expect(await screen.findByRole("heading", { name: "Chief" })).toBeVisible();
+    expect(screen.queryByText("Saved reply from yesterday")).not.toBeInTheDocument();
+    expect(screen.queryByText("Connecting… This is a saved copy and can be out of date.")).not.toBeInTheDocument();
+    // The live chat reads its own page once the roster names the agent.
+    await vi.waitFor(() => expect(window.openbot.agent.readConversationPage).toHaveBeenCalled());
+    await vi.waitFor(() =>
+      expect(saveWorkspace).toHaveBeenCalledWith(expect.objectContaining({ serverId: "remote-1", agents: AGENTS })),
+    );
+  });
+
+  it("does not read a saved copy for the server of this computer", async () => {
+    render(() => <App />);
+    expect(await screen.findByRole("heading", { name: "Chief" })).toBeVisible();
+    expect(window.openbot.remoteWorkspaceCache.read).not.toHaveBeenCalled();
+  });
+
   it("keeps a saved selection after a failed agent load and restores it on retry", async () => {
     window.localStorage.setItem(AGENT_SELECTION_STORAGE_KEY, JSON.stringify({ local: "sales-outbound" }));
     vi.mocked(window.openbot.agent.listAgents).mockRejectedValueOnce(new Error("Offline"));

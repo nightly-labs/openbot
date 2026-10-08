@@ -423,6 +423,21 @@ Discord mentions of the Discord app, and the requests to webhook routines, in tr
 [Webhook routines](#webhook-routines). For Discord, Signal also carries the host's answers to
 Discord.
 
+A member can turn on **Settings → General → Keep a copy of joined servers**. It is off by default.
+When it is on, each member computer keeps a small saved copy of every joined server, so that the next
+launch shows the sidebar and recent messages while the server connects. The copy holds the agent list
+(names, titles, sidebar previews, models), the unread counts, the sidebar sections, the member id,
+and the latest 30 messages of the 5 most recently opened agent chats, as text only. It does not hold
+attachments, generated images, question prompts, queue state, avatar addresses or channels. The
+copy is encrypted with the operating system's secret storage, the same as the server tokens, and is
+not kept when that storage is not available. It stays in the OpenBot profile folder of that computer
+(`remote-workspace-cache`) and is never sent anywhere. Each copy belongs to the signed-in account and
+one server. OpenBot deletes the copies of an account when you sign out or sign in to another
+account, the copy of a server when you leave or remove it, or when it no longer accepts the account,
+and every copy when you turn the setting off. While the copy shows, it is read-only and can be out
+of date; the server's data replaces it when the server connects. The app does not write the
+contents of the copy to its logs.
+
 An owner or admin of a joined server can manage its host from their own computer, or from the
 browser client at `/app`. A provider API key, a custom endpoint key or header, the code that a
 provider sign-in page shows, and a new server logo then travel from that computer or browser to the host over the same encrypted team connection. The

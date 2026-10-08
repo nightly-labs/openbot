@@ -22,6 +22,7 @@ export const messages = defineMessages("sidebar", {
   "sidebar.empty.noMatches": "No matches",
   "sidebar.empty.noAgents": "No agents yet",
   "sidebar.empty.firstAgent": "Create your first agent",
+  "sidebar.savedCopy.notice": "Connecting… This is a saved copy and can be out of date.",
   "sidebar.section.layoutUnsupported": "This host does not support sidebar layout changes.",
   "sidebar.section.actions": "Section actions",
   "sidebar.section.moveUp": "Move up",

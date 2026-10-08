@@ -44,6 +44,11 @@ export interface GeneralSettingsValue {
   /** Restart into a downloaded update when no work runs. */
   autoInstallUpdates: boolean;
   productAnalytics: boolean;
+  /**
+   * Keep a saved copy of each joined server on this computer, for the next launch. Off by default:
+   * a conversation of a joined server otherwise stays only on the computer that runs the server.
+   */
+  remoteWorkspaceCache: boolean;
 }
 
 export const DEFAULT_GENERAL_SETTINGS: GeneralSettingsValue = {
@@ -68,4 +73,5 @@ export const DEFAULT_GENERAL_SETTINGS: GeneralSettingsValue = {
   allowRemoteUpdates: true,
   autoInstallUpdates: false,
   productAnalytics: true,
+  remoteWorkspaceCache: false,
 };

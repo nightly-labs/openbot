@@ -148,6 +148,7 @@ import {
 } from "./dynamic-island-decoding";
 import { decodeAddOrchestratorReply, decodeMessagingOverviewReply } from "./messaging-decoding";
 import { decodeProviderRuntimeSnapshot } from "./provider-runtime";
+import { decodeRemoteWorkspaceCache, decodeRemoteWorkspaceCachePreference } from "./remote-workspace-cache-decoding";
 import {
   decodeAgentInstallation,
   decodeAgentPublicationPreview,
@@ -587,6 +588,13 @@ const openbotApi: OpenBotDesktopApi = {
     cancel: decodeOnePasswordConnectorStatus,
     disconnect: decodeOnePasswordConnectorStatus,
     changed: decodeOnePasswordConnectorStatus,
+  }),
+  remoteWorkspaceCache: bridgeGroup(IPC_ENDPOINTS.remoteWorkspaceCache, {
+    getPreference: decodeRemoteWorkspaceCachePreference,
+    setPreference: decodeRemoteWorkspaceCachePreference,
+    read: decodeRemoteWorkspaceCache,
+    saveWorkspace: decodeVoid,
+    saveConversation: decodeVoid,
   }),
   routineFeed: bridgeGroup(IPC_ENDPOINTS.routineFeed, {
     get: decodeRoutineFeed,

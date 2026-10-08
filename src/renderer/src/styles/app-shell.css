@@ -2908,6 +2908,14 @@ textarea {
   text-align: center;
 }
 
+/* A saved copy fills the list while a joined server connects. Quiet, but always in view at the top. */
+.sidebar-saved-copy-notice {
+  margin: 0 0 var(--openbot-space-2);
+  padding: 0 var(--openbot-space-3);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
 .sidebar-first-agent-state {
   display: flex;
   min-height: 100%;

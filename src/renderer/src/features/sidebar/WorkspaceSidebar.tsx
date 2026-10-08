@@ -16,6 +16,7 @@ import { useAgents } from "../agents/agents-context";
 import { useChannels } from "../channels/channels-context";
 import { useConversation } from "../conversation/conversation-context";
 import { useDirectMessages } from "../conversation/direct-messages-context";
+import { useSavedCopy } from "../saved-copy/saved-copy-context";
 import { useServerActions } from "../servers/server-actions";
 import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
@@ -50,6 +51,10 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
   const { editAgent, duplicateAgent, deleteAgent } = useAgentActions();
   const { activeTurns, queues, failedTurns, usageLimits, pendingPrompts, pendingApprovals } = useTurns();
   const { unreadReplies, recentReplies, markAllAgentMessagesRead } = useConversation();
+  /* While a joined server connects, the saved copy fills the list. It is for reading only, so the
+   * row actions that need the host are off, and selecting a row stays inside the copy. */
+  const savedCopy = useSavedCopy();
+  const saved = () => savedCopy.visible();
   const { directPeople } = usePresence();
   const { activeDirectMember, activeDirectMemberId, directThreads } = useDirectMessages();
   const { selectAgent, selectDirectMember } = useNavigation();
@@ -125,10 +130,14 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
       showingArchivedChannels={channels.state.archived}
       onToggleArchivedChannels={channels.supported() ? channels.toggleArchived : undefined}
       onCreateChannel={channels.supported() ? channels.create : undefined}
-      onMarkAllRead={() => {
-        void markAllAgentMessagesRead();
-        void channels.markAllRead();
-      }}
+      onMarkAllRead={
+        saved()
+          ? undefined
+          : () => {
+              void markAllAgentMessagesRead();
+              void channels.markAllRead();
+            }
+      }
       hasUnread={agentList().some((agent) => (unreadReplies()[agent.id] ?? 0) > 0) || channels.hasUnread()}
       serverName={activeServer()?.name ?? "Local"}
       onOpenServerSettings={(trigger) => {
@@ -148,16 +157,23 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
             }
           : undefined
       }
-      agents={agentList()}
-      activeAgentId={activeDirectMember() || channels.state.selectedId ? "" : (activeAgent()?.id ?? "")}
+      agents={saved() ? savedCopy.agents() : agentList()}
+      activeAgentId={
+        saved()
+          ? (savedCopy.selectedAgent()?.id ?? "")
+          : activeDirectMember() || channels.state.selectedId
+            ? ""
+            : (activeAgent()?.id ?? "")
+      }
       showPeople={props.peopleEnabled}
       people={directPeople()}
       directThreads={directThreads()}
       activeDirectMemberId={activeDirectMemberId()}
-      agentStates={sidebarAgentStates()}
+      agentStates={saved() ? savedCopy.agentStates() : sidebarAgentStates()}
       agentMoods={agentMoods()}
-      layout={sidebarLayout()}
-      layoutMutable={activeServerSupportsCapability("sidebar-layout")}
+      layout={(saved() ? savedCopy.layout() : null) ?? sidebarLayout()}
+      layoutMutable={!saved() && activeServerSupportsCapability("sidebar-layout")}
+      savedCopy={saved()}
       collapsedSectionIds={collapsedSidebarSectionIds()}
       onMutateLayout={mutateSidebarLayout}
       onToggleSection={toggleSidebarSection}
@@ -167,15 +183,18 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
       onUnpin={unpinSidebarItem}
       onReorderPinned={reorderPinnedSidebarItems}
       onReorderPeople={reorderSidebarPeople}
-      onSelectAgent={selectAgent}
+      onSelectAgent={saved() ? savedCopy.select : selectAgent}
       onSelectPerson={(memberId) => void selectDirectMember(memberId)}
       onPreloadDirectConversation={props.peopleEnabled ? () => void DirectConversation.preload() : undefined}
       onCreateAgent={() => {
         channels.close();
         openBotSetup();
       }}
+      createSupported={saved() ? false : undefined}
+      editSupported={!saved()}
+      deleteSupported={saved() ? false : undefined}
       onEditAgent={editAgent}
-      duplicateSupported={activeServerSupportsCapability("agent-duplication")}
+      duplicateSupported={!saved() && activeServerSupportsCapability("agent-duplication")}
       duplicatingAgentIds={duplicatingAgentIds()}
       onDuplicateAgent={duplicateAgent}
       onDeleteAgent={deleteAgent}

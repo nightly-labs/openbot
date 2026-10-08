@@ -252,6 +252,12 @@ import type {
   RemoteDesktopTestStatus,
 } from "./ipc-remote-desktop-setup";
 import type {
+  RemoteWorkspaceCache,
+  RemoteWorkspaceCachePreference,
+  SaveRemoteConversationInput,
+  SaveRemoteWorkspaceInput,
+} from "./ipc-remote-workspace-cache";
+import type {
   CreateRoutineInput,
   DeleteRoutineInput,
   ListRoutineRunsInput,
@@ -687,6 +693,17 @@ export const IPC_ENDPOINTS = {
   // The account's Stripe subscription. The main process gets the Checkout or Portal URL from the
   // account server and opens it in the browser, so the renderer never sends a URL.
   // The iCalendar feed of this computer's routines. `create` also replaces the URL of a feed that is on.
+  // The optional saved copy of a joined server, kept on this computer for the next launch. Main
+  // decides the account: the renderer names only the server.
+  remoteWorkspaceCache: {
+    getPreference: request<undefined, RemoteWorkspaceCachePreference>()("remote-workspace-cache:get-preference"),
+    setPreference: request<RemoteWorkspaceCachePreference, RemoteWorkspaceCachePreference>()(
+      "remote-workspace-cache:set-preference",
+    ),
+    read: request<string, RemoteWorkspaceCache | null>()("remote-workspace-cache:read"),
+    saveWorkspace: request<SaveRemoteWorkspaceInput, void>()("remote-workspace-cache:save-workspace"),
+    saveConversation: request<SaveRemoteConversationInput, void>()("remote-workspace-cache:save-conversation"),
+  },
   routineFeed: {
     get: request<undefined, RoutineFeed>()("routine-feed:get"),
     create: request<undefined, RoutineFeed>()("routine-feed:create"),
@@ -1081,6 +1098,7 @@ export const IPC_GROUP_PATHS = {
   onePasswordConnector: "onePasswordConnector",
   bitwardenConnector: "bitwardenConnector",
   hostedSites: "hostedSites",
+  remoteWorkspaceCache: "remoteWorkspaceCache",
   routineFeed: "routineFeed",
   billing: "billing",
   hostedServers: "hostedServers",

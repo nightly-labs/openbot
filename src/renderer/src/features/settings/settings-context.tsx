@@ -97,6 +97,7 @@ const Settings = createSimpleContext({
     let autoInstallUpdatesChanged = false;
     let desktopNotificationsChanged = false;
     let busyMessageModeChanged = false;
+    let remoteWorkspaceCacheChanged = false;
     let turboModeChanged = false;
     const [turboModePending, setTurboModePending] = createSignal(false);
 
@@ -225,6 +226,14 @@ const Settings = createSimpleContext({
           "desktopNotifications",
           settingsPort().notifications.setPreference({ desktopNotifications: value.desktopNotifications }),
           (preference) => preference.desktopNotifications,
+        );
+      }
+      if (previous.remoteWorkspaceCache !== value.remoteWorkspaceCache) {
+        remoteWorkspaceCacheChanged = true;
+        persistField(
+          "remoteWorkspaceCache",
+          settingsPort().remoteWorkspaceCache.setPreference({ enabled: value.remoteWorkspaceCache }),
+          (preference) => preference.enabled,
         );
       }
       if (previous.busyMessageMode !== value.busyMessageMode) {
@@ -371,6 +380,13 @@ const Settings = createSimpleContext({
             allowRemoteUpdates: allowRemoteUpdatesChanged ? current.allowRemoteUpdates : preference.allowRemoteUpdates,
             autoInstallUpdates: autoInstallUpdatesChanged ? current.autoInstallUpdates : preference.autoInstall,
           }));
+        })
+        .catch(() => undefined);
+      void settingsPort()
+        .remoteWorkspaceCache.getPreference()
+        .then((preference) => {
+          if (remoteWorkspaceCacheChanged) return;
+          setGeneralSettings((current) => ({ ...current, remoteWorkspaceCache: preference.enabled }));
         })
         .catch(() => undefined);
       void settingsPort()

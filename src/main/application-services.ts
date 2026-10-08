@@ -163,6 +163,7 @@ import { loadOrCreateRemoteDesktopCredentials } from "./remote-desktop-secret-st
 import { appendRemoteDiagnosticLog } from "./remote-diagnostics";
 import { decodeVoid } from "./remote-host-decoding";
 import { RemoteServerManager } from "./remote-server-manager";
+import { RemoteWorkspaceCacheStore } from "./remote-workspace-cache";
 import { sendToRenderer } from "./renderer-ipc";
 import { RequestedUpdate, RequestedUpdateRefusal } from "./requested-update";
 import { RoutineFeedServer } from "./routine-feed-server";
@@ -208,6 +209,8 @@ const LOGO_COLOR_PREFERENCE_FILE = "openbot-logo-color-preference-v1.json";
 const UPDATE_PREFERENCE_FILE = "openbot-update-preference-v1.json";
 const NOTIFICATION_PREFERENCE_FILE = "openbot-notification-preference-v1.json";
 const BUSY_MESSAGE_MODE_PREFERENCE_FILE = "openbot-busy-message-mode-v1.json";
+const REMOTE_WORKSPACE_CACHE_PREFERENCE_FILE = "openbot-remote-workspace-cache-v1.json";
+const REMOTE_WORKSPACE_CACHE_DIRECTORY = "remote-workspace-cache";
 const DYNAMIC_ISLAND_PREFERENCE_FILE = "openbot-dynamic-island-preference-v1.json";
 const BROWSER_STATE_FILE = "openbot-browser-state-v1.json";
 const SIDEBAR_LAYOUT_FILE = "openbot-sidebar-layout-v1.json";
@@ -354,6 +357,8 @@ export interface ApplicationServices {
   logoColor: LogoColorService;
   notificationPreference: NotificationPreferenceStore;
   busyMessageMode: BusyMessageModePreferenceStore;
+  /** The optional saved copy of each joined server, for the next launch. */
+  remoteWorkspaceCache: RemoteWorkspaceCacheStore;
   agentInitialization: AgentInitializationGate<AgentLifecycleFailed>;
   sidebarLayout: SidebarLayoutStore;
   host: HostService;
@@ -794,6 +799,12 @@ export async function createApplicationServices({
     join(app.getPath("userData"), BUSY_MESSAGE_MODE_PREFERENCE_FILE),
   );
   await runCauseEffect(busyMessageMode.load());
+  const remoteWorkspaceCache = new RemoteWorkspaceCacheStore({
+    directory: join(app.getPath("userData"), REMOTE_WORKSPACE_CACHE_DIRECTORY),
+    preferencePath: join(app.getPath("userData"), REMOTE_WORKSPACE_CACHE_PREFERENCE_FILE),
+    cipher: safeStorageCipher("error.app.secretStorageUnavailable"),
+  });
+  await runCauseEffect(remoteWorkspaceCache.load());
   const updatePreference = await runCauseEffect(readUpdatePreference(updatePreferenceFile));
   const approvalAutomationFile = join(app.getPath("userData"), APPROVAL_AUTOMATION_FILE);
   const approvalAutomation = new ApprovalAutomation({
@@ -1982,6 +1993,7 @@ export async function createApplicationServices({
     logoColor,
     notificationPreference,
     busyMessageMode,
+    remoteWorkspaceCache,
     agentInitialization,
     hostUpdateCoordinator,
     requestedUpdate: remoteUpdate,

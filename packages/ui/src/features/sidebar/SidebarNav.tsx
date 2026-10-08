@@ -45,6 +45,11 @@ export function SidebarNav() {
       onScroll={scrollFades.measure}
     >
       <div class="agent-list-content">
+        <Show when={props.savedCopy}>
+          <p class="sidebar-saved-copy-notice" role="status">
+            {t("sidebar.savedCopy.notice")}
+          </p>
+        </Show>
         <Show
           when={
             resolvedPinnedItems().length === 0 &&

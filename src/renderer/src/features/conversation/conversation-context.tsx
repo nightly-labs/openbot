@@ -1,6 +1,7 @@
 import type {
   AgentEvent,
   AgentRuntimeSnapshot,
+  ConversationMessage,
   ConversationPage,
   ConversationPageInfo,
   ConversationReadState,
@@ -147,6 +148,19 @@ const Conversation = createSimpleContext({
         Object.entries(conversations).map(([id, conversation]) => [id, conversation.recentReply === true]),
       ),
     );
+
+    /** Told the latest messages of the open agent chat whenever a page or a snapshot brings them. */
+    const latestMessageListeners = new Set<(agentId: string, messages: readonly ConversationMessage[]) => void>();
+
+    function onLatestMessages(listener: (agentId: string, messages: readonly ConversationMessage[]) => void) {
+      latestMessageListeners.add(listener);
+      return () => latestMessageListeners.delete(listener);
+    }
+
+    function announceLatestMessages(agentId: string, messages: readonly ConversationMessage[]): void {
+      if (agentId !== activeAgentId()) return;
+      for (const listener of latestMessageListeners) listener(agentId, messages);
+    }
 
     const pendingConversationSnapshots = new Map<string, ConversationSnapshot>();
     const agentChatsRetriedOnOpen = new Set<string>();
@@ -528,6 +542,7 @@ const Conversation = createSimpleContext({
         trimToLatestPage(conversation);
         if (sourceMessages !== snapshot.messages) conversation.page = { hasOlder: true, olderCursor: null };
       });
+      announceLatestMessages(agentId, snapshot.messages);
       const presentedRequestKey = presentedPromptResolutions()[agentId];
       const pendingPrompt = pendingPrompts()[agentId];
       const pendingRequestKey =
@@ -609,6 +624,9 @@ const Conversation = createSimpleContext({
         conversation.revision = page.revision;
         conversation.loaded = true;
       });
+      if (merge !== "older" && windowMode !== "around") {
+        announceLatestMessages(page.agentId, page.messages);
+      }
       setActiveTurns((current) => ({
         ...current,
         [page.agentId]: completedTurnByAgent.get(page.agentId) === page.activeTurnId ? null : page.activeTurnId,
@@ -943,6 +961,7 @@ const Conversation = createSimpleContext({
       markAgentMessagesRead,
       markAllAgentMessagesRead,
       presentPromptResolution,
+      onLatestMessages,
       setTeamTyping: notifyTeamTyping,
     };
   },

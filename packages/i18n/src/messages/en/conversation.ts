@@ -57,6 +57,9 @@ export const messages = defineMessages("conversation", {
   "conversation.panels.tryAgain": "Try again.",
   "conversation.view.label": "Conversation",
   "conversation.view.drop": "Drop files to attach",
+  "conversation.savedCopy.status":
+    "Connecting… You can read this saved copy. Send and change things when the server is connected.",
+  "conversation.savedCopy.empty": "No saved messages for this chat.",
   "conversation.direct.loadingLabel": "Loading direct conversation",
   "conversation.direct.olderFailed": "Older messages could not load.",
   "conversation.direct.unreadFailed": "The unread message could not load.",

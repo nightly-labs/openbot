@@ -10,6 +10,8 @@ import { WorkspaceConversation } from "./features/conversation/WorkspaceConversa
 import { WorkspaceDirectConversation } from "./features/conversation/WorkspaceDirectConversation";
 import { WorkspaceServerOnboarding } from "./features/onboarding/WorkspaceServerOnboarding";
 import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-context";
+import { SavedConversation } from "./features/saved-copy/SavedConversation";
+import { useSavedCopy } from "./features/saved-copy/saved-copy-context";
 import { SchedulePanel } from "./features/schedule/SchedulePanel";
 import { useServers } from "./features/servers/servers-context";
 import { WorkspaceServerRail } from "./features/servers/WorkspaceServerRail";
@@ -49,6 +51,7 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
   const { remoteDesktopWorkspaceVisible } = useRemoteDesktop();
   const { agentSetupOpen, serverOnboardingOpen } = useAgents();
   const { activeDirectMember } = useDirectMessages();
+  const savedCopy = useSavedCopy();
 
   const blockedRemoteServer = createMemo(() => {
     const server = activeServer();
@@ -111,7 +114,9 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
         {(member) => <WorkspaceDirectConversation member={member} />}
       </Show>
       <Show when={!agentSetupOpen() && !channelOpen() && !activeDirectMember()}>
-        <WorkspaceConversation account={props.account} />
+        <Show when={savedCopy.visible()} fallback={<WorkspaceConversation account={props.account} />}>
+          <SavedConversation />
+        </Show>
       </Show>
       <Show when={!agentSetupOpen() && channelOpen()}>
         <WorkspaceChannelConversation />
