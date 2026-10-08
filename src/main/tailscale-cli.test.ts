@@ -108,7 +108,7 @@ describe("tailscale commands", () => {
 
   it("looks in each platform's install places and on the search path", () => {
     expect(tailscaleCandidates("darwin", { PATH: "/usr/bin:relative" })).toEqual([
-      "/Applications/Tailscale.app/Contents/MacOS/Tailscale",
+      "/Applications/Tailscale.app/Contents/MacOS/tailscale",
       "/opt/homebrew/bin/tailscale",
       "/usr/local/bin/tailscale",
       "/usr/bin/tailscale",
