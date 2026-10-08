@@ -14,8 +14,8 @@ export const messages = {
   "routine.feed.eventAgent": "Агент: {name}",
   "routine.feed.eventChannel": "Канал: {name}",
   "routine.feed.eventTimezone": "Часовой пояс: {timezone}",
-  "routine.clock.am": "утра",
-  "routine.clock.pm": "вечера",
+  "routine.clock.am": "до полудня",
+  "routine.clock.pm": "после полудня",
   "routine.clock.withMeridiem": "{time} {meridiem}",
 
   "routine.summary.hourly": "Каждый час в :{minute}",
