@@ -725,10 +725,7 @@ export function createWebWorkspace(
             hostProtocol: { ...error.hostProtocol },
           };
       });
-      if (!(error instanceof WebHostIncompatibleError)) {
-        report(error);
-        hostLifecycle.hostUnavailable(host.hostId);
-      }
+      if (!(error instanceof WebHostIncompatibleError)) hostLifecycle.hostUnavailable(host.hostId, error);
     }
   }
   async function load(id: string, older = false) {
