@@ -58,6 +58,9 @@ export const messages = {
   "conversation.panels.tryAgain": "Повторите.",
   "conversation.view.label": "Диалог",
   "conversation.view.drop": "Перетащите файлы, чтобы прикрепить",
+  "conversation.savedCopy.status":
+    "Подключение… Это сохранённая копия, её можно читать. Отправлять и менять — после подключения к серверу.",
+  "conversation.savedCopy.empty": "Для этого чата нет сохранённых сообщений.",
   "conversation.direct.loadingLabel": "Загрузка личного диалога",
   "conversation.direct.olderFailed": "Не удалось загрузить прежние сообщения.",
   "conversation.direct.unreadFailed": "Не удалось загрузить непрочитанное сообщение.",
