@@ -47,6 +47,9 @@ export function BillingManagedServer(props: {
         draft.action = null;
       });
     } catch (error) {
+      // A lost response can follow a completed Stripe mutation. Read the actual state.
+      await props.hosting.load();
+      await props.billing.load();
       setDialog((draft) => {
         draft.error = errorMessage(error, t("billing.lifecycle.failed"));
       });

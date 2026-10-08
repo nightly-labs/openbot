@@ -534,7 +534,12 @@ export class HostedServerService {
         }
         if (!dependencies.billing) return yield* lifecycleFailure();
         const plan = yield* dependencies.billing
-          .setServerRenewal(user.id, serverId, input.action !== "keep")
+          .setServerRenewal(
+            user.id,
+            serverId,
+            input.action !== "keep",
+            input.action === "delete" ? input.expectedPeriodEnd : undefined,
+          )
           .pipe(Effect.mapError(hostedFailure));
         if (
           input.action === "delete" &&
@@ -546,16 +551,17 @@ export class HostedServerService {
         const stored = yield* hostedCall(() =>
           dependencies.database
             .prepare(
-              `UPDATE hosted_servers SET deletion_scheduled_at = ?, deletion_subscription_id = ?, updated_at = ?
+              `UPDATE hosted_servers SET
+           deletion_scheduled_at = CASE WHEN ? = 'cancel' THEN deletion_scheduled_at ELSE ? END,
+           deletion_subscription_id = CASE WHEN ? = 'cancel' THEN deletion_subscription_id ELSE ? END,
+           updated_at = ?
            WHERE server_id = ? AND desired_state != 'deleted' AND lifecycle_token = ? AND lifecycle_lease_until > ?`,
             )
             .bind(
-              input.action === "delete" ? plan.periodEnd : input.action === "cancel" ? row.deletion_scheduled_at : null,
-              input.action === "delete"
-                ? plan.subscriptionId
-                : input.action === "cancel"
-                  ? row.deletion_subscription_id
-                  : null,
+              input.action,
+              input.action === "delete" ? plan.periodEnd : null,
+              input.action,
+              input.action === "delete" ? plan.subscriptionId : null,
               dependencies.now(),
               serverId,
               token,

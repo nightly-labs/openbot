@@ -1044,6 +1044,7 @@ describe("paid server lifecycle data safety", () => {
     ).rejects.toMatchObject({ status: 409 });
     expect((await runApiEffect(c.service.list(owner))).servers[0]?.deletionScheduledAt).toBeNull();
     expect(c.boatCalls.filter((call) => call.method === "DELETE")).toHaveLength(0);
+    expect(c.stripe.subscriptions.get("sub_1")).toMatchObject({ cancel_at_period_end: false });
   });
 
   it("keeps data after Stripe failure and after a database failure following Stripe success", async () => {
@@ -1120,6 +1121,32 @@ describe("paid server lifecycle data safety", () => {
     expect((await runApiEffect(c.service.list(owner))).servers[0]?.deletionScheduledAt).toBeNull();
     await runApiEffect(c.service.lifecycle(owner, server.serverId, input));
     await c.stripeSync("sub_2", "active", server.serverId);
+    expect((await runApiEffect(c.service.list(owner))).servers[0]?.deletionScheduledAt).toBeNull();
+    c.clock.now += 31 * 86400_000;
+    await runApiEffect(c.service.tick());
+    expect(c.boatCalls.filter((call) => call.method === "DELETE")).toHaveLength(0);
+  });
+
+  it("does not restore deletion fields cleared after Cancel reads the server", async () => {
+    const c = await setup();
+    const server = await createRunningServer(c);
+    await runApiEffect(
+      c.service.lifecycle(owner, server.serverId, {
+        serverId: server.serverId,
+        action: "delete",
+        timing: "period-end",
+        confirmName: server.name,
+      }),
+    );
+    c.stripe.beforeRenewal = async () => {
+      // State left by Keep or a renewal webhook after the request's initial read.
+      c.database
+        .prepare(
+          "UPDATE hosted_servers SET deletion_scheduled_at = NULL, deletion_subscription_id = NULL WHERE server_id = ?",
+        )
+        .run(server.serverId);
+    };
+    await runApiEffect(c.service.lifecycle(owner, server.serverId, { serverId: server.serverId, action: "cancel" }));
     expect((await runApiEffect(c.service.list(owner))).servers[0]?.deletionScheduledAt).toBeNull();
     c.clock.now += 31 * 86400_000;
     await runApiEffect(c.service.tick());

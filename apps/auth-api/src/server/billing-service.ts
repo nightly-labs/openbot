@@ -403,6 +403,7 @@ export class BillingService {
       userId: string,
       serverId: string,
       cancel: boolean,
+      expectedPeriodEnd?: number,
     ): Effect.fn.Return<
       { subscriptionId: string; periodEnd: number },
       BillingError | BillingOperationError,
@@ -420,6 +421,13 @@ export class BillingService {
       if (rows.results.length !== 1 || !rows.results[0])
         return yield* new BillingError(409, "billing_plan_unavailable", sourceText("error.billing.lifecycleFailed"));
       const subscriptionId = rows.results[0].stripe_subscription_id;
+      if (expectedPeriodEnd !== undefined) {
+        const before = yield* this.#stripeCall(() => dependencies.stripe.getSubscription(subscriptionId));
+        const end = before.items.data[0]?.current_period_end ?? before.current_period_end;
+        if (!end || end * 1000 !== expectedPeriodEnd) {
+          return yield* new BillingError(409, "billing_plan_unavailable", sourceText("error.billing.lifecycleFailed"));
+        }
+      }
       const subscription = yield* this.#stripeCall(() => dependencies.stripe.setRenewal(subscriptionId, cancel));
       const periodEnd = subscription.items.data[0]?.current_period_end ?? subscription.current_period_end;
       if (
