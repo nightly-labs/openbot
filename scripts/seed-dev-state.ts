@@ -250,7 +250,7 @@ const SEED_SUMMARY = {
   directThreads: 1,
   queuedDeliveries: 0,
   memories: 7,
-  routines: 5,
+  routines: 6,
   routineRuns: 3,
   channels: 2,
   channelMessages: 12,
@@ -484,6 +484,9 @@ function seedMemories(agentStore: AgentStore): void {
   }
 }
 
+/** Not a ciphertext of any secret: the app cannot decrypt it, so the webhook stays closed until regenerated. */
+const SEED_WEBHOOK_SECRET_PLACEHOLDER = Buffer.from("openbot-dev-seed: regenerate this secret").toString("base64");
+
 async function seedRoutines(agentStore: AgentStore, mailbox: MailboxStore, clock: SeedClock): Promise<void> {
   const routines = new AgentRoutineStore(agentStore.database);
   const timezone = seedTimezone();
@@ -540,6 +543,27 @@ async function seedRoutines(agentStore: AgentStore, mailbox: MailboxStore, clock
       active: true,
       timezone,
       schedule: { kind: "weekdays", time: "15:30" },
+    },
+    now,
+  );
+
+  // One routine that a webhook starts, so the canvas and the routine settings show a webhook. The app
+  // keeps the signing secret encrypted with Electron's safe storage, which this script cannot reach,
+  // so the seed stores a placeholder: requests answer 503 until the secret is regenerated in the app.
+  routines.saveRecord(
+    "launch",
+    undefined,
+    {
+      name: "Release published",
+      instruction: "Check the published release's notes and assets, then list the three things the team does next.",
+      active: true,
+      timezone,
+      trigger: {
+        kind: "webhook",
+        eventType: "release.published",
+        filters: [{ pointer: "/release/prerelease", value: false }],
+        secretCiphertext: SEED_WEBHOOK_SECRET_PLACEHOLDER,
+      },
     },
     now,
   );

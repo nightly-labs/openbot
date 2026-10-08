@@ -900,7 +900,8 @@ textarea {
   .app-frame-edge > .server-rail,
   .app-frame-edge > .sidebar,
   .app-frame-edge .conversation-panel,
-  .app-frame-edge .direct-conversation {
+  .app-frame-edge .direct-conversation,
+  .app-frame-edge .diagram-view {
     background: var(--openbot-bg-native-sidebar);
   }
 
@@ -991,6 +992,21 @@ textarea {
   .app-frame-edge .first-agent-setup-header {
     border-bottom: 0;
     background: transparent;
+  }
+
+  /* The routine canvas is the same inset panel under the same top row. Its board paints its own
+   * background, so the body draws the line and the corner instead of a pseudo-element behind it. */
+  .app-frame-edge .diagram-view-header {
+    border-bottom: 0;
+    background: transparent;
+  }
+
+  .app-frame-edge .diagram-view-body {
+    overflow: hidden;
+    border-top: 1px solid var(--openbot-border-strong);
+    border-right: 1px solid var(--openbot-border-strong);
+    border-top-right-radius: var(--openbot-radius-lg);
+    background: var(--openbot-bg-canvas);
   }
 
   /* An open panel's toggle. The faint fill it has elsewhere disappears on the edge, so it takes the

@@ -7,6 +7,7 @@ import { AGENT_UPDATE_ROUTES } from "./agent-update-v1";
 import { CONTEXT_RESET_ROUTES } from "./context-reset-v1";
 import { EVENTS_ROUTES } from "./events-v1";
 import { HOST_ADMIN_ROUTES } from "./host-admin-v1";
+import { HOST_RELEASE_ROUTES } from "./host-release-v1";
 import { HOST_UPDATE_ROUTES, hostRestartEvent } from "./host-update-v1";
 import { HOSTED_SITES_ROUTES } from "./hosted-sites-v1";
 import { LIVE_ACTIVITY_PUSH_ROUTES } from "./live-activity-push-v1";
@@ -539,5 +540,17 @@ describe("hosted-sites-v1", () => {
     expect(() =>
       codec(HOSTED_SITES_ROUTES.list).response(200, { sites: [{ ...site, status: "uploading" }], limit: 3, used: 1 }),
     ).toThrow();
+  });
+});
+
+describe("host-release-v1", () => {
+  const snapshot = { currentVersion: "0.25.2", latestVersion: "0.26.0", phase: "available", method: "hosted" };
+  it("round-trips release status and omits private fields", () => {
+    for (const path of Object.values(HOST_RELEASE_ROUTES)) {
+      expect(codec(path).request({})).toEqual({});
+      expect(codec(path).response(200, { ...snapshot, privatePath: "/private" })).toEqual(snapshot);
+      expect(() => codec(path).response(200, { ...snapshot, phase: "restart" })).toThrow();
+      expect(() => codec(path).response(200, { ...snapshot, currentVersion: "x".repeat(65) })).toThrow();
+    }
   });
 });

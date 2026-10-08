@@ -4,7 +4,7 @@ import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
 import { SidebarMobileAppCard } from "@openbot/ui/features/sidebar/SidebarMobileAppCard";
 import { computeSidebarAgentStates } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import { useText } from "@openbot/ui/text";
-import { createMemo, createSignal, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, Show } from "solid-js";
 import { writeClipboardText } from "../../clipboard";
 import { useLayout } from "../../layout";
 import { DirectConversation } from "../../lazy-views";
@@ -75,9 +75,19 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
   );
 
   /* Channels reach the sidebar as data, not as a list of their own: they sit in the layout's
-   * sections beside the agents, so the sidebar has to be able to order and group them. */
+   * sections beside the agents, so the sidebar has to be able to order and group them. The Routines
+   * view lists only agents: a channel has no routine canvas. */
+  const channelsListed = () => channels.supported() && layout.sidebarView() !== "routines";
   const visibleChannels = createMemo(() =>
-    channels.supported() ? channels.state.channels.filter((channel) => !channel.archived) : [],
+    channelsListed() ? channels.state.channels.filter((channel) => !channel.archived) : [],
+  );
+  /* A channel can open while the Routines view is on: from search, a notification, or a selection
+   * restored at start. Its row must be in the list, so the list goes back to the agents view. */
+  createEffect(
+    () => layout.sidebarView() === "routines" && channels.state.selectedId !== null,
+    (channelOpenInRoutines) => {
+      if (channelOpenInRoutines) layout.setSidebarView("agents");
+    },
   );
 
   /* The agent conversation shows only the waits of the agent's own thread. A wait in a channel
@@ -122,14 +132,14 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
   return (
     <Sidebar
       channels={visibleChannels()}
-      deletedChannels={channels.supported() ? channels.state.channels.filter((channel) => channel.archived) : []}
+      deletedChannels={channelsListed() ? channels.state.channels.filter((channel) => channel.archived) : []}
       activeChannelId={channels.state.selectedId}
       onSelectChannel={(id) => void channels.open(id)}
       onEditChannel={(id) => void channels.editChannel(id)}
       onDeleteChannel={channels.deletionSupported() ? channels.remove : undefined}
-      showingArchivedChannels={channels.state.archived}
-      onToggleArchivedChannels={channels.supported() ? channels.toggleArchived : undefined}
-      onCreateChannel={channels.supported() ? channels.create : undefined}
+      showingArchivedChannels={channelsListed() && channels.state.archived}
+      onToggleArchivedChannels={channelsListed() ? channels.toggleArchived : undefined}
+      onCreateChannel={channelsListed() ? channels.create : undefined}
       onMarkAllRead={
         saved()
           ? undefined
@@ -139,6 +149,12 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
             }
       }
       hasUnread={agentList().some((agent) => (unreadReplies()[agent.id] ?? 0) > 0) || channels.hasUnread()}
+      view={layout.sidebarView()}
+      onViewChange={(view) => {
+        // An open channel would stay in the middle with no row in the list.
+        if (view === "routines") channels.close();
+        layout.setSidebarView(view);
+      }}
       serverName={activeServer()?.name ?? "Local"}
       onOpenServerSettings={(trigger) => {
         const server = activeServer();

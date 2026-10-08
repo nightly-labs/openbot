@@ -146,9 +146,11 @@ import {
   decodeDynamicIslandPreference,
   decodeDynamicIslandPresentation,
 } from "./dynamic-island-decoding";
+import { decodeHostReleaseStatusFromMain } from "./host-release-decoding";
 import { decodeAddOrchestratorReply, decodeMessagingOverviewReply } from "./messaging-decoding";
 import { decodeProviderRuntimeSnapshot } from "./provider-runtime";
 import { decodeRemoteWorkspaceCache, decodeRemoteWorkspaceCachePreference } from "./remote-workspace-cache-decoding";
+import { decodeRoutineFlowCanvas, decodeRoutineFlowLink, decodeRoutineFlowsChanged } from "./routine-flow-decoding";
 import {
   decodeAgentInstallation,
   decodeAgentPublicationPreview,
@@ -518,6 +520,15 @@ const openbotApi: OpenBotDesktopApi = {
     checkForUpdates: decodeProviderRuntimeSnapshot,
     event: decodeProviderRuntimeSnapshot,
   }),
+  routineFlows: bridgeGroup(IPC_ENDPOINTS.routineFlows, {
+    canvas: decodeRoutineFlowCanvas,
+    savePosition: decodeVoid,
+    removePosition: decodeVoid,
+    connect: decodeRoutineFlowLink,
+    disconnect: decodeVoid,
+    updateLink: decodeRoutineFlowLink,
+    changed: decodeRoutineFlowsChanged,
+  }),
   voice: bridgeGroup(IPC_ENDPOINTS.voice, {
     getModelStatus: decodeVoiceModelStatus,
     prepareModel: decodeVoiceModelStatus,
@@ -664,6 +675,8 @@ const openbotApi: OpenBotDesktopApi = {
   hostAdmin: bridgeGroup(IPC_ENDPOINTS.hostAdmin, {
     updateIdentity: decodeServer,
     getUpdateStatus: decodeHostUpdateStatus,
+    getReleaseStatus: (value) => (value === null ? null : decodeHostReleaseStatusFromMain(value)),
+    checkRelease: decodeHostReleaseStatusFromMain,
     checkForUpdate: decodeHostUpdateStatus,
     startUpdate: decodeHostUpdateStatus,
     cancelUpdate: decodeHostUpdateStatus,

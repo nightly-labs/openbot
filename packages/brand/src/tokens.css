@@ -348,6 +348,8 @@
   --openbot-duration-island-content: 340ms;
   --openbot-duration-island-content-exit: 220ms;
   --openbot-agent-activity-exit-delay: 500ms;
+  /* A loading indicator waits this long, so a fast answer replaces it before it shows. */
+  --openbot-loading-indicator-delay: 400ms;
   --openbot-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --openbot-ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --openbot-shadow-raised: 0 12px 32px var(--openbot-shadow-popover-ambient);

@@ -2,6 +2,21 @@
   display: flex;
 }
 
+/* The list area before the first list answers. It fades in after a delay, so a fast answer does not flash it. */
+.hosted-servers-loading {
+  display: grid;
+  place-items: center;
+  padding: var(--openbot-space-8);
+  animation: hosted-servers-loading-in var(--openbot-duration-normal) var(--openbot-ease-out)
+    var(--openbot-loading-indicator-delay) both;
+}
+
+@keyframes hosted-servers-loading-in {
+  from {
+    opacity: 0;
+  }
+}
+
 .hosted-servers-list .hosted-servers-row {
   min-height: 64px;
   align-items: center;

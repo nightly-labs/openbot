@@ -7,6 +7,7 @@ import {
   type ConversationPlan,
   type ConversationSnapshot,
   conversationPlanText,
+  latestTurnAnswer,
 } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
@@ -578,17 +579,7 @@ export class TurnLifecycle {
     if (deliveries.some((delivery) => delivery.delivery.sender.kind === "agent")) {
       dropPlaceholderAnswers(snapshot, turnId);
     }
-    const latestAssistant = [...snapshot.messages]
-      .reverse()
-      .find(
-        (message) =>
-          message.author === "assistant" &&
-          message.turnId === turnId &&
-          message.itemType !== "commentary" &&
-          message.itemType !== "question_prompt" &&
-          message.itemType !== CONVERSATION_PLAN_ITEM_TYPE &&
-          message.text.trim(),
-      );
+    const latestAssistant = latestTurnAnswer(snapshot.messages, turnId);
     if (deliveries.length > 0) {
       const terminal = outcome === "failed" ? "failed" : outcome === "interrupted" ? "interrupted" : "completed";
       for (const delivery of deliveries) {

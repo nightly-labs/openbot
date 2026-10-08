@@ -82,6 +82,39 @@ The release workflow checks anonymous access to the version, `v<version>` and `l
 including both Linux architectures. A failure leaves the GitHub Release and pushed images in
 place. Correct the package settings, then run the failed job again.
 
+## Hosted-server snapshots
+
+After GitHub publication, `Publish boat server snapshot` builds the Linux x64 release into a boat
+named snapshot (`openbot-server-production-<version>` with dots replaced by hyphens), then selects
+it for new production servers. It uses the tagged hosting scripts,
+the published `SHA256SUMS-linux.txt`, and `https://api.openbot.run`. The builder checks the AppImage
+checksum and installed version and requires an empty host profile before saving the snapshot.
+Existing servers and the test Worker do not change.
+
+Before the first release with this job, configure the `cloudflare-production` GitHub Environment:
+
+- Add `BOAT_TEMPLATE_API_KEY`, a separate boat key with sandbox, file, command and named snapshot
+  access. Keep the limited `BOAT_API_KEY` on the Worker.
+- Keep `CLOUDFLARE_PRODUCTION_DEPLOY_TOKEN` and the `CLOUDFLARE_ACCOUNT_ID` variable used by deployment.
+- Permit the tag pattern `v*.*.*` in addition to the `main` branch. The release job runs on a tag.
+
+`release:preflight` checks these settings. The hosted job and production Worker deployment share
+one concurrency group. The job checks GitHub's latest stable release before building and again
+before selection. It writes only the Worker's `HOSTED_SERVER_TEMPLATE` secret. Normal CI and local
+production deployments preserve it; the old GitHub variable is ignored. `hosting:setup` now sets
+up billing and webhooks only and no longer accepts `--template`.
+
+A failed hosted job leaves the GitHub Release published and the previous template selected.
+Run the failed job again after correcting the cause. A ready snapshot is reused; a save in progress
+is polled; a failed snapshot requires operator inspection. The builder never replaces an existing
+snapshot or deletes old snapshots. It stops at 10 snapshots even if boat permits paid storage above
+that count. Confirm that neither Worker nor any pending create needs a snapshot before removing it.
+
+A successful job reports the selected version in its Actions summary. Verify the first rollout by
+creating a temporary production server and checking its initial installed version. Record the
+result under `.openbot-build/`; remove only that temporary server after the check. This remote check
+is separate from local checks and requires production access.
+
 ## Windows signing
 
 A tag build signs the Windows release with Azure Artifact Signing. It needs no secret:

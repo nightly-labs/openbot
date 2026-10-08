@@ -14,16 +14,18 @@ import {
 import { AGENT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-import-v1";
 import { CONTEXT_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/context-reset-v1";
 import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
-import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-update-v1";
+import { HOST_RELEASE_CAPABILITY } from "@openbot/contracts/team-protocol/host-release-v1";
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import {
   cancelHostUpdate,
   checkHostForUpdate,
+  checkHostRelease,
   clearStorage,
   deleteHostedSite,
   deleteStoredFile,
   getAgentAdminSettings,
+  getHostReleaseStatus,
   getHostUpdateStatus,
   getStorageUsage,
   listHostedSites,
@@ -80,7 +82,7 @@ import { AddServerOverlay, type AddServerResume } from "../servers/AddServerOver
 import { watchHostUpdate } from "../servers/host-update-toast";
 import type { ServerHostedSitesOptions, ServerSettingsSection } from "../servers/ServerSettingsModal";
 import type { HostUpdateCalls } from "../servers/ServerUpdatePanel";
-import { remoteAdminServer } from "../servers/server-capabilities";
+import { remoteUpdateServer, serverRoleCanAdminister } from "../servers/server-capabilities";
 import { isReaderAuthor } from "../team/reader-identity";
 import { WebAgentSettings } from "./WebAgentSettings";
 import { WebConnectComputer } from "./WebConnectComputer";
@@ -587,13 +589,28 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     listAgents: () => workspace.runtime.listAgents(),
     saveFile,
   });
+  const memberUpdateAccess = () => !serverRoleCanAdminister(server());
   const hostUpdateCalls: HostUpdateCalls = {
+    getReleaseStatus: async (serverId) =>
+      workspace.state.capabilities.includes(HOST_RELEASE_CAPABILITY)
+        ? runTeamEffect(getHostReleaseStatus(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause)))
+        : null,
+    checkRelease: async (serverId) =>
+      runTeamEffect(checkHostRelease(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
     getUpdateStatus: async (serverId) =>
-      runTeamEffect(getHostUpdateStatus(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
+      runTeamEffect(
+        getHostUpdateStatus(hostRequest(serverId), memberUpdateAccess()).pipe(Effect.mapError((error) => error.cause)),
+      ),
     checkForUpdate: async (serverId) =>
-      runTeamEffect(checkHostForUpdate(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
+      runTeamEffect(
+        checkHostForUpdate(hostRequest(serverId), memberUpdateAccess()).pipe(Effect.mapError((error) => error.cause)),
+      ),
     startUpdate: async (restart, serverId) =>
-      runTeamEffect(startHostUpdate(hostRequest(serverId), restart).pipe(Effect.mapError((error) => error.cause))),
+      runTeamEffect(
+        startHostUpdate(hostRequest(serverId), restart, memberUpdateAccess()).pipe(
+          Effect.mapError((error) => error.cause),
+        ),
+      ),
     cancelUpdate: async (serverId) =>
       runTeamEffect(cancelHostUpdate(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
     setUpdateSettings: async (settings, serverId) =>
@@ -616,12 +633,12 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     setServerSettingsSection(section);
     serverSettings.open(trigger);
   }
-  // An admin learns about a new version, or sees the download that runs, each time the host connects.
+  // A member learns about a new version, or sees the download that runs, each time the host connects.
   createEffect(
     () => {
       const current = server();
       // An id, not an object: the summary is rebuilt on each host change, and one read is enough.
-      return current?.state === "online" && remoteAdminServer(current, HOST_UPDATE_CAPABILITY) ? current.id : null;
+      return current?.state === "online" && remoteUpdateServer(current) ? current.id : null;
     },
     (serverId) => {
       if (!serverId) return;

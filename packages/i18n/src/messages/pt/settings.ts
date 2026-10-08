@@ -237,9 +237,9 @@ export const messages = {
   "settings.updates.autoInstall.title": "Instalar atualizações automaticamente",
   "settings.updates.autoInstall.description":
     "O OpenBot reinicia para aplicar uma atualização baixada quando os agentes estão ociosos. Os membros dos seus servidores são desconectados por um breve período.",
-  "settings.updates.allowRemote.title": "Permitir atualizações por administradores do servidor",
+  "settings.updates.allowRemote.title": "Permitir atualizações por membros do servidor",
   "settings.updates.allowRemote.description":
-    "Os proprietários e administradores deste servidor podem baixar uma atualização e reiniciar o OpenBot neste computador.",
+    "Todos os membros conectados ao servidor podem solicitar uma atualização quando este computador estiver ocioso. Proprietários e administradores também podem forçar uma reinicialização.",
   "settings.hostedSites.title": "Sites publicados",
   "settings.hostedSites.unavailable": "A hospedagem de sites está indisponível.",
   "settings.hostedSites.usage": { one: "{used} de {count} site", other: "{used} de {count} sites" },
@@ -266,6 +266,7 @@ export const messages = {
   "settings.hostedServers.usageNote":
     "Um servidor para cerca de 15 minutos após a última mensagem ou alteração, mesmo com um app aberto. Uma tecla ou um clique no app, uma mensagem ou uma rotina agendada o inicia novamente. Seus agentes e rotinas funcionam quando este computador está desligado.",
   "settings.hostedServers.empty": "Você ainda não tem um servidor hospedado.",
+  "settings.hostedServers.loading": "Carregando servidores hospedados…",
   "settings.hostedServers.state.awaitingPayment": "Aguardando pagamento",
   "settings.hostedServers.state.planEnded": "Plano encerrado",
   "settings.hostedServers.state.creating": "Criando",

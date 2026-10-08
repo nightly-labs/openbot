@@ -114,6 +114,7 @@ import { createMockProviderRuntimes, type MockProviderRuntimeOptions } from "./m
 import { createMockRemoteWorkspaceCache } from "./mock-remote-workspace-cache";
 import { mockRoutineCalendar } from "./mock-routine-calendar";
 import { createMockRoutineFeed } from "./mock-routine-feed";
+import { mockRoutineFlows } from "./mock-routine-flows";
 import { applySidebarLayoutAction } from "./mock-sidebar-layout";
 import { createMockSkills, type MockSkillsOptions } from "./mock-skills";
 import { createMockStorage } from "./mock-storage";
@@ -579,6 +580,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       transcribe: async () => ({ text: "Mock voice transcript" }),
       onModelStatus: () => () => undefined,
     },
+    routineFlows: mockRoutineFlows({ routines, routineRuns }),
     auth: mockAuth.auth,
     skills: mockSkills.skills,
     hostedSites: {
