@@ -5,6 +5,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { createEffect, createSignal, For, omit, onCleanup, Show } from "solid-js";
 import { Check, Copy } from "./icons";
 import { Spinner } from "./surface";
+import { useText } from "./text";
 import { cx } from "./utils";
 
 export const buttonVariants = cva("ui-button", {
@@ -134,6 +135,9 @@ export interface CopyButtonProps extends Omit<ButtonProps, "children" | "onClick
 }
 
 export function CopyButton(props: CopyButtonProps): JSX.Element {
+  const { t } = useText();
+  const label = () => props.label ?? t("common.copy");
+  const copiedLabel = () => props.copiedLabel ?? t("common.copied");
   const [copied, setCopied] = createSignal(false);
   let resetTimer: number | undefined;
   const others = omit(props, "value", "label", "copiedLabel", "iconOnly", "onCopyError", "disabled", "class", "size");
@@ -189,11 +193,11 @@ export function CopyButton(props: CopyButtonProps): JSX.Element {
         when={!props.iconOnly}
         fallback={
           <span class="sr-only" aria-live="polite">
-            {copied() ? (props.copiedLabel ?? "Copied") : (props.label ?? "Copy")}
+            {copied() ? copiedLabel() : label()}
           </span>
         }
       >
-        <StableLabel labels={[props.label ?? "Copy", props.copiedLabel ?? "Copied"]} active={copied() ? 1 : 0} live />
+        <StableLabel labels={[label(), copiedLabel()]} active={copied() ? 1 : 0} live />
       </Show>
     </Button>
   );

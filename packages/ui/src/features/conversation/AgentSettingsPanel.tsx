@@ -352,7 +352,11 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       draftValue,
       field,
       storedValue:
-        field === "name" ? draftValue.trim() || "New agent" : field === "title" ? draftValue.trim() : draftValue,
+        field === "name"
+          ? draftValue.trim() || t("agent.setup.nameFallback")
+          : field === "title"
+            ? draftValue.trim()
+            : draftValue,
     };
   }
 
@@ -446,7 +450,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   }
 
   function saveName(): void {
-    const value = draft.fields.name.trim() || "New agent";
+    const value = draft.fields.name.trim() || t("agent.setup.nameFallback");
     setDraft((state) => {
       state.fields.name = value;
     });
