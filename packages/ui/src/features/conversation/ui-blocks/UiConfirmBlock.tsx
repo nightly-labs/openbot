@@ -1,7 +1,7 @@
 import type { UiAction, UiActionStyle, UiConfirmBlock as UiConfirmSpec } from "@openbot/contracts/ui-blocks";
 import { Button, NativeSelect, Spinner } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createSignal, createUniqueId, For, Match, Show, Switch } from "solid-js";
+import { createSignal, createUniqueId, For, flush, Match, Show, Switch } from "solid-js";
 import { useText } from "../../../text";
 import { cx } from "../../../utils";
 import { UiBlockCard } from "./UiBlockCard";
@@ -40,6 +40,24 @@ export function UiConfirmBlock(props: UiConfirmBlockProps) {
   const anyHeld = () => props.spec.actions.some(isHeld);
 
   const [selected, setSelected] = createSignal<Record<string, string>>({});
+  // A held action that was clicked instead of held. The card asks for it again before it acts.
+  const [confirming, setConfirming] = createSignal<UiAction>();
+  const holdButtons = new Map<string, HTMLButtonElement>();
+  let confirmButton: HTMLButtonElement | undefined;
+
+  function askAgain(action: UiAction): void {
+    if (locked()) return;
+    setConfirming(action);
+    flush();
+    confirmButton?.focus();
+  }
+
+  function stopAsking(): void {
+    const action = confirming();
+    setConfirming(undefined);
+    flush();
+    if (action) holdButtons.get(action.id)?.focus();
+  }
   const selectValue = (select: string, options: string[]): string =>
     (frozen() ? state().response?.values?.[select] : undefined) !== undefined
       ? String(state().response?.values?.[select])
@@ -47,6 +65,7 @@ export function UiConfirmBlock(props: UiConfirmBlockProps) {
 
   function respond(action: UiAction): void {
     if (locked()) return;
+    setConfirming(undefined);
     const values: Record<string, string> = {};
     for (const field of props.spec.fields ?? []) {
       if ("select" in field) values[field.select] = selected()[field.select] ?? field.options[0] ?? "";
@@ -107,7 +126,30 @@ export function UiConfirmBlock(props: UiConfirmBlockProps) {
           </section>
         )}
       </Show>
-      <Show when={!frozen()}>
+      <Show when={!frozen() && confirming()}>
+        {(action) => (
+          <fieldset class="ui-block-confirm-step">
+            <legend class="ui-block-confirm-question">{t("uiBlock.confirm.prompt", { action: action().label })}</legend>
+            <div class="ui-block-actions">
+              <Button
+                type="button"
+                variant={BUTTON_VARIANT[actionStyle(action())]}
+                disabled={locked()}
+                ref={(element: HTMLButtonElement) => {
+                  confirmButton = element;
+                }}
+                onClick={() => respond(action())}
+              >
+                {t("uiBlock.confirm.accept")}
+              </Button>
+              <Button type="button" variant="ghost" disabled={props.busy === true} onClick={stopAsking}>
+                {t("common.cancel")}
+              </Button>
+            </div>
+          </fieldset>
+        )}
+      </Show>
+      <Show when={!frozen() && !confirming()}>
         <div class="ui-block-actions">
           <For each={props.spec.actions}>
             {(action) => (
@@ -118,7 +160,9 @@ export function UiConfirmBlock(props: UiConfirmBlockProps) {
                     variant={BUTTON_VARIANT[actionStyle(action)]}
                     disabled={locked()}
                     describedBy={hintId}
+                    ref={(element) => holdButtons.set(action.id, element)}
                     onComplete={() => respond(action)}
+                    onClickWithoutHold={() => askAgain(action)}
                   >
                     {action.label}
                   </UiHoldButton>

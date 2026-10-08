@@ -97,7 +97,7 @@ describe("UiConfirmBlock", () => {
     expect(validateUiBlockResponse(confirmSpec, lastResponse(onRespond))).not.toBeNull();
   });
 
-  it("starts over when the hold is let go early, and ignores a plain click", async () => {
+  it("starts over when the hold is let go early", () => {
     vi.useFakeTimers();
     const onRespond: Respond = vi.fn();
     render(() => <UiConfirmBlock spec={confirmSpec} onRespond={onRespond} />);
@@ -107,8 +107,26 @@ describe("UiConfirmBlock", () => {
     vi.advanceTimersByTime(400);
     fireEvent.pointerUp(send);
     vi.advanceTimersByTime(1000);
-    fireEvent.click(send);
     expect(onRespond).not.toHaveBeenCalled();
+  });
+
+  it("asks again in the card when a held button is clicked, as a screen reader does", async () => {
+    const onRespond: Respond = vi.fn();
+    render(() => <UiConfirmBlock spec={confirmSpec} onRespond={onRespond} />);
+
+    await fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(onRespond).not.toHaveBeenCalled();
+    expect(screen.getByRole("group", { name: "Confirm: Send?" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Confirm" })).toHaveFocus();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("group", { name: "Confirm: Send?" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Send" })).toHaveFocus();
+    expect(onRespond).not.toHaveBeenCalled();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+    expect(lastResponse(onRespond)).toEqual({ actionId: "send", values: { from: "me@example.com" } });
   });
 
   it("holds with the keyboard", () => {

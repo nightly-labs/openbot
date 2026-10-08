@@ -136,6 +136,19 @@
   gap: var(--openbot-space-2);
 }
 
+.ui-block-confirm-step {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.ui-block-confirm-question {
+  padding: 0;
+  margin-bottom: var(--openbot-space-2);
+  font-weight: var(--openbot-weight-medium);
+}
+
 .ui-block-hint,
 .ui-block-counter,
 .ui-block-sending {
