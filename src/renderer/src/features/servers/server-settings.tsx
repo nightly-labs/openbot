@@ -3,6 +3,7 @@ import type {
   InviteSummary,
   McpServerConfig,
   McpTestResult,
+  ServerSummary,
   TeamInviteSummary,
   TeamPresenceMember,
   UpdateTeamMemberInput,
@@ -59,6 +60,20 @@ const ServerSettings = createSimpleContext({
     let serverSettingsRestoreTarget: HTMLElement | null = null;
 
     const serverSettingsTarget = createMemo(() => servers().find((server) => server.id === serverSettingsTargetId()));
+    /** The server that the leave confirmation from the server menu asks about, and the element that asked. */
+    const [leaveRequest, setLeaveRequest] = createSignal<{ serverId: string; trigger: HTMLElement | null } | null>(
+      null,
+    );
+    const leaveConfirmServer = createMemo(
+      () => servers().find((server) => server.id === leaveRequest()?.serverId) ?? null,
+    );
+    // A server that leaves the list in another way ends the request, so it does not open again on a rejoin.
+    createEffect(
+      () => leaveRequest() !== null && leaveConfirmServer() === null,
+      (gone) => {
+        if (gone) setLeaveRequest(null);
+      },
+    );
 
     createEffect(
       () => ({ open: serverSettingsOpen(), id: serverSettingsTargetId() }),
@@ -332,6 +347,19 @@ const ServerSettings = createSimpleContext({
     async function leaveServer(): Promise<void> {
       const server = serverSettingsTarget();
       if (!server) throw new Error(currentText().t("server.settings.unavailable"));
+      await removeMembership(server);
+      setServerSettingsOpen(false);
+    }
+
+    /** Leaves the server that the confirmation from the server menu asks about. */
+    async function leaveConfirmedServer(): Promise<void> {
+      const server = leaveConfirmServer();
+      if (!server) throw new Error(currentText().t("server.settings.unavailable"));
+      await removeMembership(server);
+      if (serverSettingsTarget()?.id === server.id) setServerSettingsOpen(false);
+    }
+
+    async function removeMembership(server: ServerSummary): Promise<void> {
       const analytics = desktopAnalytics.scope();
       try {
         await serversPort().servers.remove(server.id);
@@ -345,7 +373,6 @@ const ServerSettings = createSimpleContext({
         throw error;
       }
       analytics.track("team_action", { action: "server_left", result: "succeeded", server_kind: server.kind });
-      setServerSettingsOpen(false);
     }
 
     /**
@@ -473,6 +500,11 @@ const ServerSettings = createSimpleContext({
       removeServerMember,
       revokeServerInvite,
       leaveServer,
+      leaveConfirmServer,
+      leaveRestoreTarget: () => leaveRequest()?.trigger ?? null,
+      requestLeaveServer: (serverId: string, trigger: HTMLElement | null) => setLeaveRequest({ serverId, trigger }),
+      cancelLeaveServer: () => setLeaveRequest(null),
+      leaveConfirmedServer,
       serverSettingsMcp,
       serverSettingsMcpError,
       refreshMcpServers,

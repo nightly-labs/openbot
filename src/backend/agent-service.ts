@@ -1937,7 +1937,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     inputPath: string,
   ) {
     const agent = yield* lifecycleStep("find workspace agent", () => this.#agentForFile(agentId));
-    return yield* resolveWorkspaceFile(agent, inputPath, { allowOutside: !workspaceAccessEnforced(agent) }).pipe(
+    return yield* resolveWorkspaceFile(agent, inputPath, {
+      allowOutside: !workspaceAccessEnforced(agent),
+      fileHistory: this.#turn.fileHistory.paths(agent.id, agent.threadId),
+    }).pipe(
       Effect.mapError(
         (failure) => new AgentLifecycleFailed({ operation: "resolve local workspace file", cause: failure.cause }),
       ),
@@ -2730,7 +2733,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     input: SetMessageReactionInput,
   ) {
     const agent = yield* this.#store
-      .getOrCreate(input.agentId)
+      .existing(input.agentId)
       .pipe(
         Effect.mapError(
           (failure) => new AgentLifecycleFailed({ operation: "load reaction agent", cause: failure.cause }),
@@ -2781,7 +2784,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     mayStop?: () => boolean,
   ) {
     const agent = yield* this.#store
-      .getOrCreate(agentId)
+      .existing(agentId)
       .pipe(
         Effect.mapError(
           (failure) => new AgentLifecycleFailed({ operation: "load interrupted agent", cause: failure.cause }),

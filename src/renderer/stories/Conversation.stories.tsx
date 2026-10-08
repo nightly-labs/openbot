@@ -6,7 +6,7 @@ import {
   type UiConfirmBlock,
   uiBlockFallbackQuestions,
 } from "@openbot/contracts/ui-blocks";
-import type { AgentMessage as RendererAgentMessage } from "@openbot/ui/data";
+import type { AgentMessage as RendererAgentMessage, RoutineRunMarkerModel } from "@openbot/ui/data";
 import { BrowserTakeoverCard } from "@openbot/ui/features/conversation/ConversationPrompts";
 import { Portal } from "@solidjs/web";
 import { createEffect, createSignal, onCleanup, onSettled, Show } from "solid-js";
@@ -1905,6 +1905,59 @@ export const AgentMessageGroupInChat: Story = {
         createdAt: "2026-08-19T09:06:00.000Z",
         kind: "text",
       },
+    ],
+  },
+};
+
+/** One routine run as the host stores it: a "running" marker, then the final state a minute later. */
+function routineRunMessages(
+  hour: number,
+  minute: number,
+  status: RoutineRunMarkerModel["status"] = "succeeded",
+): RendererAgentMessage[] {
+  const runId = `watch-${hour}-${minute}`;
+  return (["running", status] as const).map((markerStatus, offset) => {
+    const timestamp = new Date(Date.UTC(2026, 7, 19, hour, minute + offset)).toISOString();
+    return {
+      id: `${runId}-${markerStatus}`,
+      author: "agent",
+      body: "Watchdog",
+      time: timestamp.slice(11, 16),
+      createdAt: timestamp,
+      kind: "action-marker",
+      actionMarker: {
+        kind: "routine-run",
+        sourceAgentId: null,
+        routineId: "routine-watch",
+        runId,
+        routineName: "Watchdog",
+        status: markerStatus,
+        timestamp,
+      },
+    };
+  });
+}
+
+/* Consecutive completed runs of one routine show as one row. A failed run keeps its own row. */
+export const RoutineRunGroupInChat: Story = {
+  name: "Routine run group in chat",
+  args: {
+    messages: [
+      {
+        id: "watch-user",
+        author: "you",
+        body: "Check the site every 15 minutes and tell me only when something breaks.",
+        time: "17:00",
+        createdAt: "2026-08-19T17:00:00.000Z",
+        kind: "text",
+      },
+      ...routineRunMessages(17, 15),
+      ...routineRunMessages(17, 30),
+      ...routineRunMessages(17, 45),
+      ...routineRunMessages(18, 0),
+      ...routineRunMessages(18, 15, "failed"),
+      ...routineRunMessages(18, 30),
+      ...routineRunMessages(18, 45),
     ],
   },
 };

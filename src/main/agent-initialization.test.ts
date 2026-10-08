@@ -35,6 +35,24 @@ describe("AgentInitializationGate", () => {
     expect(initialize).toHaveBeenCalledTimes(2);
   });
 
+  // A peer request waits through this. It must not start the providers again after a failure.
+  it("waits for the initialization in progress without starting or retrying one", async () => {
+    const failed = Deferred.makeUnsafe<void, Error>();
+    const initialize = vi.fn(() => Deferred.await(failed));
+    const gate = new AgentInitializationGate(initialize);
+
+    await Effect.runPromise(gate.awaitSettled());
+    expect(initialize).not.toHaveBeenCalled();
+    const run = Effect.runPromise(gate.start());
+    const waiting = Effect.runPromise(gate.awaitSettled());
+    await Effect.runPromise(Deferred.fail(failed, new Error("startup failed")));
+    await expect(run).rejects.toThrow("startup failed");
+    await expect(waiting).resolves.toBeUndefined();
+    await Effect.runPromise(gate.awaitSettled());
+
+    expect(initialize).toHaveBeenCalledOnce();
+  });
+
   it("reports pending only while initialization runs", async () => {
     const started = Deferred.makeUnsafe<void>();
     const gate = new AgentInitializationGate(() => Deferred.await(started));

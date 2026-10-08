@@ -23,6 +23,8 @@ const HOSTED_UNITS = [
   "openbot-update.service",
   "openbot-update.timer",
   "openbot-update-apply.service",
+  "openbot-update-request.path",
+  "openbot-update-request.service",
 ];
 
 const FUSE_DISABLED = 48;

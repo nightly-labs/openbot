@@ -51,6 +51,7 @@ type TestStreamMessage =
           id?: string;
           name?: string;
           tool_use_id?: string;
+          input?: { file_path: string };
         }>;
       };
     }
@@ -1318,6 +1319,30 @@ fi
 
     expect(narrationTexts(notifications)).toEqual(["Plan."]);
     expect(answerText(notifications)).toBe("Hello");
+    await runCauseEffect(client.stop());
+  });
+
+  it("reports file tool paths outside the conversation item", async () => {
+    const { client, notifications, output, threadId } = await createHarness();
+    const turnId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    await startTurn(client, threadId, turnId);
+    output.push({
+      type: "assistant",
+      parent_tool_use_id: null,
+      session_id: threadId,
+      uuid: "file-call",
+      message: {
+        content: [{ type: "tool_use", id: "file-read", name: "Read", input: { file_path: "/private/report.pdf" } }],
+      },
+    });
+    output.push(toolResultMessage(threadId, "file-result", "file-read"));
+    output.push(resultMessage(threadId, turnId, "Done"));
+    await waitFor(() => notifications.some((event) => event.method === "turn/completed"));
+    const started = notifications.find(
+      (event) => event.method === "item/started" && getString(getRecord(event.params, "item"), "id") === "file-read",
+    );
+    expect(started?.params).toMatchObject({ filePaths: ["/private/report.pdf"] });
+    expect(JSON.stringify(getRecord(started?.params, "item"))).not.toContain("/private/report.pdf");
     await runCauseEffect(client.stop());
   });
 

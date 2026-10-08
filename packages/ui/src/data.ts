@@ -64,6 +64,17 @@ export interface AgentMessageMarkerModel {
   expectsReply: boolean;
 }
 
+export interface RoutineRunMarkerModel {
+  kind: "routine-run";
+  sourceAgentId: string | null;
+  routineId: string;
+  runId: string;
+  routineName: string;
+  status: "queued" | RoutineRunConversationEvent["status"];
+  timestamp: string;
+  previousTransitions?: RoutineRunMarkerTransition[];
+}
+
 export type ChatActionMarkerModel =
   | (SkillConversationEvent & { kind: "skill-lifecycle"; timestamp: string })
   | AgentMessageMarkerModel
@@ -85,15 +96,18 @@ export type ChatActionMarkerModel =
       status: "completed";
       timestamp: string;
     }
+  | RoutineRunMarkerModel
+  /**
+   * Consecutive completed runs of one routine, oldest first, drawn as one row. Only the timeline
+   * joins them: each stored run keeps its own marker. `routineName` is the name of the newest run,
+   * and `timestamp` is the time of the newest run.
+   */
   | {
-      kind: "routine-run";
-      sourceAgentId: string | null;
+      kind: "routine-run-group";
       routineId: string;
-      runId: string;
       routineName: string;
-      status: "queued" | RoutineRunConversationEvent["status"];
+      runs: Array<{ id: string; marker: RoutineRunMarkerModel }>;
       timestamp: string;
-      previousTransitions?: RoutineRunMarkerTransition[];
     }
   | {
       kind: "hosted-site";

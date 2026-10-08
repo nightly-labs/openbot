@@ -63,6 +63,7 @@ function harness(overrides: Partial<WebWorkspaceRuntime> = {}) {
         role: "owner",
       },
     ]),
+    leaveHost: vi.fn().mockResolvedValue(undefined),
     previewInvite: async () => {
       throw new Error("No invitation in this fixture.");
     },

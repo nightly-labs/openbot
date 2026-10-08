@@ -46,6 +46,9 @@ function createTextValue(locale: () => TranslatedLocale, formatLocale: () => str
       percent: (value, options) => current().percent(value, options),
       currencyUsd: (value, options) => current().currencyUsd(value, options),
       date: (value, options) => current().date(value, options),
+      get hour12() {
+        return current().hour12;
+      },
       list: (items) => current().list(items),
       fileSize: (bytes) => current().fileSize(bytes),
     },
