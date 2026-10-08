@@ -277,7 +277,9 @@ function routineTurnAnswers(
         input.database.stagedProviderHistoryItems({ sessionId: input.sessionId, turnId, afterIndex, limit: 50 }),
       );
       for (const { item } of page) {
-        if (routine === undefined && item.type === "userMessage" && typeof item.clientId === "string")
+        // Every delivery of the turn must be a scheduled run, as at the turn completion: a message
+        // steered into the turn waits for the answer.
+        if (routine !== false && item.type === "userMessage" && typeof item.clientId === "string")
           routine =
             input.findDelivery(item.clientId)?.delivery.sender.kind === "routine" &&
             input.quietRoutineDelivery(item.clientId);
