@@ -1,9 +1,11 @@
 import type { AppTextKey } from "@openbot/i18n";
 import { Input, Popover, RadioGroup } from "@openbot/ui";
-import { createSignal, For } from "solid-js";
+import { createSignal, For, Show } from "solid-js";
 import { useText } from "../../text";
 import { createStableChipAnchor } from "./routine-popover-anchor";
 import {
+  clockHour24,
+  clockHourFrom24,
   formatRoutineClockShort,
   joinClock,
   type RoutineClock,
@@ -23,7 +25,7 @@ interface RoutineTimeFieldProps {
   onClose?: () => void;
 }
 
-/** A chip that shows the time and opens an hour, minute and AM/PM editor. */
+/** A chip that shows the time and opens an hour and minute editor, with AM/PM on a 12-hour clock. */
 export function RoutineTimeField(props: RoutineTimeFieldProps) {
   const text = useText();
   const anchor = createStableChipAnchor(() => props.onClose?.());
@@ -65,18 +67,21 @@ const MERIDIEM_LABEL = {
 /**
  * Hour and minute boxes take any typed value and commit it on Enter or blur. The arrow keys
  * step and commit at once, so holding one scrolls the time the way a native picker does.
+ * The hour box uses the clock of the date locale: 1 to 12 with AM/PM, or 00 to 23.
  */
 function RoutineClockInput(props: { label: string; value: RoutineClock; onChange: (value: RoutineClock) => void }) {
-  const { t } = useText();
+  const { t, format } = useText();
   const parts = () => splitClock(props.value);
-  const [hourText, setHourText] = createSignal(() => String(parts().hour));
+  const shownHour = (value: RoutineClock) =>
+    format.hour12 ? String(splitClock(value).hour) : String(clockHour24(value)).padStart(2, "0");
+  const [hourText, setHourText] = createSignal(() => shownHour(props.value));
   const [minuteText, setMinuteText] = createSignal(() => String(parts().minute).padStart(2, "0"));
 
   const commit = (next: Partial<RoutineClockParts>) => {
     const value = joinClock({ ...parts(), ...next });
     if (value !== props.value) props.onChange(value);
     // A typed value that does not change the clock ("9" to "09") still has to be redrawn.
-    setHourText(String(splitClock(value).hour));
+    setHourText(shownHour(value));
     setMinuteText(String(splitClock(value).minute).padStart(2, "0"));
   };
 
@@ -85,7 +90,12 @@ function RoutineClockInput(props: { label: string; value: RoutineClock; onChange
     return Number.isFinite(value) ? value : fallback;
   };
 
-  const commitHour = () => commit(typedClockHour(typed(hourText(), parts().hour), parts().meridiem));
+  const commitHour = () =>
+    commit(
+      format.hour12
+        ? typedClockHour(typed(hourText(), parts().hour), parts().meridiem)
+        : clockHourFrom24(typed(hourText(), clockHour24(props.value))),
+    );
   const commitMinute = () => commit({ minute: typed(minuteText(), parts().minute) });
 
   const stepKey = (event: KeyboardEvent, field: "hour" | "minute") => {
@@ -98,7 +108,8 @@ function RoutineClockInput(props: { label: string; value: RoutineClock; onChange
     if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
     event.preventDefault();
     const step = event.key === "ArrowUp" ? 1 : -1;
-    if (field === "hour") commit({ hour: wrapClockValue(parts().hour + step, 1, 12) });
+    if (field === "hour" && format.hour12) commit({ hour: wrapClockValue(parts().hour + step, 1, 12) });
+    else if (field === "hour") commit(clockHourFrom24(wrapClockValue(clockHour24(props.value) + step, 0, 23)));
     else commit({ minute: wrapClockValue(parts().minute + step, 0, 59) });
   };
 
@@ -129,24 +140,26 @@ function RoutineClockInput(props: { label: string; value: RoutineClock; onChange
         onKeyDown={(event) => stepKey(event, "minute")}
         onBlur={commitMinute}
       />
-      <RadioGroup.Root
-        class="routine-segmented"
-        aria-label={t("routine.time.meridiem", { label: props.label })}
-        orientation="horizontal"
-        value={parts().meridiem}
-        onChange={(value) => commit({ meridiem: value === "PM" ? "PM" : "AM" })}
-      >
-        <For each={MERIDIEMS}>
-          {(meridiem) => (
-            <RadioGroup.Item class="routine-segmented-item" value={meridiem}>
-              <RadioGroup.ItemInput />
-              <RadioGroup.ItemControl class="routine-segmented-control">
-                <RadioGroup.ItemLabel>{t(MERIDIEM_LABEL[meridiem])}</RadioGroup.ItemLabel>
-              </RadioGroup.ItemControl>
-            </RadioGroup.Item>
-          )}
-        </For>
-      </RadioGroup.Root>
+      <Show when={format.hour12}>
+        <RadioGroup.Root
+          class="routine-segmented"
+          aria-label={t("routine.time.meridiem", { label: props.label })}
+          orientation="horizontal"
+          value={parts().meridiem}
+          onChange={(value) => commit({ meridiem: value === "PM" ? "PM" : "AM" })}
+        >
+          <For each={MERIDIEMS}>
+            {(meridiem) => (
+              <RadioGroup.Item class="routine-segmented-item" value={meridiem}>
+                <RadioGroup.ItemInput />
+                <RadioGroup.ItemControl class="routine-segmented-control">
+                  <RadioGroup.ItemLabel>{t(MERIDIEM_LABEL[meridiem])}</RadioGroup.ItemLabel>
+                </RadioGroup.ItemControl>
+              </RadioGroup.Item>
+            )}
+          </For>
+        </RadioGroup.Root>
+      </Show>
     </div>
   );
 }

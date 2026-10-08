@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { resolveLocale, translateFor } from "./index";
+import { createFormat, resolveLocale, translateFor } from "./index";
 import { createTranslate } from "./message";
 
 describe("resolveLocale", () => {
@@ -140,5 +140,24 @@ describe("plural forms without Intl.PluralRules", () => {
     });
     expect(turkish("replies", { count: 1 })).toBe("1 yanıt");
     expect(turkish("replies", { count: 2 })).toBe("2 yanıt");
+  });
+});
+
+describe("hour cycle without resolved hourCycle", () => {
+  // Hermes may not report `hourCycle` or `hour12`. The text of 13:00 then decides the clock.
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("reads the clock from formatted text", () => {
+    class DateTimeFormat extends Intl.DateTimeFormat {
+      override resolvedOptions(): Intl.ResolvedDateTimeFormatOptions {
+        const { hourCycle: _hourCycle, hour12: _hour12, ...options } = super.resolvedOptions();
+        return options;
+      }
+    }
+    vi.stubGlobal("Intl", { ...Intl, DateTimeFormat });
+    expect(createFormat("en", "en-US").hour12).toBe(true);
+    expect(createFormat("fr", "fr-FR").hour12).toBe(false);
   });
 });
