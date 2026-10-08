@@ -30,6 +30,8 @@ import type {
   RespondToBrowserSecretInput,
   RespondToBrowserTakeoverInput,
   RespondToPromptInput,
+  Routine,
+  RoutineRun,
   SetMessageReactionInput,
   SidebarLayoutAction,
   SidebarLayoutSnapshot,
@@ -37,8 +39,10 @@ import type {
   TeamInviteSummary,
   TeamMemberSummary,
   TeamRealtimeEvent,
+  TestRoutineInput,
   UpdateAgentInput,
   UpdateQueuedMessageInput,
+  UpdateRoutineInput,
   WorkspaceDirectory,
 } from "@openbot/contracts/ipc";
 import {
@@ -63,6 +67,7 @@ import {
   TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import { ROUTINE_FLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import {
   decodeTeamProtocolSupportV1,
   type TeamProtocolSupportV1,
@@ -99,7 +104,11 @@ import {
   steerQueuedMessage,
   type TeamApiRequest,
   type TeamChannelsApi,
+  type TeamRoutineFlowsApi,
   teamChannelsApi,
+  teamRoutineFlowsApi,
+  testAgentRoutine,
+  updateAgentRoutine,
   updateQueuedMessage,
   uploadAttachmentDraft,
 } from "@openbot/team-client/team-api-requests";
@@ -162,6 +171,8 @@ export interface WebWorkspaceRuntime {
   disconnect(): Promise<void>;
   listAgents(): Promise<AgentSummary[]>;
   conversation(agentId: string, before?: string): Promise<ConversationPage>;
+  /** The page of an agent's conversation around one message, or the newest page from an older host. */
+  conversationAround?: (agentId: string, messageId: string) => Promise<ConversationPage>;
   /** Marks this member's messages from the agent read through `throughMessageId`, or all when it is null. */
   markRead(agentId: string, throughMessageId: string | null): Promise<ConversationReadState>;
   /** This member's read state for each agent, keyed by agent id. Invalid entries are left out. */
@@ -195,6 +206,12 @@ export interface WebWorkspaceRuntime {
   workspaceFile(agentId: string, path: string): Promise<WebFile>;
   /** A folder in one agent's workspace on the host. */
   workspaceDirectory(agentId: string, path: string): Promise<WorkspaceDirectory>;
+  /** The routine canvas routes. Each call refuses while the host does not serve `routine-flows-v1`. */
+  routineFlows?: TeamRoutineFlowsApi;
+  /** Changes an agent routine, such as its instruction. */
+  updateRoutine?: (input: UpdateRoutineInput) => Promise<Routine>;
+  /** Runs an agent routine now. */
+  testRoutine?: (input: TestRoutineInput) => Promise<RoutineRun>;
   react(input: SetMessageReactionInput): Promise<void>;
   setAvatar(agentId: string, image: AvatarImageInput | null): Promise<void>;
   models(): Promise<AgentModelOption[]>;
@@ -464,6 +481,18 @@ export function createWebWorkspaceRuntime(
     },
   };
   const channels = teamChannelsApi(teamApi);
+  /** The routine flow routes, sent only to a host that negotiated them. */
+  async function routineFlowsRequest<T>(
+    method: string,
+    path: string,
+    decode: (value: unknown) => T,
+    body?: TeamProtocolV2Json,
+  ): Promise<T> {
+    if (!capabilities.includes(ROUTINE_FLOWS_CAPABILITY))
+      throw new Error(currentText().t("error.team.routineFlowsUnsupported"));
+    return teamApi(method, path, decode, body);
+  }
+  const routineFlows = teamRoutineFlowsApi(routineFlowsRequest);
   const browserView = createRemoteBrowserView(
     (data) => peer.sendHostStreamData(data),
     request,
@@ -710,6 +739,12 @@ export function createWebWorkspaceRuntime(
       const query = new URLSearchParams({ limit: "50", ...(before ? { before } : {}) });
       return decodeWebConversationPage(await request("GET", `${TEAM_API_ROUTES.agent.conversationPage(id)}?${query}`));
     },
+    async conversationAround(id, messageId) {
+      if (!capabilities.includes("conversation-pagination"))
+        return decodeWebConversationSnapshot(await request("GET", TEAM_API_ROUTES.agent.conversation(id)));
+      const query = new URLSearchParams({ limit: "50", around: messageId });
+      return decodeWebConversationPage(await request("GET", `${TEAM_API_ROUTES.agent.conversationPage(id)}?${query}`));
+    },
     async markRead(id, throughMessageId) {
       const value = await request("POST", TEAM_API_ROUTES.agent.conversationRead(id), { throughMessageId });
       if (!isConversationReadState(value)) throw new Error("The host returned an invalid read state.");
@@ -838,6 +873,11 @@ export function createWebWorkspaceRuntime(
         throw new Error(currentText().t("error.team.workspaceDirectoryUnsupported"));
       return decodeWorkspaceDirectory(await request("POST", WORKSPACE_DIRECTORY_ROUTES.list, { agentId, path }));
     },
+    routineFlows,
+    updateRoutine: (input) =>
+      runTeamEffect(updateAgentRoutine(teamApi, input).pipe(Effect.mapError((error) => error.cause))),
+    testRoutine: (input) =>
+      runTeamEffect(testAgentRoutine(teamApi, input).pipe(Effect.mapError((error) => error.cause))),
     async models() {
       return guardedListDecoder(isAgentModelOption, "models")(await request("GET", TEAM_API_ROUTES.agents.models));
     },

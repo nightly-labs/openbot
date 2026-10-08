@@ -43,6 +43,7 @@ export function serverSupportsCapability(
       capability === "host-release-v1" ||
       capability === "events-v1" ||
       capability === "context-reset-v1" ||
+      capability === "routine-flows-v1" ||
       capability === "agent-import-v1") &&
     server?.kind === "remote"
   ) {

@@ -145,6 +145,11 @@ mock. The separate web preview implements the browser runtime with that same moc
   Tabs, back, forward, reload, and the address bar use the same Team API routes as a desktop
   client of a remote host. Picture in Picture is desktop only. The expanded live view is a card
   with the shape of the host frame.
+- The sidebar's Agents and Routines switch shows when the host serves `routine-flows-v1`. The Routines
+  view hides channels and shows the open agent's routine canvas, as on desktop: links, node positions,
+  task edits, Run now, a new agent from the right-click menu, and the chat panel that asks the agent
+  to edit the canvas. Webhook config and webhook routine changes need an owner or admin with
+  `events-v1`. On a phone the canvas takes the chat pane, and the pane button reads Routines.
 - No full remote desktop, push notifications, or offline operation is included. See
   [Remote desktop](#remote-desktop) for the reason.
 - These stay desktop only: the application Settings dialog (permissions, app updates),

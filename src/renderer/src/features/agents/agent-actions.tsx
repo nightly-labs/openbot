@@ -17,7 +17,7 @@ import { agentConversationKey } from "../conversation/conversation-keys";
 import { useDirectMessages } from "../conversation/direct-messages-context";
 import { useServers } from "../servers/servers-context";
 import { useSidebar } from "../sidebar/sidebar-context";
-import { createAgentInitialMessage } from "./agent-initial-message";
+import { type NewAgentDraft, newAgentInput } from "./agent-create-input";
 import { useAgents } from "./agents-context";
 import { agentsPort } from "./agents-port";
 
@@ -65,26 +65,11 @@ const AgentActions = createSimpleContext({
     const { clearDirectSelection } = useDirectMessages();
     const { selectAgent } = useNavigation();
 
-    /** Asks the host for the agent. A draft without a provider leaves the backend to pick its starting default. */
-    function requestNewAgent(
-      draft: Pick<FirstAgentDraft, "name" | "purpose" | "avatarSeed" | "avatarHue"> &
-        Partial<Pick<FirstAgentDraft, "provider" | "model">>,
-    ) {
-      // The provider and model travel with the creation request: the backend applies them before
-      // the initial message is queued, while a later provider change would be rejected as active
-      // work. A remote host without the capability drops the pair and starts its own default.
+    /** Asks the host for the agent. */
+    function requestNewAgent(draft: NewAgentDraft) {
       const createModelSupported =
         activeServer()?.kind !== "remote" || activeServerSupportsCapability(TEAM_AGENT_CREATE_MODEL_CAPABILITY);
-      return agentsPort().agent.createAgent({
-        name: draft.name.trim(),
-        description: draft.purpose.trim() || "General-purpose assistant",
-        avatarSeed: draft.avatarSeed,
-        avatarHue: draft.avatarHue,
-        ...(createModelSupported && draft.provider && draft.model
-          ? { provider: draft.provider, model: draft.model }
-          : {}),
-        initialMessage: createAgentInitialMessage(draft),
-      });
+      return agentsPort().agent.createAgent(newAgentInput(draft, createModelSupported));
     }
 
     /** Synchronous, so a caller that also selects the agent does both in the same update. */

@@ -10,7 +10,7 @@ import { toast } from "@openbot/ui";
 import type { DiagramChatMessage } from "@openbot/ui/features/diagrams/diagram-model";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createStore, onSettled } from "solid-js";
-import type { RoutineFlowsPort } from "./routine-flows-port";
+import type { RoutineFlowsHost } from "./routine-flows-port";
 
 /** A request sent and not answered yet. `deliveryId` names the request in the conversation. */
 interface PendingRequest {
@@ -18,7 +18,7 @@ interface PendingRequest {
   deliveryId: string | null;
 }
 
-export function createRoutineFlowAssistant(port: () => RoutineFlowsPort, agentId: () => string | null) {
+export function createRoutineFlowAssistant(host: () => RoutineFlowsHost, agentId: () => string | null) {
   const { t, errorMessage } = useText();
   const [chat, setChat] = createStore<{ messages: DiagramChatMessage[]; pending: PendingRequest | null }>({
     messages: [],
@@ -41,10 +41,7 @@ export function createRoutineFlowAssistant(port: () => RoutineFlowsPort, agentId
   const check = async (forAgent: string, endedTurnId: string | null) => {
     const pending = chat.pending;
     if (!pending?.deliveryId || pending.agentId !== forAgent) return;
-    const page = await port().agent.readConversationPage(
-      { agentId: forAgent, anchor: { type: "around", messageId: pending.deliveryId } },
-      "local",
-    );
+    const page = await host().conversation.page(forAgent, pending.deliveryId);
     const index = page.messages.findIndex((message) => message.id === pending.deliveryId);
     const asked = page.messages[index];
     if (!asked || chat.pending !== pending) return;
@@ -63,7 +60,7 @@ export function createRoutineFlowAssistant(port: () => RoutineFlowsPort, agentId
     // request, which can hold only an earlier message of it. Once the turn has ended, the newest
     // page holds its end, so its answer there wins.
     if (turnId && status === "completed") {
-      const latest = await port().agent.readConversationPage({ agentId: forAgent }, "local");
+      const latest = await host().conversation.page(forAgent);
       if (chat.pending !== pending) return;
       reply = latestTurnAnswer(latest.messages, turnId) ?? reply;
     }
@@ -76,8 +73,7 @@ export function createRoutineFlowAssistant(port: () => RoutineFlowsPort, agentId
   };
 
   onSettled(() =>
-    port().agent.onScopedEvent(({ serverId, event }) => {
-      if (serverId !== "local") return;
+    host().onEvent((event) => {
       const ended =
         event.type === "turn-completed"
           ? { agentId: event.agentId, turnId: event.turnId }
@@ -98,12 +94,11 @@ export function createRoutineFlowAssistant(port: () => RoutineFlowsPort, agentId
       draft.messages.push({ id: clientMessageId, author: "user", text, createdAt: new Date().toISOString() });
       draft.pending = pending;
     });
-    port()
-      .agent.sendMessage({ agentId: id, text, clientMessageId }, "local")
-      .then((receipt) => {
+    host()
+      .conversation.send({ agentId: id, text, clientMessageId })
+      .then((deliveryId) => {
         setChat((draft) => {
           if (draft.pending?.agentId !== id || draft.pending.deliveryId) return;
-          const deliveryId = receipt.deliveries.find((delivery) => delivery.recipientAgentId === id)?.id;
           if (deliveryId) draft.pending.deliveryId = deliveryId;
           else draft.pending = null;
         });
