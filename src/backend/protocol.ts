@@ -117,7 +117,7 @@ export interface AccountRateLimitNamedWindowResult extends AccountRateLimitWindo
 }
 
 /** Codex's credits snapshot. `balance` is a decimal string. */
-export interface AccountRateLimitCreditsResult {
+interface AccountRateLimitCreditsResult {
   hasCredits?: boolean | null;
   unlimited?: boolean | null;
   balance?: string | null;
