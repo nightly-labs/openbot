@@ -159,6 +159,8 @@ export function ClientTailscaleSettings(props: {
   host: ServerSettingsSectionHost;
   direct: NonNullable<ServerSummary["direct"]>;
   onSetDirectEnabled: (enabled: boolean) => Promise<void>;
+  /** Opens the Tailscale page on node sharing. Shown while the host is in another tailnet. */
+  onOpenSharingGuide?: (() => Promise<void>) | undefined;
 }) {
   const { t } = useText();
   const description = () => {
@@ -178,6 +180,27 @@ export function ClientTailscaleSettings(props: {
           label={t("server.tailscale.useLabel")}
           description={description()}
         />
+        <Show
+          when={props.direct.enabled && props.direct.hint === "other-tailnet" ? props.onOpenSharingGuide : undefined}
+        >
+          {(open) => (
+            <Item>
+              <ItemContent>
+                <ItemDescription>{t("server.tailscale.hint.sharingDescription")}</ItemDescription>
+              </ItemContent>
+              <ItemActions>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void props.host.run("tailscale-sharing", () => open()())}
+                >
+                  {t("server.tailscale.hint.sharingGuide")}
+                </Button>
+              </ItemActions>
+            </Item>
+          )}
+        </Show>
       </ItemGroup>
     </SettingsSection>
   );

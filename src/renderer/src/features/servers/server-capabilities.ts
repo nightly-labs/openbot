@@ -39,6 +39,7 @@ export function serverSupportsCapability(
       capability === "providers-v4" ||
       capability === "host-admin-v1" ||
       capability === "host-update-v1" ||
+      capability === "host-tailscale-v1" ||
       capability === "events-v1" ||
       capability === "context-reset-v1" ||
       capability === "agent-import-v1") &&
@@ -47,6 +48,16 @@ export function serverSupportsCapability(
     return server.compatibility?.capabilities.includes(capability) === true;
   }
   return server?.kind !== "remote" || !server.compatibility || server.compatibility.capabilities.includes(capability);
+}
+
+/**
+ * Whether the host of a joined server that this account owns serves `host-tailscale-v1`. Undefined for
+ * this computer, for a server the account does not own, and for a server that has not reported its
+ * capabilities yet: the owner's Tailscale setup is then not shown. False asks the owner to update it.
+ */
+export function ownedRemoteServerSupportsTailscaleSetup(server: ServerSummary | undefined): boolean | undefined {
+  if (server?.kind !== "remote" || server.role !== "owner" || !server.compatibility) return undefined;
+  return serverSupportsCapability(server, "host-tailscale-v1");
 }
 
 /** An owner or admin of a joined server. This computer is always its own administrator. */

@@ -117,6 +117,7 @@ import { applySidebarLayoutAction } from "./mock-sidebar-layout";
 import { createMockSkills, type MockSkillsOptions } from "./mock-skills";
 import { createMockStorage } from "./mock-storage";
 import { clone, type Listener, type MockRuntime, matchesQuery } from "./mock-support";
+import { createMockTailscaleSetup } from "./mock-tailscale-setup";
 import { createMockTeam, type MockTeamOptions } from "./mock-team";
 
 export interface MockOpenBotOptions
@@ -1699,6 +1700,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         return server;
       },
       ...createMockHostUpdate(options),
+      ...createMockTailscaleSetup(),
     },
     storage: createMockStorage(),
     agentImport: {

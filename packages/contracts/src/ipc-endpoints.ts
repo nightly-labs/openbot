@@ -289,6 +289,7 @@ import type {
   OpenStoredFileInput,
   StorageUsage,
 } from "./ipc-storage";
+import type { TailscaleSetupStatus } from "./ipc-tailscale-setup";
 import type {
   ConfigureHostInput,
   CreateTeamInviteInput,
@@ -643,6 +644,12 @@ export const IPC_ENDPOINTS = {
     setUpdateSettings: scopedRequest<HostUpdateSettingsChange, HostUpdateStatus, "required">()(
       "host-admin:set-update-settings",
     ),
+    /** The owner's Tailscale setup of a joined server (`host-tailscale-v1`), with this computer's Tailscale. */
+    getTailscaleSetup: scopedQuery<TailscaleSetupStatus, "required">()("host-admin:get-tailscale-setup"),
+    /** The owner's switch for the host's direct Tailscale path. */
+    setTailscaleDirect: scopedRequest<boolean, TailscaleSetupStatus, "required">()("host-admin:set-tailscale-direct"),
+    /** Asks the host to start a Tailscale sign-in, and opens the sign-in page it reports in the browser. */
+    startTailscaleSignIn: scopedQuery<TailscaleSetupStatus, "required">()("host-admin:start-tailscale-sign-in"),
   },
   // The built-in GitHub connection of this computer. Local only: a remote client connects GitHub on
   // the computer that runs OpenBot. The token stays in main; every answer is the status only.

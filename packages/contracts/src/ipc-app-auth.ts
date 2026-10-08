@@ -345,4 +345,10 @@ export type ExternalDestination =
   | "hosted-server-contact"
   // Not a page: the macOS pane that grants OpenBot screen recording. It is here rather than behind
   // its own endpoint because the destination is still a fixed address the renderer only names.
-  | "mac-screen-recording";
+  | "mac-screen-recording"
+  // The Tailscale pages that the owner's Tailscale setup of a server links to.
+  | "tailscale-download"
+  | "tailscale-windows-download"
+  | "tailscale-admin-dns"
+  | "tailscale-admin-machines"
+  | "tailscale-sharing";

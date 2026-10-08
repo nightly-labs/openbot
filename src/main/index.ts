@@ -471,6 +471,7 @@ function registerIpcHandlers({
   analytics,
   storageUsage,
   trace,
+  tailscaleCli,
 }: ApplicationServices): void {
   // Every renderer-to-main endpoint is bound by one of these, one file per domain under ./ipc.
   // Nothing is bound inline here: this is the trust boundary, and a reviewer should be able to read
@@ -560,7 +561,12 @@ function registerIpcHandlers({
       agentTemplates,
       remoteServers,
     }),
-    ...hostAdminIpcHandlers({ host, remoteServers }),
+    ...hostAdminIpcHandlers({
+      host,
+      remoteServers,
+      localTailscale: () => tailscaleCli.status(),
+      openTailscaleSignIn: (url) => shell.openExternal(url),
+    }),
     ...providerAdminIpcHandlers({
       service,
       credentials: providerCredentials,

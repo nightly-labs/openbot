@@ -4,11 +4,13 @@ import type { RemoteWorkflowError } from "../remote-service-effects";
 // the host, which answers only an owner or admin and makes the change with the account signed in there.
 
 import {
+  decodeHostTailscaleSetup,
   decodeHostUpdateStatus,
   type HostUpdateSettingsChange,
   type HostUpdateStatus,
   LOCAL_SERVER_ID,
   type ServerSummary,
+  type TailscaleSetupStatus,
   UPDATE_RESTART_MODES,
   type UpdateHostIdentityInput,
   type UpdateRestartMode,
@@ -16,12 +18,15 @@ import {
 import { isOneOf } from "@openbot/contracts/runtime-values";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { HOST_ADMIN_CAPABILITY, HOST_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/host-admin-v1";
+import { HOST_TAILSCALE_CAPABILITY, HOST_TAILSCALE_ROUTES } from "@openbot/contracts/team-protocol/host-tailscale-v1";
 import { HOST_UPDATE_CAPABILITY, HOST_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-update-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { HostService } from "../host-service";
 import { acceptEmpty, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
+import { type TailscaleLocalState, tailscaleLoginUrl } from "../tailscale-cli";
+import { tailscaleSetupStatus } from "../tailscale-setup-status";
 import { parseHostUpdateSettings } from "./app-inputs";
 import type { IpcGroupHandlers } from "./define-ipc-group";
 import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
@@ -43,6 +48,10 @@ interface HostAdminRemoteServers {
 interface HostAdminIpcDependencies {
   host: Pick<HostService, "updateIdentity">;
   remoteServers: HostAdminRemoteServers;
+  /** This computer's Tailscale client, compared with the host's in the owner's Tailscale setup. */
+  localTailscale: () => Effect.Effect<TailscaleLocalState>;
+  /** Opens the host's Tailscale sign-in page in the browser. */
+  openTailscaleSignIn: (url: string) => Promise<void>;
 }
 
 /** The body of a `host-update-v1` route: `start` carries the mode, `settings` the switches. */
@@ -51,7 +60,27 @@ type HostUpdateBody = Record<string, never> | { restart: UpdateRestartMode } | H
 export function hostAdminIpcHandlers({
   host,
   remoteServers,
+  localTailscale,
+  openTailscaleSignIn,
 }: HostAdminIpcDependencies): Pick<IpcGroupHandlers, "hostAdmin"> {
+  /** The host answers only its owner. A host without the capability asks the owner to update it. */
+  async function remoteTailscale(
+    serverId: string,
+    route: string,
+    body: Record<string, never> | { enabled: boolean },
+  ): Promise<TailscaleSetupStatus> {
+    if (!remoteServers.supportsCapability(serverId, HOST_TAILSCALE_CAPABILITY))
+      throw new Error(sourceText("error.team.hostTailscaleUnsupported"));
+    const [hostSetup, local] = await Promise.all([
+      runCauseEffect(remoteServers.request(serverId, route, decodeHostTailscaleSetup, { method: "POST", body })),
+      runCauseEffect(localTailscale()),
+    ]);
+    return tailscaleSetupStatus(local, hostSetup);
+  }
+  // This computer has its own Tailscale section. The renderer shows the setup for a joined server only.
+  const localTailscaleSetup = (): never => {
+    throw new Error(sourceText("error.team.hostTailscaleUnsupported"));
+  };
   function remoteUpdate(serverId: string, route: string, body: HostUpdateBody): Promise<HostUpdateStatus> {
     if (!remoteServers.supportsCapability(serverId, HOST_UPDATE_CAPABILITY))
       throw new Error(sourceText("error.team.hostUpdateUnsupported"));
@@ -105,6 +134,24 @@ export function hostAdminIpcHandlers({
         local: localUpdate,
         remote: (settings, serverId) => remoteUpdate(serverId, HOST_UPDATE_ROUTES.settings, settings),
       }),
+      getTailscaleSetup: scopedQueryHandler({
+        local: localTailscaleSetup,
+        remote: (serverId) => remoteTailscale(serverId, HOST_TAILSCALE_ROUTES.status, {}),
+      }),
+      setTailscaleDirect: scopedHandler(parseEnabled, {
+        local: localTailscaleSetup,
+        remote: (enabled, serverId) => remoteTailscale(serverId, HOST_TAILSCALE_ROUTES.direct, { enabled }),
+      }),
+      startTailscaleSignIn: scopedQueryHandler({
+        local: localTailscaleSetup,
+        remote: async (serverId) => {
+          const status = await remoteTailscale(serverId, HOST_TAILSCALE_ROUTES.signIn, {});
+          // The codec accepts only the Tailscale sign-in page; this checks it again before a browser opens.
+          const url = tailscaleLoginUrl(status.host.loginUrl);
+          if (url) await openTailscaleSignIn(url);
+          return status;
+        },
+      }),
     },
   };
 }
@@ -120,6 +167,11 @@ function wireIdentity(input: UpdateHostIdentityInput) {
             : null,
         }),
   };
+}
+
+function parseEnabled(value: unknown): boolean {
+  if (typeof value !== "boolean") throw new Error("enabled must be a boolean.");
+  return value;
 }
 
 function parseRestartMode(value: unknown): UpdateRestartMode {

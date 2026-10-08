@@ -57,6 +57,11 @@ export const EXTERNAL_DESTINATIONS: Record<ExternalDestination, string> = {
   "grok-bot-export": GROK_BOT_EXPORT_URL,
   "hosted-server-contact": HOSTED_SERVER_CONTACT_URL,
   "mac-screen-recording": MAC_PERMISSION_URLS["screen-recording"],
+  "tailscale-download": "https://tailscale.com/download",
+  "tailscale-windows-download": "https://tailscale.com/download/windows",
+  "tailscale-admin-dns": "https://login.tailscale.com/admin/dns",
+  "tailscale-admin-machines": "https://login.tailscale.com/admin/machines",
+  "tailscale-sharing": "https://tailscale.com/kb/1084/sharing",
 };
 
 import { runCauseEffect } from "../../backend/effect-boundary";

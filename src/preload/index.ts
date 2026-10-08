@@ -20,6 +20,7 @@ import {
   decodeMcpTestResult,
   decodeOptionalStorageUsage,
   decodeSaveAgentProfileResult,
+  decodeTailscaleSetupStatus,
   decodeWorkspaceDirectory,
   type EventEndpoint,
   type GroupApi,
@@ -662,6 +663,9 @@ const openbotApi: OpenBotDesktopApi = {
     startUpdate: decodeHostUpdateStatus,
     cancelUpdate: decodeHostUpdateStatus,
     setUpdateSettings: decodeHostUpdateStatus,
+    getTailscaleSetup: decodeTailscaleSetupStatus,
+    setTailscaleDirect: decodeTailscaleSetupStatus,
+    startTailscaleSignIn: decodeTailscaleSetupStatus,
   }),
   agentImport: bridgeGroup(IPC_ENDPOINTS.agentImport, {
     choose: decodeAgentImportPreview,

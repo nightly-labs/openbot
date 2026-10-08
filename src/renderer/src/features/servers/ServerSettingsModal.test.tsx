@@ -196,6 +196,137 @@ describe("ServerSettingsModal", () => {
     await waitFor(() => expect(onSetDirectEnabled).toHaveBeenCalledWith(false));
   });
 
+  it("asks the owner to update a server that is too old for the Tailscale setup", () => {
+    const server: ServerSummary = { ...remoteServer, role: "owner" };
+    render(() => <ServerSettingsModal {...props({ server, hostStatus: null, tailscaleSetup: null })} />);
+    expect(
+      screen.getByText("This server runs an older version of OpenBot. Update it to set up Tailscale from here."),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("switch", { name: "Direct connection over Tailscale" })).not.toBeInTheDocument();
+  });
+
+  it("walks the owner through the Tailscale setup of a headless server", async () => {
+    const host = {
+      state: "signed-out" as const,
+      tailnet: null,
+      deviceName: null,
+      dnsName: null,
+      httpsCertificates: false,
+      enabled: false,
+      url: null,
+      issue: null,
+      issueDetail: null,
+      loginUrl: null,
+      environment: "linux" as const,
+      wslNetworking: null,
+      setupCommand: true,
+      signInIssue: null,
+    };
+    const client = { state: "connected" as const, tailnet: "owner@example.com", deviceName: "Studio Mac" };
+    const signedIn = {
+      client,
+      host: {
+        ...host,
+        state: "connected" as const,
+        tailnet: "other@example.com",
+        deviceName: "home-server",
+        dnsName: "home-server.tail9.ts.net",
+      },
+      network: "other" as const,
+    };
+    const api = {
+      getSetup: vi.fn(async () => ({ client, host, network: null })),
+      signIn: vi.fn(async () => signedIn),
+      setDirect: vi.fn(async () => signedIn),
+      openLocalTailscale: vi.fn(async () => undefined),
+      openLink: vi.fn(async () => undefined),
+    };
+    const server: ServerSummary = { ...remoteServer, role: "owner" };
+    render(() => <ServerSettingsModal {...props({ server, hostStatus: null, tailscaleSetup: api })} />);
+
+    expect(await screen.findByText("Connected to owner@example.com as Studio Mac.")).toBeInTheDocument();
+    expect(screen.getByText("Sign in to Tailscale on the server.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copy setup command" })).toBeInTheDocument();
+    // The switch waits for the server, its certificates and the network.
+    expect(screen.getByRole("switch", { name: "Direct connection over Tailscale" })).toBeDisabled();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    await waitFor(() => expect(api.signIn).toHaveBeenCalledOnce());
+    expect(
+      await screen.findByText(
+        "This computer is in owner@example.com, and the server is in other@example.com. Sign in on this computer with the account of the server, or share the server with your tailnet.",
+      ),
+    ).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Share this server" }));
+    await waitFor(() => expect(api.openLink).toHaveBeenCalledWith("tailscale-admin-machines"));
+    await fireEvent.click(screen.getByRole("button", { name: "Turn on" }));
+    await waitFor(() => expect(api.openLink).toHaveBeenCalledWith("tailscale-admin-dns"));
+  });
+
+  it("turns the direct connection on from the owner's client", async () => {
+    const ready = {
+      client: { state: "connected" as const, tailnet: "owner@example.com", deviceName: "Studio Mac" },
+      host: {
+        state: "connected" as const,
+        tailnet: "owner@example.com",
+        deviceName: "home-server",
+        dnsName: "home-server.tail4b2c1.ts.net",
+        httpsCertificates: true,
+        enabled: false,
+        url: null,
+        issue: null,
+        issueDetail: null,
+        loginUrl: null,
+        environment: "wsl" as const,
+        wslNetworking: "nat" as const,
+        setupCommand: false,
+        signInIssue: null,
+      },
+      network: "same" as const,
+    };
+    const api = {
+      getSetup: vi.fn(async () => ready),
+      signIn: vi.fn(async () => ready),
+      setDirect: vi.fn(async (enabled: boolean) => ({
+        ...ready,
+        host: { ...ready.host, enabled, url: "https://home-server.tail4b2c1.ts.net:8443" },
+      })),
+      openLocalTailscale: vi.fn(async () => undefined),
+      openLink: vi.fn(async () => undefined),
+    };
+    const server: ServerSummary = { ...remoteServer, role: "owner" };
+    render(() => <ServerSettingsModal {...props({ server, hostStatus: null, tailscaleSetup: api })} />);
+    const directSwitch = await screen.findByRole("switch", { name: "Direct connection over Tailscale" });
+    expect(screen.getByText(/WSL must use mirrored networking/u)).toBeInTheDocument();
+    await waitFor(() => expect(directSwitch).toBeEnabled());
+    await fireEvent.click(directSwitch);
+    await waitFor(() => expect(api.setDirect).toHaveBeenCalledWith(true));
+    expect(await screen.findByRole("button", { name: "Copy direct address" })).toBeInTheDocument();
+  });
+
+  it("shows a member in another tailnet how node sharing works", async () => {
+    const onOpenTailscaleSharing = vi.fn(async () => undefined);
+    const server: ServerSummary = {
+      ...remoteServer,
+      apiUrl: null,
+      role: "member",
+      direct: { offered: true, enabled: true, active: false, hint: "other-tailnet" },
+    };
+    render(() => (
+      <ServerSettingsModal
+        {...props({
+          server,
+          hostStatus: null,
+          onSetDirectEnabled: vi.fn(async () => undefined),
+          onOpenTailscaleSharing,
+        })}
+      />
+    ));
+    await fireEvent.click(screen.getByRole("button", { name: "How sharing works" }));
+    await waitFor(() => expect(onOpenTailscaleSharing).toHaveBeenCalledOnce());
+    expect(screen.queryByText("Direct connection setup")).not.toBeInTheDocument();
+  });
+
   it("keeps account errors on account settings tabs", async () => {
     render(() => (
       <ServerSettingsModal {...props({ loadError: "The account cannot perform this remote operation." })} />

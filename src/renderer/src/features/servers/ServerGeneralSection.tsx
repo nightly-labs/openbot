@@ -36,6 +36,7 @@ import { truncateMiddle } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
 import { type Accessor, createStore, Show, snapshot } from "solid-js";
 import { ClientTailscaleSettings, HostTailscaleSettings } from "./ServerTailscaleSettings";
+import { ServerTailscaleSetup } from "./ServerTailscaleSetup";
 import { serverCanAdminister } from "./server-capabilities";
 import type { ServerSettingsSectionHost } from "./server-settings-section";
 
@@ -444,6 +445,9 @@ export function createServerGeneralSection(
         <Show when={local() ? props.tailscale : undefined}>
           {(api) => <HostTailscaleSettings host={host} api={api()} />}
         </Show>
+        <Show when={!local() && props.tailscaleSetup !== undefined}>
+          <ServerTailscaleSetup host={host} api={props.tailscaleSetup ?? null} />
+        </Show>
         <Show
           when={!local() && props.onSetDirectEnabled && props.server.direct?.offered ? props.server.direct : undefined}
         >
@@ -452,6 +456,7 @@ export function createServerGeneralSection(
               host={host}
               direct={direct()}
               onSetDirectEnabled={(enabled) => props.onSetDirectEnabled?.(enabled) ?? Promise.resolve()}
+              onOpenSharingGuide={props.onOpenTailscaleSharing}
             />
           )}
         </Show>
