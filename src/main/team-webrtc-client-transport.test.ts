@@ -1025,6 +1025,29 @@ describe("TeamWebRtcClientTransport", () => {
       }
     });
 
+    it("closes the prepared Signal socket when the ticket request fails", async () => {
+      const files = await sessionCache();
+      await Effect.runPromise(files.create().set("user-1", "host-1", storedSession, signalUrl));
+      const { bridge, prepareSignal, connect } = connectingBridge();
+      const disconnect = vi.mocked(bridge.disconnect);
+      const calls = sessionCalls();
+      calls.issueTicket.mockReturnValueOnce(
+        Effect.fail(new CentralAuthOperationError({ cause: new Error("offline") })),
+      );
+      const transport = createTransport(bridge, { ...calls, sessionCache: files.create() });
+      transport.pinHostKey("host-1", hostKeys.publicKey);
+      try {
+        await expect(runCauseEffect(transport.connect("host-1"))).rejects.toThrow();
+        expect(prepareSignal).toHaveBeenCalledWith("host-1", signalUrl);
+        expect(connect).not.toHaveBeenCalled();
+        expect(disconnect).toHaveBeenCalledWith("host-1");
+        expect(disconnect.mock.invocationCallOrder[0]).toBeGreaterThan(prepareSignal.mock.invocationCallOrder[0] ?? 0);
+      } finally {
+        await runCauseEffect(transport.stop());
+        await files.remove();
+      }
+    });
+
     it("ends the session at quit when the next run cannot read it", async () => {
       const files = await sessionCache(false);
       const { bridge } = connectingBridge();
