@@ -141,7 +141,7 @@ function refuse(reason: WorkspacePathRefused["reason"], message: string, memberM
 const resolveWorkspacePath = Effect.fn("Workspace.resolveWorkspacePath")(function* (
   agent: Pick<AgentSummary, "id" | "workspacePath">,
   inputPath: string,
-  options: { allowOutside?: boolean; allowRoot?: boolean },
+  options: { allowOutside?: boolean; allowRoot?: boolean; fileHistory?: readonly string[] },
 ) {
   const workspaceRoot = yield* attachmentCall(() => realpath(agent.workspacePath));
   const candidatePath = workspacePathFromInput(agent.workspacePath, agent.id, inputPath);
@@ -154,6 +154,18 @@ const resolveWorkspacePath = Effect.fn("Workspace.resolveWorkspacePath")(functio
       const withoutLocation = candidatePath.replace(LOCATION_SUFFIX, "");
       if (!isMissing(error) || withoutLocation === candidatePath) return Effect.fail(error);
       return realpathWithLegacyRoot(agent, withoutLocation);
+    }),
+    Effect.catch((error) => {
+      if (!isMissing(error) || !options.allowOutside) return Effect.fail(error);
+      const requestedPath = decodePath(inputPath.trim());
+      // An explicit target must not select a different document with the same name.
+      if (isAbsolute(requestedPath) || requestedPath.replaceAll("\\", "/").startsWith("~/")) return Effect.fail(error);
+      const name = basename(candidatePath);
+      const withoutLocation = name.replace(LOCATION_SUFFIX, "");
+      const historyPath =
+        options.fileHistory?.findLast((path) => basename(path) === name) ??
+        options.fileHistory?.findLast((path) => basename(path) === withoutLocation);
+      return historyPath ? attachmentCall(() => realpath(historyPath)) : Effect.fail(error);
     }),
     Effect.catch((error) =>
       isMissing(error)
@@ -194,7 +206,7 @@ function isMissing(error: AttachmentOperationError): boolean {
 export const resolveWorkspaceFile = Effect.fn("Workspace.resolveWorkspaceFile")(function* (
   agent: Pick<AgentSummary, "id" | "workspacePath">,
   inputPath: string,
-  options: { allowOutside?: boolean } = {},
+  options: { allowOutside?: boolean; fileHistory?: readonly string[] } = {},
 ): Effect.fn.Return<ResolvedWorkspaceFile, AttachmentOperationError> {
   const { resolvedPath, insideWorkspace, metadata } = yield* resolveWorkspacePath(agent, inputPath, options);
   if (!metadata.isFile()) return yield* refuse("not-file", sourceText("error.backend.workspacePathNotFile"));

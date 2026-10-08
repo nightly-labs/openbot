@@ -218,8 +218,11 @@ creates them and the Customer Portal settings.
   account from `openbot_user_id`. It never moves a known
   customer to another account, and it skips a subscription that names no account.
 - Desktop Settings → Billing and the web Billing dialog render `@openbot/ui/features/billing`: one
-  row for each open plan, with the server name, the plan, its price, and a menu to change or cancel
-  it. The price is the list price of the Stripe Price in the subscription's currency (from
+  row for each open plan, with the server name, the plan, its price, and its renewal controls.
+  Hosted plans support cancellation that keeps data, Keep server, and explicit deletion now or
+  after the paid period. A stored deletion date and subscription ID drive the cron; a fresh
+  terminal Stripe state and a per-server operation lease guard deletion. See
+  [server deletion](../hosted-servers.md#billing-and-server-deletion). The price is the list price of the Stripe Price in the subscription's currency (from
   `currency_options` when that is not the Price's base currency), before discounts and tax. The
   webhook stores it with the subscription. The
   account button opens the Customer Portal for the payment method and invoices.

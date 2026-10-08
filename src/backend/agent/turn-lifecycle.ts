@@ -22,6 +22,7 @@ import type { DeliveryContext, MailboxStore } from "../mailbox-store";
 import {
   type AppServerNotification,
   decodeAccountLoginCompletedResult,
+  getArray,
   getRecord,
   getString,
   isRecord,
@@ -40,6 +41,7 @@ import type { MailboxSync } from "./mailbox-sync";
 import { PLAN_UPDATED_METHOD, planFromNotification } from "./plan-updates";
 import { isBalanceDiagnostic, isPlanLimitDiagnostic, isUsageLimitDiagnostic } from "./provider-diagnostics";
 import type { ProviderRuntime } from "./provider-runtime";
+import { ThreadFileHistory } from "./thread-file-history";
 import {
   isForeignReasoningError,
   isNonActionableCodexWarning,
@@ -126,6 +128,7 @@ export class TurnLifecycle {
   readonly #deltas: DeltaBuffer;
   readonly #usageLimits: UsageLimitGate;
   readonly #hooks: TurnHooks;
+  readonly fileHistory = new ThreadFileHistory();
   readonly #failedTurns = new Map<string, string>();
   readonly #itemTurns = new Map<string, string>();
   #scope = Scope.makeUnsafe();
@@ -177,6 +180,7 @@ export class TurnLifecycle {
   }
 
   forgetAgent(agentId: string): void {
+    this.fileHistory.forgetAgent(agentId);
     this.#failedTurns.delete(agentId);
     this.#lastEventAt.delete(agentId);
   }
@@ -214,6 +218,7 @@ export class TurnLifecycle {
   readonly dispose = Effect.fn("TurnLifecycle.dispose")(function* (this: TurnLifecycle) {
     yield* Scope.close(this.#scope, Exit.void);
     this.#scope = Scope.makeUnsafe();
+    this.fileHistory.clear();
     this.#failedTurns.clear();
     this.#turnAssociations.clear();
     this.#turnErrors.clear();
@@ -317,6 +322,11 @@ export class TurnLifecycle {
         const turnId = getString(params, "turnId");
         const item = getRecord(params, "item");
         if (!turnId || !item) return;
+        this.fileHistory.record(
+          agentId,
+          this.#conversation.publicThreadId(agentId, threadId),
+          getArray(params, "filePaths"),
+        );
         const itemId = getString(item, "id");
         if (itemId) this.#itemTurns.set(itemId, turnId);
         this.#markProduced(turnId, isRepeatedWork(item));

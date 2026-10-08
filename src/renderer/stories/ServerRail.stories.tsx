@@ -13,6 +13,10 @@ const args: Parameters<typeof ServerRail>[0] = {
   onAdd: fn(),
   onOpenSettings: fn(),
   onOpenUsage: fn(),
+  onLeave: fn(),
+  onDelete: fn(),
+  // The stopped hosted server in `mock-hosted-servers.ts`.
+  canDelete: (serverId) => serverId === "6f1c2d3e-4b5a-4c6d-8e7f-9a0b1c2d3e4f",
 };
 
 const MANY_SERVERS = createManyServers();
@@ -64,6 +68,9 @@ function InteractiveServerRail(props: Parameters<typeof ServerRail>[0]) {
       onAdd={props.onAdd}
       onOpenSettings={props.onOpenSettings}
       onOpenUsage={props.onOpenUsage}
+      onLeave={props.onLeave}
+      onDelete={props.onDelete}
+      canDelete={props.canDelete}
     />
   );
 }
@@ -101,6 +108,13 @@ export const SortableServers: Story = {
 export const RemoteSelected: Story = {
   args: {
     servers: STORY_SERVERS.map((server) => ({ ...server, active: server.kind === "remote" })),
+  },
+};
+
+/** A server that the user joined and does not own, so its menu can leave it. */
+export const JoinedServer: Story = {
+  args: {
+    servers: STORY_SERVERS.map((server) => (server.id === "team" ? { ...server, role: "member" as const } : server)),
   },
 };
 

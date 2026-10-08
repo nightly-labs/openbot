@@ -959,7 +959,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       for (const toolCall of toolCalls) {
         if (turn.toolCalls.has(toolCall.id)) continue;
         turn.toolCalls.set(toolCall.id, toolCall.name);
-        this.#emitToolCall(runtime, toolCall.id, toolCall.name, false);
+        this.#emitToolCall(runtime, toolCall.id, toolCall.name, false, toolCall.input);
         const plan = foldClaudePlanCall(runtime.plan, toolCall);
         if (plan) this.#emitPlan(runtime, plan);
       }
@@ -1039,7 +1039,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     yield* this.#completeTurn(runtime, status, errors.length > 0 ? errors.join("\n") : null);
   });
 
-  #emitToolCall(runtime: ThreadRuntime, id: string, name: string, completed: boolean): void {
+  #emitToolCall(runtime: ThreadRuntime, id: string, name: string, completed: boolean, input?: unknown): void {
     const turn = runtime.activeTurn;
     if (!turn) return;
     this.emit("notification", {
@@ -1047,6 +1047,12 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       params: {
         threadId: runtime.id,
         turnId: turn.id,
+        filePaths:
+          ["Read", "Write", "Edit", "MultiEdit"].includes(name) &&
+          isRecord(input) &&
+          typeof input.file_path === "string"
+            ? [input.file_path]
+            : undefined,
         item: { id, type: "toolCall", name, status: completed ? "completed" : "in_progress" },
       },
     });

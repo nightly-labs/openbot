@@ -41,6 +41,7 @@ import { computeAgentAvatarMoods } from "@openbot/ui/features/agents/agent-avata
 import { createFirstAgentDraft, type FirstAgentDraft } from "@openbot/ui/features/agents/FirstAgentSetup";
 import { BillingDialog } from "@openbot/ui/features/billing/BillingDialog";
 import { createBillingStore } from "@openbot/ui/features/billing/billing-store";
+import { LeaveServerDialog } from "@openbot/ui/features/servers/LeaveServerDialog";
 import { ServerRail } from "@openbot/ui/features/servers/ServerRail";
 import { createSettingsHostedServersStore } from "@openbot/ui/features/settings/stores/hosted-servers-store";
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
@@ -280,16 +281,31 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const [addServer, setAddServer] = createSignal<{ resume: AddServerResume | null } | null>(null);
   // True when the account can create hosted servers. The plus button then opens the plans.
   const [hostedServersAvailable, setHostedServersAvailable] = createSignal(false);
+  /** The hosted servers of this account. The server menu can delete these. */
+  const [hostedServerIds, setHostedServerIds] = createSignal<ReadonlySet<string>>(new Set());
   async function refreshHostedServersAvailable(): Promise<boolean> {
     // A failed read keeps the last answer: a network error does not turn the plans off.
-    const available = await hostedServerCalls.list().then(
-      (list) => list.available,
-      () => hostedServersAvailable(),
-    );
-    setHostedServersAvailable(available);
-    return available;
+    const list = await hostedServerCalls.list().catch(() => null);
+    if (!list) return hostedServersAvailable();
+    setHostedServersAvailable(list.available);
+    setHostedServerIds(new Set(list.servers.map((server) => server.serverId)));
+    return list.available;
   }
   void refreshHostedServersAvailable();
+  // A server that the add server dialog creates comes into the host list as an owned host. Each owned
+  // host is read once, so its Delete server item shows without a reload.
+  const readOwnedHostIds = new Set<string>();
+  createEffect(
+    () =>
+      workspace.state.hosts
+        .filter((host) => host.role === "owner" && !readOwnedHostIds.has(host.hostId))
+        .map((host) => host.hostId),
+    (hostIds) => {
+      if (hostIds.length === 0) return;
+      for (const hostId of hostIds) readOwnedHostIds.add(hostId);
+      void refreshHostedServersAvailable();
+    },
+  );
   /**
    * The plus button opens the add server dialog when the account can create hosted servers, else the
    * join dialog. It uses the last answer, so the click does not wait for the network; the read after it
@@ -548,6 +564,25 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     },
     billingOpen,
   );
+  /** Billing holds the hosted servers on the web, so the server menu deletes a server there. */
+  function deleteHostedServer(serverId: string): void {
+    setBillingOpen(true);
+    hostedServers.requestDeleteById(serverId);
+  }
+  /** The joined server that the leave confirmation asks about, and the element that asked. */
+  const [leaveRequest, setLeaveRequest] = createSignal<{ hostId: string; trigger: HTMLElement | null } | null>(null);
+  const leaveServer = createMemo(() => servers().find((item) => item.id === leaveRequest()?.hostId) ?? null);
+  // A server that leaves the list in another way ends the request, so it does not open again on a rejoin.
+  createEffect(
+    () => leaveRequest() !== null && leaveServer() === null,
+    (gone) => {
+      if (gone) setLeaveRequest(null);
+    },
+  );
+  async function leaveHost(): Promise<void> {
+    const host = workspace.state.hosts.find((item) => item.hostId === leaveRequest()?.hostId);
+    if (host) await workspace.leaveHost(host);
+  }
   createEffect(
     () => props.billingReturn,
     (billingReturn) => {
@@ -969,6 +1004,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   onOpenUsage={(id, trigger) => void openUsage(id, trigger)}
                   onSetMuted={setMuted}
                   onSetNotificationLevel={setNotificationLevel}
+                  onLeave={(hostId, trigger) => setLeaveRequest({ hostId, trigger })}
+                  onDelete={deleteHostedServer}
+                  canDelete={(id) => hostedServerIds().has(id)}
                 />
               </Show>
               <Sidebar
@@ -1015,6 +1053,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   onOpenUsage: (id, trigger) => void openUsage(id, trigger),
                   onSetMuted: setMuted,
                   onSetNotificationLevel: setNotificationLevel,
+                  onLeave: (hostId, trigger) => setLeaveRequest({ hostId, trigger }),
+                  onDelete: deleteHostedServer,
+                  canDelete: (id) => hostedServerIds().has(id),
                 }}
                 agents={workspace.profiles()}
                 activeAgentId={channelOpen() ? "" : (workspace.state.selectedId ?? "")}
@@ -1265,6 +1306,12 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   />
                 )}
               </Show>
+              <LeaveServerDialog
+                server={leaveServer()}
+                onClose={() => setLeaveRequest(null)}
+                onLeave={leaveHost}
+                restoreFocusTarget={leaveRequest()?.trigger}
+              />
               <BillingDialog
                 open={billingOpen()}
                 onOpenChange={setBillingOpen}

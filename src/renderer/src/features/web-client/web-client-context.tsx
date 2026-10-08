@@ -39,6 +39,7 @@ import {
   type WebWorkspaceRuntime,
 } from "./web-runtime";
 import { orderWebHosts, readWebServerOrder, writeWebServerOrder } from "./web-server-order";
+import { readWebServerSelection, writeWebServerSelection } from "./web-server-selection";
 
 interface WebConversation {
   page: ConversationPage | null;
@@ -163,6 +164,11 @@ export function createWebWorkspace(
   let pendingReload = false;
   let reloadPromise: Promise<void> | null = null;
   let hostsRefreshPromise: Promise<void> | null = null;
+  /**
+   * The hosts this account left. The leave revokes this session and takes the host out of the list;
+   * neither is an error. An id stays until a list without its host arrives.
+   */
+  const leftHostIds = new Set<string>();
   let acceptedInvite: { inviteUrl: string; host: RemoteTeamHost } | null = null;
   /** Set when a revoked session connects again by itself; cleared when the host is online. */
   let revokedReconnect = false;
@@ -205,7 +211,7 @@ export function createWebWorkspace(
         if (disposed || update.hostId !== hostId) return;
         setState((draft) => {
           draft.status = update.state;
-          draft.error = update.message;
+          draft.error = update.code === "session_revoked" && leftHostIds.has(update.hostId) ? null : update.message;
           if (update.state !== "online") {
             draft.approvals = [];
             draft.prompts = [];
@@ -516,7 +522,7 @@ export function createWebWorkspace(
             draft.duplicatingAgentIds = [];
             draft.capabilities = [];
             draft.status = "offline";
-            draft.error = currentText().t("webClient.error.accessEnded");
+            draft.error = leftHostIds.has(refreshHostId) ? null : currentText().t("webClient.error.accessEnded");
           });
           // First, so the host that left does not get a status connection when it stops being open.
           runtime.hosts?.setHosts(hosts);
@@ -533,8 +539,13 @@ export function createWebWorkspace(
           draft.hostsLoaded = true;
           draft.hostsError = null;
         });
-        const first = orderWebHosts(hosts, serverOrder())[0];
-        if (!hostId && first) await connect(first);
+        for (const left of leftHostIds) if (!hosts.some((host) => host.hostId === left)) leftHostIds.delete(left);
+        if (!hostId) {
+          const savedHostId = readWebServerSelection(props.accountId);
+          const initialHost =
+            hosts.find((host) => host.hostId === savedHostId) ?? orderWebHosts(hosts, serverOrder())[0];
+          if (initialHost) await connect(initialHost);
+        }
         // After the opened host, so it takes its Signal connection before the status connections.
         if (!disposed) runtime.hosts?.setHosts(hosts);
       } catch (error) {
@@ -562,6 +573,23 @@ export function createWebWorkspace(
       },
     );
     return promise;
+  }
+  /**
+   * Leaves a joined host. The host leaves the list as it does when access ends, but without an error.
+   * Resolves when the membership is gone. The list read follows it, so a failed read or the connect
+   * to the next host is not a failed leave.
+   */
+  async function leaveHost(host: RemoteTeamHost): Promise<void> {
+    // Before the request: the host revokes this session before the request answers.
+    leftHostIds.add(host.hostId);
+    try {
+      await runtime.leaveHost(host.hostId, host.membershipId);
+    } catch (error) {
+      leftHostIds.delete(host.hostId);
+      throw error;
+    }
+    // A read that started before the leave can still list the host, so this read starts after it.
+    void (hostsRefreshPromise ?? Promise.resolve()).catch(() => undefined).then(retryHosts);
   }
   function retryHosts(): Promise<void> {
     return refreshHosts().catch(() => undefined);
@@ -598,6 +626,7 @@ export function createWebWorkspace(
     const keepWorkspace = sameHost && state.hostedSleep !== null;
     const previousSelected = sameHost ? selectedId : null;
     hostId = host.hostId;
+    writeWebServerSelection(props.accountId, host.hostId);
     if (!keepWorkspace) selectedId = null;
     if (!sameHost) hostLifecycle.endSleep();
     setState((draft) => {
@@ -1027,6 +1056,7 @@ export function createWebWorkspace(
     },
     run,
     refreshHosts,
+    leaveHost,
     retryHosts,
     reconnect,
     joinInvite,

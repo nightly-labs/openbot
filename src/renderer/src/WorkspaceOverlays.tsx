@@ -2,6 +2,7 @@ import type { CentralAuthUser, ServerSummary } from "@openbot/contracts/ipc";
 import { classifyFailure } from "@openbot/telemetry";
 import type { CustomAgentSettingsApi } from "@openbot/ui/features/custom-providers/CustomAgentSettings";
 import { providerDiagnosticsText } from "@openbot/ui/features/provider-diagnostics/provider-diagnostics";
+import { LeaveServerDialog } from "@openbot/ui/features/servers/LeaveServerDialog";
 import type { BitwardenConnectorPanelProps } from "@openbot/ui/features/settings/BitwardenConnectorPanel";
 import type { HostedSiteDeleteResult } from "@openbot/ui/features/settings/stores/hosted-sites-store";
 import { currentText } from "@openbot/ui/text";
@@ -106,6 +107,7 @@ export function WorkspaceOverlays(props: AccountProps) {
       <SharedAgentInstall />
       <JoinServer account={props.account} />
       <AddServer />
+      <LeaveServer />
       <ServerSettings
         githubConnector={githubFor(serverSettingsTarget())}
         onePasswordConnector={onePasswordFor(serverSettingsTarget())}
@@ -258,6 +260,19 @@ function AddServer() {
         setJoinServerOpen(true);
       }}
       onManageServers={() => openAppSettings(null, "hosted-servers")}
+    />
+  );
+}
+
+/** The leave confirmation that the server menu opens. */
+function LeaveServer() {
+  const { leaveConfirmServer, leaveRestoreTarget, cancelLeaveServer, leaveConfirmedServer } = useServerSettings();
+  return (
+    <LeaveServerDialog
+      server={leaveConfirmServer()}
+      onClose={cancelLeaveServer}
+      onLeave={leaveConfirmedServer}
+      restoreFocusTarget={leaveRestoreTarget()}
     />
   );
 }
@@ -615,6 +630,7 @@ function AppSettings(props: AccountProps) {
     appSettingsOpen,
     setAppSettingsOpen,
     appSettingsTab,
+    hostedServerDeleteRequest,
     generalSettings,
     builtInDisplayGeometry,
     updateGeneralSettings,
@@ -656,6 +672,7 @@ function AppSettings(props: AccountProps) {
         onOpenNotificationSettings={openNotificationSettings}
         restoreFocusTarget={appSettingsRestoreTarget()}
         openTab={appSettingsTab()}
+        hostedServerDeleteRequest={hostedServerDeleteRequest()}
       />
     </Loading>
   );
