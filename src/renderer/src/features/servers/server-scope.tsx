@@ -57,7 +57,7 @@ const ServerScope = createSimpleContext({
       markDirectMessagesRead,
       conversationVisible,
     } = useDirectMessages();
-    const { setModelOptions, activeAgent, setAgentStatus, applyStoredAgents } = useAgents();
+    const { setModelOptions, activeAgent, setAgentStatus, applyStoredAgents, setAgentListSettled } = useAgents();
     const {
       setBrowserControlState,
       supportsBrowser,
@@ -107,6 +107,7 @@ const ServerScope = createSimpleContext({
           })
           .catch((error) => {
             if (!isCurrent()) return;
+            setAgentListSettled(true);
             const text = currentText();
             setAgentStatus((current) => ({
               ...current,

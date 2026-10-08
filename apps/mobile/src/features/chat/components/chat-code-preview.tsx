@@ -6,12 +6,13 @@ import { useThemeColor } from "heroui-native/hooks";
 import { ChevronRight, CodeXml, Workflow } from "lucide-react-native";
 import { memo, useState } from "react";
 import { Pressable, useWindowDimensions, View } from "react-native";
-import Animated, { cubicBezier, useReducedMotion } from "react-native-reanimated";
+import Animated, { cubicBezier } from "react-native-reanimated";
 import { useUniwind } from "uniwind";
 import { storeCodePreview } from "@/features/chat/model/code-preview-store";
 import { useMermaidDiagram } from "@/features/chat/model/mermaid-diagrams";
 import { expoGoDomOptions } from "@/shared/lib/expo-go-dom";
 import { haptics } from "@/shared/lib/haptics";
+import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
 import HtmlPreview from "./html-preview.dom";
 

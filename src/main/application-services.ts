@@ -14,6 +14,7 @@ import { RoutineFlowStore } from "../backend/routine-flows/routine-flow-store";
 import { createRoutineFlows, type RoutineFlowsHandle } from "../backend/routine-flows/routine-flows";
 import { type AgentAdminSettingsService, createAgentAdminSettings } from "./agent-admin-settings";
 import { spawnAgentDatabaseHost } from "./agent-database-host-process";
+import { HostReleaseService, readInstallationMode } from "./host-release-service";
 import { LocalSkillLibrary } from "./local-skill-library";
 import { localSkillTools } from "./local-skill-tools";
 import { MAC_PERMISSION_URLS } from "./mac-permission-urls";
@@ -162,6 +163,7 @@ import { PROVIDER_DETECTION_SETTINGS_FILE, ProviderDetectionSettingsStore } from
 import { startProviderLog } from "./provider-log";
 import { toProviderRuntimeFailure } from "./provider-runtime-effects";
 import { ProviderRuntimeManager, providerRuntimeRoot, runtimeTarget } from "./provider-runtime-manager";
+import { ProviderUseSettingsStore } from "./provider-use-settings-store";
 import { RemoteDesktopManager } from "./remote-desktop-manager";
 import { resolveRemoteDesktopRuntime } from "./remote-desktop-runtime-artifact";
 import { loadOrCreateRemoteDesktopCredentials } from "./remote-desktop-secret-store";
@@ -830,7 +832,10 @@ export async function createApplicationServices({
    * store is the path it always used. The switch is read here rather than imported from the entry
    * point, which this file may not reach into; both readers read the same immutable value.
    */
+  const providerUse = new ProviderUseSettingsStore(join(app.getPath("userData"), "openbot-provider-use-v1.json"));
+  await runCauseEffect(providerUse.load());
   const providerRuntimes = new ProviderRuntimeManager({
+    isProviderOn: (provider) => !providerUse.off().includes(provider),
     root: providerRuntimeRoot({
       appData: app.getPath("appData"),
       userDataOverride: app.commandLine.getSwitchValue("user-data-dir"),
@@ -1124,6 +1129,13 @@ export async function createApplicationServices({
     visualPreview: new ChatVisualPreviewer(),
     hostMemory,
     requestTimeoutMs: 30_000,
+    offProviders: providerUse.off(),
+    saveProviderUse: (provider, on) =>
+      providerUse
+        .set(provider, on)
+        .pipe(
+          Effect.mapError((error) => new AgentLifecycleFailed({ operation: "saveProviderUse", cause: error.cause })),
+        ),
     preferredProvider: setupState.preferredProvider ?? "codex",
     bundledExecutables: providerRuntimes.bundledExecutables(),
     prepareAgentWorkspace: (agent) =>
@@ -1457,6 +1469,19 @@ export async function createApplicationServices({
   // The host comes before the updater, and the restart readiness reads the host. The routes reach
   // the schedule through this, and a request that arrives before it exists is refused.
   let requestedUpdate: RequestedUpdate | undefined;
+  const hostRelease = new HostReleaseService({
+    currentVersion: app.getVersion(),
+    packaged: app.isPackaged,
+    platform: process.platform,
+    arch: process.arch,
+    environment: process.env,
+    installationMode:
+      app.isPackaged && process.platform === "linux" ? await runCauseEffect(readInstallationMode()) : null,
+    updateStatus: () => ({
+      phase: requestedUpdate?.snapshot().phase ?? "unsupported",
+      managedByHost: requestedUpdate?.snapshot().remoteUpdates === "managed",
+    }),
+  });
   const scheduledUpdate = (): RequestedUpdate => {
     if (!requestedUpdate) throw new RequestedUpdateRefusal("unsupported");
     return requestedUpdate;
@@ -1506,10 +1531,12 @@ export async function createApplicationServices({
         customProviders: customProviderChanges,
         pasteSignIn: pasteCodeLoginSupported(),
       },
+      release: hostRelease,
       update: {
         snapshot: () => scheduledUpdate().snapshot(),
         check: () => scheduledUpdate().check(),
         start: (member, mode) => scheduledUpdate().start(member, mode),
+        requestWhenIdle: (member) => scheduledUpdate().requestWhenIdle(member),
         cancel: () => scheduledUpdate().cancel(),
         changeSettings: (change) => scheduledUpdate().changeSettings(change),
       },

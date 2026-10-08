@@ -11,7 +11,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
-import { useReducedMotion } from "react-native-reanimated";
+import { ReducedMotionConfig, ReduceMotion } from "react-native-reanimated";
 import { useCSSVariable, useUniwind, withUniwind } from "uniwind";
 
 import { MobileAnalyticsLifecycle } from "@/features/analytics/lifecycle";
@@ -23,10 +23,13 @@ import { loadDictationLanguage } from "@/features/settings/model/dictation-langu
 import { loadHapticsPreference } from "@/features/settings/model/haptics";
 import { loadLiveActivitiesPreference } from "@/features/settings/model/live-activities";
 import { loadAgentColorMessages } from "@/features/settings/model/message-color";
+import { useMotionPreferences } from "@/features/settings/model/motion";
+import { loadMotionPreferences } from "@/features/settings/model/motion-storage";
 import { installSupportLog } from "@/features/support/model/support-log-capture";
 import { AppLoadingOverlayProvider, useAppLoadingOverlay } from "@/shared/components/app-loading-overlay";
 import { BloubAnimationProvider } from "@/shared/components/bloub-loader";
 import { SplashBackdrop } from "@/shared/components/splash-backdrop";
+import { useReducedMotion } from "@/shared/lib/motion";
 import { nativeSplash } from "@/shared/lib/native-splash";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { queryClient } from "@/shared/lib/query-client";
@@ -54,8 +57,11 @@ function RootNavigator() {
   const pathname = usePathname();
   const { setLoadingLabel, isLoaderPresent } = useAppLoadingOverlay();
   const appearanceReady = useAppearance((state) => state.ready);
-  const busy = loading || !appearanceReady || (!session && isLoaderPresent);
-  const { covered, reportArtwork, reportContentReady } = useSplashGate(busy, nativeSplash, appearanceReady);
+  // Motion choices are read before the first screen, so no screen starts an animation that Settings turned off.
+  const motionReady = useMotionPreferences((state) => state.ready);
+  const preferencesReady = appearanceReady && motionReady;
+  const busy = loading || !preferencesReady || (!session && isLoaderPresent);
+  const { covered, reportArtwork, reportContentReady } = useSplashGate(busy, nativeSplash, preferencesReady);
 
   const container = useRef<View>(null);
   const reducedMotion = useReducedMotion();
@@ -96,7 +102,7 @@ function RootNavigator() {
             accessibilityElementsHidden={covered}
             importantForAccessibility={covered ? "no-hide-descendants" : "auto"}
           >
-            {!loading && appearanceReady ? (
+            {!loading && preferencesReady ? (
               <View className="flex-1" onLayout={session || pathname !== "/" ? () => reportReady() : undefined}>
                 <Stack
                   screenOptions={{
@@ -109,7 +115,10 @@ function RootNavigator() {
                     <Stack.Screen name="index" options={{ headerShown: false }} />
                     <Stack.Screen
                       name="scan-qr-code"
-                      options={{ animation: "slide_from_right", title: t("mobile.app.route.scanQrCode") }}
+                      options={{
+                        animation: reducedMotion ? "fade" : "slide_from_right",
+                        title: t("mobile.app.route.scanQrCode"),
+                      }}
                     />
                   </Stack.Protected>
                   <Stack.Protected guard={Boolean(session)}>
@@ -129,7 +138,7 @@ function RootNavigator() {
             accessibilityElementsHidden={!covered}
             importantForAccessibility={covered ? "auto" : "no-hide-descendants"}
           >
-            {appearanceReady && (covered || !motion.complete) ? (
+            {preferencesReady && (covered || !motion.complete) ? (
               <SplashBackdrop
                 onArtworkDisplay={reportArtwork}
                 progress={motion.progress}
@@ -146,6 +155,8 @@ function RootNavigator() {
 
 export default function RootLayout() {
   const { theme: colorScheme } = useUniwind();
+  const animations = useMotionPreferences((state) => state.allAnimations);
+  const heroConfig = useMemo(() => (animations ? {} : { animation: "disable-all" as const }), [animations]);
   const canvas = String(useCSSVariable("--openbot-bg-native-canvas"));
   // React Navigation paints its near-black dark background behind screens during transitions.
   const darkTheme = useMemo(() => ({ ...DarkTheme, colors: { ...DarkTheme.colors, background: canvas } }), [canvas]);
@@ -160,6 +171,7 @@ export default function RootLayout() {
     void loadHapticsPreference().catch(() => undefined);
     void loadAgentColorMessages().catch(() => undefined);
     void loadLiveActivitiesPreference().catch(() => undefined);
+    void loadMotionPreferences().catch(() => undefined);
     void loadDictationLanguage().catch(() => undefined);
     void loadAppLanguage().catch(() => undefined);
   }, []);
@@ -175,7 +187,9 @@ export default function RootLayout() {
         preserveEdgeToEdge={isAndroid}
       >
         <QueryClientProvider client={queryClient}>
-          <HeroUINativeProvider>
+          <HeroUINativeProvider config={heroConfig}>
+            {/* Off in Settings reduces every animation that follows the system Reduce Motion setting. */}
+            {animations ? null : <ReducedMotionConfig mode={ReduceMotion.Always} />}
             <ThemeProvider value={colorScheme === "dark" ? darkTheme : DefaultTheme}>
               <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
               <BloubAnimationProvider>

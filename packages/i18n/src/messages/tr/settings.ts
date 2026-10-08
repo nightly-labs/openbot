@@ -241,9 +241,9 @@ export const messages = {
     "OpenBot hiçbir ajan çalışmadığında {target} sürümünü yükler. Yeni rutin çalıştırmaları o zamana kadar bekler.",
   "settings.updates.idleRestart.relaunch": "Boştayken yeniden başlat",
   "settings.updates.idleRestart.update": "Boştayken yükle",
-  "settings.updates.allowRemote.title": "Sunucu yöneticilerinden gelen güncellemelere izin ver",
+  "settings.updates.allowRemote.title": "Sunucu üyelerinin güncelleme yapmasına izin ver",
   "settings.updates.allowRemote.description":
-    "Bu sunucunun sahipleri ve yöneticileri bir güncelleme indirebilir ve bu bilgisayarda OpenBot'u yeniden başlatabilir.",
+    "Oturum açmış tüm sunucu üyeleri, bu bilgisayar boştayken güncelleme isteyebilir. Sahipler ve yöneticiler ayrıca yeniden başlatmayı zorlayabilir.",
   "settings.hostedSites.title": "Yayınlanan siteler",
   "settings.hostedSites.unavailable": "Site barındırma kullanılamıyor.",
   "settings.hostedSites.usage": { one: "{count} siteden {used} tanesi", other: "{count} siteden {used} tanesi" },

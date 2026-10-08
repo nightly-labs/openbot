@@ -10,7 +10,6 @@ export const messages = {
   "mobile.app.route.newSection": "新しいセクション",
   "mobile.app.route.settings": "設定",
   "mobile.app.route.profile": "プロフィール",
-  "mobile.app.route.general": "一般",
   "mobile.app.route.accountSessions": "アカウントのセッション",
   "mobile.app.route.about": "情報",
   "mobile.app.route.support": "サポート",

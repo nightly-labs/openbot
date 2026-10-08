@@ -24,6 +24,7 @@ const LABELS: Record<AppLanguage, AppLanguageOption> = {
   fr: { id: "fr", label: "Français", lang: "fr" },
   ja: { id: "ja", label: "日本語", lang: "ja" },
   pt: { id: "pt", label: "Português (Brasil)", lang: "pt-BR" },
+  ru: { id: "ru", label: "Русский", lang: "ru" },
   tr: { id: "tr", label: "Türkçe", lang: "tr" },
 };
 

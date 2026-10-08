@@ -14,6 +14,7 @@ import { QueuedMessagesProvider } from "@/features/chat/context/queued-messages-
 import { setLiveActivityNavigator } from "@/features/live-activity/model/live-activity-link";
 import { AppDrawerShell } from "@/features/servers/components/app-drawer-shell";
 import { MobileWorkspaceProvider } from "@/features/workspace/context/mobile-workspace-context";
+import { useReducedMotion } from "@/shared/lib/motion";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 
 export const unstable_settings = {
@@ -22,6 +23,8 @@ export const unstable_settings = {
 
 function AuthenticatedStack() {
   const segments = useSegments();
+  // Reduced motion, from the device or from Settings, replaces the full-screen slide with a cross-fade.
+  const pushAnimation = useReducedMotion() ? "fade" : "slide_from_right";
   const background = useThemeColor("background");
   const sheetBackground = String(useCSSVariable("--openbot-bg-sheet") ?? background);
   const [navigationGate] = useState(createChatNavigationGate);
@@ -80,7 +83,7 @@ function AuthenticatedStack() {
         <Stack.Screen
           name="chat/[agentId]"
           options={{
-            animation: "slide_from_right",
+            animation: pushAnimation,
             contentStyle: { backgroundColor: background },
             fullScreenGestureEnabled: false,
             gestureEnabled: true,
@@ -90,7 +93,7 @@ function AuthenticatedStack() {
         <Stack.Screen
           name="code-preview/[previewId]"
           options={{
-            animation: "slide_from_right",
+            animation: pushAnimation,
             contentStyle: { backgroundColor: background },
             // The diagram pans with one finger, so only the screen edge goes back.
             fullScreenGestureEnabled: false,
@@ -102,7 +105,7 @@ function AuthenticatedStack() {
         <Stack.Screen
           name="channel/[channelId]"
           options={{
-            animation: "slide_from_right",
+            animation: pushAnimation,
             contentStyle: { backgroundColor: background },
             fullScreenGestureEnabled: false,
             gestureEnabled: true,

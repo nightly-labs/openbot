@@ -1850,7 +1850,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     }
     if (update.sessionUpdate === "tool_call" || update.sessionUpdate === "tool_call_update") {
       turn.receivedOutput = true;
-      if (update.sessionUpdate === "tool_call") this.#completeMessage(thread, turn, "commentary");
+      // A tool call ends the step, so thinking after it is a new thought, not text added to the old one.
+      if (update.sessionUpdate === "tool_call") {
+        this.#completeThought(thread, turn);
+        this.#completeMessage(thread, turn, "commentary");
+      }
       // ACP updates are partial; OpenCode omits the name when a tool finishes.
       const name = update.name ?? update.title ?? turn.toolNames.get(update.toolCallId) ?? "tool";
       turn.toolNames.set(update.toolCallId, name);

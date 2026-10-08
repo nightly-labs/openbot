@@ -5,6 +5,7 @@ import { mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import type { AgentProviderId, AgentSummary, ConversationMessage, ConversationSnapshot } from "@openbot/contracts/ipc";
 import {
   hostedSiteConversationEventItemType,
@@ -17,6 +18,7 @@ import { afterEach, assert, describe, expect, it } from "vitest";
 import { AgentRoutineStore } from "./agent-routine-store";
 import { ChannelRoutineStore } from "./channel-routine-store";
 import { ChannelStore } from "./channel-store";
+import { ConversationReadStore } from "./conversation-read-store";
 import { runCauseEffect } from "./effect-boundary";
 import { OpenBotDatabase } from "./openbot-database";
 
@@ -633,6 +635,164 @@ describe("OpenBotDatabase", () => {
     expect(search.results.map((result) => result.message.id)).toEqual(["message-00234"]);
     expect(search.nextCursor).toBeNull();
     expect(database.searchConversationMessages("pagination needle")).toEqual(search);
+    database.close();
+  });
+
+  it("pages a conversation in the order the live conversation shows it (#1540)", async () => {
+    const database = await createDatabase();
+    const agent = testAgent();
+    database.replaceAgents("agents-acp-order", [agent], "agents.imported");
+    const at = (seconds: number) => new Date(Date.UTC(2026, 0, 1, 0, 0, seconds)).toISOString();
+    const message = (id: string, seconds: number, fields: Partial<ConversationMessage> = {}): ConversationMessage => ({
+      id,
+      author: "assistant",
+      text: id,
+      createdAt: at(seconds),
+      status: "completed",
+      ...fields,
+    });
+    const messages: ConversationMessage[] = [];
+    for (let turn = 0; turn < 12; turn += 1) {
+      const start = turn * 100;
+      const turnId = `turn-${turn}`;
+      messages.push(
+        // Each later question was queued while the turn before it ran.
+        message(`${turnId}-question`, turn === 0 ? 0 : start - 50, { author: "user", turnId }),
+        message(`${turnId}-thought`, start + 1, { turnId, itemType: "commentary" }),
+        message(`${turnId}-tie`, start + 1, { turnId, itemType: "commentary" }),
+        // An ACP agent sends its answer only when the turn ends.
+        message(`${turnId}-answer`, start + 90, { turnId }),
+      );
+    }
+    // Grok refuses a steer and answers it in the same turn, after the first answer.
+    messages.push(
+      message("steered-question", 2_000, { author: "user", turnId: "steered" }),
+      message("steered-thought", 2_001, { turnId: "steered", itemType: "commentary" }),
+      message("steer", 2_010, { author: "user", turnId: "steered" }),
+      message("steered-first-answer", 2_020, { turnId: "steered" }),
+      message("steered-second-thought", 2_021, { turnId: "steered", itemType: "commentary" }),
+      message("steered-second-answer", 2_030, { turnId: "steered" }),
+      message("marker", 2_015),
+    );
+    // The shared order puts a turn's question first even when its answer has an earlier time.
+    messages.push(
+      message("skewed-answer", 1_500, { turnId: "skewed" }),
+      message("skewed-thought", 1_501, { turnId: "skewed", itemType: "commentary" }),
+      message("skewed-question", 1_502, { author: "user", turnId: "skewed" }),
+    );
+    // Two messages alone at one time keep the order they were stored in.
+    messages.push(message("tie-z", 1_600), message("tie-a", 1_600));
+    // A turn larger than a page, with a steer on its last page.
+    messages.push(
+      message("large-question", 2_999, { author: "user", turnId: "large" }),
+      message("large-answer", 3_200, { turnId: "large" }),
+    );
+    for (let index = 0; index < 120; index += 1) {
+      const id = `large-${index.toString().padStart(3, "0")}`;
+      messages.push(
+        index === 110
+          ? message(id, 3_000 + index, { author: "user", turnId: "large" })
+          : message(id, 3_000 + index, { turnId: "large", itemType: "commentary" }),
+      );
+    }
+    // The live runtime sorts a snapshot before it stores it.
+    sortConversationMessages(messages);
+    const expected = messages.map(({ id }) => id);
+    database.persistConversation(
+      { agentId: agent.id, threadId: agent.threadId, activeTurnId: null, revision: 0, messages },
+      "conversation.acp-order",
+    );
+
+    expect(database.readConversation(agent.id, agent.threadId).messages.map(({ id }) => id)).toEqual(expected);
+    expect(expected.indexOf("turn-1-question")).toBeGreaterThan(expected.indexOf("turn-0-answer"));
+    expect(expected.indexOf("steer")).toBeGreaterThan(expected.indexOf("steered-thought"));
+    expect(expected.indexOf("skewed-answer")).toBeGreaterThan(expected.indexOf("skewed-question"));
+    expect(expected.indexOf("tie-a")).toBeGreaterThan(expected.indexOf("tie-z"));
+    expect(expected.indexOf("steered-first-answer")).toBeLessThan(expected.indexOf("steered-second-thought"));
+
+    for (const limit of [1, 5, 50]) {
+      const pages: string[][] = [];
+      let page = database.readConversationPage(agent.id, agent.threadId, { type: "latest" }, limit);
+      pages.unshift(page.messages.map(({ id }) => id));
+      while (page.pageInfo.olderCursor) {
+        page = database.readConversationPage(
+          agent.id,
+          agent.threadId,
+          { type: "before", cursor: page.pageInfo.olderCursor },
+          limit,
+        );
+        expect(page.messages.length).toBeLessThanOrEqual(100);
+        pages.unshift(page.messages.map(({ id }) => id));
+      }
+      expect(pages.flat()).toEqual(expected);
+      const pageOfTurn = new Map<string, number>();
+      pages.forEach((ids, index) => {
+        for (const id of ids) {
+          const turnId = messages.find((candidate) => candidate.id === id)?.turnId;
+          if (!turnId || turnId === "large") continue;
+          expect(pageOfTurn.get(turnId) ?? index).toBe(index);
+          pageOfTurn.set(turnId, index);
+        }
+      });
+    }
+
+    // The marker came while the steered turn ran and shows after it. Read through it, only the
+    // answer of the later turn is unread.
+    expect(new ConversationReadStore(database).markReadForThread("member", agent.threadId, "marker")).toEqual({
+      unreadCount: 1,
+      firstUnreadMessageId: "large-answer",
+      throughMessageId: "marker",
+    });
+    // Read through the thought, the answer shown after it is still unread.
+    expect(
+      new ConversationReadStore(database).markReadForThread("skew-reader", agent.threadId, "skewed-thought"),
+    ).toMatchObject({ firstUnreadMessageId: "skewed-answer" });
+
+    // An anchor late in a turn larger than a page still gets the rows after it.
+    const lateAnchor = database.readConversationPage(
+      agent.id,
+      agent.threadId,
+      { type: "around", messageId: "large-105" },
+      4,
+    );
+    expect(lateAnchor.messages.length).toBeLessThanOrEqual(100);
+    expect(lateAnchor.messages.map(({ id }) => id)).toContain("large-106");
+
+    // An anchor at the start of a turn keeps the page's room for that turn, not for earlier turns.
+    const turnStart = database.readConversationPage(
+      agent.id,
+      agent.threadId,
+      { type: "around", messageId: "large-question" },
+      50,
+    );
+    expect(turnStart.messages.map(({ id }) => id)).toEqual(
+      expected.slice(expected.indexOf("large-question"), expected.indexOf("large-question") + 100),
+    );
+
+    // With limit 2 the turn before the anchor already fills the page; the rest of the turn still comes.
+    for (const limit of [2, 4]) {
+      const around = database.readConversationPage(
+        agent.id,
+        agent.threadId,
+        { type: "around", messageId: "steer" },
+        limit,
+      );
+      expect(around.messages.map(({ id }) => id)).toEqual(
+        expected.filter((id) => id.startsWith("steered") || id === "steer"),
+      );
+    }
+
+    const ordinal = expected.indexOf("turn-6-question");
+    const legacyCursor = Buffer.from(
+      JSON.stringify({ version: 1, createdAt: at(550), ordinal, messageId: "turn-6-question" }),
+    ).toString("base64url");
+    const legacyPage = database.readConversationPage(
+      agent.id,
+      agent.threadId,
+      { type: "before", cursor: legacyCursor },
+      100,
+    );
+    expect(legacyPage.messages.map(({ id }) => id)).toEqual(expected.slice(0, expected.indexOf("turn-6-question")));
     database.close();
   });
 
