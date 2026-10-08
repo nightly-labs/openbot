@@ -25,6 +25,7 @@ import {
   isAvatarHue,
   isAvatarSeed,
   isBusyMessageMode,
+  isFilePreviewPageUrl,
   isMessageReaction,
   isReasoningEffort,
   isRoutineSchedule,
@@ -97,6 +98,11 @@ export function parseChannelId(value: unknown): string {
 
 export function parseAttachmentId(value: unknown): string {
   return requireString(value, "attachmentId", INPUT_LIMITS.identifier);
+}
+
+export function parseFilePreviewPageUrl(value: unknown): string {
+  if (!isFilePreviewPageUrl(value)) throw new Error("Invalid file preview page URL.");
+  return value;
 }
 
 export function parseOptionalAgentId(value: unknown): string | undefined {

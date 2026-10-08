@@ -27,7 +27,7 @@ describe("file previews", () => {
     expect(preview.bytes).toEqual(bytes);
     expect(preview.pageUrl).toBeDefined();
     expect(filePreviewPages.get(new URL(preview.pageUrl ?? ""))).toEqual(bytes);
-    expect(filePreviewFromBytes("downloaded.html", bytes).pageUrl).toBeDefined();
+    expect(filePreviewFromBytes("downloaded.html", bytes)).not.toHaveProperty("pageUrl");
     expect(filePreviewFromBytes("source.txt", bytes)).not.toHaveProperty("pageUrl");
   });
 

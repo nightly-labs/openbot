@@ -38,6 +38,7 @@ import type { AgentService } from "../../backend/agent-service";
 import { causeHelpers, runCauseEffect } from "../../backend/effect-boundary";
 import type { MailboxStore } from "../../backend/mailbox-store";
 import { filePreviewFromBytes, localFilePreview, mimeTypeForName } from "../file-preview";
+import { filePreviewPages } from "../file-preview-pages";
 import { decodeVoid } from "../remote-host-decoding";
 import type { RemoteServerManager } from "../remote-server-manager";
 import { remoteCall, remoteDecode } from "../remote-service-effects";
@@ -46,6 +47,7 @@ import {
   parseAttachmentId,
   parseChooseAttachments,
   parseDownloadAttachments,
+  parseFilePreviewPageUrl,
   parseImportAttachments,
   parseOpenAttachment,
   parseOpenSharedFile,
@@ -129,6 +131,7 @@ export function attachmentIpcHandlers({
       }),
     },
     agentAttachments: {
+      releaseFilePreview: payloadHandler(parseFilePreviewPageUrl, (pageUrl) => filePreviewPages.release(pageUrl)),
       chooseAttachments: payloadHandler(agentRequest(parseChooseAttachments), async (parsed) => {
         const mainWindow = getMainWindow();
         const {

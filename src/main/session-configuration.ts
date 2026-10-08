@@ -124,10 +124,7 @@ export function configureAttachmentProtocol({ mailbox, agents, remoteServers }: 
   session.defaultSession.protocol.handle("openbot-visual", async (request) => {
     try {
       const url = new URL(request.url);
-      if (url.hostname === "preview") {
-        const page = request.method === "GET" ? filePreviewPages.get(url) : undefined;
-        return page ? chatVisualResponse(page) : new Response("Not found", { status: 404 });
-      }
+      if (url.hostname === "preview") return filePreviewPages.response(request);
       const id = url.hostname === "file" ? url.pathname.split("/").filter(Boolean).at(-1) : undefined;
       const attachment = id ? await runCauseEffect(mailbox.resolveAttachment(id)) : null;
       if (!attachment || !isChatVisualMimeType(attachment.mimeType)) return new Response("Not found", { status: 404 });

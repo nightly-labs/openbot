@@ -251,12 +251,15 @@ bridge to the app. `html_preview` lets the agent look at a page before it publis
 process draws it in a hidden window with its own in-memory session (`ChatVisualPreviewer`)
 and returns a PNG, the content height and the console lines. The file preview shows an HTML file in
 the same frame. On desktop, a shared or workspace HTML file preview gives the client a temporary
-`openbot-visual://preview/<token>` page URL beside its bytes. `FilePreviewPages` keeps only HTML
-that already passed the existing file-access checks, in a bounded in-memory cache. The page
+`openbot-visual://preview/<token>` page URL beside its bytes. `FilePreviewPages` keeps only local HTML
+that already passed the existing file-access checks, in a bounded in-memory registry. The page
 protocol accepts only an opaque token, never a file path, and uses the same sandbox response as
-HTML attachments. The source view and external open action keep their existing behavior. Pages
-above the existing 8 MB visual-page limit fall back to source. `FilePreview` is local IPC data;
-this optional field does not cross the Team API or change its frozen adapters.
+HTML attachments. The server-owned preview state releases its page on replacement, close or
+disposal; stale preview responses release their unused pages. Accepted
+addresses remain valid until release, including when the user switches to source and back. At
+most eight pages can be held. A full registry or a page above the existing 8 MB limit falls back
+to source. Downloaded remote files keep their existing preview path and are not registered here.
+`FilePreview` is local IPC data; this optional field does not cross the Team API or change its frozen adapters.
 
 Codex fixes dynamic tools at provider-session creation; resume does not update them. A local
 `provider-toolsets` manifest records the tool fingerprint for each new Codex session. Sessions with

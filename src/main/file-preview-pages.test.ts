@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { describe, expect, it } from "vitest";
-import { CHAT_VISUAL_PAGE_LIMIT, chatVisualResponse } from "./chat-visual-protocol";
+import { CHAT_VISUAL_PAGE_LIMIT } from "./chat-visual-protocol";
 import { FilePreviewPages } from "./file-preview-pages";
 
 const html = new TextEncoder().encode("<h1>Workspace report</h1><script>drawChart()</script>");
@@ -13,7 +13,7 @@ describe("workspace HTML preview pages", () => {
     expect(address).toBeDefined();
     const page = pages.get(new URL(address ?? ""));
     expect(page).toEqual(html);
-    const response = chatVisualResponse(page ?? new Uint8Array());
+    const response = pages.response(new Request(address ?? ""));
     expect(response.headers.get("Content-Security-Policy")).toBe("sandbox allow-scripts allow-forms");
     expect(response.headers.get("Access-Control-Allow-Origin")).toBeNull();
     expect(await response.text()).toContain("drawChart()");
@@ -37,16 +37,27 @@ describe("workspace HTML preview pages", () => {
     expect(pages.add("text/html", new Uint8Array(CHAT_VISUAL_PAGE_LIMIT + 1))).toBeUndefined();
   });
 
-  it("keeps a bounded set of recent pages and does not change when caller bytes change", () => {
+  it("keeps accepted pages alive until release and does not change when caller bytes change", () => {
     const pages = new FilePreviewPages(2);
     const bytes = html.slice();
     const first = pages.add("text/html", bytes);
     bytes.fill(0);
     const second = pages.add("text/html", html);
     expect(pages.get(new URL(first ?? ""))).toEqual(html);
-    const third = pages.add("text/html", html);
-    expect(pages.get(new URL(second ?? ""))).toBeUndefined();
+    expect(pages.add("text/html", html)).toBeUndefined();
     expect(pages.get(new URL(first ?? ""))).toEqual(html);
-    expect(pages.get(new URL(third ?? ""))).toEqual(html);
+    expect(pages.get(new URL(second ?? ""))).toEqual(html);
+    pages.release(first ?? "");
+    expect(pages.get(new URL(first ?? ""))).toBeUndefined();
+    expect(pages.add("text/html", html)).toBeDefined();
+  });
+
+  it("rejects non-GET page requests and unknown addresses through the protocol response", () => {
+    const pages = new FilePreviewPages();
+    const address = pages.add("text/html", html) ?? "";
+    expect(pages.response(new Request(address, { method: "POST" })).status).toBe(404);
+    expect(pages.response(new Request(`${address}?path=/private.html`)).status).toBe(404);
+    pages.release(address);
+    expect(pages.response(new Request(address)).status).toBe(404);
   });
 });

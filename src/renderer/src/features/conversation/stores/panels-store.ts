@@ -7,7 +7,9 @@ import {
 } from "@openbot/contracts/ipc";
 import { currentText } from "@openbot/ui/text";
 import { createMemo, createSignal } from "solid-js";
+import { createScopeGuard } from "../../../scope-lifetime";
 import { attachmentFilePreview } from "../attachment-preview";
+import { releaseFilePreviewPage } from "../conversation-port";
 import { conversationRuntime } from "../conversation-runtime";
 import type { ConversationProps, ConversationTarget, RightPanelMode, SidebarFilePreview } from "../conversation-types";
 
@@ -38,6 +40,7 @@ export interface PanelsStoreDeps {
 }
 
 export function createPanelsStore(deps: PanelsStoreDeps) {
+  const scopeActive = createScopeGuard();
   const [skillSettingsRequest, setSkillSettingsRequest] = createSignal<{ agentId: string; skillId: string } | null>(
     null,
   );
@@ -163,12 +166,19 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
       .agent.previewSharedFile({ path })
       .then(
         (preview) => {
-          if (generation !== deps.currentFilePreviewGeneration() || deps.props.agent?.id !== ownerAgentId) return;
+          if (
+            !scopeActive() ||
+            generation !== deps.currentFilePreviewGeneration() ||
+            deps.props.agent?.id !== ownerAgentId
+          ) {
+            releaseFilePreviewPage(preview.pageUrl);
+            return;
+          }
           deps.setSidebarFilePreview({ ownerAgentId, source: { kind: "shared", path }, preview });
           setActiveRightPanel("file-preview", ownerAgentId);
         },
         (error) => {
-          if (generation !== deps.currentFilePreviewGeneration()) return;
+          if (!scopeActive() || generation !== deps.currentFilePreviewGeneration()) return;
           deps.setComposerError(filePreviewError(error, path), target);
         },
       );
@@ -184,12 +194,16 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     const serverId = deps.props.server?.id ?? "local";
     const target = { agentId, serverId };
     const generation = deps.nextFilePreviewGeneration();
-    const current = () => generation === deps.currentFilePreviewGeneration() && deps.props.agent?.id === agentId;
+    const current = () =>
+      scopeActive() && generation === deps.currentFilePreviewGeneration() && deps.props.agent?.id === agentId;
     const agent = conversationRuntime(deps.props).agent;
     deps.setComposerError(null, target);
     void agent.previewWorkspaceFile({ agentId, path }).then(
       (preview) => {
-        if (!current()) return;
+        if (!current()) {
+          releaseFilePreviewPage(preview.pageUrl);
+          return;
+        }
         deps.setSidebarFilePreview({ ownerAgentId: agentId, source: { kind: "workspace", path, folder }, preview });
         setActiveRightPanel("file-preview", agentId);
       },
@@ -200,7 +214,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
             showWorkspaceFolder(agentId, path, directory);
           },
           () => {
-            if (generation !== deps.currentFilePreviewGeneration()) return;
+            if (!scopeActive() || generation !== deps.currentFilePreviewGeneration()) return;
             deps.setComposerError(filePreviewError(error, path), target);
           },
         ),

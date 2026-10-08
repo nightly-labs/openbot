@@ -15,7 +15,7 @@ export function filePreviewFromBytes(name: string, bytes: Uint8Array): FilePrevi
   if (bytes.byteLength > ATTACHMENT_LIMITS.fileBytes) throw new Error(sourceText("error.attachment.previewTooLarge"));
   const mimeType = mimeTypeForName(name);
   const kind = filePreviewKindForFile(name, mimeType);
-  return withPage({ name, size: bytes.byteLength, mimeType, previewKind: kind, bytes: kind === "none" ? null : bytes });
+  return { name, size: bytes.byteLength, mimeType, previewKind: kind, bytes: kind === "none" ? null : bytes };
 }
 
 export const localFilePreview = Effect.fn("FilePreview.local")(function* (path: string, name: string, size: number) {
@@ -23,16 +23,14 @@ export const localFilePreview = Effect.fn("FilePreview.local")(function* (path: 
     return yield* Effect.fail(attachmentFailure(new Error(sourceText("error.attachment.previewTooLarge"))));
   const mimeType = mimeTypeForName(name);
   const kind = filePreviewKindForFile(name, mimeType);
-  return withPage({
+  const bytes = kind === "none" ? null : new Uint8Array(yield* attachmentCall(() => readFile(path)));
+  const pageUrl = bytes ? filePreviewPages.add(mimeType, bytes) : undefined;
+  return {
     name,
     size,
     mimeType,
     previewKind: kind,
-    bytes: kind === "none" ? null : new Uint8Array(yield* attachmentCall(() => readFile(path))),
-  });
+    bytes,
+    ...(pageUrl ? { pageUrl } : {}),
+  };
 });
-
-function withPage(preview: FilePreview): FilePreview {
-  const pageUrl = preview.bytes ? filePreviewPages.add(preview.mimeType, preview.bytes) : undefined;
-  return pageUrl ? { ...preview, pageUrl } : preview;
-}

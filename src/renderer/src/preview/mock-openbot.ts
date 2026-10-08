@@ -1644,6 +1644,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       openSharedFile: async (_input: OpenSharedFileInput) => undefined,
       openWorkspaceFile: async (_input: OpenWorkspaceFileInput) => undefined,
       previewSharedFile: async (input: OpenSharedFileInput) => mockFilePreview(input.path, "shared-file"),
+      releaseFilePreview: async () => undefined,
       previewWorkspaceFile: async (input: OpenWorkspaceFileInput) => {
         // A path with no extension is a folder here, so a folder chip reaches the listing as on desktop.
         if (!/\.[^/]+$/u.test(input.path)) throw new Error("Workspace path is not a file.");
