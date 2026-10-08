@@ -105,6 +105,8 @@ export const messages = {
   "mcp.panel.signIn": "サインイン",
   "mcp.panel.signOut": "サインアウト",
   "mcp.panel.cancelSignIn": "サインインをキャンセル",
+  "mcp.panel.signInTo": "{name} にサインイン",
+  "mcp.panel.cancelSignInTo": "{name} へのサインインをキャンセル",
   "mcp.panel.signInWaiting": {
     other: "ブラウザーでサインインを完了してください。OpenBot は {count} 分後に待機をやめます。",
   },

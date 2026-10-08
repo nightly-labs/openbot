@@ -492,6 +492,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                                 size="sm"
                                 variant="outline"
                                 disabled={!props.canManage}
+                                aria-label={t("mcp.panel.cancelSignInTo", { name: config().name })}
                                 onClick={() => cancelSignIn(config().url)}
                               >
                                 {t("mcp.panel.cancelSignIn")}
@@ -511,6 +512,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                                   size="sm"
                                   variant="outline"
                                   disabled={disabled()}
+                                  aria-label={t("mcp.panel.signInTo", { name: config().name })}
                                   onClick={() => void signInRow(config())}
                                 >
                                   <LogIn aria-hidden="true" />

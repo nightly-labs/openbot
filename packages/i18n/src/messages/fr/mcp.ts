@@ -107,6 +107,8 @@ export const messages = {
   "mcp.panel.signIn": "Se connecter",
   "mcp.panel.signOut": "Se déconnecter",
   "mcp.panel.cancelSignIn": "Annuler la connexion",
+  "mcp.panel.signInTo": "Se connecter à {name}",
+  "mcp.panel.cancelSignInTo": "Annuler la connexion à {name}",
   "mcp.panel.signInWaiting": {
     one: "Terminez la connexion dans votre navigateur. OpenBot cesse d’attendre après {count} minute.",
     other: "Terminez la connexion dans votre navigateur. OpenBot cesse d’attendre après {count} minutes.",
