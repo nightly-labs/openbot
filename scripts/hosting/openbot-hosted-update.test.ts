@@ -117,12 +117,12 @@ function versionOf(directory: string): string | null {
   return /X-AppImage-Version=(.+)/.exec(readFileSync(entry, "utf8"))?.[1] ?? null;
 }
 
-/** The installed script that `request` runs. It records each run, and fails `apply` when told to. */
+/** The installed script that `request` runs. It records each run, and fails a step when told to. */
 function installUpdater() {
   mkdirSync(join(root, "opt", "hosted"), { recursive: true });
   writeFileSync(
     join(root, "opt", "hosted", "openbot-hosted-update"),
-    `#!/bin/bash\necho "update $1" >>"$ROOT/calls"\n[ ! -e "$ROOT/fail-apply" ]\n`,
+    `#!/bin/bash\necho "update $1" >>"$ROOT/calls"\n[ ! -e "$ROOT/fail-$1" ]\n`,
     { mode: 0o755 },
   );
 }
@@ -217,8 +217,10 @@ describe("openbot-hosted-update", () => {
     expect(readdirSync(join(root, "opt"))).toEqual(["app"]);
   });
 
-  it("takes an install request without reading it, then stops OpenBot, applies and starts it again", () => {
+  it("takes an install request without reading it, then stages, stops OpenBot, applies and starts it again", () => {
     installUpdater();
+    // With no network, the release that is already staged still applies.
+    writeFileSync(join(root, "fail-stage"), "");
     // The service user owns the request directory, so a request can be a link to a file of root.
     mkdirSync(join(root, "run"));
     writeFileSync(join(root, "secret"), "root only\n");
@@ -227,6 +229,7 @@ describe("openbot-hosted-update", () => {
 
     expect(run("request").status).toBe(0);
     expect(log("calls").trim().split("\n")).toEqual([
+      "update stage",
       "systemctl stop openbot.service",
       "update apply",
       "systemctl start --no-block openbot.service",

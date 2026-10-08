@@ -344,11 +344,12 @@ OpenBot runs as the service user from a release that root owns, so it asks root 
 (`src/main/hosted-update-adapter.ts`). It makes an empty file in its runtime directory:
 `/run/openbot/update-stage` to download, and `/run/openbot/update-install` to install.
 `openbot-update-request.path` then starts `openbot-update-request.service`, which runs
-`openbot-hosted-update request` as root. That removes the file without reading it, and runs `stage`,
-or stops OpenBot, runs `apply` and starts OpenBot again, also after a failure. While it runs, root
-writes the step to `/run/openbot-update.state` and changes its time every 5 seconds. OpenBot reads
-each change as progress, so the deadlines of the updater find a request that root never takes or that
-stops. A request that comes during a timer download waits for it.
+`openbot-hosted-update request` as root. That removes the file without reading it and runs `stage`.
+For an install, it then stops OpenBot, runs `apply` and starts OpenBot again, also after a failure.
+A request that comes during a timer download waits for it while OpenBot runs. While a request runs,
+root writes the step to `/run/openbot-update.state` and changes its time every 5 seconds. OpenBot
+reads each change as download progress, so the download deadline finds a request that root never
+takes or that stops.
 
 The release that an older script moves into place has these units, but that script installs only
 the units it knows. So `openbot.service` runs `openbot-hosted-update trigger` as root before OpenBot

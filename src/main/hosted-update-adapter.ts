@@ -62,8 +62,10 @@ class RequestCancellation implements UpdateCancellationToken {
  *
  * UpdateService drives this as it drives electron-updater, so its deadlines apply. While root works,
  * the time of the state file changes, and each change is a progress event. When root stops without
- * a staged release, or never takes the request, the download fails. When root never stops OpenBot
- * after an install request, the install deadline reports the failure.
+ * a staged release, or never takes the request, the download fails. An install request has no
+ * answer: shutdown preparation exits OpenBot after its deadline, and when root did not take the
+ * request, systemd starts the same release again. Each start of openbot.service starts the path
+ * unit, so this happens only when an administrator stopped it.
  */
 export class HostedUpdateAdapter implements UpdateAdapter {
   allowPrerelease = false;

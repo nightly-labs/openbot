@@ -329,18 +329,25 @@ request() {
   if [ -e "$REQUESTS/update-install" ] || [ -L "$REQUESTS/update-install" ]; then install=1; fi
   if [ "$install" -eq 1 ]; then set_state installing; else set_state waiting; fi
   rm -f -- "$REQUESTS/update-stage" "$REQUESTS/update-install"
-  # OpenBot sees that the request runs while the time of $STATE changes.
-  (while sleep 5; do touch -c "$STATE"; done) >/dev/null 2>&1 &
+  # OpenBot sees that the request runs while the time of $STATE changes. The `stage` of the timer
+  # removes $STATE when it ends, so the keeper makes it again while this request waits for the lock.
+  (while sleep 5; do touch "$STATE"; done) >/dev/null 2>&1 &
   keeper=$!
-  if [ "$install" -eq 0 ]; then
-    "$INSTALL/hosted/openbot-hosted-update" stage || status=$?
-  elif systemctl stop openbot.service; then
-    # OpenBot starts again also when `apply` fails, or when systemd stops this service.
-    trap 'systemctl start --no-block openbot.service' EXIT
+  # An install stages first, so OpenBot runs while it waits for a `stage` of the timer. When that
+  # fails, for example with no network, a release that is already staged still applies.
+  "$INSTALL/hosted/openbot-hosted-update" stage || status=$?
+  if [ "$install" -eq 1 ]; then
+    status=0
+    # OpenBot starts again also when `apply` fails, or when systemd stops this service. A copy that
+    # did not complete is done again first, because a partial release cannot start.
+    trap '[ ! -e "$INSTALL/.applying" ] || "$INSTALL/hosted/openbot-hosted-update" apply
+      systemctl start --no-block openbot.service' EXIT
     trap 'exit 1' TERM
-    "$INSTALL/hosted/openbot-hosted-update" apply || status=$?
-  else
-    status=1
+    if systemctl stop openbot.service; then
+      "$INSTALL/hosted/openbot-hosted-update" apply || status=$?
+    else
+      status=1
+    fi
   fi
   kill "$keeper" 2>/dev/null || true
   rm -f "$STATE"
