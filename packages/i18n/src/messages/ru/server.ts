@@ -381,7 +381,7 @@ export const messages = {
   "server.update.waitingFor": "Ожидание: {reasons}.",
   "server.update.disabledTitle": "Удалённые обновления отключены",
   "server.update.disabledDescription":
-    "Пользователь {name} отключил обновления от администраторов сервера. Попросите его обновить OpenBot или включить эту настройку.",
+    "Пользователь {name} отключил обновления от участников сервера. Попросите его обновить OpenBot или включить эту настройку.",
   "server.update.managedTitle": "Обновлениями управляет Host Manager",
   "server.update.managedDescription": "OpenBot Host Manager обновляет {name}. Обратитесь к администратору хоста.",
   "server.update.unsupportedTitle": "{name} не может обновляться сам",

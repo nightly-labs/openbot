@@ -252,9 +252,9 @@ export const messages = {
     "OpenBot установит {target}, когда ни один агент не работает. Новые запуски регулярных задач до этого ждут.",
   "settings.updates.idleRestart.relaunch": "Перезапустить при простое",
   "settings.updates.idleRestart.update": "Установить при простое",
-  "settings.updates.allowRemote.title": "Разрешить обновления от администраторов сервера",
+  "settings.updates.allowRemote.title": "Разрешить обновления от участников сервера",
   "settings.updates.allowRemote.description":
-    "Владельцы и администраторы этого сервера смогут скачать обновление и перезапустить OpenBot на этом компьютере.",
+    "Все вошедшие участники сервера могут запросить обновление, когда этот компьютер простаивает. Владельцы и администраторы могут также принудительно перезапустить OpenBot.",
   "settings.hostedSites.title": "Опубликованные сайты",
   "settings.hostedSites.unavailable": "Размещение сайтов недоступно.",
   "settings.hostedSites.usage": {
