@@ -1285,9 +1285,16 @@ function binaryBody(value: unknown): Uint8Array | null {
   return null;
 }
 
-/** The bridge refused a frame because the data channel is closed. No byte of the frame left. */
+/**
+ * The bridge refused a frame because the data channel is closed. No byte of the frame left. A host
+ * error response is a `TeamWebRtcRequestError` with the host's message, so it never matches.
+ */
 function isClosedChannelError(error: unknown): boolean {
-  return error instanceof Error && error.message === sourceText("error.remote.channelNotOpen");
+  return (
+    error instanceof Error &&
+    !(error instanceof TeamWebRtcRequestError) &&
+    error.message === sourceText("error.remote.channelNotOpen")
+  );
 }
 
 /** The account API answers 403 or 404 for a session that ended, expired, or does not exist. */
