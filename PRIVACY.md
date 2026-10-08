@@ -445,7 +445,13 @@ The host gives this address to signed-in members over the existing encrypted con
 OpenBot stores it with the saved server and runs `tailscale status` on that computer to see whether
 the host device is reachable. Before it sends anything secret to the address, it checks the host's
 pinned key. It then sends one account ticket, which the host checks with the account service, and
-receives a session token that lasts 24 hours and is kept only in memory. Team API data then travels
+receives a session token that lasts 24 hours. OpenBot keeps this token for the next start in
+`~/Library/Application Support/OpenBot/openbot-direct-sessions-v1.bin`, encrypted by the operating
+system's secret storage, with the account, the server and the address it belongs to. Without that
+storage the token is kept only in memory. On the next start OpenBot checks the pinned host key again
+and then uses the kept token, with no account ticket. It removes the token at sign-out or when another
+account signs in, when the server is removed, when the member turns the direct connection off, when the
+host gives another address, and when the host no longer accepts it or it ends. Team API data then travels
 through Tailscale (WireGuard), not through Signal or a relay. The remote desktop and the live
 browser view still use WebRTC. The tailnet name and the device names stay on the computer that
 reads them; the only value that crosses to members is the address.

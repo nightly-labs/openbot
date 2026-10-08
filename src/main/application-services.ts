@@ -161,6 +161,7 @@ import { RemoteDesktopManager } from "./remote-desktop-manager";
 import { resolveRemoteDesktopRuntime } from "./remote-desktop-runtime-artifact";
 import { loadOrCreateRemoteDesktopCredentials } from "./remote-desktop-secret-store";
 import { appendRemoteDiagnosticLog } from "./remote-diagnostics";
+import { RemoteDirectSessionStore } from "./remote-direct-session-store";
 import { decodeVoid } from "./remote-host-decoding";
 import { RemoteServerManager } from "./remote-server-manager";
 import { sendToRenderer } from "./renderer-ipc";
@@ -217,6 +218,7 @@ const TEAM_FILE = "openbot-team-server-v1.json";
 /** One host per account. The v1 file above stays as the last build without accounts left it. */
 const TEAM_FILE_V2 = "openbot-team-server-v2.json";
 const REMOTE_SERVERS_FILE = "openbot-remote-servers-v1.json";
+const REMOTE_DIRECT_SESSIONS_FILE = "openbot-direct-sessions-v1.bin";
 /** The owner's switch for the direct Tailscale path of this host, and the `tailscale serve` port it set. */
 const TAILSCALE_DIRECT_FILE = "openbot-tailscale-direct-v1.json";
 const TAILSCALE_DOWNLOAD_URL = "https://tailscale.com/download";
@@ -1680,6 +1682,10 @@ export async function createApplicationServices({
     {
       createTeamAuthTicket: (serverId) => centralAuth.createTeamAuthTicket(serverId),
       getEmail: () => centralAuth.getSignedInUser().email,
+      getPrincipalId: () => {
+        const state = centralAuth.getState();
+        return state.status === "signed_in" ? state.user.id : null;
+      },
       sendTeamInviteEmail: (input) => centralAuth.sendTeamInviteEmail(input),
     },
     {
@@ -1688,6 +1694,10 @@ export async function createApplicationServices({
       appVersion: app.getVersion(),
       getLocalHostId: () => teamStore.getIdentity()?.serverId ?? null,
       localTailscale: () => tailscale.status(),
+      directSessions: new RemoteDirectSessionStore({
+        path: join(app.getPath("userData"), REMOTE_DIRECT_SESSIONS_FILE),
+        ...safeStorageCipher("error.app.macSecureStorageUnavailable"),
+      }),
       hostedServers: {
         unavailable: (serverId, wake) => hostedServers.unavailableHost(serverId, wake),
         wake: (serverId) => hostedServers.wake(serverId),

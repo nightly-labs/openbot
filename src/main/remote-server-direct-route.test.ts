@@ -1,11 +1,17 @@
 // @vitest-environment node
 
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { ServerCompatibility } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { Effect } from "effect";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { RemoteDirectSessionStore } from "./remote-direct-session-store";
 import {
+  DIRECT_REFRESH_MARGIN_MS,
   DIRECT_RETRY_AFTER_MS,
+  type DirectSessionPersistence,
   RemoteDirectRoutes,
   type RemoteDirectRoutesOptions,
 } from "./remote-server-direct-route";
@@ -226,5 +232,221 @@ describe("RemoteDirectRoutes", () => {
     const view: StoredRemoteServerView = direct.require(HOST);
     expect(view.transport).toBe("webrtc-v2");
     expect(direct.token(view)).toBe("webrtc-token");
+  });
+});
+
+describe("RemoteDirectRoutes with kept sessions", () => {
+  let directory = "";
+  // Across runs, so that each sign-in gives another token.
+  let issued = 0;
+  const DAY = 24 * 60 * 60_000;
+
+  afterEach(async () => {
+    if (directory) await rm(directory, { recursive: true, force: true });
+    directory = "";
+  });
+
+  /** One run of the app: a new store object over the same file, as after a restart. */
+  async function run(
+    principal: { id: string | null },
+    overrides: Partial<RemoteDirectRoutesOptions> & { server?: StoredRemoteServer; valid?: Set<string> } = {},
+  ) {
+    directory ||= await mkdtemp(join(tmpdir(), "openbot-direct-route-"));
+    const store = new RemoteDirectSessionStore({
+      path: join(directory, "sessions.bin"),
+      canPersist: () => true,
+      encrypt: (value) => Buffer.from(value),
+      decrypt: (value) => value.toString(),
+    });
+    const sessions: DirectSessionPersistence = {
+      principalId: () => principal.id,
+      read: (principalId, serverId) => store.load().pipe(Effect.map(() => store.get(principalId, serverId))),
+      write: (principalId, serverId, session) => store.set(principalId, serverId, session),
+      remove: (serverId) => store.delete(serverId),
+      clear: () => store.clear(),
+    };
+    const valid = overrides.valid ?? new Set<string>();
+    const result = routes(overrides.server ?? webRtcServer(), {
+      sessions,
+      signIn: () =>
+        Effect.sync(() => {
+          issued += 1;
+          const sessionToken = `direct-token-${issued}`;
+          valid.add(sessionToken);
+          return { sessionToken, sessionExpiresAt: new Date(Date.now() + DAY).toISOString() };
+        }),
+      checkSession: (_apiUrl, token) => Effect.succeed(valid.has(token) ? "valid" : "rejected"),
+      ...overrides,
+    });
+    return { ...result, store, valid };
+  }
+
+  async function keptToken(store: RemoteDirectSessionStore, principalId: string): Promise<string | null> {
+    await Effect.runPromise(store.load());
+    return store.get(principalId, HOST)?.token ?? null;
+  }
+
+  it("uses the kept session after a restart: the host key is checked, and no ticket or sign-in follows", async () => {
+    const principal = { id: "user-1" };
+    const valid = new Set<string>();
+    const first = await run(principal, { valid });
+    expect(await Effect.runPromise(first.direct.tryActivate(HOST))).toBe(true);
+    expect(first.steps).toEqual([`identity ${DIRECT}`, "ticket"]);
+    const token = first.direct.token(first.direct.require(HOST));
+    first.direct.clear();
+
+    const checked: string[] = [];
+    const second = await run(principal, {
+      valid,
+      checkSession: (apiUrl, token) =>
+        Effect.sync(() => {
+          checked.push(`${apiUrl} ${token}`);
+          return valid.has(token) ? "valid" : "rejected";
+        }),
+    });
+    expect(await Effect.runPromise(second.direct.tryActivate(HOST))).toBe(true);
+    expect(second.steps).toEqual([`identity ${DIRECT}`]);
+    expect(checked).toEqual([`${DIRECT} ${token}`]);
+    expect(second.direct.token(second.direct.require(HOST))).toBe(token);
+  });
+
+  it("sends no kept token to an address that answers with another host key", async () => {
+    const principal = { id: "user-1" };
+    const valid = new Set<string>();
+    const first = await run(principal, { valid });
+    await Effect.runPromise(first.direct.tryActivate(HOST));
+    const token = first.direct.token(first.direct.require(HOST));
+    const checkSession = vi.fn(() => Effect.succeed("valid" as const));
+    const second = await run(principal, {
+      valid,
+      checkSession,
+      verifyIdentity: () => Effect.succeed({ publicKey: "another-key", compatibility }),
+    });
+    expect(await Effect.runPromise(second.direct.tryActivate(HOST))).toBe(false);
+    expect(checkSession).not.toHaveBeenCalled();
+    // The host may be back with its own key later: the session stays kept.
+    expect(await keptToken(second.store, "user-1")).toBe(token);
+  });
+
+  it("signs in once when the host no longer accepts the kept session, and keeps the new one", async () => {
+    const principal = { id: "user-1" };
+    const first = await run(principal);
+    await Effect.runPromise(first.direct.tryActivate(HOST));
+    const old = first.direct.token(first.direct.require(HOST));
+    // The host restarted: its sessions are gone.
+    const checked: string[] = [];
+    const valid = new Set<string>();
+    const second = await run(principal, {
+      valid,
+      checkSession: (_apiUrl, token) =>
+        Effect.sync(() => {
+          checked.push(token);
+          return valid.has(token) ? "valid" : "rejected";
+        }),
+    });
+    expect(await Effect.runPromise(second.direct.tryActivate(HOST))).toBe(true);
+    expect(checked).toEqual([old]);
+    expect(second.steps).toEqual([`identity ${DIRECT}`, "ticket"]);
+    const renewed = second.direct.token(second.direct.require(HOST));
+    expect(renewed).not.toBe(old);
+    expect(await keptToken(second.store, "user-1")).toBe(renewed);
+  });
+
+  it("keeps the session and uses WebRTC when the check fails for another reason", async () => {
+    const principal = { id: "user-1" };
+    const valid = new Set<string>();
+    const first = await run(principal, { valid });
+    await Effect.runPromise(first.direct.tryActivate(HOST));
+    const token = first.direct.token(first.direct.require(HOST));
+    const second = await run(principal, {
+      valid,
+      checkSession: () => Effect.fail(new RemoteWorkflowError({ cause: new Error("timed out") })),
+    });
+    expect(await Effect.runPromise(second.direct.tryActivate(HOST))).toBe(false);
+    expect(second.steps).toEqual([`identity ${DIRECT}`]);
+    expect(await keptToken(second.store, "user-1")).toBe(token);
+  });
+
+  it("does not use a session of another account", async () => {
+    const valid = new Set<string>();
+    const first = await run({ id: "user-1" }, { valid });
+    await Effect.runPromise(first.direct.tryActivate(HOST));
+    const checkSession = vi.fn(() => Effect.succeed("valid" as const));
+    const second = await run({ id: "user-2" }, { valid, checkSession });
+    expect(await Effect.runPromise(second.direct.tryActivate(HOST))).toBe(true);
+    expect(checkSession).not.toHaveBeenCalled();
+    expect(second.steps).toEqual([`identity ${DIRECT}`, "ticket"]);
+    expect(await keptToken(second.store, "user-2")).toBe(second.direct.token(second.direct.require(HOST)));
+    expect(await keptToken(second.store, "user-1")).toBeNull();
+  });
+
+  it("keeps nothing while no account is signed in", async () => {
+    const first = await run({ id: null });
+    expect(await Effect.runPromise(first.direct.tryActivate(HOST))).toBe(true);
+    const second = await run({ id: "user-1" });
+    await Effect.runPromise(second.store.load());
+    expect(second.store.get("user-1", HOST)).toBeNull();
+  });
+
+  it("does not keep or use a session when the account changes during the attempt", async () => {
+    const principal: { id: string | null } = { id: "user-1" };
+    const first = await run(principal, {
+      createTicket: () =>
+        Effect.sync(() => {
+          principal.id = "user-2";
+          return "account-ticket";
+        }),
+    });
+    expect(await Effect.runPromise(first.direct.tryActivate(HOST))).toBe(false);
+    expect(first.direct.isActive(HOST)).toBe(false);
+    expect(await keptToken(first.store, "user-1")).toBeNull();
+    expect(await keptToken(first.store, "user-2")).toBeNull();
+  });
+
+  it("signs in again for a session close to its end, or one for another address", async () => {
+    const principal = { id: "user-1" };
+    const valid = new Set<string>();
+    const first = await run(principal, { valid });
+    await Effect.runPromise(first.direct.tryActivate(HOST));
+
+    const late = Date.now() + DAY - DIRECT_REFRESH_MARGIN_MS + 1_000;
+    const checkSession = vi.fn(() => Effect.succeed("valid" as const));
+    const second = await run(principal, { valid, checkSession, now: () => late });
+    expect(await Effect.runPromise(second.direct.tryActivate(HOST))).toBe(true);
+    expect(checkSession).not.toHaveBeenCalled();
+    expect(second.steps).toEqual([`identity ${DIRECT}`, "ticket"]);
+
+    const moved = "https://studio-mac-1.tail4b2c1.ts.net";
+    const third = await run(principal, {
+      valid,
+      checkSession,
+      server: webRtcServer({ directUrl: moved }),
+      localTailscale: () => Effect.succeed({ ...connected, peerDnsNames: ["studio-mac-1.tail4b2c1.ts.net"] }),
+    });
+    expect(await Effect.runPromise(third.direct.tryActivate(HOST))).toBe(true);
+    expect(checkSession).not.toHaveBeenCalled();
+    expect(third.steps).toEqual([`identity ${moved}`, "ticket"]);
+    await Effect.runPromise(third.store.load());
+    expect(third.store.get("user-1", HOST)?.url).toBe(moved);
+  });
+
+  it("does not use a session that was forgotten, even before its removal is written", async () => {
+    const principal = { id: "user-1" };
+    const valid = new Set<string>();
+    const first = await run(principal, { valid });
+    await Effect.runPromise(first.direct.tryActivate(HOST));
+    first.direct.deactivate(HOST, false);
+    // The removal is not run yet: only the flag set by the call guards the next attempt.
+    first.direct.forgetSession(HOST);
+    expect(await Effect.runPromise(first.direct.tryActivate(HOST))).toBe(true);
+    expect(first.steps).toEqual([`identity ${DIRECT}`, "ticket", `identity ${DIRECT}`, "ticket"]);
+  });
+
+  it("forgets every kept session at once", async () => {
+    const principal = { id: "user-1" };
+    const first = await run(principal);
+    await Effect.runPromise(first.direct.tryActivate(HOST));
+    await Effect.runPromise(first.direct.forgetAllSessions());
+    expect(await keptToken((await run(principal)).store, "user-1")).toBeNull();
   });
 });

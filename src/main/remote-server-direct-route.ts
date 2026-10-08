@@ -15,13 +15,17 @@
 // and its token is the direct session), so they use their released HTTPS arms unchanged. The remote
 // screen and the browser view keep the WebRTC view: see `isWebRtcOnlyTeamPath`.
 //
-// The token is kept in memory only. A restart of this app or of the host asks for a new one.
+// With `sessions`, the token is also kept, encrypted, for the next run of this app. That run checks the
+// pinned host key as before, then asks the host with the kept token (`checkSession`) and uses it: no
+// ticket and no sign-in. A host that no longer accepts it (it restarted, or the session ended) answers
+// 401, and the same attempt signs in once as above. Without `sessions` the token is in memory only.
 
 import { isValidTailscaleDirectApiUrl } from "@openbot/contracts/invite-links";
 import type { ServerCompatibility, ServerDirectRoute, ServerDirectRouteHint } from "@openbot/contracts/ipc";
 import { decodeRecord } from "@openbot/contracts/ipc-decoding";
 import { isString } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
+import type { StoredDirectSession } from "./remote-direct-session-store";
 import type { RemoteServerDirectory, StoredRemoteServerView } from "./remote-server-store";
 import { RemoteWorkflowError } from "./remote-service-effects";
 import type { TailscaleLocalState } from "./tailscale-cli";
@@ -44,6 +48,18 @@ export interface DirectSignIn {
   sessionExpiresAt: string | null;
 }
 
+/**
+ * The direct sessions kept between runs, for the signed-in account. `principalId` is null when no
+ * account is signed in: nothing is read or written then.
+ */
+export interface DirectSessionPersistence {
+  principalId: () => string | null;
+  read: (principalId: string, serverId: string) => Effect.Effect<StoredDirectSession | null>;
+  write: (principalId: string, serverId: string, session: StoredDirectSession) => Effect.Effect<void>;
+  remove: (serverId: string) => Effect.Effect<void>;
+  clear: () => Effect.Effect<void>;
+}
+
 export interface RemoteDirectRoutesOptions {
   servers: RemoteServerDirectory;
   localTailscale: () => Effect.Effect<TailscaleLocalState>;
@@ -59,6 +75,16 @@ export interface RemoteDirectRoutesOptions {
     accountTicket: string,
     compatibility: ServerCompatibility,
   ) => Effect.Effect<DirectSignIn, RemoteWorkflowError>;
+  /**
+   * Asks the host whether it still accepts a kept token. "rejected" is its 401 or 403; any other
+   * failure fails the attempt and keeps the token.
+   */
+  checkSession?: (
+    apiUrl: string,
+    token: string,
+    compatibility: ServerCompatibility,
+  ) => Effect.Effect<"valid" | "rejected", RemoteWorkflowError>;
+  sessions?: DirectSessionPersistence;
   /** The negotiated HTTPS protocol of the direct address replaces the WebRTC one while it is in use. */
   setCompatibility: (serverId: string, compatibility: ServerCompatibility) => void;
   clearCompatibility: (serverId: string) => void;
@@ -81,6 +107,8 @@ export class RemoteDirectRoutes implements RemoteServerDirectory {
   readonly #active = new Map<string, ActiveRoute>();
   readonly #retryAfter = new Map<string, number>();
   readonly #hints = new Map<string, DirectRouteHint>();
+  /** Servers whose kept session must not be used, from the moment it was forgotten until it is removed. */
+  readonly #forgotten = new Set<string>();
   /** The HTTPS view made for a stored server under one route, and the route of each view. */
   readonly #views = new WeakMap<StoredRemoteServerView, { route: ActiveRoute; view: StoredRemoteServerView }>();
   readonly #routes = new WeakMap<StoredRemoteServerView, ActiveRoute>();
@@ -160,14 +188,30 @@ export class RemoteDirectRoutes implements RemoteServerDirectory {
       this.#hints.set(serverId, "other-tailnet");
       return false;
     }
+    // The account the attempt is for. A session is kept and used only for this account.
+    const principalId = this.#options.sessions?.principalId() ?? null;
+    const kept = yield* this.#keptSession(principalId, serverId, url);
     const attempt = yield* Effect.gen({ self: this }, function* () {
       const identity = yield* this.#options.verifyIdentity(url, server.id, server.fingerprint);
       // `verifyIdentity` checks the key against the pinned fingerprint. A pinned key is checked too.
       if (server.publicKey !== undefined && identity.publicKey !== server.publicKey)
         return yield* new RemoteWorkflowError({ cause: new Error("The direct address has another host key.") });
+      // The kept token goes only to the address whose key was just checked.
+      const checkSession = this.#options.checkSession;
+      if (kept && checkSession) {
+        const answer = yield* checkSession(url, kept.token, identity.compatibility);
+        if (answer === "valid")
+          return { token: kept.token, expiresAt: kept.expiresAt, kept: true, compatibility: identity.compatibility };
+        yield* this.#forgetKept(serverId);
+      }
       const ticket = yield* this.#options.createTicket(server.id);
       const session = yield* this.#options.signIn(url, ticket, identity.compatibility);
-      return { session, compatibility: identity.compatibility };
+      return {
+        token: session.sessionToken,
+        expiresAt: this.#expiresAt(session.sessionExpiresAt),
+        kept: false,
+        compatibility: identity.compatibility,
+      };
     }).pipe(
       Effect.timeoutOrElse({
         duration: this.#options.attemptTimeoutMs ?? DIRECT_ATTEMPT_TIMEOUT_MS,
@@ -177,28 +221,33 @@ export class RemoteDirectRoutes implements RemoteServerDirectory {
     );
     // The server can be removed, or the member can turn the path off, while the attempt runs.
     const current = this.#options.servers.find(serverId);
-    if (attempt._tag === "Failure" || !current || current.directUrl !== url || current.directDisabled) {
+    // So can the account: a session of the previous account is not used for the next one.
+    const accountChanged = principalId !== (this.#options.sessions?.principalId() ?? null);
+    if (
+      attempt._tag === "Failure" ||
+      !current ||
+      current.directUrl !== url ||
+      current.directDisabled ||
+      accountChanged
+    ) {
       this.#retryAfter.set(serverId, this.#now() + DIRECT_RETRY_AFTER_MS);
       this.#hints.set(serverId, "failed");
       return false;
     }
+    const { token, expiresAt } = attempt.success;
     const now = this.#now();
-    const answered = attempt.success.session.sessionExpiresAt
-      ? Date.parse(attempt.success.session.sessionExpiresAt)
-      : Number.NaN;
-    const expiresAt = Math.min(
-      Number.isFinite(answered) ? answered : Number.POSITIVE_INFINITY,
-      now + DIRECT_SESSION_MAXIMUM_MS,
-    );
     const refresh = setTimeout(
       () => this.#options.onRefreshDue(serverId),
       Math.max(0, expiresAt - now - DIRECT_REFRESH_MARGIN_MS),
     );
     refresh.unref?.();
-    this.#active.set(serverId, { url, token: attempt.success.session.sessionToken, expiresAt, refresh });
+    this.#active.set(serverId, { url, token, expiresAt, refresh });
     this.#retryAfter.delete(serverId);
     this.#hints.delete(serverId);
     this.#options.setCompatibility(serverId, attempt.success.compatibility);
+    // A new session is kept for the next run. A failed write only means a new sign-in then.
+    if (!attempt.success.kept && principalId !== null && this.#options.sessions)
+      yield* this.#options.sessions.write(principalId, serverId, { url, token, expiresAt });
     return true;
   });
 
@@ -216,6 +265,23 @@ export class RemoteDirectRoutes implements RemoteServerDirectory {
       this.#retryAfter.set(serverId, this.#now() + DIRECT_RETRY_AFTER_MS);
       this.#hints.set(serverId, "failed");
     }
+  }
+
+  /**
+   * Removes the kept session of one server, such as when the host no longer accepts it, the member
+   * turns the direct path off, the server is removed or its address changes.
+   */
+  forgetSession(serverId: string): Effect.Effect<void> {
+    if (this.#options.sessions) this.#forgotten.add(serverId);
+    return this.#forgetKept(serverId);
+  }
+
+  /** Removes every kept session, such as at sign-out or when another account signs in. */
+  forgetAllSessions(): Effect.Effect<void> {
+    const sessions = this.#options.sessions;
+    if (!sessions) return Effect.void;
+    for (const server of this.#options.servers.servers) this.#forgotten.add(server.id);
+    return sessions.clear().pipe(Effect.ensuring(Effect.sync(() => this.#forgotten.clear())));
   }
 
   /** The member asked for this server again: the next connection may try the direct path at once. */
@@ -236,6 +302,39 @@ export class RemoteDirectRoutes implements RemoteServerDirectory {
     this.#active.clear();
     this.#retryAfter.clear();
     this.#hints.clear();
+  }
+
+  /**
+   * The kept session that this attempt can use: of this account, for this address, and not close to
+   * its end. Another one is removed. A session close to its end is renewed with a new sign-in.
+   */
+  #keptSession(principalId: string | null, serverId: string, url: string): Effect.Effect<StoredDirectSession | null> {
+    const sessions = this.#options.sessions;
+    if (!sessions || principalId === null || !this.#options.checkSession) return Effect.succeed(null);
+    return Effect.gen({ self: this }, function* () {
+      const kept = yield* sessions.read(principalId, serverId);
+      const forgotten = this.#forgotten.delete(serverId);
+      if (!kept) return null;
+      if (!forgotten && kept.url === url && kept.expiresAt - this.#now() > DIRECT_REFRESH_MARGIN_MS) return kept;
+      yield* sessions.remove(serverId);
+      return null;
+    });
+  }
+
+  #forgetKept(serverId: string): Effect.Effect<void> {
+    const sessions = this.#options.sessions;
+    if (!sessions) return Effect.void;
+    // The flag only covers the time until the removal is done.
+    return sessions.remove(serverId).pipe(Effect.ensuring(Effect.sync(() => this.#forgotten.delete(serverId))));
+  }
+
+  /** When the client ends a new session: the host's answer, never later than 24 hours. */
+  #expiresAt(answer: string | null): number {
+    const answered = answer ? Date.parse(answer) : Number.NaN;
+    return Math.min(
+      Number.isFinite(answered) ? answered : Number.POSITIVE_INFINITY,
+      this.#now() + DIRECT_SESSION_MAXIMUM_MS,
+    );
   }
 
   #view(server: StoredRemoteServerView): StoredRemoteServerView {

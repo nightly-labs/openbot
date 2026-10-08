@@ -53,6 +53,7 @@ import {
   REMOTE_DESKTOP_SETUP_CAPABILITY,
   type RemoteDesktopTestInput,
 } from "@openbot/contracts/ipc";
+import { decodeRecord } from "@openbot/contracts/ipc-decoding";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/agent-import-v1";
 import { decodeBrowserViewSessionResponse } from "@openbot/contracts/team-protocol/browser-view-v1";
@@ -84,10 +85,16 @@ import {
 } from "./remote-conversation-decoding";
 import { decodeRemoteDesktopSetupFromHost, decodeRemoteDesktopTestFromHost } from "./remote-desktop-setup-decoding";
 import { decodeRemoteDesktopSession } from "./remote-device-decoding";
+import type { RemoteDirectSessionStore } from "./remote-direct-session-store";
 import { decodeVoid, type ResponseDecoder } from "./remote-host-decoding";
 import { type RemoteRequestInit, RemoteServerClient } from "./remote-server-client";
 import { RemoteServerConnections } from "./remote-server-connections";
-import { type DirectRouteStatus, decodeDirectSignIn, RemoteDirectRoutes } from "./remote-server-direct-route";
+import {
+  type DirectRouteStatus,
+  type DirectSessionPersistence,
+  decodeDirectSignIn,
+  RemoteDirectRoutes,
+} from "./remote-server-direct-route";
 import { RemoteProtocolError, RemoteRequestError } from "./remote-server-errors";
 import { RemoteEventRefresh } from "./remote-server-event-refresh";
 import { RemoteEventStream } from "./remote-server-event-stream";
@@ -127,6 +134,8 @@ interface RemoteServerEvents {
 interface CentralAccountSession {
   createTeamAuthTicket: (serverId: string) => Effect.Effect<string, CentralAuthOperationError>;
   getEmail: () => string;
+  /** The signed-in account, or null. Kept direct sessions belong to it. */
+  getPrincipalId?: () => string | null;
   sendTeamInviteEmail?: (input: {
     email: string;
     serverName: string;
@@ -149,6 +158,8 @@ interface RemoteServerManagerOptions {
    * Tailscale path is not tried and the server uses WebRTC.
    */
   localTailscale?: () => Effect.Effect<TailscaleLocalState>;
+  /** Keeps direct Tailscale sessions for the next run. Without it they are in memory only. */
+  directSessions?: RemoteDirectSessionStore;
 }
 
 export interface HostedServerWakeHooks {
@@ -243,6 +254,19 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     this.#getLocalHostId = options.getLocalHostId ?? (() => null);
     this.#hostedServers = options.hostedServers ?? null;
     const localTailscale = options.localTailscale;
+    const directSessions = options.directSessions;
+    const getPrincipalId = centralAccount.getPrincipalId;
+    const sessions: DirectSessionPersistence | undefined =
+      directSessions && getPrincipalId
+        ? {
+            principalId: getPrincipalId,
+            read: (principalId, serverId) =>
+              directSessions.load().pipe(Effect.map(() => directSessions.get(principalId, serverId))),
+            write: (principalId, serverId, session) => directSessions.set(principalId, serverId, session),
+            remove: (serverId) => directSessions.delete(serverId),
+            clear: () => directSessions.clear(),
+          }
+        : undefined;
     this.#direct = new RemoteDirectRoutes({
       servers: this.#store,
       localTailscale: localTailscale ?? (() => Effect.succeed<TailscaleLocalState>({ kind: "not-installed" })),
@@ -254,6 +278,19 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
           body: { accountTicket },
           ...this.#client.requestProtocol(compatibility),
         }).pipe(Effect.mapError((failure) => new RemoteWorkflowError({ cause: failure }))),
+      checkSession: (apiUrl, token, compatibility) =>
+        requestJson(apiUrl, TEAM_API_ROUTES.me, (value) => decodeRecord(value, "team member"), {
+          token,
+          ...this.#client.requestProtocol(compatibility),
+        }).pipe(
+          Effect.as("valid" as const),
+          Effect.catch((failure) =>
+            failure instanceof RemoteRequestError && (failure.status === 401 || failure.status === 403)
+              ? Effect.succeed("rejected" as const)
+              : Effect.fail(new RemoteWorkflowError({ cause: failure })),
+          ),
+        ),
+      sessions,
       setCompatibility: (serverId, compatibility) => this.#connections.setCompatibility(serverId, compatibility),
       clearCompatibility: (serverId) => this.#connections.clearCompatibility(serverId),
       onRefreshDue: (serverId) => this.#renewDirectRoute(serverId),
@@ -272,6 +309,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       reportUnreachable: (serverId: string) => this.#connections.reportUnreachable(serverId),
       reportError: (serverId: string, error: unknown) => {
         if (this.#direct.isActive(serverId) && error instanceof RemoteRequestError && error.status === 401) {
+          // The reconnect signs in again and does not use the kept session.
+          this.#background(this.#direct.forgetSession(serverId));
           this.#renewDirectRoute(serverId);
           return;
         }
@@ -504,6 +543,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       directUrl = answer !== null && isValidTailscaleDirectApiUrl(answer) ? answer : undefined;
     }
     if (this.#store.find(serverId)?.directUrl === directUrl) return;
+    // A session belongs to one address.
+    yield* this.#direct.forgetSession(serverId);
     yield* this.#store.update(serverId, { directUrl });
     this.#emitChanged();
   });
@@ -527,6 +568,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     if (server.transport === "webrtc-v2") {
       yield* this.#store.update(serverId, { directDisabled: enabled ? undefined : true });
       this.#direct.clearRetry(serverId);
+      if (!enabled) yield* this.#direct.forgetSession(serverId);
       if (!enabled && this.#direct.isActive(serverId)) {
         this.#direct.deactivate(serverId, false);
         yield* this.#events.restart(serverId);
@@ -1165,6 +1207,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
 
   #clearServerConnectionState(serverId: string): void {
     this.#direct.forget(serverId);
+    this.#background(this.#direct.forgetSession(serverId));
     this.#hostedStartAt.delete(serverId);
     this.#hostedStartExpired.delete(serverId);
     this.#events.forget(serverId);
@@ -1771,6 +1814,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       // A copy skips the host's check of the account, so the next account must not see it.
       this.#attachments.clear();
       // A direct session is this account's too. Its socket closes, and the reconnect signs in again.
+      // The kept sessions go with it.
+      yield* this.#direct.forgetAllSessions();
       for (const server of this.#store.servers) {
         if (!this.#direct.isActive(server.id)) continue;
         this.#direct.deactivate(server.id, false);

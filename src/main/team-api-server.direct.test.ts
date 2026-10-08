@@ -145,6 +145,15 @@ describe("TeamApiServer direct Tailscale listener", () => {
     expect(await upgradeStatus(base, sessionToken)).toBe(401);
   });
 
+  it("accepts a direct session again from a new connection, as a client that restarted sends it", async () => {
+    const { direct } = await directFixture();
+    const { sessionToken } = await directSignIn(direct);
+    expect(await upgradeStatus(direct, sessionToken)).toBe(101);
+    // The client's sockets and its memory are gone; the host keeps the session until it ends.
+    expect((await get(direct, TEAM_API_ROUTES.me, sessionToken)).status).toBe(200);
+    expect(await upgradeStatus(direct, sessionToken)).toBe(101);
+  });
+
   it("keeps the remote screen and the browser view off the direct listener", async () => {
     const { direct } = await directFixture();
     const { sessionToken } = await directSignIn(direct);
