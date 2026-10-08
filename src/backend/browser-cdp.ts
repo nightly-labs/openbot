@@ -106,34 +106,57 @@ export type BrowserViewportInput =
       modifiers: number;
     }
   | { type: "key"; action: "down" | "up" | "char"; key: string; code: string; text: string; modifiers: number }
-  | { type: "paste"; text: string };
+  | { type: "paste"; text: string }
+  | { type: "cut"; text: string };
+
+/**
+ * The focused element and its document, past open shadow roots and into frames of the page's own
+ * origin. A frame of another origin is closed to the automation world, so focus there stops at the
+ * frame. An element in a frame belongs to that frame's realm, so it is known by its tag, not by
+ * `instanceof`. A field's selection is not part of `getSelection()`, and a password field gives
+ * nothing, as it does for a user's copy.
+ */
+const FOCUSED_SELECTION = `
+  let doc = document;
+  let active = doc.activeElement;
+  for (;;) {
+    if (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
+    else if (active?.tagName === "IFRAME" && active.contentDocument?.activeElement) {
+      doc = active.contentDocument;
+      active = doc.activeElement;
+    } else break;
+  }
+  const isField = active?.tagName === "TEXTAREA" || active?.tagName === "INPUT";
+  const selected = () => {
+    if (active?.tagName === "INPUT" && active.type === "password") return "";
+    if (isField) {
+      const start = active.selectionStart;
+      const end = active.selectionEnd;
+      return typeof start === "number" && typeof end === "number" ? active.value.slice(start, end) : "";
+    }
+    const root = active?.getRootNode() ?? doc;
+    const selection = typeof root.getSelection === "function" ? root.getSelection() : doc.getSelection();
+    return selection?.toString() ?? "";
+  };`;
 
 /**
  * The page's selection, read in the automation world so the page's own scripts cannot answer for it.
- * A field's selection is not part of `getSelection()`, and a password field gives nothing, as it does
- * for a user's copy. `cut` deletes the selection only where the user could have typed over it, and
- * only when the text can go back to the member: a selection over `max` answers null and stays.
- * A field in a frame, or in an `email` or `number` input, has no selection this world can read.
+ * A selection longer than `max` answers null. An `email` or `number` input has no selection to read.
  */
-const SELECTION_TEXT_SCRIPT = `(cut, max) => {
-  let active = document.activeElement;
-  while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
-  if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) {
-    if (active instanceof HTMLInputElement && active.type === "password") return "";
-    const start = active.selectionStart;
-    const end = active.selectionEnd;
-    if (start === null || end === null) return "";
-    if (end - start > max) return null;
-    const text = active.value.slice(start, end);
-    if (cut && text && !active.readOnly && !active.disabled) document.execCommand("delete");
-    return text;
-  }
-  const root = active?.getRootNode();
-  const selection = root instanceof ShadowRoot && root.getSelection ? root.getSelection() : window.getSelection();
-  const text = selection?.toString() ?? "";
-  if (text.length > max) return null;
-  if (cut && text && active instanceof HTMLElement && active.isContentEditable) document.execCommand("delete");
-  return text;
+const SELECTION_TEXT_SCRIPT = `(max) => {${FOCUSED_SELECTION}
+  const text = selected();
+  return text.length > max ? null : text;
+}`;
+
+/**
+ * The second half of a cut, once its text is on the member's clipboard. It deletes only the same
+ * selection, and only where the user could have typed over it: a selection that changed meanwhile
+ * is not the text the member has.
+ */
+const CUT_SCRIPT = `(expected) => {${FOCUSED_SELECTION}
+  const editable = isField ? !active.readOnly && !active.disabled : active?.isContentEditable === true;
+  if (!editable || selected() !== expected) return false;
+  return doc.execCommand("delete");
 }`;
 
 /**
@@ -141,13 +164,11 @@ const SELECTION_TEXT_SCRIPT = `(cut, max) => {
  * that handles it - an editor that formats the text, a code form split over several fields - cancels
  * it, and the text is inserted only when nothing did.
  */
-const PASTE_EVENT_SCRIPT = `(text) => {
-  let active = document.activeElement;
-  while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
+const PASTE_EVENT_SCRIPT = `(text) => {${FOCUSED_SELECTION}
   const data = new DataTransfer();
   data.setData("text/plain", text);
   const event = new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true, composed: true });
-  return (active ?? document.body).dispatchEvent(event);
+  return (active ?? doc.body).dispatchEvent(event);
 }`;
 
 /** The letter of a shortcut. On a layout whose letters are not Latin, it is the key's place. */
@@ -1393,6 +1414,15 @@ export class BrowserCdpEngine {
             if (recordValue(result.result)?.value !== false) yield* send("Input.insertText", { text: input.text });
             return;
           }
+          if (input.type === "cut") {
+            const contextId = yield* automationContextId(send);
+            yield* send("Runtime.evaluate", {
+              expression: `(${CUT_SCRIPT})(${JSON.stringify(input.text)})`,
+              contextId,
+              returnByValue: true,
+            });
+            return;
+          }
           if (input.type === "key") {
             if (input.action === "char") {
               yield* send("Input.dispatchKeyEvent", { type: "char", modifiers: input.modifiers, text: input.text });
@@ -1452,7 +1482,6 @@ export class BrowserCdpEngine {
    */
   readonly viewportSelectionText = Effect.fn("BrowserCdp.viewportSelectionText")(function* (
     this: BrowserCdpEngine,
-    cut: boolean,
     max: number,
   ): Effect.fn.Return<string | null, BrowserOperationError> {
     return yield* this.#leaseEffect(
@@ -1460,11 +1489,11 @@ export class BrowserCdpEngine {
         Effect.gen(function* () {
           const contextId = yield* automationContextId(send);
           const result = yield* send("Runtime.evaluate", {
-            expression: `(${SELECTION_TEXT_SCRIPT})(${cut}, ${max})`,
+            expression: `(${SELECTION_TEXT_SCRIPT})(${max})`,
             contextId,
             returnByValue: true,
           });
-          // Null is a selection longer than `max`, which the page kept.
+          // Null is a selection longer than `max`, which is not sent.
           const value = recordValue(result.result)?.value;
           return value === null ? null : stringValue(value);
         }),

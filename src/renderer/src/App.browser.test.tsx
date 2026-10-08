@@ -420,7 +420,7 @@ describe("OpenBot connected desktop shell", () => {
 
     // A copy on a Russian layout: the key is the Cyrillic letter, its place is still C.
     await fireEvent.keyDown(view, { key: "с", code: "KeyC", ctrlKey: true });
-    expect(window.openbot.browser.sendLiveViewInput).toHaveBeenLastCalledWith({ type: "copy", cut: false });
+    expect(window.openbot.browser.sendLiveViewInput).toHaveBeenLastCalledWith({ type: "copy" });
     emitBrowserLiveView?.({ type: "copied", tabId: tab.id, text: "the host's selection" });
     await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith("the host's selection"));
 
@@ -431,6 +431,24 @@ describe("OpenBot connected desktop shell", () => {
     emitBrowserLiveView?.({ type: "copied", tabId: tab.id, text: "second selection" });
     await vi.waitFor(() => expect(writeText).toHaveBeenLastCalledWith("second selection"));
     expect(writeText).toHaveBeenCalledTimes(2);
+
+    // A cut deletes on the host only once the text is on the clipboard.
+    writeText.mockImplementationOnce(() => Promise.reject(new Error("denied")));
+    await fireEvent.keyDown(view, { key: "x", code: "KeyX", metaKey: true });
+    emitBrowserLiveView?.({ type: "copied", tabId: tab.id, text: "kept on the host" });
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalledTimes(3));
+    await fireEvent.keyDown(view, { key: "x", code: "KeyX", metaKey: true });
+    emitBrowserLiveView?.({ type: "copied", tabId: tab.id, text: "cut on the host" });
+    await vi.waitFor(() =>
+      expect(window.openbot.browser.sendLiveViewInput).toHaveBeenLastCalledWith({
+        type: "cut",
+        text: "cut on the host",
+      }),
+    );
+    expect(window.openbot.browser.sendLiveViewInput).not.toHaveBeenCalledWith({
+      type: "cut",
+      text: "kept on the host",
+    });
   });
 
   it("sends a click on a live view that is letterboxed top and bottom as a point on the frame", async () => {

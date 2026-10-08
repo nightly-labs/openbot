@@ -1,6 +1,6 @@
 import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
-import { Context, Deferred, Effect, Layer, Result } from "effect";
+import { Context, Deferred, Effect, Layer, Result, Semaphore } from "effect";
 import { recordRestartActivity } from "../backend/restart-activity";
 import { RemoteWorkflowError, remoteDecode } from "./remote-service-effects";
 // The host's side of the live browser view: a session a member asks for, a socket that carries the
@@ -107,6 +107,11 @@ interface ManagedViewSession {
    */
   frameSizes: Map<number, { width: number; height: number }>;
   rememberFrames: boolean;
+  /**
+   * One input at a time, in the order the member sent them. A paste takes several CDP calls, and a
+   * key typed after it must not land first.
+   */
+  input: Semaphore.Semaphore;
 }
 
 export class BrowserViewGateway {
@@ -138,6 +143,7 @@ export class BrowserViewGateway {
       frameHeight: 0,
       frameSizes: new Map(),
       rememberFrames: false,
+      input: Semaphore.makeUnsafe(1),
     });
     return { id, tabId: input.tabId, streamPath: browserViewStreamPath(id) };
   }
@@ -246,7 +252,7 @@ export class BrowserViewGateway {
     recordRestartActivity();
     client.on("message", (data, binary) => {
       if (binary || session.socket !== client) return;
-      this.#dispatch(this.#handleInput(session, data));
+      this.#dispatch(session.input.withPermits(1)(this.#handleInput(session, data)));
     });
     client.once("close", () => this.#dispatch(this.#detach(session, client)));
     client.once("error", () => this.#dispatch(this.#detach(session, client)));
@@ -315,7 +321,7 @@ export class BrowserViewGateway {
       const client = session.socket;
       const browser = yield* BrowserViewPort;
       const text = yield* browser
-        .copy(session.tabId, input.cut, BROWSER_VIEW_MAX_CLIPBOARD_TEXT)
+        .copy(session.tabId, BROWSER_VIEW_MAX_CLIPBOARD_TEXT)
         .pipe(Effect.catch(() => Effect.succeed("")));
       if (session.socket !== client || client.readyState !== webSockets.WebSocket.OPEN) return;
       client.send(encodeBrowserViewCopied(text === null ? { type: "copyTooLarge" } : { type: "copied", text }));

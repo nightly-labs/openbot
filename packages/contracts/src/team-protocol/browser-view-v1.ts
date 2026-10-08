@@ -27,7 +27,8 @@ export const TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY = "browser-view-frame-poin
 /**
  * A host that pastes the client's text into the page and sends the page's selection back on copy.
  * The clipboard is the user's, on the client: the host never reads or writes its own. Older hosts
- * reject an unknown input, so a client sends `paste` and `copy` only when the host advertises this.
+ * reject an unknown input, so a client sends `paste`, `copy` and `cut` only when the host advertises
+ * this.
  */
 export const TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY = "browser-view-clipboard";
 /** Present on the view socket when this client will acknowledge the frame it has drawn. */
@@ -93,8 +94,13 @@ export type BrowserViewInput =
   | { type: "ack"; sequence: number }
   /** Text from the client's clipboard, inserted where the page has focus. */
   | { type: "paste"; text: string }
-  /** Asks for the page's selection. `cut` also deletes it when it is in a field the user can edit. */
-  | { type: "copy"; cut: boolean };
+  /** Asks for the page's selection, which comes back as `copied`. */
+  | { type: "copy" }
+  /**
+   * Deletes the selection after a cut, once its text is on the client's clipboard. The host deletes
+   * only when the selection is still `text` and in a field the user can edit.
+   */
+  | { type: "cut"; text: string };
 
 /**
  * The text message a host sends on the view socket, only in answer to a `copy`: the selection, or
@@ -176,8 +182,9 @@ export function encodeBrowserViewInput(input: BrowserViewInput): string {
 
 /**
  * The input a host of this capability is sent. A host that does not name frames still accepts the
- * released payload, and it expands every point with its newest frame. An acknowledgement, a paste
- * and a copy are not part of that payload: an older host closes the view on an input it does not know.
+ * released payload, and it expands every point with its newest frame. An acknowledgement, a paste,
+ * a copy and a cut are not part of that payload: an older host closes the view on an input it does
+ * not know.
  */
 export function browserViewInputForHost(
   input: BrowserViewInput,
@@ -185,7 +192,7 @@ export function browserViewInputForHost(
   clipboard: boolean,
 ): BrowserViewInput | null {
   if (!namesFrames && input.type === "ack") return null;
-  if (!clipboard && (input.type === "paste" || input.type === "copy")) return null;
+  if (!clipboard && (input.type === "paste" || input.type === "copy" || input.type === "cut")) return null;
   if (input.type !== "pointer" || input.sequence === undefined || namesFrames) return input;
   const { sequence: _sequence, ...released } = input;
   return released;
@@ -204,16 +211,13 @@ export function decodeBrowserViewInputValue(message: unknown): BrowserViewInput 
   if (!isDynamicRecord(message)) throw new Error("Invalid browser view input.");
   // The client says which frame it has drawn. There is no page event in it.
   if (message.type === "ack") return { type: "ack", sequence: sequenceNumber(message.sequence) };
-  if (message.type === "paste") {
+  if (message.type === "paste" || message.type === "cut") {
     if (!isBoundedString(message.text, BROWSER_VIEW_MAX_CLIPBOARD_TEXT) || message.text.length === 0) {
       throw new Error("Invalid browser view input.");
     }
-    return { type: "paste", text: message.text };
+    return { type: message.type, text: message.text };
   }
-  if (message.type === "copy") {
-    if (typeof message.cut !== "boolean") throw new Error("Invalid browser view input.");
-    return { type: "copy", cut: message.cut };
-  }
+  if (message.type === "copy") return { type: "copy" };
   const modifiers = isNumber(message.modifiers) ? message.modifiers : 0;
   if (!Number.isInteger(modifiers) || modifiers < 0 || modifiers > 15) throw new Error("Invalid browser view input.");
   if (message.type === "pointer") {

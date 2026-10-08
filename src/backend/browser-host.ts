@@ -1209,14 +1209,12 @@ export class BrowserHost {
   readonly copyViewSelection = Effect.fn("BrowserHost.copyViewSelection")(function* (
     this: BrowserHost,
     tabId: string,
-    cut: boolean,
     max: number,
   ): Effect.fn.Return<string | null, BrowserOperationError> {
     const tab = yield* this.#requireTab(tabId);
     if (tab.secret?.submitted)
       return yield* browserFailure(new Error(sourceText("error.backend.browserInputProtected")));
-    if (cut) tab.engine.invalidateReferences();
-    return yield* tab.engine.viewportSelectionText(cut, max);
+    return yield* tab.engine.viewportSelectionText(max);
   }).bind(this);
 
   readonly #toolHandlers: BrowserToolHandlers = {

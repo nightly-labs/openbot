@@ -150,8 +150,11 @@ mock. The separate web preview implements the browser runtime with that same moc
   fires a `paste` event on the focused element and, when the page does not cancel it, inserts the
   text with CDP `Input.insertText`. A copy starts in the key press with a `ClipboardItem` that waits
   for the host's answer, the one text message on the view socket. The host answers every `copy`.
-  The host never reads or writes its own clipboard. Password fields give no text. Copy cannot read a
-  selection in a frame or in an `email` or `number` input; paste works there.
+  A cut is a copy, then a `cut` input once the text is on the clipboard; the host deletes only the
+  same selection. The host runs one input of a view at a time, in order. The host never reads or
+  writes its own clipboard. Password fields give no text. The host reaches focus in open shadow
+  roots and in frames of the page's own origin. In a frame of another origin, or in an `email` or
+  `number` input, copy gets no text and the page gets no paste event; the text is still pasted.
 - No full remote desktop, push notifications, or offline operation is included. See
   [Remote desktop](#remote-desktop) for the reason.
 - These stay desktop only: the application Settings dialog (permissions, app updates),

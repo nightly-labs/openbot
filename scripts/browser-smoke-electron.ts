@@ -2161,19 +2161,49 @@ async function runLiveViewClipboard(browser: BrowserHost, tabId: string, content
       browser.dispatchViewInput(tabId, { type: "key", action, key: "a", code: "KeyA", text: "", modifiers: 4 }),
     );
   }
-  const copied = await runCauseEffect(browser.copyViewSelection(tabId, false, 100_000));
+  const copied = await runCauseEffect(browser.copyViewSelection(tabId, 100_000));
   if (copied !== pasted) throw new Error(`A live view copy after select-all returned ${JSON.stringify(copied)}.`);
-  // A cut longer than one answer carries is refused, and the page keeps its text.
-  const tooLarge = await runCauseEffect(browser.copyViewSelection(tabId, true, pasted.length - 1));
-  if (tooLarge !== null || (await value("live-view-text")) !== pasted) {
-    throw new Error("A live view cut too long to send deleted the text.");
-  }
-  const cut = await runCauseEffect(browser.copyViewSelection(tabId, true, 100_000));
+  const tooLarge = await runCauseEffect(browser.copyViewSelection(tabId, pasted.length - 1));
+  if (tooLarge !== null) throw new Error("A live view copy sent a selection longer than its limit.");
+  // The second half of a cut deletes only the text the member has on their clipboard.
+  await runCauseEffect(browser.dispatchViewInput(tabId, { type: "cut", text: "other text" }));
+  const afterStaleCut = await value("live-view-text");
+  if (afterStaleCut !== pasted) throw new Error("A live view cut deleted a selection that had changed.");
+  await runCauseEffect(browser.dispatchViewInput(tabId, { type: "cut", text: pasted }));
   const afterCut = await value("live-view-text");
-  if (cut !== pasted || afterCut !== "") throw new Error("A live view cut did not take the selected text.");
+  if (afterCut !== "") throw new Error("A live view cut did not delete the selected text.");
+
+  // A field in a frame of the page's own origin gets the paste event and gives its selection.
+  await contents.executeJavaScript(
+    `new Promise(resolve => {
+      document.getElementById('live-view-frame')?.remove();
+      const frame = document.createElement('iframe');
+      frame.id = 'live-view-frame';
+      frame.style.cssText = 'position:fixed;left:10px;top:300px;width:300px;height:80px;z-index:2147483647';
+      frame.srcdoc = '<textarea></textarea>';
+      frame.onload = () => {
+        const inner = frame.contentDocument.querySelector('textarea');
+        inner.addEventListener('paste', event => { window.__liveViewFramePaste = event.clipboardData.getData('text/plain'); });
+        inner.focus();
+        resolve();
+      };
+      document.body.append(frame);
+    })`,
+    true,
+  );
+  await runCauseEffect(browser.dispatchViewInput(tabId, { type: "paste", text: "in a frame" }));
+  const framePasteEvent = await contents.executeJavaScript("window.__liveViewFramePaste", true);
+  await contents.executeJavaScript(
+    "document.getElementById('live-view-frame').contentDocument.querySelector('textarea').select()",
+    true,
+  );
+  const fromFrame = await runCauseEffect(browser.copyViewSelection(tabId, 100_000));
+  if (framePasteEvent !== "in a frame" || fromFrame !== "in a frame") {
+    throw new Error("A live view paste or copy missed a field in a frame of the same origin.");
+  }
 
   await field("live-view-password", "password");
-  const fromPassword = await runCauseEffect(browser.copyViewSelection(tabId, false, 100_000));
+  const fromPassword = await runCauseEffect(browser.copyViewSelection(tabId, 100_000));
   if (fromPassword !== "") throw new Error("A live view copy read a password field.");
   // Whoever sits at the host may copy something meanwhile, so the check is that the member's text
   // never reached the host's clipboard, not that the clipboard stayed the same.
@@ -2191,8 +2221,10 @@ async function runLiveViewClipboard(browser: BrowserHost, tabId: string, content
         afterPaste,
         copied,
         tooLarge,
-        cut,
+        afterStaleCut,
         afterCut,
+        framePasteEvent,
+        fromFrame,
         fromPassword,
         hostClipboardHasMemberText,
       },
@@ -2201,7 +2233,7 @@ async function runLiveViewClipboard(browser: BrowserHost, tabId: string, content
     )}\n`,
   );
   await contents.executeJavaScript(
-    "document.getElementById('live-view-text')?.remove(); document.getElementById('live-view-password')?.remove();",
+    `for (const id of ['live-view-text', 'live-view-password', 'live-view-frame']) document.getElementById(id)?.remove();`,
     true,
   );
 }

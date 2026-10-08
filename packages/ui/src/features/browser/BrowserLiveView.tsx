@@ -241,11 +241,13 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
   /**
    * Ask the host for its selection, and write it to the user's clipboard when it comes. The host's
    * clipboard is not the user's, so the text has to come back here. A copy already waiting is the
-   * same copy: the Edit menu fires one after the key press that started it.
+   * same copy: the Edit menu fires one after the key press that started it. A cut deletes the text
+   * on the host only once it is on the clipboard, so a write that fails loses nothing.
    */
   const copy = (cut: boolean) => {
     if (pendingCopy) return;
     let failure: "empty" | "tooLarge" | undefined;
+    let copied = "";
     const answer = new Promise<CopyAnswer>((resolve) => {
       pendingCopy = resolve;
     });
@@ -254,14 +256,20 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
         failure = reply === "tooLarge" ? "tooLarge" : "empty";
         throw new Error("The host sent no text to copy.");
       }
+      copied = reply.text;
       return new Blob([reply.text], { type: "text/plain" });
     });
-    send({ type: "copy", cut });
+    send({ type: "copy" });
     // Nothing selected leaves the clipboard as it was, as a copy of nothing does.
-    void writeClipboard(text).catch(() => {
-      if (failure === "tooLarge") toast.error(t("browser.liveView.copyTooLarge"));
-      else if (failure !== "empty") toast.error(t("browser.liveView.copyFailed"));
-    });
+    void writeClipboard(text).then(
+      () => {
+        if (cut) send({ type: "cut", text: copied });
+      },
+      () => {
+        if (failure === "tooLarge") toast.error(t("browser.liveView.copyTooLarge"));
+        else if (failure !== "empty") toast.error(t("browser.liveView.copyFailed"));
+      },
+    );
   };
 
   const key = (event: KeyboardEvent, action: "down" | "up") => {

@@ -241,7 +241,9 @@ export type BrowserLiveViewInput =
   /** Text from the user's own clipboard, inserted where the remote page has focus. */
   | { type: "paste"; text: string }
   /** Asks for the remote page's selection; it comes back as a `copied` event. */
-  | { type: "copy"; cut: boolean };
+  | { type: "copy" }
+  /** Deletes the remote selection after a cut, once `text` is on the user's clipboard. */
+  | { type: "cut"; text: string };
 
 /** The longest paste a live view sends, the same bound the Team protocol puts on one. */
 export const BROWSER_LIVE_VIEW_MAX_PASTE_TEXT = 100_000;

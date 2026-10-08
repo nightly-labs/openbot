@@ -86,17 +86,21 @@ describe("the live browser view on a host", () => {
     }
   });
 
-  // Failure modes: a paste longer than the old 4 KiB input bound is dropped; a copy gets no answer and
-  // the client's clipboard write waits for ever; a protected tab's selection reaches the member; a
-  // selection too long to send is sent, or is not reported.
-  it("pastes the member's text and answers every copy", async () => {
+  // Failure modes: a paste longer than the old 4 KiB input bound is dropped; a key typed after a paste
+  // lands before it; a copy gets no answer and the client's clipboard write waits for ever; a
+  // protected tab's selection reaches the member; a selection too long to send is sent, or is not
+  // reported.
+  it("pastes the member's text in order and answers every copy", async () => {
     const dispatched: BrowserViewportInput[] = [];
     // A tab whose fields hold a secret, a selection too long to send, then one that is sent.
-    const copySelection = vi.fn((_tabId: string, cut: boolean, _max: number) => {
+    const copySelection = vi.fn((_tabId: string, _max: number) => {
       const call = copySelection.mock.calls.length;
       if (call === 1) return Effect.fail(browserFailure(new Error("protected")));
-      return Effect.succeed(call === 2 ? null : cut ? "cut text" : "copied text");
+      return Effect.succeed(call === 2 ? null : "copied text");
     });
+    // A paste takes several CDP calls on a real page. This one gives the event loop a turn, which is
+    // when the key sent right behind it is read from the socket.
+    const pasting = () => new Promise<void>((resolve) => setImmediate(() => setImmediate(resolve)));
     const gateway = new BrowserViewGateway({
       browser: {
         startView: (_tabId, onFrame) =>
@@ -106,9 +110,13 @@ describe("the live browser view on a host", () => {
           }),
         copyViewSelection: copySelection,
         dispatchViewInput: (_tabId, input) =>
-          Effect.sync(() => {
-            dispatched.push(input);
-          }),
+          Effect.promise(() => (input.type === "paste" ? pasting() : Promise.resolve())).pipe(
+            Effect.andThen(
+              Effect.sync(() => {
+                dispatched.push(input);
+              }),
+            ),
+          ),
       },
       authenticate: () => null,
     });
@@ -124,19 +132,24 @@ describe("the live browser view on a host", () => {
     await new Promise((resolve) => socket.once("open", resolve));
 
     const text = "a pasted paragraph ".repeat(1_000);
+    const key = { type: "key", action: "char", key: "!", code: "Digit1", text: "!", modifiers: 8 } as const;
     socket.send(encodeBrowserViewInput({ type: "paste", text }));
-    await vi.waitFor(() => expect(dispatched).toEqual([{ type: "paste", text }]));
+    socket.send(encodeBrowserViewInput(key));
+    // The key and the copy reach the host while the paste still runs. They wait for it.
+    socket.send(encodeBrowserViewInput({ type: "copy" }));
+    await vi.waitFor(() => expect(answers).toHaveLength(1));
+    expect(dispatched).toEqual([{ type: "paste", text }, key]);
 
-    for (const [index, cut] of [false, false, true].entries()) {
-      socket.send(encodeBrowserViewInput({ type: "copy", cut }));
+    for (const index of [1, 2]) {
+      socket.send(encodeBrowserViewInput({ type: "copy" }));
       await vi.waitFor(() => expect(answers).toHaveLength(index + 1));
     }
     expect(answers.map(decodeBrowserViewCopied)).toEqual([
       { type: "copied", text: "" },
       { type: "copyTooLarge" },
-      { type: "copied", text: "cut text" },
+      { type: "copied", text: "copied text" },
     ]);
-    expect(copySelection).toHaveBeenLastCalledWith("tab-1", true, BROWSER_VIEW_MAX_CLIPBOARD_TEXT);
+    expect(copySelection).toHaveBeenLastCalledWith("tab-1", BROWSER_VIEW_MAX_CLIPBOARD_TEXT);
     socket.close();
     await runCauseEffect(gateway.stop());
   });

@@ -105,16 +105,17 @@ describe("the browser view wire format", () => {
     expect(browserViewInputForHost(ack, false, true)).toBeNull();
   });
 
-  it("carries a paste and a copy only to a host that answers them", () => {
+  it("carries a paste, a copy and a cut only to a host that answers them", () => {
     const paste: BrowserViewInput = { type: "paste", text: "line one\nline two" };
-    const copy: BrowserViewInput = { type: "copy", cut: true };
+    const copy: BrowserViewInput = { type: "copy" };
+    const cut: BrowserViewInput = { type: "cut", text: "line one" };
     expect(TEAM_CURRENT_CAPABILITIES).toContain(TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY);
-    expect(decodeBrowserViewInput(encodeBrowserViewInput(paste))).toEqual(paste);
-    expect(decodeBrowserViewInput(encodeBrowserViewInput(copy))).toEqual(copy);
-    expect(browserViewInputForHost(paste, true, true)).toEqual(paste);
-    // An older host closes the view on either, which would end the view the user is working in.
-    expect(browserViewInputForHost(paste, true, false)).toBeNull();
-    expect(browserViewInputForHost(copy, true, false)).toBeNull();
+    for (const input of [paste, copy, cut]) {
+      expect(decodeBrowserViewInput(encodeBrowserViewInput(input))).toEqual(input);
+      expect(browserViewInputForHost(input, true, true)).toEqual(input);
+      // An older host closes the view on each, which would end the view the user is working in.
+      expect(browserViewInputForHost(input, true, false)).toBeNull();
+    }
     const longest = "x".repeat(BROWSER_VIEW_MAX_CLIPBOARD_TEXT);
     expect(decodeBrowserViewInput(encodeBrowserViewInput({ type: "paste", text: longest }))).toEqual({
       type: "paste",
@@ -153,7 +154,8 @@ describe("the browser view wire format", () => {
       { type: "clipboard", data: "secret" },
       { type: "paste", text: "" },
       { type: "paste", text: "x".repeat(BROWSER_VIEW_MAX_CLIPBOARD_TEXT + 1) },
-      { type: "copy" },
+      { type: "cut", text: "" },
+      { type: "cut" },
     ]) {
       expect(() => decodeBrowserViewInput(JSON.stringify(invalid))).toThrow("Invalid browser view input.");
     }
