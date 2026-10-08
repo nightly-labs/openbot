@@ -18,6 +18,7 @@ import { afterEach, assert, describe, expect, it } from "vitest";
 import { AgentRoutineStore } from "./agent-routine-store";
 import { ChannelRoutineStore } from "./channel-routine-store";
 import { ChannelStore } from "./channel-store";
+import { ConversationReadStore } from "./conversation-read-store";
 import { runCauseEffect } from "./effect-boundary";
 import { OpenBotDatabase } from "./openbot-database";
 
@@ -723,6 +724,14 @@ describe("OpenBotDatabase", () => {
         }
       });
     }
+
+    // The marker came while the steered turn ran and shows after it. Read through it, only the
+    // answer of the later turn is unread.
+    expect(new ConversationReadStore(database).markReadForThread("member", agent.threadId, "marker")).toEqual({
+      unreadCount: 1,
+      firstUnreadMessageId: "large-answer",
+      throughMessageId: "marker",
+    });
 
     // With limit 2 the turn before the anchor already fills the page; the rest of the turn still comes.
     for (const limit of [2, 4]) {

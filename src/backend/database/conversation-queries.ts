@@ -309,7 +309,7 @@ export class ConversationQueries {
       this.#core.connection
         .prepare(
           `${ORDERED_THREAD_MESSAGES}
-           SELECT ${PAGE_KEY_COLUMNS} FROM ordered WHERE message_id = ?`,
+           SELECT ${ORDER_KEY_COLUMNS} FROM ordered WHERE message_id = ?`,
         )
         .get(threadId, throughMessageId),
     );
@@ -319,13 +319,13 @@ export class ConversationQueries {
         .prepare(
           `${ORDERED_THREAD_MESSAGES}
            SELECT message_id FROM ordered
-           WHERE (${PAGE_KEY_COLUMNS}) <= (?, ?, ?, ?, ?)
+           WHERE (${ORDER_KEY_COLUMNS}) <= (?, ?, ?, ?, ?)
              ${conversationMarkerSqlFilter(
                options.excludeRoutineEvents === true,
                options.excludeRoutineRunEvents === true,
                options.excludeHostedSiteEvents === true,
              )}
-           ORDER BY ${PAGE_ORDER_DESC}
+           ORDER BY ${ORDER_KEY_DESC}
            LIMIT 1`,
         )
         .get(threadId, ...pageKeyValues(conversationRowCursor(boundary))),
@@ -510,9 +510,9 @@ export class ConversationQueries {
         this.#core.connection
           .prepare(
             `${ORDERED_THREAD_MESSAGES}
-             SELECT ${PAGE_KEY_COLUMNS} FROM ordered
+             SELECT ${ORDER_KEY_COLUMNS} FROM ordered
              WHERE 1 = 1 ${routineFilter}
-             ORDER BY ${PAGE_ORDER_DESC} LIMIT ?`,
+             ORDER BY ${ORDER_KEY_DESC} LIMIT ?`,
           )
           .all(threadId, PAGE_MESSAGE_LIMIT + 1),
       );
@@ -524,10 +524,10 @@ export class ConversationQueries {
         this.#core.connection
           .prepare(
             `${ORDERED_THREAD_MESSAGES}
-             SELECT ${PAGE_KEY_COLUMNS} FROM ordered
-             WHERE (${PAGE_KEY_COLUMNS}) < (?, ?, ?, ?, ?)
+             SELECT ${ORDER_KEY_COLUMNS} FROM ordered
+             WHERE (${ORDER_KEY_COLUMNS}) < (?, ?, ?, ?, ?)
              ${routineFilter}
-             ORDER BY ${PAGE_ORDER_DESC} LIMIT ?`,
+             ORDER BY ${ORDER_KEY_DESC} LIMIT ?`,
           )
           .all(threadId, ...pageKeyValues(cursor), PAGE_MESSAGE_LIMIT + 1),
       );
@@ -537,7 +537,7 @@ export class ConversationQueries {
       this.#core.connection
         .prepare(
           `${ORDERED_THREAD_MESSAGES}
-           SELECT ${PAGE_KEY_COLUMNS} FROM ordered
+           SELECT ${ORDER_KEY_COLUMNS} FROM ordered
            WHERE message_id = ? ${routineFilter}`,
         )
         .get(threadId, anchor.messageId),
@@ -548,10 +548,10 @@ export class ConversationQueries {
       this.#core.connection
         .prepare(
           `${ORDERED_THREAD_MESSAGES}
-           SELECT ${PAGE_KEY_COLUMNS} FROM ordered
-           WHERE (${PAGE_KEY_COLUMNS}) <= (?, ?, ?, ?, ?)
+           SELECT ${ORDER_KEY_COLUMNS} FROM ordered
+           WHERE (${ORDER_KEY_COLUMNS}) <= (?, ?, ?, ?, ?)
            ${routineFilter}
-           ORDER BY ${PAGE_ORDER_DESC} LIMIT ?`,
+           ORDER BY ${ORDER_KEY_DESC} LIMIT ?`,
         )
         .all(threadId, ...anchorKey, PAGE_MESSAGE_LIMIT + 1),
     );
@@ -562,10 +562,10 @@ export class ConversationQueries {
       this.#core.connection
         .prepare(
           `${ORDERED_THREAD_MESSAGES}
-           SELECT ${PAGE_KEY_COLUMNS} FROM ordered
-           WHERE (${PAGE_KEY_COLUMNS}) > (?, ?, ?, ?, ?)
+           SELECT ${ORDER_KEY_COLUMNS} FROM ordered
+           WHERE (${ORDER_KEY_COLUMNS}) > (?, ?, ?, ?, ?)
            ${routineFilter}
-           ORDER BY ${PAGE_ORDER} LIMIT ?`,
+           ORDER BY ${ORDER_KEY_COLUMNS} LIMIT ?`,
         )
         .all(threadId, ...anchorKey, newerCap + 1),
     );
@@ -637,7 +637,7 @@ export class ConversationQueries {
              (SELECT created_at FROM projection_thread_messages WHERE thread_id = ? ${routineFilter}
               ORDER BY created_at, ordinal, message_id LIMIT 1) AS oldest_at
            FROM ordered
-           WHERE (${PAGE_KEY_COLUMNS}) < (?, ?, ?, ?, ?)
+           WHERE (${ORDER_KEY_COLUMNS}) < (?, ?, ?, ?, ?)
            ${routineFilter}`,
         )
         .get(threadId, threadId, ...pageKeyValues(cursor)),
@@ -654,19 +654,18 @@ export class ConversationQueries {
  * starts at its earliest message, so ordering by group start and then by row keeps each turn
  * together, as `sortConversationMessages` shows it. A message queued while a turn ran then stays
  * after that turn's answer, which an ACP agent sends only when the turn ends (#1540).
- * The one parameter is the thread id.
+ * Pages and read state use this one order. The one parameter is the thread id.
  */
-const ORDERED_THREAD_MESSAGES = `WITH ordered AS (
-  SELECT created_at, ordinal, message_id, item_type,
+export const ORDERED_THREAD_MESSAGES = `WITH ordered AS (
+  SELECT created_at, ordinal, message_id, author, item_type,
     CASE WHEN NULLIF(turn_id, '') IS NULL THEN created_at
       ELSE MIN(created_at) OVER (PARTITION BY NULLIF(turn_id, '')) END AS group_start,
     CASE WHEN NULLIF(turn_id, '') IS NULL THEN 'message:' || message_id
       ELSE 'turn:' || turn_id END AS group_id
   FROM projection_thread_messages WHERE thread_id = ?
 )`;
-const PAGE_KEY_COLUMNS = "group_start, group_id, created_at, ordinal, message_id";
-const PAGE_ORDER = PAGE_KEY_COLUMNS;
-const PAGE_ORDER_DESC = "group_start DESC, group_id DESC, created_at DESC, ordinal DESC, message_id DESC";
+export const ORDER_KEY_COLUMNS = "group_start, group_id, created_at, ordinal, message_id";
+export const ORDER_KEY_DESC = "group_start DESC, group_id DESC, created_at DESC, ordinal DESC, message_id DESC";
 
 /** Page decoders on IPC and every Team API version reject a conversation page of more than 100 messages. */
 const PAGE_MESSAGE_LIMIT = 100;
