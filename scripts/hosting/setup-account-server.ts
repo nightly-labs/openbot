@@ -17,16 +17,19 @@
  *
  * The production store is the `cloudflare-production` GitHub Environment (`gh` must be signed in),
  * and the keys come from the shell. The test store is the encrypted `apps/auth-api/.env.shared`,
- * and the keys come from that file. The script shows no secret value.
+ * and the keys come from the shared development environment. The script shows no secret value.
  */
 
 import { execFile } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-import { get as dotenvGet, set as dotenvSet } from "@dotenvx/dotenvx";
+import { set as dotenvSet } from "@dotenvx/dotenvx";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { z } from "zod";
+import { loadSharedDevelopmentEnvironment } from "../development-environment";
 import { bootstrapStripe } from "../stripe-bootstrap";
 
 const logger = createOpenBotLogger("hosting-setup");
@@ -86,13 +89,34 @@ function githubStore(): SecretStore {
 }
 
 function envFileStore(path: string): SecretStore {
-  const options = { path: join(repoRoot, path), envKeysFile: join(repoRoot, ".env.keys"), quiet: true };
-  const read = async (name: string): Promise<string | null> =>
-    (await dotenvGet(name, { ...options, ignore: ["MISSING_KEY"] }))?.trim() || null;
+  const envPath = join(repoRoot, path);
+  const read = async (name: string): Promise<string | null> => {
+    const values = await loadSharedDevelopmentEnvironment(repoRoot);
+    return values[name]?.trim() || null;
+  };
   const put = async (name: string, value: string): Promise<void> => {
-    const result = await dotenvSet(name, value, options);
-    if (result.changedFilepaths.length === 0 && result.unchangedFilepaths.length === 0) {
-      throw new Error(`${name} was not written to ${path}. Check that .env.keys has its private key.`);
+    const privateKey = process.env.DOTENV_PRIVATE_KEY_DEV?.trim() ?? process.env.DOTENV_PRIVATE_KEY_SHARED?.trim();
+    if (!privateKey) {
+      throw new Error(
+        `${name} was not written to ${path}. Set DOTENV_PRIVATE_KEY_SHARED or DOTENV_PRIVATE_KEY_DEV in the shell.`,
+      );
+    }
+    const keysDirectory = mkdtempSync(join(tmpdir(), "openbot-dotenv-"));
+    const keysPath = join(keysDirectory, ".env.keys");
+    writeFileSync(keysPath, `DOTENV_PRIVATE_KEY_SHARED=${privateKey}\n`, { encoding: "utf8", mode: 0o600 });
+    try {
+      const options = { path: envPath, envKeysFile: keysPath, quiet: true };
+      let result: Awaited<ReturnType<typeof dotenvSet>>;
+      try {
+        result = await dotenvSet(name, value, options);
+      } catch {
+        throw new Error(`${name} was not written to ${path}. Check the development private key.`);
+      }
+      if (result.changedFilepaths.length === 0 && result.unchangedFilepaths.length === 0) {
+        throw new Error(`${name} was not written to ${path}. Check the development private key.`);
+      }
+    } finally {
+      rmSync(keysDirectory, { recursive: true, force: true });
     }
   };
   return { label: path, read, has: async (name) => (await read(name)) !== null, put };
@@ -175,6 +199,15 @@ async function main(args: string[]): Promise<void> {
   const api = new URL(values.api ?? TARGETS[target].api).origin;
   const replace = values["replace-webhooks"];
   const store = live ? githubStore() : envFileStore("apps/auth-api/.env.shared");
+  if (!live) {
+    const privateKey = process.env.DOTENV_PRIVATE_KEY_DEV?.trim() ?? process.env.DOTENV_PRIVATE_KEY_SHARED?.trim();
+    if (!privateKey) {
+      throw new Error(
+        "Set DOTENV_PRIVATE_KEY_DEV or DOTENV_PRIVATE_KEY_SHARED in the shell before updating the test store.",
+      );
+    }
+    await loadSharedDevelopmentEnvironment(repoRoot);
+  }
   const written: string[] = [];
   const put = async (name: string, value: string): Promise<void> => {
     await store.put(name, value);

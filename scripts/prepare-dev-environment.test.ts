@@ -26,11 +26,11 @@ describe("development environment preparation", () => {
     expect(() => assertSupportedBunVersion(version)).toThrow("OpenBot development requires stable Bun 1.4.0");
   });
 
-  it("generates the development env file before running any command", () => {
+  it("generates development state before running any command", () => {
     const root = createTemporaryRoot();
     const envFilePresent: boolean[] = [];
     const run: DevelopmentCommandRunner = () =>
-      envFilePresent.push(existsSync(join(root, "apps", "auth-api", ".env.dev")));
+      envFilePresent.push(existsSync(join(root, ".openbot", "dev-state.json")));
 
     const outcome = prepareDevelopmentEnvironment({
       projectRoot: root,

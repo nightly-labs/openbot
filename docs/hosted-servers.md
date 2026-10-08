@@ -196,10 +196,11 @@ with `getServerEntitlement` when a member joins or is reactivated, and refuses a
 ## Configure the test Worker
 
 `HOSTED_SERVERS_ENABLED` is `true` in `env.test` of `apps/auth-api/wrangler.jsonc`.
-`bun run api:deploy:test` sets `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `BOAT_API_KEY` and
-`BOAT_WEBHOOK_SECRET` from the encrypted `apps/auth-api/.env.shared` on each deploy, so a value that
-you set by hand for these four is replaced. `bun run hosting:setup --target=test` makes the two
-webhooks and writes their secrets to that file. It also sets the allow list from
+`bun run api:deploy:test` loads `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `BOAT_API_KEY` and
+`BOAT_WEBHOOK_SECRET` from the stage-one encrypted `apps/auth-api/.env.shared` on each deploy, so a
+value that you set by hand for these four is replaced. Set `DOTENV_PRIVATE_KEY_DEV` in the shell (the
+legacy `DOTENV_PRIVATE_KEY_SHARED` name is also accepted). `bun run hosting:setup --target=test`
+makes the two webhooks and writes their secrets to that file. It also sets the allow list from
 `HOSTED_SERVERS_TEST_ALLOW_LIST` in that file. Set the template with
 `wrangler secret put HOSTED_SERVER_TEMPLATE --env test` from `apps/auth-api`:
 
@@ -226,15 +227,18 @@ signs in to the test Worker, and the test Worker makes the VM. The local Worker 
 start, but the app does not use them for its account. The app uses its own profile for the test
 Worker, and all worktrees share it, so you sign in one time.
 
-Each developer who has `DOTENV_PRIVATE_KEY_SHARED` can create a server with any account. The
-command decrypts `HOSTED_SERVERS_DEVELOPER_KEY` from `.env.shared`, and main sends it in the
+Each developer who has `DOTENV_PRIVATE_KEY_DEV` can create a server with any account. The legacy
+`DOTENV_PRIVATE_KEY_SHARED` name is also accepted during stage one. The command decrypts
+`HOSTED_SERVERS_DEVELOPER_KEY` from `.env.shared`, and main sends it in the
 `OpenBot-Hosting-Developer-Key` header of each hosted server request. The test Worker has the same
 key and lets the account create servers. A clone of the repository cannot decrypt the key. Main
 removes the key from its environment at the start, so agents do not get it, and a packaged build
-never sends it. To change the key, set a new one and deploy:
+never sends it. To change the key, update `HOSTED_SERVERS_DEVELOPER_KEY` in `.env.shared` with a
+temporary 0600 dotenvx key file containing the matching development key, remove that temporary file,
+and run:
 
 ```bash
-bunx dotenvx set HOSTED_SERVERS_DEVELOPER_KEY "$(openssl rand -hex 32)" -f apps/auth-api/.env.shared -fk .env.keys
+bun run hosting:setup --target=test
 bun run api:deploy:test
 ```
 

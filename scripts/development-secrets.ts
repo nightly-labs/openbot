@@ -1,12 +1,26 @@
-import { generateKeyPairSync, randomBytes } from "node:crypto";
-import { existsSync, writeFileSync } from "node:fs";
+import { createHash, generateKeyPairSync, randomBytes } from "node:crypto";
+import {
+  chmodSync,
+  closeSync,
+  existsSync,
+  fsyncSync,
+  linkSync,
+  lstatSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseEnv } from "node:util";
 
-// Every value the local Auth API needs is derivable on the machine that runs it, so the development
-// env file is generated per checkout instead of being committed. Nothing here is shared with
-// production: `.env.production` stays encrypted and its key stays in `.env.keys`. This is what lets
-// a fork run `bun run dev` without the maintainer's dotenvx keys.
+// Every value the local Auth API needs is derivable on the machine that runs it, so local defaults
+// live in private state instead of a committed file. Nothing here is shared with production:
+// `.env.production` stays encrypted and its key stays in `.env.keys`. This is what lets a fork run
+// `bun run dev` without the maintainer's dotenvx keys.
 //
 // `prepare-dev-environment.ts` calls this before `bun install`, so it uses node builtins only —
 // `@openbot/logging` is not resolvable yet on a fresh clone, which is why this writes to stdout.
@@ -14,6 +28,44 @@ import { fileURLToPath } from "node:url";
 // `wrangler.jsonc` pins the active ticket key ID in its top-level `vars`, and `parseJwks` rejects a
 // JWKS that does not carry that `kid`, so the generated pair has to claim the same one.
 const TICKET_KEY_ID = "openbot-remote-1";
+const DEVELOPMENT_STATE_VERSION = 1 as const;
+const DEVELOPMENT_STATE_DIRECTORY = ".openbot";
+const DEVELOPMENT_STATE_FILE = "dev-state.json";
+const LEGACY_ENV_FILE = join("apps", "auth-api", ".env.dev");
+const LEGACY_ENV_BACKUP_FILE = "legacy-env.dev.backup";
+const DEVELOPMENT_STATE_LOCK = "dev-state.json.lock";
+
+/** The persisted local values used by development services. */
+export interface DevelopmentState {
+  version: typeof DEVELOPMENT_STATE_VERSION;
+  defaults: Record<string, string>;
+  overrides: Record<string, string>;
+  /** SHA-256 of the legacy `.env.dev` bytes imported into this state, when present. */
+  legacyEnvDigest?: string;
+}
+
+const GENERATED_DEFAULT_NAMES = new Set([
+  "AUTH_EXPOSE_DEVELOPMENT_CODE",
+  "EMAIL_SMTP_HOST",
+  "EMAIL_SMTP_PORT",
+  "EMAIL_SMTP_USERNAME",
+  "EMAIL_FROM",
+  "EMAIL_SMTP_PASSWORD",
+  "SKILLS_ADMIN_TOKEN",
+  "SITE_REPORT_HASH_SECRET",
+  "REMOTE_AUTH_WEBHOOK_SECRET",
+  "REMOTE_TICKET_PRIVATE_JWK",
+  "REMOTE_TICKET_PUBLIC_JWKS",
+]);
+const STATIC_DEFAULT_VALUES = new Map([
+  ["AUTH_EXPOSE_DEVELOPMENT_CODE", "true"],
+  ["EMAIL_SMTP_HOST", ""],
+  ["EMAIL_SMTP_PORT", ""],
+  ["EMAIL_SMTP_USERNAME", ""],
+  ["EMAIL_FROM", ""],
+  ["EMAIL_SMTP_PASSWORD", ""],
+]);
+const REQUIRED_DEFAULT_NAMES = ["REMOTE_TICKET_PRIVATE_JWK", "REMOTE_TICKET_PUBLIC_JWKS"] as const;
 
 export interface DevelopmentTicketKeyPair {
   privateJwk: string;
@@ -72,10 +124,367 @@ REMOTE_TICKET_PUBLIC_JWKS=${tickets.publicJwks}
 export type DevelopmentEnvOutcome = "created" | "kept";
 
 export function ensureDevelopmentEnvFile(projectRoot: string): DevelopmentEnvOutcome {
-  const path = join(projectRoot, "apps", "auth-api", ".env.dev");
-  if (existsSync(path)) return "kept";
-  writeFileSync(path, createDevelopmentEnvFile(), { encoding: "utf8", mode: 0o600 });
-  return "created";
+  const paths = developmentStatePaths(projectRoot);
+  const existed = existsSync(paths.state) || existsSync(paths.legacy) || existsSync(paths.backup);
+  readDevelopmentState(projectRoot);
+  return existed ? "kept" : "created";
+}
+
+/**
+ * Reads the persisted development state, importing the legacy generated env file on first use.
+ *
+ * This function is intentionally synchronous. It runs before dependency installation, and the
+ * only modules it uses are Node builtins. A missing state is created with local defaults. A legacy
+ * file is never removed; its exact bytes are kept in `.openbot/legacy-env.dev.backup` for recovery.
+ */
+export function readDevelopmentState(projectRoot: string): DevelopmentState {
+  const paths = developmentStatePaths(projectRoot);
+  ensurePrivateDirectory(paths.directory);
+
+  const current = readStateIfPresent(paths.state);
+  if (current) {
+    assertLegacyUnchanged(paths, current);
+    return current;
+  }
+
+  const lock = acquireStateLock(paths.lock);
+  try {
+    const afterLock = readStateIfPresent(paths.state);
+    if (afterLock) {
+      assertLegacyUnchanged(paths, afterLock);
+      return afterLock;
+    }
+
+    const source = readLegacySource(paths);
+    const state = source ? migrateLegacyState(source.bytes) : createInitialState();
+    if (source) publishLegacyBackup(paths.backup, source.bytes);
+    publishInitialState(paths.state, state);
+    return readStateIfPresent(paths.state) ?? state;
+  } finally {
+    releaseStateLock(paths.lock, lock);
+  }
+}
+
+/**
+ * Applies explicit local development overrides and publishes them as one atomic state update.
+ * `undefined` and `null` remove an override. The writer takes an exclusive lock and therefore
+ * fails safely if another process is updating the state instead of losing that process's update.
+ */
+export function setDevelopmentOverrides(
+  projectRoot: string,
+  updates: Record<string, string | null | undefined>,
+): DevelopmentState {
+  const paths = developmentStatePaths(projectRoot);
+  ensurePrivateDirectory(paths.directory);
+  readDevelopmentState(projectRoot);
+  const lock = acquireStateLock(paths.lock);
+  try {
+    const current = readStateIfPresent(paths.state);
+    if (!current) throw new Error("The development state disappeared during update. Retry the operation.");
+    assertLegacyUnchanged(paths, current);
+    const overrides = { ...current.overrides };
+    for (const [name, value] of Object.entries(updates)) {
+      if (value === undefined || value === null) delete overrides[name];
+      else overrides[name] = value;
+    }
+    const next: DevelopmentState = { ...current, overrides };
+    publishState(paths.state, next);
+    return next;
+  } finally {
+    releaseStateLock(paths.lock, lock);
+  }
+}
+
+interface DevelopmentStatePaths {
+  directory: string;
+  state: string;
+  lock: string;
+  legacy: string;
+  backup: string;
+}
+
+interface LegacySource {
+  bytes: Buffer;
+}
+
+interface ParsedDevelopmentState {
+  version?: unknown;
+  defaults?: unknown;
+  overrides?: unknown;
+  legacyEnvDigest?: unknown;
+}
+
+function developmentStatePaths(projectRoot: string): DevelopmentStatePaths {
+  const directory = join(projectRoot, DEVELOPMENT_STATE_DIRECTORY);
+  return {
+    directory,
+    state: join(directory, DEVELOPMENT_STATE_FILE),
+    lock: join(directory, DEVELOPMENT_STATE_LOCK),
+    legacy: join(projectRoot, LEGACY_ENV_FILE),
+    backup: join(directory, LEGACY_ENV_BACKUP_FILE),
+  };
+}
+
+function createInitialState(): DevelopmentState {
+  return {
+    version: DEVELOPMENT_STATE_VERSION,
+    defaults: parseDevelopmentEnv(createDevelopmentEnvFile()),
+    overrides: {},
+  };
+}
+
+function migrateLegacyState(bytes: Buffer): DevelopmentState {
+  const values = parseDevelopmentEnv(bytes.toString("utf8"));
+  if (Object.values(values).some((value) => value.startsWith("encrypted:"))) {
+    throw new Error("The legacy development env is encrypted. Decrypt it before migration.");
+  }
+  const hasPrivateTicket = Object.hasOwn(values, "REMOTE_TICKET_PRIVATE_JWK");
+  const hasPublicTickets = Object.hasOwn(values, "REMOTE_TICKET_PUBLIC_JWKS");
+  if (hasPrivateTicket !== hasPublicTickets) {
+    throw new Error(
+      "The legacy development env has an incomplete remote ticket key pair. Resolve it before continuing.",
+    );
+  }
+  const defaults: Record<string, string> = {};
+  const overrides: Record<string, string> = {};
+  for (const [name, value] of Object.entries(values)) {
+    const staticDefault = STATIC_DEFAULT_VALUES.get(name);
+    if (GENERATED_DEFAULT_NAMES.has(name) && (staticDefault === undefined || staticDefault === value)) {
+      defaults[name] = value;
+    } else {
+      overrides[name] = value;
+    }
+  }
+
+  // A hand-edited legacy file can omit one of the generated values. Keep local development usable
+  // by filling only those missing generated names; all values that were present remain unchanged.
+  const generated = createInitialState().defaults;
+  for (const name of GENERATED_DEFAULT_NAMES) {
+    const value = generated[name];
+    if (!(name in defaults) && value !== undefined) defaults[name] = value;
+  }
+
+  return {
+    version: DEVELOPMENT_STATE_VERSION,
+    defaults,
+    overrides,
+    legacyEnvDigest: digest(bytes),
+  };
+}
+
+function parseDevelopmentEnv(contents: string): Record<string, string> {
+  let parsed: ReturnType<typeof parseEnv>;
+  try {
+    parsed = parseEnv(contents);
+  } catch {
+    throw new Error("The legacy development env file is invalid. Resolve its syntax before continuing.");
+  }
+  const values: Record<string, string> = {};
+  for (const [name, value] of Object.entries(parsed)) {
+    if (value !== undefined) values[name] = value;
+  }
+  return values;
+}
+
+function readLegacySource(paths: DevelopmentStatePaths): LegacySource | undefined {
+  const legacyExists = existsSync(paths.legacy);
+  const backupExists = existsSync(paths.backup);
+  if (legacyExists) {
+    assertRegularPrivateFile(paths.legacy, "legacy development env");
+    const bytes = readFileSync(paths.legacy);
+    if (backupExists) {
+      assertRegularPrivateFile(paths.backup, "legacy development env recovery backup");
+    }
+    if (backupExists && !bytes.equals(readFileSync(paths.backup))) {
+      throw new Error(
+        "The legacy development env and its recovery backup differ. Resolve the conflict before continuing.",
+      );
+    }
+    return { bytes };
+  }
+  if (backupExists) {
+    assertRegularPrivateFile(paths.backup, "legacy development env recovery backup");
+    return { bytes: readFileSync(paths.backup) };
+  }
+  return undefined;
+}
+
+function assertLegacyUnchanged(paths: DevelopmentStatePaths, state: DevelopmentState): void {
+  if (existsSync(paths.legacy)) {
+    assertRegularPrivateFile(paths.legacy, "legacy development env");
+    const legacyDigest = digest(readFileSync(paths.legacy));
+    if (state.legacyEnvDigest !== legacyDigest) {
+      throw new Error(
+        "The legacy apps/auth-api/.env.dev changed after development state migration. Resolve the conflict before continuing.",
+      );
+    }
+  }
+  if (existsSync(paths.backup)) {
+    assertRegularPrivateFile(paths.backup, "legacy development env recovery backup");
+    const backupDigest = digest(readFileSync(paths.backup));
+    if (state.legacyEnvDigest !== backupDigest) {
+      throw new Error(
+        "The legacy development env recovery backup changed after development state migration. Resolve the conflict before continuing.",
+      );
+    }
+  }
+  if (state.legacyEnvDigest === undefined && (existsSync(paths.legacy) || existsSync(paths.backup))) {
+    throw new Error("A legacy development env appeared after state creation. Resolve the conflict before continuing.");
+  }
+}
+
+function publishLegacyBackup(path: string, bytes: Buffer): void {
+  if (existsSync(path)) {
+    assertRegularPrivateFile(path, "legacy development env recovery backup");
+    if (!bytes.equals(readFileSync(path))) {
+      throw new Error(
+        "The legacy development env recovery backup differs from the source. Resolve the conflict before continuing.",
+      );
+    }
+    chmodSync(path, 0o600);
+    return;
+  }
+  writeExclusive(path, bytes);
+}
+
+function readStateIfPresent(path: string): DevelopmentState | undefined {
+  if (!existsSync(path)) return undefined;
+  assertRegularPrivateFile(path, "development state");
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(path, "utf8"));
+  } catch {
+    throw new Error("The development state file is invalid or unreadable. Restore .openbot/dev-state.json.");
+  }
+  if (!isDevelopmentState(parsed)) {
+    throw new Error(
+      "The development state file has an invalid format. Restore .openbot/dev-state.json before continuing.",
+    );
+  }
+  chmodSync(path, 0o600);
+  return parsed;
+}
+
+function isDevelopmentState(value: unknown): value is DevelopmentState {
+  if (!value || typeof value !== "object") return false;
+  const state: ParsedDevelopmentState = value;
+  if (state.version !== DEVELOPMENT_STATE_VERSION) return false;
+  if (!isStringRecord(state.defaults) || !isStringRecord(state.overrides)) return false;
+  for (const name of REQUIRED_DEFAULT_NAMES) {
+    if (!state.defaults[name]) return false;
+  }
+  return state.legacyEnvDigest === undefined || typeof state.legacyEnvDigest === "string";
+}
+
+function isStringRecord(value: unknown): value is Record<string, string> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  return Object.values(value).every((entry) => typeof entry === "string");
+}
+
+function publishInitialState(path: string, state: DevelopmentState): void {
+  if (existsSync(path)) return;
+  const temporary = writeTemporary(path, state);
+  try {
+    // Hard-link publication is exclusive: a concurrent first run cannot replace a state that won
+    // the race and thereby rotate the ticket identity.
+    try {
+      linkSync(temporary, path);
+    } catch (error) {
+      if (!isAlreadyExistsError(error)) throw error;
+    }
+  } finally {
+    unlinkIfPresent(temporary);
+  }
+}
+
+function publishState(path: string, state: DevelopmentState): void {
+  assertRegularPrivateFileIfPresent(path, "development state");
+  const temporary = writeTemporary(path, state);
+  try {
+    renameSync(temporary, path);
+    chmodSync(path, 0o600);
+  } finally {
+    unlinkIfPresent(temporary);
+  }
+}
+
+function writeTemporary(path: string, state: DevelopmentState): string {
+  const temporary = `${path}.tmp-${process.pid}-${randomBytes(8).toString("hex")}`;
+  const descriptor = openSync(temporary, "wx", 0o600);
+  try {
+    const contents = `${JSON.stringify(state, null, 2)}\n`;
+    writeFileSync(descriptor, contents, "utf8");
+    fsyncSync(descriptor);
+  } finally {
+    closeSync(descriptor);
+  }
+  chmodSync(temporary, 0o600);
+  return temporary;
+}
+
+function writeExclusive(path: string, bytes: Buffer): void {
+  const descriptor = openSync(path, "wx", 0o600);
+  try {
+    writeFileSync(descriptor, bytes);
+    fsyncSync(descriptor);
+  } finally {
+    closeSync(descriptor);
+  }
+  chmodSync(path, 0o600);
+}
+
+function acquireStateLock(path: string): string {
+  try {
+    mkdirSync(path, { mode: 0o700 });
+  } catch (error) {
+    if (isAlreadyExistsError(error)) {
+      throw new Error(
+        `Another process is updating ${path}. Retry after it finishes; do not delete the lock automatically.`,
+      );
+    }
+    throw error;
+  }
+  return path;
+}
+
+function releaseStateLock(path: string, lock: string): void {
+  if (lock !== path) return;
+  rmSync(path, { recursive: true, force: true });
+}
+
+function ensurePrivateDirectory(path: string): void {
+  if (existsSync(path)) {
+    if (!lstatSync(path).isDirectory()) throw new Error("The .openbot development state path is not a directory.");
+  } else {
+    mkdirSync(path, { recursive: true, mode: 0o700 });
+  }
+  chmodSync(path, 0o700);
+}
+
+function assertRegularPrivateFile(path: string, label: string): void {
+  const stat = lstatSync(path);
+  if (!stat.isFile()) throw new Error(`The ${label} path is not a regular file.`);
+}
+
+function assertRegularPrivateFileIfPresent(path: string, label: string): void {
+  if (existsSync(path)) assertRegularPrivateFile(path, label);
+}
+
+function unlinkIfPresent(path: string): void {
+  try {
+    rmSync(path, { force: true });
+  } catch {
+    // The state has already been published. A leftover private temporary can be removed on the
+    // next run, but must not hide the successful operation.
+  }
+}
+
+function digest(bytes: Buffer): string {
+  return createHash("sha256").update(bytes).digest("hex");
+}
+
+function isAlreadyExistsError(error: unknown): boolean {
+  return Boolean(error && typeof error === "object" && "code" in error && error.code === "EEXIST");
 }
 
 if (import.meta.main) {
@@ -83,7 +492,7 @@ if (import.meta.main) {
   const outcome = ensureDevelopmentEnvFile(projectRoot);
   process.stdout.write(
     outcome === "created"
-      ? "Generated apps/auth-api/.env.dev for local development.\n"
-      : "Kept the existing apps/auth-api/.env.dev.\n",
+      ? "Generated .openbot/dev-state.json for local development.\n"
+      : "Kept the existing .openbot/dev-state.json.\n",
   );
 }

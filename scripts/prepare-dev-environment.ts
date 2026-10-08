@@ -40,11 +40,10 @@ export interface DevelopmentPreparationInput {
 export function prepareDevelopmentEnvironment(input: DevelopmentPreparationInput = {}): DevelopmentEnvOutcome {
   const projectRoot = input.projectRoot ?? developmentProjectRoot;
   assertSupportedBunVersion(input.bunVersion ?? process.versions.bun ?? "unknown");
-  // Before the env file, so a worktree reuses the main checkout's `.env.dev` identity.
+  // Copy state before generation so a new worktree retains the main checkout's identity.
   const copied = copyWorktreeIncludes(projectRoot, input.mainCheckoutRoot ?? findMainCheckoutRoot(projectRoot));
   for (const path of copied) process.stdout.write(`Copied ${path} from the main checkout.\n`);
-  // Before `bun install`, because a fresh clone has no `.env.dev` and both dev services load one.
-  // Only `.env.production` is still encrypted, so a fork needs no `.env.keys` to reach this point.
+  // State generation uses Node built-ins and needs no decryption key or installed packages.
   const envFile = ensureDevelopmentEnvFile(projectRoot);
 
   const executable = input.executable ?? process.execPath;
@@ -190,6 +189,8 @@ export function copyWorktreeIncludes(projectRoot: string, mainCheckoutRoot: stri
   for (const line of readFileSync(listPath, "utf8").split("\n")) {
     const path = line.trim();
     if (!path || path.startsWith("#") || !isInsideCheckout(path)) continue;
+    if (path === ".openbot/dev-state.json" && existsSync(join(projectRoot, "apps/auth-api/.env.dev"))) continue;
+    if (path === "apps/auth-api/.env.dev" && existsSync(join(projectRoot, ".openbot/dev-state.json"))) continue;
     const source = join(mainCheckoutRoot, path);
     const target = join(projectRoot, path);
     if (!existsSync(source) || existsSync(target)) continue;
@@ -238,6 +239,6 @@ if (import.meta.main) {
   // Generating secrets without saying so leaves a contributor guessing where the file came from.
   // stdout rather than a logger, because this runs before `bun install` on a fresh clone.
   if (prepareDevelopmentWorktree() === "created") {
-    process.stdout.write("Generated apps/auth-api/.env.dev for local development.\n");
+    process.stdout.write("Prepared local development state.\n");
   }
 }

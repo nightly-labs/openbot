@@ -1,7 +1,6 @@
-# Local dotenvx decryption key used by the development Auth API.
-.env.keys
-# Local dotenvx decryption key used by the Remote production stack.
+# Remote production keys retain their existing copy behavior.
 remote/.env.keys
-# Generated local development env file, so a worktree reuses this machine's dev identity
-# instead of generating a second one.
+# Reuse the local identity. Existing worktree state is never replaced.
+.openbot/dev-state.json
+# Stage one: import legacy identity from an older main checkout.
 apps/auth-api/.env.dev

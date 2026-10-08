@@ -58,3 +58,6 @@ mise.local.toml
 keys
 # Agent task checklist. Local to one worktree.
 /TASKS.md
+
+# Persistent local development identity and migration recovery.
+.openbot/

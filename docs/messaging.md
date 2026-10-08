@@ -109,7 +109,7 @@ local Signal and gives it the development app's signing secret.
    ```
    The value is the signing secret of `OpenBot (dev)` (`A0C5G5XGS83`), under **Basic Information**
    at <https://api.slack.com/apps>.
-3. In `apps/auth-api/.env.dev`, add `SLACK_ROUTE_PRIVATE_JWK` with the same value as
+3. In local development state, add `SLACK_ROUTE_PRIVATE_JWK` with the same value as
    `REMOTE_TICKET_PRIVATE_JWK`, and `SLACK_ROUTE_KEY_ID=openbot-remote-1`. Development only: the
    ticket key's public key is already in the JWKS that Signal loads.
 4. Run `bun run dev:slack` (add `--shared` for the shared `OpenBot Dev` profile). Set the printed address

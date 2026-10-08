@@ -87,9 +87,9 @@ Do the steps in this order:
 6. **Desktop.** Run `release-upgrade-safety`, then release. An old Signal refuses the new `ingress`
    hello, so step 4 comes first.
 
-The test Worker (`bun run deploy:test`) reads `.env.shared`, then `.env.production`. `.env.shared` has
-no route key, so it takes the production route key and JWKS. This computer has no key for
-`.env.shared`.
+The test Worker (`bun run deploy:test`) loads the stage-one `.env.shared` values, then the production
+inputs. `.env.shared` has no route key, so it takes the production route key and JWKS. Without the
+development key, local startup still works but the shared integration values stay unavailable.
 
 ## End-to-end test
 
