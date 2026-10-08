@@ -35,6 +35,9 @@ export function DynamicIslandSurface() {
     ...DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
   });
   const [viewState, setViewState] = createSignal<DynamicIslandViewState>("compact");
+  // A failed action keeps the panel open with this message, so an Approve that did not reach the
+  // agent does not look like it worked.
+  const [actionError, setActionError] = createSignal<string>();
   let pointerInside = false;
   let focusInside = false;
   let queuedPresentation: DynamicIslandPresentation | undefined;
@@ -50,6 +53,7 @@ export function DynamicIslandSurface() {
   }
 
   function commitPresentation(next: DynamicIslandPresentation): void {
+    if (presentationIdentity(next) !== presentationIdentity(presentation())) setActionError(undefined);
     setPresentation(next);
     if (next.mode === "idle") {
       setViewState("compact");
@@ -68,6 +72,7 @@ export function DynamicIslandSurface() {
   function changeViewState(next: DynamicIslandViewState, reason: DynamicIslandStateChangeReason): void {
     if (reason === "pointer" || reason === "keyboard" || reason === "escape") performHaptic();
     setViewState(next);
+    if (next === "compact") setActionError(undefined);
     if (next === "compact" && !pointerInside && !focusInside) applyQueuedPresentation();
   }
 
@@ -128,9 +133,11 @@ export function DynamicIslandSurface() {
 
   async function perform(action: DynamicIslandAction): Promise<void> {
     performHaptic();
+    setActionError(undefined);
     try {
       await dynamicIslandPort().dynamicIsland.performAction(action);
     } catch {
+      setActionError(t("island.action.failed"));
       return;
     }
     pointerInside = false;
@@ -162,6 +169,7 @@ export function DynamicIslandSurface() {
       pointerInside = false;
       focusInside = false;
       setViewState("compact");
+      setActionError(undefined);
       applyQueuedPresentation();
       void dynamicIslandPort().dynamicIsland.setInteractive({ interactive: false });
     };
@@ -197,6 +205,7 @@ export function DynamicIslandSurface() {
             extendedHoverArea
             onStateChange={changeViewState}
             onAction={perform}
+            actionError={actionError()}
             onHaptic={performHaptic}
           />
         </fieldset>

@@ -40,6 +40,7 @@ export const messages = {
   "island.action.later": "Más tarde",
   "island.action.dismiss": "Descartar",
   "island.action.answerInOpenBot": "Responder en OpenBot",
+  "island.action.failed": "No funcionó. Vuelve a intentarlo.",
   "island.action.expand": "Expandir {label}",
   "island.action.collapse": "Contraer {label}",
   "island.failure.fallback": "La tarea se detuvo antes de terminar.",

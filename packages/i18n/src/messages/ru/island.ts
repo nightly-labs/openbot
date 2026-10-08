@@ -44,6 +44,7 @@ export const messages = {
   "island.action.later": "Позже",
   "island.action.dismiss": "Закрыть",
   "island.action.answerInOpenBot": "Ответить в OpenBot",
+  "island.action.failed": "Не получилось. Попробуйте снова.",
   "island.action.expand": "Развернуть: {label}",
   "island.action.collapse": "Свернуть: {label}",
   "island.failure.fallback": "Задача остановилась, не успев завершиться.",
