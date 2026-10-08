@@ -232,6 +232,11 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #hostedStartAt = new Map<string, number>();
   /** Hosted servers that did not come online in the start time. Only the user's next wake starts them again. */
   readonly #hostedStartExpired = new Set<string>();
+  /**
+   * WebRTC connections that opened while the direct path was in use, such as for the remote screen.
+   * Their `connected` event did not run the connection setup, and a later `connect` raises none.
+   */
+  readonly #webRtcConnectedBesideDirect = new Set<string>();
   #appFocused = true;
   readonly #remoteViewerProxy: RemoteViewerProxy | null;
   #selections = Semaphore.makeUnsafe(1);
@@ -399,43 +404,15 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       : null;
     this.#webrtcTransport?.on("connected", (serverId) => {
       // A WebRTC connection opened only for the remote screen while the direct path carries the rest.
-      if (this.#direct.isActive(serverId)) return;
-      this.#events.clearReconnectBackoff(serverId);
-      this.#hostRestartAway.delete(serverId);
-      this.#hostedStartAt.delete(serverId);
-      this.#hostedStartExpired.delete(serverId);
-      this.#connections.markConnected(serverId);
-      this.#emitChanged();
-      const server = this.#store.find(serverId);
-      this.#background(
-        this.#owned(
-          Effect.gen({ self: this }, function* () {
-            // Read the host report before negotiating the fixed WebRTC transport. This keeps the
-            // transport view stable when both operations finish in the same event-loop turn.
-            yield* this.#client.refreshWebRtcCompatibility(serverId).pipe(Effect.catch(() => Effect.void));
-            if (server) yield* this.#client.ensureCompatibility(server, true).pipe(Effect.catch(() => Effect.void));
-            this.#emitChanged();
-            yield* Effect.all(
-              [
-                this.#refresh.refreshAgentRoster(serverId).pipe(Effect.catch(() => Effect.void)),
-                server
-                  ? Effect.gen({ self: this }, function* () {
-                      const remoteDesktopAvailable = yield* this.#client
-                        .probeRemoteDesktop(server)
-                        .pipe(Effect.catch(() => Effect.succeed(false)));
-                      yield* this.#store.update(serverId, { remoteDesktopAvailable });
-                      this.#emitChanged();
-                    }).pipe(Effect.catch(() => Effect.void))
-                  : Effect.void,
-                this.#refreshDirectEndpoint(serverId).pipe(Effect.catch(() => Effect.void)),
-              ],
-              { concurrency: "unbounded" },
-            );
-          }),
-        ),
-      );
+      // A fallback to WebRTC runs the setup later: see `#connectHost`.
+      if (this.#direct.isActive(serverId)) {
+        this.#webRtcConnectedBesideDirect.add(serverId);
+        return;
+      }
+      this.#webRtcConnected(serverId);
     });
     this.#webrtcTransport?.on("disconnected", (serverId) => {
+      this.#webRtcConnectedBesideDirect.delete(serverId);
       if (this.#direct.isActive(serverId)) return;
       const wasOnline = this.#connections.statusFor(serverId).state === "online";
       // A host the app has stopped reconnecting to is not merely offline. The recorded failure is
@@ -512,7 +489,48 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       // A connect that starts with the app waits for the account: WebRTC fails at once before it loads.
       yield* this.#accountReady();
       yield* transport.connect(hostId);
+      // The connection was already open beside the direct path, so `connect` raised no event.
+      if (this.#webRtcConnectedBesideDirect.delete(hostId) && transport.isConnected(hostId))
+        this.#webRtcConnected(hostId);
     });
+  }
+
+  /** The WebRTC data channel to a host is up: the server is online, and its details are read again. */
+  #webRtcConnected(serverId: string): void {
+    this.#events.clearReconnectBackoff(serverId);
+    this.#hostRestartAway.delete(serverId);
+    this.#hostedStartAt.delete(serverId);
+    this.#hostedStartExpired.delete(serverId);
+    this.#connections.markConnected(serverId);
+    this.#emitChanged();
+    const server = this.#store.find(serverId);
+    this.#background(
+      this.#owned(
+        Effect.gen({ self: this }, function* () {
+          // Read the host report before negotiating the fixed WebRTC transport. This keeps the
+          // transport view stable when both operations finish in the same event-loop turn.
+          yield* this.#client.refreshWebRtcCompatibility(serverId).pipe(Effect.catch(() => Effect.void));
+          if (server) yield* this.#client.ensureCompatibility(server, true).pipe(Effect.catch(() => Effect.void));
+          this.#emitChanged();
+          yield* Effect.all(
+            [
+              this.#refresh.refreshAgentRoster(serverId).pipe(Effect.catch(() => Effect.void)),
+              server
+                ? Effect.gen({ self: this }, function* () {
+                    const remoteDesktopAvailable = yield* this.#client
+                      .probeRemoteDesktop(server)
+                      .pipe(Effect.catch(() => Effect.succeed(false)));
+                    yield* this.#store.update(serverId, { remoteDesktopAvailable });
+                    this.#emitChanged();
+                  }).pipe(Effect.catch(() => Effect.void))
+                : Effect.void,
+              this.#refreshDirectEndpoint(serverId).pipe(Effect.catch(() => Effect.void)),
+            ],
+            { concurrency: "unbounded" },
+          );
+        }),
+      ),
+    );
   }
 
   /**

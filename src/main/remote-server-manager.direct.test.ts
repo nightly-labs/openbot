@@ -307,6 +307,22 @@ describe("RemoteServerManager direct Tailscale path", () => {
     expect(fixture.manager.directRouteStatus(HOST)).toMatchObject({ active: false, hint: "failed" });
   });
 
+  it("sets up a WebRTC connection that opened beside the direct path when it falls back to it", async () => {
+    directHost();
+    const sockets = stubEventSockets();
+    const fixture = await directFixture();
+    await runCauseEffect(fixture.manager.startEventConnections());
+    await waitForServer(fixture, { state: "online" }, HOST);
+    // The remote screen opens WebRTC while the direct path carries the rest.
+    vi.spyOn(fixture.transport, "isConnected").mockReturnValue(true);
+    fixture.transport.emit("connected", HOST);
+    sockets.last()?.close(1000, "Tailscale went away");
+    await vi.waitFor(() => expect(fixture.connect).toHaveBeenCalledWith(HOST), { timeout: 5_000 });
+    // `connect` finds the open connection and raises no event. The server is online over it.
+    await waitForServer(fixture, { state: "online" }, HOST);
+    expect(fixture.manager.directRouteStatus(HOST)).toMatchObject({ active: false });
+  });
+
   it("signs in again, not 'sign in again', when the host no longer accepts the direct session", async () => {
     const host = directHost();
     stubEventSockets();
