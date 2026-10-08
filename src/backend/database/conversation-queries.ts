@@ -10,6 +10,7 @@ import type {
   ConversationSnapshot,
 } from "@openbot/contracts/ipc";
 import {
+  AGENT_EXCHANGE_ITEM_TYPE,
   HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX,
   isAttachmentSummary,
   MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX,
@@ -231,10 +232,14 @@ export class ConversationQueries {
     );
     // The rows come in group order, which a cursor follows. Inside a turn, the shared order puts the
     // user's message before commentary and the answer, as the live conversation shows them.
-    const messages = sortConversationMessages(
-      rows.map((row) => decodeConversationMessageJson(requiredStringColumn(row, "message_json"))),
-    );
-    const messageIds = new Set(messages.map((message) => message.id));
+    const pageMessages = rows.map((row) => decodeConversationMessageJson(requiredStringColumn(row, "message_json")));
+    const messageIds = new Set(pageMessages.map((message) => message.id));
+    // A turn larger than a page is split. The order finds a steer by the turn's earlier input, so the
+    // sort also reads the inputs that are on another page and then drops them.
+    const messages = sortConversationMessages([
+      ...pageMessages,
+      ...this.#turnInputsOutside(threadId, pageMessages, messageIds),
+    ]).filter((message) => messageIds.has(message.id));
     const referenceIdSet = new Set<string>();
     for (const message of messages) {
       const referenceId = message.replyToMessageId;
@@ -564,7 +569,30 @@ export class ConversationQueries {
         )
         .all(threadId, ...anchorKey, newerCap + 1),
     );
-    return [...older, ...wholeGroups(newerRows, limit - older.length, newerCap)];
+    // At least one group: the anchor's turn can continue after the anchor, and an around page has no
+    // newer cursor to load the rest of it.
+    return [...older, ...wholeGroups(newerRows, Math.max(limit - older.length, 1), newerCap)];
+  }
+
+  /** The user and teammate messages of the page's turns that are not on the page. */
+  #turnInputsOutside(
+    threadId: string,
+    messages: readonly ConversationMessage[],
+    messageIds: ReadonlySet<string>,
+  ): ConversationMessage[] {
+    const turnIds = [...new Set(messages.flatMap((message) => (message.turnId ? [message.turnId] : [])))];
+    if (turnIds.length === 0) return [];
+    return databaseRows(
+      this.#core.connection
+        .prepare(
+          `SELECT message_id, message_json FROM projection_thread_messages
+           WHERE thread_id = ? AND turn_id IN (${turnIds.map(() => "?").join(", ")})
+             AND (author = 'user' OR item_type = ?)`,
+        )
+        .all(threadId, ...turnIds, AGENT_EXCHANGE_ITEM_TYPE),
+    )
+      .filter((row) => !messageIds.has(requiredStringColumn(row, "message_id")))
+      .map((row) => decodeConversationMessageJson(requiredStringColumn(row, "message_json")));
   }
 
   /** A page cursor from a client. A version 1 cursor, from before pages kept turns whole, gets its row's group. */

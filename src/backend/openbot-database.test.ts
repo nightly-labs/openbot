@@ -672,9 +672,18 @@ describe("OpenBotDatabase", () => {
       message("steered-second-answer", 2_030, { turnId: "steered" }),
       message("marker", 2_015),
     );
-    // A turn larger than a page.
+    // A turn larger than a page, with a steer on its last page.
+    messages.push(
+      message("large-question", 2_999, { author: "user", turnId: "large" }),
+      message("large-answer", 3_200, { turnId: "large" }),
+    );
     for (let index = 0; index < 120; index += 1) {
-      messages.push(message(`large-${index.toString().padStart(3, "0")}`, 3_000 + index, { turnId: "large" }));
+      const id = `large-${index.toString().padStart(3, "0")}`;
+      messages.push(
+        index === 110
+          ? message(id, 3_000 + index, { author: "user", turnId: "large" })
+          : message(id, 3_000 + index, { turnId: "large", itemType: "commentary" }),
+      );
     }
     // The live runtime sorts a snapshot before it stores it.
     sortConversationMessages(messages);
@@ -715,10 +724,18 @@ describe("OpenBotDatabase", () => {
       });
     }
 
-    const around = database.readConversationPage(agent.id, agent.threadId, { type: "around", messageId: "steer" }, 4);
-    expect(around.messages.map(({ id }) => id)).toEqual(
-      expected.filter((id) => id.startsWith("steered") || id === "steer"),
-    );
+    // With limit 2 the turn before the anchor already fills the page; the rest of the turn still comes.
+    for (const limit of [2, 4]) {
+      const around = database.readConversationPage(
+        agent.id,
+        agent.threadId,
+        { type: "around", messageId: "steer" },
+        limit,
+      );
+      expect(around.messages.map(({ id }) => id)).toEqual(
+        expected.filter((id) => id.startsWith("steered") || id === "steer"),
+      );
+    }
 
     const ordinal = expected.indexOf("turn-6-question");
     const legacyCursor = Buffer.from(
