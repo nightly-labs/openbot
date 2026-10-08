@@ -164,39 +164,65 @@ describe("Team protocol v6", () => {
       expect(encodeTeamProtocolV1CurrentHttpResponse("GET", snapshotPath, 200, snapshot)).not.toContain("uiBlock");
     });
 
-    it("fails closed on a malformed block in both directions and on the event stream", () => {
+    it("leaves out only a malformed block, in both directions and on the event stream", () => {
       const [prompt, ...rest] = page.messages;
       if (!prompt) throw new Error("Invalid v6 conversation fixture.");
+      const { uiBlock: _promptBlock, ...promptWithoutBlock } = prompt;
+      // The message arrives with its fallback question, and every other block stays.
+      const expected = { ...page, messages: [promptWithoutBlock, ...rest] };
       const malformed = {
         ...page,
         messages: [{ ...prompt, uiBlock: { ...prompt.uiBlock, spec: { type: "confirm" } } }, ...rest],
       };
-      expect(() => encodeTeamProtocolV6CurrentHttpResponse("GET", pagePath, 200, malformed)).toThrow(
-        "Invalid conversation ui block.",
-      );
+      const encoded = JSON.parse(encodeTeamProtocolV6CurrentHttpResponse("GET", pagePath, 200, malformed));
+      expect(decodeTeamProtocolV6CurrentHttpResponse("GET", pagePath, 200, encoded)).toEqual(expected);
+
       const [wirePrompt, ...wireRest] = conversationPageWire.messages;
       const malformedWire = {
         ...conversationPageWire,
         messages: [{ ...wirePrompt, uiBlock: { ...wirePrompt?.uiBlock, spec: { type: "confirm" } } }, ...wireRest],
       };
-      expect(() => decodeTeamProtocolV6CurrentHttpResponse("GET", pagePath, 200, malformedWire)).toThrow(
-        "Invalid conversation ui block.",
-      );
+      expect(decodeTeamProtocolV6CurrentHttpResponse("GET", pagePath, 200, malformedWire)).toEqual(expected);
+      expect(decodeTeamProtocolV6WebRtcHttpResponse("GET", pagePath, 200, malformedWire)).toEqual(expected);
+
+      const reference = page.references["ui-block:weekly"];
+      if (!reference) throw new Error("Invalid v6 conversation fixture.");
+      const { uiBlock: _referenceBlock, ...referenceWithoutBlock } = reference;
       const badReference = {
         ...conversationPageWire,
         references: {
           "ui-block:weekly": { ...conversationPageWire.references["ui-block:weekly"], uiBlock: { version: 2 } },
         },
       };
-      expect(() => decodeTeamProtocolV6CurrentHttpResponse("GET", pagePath, 200, badReference)).toThrow(
-        "Invalid conversation ui block.",
+      expect(decodeTeamProtocolV6CurrentHttpResponse("GET", pagePath, 200, badReference)).toEqual({
+        ...page,
+        references: { "ui-block:weekly": referenceWithoutBlock },
+      });
+
+      const { readState: _readState, ...eventSnapshot } = snapshot;
+      const { readState: _expectedReadState, ...expectedSnapshot } = expected;
+      const {
+        references: _expectedReferences,
+        pageInfo: _expectedPageInfo,
+        ...expectedEventSnapshot
+      } = expectedSnapshot;
+      const eventWire = JSON.parse(
+        encodeTeamProtocolV6BaseCurrentEvent({ type: "conversation", snapshot: eventSnapshot }) ?? "null",
       );
-      const eventWire = JSON.parse(encodeTeamProtocolV6BaseCurrentEvent({ type: "conversation", snapshot }) ?? "null");
       const malformedEvent = { ...eventWire, snapshot: { ...eventWire.snapshot, messages: malformedWire.messages } };
-      expect(decodeTeamProtocolV6BaseCurrentEvent(malformedEvent)).toEqual({ kind: "invalid", type: "conversation" });
-      // The event encoder refuses it too; the clone stands in for a host's corrupt stored message.
-      const corrupt = JSON.parse(JSON.stringify(malformed));
-      expect(() => encodeTeamProtocolV6BaseCurrentEvent({ type: "conversation", snapshot: corrupt })).toThrow();
+      const expectedEvent = { type: "conversation", snapshot: expectedEventSnapshot };
+      expect(decodeTeamProtocolV6BaseCurrentEvent(malformedEvent)).toEqual({ kind: "known", event: expectedEvent });
+      expect(decodeTeamProtocolV6CurrentEvent(createTeamProtocolV6Event(1, malformedEvent))).toEqual({
+        status: "known",
+        event: expectedEvent,
+      });
+      // The host leaves it out too; the clone stands in for a corrupt stored message.
+      const { readState: _malformedReadState, references: _r, pageInfo: _p, ...malformedSnapshot } = malformed;
+      const corrupt = JSON.parse(JSON.stringify(malformedSnapshot));
+      const corruptWire = JSON.parse(
+        encodeTeamProtocolV6BaseCurrentEvent({ type: "conversation", snapshot: corrupt }) ?? "null",
+      );
+      expect(decodeTeamProtocolV6BaseCurrentEvent(corruptWire)).toEqual({ kind: "known", event: expectedEvent });
     });
 
     it("sends a block with only known keys", () => {

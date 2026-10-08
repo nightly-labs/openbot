@@ -18,8 +18,9 @@ const CONVERSATION_UI_BLOCKS_WIRE_BUDGET = 1_000_000;
  * current v6 adapter carries the block itself, so no protocol bump is needed.
  *
  * A present block must decode. The projection removes the key, so an unchecked value would reach
- * the client as a block the contract never allowed. Fail closed instead; an absent block still
- * means an older host, or an ordinary message. The block goes out normalized, with only known keys.
+ * the client as a block the contract never allowed. A malformed block is left out, in both
+ * directions, and only it: the message keeps its fallback question or text, and the rest of the
+ * snapshot, page or event still arrives. The block goes out normalized, with only known keys.
  */
 export function withConversationUiBlocks(
   projected: TeamProtocolV6BaseJsonValue,
@@ -34,7 +35,7 @@ export function withConversationUiBlocks(
   for (const message of [...[...fromMessages].reverse(), ...fromReferences]) {
     if (!isDynamicRecord(message) || message.uiBlock === undefined) continue;
     const normalized = normalizeConversationUiBlock(message.uiBlock);
-    if (!normalized) throw new Error("Invalid conversation ui block.");
+    if (!normalized) continue;
     const json = JSON.stringify(normalized);
     if (isString(message.id)) candidates.push({ id: message.id, block: JSON.parse(json), size: json.length });
   }
