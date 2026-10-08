@@ -43,6 +43,7 @@ import { messages as skill } from "./skill";
 import { source } from "./source";
 import { messages as startup } from "./startup";
 import { messages as team } from "./team";
+import { messages as uiBlock } from "./uiBlock";
 import { messages as update } from "./update";
 import { messages as usage } from "./usage";
 import { messages as webClient } from "./webClient";
@@ -101,4 +102,5 @@ export const tr = {
   ...island,
   ...computerUse,
   ...connector,
+  ...uiBlock,
 } as const satisfies PartialTranslation<AppMessages>;
