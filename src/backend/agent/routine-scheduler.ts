@@ -187,6 +187,15 @@ export class RoutineScheduler implements RoutineDueSource {
     return this.#routines.runForDelivery(deliveryId);
   }
 
+  /**
+   * Whether the run of this delivery may end without a message, when the agent answers only the
+   * no-update marker. Only a scheduled run: a Test run and a script or webhook run are started by
+   * someone who waits for the result.
+   */
+  quietRunForDelivery(deliveryId: string): boolean {
+    return this.#routines.runForDelivery(deliveryId)?.kind === "scheduled";
+  }
+
   duplicate(sourceAgentId: string, targetAgentId: string, now: Date): Map<string, Routine> {
     return this.#routines.duplicate(sourceAgentId, targetAgentId, now);
   }

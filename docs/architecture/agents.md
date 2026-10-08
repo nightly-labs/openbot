@@ -16,6 +16,19 @@ changes it, on the computer that runs the agent: the Team API parser and the age
 not accept it, the remote IPC branch refuses it, and duplication does not copy it. When the flag is
 on, the developer instructions name the two file paths, never the token.
 
+## Quiet routine runs
+
+A scheduled run of an agent routine can end without a message. The user asks for it in the routine
+task ("if there is nothing new, answer `[[no-update]]`"); OpenBot adds nothing to the run prompt, and
+there is no setting or column. The marker is a fixed token, not a phrase, so the check does not
+depend on the language of the answer (`src/backend/agent/routine-quiet-runs.ts`). When a turn that
+ran only scheduled routine runs completes and every answer is the marker, the turn drops its answers,
+thinking and plan from the conversation, does not change the agent preview, and its `turn-completed`
+event has `quiet: true`, which stops the desktop notification and the completion sound. The run
+marker and the run history stay. A marker inside a longer answer is a report and is shown. Test runs,
+and script or webhook runs, which are also manual runs, are never quiet. The released Team API event
+projects a fixed key list, so `quiet` stays on this computer.
+
 ## Routine calendar feed
 
 `src/main/routine-feed-server.ts` is a loopback HTTP listener that serves the routines of this

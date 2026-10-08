@@ -39,6 +39,7 @@ import type { MailboxSync } from "./mailbox-sync";
 import { PLAN_UPDATED_METHOD, planFromNotification } from "./plan-updates";
 import { isBalanceDiagnostic, isPlanLimitDiagnostic, isUsageLimitDiagnostic } from "./provider-diagnostics";
 import type { ProviderRuntime } from "./provider-runtime";
+import { settleQuietRoutineTurn } from "./routine-quiet-runs";
 import {
   isForeignReasoningError,
   isNonActionableCodexWarning,
@@ -84,6 +85,11 @@ export interface TurnHooks {
    * when the delivery is not an active channel assignment that can go back.
    */
   requeueChannelDelivery(deliveryId: string): Effect.Effect<boolean>;
+  /**
+   * Whether this delivery is a routine run that may end without a message: a scheduled run whose
+   * agent answers only the no-update marker.
+   */
+  quietRoutineDelivery(deliveryId: string): boolean;
 }
 
 export interface TurnLifecycleOptions {
@@ -578,6 +584,16 @@ export class TurnLifecycle {
     if (deliveries.some((delivery) => delivery.delivery.sender.kind === "agent")) {
       dropPlaceholderAnswers(snapshot, turnId);
     }
+    // Only a turn that ran nothing but scheduled routine runs: a person who wrote in the same turn,
+    // or who started a Test, script or webhook run, waits for the answer.
+    const quiet =
+      outcome === "completed" &&
+      deliveries.length > 0 &&
+      !this.#conversation.isExecutionThread(snapshot.threadId) &&
+      deliveries.every(
+        ({ delivery }) => delivery.sender.kind === "routine" && this.#hooks.quietRoutineDelivery(delivery.id),
+      ) &&
+      settleQuietRoutineTurn(snapshot, turnId);
     const latestAssistant = [...snapshot.messages]
       .reverse()
       .find(
@@ -629,6 +645,7 @@ export class TurnLifecycle {
       turnId,
       status: outcome,
       origin: deliveries[0]?.delivery.sender.kind ?? "unknown",
+      ...(quiet ? { quiet: true as const } : {}),
     });
     if (shouldCompact) yield* this.#compaction.request(agentId, threadId);
     else this.#hooks.scheduleDrain(agentId);
