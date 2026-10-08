@@ -155,6 +155,7 @@ export interface WebWorkspaceRuntime {
   listHosts(): Promise<RemoteTeamHost[]>;
   /** Ends this account's membership of a host. The account service refuses the owner. */
   leaveHost(hostId: string, membershipId: string): Promise<void>;
+  removeOwnedHost?: (hostId: string) => Promise<void>;
   previewInvite(url: string): Promise<InvitePreview>;
   acceptInvite(url: string): Promise<RemoteTeamHost>;
   connect(host: RemoteTeamHost): Promise<string[]>;
@@ -593,6 +594,15 @@ export function createWebWorkspaceRuntime(
       Effect.runPromise(respondToBrowserTakeover(teamApi, input).pipe(Effect.mapError((error) => error.cause))),
     listHosts: () => runTeamEffect(directory.listHosts()),
     leaveHost: (hostId, membershipId) => runTeamEffect(directory.leaveHost(hostId, membershipId)),
+    async removeOwnedHost(hostId) {
+      const response = await accountFetch(`/api/browser/v2/remote/hosts/${encodeURIComponent(hostId)}`, {
+        method: "DELETE",
+        credentials: "same-origin",
+        headers: { "X-OpenBot-Browser": "1", "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!response.ok) throw new Error(currentText().t("server.settings.actionFailed"));
+    },
     async previewInvite(url) {
       const value = await runTeamEffect(directory.previewInvite(url));
       return {

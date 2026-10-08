@@ -31,4 +31,11 @@ export class AgentInitializationGate<E> {
     yield* Deferred.done(completion, exit);
     return yield* Deferred.await(completion);
   }, Effect.uninterruptible).bind(this);
+
+  /** Waits for the initialization in progress to end. Starts none, and does not retry a failed one. */
+  readonly awaitSettled = Effect.fn("AgentInitializationGate.awaitSettled")(function* (
+    this: AgentInitializationGate<E>,
+  ) {
+    if (this.#pending) yield* Effect.exit(Deferred.await(this.#pending));
+  }).bind(this);
 }

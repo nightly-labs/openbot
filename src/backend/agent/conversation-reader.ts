@@ -48,7 +48,7 @@ export class ConversationReader {
   }
 
   readonly read = Effect.fn("ConversationReader.read")(function* (this: ConversationReader, agentId: string) {
-    const agent = yield* this.#store.getOrCreate(agentId).pipe(toConversationReadFailed);
+    const agent = yield* this.#store.existing(agentId).pipe(toConversationReadFailed);
     return yield* readerStep(() => {
       // The legacy read endpoint still returns the complete durable conversation. `setSnapshot`
       // keeps only a bounded recent view after this transient response is built, so this read does
@@ -84,7 +84,7 @@ export class ConversationReader {
     limit = 50,
     options: ConversationMarkerExclusions = {},
   ) {
-    const agent = yield* this.#store.getOrCreate(agentId).pipe(toConversationReadFailed);
+    const agent = yield* this.#store.existing(agentId).pipe(toConversationReadFailed);
     return yield* readerStep(() => {
       this.#mailboxSync.reconcilePersistedMailboxMessages(agent);
       const page = this.#store.database.readConversationPage(agentId, agent.threadId, anchor, limit, options);
@@ -118,7 +118,7 @@ export class ConversationReader {
     throughMessageId: string | null,
     options: ConversationMarkerExclusions = {},
   ) {
-    const agent = yield* this.#store.getOrCreate(agentId).pipe(toConversationReadFailed);
+    const agent = yield* this.#store.existing(agentId).pipe(toConversationReadFailed);
     return yield* readerStep(() => {
       const previous = this.#reads.readStateForThread(memberId, agent.threadId, options).throughMessageId;
       const state = this.#reads.markReadForThread(memberId, agent.threadId, throughMessageId, options);
@@ -140,7 +140,7 @@ export class ConversationReader {
     agentId: string,
     memberId: string,
   ) {
-    const agent = yield* this.#store.getOrCreate(agentId).pipe(toConversationReadFailed);
+    const agent = yield* this.#store.existing(agentId).pipe(toConversationReadFailed);
     return yield* readerStep(() => {
       const state = this.#reads.markUnreadForThread(memberId, agent.threadId);
       this.#hooks.emit({

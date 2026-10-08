@@ -190,6 +190,8 @@ export function ServerMenu(props: ServerMenuProps) {
                       onLeave={props.onLeave}
                       onDelete={props.onDelete}
                       canDelete={props.canDelete}
+                      onRemove={props.onRemove}
+                      canRemove={props.canRemove}
                     />
                   )}
                 </Show>
@@ -241,6 +243,8 @@ export function ServerMenu(props: ServerMenuProps) {
                           onLeave={props.onLeave}
                           onDelete={props.onDelete}
                           canDelete={props.canDelete}
+                          onRemove={props.onRemove}
+                          canRemove={props.canRemove}
                         />
                       </DropdownMenu.SubContent>
                     </DropdownMenu.Portal>
@@ -276,6 +280,8 @@ export function ServerMenu(props: ServerMenuProps) {
                       onLeave={props.onLeave}
                       onDelete={props.onDelete}
                       canDelete={props.canDelete}
+                      onRemove={props.onRemove}
+                      canRemove={props.canRemove}
                     />
                   </>
                 )}
@@ -346,6 +352,8 @@ export function ServerMenu(props: ServerMenuProps) {
                   onLeave={props.onLeave}
                   onDelete={props.onDelete}
                   canDelete={props.canDelete}
+                  onRemove={props.onRemove}
+                  canRemove={props.canRemove}
                 />
               )}
             </Show>
