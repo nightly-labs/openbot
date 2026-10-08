@@ -1,6 +1,15 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -11,6 +20,9 @@ const harness = `
 source "$UPDATER"
 INSTALL=$ROOT/opt
 SCRATCH=$ROOT/tmp
+REQUESTS=$ROOT/run
+STATE=$ROOT/state
+systemctl() { echo "systemctl $*" >>"$ROOT/calls"; }
 uname() { echo x86_64; }
 chown() { :; }
 fetch() {
@@ -39,6 +51,8 @@ const HOSTING_FILES = [
   "openbot-update.service",
   "openbot-update.timer",
   "openbot-update-apply.service",
+  "openbot-update-request.path",
+  "openbot-update-request.service",
 ].join(" ");
 
 let root: string;
@@ -52,7 +66,7 @@ beforeEach(() => {
 
 afterEach(() => rmSync(root, { recursive: true, force: true }));
 
-function run(command: "stage" | "apply") {
+function run(command: "stage" | "apply" | "request") {
   return spawnSync("bash", ["-c", harness, "harness", command], {
     env: { ...process.env, ROOT: root, UPDATER: updater },
     encoding: "utf8",
@@ -101,6 +115,16 @@ function versionOf(directory: string): string | null {
   const entry = join(root, "opt", directory, "openbot.desktop");
   if (!existsSync(entry)) return null;
   return /X-AppImage-Version=(.+)/.exec(readFileSync(entry, "utf8"))?.[1] ?? null;
+}
+
+/** The installed script that `request` runs. It records each run, and fails `apply` when told to. */
+function installUpdater() {
+  mkdirSync(join(root, "opt", "hosted"), { recursive: true });
+  writeFileSync(
+    join(root, "opt", "hosted", "openbot-hosted-update"),
+    `#!/bin/bash\necho "update $1" >>"$ROOT/calls"\n[ ! -e "$ROOT/fail-apply" ]\n`,
+    { mode: 0o755 },
+  );
 }
 
 function log(name: string): string {
@@ -191,5 +215,34 @@ describe("openbot-hosted-update", () => {
     expect(run("apply").status).toBe(0);
     expect(existsSync(join(root, "opt", "app", "openbot"))).toBe(true);
     expect(readdirSync(join(root, "opt"))).toEqual(["app"]);
+  });
+
+  it("takes an install request without reading it, then stops OpenBot, applies and starts it again", () => {
+    installUpdater();
+    // The service user owns the request directory, so a request can be a link to a file of root.
+    mkdirSync(join(root, "run"));
+    writeFileSync(join(root, "secret"), "root only\n");
+    symlinkSync(join(root, "secret"), join(root, "run", "update-install"));
+    writeFileSync(join(root, "run", "update-stage"), "");
+
+    expect(run("request").status).toBe(0);
+    expect(log("calls").trim().split("\n")).toEqual([
+      "systemctl stop openbot.service",
+      "update apply",
+      "systemctl start --no-block openbot.service",
+    ]);
+    expect(readdirSync(join(root, "run"))).toEqual([]);
+    expect(readFileSync(join(root, "secret"), "utf8")).toBe("root only\n");
+    expect(existsSync(join(root, "state"))).toBe(false);
+  });
+
+  it("starts OpenBot again when the update fails", () => {
+    installUpdater();
+    mkdirSync(join(root, "run"));
+    writeFileSync(join(root, "run", "update-install"), "");
+    writeFileSync(join(root, "fail-apply"), "");
+
+    expect(run("request").status).not.toBe(0);
+    expect(log("calls").trim().split("\n").at(-1)).toBe("systemctl start --no-block openbot.service");
   });
 });

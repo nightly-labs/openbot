@@ -9,6 +9,11 @@
 #                                 reboot, so a server gets the update at its next wake. A self-hosted
 #                                 server seldom reboots, so `openbot update` stops OpenBot, runs
 #                                 `stage` and `apply`, and starts it again.
+#   openbot-hosted-update request openbot-update-request.service, when OpenBot asks for an update in
+#                                 Server Settings. Runs `stage`, or stops OpenBot, runs `apply` and
+#                                 starts it again.
+#   openbot-hosted-update trigger openbot.service, as root before OpenBot starts. Installs the units
+#                                 of `request` when an older release moved this one into place.
 #
 # The manifest is the one that the Linux desktop updater reads, so a server trusts the same source as
 # a desktop install. A server only moves to a newer version: an older OpenBot cannot open a database
@@ -25,7 +30,15 @@ SCRATCH=/var/tmp
 # The session of the lazy disk restore that boat runs after a resume.
 RESTORE=/var/lib/ascii-lazy
 HOSTED_FILES=(openbot-hosted-server openbot-hosted-env openbot-hosted-update openbot)
-UNITS=(openbot.service openbot-update.service openbot-update.timer openbot-update-apply.service)
+# OpenBot asks for an update with an empty file in its runtime directory, which the service user
+# owns. The path unit starts the request service as root when a file is there.
+REQUESTS=/run/openbot
+# What a request or a stage does now, for OpenBot to show. Root writes it, and each user can read it.
+# It is there only while a request or a download runs.
+STATE=/run/openbot-update.state
+UNIT_DIRECTORY=/etc/systemd/system
+REQUEST_UNITS=(openbot-update-request.path openbot-update-request.service)
+UNITS=(openbot.service openbot-update.service openbot-update.timer openbot-update-apply.service "${REQUEST_UNITS[@]}")
 # All that `install_hosting` reads from a release.
 RELEASE_FILES=(packages.txt openbot-hosted.apparmor "${HOSTED_FILES[@]}" "${UNITS[@]}")
 
@@ -165,6 +178,26 @@ recover() {
   rm -rf "$SCRATCH"/openbot-update.*
 }
 
+set_state() {
+  printf '%s\n' "$*" >"$STATE.new"
+  mv -f "$STATE.new" "$STATE"
+}
+
+# Downloads $1 to $2, and writes the percent to $STATE. $3 is the size that the manifest gives.
+download() {
+  local pid bytes percent
+  fetch --output "$2" "$1" &
+  pid=$!
+  while kill -0 "$pid" 2>/dev/null; do
+    bytes=$(stat -c %s "$2" 2>/dev/null || echo 0)
+    percent=0
+    if [[ $3 =~ ^[1-9][0-9]{0,11}$ && $bytes =~ ^[0-9]+$ ]]; then percent=$((bytes * 100 / $3)); fi
+    set_state downloading "$((percent > 100 ? 100 : percent))"
+    sleep 1
+  done
+  wait "$pid"
+}
+
 # Installs the server scripts, the AppArmor profile and the units of $1. A script is written next to
 # its target and then renamed, so a running script never reads a half-written file.
 install_hosting() {
@@ -181,14 +214,15 @@ install_hosting() {
   fi
   for unit in "${UNITS[@]}"; do
     sed "s/@SERVICE_USER@/$user/g" "$source/$unit" >"$INSTALL/hosted/.unit.new"
-    if ! cmp -s "$INSTALL/hosted/.unit.new" "/etc/systemd/system/$unit"; then
-      install -m 0644 "$INSTALL/hosted/.unit.new" "/etc/systemd/system/$unit"
+    if ! cmp -s "$INSTALL/hosted/.unit.new" "$UNIT_DIRECTORY/$unit"; then
+      install -m 0644 "$INSTALL/hosted/.unit.new" "$UNIT_DIRECTORY/$unit"
       changed=1
     fi
   done
   rm -f "$INSTALL/hosted/.unit.new"
   if [ "$changed" -eq 1 ]; then systemctl daemon-reload; fi
-  systemctl enable --quiet openbot.service openbot-update-apply.service openbot-update.timer
+  systemctl enable --quiet openbot.service openbot-update-apply.service openbot-update.timer \
+    openbot-update-request.path
   # The terminal command of a self-hosted server. A hosted server has no person at a terminal.
   if [ -r "$INSTALL/hosted/mode" ] && [ "$(<"$INSTALL/hosted/mode")" = self ]; then
     ln -sfn "$INSTALL/hosted/openbot" /usr/local/bin/openbot
@@ -196,7 +230,7 @@ install_hosting() {
 }
 
 stage() {
-  local architecture manifest version path sha512 current
+  local architecture manifest version path sha512 size current
   case $(uname -m) in
     x86_64) architecture=x86_64 manifest=latest-linux.yml ;;
     aarch64) architecture=arm64 manifest=latest-linux-arm64.yml ;;
@@ -212,6 +246,8 @@ stage() {
   version=$(sed -n 's/^version: *//p' <<<"$manifest" | head -n 1)
   path=$(sed -n 's/^path: *//p' <<<"$manifest" | head -n 1)
   sha512=$(sed -n 's/^sha512: *//p' <<<"$manifest" | head -n 1)
+  # Only for the percent. A Linux manifest has one file, the AppImage.
+  size=$(sed -n 's/^ *size: *//p' <<<"$manifest" | head -n 1)
   [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "The release manifest has no valid version."
   [ "$path" = "OpenBot-$version-$architecture.AppImage" ] || fail "The release manifest names another file."
   [[ $sha512 =~ ^[A-Za-z0-9+/]{86}==$ ]] || fail "The release manifest has no valid SHA-512."
@@ -226,8 +262,9 @@ stage() {
   echo "Staging OpenBot $version (installed: ${current:-unknown})."
   # Global: the trap runs after this function returns.
   work=$(mktemp -d "$SCRATCH/openbot-update.XXXXXX")
-  trap 'rm -rf "$work"' EXIT
-  fetch --output "$work/OpenBot.AppImage" "$RELEASES/download/v$version/$path"
+  trap 'rm -rf "$work"; rm -f "$STATE"' EXIT
+  download "$RELEASES/download/v$version/$path" "$work/OpenBot.AppImage" "$size"
+  set_state preparing
   [ "$(openssl dgst -sha512 -binary "$work/OpenBot.AppImage" | openssl base64 -A)" = "$sha512" ] ||
     fail "The AppImage does not match the release manifest."
   unpack "$work/OpenBot.AppImage"
@@ -264,8 +301,64 @@ apply() {
   echo "Updated OpenBot from ${current:-unknown} to $staged."
 }
 
+# A release that an older script moved into place has the units of `request`, but that script
+# installed only the units that it knew. The start of OpenBot does not wait for the update lock.
+trigger() {
+  local source=$INSTALL/app/resources/hosting unit changed=0
+  for unit in "${REQUEST_UNITS[@]}"; do
+    if [ ! -e "$UNIT_DIRECTORY/$unit" ] && [ -f "$source/$unit" ]; then
+      install -m 0644 "$source/$unit" "$UNIT_DIRECTORY/$unit"
+      changed=1
+    fi
+  done
+  if [ "$changed" -eq 1 ]; then
+    systemctl daemon-reload
+    systemctl enable --quiet openbot-update-request.path
+  fi
+  [ -e "$UNIT_DIRECTORY/openbot-update-request.path" ] || return 0
+  # Without --no-block, a start during the start of openbot.service could wait for it.
+  systemctl is-active --quiet openbot-update-request.path ||
+    systemctl start --no-block openbot-update-request.path
+}
+
+# The service user owns the request directory, so root only tests a request and removes it. It never
+# reads or follows one. `stage` and `apply` run as their own process and take the update lock, so a
+# request that comes during a download waits for it.
+request() {
+  local install=0 status=0 keeper
+  if [ -e "$REQUESTS/update-install" ] || [ -L "$REQUESTS/update-install" ]; then install=1; fi
+  if [ "$install" -eq 1 ]; then set_state installing; else set_state waiting; fi
+  rm -f -- "$REQUESTS/update-stage" "$REQUESTS/update-install"
+  # OpenBot sees that the request runs while the time of $STATE changes.
+  (while sleep 5; do touch -c "$STATE"; done) >/dev/null 2>&1 &
+  keeper=$!
+  if [ "$install" -eq 0 ]; then
+    "$INSTALL/hosted/openbot-hosted-update" stage || status=$?
+  elif systemctl stop openbot.service; then
+    # OpenBot starts again also when `apply` fails, or when systemd stops this service.
+    trap 'systemctl start --no-block openbot.service' EXIT
+    trap 'exit 1' TERM
+    "$INSTALL/hosted/openbot-hosted-update" apply || status=$?
+  else
+    status=1
+  fi
+  kill "$keeper" 2>/dev/null || true
+  rm -f "$STATE"
+  return "$status"
+}
+
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then
   [ "$(id -u)" -eq 0 ] || fail "Run this as root."
+  case ${1:-} in
+    trigger)
+      trigger
+      exit 0
+      ;;
+    request)
+      request
+      exit 0
+      ;;
+  esac
   exec 9>"$LOCK"
   flock 9
   # openbot.service waits for `apply`, so `apply` waits for the restore only when it has work. A staged
@@ -278,6 +371,6 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
   case ${1:-} in
     stage) stage ;;
     apply) apply ;;
-    *) fail "usage: $0 stage|apply" ;;
+    *) fail "usage: $0 stage|apply|request|trigger" ;;
   esac
 fi
