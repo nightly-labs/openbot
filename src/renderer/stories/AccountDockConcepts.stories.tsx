@@ -194,6 +194,7 @@ function usageWithRemaining(remainingPercent: number): AccountUsage {
       ...limit,
       primary: limit.primary ? { ...limit.primary, usedPercent } : null,
       secondary: limit.secondary ? { ...limit.secondary, usedPercent } : null,
+      ...(limit.windows ? { windows: limit.windows.map((window) => ({ ...window, usedPercent })) } : {}),
     })),
   };
 }

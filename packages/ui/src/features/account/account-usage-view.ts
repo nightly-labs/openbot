@@ -1,7 +1,9 @@
 import {
   type AccountUsage,
   type AccountUsageLimit,
+  type AccountUsageNamedWindow,
   type AccountUsageWindow,
+  type AccountUsageWindowKind,
   type AgentProviderId,
   accountUsageCoversModel,
   agentProviderDescriptor,
@@ -14,13 +16,36 @@ type UsageText = Pick<TextValue, "t" | "format">;
 
 export type AccountUsageTone = "neutral" | "warning" | "critical";
 
+/** One quota window under a provider in the usage list. */
+export interface AccountUsageWindowRow {
+  key: string;
+  /** The window length, the provider's model name, or "Extra usage". */
+  label: string;
+  /** The window length of a model window, or the spend of an extra-usage window. */
+  detail: string | null;
+  remainingPercent: number;
+  /** "Resets at 15:00" today, else "Resets Oct 9, 15:00". The list never cuts it short. */
+  resetsAtLabel: string | null;
+  tone: AccountUsageTone;
+}
+
+export interface AccountUsageCreditRow {
+  key: string;
+  label: string;
+  value: string;
+}
+
 export interface AccountUsageProviderRow {
   provider: AgentProviderId;
   name: string;
+  /** The tightest of `primary` and `secondary`: the reading the dock chip shows. */
   remainingPercent: number | null;
   windowLabel: string | null;
   resetsAtLabel: string | null;
   tone: AccountUsageTone;
+  /** Every window the provider reported. Empty when it reported none. */
+  windows: AccountUsageWindowRow[];
+  credits: AccountUsageCreditRow[];
 }
 
 /** Remaining quota from a provider-reported used percentage. */
@@ -72,7 +97,111 @@ function usageRow(
     windowLabel: window ? usageWindowLabel(window.windowDurationMins, text) : null,
     resetsAtLabel: window ? formatUsageReset(window.resetsAt, text) : null,
     tone: usageTone(remainingPercent),
+    windows: limit ? usageWindowRows(limit, text) : [],
+    credits: limit ? usageCreditRows(limit, text) : [],
   };
+}
+
+const WINDOW_KIND_ORDER: Record<AccountUsageWindowKind, number> = { window: 0, model: 1, extra: 2 };
+
+/**
+ * Plan windows first, shortest first, then model windows in the provider's order, then extra usage.
+ * A reading from an older host has no `windows`; its `primary` and `secondary` are the list.
+ */
+function usageWindowRows(limit: AccountUsageLimit, text: UsageText): AccountUsageWindowRow[] {
+  const windows: AccountUsageNamedWindow[] =
+    limit.windows ??
+    [limit.primary, limit.secondary].flatMap((window) =>
+      window ? [{ ...window, kind: "window" as const, label: null }] : [],
+    );
+  return windows
+    .map((window, index) => ({ window, index }))
+    .sort((left, right) => {
+      const kind = WINDOW_KIND_ORDER[left.window.kind] - WINDOW_KIND_ORDER[right.window.kind];
+      if (kind !== 0) return kind;
+      if (left.window.kind === "window") {
+        const duration =
+          (left.window.windowDurationMins ?? Number.POSITIVE_INFINITY) -
+          (right.window.windowDurationMins ?? Number.POSITIVE_INFINITY);
+        if (duration !== 0 && !Number.isNaN(duration)) return duration;
+      }
+      return left.index - right.index;
+    })
+    .map(({ window, index }) => usageWindowRow(window, index, text));
+}
+
+function usageWindowRow(window: AccountUsageNamedWindow, index: number, text: UsageText): AccountUsageWindowRow {
+  const { t, format } = text;
+  const remainingPercent = usageRemainingPercent(window.usedPercent);
+  const durationLabel = window.windowDurationMins === null ? null : usageWindowLabel(window.windowDurationMins, text);
+  let label: string;
+  let detail: string | null = null;
+  if (window.kind === "extra") {
+    label = window.label ?? t("account.usage.window.extra");
+    const spent = window.spentUsd ?? null;
+    const limit = window.limitUsd ?? null;
+    if (spent !== null && limit !== null)
+      detail = t("account.usage.window.spent", { spent: format.currencyUsd(spent), limit: format.currencyUsd(limit) });
+    else if (spent !== null) detail = t("account.usage.window.spentOnly", { spent: format.currencyUsd(spent) });
+  } else if (window.kind === "model" && window.label) {
+    label = window.label;
+    detail = durationLabel;
+  } else {
+    label = window.label ?? usageWindowLabel(window.windowDurationMins, text);
+  }
+  return {
+    key: `${window.kind}:${index}`,
+    label,
+    detail,
+    remainingPercent,
+    resetsAtLabel: usageWindowReset(window.resetsAt, text),
+    tone: usageTone(remainingPercent),
+  };
+}
+
+/** A short reset time: the time alone when it is today, else the date and the time. */
+export function usageWindowReset(
+  resetsAt: number | null,
+  text: UsageText = currentText(),
+  now: Date = new Date(),
+): string | null {
+  if (resetsAt === null) return null;
+  const date = new Date(resetsAt * 1_000);
+  if (Number.isNaN(date.getTime())) return null;
+  const { t, format } = text;
+  if (date.toDateString() === now.toDateString()) {
+    return t("account.usage.window.resetsToday", {
+      time: format.date(date, { hour: "numeric", minute: "2-digit" }),
+    });
+  }
+  return t("account.usage.window.resets", {
+    time: format.date(date, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }),
+  });
+}
+
+function usageCreditRows(limit: AccountUsageLimit, text: UsageText): AccountUsageCreditRow[] {
+  const { t, format } = text;
+  return (limit.credits ?? []).flatMap((credit, index) => {
+    if (!credit.unlimited && credit.balance === null) return [];
+    return [
+      {
+        key: `${credit.kind}:${index}`,
+        label: t("account.usage.credits"),
+        value: credit.unlimited
+          ? t("account.usage.credits.unlimited")
+          : format.number(credit.balance ?? 0, { maximumFractionDigits: 2 }),
+      },
+    ];
+  });
+}
+
+/** What the usage list says for one window, for its accessible name. */
+export function accountUsageWindowLabel(window: AccountUsageWindowRow, text: UsageText = currentText()): string {
+  const { t } = text;
+  const parts = [t("account.usage.row.left", { name: window.label, percent: window.remainingPercent })];
+  if (window.detail) parts.push(window.detail);
+  if (window.resetsAtLabel) parts.push(window.resetsAtLabel);
+  return parts.join(", ");
 }
 
 /**

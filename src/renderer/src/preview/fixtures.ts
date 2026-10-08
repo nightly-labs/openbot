@@ -256,16 +256,46 @@ export const STORY_USAGE: AccountUsage = {
       id: "codex",
       primary: { usedPercent: 28, windowDurationMins: 300, resetsAt: 1_786_563_600 },
       secondary: { usedPercent: 41, windowDurationMins: 10_080, resetsAt: 1_787_040_000 },
+      windows: [
+        { kind: "window", label: null, usedPercent: 28, windowDurationMins: 300, resetsAt: 1_786_563_600 },
+        { kind: "window", label: null, usedPercent: 41, windowDurationMins: 10_080, resetsAt: 1_787_040_000 },
+        { kind: "model", label: "GPT-5.6 Luna", usedPercent: 74, windowDurationMins: 10_080, resetsAt: 1_787_040_000 },
+      ],
+      credits: [{ kind: "credits", balance: 1_250, unlimited: false }],
     },
     {
       id: "claude",
       primary: { usedPercent: 91, windowDurationMins: 300, resetsAt: 1_786_563_600 },
       secondary: { usedPercent: 64, windowDurationMins: 10_080, resetsAt: 1_787_040_000 },
+      windows: [
+        { kind: "window", label: null, usedPercent: 91, windowDurationMins: 300, resetsAt: 1_786_563_600 },
+        { kind: "window", label: null, usedPercent: 64, windowDurationMins: 10_080, resetsAt: 1_787_040_000 },
+        { kind: "model", label: "Fable", usedPercent: 38, windowDurationMins: 10_080, resetsAt: 1_787_040_000 },
+        {
+          kind: "extra",
+          label: null,
+          usedPercent: 25,
+          windowDurationMins: null,
+          resetsAt: null,
+          spentUsd: 12.5,
+          limitUsd: 50,
+        },
+      ],
     },
     {
       id: "grok",
       primary: null,
       secondary: { usedPercent: 22, windowDurationMins: 10_080, resetsAt: 1_787_040_000 },
+    },
+    {
+      id: "opencode",
+      primary: { usedPercent: 12, windowDurationMins: 300, resetsAt: 1_786_563_600 },
+      secondary: { usedPercent: 47, windowDurationMins: 43_200, resetsAt: 1_788_825_600 },
+      windows: [
+        { kind: "window", label: null, usedPercent: 12, windowDurationMins: 300, resetsAt: 1_786_563_600 },
+        { kind: "window", label: null, usedPercent: 30, windowDurationMins: 10_080, resetsAt: 1_787_040_000 },
+        { kind: "window", label: null, usedPercent: 47, windowDurationMins: 43_200, resetsAt: 1_788_825_600 },
+      ],
     },
   ],
 };

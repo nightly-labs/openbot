@@ -5,6 +5,7 @@ import {
 } from "@openbot/ui/features/account/account-usage-view";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
+import { STORY_USAGE } from "../src/preview/fixtures";
 
 const mixedRows = accountUsageProviderRows({
   limits: [
@@ -27,6 +28,8 @@ const mixedRows = accountUsageProviderRows({
 });
 
 const oneProviderRows = mixedRows.filter((row) => row.provider === "codex");
+// Every window each provider reports: plan windows, model windows, extra usage and credits.
+const allWindowRows = accountUsageProviderRows(STORY_USAGE);
 const unreportedRows = accountUsageProviderRows(
   {
     limits: [
@@ -70,6 +73,10 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const ConnectedProviders: Story = {};
+
+export const AllWindows: Story = {
+  args: { rows: allWindowRows },
+};
 
 export const OneProvider: Story = {
   args: { rows: oneProviderRows },

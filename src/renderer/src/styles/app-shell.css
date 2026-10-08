@@ -3375,6 +3375,96 @@ textarea {
   color: var(--openbot-danger);
 }
 
+/* A provider that reports its windows: the name sits beside the logo, and each window is a line
+   under it with its own bar. */
+.account-usage-provider:has(> .account-usage-windows) > .account-usage-provider-name {
+  grid-column: 2 / -1;
+}
+
+.account-usage-windows {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  grid-column: 2 / -1;
+  gap: var(--openbot-space-2);
+  list-style: none;
+}
+
+.account-usage-window {
+  display: grid;
+  min-width: 0;
+  align-items: baseline;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--openbot-space-2);
+  row-gap: var(--openbot-space-1);
+}
+
+.account-usage-window-label {
+  overflow: hidden;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-usage-window-remaining {
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--openbot-leading-sm);
+  white-space: nowrap;
+}
+
+.account-usage-window-bar,
+.account-usage-window-meta {
+  grid-column: 1 / -1;
+}
+
+/* The detail, such as a model window's length, may be cut short; the reset time never is. It wraps
+   to its own line when the two do not fit. */
+.account-usage-window-meta {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  column-gap: var(--openbot-space-2);
+}
+
+.account-usage-window-detail {
+  overflow: hidden;
+  min-width: 0;
+  flex: 1 1 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-usage-window-reset {
+  flex: 0 0 auto;
+  margin-inline-start: auto;
+  white-space: nowrap;
+}
+
+.account-usage-window[data-usage-tone="warning"] .account-usage-window-remaining {
+  color: var(--openbot-warning);
+}
+
+.account-usage-window[data-usage-tone="warning"] .ui-progress-fill {
+  background: var(--openbot-warning);
+}
+
+.account-usage-window[data-usage-tone="critical"] .account-usage-window-remaining {
+  color: var(--openbot-danger);
+}
+
+.account-usage-window[data-usage-tone="critical"] .ui-progress-fill {
+  background: var(--openbot-danger);
+}
+
 .account-usage-empty {
   margin: 0;
   padding: var(--openbot-space-2) var(--openbot-space-1);
