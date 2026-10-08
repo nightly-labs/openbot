@@ -1506,7 +1506,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               browserTabs={workspace.state.browserTabs}
               activeBrowserTabId={workspace.state.activeBrowserTabId}
               browserVisibilitySuspended={workspace.state.status !== "online" || usageOpen()}
-              workspaceCovered={usageOpen()}
+              workspaceCovered={usageOpen() || wakeScreen() !== null}
               browserControlState={workspace.state.browserControlState}
               server={server()}
               presence={workspace.state.presence ?? { serverId: server()?.id ?? null, members: [], updatedAt: "" }}

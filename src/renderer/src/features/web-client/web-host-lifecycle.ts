@@ -44,7 +44,9 @@ export function createWebHostLifecycle(options: {
     void (starting ? runTeamEffect(hostedServer.wake(id)) : Promise.resolve(false)).then(async (waking) => {
       const availability = waking ? "waking" : await runTeamEffect(hostedServer.unavailable(id));
       if (disposed() || hostId() !== id || status() === "online") return;
-      if (error !== undefined && availability !== "sleeping" && availability !== "waking") options.report(error);
+      // A reconnect that started during the status read clears the error, so the old error does not show again.
+      if (error !== undefined && status() === "offline" && availability !== "sleeping" && availability !== "waking")
+        options.report(error);
       // The 5-minute recheck can find that the server does not sleep now, so input does not wake it.
       if (availability !== "sleeping") stopWaitingForInput?.();
       options.setHostedSleep(availability === "sleeping" ? "sleeping" : availability === "waking" ? "waking" : null);
