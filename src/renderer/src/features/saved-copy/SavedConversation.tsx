@@ -19,7 +19,7 @@ export function SavedConversation() {
   const author = (message: AgentMessage): ChatMessageAuthor => {
     const agent = savedCopy.selectedAgent();
     if (message.author !== "you") {
-      return { kind: "agent", name: agent?.name ?? t("chat.message.agentFallback"), agent };
+      return { kind: "agent", name: agent?.name ?? t("chat.message.agentFallback"), ...(agent ? { agent } : {}) };
     }
     const sender = message.senderMember;
     const auth = centralAuth();
