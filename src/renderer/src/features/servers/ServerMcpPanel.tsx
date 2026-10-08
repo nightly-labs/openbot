@@ -326,6 +326,10 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
   }
 
   function openForm(config: McpServerConfig | null): void {
+    // The row's Cancel is not on the form, and an edit can change the address it signs in to: a
+    // sign-in still waiting on this row ends here rather than storing a token for the old address.
+    const pending = config ? state.tests[config.id] : undefined;
+    if (pending?.test.status === "signing-in") cancelSignIn(pending.config.url);
     const draft = config ? mcpConfigDraft(config) : emptyMcpConfig();
     setState((current) => {
       current.view = "form";
