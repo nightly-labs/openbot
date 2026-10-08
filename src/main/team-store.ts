@@ -61,6 +61,11 @@ class TeamStoreFiles extends Context.Service<
 const scrypt = promisify(scryptCallback);
 const INVITE_TTL_MS = 24 * 60 * 60 * 1_000;
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1_000;
+/**
+ * A session made over the direct Tailscale path. It is short so that a removed or changed membership
+ * ends soon, and the client gets a new one with a new account ticket.
+ */
+export const DIRECT_SESSION_TTL_MS = 24 * 60 * 60 * 1_000;
 
 export class TeamStoreError extends Schema.TaggedError<TeamStoreError>()("TeamStoreError", { message: Schema.String }) {
   constructor(message = "") {
@@ -187,6 +192,14 @@ export class TeamStore {
   readonly #remoteSessions = new Map<
     string,
     { member: TeamMemberSummary; sessionId: string; createdAt: string; sessionExpiresAt: string }
+  >();
+  /**
+   * Sessions of the direct Tailscale path, by token hash. In memory only: a restart ends them. Each
+   * use reads the member again, so a removed or disabled member is refused at once.
+   */
+  readonly #directSessions = new Map<
+    string,
+    { memberId: string; sessionId: string; createdAt: string; sessionExpiresAt: string }
   >();
   #writeChain: Deferred.Deferred<void> | null = null;
   /**
@@ -877,6 +890,66 @@ export class TeamStore {
     for (const [tokenHash, session] of this.#remoteSessions) {
       if (session.sessionId === sessionId) this.#remoteSessions.delete(tokenHash);
     }
+    for (const [tokenHash, session] of this.#directSessions) {
+      if (session.sessionId === sessionId) this.#directSessions.delete(tokenHash);
+    }
+  }
+
+  /**
+   * Signs a member in on the direct Tailscale path, with an account the account service just
+   * confirmed. Unlike `loginWithAccount` it writes nothing: the session is in memory and lasts
+   * `ttlMs`. An account that a member row names by account id must be that account; a row without
+   * one is matched by its address, as `loginWithAccount` does.
+   */
+  openDirectSession(user: CentralAuthUser, ttlMs = DIRECT_SESSION_TTL_MS): AuthenticatedMember {
+    const state = this.#requireState();
+    const email = normalizeEmail(user.email);
+    const member = state.members.find(
+      (candidate) =>
+        !candidate.disabled &&
+        (candidate.accountId
+          ? candidate.accountId === user.id
+          : candidate.email === email || candidate.username === email),
+    );
+    if (!member) throw new TeamStoreError(sourceText("error.team.accountNotMember"));
+    const now = Date.now();
+    for (const [tokenHash, session] of this.#directSessions) {
+      if (Date.parse(session.sessionExpiresAt) <= now) this.#directSessions.delete(tokenHash);
+    }
+    // A map keeps insertion order, so the first entries of a member are its oldest sessions.
+    const own = [...this.#directSessions].filter(([, session]) => session.memberId === member.id);
+    for (const [tokenHash] of own.slice(0, Math.max(0, own.length - INPUT_LIMITS.sessionsPerMember + 1)))
+      this.#directSessions.delete(tokenHash);
+    const sessionToken = randomBytes(32).toString("base64url");
+    const sessionExpiresAt = new Date(now + ttlMs).toISOString();
+    this.#directSessions.set(hashToken(sessionToken), {
+      memberId: member.id,
+      sessionId: randomUUID(),
+      createdAt: new Date(now).toISOString(),
+      sessionExpiresAt,
+    });
+    return { member: publicMember(member), sessionToken, sessionExpiresAt };
+  }
+
+  /** A token of the direct Tailscale path. Other tokens are not valid there, and these not elsewhere. */
+  authenticateDirectSession(
+    token: string,
+  ): { member: TeamMemberSummary; sessionId: string; sessionExpiresAt: string } | null {
+    if (!this.#state || !token) return null;
+    const tokenHash = hashToken(token);
+    const session = this.#directSessions.get(tokenHash);
+    if (!session) return null;
+    const member = this.#state.members.find((candidate) => candidate.id === session.memberId && !candidate.disabled);
+    if (Date.parse(session.sessionExpiresAt) <= Date.now() || !member) {
+      this.#directSessions.delete(tokenHash);
+      return null;
+    }
+    return { member: publicMember(member), sessionId: session.sessionId, sessionExpiresAt: session.sessionExpiresAt };
+  }
+
+  /** Ends every direct session, when the owner turns the direct path off or the host stops. */
+  closeDirectSessions(): void {
+    this.#directSessions.clear();
   }
 
   getMember(memberId: string): TeamMemberSummary | null {
@@ -916,6 +989,21 @@ export class TeamStore {
         id: session.sessionId,
         memberId: session.member.id,
         username: session.member.username,
+        createdAt: session.createdAt,
+        expiresAt: session.sessionExpiresAt,
+      });
+    }
+    const members = new Map(state.members.map((member) => [member.id, member]));
+    for (const [tokenHash, session] of this.#directSessions) {
+      const member = members.get(session.memberId);
+      if (Date.parse(session.sessionExpiresAt) <= now || !member) {
+        this.#directSessions.delete(tokenHash);
+        continue;
+      }
+      remote.push({
+        id: session.sessionId,
+        memberId: session.memberId,
+        username: member.username,
         createdAt: session.createdAt,
         expiresAt: session.sessionExpiresAt,
       });
@@ -1165,6 +1253,7 @@ export class TeamStore {
       const state = yield* remoteDecode(() => this.#requireState());
       const tokenHash = hashToken(token);
       state.sessions = state.sessions.filter((candidate) => !safeTextEqual(candidate.tokenHash, tokenHash));
+      this.#directSessions.delete(tokenHash);
       yield* this.#persistEffect();
     },
     Effect.provide(TeamStoreFiles.layer),

@@ -16,6 +16,7 @@ import type {
   SendDirectMessageInput,
   ServerSummary,
   SetTeamTypingInput,
+  TailscaleHostStatus,
   TeamInviteSummary,
   TeamMemberSummary,
   TeamPresenceSnapshot,
@@ -330,8 +331,28 @@ export function createMockTeam(
     },
   };
 
+  // The preview has a connected Tailscale and a host that serves the direct path once it is on.
+  let tailscaleStatus: TailscaleHostStatus = {
+    state: "connected",
+    tailnet: "story-tailnet.ts.net",
+    deviceName: "Studio Mac",
+    enabled: false,
+    url: null,
+    issue: null,
+    issueDetail: null,
+  };
   const host: OpenBotDesktopApi["host"] = {
     getStatus: async () => clone(hostStatus),
+    getTailscaleStatus: async () => clone(tailscaleStatus),
+    setTailscaleDirect: async (enabled) => {
+      tailscaleStatus = {
+        ...tailscaleStatus,
+        enabled,
+        url: enabled ? "https://studio-mac.story-tailnet.ts.net" : null,
+      };
+      return clone(tailscaleStatus);
+    },
+    openTailscale: async () => undefined,
     configure: async (input: ConfigureHostInput) => {
       hostStatus = {
         ...hostStatus,

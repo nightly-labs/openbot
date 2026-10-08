@@ -318,6 +318,7 @@ import type {
   SetServerMutedInput,
   SetServerNotificationLevelInput,
   SetTeamTypingInput,
+  TailscaleHostStatus,
   TeamInviteSummary,
   TeamMemberSummary,
   TeamPresenceSnapshot,
@@ -1029,6 +1030,12 @@ export const IPC_ENDPOINTS = {
     removeMember: request<string, void>()("host:remove-member"),
     listSessions: request<undefined, TeamSessionSummary[]>()("host:list-sessions"),
     revokeSession: request<string, void>()("host:revoke-session"),
+    /** The local Tailscale client and the direct Tailscale path of this host. Runs the `tailscale` command. */
+    getTailscaleStatus: request<undefined, TailscaleHostStatus>()("host:get-tailscale-status"),
+    /** The owner's switch for the direct Tailscale path. On, it runs `tailscale serve` while the host is online. */
+    setTailscaleDirect: request<boolean, TailscaleHostStatus>()("host:set-tailscale-direct"),
+    /** Opens the Tailscale app, or its download page when it is not installed. */
+    openTailscale: request<undefined, void>()("host:open-tailscale"),
     event: event<HostStatus>()("host:event"),
   },
   events: {

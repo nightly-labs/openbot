@@ -2,6 +2,7 @@ import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/agent-admin-v1";
 import { AGENT_PUBLISH_ROUTES } from "@openbot/contracts/team-protocol/agent-publish-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
+import { DIRECT_ENDPOINT_ROUTES } from "@openbot/contracts/team-protocol/direct-endpoint-v1";
 import { HOST_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-update-v1";
 import { HOSTED_SITES_ROUTES } from "@openbot/contracts/team-protocol/hosted-sites-v1";
 import { LIVE_ACTIVITY_PUSH_ROUTES } from "@openbot/contracts/team-protocol/live-activity-push-v1";
@@ -31,6 +32,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   AGENT_PUBLISH_ROUTES.preview,
   SHARED_TABLES_ROUTES.list,
   HOSTED_SITES_ROUTES.list,
+  DIRECT_ENDPOINT_ROUTES.read,
   PROVIDERS_ADMIN_ROUTES.apiKeyState,
   PROVIDERS_ADMIN_ROUTES.customList,
   PROVIDERS_ADMIN_ROUTES.runtimesStatus,

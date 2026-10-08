@@ -196,6 +196,33 @@ export function isValidRemoteApiUrl(value: string, options: InviteLinkOptions = 
   }
 }
 
+const TAILSCALE_LABEL = "[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?";
+const TAILSCALE_DIRECT_HOST_PATTERN = new RegExp(`^${TAILSCALE_LABEL}\\.${TAILSCALE_LABEL}\\.ts\\.net$`, "u");
+
+/**
+ * Whether a value is a host's direct Tailscale address: `https://<device>.<tailnet>.ts.net`, with an
+ * optional port and nothing else. Only the direct path accepts it. It is not an invitation address,
+ * so `isValidRemoteApiUrl` and invitations still refuse it.
+ */
+export function isValidTailscaleDirectApiUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === "https:" &&
+      url.username === "" &&
+      url.password === "" &&
+      url.pathname === "/" &&
+      url.search === "" &&
+      url.hash === "" &&
+      TAILSCALE_DIRECT_HOST_PATTERN.test(url.hostname) &&
+      // `URL` lowercases the host and drops a default port, so the text must already be in that form.
+      (value === url.origin || value === `${url.origin}/`)
+    );
+  } catch {
+    return false;
+  }
+}
+
 function isSelfHostedApiUrl(url: URL, options: InviteLinkOptions): boolean {
   return url.protocol === "https:" && url.origin === options.selfHostedApiOrigin;
 }

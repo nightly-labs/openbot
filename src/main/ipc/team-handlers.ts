@@ -26,7 +26,7 @@ import {
   parseSetTeamTyping,
   parseUpdateTeamMember,
 } from "./server-inputs";
-import { stringPayload } from "./validation";
+import { booleanPayload, stringPayload } from "./validation";
 
 interface TeamIpcDependencies {
   host: HostService;
@@ -171,6 +171,11 @@ export function teamIpcHandlers({
         runCauseEffect(host.revokeInvite(inviteId)),
       ),
       createInvite: payloadHandler(parseCreateTeamInvite, (invite) => runCauseEffect(host.createInvite(invite))),
+      getTailscaleStatus: handler(() => runCauseEffect(host.getTailscaleStatus())),
+      setTailscaleDirect: payloadHandler(booleanPayload("enabled"), (enabled) =>
+        runCauseEffect(host.setTailscaleDirect(enabled)),
+      ),
+      openTailscale: handler(() => runCauseEffect(host.openTailscale())),
     },
     remoteDesktop: {
       checkSetup: payloadHandler(stringPayload("serverId"), (serverId) =>

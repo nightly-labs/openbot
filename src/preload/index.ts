@@ -185,6 +185,7 @@ import {
   decodeScopedTeamPresence,
   decodeServer,
   decodeServers,
+  decodeTailscaleHostStatus,
   decodeTeamInvites,
   decodeTeamMember,
   decodeTeamMembers,
@@ -853,6 +854,9 @@ const openbotApi: OpenBotDesktopApi = {
     listInvites: decodeTeamInvites,
     revokeInvite: decodeVoid,
     createInvite: decodeInviteSummary,
+    getTailscaleStatus: decodeTailscaleHostStatus,
+    setTailscaleDirect: decodeTailscaleHostStatus,
+    openTailscale: decodeVoid,
     event: decodeHostStatus,
   }),
   // The shared strict contract decoders, as MCP does: main decodes a remote answer with the same

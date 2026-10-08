@@ -24,6 +24,9 @@ import {
   type ServerCompatibility,
   type ServerConnectionIssue,
   type ServerSummary,
+  TAILSCALE_DIRECT_ISSUES,
+  TAILSCALE_LOCAL_STATES,
+  type TailscaleHostStatus,
   type TeamInviteSummary,
   type TeamMemberSummary,
   type TeamPresenceMember,
@@ -107,6 +110,22 @@ export function decodeHostStatus(value: unknown): HostStatus {
     remoteDesktopActiveSessions: requiredNumber(status, "remoteDesktopActiveSessions"),
     remoteDesktopMaxSessions: requiredNumber(status, "remoteDesktopMaxSessions"),
     message: nullableString(status, "message"),
+  };
+}
+
+export function decodeTailscaleHostStatus(value: unknown): TailscaleHostStatus {
+  const status = decodeRecord(value, "Tailscale status");
+  if (!isOneOf(TAILSCALE_LOCAL_STATES, status.state)) throw new Error("Invalid Tailscale state.");
+  if (status.issue !== null && !isOneOf(TAILSCALE_DIRECT_ISSUES, status.issue))
+    throw new Error("Invalid Tailscale issue.");
+  return {
+    state: status.state,
+    tailnet: nullableString(status, "tailnet"),
+    deviceName: nullableString(status, "deviceName"),
+    enabled: requiredBoolean(status, "enabled"),
+    url: nullableString(status, "url"),
+    issue: status.issue,
+    issueDetail: nullableString(status, "issueDetail"),
   };
 }
 

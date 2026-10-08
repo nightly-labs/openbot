@@ -135,6 +135,17 @@ export type TeamApiStorage = Pick<StorageUsageService, "usage" | "deleteFile" | 
 /** `hosted-sites-v1`: the openbot.site sites of this server. Members list; only admins delete. */
 export type TeamApiHostedSites = Pick<HostedSiteDesktopService, "listServerSites" | "deleteServerSite">;
 
+/** The direct Tailscale path of this host. Frozen on the wire by `direct-endpoint-v1`. */
+export interface TeamApiDirectEndpoint {
+  /** The address members can use now, or null while the owner has it off or `tailscale serve` is not set up. */
+  url(): string | null;
+  /**
+   * Reads the member list again before a direct sign-in, so a membership the account service ended
+   * is not still accepted from an old copy. A failure refuses the sign-in.
+   */
+  refreshMembers?: () => Effect.Effect<void, RemoteWorkflowError>;
+}
+
 /** Its presence is what `#protocolSupport` advertises `agent-import-v1` on. Any member can use it. */
 export type TeamApiAgentImport = Pick<AgentImportService, "stageUpload" | "apply" | "discard">;
 
@@ -238,6 +249,8 @@ export interface TeamApiOptions {
   mcpToolRuntimePreparation?: McpToolRuntimePreparation;
   storage?: TeamApiStorage;
   hostedSites?: TeamApiHostedSites;
+  /** Absent when this host cannot offer the direct Tailscale path. */
+  directEndpoint?: TeamApiDirectEndpoint;
   agentImport?: TeamApiAgentImport;
   admin?: TeamApiAdmin;
   appVersion?: string;

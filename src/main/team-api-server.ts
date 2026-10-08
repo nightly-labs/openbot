@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
+import type { Duplex } from "node:stream";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT,
@@ -30,6 +31,7 @@ import {
   AGENT_PUBLISH_CAPABILITY,
   AGENT_UPDATE_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
+  DIRECT_ENDPOINT_CAPABILITY,
   EVENTS_CAPABILITY,
   HOST_ADMIN_CAPABILITY,
   HOST_UPDATE_CAPABILITY,
@@ -118,6 +120,7 @@ import { routeBrowser } from "./team-api/route-browser";
 import { routeChannels } from "./team-api/route-channels";
 import { routeContextReset } from "./team-api/route-context-reset";
 import { routeDirect } from "./team-api/route-direct";
+import { routeDirectEndpoint } from "./team-api/route-direct-endpoint";
 import { routeEvents } from "./team-api/route-events";
 import { routeFiles } from "./team-api/route-files";
 import { routeHostAdmin } from "./team-api/route-host-admin";
@@ -132,7 +135,8 @@ import { routeSkillsAdmin } from "./team-api/route-skills-admin";
 import { routeStorage } from "./team-api/route-storage";
 import { routeTeam } from "./team-api/route-team";
 import { routeWorkspaceDirectory } from "./team-api/route-workspace-directory";
-import { TeamStoreError } from "./team-store";
+import { isWebRtcOnlyTeamPath } from "./team-api-direct-paths";
+import { type AuthenticatedMember, TeamStoreError } from "./team-store";
 
 const EVENT_PAYLOAD_LIMIT = 256 * 1_024;
 const TYPING_TIMEOUT_MS = 5_000;
@@ -150,6 +154,8 @@ const logger = createOpenBotLogger("team-api-server");
 
 interface EventClientState {
   token: string;
+  /** Opened on the direct Tailscale listener, so its token is a direct session. */
+  direct: boolean;
   memberId: string;
   capabilities: Set<string>;
   includeConversationEvents: boolean;
@@ -214,6 +220,9 @@ export class TeamApiServer {
   readonly #rateLimitCapacity: number;
   readonly #now: () => number;
   #server: Server | null = null;
+  /** The second loopback listener that `tailscale serve` forwards to. Null while the direct path is off. */
+  #directServer: Server | null = null;
+  #directPort: number | null = null;
   readonly #lifecycle = new LifecycleGate<number, RemoteWorkflowError>();
   #port: number | null = null;
   #heartbeat: ReturnType<typeof setInterval> | null = null;
@@ -252,61 +261,7 @@ export class TeamApiServer {
     if (this.#legacyConversationScope.state._tag === "Closed") this.#legacyConversationScope = Scope.makeUnsafe();
     const server = createServer((request, response) => void this.#handle(request, response));
     this.#server = server;
-    server.on("upgrade", (request, socket, head) => {
-      const url = new URL(request.url ?? "/", "http://127.0.0.1");
-      if (this.#options.remoteScreen?.handlesUpgrade(url)) {
-        this.#options.remoteScreen.handleUpgrade(request, socket, head, url);
-        return;
-      }
-      // Like the remote screen, and above the token check for the same reason: a tunneled view
-      // socket carries the WebRTC session this host opened it for rather than a member's token.
-      if (this.#options.browserView?.handlesUpgrade(url)) {
-        this.#options.browserView.handleUpgrade(request, socket, head, url);
-        return;
-      }
-      const protocols = (request.headers["sec-websocket-protocol"] ?? "").split(",").map((value) => value.trim());
-      if (
-        this.#options.appVersion &&
-        url.pathname === TEAM_API_ROUTES.events &&
-        !protocols.includes(TEAM_PROTOCOL_V1_WEBSOCKET)
-      ) {
-        socket.write("HTTP/1.1 426 Upgrade Required\r\nConnection: close\r\n\r\n");
-        socket.destroy();
-        return;
-      }
-      const encodedToken = protocols.find((value) => value.startsWith("openbot-token."));
-      const token = encodedToken?.slice("openbot-token.".length) ?? "";
-      const member = token.length <= 512 ? this.#options.store.authenticate(token) : null;
-      if (!member) {
-        socket.write("HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n");
-        socket.destroy();
-        return;
-      }
-      if (
-        url.pathname === TEAM_API_ROUTES.events &&
-        (protocols.includes(TEAM_PROTOCOL_V1_WEBSOCKET) ||
-          (!this.#options.appVersion &&
-            (protocols.includes(TEST_LEGACY_SNAPSHOT_PROTOCOL) || protocols.includes(TEST_LEGACY_EVENT_PROTOCOL))))
-      ) {
-        this.#webSockets.handleUpgrade(request, socket, head, (client) => {
-          this.#connectEvents(
-            client,
-            token,
-            member.id,
-            client.protocol === TEAM_PROTOCOL_V1_WEBSOCKET || client.protocol === TEST_LEGACY_SNAPSHOT_PROTOCOL,
-            client.protocol === TEAM_PROTOCOL_V1_WEBSOCKET,
-          );
-        });
-        return;
-      }
-      if (url.pathname === TEAM_API_ROUTES.remoteDesktopUpgrade) {
-        socket.write("HTTP/1.1 426 Upgrade Required\r\nConnection: close\r\n\r\n");
-        socket.destroy();
-        return;
-      }
-      socket.write("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n");
-      socket.destroy();
-    });
+    server.on("upgrade", (request, socket, head) => this.#handleUpgrade(request, socket, head, false));
     const port = yield* remoteCall(() => listenLoopback(server, () => new Error(sourceText("error.team.bindFailed"))));
     this.#port = port;
     this.#agentListener = (event) => this.#broadcastAgentEvent(event);
@@ -315,7 +270,7 @@ export class TeamApiServer {
     this.#options.sidebarLayout.on("changed", this.#sidebarLayoutListener);
     this.#heartbeat = setInterval(() => {
       for (const [client, connection] of this.#eventClients) {
-        if (!this.#options.store.authenticate(connection.token)) {
+        if (!this.#authenticate(connection.token, connection.direct)) {
           client.close(1008, "Team access was revoked");
         } else if (client.readyState === webSockets.WebSocket.OPEN) client.ping();
       }
@@ -325,7 +280,157 @@ export class TeamApiServer {
     return port;
   }).bind(this);
 
+  /** The loopback port of the direct Tailscale listener, or null while it is off. */
+  get directPort(): number | null {
+    return this.#directPort;
+  }
+
+  /**
+   * Opens the second loopback listener, which `tailscale serve` forwards the tailnet address to. It
+   * listens on `127.0.0.1` only, as the main one does: Tailscale, not OpenBot, takes the connection
+   * from the network. It answers fewer routes than the main listener and accepts only direct
+   * sessions. The main listener must be running.
+   */
+  startDirectListener(): Effect.Effect<number, RemoteWorkflowError> {
+    return Effect.gen({ self: this }, function* () {
+      if (this.#directServer && this.#directPort) return this.#directPort;
+      if (!this.#server)
+        return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.team.bindFailed")) });
+      const server = createServer((request, response) => void this.#handle(request, response, true));
+      server.on("upgrade", (request, socket, head) => this.#handleUpgrade(request, socket, head, true));
+      this.#directServer = server;
+      const port = yield* remoteCall(() =>
+        listenLoopback(server, () => new Error(sourceText("error.team.bindFailed"))),
+      ).pipe(
+        Effect.tapError(() =>
+          Effect.sync(() => {
+            if (this.#directServer === server) this.#directServer = null;
+            server.close();
+          }),
+        ),
+      );
+      this.#directPort = port;
+      return port;
+    });
+  }
+
+  /** Closes the direct listener, its event sockets and every direct session. */
+  stopDirectListener(): Effect.Effect<void> {
+    return Effect.gen({ self: this }, function* () {
+      const server = this.#directServer;
+      this.#directServer = null;
+      this.#directPort = null;
+      for (const [client, connection] of this.#eventClients) {
+        if (connection.direct) client.close(1001, "Server stopped");
+      }
+      this.#options.store.closeDirectSessions();
+      if (server) {
+        yield* Effect.callback<void>((resume) => {
+          server.close(() => resume(Effect.void));
+          server.closeAllConnections();
+        });
+      }
+    });
+  }
+
+  /** A session on the listener it arrived on: a direct session there, any other session elsewhere. */
+  #authenticate(
+    token: string,
+    direct: boolean,
+  ): { member: TeamMemberSummary; sessionId: string; sessionExpiresAt: string } | null {
+    return direct
+      ? this.#options.store.authenticateDirectSession(token)
+      : this.#options.store.authenticateSession(token);
+  }
+
+  /**
+   * The account sign-in of the direct listener. The ticket is checked with the account service, as on
+   * the main listener, and the member list is read again first. The session it opens is short and in
+   * memory: `TeamStore.openDirectSession`.
+   */
+  async #directSignIn(request: IncomingMessage): Promise<AuthenticatedMember> {
+    const body = await readJson(request);
+    const accountTicket = stringField(body, "accountTicket", false, INPUT_LIMITS.identifier);
+    const directEndpoint = this.#options.directEndpoint;
+    const identity = this.#options.store.getIdentity();
+    const redeem = this.#options.redeemCentralTicket;
+    const user =
+      directEndpoint && identity && redeem ? await runCauseEffect(redeem(accountTicket, identity.serverId)) : null;
+    if (!directEndpoint || !user) throw new HttpError(401, sourceText("error.team.signInRequired"));
+    this.#checkRate(request, user.email);
+    if (directEndpoint.refreshMembers) {
+      try {
+        await runCauseEffect(directEndpoint.refreshMembers());
+      } catch {
+        throw new HttpError(503, sourceText("error.team.directSignInUnavailable"));
+      }
+    }
+    return this.#options.store.openDirectSession(user);
+  }
+
+  /**
+   * A WebSocket upgrade. On the direct Tailscale listener only the event stream is served, with a
+   * direct session token: the remote screen and the browser view stay on WebRTC.
+   */
+  #handleUpgrade(request: IncomingMessage, socket: Duplex, head: Buffer, direct: boolean): void {
+    const url = new URL(request.url ?? "/", "http://127.0.0.1");
+    if (!direct && this.#options.remoteScreen?.handlesUpgrade(url)) {
+      this.#options.remoteScreen.handleUpgrade(request, socket, head, url);
+      return;
+    }
+    // Like the remote screen, and above the token check for the same reason: a tunneled view
+    // socket carries the WebRTC session this host opened it for rather than a member's token.
+    if (!direct && this.#options.browserView?.handlesUpgrade(url)) {
+      this.#options.browserView.handleUpgrade(request, socket, head, url);
+      return;
+    }
+    const protocols = (request.headers["sec-websocket-protocol"] ?? "").split(",").map((value) => value.trim());
+    if (
+      this.#options.appVersion &&
+      url.pathname === TEAM_API_ROUTES.events &&
+      !protocols.includes(TEAM_PROTOCOL_V1_WEBSOCKET)
+    ) {
+      socket.write("HTTP/1.1 426 Upgrade Required\r\nConnection: close\r\n\r\n");
+      socket.destroy();
+      return;
+    }
+    const encodedToken = protocols.find((value) => value.startsWith("openbot-token."));
+    const token = encodedToken?.slice("openbot-token.".length) ?? "";
+    const member = token.length <= 512 ? this.#authenticate(token, direct)?.member : null;
+    if (!member) {
+      socket.write("HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n");
+      socket.destroy();
+      return;
+    }
+    if (
+      url.pathname === TEAM_API_ROUTES.events &&
+      (protocols.includes(TEAM_PROTOCOL_V1_WEBSOCKET) ||
+        (!this.#options.appVersion &&
+          (protocols.includes(TEST_LEGACY_SNAPSHOT_PROTOCOL) || protocols.includes(TEST_LEGACY_EVENT_PROTOCOL))))
+    ) {
+      this.#webSockets.handleUpgrade(request, socket, head, (client) => {
+        this.#connectEvents(
+          client,
+          token,
+          direct,
+          member.id,
+          client.protocol === TEAM_PROTOCOL_V1_WEBSOCKET || client.protocol === TEST_LEGACY_SNAPSHOT_PROTOCOL,
+          client.protocol === TEAM_PROTOCOL_V1_WEBSOCKET,
+        );
+      });
+      return;
+    }
+    if (!direct && url.pathname === TEAM_API_ROUTES.remoteDesktopUpgrade) {
+      socket.write("HTTP/1.1 426 Upgrade Required\r\nConnection: close\r\n\r\n");
+      socket.destroy();
+      return;
+    }
+    socket.write("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n");
+    socket.destroy();
+  }
+
   readonly #stop = Effect.fn("TeamApiServer.stop")(function* (this: TeamApiServer) {
+    yield* this.stopDirectListener();
     if (this.#heartbeat) clearInterval(this.#heartbeat);
     this.#heartbeat = null;
     if (this.#agentListener) this.#options.agents.off("event", this.#agentListener);
@@ -413,7 +518,7 @@ export class TeamApiServer {
 
   refreshPresence(): void {
     for (const [client, connection] of this.#eventClients) {
-      if (!this.#options.store.authenticate(connection.token)) {
+      if (!this.#authenticate(connection.token, connection.direct)) {
         client.close(1008, "Team access was revoked");
       }
     }
@@ -493,7 +598,7 @@ export class TeamApiServer {
     this.#publishDirectTyping(senderMemberId, recipientMemberId, typing);
   }
 
-  async #handle(request: IncomingMessage, response: ServerResponse) {
+  async #handle(request: IncomingMessage, response: ServerResponse, direct = false) {
     const method = request.method ?? "GET";
     // The route is recorded before the target is parsed, because `#json` cannot answer without it and
     // this is the first thing below that can throw. Node's HTTP parser accepts request targets the
@@ -538,7 +643,7 @@ export class TeamApiServer {
         return this.#json(response, 200, this.#protocolSupport());
       }
 
-      if (this.#options.remoteScreen?.handlesHttp(url)) {
+      if (!direct && this.#options.remoteScreen?.handlesHttp(url)) {
         await runCauseEffect(this.#options.remoteScreen.handleHttp(request, response, url));
         return;
       }
@@ -558,7 +663,12 @@ export class TeamApiServer {
           challenge ? this.#options.store.getIdentityProof(challenge) : this.#options.store.getIdentity(),
         );
       }
-      if (method === "POST" && url.pathname === TEAM_API_ROUTES.join.invitationPreview) {
+      // The direct Tailscale listener has no invitation or password route: a member there signs in
+      // only with an account ticket, and every other route needs the token that sign-in gives.
+      if (direct && method === "POST" && url.pathname === TEAM_API_ROUTES.auth.account) {
+        return this.#json(response, 200, await this.#directSignIn(request));
+      }
+      if (!direct && method === "POST" && url.pathname === TEAM_API_ROUTES.join.invitationPreview) {
         const body = await readJson(request);
         return this.#json(
           response,
@@ -566,7 +676,7 @@ export class TeamApiServer {
           this.#options.store.previewInvite(stringField(body, "inviteToken", false, INPUT_LIMITS.identifier)),
         );
       }
-      if (method === "POST" && url.pathname === TEAM_API_ROUTES.join.server) {
+      if (!direct && method === "POST" && url.pathname === TEAM_API_ROUTES.join.server) {
         const body = await readJson(request);
         this.#checkRate(request, stringField(body, "username", false, 64));
         const result = await runCauseEffect(
@@ -578,7 +688,7 @@ export class TeamApiServer {
         );
         return this.#json(response, 201, result);
       }
-      if (method === "POST" && url.pathname === TEAM_API_ROUTES.join.account) {
+      if (!direct && method === "POST" && url.pathname === TEAM_API_ROUTES.join.account) {
         const body = await readJson(request);
         const identity = this.#options.store.getIdentity();
         const user = identity
@@ -601,7 +711,7 @@ export class TeamApiServer {
         );
         return this.#json(response, 201, result);
       }
-      if (method === "POST" && url.pathname === TEAM_API_ROUTES.auth.login) {
+      if (!direct && method === "POST" && url.pathname === TEAM_API_ROUTES.auth.login) {
         const body = await readJson(request);
         this.#checkRate(request, stringField(body, "username", false, 64));
         const result = await runCauseEffect(
@@ -612,7 +722,7 @@ export class TeamApiServer {
         );
         return this.#json(response, 200, result);
       }
-      if (method === "POST" && url.pathname === TEAM_API_ROUTES.auth.account) {
+      if (!direct && method === "POST" && url.pathname === TEAM_API_ROUTES.auth.account) {
         const body = await readJson(request);
         const identity = this.#options.store.getIdentity();
         const user = identity
@@ -633,9 +743,14 @@ export class TeamApiServer {
       // The auth gate does not look at the path. An unknown route without a token is 401, not 404,
       // and that is deliberate: answering 404 would let anyone map which endpoints this host has.
       const token = bearerToken(request.headers.authorization);
-      const authenticated = token ? this.#options.store.authenticateSession(token) : null;
+      const authenticated = token ? this.#authenticate(token, direct) : null;
       if (!authenticated || !token) {
         return this.#json(response, 401, { error: sourceText("error.team.authenticationRequired") });
+      }
+      // The remote screen and the browser view stay on WebRTC. On the direct listener their routes
+      // answer as an unknown route does.
+      if (direct && isWebRtcOnlyTeamPath(url.pathname)) {
+        return this.#json(response, 404, { error: sourceText("error.team.routeNotFound") });
       }
       if (isClientUse(method, url.pathname)) this.#lastClientUseAt = Date.now();
       const context = this.#requestContext(request, response, url, token, authenticated);
@@ -679,6 +794,7 @@ export class TeamApiServer {
         return;
       if ((await routeStorage(context, this.#options.storage)) === "handled") return;
       if ((await routeHostedSites(context, this.#options.hostedSites)) === "handled") return;
+      if ((await routeDirectEndpoint(context, this.#options.directEndpoint)) === "handled") return;
       if ((await routeAgentAdmin(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeSkillsAdmin(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeSharedTables(context, this.#options.admin)) === "handled") return;
@@ -1021,12 +1137,14 @@ export class TeamApiServer {
   #connectEvents(
     client: Ws.WebSocket,
     token: string,
+    direct: boolean,
     memberId: string,
     supportsSnapshotTransport: boolean,
     acceptsCapabilityDeclaration: boolean,
   ): void {
     const connection: EventClientState = {
       token,
+      direct,
       memberId,
       capabilities: new Set(
         acceptsCapabilityDeclaration
@@ -1113,7 +1231,7 @@ export class TeamApiServer {
       }
     });
     // iOS can suspend a phone before it says that it goes away. Its closed connection says so.
-    const sessionId = this.#options.store.authenticateSession(token)?.sessionId;
+    const sessionId = this.#authenticate(token, direct)?.sessionId;
     client.once("close", () => {
       if (sessionId) this.#options.liveActivityPush?.disconnected(sessionId);
       if (connection.typingTimer) clearTimeout(connection.typingTimer);
@@ -1411,6 +1529,7 @@ export class TeamApiServer {
         if (capability === MCP_SERVERS_CAPABILITY) return this.#options.mcpServers !== undefined;
         if (capability === STORAGE_CAPABILITY) return this.#options.storage !== undefined;
         if (capability === HOSTED_SITES_CAPABILITY) return this.#options.hostedSites !== undefined;
+        if (capability === DIRECT_ENDPOINT_CAPABILITY) return this.#options.directEndpoint !== undefined;
         if (capability === AGENT_ADMIN_CAPABILITY) return this.#options.admin?.agents !== undefined;
         if (capability === SKILLS_ADMIN_CAPABILITY) return this.#options.admin?.skills !== undefined;
         if (capability === SKILLS_EVENTS_CAPABILITY) return this.#options.skills !== undefined;

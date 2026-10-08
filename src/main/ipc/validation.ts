@@ -43,3 +43,11 @@ export function optionalBoolean(value: unknown, field: string): boolean | undefi
   if (!isBoolean(value)) throw new Error(`${field} must be a boolean.`);
   return value;
 }
+
+/** A payload that is one boolean, such as an on/off switch. */
+export function booleanPayload(field: string): (value: unknown) => boolean {
+  return (value) => {
+    if (!isBoolean(value)) throw new Error(`${field} must be a boolean.`);
+    return value;
+  };
+}
