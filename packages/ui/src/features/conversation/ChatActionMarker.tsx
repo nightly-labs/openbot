@@ -297,7 +297,7 @@ function RoutineRunGroupMarker(props: {
             icon={CircleCheck}
             status="completed"
             available={props.routineAvailable !== false}
-            onOpenRoutine={props.onOpenRoutine}
+            {...(props.onOpenRoutine ? { onOpenRoutine: props.onOpenRoutine } : {})}
           />
           <span class="chat-action-run-group-details">
             <span class="chat-action-marker-label chat-action-run-group-count">
