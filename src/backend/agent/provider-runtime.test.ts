@@ -1861,6 +1861,15 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
       "diagnostic",
       "I1007 18:11:18.606862 9452 local_connection.py:579] harness stderr: ERROR: logging before google.Init: E1007 18:11:18.606862 917 errorreport.go:224] error executing cascade step: CORTEX_STEP_TYPE_MCP_TOOL: Error: No node found at given location",
     );
+    // The other forms from #1524: the tool's error after the MCP method, and the harness's call timeout.
+    client.emit(
+      "diagnostic",
+      'I1007 19:48:10.078135 9984 local_connection.py:579] harness stderr: ERROR: logging before google.Init: E1007 19:48:10.078135 947 errorreport.go:224] error executing cascade step: CORTEX_STEP_TYPE_MCP_TOOL: calling "tools/call": Error: Memory text is required.',
+    );
+    client.emit(
+      "diagnostic",
+      'I1007 19:46:31.115287 9984 local_connection.py:579] harness stderr: ERROR: logging before google.Init: E1007 19:46:31.015978 629 errorreport.go:224] error executing cascade step: CORTEX_STEP_TYPE_MCP_TOOL: MCP tool call to server "openbot_browser" timed out after 3m0s: context deadline exceeded',
+    );
     client.emit(
       "diagnostic",
       "E1007 18:11:18.606862 917 errorreport.go:224] error executing cascade step: CORTEX_STEP_TYPE_MODEL: Error: model request failed",

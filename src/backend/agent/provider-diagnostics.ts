@@ -124,8 +124,10 @@ function bracketBalance(line: string) {
  * Codex logs a cancelled dynamic tool call when a turn stops before its reply. The turn's
  * interrupted state is the user feedback; this record does not mean the provider failed.
  *
- * Antigravity logs failed MCP calls as `error executing cascade step: CORTEX_STEP_TYPE_MCP_TOOL:`.
- * These records also describe one tool call. Other cascade step failures stay visible.
+ * Antigravity logs failed MCP calls as `error executing cascade step: CORTEX_STEP_TYPE_MCP_TOOL:`,
+ * followed by the tool's error, `calling "tools/call": Error: …`, or its own call timeout. These
+ * records also describe one tool call, which the agent reads as the tool's result (#1524). Other
+ * cascade step failures stay visible.
  */
 export function isToolCallDiagnostic(message: string): boolean {
   return (
@@ -133,7 +135,7 @@ export function isToolCallDiagnostic(message: string): boolean {
       message,
     ) ||
     /\btool_error:\s*(?:tool_output_error|execution_failure|parse_failure)\b/.test(message) ||
-    /\berror executing cascade step:\s*CORTEX_STEP_TYPE_MCP_TOOL:\s*Error:/.test(message)
+    /\berror executing cascade step:\s*CORTEX_STEP_TYPE_MCP_TOOL:/.test(message)
   );
 }
 
