@@ -550,10 +550,11 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     setProviderOn: async ({ provider, on }) => {
       if (!on && agents.some((agent) => agent.provider === provider))
         throw new Error(sourceText("error.provider.inUse", { provider }));
-      agentStatus = {
-        ...agentStatus,
-        providers: agentStatus.providers?.map((row) => (row.id === provider ? { ...row, off: !on } : row)),
-      };
+      if (agentStatus.providers)
+        agentStatus = {
+          ...agentStatus,
+          providers: agentStatus.providers.map((row) => (row.id === provider ? { ...row, off: !on } : row)),
+        };
       emitAgentEvent({ type: "status", status: clone(agentStatus) });
       return clone(agentStatus);
     },
