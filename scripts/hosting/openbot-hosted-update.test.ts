@@ -239,13 +239,18 @@ describe("openbot-hosted-update", () => {
     expect(existsSync(join(root, "state"))).toBe(false);
   });
 
-  it("starts OpenBot again when the update fails", () => {
+  it("starts OpenBot again when the update fails, also when the copy cannot complete", () => {
     installUpdater();
     mkdirSync(join(root, "run"));
     writeFileSync(join(root, "run", "update-install"), "");
     writeFileSync(join(root, "fail-apply"), "");
+    // The failed copy left `.applying`, so the start tries `apply` again, and that fails too.
+    writeFileSync(join(root, "opt", ".applying"), "");
 
     expect(run("request").status).not.toBe(0);
-    expect(log("calls").trim().split("\n").at(-1)).toBe("systemctl start --no-block openbot.service");
+    expect(log("calls").trim().split("\n").slice(-2)).toEqual([
+      "update apply",
+      "systemctl start --no-block openbot.service",
+    ]);
   });
 });

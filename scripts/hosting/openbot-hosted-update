@@ -339,8 +339,9 @@ request() {
   if [ "$install" -eq 1 ]; then
     status=0
     # OpenBot starts again also when `apply` fails, or when systemd stops this service. A copy that
-    # did not complete is done again first, because a partial release cannot start.
-    trap '[ ! -e "$INSTALL/.applying" ] || "$INSTALL/hosted/openbot-hosted-update" apply
+    # did not complete is done again first, because a partial release cannot start. `set -e` applies
+    # in the trap, so a second failure must not stop it before the start.
+    trap '[ ! -e "$INSTALL/.applying" ] || "$INSTALL/hosted/openbot-hosted-update" apply || true
       systemctl start --no-block openbot.service' EXIT
     trap 'exit 1' TERM
     if systemctl stop openbot.service; then
