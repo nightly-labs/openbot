@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
-import { expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
 import {
   CHANNEL_PREVIEW_LIMIT,
   CHANNEL_ROUTING_EVENT_ITEM_TYPE_PREFIX,
@@ -15,6 +14,7 @@ import {
   isChannelTask,
   SIGNED_OUT_CHANNEL_MEMBER_ID,
 } from "@openbot/contracts/ipc";
+import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { deleteAggregateHistory } from "./database/database-core";
@@ -767,13 +767,16 @@ function channelRoutineIds(db: DatabaseSync, channelId: string): string[] {
   return [...ids];
 }
 
+const CHANNEL_PREVIEW_SOURCE_LIMIT = CHANNEL_PREVIEW_LIMIT * 16;
+
 /**
  * One line for a sidebar row. A message can carry no text at all (an attachment, or a question
  * the agent asked), so fall back to a description of what arrived instead of showing an empty row.
  */
 function previewText(entry: ChannelMessage): string {
-  // A stored mention is markup (`@[Chief](agent:chief)`), so render it the way a reader sees it.
-  const text = expandChatTagReferences(entry.message.text).trim();
+  // The text is Markdown with mention markup (`@[Chief](agent:chief)`): show what a reader sees.
+  // Only the start is parsed, so a very long message does not slow down every channel list.
+  const text = markdownPreviewText(entry.message.text.slice(0, CHANNEL_PREVIEW_SOURCE_LIMIT));
   if (text.length > 0) return text.slice(0, CHANNEL_PREVIEW_LIMIT);
   if (entry.message.questionPrompt) return "Asked a question";
   if (entry.message.attachments?.length) return "Sent an attachment";
