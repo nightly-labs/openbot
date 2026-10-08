@@ -144,6 +144,15 @@ function usageWindowHasReset(limit: AccountUsage["limits"][number]): boolean {
   );
 }
 
+/**
+ * True when a reading has something to show: a quota window, or a credit balance. A reading of
+ * credits alone, with no window, still reports usage.
+ */
+function usageHasReading(limit: AccountUsage["limits"][number]): boolean {
+  if (limit.primary || limit.secondary || (limit.windows?.length ?? 0) > 0) return true;
+  return (limit.credits ?? []).some((credit) => credit.unlimited || credit.balance !== null);
+}
+
 export type AgentClientFactory = (
   provider: AgentProvider,
   cli: AgentCliInfo,
@@ -658,7 +667,7 @@ export class ProviderRuntime implements ProviderPort {
               usage = yield* this.#refreshUsage(client, model, false).pipe(deadline);
             }
             const limit = usage.limits[0];
-            if (!limit || (!limit.primary && !limit.secondary)) {
+            if (!limit || !usageHasReading(limit)) {
               this.#usageUnreported.add(provider);
               return;
             }

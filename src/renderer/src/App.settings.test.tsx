@@ -313,6 +313,29 @@ describe("OpenBot connected desktop shell", () => {
     expect(within(usageDialog).getByRole("listitem", { name: /ChatGPT, 85% left/ })).toBeInTheDocument();
   });
 
+  it("lists the credits of a provider that reports no quota window", async () => {
+    vi.mocked(window.openbot.agent.getUsage).mockResolvedValue({
+      limits: [
+        {
+          id: "codex",
+          primary: null,
+          secondary: null,
+          credits: [{ kind: "credits", balance: 1_250, unlimited: false }],
+        },
+      ],
+    });
+
+    render(() => <App />);
+    const usageItem = await waitFor(async () => {
+      await fireEvent.click(screen.getByRole("button", { name: /^Usage/ }));
+      return within(screen.getByRole("dialog", { name: "Usage" })).getByRole("listitem", {
+        name: "ChatGPT, Credits 1,250",
+      });
+    });
+    expect(within(usageItem).getByText("1,250")).toBeInTheDocument();
+    expect(within(usageItem).queryByText("Unavailable")).not.toBeInTheDocument();
+  });
+
   it("keeps host-wide usage when an earlier request finishes late", async () => {
     let resolveInitialUsage!: (usage: AccountUsage) => void;
     const initialUsageRequest = new Promise<AccountUsage>((resolve) => {

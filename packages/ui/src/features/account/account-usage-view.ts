@@ -258,6 +258,9 @@ export function accountUsageRowLabel(
   loading = false,
 ): string {
   const { t } = text;
+  // A reading of credits alone has no percentage; its accessible name lists the balances.
+  if (row.remainingPercent === null && row.credits.length > 0)
+    return [row.name, ...row.credits.map((credit) => `${credit.label} ${credit.value}`)].join(", ");
   if (row.remainingPercent === null)
     return t(loading ? "account.usage.row.loading" : "account.usage.row.unavailable", { name: row.name });
   const parts = [t("account.usage.row.left", { name: row.name, percent: row.remainingPercent })];

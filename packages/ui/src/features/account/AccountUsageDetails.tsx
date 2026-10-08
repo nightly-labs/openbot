@@ -69,7 +69,7 @@ export function AccountUsageDetails(props: {
               >
                 <ProviderLogo provider={row.provider} class="account-usage-provider-logo" />
                 <Show
-                  when={row.windows.length > 0}
+                  when={row.windows.length > 0 || row.credits.length > 0}
                   fallback={
                     <>
                       <span class="account-usage-provider-copy">

@@ -3052,6 +3052,36 @@ describe.sequential("AgentService: providers", () => {
     expect((await runCauseEffect(service.getUsage())).limits.map((limit) => limit.id)).toEqual(["claude", "codex"]);
   });
 
+  it("keeps an account-wide reading of credits alone", async () => {
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    const { service: agentService } = await startService(root, {
+      client: (provider) => {
+        const client = new FakeAgentClient(provider);
+        clients.set(provider, client);
+        return client;
+      },
+      preferredProvider: "codex",
+    });
+    service = agentService;
+    const codex = clients.get("codex");
+    if (!codex) throw new Error("Codex test client was not created.");
+    codex.accountRateLimits = {
+      rateLimits: { limitId: "codex", credits: { hasCredits: true, unlimited: false, balance: "1250" } },
+      rateLimitsByLimitId: null,
+    };
+
+    await expect(runCauseEffect(service.getUsage())).resolves.toMatchObject({
+      limits: [
+        {
+          id: "codex",
+          primary: null,
+          secondary: null,
+          credits: [{ kind: "credits", balance: 1_250, unlimited: false }],
+        },
+      ],
+    });
+  });
+
   it("maps provider browser tool calls to the stable OpenBot thread", async () => {
     const calls: DynamicToolCallParams[] = [];
     const browser = fakeBrowser();

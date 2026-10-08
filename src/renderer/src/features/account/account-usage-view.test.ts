@@ -164,6 +164,25 @@ describe("account usage view", () => {
     expect(codex?.credits).toEqual([]);
   });
 
+  it("keeps a reading of credits alone, with no window", () => {
+    const [codex] = accountUsageProviderRows({
+      limits: [
+        {
+          id: "codex",
+          primary: null,
+          secondary: null,
+          credits: [{ kind: "credits", balance: 1_250, unlimited: false }],
+        },
+      ],
+    });
+    assert(codex);
+    const balance = currentText().format.number(1_250);
+    expect(codex.remainingPercent).toBeNull();
+    expect(codex.windows).toEqual([]);
+    expect(codex.credits.map((credit) => [credit.label, credit.value])).toEqual([["Credits", balance]]);
+    expect(accountUsageRowLabel(codex)).toBe(`ChatGPT, Credits ${balance}`);
+  });
+
   it("shows only the time for a reset later today and the date for a later day", () => {
     const now = new Date(2026, 9, 8, 9, 0);
     const today = usageWindowReset(new Date(2026, 9, 8, 15, 0).getTime() / 1_000, currentText(), now);
