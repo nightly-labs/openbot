@@ -247,4 +247,11 @@ export const messages = {
     "Este agente personalizado no está guardado. Actualiza la lista e inténtalo de nuevo.",
   "error.provider.customAgentTooMany": "Puedes guardar un máximo de {count} agentes personalizados.",
   "error.provider.customAgentEnvValueMissing": "Introduce un valor para {name}.",
+  "error.provider.off": "{provider} está desactivado en OpenBot. Actívalo primero en los ajustes de proveedores.",
+  "error.provider.inUse": "Un agente usa {provider}. Cambia su modelo antes de desactivar este proveedor.",
+  "error.provider.useBusy":
+    "Espera a que termine la comprobación del proveedor o el inicio de sesión e inténtalo de nuevo.",
+  "error.provider.useSettingsReadOnly":
+    "No se pueden leer los ajustes guardados del proveedor. Actualiza OpenBot antes de cambiarlos.",
+  "error.provider.useChangeFailed": "OpenBot no pudo cambiar el ajuste del proveedor.",
 } as const satisfies PartialTranslation<typeof source>;

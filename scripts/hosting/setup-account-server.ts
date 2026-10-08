@@ -3,7 +3,7 @@
  * it makes. Run it again at any time: it changes only what differs.
  *
  *   read -rs STRIPE_SECRET_KEY && read -rs BOAT_API_KEY && export STRIPE_SECRET_KEY BOAT_API_KEY
- *   bun run hosting:setup --target=production [--template=<snapshot>]
+ *   bun run hosting:setup --target=production
  *
  *   bun run hosting:setup --target=test
  *
@@ -16,17 +16,20 @@
  * deliveries; Stripe retries them, and the Worker cron repairs a missed boat event.
  *
  * The production store is the `cloudflare-production` GitHub Environment (`gh` must be signed in),
- * and the keys come from the shell. The test store is the encrypted `apps/auth-api/.env.shared`,
- * and the keys come from that file. The script shows no secret value.
+ * and the keys come from the shell. The test store is the encrypted `apps/auth-api/.env.dev`,
+ * and the keys come from the shared development environment. The script shows no secret value.
  */
 
 import { execFile } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-import { get as dotenvGet, set as dotenvSet } from "@dotenvx/dotenvx";
+import { set as dotenvSet } from "@dotenvx/dotenvx";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { z } from "zod";
+import { loadSharedDevelopmentEnvironment } from "../development-environment";
 import { bootstrapStripe } from "../stripe-bootstrap";
 
 const logger = createOpenBotLogger("hosting-setup");
@@ -86,13 +89,32 @@ function githubStore(): SecretStore {
 }
 
 function envFileStore(path: string): SecretStore {
-  const options = { path: join(repoRoot, path), envKeysFile: join(repoRoot, ".env.keys"), quiet: true };
-  const read = async (name: string): Promise<string | null> =>
-    (await dotenvGet(name, { ...options, ignore: ["MISSING_KEY"] }))?.trim() || null;
+  const envPath = join(repoRoot, path);
+  const read = async (name: string): Promise<string | null> => {
+    const values = await loadSharedDevelopmentEnvironment(repoRoot);
+    return values[name]?.trim() || null;
+  };
   const put = async (name: string, value: string): Promise<void> => {
-    const result = await dotenvSet(name, value, options);
-    if (result.changedFilepaths.length === 0 && result.unchangedFilepaths.length === 0) {
-      throw new Error(`${name} was not written to ${path}. Check that .env.keys has its private key.`);
+    const privateKey = process.env.DOTENV_PRIVATE_KEY_DEV?.trim();
+    if (!privateKey) {
+      throw new Error(`${name} was not written to ${path}. Set DOTENV_PRIVATE_KEY_DEV in the shell.`);
+    }
+    const keysDirectory = mkdtempSync(join(tmpdir(), "openbot-dotenv-"));
+    const keysPath = join(keysDirectory, ".env.keys");
+    writeFileSync(keysPath, `DOTENV_PRIVATE_KEY_DEV=${privateKey}\n`, { encoding: "utf8", mode: 0o600 });
+    try {
+      const options = { path: envPath, envKeysFile: keysPath, quiet: true };
+      let result: Awaited<ReturnType<typeof dotenvSet>>;
+      try {
+        result = await dotenvSet(name, value, options);
+      } catch {
+        throw new Error(`${name} was not written to ${path}. Check the development private key.`);
+      }
+      if (result.changedFilepaths.length === 0 && result.unchangedFilepaths.length === 0) {
+        throw new Error(`${name} was not written to ${path}. Check the development private key.`);
+      }
+    } finally {
+      rmSync(keysDirectory, { recursive: true, force: true });
     }
   };
   return { label: path, read, has: async (name) => (await read(name)) !== null, put };
@@ -165,7 +187,6 @@ async function main(args: string[]): Promise<void> {
       target: { type: "string" },
       api: { type: "string" },
       "replace-webhooks": { type: "boolean", default: false },
-      template: { type: "string" },
     },
     strict: true,
   });
@@ -174,7 +195,14 @@ async function main(args: string[]): Promise<void> {
   const live = target === "production";
   const api = new URL(values.api ?? TARGETS[target].api).origin;
   const replace = values["replace-webhooks"];
-  const store = live ? githubStore() : envFileStore("apps/auth-api/.env.shared");
+  const store = live ? githubStore() : envFileStore("apps/auth-api/.env.dev");
+  if (!live) {
+    const privateKey = process.env.DOTENV_PRIVATE_KEY_DEV?.trim();
+    if (!privateKey) {
+      throw new Error("Set DOTENV_PRIVATE_KEY_DEV in the shell before updating the test store.");
+    }
+    await loadSharedDevelopmentEnvironment(repoRoot);
+  }
   const written: string[] = [];
   const put = async (name: string, value: string): Promise<void> => {
     await store.put(name, value);
@@ -207,21 +235,6 @@ async function main(args: string[]): Promise<void> {
   );
   if (boatSecretValue) await put("BOAT_WEBHOOK_SECRET", boatSecretValue);
 
-  if (values.template) {
-    if (!live) throw new Error("--template is for production. Set the test template on the test Worker.");
-    // A variable, not a secret: the snapshot name is not private.
-    await run("gh", [
-      "variable",
-      "set",
-      "HOSTED_SERVER_TEMPLATE",
-      "--env",
-      GITHUB_ENVIRONMENT,
-      "--body",
-      values.template,
-    ]);
-    written.push("HOSTED_SERVER_TEMPLATE");
-  }
-
   logger.info(written.length ? `Wrote ${written.join(", ")} to ${store.label}.` : `${store.label} did not change.`);
   const next: string[] = [];
   if (written.length > 0) {
@@ -235,8 +248,7 @@ async function main(args: string[]): Promise<void> {
     "Stripe Dashboard: in Revenue recovery → Retries, set 'If all retries for a payment fail' to cancel the subscription or to mark it unpaid.",
   );
   if (live) {
-    if (!values.template)
-      next.push("Set HOSTED_SERVER_TEMPLATE with --template=<snapshot> (bun run hosting:template).");
+    next.push("The desktop release workflow selects HOSTED_SERVER_TEMPLATE directly on the production Worker.");
     if (!(await store.has("OPENPANEL_CLIENT_ID"))) {
       next.push("Optional: set OPENPANEL_CLIENT_ID and OPENPANEL_CLIENT_SECRET with gh secret set --env.");
     }

@@ -255,4 +255,11 @@ export const messages = {
     "Dieser benutzerdefinierte Agent ist nicht gespeichert. Aktualisiere die Liste und versuche es erneut.",
   "error.provider.customAgentTooMany": "Du kannst höchstens {count} benutzerdefinierte Agenten speichern.",
   "error.provider.customAgentEnvValueMissing": "Gib einen Wert für {name} ein.",
+  "error.provider.off":
+    "{provider} ist in OpenBot ausgeschaltet. Schalte den Anbieter zuerst in den Anbietereinstellungen ein.",
+  "error.provider.inUse": "Ein Agent verwendet {provider}. Ändere sein Modell, bevor du diesen Anbieter ausschaltest.",
+  "error.provider.useBusy": "Warte, bis die Anbieterprüfung oder Anmeldung abgeschlossen ist, und versuche es erneut.",
+  "error.provider.useSettingsReadOnly":
+    "Die gespeicherten Anbietereinstellungen können nicht gelesen werden. Aktualisiere OpenBot, bevor du sie änderst.",
+  "error.provider.useChangeFailed": "OpenBot konnte die Anbietereinstellung nicht ändern.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -221,6 +221,7 @@ const switchOptions: ProviderPickerOption[] = [
 function ProviderSwitchStory(props: {
   off: readonly AgentProviderId[];
   usedBy?: Partial<Record<AgentProviderId, string[]>>;
+  save?: () => Promise<void>;
 }) {
   const [off, setOff] = createSignal<readonly AgentProviderId[]>(props.off);
   return (
@@ -235,7 +236,8 @@ function ProviderSwitchStory(props: {
         off: off().includes(option.id),
         usedBy: props.usedBy?.[option.id],
       }))}
-      onSetProviderOn={(provider, on) => {
+      onSetProviderOn={async (provider, on) => {
+        await props.save?.();
         setOff((current) => (on ? current.filter((id) => id !== provider) : [...current, provider]));
       }}
     />
@@ -249,4 +251,19 @@ export const ProvidersOff: Story = {
 /** Agents use Codex and Claude, so their switches stay on. Turning one off names its agents. */
 export const ProviderInUse: Story = {
   render: () => <ProviderSwitchStory off={["cursor"]} usedBy={{ codex: ["Ada"], claude: ["Rex", "Mila"] }} />,
+};
+
+/** Click a switch to see the pending state while storage has not answered. */
+export const ProviderSwitchPending: Story = {
+  render: () => <ProviderSwitchStory off={[]} save={() => new Promise<void>(() => undefined)} />,
+};
+
+/** A failed save keeps the previous switch value and shows its error below the row. */
+export const ProviderSwitchError: Story = {
+  render: () => (
+    <ProviderSwitchStory
+      off={[]}
+      save={() => Promise.reject(new Error("OpenBot could not change the provider setting."))}
+    />
+  ),
 };

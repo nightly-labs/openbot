@@ -16,8 +16,6 @@ export const messages = {
   "mobile.settings.about.privacy": "Datenschutzerklärung",
   "mobile.settings.home.profile": "Profil",
   "mobile.settings.home.preferences": "Einstellungen",
-  "mobile.settings.home.generalHint": "Darstellung und Unterhaltungen",
-  "mobile.settings.home.general": "Allgemein",
   "mobile.settings.home.about": "Über OpenBot",
   "mobile.settings.home.support": "Support",
   "mobile.settings.home.supportHint": "Hilfe erhalten und ein Supportprotokoll speichern",
@@ -71,7 +69,6 @@ export const messages = {
   "mobile.settings.appearance.agentColorMessages": "Agentenfarbe für meine Nachrichten",
   "mobile.settings.appearance.agentColorMessagesFooter":
     "Deine Nachrichten in einem Agentenchat verwenden dessen Farbe. Deaktiviere dies, wenn der Text schwer lesbar ist.",
-  "mobile.settings.feedback.title": "Feedback",
   "mobile.settings.feedback.footer": "Haptisches Feedback für Aktionen in der App auf diesem Gerät.",
   "mobile.settings.feedback.haptics": "Haptik",
   "mobile.settings.feedback.retry": "Haptikeinstellung erneut speichern",

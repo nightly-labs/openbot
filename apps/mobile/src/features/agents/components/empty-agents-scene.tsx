@@ -4,9 +4,10 @@ import { useIsFocused } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { Plus } from "lucide-react-native";
 import { type StyleProp, View, type ViewStyle } from "react-native";
-import Animated, { cubicBezier, Easing, FadeOut, ReduceMotion, useReducedMotion } from "react-native-reanimated";
+import Animated, { cubicBezier, Easing, FadeOut, ReduceMotion } from "react-native-reanimated";
 import { useCSSVariable } from "uniwind";
 import { BloubAvatarPreview } from "@/features/agents/components/bloub-avatar";
+import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
 
 // CSS animations take `cubicBezier`; layout animations take a worklet `Easing` function.

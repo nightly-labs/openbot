@@ -14,7 +14,6 @@ import Animated, {
   type SharedValue,
   useAnimatedProps,
   useAnimatedStyle,
-  useReducedMotion,
   useSharedValue,
   withRepeat,
   withTiming,
@@ -23,6 +22,7 @@ import Svg, { Circle, Path } from "react-native-svg";
 import { useCSSVariable } from "uniwind";
 import type { ChatMessage, ChatPlanStepState } from "@/features/chat/model/chat-messages";
 import { haptics } from "@/shared/lib/haptics";
+import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
 import { ThinkingTextGradient } from "./thinking-text-gradient";
 
