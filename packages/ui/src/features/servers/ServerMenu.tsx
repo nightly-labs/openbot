@@ -17,7 +17,7 @@ import {
 import { SwapLabel } from "@openbot/ui/components/SwapLabel";
 import { createEffect, createSignal, For, Show, untrack } from "solid-js";
 import { useText } from "../../text";
-import { type ServerActionCallbacks, ServerActionItems, ServerSettingsGlyph } from "./ServerActionItems";
+import { type ServerActionCallbacks, ServerActionItems } from "./ServerActionItems";
 import { ServerMark, ServerSleepDot, serverHostedSleep, serverStatusLabels } from "./ServerRail";
 
 /** Where the desktop app lists servers: the rail beside the sidebar, or the menu on the server name. */
@@ -182,10 +182,15 @@ export function ServerMenu(props: ServerMenuProps) {
               fallback={
                 <Show when={props.onOpenSettings ? activeServer() : undefined}>
                   {(server) => (
-                    <DropdownMenu.Item onSelect={() => props.onOpenSettings?.(server().id, trigger ?? null)}>
-                      <ServerSettingsGlyph />
-                      <span>{t("server.rail.settings")}</span>
-                    </DropdownMenu.Item>
+                    <ServerActionItems
+                      menu={DropdownMenu}
+                      server={server()}
+                      trigger={() => trigger ?? null}
+                      onOpenSettings={props.onOpenSettings}
+                      onLeave={props.onLeave}
+                      onDelete={props.onDelete}
+                      canDelete={props.canDelete}
+                    />
                   )}
                 </Show>
               }
@@ -233,6 +238,9 @@ export function ServerMenu(props: ServerMenuProps) {
                           onOpenUsage={props.onOpenUsage}
                           onOpenSchedule={props.onOpenSchedule}
                           onOpenSettings={props.onOpenSettings}
+                          onLeave={props.onLeave}
+                          onDelete={props.onDelete}
+                          canDelete={props.canDelete}
                         />
                       </DropdownMenu.SubContent>
                     </DropdownMenu.Portal>
@@ -247,6 +255,12 @@ export function ServerMenu(props: ServerMenuProps) {
                   <span>{t(props.addCreatesServer ? "server.rail.add" : "server.rail.addRemote")}</span>
                 </DropdownMenu.Item>
               </Show>
+              <Show when={props.onOpenMarketplace}>
+                <DropdownMenu.Item onSelect={() => props.onOpenMarketplace?.()}>
+                  <Puzzle class="agent-context-icon size-4" aria-hidden="true" />
+                  <span>{t("sidebar.topbar.marketplace")}</span>
+                </DropdownMenu.Item>
+              </Show>
               <Show when={activeServer()}>
                 {(server) => (
                   <>
@@ -259,15 +273,12 @@ export function ServerMenu(props: ServerMenuProps) {
                       onOpenUsage={props.onOpenUsage}
                       onOpenSchedule={props.onOpenSchedule}
                       onOpenSettings={props.onOpenSettings}
+                      onLeave={props.onLeave}
+                      onDelete={props.onDelete}
+                      canDelete={props.canDelete}
                     />
                   </>
                 )}
-              </Show>
-              <Show when={props.onOpenMarketplace}>
-                <DropdownMenu.Item onSelect={() => props.onOpenMarketplace?.()}>
-                  <Puzzle class="agent-context-icon size-4" aria-hidden="true" />
-                  <span>{t("sidebar.topbar.marketplace")}</span>
-                </DropdownMenu.Item>
               </Show>
             </Show>
             <DropdownMenu.Separator />
@@ -332,6 +343,9 @@ export function ServerMenu(props: ServerMenuProps) {
                   onOpenUsage={props.onOpenUsage}
                   onOpenSchedule={props.onOpenSchedule}
                   onOpenSettings={props.onOpenSettings}
+                  onLeave={props.onLeave}
+                  onDelete={props.onDelete}
+                  canDelete={props.canDelete}
                 />
               )}
             </Show>

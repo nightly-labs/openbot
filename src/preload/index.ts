@@ -613,6 +613,7 @@ const openbotApi: OpenBotDesktopApi = {
     openPortal: decodeVoid,
   }),
   hostedServers: bridgeGroup(IPC_ENDPOINTS.hostedServers, {
+    lifecycle: decodeVoid,
     list: decodeHostedServerList,
     plans: decodeHostedServerCatalog,
     create: decodeHostedServer,
