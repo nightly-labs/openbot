@@ -11,6 +11,7 @@ import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
 import { AgentPinSwipeRow } from "@/features/agents/components/agent-pin-swipe-row";
 import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
+import { ChatZoomSource } from "@/features/agents/components/chat-zoom-source";
 import { PinnedChatItem, usePinnedItemWidth } from "@/features/agents/components/pinned-agents-grid";
 import { useChatSectionMenu } from "@/features/agents/components/use-chat-section-menu";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
@@ -121,7 +122,7 @@ export const ChannelListRow = memo(function ChannelListRow({
               }
               style={{ paddingLeft: pinned ? 4 : 15, paddingRight: pinned ? 4 : 24, opacity: pressed ? 0.58 : 1 }}
             >
-              <Link.AppleZoom>
+              <ChatZoomSource>
                 <AgentPinAvatar agentId={channel.id} location={pinned ? "pinned" : "row"} size={pinned ? 64 : 54}>
                   <ChannelAvatar
                     channel={channel}
@@ -133,7 +134,7 @@ export const ChannelListRow = memo(function ChannelListRow({
                     <View className="absolute right-0 top-0 size-3.5 rounded-full border-2 border-background bg-accent" />
                   ) : null}
                 </AgentPinAvatar>
-              </Link.AppleZoom>
+              </ChatZoomSource>
               {pinned ? (
                 <View className="w-full gap-0.5">
                   <Typography.Paragraph
