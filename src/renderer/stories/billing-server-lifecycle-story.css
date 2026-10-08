@@ -1,0 +1,51 @@
+.billing-lifecycle-story {
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  background: var(--openbot-bg-canvas);
+}
+
+.billing-lifecycle-story-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--openbot-space-3);
+  padding: var(--openbot-space-3) var(--openbot-space-6);
+  border-top: 1px solid var(--openbot-border);
+}
+
+.billing-lifecycle-story-narrow.settings-modal {
+  width: min(390px, calc(100vw - 32px));
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.billing-lifecycle-story-narrow .settings-modal-sidebar {
+  display: none;
+}
+
+@media (max-width: 700px) {
+  .billing-lifecycle-story-shell.settings-modal {
+    width: calc(100vw - 24px);
+    height: calc(100dvh - 24px);
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .billing-lifecycle-story-shell .settings-modal-sidebar {
+    display: none;
+  }
+
+  .billing-lifecycle-story-shell .settings-modal-content {
+    padding: 0 var(--openbot-space-4) var(--openbot-space-4);
+  }
+
+  .billing-lifecycle-story-shell .settings-modal-header {
+    padding: var(--openbot-space-4);
+  }
+
+  .billing-lifecycle-story-footer {
+    flex-wrap: wrap;
+    padding: var(--openbot-space-3) var(--openbot-space-4);
+  }
+}

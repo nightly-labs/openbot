@@ -22,6 +22,7 @@ import type {
   CreateHostedServerInput,
   DeleteHostedServerInput,
   HostedServerCatalog,
+  HostedServerLifecycleInput,
   HostedServerList,
   HostedServerSummary,
 } from "./hosted-servers";
@@ -719,6 +720,7 @@ export const IPC_ENDPOINTS = {
     create: request<CreateHostedServerInput, HostedServerSummary>()("hosted-servers:create"),
     openCheckout: request<string, HostedServerSummary>()("hosted-servers:open-checkout"),
     delete: request<DeleteHostedServerInput, void>()("hosted-servers:delete"),
+    lifecycle: request<HostedServerLifecycleInput, void>()("hosted-servers:lifecycle"),
     wake: request<string, HostedServerSummary>()("hosted-servers:wake"),
   },
   marketplaceAgents: {

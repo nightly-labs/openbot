@@ -16,7 +16,7 @@ import { D1AuthRepository } from "../src/server/d1-auth-repository";
 import { runApiEffect } from "../src/server/effect-runtime";
 import { HostedServerService, sandboxName } from "../src/server/hosted-server-service";
 import { RemoteControlPlane } from "../src/server/remote-control-plane";
-import { migratedDatabase, sqliteD1 } from "./sqlite-d1";
+import { migratedDatabase, migration, sqliteD1 } from "./sqlite-d1";
 
 const owner = { id: "owner", email: "owner@example.test", name: null, avatarUrl: null };
 const member = { id: "member", email: "member@example.test", name: null, avatarUrl: null };
@@ -230,6 +230,7 @@ describe("hosted servers", () => {
     const context = await setup();
     await expect(runApiEffect(context.service.list(stranger))).resolves.toEqual({
       available: false,
+      lifecycleAvailable: true,
       servers: [],
       maxServers: 3,
     });
@@ -983,6 +984,234 @@ describe("hosted servers", () => {
 });
 
 /** The Stripe API calls that hosted servers make. Customer `cus_1` belongs to the owner. */
+describe("paid server lifecycle data safety", () => {
+  it("cancels renewal without deleting data and keeps only the selected server", async () => {
+    const c = await setup();
+    const server = await createRunningServer(c);
+    await runApiEffect(c.service.lifecycle(owner, server.serverId, { serverId: server.serverId, action: "cancel" }));
+    expect(c.state(server.serverId)).toMatchObject({ desired_state: "running" });
+    expect(c.boatCalls.filter((call) => call.method === "DELETE")).toHaveLength(0);
+    expect((await runApiEffect(c.service.list(owner))).servers[0]?.deletionScheduledAt).toBeNull();
+    await runApiEffect(c.service.lifecycle(owner, server.serverId, { serverId: server.serverId, action: "keep" }));
+    expect(c.stripe.subscriptions.get("sub_1")).toMatchObject({ cancel_at_period_end: false });
+  });
+
+  it("requires ownership and exact name before scheduling data deletion", async () => {
+    const c = await setup();
+    const server = await createRunningServer(c);
+    const input = {
+      serverId: server.serverId,
+      action: "delete",
+      timing: "period-end",
+      confirmName: server.name,
+    } as const;
+    await expect(runApiEffect(c.service.lifecycle(stranger, server.serverId, input))).rejects.toMatchObject({
+      status: 404,
+    });
+    await expect(
+      runApiEffect(c.service.lifecycle(owner, server.serverId, { ...input, confirmName: "wrong" })),
+    ).rejects.toMatchObject({ status: 400 });
+    await runApiEffect(c.service.lifecycle(owner, server.serverId, input));
+    const at = (await runApiEffect(c.service.list(owner))).servers[0]?.deletionScheduledAt;
+    expect(at).toBe(c.clock.now + 30 * 86400_000);
+    await runApiEffect(c.service.tick());
+    expect(c.boatCalls.filter((call) => call.method === "DELETE")).toHaveLength(0);
+    c.clock.now += 30 * 86400_000 + MINUTE;
+    // Expiry alone is insufficient: Stripe still says active.
+    await runApiEffect(c.service.tick());
+    expect(c.boatCalls.filter((call) => call.method === "DELETE")).toHaveLength(0);
+    const stored = c.stripe.subscriptions.get("sub_1");
+    if (!isDynamicRecord(stored)) throw new Error("Missing subscription");
+    c.stripe.subscriptions.set("sub_1", { ...stored, status: "canceled" });
+    // An older annual plan ended early. Its later period end must not block this schedule.
+    await c.stripeSync("sub_old", "canceled", server.serverId);
+    c.database
+      .prepare("UPDATE billing_subscriptions SET current_period_end = ? WHERE stripe_subscription_id = ?")
+      .run(c.clock.now + 365 * 86400_000, "sub_old");
+    // No webhook: the cron must fetch and persist the terminal Stripe state itself.
+    await runApiEffect(c.service.tick());
+    expect(c.state(server.serverId)).toMatchObject({ observed_state: "deleted" });
+  });
+
+  it("does not schedule deletion when the paid-through date changed after confirmation", async () => {
+    const c = await setup();
+    const server = await createRunningServer(c);
+    await expect(
+      runApiEffect(
+        c.service.lifecycle(owner, server.serverId, {
+          serverId: server.serverId,
+          action: "delete",
+          timing: "period-end",
+          confirmName: server.name,
+          expectedPeriodEnd: c.clock.now + 29 * 86400_000,
+        }),
+      ),
+    ).rejects.toMatchObject({ status: 409 });
+    expect((await runApiEffect(c.service.list(owner))).servers[0]?.deletionScheduledAt).toBeNull();
+    expect(c.boatCalls.filter((call) => call.method === "DELETE")).toHaveLength(0);
+    expect(c.stripe.subscriptions.get("sub_1")).toMatchObject({ cancel_at_period_end: false });
+  });
+
+  it("keeps data after Stripe failure and after a database failure following Stripe success", async () => {
+    const c = await setup();
+    const server = await createRunningServer(c);
+    const input = {
+      serverId: server.serverId,
+      action: "delete",
+      timing: "period-end",
+      confirmName: server.name,
+    } as const;
+    c.stripe.failCancel = true;
+    await expect(runApiEffect(c.service.lifecycle(owner, server.serverId, input))).rejects.toBeDefined();
+    expect((await runApiEffect(c.service.list(owner))).servers[0]?.deletionScheduledAt).toBeNull();
+    c.stripe.failCancel = false;
+    c.database.exec(
+      "CREATE TRIGGER fail_schedule BEFORE UPDATE OF deletion_scheduled_at ON hosted_servers WHEN NEW.deletion_scheduled_at IS NOT NULL BEGIN SELECT RAISE(FAIL, 'write failed'); END",
+    );
+    await expect(runApiEffect(c.service.lifecycle(owner, server.serverId, input))).rejects.toBeDefined();
+    expect(c.stripe.subscriptions.get("sub_1")).toMatchObject({ cancel_at_period_end: true });
+    expect((await runApiEffect(c.service.list(owner))).servers[0]?.deletionScheduledAt).toBeNull();
+    c.database.exec("DROP TRIGGER fail_schedule");
+    await runApiEffect(c.service.lifecycle(owner, server.serverId, input));
+    expect((await runApiEffect(c.service.list(owner))).servers[0]?.deletionScheduledAt).toBeGreaterThan(c.clock.now);
+    expect(c.boatCalls.filter((call) => call.method === "DELETE")).toHaveLength(0);
+  });
+
+  it("does not delete while Keep is in progress and rejects a concurrent mutation", async () => {
+    const c = await setup();
+    const server = await createRunningServer(c);
+    await runApiEffect(
+      c.service.lifecycle(owner, server.serverId, {
+        serverId: server.serverId,
+        action: "delete",
+        timing: "period-end",
+        confirmName: server.name,
+      }),
+    );
+    // Make the stored date due while Stripe retains a future paid period.
+    c.database
+      .prepare("UPDATE hosted_servers SET deletion_scheduled_at = ? WHERE server_id = ?")
+      .run(c.clock.now, server.serverId);
+    const entered = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    c.stripe.beforeRenewal = async () => {
+      entered.resolve();
+      await release.promise;
+    };
+    const keep = runApiEffect(
+      c.service.lifecycle(owner, server.serverId, { serverId: server.serverId, action: "keep" }),
+    );
+    await entered.promise;
+    await expect(
+      runApiEffect(c.service.lifecycle(owner, server.serverId, { serverId: server.serverId, action: "cancel" })),
+    ).rejects.toMatchObject({ status: 409 });
+    await runApiEffect(c.service.tick());
+    expect(c.boatCalls.filter((call) => call.method === "DELETE")).toHaveLength(0);
+    release.resolve();
+    await keep;
+    expect((await runApiEffect(c.service.list(owner))).servers[0]?.deletionScheduledAt).toBeNull();
+  });
+
+  it("keeps data when a replacement plan exists or Stripe resumes renewal", async () => {
+    const c = await setup();
+    const server = await createRunningServer(c);
+    const input = {
+      serverId: server.serverId,
+      action: "delete",
+      timing: "period-end",
+      confirmName: server.name,
+    } as const;
+    await runApiEffect(c.service.lifecycle(owner, server.serverId, input));
+    await c.stripeSync("sub_1", "active", server.serverId);
+    expect((await runApiEffect(c.service.list(owner))).servers[0]?.deletionScheduledAt).toBeNull();
+    await runApiEffect(c.service.lifecycle(owner, server.serverId, input));
+    await c.stripeSync("sub_2", "active", server.serverId);
+    expect((await runApiEffect(c.service.list(owner))).servers[0]?.deletionScheduledAt).toBeNull();
+    c.clock.now += 31 * 86400_000;
+    await runApiEffect(c.service.tick());
+    expect(c.boatCalls.filter((call) => call.method === "DELETE")).toHaveLength(0);
+  });
+
+  it("does not restore deletion fields cleared after Cancel reads the server", async () => {
+    const c = await setup();
+    const server = await createRunningServer(c);
+    await runApiEffect(
+      c.service.lifecycle(owner, server.serverId, {
+        serverId: server.serverId,
+        action: "delete",
+        timing: "period-end",
+        confirmName: server.name,
+      }),
+    );
+    c.stripe.beforeRenewal = async () => {
+      // State left by Keep or a renewal webhook after the request's initial read.
+      c.database
+        .prepare(
+          "UPDATE hosted_servers SET deletion_scheduled_at = NULL, deletion_subscription_id = NULL WHERE server_id = ?",
+        )
+        .run(server.serverId);
+    };
+    await runApiEffect(c.service.lifecycle(owner, server.serverId, { serverId: server.serverId, action: "cancel" }));
+    expect((await runApiEffect(c.service.list(owner))).servers[0]?.deletionScheduledAt).toBeNull();
+    c.clock.now += 31 * 86400_000;
+    await runApiEffect(c.service.tick());
+    expect(c.boatCalls.filter((call) => call.method === "DELETE")).toHaveLength(0);
+  });
+
+  it("keeps a schedule after failed Keep and recovers an expired operation lease", async () => {
+    const c = await setup();
+    const server = await createRunningServer(c);
+    await runApiEffect(
+      c.service.lifecycle(owner, server.serverId, {
+        serverId: server.serverId,
+        action: "delete",
+        timing: "period-end",
+        confirmName: server.name,
+      }),
+    );
+    const before = (await runApiEffect(c.service.list(owner))).servers[0]?.deletionScheduledAt;
+    c.stripe.failCancel = true;
+    await expect(
+      runApiEffect(c.service.lifecycle(owner, server.serverId, { serverId: server.serverId, action: "keep" })),
+    ).rejects.toBeDefined();
+    expect((await runApiEffect(c.service.list(owner))).servers[0]?.deletionScheduledAt).toBe(before);
+    c.stripe.failCancel = false;
+    c.database
+      .prepare(
+        "UPDATE hosted_servers SET lifecycle_token = 'dead-request', lifecycle_lease_until = ? WHERE server_id = ?",
+      )
+      .run(c.clock.now - 1, server.serverId);
+    await runApiEffect(c.service.lifecycle(owner, server.serverId, { serverId: server.serverId, action: "keep" }));
+    expect((await runApiEffect(c.service.list(owner))).servers[0]?.deletionScheduledAt).toBeNull();
+    expect(c.boatCalls.filter((call) => call.method === "DELETE")).toHaveLength(0);
+  });
+
+  it("preserves existing rows and old inserts when the lifecycle migration runs", () => {
+    const db = migratedDatabase("0027_webhook_routes.sql");
+    databases.push(db);
+    db.exec(
+      "INSERT INTO users(id, identity_key, email, created_at, updated_at) VALUES ('owner', 'email:o', 'o@test', 1, 1)",
+    );
+    const insert = db.prepare(
+      "INSERT INTO hosted_servers(server_id, owner_user_id, name, size, plan, billing_interval, currency, desired_state, observed_state, idempotency_key, created_at, updated_at) VALUES (?, 'owner', 'Data', 'small', 'starter', 'month', 'eur', 'running', 'running', ?, 1, 1)",
+    );
+    insert.run("old", "old");
+    const before = db.prepare("SELECT * FROM hosted_servers").get();
+    db.exec("BEGIN");
+    db.exec(migration("0028_hosted_server_lifecycle.sql"));
+    db.exec("ROLLBACK");
+    expect(db.prepare("SELECT * FROM hosted_servers WHERE server_id = 'old'").get()).toEqual(before);
+    db.exec(migration("0028_hosted_server_lifecycle.sql"));
+    expect(db.prepare("SELECT * FROM hosted_servers WHERE server_id = 'old'").get()).toMatchObject({
+      ...before,
+      deletion_scheduled_at: null,
+      lifecycle_token: null,
+    });
+    insert.run("new", "new");
+    expect(db.prepare("SELECT COUNT(*) AS count FROM hosted_servers").get()).toEqual({ count: 2 });
+  });
+});
+
 class FakeStripe {
   readonly subscriptions = new Map<string, unknown>();
   /** Checkout session ID → status. */
@@ -993,6 +1222,7 @@ class FakeStripe {
   readonly cancelled: string[] = [];
   customersCreated = 0;
   failCancel = false;
+  beforeRenewal: () => Promise<void> = async () => {};
 
   async fetch(input: string, init: RequestInit): Promise<Response> {
     const url = new URL(input);
@@ -1033,6 +1263,14 @@ class FakeStripe {
       return stored
         ? Response.json(stored)
         : Response.json({ error: { type: "invalid_request_error" } }, { status: 404 });
+    }
+    if (method === "POST" && subscriptionId && isDynamicRecord(stored)) {
+      await this.beforeRenewal();
+      if (this.failCancel || stored.status === "canceled")
+        return Response.json({ error: { type: "api_error" } }, { status: 500 });
+      const updated = { ...stored, cancel_at_period_end: body.get("cancel_at_period_end") === "true", cancel_at: null };
+      this.subscriptions.set(subscriptionId, updated);
+      return Response.json(updated);
     }
     if (method === "DELETE" && subscriptionId && isDynamicRecord(stored)) {
       if (this.failCancel) return Response.json({ error: { type: "api_error" } }, { status: 500 });

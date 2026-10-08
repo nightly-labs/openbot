@@ -17,8 +17,15 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: var(--openbot-space-3);
   min-height: 32px;
+}
+
+.billing-toolbar .ui-button {
+  max-width: 100%;
+  height: auto;
+  white-space: normal;
 }
 
 .billing-empty {

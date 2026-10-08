@@ -73,6 +73,8 @@ export const messages = {
   "server.rail.notificationSettings": "Réglages des notifications",
   "server.rail.usage": "Utilisation",
   "server.rail.settings": "Réglages du serveur",
+  "server.rail.leave": "Quitter le serveur",
+  "server.rail.delete": "Supprimer le serveur",
   "server.select.failedTitle": "Impossible de sélectionner le serveur",
   "server.select.failedDescription": "Impossible de changer de serveur. Réessayez.",
   "server.select.openAgentFailed": "Impossible d’ouvrir {name}. Retrouvez-le dans la barre latérale.",

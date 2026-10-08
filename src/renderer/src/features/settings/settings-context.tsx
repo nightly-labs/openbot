@@ -67,6 +67,12 @@ const Settings = createSimpleContext({
     const [appSettingsOpen, setAppSettingsOpen] = createSignal(false);
     /** The tab that the next opening shows. Undefined keeps the tab that was open last. */
     const [appSettingsTab, setAppSettingsTab] = createSignal<SettingsTab | undefined>();
+    /** A hosted server that the server menu asked to delete. The nonce repeats a request for the same server. */
+    const [hostedServerDeleteRequest, setHostedServerDeleteRequest] = createSignal<{
+      serverId: string;
+      nonce: number;
+    } | null>(null);
+    let hostedServerDeleteNonce = 0;
     const [generalSettings, setGeneralSettings] = createSignal<GeneralSettingsValue>({
       ...DEFAULT_GENERAL_SETTINGS,
       taskCompletionSound: isCompletionSoundEnabled(),
@@ -309,6 +315,12 @@ const Settings = createSimpleContext({
       setAppSettingsOpen(true);
     }
 
+    /** Opens the Hosted servers tab with the delete confirmation of one server. */
+    function openHostedServerDelete(serverId: string, trigger?: HTMLElement | null): void {
+      setHostedServerDeleteRequest({ serverId, nonce: ++hostedServerDeleteNonce });
+      openAppSettings(trigger, "hosted-servers");
+    }
+
     onSettled(() => {
       // The native Preferences menu item sends the same request from main, so the shortcut below only
       // covers the window itself: both land here, and the dialog owns the open state either way.
@@ -425,6 +437,8 @@ const Settings = createSimpleContext({
       appSettingsRestoreTarget: () => appSettingsRestoreTarget,
       appSettingsTab,
       openAppSettings,
+      hostedServerDeleteRequest,
+      openHostedServerDelete,
       skillsMarketplaceOpen,
       setSkillsMarketplaceOpen,
       pendingPluginSlug,

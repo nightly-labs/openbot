@@ -987,11 +987,6 @@
   width: 100%;
 }
 
-/* The logo color description breaks after its first clause, as the catalog text says. */
-.settings-modal .ui-item-description.settings-logo-color-description {
-  white-space: pre-line;
-}
-
 /* The sound theme cards are too wide to sit beside the text, so they wrap below it. */
 .settings-sound-theme-row {
   flex-wrap: wrap;
