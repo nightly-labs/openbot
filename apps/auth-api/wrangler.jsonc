@@ -210,7 +210,7 @@
         "crons": ["* * * * *"]
       },
       // Hosted servers stay off until these are set. `api:deploy:test` sets the Stripe pair, BOAT_API_KEY,
-      // BOAT_WEBHOOK_SECRET and HOSTED_SERVERS_DEVELOPER_KEY from `.env.shared`, and
+      // BOAT_WEBHOOK_SECRET and HOSTED_SERVERS_DEVELOPER_KEY from the `.env.dev`, and
       // HOSTED_SERVERS_ALLOWED_USER_IDS from its HOSTED_SERVERS_TEST_ALLOW_LIST.
       // Set HOSTED_SERVER_TEMPLATE with `wrangler secret put <name> --env test`.
       // They are not required, so the test Worker deploys without them. See docs/hosted-servers.md.

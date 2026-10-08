@@ -1,5 +1,10 @@
 import type { HostUpdateSettingsChange, HostUpdateStatus, UpdateRestartMode } from "@openbot/contracts/ipc";
 import {
+  HOST_MEMBER_UPDATE_CAPABILITY,
+  HOST_MEMBER_UPDATE_ROUTES,
+} from "@openbot/contracts/team-protocol/host-member-update-v1";
+import { HOST_RELEASE_CAPABILITY, HOST_RELEASE_ROUTES } from "@openbot/contracts/team-protocol/host-release-v1";
+import {
   HOST_UPDATE_CAPABILITY,
   HOST_UPDATE_RESTART_MODES,
   HOST_UPDATE_ROUTES,
@@ -14,6 +19,7 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin } from "./request-helpers";
 
+const MEMBER_ROUTES = new Set<string>(Object.values(HOST_MEMBER_UPDATE_ROUTES));
 const ROUTES = new Set<string>(Object.values(HOST_UPDATE_ROUTES));
 const WAIT_REASONS = new Set<string>(HOST_UPDATE_WAIT_REASONS);
 
@@ -26,12 +32,40 @@ export async function routeHostUpdate(
   admin: TeamApiAdmin | undefined,
 ): Promise<RouteOutcome> {
   const { method, url, capabilities, member, request, json } = context;
-  if (method !== "POST" || !ROUTES.has(url.pathname)) return "unmatched";
+  if (
+    method === "POST" &&
+    (url.pathname === HOST_RELEASE_ROUTES.status || url.pathname === HOST_RELEASE_ROUTES.check)
+  ) {
+    if (!admin?.release || !capabilities.has(HOST_RELEASE_CAPABILITY))
+      throw new HttpError(400, sourceText("error.team.hostUpdateUnsupported"));
+    return json(
+      200,
+      url.pathname === HOST_RELEASE_ROUTES.status
+        ? admin.release.snapshot()
+        : await runCauseEffect(admin.release.check()),
+    );
+  }
+  const memberRoute = MEMBER_ROUTES.has(url.pathname);
+  if (method !== "POST" || (!memberRoute && !ROUTES.has(url.pathname))) return "unmatched";
   const update = admin?.update;
-  if (!update || !capabilities.has(HOST_UPDATE_CAPABILITY))
+  if (!update || !capabilities.has(memberRoute ? HOST_MEMBER_UPDATE_CAPABILITY : HOST_UPDATE_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.hostUpdateUnsupported"));
-  requireAdmin(member);
+  if (!memberRoute) requireAdmin(member);
   try {
+    if (memberRoute) {
+      if (url.pathname === HOST_MEMBER_UPDATE_ROUTES.status) return json(200, wireSnapshot(update.snapshot()));
+      if (url.pathname === HOST_MEMBER_UPDATE_ROUTES.check)
+        return json(200, wireSnapshot(await runCauseEffect(update.check())));
+      await readJson(request);
+      return json(
+        200,
+        wireSnapshot(
+          await runCauseEffect(
+            update.requestWhenIdle({ id: member.id, name: (member.name ?? member.username).slice(0, 128) }),
+          ),
+        ),
+      );
+    }
     if (url.pathname === HOST_UPDATE_ROUTES.status) return json(200, wireSnapshot(update.snapshot()));
     if (url.pathname === HOST_UPDATE_ROUTES.check) return json(200, wireSnapshot(await runCauseEffect(update.check())));
     if (url.pathname === HOST_UPDATE_ROUTES.cancel) return json(200, wireSnapshot(update.cancel()));

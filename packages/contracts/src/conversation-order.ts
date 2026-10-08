@@ -9,6 +9,10 @@ import type { ConversationMessage } from "./ipc-conversation-messages";
  * Sorts `messages` in place and returns the same array. Turns go by their earliest message, and
  * inside one turn the user's message comes first, then commentary and the plan, then the answer. A message with
  * no valid `createdAt` goes last.
+ *
+ * A turn can take a second message from the user, a steer. From the steer on, the turn goes by time, so
+ * the steer comes after the commentary the agent sent before it, and Grok's answers to the first message
+ * and to the steer stay in the order they came (#1540).
  */
 export function sortConversationMessages(messages: ConversationMessage[]): ConversationMessage[] {
   const originalIndexes = new Map(messages.map((message, index) => [message, index]));
@@ -27,6 +31,7 @@ export function sortConversationMessages(messages: ConversationMessage[]): Conve
       groups.set(groupKey, { startedAt: createdAt, firstIndex: index });
     }
   }
+  const steeredAt = turnSteerTimes(messages);
 
   messages.sort((left, right) => {
     const leftGroup = groups.get(groupKeys.get(left) ?? "");
@@ -37,7 +42,11 @@ export function sortConversationMessages(messages: ConversationMessage[]): Conve
     }
 
     if (left.turnId && left.turnId === right.turnId) {
-      const rankDifference = turnMessageRank(left) - turnMessageRank(right);
+      const steerAt = steeredAt.get(left.turnId);
+      const leftSteered = steerAt !== undefined && messageTime(left) >= steerAt;
+      const rightSteered = steerAt !== undefined && messageTime(right) >= steerAt;
+      if (leftSteered !== rightSteered) return leftSteered ? 1 : -1;
+      const rankDifference = leftSteered ? 0 : turnMessageRank(left) - turnMessageRank(right);
       if (rankDifference !== 0) return rankDifference;
     }
     const timeDifference = messageTime(left) - messageTime(right);
@@ -45,6 +54,23 @@ export function sortConversationMessages(messages: ConversationMessage[]): Conve
     return (originalIndexes.get(left) ?? 0) - (originalIndexes.get(right) ?? 0);
   });
   return messages;
+}
+
+/** When each steered turn took its second message from the user. */
+function turnSteerTimes(messages: readonly ConversationMessage[]): Map<string, number> {
+  const userTimes = new Map<string, number[]>();
+  for (const message of messages) {
+    if (!message.turnId || turnMessageRank(message) !== 0) continue;
+    const times = userTimes.get(message.turnId) ?? [];
+    times.push(messageTime(message));
+    userTimes.set(message.turnId, times);
+  }
+  const steeredAt = new Map<string, number>();
+  for (const [turnId, times] of userTimes) {
+    const second = times.sort((left, right) => left - right)[1];
+    if (second !== undefined) steeredAt.set(turnId, second);
+  }
+  return steeredAt;
 }
 
 function messageTime(message: ConversationMessage): number {

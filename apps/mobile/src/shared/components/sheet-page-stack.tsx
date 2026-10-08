@@ -7,11 +7,21 @@ import { sheetHeaderInsetOptions } from "@/shared/lib/sheet-header";
  * The layout of a formSheet route that holds one page. Android shows the native header, with its title,
  * `AndroidHeaderButton` and `SheetSaveAction`, only on a page inside a stack, not on the formSheet
  * route itself. The page can set its own title with `Stack.Screen`. On iOS the header is transparent,
- * unless `opaqueHeader` is set for a page whose content starts below the header.
+ * unless `opaqueHeader` is set for a page whose content starts below the header. `clearHeader` makes
+ * it transparent on Android too; the page's `SheetScrollView` must set `clearHeader` as well, to keep
+ * the content clear of it.
  */
-export function SheetPageStack({ title, opaqueHeader = false }: { title?: string; opaqueHeader?: boolean }) {
+export function SheetPageStack({
+  title,
+  opaqueHeader = false,
+  clearHeader = false,
+}: {
+  title?: string;
+  opaqueHeader?: boolean;
+  clearHeader?: boolean;
+}) {
   const background = String(useCSSVariable("--openbot-bg-sheet"));
-  const transparentHeader = isIOS && !opaqueHeader;
+  const transparentHeader = clearHeader || (isIOS && !opaqueHeader);
   return (
     <Stack
       screenOptions={{

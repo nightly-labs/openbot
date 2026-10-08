@@ -1,7 +1,13 @@
+import {
+  HOST_MEMBER_UPDATE_CAPABILITY,
+  memberUpdateRoute,
+} from "@openbot/contracts/team-protocol/host-member-update-v1";
+import { HOST_RELEASE_CAPABILITY, HOST_RELEASE_ROUTES } from "@openbot/contracts/team-protocol/host-release-v1";
 import type { Effect } from "effect";
 import type { RemoteWorkflowError } from "../remote-service-effects";
 // The server name, logo and app update of one server's host. On a joined server the request goes to
-// the host, which answers only an owner or admin and makes the change with the account signed in there.
+// the host. Identity, settings, cancellation, and forced restarts require an owner or admin.
+// Ordinary members can check and request an idle update through host-member-update-v1.
 
 import {
   decodeHostUpdateStatus,
@@ -20,7 +26,7 @@ import { HOST_UPDATE_CAPABILITY, HOST_UPDATE_ROUTES } from "@openbot/contracts/t
 import { sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { HostService } from "../host-service";
-import { acceptEmpty, type ResponseDecoder } from "../remote-host-decoding";
+import { acceptEmpty, decodeHostReleaseStatusFromHost, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
 import { parseHostUpdateSettings } from "./app-inputs";
 import type { IpcGroupHandlers } from "./define-ipc-group";
@@ -53,6 +59,13 @@ export function hostAdminIpcHandlers({
   remoteServers,
 }: HostAdminIpcDependencies): Pick<IpcGroupHandlers, "hostAdmin"> {
   function remoteUpdate(serverId: string, route: string, body: HostUpdateBody): Promise<HostUpdateStatus> {
+    const role = remoteServers.list().find((server) => server.id === serverId)?.role;
+    const memberRoute = role === "member" && memberUpdateRoute(route);
+    if (memberRoute && remoteServers.supportsCapability(serverId, HOST_MEMBER_UPDATE_CAPABILITY)) {
+      return runCauseEffect(
+        remoteServers.request(serverId, memberRoute, decodeHostUpdateStatus, { method: "POST", body: {} }),
+      );
+    }
     if (!remoteServers.supportsCapability(serverId, HOST_UPDATE_CAPABILITY))
       throw new Error(sourceText("error.team.hostUpdateUnsupported"));
     return runCauseEffect(remoteServers.request(serverId, route, decodeHostUpdateStatus, { method: "POST", body }));
@@ -83,6 +96,30 @@ export function hostAdminIpcHandlers({
           );
           // The host has published the change before it answered, so this reads the new name and logo.
           return runCauseEffect(remoteServers.refreshIdentity(serverId));
+        },
+      }),
+      getReleaseStatus: scopedQueryHandler({
+        local: localUpdate,
+        remote: (serverId) =>
+          remoteServers.supportsCapability(serverId, HOST_RELEASE_CAPABILITY)
+            ? runCauseEffect(
+                remoteServers.request(serverId, HOST_RELEASE_ROUTES.status, decodeHostReleaseStatusFromHost, {
+                  method: "POST",
+                  body: {},
+                }),
+              )
+            : Promise.resolve(null),
+      }),
+      checkRelease: scopedQueryHandler({
+        local: localUpdate,
+        remote: (serverId) => {
+          if (!remoteServers.supportsCapability(serverId, HOST_RELEASE_CAPABILITY)) return localUpdate();
+          return runCauseEffect(
+            remoteServers.request(serverId, HOST_RELEASE_ROUTES.check, decodeHostReleaseStatusFromHost, {
+              method: "POST",
+              body: {},
+            }),
+          );
         },
       }),
       getUpdateStatus: scopedQueryHandler({

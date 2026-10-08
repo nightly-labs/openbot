@@ -5,7 +5,6 @@ import { createServer } from "node:net";
 import { type NetworkInterfaceInfo, networkInterfaces } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { get as getEncryptedValue } from "@dotenvx/dotenvx";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { cliSpawnTarget } from "../src/backend/cli";
 import {
@@ -30,6 +29,13 @@ import {
   writeDevStackRecord,
 } from "./dev-automation/stack-registry";
 import { attachSlackTunnels } from "./dev-slack-tunnels";
+import {
+  developmentChildEnvironment,
+  developmentSettingsForService,
+  loadDevelopmentEnvironment,
+  loadSharedDevelopmentEnvironment,
+  requireDevelopmentValues,
+} from "./development-environment";
 import { resolveDevelopmentAppDataRoot } from "./development-state-paths";
 import { withoutElectronRuntimeFlags } from "./electron-spawn-env";
 import { resolvePackageBin } from "./package-bin";
@@ -113,7 +119,7 @@ export function createDevelopmentServiceSpec(
   // ELECTRON_RUN_AS_NODE=1. Every spec below becomes a spawned child, and the
   // app/test-client children relaunch Electron, so the runtime flags are
   // stripped once here rather than at each spawn.
-  const childEnvironment = withoutElectronRuntimeFlags(environment);
+  const childEnvironment = withoutElectronRuntimeFlags(developmentChildEnvironment(environment, name));
   if (name === "api") {
     return {
       name,
@@ -125,25 +131,10 @@ export function createDevelopmentServiceSpec(
   }
 
   if (name === "remote") {
-    const dotenvx = resolvePackageBin(projectRoot, "dotenvx");
     return {
       name,
-      executable: dotenvx,
-      args: [
-        "run",
-        "--redact",
-        "--strict",
-        "-f",
-        join(projectRoot, "apps", "auth-api", ".env.dev"),
-        "-fk",
-        join(projectRoot, ".env.keys"),
-        "--",
-        process.execPath,
-        "run",
-        "--cwd",
-        join(projectRoot, "remote", "api"),
-        "dev",
-      ],
+      executable: process.execPath,
+      args: [join(projectRoot, "scripts/run-development.ts"), "remote"],
       cwd: projectRoot,
       env: { ...childEnvironment },
     };
@@ -288,29 +279,22 @@ export function parseDevelopmentTarget(args: string[]): DevelopmentInvocation {
 
 /**
  * The test Worker lets an account create servers when the app sends this key. It is in the encrypted
- * `.env.shared`, so only a developer with `DOTENV_PRIVATE_KEY_SHARED` can read it. Never log it.
+ * `.env.dev`, so only a developer with `DOTENV_PRIVATE_KEY_DEV` can read it. Never log it.
  */
 async function readHostingDeveloperKey(): Promise<string> {
-  const missing =
-    "--hosting=test needs DOTENV_PRIVATE_KEY_SHARED in .env.keys or the environment, to read HOSTED_SERVERS_DEVELOPER_KEY.";
-  const value = await getEncryptedValue("HOSTED_SERVERS_DEVELOPER_KEY", {
-    path: join(projectRoot, "apps", "auth-api", ".env.shared"),
-    envKeysFile: join(projectRoot, ".env.keys"),
-    strict: true,
-  }).catch((error: unknown) => {
-    throw new Error(missing, { cause: error });
-  });
-  const key = value?.trim() ?? "";
-  if (!key || key.startsWith("encrypted:")) throw new Error(missing);
-  return key;
+  const shared = await loadSharedDevelopmentEnvironment(projectRoot);
+  const environment = { ...shared, ...process.env };
+  requireDevelopmentValues(environment, ["HOSTED_SERVERS_DEVELOPER_KEY"]);
+  return environment.HOSTED_SERVERS_DEVELOPER_KEY ?? "";
 }
 
 async function main(): Promise<void> {
   const { target, dryRun, force, shared, hostingTest, slack } = parseDevelopmentTarget(process.argv.slice(2));
   if (!dryRun && prepareDevelopmentEnvironment() === "created") {
-    logger.info("Generated apps/auth-api/.env.dev for local development.");
+    logger.info("Prepared local development state.");
   }
   const services = servicesForTarget(target);
+  const developmentEnvironment = dryRun ? {} : await loadDevelopmentEnvironment(projectRoot);
   const sharedEnvironment = developmentEnvironmentForTarget(target);
   if (hostingTest) {
     sharedEnvironment.OPENBOT_AUTH_API_URL = TEST_ACCOUNT_API_URL;
@@ -350,7 +334,12 @@ async function main(): Promise<void> {
       // The default changed from the shared profile, so a developer who expects their old data learns where it is.
       logger.info("This worktree opens its own dev profile. Pass --shared to open the shared OpenBot Dev profile.");
     }
-    const allocated = await allocateDevelopmentPorts(services, sharedEnvironment, heldDevStackPorts(records));
+    const allocated = await allocateDevelopmentPorts(
+      services,
+      sharedEnvironment,
+      heldDevStackPorts(records),
+      developmentEnvironment,
+    );
     validateServiceSpecs(allocated);
     if (dryRun) return { specs: allocated, stack: null };
     const record = createDevStackRecord(allocated, process.pid, Date.now());
@@ -437,6 +426,7 @@ async function allocateDevelopmentPorts(
   services: DevelopmentService[],
   sharedEnvironment: NodeJS.ProcessEnv,
   heldPorts: Set<number>,
+  developmentEnvironment: NodeJS.ProcessEnv,
 ): Promise<DevelopmentServiceSpec[]> {
   const reservedPorts = new Set<number>();
 
@@ -488,7 +478,7 @@ async function allocateDevelopmentPorts(
 
   const specs: DevelopmentServiceSpec[] = [];
   for (const service of services) {
-    const environment = { ...sharedEnvironment };
+    const environment = { ...developmentSettingsForService(developmentEnvironment, service), ...sharedEnvironment };
     if (service === "app" || service === "test-client") {
       const defaultPort = DEFAULT_RENDERER_PORTS[service];
       const rendererPort = await findAvailablePort(
@@ -776,7 +766,7 @@ function validateServiceSpecs(specs: DevelopmentServiceSpec[]): void {
       throw new Error("The Remote API package is missing at remote/api/package.json.");
     }
     if (spec.name !== "api" && !existsSync(spec.executable)) {
-      const executableName = spec.name === "remote" ? "dotenvx" : "electron-vite";
+      const executableName = spec.name === "remote" ? "bun" : "electron-vite";
       throw new Error(`${executableName} is missing at ${spec.executable}. Run bun install.`);
     }
   }

@@ -73,6 +73,7 @@ import { providerAdminIpcHandlers } from "./ipc/provider-admin-handlers";
 import { providerDetectionIpcHandlers } from "./ipc/provider-detection-handlers";
 import { providerIpcHandlers } from "./ipc/provider-handlers";
 import { routineFeedIpcHandlers } from "./ipc/routine-feed-handlers";
+import { routineFlowIpcHandlers } from "./ipc/routine-flow-handlers";
 import { routineIpcHandlers } from "./ipc/routine-handlers";
 import { sharedTableIpcHandlers } from "./ipc/shared-table-handlers";
 import { skillIpcHandlers } from "./ipc/skill-handlers";
@@ -284,6 +285,7 @@ const {
   forwardVoiceModelStatus,
   forwardProviderRuntimeStatus,
   forwardGitHubConnectorStatus,
+  forwardRoutineFlowsChanged,
   forwardOnePasswordConnectorStatus,
   forwardBitwardenConnectorStatus,
   forwardHostStatus,
@@ -473,6 +475,7 @@ function registerIpcHandlers({
   analytics,
   storageUsage,
   trace,
+  routineFlows,
 }: ApplicationServices): void {
   // Every renderer-to-main endpoint is bound by one of these, one file per domain under ./ipc.
   // Nothing is bound inline here: this is the trust boundary, and a reviewer should be able to read
@@ -555,6 +558,7 @@ function registerIpcHandlers({
     ...memoryIpcHandlers({ service, remoteServers }),
     ...sharedTableIpcHandlers({ service, remoteServers }),
     ...routineIpcHandlers({ service, remoteServers }),
+    ...routineFlowIpcHandlers({ routineFlows }),
     ...channelMemoryIpcHandlers({ service, remoteServers }),
     ...channelRoutineIpcHandlers({ service, remoteServers }),
     ...agentAdminIpcHandlers({
@@ -999,6 +1003,7 @@ if (!hasSingleInstanceLock) {
       host.on("directTyping", (event) => forwardDirectTyping("local", event));
       remoteDesktop.on("changed", forwardRemoteDesktopSessions);
       built.githubConnector.onChanged(forwardGitHubConnectorStatus);
+      built.routineFlows.onChanged(forwardRoutineFlowsChanged);
       built.onePasswordConnector.onChanged(forwardOnePasswordConnectorStatus);
       built.bitwardenConnector.onChanged(forwardBitwardenConnectorStatus);
       remoteServers.on("changed", forwardServers);

@@ -21,6 +21,8 @@ export const enqueueTabOperation = Effect.fn("BrowserTab.enqueue")(function* <A>
   const drained = Deferred.makeUnsafe<void>();
   const response = Deferred.makeUnsafe<A, BrowserOperationError>();
   const drains: Effect.Effect<unknown, BrowserOperationError>[] = [];
+  let cancelled = false;
+  let active: Fiber.Fiber<A, BrowserOperationError> | undefined;
   tab.queue = drained;
   tab.pendingOperations += 1;
   yield* Effect.forkIn(
@@ -28,12 +30,18 @@ export const enqueueTabOperation = Effect.fn("BrowserTab.enqueue")(function* <A>
       const result = yield* Effect.exit(
         Effect.gen(function* () {
           yield* Deferred.await(previous);
+          if (cancelled) return yield* Effect.interrupt;
           if (tab.secret?.submitted && !allowProtected) {
             return yield* browserFailure(
               new Error("Browser inspection is protected during authentication. Use takeover."),
             );
           }
-          return yield* browserSync(() => operation(tab, (work) => drains.push(work))).pipe(Effect.flatten);
+          active = yield* Effect.forkIn(
+            browserSync(() => operation(tab, (work) => drains.push(work))).pipe(Effect.flatten, Effect.interruptible),
+            tab.scope,
+            { startImmediately: true },
+          );
+          return yield* Fiber.join(active);
         }),
       );
       yield* Deferred.done(response, result);
@@ -49,7 +57,14 @@ export const enqueueTabOperation = Effect.fn("BrowserTab.enqueue")(function* <A>
     tab.scope,
     { startImmediately: true, uninterruptible: true },
   );
-  return yield* Deferred.await(response);
+  return yield* Deferred.await(response).pipe(
+    Effect.onInterrupt(() =>
+      Effect.sync(() => {
+        cancelled = true;
+        if (active) active.interruptUnsafe();
+      }),
+    ),
+  );
 });
 
 export const readTabSnapshot = Effect.fn("BrowserTab.readTabSnapshot")(function* (
@@ -87,6 +102,13 @@ export const boundEngineOperation = Effect.fn("BrowserTab.boundOperation")(funct
 ) {
   const completion = yield* Effect.forkIn(operation, tab.scope, { startImmediately: true });
   return yield* withTimeout(Fiber.join(completion), timeoutMs, timeoutMessage).pipe(
+    Effect.onInterrupt(() =>
+      Effect.sync(() => {
+        if (tab.engine.cancelPendingCommands()) completion.interruptUnsafe();
+        // An attached external debugger may still have a command in flight.
+        keepQueueBlocked(Fiber.await(completion));
+      }),
+    ),
     Effect.catch((error) => {
       if (isTimeoutError(error instanceof TimeoutError ? error : error.cause)) {
         keepQueueBlocked(unwindStalledOperation(tab, completion));
@@ -188,6 +210,12 @@ export const runTabAction = Effect.fn("BrowserTab.action")(
           const settleTimeout = Math.max(1, deadline - Date.now());
           const settle = yield* Effect.forkIn(tab.engine.settle(settleTimeout), tab.scope, { startImmediately: true });
           yield* withTimeout(Fiber.join(settle), settleTimeout, timeoutMessage).pipe(
+            Effect.onInterrupt(() =>
+              Effect.sync(() => {
+                if (tab.engine.cancelPendingCommands()) settle.interruptUnsafe();
+                stalledSettle = settle;
+              }),
+            ),
             Effect.catch((error) =>
               Effect.gen(function* () {
                 const cause = error instanceof TimeoutError ? error : error.cause;
@@ -214,6 +242,14 @@ export const runTabAction = Effect.fn("BrowserTab.action")(
             timeoutMessage,
           )).snapshot;
         }).pipe(
+          Effect.onInterrupt(() =>
+            Effect.sync(() => {
+              cancellationConfirmed = tab.engine.cancelPendingCommands();
+              // Target resolution can issue CDP commands before input dispatch.
+              if (cancellationConfirmed) completion.interruptUnsafe();
+              keepQueueBlocked(Fiber.await(completion));
+            }),
+          ),
           Effect.catch((error) =>
             Effect.gen(function* () {
               if (dispatched && (tab.closing || tab.contents.isDestroyed()))

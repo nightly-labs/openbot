@@ -265,9 +265,9 @@ export const messages = defineMessages("settings", {
     "OpenBot installs {target} when no agent works. New routine runs wait until then.",
   "settings.updates.idleRestart.relaunch": "Restart when idle",
   "settings.updates.idleRestart.update": "Install when idle",
-  "settings.updates.allowRemote.title": "Allow updates from server admins",
+  "settings.updates.allowRemote.title": "Allow updates from server members",
   "settings.updates.allowRemote.description":
-    "Owners and admins of this server can download an update and restart OpenBot on this computer.",
+    "All signed-in server members can request an update when this computer is idle. Owners and admins can also force a restart.",
   // The Hosted sites tab.
   "settings.hostedSites.title": "Published sites",
   "settings.hostedSites.unavailable": "Site hosting is unavailable.",
@@ -296,6 +296,7 @@ export const messages = defineMessages("settings", {
   "settings.hostedServers.usageNote":
     "A server stops about 15 minutes after the last message or change, also when an app is open. A key press or click in the app, a message, or a scheduled routine starts it again. Its agents and routines work when this computer is off.",
   "settings.hostedServers.empty": "You do not have a hosted server yet.",
+  "settings.hostedServers.loading": "Loading hosted servers…",
   "settings.hostedServers.state.awaitingPayment": "Waiting for payment",
   "settings.hostedServers.state.planEnded": "Plan ended",
   "settings.hostedServers.state.creating": "Creating",
