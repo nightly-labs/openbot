@@ -190,7 +190,7 @@ export const messages = {
   "settings.profile.name.tooLong": "Используйте не более {limit} символов.",
   "settings.profile.name.saveFailed": "Не удалось обновить отображаемое имя.",
   "settings.profile.photo.title": "Фото профиля",
-  "settings.profile.photo.description": "Показывается в вашем профиле в OpenBot.",
+  "settings.profile.photo.description": "Видно в вашем профиле.",
   "settings.profile.photo.upload": "Загрузить фото профиля",
   "settings.profile.photo.add": "Добавить фото профиля",
   "settings.profile.photo.edit": "Изменить фото профиля",

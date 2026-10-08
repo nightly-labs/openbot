@@ -60,8 +60,8 @@ export const messages = {
 
   "agentSettings.access.workspace": "Только рабочее пространство",
   "agentSettings.access.full": "Полный доступ",
-  "agentSettings.busyMessage.appDefaultQueue": "По умолчанию (очередь)",
-  "agentSettings.busyMessage.appDefaultSteer": "По умолчанию (направлять)",
+  "agentSettings.busyMessage.appDefaultQueue": "Очередь (общая)",
+  "agentSettings.busyMessage.appDefaultSteer": "Направлять (общая)",
   "agentSettings.busyMessage.queue": "Очередь",
   "agentSettings.busyMessage.steer": "Направлять",
   "agentSettings.busyMessage.steerUnsupported":

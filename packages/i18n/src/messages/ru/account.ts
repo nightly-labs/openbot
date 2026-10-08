@@ -45,10 +45,10 @@ export const messages = {
   "account.usage.row.left": "{name}, осталось {percent}%",
   "account.usage.row.resets": "сброс: {time}",
   "account.usage.window.limit": "Лимит",
-  "account.usage.window.weekly": "Неделя",
+  "account.usage.window.weekly": "7 дн.",
   "account.usage.window.monthly": "Месяц",
   "account.usage.window.daily": "День",
-  "account.usage.window.fiveHour": "5 часов",
+  "account.usage.window.fiveHour": "5 ч",
   "account.usage.window.hours": {
     one: "{count} ч",
     few: "{count} ч",
