@@ -57,7 +57,7 @@ export function readLocalRuntimeVars(environment: NodeJS.ProcessEnv): Record<str
   const result: Record<string, string> = {};
   for (const key of LOCAL_RUNTIME_KEYS) {
     const value = environment[key];
-    // dotenvx passes the ciphertext on when a developer has no key for `.env.shared`.
+    // A development loader may leave ciphertext when a developer has no key for the shared file.
     if (value === undefined || value.startsWith("encrypted:")) continue;
     result[key] = BOOLEAN_RUNTIME_KEYS.has(key) ? (normalizeBooleanFlag(value) ? "true" : "false") : value;
   }

@@ -518,38 +518,40 @@ export class BrowserHost {
     this.#syncAttachedView();
     if (!focus) restoreWebContentsFocus(previouslyFocused, tab.contents);
     this.#emitChanged();
-    yield* this.#persistState();
+    return yield* Effect.gen({ self: this }, function* () {
+      yield* this.#persistState();
 
-    yield* Effect.gen({ self: this }, function* () {
-      yield* browserCall(() => tab.contents.loadURL(normalizedUrl, browserLoadOptions()));
-      if (focus) {
-        this.#focusTab(tab);
-        setImmediate(() => this.#focusTab(tab));
-      } else restoreWebContentsFocus(previouslyFocused, tab.contents);
-    }).pipe(
-      Effect.catch((operationFailure) =>
-        Effect.gen({ self: this }, function* () {
-          const error = operationFailure.cause;
-          if (this.#tabs.get(tab.id) === tab) {
-            this.#unmountView(tab.view);
-            this.#tabs.delete(tab.id);
-            yield* tab.engine.destroy();
-            tab.contents.close();
-            if (this.#activeTabId === tab.id) {
-              this.#activeTabId = this.#tabs.keys().next().value ?? null;
+      yield* Effect.gen({ self: this }, function* () {
+        yield* browserCall(() => tab.contents.loadURL(normalizedUrl, browserLoadOptions()));
+        if (focus) {
+          this.#focusTab(tab);
+          setImmediate(() => this.#focusTab(tab));
+        } else restoreWebContentsFocus(previouslyFocused, tab.contents);
+      }).pipe(
+        Effect.catch((operationFailure) =>
+          Effect.gen({ self: this }, function* () {
+            const error = operationFailure.cause;
+            if (this.#tabs.get(tab.id) === tab) {
+              this.#unmountView(tab.view);
+              this.#tabs.delete(tab.id);
+              yield* tab.engine.destroy();
+              tab.contents.close();
+              if (this.#activeTabId === tab.id) {
+                this.#activeTabId = this.#tabs.keys().next().value ?? null;
+              }
+              this.#syncAttachedView();
             }
-            this.#syncAttachedView();
-          }
-          this.#emitChanged();
-          yield* this.#persistState();
-          return yield* browserFailure(
-            new Error(sourceText("error.backend.browserOpenFailed", { url: normalizedUrl, reason: String(error) })),
-          );
-        }),
-      ),
-    );
+            this.#emitChanged();
+            yield* this.#persistState();
+            return yield* browserFailure(
+              new Error(sourceText("error.backend.browserOpenFailed", { url: normalizedUrl, reason: String(error) })),
+            );
+          }),
+        ),
+      );
 
-    return toPublicTab(tab);
+      return toPublicTab(tab);
+    }).pipe(Effect.onInterrupt(() => this.close(tab.id).pipe(Effect.ignore)));
   }).bind(this);
 
   #hasTabCapacity(ownerThreadId: string | null, ownerAgentId: string | null): boolean {

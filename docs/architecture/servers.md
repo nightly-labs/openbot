@@ -163,14 +163,14 @@ form directly.
 `host-update-v1` runs the same update as the host's own Settings. `src/main/requested-update.ts`
 keeps the schedule in memory: who asked, and whether the restart waits until
 `describeRestartReadiness` reports no running work or happens as soon as the update is ready. The
-host user can turn the routes off with "Allow updates from server admins" (`openbot-update-preference-v1.json`,
+host user can turn the routes off with "Allow updates from server members" (`openbot-update-preference-v1.json`,
 default on) and can cancel a restart that waits. The host still advertises the capability when the
 setting is off, so the client can show why. A Host Manager tenant refuses the routes. The client
 reads the status again every second while a check, a download or a restart runs. An admin can also
 set the host's automatic download and automatic install when idle through the settings route; an
 automatic install is a schedule with no requester.
 
-When an admin connects, `host-update-toast.tsx` reads the status once: it offers a new version and
+When a member with update access connects, `host-update-toast.tsx` reads the status once: it offers a new version and
 shows a live percentage while the host downloads. All members get the `host-restart` event
 (`waiting`, `restarting`, `none`) from the host's event stream, and the host sends the current state
 again when a client declares the capability. Like `channelEvent`, the event skips the frozen v1-v3
@@ -286,3 +286,24 @@ A self-hosted server uses the same Linux build, scripts and units on the owner's
 (`src/main/server-mode.ts`, `OPENBOT_SERVER=1`), and the `openbot` terminal command signs it in over
 a Unix socket in the 0700 runtime directory of the service user. Main publishes the host after each
 sign-in. See [self-hosted servers](../self-hosted-server.md).
+
+### Remote release checks
+
+`host-release-v1` adds release status and check routes for all signed-in server members. It does not change
+`host-update-v1`, which still refuses installation requests and checks when updates are managed
+or disabled. The new check reads only the official stable release manifest for the host platform
+and architecture. It never installs files, restarts the host, or changes update preferences.
+The host checks that the manifest contains a compatible asset and returns only version, phase,
+and installation method. Feed errors return a safe status and can be retried.
+
+`HostReleaseService` owns release discovery. `RequestedUpdate` still owns idle restarts and
+`UpdateService` still owns app updates. Desktop and web use the new capability when available;
+older hosts keep their existing update controls. The status poll is passive and does not keep a
+hosted server awake. Mobile shares the protocol codecs but has no new update screen.
+
+`host-member-update-v1` adds `/v1/host/update/status`, `/check`, and `/start` for all active,
+signed-in server members. It reuses the released update snapshot. The start body is empty:
+requests always wait for idle time and preserve any existing schedule. Host restrictions still
+apply. Cancellation, preferences, and forced restarts stay on the administrator-only
+`host-update-v1` routes. Desktop and web clients show member controls only after this capability
+is negotiated; older hosts keep the administrator-only panel.

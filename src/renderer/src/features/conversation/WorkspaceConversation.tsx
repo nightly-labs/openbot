@@ -64,8 +64,16 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   // a remote server's OpenCode has its own catalogue. Only the write paths are local-only.
   const { customProviders } = useCustomProviders();
   const { customAgents } = useCustomAgents();
-  const { agentStatus, agentList, activeAgent, modelOptions, settingsRequest, updateAgent, setAgentAvatar } =
-    useAgents();
+  const {
+    agentStatus,
+    agentList,
+    agentListConnecting,
+    activeAgent,
+    modelOptions,
+    settingsRequest,
+    updateAgent,
+    setAgentAvatar,
+  } = useAgents();
   const {
     activeQueue,
     activeRoutineIds,
@@ -225,6 +233,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
       }}
       onOpenUsage={(trigger) => usage.openUsage(activeServer()?.id ?? "local", trigger, activeAgent()?.id)}
       agentStatus={agentStatus()}
+      agentsConnecting={agentListConnecting()}
       accountUsage={auth.accountUsage()}
       providerRuntimeStatuses={providerDownloads() ? providerRuntimeStatuses() : undefined}
       customProviders={customProviders()}

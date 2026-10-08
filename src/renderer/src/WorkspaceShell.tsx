@@ -10,6 +10,7 @@ import { WorkspaceConversation } from "./features/conversation/WorkspaceConversa
 import { WorkspaceDirectConversation } from "./features/conversation/WorkspaceDirectConversation";
 import { WorkspaceServerOnboarding } from "./features/onboarding/WorkspaceServerOnboarding";
 import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-context";
+import { WorkspaceRoutineFlows } from "./features/routine-flows/WorkspaceRoutineFlows";
 import { SchedulePanel } from "./features/schedule/SchedulePanel";
 import { useServers } from "./features/servers/servers-context";
 import { WorkspaceServerRail } from "./features/servers/WorkspaceServerRail";
@@ -37,7 +38,7 @@ import { WorkspaceOverlays } from "./WorkspaceOverlays";
  * middle-pane `<Show>`s are mutually exclusive by construction: a blocked remote
  * server wins over everything, then a joined server's provider step, then the
  * Agent form, then a channel, then a
- * person, then a Agent. The usage panel sits outside that group and inerts it.
+ * person, then a Agent: its chat, or on the Routines view its routine canvas. The usage panel sits outside that group and inerts it.
  */
 export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
   const platform = usePlatform();
@@ -110,8 +111,11 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
       <Show when={activePeopleEnabled() && !agentSetupOpen() && !channelOpen() && activeDirectMember()} keyed>
         {(member) => <WorkspaceDirectConversation member={member} />}
       </Show>
-      <Show when={!agentSetupOpen() && !channelOpen() && !activeDirectMember()}>
+      <Show when={!agentSetupOpen() && !channelOpen() && !activeDirectMember() && layout.sidebarView() !== "routines"}>
         <WorkspaceConversation account={props.account} />
+      </Show>
+      <Show when={!agentSetupOpen() && !channelOpen() && !activeDirectMember() && layout.sidebarView() === "routines"}>
+        <WorkspaceRoutineFlows />
       </Show>
       <Show when={!agentSetupOpen() && channelOpen()}>
         <WorkspaceChannelConversation />

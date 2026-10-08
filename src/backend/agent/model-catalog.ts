@@ -154,6 +154,7 @@ export class ModelCatalog {
                 supportedReasoningEfforts: efforts.length
                   ? efforts
                   : (fallback?.supportedReasoningEfforts ?? ["medium"]),
+                ...(server.reasoningEffortConfigurable === false ? { reasoningEffortConfigurable: false } : {}),
               });
             }
             const rank = PREFERRED_MODEL_ORDER.get(client.provider) ?? (() => 0);
