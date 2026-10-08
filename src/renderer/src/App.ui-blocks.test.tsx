@@ -1,7 +1,7 @@
 import type { ConversationMessage } from "@openbot/contracts/ipc";
 import {
   type ConversationUiBlock,
-  type UiBlockingBlockSpec,
+  type UiBlockSpec,
   type UiBlockState,
   uiBlockFallbackQuestions,
 } from "@openbot/contracts/ui-blocks";
@@ -10,7 +10,7 @@ import { expect, it, vi } from "vitest";
 import { App } from "./App";
 import { confirmOnboardingModel, emitAgentEvent, installOpenbotStub } from "./app-test-harness";
 
-const CHOICE: UiBlockingBlockSpec = {
+const CHOICE: UiBlockSpec = {
   type: "choice",
   title: "What should I do with the letter?",
   options: [
@@ -22,7 +22,7 @@ const CHOICE: UiBlockingBlockSpec = {
 function blockMessage(
   turnId: string,
   requestId: string,
-  spec: UiBlockingBlockSpec,
+  spec: UiBlockSpec,
   state: UiBlockState = { status: "pending" },
 ): ConversationMessage {
   const uiBlock: ConversationUiBlock = { version: 1, blockId: `block-${requestId}`, spec, state };
@@ -56,7 +56,7 @@ function emitSnapshot(revision: number, turnId: string, messages: ConversationMe
   });
 }
 
-function emitPrompt(turnId: string, requestId: string, spec: UiBlockingBlockSpec): void {
+function emitPrompt(turnId: string, requestId: string, spec: UiBlockSpec): void {
   emitAgentEvent?.({
     type: "prompt",
     requestId,

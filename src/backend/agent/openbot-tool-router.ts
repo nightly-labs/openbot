@@ -21,7 +21,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { isPluginSlug } from "@openbot/contracts/plugin-links";
 import { isString } from "@openbot/contracts/runtime-values";
-import { isBlockingUiBlockSpec, normalizeUiBlockSpec } from "@openbot/contracts/ui-blocks";
+import { isUiBlockId, normalizeUiBlockSpec } from "@openbot/contracts/ui-blocks";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { Effect, Result } from "effect";
@@ -345,9 +345,11 @@ export class OpenBotToolRouter {
       return;
     }
     const spec = normalizeUiBlockSpec(parsed.data.block);
-    if (!spec || !isBlockingUiBlockSpec(spec)) {
+    // The stored block must read back, so its id passes the same check as the read.
+    const blockId = parsed.data.blockId ?? randomUUID();
+    if (!spec || !isUiBlockId(blockId)) {
       refuse(
-        "The block breaks a rule: ids and option labels must be unique, an id must not be botId or a similar name, a value must be one of its options, and a single choice selects at most one option. Correct the block and retry.",
+        "The block breaks a rule: ids and option labels must be unique, an id must not be botId or a similar name, a value must be one of its options, a single choice selects at most one option, and a secret field is a text field with no value. Correct the block and retry.",
       );
       return;
     }
@@ -356,7 +358,7 @@ export class OpenBotToolRouter {
       refuse("A channel cannot show an ask_ui block. Ask in plain text instead.");
       return;
     }
-    this.#attention.surfaceUiBlock(client, request, { blockId: parsed.data.blockId ?? randomUUID(), spec });
+    this.#attention.surfaceUiBlock(client, request, { blockId, spec });
   }
 
   #requireAgent(agentId: string): AgentSummary {

@@ -1,4 +1,5 @@
 import {
+  isSecretFormField,
   UI_BLOCK_LIMITS,
   UI_BLOCK_SUBMIT_ACTION_ID,
   type UiBlockValue,
@@ -152,7 +153,8 @@ export function UiFormBlock(props: UiBlockProps<UiFormSpec>) {
                     </Match>
                     <Match when={true}>
                       <Input
-                        type="text"
+                        type={isSecretFormField(field) ? "password" : "text"}
+                        autocomplete={isSecretFormField(field) ? "off" : undefined}
                         value={currentValue(field)}
                         maxlength={UI_BLOCK_LIMITS.fieldValue}
                         placeholder={"placeholder" in field ? field.placeholder : undefined}

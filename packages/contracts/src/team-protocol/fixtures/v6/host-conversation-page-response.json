@@ -66,33 +66,71 @@
       }
     },
     {
-      "id": "ui-block:report",
+      "id": "question-prompt:turn-1:request-2",
       "turnId": "turn-1",
       "author": "assistant",
-      "text": "**Monthly report** (50%)\n\n- [x] Load sales\n- [ ] Check returns (running)",
+      "text": "Which week?\n\nAnswer: This week",
       "createdAt": "2026-10-08T10:02:00.000Z",
       "status": "completed",
-      "itemType": "ui-block:progress",
+      "itemType": "question_prompt",
+      "questionPrompt": {
+        "requestId": "request-2",
+        "questions": [
+          {
+            "id": "reply",
+            "header": "Which week?",
+            "question": "Which week?",
+            "isSecret": false,
+            "options": [
+              {
+                "label": "This week",
+                "description": ""
+              },
+              {
+                "label": "Last week",
+                "description": ""
+              }
+            ]
+          }
+        ],
+        "resolution": {
+          "status": "answered",
+          "responses": {
+            "reply": {
+              "status": "answered",
+              "answers": ["This week"]
+            }
+          }
+        }
+      },
       "uiBlock": {
         "version": 1,
-        "blockId": "report",
+        "blockId": "week",
         "spec": {
-          "type": "progress",
-          "title": "Monthly report",
-          "steps": [
+          "type": "quick_replies",
+          "title": "Which week?",
+          "options": [
             {
-              "label": "Load sales",
-              "state": "done"
+              "id": "this",
+              "label": "This week"
             },
             {
-              "label": "Check returns",
-              "state": "running"
+              "id": "last",
+              "label": "Last week"
             }
-          ],
-          "percent": 50
+          ]
         },
         "state": {
-          "status": "pending"
+          "status": "answered",
+          "response": {
+            "actionId": "this"
+          },
+          "respondedBy": {
+            "id": "member-1",
+            "name": "Ada"
+          },
+          "respondedAt": "2026-10-08T10:02:30.000Z",
+          "outcome": "This week"
         }
       }
     },
@@ -103,28 +141,56 @@
       "text": "What about last week?",
       "createdAt": "2026-10-08T10:03:00.000Z",
       "status": "completed",
-      "replyToMessageId": "ui-block:weekly"
+      "replyToMessageId": "question-prompt:turn-0:request-0"
     }
   ],
   "references": {
-    "ui-block:weekly": {
-      "id": "ui-block:weekly",
+    "question-prompt:turn-0:request-0": {
+      "id": "question-prompt:turn-0:request-0",
       "turnId": "turn-0",
       "author": "assistant",
-      "text": "**Weekly report**\n\n- [x] Load sales",
+      "text": "Which report?\n\nNo answer",
       "createdAt": "2026-10-01T10:00:00.000Z",
       "status": "completed",
-      "itemType": "ui-block:progress",
+      "itemType": "question_prompt",
+      "questionPrompt": {
+        "requestId": "request-0",
+        "questions": [
+          {
+            "id": "choice",
+            "header": "Which report?",
+            "question": "Which report?",
+            "isSecret": false,
+            "options": [
+              {
+                "label": "Sales",
+                "description": ""
+              },
+              {
+                "label": "Returns",
+                "description": ""
+              }
+            ]
+          }
+        ],
+        "resolution": {
+          "status": "cancelled"
+        }
+      },
       "uiBlock": {
         "version": 1,
         "blockId": "weekly",
         "spec": {
-          "type": "progress",
-          "title": "Weekly report",
-          "steps": [
+          "type": "choice",
+          "title": "Which report?",
+          "options": [
             {
-              "label": "Load sales",
-              "state": "done"
+              "id": "sales",
+              "label": "Sales"
+            },
+            {
+              "id": "returns",
+              "label": "Returns"
             }
           ]
         },

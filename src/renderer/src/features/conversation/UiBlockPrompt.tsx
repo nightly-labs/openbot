@@ -1,6 +1,5 @@
 import {
   type ConversationUiBlock,
-  type UiBlockingBlockSpec,
   type UiBlockResponse,
   type UiBlockState,
   uiBlockAnswersFromResponse,
@@ -14,11 +13,9 @@ import { useText } from "@openbot/ui/text";
 import { createSignal, onCleanup } from "solid-js";
 import type { PromptAnswerOptions } from "./conversation-types";
 
-/** A blocking block: one the person answers through the prompt it sits beside. */
-export type BlockingUiBlock = ConversationUiBlock & { spec: UiBlockingBlockSpec };
-
 export interface UiBlockPromptProps {
-  block: BlockingUiBlock;
+  /** A block the person answers through the prompt it sits beside. */
+  block: ConversationUiBlock;
   agents: AgentProfile[];
   onSelectAgent: (agentId: string) => void;
   onOpenLink: (url: string) => void;
@@ -39,14 +36,21 @@ export interface UiBlockPromptProps {
  * reads both alike. A skip answers every question with nothing.
  */
 export function UiBlockPrompt(props: UiBlockPromptProps) {
-  const { t, errorMessage } = useText();
+  const { t, format, errorMessage } = useText();
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal<string>();
   // What this client sent, shown frozen until the host's stored state replaces it.
   const [sent, setSent] = createSignal<UiBlockState>();
   onCleanup(() => props.elementRef?.(undefined));
-  const state = (): UiBlockState =>
+  const stored = (): UiBlockState =>
     props.block.state.status === "pending" ? (sent() ?? props.block.state) : props.block.state;
+  // The host stores the outcome with English list commas; draw it again in the reader's language.
+  const state = (): UiBlockState => {
+    const current = stored();
+    if (current.status !== "answered" || !current.response) return current;
+    const outcome = uiBlockOutcomeText(props.block.spec, current.response, format.list);
+    return outcome.trim() ? { ...current, outcome } : current;
+  };
 
   async function send(answers: Record<string, string[]>, frozen: UiBlockState): Promise<void> {
     const answer = props.onAnswer;

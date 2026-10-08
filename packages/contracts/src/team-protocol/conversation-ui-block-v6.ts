@@ -7,20 +7,21 @@ import type { TeamProtocolV6BaseJsonObject, TeamProtocolV6BaseJsonValue } from "
  * code units. One block is already bounded by the contract (`UI_BLOCK_LIMITS.specJson` and
  * `responseJson`), but a page carries up to a hundred messages and their references. The newest
  * blocks are kept up to this budget, and an older block over it is left out: its message still has
- * the fallback question or text that a client without `uiBlock` reads.
+ * the fallback question that a client without `uiBlock` reads.
  */
 const CONVERSATION_UI_BLOCKS_WIRE_BUDGET = 1_000_000;
 
 /**
  * `uiBlock` rides beside the frozen conversation projection, in the way `plan` and `senderMember`
  * do: the shipped key lists drop it, so a client on protocol 1-5, or a v6 client that predates it,
- * reads the message as its fallback: a question prompt it can answer, or the block as text. Only the
- * current v6 adapter carries the block itself, so no protocol bump is needed.
+ * reads the message as its fallback: a question prompt it can answer. Only the current v6 adapter
+ * carries the block itself, so no protocol bump is needed.
  *
  * A present block must decode. The projection removes the key, so an unchecked value would reach
- * the client as a block the contract never allowed. A malformed block is left out, in both
- * directions, and only it: the message keeps its fallback question or text, and the rest of the
- * snapshot, page or event still arrives. The block goes out normalized, with only known keys.
+ * the client as a block the contract never allowed. Fail closed instead, in both directions, as
+ * `withConversationPlans` and `withConversationSenders` do: the host stores only blocks that
+ * `normalizeConversationUiBlock` accepts, so a malformed one is a protocol error. An absent block
+ * still means an older host. The block goes out normalized, with only known keys.
  */
 export function withConversationUiBlocks(
   projected: TeamProtocolV6BaseJsonValue,
@@ -35,7 +36,7 @@ export function withConversationUiBlocks(
   for (const message of [...[...fromMessages].reverse(), ...fromReferences]) {
     if (!isDynamicRecord(message) || message.uiBlock === undefined) continue;
     const normalized = normalizeConversationUiBlock(message.uiBlock);
-    if (!normalized) continue;
+    if (!normalized) throw new Error("Invalid conversation UI block.");
     const json = JSON.stringify(normalized);
     if (isString(message.id)) candidates.push({ id: message.id, block: JSON.parse(json), size: json.length });
   }

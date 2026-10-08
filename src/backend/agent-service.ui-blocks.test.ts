@@ -1,10 +1,6 @@
 import type { AgentEvent, ConversationMessage } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
-import {
-  type UiBlockingBlockSpec,
-  uiBlockAnswersFromResponse,
-  uiBlockFallbackQuestions,
-} from "@openbot/contracts/ui-blocks";
+import { type UiBlockSpec, uiBlockAnswersFromResponse, uiBlockFallbackQuestions } from "@openbot/contracts/ui-blocks";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { AgentService } from "./agent-service";
 import {
@@ -20,7 +16,7 @@ import {
 } from "./agent-service-test-harness";
 import { runCauseEffect } from "./effect-boundary";
 
-const LETTER: UiBlockingBlockSpec = {
+const LETTER: UiBlockSpec = {
   type: "confirm",
   title: "Send the letter to Ann?",
   danger: true,
@@ -35,7 +31,7 @@ const LETTER: UiBlockingBlockSpec = {
   ],
 };
 
-const REPLIES: UiBlockingBlockSpec = {
+const REPLIES: UiBlockSpec = {
   type: "quick_replies",
   title: "Which report?",
   options: [
@@ -312,6 +308,54 @@ describe.sequential("AgentService: ask_ui blocks", () => {
       payload: { error: expect.stringContaining("Correct the arguments and retry.") },
     });
     expect(turn.events.some((event) => event.type === "prompt")).toBe(false);
+  });
+
+  it("refuses a block id that the stored message could not read back, and stores nothing", async () => {
+    const turn = await startTurn();
+    // The legacy message read renames these keys, so a stored block with such an id would make the
+    // whole conversation page unreadable.
+    for (const blockId of ["botId", "recipientBotId", "recipientBotIds", "senderBotId"]) {
+      askUi(turn, blockId, { blockId, block: REPLIES });
+    }
+    await waitFor(() => turn.client.responses.length === 4);
+
+    for (const blockId of ["botId", "recipientBotId", "recipientBotIds", "senderBotId"]) {
+      expect(providerResult(turn, blockId)).toMatchObject({
+        success: false,
+        payload: { error: expect.stringContaining("reserved") },
+      });
+    }
+    expect(turn.events.some((event) => event.type === "prompt")).toBe(false);
+    const conversation = await runCauseEffect(turn.service.readConversation("chief"));
+    expect(conversation.messages.some((message) => message.uiBlock || message.questionPrompt)).toBe(false);
+  });
+
+  it("gives the agent a secret form value but does not store it", async () => {
+    const turn = await startTurn();
+    const login: UiBlockSpec = {
+      type: "form",
+      title: "Sign in",
+      fields: [
+        { id: "user", kind: "text", label: "User", required: true },
+        { id: "password", kind: "text", label: "Password", required: true, secret: true },
+      ],
+    };
+    askUi(turn, "login", { blockId: "login", block: login });
+    await waitFor(() => turn.events.some((event) => event.type === "prompt"));
+
+    const response = { actionId: "submit", values: { user: "ann", password: "hunter2" } };
+    await runCauseEffect(
+      turn.service.respondToPrompt({ requestId: "login", answers: uiBlockAnswersFromResponse(login, response) }),
+    );
+
+    expect(providerResult(turn, "login").payload).toEqual({ status: "answered", blockId: "login", ...response });
+    const stored = await blockMessage(turn, "login");
+    expect(stored?.uiBlock?.state).toMatchObject({
+      status: "answered",
+      response: { actionId: "submit", values: { user: "ann" } },
+      outcome: "User: ann",
+    });
+    expect(JSON.stringify(stored)).not.toContain("hunter2");
   });
 
   it("expires a persisted open block after restart", async () => {

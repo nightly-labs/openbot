@@ -209,9 +209,8 @@ export interface ConversationMessage {
   /** Set on the one `plan` message of a turn. The text holds the same plan as a checklist. */
   plan?: ConversationPlan;
   /**
-   * An interactive block from `ask_ui` or `show_ui` (see `ui-blocks.ts`). A blocking block rides on a
-   * `question_prompt` message beside `questionPrompt`; a display block's message has the `ui-block:`
-   * item type and its fallback text. Absent on a message from an older host.
+   * An interactive block from `ask_ui` (see `ui-blocks.ts`). It rides on a `question_prompt` message
+   * beside `questionPrompt`. Absent on a message from an older host.
    */
   uiBlock?: ConversationUiBlock;
 }

@@ -388,16 +388,29 @@ describe("web workspace state", () => {
       uiBlock,
     };
     const reference: ConversationMessage = {
-      id: "ui-block:report",
+      id: "question-prompt:turn-0:request-0",
       author: "assistant",
-      text: "Report",
+      text: "Which report?",
       createdAt: "2026-10-01T10:00:00.000Z",
       status: "completed",
-      itemType: "ui-block:progress",
+      itemType: "question_prompt",
+      questionPrompt: {
+        requestId: "request-0",
+        questions: [
+          {
+            id: "reply",
+            header: "Which report?",
+            question: "Which report?",
+            isSecret: false,
+            options: [{ label: "Weekly", description: "" }],
+          },
+        ],
+        resolution: { status: "cancelled" },
+      },
       uiBlock: {
         version: 1,
         blockId: "report",
-        spec: { type: "progress", title: "Report", steps: [{ label: "Load", state: "done" }] },
+        spec: { type: "quick_replies", title: "Which report?", options: [{ id: "weekly", label: "Weekly" }] },
         state: { status: "closed" },
       },
     };

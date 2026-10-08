@@ -97,7 +97,7 @@ describe("OpenBot tool declarations", () => {
       },
       true,
     ],
-    ["ask_ui", { block: { type: "alert", severity: "info", title: "Display blocks use show_ui" } }, false],
+    ["ask_ui", { block: { type: "alert", severity: "info", title: "Not a block type yet" } }, false],
     ["ask_ui", { block: { type: "choice", title: "Pick", options: [] } }, false],
     ["ask_ui", { block: { type: "quick_replies", options: [{ id: "_text", label: "Reserved" }] } }, false],
     ["ask_ui", { block: { type: "quick_replies", options: [{ id: "a", label: "A", unexpected: true }] } }, false],

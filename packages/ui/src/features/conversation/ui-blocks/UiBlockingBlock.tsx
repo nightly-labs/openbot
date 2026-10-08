@@ -1,4 +1,4 @@
-import type { UiBlockingBlockSpec } from "@openbot/contracts/ui-blocks";
+import type { UiBlockSpec } from "@openbot/contracts/ui-blocks";
 import type { JSX } from "@solidjs/web";
 import { Match, Switch } from "solid-js";
 import { UiChoiceBlock } from "./UiChoiceBlock";
@@ -7,7 +7,7 @@ import { UiFormBlock } from "./UiFormBlock";
 import { UiQuickReplies } from "./UiQuickReplies";
 import type { UiBlockProps } from "./ui-block-support";
 
-export interface UiBlockingBlockProps extends UiBlockProps<UiBlockingBlockSpec> {
+export interface UiBlockingBlockProps extends UiBlockProps<UiBlockSpec> {
   /** Draws a confirm block's preview as safe Markdown. */
   renderPreview?: ((markdown: string) => JSX.Element) | undefined;
 }

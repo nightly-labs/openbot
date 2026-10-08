@@ -113,8 +113,8 @@ describe("Team protocol v6", () => {
     };
 
     it("carries a block over HTTP, WebRTC and conversation events", () => {
-      expect(page.messages.map((message) => message.uiBlock?.blockId)).toEqual(["letter", "report", undefined]);
-      expect(page.references["ui-block:weekly"]?.uiBlock?.blockId).toBe("weekly");
+      expect(page.messages.map((message) => message.uiBlock?.blockId)).toEqual(["letter", "week", undefined]);
+      expect(page.references["question-prompt:turn-0:request-0"]?.uiBlock?.blockId).toBe("weekly");
       const wire = JSON.parse(encodeTeamProtocolV6CurrentHttpResponse("GET", pagePath, 200, page));
       expect(wire).toEqual(conversationPageWire);
       expect(decodeTeamProtocolV6CurrentHttpResponse("GET", pagePath, 200, wire)).toEqual(page);
@@ -123,7 +123,7 @@ describe("Team protocol v6", () => {
       const overWebRtc = encodeTeamProtocolV6WebRtcHttpResponse("GET", pagePath, 200, page);
       expect(decodeTeamProtocolV6WebRtcHttpResponse("GET", pagePath, 200, overWebRtc)).toEqual(page);
 
-      // A block that changes, such as a progress step, reaches a client as a conversation event.
+      // A block that changes, such as an answered block, reaches a client as a conversation event.
       // Events carry no read state.
       const { readState: _readState, ...eventSnapshot } = snapshot;
       const { readState: _pageReadState, ...eventPage } = page;
@@ -148,11 +148,11 @@ describe("Team protocol v6", () => {
         wire,
       );
       expect(JSON.stringify(shipped)).not.toContain("uiBlock");
-      // It still reads the fallback: a question it can answer, and the block as text.
+      // It still reads the fallback: a question it can answer, and its answer.
       expect(shipped).toMatchObject({
         messages: [
           { itemType: "question_prompt", questionPrompt: page.messages[0]?.questionPrompt },
-          { itemType: "ui-block:progress", text: page.messages[1]?.text },
+          { itemType: "question_prompt", questionPrompt: page.messages[1]?.questionPrompt },
           { text: page.messages[2]?.text },
         ],
       });
@@ -164,65 +164,57 @@ describe("Team protocol v6", () => {
       expect(encodeTeamProtocolV1CurrentHttpResponse("GET", snapshotPath, 200, snapshot)).not.toContain("uiBlock");
     });
 
-    it("leaves out only a malformed block, in both directions and on the event stream", () => {
+    it("fails closed on a malformed block, in both directions and on the event stream", () => {
       const [prompt, ...rest] = page.messages;
       if (!prompt) throw new Error("Invalid v6 conversation fixture.");
-      const { uiBlock: _promptBlock, ...promptWithoutBlock } = prompt;
-      // The message arrives with its fallback question, and every other block stays.
-      const expected = { ...page, messages: [promptWithoutBlock, ...rest] };
       const malformed = {
         ...page,
         messages: [{ ...prompt, uiBlock: { ...prompt.uiBlock, spec: { type: "confirm" } } }, ...rest],
       };
-      const encoded = JSON.parse(encodeTeamProtocolV6CurrentHttpResponse("GET", pagePath, 200, malformed));
-      expect(decodeTeamProtocolV6CurrentHttpResponse("GET", pagePath, 200, encoded)).toEqual(expected);
+      expect(() => encodeTeamProtocolV6CurrentHttpResponse("GET", pagePath, 200, malformed)).toThrow(
+        "Invalid conversation UI block.",
+      );
 
       const [wirePrompt, ...wireRest] = conversationPageWire.messages;
       const malformedWire = {
         ...conversationPageWire,
         messages: [{ ...wirePrompt, uiBlock: { ...wirePrompt?.uiBlock, spec: { type: "confirm" } } }, ...wireRest],
       };
-      expect(decodeTeamProtocolV6CurrentHttpResponse("GET", pagePath, 200, malformedWire)).toEqual(expected);
-      expect(decodeTeamProtocolV6WebRtcHttpResponse("GET", pagePath, 200, malformedWire)).toEqual(expected);
+      expect(() => decodeTeamProtocolV6CurrentHttpResponse("GET", pagePath, 200, malformedWire)).toThrow(
+        "Invalid conversation UI block.",
+      );
+      expect(() => decodeTeamProtocolV6WebRtcHttpResponse("GET", pagePath, 200, malformedWire)).toThrow(
+        "Invalid conversation UI block.",
+      );
+      // A block id that the legacy read renames is malformed too.
+      const legacyId = {
+        ...conversationPageWire,
+        messages: [{ ...wirePrompt, uiBlock: { ...wirePrompt?.uiBlock, blockId: "botId" } }, ...wireRest],
+      };
+      expect(() => decodeTeamProtocolV6CurrentHttpResponse("GET", pagePath, 200, legacyId)).toThrow(
+        "Invalid conversation UI block.",
+      );
 
-      const reference = page.references["ui-block:weekly"];
-      if (!reference) throw new Error("Invalid v6 conversation fixture.");
-      const { uiBlock: _referenceBlock, ...referenceWithoutBlock } = reference;
       const badReference = {
         ...conversationPageWire,
         references: {
-          "ui-block:weekly": { ...conversationPageWire.references["ui-block:weekly"], uiBlock: { version: 2 } },
+          "question-prompt:turn-0:request-0": {
+            ...conversationPageWire.references["question-prompt:turn-0:request-0"],
+            uiBlock: { version: 2 },
+          },
         },
       };
-      expect(decodeTeamProtocolV6CurrentHttpResponse("GET", pagePath, 200, badReference)).toEqual({
-        ...page,
-        references: { "ui-block:weekly": referenceWithoutBlock },
-      });
+      expect(() => decodeTeamProtocolV6CurrentHttpResponse("GET", pagePath, 200, badReference)).toThrow(
+        "Invalid conversation UI block.",
+      );
 
       const { readState: _readState, ...eventSnapshot } = snapshot;
-      const { readState: _expectedReadState, ...expectedSnapshot } = expected;
-      const {
-        references: _expectedReferences,
-        pageInfo: _expectedPageInfo,
-        ...expectedEventSnapshot
-      } = expectedSnapshot;
       const eventWire = JSON.parse(
         encodeTeamProtocolV6BaseCurrentEvent({ type: "conversation", snapshot: eventSnapshot }) ?? "null",
       );
       const malformedEvent = { ...eventWire, snapshot: { ...eventWire.snapshot, messages: malformedWire.messages } };
-      const expectedEvent = { type: "conversation", snapshot: expectedEventSnapshot };
-      expect(decodeTeamProtocolV6BaseCurrentEvent(malformedEvent)).toEqual({ kind: "known", event: expectedEvent });
-      expect(decodeTeamProtocolV6CurrentEvent(createTeamProtocolV6Event(1, malformedEvent))).toEqual({
-        status: "known",
-        event: expectedEvent,
-      });
-      // The host leaves it out too; the clone stands in for a corrupt stored message.
-      const { readState: _malformedReadState, references: _r, pageInfo: _p, ...malformedSnapshot } = malformed;
-      const corrupt = JSON.parse(JSON.stringify(malformedSnapshot));
-      const corruptWire = JSON.parse(
-        encodeTeamProtocolV6BaseCurrentEvent({ type: "conversation", snapshot: corrupt }) ?? "null",
-      );
-      expect(decodeTeamProtocolV6BaseCurrentEvent(corruptWire)).toEqual({ kind: "known", event: expectedEvent });
+      expect(decodeTeamProtocolV6BaseCurrentEvent(malformedEvent)).toEqual({ kind: "invalid", type: "conversation" });
+      expect(() => createTeamProtocolV6Event(1, malformedEvent)).toThrow("Invalid Team protocol v6 event.");
     });
 
     it("sends a block with only known keys", () => {
@@ -234,22 +226,24 @@ describe("Team protocol v6", () => {
     });
 
     it("keeps the newest blocks within the size budget and leaves the older ones to their fallback", () => {
-      const rows = Array.from({ length: 50 }, (_, row) => ({
-        id: `row-${row}`,
-        cells: Array.from({ length: 6 }, () => "x".repeat(190)),
-      }));
-      const messages = Array.from({ length: 20 }, (_, index) => ({
-        id: `ui-block:table-${index}`,
+      const fields = Array.from({ length: 8 }, (_, field) => ({ label: `Field ${field}`, value: "x".repeat(2_000) }));
+      const messages = Array.from({ length: 50 }, (_, index) => ({
+        id: `question-prompt:turn-1:request-${index}`,
         author: "assistant" as const,
-        text: `Table ${index}`,
+        text: `Letter ${index}`,
         createdAt: `2026-10-08T10:${String(index).padStart(2, "0")}:00.000Z`,
         status: "completed" as const,
-        itemType: "ui-block:table",
         uiBlock: {
           version: 1,
-          blockId: `table-${index}`,
-          spec: { type: "table", title: `Table ${index}`, columns: ["a", "b", "c", "d", "e", "f"], rows },
-          state: { status: "pending" },
+          blockId: `letter-${index}`,
+          spec: {
+            type: "confirm",
+            title: `Letter ${index}`,
+            fields,
+            preview: "y".repeat(8_000),
+            actions: [{ id: "send", label: "Send" }],
+          },
+          state: { status: "closed" },
         },
       }));
       const large = { ...snapshot, messages };

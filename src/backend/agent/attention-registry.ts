@@ -17,10 +17,11 @@ import type {
 import { AGENT_RUNTIME_ATTENTION_LIMIT } from "@openbot/contracts/ipc";
 import {
   type ConversationUiBlock,
+  normalizeConversationUiBlock,
   UI_BLOCK_TEXT_ACTION_ID,
   UI_BLOCK_VERSION,
-  type UiBlockingBlockSpec,
   type UiBlockResponse,
+  type UiBlockSpec,
   type UiBlockState,
   uiBlockActionIsPrivileged,
   uiBlockFallbackQuestions,
@@ -87,7 +88,7 @@ interface PendingPrompt {
   /** For `ui-block`, the fallback questions of the block. */
   questions: AgentPromptQuestion[];
   /** Set exactly when `responseKind` is `ui-block`. */
-  uiBlock?: { blockId: string; spec: UiBlockingBlockSpec };
+  uiBlock?: { blockId: string; spec: UiBlockSpec };
 }
 
 /**
@@ -712,17 +713,20 @@ export class AttentionRegistry {
    * questions let a client that does not know `uiBlock` answer it through `respondToPrompt`. The
    * caller has checked the spec and refused a channel.
    */
-  surfaceUiBlock(
-    client: AgentClient,
-    request: AppServerRequest,
-    block: { blockId: string; spec: UiBlockingBlockSpec },
-  ): void {
+  surfaceUiBlock(client: AgentClient, request: AppServerRequest, block: { blockId: string; spec: UiBlockSpec }): void {
     const threadId = getString(request.params, "threadId");
     const turnId = getString(request.params, "turnId");
     const agentId = threadId ? this.#conversation.agentForThread(threadId) : undefined;
     const publicThreadId = threadId && agentId ? this.#conversation.publicThreadId(agentId, threadId) : null;
     const questions = uiBlockFallbackQuestions(block.spec);
-    if (!threadId || !turnId || !agentId || !publicThreadId || !validPromptQuestions(questions)) {
+    // Store only what the contract reads back: a block it refuses would make the whole page unreadable.
+    const uiBlock = normalizeConversationUiBlock({
+      version: UI_BLOCK_VERSION,
+      blockId: block.blockId,
+      spec: block.spec,
+      state: { status: "pending" },
+    });
+    if (!threadId || !turnId || !agentId || !publicThreadId || !uiBlock || !validPromptQuestions(questions)) {
       client.respond(request.id, {
         success: false,
         contentItems: [{ type: "inputText", text: "OpenBot could not show this block." }],
@@ -730,12 +734,6 @@ export class AttentionRegistry {
       return;
     }
 
-    const uiBlock: ConversationUiBlock = {
-      version: UI_BLOCK_VERSION,
-      blockId: block.blockId,
-      spec: structuredClone(block.spec),
-      state: { status: "pending" },
-    };
     const messageId = this.#persistQuestionPrompt(agentId, publicThreadId, turnId, request.id, questions, uiBlock);
     this.#prompts.set(request.id, {
       client,
@@ -1093,7 +1091,13 @@ export class AttentionRegistry {
     if (!message?.questionPrompt || message.questionPrompt.resolution !== null) return;
     message.questionPrompt.resolution = structuredClone(resolution);
     message.text = questionPromptText(message.questionPrompt.questions, resolution);
-    if (message.uiBlock && uiBlockState) message.uiBlock.state = structuredClone(uiBlockState);
+    if (message.uiBlock && uiBlockState) {
+      // The read drops a secret form value; storing the read result keeps it out of the database.
+      const frozen = normalizeConversationUiBlock({ ...message.uiBlock, state: uiBlockState });
+      message.uiBlock.state = frozen?.state ?? {
+        status: uiBlockState.status === "answered" ? "closed" : uiBlockState.status,
+      };
+    }
     this.#conversation.emitConversation(snapshot, "prompt.resolved", {
       turnId: pending.turnId,
       requestId: pending.id,
@@ -1109,7 +1113,7 @@ export class AttentionRegistry {
  * owner or an admin takes a privileged action.
  */
 function uiBlockAnswer(
-  spec: UiBlockingBlockSpec,
+  spec: UiBlockSpec,
   answers: Readonly<Record<string, readonly string[]>>,
   responder: PromptResponder | undefined,
 ): UiBlockResponse | null {
@@ -1130,7 +1134,7 @@ function uiBlockAnswer(
 }
 
 function answeredUiBlockState(
-  spec: UiBlockingBlockSpec,
+  spec: UiBlockSpec,
   response: UiBlockResponse | null,
   responder: PromptResponder | undefined,
 ): UiBlockState {

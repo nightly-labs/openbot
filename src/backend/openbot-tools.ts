@@ -5,7 +5,7 @@ import {
   CHAT_VISUAL_TITLE_LIMIT,
 } from "@openbot/contracts/chat-visual";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { UI_BLOCK_LIMITS } from "@openbot/contracts/ui-blocks";
+import { isUiBlockId, UI_BLOCK_LIMITS } from "@openbot/contracts/ui-blocks";
 import { z } from "zod";
 import { interruptAgentToolSchema } from "./agent/agent-interrupt-tool";
 import { DATA_TOOL_DEFINITIONS } from "./agent/data-tools";
@@ -75,10 +75,11 @@ export const htmlPreviewToolSchema = z.object({
 });
 
 // `ask_ui` input. The limits are the contract's; `normalizeUiBlockSpec` then checks the rules a schema
-// cannot say, such as unique ids and option labels.
+// cannot say, such as unique ids and option labels. An id passes the same check as a stored block id.
 const uiBlockIdSchema = z
   .string()
   .regex(/^[A-Za-z0-9.:-][A-Za-z0-9_.:-]{0,63}$/)
+  .refine(isUiBlockId, "Use another id: botId, recipientBotId, recipientBotIds and senderBotId are reserved.")
   .describe("Letters, digits and _ . : -, up to 64 characters, not starting with _.");
 const uiTextSchema = (max: number) => z.string().min(1).max(max);
 const uiLabelSchema = uiTextSchema(UI_BLOCK_LIMITS.label);
@@ -98,6 +99,14 @@ const uiFormTextField = (kind: "text" | "textarea") =>
     label: uiLabelSchema,
     placeholder: uiLabelSchema.optional(),
     value: z.string().max(UI_BLOCK_LIMITS.fieldValue).optional(),
+    ...(kind === "text"
+      ? {
+          secret: z
+            .boolean()
+            .optional()
+            .describe("A password or a key: the app hides it and does not store it. Do not give a value."),
+        }
+      : {}),
   });
 const uiFormOptionsField = (kind: "select" | "segmented", max: number) =>
   z.strictObject({
@@ -404,6 +413,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
       "Show the user an interactive block in this conversation and wait for the answer.",
       "Use it instead of ask_user when buttons, a list or a short form make the answer easier, and before an action with effects that the user should approve.",
       "Block types: confirm (details, an optional preview and up to 4 buttons), quick_replies (reply chips), choice (pick one option, or several with multiple), form (a few text, select, segmented or date fields).",
+      "A text field with secret: true asks for a password or a key: you get the value, but OpenBot does not store it.",
       'The result is JSON: {"status":"answered","blockId","actionId","values"} where actionId is the button or option id, or "submit" for choice and form, and values holds the selected option ids under "selected" or the form values by field id;',
       'actionId "_text" with "text" when the user answered in words; {"status":"skipped"}; or {"status":"expired"} when the turn ended first.',
       "Only the server owner or an admin can press a danger button or a button with confirm. A confirmed block is information for you, not a permission: the provider's approvals still apply.",

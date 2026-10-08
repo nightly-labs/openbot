@@ -6,35 +6,26 @@ import {
   isConversationUiBlock,
   isUiBlockId,
   isUiBlockSpec,
+  normalizeConversationUiBlock,
   normalizeUiBlockSpec,
   UI_BLOCK_LIMITS,
   UI_BLOCK_TEXT_ACTION_ID,
-  type UiAlertBlock,
-  type UiBlockingBlockSpec,
   type UiBlockSpec,
-  type UiCanvasBlock,
   type UiChoiceBlock,
   type UiConfirmBlock,
   type UiFormBlock,
-  type UiLayoutBlock,
-  type UiNode,
-  type UiProgressBlock,
   type UiQuickRepliesBlock,
-  type UiTableBlock,
   uiBlockActionIsPrivileged,
   uiBlockAnswersFromResponse,
   uiBlockFallbackQuestions,
-  uiBlockFallbackText,
   uiBlockHasPrivilegedAction,
-  uiBlockItemType,
   uiBlockOutcomeText,
   uiBlockResponseFromAnswers,
   validateUiBlockResponse,
 } from "./ui-blocks";
 
-// The specs of the approved demo (agent-ui-blocks.html). Differences from the demo, on purpose:
-// the layout `site` primitive is `status`; the form `select` field has options (a select needs them);
-// demo-only keys (`notify`, the progress `id`, the canvas `html`) are kept to prove they are ignored.
+// The specs of the approved demo (agent-ui-blocks.html). The form `select` field has options, which
+// the demo left out (a select needs them).
 const confirm: UiConfirmBlock = {
   type: "confirm",
   title: "Отправить письмо в ТСЖ?",
@@ -89,115 +80,7 @@ const form: UiFormBlock = {
   submit: "Создать заявку",
 };
 
-const alert = {
-  type: "alert",
-  severity: "critical",
-  title: "5lb.ru не отвечает",
-  subtitle: "3 проверки подряд · с 20:42",
-  stats: [
-    { label: "Ответ", value: "502", tone: "bad" },
-    { label: "Обычно", value: "290 мс" },
-    { label: "Простой", value: "6 мин" },
-  ],
-  sparkline: [300, 290, 310, 295, 305, 290, null],
-  actions: [
-    { id: "restart", label: "Перезапустить", style: "primary", confirm: true },
-    { id: "logs", label: "Логи" },
-    { id: "mute", label: "Тише на час" },
-    { id: "ack", label: "Я разберусь", style: "ghost" },
-  ],
-  notify: "push",
-};
-
-const progress = {
-  type: "progress",
-  id: "export-sept",
-  title: "Выгрузка чеков за сентябрь",
-  steps: [
-    { label: "Подключение к 1С", state: "done" },
-    { label: "Сверка возвратов", state: "running" },
-    { label: "Отчёт в таблицу", state: "todo" },
-  ],
-  actions: [{ id: "stop", label: "Остановить", style: "danger" }],
-};
-
-const table: UiTableBlock = {
-  type: "table",
-  title: "Счета, которые ждут оплаты",
-  columns: ["Кому", "За что", "Срок", { label: "Сумма", align: "right" }],
-  rows: [
-    { id: "tw", cells: ["Timeweb", "Хостинг 5lb.ru", "12 окт", "2 490 ₽"] },
-    { id: "cf", cells: ["Cloudflare", "Домен | mda.ru", "15 окт", "1 100 ₽"] },
-  ],
-  rowAction: { id: "paid", label: "Оплачено" },
-};
-
-const layout: UiLayoutBlock = {
-  type: "layout",
-  root: {
-    type: "column",
-    children: [
-      {
-        type: "row",
-        justify: "between",
-        children: [
-          {
-            type: "column",
-            gap: 2,
-            children: [
-              { type: "heading", text: "Сайты и сервисы" },
-              { type: "muted", text: "Проверка каждые 5 минут · обновлено 20:52" },
-            ],
-          },
-          { type: "pill", tone: "bad", text: "1 не отвечает" },
-        ],
-      },
-      { type: "segmented", id: "group", options: ["Сайты", "ПК", "Связи ботов"], value: "Сайты" },
-      {
-        type: "grid",
-        children: [
-          { type: "status", name: "5lb.ru", status: "down", value: "502 · 6 мин" },
-          { type: "status", name: "shop.5lb.ru", status: "ok", value: "280 мс · 99,98%" },
-          { type: "status", name: "crm.5lb.ru", status: "warn", value: "1 840 мс · медленно" },
-        ],
-      },
-      { type: "divider" },
-      { type: "switch", id: "night", label: "Будить ночью, если сайт упал", value: false },
-      { type: "switch", id: "slow", label: "Сообщать о медленных ответах", value: true },
-      {
-        type: "slider",
-        id: "limit",
-        label: "Медленно — это дольше",
-        min: 500,
-        max: 5000,
-        step: 100,
-        value: 1500,
-        unit: "мс",
-      },
-      {
-        type: "row",
-        children: [
-          { type: "button", id: "save", label: "Сохранить", style: "primary" },
-          { type: "button", id: "check", label: "Проверить сейчас" },
-        ],
-      },
-    ],
-  },
-};
-
-const canvas = { type: "canvas", title: "Письма по часам", height: 312, html: "<!doctype html>… код агента …" };
-
-const DEMO_SPECS = {
-  confirm,
-  quickReplies,
-  choice,
-  form,
-  alert,
-  progress,
-  table,
-  layout,
-  canvas,
-};
+const DEMO_SPECS = { confirm, quickReplies, choice, form };
 
 function spec<T extends UiBlockSpec>(value: unknown): T {
   const normalized = normalizeUiBlockSpec(value);
@@ -206,26 +89,18 @@ function spec<T extends UiBlockSpec>(value: unknown): T {
   return normalized as T;
 }
 
-function nest(depth: number): UiNode {
-  return depth <= 1 ? { type: "text", text: "leaf" } : { type: "column", children: [nest(depth - 1)] };
-}
-
 describe("ui block specs", () => {
   it.each(Object.entries(DEMO_SPECS))("accepts the demo %s block", (_, value) => {
     expect(isUiBlockSpec(value)).toBe(true);
   });
 
   it("drops keys it does not know", () => {
-    expect(normalizeUiBlockSpec(alert)).not.toHaveProperty("notify");
-    expect(normalizeUiBlockSpec(progress)).not.toHaveProperty("id");
-    expect(normalizeUiBlockSpec(canvas)).toEqual({ type: "canvas", title: "Письма по часам", height: 312 });
-    expect(normalizeUiBlockSpec(confirm)).toEqual(confirm);
-    expect(normalizeUiBlockSpec(layout)).toEqual(layout);
+    expect(normalizeUiBlockSpec({ ...confirm, notify: "push" })).toEqual(confirm);
   });
 
-  it("rejects an unknown type and the old site primitive", () => {
+  it("rejects an unknown type and a display block", () => {
     expect(isUiBlockSpec({ ...confirm, type: "dialog" })).toBe(false);
-    expect(isUiBlockSpec({ type: "layout", root: { type: "site", name: "a", status: "ok" } })).toBe(false);
+    expect(isUiBlockSpec({ type: "alert", severity: "info", title: "Not here yet" })).toBe(false);
     expect(isUiBlockSpec(null)).toBe(false);
     expect(isUiBlockSpec([confirm])).toBe(false);
   });
@@ -237,20 +112,15 @@ describe("ui block specs", () => {
     expect(isUiBlockSpec({ ...confirm, actions: [{ id: "a", label: "A", style: "neon" }] })).toBe(false);
     expect(isUiBlockSpec({ ...confirm, confirmHold: 100 })).toBe(false);
     expect(isUiBlockSpec({ ...confirm, confirmHold: 5_000 })).toBe(false);
-    expect(isUiBlockSpec({ ...alert, severity: "fatal" })).toBe(false);
-    expect(isUiBlockSpec({ ...alert, sparkline: [1, Number.NaN] })).toBe(false);
-    expect(isUiBlockSpec({ ...table, rows: [{ id: "x", cells: ["one"] }] })).toBe(false);
-    expect(isUiBlockSpec({ ...progress, percent: 101 })).toBe(false);
-    expect(isUiBlockSpec({ ...progress, steps: [{ label: "a", state: "paused" }] })).toBe(false);
     expect(isUiBlockSpec({ ...form, fields: [{ id: "d", kind: "date", label: "D", value: "2026-02-30" }] })).toBe(
       false,
     );
     expect(isUiBlockSpec({ ...form, fields: [{ id: "s", kind: "select", label: "S", options: [] }] })).toBe(false);
     expect(isUiBlockSpec({ ...form, fields: [{ id: "s", kind: "select", options: ["a"], value: "b" }] })).toBe(false);
-    expect(isUiBlockSpec({ type: "layout", root: { type: "slider", id: "s", label: "S", min: 5, max: 1 } })).toBe(
+    expect(isUiBlockSpec({ ...form, fields: [{ id: "p", kind: "textarea", label: "P", secret: true }] })).toBe(false);
+    expect(isUiBlockSpec({ ...form, fields: [{ id: "p", kind: "text", label: "P", secret: true, value: "x" }] })).toBe(
       false,
     );
-    expect(isUiBlockSpec({ ...canvas, height: 10 })).toBe(false);
   });
 
   it("rejects duplicate ids and option labels", () => {
@@ -265,19 +135,6 @@ describe("ui block specs", () => {
       }),
     ).toBe(false);
     expect(isUiBlockSpec({ ...form, fields: [form.fields[0], form.fields[0]] })).toBe(false);
-    expect(isUiBlockSpec({ ...table, rows: [table.rows[0], table.rows[0]] })).toBe(false);
-    expect(
-      isUiBlockSpec({
-        type: "layout",
-        root: {
-          type: "row",
-          children: [
-            { type: "switch", id: "x", label: "X" },
-            { type: "button", id: "x", label: "Go" },
-          ],
-        },
-      }),
-    ).toBe(false);
     expect(isUiBlockSpec({ ...choice, multiple: false })).toBe(true);
     expect(
       isUiBlockSpec({
@@ -308,36 +165,13 @@ describe("ui block specs", () => {
     expect(isUiBlockSpec({ ...choice, options: many(UI_BLOCK_LIMITS.choiceOptions + 1) })).toBe(false);
     expect(isUiBlockSpec({ ...confirm, title: "x".repeat(UI_BLOCK_LIMITS.title + 1) })).toBe(false);
     expect(isUiBlockSpec({ ...confirm, preview: "x".repeat(UI_BLOCK_LIMITS.preview + 1) })).toBe(false);
-    const rows = Array.from({ length: UI_BLOCK_LIMITS.tableRows + 1 }, (_, index) => ({
-      id: `r${index}`,
-      cells: ["a", "b", "c", "d"],
-    }));
-    expect(isUiBlockSpec({ ...table, rows })).toBe(false);
     // The JSON limit holds even when each field is within its own limit.
-    expect(isUiBlockSpec({ ...canvas, html: "x".repeat(UI_BLOCK_LIMITS.specJson) })).toBe(false);
-  });
-
-  it("bounds the layout depth and node count", () => {
-    expect(isUiBlockSpec({ type: "layout", root: nest(UI_BLOCK_LIMITS.layoutDepth) })).toBe(true);
-    expect(isUiBlockSpec({ type: "layout", root: nest(UI_BLOCK_LIMITS.layoutDepth + 1) })).toBe(false);
-    const leaves = (count: number): UiNode => ({
-      type: "column",
-      children: Array.from({ length: count }, () => ({ type: "divider" }) as const),
-    });
-    expect(isUiBlockSpec({ type: "layout", root: leaves(UI_BLOCK_LIMITS.layoutNodes - 1) })).toBe(true);
-    expect(isUiBlockSpec({ type: "layout", root: leaves(UI_BLOCK_LIMITS.layoutNodes) })).toBe(false);
-  });
-
-  it("names the item type of a display block", () => {
-    expect(uiBlockItemType("progress")).toBe("ui-block:progress");
+    expect(isUiBlockSpec({ ...confirm, notes: "x".repeat(UI_BLOCK_LIMITS.specJson) })).toBe(false);
   });
 });
 
 describe("ui block responses", () => {
   const confirmSpec = spec<UiConfirmBlock>(confirm);
-  const alertSpec = spec<UiAlertBlock>(alert);
-  const progressSpec = spec<UiProgressBlock>(progress);
-  const canvasSpec = spec<UiCanvasBlock>(canvas);
 
   it("accepts a response for every block", () => {
     expect(
@@ -357,19 +191,13 @@ describe("ui block responses", () => {
         values: { what: "Нет отопления", urgency: "Высокая", due: "2026-10-09", to: "Сантехник", note: "" },
       }),
     ).not.toBeNull();
-    expect(validateUiBlockResponse(alertSpec, { actionId: "restart", approved: true })).not.toBeNull();
-    expect(validateUiBlockResponse(table, { actionId: "paid", rowId: "tw" })).not.toBeNull();
-    expect(validateUiBlockResponse(progressSpec, { actionId: "stop" })).not.toBeNull();
-    expect(
-      validateUiBlockResponse(layout, { actionId: "save", values: { group: "ПК", night: true, limit: 2000 } }),
-    ).not.toBeNull();
-    expect(
-      validateUiBlockResponse(canvasSpec, { actionId: "pick", values: { hour: 14, tags: ["a", "b"], ok: true } }),
-    ).not.toBeNull();
   });
 
   it("drops keys it does not know", () => {
-    expect(validateUiBlockResponse(alertSpec, { actionId: "logs", extra: 1 })).toEqual({ actionId: "logs" });
+    expect(validateUiBlockResponse(confirmSpec, { actionId: "edit", extra: 1, approved: true })).toEqual({
+      actionId: "edit",
+      approved: true,
+    });
   });
 
   it("rejects unknown ids", () => {
@@ -378,11 +206,6 @@ describe("ui block responses", () => {
     expect(validateUiBlockResponse(quickReplies, { actionId: "never" })).toBeNull();
     expect(validateUiBlockResponse(choice, { actionId: "submit", values: { selected: ["nobody"] } })).toBeNull();
     expect(validateUiBlockResponse(form, { actionId: "submit", values: { what: "x", extra: "y" } })).toBeNull();
-    expect(validateUiBlockResponse(table, { actionId: "paid", rowId: "nope" })).toBeNull();
-    expect(validateUiBlockResponse(table, { actionId: "paid" })).toBeNull();
-    expect(validateUiBlockResponse(alertSpec, { actionId: "logs", rowId: "tw" })).toBeNull();
-    expect(validateUiBlockResponse(layout, { actionId: "save", values: { unknown: 1 } })).toBeNull();
-    expect(validateUiBlockResponse(layout, { actionId: "group" })).toBeNull();
   });
 
   it("rejects values of the wrong kind", () => {
@@ -398,20 +221,14 @@ describe("ui block responses", () => {
     expect(validateUiBlockResponse(form, { actionId: "submit", values: { urgency: "Высокая" } })).toBeNull();
     expect(validateUiBlockResponse(form, { actionId: "submit", values: { what: "x", due: "09.10.2026" } })).toBeNull();
     expect(validateUiBlockResponse(form, { actionId: "submit", values: { what: "x", urgency: "Никогда" } })).toBeNull();
-    expect(validateUiBlockResponse(layout, { actionId: "save", values: { limit: 9000 } })).toBeNull();
-    expect(validateUiBlockResponse(layout, { actionId: "save", values: { night: "yes" } })).toBeNull();
-    expect(validateUiBlockResponse(alertSpec, { actionId: "logs", values: { a: "b" } })).toBeNull();
-    expect(validateUiBlockResponse(canvasSpec, { actionId: "pick", values: { nested: { a: 1 } } })).toBeNull();
   });
 
-  it("takes words only for a blocking block", () => {
+  it("takes words with text only", () => {
     expect(
       validateUiBlockResponse(confirmSpec, { actionId: UI_BLOCK_TEXT_ACTION_ID, text: "Пока нет" }),
     ).not.toBeNull();
     expect(validateUiBlockResponse(confirmSpec, { actionId: UI_BLOCK_TEXT_ACTION_ID })).toBeNull();
-    expect(validateUiBlockResponse(alertSpec, { actionId: UI_BLOCK_TEXT_ACTION_ID, text: "ok" })).toBeNull();
-    expect(validateUiBlockResponse(canvasSpec, { actionId: UI_BLOCK_TEXT_ACTION_ID, text: "ok" })).toBeNull();
-    expect(validateUiBlockResponse(alertSpec, { actionId: "logs", text: "ok" })).toBeNull();
+    expect(validateUiBlockResponse(confirmSpec, { actionId: "edit", text: "ok" })).toBeNull();
   });
 
   it("bounds the response size", () => {
@@ -421,33 +238,34 @@ describe("ui block responses", () => {
         values: { what: "x".repeat(UI_BLOCK_LIMITS.fieldValue + 1) },
       }),
     ).toBeNull();
-    const values = Object.fromEntries(
-      Array.from({ length: UI_BLOCK_LIMITS.canvasValues }, (_, index) => [`k${index}`, "x".repeat(1_000)]),
-    );
-    expect(validateUiBlockResponse(canvasSpec, { actionId: "pick", values })).toBeNull();
+    const fields = Array.from({ length: 3 }, (_, index) => ({
+      id: `f${index}`,
+      kind: "textarea" as const,
+      label: "F",
+    }));
+    const values = Object.fromEntries(fields.map((field) => [field.id, "x".repeat(UI_BLOCK_LIMITS.fieldValue)]));
+    expect(validateUiBlockResponse({ ...form, fields }, { actionId: "submit", values })).toBeNull();
   });
 
   it("marks danger and confirm actions as privileged", () => {
     expect(uiBlockActionIsPrivileged(confirmSpec, "send")).toBe(true);
     expect(uiBlockActionIsPrivileged(confirmSpec, "cancel")).toBe(false);
     expect(uiBlockActionIsPrivileged({ ...confirmSpec, danger: false }, "send")).toBe(false);
-    expect(uiBlockActionIsPrivileged(alertSpec, "restart")).toBe(true);
-    expect(uiBlockActionIsPrivileged(alertSpec, "logs")).toBe(false);
-    expect(uiBlockActionIsPrivileged(progressSpec, "stop")).toBe(true);
-    expect(uiBlockActionIsPrivileged(layout, "save")).toBe(false);
-    expect(uiBlockActionIsPrivileged(table, "paid")).toBe(false);
+    expect(
+      uiBlockActionIsPrivileged({ ...confirmSpec, actions: [{ id: "go", label: "Go", confirm: true }] }, "go"),
+    ).toBe(true);
+    expect(uiBlockActionIsPrivileged(quickReplies, "skip")).toBe(false);
   });
 
   it("tells whether a block has a privileged action", () => {
     expect(uiBlockHasPrivilegedAction(confirmSpec)).toBe(true);
     expect(uiBlockHasPrivilegedAction({ ...confirmSpec, danger: false })).toBe(false);
     expect(uiBlockHasPrivilegedAction(choice)).toBe(false);
-    expect(uiBlockHasPrivilegedAction(alertSpec)).toBe(true);
   });
 });
 
 describe("ui block fallbacks", () => {
-  const blocking: UiBlockingBlockSpec[] = [spec(confirm), quickReplies, choice, form];
+  const blocking: UiBlockSpec[] = [spec(confirm), quickReplies, choice, form];
 
   it.each(blocking.map((block) => [block.type, block] as const))(
     "turns a %s block into valid prompt questions",
@@ -565,7 +383,7 @@ describe("ui block fallbacks", () => {
   });
 
   it("round-trips a response through the prompt answers", () => {
-    const cases: Array<[UiBlockingBlockSpec, unknown]> = [
+    const cases: Array<[UiBlockSpec, unknown]> = [
       [spec(confirm), { actionId: "send", values: { from: "nekitterekhin@gmail.com" } }],
       [quickReplies, { actionId: "task" }],
       [quickReplies, { actionId: UI_BLOCK_TEXT_ACTION_ID, text: "Позвони мне" }],
@@ -584,27 +402,6 @@ describe("ui block fallbacks", () => {
     }
   });
 
-  it("writes display blocks as readable text", () => {
-    const alertText = uiBlockFallbackText(spec(alert));
-    expect(alertText).toContain("**Critical: 5lb.ru не отвечает**");
-    expect(alertText).toContain("- Ответ: 502");
-    expect(alertText).toContain("Actions: Перезапустить · Логи · Тише на час · Я разберусь");
-    const tableText = uiBlockFallbackText(table);
-    expect(tableText).toContain("| Кому | За что | Срок | Сумма |");
-    expect(tableText).toContain("| --- | --- | --- | ---: |");
-    expect(tableText).toContain("Домен \\| mda.ru");
-    const progressText = uiBlockFallbackText(spec(progress));
-    expect(progressText).toContain("- [x] Подключение к 1С");
-    expect(progressText).toContain("- [ ] Сверка возвратов (running)");
-    const layoutText = uiBlockFallbackText(layout);
-    expect(layoutText).toContain("**Сайты и сервисы**");
-    expect(layoutText).toContain("- 5lb.ru: down · 502 · 6 мин");
-    expect(layoutText).toContain("- Медленно — это дольше: 1500 мс");
-    expect(layoutText).toContain("Actions: Сохранить · Проверить сейчас");
-    expect(uiBlockFallbackText(spec(canvas))).toContain("Письма по часам");
-    for (const value of Object.values(DEMO_SPECS)) expect(uiBlockFallbackText(spec(value)).trim()).not.toBe("");
-  });
-
   it("describes the outcome of a response", () => {
     expect(uiBlockOutcomeText(spec(confirm), { actionId: "send", values: { from: "a@b.c" } })).toBe(
       "Отправить · a@b.c",
@@ -612,9 +409,12 @@ describe("ui block fallbacks", () => {
     expect(uiBlockOutcomeText(choice, { actionId: "submit", values: { selected: ["protein90", "vvo"] } })).toBe(
       "Покупали протеин за 90 дней, Только Владивосток",
     );
-    expect(uiBlockOutcomeText(table, { actionId: "paid", rowId: "tw" })).toBe("Оплачено: Timeweb");
     expect(uiBlockOutcomeText(form, { actionId: "submit", values: { what: "Кран", urgency: "Высокая" } })).toBe(
-      "Что случилось: Кран; urgency: Высокая",
+      "Что случилось: Кран, urgency: Высокая",
+    );
+    const list = (items: readonly string[]) => items.join(" и ");
+    expect(uiBlockOutcomeText(choice, { actionId: "submit", values: { selected: ["sleeping", "vvo"] } }, list)).toBe(
+      "Спящие клиенты и Только Владивосток",
     );
   });
 });
@@ -634,19 +434,11 @@ describe("conversation ui blocks", () => {
     },
   };
 
-  it("accepts a pending, an answered and a logged block", () => {
+  it("accepts a pending, an answered, an expired and a closed block", () => {
     expect(isConversationUiBlock({ version: 1, blockId: "b1", spec: quickReplies, state: { status: "pending" } })).toBe(
       true,
     );
     expect(isConversationUiBlock(answered)).toBe(true);
-    expect(
-      isConversationUiBlock({
-        version: 1,
-        blockId: "bills",
-        spec: table,
-        state: { status: "pending", log: [{ actionId: "paid", rowId: "tw", at: "2026-10-08T10:00:00Z", by: sender }] },
-      }),
-    ).toBe(true);
     for (const status of ["expired", "closed"]) {
       expect(isConversationUiBlock({ ...answered, state: { status } })).toBe(true);
     }
@@ -655,6 +447,9 @@ describe("conversation ui blocks", () => {
   it("fails closed on a broken block", () => {
     expect(isConversationUiBlock({ ...answered, version: 2 })).toBe(false);
     expect(isConversationUiBlock({ ...answered, blockId: "" })).toBe(false);
+    for (const blockId of ["botId", "recipientBotId", "recipientBotIds", "senderBotId", "_text"]) {
+      expect(isConversationUiBlock({ ...answered, blockId })).toBe(false);
+    }
     expect(isConversationUiBlock({ ...answered, spec: { ...confirm, type: "nope" } })).toBe(false);
     expect(isConversationUiBlock({ ...answered, state: { status: "open" } })).toBe(false);
     expect(isConversationUiBlock({ ...answered, state: { status: "answered" } })).toBe(false);
@@ -662,26 +457,56 @@ describe("conversation ui blocks", () => {
       false,
     );
     expect(isConversationUiBlock({ ...answered, state: { ...answered.state, respondedBy: { id: "" } } })).toBe(false);
-    expect(
-      isConversationUiBlock({
-        ...answered,
-        state: { status: "pending", log: [{ actionId: "send", at: "2026-10-08T10:00:00Z" }] },
-      }),
-    ).toBe(false);
-    expect(
-      isConversationUiBlock({
-        version: 1,
-        blockId: "bills",
-        spec: table,
-        state: {
-          status: "pending",
-          log: Array.from({ length: UI_BLOCK_LIMITS.actionLog + 1 }, () => ({
-            actionId: "paid",
-            rowId: "tw",
-            at: "t",
-          })),
-        },
-      }),
-    ).toBe(false);
+  });
+});
+
+describe("secret form fields", () => {
+  const login: UiFormBlock = {
+    type: "form",
+    title: "Вход в 1С",
+    fields: [
+      { id: "user", kind: "text", label: "Логин", required: true },
+      { id: "password", kind: "text", label: "Пароль", required: true, secret: true },
+    ],
+  };
+  const response = { actionId: "submit", values: { user: "admin", password: "hunter2" } };
+
+  it("asks a secret field as a secret question", () => {
+    expect(uiBlockFallbackQuestions(login).map((item) => item.isSecret)).toEqual([false, true]);
+  });
+
+  it("gives the agent the value but never stores it", () => {
+    expect(validateUiBlockResponse(login, response)).toEqual(response);
+    expect(validateUiBlockResponse(login, { actionId: "submit", values: { user: "admin" } })).toBeNull();
+    const stored = normalizeConversationUiBlock({
+      version: 1,
+      blockId: "login",
+      spec: login,
+      state: { status: "answered", response, outcome: uiBlockOutcomeText(login, response) },
+    });
+    expect(stored?.state).toEqual({
+      status: "answered",
+      response: { actionId: "submit", values: { user: "admin" } },
+      outcome: "Логин: admin",
+    });
+    expect(JSON.stringify(stored)).not.toContain("hunter2");
+  });
+
+  it("keeps a secret answer out of an answer in words", () => {
+    const answer = uiBlockResponseFromAnswers(
+      { ...login, fields: [...login.fields, { id: "db", kind: "select", label: "База", options: ["ut"] }] },
+      {
+        user: ["admin"],
+        password: ["hunter2"],
+        db: ["other"],
+      },
+    );
+    expect(answer?.actionId).toBe(UI_BLOCK_TEXT_ACTION_ID);
+    expect(answer?.text).not.toContain("hunter2");
+    const only: UiFormBlock = { ...login, fields: [{ id: "password", kind: "text", label: "Пароль", secret: true }] };
+    expect(uiBlockResponseFromAnswers(only, { password: ["hunter2"] })).toEqual({
+      actionId: "submit",
+      values: { password: "hunter2" },
+    });
   });
 });

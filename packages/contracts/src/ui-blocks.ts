@@ -6,27 +6,19 @@ import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isOneOf, isSt
 /**
  * Interactive blocks an agent puts in a conversation.
  *
- * An agent draws a block with one of two OpenBot tools:
- * - `ask_ui` waits for the answer. Its block types are the *blocking* ones (`confirm`,
- *   `quick_replies`, `choice`, `form`). The block is stored as an ordinary `question_prompt` message:
- *   `questionPrompt` holds the questions from `uiBlockFallbackQuestions`, and `uiBlock` sits beside
- *   it. A client that does not know `uiBlock` answers the questions; the answer comes back through
- *   the released `respondToPrompt` route and `uiBlockResponseFromAnswers` reads it.
- * - `show_ui` does not wait. Its block types are the *display* ones (`alert`, `table`, `progress`,
- *   `layout`, `canvas`). The message has `itemType` `uiBlockItemType(type)`, its `text` is
- *   `uiBlockFallbackText(spec)`, and a later call with the same `blockId` updates it in place.
+ * An agent draws a block with the OpenBot tool `ask_ui` and waits for the answer. The block types are
+ * `confirm`, `quick_replies`, `choice` and `form`. The block is stored as an ordinary `question_prompt`
+ * message: `questionPrompt` holds the questions from `uiBlockFallbackQuestions`, and `uiBlock` sits
+ * beside it. A client that does not know `uiBlock` answers the questions; the answer comes back
+ * through the released `respondToPrompt` route and `uiBlockResponseFromAnswers` reads it.
  *
  * Every field is plain text. No field is HTML, and no renderer may read one as HTML or Markdown,
- * except that `confirm.preview` may go through the app's safe Markdown renderer. A canvas keeps its
- * HTML in a message attachment, never in the spec.
+ * except that `confirm.preview` may go through the app's safe Markdown renderer.
  *
  * No key in a spec, a response or a state starts with `bot`: the legacy message read renames such
  * keys anywhere in the stored tree. For the same reason an id a response uses as a record key may
  * not be one of those legacy names (see `isUiBlockId`).
  */
-
-/** The `itemType` prefix of a display block's message. A blocking block's message is `question_prompt`. */
-export const UI_BLOCK_ITEM_TYPE_PREFIX = "ui-block:";
 
 /** The version of `ConversationUiBlock`. A reader rejects any other. */
 export const UI_BLOCK_VERSION = 1;
@@ -38,7 +30,6 @@ export const UI_BLOCK_LIMITS = {
   responseJson: 16_000,
   id: 64,
   title: 200,
-  subtitle: 300,
   label: 120,
   meta: 60,
   text: 2_000,
@@ -53,24 +44,8 @@ export const UI_BLOCK_LIMITS = {
   formFields: 20,
   selectOptions: 50,
   segmentedOptions: 6,
-  stats: 6,
-  sparkline: 120,
-  tableColumns: 8,
-  tableRows: 50,
-  cell: 200,
-  progressSteps: 20,
-  layoutNodes: 200,
-  layoutDepth: 6,
-  layoutGap: 48,
-  gridColumns: 4,
-  canvasMinHeight: 120,
-  canvasMaxHeight: 1_200,
-  /** Values one canvas response carries. */
-  canvasValues: 20,
   holdMinMs: 400,
   holdMaxMs: 3_000,
-  /** Actions kept in a display block's `state.log`, newest last. */
-  actionLog: 20,
   timestamp: 160,
 } as const;
 
@@ -80,7 +55,7 @@ export const UI_BLOCK_ID_PATTERN = /^[A-Za-z0-9_.:-]{1,64}$/u;
 /** `actionId` of the submit button of a `choice` or a `form`. */
 export const UI_BLOCK_SUBMIT_ACTION_ID = "submit";
 /**
- * `actionId` of an answer in words to a blocking block: a `quick_replies` free-text reply, or the
+ * `actionId` of an answer in words: a `quick_replies` free-text reply, or the
  * answer of a client that only saw the fallback questions and typed something the block cannot read.
  * The words are in `UiBlockResponse.text`.
  */
@@ -100,9 +75,6 @@ const LEGACY_KEY_IDS: ReadonlySet<string> = new Set(["botId", "recipientBotId", 
 
 // ---------------------------------------------------------------------------------------------------
 // Types
-
-export type UiTone = "neutral" | "good" | "warn" | "bad";
-export const UI_TONES = ["neutral", "good", "warn", "bad"] as const satisfies readonly UiTone[];
 
 /** The look of a button. Only these; an agent cannot style a block any other way. */
 export type UiActionStyle = "primary" | "secondary" | "ghost" | "danger";
@@ -191,6 +163,12 @@ export interface UiFormTextField {
   required?: boolean;
   placeholder?: string;
   value?: string;
+  /**
+   * Only on a `text` field, and only without `value`. The app draws a password box. The agent gets the
+   * value, but OpenBot does not store it: the stored response, the outcome and the fallback question
+   * resolution leave it out.
+   */
+  secret?: boolean;
 }
 
 export interface UiFormOptionsField {
@@ -224,208 +202,12 @@ export interface UiFormBlock {
   submit?: string;
 }
 
-export type UiAlertSeverity = "info" | "warning" | "critical" | "success";
-export const UI_ALERT_SEVERITIES = [
-  "info",
-  "warning",
-  "critical",
-  "success",
-] as const satisfies readonly UiAlertSeverity[];
-
-export interface UiStat {
-  label: string;
-  value: string;
-  tone?: UiTone;
-}
-
-/** Display. Something happened: a title, a few numbers, a sparkline, buttons. */
-export interface UiAlertBlock {
-  type: "alert";
-  severity: UiAlertSeverity;
-  title: string;
-  subtitle?: string;
-  stats?: UiStat[];
-  /** Finite numbers; `null` is a gap. */
-  sparkline?: Array<number | null>;
-  actions?: UiAction[];
-}
-
-export type UiTableColumn = string | { label: string; align?: "left" | "right" };
-
-export interface UiTableRow {
-  id: string;
-  /** One cell per column. */
-  cells: string[];
-}
-
-/** Display. A table; `rowAction` puts the same button on every row. */
-export interface UiTableBlock {
-  type: "table";
-  title: string;
-  columns: UiTableColumn[];
-  rows: UiTableRow[];
-  rowAction?: UiOption;
-}
-
-export type UiProgressStepState = "todo" | "running" | "done" | "failed";
-export const UI_PROGRESS_STEP_STATES = [
-  "todo",
-  "running",
-  "done",
-  "failed",
-] as const satisfies readonly UiProgressStepState[];
-
-export interface UiProgressStep {
-  label: string;
-  state: UiProgressStepState;
-}
-
-/** Display. Steps of a long job; the agent updates it by `blockId`. */
-export interface UiProgressBlock {
-  type: "progress";
-  title: string;
-  steps: UiProgressStep[];
-  /** 0 to 100. */
-  percent?: number;
-  actions?: UiAction[];
-}
-
-export type UiLayoutJustify = "start" | "between" | "end";
-
-export interface UiStackNode {
-  type: "column" | "row";
-  /** In px, 0 to `layoutGap`. */
-  gap?: number;
-  justify?: UiLayoutJustify;
-  children: UiNode[];
-}
-
-export interface UiGridNode {
-  type: "grid";
-  /** 1 to `gridColumns`; absent lets the client choose. */
-  columns?: number;
-  children: UiNode[];
-}
-
-export interface UiTextNode {
-  type: "heading" | "text" | "muted";
-  text: string;
-}
-
-export interface UiPillNode {
-  type: "pill";
-  text: string;
-  tone?: UiTone;
-}
-
-export interface UiDividerNode {
-  type: "divider";
-}
-
-export type UiStatusLevel = "ok" | "warn" | "down";
-export const UI_STATUS_LEVELS = ["ok", "warn", "down"] as const satisfies readonly UiStatusLevel[];
-
-/** A status card: a name, a light, a short value, such as a site and its response time. */
-export interface UiStatusNode {
-  type: "status";
-  name: string;
-  status: UiStatusLevel;
-  value?: string;
-}
-
-/** An input. Its value is a string, one of `options`. */
-export interface UiSegmentedNode {
-  type: "segmented";
-  id: string;
-  label?: string;
-  options: string[];
-  value?: string;
-}
-
-/** An input. Its value is a boolean. */
-export interface UiSwitchNode {
-  type: "switch";
-  id: string;
-  label: string;
-  value?: boolean;
-}
-
-/** An input. Its value is a number in `min`..`max`. */
-export interface UiSliderNode {
-  type: "slider";
-  id: string;
-  label: string;
-  min: number;
-  max: number;
-  step?: number;
-  value?: number;
-  unit?: string;
-}
-
-/** A button. Pressing it sends `{ actionId: id, values }` with the value of every input of the layout. */
-export interface UiButtonNode {
-  type: "button";
-  id: string;
-  label: string;
-  style?: UiActionStyle;
-  confirm?: boolean;
-}
-
-export type UiNode =
-  | UiStackNode
-  | UiGridNode
-  | UiTextNode
-  | UiPillNode
-  | UiDividerNode
-  | UiStatusNode
-  | UiSegmentedNode
-  | UiSwitchNode
-  | UiSliderNode
-  | UiButtonNode;
-
-export type UiNodeType = UiNode["type"];
-
-/** Display. A panel built from primitives. Input and button ids share one namespace. */
-export interface UiLayoutBlock {
-  type: "layout";
-  title?: string;
-  root: UiNode;
-}
-
-/**
- * Display. An agent-written page in a sandboxed frame with no network. The HTML is a message
- * attachment, not part of the spec. A response carries what the page sent.
- */
-export interface UiCanvasBlock {
-  type: "canvas";
-  title: string;
-  /** In px, `canvasMinHeight`..`canvasMaxHeight`. */
-  height?: number;
-  /** The page may send one response; then the block is answered. */
-  once?: boolean;
-}
-
-export type UiBlockingBlockSpec = UiConfirmBlock | UiQuickRepliesBlock | UiChoiceBlock | UiFormBlock;
-export type UiDisplayBlockSpec = UiAlertBlock | UiTableBlock | UiProgressBlock | UiLayoutBlock | UiCanvasBlock;
-export type UiBlockSpec = UiBlockingBlockSpec | UiDisplayBlockSpec;
+export type UiBlockSpec = UiConfirmBlock | UiQuickRepliesBlock | UiChoiceBlock | UiFormBlock;
 export type UiBlockType = UiBlockSpec["type"];
 
-export const UI_BLOCKING_BLOCK_TYPES = [
-  "confirm",
-  "quick_replies",
-  "choice",
-  "form",
-] as const satisfies readonly UiBlockingBlockSpec["type"][];
-export const UI_DISPLAY_BLOCK_TYPES = [
-  "alert",
-  "table",
-  "progress",
-  "layout",
-  "canvas",
-] as const satisfies readonly UiDisplayBlockSpec["type"][];
-export const UI_BLOCK_TYPES = [...UI_BLOCKING_BLOCK_TYPES, ...UI_DISPLAY_BLOCK_TYPES] as const;
+export const UI_BLOCK_TYPES = ["confirm", "quick_replies", "choice", "form"] as const satisfies readonly UiBlockType[];
 
-export type UiBlockValue = string | string[] | number | boolean;
+export type UiBlockValue = string | string[];
 
 /**
  * What the person did with a block. `validateUiBlockResponse` checks it against the spec.
@@ -436,18 +218,11 @@ export type UiBlockValue = string | string[] | number | boolean;
  * | `quick_replies` | an option id                       | none                                      |
  * | `choice`        | `submit`                           | `selected` → option ids                   |
  * | `form`          | `submit`                           | field id → string                         |
- * | `alert`         | an action id                       | none                                      |
- * | `table`         | `rowAction.id`, with `rowId`       | none                                      |
- * | `progress`      | an action id                       | none                                      |
- * | `layout`        | a button id                        | input id → string / boolean / number      |
- * | `canvas`        | any id the page chose              | any ids → string / string[] / number / boolean |
  *
- * Any blocking block also takes `actionId: "_text"` with `text` (`UI_BLOCK_TEXT_ACTION_ID`).
+ * Any block also takes `actionId: "_text"` with `text` (`UI_BLOCK_TEXT_ACTION_ID`).
  */
 export interface UiBlockResponse {
   actionId: string;
-  /** The row of a `table` row action. */
-  rowId?: string;
   values?: Record<string, UiBlockValue>;
   /** An answer in words, with `UI_BLOCK_TEXT_ACTION_ID`. */
   text?: string;
@@ -456,9 +231,8 @@ export interface UiBlockResponse {
 }
 
 /**
- * - `pending`: open. A blocking block waits for its answer; a display block takes actions.
- * - `answered`: frozen with `response`. A blocking block has one answer; a display block froze after
- *   an action (such as a canvas with `once`).
+ * - `pending`: open. The block waits for its answer.
+ * - `answered`: frozen with `response`.
  * - `expired`: the turn ended, the app restarted, or the agent's call was cancelled before an answer.
  * - `closed`: shut without an answer: the person skipped it or the agent closed it.
  */
@@ -470,31 +244,21 @@ export const UI_BLOCK_STATUSES = [
   "closed",
 ] as const satisfies readonly UiBlockStatus[];
 
-export interface UiBlockActionLogEntry {
-  actionId: string;
-  rowId?: string;
-  /** ISO time. */
-  at: string;
-  by?: ConversationMessageSender;
-}
-
 export interface UiBlockState {
   status: UiBlockStatus;
-  /** Required when `answered`. On a pending display block, the last action. */
+  /** Required when `answered`. */
   response?: UiBlockResponse;
   respondedBy?: ConversationMessageSender;
   /** ISO time. */
   respondedAt?: string;
   /** The line the frozen block shows, such as the chosen button. See `uiBlockOutcomeText`. */
   outcome?: string;
-  /** Display blocks only: the actions taken so far, newest last, at most `actionLog`. */
-  log?: UiBlockActionLogEntry[];
 }
 
 /** The `uiBlock` field of a `ConversationMessage`. */
 export interface ConversationUiBlock {
   version: typeof UI_BLOCK_VERSION;
-  /** Given by the agent or made by the host. A display block with the same id is updated in place. */
+  /** Given by the agent or made by the host. */
   blockId: string;
   spec: UiBlockSpec;
   state: UiBlockState;
@@ -505,23 +269,6 @@ export interface ConversationUiBlock {
 
 export function isUiBlockType(value: unknown): value is UiBlockType {
   return isOneOf(UI_BLOCK_TYPES, value);
-}
-
-export function isBlockingUiBlockType(value: unknown): value is UiBlockingBlockSpec["type"] {
-  return isOneOf(UI_BLOCKING_BLOCK_TYPES, value);
-}
-
-export function isBlockingUiBlockSpec(spec: UiBlockSpec): spec is UiBlockingBlockSpec {
-  return isBlockingUiBlockType(spec.type);
-}
-
-/** The `itemType` of a display block's message. */
-export function uiBlockItemType(type: UiDisplayBlockSpec["type"]): string {
-  return `${UI_BLOCK_ITEM_TYPE_PREFIX}${type}`;
-}
-
-export function isUiBlockItemType(itemType: string | undefined): boolean {
-  return itemType?.startsWith(UI_BLOCK_ITEM_TYPE_PREFIX) === true;
 }
 
 /**
@@ -714,6 +461,11 @@ function readChoice(record: DynamicRecord): UiChoiceBlock {
   return block;
 }
 
+/** A form field whose value OpenBot does not store. See `UiFormTextField.secret`. */
+export function isSecretFormField(field: UiFormField): boolean {
+  return field.kind === "text" && field.secret === true;
+}
+
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
 
 function isUiDate(value: unknown): value is string {
@@ -753,6 +505,9 @@ function readFormField(value: unknown): UiFormField {
     const placeholder = readOptionalString(record.placeholder, UI_BLOCK_LIMITS.label);
     if (placeholder !== undefined) textField.placeholder = placeholder;
     if (record.value !== undefined) textField.value = readString(record.value, UI_BLOCK_LIMITS.fieldValue, false);
+    const secret = readOptionalBoolean(record.secret);
+    if (secret === true) check(kind === "text" && textField.value === undefined);
+    if (secret !== undefined) textField.secret = secret;
     field = textField;
   }
   if (required !== undefined) field.required = required;
@@ -765,222 +520,6 @@ function readForm(record: DynamicRecord): UiFormBlock {
   const block: UiFormBlock = { type: "form", title: readString(record.title, UI_BLOCK_LIMITS.title), fields };
   const submit = readOptionalString(record.submit, UI_BLOCK_LIMITS.label);
   if (submit !== undefined) block.submit = submit;
-  return block;
-}
-
-function readStat(value: unknown): UiStat {
-  const record = readRecord(value);
-  const stat: UiStat = {
-    label: readString(record.label, UI_BLOCK_LIMITS.label),
-    value: readString(record.value, UI_BLOCK_LIMITS.label),
-  };
-  const tone = readOptionalOneOf(UI_TONES, record.tone);
-  if (tone !== undefined) stat.tone = tone;
-  return stat;
-}
-
-function readAlert(record: DynamicRecord): UiAlertBlock {
-  const block: UiAlertBlock = {
-    type: "alert",
-    severity: readOneOf(UI_ALERT_SEVERITIES, record.severity),
-    title: readString(record.title, UI_BLOCK_LIMITS.title),
-  };
-  const subtitle = readOptionalString(record.subtitle, UI_BLOCK_LIMITS.subtitle);
-  if (subtitle !== undefined) block.subtitle = subtitle;
-  if (record.stats !== undefined) block.stats = readArray(record.stats, UI_BLOCK_LIMITS.stats).map(readStat);
-  if (record.sparkline !== undefined) {
-    block.sparkline = readArray(record.sparkline, UI_BLOCK_LIMITS.sparkline).map((point) =>
-      point === null ? null : readNumber(point, -Number.MAX_VALUE, Number.MAX_VALUE),
-    );
-  }
-  if (record.actions !== undefined) block.actions = readActions(record.actions, 0);
-  return block;
-}
-
-function readTableColumn(value: unknown): UiTableColumn {
-  if (isString(value)) return readString(value, UI_BLOCK_LIMITS.label);
-  const record = readRecord(value);
-  const column: { label: string; align?: "left" | "right" } = {
-    label: readString(record.label, UI_BLOCK_LIMITS.label),
-  };
-  const align = readOptionalOneOf(["left", "right"] as const, record.align);
-  if (align !== undefined) column.align = align;
-  return column;
-}
-
-function readTable(record: DynamicRecord): UiTableBlock {
-  const columns = readArray(record.columns, UI_BLOCK_LIMITS.tableColumns, 1).map(readTableColumn);
-  const rows = readArray(record.rows, UI_BLOCK_LIMITS.tableRows).map((value): UiTableRow => {
-    const row = readRecord(value);
-    const cells = readArray(row.cells, columns.length, columns.length).map((cell) =>
-      readString(cell, UI_BLOCK_LIMITS.cell, false),
-    );
-    return { id: readId(row.id), cells };
-  });
-  checkUnique(rows.map((row) => row.id));
-  const block: UiTableBlock = { type: "table", title: readString(record.title, UI_BLOCK_LIMITS.title), columns, rows };
-  if (record.rowAction !== undefined) block.rowAction = readOption(record.rowAction);
-  return block;
-}
-
-function readProgress(record: DynamicRecord): UiProgressBlock {
-  const steps = readArray(record.steps, UI_BLOCK_LIMITS.progressSteps).map((value): UiProgressStep => {
-    const step = readRecord(value);
-    return {
-      label: readString(step.label, UI_BLOCK_LIMITS.label),
-      state: readOneOf(UI_PROGRESS_STEP_STATES, step.state),
-    };
-  });
-  const block: UiProgressBlock = { type: "progress", title: readString(record.title, UI_BLOCK_LIMITS.title), steps };
-  const percent = readOptionalNumber(record.percent, 0, 100);
-  if (percent !== undefined) block.percent = percent;
-  if (record.actions !== undefined) block.actions = readActions(record.actions, 0);
-  return block;
-}
-
-interface LayoutBudget {
-  nodes: number;
-  ids: string[];
-}
-
-const UI_NODE_TYPES = [
-  "column",
-  "row",
-  "grid",
-  "heading",
-  "text",
-  "muted",
-  "pill",
-  "divider",
-  "status",
-  "segmented",
-  "switch",
-  "slider",
-  "button",
-] as const satisfies readonly UiNodeType[];
-
-function readChildren(value: unknown, depth: number, budget: LayoutBudget): UiNode[] {
-  return readArray(value, UI_BLOCK_LIMITS.layoutNodes).map((child) => readNode(child, depth + 1, budget));
-}
-
-function readNode(value: unknown, depth: number, budget: LayoutBudget): UiNode {
-  check(depth <= UI_BLOCK_LIMITS.layoutDepth);
-  budget.nodes += 1;
-  check(budget.nodes <= UI_BLOCK_LIMITS.layoutNodes);
-  const record = readRecord(value);
-  const type = readOneOf(UI_NODE_TYPES, record.type);
-  switch (type) {
-    case "column":
-    case "row": {
-      const node: UiStackNode = { type, children: readChildren(record.children, depth, budget) };
-      const gap = readOptionalNumber(record.gap, 0, UI_BLOCK_LIMITS.layoutGap, true);
-      if (gap !== undefined) node.gap = gap;
-      const justify = readOptionalOneOf(["start", "between", "end"] as const, record.justify);
-      if (justify !== undefined) node.justify = justify;
-      return node;
-    }
-    case "grid": {
-      const node: UiGridNode = { type, children: readChildren(record.children, depth, budget) };
-      const columns = readOptionalNumber(record.columns, 1, UI_BLOCK_LIMITS.gridColumns, true);
-      if (columns !== undefined) node.columns = columns;
-      return node;
-    }
-    case "heading":
-    case "text":
-    case "muted":
-      return { type, text: readString(record.text, UI_BLOCK_LIMITS.text) };
-    case "pill": {
-      const node: UiPillNode = { type, text: readString(record.text, UI_BLOCK_LIMITS.label) };
-      const tone = readOptionalOneOf(UI_TONES, record.tone);
-      if (tone !== undefined) node.tone = tone;
-      return node;
-    }
-    case "divider":
-      return { type };
-    case "status": {
-      const node: UiStatusNode = {
-        type,
-        name: readString(record.name, UI_BLOCK_LIMITS.label),
-        status: readOneOf(UI_STATUS_LEVELS, record.status),
-      };
-      const statusValue = readOptionalString(record.value, UI_BLOCK_LIMITS.label);
-      if (statusValue !== undefined) node.value = statusValue;
-      return node;
-    }
-    case "segmented": {
-      const node: UiSegmentedNode = {
-        type,
-        id: readId(record.id),
-        options: readStringOptions(record.options, UI_BLOCK_LIMITS.segmentedOptions),
-      };
-      budget.ids.push(node.id);
-      const label = readOptionalString(record.label, UI_BLOCK_LIMITS.label);
-      if (label !== undefined) node.label = label;
-      if (record.value !== undefined) {
-        check(isOneOf(node.options, record.value));
-        node.value = record.value;
-      }
-      return node;
-    }
-    case "switch": {
-      const node: UiSwitchNode = {
-        type,
-        id: readId(record.id),
-        label: readString(record.label, UI_BLOCK_LIMITS.label),
-      };
-      budget.ids.push(node.id);
-      const switchValue = readOptionalBoolean(record.value);
-      if (switchValue !== undefined) node.value = switchValue;
-      return node;
-    }
-    case "slider": {
-      const min = readNumber(record.min, -Number.MAX_VALUE, Number.MAX_VALUE);
-      const max = readNumber(record.max, -Number.MAX_VALUE, Number.MAX_VALUE);
-      check(min < max);
-      const node: UiSliderNode = {
-        type,
-        id: readId(record.id),
-        label: readString(record.label, UI_BLOCK_LIMITS.label),
-        min,
-        max,
-      };
-      budget.ids.push(node.id);
-      const step = readOptionalNumber(record.step, Number.MIN_VALUE, max - min);
-      if (step !== undefined) node.step = step;
-      const sliderValue = readOptionalNumber(record.value, min, max);
-      if (sliderValue !== undefined) node.value = sliderValue;
-      const unit = readOptionalString(record.unit, UI_BLOCK_LIMITS.meta);
-      if (unit !== undefined) node.unit = unit;
-      return node;
-    }
-    case "button": {
-      const node: UiButtonNode = { type, ...readAction(record) };
-      budget.ids.push(node.id);
-      return node;
-    }
-  }
-}
-
-function readLayout(record: DynamicRecord): UiLayoutBlock {
-  const budget: LayoutBudget = { nodes: 0, ids: [] };
-  const block: UiLayoutBlock = { type: "layout", root: readNode(record.root, 1, budget) };
-  checkUnique(budget.ids);
-  const title = readOptionalString(record.title, UI_BLOCK_LIMITS.title);
-  if (title !== undefined) block.title = title;
-  return block;
-}
-
-function readCanvas(record: DynamicRecord): UiCanvasBlock {
-  const block: UiCanvasBlock = { type: "canvas", title: readString(record.title, UI_BLOCK_LIMITS.title) };
-  const height = readOptionalNumber(
-    record.height,
-    UI_BLOCK_LIMITS.canvasMinHeight,
-    UI_BLOCK_LIMITS.canvasMaxHeight,
-    true,
-  );
-  if (height !== undefined) block.height = height;
-  const once = readOptionalBoolean(record.once);
-  if (once !== undefined) block.once = once;
   return block;
 }
 
@@ -997,24 +536,13 @@ function readSpec(value: unknown): UiBlockSpec {
       return readChoice(record);
     case "form":
       return readForm(record);
-    case "alert":
-      return readAlert(record);
-    case "table":
-      return readTable(record);
-    case "progress":
-      return readProgress(record);
-    case "layout":
-      return readLayout(record);
-    case "canvas":
-      return readCanvas(record);
   }
 }
 
 /**
  * The spec with only the keys this module knows, or null when it breaks a rule: an unknown `type`, a
  * missing or malformed field, a limit, a duplicate id or option label, or a reserved id. The input may
- * carry other keys (the tool input of a canvas has `html`); they are left out. The backend stores what
- * this returns.
+ * carry other keys; they are left out. The backend stores what this returns.
  */
 export function normalizeUiBlockSpec(value: unknown): UiBlockSpec | null {
   return attempt(() => readSpec(value));
@@ -1028,27 +556,7 @@ export function isUiBlockSpec(value: unknown): value is UiBlockSpec {
 // Responses
 
 function actionsOf(spec: UiBlockSpec): readonly UiAction[] {
-  switch (spec.type) {
-    case "confirm":
-      return spec.actions;
-    case "alert":
-    case "progress":
-      return spec.actions ?? [];
-    case "layout":
-      return layoutNodes(spec.root).filter((node): node is UiButtonNode => node.type === "button");
-    default:
-      return [];
-  }
-}
-
-function layoutNodes(root: UiNode): UiNode[] {
-  const nodes: UiNode[] = [];
-  const visit = (node: UiNode): void => {
-    nodes.push(node);
-    if (node.type === "column" || node.type === "row" || node.type === "grid") node.children.forEach(visit);
-  };
-  visit(root);
-  return nodes;
+  return spec.type === "confirm" ? spec.actions : [];
 }
 
 /** The entries of a response's `values`, with every key a valid id. The values are checked by the caller. */
@@ -1062,6 +570,7 @@ function readResponseValues(
   spec: UiBlockSpec,
   record: DynamicRecord,
   actionId: string,
+  stored: boolean,
 ): Record<string, UiBlockValue> | undefined {
   if (actionId === UI_BLOCK_TEXT_ACTION_ID) {
     check(record.values === undefined);
@@ -1100,9 +609,11 @@ function readResponseValues(
       const fields = new Map(spec.fields.map((field) => [field.id, field] as const));
       for (const key of raw.keys()) check(fields.has(key));
       for (const field of spec.fields) {
-        const entry = raw.get(field.id);
+        // A stored response never holds a secret value; reading one drops it.
+        const secret = isSecretFormField(field);
+        const entry = stored && secret ? undefined : raw.get(field.id);
         if (entry === undefined || entry === "") {
-          check(field.required !== true);
+          check(field.required !== true || (stored && secret));
           if (entry === "") values[field.id] = "";
           continue;
         }
@@ -1116,56 +627,14 @@ function readResponseValues(
       }
       return values;
     }
-    case "layout": {
-      if (record.values === undefined) return undefined;
-      const inputs = new Map(
-        layoutNodes(spec.root).flatMap((node) =>
-          node.type === "segmented" || node.type === "switch" || node.type === "slider"
-            ? [[node.id, node] as const]
-            : [],
-        ),
-      );
-      const raw = readValues(record.values, inputs.size);
-      const values: Record<string, UiBlockValue> = {};
-      for (const [key, entry] of raw) {
-        const node = inputs.get(key);
-        check(node !== undefined);
-        if (node.type === "segmented") {
-          check(isOneOf(node.options, entry));
-          values[key] = entry;
-        } else if (node.type === "switch") {
-          check(isBoolean(entry));
-          values[key] = entry;
-        } else values[key] = readNumber(entry, node.min, node.max);
-      }
-      return values;
-    }
-    case "canvas": {
-      if (record.values === undefined) return undefined;
-      const raw = readValues(record.values, UI_BLOCK_LIMITS.canvasValues);
-      const values: Record<string, UiBlockValue> = {};
-      for (const [key, entry] of raw) {
-        if (Array.isArray(entry)) {
-          values[key] = readArray(entry, UI_BLOCK_LIMITS.selectOptions).map((item) =>
-            readString(item, UI_BLOCK_LIMITS.fieldValue, false),
-          );
-        } else if (isString(entry)) values[key] = readString(entry, UI_BLOCK_LIMITS.fieldValue, false);
-        else if (isBoolean(entry)) values[key] = entry;
-        else values[key] = readNumber(entry, -Number.MAX_VALUE, Number.MAX_VALUE);
-      }
-      return values;
-    }
     default:
       check(record.values === undefined);
       return undefined;
   }
 }
 
-function checkActionId(spec: UiBlockSpec, actionId: string, rowId: unknown): void {
-  if (actionId === UI_BLOCK_TEXT_ACTION_ID) {
-    check(isBlockingUiBlockSpec(spec) && rowId === undefined);
-    return;
-  }
+function checkActionId(spec: UiBlockSpec, actionId: string): void {
+  if (actionId === UI_BLOCK_TEXT_ACTION_ID) return;
   switch (spec.type) {
     case "quick_replies":
       check(spec.options.some((option) => option.id === actionId));
@@ -1174,27 +643,20 @@ function checkActionId(spec: UiBlockSpec, actionId: string, rowId: unknown): voi
     case "form":
       check(actionId === UI_BLOCK_SUBMIT_ACTION_ID);
       break;
-    case "table":
-      check(spec.rowAction?.id === actionId && spec.rows.some((row) => row.id === rowId));
-      return;
-    case "canvas":
-      check(isUiBlockId(actionId));
-      break;
-    default:
-      check(actionsOf(spec).some((action) => action.id === actionId));
+    case "confirm":
+      check(spec.actions.some((action) => action.id === actionId));
   }
-  check(rowId === undefined);
 }
 
-function readResponse(spec: UiBlockSpec, value: unknown): UiBlockResponse {
+/** `stored` reads a response from a stored state, which leaves out the value of a secret field. */
+function readResponse(spec: UiBlockSpec, value: unknown, stored = false): UiBlockResponse {
   check(jsonLength(value) <= UI_BLOCK_LIMITS.responseJson);
   const record = readRecord(value);
   check(isString(record.actionId));
   const actionId = record.actionId;
-  checkActionId(spec, actionId, record.rowId);
+  checkActionId(spec, actionId);
   const response: UiBlockResponse = { actionId };
-  if (record.rowId !== undefined) response.rowId = readId(record.rowId);
-  const values = readResponseValues(spec, record, actionId);
+  const values = readResponseValues(spec, record, actionId, stored);
   if (values !== undefined) response.values = values;
   if (actionId === UI_BLOCK_TEXT_ACTION_ID) response.text = readString(record.text, UI_BLOCK_LIMITS.fieldValue);
   else check(record.text === undefined);
@@ -1204,9 +666,9 @@ function readResponse(spec: UiBlockSpec, value: unknown): UiBlockResponse {
 }
 
 /**
- * The response with only known keys, or null when it does not fit the spec: an action, row, option or
- * input id the spec does not have, a value of the wrong kind or outside its options or range, a
- * required form field left empty, or more than `responseJson` in all.
+ * The response with only known keys, or null when it does not fit the spec: an action, option or
+ * field id the spec does not have, a value of the wrong kind or outside its options, a required form
+ * field left empty, or more than `responseJson` in all.
  */
 export function validateUiBlockResponse(spec: UiBlockSpec, value: unknown): UiBlockResponse | null {
   return attempt(() => readResponse(spec, value));
@@ -1246,33 +708,16 @@ function readSender(value: unknown): ConversationMessageSender {
   return { id: record.id, name: record.name };
 }
 
-function readLogEntry(spec: UiBlockSpec, value: unknown): UiBlockActionLogEntry {
-  const record = readRecord(value);
-  check(isString(record.actionId));
-  checkActionId(spec, record.actionId, record.rowId);
-  const entry: UiBlockActionLogEntry = {
-    actionId: record.actionId,
-    at: readString(record.at, UI_BLOCK_LIMITS.timestamp),
-  };
-  if (record.rowId !== undefined) entry.rowId = readId(record.rowId);
-  if (record.by !== undefined) entry.by = readSender(record.by);
-  return entry;
-}
-
 function readState(spec: UiBlockSpec, value: unknown): UiBlockState {
   const record = readRecord(value);
   const state: UiBlockState = { status: readOneOf(UI_BLOCK_STATUSES, record.status) };
-  if (record.response !== undefined) state.response = readResponse(spec, record.response);
+  if (record.response !== undefined) state.response = readResponse(spec, record.response, true);
   check(state.status !== "answered" || state.response !== undefined);
   if (record.respondedBy !== undefined) state.respondedBy = readSender(record.respondedBy);
   const respondedAt = readOptionalString(record.respondedAt, UI_BLOCK_LIMITS.timestamp);
   if (respondedAt !== undefined) state.respondedAt = respondedAt;
   const outcome = readOptionalString(record.outcome, UI_BLOCK_LIMITS.outcome);
   if (outcome !== undefined) state.outcome = outcome;
-  if (record.log !== undefined) {
-    check(!isBlockingUiBlockSpec(spec));
-    state.log = readArray(record.log, UI_BLOCK_LIMITS.actionLog).map((entry) => readLogEntry(spec, entry));
-  }
   return state;
 }
 
@@ -1283,7 +728,10 @@ function readConversationUiBlock(value: unknown): ConversationUiBlock {
   return { version: UI_BLOCK_VERSION, blockId: readId(record.blockId), spec, state: readState(spec, record.state) };
 }
 
-/** The block with only known keys, or null when any part of it is malformed. */
+/**
+ * The block with only known keys, or null when any part of it is malformed. The response leaves out the
+ * value of a secret form field. The backend stores what this returns, so a stored block always reads.
+ */
 export function normalizeConversationUiBlock(value: unknown): ConversationUiBlock | null {
   return attempt(() => readConversationUiBlock(value));
 }
@@ -1305,12 +753,13 @@ function question(
   header: string,
   body: string,
   options: readonly { label: string; description?: string }[] | null,
+  isSecret = false,
 ): AgentPromptQuestion {
   return {
     id,
     header: clip(header, INPUT_LIMITS.promptHeader),
     question: clip(body, INPUT_LIMITS.promptQuestion),
-    isSecret: false,
+    isSecret,
     options:
       options === null
         ? null
@@ -1344,9 +793,9 @@ function confirmFieldLine(field: UiConfirmField): string {
  * - `quick_replies`: `reply`.
  * - `choice`: `choice`. A `multiple` choice always takes a typed answer: one or more labels, one per
  *   line or comma-separated.
- * - `form`: one question per field, id = field id.
+ * - `form`: one question per field, id = field id. A secret field is a secret question.
  */
-export function uiBlockFallbackQuestions(spec: UiBlockingBlockSpec): AgentPromptQuestion[] {
+export function uiBlockFallbackQuestions(spec: UiBlockSpec): AgentPromptQuestion[] {
   switch (spec.type) {
     case "confirm": {
       const details = (spec.fields ?? []).map(confirmFieldLine);
@@ -1408,7 +857,7 @@ export function uiBlockFallbackQuestions(spec: UiBlockingBlockSpec): AgentPrompt
           return question(field.id, header, options ? label : `${label}\n\n${listText(field.options)}`, options);
         }
         if (field.kind === "date") return question(field.id, header, `${label} (YYYY-MM-DD)`, null);
-        return question(field.id, header, label, null);
+        return question(field.id, header, label, null, isSecretFormField(field));
       });
   }
 }
@@ -1455,9 +904,11 @@ function choiceOptionsIn<T extends { id: string; label: string }>(options: reado
   return found;
 }
 
+/** The answers as `header: answer` lines. A secret answer is left out, so it is never stored as text. */
 function answersText(questions: readonly AgentPromptQuestion[], answers: Readonly<Record<string, readonly string[]>>) {
   return questions
     .flatMap((item) => {
+      if (item.isSecret) return [];
       const given = (answers[item.id] ?? []).filter((answer) => answer.trim());
       return given.length ? [`${item.header}: ${given.join(", ")}`] : [];
     })
@@ -1465,7 +916,7 @@ function answersText(questions: readonly AgentPromptQuestion[], answers: Readonl
 }
 
 function structuredResponse(
-  spec: UiBlockingBlockSpec,
+  spec: UiBlockSpec,
   answers: Readonly<Record<string, readonly string[]>>,
 ): UiBlockResponse | null {
   const first = (id: string): string | undefined => answers[id]?.find((answer) => answer.trim());
@@ -1519,20 +970,23 @@ function structuredResponse(
  * The response read back from the answers to `uiBlockFallbackQuestions`, as `respondToPrompt` carries
  * them. An answer may name an option by its label (what a client that only saw the questions sends)
  * or by its id. When the answers cannot be read as the block's response, they become one answer in
- * words (`UI_BLOCK_TEXT_ACTION_ID`) with every answer as a `header: answer` line. Null when nothing
- * was answered.
+ * words (`UI_BLOCK_TEXT_ACTION_ID`) with every answer as a `header: answer` line, except a secret one.
+ * Null when nothing was answered.
  */
 export function uiBlockResponseFromAnswers(
-  spec: UiBlockingBlockSpec,
+  spec: UiBlockSpec,
   answers: Readonly<Record<string, readonly string[]>>,
 ): UiBlockResponse | null {
   const questions = uiBlockFallbackQuestions(spec);
   const text = answersText(questions, answers);
-  if (!text) return null;
+  if (!text && !questions.some((item) => item.isSecret && answers[item.id]?.some((answer) => answer.trim()))) {
+    return null;
+  }
   const structured = structuredResponse(spec, answers);
   const valid = structured === null ? null : validateUiBlockResponse(spec, structured);
   if (valid) return valid;
-  const single = questions.length === 1 ? (answers[questions[0]?.id ?? ""] ?? []).join("\n").trim() : "";
+  const only = questions.length === 1 ? questions[0] : undefined;
+  const single = only && !only.isSecret ? (answers[only.id] ?? []).join("\n").trim() : "";
   return { actionId: UI_BLOCK_TEXT_ACTION_ID, text: clip(single || text, UI_BLOCK_LIMITS.fieldValue) };
 }
 
@@ -1541,10 +995,7 @@ export function uiBlockResponseFromAnswers(
  * fallback question ids. Options are named by label, so the stored `questionPrompt.resolution` reads
  * well on a client that only shows the questions. `uiBlockResponseFromAnswers` reads them back.
  */
-export function uiBlockAnswersFromResponse(
-  spec: UiBlockingBlockSpec,
-  response: UiBlockResponse,
-): Record<string, string[]> {
+export function uiBlockAnswersFromResponse(spec: UiBlockSpec, response: UiBlockResponse): Record<string, string[]> {
   if (response.actionId === UI_BLOCK_TEXT_ACTION_ID) {
     const firstQuestion = uiBlockFallbackQuestions(spec)[0];
     return firstQuestion ? { [firstQuestion.id]: [response.text ?? ""] } : {};
@@ -1580,134 +1031,17 @@ export function uiBlockAnswersFromResponse(
   }
 }
 
-function escapeTableCell(text: string): string {
-  return text.replace(/\|/gu, "\\|").replace(/\s*\n\s*/gu, " ");
-}
-
-function columnLabel(column: UiTableColumn): string {
-  return isString(column) ? column : column.label;
-}
-
-const SEVERITY_LABELS: Readonly<Record<UiAlertSeverity, string>> = {
-  info: "Info",
-  warning: "Warning",
-  critical: "Critical",
-  success: "Done",
-};
-
-const STEP_MARKS: Readonly<Record<UiProgressStepState, string>> = {
-  todo: "- [ ] ",
-  running: "- [ ] ",
-  done: "- [x] ",
-  failed: "- [ ] ",
-};
-
-const STEP_SUFFIXES: Readonly<Record<UiProgressStepState, string>> = {
-  todo: "",
-  running: " (running)",
-  done: "",
-  failed: " (failed)",
-};
-
-function actionsLine(actions: readonly UiAction[] | undefined): string {
-  return actions?.length ? `Actions: ${actions.map((action) => action.label).join(" · ")}` : "";
-}
-
-function layoutLines(node: UiNode): string[] {
-  switch (node.type) {
-    case "column":
-    case "row":
-    case "grid":
-      return node.children.flatMap(layoutLines);
-    case "heading":
-      return [`**${node.text}**`];
-    case "text":
-    case "muted":
-      return [node.text];
-    case "pill":
-      return [`[${node.text}]`];
-    case "divider":
-      return ["---"];
-    case "status":
-      return [`- ${node.name}: ${node.status}${node.value ? ` · ${node.value}` : ""}`];
-    case "segmented":
-      return [`- ${node.label ?? node.id}: ${node.value ?? node.options[0] ?? ""}`];
-    case "switch":
-      return [`- ${node.label}: ${node.value ? "on" : "off"}`];
-    case "slider":
-      return [`- ${node.label}: ${node.value ?? node.min}${node.unit ? ` ${node.unit}` : ""}`];
-    case "button":
-      return [];
-  }
-}
-
-/**
- * The block as Markdown: the `text` of a display block's message, which a client that does not know
- * `uiBlock` shows, and the text search and previews read. It names the buttons but cannot press them.
- * Works for every block type, so a blocking block can use it for a preview too.
- */
-export function uiBlockFallbackText(spec: UiBlockSpec): string {
-  const parts: string[] = [];
-  switch (spec.type) {
-    case "confirm":
-      parts.push(`**${spec.title}**`, (spec.fields ?? []).map(confirmFieldLine).join("\n"), spec.preview ?? "");
-      parts.push(actionsLine(spec.actions));
-      break;
-    case "quick_replies":
-      parts.push(spec.title ? `**${spec.title}**` : "", listText(spec.options.map((option) => option.label)));
-      break;
-    case "choice":
-      parts.push(
-        `**${spec.title}**`,
-        spec.options
-          .map(
-            (option) => `- [${option.selected ? "x" : " "}] ${option.label}${option.meta ? ` (${option.meta})` : ""}`,
-          )
-          .join("\n"),
-      );
-      break;
-    case "form":
-      parts.push(
-        `**${spec.title}**`,
-        spec.fields.map((field) => `- ${field.label ?? field.id}${field.value ? `: ${field.value}` : ""}`).join("\n"),
-      );
-      break;
-    case "alert":
-      parts.push(`**${SEVERITY_LABELS[spec.severity]}: ${spec.title}**`, spec.subtitle ?? "");
-      parts.push((spec.stats ?? []).map((stat) => `- ${stat.label}: ${stat.value}`).join("\n"));
-      parts.push(actionsLine(spec.actions));
-      break;
-    case "table": {
-      const header = spec.columns.map((column) => escapeTableCell(columnLabel(column)));
-      const divider = spec.columns.map((column) => (!isString(column) && column.align === "right" ? "---:" : "---"));
-      const rows = spec.rows.map((row) => `| ${row.cells.map(escapeTableCell).join(" | ")} |`);
-      parts.push(`**${spec.title}**`, [`| ${header.join(" | ")} |`, `| ${divider.join(" | ")} |`, ...rows].join("\n"));
-      if (spec.rowAction) parts.push(`Row action: ${spec.rowAction.label}`);
-      break;
-    }
-    case "progress":
-      parts.push(
-        `**${spec.title}**${spec.percent === undefined ? "" : ` (${Math.round(spec.percent)}%)`}`,
-        spec.steps.map((step) => `${STEP_MARKS[step.state]}${step.label}${STEP_SUFFIXES[step.state]}`).join("\n"),
-        actionsLine(spec.actions),
-      );
-      break;
-    case "layout":
-      parts.push(spec.title ? `**${spec.title}**` : "", layoutLines(spec.root).join("\n"));
-      parts.push(actionsLine(actionsOf(spec)));
-      break;
-    case "canvas":
-      parts.push(`**${spec.title}**`, "An interactive page. Open it in the OpenBot desktop app.");
-      break;
-  }
-  return clip(parts.filter((part) => part.trim()).join("\n\n"), INPUT_LIMITS.messageText);
-}
-
 /**
  * The line a frozen block shows for a response, such as the chosen button or the selected options.
- * Plain text within `outcome`.
+ * Plain text within `outcome`. A secret form value is left out. `list` joins the parts of a list in
+ * the reader's language; the backend stores the line with commas, and an app may draw it again with
+ * its own `list`.
  */
-export function uiBlockOutcomeText(spec: UiBlockSpec, response: UiBlockResponse): string {
+export function uiBlockOutcomeText(
+  spec: UiBlockSpec,
+  response: UiBlockResponse,
+  list: (items: readonly string[]) => string = (items) => items.join(", "),
+): string {
   if (response.actionId === UI_BLOCK_TEXT_ACTION_ID) return clip(response.text ?? "", UI_BLOCK_LIMITS.outcome);
   const values = response.values ?? {};
   let text: string;
@@ -1718,28 +1052,22 @@ export function uiBlockOutcomeText(spec: UiBlockSpec, response: UiBlockResponse)
     case "choice": {
       const selected = values[UI_CHOICE_VALUES_KEY];
       const ids = Array.isArray(selected) ? selected : [];
-      text = ids.map((id) => spec.options.find((option) => option.id === id)?.label ?? id).join(", ");
+      text = list(ids.map((id) => spec.options.find((option) => option.id === id)?.label ?? id));
       break;
     }
     case "form":
-      text = spec.fields
-        .flatMap((field) => {
+      text = list(
+        spec.fields.flatMap((field) => {
           const value = values[field.id];
-          return value === undefined || value === "" ? [] : [`${field.label ?? field.id}: ${String(value)}`];
-        })
-        .join("; ");
+          if (isSecretFormField(field) || value === undefined || value === "") return [];
+          return [`${field.label ?? field.id}: ${String(value)}`];
+        }),
+      );
       break;
-    case "table": {
-      const row = spec.rows.find((candidate) => candidate.id === response.rowId);
-      text = `${spec.rowAction?.label ?? response.actionId}${row?.cells[0] ? `: ${row.cells[0]}` : ""}`;
-      break;
-    }
-    default: {
-      const label = actionsOf(spec).find((action) => action.id === response.actionId)?.label ?? response.actionId;
-      const details = Object.values(values)
-        .map((value) => (Array.isArray(value) ? value.join(", ") : String(value)))
-        .join(", ");
-      text = spec.type === "confirm" && details ? `${label} · ${details}` : label;
+    case "confirm": {
+      const label = spec.actions.find((action) => action.id === response.actionId)?.label ?? response.actionId;
+      const details = list(Object.values(values).map((value) => (Array.isArray(value) ? list(value) : value)));
+      text = details ? `${label} · ${details}` : label;
     }
   }
   return clip(text, UI_BLOCK_LIMITS.outcome);

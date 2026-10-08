@@ -1,6 +1,6 @@
 import { chatVisualReply } from "@openbot/contracts/chat-visual";
 import type { ConversationMessageSender } from "@openbot/contracts/ipc";
-import { type ConversationUiBlock, isBlockingUiBlockSpec } from "@openbot/contracts/ui-blocks";
+import type { ConversationUiBlock } from "@openbot/contracts/ui-blocks";
 import { Button } from "@openbot/ui";
 import type { AgentMessage, ChatActionMarkerModel } from "@openbot/ui/data";
 import { AgentActivityIndicator } from "@openbot/ui/features/conversation/AgentActivity";
@@ -32,7 +32,6 @@ import type { ConversationProps } from "./conversation-types";
 import { MarketplaceSuggestionChatCard, marketplaceSuggestionKnown } from "./MarketplaceSuggestionChatCard";
 import { RoutineChatCard } from "./RoutineChatCard";
 import { PENDING_SEND_ID_PREFIX, pendingSendRetrySafe } from "./stores/pending-send-store";
-import type { BlockingUiBlock } from "./UiBlockPrompt";
 
 /**
  * A message that renders only an action marker, with no bubble of its own. A routine instruction is
@@ -42,18 +41,9 @@ function markerOnlyMessage(message: AgentMessage): boolean {
   return Boolean(message.actionMarker);
 }
 
-function isBlockingUiBlock(block: ConversationUiBlock): block is BlockingUiBlock {
-  return isBlockingUiBlockSpec(block.spec);
-}
-
-/** The block of a message when it is one the person answers through its question prompt. */
-function blockingUiBlock(block: ConversationUiBlock | undefined): BlockingUiBlock | undefined {
-  return block && isBlockingUiBlock(block) ? block : undefined;
-}
-
-/** A blocking block the history draws: one that is answered, expired or closed. */
-function frozenUiBlock(message: AgentMessage | undefined): BlockingUiBlock | undefined {
-  const block = blockingUiBlock(message?.uiBlock);
+/** A block the history draws: one that is answered, expired or closed. */
+function frozenUiBlock(message: AgentMessage | undefined): ConversationUiBlock | undefined {
+  const block = message?.uiBlock;
   return block && block.state.status !== "pending" ? block : undefined;
 }
 
@@ -238,7 +228,7 @@ export function ConversationTimeline() {
    * The block of the waiting prompt draws it as a card. Until the block's message arrives, or when the
    * agent asked without one, the prompt's questions draw it.
    */
-  const pendingPromptBlock = createMemo(() => (keyedPrompt() ? blockingUiBlock(props.promptUiBlock) : undefined));
+  const pendingPromptBlock = createMemo(() => (keyedPrompt() ? props.promptUiBlock : undefined));
   return (
     <>
       <span class="sr-only" role="status" aria-live="polite" aria-atomic="true">
