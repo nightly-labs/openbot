@@ -1584,7 +1584,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             this.#providers.requireProviderOn(agent.provider);
             if (needsModel)
               throw new Error(
-                sourceText("error.agent.noStartingModel", { provider: providerLabel(this.#preference().provider) }),
+                sourceText("error.agent.noStartingModelInSettings", {
+                  provider: providerLabel(this.#preference().provider),
+                }),
               );
           });
           return agent;
@@ -2733,7 +2735,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     input: SetMessageReactionInput,
   ) {
     const agent = yield* this.#store
-      .getOrCreate(input.agentId)
+      .existing(input.agentId)
       .pipe(
         Effect.mapError(
           (failure) => new AgentLifecycleFailed({ operation: "load reaction agent", cause: failure.cause }),
@@ -2784,7 +2786,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     mayStop?: () => boolean,
   ) {
     const agent = yield* this.#store
-      .getOrCreate(agentId)
+      .existing(agentId)
       .pipe(
         Effect.mapError(
           (failure) => new AgentLifecycleFailed({ operation: "load interrupted agent", cause: failure.cause }),
