@@ -209,9 +209,15 @@ export function createWebWorkspace(
       hostSessionRevoked: () => void retryHosts(),
       connection(update) {
         if (disposed || update.hostId !== hostId) return;
+        // A host that announced a restart comes back by itself; a wake is only for a stopped server.
+        const unavailable = update.state === "offline" && !update.code && !state.hostRestart;
         setState((draft) => {
           draft.status = update.state;
-          draft.error = update.code === "session_revoked" && leftHostIds.has(update.hostId) ? null : update.message;
+          // The lifecycle shows the message of an unavailable host only when the host does not sleep or wake.
+          draft.error =
+            unavailable || (update.code === "session_revoked" && leftHostIds.has(update.hostId))
+              ? null
+              : update.message;
           if (update.state !== "online") {
             draft.approvals = [];
             draft.prompts = [];
@@ -268,9 +274,8 @@ export function createWebWorkspace(
             .catch(report);
           return;
         }
-        // A host that announced a restart comes back by itself; a wake is only for a stopped server.
-        if (update.state === "offline" && !update.code && !state.hostRestart)
-          hostLifecycle.hostUnavailable(update.hostId);
+        if (unavailable)
+          hostLifecycle.hostUnavailable(update.hostId, update.message ? new Error(update.message) : undefined);
         if (update.state === "online") {
           revokedReconnect = false;
           hostLifecycle.endSleep();
