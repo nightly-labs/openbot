@@ -16,7 +16,6 @@ import { FileText } from "lucide-react-native";
 import type { Token, Tokens } from "marked";
 import { Fragment, memo, type ReactNode, useMemo } from "react";
 import { type ColorValue, ScrollView, type TextStyle, useWindowDimensions, View } from "react-native";
-import { useReducedMotion } from "react-native-reanimated";
 import { useCSSVariable } from "uniwind";
 import { BloubAvatarThumbnail } from "@/features/agents/components/bloub-avatar";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
@@ -28,6 +27,7 @@ import {
 } from "@/features/chat/components/streaming-tail-text";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { haptics } from "@/shared/lib/haptics";
+import { useMotionPreference } from "@/shared/lib/motion";
 import { currentText, useText } from "@/shared/lib/text";
 import { parseChatMarkdown } from "../model/chat-markdown-parser";
 import { plainMentionParts } from "../model/chat-mentions";
@@ -600,7 +600,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   selectable?: boolean;
   agents?: readonly MobileAgent[];
 }) {
-  const reducedMotion = useReducedMotion();
+  const textReveal = useMotionPreference("textReveal");
   const { fontScale } = useWindowDimensions();
   const tokens = useMemo(() => parseChatMarkdown(body), [body]);
   const reveal = useMemo(() => createReplyReveal(tokens), [tokens]);
@@ -621,7 +621,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
           fontScale,
           t,
           streaming,
-          animateTail: (streaming || Boolean(playback?.enabled)) && animationEnabled && !reducedMotion,
+          animateTail: (streaming || Boolean(playback?.enabled)) && animationEnabled && textReveal,
         }}
       />
     </StreamRevealProvider>
