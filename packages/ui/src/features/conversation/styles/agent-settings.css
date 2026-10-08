@@ -216,23 +216,6 @@
   padding: 9px 2px;
 }
 
-.agent-routine-run-row > span:nth-child(2) {
-  display: grid;
-  gap: 2px;
-}
-
-.agent-routine-run-row strong {
-  color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-sm);
-}
-
-.agent-routine-run-row small,
-.agent-routine-run-row em {
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
-  font-style: normal;
-}
-
 .agent-routines-overlay {
   top: 0;
   overflow: hidden;
@@ -353,8 +336,9 @@
   margin-top: 0;
 }
 
-/* The schedule is a field between Name and Instruction, so its heading matches their labels. */
-.agent-routine-when h3 {
+/* The schedule and history are fields, so their headings match the field labels. */
+.agent-routine-when h3,
+.agent-routine-history h3 {
   margin: 0 0 var(--openbot-space-1-5) var(--openbot-space-2);
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-md);
@@ -362,11 +346,12 @@
   line-height: var(--openbot-leading-md);
 }
 
-.agent-routine-history h3 {
-  margin: 0 0 8px;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
-  line-height: var(--openbot-leading-sm);
+/* A pointer and value row in the webhook filters. A JSON Pointer is longer than its value. */
+.agent-routine-event-filter {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr) auto;
+  align-items: center;
+  gap: var(--openbot-space-2);
 }
 
 .agent-routine-history {
@@ -389,7 +374,7 @@
   gap: 12px;
   border: 0;
   border-radius: var(--openbot-radius-sm);
-  padding: 5px var(--openbot-space-3);
+  padding: 5px var(--openbot-space-2);
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-sm);
   text-align: left;
@@ -397,6 +382,27 @@
 
 .ui-button.agent-routine-run-link {
   cursor: pointer;
+}
+
+/* An ignored webhook request: the time, then a muted note. */
+.agent-routine-run-text {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  gap: var(--openbot-space-2);
+  white-space: nowrap;
+}
+
+.agent-routine-run-note {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--openbot-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-routine-history-error {
+  margin-bottom: var(--openbot-space-2);
 }
 
 @media (hover: hover) and (pointer: fine) {

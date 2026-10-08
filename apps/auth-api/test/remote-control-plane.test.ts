@@ -24,6 +24,7 @@ function applyPlanMigrations(database: DatabaseSync): void {
     "0023_hosted_servers.sql",
     "0025_slack_workspace_routes.sql",
     "0026_discord_guild_routes.sql",
+    "0027_webhook_routes.sql",
   ]) {
     database.exec(readFileSync(new URL(`../migrations/${name}`, import.meta.url), "utf8"));
   }
@@ -731,6 +732,64 @@ describe("RemoteControlPlane", () => {
     ).resolves.toEqual([]);
     await runApiEffect(controlPlane.disconnectDiscordGuild("host-1", registration.machineToken, "111"));
     expect(discordRevocations()).toHaveLength(1);
+    // Generic webhook routes keep only opaque ownership metadata in the account service.
+    const webhookRegistration = await runApiEffect(
+      controlPlane.registerWebhookRoute("host-1", registration.machineToken, "source-1"),
+    );
+    expect(webhookRegistration).toEqual({ routeId: "source-1" });
+    const linkedAt = database.prepare("SELECT connected_at FROM webhook_routes WHERE route_id = 'source-1'").get();
+    if (!linkedAt || typeof linkedAt.connected_at !== "number") throw new Error("Missing webhook route timestamp.");
+    await expect(
+      runApiEffect(controlPlane.registerWebhookRoute("host-1", registration.machineToken, "source-1")),
+    ).resolves.toEqual(webhookRegistration);
+    expect(database.prepare("SELECT connected_at FROM webhook_routes WHERE route_id = 'source-1'").get()).toEqual(
+      linkedAt,
+    );
+    const webhookTicket = await runApiEffect(controlPlane.issueWebhookRoute("host-1", registration.machineToken));
+    expect(decodeJwt(webhookTicket.ticket)).toMatchObject({
+      aud: "openbot-webhook-route",
+      hid: "host-1",
+      routes: [{ id: "source-1", linkedAt: expect.any(Number) }],
+    });
+    await expect(
+      runApiEffect(
+        controlPlane.validateWebhookRoute({
+          hostId: "host-1",
+          routes: [{ id: "source-1", linkedAt: linkedAt.connected_at }],
+        }),
+      ),
+    ).resolves.toEqual(["source-1"]);
+    const otherHost = await runApiEffect(
+      controlPlane.registerHost(owner, {
+        hostId: "host-2",
+        name: "Second Mac",
+        ownerMembershipId: "local-owner-2",
+        devicePublicKey: "public-key-b",
+      }),
+    );
+    if (!otherHost.machineToken) throw new Error("The second host credential is missing.");
+    await expect(
+      runApiEffect(controlPlane.registerWebhookRoute("host-2", otherHost.machineToken, "source-1")),
+    ).rejects.toMatchObject({ code: "webhook_route_conflict" });
+    const webhookRevocations = () =>
+      webhookBodies.map((body) => JSON.parse(body)).filter((event) => event.type === "webhook-route-revoked");
+    await runApiEffect(controlPlane.disconnectWebhookRoute("host-1", registration.machineToken, "source-1"));
+    expect(database.prepare("SELECT revoked_at FROM webhook_routes WHERE route_id = 'source-1'").get()).toEqual({
+      revoked_at: 1_000,
+    });
+    expect(webhookRevocations()).toEqual([{ type: "webhook-route-revoked", routeId: "source-1", through: 1_000 }]);
+    await runApiEffect(controlPlane.disconnectWebhookRoute("host-1", registration.machineToken, "source-1"));
+    expect(webhookRevocations()).toHaveLength(1);
+    await expect(
+      runApiEffect(
+        controlPlane.validateWebhookRoute({
+          hostId: "host-1",
+          routes: [{ id: "source-1", linkedAt: linkedAt.connected_at }],
+        }),
+      ),
+    ).resolves.toEqual([]);
+    // Keep later outbox assertions scoped to the operations after this route-specific fixture.
+    webhookBodies.length = 0;
     // Signal reports that the bot left a guild: the link goes without the host.
     database
       .prepare(
@@ -1355,6 +1414,92 @@ describe("member limits per plan", () => {
           .all()
           .map((row) => row.userId),
       ).toEqual(["owner", ...users.slice(0, 8)].sort());
+    } finally {
+      database.close();
+    }
+  });
+});
+
+describe("webhook route tombstones", () => {
+  it("never gives a revoked or deleted host's route ID to another host", async () => {
+    const database = new DatabaseSync(":memory:");
+    try {
+      database.exec("PRAGMA foreign_keys = ON");
+      database.exec(`
+        CREATE TABLE users (id TEXT PRIMARY KEY);
+        CREATE TABLE team_tunnels (
+          server_id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL REFERENCES users(id),
+          tunnel_name TEXT NOT NULL,
+          api_hostname TEXT NOT NULL,
+          status TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          machine_token_hash TEXT
+        );
+        -- A host delete unlinks the owner's hosted sites.
+        CREATE TABLE hosted_sites (server_id TEXT, user_id TEXT);
+        INSERT INTO users(id) VALUES ('owner'), ('stranger');
+      `);
+      for (const name of [
+        "0012_remote_control_plane.sql",
+        "0013_remote_session_lifecycle.sql",
+        "0020_permanent_invites.sql",
+      ]) {
+        database.exec(readFileSync(new URL(`../migrations/${name}`, import.meta.url), "utf8"));
+      }
+      applyPlanMigrations(database);
+      const pair = await generateKeyPair("ES256", { extractable: true });
+      const privateJwk = await exportJWK(pair.privateKey);
+      const publicJwk = { ...(await exportJWK(pair.publicKey)), kid: "test-key", use: "sig", alg: "ES256" };
+      const controlPlane = new RemoteControlPlane(
+        {
+          DB: sqliteD1(database),
+          REMOTE_TICKET_PRIVATE_JWK: JSON.stringify({ ...privateJwk, kid: "test-key", alg: "ES256" }),
+          REMOTE_TICKET_PUBLIC_JWKS: JSON.stringify({ keys: [publicJwk] }),
+          REMOTE_TICKET_KEY_ID: "test-key",
+        },
+        { now: () => 1_000 },
+      );
+      const account = (id: string) => ({ id, email: `${id}@example.com`, name: null, avatarUrl: null });
+      const host = async (user: string, hostId: string) => {
+        const registered = await runApiEffect(
+          controlPlane.registerHost(account(user), { hostId, name: hostId, ownerMembershipId: `${hostId}:${user}` }),
+        );
+        if (!registered.machineToken) throw new Error("The host credential is missing.");
+        return registered.machineToken;
+      };
+      const ownerToken = await host("owner", "host-1");
+      await runApiEffect(controlPlane.registerWebhookRoute("host-1", ownerToken, "revoked-route"));
+      await runApiEffect(controlPlane.registerWebhookRoute("host-1", ownerToken, "deleted-host-route"));
+      await runApiEffect(controlPlane.disconnectWebhookRoute("host-1", ownerToken, "revoked-route"));
+      // The owner's own host cannot revive a revoked URL either.
+      await expect(
+        runApiEffect(controlPlane.registerWebhookRoute("host-1", ownerToken, "revoked-route")),
+      ).rejects.toMatchObject({ code: "webhook_route_conflict" });
+
+      const strangerToken = await host("stranger", "host-2");
+      await expect(
+        runApiEffect(controlPlane.registerWebhookRoute("host-2", strangerToken, "revoked-route")),
+      ).rejects.toMatchObject({ code: "webhook_route_conflict" });
+
+      // A deleted host frees its host ID, but not its route IDs.
+      await runApiEffect(controlPlane.deleteHost("owner", "host-1"));
+      const reusedHostToken = await host("stranger", "host-1");
+      await expect(
+        runApiEffect(controlPlane.registerWebhookRoute("host-1", reusedHostToken, "deleted-host-route")),
+      ).rejects.toMatchObject({ code: "webhook_route_conflict" });
+      await expect(runApiEffect(controlPlane.issueWebhookRoute("host-1", reusedHostToken))).resolves.toMatchObject({
+        routes: [],
+      });
+      await expect(
+        runApiEffect(
+          controlPlane.validateWebhookRoute({
+            hostId: "host-1",
+            routes: [{ id: "deleted-host-route", linkedAt: 1_000 }],
+          }),
+        ),
+      ).resolves.toEqual([]);
     } finally {
       database.close();
     }

@@ -1,4 +1,5 @@
 import type { BitwardenConnectorStatus } from "@openbot/contracts/ipc";
+import { classifyFailure } from "@openbot/telemetry";
 import { toast } from "@openbot/ui";
 import type { BitwardenConnectorPanelProps } from "@openbot/ui/features/settings/BitwardenConnectorPanel";
 import { currentText } from "@openbot/ui/text";
@@ -47,7 +48,9 @@ export function createBitwardenConnector(port = bitwardenConnectorPort): Bitward
       .catch((error: unknown) => {
         if (disposed || current !== attempt) return;
         const { t, errorMessage } = currentText();
-        toast.error(errorMessage(error, t("connector.bitwarden.failed")));
+        toast.error(errorMessage(error, t("connector.bitwarden.failed")), {
+          report: { operation: "other", source: "system", cause_code: classifyFailure(error) },
+        });
       })
       .finally(() => {
         if (!disposed && current === attempt)

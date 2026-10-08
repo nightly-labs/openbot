@@ -175,6 +175,17 @@ import type {
   SetDynamicIslandInteractiveInput,
   SetDynamicIslandPreferenceInput,
 } from "./ipc-dynamic-island";
+import type {
+  EventActivity,
+  EventRoutine,
+  EventRoutineRef,
+  EventStatus,
+  ListEventActivityInput,
+  ListEventRoutinesInput,
+  SaveEventRoutineInput,
+  SaveEventRoutineResult,
+  WebhookSecret,
+} from "./ipc-events";
 import type { GitHubConnectorRepositories, GitHubConnectorStatus } from "./ipc-github-connector";
 import type { HostAnalytics, HostAnalyticsInput } from "./ipc-host-analytics";
 import type {
@@ -1044,6 +1055,16 @@ export const IPC_ENDPOINTS = {
     revokeSession: request<string, void>()("host:revoke-session"),
     event: event<HostStatus>()("host:event"),
   },
+  events: {
+    getStatus: scopedQuery<EventStatus, "required">()("events:get-status"),
+    listRoutines: scopedRequest<ListEventRoutinesInput, EventRoutine[], "required">()("events:list-routines"),
+    saveRoutine: scopedRequest<SaveEventRoutineInput, SaveEventRoutineResult, "required">()("events:save-routine"),
+    deleteRoutine: scopedRequest<EventRoutineRef, void, "required">()("events:delete-routine"),
+    testRoutine: scopedRequest<EventRoutineRef, void, "required">()("events:test-routine"),
+    rotateSecret: scopedRequest<EventRoutineRef, WebhookSecret, "required">()("events:rotate-secret"),
+    listActivity: scopedRequest<ListEventActivityInput, EventActivity[], "required">()("events:list-activity"),
+  },
+
   remoteDesktop: {
     checkSetup: request<string, RemoteDesktopSetupStatus>()("remote-desktop:check-setup"),
     openSetup: request<RemoteDesktopSetupAction, void>()("remote-desktop:open-setup"),
@@ -1111,6 +1132,7 @@ export const IPC_GROUP_PATHS = {
   agentImport: "agentImport",
   plugins: "plugins",
   host: "host",
+  events: "events",
   remoteDesktop: "remoteDesktop",
 } as const satisfies { readonly [Group in keyof IpcEndpoints]: string | null };
 

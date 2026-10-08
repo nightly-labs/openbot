@@ -124,6 +124,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `providers-v4` | Code or link sign-in and managed runtimes, Cursor and Cline included | `providerAdmin` |
 | `host-admin-v1` | Server name and logo | `hostAdmin` |
 | `host-update-v1` | Check for, download and restart into an app update; cancel a restart that waits | `hostAdmin` |
+| `events-v1` | Manage webhook routines, their secrets, and activity | `events` |
 
 These IPC groups take a required server id and route with `scopedHandler`. A key travels only towards
 the host; no response carries one. `providers-v1` has no progress event, so the renderer reads runtime
@@ -177,6 +178,14 @@ event encoders at each hop (host peer, client transport, `remote-peer.ts`, SSE s
 loses the host while a restart waits treats it as the restart: desktop keeps the fast WebRTC retry
 instead of the `host_unavailable` wait for 10 minutes, and web tries again every 5 s for 3 minutes.
 `host-restart-toast.ts` shows the notice until the host is back, for 10 minutes at most.
+
+### Webhook routines
+
+A webhook belongs to its routine. The host keeps the trigger, the encrypted secret, and receipts in
+SQLite. D1 keeps only the route ID, the host, and the owner account.
+Signal sends each signed request to the connected host without a cloud queue. All `events-v1`
+routes need a host administrator. See [Webhook routines](events.md) and the
+[webhook guide](../webhooks.md).
 
 ## Desktop server notifications
 

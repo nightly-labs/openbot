@@ -8,6 +8,10 @@ export const messages = {
   "composer.signIn.pending": "Entrando…",
   "composer.signIn.label": "Entrar em {provider}",
   "composer.signIn.action": "Entrar",
+  "composer.update.body": "Atualize {provider} para continuar.",
+  "composer.update.manual": "Atualize {provider} no computador em que ele é executado para continuar.",
+  "composer.update.pending": "Atualizando…",
+  "composer.update.action": "Atualizar",
   "composer.usageLimit.resets": "Você usou todo o seu limite de {provider}. Ele será renovado {reset}.",
   "composer.usageLimit.selectModel":
     "Você usou todo o seu limite de {provider}. Selecione outro modelo para continuar.",

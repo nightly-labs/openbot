@@ -23,6 +23,7 @@ export interface AppPort {
   billing: OpenBotDesktopApi["billing"];
   hostedServers: OpenBotDesktopApi["hostedServers"];
   routineFeed: OpenBotDesktopApi["routineFeed"];
+  events: OpenBotDesktopApi["events"];
   plugins: Pick<OpenBotDesktopApi["plugins"], "onOpenListing" | "takePendingListing">;
   servers: Pick<OpenBotDesktopApi["servers"], "onInvite" | "takePendingInvite">;
 }

@@ -90,6 +90,7 @@ import { ContextResetBusyError } from "@openbot/contracts/team-protocol/context-
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
+import { classifyFailure } from "@openbot/telemetry";
 import { Deferred, Effect, Exit, Fiber, Result, Schema, Scope } from "effect";
 import { AgentMemories } from "./agent/agent-memories";
 import { AgentRemoval, type AgentRemovalFailed } from "./agent/agent-removal";
@@ -107,7 +108,8 @@ import { agentNamesById, displayMessageReferences } from "./agent/delivery-conte
 import { DeltaBuffer } from "./agent/delta-buffer";
 import { DrainScheduler } from "./agent/drain-scheduler";
 import { DuplicationGate, toAgentDuplicationFailed } from "./agent/duplication-gate";
-import { decodeProviderTurns } from "./agent/handoff-tool-steps";
+import type { FailureContext, FailureSignal } from "./agent/failure-signal";
+import { readCapturedSteps } from "./agent/handoff-tool-steps";
 import { type AgentHostedSites, HostedSiteCoordinator } from "./agent/hosted-site-coordinator";
 import { ImageGenRuntime } from "./agent/image-gen-runtime";
 import { MailboxSync } from "./agent/mailbox-sync";
@@ -160,8 +162,10 @@ import { MessagingThreads, toMessagingThreadFailed } from "./messaging/messaging
 import type { PasswordVault } from "./password-vault";
 import { decodeRecordResponse } from "./protocol";
 import { NO_PROVIDER_CREDENTIALS, type ProviderClientContext } from "./provider-drivers";
+import { providerHistoryPersistence } from "./provider-history-persistence";
 import { recordAgentRestartActivity } from "./restart-activity";
 import type { RoutineFlowTools } from "./routine-flows/routine-flow-tools";
+import { RoutineRecords } from "./routine-records";
 import type { RoutineHoldWindow } from "./routine-store";
 import { RoutineTimer } from "./routine-timer";
 import type { SidebarLayoutStore } from "./sidebar-layout-store";
@@ -187,6 +191,7 @@ export type { RoutineMutationOptions } from "./agent/routine-scheduler";
 export type { ResolvedSharedFile } from "./workspace-paths";
 
 interface AgentServiceEvents {
+  failure: [failure: FailureSignal];
   event: [event: AgentEvent];
   /** Finished tool steps for the local host's product analytics. Never forwarded to a client. */
   toolUsage: [usage: ToolUsageSignal];
@@ -282,6 +287,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #routines: RoutineScheduler;
   readonly #routineTimer: RoutineTimer;
   readonly #channelRoutines: ChannelRoutineScheduler;
+  /** Agent and channel routines of every trigger kind, with their webhook routes. */
+  readonly routineRecords: RoutineRecords;
   readonly #mcp: McpGateway;
   readonly #providers: ProviderRuntime;
   readonly #endpoints: CustomEndpoints;
@@ -526,6 +533,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       // endpoint can refuse the prompt itself, after the waits every caller above it makes.
       credentials: {
         ...credentials,
+        history: credentials.history ?? ((provider) => providerHistoryPersistence(this.#store.database, provider)),
         servesModel: (modelId) => this.#endpoints.serves(modelId),
         // Every MCP set that leaves for a provider is remembered, so its secrets stay redactable
         // after the user edits them. This is the second of the two ways one leaves; the other is
@@ -615,6 +623,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       mailbox,
       conversation: this.#conversation,
       routines: this.#routines,
+      scope: () => this.#scope,
       hooks: {
         emit: (event) => this.#emit(event),
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
@@ -659,14 +668,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       // The previous provider's CLI stops a minute after no agent uses it, so it is started again. The
       // first turn on the new provider waits for the start and the read, so both share one short
       // limit. No `cwd` is sent, as in the boot backfill: a replaced ACP session is not opened again.
-      readProviderTurns: (provider, threadId) =>
+      readProviderSteps: (provider, threadId) =>
         withTimeout(
           Effect.gen({ self: this }, function* () {
             yield* this.#providers.ensureProvider(provider);
             const client = this.#providers.clientFor(provider);
-            return client
-              ? yield* client.request("thread/read", { threadId, includeTurns: true }, decodeProviderTurns)
-              : [];
+            return client ? yield* readCapturedSteps(client, threadId) : new Map<string, string>();
           }),
           10_000,
           "The earlier provider session could not be read in time.",
@@ -821,6 +828,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         },
       },
     });
+    this.routineRecords = new RoutineRecords({
+      database: store.database,
+      agentRoutines: this.#routines,
+      channelRoutines: this.#channelRoutines,
+      agentExists: (agentId) => this.listAgents().some((agent) => agent.id === agentId),
+      channelExists: (channelId) => this.channels.store.exists(channelId),
+      channelRoutinesChanged: (channelId) => this.#emit({ type: "channel-routines-changed", channelId }),
+      routinesHeld: () => this.#routineTimer.held,
+    });
     this.messaging = new MessagingThreads(store.database, mailbox, {
       schedule: (agentId) => this.#drain.scheduleDrain(agentId),
       busy: (agentId) =>
@@ -915,8 +931,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       deltas: this.#deltas,
       usageLimits: this.#usageLimits,
       hooks: {
+        emitFailure: (failure) => this.emit("failure", failure),
         emit: (event) => this.#emit(event),
-        emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
+        emitError: (code, error, agentId, context) => this.#emitError(code, error, agentId, context),
         emitRuntimeSnapshot: () => this.#emitRuntimeSnapshot(),
         scheduleDrain: (agentId) => this.#drain.scheduleDrain(agentId),
         dropRefusedSession: (agentId, externalThreadId) =>
@@ -2473,7 +2490,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       }
       const skipped = new Set(
         this.#routines
-          .listFor(agentId)
+          .listRecordsFor(agentId)
           .filter((routine) => routine.limitPolicy === "skip")
           .map((routine) => routine.id),
       );
@@ -2707,14 +2724,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
     const snapshot = this.#conversation.ensureSnapshot(agent.id, agent.threadId);
     if (!snapshot.messages.some((message) => message.id === input.messageId)) {
-      yield* this.readConversation(agent.id).pipe(
-        Effect.mapError(
-          (failure) => new AgentLifecycleFailed({ operation: "read reaction conversation", cause: failure.cause }),
-        ),
-      );
+      const [message] = this.#store.database.readConversationMessages(agent.id, agent.threadId, [input.messageId]);
+      if (message) snapshot.messages.push(message);
     }
-    const current = this.#conversation.ensureSnapshot(agent.id, agent.threadId);
-    if (!current.messages.some((message) => message.id === input.messageId)) {
+    if (!snapshot.messages.some((message) => message.id === input.messageId)) {
       return yield* new AgentLifecycleFailed({
         operation: "set message reaction",
         cause: new Error(sourceText("error.agent.messageUnavailable")),
@@ -2727,8 +2740,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           (failure) => new AgentLifecycleFailed({ operation: "set message reaction", cause: failure.cause }),
         ),
       );
-    this.#mailboxSync.syncMailboxMessages(current);
-    this.#conversation.emitConversation(current);
+    this.#mailboxSync.syncMailboxMessages(snapshot);
+    this.#conversation.emitConversation(snapshot);
   }, Effect.uninterruptible).bind(this);
 
   interrupt(agentId: string, turnId: string, executionThreadId?: string): Effect.Effect<void, AgentLifecycleFailed> {
@@ -2853,7 +2866,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
   }
 
-  #emitError(code: string, error: unknown, agentId?: string): void {
+  #emitError(code: string, error: unknown, agentId?: string, context?: FailureContext): void {
+    this.emit("failure", {
+      ...context,
+      code,
+      ...(agentId !== undefined ? { agentId } : {}),
+      causeCode: context?.causeCode ?? classifyFailure(error),
+    });
     this.#emit({
       type: "error",
       agentId,

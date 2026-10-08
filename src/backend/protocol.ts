@@ -284,17 +284,23 @@ function decodeTurnRecord(value: unknown): TurnRecord {
   };
 }
 
-function decodeThreadItem(value: unknown): ThreadItem {
+export function decodeThreadItem(value: unknown): ThreadItem {
   const record = decodeRecord(value, "thread item");
   const item: ThreadItem = { type: requiredString(record, "type") };
   const id = optionalString(record, "id");
   const clientId = optionalString(record, "clientId");
   const text = optionalString(record, "text");
   const status = optionalString(record, "status");
+  const name = optionalString(record, "name");
+  const toolKind = optionalString(record, "toolKind");
   if (id !== undefined && id !== null) item.id = id;
   if (clientId !== undefined) item.clientId = clientId;
   if (text !== undefined && text !== null) item.text = text;
   if (status !== undefined && status !== null) item.status = status;
+  if (name !== undefined && name !== null) item.name = name;
+  if (toolKind !== undefined && toolKind !== null) item.toolKind = toolKind;
+  if (record.arguments !== undefined) item.arguments = record.arguments;
+  if (record.result !== undefined) item.result = record.result;
   const phase = optionalString(record, "phase");
   if (phase !== undefined && phase !== null) item.phase = phase;
   if (record.content !== undefined && item.type !== "reasoning") item.content = decodeThreadContent(record.content);

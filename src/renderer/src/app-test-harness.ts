@@ -1202,6 +1202,10 @@ export function installOpenbotStub(): void {
     customAgents: stubGroup("customAgents", {
       list: vi.fn().mockResolvedValue([]),
     }),
+    // A channel on this computer reads its routine count through the events group.
+    events: stubGroup("events", {
+      listRoutines: vi.fn().mockResolvedValue([]),
+    }),
     // Onboarding and the Providers section of Server settings scan on their own, so a scan finds nothing by default.
     providerDetection: stubGroup("providerDetection", {
       getSettings: vi.fn().mockResolvedValue({ enabled: true, addresses: [], folders: [], hiddenIds: [] }),

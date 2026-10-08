@@ -22,11 +22,16 @@ import { attachmentReferenceTone } from "@openbot/ui/features/conversation/Attac
 import { AwaitingReplies } from "@openbot/ui/features/conversation/AwaitingReplies";
 import { ComposerEditor } from "@openbot/ui/features/conversation/ComposerEditor";
 import { ComposerErrorBanner } from "@openbot/ui/features/conversation/ComposerErrorBanner";
-import { ComposerSignInNotice, ComposerUsageLimitNotice } from "@openbot/ui/features/conversation/ComposerNotice";
+import {
+  ComposerSignInNotice,
+  ComposerUpdateNotice,
+  ComposerUsageLimitNotice,
+} from "@openbot/ui/features/conversation/ComposerNotice";
 import { CloseIcon, MoreIcon, StopIcon } from "@openbot/ui/features/conversation/ConversationIcons";
 import { RichMessageText } from "@openbot/ui/features/conversation/RichMessageText";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, For, Loading, lazy, onCleanup, Show } from "solid-js";
+import { reportErrorBanner, reportNotification } from "../../error-reports";
 import { deviceSendShortcut, sendShortcutAriaKey, sendShortcutHintKey } from "../../send-shortcut-preference";
 import { useConversationViewScope } from "./conversation-scope";
 import { formatVoiceDuration, voiceButtonLabel, voiceSupported } from "./voice-status";
@@ -35,6 +40,7 @@ import { formatVoiceDuration, voiceButtonLabel, voiceSupported } from "./voice-s
 export function ConversationComposer() {
   const {
     agentReady,
+    providerUpdateRequired,
     attachmentAction,
     attachmentBusy,
     awaitingReplies,
@@ -211,22 +217,66 @@ export function ConversationComposer() {
             </div>
           )}
         </Show>
+        <Show when={providerUpdateRequired()}>
+          {(status) => (
+            <ComposerUpdateNotice
+              provider={status().id}
+              onUpdate={
+                props.providerRuntimeStatuses?.[status().id]?.availableVersion ? props.onDownloadProvider : undefined
+              }
+              updating={
+                props.providerRuntimeStatuses?.[status().id]?.phase === "downloading" ||
+                props.providerRuntimeStatuses?.[status().id]?.phase === "finishing"
+              }
+            />
+          )}
+        </Show>
         <Show when={signInRequired()}>
           {(status) => (
             <ComposerSignInNotice
               provider={status().id}
+              onShown={() =>
+                reportNotification({
+                  operation: "provider",
+                  source: "provider",
+                  cause_code: "authentication",
+                  severity: "warning",
+                  presentation: "banner",
+                  provider: status().id,
+                })
+              }
               signingIn={status().connectionState === "connecting"}
               onSignIn={(provider) => props.onSignInProvider?.(provider)}
             />
           )}
         </Show>
         <Show when={usageExhausted()}>
-          {(spent) => <ComposerUsageLimitNotice provider={spent().provider} resetsAt={spent().resetsAt} />}
+          {(spent) => (
+            <ComposerUsageLimitNotice
+              provider={spent().provider}
+              resetsAt={spent().resetsAt}
+              onShown={() =>
+                reportNotification({
+                  operation: "turn",
+                  source: "provider",
+                  cause_code: "usage_limit",
+                  severity: "error",
+                  presentation: "banner",
+                  provider: spent().provider,
+                })
+              }
+            />
+          )}
         </Show>
-        <Show when={currentChatError()}>
+        <Show
+          when={
+            currentChatError() && currentChatError() !== providerUpdateRequired()?.message ? currentChatError() : null
+          }
+        >
           {(message) => (
             <ComposerErrorBanner
               message={message()}
+              onShown={() => reportErrorBanner(message(), "turn")}
               conversationKey={currentChatConversationKey()}
               onDismiss={() => {
                 dismissCurrentChatErrors();
@@ -497,6 +547,7 @@ export function ConversationComposer() {
                       attachmentBusy() ||
                       submitting() ||
                       !agentReady() ||
+                      Boolean(providerUpdateRequired()) ||
                       voicePhase() === "preparing" ||
                       voicePhase() === "requesting" ||
                       voicePhase() === "transcribing"

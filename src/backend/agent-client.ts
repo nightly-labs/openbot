@@ -2,6 +2,7 @@ import type { AgentProviderId } from "@openbot/contracts/ipc";
 import type { Effect } from "effect";
 import type { AppServerNotification, AppServerRequest, RequestId, ResponseDecoder, RpcError } from "./protocol";
 import type { ProviderClientOperationError } from "./provider-client-effects";
+import type { ReadProviderHistory } from "./provider-history";
 
 export type AgentProvider = AgentProviderId;
 
@@ -13,6 +14,9 @@ export interface DiagnosticOrigin {
 export interface AgentClient {
   readonly provider: AgentProvider;
   readonly running: boolean;
+  readonly readHistory?: ReadProviderHistory;
+  /** False when stopping this client would lose a live provider session with no recovery path. */
+  readonly canReleaseProcess?: () => boolean;
   start(): void;
   stop(): Effect.Effect<void, ProviderClientOperationError>;
   /**

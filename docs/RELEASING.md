@@ -45,11 +45,42 @@ Create the `release` environment in `nightly-labs/openbot`, then add these envir
 Do not use an Apple Development certificate. Direct distribution and native macOS updates require a
 Developer ID Application certificate. Never commit signing credentials to the repository.
 
-The Docker image needs no secret: the `docker-publish` job pushes with `GITHUB_TOKEN`. After the
-first push, GHCR keeps the package `openbot` private. Open the package settings of
-`nightly-labs/openbot` once, make it public, and give the repository write access under **Manage
-Actions access**. (Not confirmed: a repository that pushes a new package usually gets this access
-already.)
+### Docker package access
+
+The Docker image needs no secret: the `docker-publish` job pushes with `GITHUB_TOKEN`.
+[GHCR makes new packages private](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry),
+even when the source repository is public. A successful push does not confirm public access.
+
+After the first push, a package administrator must open the
+[OpenBot package](https://github.com/orgs/nightly-labs/packages/container/package/openbot):
+
+1. Open **Package settings** and set **Change visibility** to **Public**.
+2. Check that the package is linked to `nightly-labs/openbot`. The Dockerfile sets the
+   `org.opencontainers.image.source` label for this link.
+3. Under **Manage Actions access**, check that `nightly-labs/openbot` has write access.
+
+If **Public** is disabled by organization administrators, an organization owner must enable
+**Public** under **Package creation** in the
+[organization package settings](https://github.com/organizations/nightly-labs/settings/packages).
+Make OpenBot public, then restore the previous organization policy. Existing public packages stay
+public when this creation permission is disabled again.
+
+If a release pushed its image but users cannot pull it, check these settings first. Changing
+visibility makes the existing tags public; no rebuild is needed. Tags `0.30.0` and `0.31.0` have
+no `v` prefix. Later releases also publish `v<version>` as an alias.
+
+Check access with an empty Docker configuration, so a saved login cannot hide the fault:
+
+```sh
+anonymous_config=$(mktemp -d)
+docker --config "$anonymous_config" manifest inspect ghcr.io/nightly-labs/openbot:latest
+docker --config "$anonymous_config" manifest inspect ghcr.io/nightly-labs/openbot:0.30.0
+rm -rf "$anonymous_config"
+```
+
+The release workflow checks anonymous access to the version, `v<version>` and `latest` tags,
+including both Linux architectures. A failure leaves the GitHub Release and pushed images in
+place. Correct the package settings, then run the failed job again.
 
 ## Windows signing
 
@@ -394,8 +425,9 @@ The workflow:
     architecture, after it checks the AppImage against its `SHA256SUMS` file. It starts each image
     with `docker/seccomp.json`, waits for `openbot status`, and stops it, which must exit with 0;
 11. after the GitHub Release is published, pushes both images to `ghcr.io/nightly-labs/openbot`
-    with the tags `<version>-amd64` and `<version>-arm64`, joins them under `<version>`, `latest` and
-    `sha-<commit>`, and attests the build provenance of that image. See [Docker](docker.md).
+    with the tags `<version>-amd64` and `<version>-arm64`, joins them under `<version>`, `v<version>`,
+    `latest` and `sha-<commit>`, and attests the build provenance of that image. It then checks
+    anonymous access to both architectures. See [Docker](docker.md).
 
 Users can verify a downloaded artifact with
 `gh attestation verify <file> --repo nightly-labs/openbot`.

@@ -100,6 +100,9 @@ export const messages = defineMessages("settings", {
   "settings.analytics.title": "Share product analytics",
   "settings.analytics.description":
     "Send usage and reliability metadata with your account ID and email to OpenBot’s self-hosted analytics.",
+  "settings.analytics.webTitle": "Share error reports",
+  "settings.analytics.webDescription":
+    "Send error and warning codes with your account ID to OpenBot’s analytics. This setting applies to this browser.",
   // The Settings window shell: its tab list, headers and save bar.
   "settings.tab.general.title": "General",
   "settings.tab.general.description": "Control how OpenBot behaves on this computer.",

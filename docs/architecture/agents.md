@@ -40,7 +40,7 @@ sidebar shows one canvas for each agent: every routine whose run reaches it, the
 reach, and the last run of each routine. Only this computer's host keeps flows; the remote IPC
 branch refuses them, and no Team API protocol changes.
 
-- `src/backend/routine-flows/` owns the three tables of migration 29: links, node positions and steps.
+- `src/backend/routine-flows/` owns the three tables of migration 31: links, node positions and steps.
   The rows are written directly, not through `dispatch`, because a step holds the text that one agent
   gave another, and the event log is never deleted from. `hardDeleteAgent` removes the rows of a
   deleted agent; a deleted routine or run takes its rows by foreign key.

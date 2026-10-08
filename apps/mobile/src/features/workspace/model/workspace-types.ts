@@ -35,6 +35,16 @@ import type {
   UpdateAgentInput,
   UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
+import type {
+  EventActivity,
+  EventRoutine,
+  EventRoutineOwner,
+  EventRoutineRef,
+  ListEventActivityInput,
+  SaveEventRoutineInput,
+  SaveEventRoutineResult,
+  WebhookSecret,
+} from "@openbot/contracts/ipc-events";
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import type { RemoteRecoveryStatus, RemoteTeamDirectoryClient } from "@openbot/team-client";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
@@ -152,6 +162,15 @@ export interface MobileWorkspaceContextValue {
   updateAgentRoutine: (input: UpdateRoutineInput, serverId: string) => Promise<void>;
   deleteAgentRoutine: (agentId: string, routineId: string, serverId: string) => Promise<void>;
   testAgentRoutine: (agentId: string, routineId: string, serverId: string) => Promise<void>;
+  /** Event administration is available only to owners and admins on hosts with events-v1. */
+  canManageEvents: (serverId: string) => boolean;
+  listEventRoutines: (owner: EventRoutineOwner, serverId: string) => Promise<EventRoutine[]>;
+  /** The result has the signing secret only when the save made a new webhook trigger. */
+  saveEventRoutine: (input: SaveEventRoutineInput, serverId: string) => Promise<SaveEventRoutineResult>;
+  deleteEventRoutine: (input: EventRoutineRef, serverId: string) => Promise<void>;
+  testEventRoutine: (input: EventRoutineRef, serverId: string) => Promise<void>;
+  rotateEventRoutineSecret: (input: EventRoutineRef, serverId: string) => Promise<WebhookSecret>;
+  listEventActivity: (input: ListEventActivityInput, serverId: string) => Promise<EventActivity[]>;
   loadAgentModels: (serverId: string) => Promise<AgentModelOption[]>;
   loadAgentMemories: (agentId: string, serverId: string) => Promise<AgentMemory[]>;
   loadAgentRoutines: (agentId: string, serverId: string) => Promise<Routine[]>;

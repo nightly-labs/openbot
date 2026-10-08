@@ -120,11 +120,43 @@ export class ConversationReadStore {
     return this.#withSupportedCursor(snapshot.threadId, stateFromSnapshot(snapshot, nextThroughMessageId), options);
   }
 
+  /**
+   * Marks a database boundary without loading the thread messages. The public conversation reader
+   * uses this for marker actions because a marker can target a message older than the working
+   * cache. The ordering key keeps the monotonic cursor rule from the snapshot implementation.
+   */
+  markReadForThread(
+    memberId: string,
+    threadId: string | null,
+    throughMessageId: string | null,
+    options: ConversationMarkerExclusions = {},
+  ): ConversationReadState {
+    if (!threadId) return emptyReadState();
+    const requestedKey = throughMessageId ? this.#messageOrderKey(threadId, throughMessageId) : undefined;
+    if (throughMessageId && !requestedKey) {
+      throw new Error(sourceText("error.backend.readBoundaryUnavailable"));
+    }
+    const stored = this.#storedCursor(threadId, memberId);
+    let nextThroughMessageId = throughMessageId;
+    if (stored && (!throughMessageId || this.#isAfter(threadId, stored, requestedKey))) {
+      nextThroughMessageId = stored;
+    }
+    this.#saveCursor(threadId, memberId, nextThroughMessageId, "marked");
+    return this.#withSupportedCursor(threadId, this.#stateFromDatabase(threadId, nextThroughMessageId), options);
+  }
+
   markUnread(memberId: string, snapshot: ConversationSnapshot): ConversationReadState {
     if (!snapshot.threadId) return emptyReadState();
     // Explicit user action only. Ordinary read acknowledgements remain monotonic.
     this.#saveCursor(snapshot.threadId, memberId, null, "marked");
     return stateFromSnapshot(snapshot, null);
+  }
+
+  /** Marks a thread unread without reading its message rows. */
+  markUnreadForThread(memberId: string, threadId: string | null): ConversationReadState {
+    if (!threadId) return emptyReadState();
+    this.#saveCursor(threadId, memberId, null, "marked");
+    return this.#stateFromDatabase(threadId, null);
   }
 
   #withSupportedCursor(
@@ -162,6 +194,41 @@ export class ConversationReadStore {
            WHERE thread_id = ? AND message_id = ? LIMIT 1`,
         )
         .get(threadId, messageId),
+    );
+  }
+
+  #messageOrderKey(
+    threadId: string,
+    messageId: string,
+  ): [createdAt: string, ordinal: number, messageId: string] | undefined {
+    const row = this.database.connection
+      .prepare(
+        `SELECT created_at, ordinal, message_id FROM projection_thread_messages
+         WHERE thread_id = ? AND message_id = ? LIMIT 1`,
+      )
+      .get(threadId, messageId);
+    if (row === undefined) return undefined;
+    if (!isDynamicRecord(row) || !isString(row.created_at) || !isNumber(row.ordinal) || !isString(row.message_id)) {
+      throw new Error("The conversation message order is malformed.");
+    }
+    return [row.created_at, row.ordinal, row.message_id];
+  }
+
+  #isAfter(
+    threadId: string,
+    candidateMessageId: string,
+    boundary: [createdAt: string, ordinal: number, messageId: string] | undefined,
+  ): boolean {
+    if (!boundary) return false;
+    return Boolean(
+      this.database.connection
+        .prepare(
+          `SELECT 1 FROM projection_thread_messages
+           WHERE thread_id = ? AND message_id = ?
+             AND (created_at, ordinal, message_id) > (?, ?, ?)
+           LIMIT 1`,
+        )
+        .get(threadId, candidateMessageId, ...boundary),
     );
   }
 

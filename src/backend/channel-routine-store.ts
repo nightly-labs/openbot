@@ -1,4 +1,3 @@
-import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   ChannelRoutine,
   ChannelRoutineRun,
@@ -6,15 +5,16 @@ import type {
   CreateChannelRoutineInput,
   UpdateChannelRoutineInput,
 } from "@openbot/contracts/ipc";
-import { sourceText } from "@openbot/i18n/source";
 import type { OpenBotDatabase } from "./openbot-database";
 import {
   type DueRoutine,
   type OwnedRoutine,
   type OwnedRoutineRun,
+  type ReceivedWebhookEvent,
   RoutineStore,
-  type RoutineTables,
+  type WebhookReceiveResult,
 } from "./routine-store";
+import { ROUTINE_TABLES } from "./routine-tables";
 
 export interface DueChannelRoutine {
   routine: ChannelRoutine;
@@ -23,20 +23,6 @@ export interface DueChannelRoutine {
   schedule: DueRoutine["schedule"];
 }
 
-const CHANNEL_ROUTINE_TABLES: RoutineTables = {
-  routineTable: "projection_channel_routines",
-  triggerTable: "projection_channel_routine_triggers",
-  runTable: "projection_channel_routine_runs",
-  ownerColumn: "channel_id",
-  handleColumn: "request_message_id",
-  routineAggregate: "channel-routine",
-  runAggregate: "channel-routine-run",
-  commandPrefix: "channel-routine",
-  eventPrefix: "channel-routine",
-  limit: INPUT_LIMITS.agentRoutines,
-  limitMessage: sourceText("error.backend.channelRoutineLimit", { limit: INPUT_LIMITS.agentRoutines }),
-};
-
 /**
  * The channel-shaped names over the shared store: `ownerId` reads as `channelId` and the run handle
  * reads as `requestMessageId` - the id of the message the fire posted, which is also the key that
@@ -44,7 +30,7 @@ const CHANNEL_ROUTINE_TABLES: RoutineTables = {
  */
 export class ChannelRoutineStore extends RoutineStore {
   constructor(database: OpenBotDatabase) {
-    super(database, CHANNEL_ROUTINE_TABLES);
+    super(database, ROUTINE_TABLES.channel);
   }
 
   list(channelId: string): ChannelRoutine[] {
@@ -89,12 +75,21 @@ export class ChannelRoutineStore extends RoutineStore {
   }
 
   createRun(
-    routine: ChannelRoutine,
+    routine: Pick<ChannelRoutine, "id" | "channelId" | "name" | "instruction">,
     triggerId: string | null,
     kind: ChannelRoutineRun["kind"],
     scheduledFor: string,
   ): ChannelRoutineRun {
-    return toChannelRun(this.createRunRow(toOwnedRoutine(routine), triggerId, kind, scheduledFor));
+    return toChannelRun(this.createRunRow(runSource(routine), triggerId, kind, scheduledFor));
+  }
+
+  receiveWebhook(
+    channelId: string,
+    routineId: string,
+    event: ReceivedWebhookEvent,
+  ): WebhookReceiveResult<ChannelRoutineRun> {
+    const result = this.receiveWebhookRow(channelId, routineId, event);
+    return result.kind === "started" ? { kind: "started", run: toChannelRun(result.run) } : result;
   }
 
   attachRequest(runId: string, requestMessageId: string): ChannelRoutineRun {
@@ -127,8 +122,13 @@ function toChannelRoutine({ ownerId, ...fields }: OwnedRoutine): ChannelRoutine 
   return { ...fields, channelId: ownerId };
 }
 
-function toOwnedRoutine({ channelId, ...fields }: ChannelRoutine): OwnedRoutine {
-  return { ...fields, ownerId: channelId };
+function runSource({
+  id,
+  channelId,
+  name,
+  instruction,
+}: Pick<ChannelRoutine, "id" | "channelId" | "name" | "instruction">) {
+  return { id, ownerId: channelId, name, instruction };
 }
 
 /**

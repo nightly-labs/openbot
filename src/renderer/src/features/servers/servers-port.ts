@@ -18,6 +18,7 @@ export interface ServersPort {
     | "setMcpServerEnabled"
     | "testMcpServer"
   >;
+  events: OpenBotDesktopApi["events"];
   auth: Pick<OpenBotDesktopApi["auth"], "onEvent">;
   browser: Pick<OpenBotDesktopApi["browser"], "setVisible">;
   hostAdmin: Pick<OpenBotDesktopApi["hostAdmin"], "getUpdateStatus" | "updateIdentity">;

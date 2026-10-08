@@ -1,5 +1,6 @@
 import type { AgentSummary } from "@openbot/contracts/ipc";
 import { TEAM_AGENT_CREATE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import { classifyFailure } from "@openbot/telemetry";
 import type { AgentProfile } from "@openbot/ui/data";
 import type { FirstAgentDraft } from "@openbot/ui/features/agents/FirstAgentSetup";
 import { currentText } from "@openbot/ui/text";
@@ -159,7 +160,10 @@ const AgentActions = createSimpleContext({
         });
         const { t, errorMessage } = currentText();
         actionToast.error(t("agent.error.duplicateTitle"), {
-          description: errorMessage(error, t("agent.error.duplicateFailed")),
+          ...{
+            description: errorMessage(error, t("agent.error.duplicateFailed")),
+          },
+          report: { operation: "agent", source: "action", cause_code: classifyFailure(error) },
         });
         throw error;
       } finally {

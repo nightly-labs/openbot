@@ -1,4 +1,5 @@
 import type { ServerSummary } from "@openbot/contracts/ipc";
+import { classifyFailure } from "@openbot/telemetry";
 import { useText } from "@openbot/ui/text";
 import { actionToast } from "../../action-toast";
 import { createSettingsPanelWidth, saveSettingsPanelWidth } from "../../components/settings-panel-width";
@@ -9,6 +10,7 @@ import { serverCanAdminister, serverSupportsCapability } from "../servers/server
 import { htmlAttachmentPageUrl } from "./chat-visual-url";
 import { useConversationController } from "./conversation-controller-context";
 import { useConversationViewScope } from "./conversation-scope";
+import { desktopEventRoutinesApi } from "./routine-webhooks-api";
 
 const SETTINGS_PANEL_MIN = 180;
 const SETTINGS_PANEL_MAX = 1600;
@@ -101,7 +103,10 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
                 .storage.openLocation({ agentId })
                 .catch((error) =>
                   actionToast.error(t("conversation.panels.openWorkspaceFailed"), {
-                    description: errorMessage(error, t("conversation.panels.tryAgain")),
+                    ...{
+                      description: errorMessage(error, t("conversation.panels.tryAgain")),
+                    },
+                    report: { operation: "turn", source: "action", cause_code: classifyFailure(error) },
                   }),
                 )
           : undefined,
@@ -343,6 +348,11 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
               onRoutineSelectionRequestHandled={handleRoutineSettingsRequest}
               onOpenRoutineRun={props.onOpenSearchMessage ? openRoutineRunMessage : undefined}
               files={agentFiles(props.server, agent().id)}
+              eventRoutines={
+                !props.runtime && serverCanAdminister(props.server, "events-v1")
+                  ? desktopEventRoutinesApi(props.server.id)
+                  : undefined
+              }
             />
           </Loading>
         )}

@@ -325,7 +325,7 @@ describe.sequential("AgentService: queue", () => {
       runCauseEffect(service.createAgent({ ...CREATE_AGENT_INPUT, name: "Chosen Agent", avatarSeed: "setup:chosen" })),
     ).resolves.toMatchObject({
       provider: "claude",
-      model: "claude-opus-5-5",
+      model: "claude-haiku-5-5",
     });
     // A template, a marketplace agent or an import names no model, and starts on the same choice.
     await expect(
@@ -337,7 +337,7 @@ describe.sequential("AgentService: queue", () => {
           avatarHue: null,
         }),
       ),
-    ).resolves.toMatchObject({ provider: "claude", model: "claude-opus-5-5" });
+    ).resolves.toMatchObject({ provider: "claude", model: "claude-haiku-5-5" });
 
     // A Codex model saved in setup is a choice too, not the built-in Luna 6 the record starts on.
     await runCauseEffect(service.setPreferredProvider("codex", "gpt-5.6-terra"));
@@ -403,7 +403,7 @@ describe.sequential("AgentService: queue", () => {
         {
           id: "codex",
           state: "available",
-          version: "0.144.1",
+          version: "0.156.0",
           email: "codex@example.com",
         },
         {
@@ -429,13 +429,13 @@ describe.sequential("AgentService: queue", () => {
         }),
       ),
     ).resolves.toMatchObject({
-      model: "claude-opus-5-5",
-      reasoningEffort: "high",
+      model: "claude-haiku-5-5",
+      reasoningEffort: "medium",
     });
     await runCauseEffect(service.setPreferredProvider("codex"));
     expect(service.getStatus()).toMatchObject({
       auth: { kind: "chatgpt", email: "codex@example.com" },
-      cliVersion: "0.144.1",
+      cliVersion: "0.156.0",
     });
     // The store default, which is what a new agent on the default provider keeps: `low`, not the
     // `medium` the Codex CLI reports for every GPT-5.6 model.
@@ -461,7 +461,7 @@ describe.sequential("AgentService: queue", () => {
       ),
     ).resolves.toMatchObject({
       provider: "claude",
-      model: "claude-opus-5-5",
+      model: "claude-haiku-5-5",
     });
   });
 
@@ -1177,6 +1177,22 @@ describe.sequential("AgentService: queue", () => {
         expect(message.delivery?.status).toBe("completed");
       }
     }
+  });
+
+  it("does not replay a provider turn when its first running marker fails", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex");
+    service = createTestService({ store, mailbox, clientFactory: () => client });
+    vi.spyOn(mailbox, "markRunning").mockImplementationOnce(() =>
+      Effect.fail(new StoredStateFailure({ cause: new Error("Running marker write failed.") })),
+    );
+    await runCauseEffect(service.initialize());
+
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Run once" }));
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "completed");
+
+    expect(client.requests.filter((request) => request.method === "turn/start")).toHaveLength(1);
+    expect(service.listQueue("chief").deliveries[0]?.status).toBe("completed");
   });
 
   it("queues FIFO instead of steering and continues draining after an interrupt", async () => {

@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { MemoryEditor, RoutineEditor } from "@/features/agents/components/agent-record-editor";
+import { useEventRoutines } from "@/features/agents/components/use-event-routines";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { useChannels } from "@/features/channels/components/use-channels";
 import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
@@ -36,16 +37,26 @@ export function ChannelRecordsScreen({ section }: { section: "memories" | "memor
     queryKey: [...key, "routines"],
     queryFn: () => store.routines(serverId, channelId),
   });
+  const { eventsEnabled, eventRoutines, webhookRoutines } = useEventRoutines(
+    { kind: "channel", id: channelId },
+    serverId,
+    available && !memorySection,
+    key,
+  );
   const query = memorySection ? memories : routines;
+  const recordsPending = query.isPending || (eventsEnabled && eventRoutines.isPending);
+  const recordsError = query.isError || (eventsEnabled && eventRoutines.isError);
   const target = { id: channelId, serverId };
   const memory = memories.data?.find((item) => item.id === recordId);
   const routine = routines.data?.find((item) => item.id === recordId);
+  const eventRoutine = eventRoutines.data?.find((item) => item.id === recordId);
+  const allRoutines = [...(routines.data ?? []), ...webhookRoutines];
   return (
     <SettingsContent>
       {!available ? <Typography.Paragraph>{t("mobile.channel.records.connect")}</Typography.Paragraph> : null}
-      {query.isPending && (Boolean(recordId) || section === "memories" || section === "routines") ? (
+      {recordsPending && (Boolean(recordId) || section === "memories" || section === "routines") ? (
         <Typography.Paragraph>{t("common.loading")}</Typography.Paragraph>
-      ) : query.isError && !query.data ? (
+      ) : recordsError && !query.data && !eventRoutines.data ? (
         <>
           <Typography.Paragraph accessibilityRole="alert">
             {t("mobile.channel.records.loadFailed")}
@@ -54,7 +65,7 @@ export function ChannelRecordsScreen({ section }: { section: "memories" | "memor
             <Button.Label>{t("common.tryAgain")}</Button.Label>
           </Button>
         </>
-      ) : recordId && !memory && !routine ? (
+      ) : recordId && !memory && !routine && !eventRoutine ? (
         <Typography.Paragraph>{t("mobile.channel.records.gone")}</Typography.Paragraph>
       ) : section === "memory" ? (
         <MemoryEditor
@@ -70,7 +81,7 @@ export function ChannelRecordsScreen({ section }: { section: "memories" | "memor
       ) : section === "routine" ? (
         <RoutineEditor
           agent={target}
-          routine={routine}
+          routine={eventRoutine ?? routine}
           available={available}
           port={{
             queryKey: key,
@@ -96,7 +107,7 @@ export function ChannelRecordsScreen({ section }: { section: "memories" | "memor
                   <Typography.Paragraph numberOfLines={2}>{item.text}</Typography.Paragraph>
                 </SettingsRow>
               ))
-            : routines.data?.map((item) => (
+            : allRoutines.map((item) => (
                 <SettingsRow
                   key={item.id}
                   supportingText={t(item.active ? "mobile.channel.records.enabled" : "mobile.channel.records.paused")}
@@ -110,7 +121,7 @@ export function ChannelRecordsScreen({ section }: { section: "memories" | "memor
                   <Typography.Paragraph>{item.name}</Typography.Paragraph>
                 </SettingsRow>
               ))}
-          {!query.data?.length ? (
+          {!memorySection && !allRoutines.length ? (
             <SettingsRow>
               <Typography.Paragraph>
                 {t(memorySection ? "mobile.channel.records.noMemories" : "mobile.channel.records.noRoutines")}

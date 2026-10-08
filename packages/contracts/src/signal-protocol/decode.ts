@@ -17,7 +17,14 @@ import {
   type SignalServerMessage,
   SLACK_DELIVERY_BODY_BYTES_LIMIT,
   type SlackDeliveryKind,
+  WEBHOOK_DELIVERY_BODY_BYTES_LIMIT,
 } from "./messages";
+import {
+  WEBHOOK_DELIVERY_ID_PATTERN,
+  WEBHOOK_ROUTE_ID_PATTERN,
+  WEBHOOK_SIGNATURE_PATTERN,
+  WEBHOOK_TIMESTAMP_PATTERN,
+} from "./webhook-route";
 
 /**
  * Returns `null` for a frame whose `type` this version does not know: a newer Signal service may add
@@ -99,10 +106,23 @@ export function decodeSignalServerMessage(value: unknown): SignalServerMessage |
         kind: deliveryKind(value.kind),
         retryNum: value.retryNum === null ? null : retryNumber(value.retryNum),
         retryReason: value.retryReason === null ? null : identifier(value.retryReason),
-        bodyBase64: deliveryBody(value.bodyBase64),
+        bodyBase64: deliveryBody(value.bodyBase64, SLACK_DELIVERY_BODY_BYTES_LIMIT),
+      };
+    case "webhook-delivery":
+      return {
+        type: kind,
+        version,
+        requestId: identifier(value.requestId),
+        routeId: matching(value.routeId, WEBHOOK_ROUTE_ID_PATTERN),
+        timestamp: matching(value.timestamp, WEBHOOK_TIMESTAMP_PATTERN),
+        deliveryId: matching(value.deliveryId, WEBHOOK_DELIVERY_ID_PATTERN),
+        signature: matching(value.signature, WEBHOOK_SIGNATURE_PATTERN),
+        bodyBase64: deliveryBody(value.bodyBase64, WEBHOOK_DELIVERY_BODY_BYTES_LIMIT),
       };
     case "discord-session":
       return { type: kind, version, token: identifier(value.token), guilds: guildList(value.guilds) };
+    case "webhook-ready":
+      return { type: kind, version };
     case "discord-delivery":
       return {
         type: kind,
@@ -175,13 +195,15 @@ function deliveryKind(value: unknown): SlackDeliveryKind {
 }
 
 // Base64 of at most the body limit.
-function deliveryBody(value: unknown): string {
+function deliveryBody(value: unknown, bytesLimit: number): string {
   const candidate = text(value);
-  if (
-    candidate.length > Math.ceil(SLACK_DELIVERY_BODY_BYTES_LIMIT / 3) * 4 ||
-    !/^[A-Za-z0-9+/]*={0,2}$/u.test(candidate)
-  )
-    invalid();
+  if (candidate.length > Math.ceil(bytesLimit / 3) * 4 || !/^[A-Za-z0-9+/]*={0,2}$/u.test(candidate)) invalid();
+  return candidate;
+}
+
+function matching(value: unknown, pattern: RegExp): string {
+  const candidate = text(value);
+  if (!pattern.test(candidate)) invalid();
   return candidate;
 }
 

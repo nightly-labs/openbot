@@ -103,7 +103,7 @@ export const messages = defineMessages("error.provider", {
   "error.provider.noModelNamed": "{provider} has no model available.",
   "error.provider.acpNoModels": "ACP CLI did not advertise any ACP models. OpenBot will not guess a fallback model.",
   "error.provider.endpointRemoveBusy": "Wait for the active turn and queue to finish before you remove this endpoint.",
-  "error.provider.codexOutdated": "Codex CLI {version} is too old. OpenBot requires 0.144.1 or newer.",
+  "error.provider.codexOutdated": "Codex CLI {version} is too old. OpenBot requires 0.156.0 or newer.",
   "error.provider.codexNotStarted": "Codex CLI was found but could not be started.",
   "error.provider.codexNotStartedHint":
     "Codex CLI was found but could not be started. Run `codex --version` in a new terminal.",

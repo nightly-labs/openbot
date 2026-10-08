@@ -26,6 +26,7 @@ import {
   requiredStringColumn,
 } from "./database/database-rows";
 import type { OpenBotDatabase } from "./openbot-database";
+import { revokeRoutineWebhooks } from "./webhook-route-store";
 
 export interface ChannelAssignment {
   id: string;
@@ -479,6 +480,7 @@ export class ChannelStore {
           db.prepare("SELECT memory_id FROM projection_channel_memories WHERE channel_id = ?").all(channelId),
         ).map((row) => requiredStringColumn(row, "memory_id"));
         const routineIds = channelRoutineIds(db, channelId);
+        revokeRoutineWebhooks(db, "channel", routineIds, { forget: true });
         deleteAggregateHistory(db, "channel", [channelId]);
         deleteAggregateHistory(db, "channel-memory", memoryIds);
         deleteAggregateHistory(db, "channel-routine", routineIds);

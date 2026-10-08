@@ -105,6 +105,7 @@ import { Route as V2RemoteInvitesPreviewRouteImport } from './routes/v2/remote/i
 import { Route as V2RemoteResumeValidateRouteImport } from './routes/v2/remote/resume/validate'
 import { Route as V2RemoteSessionsIndexRouteImport } from './routes/v2/remote/sessions/index'
 import { Route as V2RemoteSlackRouteValidateRouteImport } from './routes/v2/remote/slack-route/validate'
+import { Route as V2RemoteWebhookRouteValidateRouteImport } from './routes/v2/remote/webhook-route/validate'
 import { Route as V1MarketplaceAgentsAgentIdAvatarRouteImport } from './routes/v1/marketplace/agents/$agentId/avatar'
 import { Route as V1MarketplaceAgentsAgentIdInstallRouteImport } from './routes/v1/marketplace/agents/$agentId/install'
 import { Route as V1MarketplaceAgentsAdminSubmissionsRouteImport } from './routes/v1/marketplace/agents/admin/submissions'
@@ -127,6 +128,8 @@ import { Route as V2RemoteHostsHostIdLogoRouteImport } from './routes/v2/remote/
 import { Route as V2RemoteHostsHostIdSlackDisconnectRouteImport } from './routes/v2/remote/hosts/$hostId/slack-disconnect'
 import { Route as V2RemoteHostsHostIdSlackRouteRouteImport } from './routes/v2/remote/hosts/$hostId/slack-route'
 import { Route as V2RemoteHostsHostIdTicketRouteImport } from './routes/v2/remote/hosts/$hostId/ticket'
+import { Route as V2RemoteHostsHostIdWebhookRouteRouteImport } from './routes/v2/remote/hosts/$hostId/webhook-route'
+import { Route as V2RemoteHostsHostIdWebhookRoutesRouteImport } from './routes/v2/remote/hosts/$hostId/webhook-routes'
 import { Route as V2RemoteSessionsSessionIdEndRouteImport } from './routes/v2/remote/sessions/$sessionId/end'
 import { Route as V2RemoteSessionsSessionIdTicketRouteImport } from './routes/v2/remote/sessions/$sessionId/ticket'
 import { Route as V1MarketplaceAgentsAdminFeaturedAgentIdRouteImport } from './routes/v1/marketplace/agents/admin/featured/$agentId'
@@ -629,6 +632,12 @@ const V2RemoteSlackRouteValidateRoute =
     path: '/v2/remote/slack-route/validate',
     getParentRoute: () => rootRouteImport,
   } as any)
+const V2RemoteWebhookRouteValidateRoute =
+  V2RemoteWebhookRouteValidateRouteImport.update({
+    id: '/v2/remote/webhook-route/validate',
+    path: '/v2/remote/webhook-route/validate',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const V1MarketplaceAgentsAgentIdAvatarRoute =
   V1MarketplaceAgentsAgentIdAvatarRouteImport.update({
     id: '/avatar',
@@ -757,6 +766,18 @@ const V2RemoteHostsHostIdTicketRoute =
   V2RemoteHostsHostIdTicketRouteImport.update({
     id: '/v2/remote/hosts/$hostId/ticket',
     path: '/v2/remote/hosts/$hostId/ticket',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const V2RemoteHostsHostIdWebhookRouteRoute =
+  V2RemoteHostsHostIdWebhookRouteRouteImport.update({
+    id: '/v2/remote/hosts/$hostId/webhook-route',
+    path: '/v2/remote/hosts/$hostId/webhook-route',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const V2RemoteHostsHostIdWebhookRoutesRoute =
+  V2RemoteHostsHostIdWebhookRoutesRouteImport.update({
+    id: '/v2/remote/hosts/$hostId/webhook-routes',
+    path: '/v2/remote/hosts/$hostId/webhook-routes',
     getParentRoute: () => rootRouteImport,
   } as any)
 const V2RemoteSessionsSessionIdEndRoute =
@@ -894,6 +915,7 @@ export interface FileRoutesByFullPath {
   '/v2/remote/invites/preview': typeof V2RemoteInvitesPreviewRoute
   '/v2/remote/resume/validate': typeof V2RemoteResumeValidateRoute
   '/v2/remote/slack-route/validate': typeof V2RemoteSlackRouteValidateRoute
+  '/v2/remote/webhook-route/validate': typeof V2RemoteWebhookRouteValidateRoute
   '/v1/marketplace/agents/': typeof V1MarketplaceAgentsIndexRoute
   '/v1/me/billing/': typeof V1MeBillingIndexRoute
   '/v2/hosting/servers/': typeof V2HostingServersIndexRoute
@@ -920,6 +942,8 @@ export interface FileRoutesByFullPath {
   '/v2/remote/hosts/$hostId/slack-disconnect': typeof V2RemoteHostsHostIdSlackDisconnectRoute
   '/v2/remote/hosts/$hostId/slack-route': typeof V2RemoteHostsHostIdSlackRouteRoute
   '/v2/remote/hosts/$hostId/ticket': typeof V2RemoteHostsHostIdTicketRoute
+  '/v2/remote/hosts/$hostId/webhook-route': typeof V2RemoteHostsHostIdWebhookRouteRoute
+  '/v2/remote/hosts/$hostId/webhook-routes': typeof V2RemoteHostsHostIdWebhookRoutesRoute
   '/v2/remote/sessions/$sessionId/end': typeof V2RemoteSessionsSessionIdEndRoute
   '/v2/remote/sessions/$sessionId/ticket': typeof V2RemoteSessionsSessionIdTicketRoute
   '/v2/hosting/servers/$serverId/': typeof V2HostingServersServerIdIndexRoute
@@ -1021,6 +1045,7 @@ export interface FileRoutesByTo {
   '/v2/remote/invites/preview': typeof V2RemoteInvitesPreviewRoute
   '/v2/remote/resume/validate': typeof V2RemoteResumeValidateRoute
   '/v2/remote/slack-route/validate': typeof V2RemoteSlackRouteValidateRoute
+  '/v2/remote/webhook-route/validate': typeof V2RemoteWebhookRouteValidateRoute
   '/v1/marketplace/agents': typeof V1MarketplaceAgentsIndexRoute
   '/v1/me/billing': typeof V1MeBillingIndexRoute
   '/v2/hosting/servers': typeof V2HostingServersIndexRoute
@@ -1047,6 +1072,8 @@ export interface FileRoutesByTo {
   '/v2/remote/hosts/$hostId/slack-disconnect': typeof V2RemoteHostsHostIdSlackDisconnectRoute
   '/v2/remote/hosts/$hostId/slack-route': typeof V2RemoteHostsHostIdSlackRouteRoute
   '/v2/remote/hosts/$hostId/ticket': typeof V2RemoteHostsHostIdTicketRoute
+  '/v2/remote/hosts/$hostId/webhook-route': typeof V2RemoteHostsHostIdWebhookRouteRoute
+  '/v2/remote/hosts/$hostId/webhook-routes': typeof V2RemoteHostsHostIdWebhookRoutesRoute
   '/v2/remote/sessions/$sessionId/end': typeof V2RemoteSessionsSessionIdEndRoute
   '/v2/remote/sessions/$sessionId/ticket': typeof V2RemoteSessionsSessionIdTicketRoute
   '/v2/hosting/servers/$serverId': typeof V2HostingServersServerIdIndexRoute
@@ -1149,6 +1176,7 @@ export interface FileRoutesById {
   '/v2/remote/invites/preview': typeof V2RemoteInvitesPreviewRoute
   '/v2/remote/resume/validate': typeof V2RemoteResumeValidateRoute
   '/v2/remote/slack-route/validate': typeof V2RemoteSlackRouteValidateRoute
+  '/v2/remote/webhook-route/validate': typeof V2RemoteWebhookRouteValidateRoute
   '/v1/marketplace/agents/': typeof V1MarketplaceAgentsIndexRoute
   '/v1/me/billing/': typeof V1MeBillingIndexRoute
   '/v2/hosting/servers/': typeof V2HostingServersIndexRoute
@@ -1175,6 +1203,8 @@ export interface FileRoutesById {
   '/v2/remote/hosts/$hostId/slack-disconnect': typeof V2RemoteHostsHostIdSlackDisconnectRoute
   '/v2/remote/hosts/$hostId/slack-route': typeof V2RemoteHostsHostIdSlackRouteRoute
   '/v2/remote/hosts/$hostId/ticket': typeof V2RemoteHostsHostIdTicketRoute
+  '/v2/remote/hosts/$hostId/webhook-route': typeof V2RemoteHostsHostIdWebhookRouteRoute
+  '/v2/remote/hosts/$hostId/webhook-routes': typeof V2RemoteHostsHostIdWebhookRoutesRoute
   '/v2/remote/sessions/$sessionId/end': typeof V2RemoteSessionsSessionIdEndRoute
   '/v2/remote/sessions/$sessionId/ticket': typeof V2RemoteSessionsSessionIdTicketRoute
   '/v2/hosting/servers/$serverId/': typeof V2HostingServersServerIdIndexRoute
@@ -1278,6 +1308,7 @@ export interface FileRouteTypes {
     | '/v2/remote/invites/preview'
     | '/v2/remote/resume/validate'
     | '/v2/remote/slack-route/validate'
+    | '/v2/remote/webhook-route/validate'
     | '/v1/marketplace/agents/'
     | '/v1/me/billing/'
     | '/v2/hosting/servers/'
@@ -1304,6 +1335,8 @@ export interface FileRouteTypes {
     | '/v2/remote/hosts/$hostId/slack-disconnect'
     | '/v2/remote/hosts/$hostId/slack-route'
     | '/v2/remote/hosts/$hostId/ticket'
+    | '/v2/remote/hosts/$hostId/webhook-route'
+    | '/v2/remote/hosts/$hostId/webhook-routes'
     | '/v2/remote/sessions/$sessionId/end'
     | '/v2/remote/sessions/$sessionId/ticket'
     | '/v2/hosting/servers/$serverId/'
@@ -1405,6 +1438,7 @@ export interface FileRouteTypes {
     | '/v2/remote/invites/preview'
     | '/v2/remote/resume/validate'
     | '/v2/remote/slack-route/validate'
+    | '/v2/remote/webhook-route/validate'
     | '/v1/marketplace/agents'
     | '/v1/me/billing'
     | '/v2/hosting/servers'
@@ -1431,6 +1465,8 @@ export interface FileRouteTypes {
     | '/v2/remote/hosts/$hostId/slack-disconnect'
     | '/v2/remote/hosts/$hostId/slack-route'
     | '/v2/remote/hosts/$hostId/ticket'
+    | '/v2/remote/hosts/$hostId/webhook-route'
+    | '/v2/remote/hosts/$hostId/webhook-routes'
     | '/v2/remote/sessions/$sessionId/end'
     | '/v2/remote/sessions/$sessionId/ticket'
     | '/v2/hosting/servers/$serverId'
@@ -1532,6 +1568,7 @@ export interface FileRouteTypes {
     | '/v2/remote/invites/preview'
     | '/v2/remote/resume/validate'
     | '/v2/remote/slack-route/validate'
+    | '/v2/remote/webhook-route/validate'
     | '/v1/marketplace/agents/'
     | '/v1/me/billing/'
     | '/v2/hosting/servers/'
@@ -1558,6 +1595,8 @@ export interface FileRouteTypes {
     | '/v2/remote/hosts/$hostId/slack-disconnect'
     | '/v2/remote/hosts/$hostId/slack-route'
     | '/v2/remote/hosts/$hostId/ticket'
+    | '/v2/remote/hosts/$hostId/webhook-route'
+    | '/v2/remote/hosts/$hostId/webhook-routes'
     | '/v2/remote/sessions/$sessionId/end'
     | '/v2/remote/sessions/$sessionId/ticket'
     | '/v2/hosting/servers/$serverId/'
@@ -1651,6 +1690,7 @@ export interface RootRouteChildren {
   V2RemoteInvitesPreviewRoute: typeof V2RemoteInvitesPreviewRoute
   V2RemoteResumeValidateRoute: typeof V2RemoteResumeValidateRoute
   V2RemoteSlackRouteValidateRoute: typeof V2RemoteSlackRouteValidateRoute
+  V2RemoteWebhookRouteValidateRoute: typeof V2RemoteWebhookRouteValidateRoute
   V1MarketplaceAgentsIndexRoute: typeof V1MarketplaceAgentsIndexRoute
   V2HostingServersIndexRoute: typeof V2HostingServersIndexRoute
   V2RemoteHostsIndexRoute: typeof V2RemoteHostsIndexRoute
@@ -1672,6 +1712,8 @@ export interface RootRouteChildren {
   V2RemoteHostsHostIdSlackDisconnectRoute: typeof V2RemoteHostsHostIdSlackDisconnectRoute
   V2RemoteHostsHostIdSlackRouteRoute: typeof V2RemoteHostsHostIdSlackRouteRoute
   V2RemoteHostsHostIdTicketRoute: typeof V2RemoteHostsHostIdTicketRoute
+  V2RemoteHostsHostIdWebhookRouteRoute: typeof V2RemoteHostsHostIdWebhookRouteRoute
+  V2RemoteHostsHostIdWebhookRoutesRoute: typeof V2RemoteHostsHostIdWebhookRoutesRoute
   V2RemoteSessionsSessionIdEndRoute: typeof V2RemoteSessionsSessionIdEndRoute
   V2RemoteSessionsSessionIdTicketRoute: typeof V2RemoteSessionsSessionIdTicketRoute
   V2HostingServersServerIdIndexRoute: typeof V2HostingServersServerIdIndexRoute
@@ -2354,6 +2396,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof V2RemoteSlackRouteValidateRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/v2/remote/webhook-route/validate': {
+      id: '/v2/remote/webhook-route/validate'
+      path: '/v2/remote/webhook-route/validate'
+      fullPath: '/v2/remote/webhook-route/validate'
+      preLoaderRoute: typeof V2RemoteWebhookRouteValidateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/v1/marketplace/agents/$agentId/avatar': {
       id: '/v1/marketplace/agents/$agentId/avatar'
       path: '/avatar'
@@ -2506,6 +2555,20 @@ declare module '@tanstack/solid-router' {
       path: '/v2/remote/hosts/$hostId/ticket'
       fullPath: '/v2/remote/hosts/$hostId/ticket'
       preLoaderRoute: typeof V2RemoteHostsHostIdTicketRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v2/remote/hosts/$hostId/webhook-route': {
+      id: '/v2/remote/hosts/$hostId/webhook-route'
+      path: '/v2/remote/hosts/$hostId/webhook-route'
+      fullPath: '/v2/remote/hosts/$hostId/webhook-route'
+      preLoaderRoute: typeof V2RemoteHostsHostIdWebhookRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v2/remote/hosts/$hostId/webhook-routes': {
+      id: '/v2/remote/hosts/$hostId/webhook-routes'
+      path: '/v2/remote/hosts/$hostId/webhook-routes'
+      fullPath: '/v2/remote/hosts/$hostId/webhook-routes'
+      preLoaderRoute: typeof V2RemoteHostsHostIdWebhookRoutesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/v2/remote/sessions/$sessionId/end': {
@@ -2770,6 +2833,7 @@ const rootRouteChildren: RootRouteChildren = {
   V2RemoteInvitesPreviewRoute: V2RemoteInvitesPreviewRoute,
   V2RemoteResumeValidateRoute: V2RemoteResumeValidateRoute,
   V2RemoteSlackRouteValidateRoute: V2RemoteSlackRouteValidateRoute,
+  V2RemoteWebhookRouteValidateRoute: V2RemoteWebhookRouteValidateRoute,
   V1MarketplaceAgentsIndexRoute: V1MarketplaceAgentsIndexRoute,
   V2HostingServersIndexRoute: V2HostingServersIndexRoute,
   V2RemoteHostsIndexRoute: V2RemoteHostsIndexRoute,
@@ -2794,6 +2858,8 @@ const rootRouteChildren: RootRouteChildren = {
     V2RemoteHostsHostIdSlackDisconnectRoute,
   V2RemoteHostsHostIdSlackRouteRoute: V2RemoteHostsHostIdSlackRouteRoute,
   V2RemoteHostsHostIdTicketRoute: V2RemoteHostsHostIdTicketRoute,
+  V2RemoteHostsHostIdWebhookRouteRoute: V2RemoteHostsHostIdWebhookRouteRoute,
+  V2RemoteHostsHostIdWebhookRoutesRoute: V2RemoteHostsHostIdWebhookRoutesRoute,
   V2RemoteSessionsSessionIdEndRoute: V2RemoteSessionsSessionIdEndRoute,
   V2RemoteSessionsSessionIdTicketRoute: V2RemoteSessionsSessionIdTicketRoute,
   V2HostingServersServerIdIndexRoute: V2HostingServersServerIdIndexRoute,

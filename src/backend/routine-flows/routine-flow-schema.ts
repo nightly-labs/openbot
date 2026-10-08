@@ -1,4 +1,4 @@
-// Shared by migration v29 and the separate new-database schema. IF NOT EXISTS throughout, because
+// Shared by migration v31 and the separate new-database schema. IF NOT EXISTS throughout, because
 // this text is both the migration and the tail of the latest schema.
 //
 // A routine flow is what happens after an agent routine's own agent answers: each link hands that

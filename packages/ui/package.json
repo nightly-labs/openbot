@@ -113,7 +113,9 @@
     "./features/conversation/QueuePanel": "./src/features/conversation/QueuePanel.tsx",
     "./features/conversation/RichMessageText": "./src/features/conversation/RichMessageText.tsx",
     "./features/conversation/RoutineRunHistory": "./src/features/conversation/RoutineRunHistory.tsx",
+    "./features/conversation/RoutineWebhookTrigger": "./src/features/conversation/RoutineWebhookTrigger.tsx",
     "./features/conversation/RoutineSchedulePicker": "./src/features/conversation/RoutineSchedulePicker.tsx",
+    "./features/conversation/RoutineTriggerMenu": "./src/features/conversation/RoutineTriggerMenu.tsx",
     "./features/conversation/RoutineCalendar": "./src/features/conversation/RoutineCalendar.tsx",
     "./features/conversation/RoutineScheduleCard": "./src/features/conversation/RoutineScheduleCard.tsx",
     "./features/conversation/routine-schedule-draft": "./src/features/conversation/routine-schedule-draft.ts",
@@ -328,7 +330,8 @@
     "mermaid": "catalog:",
     "@tanstack/virtual-core": "catalog:",
     "zod": "catalog:",
-    "@openbot/i18n": "workspace:*"
+    "@openbot/i18n": "workspace:*",
+    "@openbot/telemetry": "workspace:*"
   },
   "peerDependencies": {
     "solid-js": "2.0.0-rc.0",

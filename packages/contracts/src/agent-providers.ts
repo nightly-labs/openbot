@@ -115,7 +115,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     onboardingDescription: "Included with OpenBot",
     signInMessage: "Connect Claude to continue.",
     installGuideLink: "claude-install",
-    defaultModel: "claude-opus-5-5",
+    defaultModel: "claude-haiku-5-5",
     legacyModelPrefix: "claude-",
     authKind: "claude",
     pickerOrder: 0,

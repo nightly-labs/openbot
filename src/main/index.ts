@@ -1,6 +1,12 @@
 import { join, resolve } from "node:path";
 import { parseInviteUrl, selfHostedApiOrigin } from "@openbot/contracts/invite-links";
-import { type AppLogoColor, type CentralAuthState, IPC_ENDPOINTS } from "@openbot/contracts/ipc";
+import {
+  type AgentEvent,
+  type AppLogoColor,
+  type CentralAuthState,
+  type HostStatus,
+  IPC_ENDPOINTS,
+} from "@openbot/contracts/ipc";
 import { createFormat, resolveLocale, translateFor } from "@openbot/i18n";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { createRemoteDirectoryRefresh } from "@openbot/team-client/remote-directory";
@@ -51,6 +57,7 @@ import { customAgentIpcHandlers } from "./ipc/custom-agent-handlers";
 import { customProviderIpcHandlers } from "./ipc/custom-provider-handlers";
 import { registerIpcGroups } from "./ipc/define-ipc-group";
 import { dynamicIslandIpcHandlers } from "./ipc/dynamic-island-handlers";
+import { eventsIpcHandlers } from "./ipc/events-handlers";
 import { githubConnectorIpcHandlers } from "./ipc/github-connector-handlers";
 import { hostAdminIpcHandlers } from "./ipc/host-admin-handlers";
 import { hostedServerIpcHandlers } from "./ipc/hosted-server-handlers";
@@ -451,6 +458,7 @@ function registerIpcHandlers({
   billing,
   hostedServers,
   routineFeed,
+  events,
   customProviderChanges,
   customAgentChanges,
   providerDetection,
@@ -508,6 +516,7 @@ function registerIpcHandlers({
     ...bitwardenConnectorIpcHandlers({ bitwardenConnector }),
     ...billingIpcHandlers({ billing }),
     ...routineFeedIpcHandlers({ routineFeed }),
+    ...eventsIpcHandlers({ events, remoteServers }),
     ...hostedServerIpcHandlers({ hostedServers }),
     ...customProviderIpcHandlers(customProviderChanges),
     ...customAgentIpcHandlers(customAgentChanges),
@@ -927,6 +936,53 @@ if (!hasSingleInstanceLock) {
       setIpcCallObserver((call) => trace.record({ kind: "ipc", ...call }));
       service.on("event", (event) => trace.observeAgentEvent(event));
       service.on("event", (event) => forwardAgentEvent("local", event));
+      // A routine or its owner can be deleted outside the events API. Its route is then revoked here.
+      // Turns and channel messages also send these events, so only a deleted owner starts a sync.
+      let webhookAgentIds = new Set(service.listAgents().map((agent) => agent.id));
+      const onRoutineEvent = (event: AgentEvent): void => {
+        switch (event.type) {
+          case "routines-changed":
+          case "channel-routines-changed":
+            built.eventsRuntime.syncRoutes({ all: false });
+            return;
+          case "agents-changed": {
+            const previous = webhookAgentIds;
+            webhookAgentIds = new Set(event.agents.map((agent) => agent.id));
+            if ([...previous].some((id) => !webhookAgentIds.has(id))) built.eventsRuntime.syncRoutes({ all: false });
+            return;
+          }
+          case "channels-changed":
+            if (!service.routineRecords.ownerExists({ kind: "channel", id: event.channelId }))
+              built.eventsRuntime.syncRoutes({ all: false });
+            return;
+        }
+      };
+      // Routes belong to the signed-in account. A token refresh does not change them.
+      let webhookPrincipalId = centralAuthPrincipalId(built.centralAuth.getState());
+      built.eventsRuntime.setAccountPrincipal(webhookPrincipalId);
+      const refreshWebhookRoutes = (state: CentralAuthState): void => {
+        const principalId = centralAuthPrincipalId(state);
+        if (principalId === webhookPrincipalId) return;
+        webhookPrincipalId = principalId;
+        built.eventsRuntime.setAccountPrincipal(principalId);
+        if (principalId !== null) built.eventsRuntime.syncRoutes({ all: true });
+      };
+      service.on("event", onRoutineEvent);
+      built.centralAuth.on("changed", refreshWebhookRoutes);
+      let webhookHostId = host.getStatus().serverId;
+      const onHostChanged = (status: HostStatus): void => {
+        const hostIdentityChanged = status.serverId !== webhookHostId;
+        webhookHostId = status.serverId;
+        forwardHostStatus(status);
+        const principalId = centralAuthPrincipalId(built.centralAuth.getState());
+        if (hostIdentityChanged && principalId !== null && status.serverId !== null)
+          built.eventsRuntime.syncRoutes({ all: true });
+      };
+      teardown.push(0, "event service listeners", () => {
+        service.off("event", onRoutineEvent);
+        built.centralAuth.off("changed", refreshWebhookRoutes);
+        host.off("changed", onHostChanged);
+      });
       // Internal usage signals for analytics only. They are not agent events, so the renderer and
       // Team API clients never receive them.
       service.on("toolUsage", (usage) => built.analytics.handleToolUsage(usage));
@@ -937,7 +993,7 @@ if (!hasSingleInstanceLock) {
           sendToRenderer(window, IPC_ENDPOINTS.app.approvalAutomation, preference);
         }
       });
-      host.on("changed", forwardHostStatus);
+      host.on("changed", onHostChanged);
       host.on("presence", (snapshot) => forwardTeamPresence("local", snapshot));
       host.on("directMessage", (event) => forwardDirectMessage("local", event));
       host.on("directTyping", (event) => forwardDirectTyping("local", event));

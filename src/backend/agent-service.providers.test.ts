@@ -2812,7 +2812,7 @@ describe.sequential("AgentService: providers", () => {
         {
           id: "codex",
           state: "available",
-          version: "0.144.1",
+          version: "0.156.0",
           email: "codex@example.com",
         },
         { id: "claude", state: "error", version: null },

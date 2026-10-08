@@ -13,11 +13,12 @@ import type {
 import { sourceText } from "@openbot/i18n/source";
 import { collapseMissedOccurrences } from "@openbot/team-client/routine-schedule";
 import { Effect, Result, Schema } from "effect";
+import type { RoutineTriggerAccess } from "./agent/routine-scheduler";
 import { ChannelRoutineStore } from "./channel-routine-store";
 import type { ChannelService } from "./channel-service";
 import { causeHelpers } from "./effect-boundary";
 import { recordRestartActivity } from "./restart-activity";
-import type { RoutineHoldWindow } from "./routine-store";
+import type { OwnedRoutineRecord, ReceivedWebhookEvent, RoutineHoldWindow, RoutineRecordInput } from "./routine-store";
 import type { RoutineDueSource } from "./routine-timer";
 
 export interface ChannelRoutineHooks {
@@ -118,7 +119,7 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
    */
   hasActiveRuns(): boolean {
     for (const channelId of this.#channels.store.ids()) {
-      for (const routine of this.#routines.list(channelId)) {
+      for (const routine of this.#routines.listRecords(channelId)) {
         if (this.#routines.activeRuns(channelId, routine.id).length > 0) return true;
       }
     }
@@ -141,8 +142,56 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
     return routine;
   }
 
-  delete(input: DeleteChannelRoutineInput): void {
-    this.#routines.delete(this.#requireChannel(input.channelId), input.routineId);
+  /** Routines of every trigger kind, for the events surface. */
+  listRecords(channelId: string): OwnedRoutineRecord[] {
+    return this.#routines.listRecords(this.#requireChannel(channelId));
+  }
+
+  getRecord(channelId: string, routineId: string): OwnedRoutineRecord | null {
+    return this.#routines.getRecord(this.#requireChannel(channelId), routineId);
+  }
+
+  saveRecord(channelId: string, routineId: string | undefined, input: RoutineRecordInput): OwnedRoutineRecord {
+    const routine = this.#routines.saveRecord(this.#requireChannel(channelId), routineId, input);
+    this.#changed(channelId);
+    return routine;
+  }
+
+  /**
+   * Starts a run for one verified webhook request. An archived or held channel is unavailable, so
+   * the sender retries later and nothing is written.
+   */
+  readonly receiveWebhook = Effect.fn("ChannelRoutineScheduler.receiveWebhook")(function* (
+    this: ChannelRoutineScheduler,
+    channelId: string,
+    routineId: string,
+    event: ReceivedWebhookEvent,
+  ) {
+    if (!this.#channels.store.exists(channelId) || this.#excluded().has(channelId)) {
+      return { kind: "unavailable" } as const;
+    }
+    const result = yield* channelRoutineStep(() => this.#routines.receiveWebhook(channelId, routineId, event));
+    // An ignored request adds a history row, so an open editor reloads it.
+    if (result.kind === "ignored") this.#changed(channelId);
+    if (result.kind !== "started") return result;
+    const run = result.run;
+    const record = yield* channelRoutineStep(() => this.#routines.getRecord(channelId, routineId));
+    if (record?.limitPolicy === "skip" && this.#hooks.usageLimited(channelId)) {
+      yield* channelRoutineStep(() => this.#settle(run, { status: "cancelled", error: null }));
+    } else {
+      const request = yield* channelRoutineStep(() => this.#routines.attachRequest(run.id, randomUUID()));
+      yield* this.#issueEffect(request);
+    }
+    this.#changed(channelId);
+    return result;
+  }, Effect.uninterruptible);
+
+  delete(input: DeleteChannelRoutineInput, access: RoutineTriggerAccess = {}): void {
+    const channelId = this.#requireChannel(input.channelId);
+    if (!access.webhook && this.#routines.getRecord(channelId, input.routineId)?.trigger.kind === "webhook") {
+      throw new Error(sourceText("error.backend.routineGone"));
+    }
+    this.#routines.delete(channelId, input.routineId);
     this.#changed(input.channelId);
   }
 
@@ -151,12 +200,15 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
   readonly test = Effect.fn("ChannelRoutineScheduler.test")(function* (
     this: ChannelRoutineScheduler,
     input: TestChannelRoutineInput,
+    access: RoutineTriggerAccess = {},
   ) {
     const routine = yield* channelRoutineStep(() => {
       const channelId = this.#requireChannel(input.channelId);
-      const stored = this.#routines.get(channelId, input.routineId);
-      if (!stored) throw new Error(sourceText("error.backend.routineGone"));
-      return stored;
+      const stored = this.#routines.getRecord(channelId, input.routineId);
+      if (!stored || (stored.trigger.kind === "webhook" && !access.webhook)) {
+        throw new Error(sourceText("error.backend.routineGone"));
+      }
+      return { ...stored, channelId: stored.ownerId };
     });
     const now = new Date().toISOString();
     // The run would wait for the reset, and a routine set to skip has no use for a late result.
@@ -180,7 +232,7 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
    */
   skipAtLimit(channelId: string, requestMessageId: string): boolean {
     const run = this.#routines.openRuns(channelId).find((item) => item.requestMessageId === requestMessageId);
-    if (!run || this.#routines.get(channelId, run.routineId)?.limitPolicy !== "skip") return false;
+    if (!run || this.#routines.getRecord(channelId, run.routineId)?.limitPolicy !== "skip") return false;
     this.#settle(run, { status: "cancelled", error: null });
     return true;
   }
@@ -309,7 +361,7 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
    */
   readonly #fireEffect = Effect.fn("ChannelRoutineScheduler.fire")(function* (
     this: ChannelRoutineScheduler,
-    routine: ChannelRoutine,
+    routine: Pick<ChannelRoutine, "id" | "channelId" | "name" | "instruction">,
     triggerId: string | null,
     scheduledFor: string,
   ) {

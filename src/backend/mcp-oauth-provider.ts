@@ -179,6 +179,10 @@ export class McpOAuth implements McpOAuthAuthority {
     if (!stored?.tokens) return null;
     const fallback = stored.tokens.access_token;
     if (!expiringSoon(stored)) return fallback;
+    // The SDK binds credentials saved by new versions to the authorization server. An older
+    // record without that binding must not trigger discovery and then spend its refresh token at
+    // whichever server the MCP resource names. Keep the access token for the resource instead.
+    if (!credentialIssuer(stored.tokens, stored)) return fallback;
     yield* this.#refresh(resource);
     return yield* mcpSync(() => this.#options.storage.read(resource)?.tokens?.access_token ?? fallback);
   }).bind(this);
@@ -331,6 +335,7 @@ export class McpOAuth implements McpOAuthAuthority {
   #provider(resource: string, state: string | null, isAbandoned: () => boolean = () => false): McpOAuthClientProvider {
     const generation = this.#generations.get(resource) ?? 0;
     const storage = this.#options.storage;
+    const stored = storage.read(resource);
     // The store as this run saw it: reads answer from disk, but a write or a removal lands only
     // while no `forget` has removed the server - and no abandon has ended the run - since this
     // provider was built.
@@ -362,6 +367,8 @@ export class McpOAuth implements McpOAuthAuthority {
       redirectUrl: this.#options.redirectUrl,
       openExternal: this.#options.openExternal,
       isAbandoned,
+      legacyIssuer: legacyIssuer(stored),
+      hasUnboundCredentials: hasUnboundCredentials(stored),
     });
   }
 }
@@ -374,6 +381,10 @@ interface ClientProviderOptions {
   openExternal: (url: string) => Promise<void>;
   /** Whether the sign-in that built this provider has been abandoned since. */
   isAbandoned: () => boolean;
+  /** The issuer from a pre-1.31 record, captured before the SDK can write new discovery state. */
+  legacyIssuer: string | undefined;
+  /** Whether this provider started with credentials that have no issuer binding. */
+  hasUnboundCredentials: boolean;
 }
 
 /**
@@ -400,6 +411,10 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   #redirectAddressChecked = false;
   /** Set once the grant is in hand: from there the client on file is the one that must spend it. */
   #exchangingCode = false;
+  /** Issuer selected by the SDK for this auth attempt, captured before credentials are read. */
+  #activeIssuer: string | undefined;
+  /** Full discovery for this attempt, including custom protected-resource metadata. */
+  #discoveryState: OAuthDiscoveryState | undefined;
   /** Set when the SDK is told to register, and cleared when it saves what it registered. */
   #registrationPending = false;
 
@@ -459,8 +474,8 @@ class McpOAuthClientProvider implements OAuthClientProvider {
    */
   clientInformation(): OAuthClientInformationFull | undefined {
     const record = this.#record();
-    const client = record.client;
-    this.recordSecret(client?.client_secret);
+    const client = this.#credential(record.client);
+    this.recordSecret(record.client?.client_secret);
     if (!client) return this.#register();
     if (!this.#options.state || this.#exchangingCode) return client;
     if (client.redirect_uris.includes(this.#options.redirectUrl)) return client;
@@ -498,7 +513,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   }
 
   tokens(): OAuthTokens | undefined {
-    const tokens = this.#record().tokens;
+    const tokens = this.#credential(this.#record().tokens);
     this.#recordTokens(tokens);
     return tokens;
   }
@@ -559,6 +574,16 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   saveDiscoveryState(discovery: OAuthDiscoveryState): Promise<void> {
     return runCauseEffect(
       Effect.gen({ self: this }, function* () {
+        this.#activeIssuer = discovery.authorizationServerUrl;
+        this.#discoveryState = discovery;
+        // A pre-1.31 record has no safe issuer when its discovery state is absent. Do not let a
+        // malicious resource install its authorization server as the binding for that record.
+        // When old discovery exists, keep it until the old credentials have been stamped.
+        if (
+          this.#options.hasUnboundCredentials &&
+          (!this.#options.legacyIssuer || !issuersMatch(this.#options.legacyIssuer, discovery.authorizationServerUrl))
+        )
+          return;
         yield* this.#save({
           discovery: {
             authorizationServerUrl: discovery.authorizationServerUrl,
@@ -570,7 +595,18 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   }
 
   discoveryState(): OAuthDiscoveryState | undefined {
-    return this.#record().discovery;
+    const stored = this.#record().discovery;
+    const discovery =
+      this.#discoveryState ??
+      (stored
+        ? {
+            authorizationServerUrl: stored.authorizationServerUrl,
+            ...(stored.resourceMetadataUrl ? { resourceMetadataUrl: stored.resourceMetadataUrl } : {}),
+          }
+        : undefined);
+    this.#discoveryState = discovery;
+    this.#activeIssuer = discovery?.authorizationServerUrl;
+    return discovery;
   }
 
   saveCodeVerifier(codeVerifier: string): void {
@@ -593,7 +629,11 @@ class McpOAuthClientProvider implements OAuthClientProvider {
       Effect.gen({ self: this }, function* () {
         if (scope === "verifier" || scope === "discovery") {
           if (scope === "verifier") this.#codeVerifier = null;
-          else yield* this.#save({ discovery: undefined });
+          else {
+            this.#discoveryState = undefined;
+            this.#activeIssuer = undefined;
+            yield* this.#save({ discovery: undefined });
+          }
           return;
         }
         if (scope === "all") {
@@ -614,12 +654,32 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     return this.#options.storage.read(this.#options.resource) ?? {};
   }
 
+  #credential<T extends Pick<OAuthTokens, "issuer">>(credential: T | undefined): T | undefined {
+    if (!credential) return undefined;
+    if (typeof credential.issuer === "string") return credential;
+    // Let SDK 1.31 stamp a trusted legacy value when the exchange succeeds. Returning a copy
+    // with an issuer here would make the SDK treat it as already stamped and leave the record
+    // unbound after the migration.
+    return this.#options.legacyIssuer &&
+      this.#activeIssuer &&
+      issuersMatch(this.#options.legacyIssuer, this.#activeIssuer)
+      ? credential
+      : undefined;
+  }
+
   readonly #save = Effect.fn("McpOAuthClientProvider.save")(function* (
     this: McpOAuthClientProvider,
     part: Partial<McpOAuthRecord>,
   ): Effect.fn.Return<void, McpOperationError> {
     const record = yield* mcpSync(() => this.#record());
-    yield* this.#options.storage.write(this.#options.resource, { ...record, ...part });
+    const next = { ...record, ...part };
+    if (!("discovery" in part) && this.#discoveryState && !hasUnboundCredentials(next)) {
+      next.discovery = {
+        authorizationServerUrl: this.#discoveryState.authorizationServerUrl,
+        resourceMetadataUrl: this.#discoveryState.resourceMetadataUrl,
+      };
+    }
+    yield* this.#options.storage.write(this.#options.resource, next);
   });
 }
 
@@ -639,6 +699,39 @@ export function normalizeResource(url: string): string | null {
     return parsed.toString();
   } catch {
     return null;
+  }
+}
+
+/** A legacy binding is useful only when it names an endpoint this client would send credentials to. */
+function legacyIssuer(record: McpOAuthRecord | null): string | undefined {
+  const issuer = record?.discovery?.authorizationServerUrl;
+  if (!issuer) return undefined;
+  try {
+    const parsed = new URL(issuer);
+    return isSecureEndpoint(parsed) ? parsed.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function hasUnboundCredentials(record: McpOAuthRecord | null): boolean {
+  return Boolean(
+    (record?.client && typeof record.client.issuer !== "string") ||
+      (record?.tokens && typeof record.tokens.issuer !== "string"),
+  );
+}
+
+function credentialIssuer(credential: Pick<OAuthTokens, "issuer">, record: McpOAuthRecord): string | undefined {
+  return typeof credential.issuer === "string" ? credential.issuer : legacyIssuer(record);
+}
+
+function issuersMatch(left: string, right: string): boolean {
+  try {
+    const a = new URL(left).toString();
+    const b = new URL(right).toString();
+    return a === b || (a.endsWith("/") && a.slice(0, -1) === b) || (b.endsWith("/") && b.slice(0, -1) === a);
+  } catch {
+    return left === right;
   }
 }
 

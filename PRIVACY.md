@@ -195,6 +195,11 @@ The service stores:
   end, and expiration times;
 - the current account avatar file and its content type when the user uploads an avatar.
 - optional host logo files and their content types when the owner uploads a logo.
+- webhook routes: for each webhook routine of a host, the opaque route ID, the host ID, the owner
+  account ID, the link time, and the revocation time. When the routine stops using a route, or the
+  host is deleted, the service sets the revocation time and the route stops working. The service
+  keeps the row with these fields permanently, so that the old public URL never belongs to another
+  host. It does not store the routine, the secret, or request bodies.
 - published agent templates: the agent name, title, instructions, avatar, routine names, schedules
   and instructions, marketplace skill references, the `SKILL.md` text of local skills, the local
   agent ID, a share card image made from these fields, and creation and update times. Anyone
@@ -412,9 +417,10 @@ media connection. ICE uses a direct peer-to-peer path when possible. If a direct
 Agents, conversations, queues, direct messages, attachments, browser data, prompts, approvals, and
 Remote Desktop data remain on the host. The central account service does not copy them into D1 or
 R2. The Signal service does not proxy them or write them to logs. The host does not need a public
-inbound port. The things Signal passes to a host are the Slack events of an agent's Slack app and
-the Discord mentions of the Discord app, in transit; see [Slack connections](#slack-connections) and
-[Discord connections](#discord-connections). For Discord, Signal also carries the host's answers to
+inbound port. The things Signal passes to a host are the Slack events of an agent's Slack app, the
+Discord mentions of the Discord app, and the requests to webhook routines, in transit; see
+[Slack connections](#slack-connections), [Discord connections](#discord-connections), and
+[Webhook routines](#webhook-routines). For Discord, Signal also carries the host's answers to
 Discord.
 
 An owner or admin of a joined server can manage its host from their own computer, or from the
@@ -481,6 +487,27 @@ Network traffic can also occur when:
 - a user opens an explicitly labeled external support or setup link;
 - a Slack workspace is connected. See [Slack connections](#slack-connections).
 - a Discord server is connected. See [Discord connections](#discord-connections).
+
+## Webhook routines
+
+An administrator can give a routine a webhook trigger. The routine then gets a public URL and a
+signing secret. The host stores the trigger and the encrypted secret in its local SQLite database.
+The signing secret is encrypted with the operating system's secret storage. It is shown one time.
+Management screens do not return saved secrets.
+
+Requests to a webhook routine pass through OpenBot's Signal service to the connected host. Signal
+uses the sender's IP address in memory for rate limits. The account service keeps only the route
+metadata above. Neither cloud service stores or logs request bodies. The host verifies the request
+signature before it accepts the event. If the host is offline, the sender receives an error and
+must retry. There is no cloud event queue.
+
+The host keeps a receipt of each request for 7 days, to ignore a repeated delivery. A receipt has
+the delivery ID, the event type, the result, and the run ID, but not the request body. The event is
+added to the run instruction, which the host stores with the run. Event data can reach the
+routine's model provider, as other routine input does.
+
+Change a routine to a schedule, or delete it, to stop its URL. Deleting a routine deletes its
+receipts.
 
 ## Slack connections
 
@@ -847,3 +874,24 @@ automatically, and the tab's back/forward history is cleared after replacement t
 the sensitive document. The destination site receives the value and controls its own processing.
 This protection does not isolate credentials from the operating system or agents with unrestricted
 machine access. Values pasted into ordinary chat are not covered by secure handoff.
+
+## Error and warning reports
+
+Production desktop, browser app, and mobile clients report safe failure categories to the same
+self-hosted OpenPanel service. Reports can include the app version, platform, provider, model,
+operation, severity, and a fixed cause code. They also record whether a problem appeared as a
+toast, shared alert or chat banner, or native error/warning alert. These reports do not include displayed text,
+raw exceptions, stack traces, prompts, messages, file names, paths, commands, or credentials.
+A random report ID helps identify repeated delivery attempts; it is not a conversation or file ID.
+A reported cause describes the error observed by OpenBot and might not explain its root cause.
+
+Validated reports wait in local files on the host and mobile, or IndexedDB in desktop and browser
+clients. Each queue is limited to 1,000 reports, 1 MiB, and seven days. Reports are removed after
+OpenPanel accepts them, when they expire, or when the queue reaches its limits. Network failures
+can cause retries and duplicate delivery. Queue failures do not block the application.
+
+Turning off analytics or changing accounts clears pending reports and cancels active sends.
+Requests already received by OpenPanel cannot be recalled. Anonymous error reports remain
+anonymous. The browser app has its own local analytics setting in account settings, separate
+from desktop and mobile. Collection is enabled by default; a malformed or unreadable setting
+keeps it disabled. Existing OpenPanel retention rules apply after delivery.

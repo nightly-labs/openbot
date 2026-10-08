@@ -1,4 +1,3 @@
-import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   CreateRoutineInput,
   Routine,
@@ -6,15 +5,16 @@ import type {
   RoutineRunStatus,
   UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
-import { sourceText } from "@openbot/i18n/source";
 import type { OpenBotDatabase } from "./openbot-database";
 import {
   type DueRoutine,
   type OwnedRoutine,
   type OwnedRoutineRun,
+  type ReceivedWebhookEvent,
   RoutineStore,
-  type RoutineTables,
+  type WebhookReceiveResult,
 } from "./routine-store";
+import { ROUTINE_TABLES } from "./routine-tables";
 
 export interface DueRoutineTrigger {
   routine: Routine;
@@ -22,20 +22,6 @@ export interface DueRoutineTrigger {
   nextRunAt: string;
   schedule: DueRoutine["schedule"];
 }
-
-const AGENT_ROUTINE_TABLES: RoutineTables = {
-  routineTable: "projection_agent_routines",
-  triggerTable: "projection_routine_triggers",
-  runTable: "projection_routine_runs",
-  ownerColumn: "agent_id",
-  handleColumn: "delivery_id",
-  routineAggregate: "agent-routine",
-  runAggregate: "routine-run",
-  commandPrefix: "routine",
-  eventPrefix: "routine",
-  limit: INPUT_LIMITS.agentRoutines,
-  limitMessage: sourceText("error.backend.agentRoutineLimit", { limit: INPUT_LIMITS.agentRoutines }),
-};
 
 /**
  * The agent-shaped names over the shared store: `ownerId` reads as `agentId` and the run handle
@@ -45,7 +31,7 @@ const AGENT_ROUTINE_TABLES: RoutineTables = {
  */
 export class AgentRoutineStore extends RoutineStore {
   constructor(database: OpenBotDatabase) {
-    super(database, AGENT_ROUTINE_TABLES);
+    super(database, ROUTINE_TABLES.agent);
   }
 
   list(agentId: string): Routine[] {
@@ -110,8 +96,18 @@ export class AgentRoutineStore extends RoutineStore {
     }));
   }
 
-  createRun(routine: Routine, triggerId: string | null, kind: RoutineRun["kind"], scheduledFor: string): RoutineRun {
-    return toRun(this.createRunRow(toOwnedRoutine(routine), triggerId, kind, scheduledFor));
+  createRun(
+    routine: Pick<Routine, "id" | "agentId" | "name" | "instruction">,
+    triggerId: string | null,
+    kind: RoutineRun["kind"],
+    scheduledFor: string,
+  ): RoutineRun {
+    return toRun(this.createRunRow(runSource(routine), triggerId, kind, scheduledFor));
+  }
+
+  receiveWebhook(agentId: string, routineId: string, event: ReceivedWebhookEvent): WebhookReceiveResult<RoutineRun> {
+    const result = this.receiveWebhookRow(agentId, routineId, event);
+    return result.kind === "started" ? { kind: "started", run: toRun(result.run) } : result;
   }
 
   attachDelivery(runId: string, deliveryId: string): RoutineRun {
@@ -132,8 +128,8 @@ function toRoutine({ ownerId, ...fields }: OwnedRoutine): Routine {
   return { ...fields, agentId: ownerId };
 }
 
-function toOwnedRoutine({ agentId, ...fields }: Routine): OwnedRoutine {
-  return { ...fields, ownerId: agentId };
+function runSource({ id, agentId, name, instruction }: Pick<Routine, "id" | "agentId" | "name" | "instruction">) {
+  return { id, ownerId: agentId, name, instruction };
 }
 
 function toRun({ ownerId, handleId, ...fields }: OwnedRoutineRun): RoutineRun {

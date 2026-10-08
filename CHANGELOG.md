@@ -6,10 +6,58 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.33.0] - 2026-10-07
+
+### Added
+
+- Add a webhook trigger to teammate and group routines. In **When to run**, open **Change trigger** and select **Webhook**. The routine gets its own endpoint and signing secret. A signed request to the endpoint starts the routine. Select **Filter events** to limit the routine to one event type and to data filters.
+- The **Change trigger** menu shows each schedule and the webhook with one line that tells when the routine runs.
+- You see the signing secret of a webhook routine one time when you save it, and you can make a new secret. When you change the routine to a schedule or delete it, its endpoint stops working.
+- The routine **History** shows runs and the webhook requests that the routine ignored. Event data stays on the host computer. The host must be online to receive webhook requests.
+
+### Changed
+
+- New Claude agents use Haiku 5.5 by default.
+
+### Fixed
+
+- Show a yellow update notice with an Update button when the selected provider needs a newer runtime. Keep the draft and block sending until the required update is complete, instead of asking the user to reinstall OpenBot.
+- Hide the failed-send error while the required update notice is shown. Keep Edit and Dismiss available, and restore Retry after the update. Show manual update instructions when OpenBot cannot offer an update.
+- Pause webhook requests when you sign out. Sign in again to resume the saved routes without changing their URLs or secrets.
+- Protect saved MCP sign-in credentials from a changed authorization server. Older credentials refresh only when their original authorization server is known.
+
+## [0.32.0] - 2026-10-07
+
+### Added
+
+- Docker version tags now also accept the `v` prefix used by GitHub releases.
+- Report safe provider failure causes and error/warning notifications to OpenPanel, including invalid upload requests from ChatGPT and OpenCode.
+- Keep bounded local error queues and retry delivery after network failures or restarts. Tracking changes clear pending reports.
+- Add a separate analytics setting for the browser app. Error reports exclude messages, prompts, paths, and raw exception text.
+
+### Fixed
+
+- Fixed Codex Computer Use approval storage, including `set_value` on Windows. Saved tool approvals now remain available after a restart. Configuration failures show recovery steps.
+- Keep remote Browser Live View available after the host's Team API restarts. Show stream and connection failures instead of a normal end message, and redact secrets from browser start errors.
+- Explain OpenCode's invalid upload error as a model provider failure, with steps to change models and check saved routines before creating them again.
+- Docker releases now check that image tags are readable without a GHCR sign-in. Previously, a release could pass while the package was private.
+- Increase the provider message size limit from 128 MB to 256 MB to allow larger individual records.
+- Allow model and provider changes after recovery from a stopped provider. Before, a stale active turn could block the change after Codex exceeded the message size limit.
+- Read provider history in pages and keep completed history on disk. Long chats no longer require a retained copy of the full provider transcript.
+- Preserve saved messages and attachments when a history import fails or resumes after a restart.
+- Require Codex CLI 0.156.0 or newer for bounded history reads. The bundled runtime is updated to 0.160.1.
+- Bundle the internal error-reporting package so the desktop can start correctly.
+
 ## [0.31.0] - 2026-10-07
 
 ### Added
 
+- Visual replies. An agent can show a chart, a table, a diagram or a mockup as an HTML page above its
+  reply. The page runs its scripts in a sandbox and can load files from the network. A link in the
+  page opens in your browser after you click it. Agents can look at a page before they show it.
+- An HTML file opens as a page in the file preview. Use "Show HTML source" to see its code.
+- Copy a table from a reply as Markdown or CSV.
+- Click an image in a reply to open it in the image viewer, with the other images of the message.
 - Play attached audio and video directly in chat, without opening the preview panel.
 - Cursor and Cline agents on a joined server now show in the app and the browser client, and you can create them there. Before, they stayed on the host computer only.
 - An owner or admin can download Cursor and Cline on a joined server and sign them in from their own device. Cursor shows a sign-in page that signs the server in by itself, so a server with no screen can use your Cursor plan. Cline shows a device code.
@@ -40,6 +88,9 @@ All notable changes to OpenBot will be documented here. The project follows
 - Connect Bitwarden in Marketplace or Server settings to fill browser passwords and authenticator codes. Share logins through a folder named `Shared with OpenBot`. The CLI session lasts until disconnect, eight idle hours, or app exit.
 
 ### Changed
+
+- A Mermaid diagram that cannot be drawn shows the parser message. When the diagram module did not
+  load, a retry button shows.
 
 - The agent cursor in Computer Use now travels to each point with a smooth, curved move, as a
   person moves a mouse. A long move across the screen takes a wider arc. Before, the cursor slid in

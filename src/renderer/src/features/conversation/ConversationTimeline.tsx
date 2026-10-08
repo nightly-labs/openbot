@@ -115,6 +115,7 @@ export function ConversationTimeline() {
     openSharedFile,
     openWorkspaceFile,
     pendingSendFor,
+    providerUpdateRequired,
     previewAttachment,
     props,
     reactToMessage,
@@ -657,6 +658,7 @@ export function ConversationTimeline() {
                               pending() ? (
                                 <PendingSendStatus
                                   state={pendingState()}
+                                  updateRequired={Boolean(providerUpdateRequired())}
                                   error={pendingSend()?.error ?? null}
                                   retrySafe={pendingRetrySafe()}
                                   canEdit={!composerHasContent() && !editingDeliveryId()}

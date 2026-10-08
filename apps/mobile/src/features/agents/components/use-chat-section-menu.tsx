@@ -2,7 +2,7 @@ import type { MenuAction } from "@expo/ui/community/menu";
 import { SIDEBAR_UNASSIGNED_SECTION_ID } from "@openbot/contracts/ipc";
 import { Link } from "expo-router";
 import { useRef, useState } from "react";
-import { Alert } from "react-native";
+import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
@@ -34,7 +34,9 @@ export function useChatSectionMenu(serverId: string, chatId: string) {
     } catch (error) {
       void haptics.notification("error");
       const text = currentText();
-      Alert.alert(
+      showFailureAlert(
+        error,
+        "turn",
         text.t("mobile.agent.section.moveFailed"),
         text.errorMessage(error, text.t("mobile.agent.section.tryAgain")),
       );

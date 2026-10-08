@@ -1,4 +1,8 @@
-import { ComposerSignInNotice, ComposerUsageLimitNotice } from "@openbot/ui/features/conversation/ComposerNotice";
+import {
+  ComposerSignInNotice,
+  ComposerUpdateNotice,
+  ComposerUsageLimitNotice,
+} from "@openbot/ui/features/conversation/ComposerNotice";
 import type { JSX } from "@solidjs/web";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
@@ -72,6 +76,30 @@ export const UsageLimitWithoutReset: Story = {
   render: () => (
     <ComposerStack>
       <ComposerUsageLimitNotice provider="claude" resetsAt={null} />
+    </ComposerStack>
+  ),
+};
+
+export const UpdateRequired: Story = {
+  render: () => (
+    <ComposerStack>
+      <ComposerUpdateNotice provider="codex" onUpdate={fn()} />
+    </ComposerStack>
+  ),
+};
+
+export const Updating: Story = {
+  render: () => (
+    <ComposerStack>
+      <ComposerUpdateNotice provider="codex" onUpdate={fn()} updating />
+    </ComposerStack>
+  ),
+};
+
+export const ManualUpdateRequired: Story = {
+  render: () => (
+    <ComposerStack>
+      <ComposerUpdateNotice provider="codex" />
     </ComposerStack>
   ),
 };

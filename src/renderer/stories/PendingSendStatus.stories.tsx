@@ -32,3 +32,5 @@ export const FailedWithDraft: Story = { args: { state: "failed", canEdit: false 
 
 /** An older host cannot drop a repeated send, so there is no Retry: the first one may have arrived. */
 export const Unconfirmed: Story = { args: { state: "failed", retrySafe: false } };
+
+export const UpdateRequired: Story = { args: { state: "failed", updateRequired: true } };

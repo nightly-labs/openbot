@@ -34,6 +34,13 @@ import {
   type ServerSummary,
   type Untyped,
 } from "@openbot/contracts/ipc";
+import {
+  decodeEventActivity,
+  decodeEventRoutines,
+  decodeEventStatus,
+  decodeSaveEventRoutineResult,
+  decodeWebhookSecret,
+} from "@openbot/contracts/ipc-events";
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import {
   decodeAccountUsageFromMain,
@@ -857,6 +864,17 @@ const openbotApi: OpenBotDesktopApi = {
     revokeInvite: decodeVoid,
     createInvite: decodeInviteSummary,
     event: decodeHostStatus,
+  }),
+  // The shared strict contract decoders, as MCP does: main decodes a remote answer with the same
+  // decoder before it reaches this point.
+  events: bridgeGroup(IPC_ENDPOINTS.events, {
+    getStatus: decodeEventStatus,
+    listRoutines: decodeEventRoutines,
+    saveRoutine: decodeSaveEventRoutineResult,
+    deleteRoutine: decodeVoid,
+    testRoutine: decodeVoid,
+    rotateSecret: decodeWebhookSecret,
+    listActivity: decodeEventActivity,
   }),
   // The shared contract decoder, as MCP does: it already bounds every row, and a remote answer was
   // decoded in main before it reached this point.

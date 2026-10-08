@@ -248,6 +248,7 @@ describe.sequential("OpenBot Slack app end to end", () => {
       issueTicket: () => Effect.succeed({ ticket: "ticket-1", signalUrl: signal.url }),
       issueSlackRoute: () => Effect.sync(() => `route-${++routeTickets}`),
       issueDiscordRoute: () => Effect.die(new Error("No Discord in this test.")),
+      issueWebhookRoute: () => Effect.die(new Error("No webhooks in this test.")),
     });
     messaging = new MessagingService({
       threads: started.service.messaging,

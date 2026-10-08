@@ -78,7 +78,8 @@ import { EMPTY_DRAFT } from "../conversation/composer-draft";
 import { useConversationController } from "../conversation/conversation-controller-context";
 import type { ComposerDraft } from "../conversation/conversation-types";
 import { channelMemoriesPort } from "../conversation/memories-port";
-import { channelRoutinesPort } from "../conversation/routines-port";
+import { desktopEventRoutinesApi } from "../conversation/routine-webhooks-api";
+import { channelRoutinesPort, eventRoutinesPort } from "../conversation/routines-port";
 import { ChannelEditor } from "./ChannelEditor";
 import { channelTimelineEntries, firstUnreadChannelMessageId } from "./channel-timeline";
 import { useChannels } from "./channels-context";
@@ -98,6 +99,8 @@ export interface ChannelConversationProps {
   onSelectAgent: (agentId: string) => void;
   /** The host is this computer, so it keeps the routine settings that the released Team API drops. */
   localHost?: boolean;
+  /** The desktop server whose event API this window may manage, as for an agent: owner, admin or this computer. */
+  eventsServerId?: string | undefined;
 }
 
 export function ChannelConversation(props: ChannelConversationProps) {
@@ -139,9 +142,17 @@ export function ChannelConversation(props: ChannelConversationProps) {
     const id = channelId();
     return id ? channelMemoriesPort(id, channelName(), runtime().agent) : null;
   });
-  const routinesPort = createMemo(() => {
+  const legacyRoutinesPort = createMemo(() => {
     const id = channelId();
     return id ? channelRoutinesPort(id, runtime().agent, props.localHost === true) : null;
+  });
+  const routinesPort = createMemo(() => {
+    const id = channelId();
+    const legacy = legacyRoutinesPort();
+    if (!id || !legacy) return null;
+    const serverId = props.eventsServerId;
+    const eventApi = runtime().eventRoutines ?? (serverId ? desktopEventRoutinesApi(serverId) : undefined);
+    return eventApi ? eventRoutinesPort({ kind: "channel", id }, eventApi, legacy) : legacy;
   });
   // The settings row reads both counts before either view opens, so it cannot take them from the
   // view that renders the list. It loads them here and follows the events those views follow.

@@ -494,15 +494,18 @@ export class DrainScheduler {
           this.#threads.logRecovery(agent.id, client.provider, "resumed");
         }
       }
-      for (const item of batch)
-        yield* this.#mailbox.markRunning(item.delivery.id, response.turn.id).pipe(toDeliveryStartFailed);
+      // The provider has accepted the turn. Publish the active turn before the first mailbox write
+      // can yield: queue reconciliation may run while delivery rows change, and an idle cached
+      // snapshot with a running delivery is a stale state for clients.
+      snapshot.activeTurnId = response.turn.id;
       confirmedTurnId = response.turn.id;
       this.#turnModels.set(agent.id, { turnId: response.turn.id, model: agent.model });
+      for (const item of batch)
+        yield* this.#mailbox.markRunning(item.delivery.id, response.turn.id).pipe(toDeliveryStartFailed);
       if (this.#channels)
         yield* this.#channels.accepted(delivery.id, threadId, response.turn.id).pipe(toDeliveryStartFailed);
       const currentDelivery = this.#mailbox.getDelivery(delivery.id)?.delivery;
       if (currentDelivery?.status === "running" && currentDelivery.turnId === response.turn.id) {
-        snapshot.activeTurnId = response.turn.id;
         for (const item of batch) this.#mailboxSync.syncDeliveryMessage(snapshot, item.delivery.id);
         this.#mailboxSync.emitQueue(agent.id);
         this.#conversation.emitConversation(snapshot);
@@ -520,10 +523,16 @@ export class DrainScheduler {
       Effect.catch((failure) =>
         Effect.gen({ self: this }, function* () {
           const error = failure.cause;
-          const currentDelivery = this.#mailbox.getDelivery(delivery.id)?.delivery;
-          if (confirmedTurnId && currentDelivery?.status === "running" && currentDelivery.turnId === confirmedTurnId) {
+          // The provider accepted the turn. Keep its active reservation even when a mailbox write
+          // failed: restoring or replaying any delivery could submit the same provider turn twice.
+          // The lifecycle association and the targeted mailbox retry finish rows left in starting.
+          if (confirmedTurnId) {
             this.#hooks.emitError("delivery_reconciliation_pending", error, delivery.recipientAgentId);
-            this.#mailboxSync.retryDeliveryReconciliation(delivery.recipientAgentId);
+            this.#mailboxSync.retryDeliveryReconciliation(
+              delivery.recipientAgentId,
+              confirmedTurnId,
+              batch.map(({ delivery: item }) => item.id),
+            );
             return;
           }
           if (isRequestTimeout(error, "turn/start")) {

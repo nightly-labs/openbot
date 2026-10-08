@@ -520,6 +520,9 @@ cannot access `window.openbot` or managed local attachments.
 
 To run your own account service, Signal and TURN, see [Self-hosted remote access](docs/self-hosting.md).
 
+To trigger routines from external services, see
+[Webhooks](docs/webhooks.md). Public webhook requests require the host to be online.
+
 ## Security
 
 Read [SECURITY.md](SECURITY.md) before reporting a vulnerability. Do not put credentials, private

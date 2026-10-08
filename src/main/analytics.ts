@@ -13,9 +13,11 @@ import {
 } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isFunction, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { normalizeEmailAddress } from "@openbot/contracts/validation";
+import { classifyFailure, operationForCode, type ReportQueue, safeProperties } from "@openbot/telemetry";
 import { OpenPanelBase, type OpenPanelOptions } from "@openpanel/web";
 import { Effect, Exit, Scope } from "effect";
 import { parse as parseDomain } from "tldts";
+import type { FailureSignal } from "../backend/agent/failure-signal";
 import type { ToolUsageSignal } from "../backend/agent/thread-items";
 import type { BrowserSiteVisit } from "../backend/browser-host";
 import { type AnalyticsOperationFailure, analyticsIO, analyticsSync } from "./analytics-effects";
@@ -38,7 +40,7 @@ const MAX_TOOL_ROWS_PER_TURN = 32;
 const MAX_SITE_TABS = 1_000;
 const MAX_ROUTINE_RUNS = 10_000;
 const MAX_INVENTORY_ITEMS = 32;
-const ANALYTICS_SCHEMA_VERSION = 6;
+const ANALYTICS_SCHEMA_VERSION = 7;
 const CURATED_AGENT_PREFIX = "openbot-curated-agent-";
 const LISTING_SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/u;
 const TOOL_NAME_PATTERN = /^[A-Za-z0-9_.-]{1,64}$/u;
@@ -99,6 +101,7 @@ function createOpenPanelClient(options: OpenPanelOptions): HostOpenPanelClient {
 }
 
 export interface HostAnalyticsOptions {
+  reports?: ReportQueue;
   enabled: boolean;
   trackingEnabled?: boolean;
   appVersion: string;
@@ -153,7 +156,16 @@ const HOST_ALLOWLIST = {
     "has_secret_prompt",
     "approval_kind",
   ],
-  system_operation_failed: ["provider", "model", "reasoning_effort", "area", "failure_code"],
+  system_operation_failed: [
+    "provider",
+    "model",
+    "reasoning_effort",
+    "area",
+    "failure_code",
+    "cause_code",
+    "severity",
+    "operation",
+  ],
   system_tool_used: [...AGENT_PROPERTY_NAMES, "origin", "tool_kind", "plugin", "tool", "call_count", "failed_count"],
   system_site_visited: [...AGENT_PROPERTY_NAMES, "domain", "actor"],
   system_routine_run: [...AGENT_PROPERTY_NAMES, "status", "run_kind", "trigger_type"],
@@ -178,6 +190,9 @@ type HostProperties = Partial<Record<HostPropertyName, HostPropertyValue>>;
 type HostPendingEvent = { name: HostEventName; properties: HostProperties; timestamp: string };
 type ToolUseRow = { kind: string; plugin?: string; tool?: string; calls: number; failed: number };
 type ActiveTurn = {
+  failureScope?: ReturnType<ReportQueue["scope"]>;
+  agentId: string;
+  properties: HostProperties;
   startedAt: number;
   origin: string;
   owner: AnalyticsIdentity | null;
@@ -186,6 +201,7 @@ type ActiveTurn = {
 };
 
 export class HostAnalytics {
+  readonly #reports: ReportQueue | undefined;
   readonly #resolveOwner: HostAnalyticsOptions["resolveOwner"];
   readonly #resolveAgent: HostAnalyticsOptions["resolveAgent"];
   readonly #resolveMcpServer: NonNullable<HostAnalyticsOptions["resolveMcpServer"]>;
@@ -210,6 +226,7 @@ export class HostAnalytics {
   readonly #operationQueue: AnalyticsOperationQueue = { active: false, operations: [] };
 
   constructor(options: HostAnalyticsOptions, createClient: ClientFactory = createOpenPanelClient) {
+    this.#reports = options.reports;
     this.#resolveOwner = options.resolveOwner;
     this.#resolveAgent = options.resolveAgent;
     this.#resolveMcpServer = options.resolveMcpServer ?? (() => null);
@@ -241,17 +258,21 @@ export class HostAnalytics {
       this.#handleHostedSiteConversation(event.snapshot.messages);
       this.#handleRoutineRunConversation(event.snapshot.agentId, event.snapshot.messages);
     }
-    if (!this.#client || !this.#trackingEnabled) return;
+    if ((!this.#client && !this.#reports) || !this.#trackingEnabled) return;
     switch (event.type) {
       case "conversation":
         return;
       case "turn-started": {
+        this.#configureReports();
         const now = performance.now();
         this.#pruneActiveTurns(now);
         if (this.#activeTurns.has(event.turnId)) return;
         this.#makeTurnCapacity();
         const owner = normalizeAnalyticsIdentity(this.#resolveOwner());
         this.#activeTurns.set(event.turnId, {
+          ...(this.#reports ? { failureScope: this.#reports.scope() } : {}),
+          agentId: event.agentId,
+          properties: this.#agentProperties(event.agentId),
           startedAt: now,
           origin: event.origin ?? "unknown",
           owner,
@@ -329,15 +350,52 @@ export class HostAnalytics {
         );
         return;
       case "error":
+        if (this.#reports) return;
         this.#track("system_operation_failed", {
           ...(event.agentId ? this.#agentProperties(event.agentId) : {}),
           area: "agent",
           failure_code: systemFailureCode(event.code),
+          cause_code: classifyFailure(event.message),
+          severity: "error",
+          operation: operationForCode(event.code),
         });
         return;
       default:
         return;
     }
+  }
+
+  #configureReports(): void {
+    if (this.#reports) Effect.runFork(this.#reports.configure(this.#trackingEnabled, this.#resolveOwner()?.id ?? null));
+  }
+
+  /** Only the local service emits this signal. Remote clients never send host reports. */
+  handleFailure(failure: FailureSignal): void {
+    if (!this.#reports || !this.#trackingEnabled) return;
+    this.#configureReports();
+    const candidates = [...this.#activeTurns.values()].filter((turn) => turn.agentId === failure.agentId);
+    const turn = failure.turnId
+      ? this.#activeTurns.get(failure.turnId)
+      : candidates.length === 1
+        ? candidates[0]
+        : undefined;
+    if (turn?.owner && turn.owner.id !== this.#resolveOwner()?.id) return;
+    const properties = turn?.properties ?? (failure.agentId ? this.#agentProperties(failure.agentId) : {});
+    const provider =
+      failure.provider ?? properties.provider ?? AGENT_PROVIDERS.find((id) => failure.code.startsWith(`${id}_`));
+    const safe = safeProperties({
+      ...properties,
+      provider,
+      ...(failure.model ? { model: failure.model } : {}),
+      area: "agent",
+      operation: operationForCode(failure.code),
+      source: "host",
+      severity: failure.severity ?? "error",
+      failure_code: systemFailureCode(failure.code),
+      cause_code: failure.causeCode,
+      ...(turn ? { origin: turn.origin } : {}),
+    });
+    if (safe) Effect.runFork((turn?.failureScope ?? this.#reports).record("system_operation_failed", safe));
   }
 
   /** Counts one finished tool step. The turn's rows are sent when the turn completes. */
@@ -372,6 +430,7 @@ export class HostAnalytics {
   }
 
   flushPending(): void {
+    this.#configureReports();
     if (!this.#client || !this.#trackingEnabled) return;
     const owner = normalizeAnalyticsIdentity(this.#resolveOwner());
     if (!owner) return;
@@ -386,6 +445,7 @@ export class HostAnalytics {
   }
 
   clear(): void {
+    if (this.#reports) Effect.runFork(this.#reports.configure(this.#trackingEnabled, null));
     this.#pending = [];
     this.#bufferOwnerlessEvents = false;
     for (const activeTurn of this.#activeTurns.values()) {
@@ -398,6 +458,7 @@ export class HostAnalytics {
   setTrackingEnabled(enabled: boolean): void {
     if (this.#trackingEnabled === enabled) return;
     this.#trackingEnabled = enabled;
+    this.#configureReports();
     if (!enabled) {
       this.#hostedSiteOwners.clear();
       this.#activeTurns.clear();
@@ -704,6 +765,7 @@ export class HostAnalytics {
   /** Stop accepting events, then finish work already owned by this service. */
   readonly close = Effect.fn("HostAnalytics.close")(function* (this: HostAnalytics) {
     this.#closed = true;
+    if (this.#reports) yield* this.#reports.close();
     yield* Scope.close(this.#scope, Exit.void);
   }, Effect.uninterruptible);
 }
@@ -740,6 +802,16 @@ export function sanitizeHostEvent(name: HostEventName, properties: HostPropertie
 }
 
 function sanitizeHostProperty(name: HostEventName, key: string, value: unknown): HostPropertyValue | undefined {
+  if (key === "cause_code" || key === "severity" || key === "operation") {
+    const safe = safeProperties({
+      source: "host",
+      operation: "other",
+      cause_code: "unknown",
+      severity: "error",
+      [key]: value,
+    });
+    return safe?.[key];
+  }
   if (key === "failure_code") {
     return isString(value)
       ? name === "hosted_site_action"

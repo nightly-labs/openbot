@@ -2,6 +2,7 @@ import { type AgentEvent, type BrowserTab, isAgentEvent, routineRunConversationE
 import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentRemovalFailed } from "./agent/agent-removal";
+import type { FailureSignal } from "./agent/failure-signal";
 import type { AgentProvider } from "./agent-client";
 import type { AgentService } from "./agent-service";
 import {
@@ -23,6 +24,7 @@ import {
 import { browserFailure } from "./browser-effects";
 import { ChannelStore } from "./channel-store";
 import { runCauseEffect } from "./effect-boundary";
+import { LineTooLongError } from "./jsonl";
 import { getString } from "./protocol";
 import { StoredStateFailure } from "./stored-state-effects";
 
@@ -49,6 +51,38 @@ afterEach(async () => {
 });
 
 describe.sequential("AgentService: restart", () => {
+  it("keeps the conversation and permits provider changes after a size-limit exit", async () => {
+    process.env.OPENBOT_CLAUDE_PATH = await fakeClaudeCli();
+    const { store, mailbox } = stores(root);
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider, undefined, false);
+        clients.set(provider, client);
+        return client;
+      },
+    });
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Keep this message" }));
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "running");
+    const before = await runCauseEffect(service.readConversation("chief"));
+    expect(before.activeTurnId).not.toBeNull();
+    const client = clients.get("codex");
+    if (!client) throw new Error("The fake provider did not start.");
+    client.emit("exit", new LineTooLongError("Codex"));
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "interrupted");
+
+    await runCauseEffect(service.updateAgent({ agentId: "chief", provider: "claude", model: "claude-fable-5" }));
+    await runCauseEffect(service.updateAgent({ agentId: "chief", provider: "codex", model: "gpt-5.6-sol" }));
+    const after = await runCauseEffect(service.readConversation("chief"));
+    expect(after.threadId).toBe(before.threadId);
+    expect(after.activeTurnId).toBeNull();
+    expect(after.messages.map((message) => message.id)).toEqual(before.messages.map((message) => message.id));
+  });
+
   it("notifies other devices when a member reads a reply without clearing another member's unread state", async () => {
     const { store, mailbox } = stores(root);
     service = createTestService({
@@ -239,6 +273,42 @@ describe.sequential("AgentService: restart", () => {
     );
     expect((await runCauseEffect(service.readConversation("chief"))).messages).toEqual([
       expect.objectContaining(local),
+    ]);
+  });
+
+  it("reports a structured provider error once when its message is absent", async () => {
+    const { store, mailbox } = stores(root);
+    let client: FakeAgentClient | undefined;
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        client = new FakeAgentClient(provider, "", false);
+        return client;
+      },
+    });
+    const events: AgentEvent[] = [];
+    const failures: FailureSignal[] = [];
+    service.on("event", (event) => events.push(event));
+    service.on("failure", (failure) => failures.push(failure));
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Say hi" }));
+    await waitFor(() => events.some((event) => event.type === "turn-started"));
+    const started = events.find((event) => event.type === "turn-started");
+    const threadId = store.activeProviderSession("chief")?.externalSessionId;
+    if (started?.type !== "turn-started" || !client || !threadId) throw new Error("The fake Codex turn did not start.");
+    client.emit(
+      "notification",
+      notification("error", { threadId, turnId: started.turnId, error: { code: "invalid_upload_request" } }),
+    );
+    client.emit(
+      "notification",
+      notification("turn/completed", { threadId, turn: { id: started.turnId, status: "failed" } }),
+    );
+    await waitForQueue(service, "chief", (queue) => queue.deliveries.some((delivery) => delivery.status === "failed"));
+    expect(failures.filter((failure) => failure.turnId === started.turnId)).toEqual([
+      expect.objectContaining({ causeCode: "invalid_upload_request", provider: "codex" }),
     ]);
   });
 

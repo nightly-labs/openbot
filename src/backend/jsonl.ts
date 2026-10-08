@@ -12,10 +12,10 @@ const NEWLINE = 0x0a;
  * One JSON-RPC message is one line, and the largest is the full history of a thread: `thread/resume`
  * sends all turns in its response, with the base64 data of each generated image and tool screenshot.
  * The resume of a 125 MB Codex rollout was a 21 MB line, and one tool output in a rollout was 16 MB.
- * The limit is six times the largest line that we measured. It also stops a CLI that writes with no
+ * The limit allows larger thread histories. It also stops a CLI that writes with no
  * newline before main uses a large part of a 4 GB hosted server.
  */
-const PROVIDER_LINE_LIMIT_BYTES = 128 * MIB;
+const PROVIDER_LINE_LIMIT_BYTES = 256 * MIB;
 
 /**
  * A provider CLI wrote a line longer than `PROVIDER_LINE_LIMIT_BYTES`. The stream cannot continue

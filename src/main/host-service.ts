@@ -77,6 +77,7 @@ interface HostServiceOptions {
   mcpToolRuntimePreparation?: ForwardedApiOptions["mcpToolRuntimePreparation"];
   storage?: ForwardedApiOptions["storage"];
   hostedSites?: ForwardedApiOptions["hostedSites"];
+  events?: ForwardedApiOptions["events"];
   agentImport?: ForwardedApiOptions["agentImport"];
   admin?: ForwardedApiOptions["admin"];
   appVersion: string;
@@ -290,6 +291,7 @@ export class HostService extends EventEmitter<HostEvents> {
       mcpToolRuntimePreparation: options.mcpToolRuntimePreparation,
       storage: options.storage,
       hostedSites: options.hostedSites,
+      events: options.events,
       agentImport: options.agentImport,
       // The identity route changes this host's name and logo through `updateIdentity`, so a change
       // from a joined admin runs every step a local one does.

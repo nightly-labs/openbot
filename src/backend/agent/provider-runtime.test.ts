@@ -708,7 +708,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
         id: "codex",
         state: "sign-in-required",
         connectionState: "connecting",
-        version: "0.144.1",
+        version: "0.156.0",
       }),
     );
     expect(openExternal).toHaveBeenCalledWith("https://auth.openai.test/connect");
@@ -1975,7 +1975,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     ).rejects.toThrow(/working on a turn/u);
 
     expect(service.getStatus().providers).toContainEqual(
-      expect.objectContaining({ id: "codex", state: "available", version: "0.144.1" }),
+      expect.objectContaining({ id: "codex", state: "available", version: "0.156.0" }),
     );
   });
 

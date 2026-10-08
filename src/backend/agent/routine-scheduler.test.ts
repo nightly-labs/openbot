@@ -243,6 +243,14 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
     expect(events).toContainEqual(
       expect.objectContaining({ routineId: routine.id, runId: run.id, status: "cancelled" }),
     );
+    const threadId = store.list().find((candidate) => candidate.id === agent.id)?.threadId;
+    if (!threadId) throw new Error("The routine agent thread is missing.");
+    const persistedEvents = store.database
+      .readConversationPage(agent.id, threadId, { type: "latest" }, 100)
+      .messages.flatMap((message) => routineRunConversationEvent(message) ?? []);
+    expect(persistedEvents).toContainEqual(
+      expect.objectContaining({ routineId: routine.id, runId: run.id, status: "cancelled" }),
+    );
   });
   it("rolls back a routine transition and retries without a duplicate marker", async () => {
     const { store, mailbox } = stores(root);
@@ -414,7 +422,7 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
     expect(errors).toEqual([]);
 
     // A fault is not a request the model can correct, so it still fails as a provider error.
-    vi.spyOn(store.database, "persistConversation").mockImplementationOnce(() => {
+    vi.spyOn(store.database, "persistConversationChanges").mockImplementationOnce(() => {
       throw new Error("conversation persistence failed");
     });
     await expectOpenBotToolError(
@@ -495,7 +503,7 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
     await runCauseEffect(service.initialize());
     const agent = await runCauseEffect(store.getOrCreate("chief"));
     const initialAgent = store.list().find((candidate) => candidate.id === agent.id);
-    vi.spyOn(store.database, "persistConversation").mockImplementationOnce(() => {
+    vi.spyOn(store.database, "persistConversationChanges").mockImplementationOnce(() => {
       throw new Error("conversation persistence failed");
     });
 
@@ -538,10 +546,10 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
       .listRoutineRuns({ agentId: agent.id, routineId: routine.id, limit: 10 })
       .find((run) => run.deliveryId === queuedDelivery.id);
     if (!queuedRun) throw new Error("The queued routine run is missing.");
-    const persistConversation = store.database.persistConversation.bind(store.database);
-    vi.spyOn(store.database, "persistConversation").mockImplementation((...args) => {
-      if (args[1] === "routine.deleted") throw new Error("delete marker persistence failed");
-      return persistConversation(...args);
+    const persistConversationChanges = store.database.persistConversationChanges.bind(store.database);
+    vi.spyOn(store.database, "persistConversationChanges").mockImplementation((input) => {
+      if (input.eventType === "routine.deleted") throw new Error("delete marker persistence failed");
+      return persistConversationChanges(input);
     });
 
     await expect(runCauseEffect(service.deleteRoutine({ agentId: agent.id, routineId: routine.id }))).rejects.toThrow(

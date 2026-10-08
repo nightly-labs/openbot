@@ -1,4 +1,5 @@
 import type { ServerSummary } from "@openbot/contracts/ipc";
+import { classifyFailure } from "@openbot/telemetry";
 import type { ServerActionCallbacks } from "@openbot/ui/features/servers/ServerActionItems";
 import { useText } from "@openbot/ui/text";
 import { actionToast } from "../../action-toast";
@@ -39,7 +40,10 @@ export function useServerActions() {
 
   function selectFailed(error: unknown): void {
     actionToast.error(t("server.select.failedTitle"), {
-      description: errorMessage(error, t("server.select.failedDescription")),
+      ...{
+        description: errorMessage(error, t("server.select.failedDescription")),
+      },
+      report: { operation: "team", source: "action", cause_code: classifyFailure(error) },
     });
   }
 

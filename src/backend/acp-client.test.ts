@@ -22,7 +22,7 @@ import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
-import { ACP_IDLE_SESSION_LIMIT } from "./acp-client";
+import { ACP_IDLE_SESSION_LIMIT, type AcpHistoryPersistence } from "./acp-client";
 import { isMissingProviderSessionError } from "./agent/thread-items";
 import { type AgentClient, AgentProcessExitError } from "./agent-client";
 import type { OpencodeCliInfo } from "./cli";
@@ -34,6 +34,7 @@ import {
   decodeRecordResponse,
   decodeThreadResponse,
 } from "./protocol";
+import { ProviderClientOperationError } from "./provider-client-effects";
 import { requireProviderDriver } from "./provider-drivers";
 
 const started: AgentClient[] = [];
@@ -129,7 +130,9 @@ process.stdin.on("data", (chunk) => {
 function handle(message) {
   if (typeof message.id === "undefined") return;
   if (message.method === "initialize") {
-    const agentCapabilities = process.env.OPENBOT_FAKE_ACP_CLOSE_LOG
+    const agentCapabilities = process.env.OPENBOT_FAKE_ACP_RESUME
+      ? { sessionCapabilities: { resume: {} } }
+      : process.env.OPENBOT_FAKE_ACP_CLOSE_LOG
       ? { loadSession: true, sessionCapabilities: { close: {} } }
       : process.env.OPENBOT_FAKE_ACP_LIST
         ? { loadSession: true, sessionCapabilities: { list: {} } }
@@ -167,6 +170,29 @@ function handle(message) {
       write({ jsonrpc: "2.0", id: message.id, error: SERVICE_FAILURE });
       return;
     }
+    if (process.env.OPENBOT_FAKE_ACP_REPLAY) {
+      const count = Number(process.env.OPENBOT_FAKE_ACP_REPLAY_COUNT ?? 1);
+      for (let index = 0; index < count; index += 1) {
+        write({
+          jsonrpc: "2.0",
+          method: "session/update",
+          params: {
+            sessionId: message.params.sessionId,
+            update: {
+              sessionUpdate: "agent_message_chunk",
+              messageId: "replayed-message-" + index,
+              content: { type: "text", text: "Restored" },
+            },
+          },
+        });
+      }
+      if (process.env.OPENBOT_FAKE_ACP_REPLAY_READY)
+        fs.writeFileSync(process.env.OPENBOT_FAKE_ACP_REPLAY_READY, "ready");
+    }
+    write({ jsonrpc: "2.0", id: message.id, result: {} });
+    return;
+  }
+  if (message.method === "session/resume") {
     write({ jsonrpc: "2.0", id: message.id, result: {} });
     return;
   }
@@ -179,6 +205,51 @@ function handle(message) {
   if (message.method === "session/prompt") {
     const promptLog = process.env.OPENBOT_FAKE_ACP_PROMPT_LOG;
     if (promptLog) fs.appendFileSync(promptLog, JSON.stringify(message.params) + NL);
+    if (process.env.OPENBOT_FAKE_ACP_PROMPT_TOOL) {
+      write({
+        jsonrpc: "2.0",
+        method: "session/update",
+        params: {
+          sessionId: message.params.sessionId,
+          update: {
+            sessionUpdate: "tool_call",
+            toolCallId: "tool-1",
+            title: "Read README.md",
+            name: "read_file",
+            kind: "read",
+            status: "in_progress",
+            rawInput: { path: "README.md" },
+          },
+        },
+      });
+      write({
+        jsonrpc: "2.0",
+        method: "session/update",
+        params: {
+          sessionId: message.params.sessionId,
+          update: {
+            sessionUpdate: "tool_call_update",
+            toolCallId: "tool-1",
+            status: "completed",
+            rawOutput: { text: "OpenBot" },
+          },
+        },
+      });
+    }
+    if (process.env.OPENBOT_FAKE_ACP_PROMPT_OUTPUT) {
+      write({
+        jsonrpc: "2.0",
+        method: "session/update",
+        params: {
+          sessionId: message.params.sessionId,
+          update: {
+            sessionUpdate: "agent_message_chunk",
+            messageId: "prompt-message",
+            content: { type: "text", text: "Answer" },
+          },
+        },
+      });
+    }
     write({ jsonrpc: "2.0", id: message.id, result: { stopReason: "end_turn" } });
     return;
   }
@@ -342,6 +413,7 @@ function startOpencode(
     mcpAuthorization?: McpAuthorizationSource;
     /** How long one request may take, which is also the deadline model discovery works inside. */
     requestTimeoutMs?: number;
+    history?: AcpHistoryPersistence;
   } = {},
 ): AgentClient {
   vi.stubEnv("OPENBOT_FAKE_ACP_ENV_LOG", envLog);
@@ -350,8 +422,9 @@ function startOpencode(
     apiKey,
     customProviders: options.customProviders ?? (() => []),
     mcpServers: options.mcpServers ?? (() => []),
-    mcpAuthorization: options.mcpAuthorization,
-    servesModel: options.servesModel,
+    ...(options.mcpAuthorization === undefined ? {} : { mcpAuthorization: options.mcpAuthorization }),
+    ...(options.servesModel === undefined ? {} : { servesModel: options.servesModel }),
+    ...(options.history === undefined ? {} : { history: () => options.history }),
   };
   const timeoutMs = options.requestTimeoutMs ?? 10_000;
   const client = options.profile
@@ -794,6 +867,152 @@ describe("OpenCode MCP sign-in", () => {
 });
 
 describe("OpenCode ACP session loading", () => {
+  it("keeps a live non-resumable ACP session when provider idle release runs", async () => {
+    const fake = await createFakeOpencodeAgent();
+    const client = startOpencode(fake.cli, () => null, fake.envLog);
+    await runCauseEffect(client.request("initialize", {}, decodeRecordResponse));
+    expect(client.canReleaseProcess?.()).toBe(true);
+    await runCauseEffect(client.request("thread/start", { cwd: fake.directory }, decodeRecordResponse));
+    expect(client.canReleaseProcess?.()).toBe(false);
+  });
+
+  it("resumes a session when ACP advertises resume without load", async () => {
+    const fake = await createFakeOpencodeAgent();
+    vi.stubEnv("OPENBOT_FAKE_ACP_RESUME", "1");
+    const client = startOpencode(fake.cli, () => null, fake.envLog);
+    await runCauseEffect(client.request("initialize", {}, decodeRecordResponse));
+
+    await expect(
+      runCauseEffect(
+        client.request("thread/resume", { threadId: "ses_resume_only", cwd: fake.directory }, decodeRecordResponse),
+      ),
+    ).resolves.toEqual(expect.any(Object));
+    expect(client.canReleaseProcess?.()).toBe(true);
+    expect(await fake.readLoadedSessions()).toEqual([]);
+  });
+
+  it("streams load replay through readHistory without publishing live updates", async () => {
+    const fake = await createFakeOpencodeAgent();
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_SESSION", "1");
+    vi.stubEnv("OPENBOT_FAKE_ACP_REPLAY", "1");
+    const client = startOpencode(fake.cli, () => null, fake.envLog);
+    const live: unknown[] = [];
+    const fragments: string[] = [];
+    client.on("notification", (notification) => live.push(notification));
+    await runCauseEffect(client.request("initialize", {}, decodeRecordResponse));
+    if (!client.readHistory) throw new Error("ACP client has no history reader.");
+    await runCauseEffect(
+      client.readHistory({ threadId: "ses_stored", cwd: fake.directory, items: "full" }, (fragment) =>
+        Effect.sync(() => {
+          fragments.push(fragment.items.map((item) => item.text ?? "").join(""));
+          return true;
+        }),
+      ),
+    );
+    expect(fragments.join("")).toContain("Restored");
+    expect(live).toEqual([]);
+  });
+
+  it("bounds replay work when the history consumer is slower than the provider", async () => {
+    const fake = await createFakeOpencodeAgent();
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_SESSION", "1");
+    vi.stubEnv("OPENBOT_FAKE_ACP_REPLAY", "1");
+    vi.stubEnv("OPENBOT_FAKE_ACP_REPLAY_COUNT", "300");
+    const replayReady = join(fake.directory, "replay-ready");
+    vi.stubEnv("OPENBOT_FAKE_ACP_REPLAY_READY", replayReady);
+    const client = startOpencode(fake.cli, () => null, fake.envLog);
+    await runCauseEffect(client.request("initialize", {}, decodeRecordResponse));
+    if (!client.readHistory) throw new Error("ACP client has no history reader.");
+    let release!: () => void;
+    let started!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const consumerStarted = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const pending = runCauseEffect(
+      client.readHistory({ threadId: "ses_stored", cwd: fake.directory, items: "full" }, () =>
+        Effect.promise(async () => {
+          started();
+          await gate;
+          return true;
+        }),
+      ),
+    );
+    const rejected = expect(pending).rejects.toThrow(/history consumer is too slow/i);
+    await consumerStarted;
+    await vi.waitFor(async () => expect(await readFile(replayReady, "utf8")).toBe("ready"));
+    release();
+    await rejected;
+  });
+
+  it("reports a failed turn when durable history persistence fails", async () => {
+    const fake = await createFakeOpencodeAgent();
+    vi.stubEnv("OPENBOT_FAKE_ACP_PROMPT_OUTPUT", "1");
+    const client = startOpencode(fake.cli, () => null, fake.envLog, {
+      history: {
+        append: () => Effect.fail(new ProviderClientOperationError({ cause: new Error("history write failed") })),
+      },
+    });
+    const completed: unknown[] = [];
+    client.on("notification", (notification) => {
+      if (notification.method === "turn/completed") completed.push(notification);
+    });
+    await runCauseEffect(client.request("initialize", {}, decodeRecordResponse));
+    const thread = await runCauseEffect(client.request("thread/start", { cwd: fake.directory }, decodeRecordResponse));
+    const threadId = isDynamicRecord(thread.thread) ? thread.thread.id : null;
+    if (typeof threadId !== "string") throw new Error("The fake agent opened no thread.");
+    await runCauseEffect(
+      client.request(
+        "turn/start",
+        { threadId, clientUserMessageId: "turn-persist-failure", input: [{ type: "inputText", text: "Hi" }] },
+        decodeRecordResponse,
+      ),
+    );
+    await vi.waitFor(() => expect(completed).toHaveLength(1));
+    expect(completed[0]).toMatchObject({ params: { turn: { status: "failed" } } });
+  });
+
+  it("persists completed ACP tool items before releasing a turn", async () => {
+    const fake = await createFakeOpencodeAgent();
+    vi.stubEnv("OPENBOT_FAKE_ACP_PROMPT_TOOL", "1");
+    const appended: Array<Parameters<NonNullable<AcpHistoryPersistence["append"]>>> = [];
+    const client = startOpencode(fake.cli, () => null, fake.envLog, {
+      history: {
+        append: (...args) => {
+          appended.push(args);
+          return Effect.void;
+        },
+      },
+    });
+    await runCauseEffect(client.request("initialize", {}, decodeRecordResponse));
+    const thread = await runCauseEffect(client.request("thread/start", { cwd: fake.directory }, decodeRecordResponse));
+    const threadId = isDynamicRecord(thread.thread) ? thread.thread.id : null;
+    if (typeof threadId !== "string") throw new Error("The fake agent opened no thread.");
+    await runCauseEffect(
+      client.request(
+        "turn/start",
+        { threadId, clientUserMessageId: "turn-tool-history", input: [{ type: "inputText", text: "Read it" }] },
+        decodeRecordResponse,
+      ),
+    );
+    await vi.waitFor(() => expect(appended).toHaveLength(1));
+    expect(appended[0]?.[1]).toMatchObject({
+      complete: true,
+      items: [
+        expect.objectContaining({
+          id: "tool-1",
+          type: "toolCall",
+          name: "read_file",
+          status: "completed",
+          arguments: { path: "README.md" },
+          result: { text: "OpenBot" },
+        }),
+      ],
+    });
+  });
+
   it("answers a read for a session this process does not hold by loading it", async () => {
     const fake = await createFakeOpencodeAgent();
     vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_SESSION", "1");
