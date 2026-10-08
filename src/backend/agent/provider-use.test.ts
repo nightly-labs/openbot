@@ -5,6 +5,7 @@ import {
   CREATE_AGENT_INPUT,
   createTestService,
   FakeAgentClient,
+  fakeOpencodeCli,
   startAgentTestFixture,
   stopAgentTestFixture,
   stores,
@@ -22,6 +23,32 @@ afterEach(async () => {
 });
 
 describe("provider switches", () => {
+  it("generates a new profile with an on provider when the preferred provider is off", async () => {
+    process.env.OPENBOT_OPENCODE_PATH = await fakeOpencodeCli();
+    const draft = {
+      name: "Researcher",
+      title: "Research assistant",
+      description: "Compare primary sources.",
+      avatarSeed: "profile:research",
+      avatarHue: 215,
+      sectionId: null,
+    };
+    const clients: FakeAgentClient[] = [];
+    service = createTestService({
+      ...stores(root),
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider, JSON.stringify(draft));
+        clients.push(client);
+        return client;
+      },
+    });
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.setProviderOn("codex", false));
+    await expect(runCauseEffect(service.generateProfile({ prompt: "Research assistant" }, []))).resolves.toEqual(draft);
+    expect(clients.at(-1)?.provider).toBe("opencode");
+    expect(clients.at(-1)?.running).toBe(false);
+  });
+
   it("does not start an off CLI, restores its models on enable, and removes them on disable", async () => {
     const state = stores(root);
     const clients: FakeAgentClient[] = [];

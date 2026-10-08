@@ -1106,16 +1106,17 @@ export class ProviderRuntime implements ProviderPort {
     provider: AgentProvider,
   ) {
     const client = this.#clients.get(provider);
-    if (!client) return;
-    // Remove ownership first so a process exit cannot start a replacement.
-    yield* providerStep(() => {
-      this.#clients.delete(provider);
-      this.#cli.delete(provider);
-      this.#accounts.delete(provider);
-      this.#conversation.unloadClientThreads(client);
-    });
-    yield* client.stop().pipe(Effect.catch(() => Effect.void));
-    yield* this.#hooks.onClientStopped(client);
+    if (client) {
+      // Remove ownership first so a process exit cannot start a replacement.
+      yield* providerStep(() => {
+        this.#clients.delete(provider);
+        this.#cli.delete(provider);
+        this.#accounts.delete(provider);
+        this.#conversation.unloadClientThreads(client);
+      });
+      yield* client.stop().pipe(Effect.catch(() => Effect.void));
+      yield* this.#hooks.onClientStopped(client);
+    }
     yield* Effect.forEach(
       [...this.#confined].filter(([, confined]) => confined.client.provider === provider),
       ([agentId, confined]) => this.#stopConfined(agentId, confined),

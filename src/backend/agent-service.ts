@@ -1461,7 +1461,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         return yield* new ProfileGenerationFailed({
           cause: new Error(sourceText("error.agent.profileGenerationBusy")),
         });
-      const provider = agent?.provider ?? this.#providers.preferredProvider();
+      const provider = agent?.provider ?? this.#startingChoice()?.provider ?? this.#providers.preferredProvider();
       yield* this.#providers.ensureProvider(provider);
       const models = this.#endpoints.available();
       const model = agent
