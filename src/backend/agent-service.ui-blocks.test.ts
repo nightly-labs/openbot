@@ -218,6 +218,56 @@ describe.sequential("AgentService: ask_ui blocks", () => {
     expect(providerResult(turn, "admin").payload).toMatchObject({ status: "answered", actionId: "send" });
   });
 
+  it("refuses an answer in words from a member when the block has a privileged action", async () => {
+    const turn = await startTurn();
+    askUi(turn, "words", { block: LETTER });
+    await waitFor(() => turn.events.some((event) => event.type === "prompt"));
+    const member = { id: "member-1", name: "Member" };
+
+    await expect(
+      runCauseEffect(
+        turn.service.respondToPrompt(
+          { requestId: "words", answers: { action: ["Yes, go ahead"] } },
+          { sender: member, privileged: false },
+        ),
+      ),
+    ).rejects.toThrow("Only the server owner or an admin can choose this action.");
+    expect(turn.client.responses).toHaveLength(0);
+    expect((await blockMessage(turn, "words"))?.uiBlock?.state).toEqual({ status: "pending" });
+
+    // A member may still skip the block.
+    await runCauseEffect(
+      turn.service.respondToPrompt(
+        { requestId: "words", answers: { action: [] } },
+        { sender: member, privileged: false },
+      ),
+    );
+    expect(providerResult(turn, "words").payload).toMatchObject({ status: "skipped" });
+    expect((await blockMessage(turn, "words"))?.uiBlock?.state).toMatchObject({ status: "closed" });
+
+    // On a block with no privileged action a member may answer in words.
+    askUi(turn, "replies", { block: REPLIES });
+    await waitFor(() => turn.events.filter((event) => event.type === "prompt").length === 2);
+    await runCauseEffect(
+      turn.service.respondToPrompt(
+        { requestId: "replies", answers: { reply: ["Both, please"] } },
+        { sender: member, privileged: false },
+      ),
+    );
+    expect(providerResult(turn, "replies").payload).toMatchObject({ status: "answered", actionId: "_text" });
+
+    // The owner may answer in words on a privileged block.
+    askUi(turn, "owner", { block: LETTER });
+    await waitFor(() => turn.events.filter((event) => event.type === "prompt").length === 3);
+    await runCauseEffect(
+      turn.service.respondToPrompt(
+        { requestId: "owner", answers: { action: ["Yes, go ahead"] } },
+        { sender: { id: "admin-1", name: "Admin" }, privileged: true },
+      ),
+    );
+    expect(providerResult(turn, "owner").payload).toMatchObject({ status: "answered", actionId: "_text" });
+  });
+
   it("expires an open block when the turn ends", async () => {
     const turn = await startTurn();
     askUi(turn, "late", { blockId: "late-block", block: REPLIES });

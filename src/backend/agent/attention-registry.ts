@@ -17,12 +17,14 @@ import type {
 import { AGENT_RUNTIME_ATTENTION_LIMIT } from "@openbot/contracts/ipc";
 import {
   type ConversationUiBlock,
+  UI_BLOCK_TEXT_ACTION_ID,
   UI_BLOCK_VERSION,
   type UiBlockingBlockSpec,
   type UiBlockResponse,
   type UiBlockState,
   uiBlockActionIsPrivileged,
   uiBlockFallbackQuestions,
+  uiBlockHasPrivilegedAction,
   uiBlockOutcomeText,
   uiBlockResponseFromAnswers,
   validateUiBlockResponse,
@@ -1115,7 +1117,13 @@ function uiBlockAnswer(
   if (!read) return null;
   const response = validateUiBlockResponse(spec, read);
   if (!response) throw new Error(sourceText("error.backend.uiBlockAnswerInvalid"));
-  if (responder && !responder.privileged && uiBlockActionIsPrivileged(spec, response.actionId)) {
+  // On a block with a privileged action an answer in words is privileged too: a member could
+  // otherwise write "yes" to an action they may not press.
+  const privileged =
+    response.actionId === UI_BLOCK_TEXT_ACTION_ID
+      ? uiBlockHasPrivilegedAction(spec)
+      : uiBlockActionIsPrivileged(spec, response.actionId);
+  if (responder && !responder.privileged && privileged) {
     throw new Error(sourceText("error.backend.uiBlockActionNotAllowed"));
   }
   return response;
