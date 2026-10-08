@@ -1236,6 +1236,42 @@ describe.sequential("AgentService: queue", () => {
     }
   });
 
+  it("delivers an agent message once when the provider's thread and call ids are long", async () => {
+    const {
+      service: agentService,
+      client,
+      store,
+      mailbox,
+    } = await startService(root, { provider: "codex", autoComplete: false });
+    service = agentService;
+    await Promise.all([runCauseEffect(store.getOrCreate("chief")), runCauseEffect(store.getOrCreate("worker"))]);
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Coordinate the report." }));
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "running");
+    const chiefThreadId = store.activeProviderSession("chief")?.externalSessionId;
+    assert(chiefThreadId);
+    // Custom ACP threads add an agent id and a folder tag to a UUID session, so the joined ids pass the limit.
+    const callId = "c".repeat(INPUT_LIMITS.identifier);
+
+    const send = () =>
+      callOpenBotTool(
+        client,
+        chiefThreadId,
+        "send_message",
+        { recipientAgentIds: ["worker"], text: "Draft the report." },
+        "provider-turn",
+        callId,
+      );
+    const first = openBotToolPayload((await send()).result);
+    const retry = openBotToolPayload((await send()).result);
+
+    expect(first).toMatchObject({ messageId: expect.any(String) });
+    expect(retry.messageId).toBe(first.messageId);
+    await waitForQueue(service, "worker", (queue) => queue.deliveries.length > 0);
+    expect(service.listQueue("worker").deliveries).toHaveLength(1);
+    // The automatic result of the turn still sees that this turn already wrote to the worker.
+    expect(mailbox.hasAgentMessageFromTurnTo("chief", "provider-turn", "worker")).toBe(true);
+  });
+
   it("lets an agent stop the turn its own message started and drops its queued follow-up", async () => {
     const {
       service: agentService,

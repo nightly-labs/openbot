@@ -298,8 +298,7 @@ export interface HostProviderSettings {
   onRestartProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   onCancelProviderRestart?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   /**
-   * The providers the user turned off, and the switch that turns one on or off. Only the stories
-   * give them until OpenBot saves the setting (issue #1261).
+   * The stories can supply off providers. Production reads the saved switches from agentStatus.
    */
   offProviders?: readonly AgentProviderId[] | undefined;
   /** The names of the agents that use each provider. A provider with one stays on. */

@@ -9,7 +9,6 @@ export const messages = defineMessages("mobile.app", {
   "mobile.app.route.newSection": "New section",
   "mobile.app.route.settings": "Settings",
   "mobile.app.route.profile": "Profile",
-  "mobile.app.route.general": "General",
   "mobile.app.route.accountSessions": "Account sessions",
   "mobile.app.route.about": "About",
   "mobile.app.route.support": "Support",

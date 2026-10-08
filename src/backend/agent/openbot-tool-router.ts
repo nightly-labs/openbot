@@ -77,6 +77,7 @@ import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from 
 import { type AgentSidebar, handleSidebarTool } from "./sidebar-tools";
 import { LOCAL_SKILL_TOOL_DEFINITIONS, type LocalSkillTools, runLocalSkillTool } from "./skill-tools";
 import { isDynamicToolCall } from "./thread-items";
+import { toolCallIdempotencyKey } from "./tool-call-idempotency";
 import { ToolOperationFailed, toolStep, toToolOperationFailed } from "./tool-operation";
 import type { AgentBrowserHost } from "./turn-lifecycle";
 
@@ -200,6 +201,7 @@ export class OpenBotToolRouter {
     client: AgentClient,
     request: AppServerRequest,
   ) {
+    if (request.signal?.aborted) return;
     request.signal?.addEventListener("abort", () => this.#attention.cancelRequest(client, request.id), {
       once: true,
     });
@@ -252,14 +254,26 @@ export class OpenBotToolRouter {
               threadId: this.#conversation.publicThreadId(agentId, request.params.threadId),
               ownerAgentId: agentId,
             };
-            client.respond(
-              request.id,
-              request.params.tool === "upload_files"
-                ? yield* this.#browserUploads.uploadFiles(agentId, params)
-                : request.params.tool === "list_logins"
-                  ? yield* this.#attention.listVaultLogins(params)
-                  : yield* this.#browser.handleDynamicTool(params),
+            const operation = Effect.gen({ self: this }, function* () {
+              return yield* params.tool === "upload_files"
+                ? this.#browserUploads.uploadFiles(agentId, params)
+                : params.tool === "list_logins"
+                  ? this.#attention.listVaultLogins(params)
+                  : this.#browser.handleDynamicTool(params);
+            });
+            const signal = request.signal;
+            const cancelled = Effect.callback<never>((resume) => {
+              const abort = () => resume(Effect.interrupt);
+              if (signal?.aborted) abort();
+              else signal?.addEventListener("abort", abort, { once: true });
+              return Effect.sync(() => signal?.removeEventListener("abort", abort));
+            });
+            if (signal?.aborted) return;
+            const result = yield* operation.pipe(
+              Effect.raceFirst(cancelled),
+              Effect.onInterrupt(() => Effect.sync(() => this.#browser.endControl(params.threadId, params.turnId))),
             );
+            if (!signal?.aborted && client.running) client.respond(request.id, result);
             return;
           }
           if (request.params.namespace === "openbot") {
@@ -1028,7 +1042,7 @@ export class OpenBotToolRouter {
           replyToMessageId: replyToMessageId ?? null,
           expectsReply,
           ...(messagingReturn ? { messagingReturn } : {}),
-          idempotencyKey: `${params.threadId}:${params.turnId}:${params.callId}`,
+          idempotencyKey: toolCallIdempotencyKey(params),
         })
         .pipe(toToolOperationFailed);
       for (const recipient of recipientValues) {

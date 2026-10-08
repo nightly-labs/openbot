@@ -232,4 +232,10 @@ export const messages = defineMessages("error.provider", {
   "error.provider.customAgentNotSaved": "This custom agent is not saved. Refresh the list and try again.",
   "error.provider.customAgentTooMany": "You can save at most {count} custom agents.",
   "error.provider.customAgentEnvValueMissing": "Enter a value for {name}.",
+  "error.provider.off": "{provider} is off in OpenBot. Turn it on in provider settings first.",
+  "error.provider.inUse": "An agent uses {provider}. Change its model before you turn this provider off.",
+  "error.provider.useBusy": "Wait for the provider check or sign-in to finish, then try again.",
+  "error.provider.useSettingsReadOnly":
+    "The saved provider settings cannot be read. Update OpenBot before you change them.",
+  "error.provider.useChangeFailed": "OpenBot could not change the provider setting.",
 });

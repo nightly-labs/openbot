@@ -1,0 +1,102 @@
+import type { PartialTranslation } from "../../message";
+import type { messages as source } from "../en/mcp";
+
+export const messages = {
+  "mcp.connect.unreachable": "No se pudo acceder a ese servidor.",
+  "mcp.connect.title": "Conectar {name}",
+  "mcp.connect.notConnected": "Sin conexión",
+  "mcp.connect.close": "Cerrar el diálogo de conexión con {name}",
+  "mcp.connect.getKey": "Obtener una clave",
+  "mcp.connect.keyDescription":
+    "Pega una credencial de tu cuenta de {name}. OpenBot se conecta con ella y la guarda en {host}.",
+  "mcp.connect.thisComputer": "este equipo",
+  "mcp.connect.noCredentialDescription":
+    "{name} no solicita credenciales. OpenBot se conecta una vez para ver qué herramientas ofrece.",
+  "mcp.connect.connect": "Conectar",
+  "mcp.connect.required": "Obligatorio.",
+  "mcp.connect.keptOn": "Se guarda en {host}.",
+  "mcp.connect.httpsLinkRequired": "Introduce un enlace https de {hostname}.",
+  "mcp.local.description":
+    "{name} ejecuta este servidor en su aplicación de escritorio, en este equipo. Actívalo allí y después conéctate.",
+  "mcp.local.stepsTitle": "Activa el servidor en {name}",
+  "mcp.local.address": "Dirección",
+  "mcp.local.docs": "Guía de configuración",
+  "mcp.signIn.description":
+    "Inicia sesión en tu cuenta de {name}. OpenBot obtiene las herramientas a las que puede acceder esa cuenta, pero no la contraseña.",
+  "mcp.signIn.waiting": "Esperando al navegador…",
+  "mcp.signIn.continue": "Continuar a {name}",
+  "mcp.server.loadFailed": "No se pudieron cargar los servidores MCP.",
+  "mcp.test.connected": {
+    one: "Conectado · {count} herramienta",
+    other: "Conectado · {count} herramientas",
+  },
+  "mcp.status.testing": "Probando…",
+  "mcp.status.failed": "Error",
+  "mcp.status.enabled": "Activado",
+  "mcp.status.disabled": "Desactivado",
+  "mcp.server.providerLimitNote":
+    "Solo Claude: un servidor con un directorio de trabajo no se proporciona a los otros proveedores.",
+  "mcp.server.runtimeDownloading":
+    "Descargando el entorno de ejecución usado para iniciar servidores STDIO. Es posible que no puedan iniciarse hasta que termine.",
+  "mcp.server.runtimeDownloadingProgress":
+    "Descargando el entorno de ejecución usado para iniciar servidores STDIO ({percent}%). Es posible que no puedan iniciarse hasta que termine.",
+  "mcp.server.runtimeDownloadFailed":
+    "No se descargó el entorno de ejecución usado para iniciar servidores STDIO. Un servidor puede iniciarse si este equipo tiene Node.",
+  "mcp.panel.saveFailed": "No se pudo guardar ese cambio.",
+  "mcp.panel.noAnswer": "Ese servidor no respondió.",
+  "mcp.panel.connectTitle": "Conectar a un MCP personalizado",
+  "mcp.panel.editTitle": "Editar servidor MCP",
+  "mcp.panel.changesNotSaved": "Cambios sin guardar",
+  "mcp.panel.title": "Servidores MCP",
+  "mcp.panel.description":
+    "Los servidores de Model Context Protocol proporcionan herramientas adicionales a los agentes de este servidor. Los agentes de Claude y Codex solo reciben los servidores de esta lista; los agentes de OpenCode y Grok también pueden iniciar servidores desde sus propios archivos de configuración.",
+  "mcp.panel.connectCustom": "Conectar un MCP personalizado",
+  "mcp.panel.empty": "Aún no hay servidores MCP.",
+  "mcp.panel.enable": "Activar {name}",
+  "mcp.panel.detailsTitle": "Detalles",
+  "mcp.panel.detailsDescription": "Asigna un nombre a este servidor y elige cómo accede OpenBot a él.",
+  "mcp.panel.transport": "Transporte",
+  "mcp.panel.name": "Nombre",
+  "mcp.panel.namePlaceholder": "Nombre del servidor MCP",
+  "mcp.panel.launchTitle": "Inicio",
+  "mcp.panel.command": "Comando de inicio",
+  "mcp.panel.commandDescription":
+    "Solo el programa. Al iniciar, este campo no se interpreta como una línea de comandos, por lo que una palabra como serve-sqlite debe ir en Argumentos, más abajo.",
+  "mcp.panel.arguments": "Argumentos",
+  "mcp.panel.addArgument": "Añadir argumento",
+  "mcp.panel.argument": "Argumento {position}",
+  "mcp.panel.removeArgument": "Eliminar argumento {position}",
+  "mcp.panel.environmentVariables": "Variables de entorno",
+  "mcp.panel.addEnvironmentVariable": "Añadir variable de entorno",
+  "mcp.panel.environmentVariableKey": "Clave de la variable de entorno {position}",
+  "mcp.panel.environmentVariableValue": "Valor de la variable de entorno {position}",
+  "mcp.panel.removeEnvironmentVariable": "Eliminar variable de entorno {position}",
+  "mcp.panel.passthrough": "Transferencia de variables de entorno",
+  "mcp.panel.addVariable": "Añadir variable",
+  "mcp.panel.passthroughVariable": "Variable transferida {position}",
+  "mcp.panel.removePassthroughVariable": "Eliminar variable transferida {position}",
+  "mcp.panel.workingDirectory": "Directorio de trabajo",
+  "mcp.panel.workingDirectoryDescription":
+    "Los agentes de Claude y la prueba de conexión inician el servidor aquí. Déjalo vacío para proporcionar este servidor a todos los proveedores: ningún otro proveedor puede establecer un directorio, por lo que omite los servidores que indican uno.",
+  "mcp.panel.endpointTitle": "Endpoint",
+  "mcp.panel.endpointDescription": "Todos los proveedores pueden usar un servidor MCP HTTP.",
+  "mcp.panel.serverUrl": "URL del servidor",
+  "mcp.panel.headers": "Cabeceras",
+  "mcp.panel.addHeader": "Añadir cabecera",
+  "mcp.panel.headerKey": "Clave de la cabecera {position}",
+  "mcp.panel.headerValue": "Valor de la cabecera {position}",
+  "mcp.panel.removeHeader": "Eliminar cabecera {position}",
+  "mcp.panel.key": "Clave",
+  "mcp.panel.value": "Valor",
+  "mcp.panel.testTitle": "Prueba",
+  "mcp.panel.testDescription":
+    "Se conecta una vez con estos ajustes e informa de las herramientas que ofrece. No se guarda ni conserva nada.",
+  "mcp.panel.testConnection": "Probar conexión",
+  "mcp.panel.notTested": "Aún sin probar.",
+  "mcp.panel.removeTitle": "¿Eliminar {name}?",
+  "mcp.panel.removeDescription":
+    "Sus herramientas dejarán de ofrecerse a los agentes de este servidor. La configuración no se conserva.",
+  "mcp.panel.removeConfirm": "Eliminar servidor MCP",
+  "mcp.panel.actionsFor": "Acciones para {name}",
+  "mcp.panel.testUnavailable": "Este servidor no se puede probar aquí.",
+} as const satisfies PartialTranslation<typeof source>;
