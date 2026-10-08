@@ -190,7 +190,12 @@ export function parseExternalDestination(input: unknown): ExternalDestination {
     input !== "message" &&
     input !== "grok-bot-export" &&
     input !== "hosted-server-contact" &&
-    input !== "mac-screen-recording"
+    input !== "mac-screen-recording" &&
+    input !== "tailscale-download" &&
+    input !== "tailscale-windows-download" &&
+    input !== "tailscale-admin-dns" &&
+    input !== "tailscale-admin-machines" &&
+    input !== "tailscale-sharing"
   ) {
     throw new Error("Unknown external destination.");
   }

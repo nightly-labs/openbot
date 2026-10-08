@@ -1027,6 +1027,7 @@ export function installOpenbotStub(): void {
     }),
     servers: {
       reorder: notStubbed("servers.reorder"),
+      setDirectEnabled: notStubbed("servers.setDirectEnabled"),
       setMuted: vi
         .fn()
         .mockImplementation(async ({ serverId, muted }) => [

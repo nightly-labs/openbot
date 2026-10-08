@@ -218,6 +218,104 @@ export const messages = {
   "server.settings.editLogo": "Editar logotipo del servidor",
   "server.settings.addLogo": "Añadir logotipo del servidor",
   "server.settings.removeLogo": "Eliminar logotipo del servidor",
+  "server.tailscale.title": "Tailscale",
+  "server.tailscale.localTitle": "Tailscale en este equipo",
+  "server.tailscale.checking": "Comprobando Tailscale…",
+  "server.tailscale.loadFailed": "No se pudo leer el estado de Tailscale.",
+  "server.tailscale.notInstalled":
+    "Tailscale no está instalado. Instálalo para que los miembros se conecten directamente.",
+  "server.tailscale.notRunning": "Tailscale no responde. Abre la aplicación de Tailscale y vuelve a comprobarlo.",
+  "server.tailscale.signedOut": "Tailscale está instalado, pero no has iniciado sesión.",
+  "server.tailscale.stopped": "Tailscale está desactivado.",
+  "server.tailscale.connected": "Conectado a {tailnet} como {device}.",
+  "server.tailscale.unknownTailnet": "tu tailnet",
+  "server.tailscale.unknownDevice": "este dispositivo",
+  "server.tailscale.install": "Obtener Tailscale",
+  "server.tailscale.open": "Abrir Tailscale",
+  "server.tailscale.checkAgain": "Volver a comprobar",
+  "server.tailscale.directLabel": "Conexión directa por Tailscale",
+  "server.tailscale.directDescription":
+    "Los miembros cuyos equipos están en tu tailnet se conectan directamente, sin la nube de OpenBot. Solo los dispositivos de tu tailnet pueden acceder. La nube de OpenBot sigue siendo la alternativa.",
+  "server.tailscale.addressTitle": "Dirección directa",
+  "server.tailscale.addressDescription":
+    "Los miembros reciben esta dirección a través de su conexión con sesión iniciada.",
+  "server.tailscale.copyAddress": "Copiar dirección directa",
+  "server.tailscale.issue.hostOffline": "Se activará cuando el servidor esté publicado.",
+  "server.tailscale.issue.tailscaleUnavailable":
+    "Tailscale debe estar en ejecución y con la sesión iniciada en este equipo.",
+  "server.tailscale.issue.httpsOff":
+    "Activa los certificados HTTPS para tu tailnet en la consola de administración de Tailscale y vuelve a activar esta opción.",
+  "server.tailscale.issue.portInUse":
+    "Tailscale Serve ya usa los puertos 443 y 8443 en este equipo. OpenBot no los cambia.",
+  "server.tailscale.issue.funnelOn":
+    "Tailscale Funnel publica este puerto en internet, por lo que OpenBot desactivó la conexión directa.",
+  "server.tailscale.issue.serveFailed": "Tailscale no pudo servir la conexión directa.",
+  "server.tailscale.issue.serveFailedDetail": "Tailscale no pudo servir la conexión directa: {detail}",
+  "server.tailscale.useLabel": "Usar Tailscale cuando esté disponible",
+  "server.tailscale.useDescription": "Este servidor se conecta a través de la nube de OpenBot.",
+  "server.tailscale.routeDirect": "Conectado directamente por Tailscale.",
+  "server.tailscale.routeCloud":
+    "Conectado a través de la nube de OpenBot. La próxima conexión probará primero Tailscale.",
+  "server.tailscale.hint.tailscaleUnavailable":
+    "Tailscale no se está ejecutando en este equipo, por lo que este servidor se conecta a través de la nube de OpenBot.",
+  "server.tailscale.hint.otherTailnet":
+    "Este equipo no está en la tailnet del host. Pide al propietario del host que comparta contigo el dispositivo del host en Tailscale (uso compartido de nodos) o conéctate a través de la nube de OpenBot.",
+  "server.tailscale.hint.failed":
+    "La conexión directa no respondió, por lo que este servidor se conecta por ahora a través de la nube de OpenBot.",
+  "server.tailscale.hint.sharingGuide": "Cómo funciona el uso compartido",
+  "server.tailscale.hint.sharingDescription":
+    "El propietario del host comparte contigo el dispositivo del host en la consola de administración de Tailscale. Después, tú lo aceptas.",
+  "server.tailscale.setup.title": "Configurar la conexión directa",
+  "server.tailscale.setup.description":
+    "Los miembros de tu tailnet pueden conectarse directamente a este servidor. Cada paso se vuelve a comprobar solo.",
+  "server.tailscale.setup.updateServer":
+    "Este servidor ejecuta una versión anterior de OpenBot. Actualízalo para configurar Tailscale desde aquí.",
+  "server.tailscale.setup.stepDone": "Hecho",
+  "server.tailscale.setup.stepToDo": "Pendiente",
+  "server.tailscale.setup.clientTitle": "Tailscale en este equipo",
+  "server.tailscale.setup.serverTitle": "Tailscale en el servidor",
+  "server.tailscale.setup.networkTitle": "Misma tailnet",
+  "server.tailscale.setup.httpsTitle": "Certificados HTTPS",
+  "server.tailscale.setup.serverRunCommand":
+    "Ejecuta este comando en el servidor. Instala Tailscale y permite que OpenBot lo use.",
+  "server.tailscale.setup.serverSignIn": "Inicia sesión en Tailscale en el servidor.",
+  "server.tailscale.setup.serverWaitsForSignIn":
+    "Tailscale en el servidor espera un inicio de sesión. Abre la página y aprueba el servidor.",
+  "server.tailscale.setup.serverSignInFailed":
+    "Tailscale en el servidor no inició un inicio de sesión. Ejecuta el comando en el servidor y vuelve a comprobarlo.",
+  "server.tailscale.setup.serverInstall": "Instala Tailscale en el equipo del servidor e inicia sesión.",
+  "server.tailscale.setup.serverWsl":
+    "Este servidor se ejecuta en WSL y usa la aplicación de Tailscale para Windows. Instálala en Windows e inicia sesión.",
+  "server.tailscale.setup.wslMirroredRequired":
+    "WSL debe usar la red en modo espejo: añade networkingMode=mirrored en [wsl2] de %UserProfile%\\.wslconfig y luego ejecuta wsl --shutdown.",
+  "server.tailscale.setup.wslMirroredCheck":
+    "Asegúrate de que WSL usa la red en modo espejo: networkingMode=mirrored en [wsl2] de %UserProfile%\\.wslconfig.",
+  "server.tailscale.setup.copyCommand": "Copiar comando de configuración",
+  "server.tailscale.setup.signIn": "Iniciar sesión",
+  "server.tailscale.setup.openSignIn": "Abrir página de inicio de sesión",
+  "server.tailscale.setup.getWindowsApp": "Obtener Tailscale para Windows",
+  "server.tailscale.setup.networkWaiting": "Se comprobará cuando Tailscale se ejecute en ambos equipos.",
+  "server.tailscale.setup.networkSame": "Este equipo y el servidor están en {tailnet}.",
+  "server.tailscale.setup.networkShared": "El servidor está compartido con la tailnet de este equipo.",
+  "server.tailscale.setup.networkOther":
+    "Este equipo está en {client} y el servidor está en {server}. Inicia sesión en este equipo con la cuenta del servidor o comparte el servidor con tu tailnet.",
+  "server.tailscale.setup.shareServer": "Compartir este servidor",
+  "server.tailscale.setup.serverFirst": "Se comprobará cuando Tailscale se ejecute en el servidor.",
+  "server.tailscale.setup.httpsOn": "Activados para la tailnet del servidor.",
+  "server.tailscale.setup.httpsOff":
+    "Activa los certificados HTTPS en la página DNS de la consola de administración de Tailscale.",
+  "server.tailscale.setup.turnOnHttps": "Activar",
+  "server.tailscale.setup.directWaiting": "Disponible cuando los pasos anteriores estén hechos.",
+  "server.tailscale.setup.directDescription":
+    "Los miembros de tu tailnet se conectan directamente, sin la nube de OpenBot. La nube de OpenBot sigue siendo la alternativa.",
+  "server.tailscale.setup.issue.hostOffline": "Se activará cuando el servidor esté en línea.",
+  "server.tailscale.setup.issue.tailscaleUnavailable":
+    "Tailscale debe estar en ejecución y con la sesión iniciada en el servidor.",
+  "server.tailscale.setup.issue.portInUse":
+    "Tailscale Serve ya usa los puertos 443 y 8443 en el servidor. OpenBot no los cambia.",
+  "server.route.label": "Conexión",
+  "server.route.direct": "Directa · Tailscale",
+  "server.route.cloud": "Por la nube de OpenBot",
   "server.settings.access": "Acceso",
   "server.settings.publish": "Publicar este servidor",
   "server.settings.published": "El servidor está publicado",

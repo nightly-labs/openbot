@@ -29,12 +29,18 @@ import { useSetup } from "./features/onboarding/onboarding-context";
 import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-context";
 import { AddServerOverlay } from "./features/servers/AddServerOverlay";
 import { mcpToolRuntimeNote } from "./features/servers/mcp-servers";
+import type { ServerTailscaleSetupApi } from "./features/servers/ServerTailscaleSetup";
 import { useServerActions } from "./features/servers/server-actions";
-import { serverCanAdminister, serverSupportsCapability } from "./features/servers/server-capabilities";
+import {
+  ownedRemoteServerSupportsTailscaleSetup,
+  serverCanAdminister,
+  serverSupportsCapability,
+} from "./features/servers/server-capabilities";
 import { useServerSelection } from "./features/servers/server-selection";
 import { useServerSettings } from "./features/servers/server-settings";
 import { useServerSwitch } from "./features/servers/server-switch";
 import { useServers } from "./features/servers/servers-context";
+import { serversPort } from "./features/servers/servers-port";
 import type { HostProviderSettings } from "./features/settings/ProviderSettingsSection";
 import { useSettings } from "./features/settings/settings-context";
 import { useSidebar } from "./features/sidebar/sidebar-context";
@@ -250,13 +256,28 @@ function LeaveServer() {
  * Settings for one server, which is any server on the rail rather than the
  * active one - hence the target held by the domain instead of `activeServer()`.
  */
+/** The owner's Tailscale setup of a joined server; see `ownedRemoteServerSupportsTailscaleSetup`. */
+function ownerTailscaleSetup(server: ServerSummary): ServerTailscaleSetupApi | null | undefined {
+  const supported = ownedRemoteServerSupportsTailscaleSetup(server);
+  if (supported === undefined) return undefined;
+  if (!supported) return null;
+  const serverId = server.id;
+  return {
+    getSetup: () => serversPort().hostAdmin.getTailscaleSetup(serverId),
+    setDirect: (enabled) => serversPort().hostAdmin.setTailscaleDirect(enabled, serverId),
+    signIn: () => serversPort().hostAdmin.startTailscaleSignIn(serverId),
+    openLocalTailscale: () => serversPort().host.openTailscale(),
+    openLink: (link) => appPort().openExternal(link),
+  };
+}
+
 function ServerSettings(props: {
   githubConnector: GitHubConnectorController | undefined;
   onePasswordConnector: OnePasswordConnectorController | undefined;
   bitwardenConnector: BitwardenConnectorPanelProps | undefined;
 }) {
   const platform = usePlatform();
-  const { hostStatus, setServerMuted, setServerNotificationLevel, activeServer } = useServers();
+  const { hostStatus, setServerMuted, setServerNotificationLevel, setServerDirectEnabled, activeServer } = useServers();
   const { selectAgent, selectGlobalSearchMessage } = useNavigation();
   const { selectServer } = useServerSelection();
   const { setPendingAgentSelection } = useServerSwitch();
@@ -510,6 +531,10 @@ function ServerSettings(props: {
           onSetPublished={setServerPublished}
           onSetMuted={(muted) => setServerMuted(server().id, muted)}
           onSetNotificationLevel={(level) => setServerNotificationLevel(server().id, level)}
+          tailscale={server().kind === "local" ? serversPort().host : undefined}
+          onSetDirectEnabled={(enabled) => setServerDirectEnabled(server().id, enabled)}
+          tailscaleSetup={ownerTailscaleSetup(server())}
+          onOpenTailscaleSharing={() => appPort().openExternal("tailscale-sharing")}
           onCreateInvite={createServerInvite}
           onUpdateMember={updateServerMember}
           onRemoveMember={removeServerMember}

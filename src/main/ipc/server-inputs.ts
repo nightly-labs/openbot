@@ -13,6 +13,7 @@ import type {
   RemoteDesktopTestInput,
   ReorderServersInput,
   SendDirectMessageInput,
+  SetServerDirectInput,
   SetServerMutedInput,
   SetServerNotificationLevelInput,
   SetTeamTypingInput,
@@ -211,6 +212,11 @@ export function parseSetServerMuted(value: unknown): SetServerMutedInput {
     throw new Error("Invalid server mute duration.");
   }
   return { serverId, muted: true, durationMs: value.durationMs };
+}
+
+export function parseSetServerDirect(value: unknown): SetServerDirectInput {
+  if (!isObject(value) || !isBoolean(value.enabled)) throw new Error("Invalid direct connection setting.");
+  return { serverId: requireString(value.serverId, "serverId", INPUT_LIMITS.identifier), enabled: value.enabled };
 }
 
 export function parseSetServerNotificationLevel(value: unknown): SetServerNotificationLevelInput {

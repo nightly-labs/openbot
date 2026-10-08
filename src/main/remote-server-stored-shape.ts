@@ -24,6 +24,7 @@
 // is a re-tag. A version this build does not know is refused outright: it was written by a newer
 // OpenBot, and guessing at it would replace a file that build can still read.
 
+import { isValidTailscaleDirectApiUrl } from "@openbot/contracts/invite-links";
 import type { ServerNotificationLevel, TeamRole } from "@openbot/contracts/ipc";
 import { LOCAL_SERVER_ID, SERVER_NOTIFICATION_LEVELS } from "@openbot/contracts/ipc";
 import {
@@ -49,6 +50,14 @@ export interface StoredRemoteServer {
   transport?: "webrtc-v2";
   /** The active members that the host's plan allows, from the account server's host list. */
   memberLimit?: number;
+  /**
+   * The host's direct Tailscale address (`direct-endpoint-v1`), as the host last said over an
+   * authenticated connection. Not an identity: each direct connection checks the pinned host key
+   * there before it sends anything else. Optional, so an older build reads the entry and drops it.
+   */
+  directUrl?: string | undefined;
+  /** The member turned "Use Tailscale when available" off for this server. Absent means on. */
+  directDisabled?: true | undefined;
 }
 
 // An entry this build cannot read, and where it sat in `servers`. The slot is named by the entry
@@ -259,6 +268,11 @@ function readStoredRemoteServer(value: unknown): StoredRemoteServer | null {
     ...(value.transport === undefined ? {} : { transport: value.transport }),
     // A bad limit drops only the limit: the next host list writes it again.
     ...(isMemberLimit(value.memberLimit) ? { memberLimit: value.memberLimit } : {}),
+    // A bad direct address drops only the address: the next connection to the host asks for it again.
+    ...(isString(value.directUrl) && isValidTailscaleDirectApiUrl(value.directUrl)
+      ? { directUrl: value.directUrl }
+      : {}),
+    ...(value.directDisabled === true ? { directDisabled: true as const } : {}),
   };
 }
 

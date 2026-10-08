@@ -21,12 +21,13 @@ import {
   parseRemoteDesktopTest,
   parseReorderServers,
   parseSendDirectMessage,
+  parseSetServerDirect,
   parseSetServerMuted,
   parseSetServerNotificationLevel,
   parseSetTeamTyping,
   parseUpdateTeamMember,
 } from "./server-inputs";
-import { stringPayload } from "./validation";
+import { booleanPayload, stringPayload } from "./validation";
 
 interface TeamIpcDependencies {
   host: HostService;
@@ -50,6 +51,11 @@ export function teamIpcHandlers({
       ),
       setNotificationLevel: payloadHandler(parseSetServerNotificationLevel, ({ serverId, level }) =>
         runCauseEffect(remoteServers.setNotificationLevel(serverId, level)).then((servers) =>
+          withLocalHostSummary(servers, host.getStatus()),
+        ),
+      ),
+      setDirectEnabled: payloadHandler(parseSetServerDirect, ({ serverId, enabled }) =>
+        runCauseEffect(remoteServers.setDirectEnabled(serverId, enabled)).then((servers) =>
           withLocalHostSummary(servers, host.getStatus()),
         ),
       ),
@@ -171,6 +177,11 @@ export function teamIpcHandlers({
         runCauseEffect(host.revokeInvite(inviteId)),
       ),
       createInvite: payloadHandler(parseCreateTeamInvite, (invite) => runCauseEffect(host.createInvite(invite))),
+      getTailscaleStatus: handler(() => runCauseEffect(host.getTailscaleStatus())),
+      setTailscaleDirect: payloadHandler(booleanPayload("enabled"), (enabled) =>
+        runCauseEffect(host.setTailscaleDirect(enabled)),
+      ),
+      openTailscale: handler(() => runCauseEffect(host.openTailscale())),
     },
     remoteDesktop: {
       checkSetup: payloadHandler(stringPayload("serverId"), (serverId) =>

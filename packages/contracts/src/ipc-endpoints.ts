@@ -302,6 +302,7 @@ import type {
   OpenStoredFileInput,
   StorageUsage,
 } from "./ipc-storage";
+import type { TailscaleSetupStatus } from "./ipc-tailscale-setup";
 import type {
   ConfigureHostInput,
   CreateTeamInviteInput,
@@ -328,9 +329,11 @@ import type {
   ScopedTeamPresenceSnapshot,
   SendDirectMessageInput,
   ServerSummary,
+  SetServerDirectInput,
   SetServerMutedInput,
   SetServerNotificationLevelInput,
   SetTeamTypingInput,
+  TailscaleHostStatus,
   TeamInviteSummary,
   TeamMemberSummary,
   TeamPresenceSnapshot,
@@ -661,6 +664,12 @@ export const IPC_ENDPOINTS = {
     setUpdateSettings: scopedRequest<HostUpdateSettingsChange, HostUpdateStatus, "required">()(
       "host-admin:set-update-settings",
     ),
+    /** The owner's Tailscale setup of a joined server (`host-tailscale-v1`), with this computer's Tailscale. */
+    getTailscaleSetup: scopedQuery<TailscaleSetupStatus, "required">()("host-admin:get-tailscale-setup"),
+    /** The owner's switch for the host's direct Tailscale path. */
+    setTailscaleDirect: scopedRequest<boolean, TailscaleSetupStatus, "required">()("host-admin:set-tailscale-direct"),
+    /** Asks the host to start a Tailscale sign-in, and opens the sign-in page it reports in the browser. */
+    startTailscaleSignIn: scopedQuery<TailscaleSetupStatus, "required">()("host-admin:start-tailscale-sign-in"),
   },
   // The built-in GitHub connection of this computer. Local only: a remote client connects GitHub on
   // the computer that runs OpenBot. The token stays in main; every answer is the status only.
@@ -946,6 +955,8 @@ export const IPC_ENDPOINTS = {
     reorder: request<ReorderServersInput, ServerSummary[]>()("servers:reorder"),
     setMuted: request<SetServerMutedInput, ServerSummary[]>()("servers:set-muted"),
     setNotificationLevel: request<SetServerNotificationLevelInput, ServerSummary[]>()("servers:set-notification-level"),
+    /** The member's "Use Tailscale when available" choice for one joined server. */
+    setDirectEnabled: request<SetServerDirectInput, ServerSummary[]>()("servers:set-direct-enabled"),
     join: request<JoinServerInput, ServerSummary>()("servers:join"),
     previewInvite: request<JoinServerInput, InvitePreview>()("servers:preview-invite"),
     takePendingInvite: request<undefined, string | null>()("servers:take-pending-invite"),
@@ -1064,6 +1075,12 @@ export const IPC_ENDPOINTS = {
     removeMember: request<string, void>()("host:remove-member"),
     listSessions: request<undefined, TeamSessionSummary[]>()("host:list-sessions"),
     revokeSession: request<string, void>()("host:revoke-session"),
+    /** The local Tailscale client and the direct Tailscale path of this host. Runs the `tailscale` command. */
+    getTailscaleStatus: request<undefined, TailscaleHostStatus>()("host:get-tailscale-status"),
+    /** The owner's switch for the direct Tailscale path. On, it runs `tailscale serve` while the host is online. */
+    setTailscaleDirect: request<boolean, TailscaleHostStatus>()("host:set-tailscale-direct"),
+    /** Opens the Tailscale app, or its download page when it is not installed. */
+    openTailscale: request<undefined, void>()("host:open-tailscale"),
     event: event<HostStatus>()("host:event"),
   },
   events: {

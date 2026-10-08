@@ -170,6 +170,7 @@ import { RemoteDesktopManager } from "./remote-desktop-manager";
 import { resolveRemoteDesktopRuntime } from "./remote-desktop-runtime-artifact";
 import { loadOrCreateRemoteDesktopCredentials } from "./remote-desktop-secret-store";
 import { appendRemoteDiagnosticLog } from "./remote-diagnostics";
+import { RemoteDirectSessionStore } from "./remote-direct-session-store";
 import { decodeVoid } from "./remote-host-decoding";
 import { RemoteServerManager } from "./remote-server-manager";
 import { RemoteSessionCache } from "./remote-session-cache";
@@ -188,6 +189,9 @@ import { readSetupState } from "./setup-store";
 import { SignalIngress } from "./signal-ingress";
 import { SkillMarketplaceService } from "./skill-marketplace-service";
 import { SLACK_DEV_CALLBACK_PATH, startSlackDevCallbackServer } from "./slack-dev-callback-server";
+import { locateTailscale, TailscaleCli } from "./tailscale-cli";
+import { TailscaleDirectService } from "./tailscale-direct-service";
+import { TailscaleHostSetup } from "./tailscale-host-setup";
 import { TeamStore } from "./team-store";
 import { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcClientTransport } from "./team-webrtc-client-transport";
@@ -227,6 +231,11 @@ const TEAM_FILE = "openbot-team-server-v1.json";
 /** One host per account. The v1 file above stays as the last build without accounts left it. */
 const TEAM_FILE_V2 = "openbot-team-server-v2.json";
 const REMOTE_SERVERS_FILE = "openbot-remote-servers-v1.json";
+const REMOTE_DIRECT_SESSIONS_FILE = "openbot-direct-sessions-v1.bin";
+/** The owner's switch for the direct Tailscale path of this host, and the `tailscale serve` port it set. */
+const TAILSCALE_DIRECT_FILE = "openbot-tailscale-direct-v1.json";
+const TAILSCALE_DOWNLOAD_URL = "https://tailscale.com/download";
+const TAILSCALE_MAC_APP = "/Applications/Tailscale.app";
 const CENTRAL_AUTH_FILE = "openbot-central-auth-v1.bin";
 const REMOTE_SESSIONS_FILE = "openbot-remote-sessions-v1.bin";
 const LEGACY_REMOTE_DESKTOP_CREDENTIAL_FILE = "openbot-remote-desktop-credential-v1.json";
@@ -392,6 +401,8 @@ export interface ApplicationServices {
   eventsRuntime: HostEventsRuntime;
   /** The terminal control of a self-hosted server. Null in every other build. */
   serverMode: ServerMode | null;
+  /** This computer's Tailscale client, read with its command line. */
+  tailscaleCli: TailscaleCli;
   customProviders: CustomProviderStore;
   customProviderChanges: CustomProviderChanges;
   customAgentChanges: CustomAgentChanges;
@@ -1523,8 +1534,38 @@ export async function createApplicationServices({
     undefined,
     join(app.getPath("userData"), "agent-import-uploads"),
   );
+  // The local Tailscale client: the host serves its direct path with it, and a joined server's direct
+  // path is tried only when it can reach that host.
+  const tailscalePlatform = process.platform === "darwin" || process.platform === "win32" ? process.platform : "linux";
+  const tailscale = new TailscaleCli({ locate: locateTailscale(tailscalePlatform) });
+  const tailscaleDirect = new TailscaleDirectService({
+    settingsPath: join(app.getPath("userData"), TAILSCALE_DIRECT_FILE),
+    cli: tailscale,
+  });
+  await Effect.runPromise(tailscaleDirect.load());
+  // The owner's Tailscale setup of this host, from the owner's client (`host-tailscale-v1`).
+  const tailscaleSetup = new TailscaleHostSetup({
+    direct: tailscaleDirect,
+    cli: tailscale,
+    platform: tailscalePlatform,
+    serverMode: serverModeEnvironment !== null,
+  });
   const host = new HostService({
     appVersion: app.getVersion(),
+    tailscaleDirect,
+    tailscaleSetup,
+    openTailscale: (installed) =>
+      Effect.tryPromise({
+        try: async () => {
+          if (installed && tailscalePlatform === "darwin" && existsSync(TAILSCALE_MAC_APP)) {
+            const failure = await shell.openPath(TAILSCALE_MAC_APP);
+            if (failure) throw new Error(failure);
+            return;
+          }
+          await shell.openExternal(TAILSCALE_DOWNLOAD_URL);
+        },
+        catch: (cause) => new RemoteWorkflowError({ cause }),
+      }),
     store: teamStore,
     agents: service,
     // Defined below with the startup it waits for; a request runs only after this returns.
@@ -1753,6 +1794,12 @@ export async function createApplicationServices({
     {
       createTeamAuthTicket: (serverId) => centralAuth.createTeamAuthTicket(serverId),
       getEmail: () => centralAuth.getSignedInUser().email,
+      getPrincipalId: () => {
+        const state = centralAuth.getState();
+        return state.status === "signed_in" ? state.user.id : null;
+      },
+      // Requests to a WebRTC host and a direct attempt wait for the account that loads at startup.
+      ready: () => Effect.ignore(centralAuthInitialization),
       sendTeamInviteEmail: (input) => centralAuth.sendTeamInviteEmail(input),
     },
     {
@@ -1761,6 +1808,11 @@ export async function createApplicationServices({
       appVersion: app.getVersion(),
       connectTrace,
       getLocalHostId: () => teamStore.getIdentity()?.serverId ?? null,
+      localTailscale: () => tailscale.status(),
+      directSessions: new RemoteDirectSessionStore({
+        path: join(app.getPath("userData"), REMOTE_DIRECT_SESSIONS_FILE),
+        ...safeStorageCipher("error.app.macSecureStorageUnavailable"),
+      }),
       hostedServers: {
         unavailable: (serverId, wake) => hostedServers.unavailableHost(serverId, wake),
         wake: (serverId) => hostedServers.wake(serverId),
@@ -2119,6 +2171,7 @@ export async function createApplicationServices({
     events,
     eventsRuntime,
     serverMode,
+    tailscaleCli: tailscale,
     customProviders,
     customProviderChanges,
     customAgentChanges,

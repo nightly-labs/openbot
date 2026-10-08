@@ -1,0 +1,16 @@
+{
+  "state": "signed-out",
+  "tailnet": null,
+  "deviceName": null,
+  "dnsName": null,
+  "httpsCertificates": false,
+  "enabled": false,
+  "url": null,
+  "issue": null,
+  "issueDetail": null,
+  "loginUrl": "https://login.tailscale.com/a/1a2b3c4d5e6f7",
+  "environment": "wsl",
+  "wslNetworking": "nat",
+  "setupCommand": false,
+  "signInIssue": null
+}

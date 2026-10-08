@@ -63,6 +63,9 @@ export interface RemoteServerPatch {
   encryptedToken?: string;
   logoVersion?: string | null;
   remoteDesktopAvailable?: boolean;
+  /** `undefined` removes it. The host gives it; the pinned key is checked at it on each use. */
+  directUrl?: string | undefined;
+  directDisabled?: true | undefined;
 }
 
 // What a reader needs. Consumers that only look things up take this, not the class, so their tests

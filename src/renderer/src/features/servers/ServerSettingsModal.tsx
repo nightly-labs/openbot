@@ -60,6 +60,8 @@ import { type ServerImportOptions, ServerImportPanel } from "./ServerImportPanel
 import { type McpPanelDetail, ServerMcpPanel } from "./ServerMcpPanel";
 import { createServerMembersSection } from "./ServerMembersSection";
 import { type ServerRoutineFeedOptions, ServerRoutineFeedPanel } from "./ServerRoutineFeedPanel";
+import type { ServerTailscaleHostApi } from "./ServerTailscaleSettings";
+import type { ServerTailscaleSetupApi } from "./ServerTailscaleSetup";
 import { type ServerUpdateOptions, ServerUpdatePanel } from "./ServerUpdatePanel";
 import { serverRoleCanAdminister } from "./server-capabilities";
 import type { ServerSettingsSectionHost } from "./server-settings-section";
@@ -83,6 +85,17 @@ export interface ServerSettingsModalProps {
   /** The Notifications section appears only when a caller supplies both: they are desktop notifications. */
   onSetMuted?: (muted: boolean) => Promise<void>;
   onSetNotificationLevel?: (level: ServerNotificationLevel) => Promise<void>;
+  /** The host side of the direct Tailscale path. Only this computer passes it. */
+  tailscale?: ServerTailscaleHostApi | undefined;
+  /** A joined server's "Use Tailscale when available" switch. It shows only when the host offers the path. */
+  onSetDirectEnabled?: ((enabled: boolean) => Promise<void>) | undefined;
+  /**
+   * The owner's Tailscale setup of a joined server. Null when the host is too old for it; absent for
+   * this computer and for a server the account does not own.
+   */
+  tailscaleSetup?: ServerTailscaleSetupApi | null | undefined;
+  /** Opens the Tailscale page on node sharing, for a member whose computer is in another tailnet. */
+  onOpenTailscaleSharing?: (() => Promise<void>) | undefined;
   onCreateInvite: (input: { role: "admin" | "member"; email?: string; permanent?: boolean }) => Promise<InviteSummary>;
   onUpdateMember: (input: UpdateTeamMemberInput) => Promise<void>;
   onRemoveMember: (memberId: string) => Promise<void>;

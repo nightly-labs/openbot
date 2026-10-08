@@ -157,6 +157,11 @@ export function requireAdmin(member: TeamMemberSummary): void {
   if (member.role === "member") throw new HttpError(403, sourceText("error.team.adminRequired"));
 }
 
+/** For a route that changes what only the owner decides, such as the network the host joins. */
+export function requireOwner(member: TeamMemberSummary): void {
+  if (member.role !== "owner") throw new HttpError(403, sourceText("error.team.ownerRequired"));
+}
+
 /**
  * An action on one agent never creates it. A device can still hold the id of an agent that another
  * device deleted; it gets the same 404 as for an agent hidden from it.

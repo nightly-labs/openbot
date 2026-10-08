@@ -21,11 +21,23 @@ export interface ServersPort {
   events: OpenBotDesktopApi["events"];
   auth: Pick<OpenBotDesktopApi["auth"], "onEvent">;
   browser: Pick<OpenBotDesktopApi["browser"], "setVisible">;
-  hostAdmin: Pick<OpenBotDesktopApi["hostAdmin"], "getUpdateStatus" | "updateIdentity">;
+  hostAdmin: Pick<
+    OpenBotDesktopApi["hostAdmin"],
+    "getUpdateStatus" | "updateIdentity" | "getTailscaleSetup" | "setTailscaleDirect" | "startTailscaleSignIn"
+  >;
   hostedServers: Pick<OpenBotDesktopApi["hostedServers"], "list" | "wake">;
   host: Pick<
     OpenBotDesktopApi["host"],
-    "configure" | "getStatus" | "onEvent" | "recheckScreenRecording" | "start" | "stop" | "updateIdentity"
+    | "configure"
+    | "getStatus"
+    | "getTailscaleStatus"
+    | "onEvent"
+    | "openTailscale"
+    | "recheckScreenRecording"
+    | "setTailscaleDirect"
+    | "start"
+    | "stop"
+    | "updateIdentity"
   >;
   notifications: Pick<OpenBotDesktopApi["notifications"], "onOpened">;
   remoteDesktop: Pick<
@@ -44,6 +56,7 @@ export interface ServersPort {
     | "reorder"
     | "retryConnection"
     | "select"
+    | "setDirectEnabled"
     | "setMuted"
     | "setNotificationLevel"
   >;

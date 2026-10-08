@@ -221,6 +221,98 @@ export const messages = defineMessages("server", {
   "server.settings.editLogo": "Edit server logo",
   "server.settings.addLogo": "Add server logo",
   "server.settings.removeLogo": "Remove server logo",
+  "server.tailscale.title": "Tailscale",
+  "server.tailscale.localTitle": "Tailscale on this computer",
+  "server.tailscale.checking": "Checking Tailscale…",
+  "server.tailscale.loadFailed": "Could not read the state of Tailscale.",
+  "server.tailscale.notInstalled": "Tailscale is not installed. Install it to let members connect directly.",
+  "server.tailscale.notRunning": "Tailscale does not answer. Start the Tailscale app, then check again.",
+  "server.tailscale.signedOut": "Tailscale is installed, but you are not signed in.",
+  "server.tailscale.stopped": "Tailscale is turned off.",
+  "server.tailscale.connected": "Connected to {tailnet} as {device}.",
+  "server.tailscale.unknownTailnet": "your tailnet",
+  "server.tailscale.unknownDevice": "this device",
+  "server.tailscale.install": "Get Tailscale",
+  "server.tailscale.open": "Open Tailscale",
+  "server.tailscale.checkAgain": "Check again",
+  "server.tailscale.directLabel": "Direct connection over Tailscale",
+  "server.tailscale.directDescription":
+    "Members whose computers are in your tailnet connect directly, without the OpenBot cloud. Only devices in your tailnet can reach it. The OpenBot cloud stays the fallback.",
+  "server.tailscale.addressTitle": "Direct address",
+  "server.tailscale.addressDescription": "Members get this address over their signed-in connection.",
+  "server.tailscale.copyAddress": "Copy direct address",
+  "server.tailscale.issue.hostOffline": "This turns on when the server is published.",
+  "server.tailscale.issue.tailscaleUnavailable": "Tailscale must be running and signed in on this computer.",
+  "server.tailscale.issue.httpsOff":
+    "Turn on HTTPS certificates for your tailnet in the Tailscale admin console, then turn this on again.",
+  "server.tailscale.issue.portInUse":
+    "Tailscale Serve already uses ports 443 and 8443 on this computer. OpenBot does not change them.",
+  "server.tailscale.issue.funnelOn":
+    "Tailscale Funnel publishes this port to the internet, so OpenBot turned the direct connection off.",
+  "server.tailscale.issue.serveFailed": "Tailscale could not serve the direct connection.",
+  "server.tailscale.issue.serveFailedDetail": "Tailscale could not serve the direct connection: {detail}",
+  "server.tailscale.useLabel": "Use Tailscale when available",
+  "server.tailscale.useDescription": "This server connects through the OpenBot cloud.",
+  "server.tailscale.routeDirect": "Connected directly over Tailscale.",
+  "server.tailscale.routeCloud": "Connected through the OpenBot cloud. The next connection tries Tailscale first.",
+  "server.tailscale.hint.tailscaleUnavailable":
+    "Tailscale is not running on this computer, so this server connects through the OpenBot cloud.",
+  "server.tailscale.hint.otherTailnet":
+    "This computer is not in the host's tailnet. Ask the host owner to share the host device with you in Tailscale (node sharing), or connect through the OpenBot cloud.",
+  "server.tailscale.hint.failed":
+    "The direct connection did not answer, so this server connects through the OpenBot cloud for now.",
+  "server.tailscale.hint.sharingGuide": "How sharing works",
+  "server.tailscale.hint.sharingDescription":
+    "The host owner shares the host device with you in the Tailscale admin console. You then accept it.",
+  "server.tailscale.setup.title": "Direct connection setup",
+  "server.tailscale.setup.description":
+    "Members in your tailnet can connect to this server directly. Each step checks itself again.",
+  "server.tailscale.setup.updateServer":
+    "This server runs an older version of OpenBot. Update it to set up Tailscale from here.",
+  "server.tailscale.setup.stepDone": "Done",
+  "server.tailscale.setup.stepToDo": "Not done",
+  "server.tailscale.setup.clientTitle": "Tailscale on this computer",
+  "server.tailscale.setup.serverTitle": "Tailscale on the server",
+  "server.tailscale.setup.networkTitle": "Same tailnet",
+  "server.tailscale.setup.httpsTitle": "HTTPS certificates",
+  "server.tailscale.setup.serverRunCommand":
+    "Run this command on the server. It installs Tailscale and lets OpenBot use it.",
+  "server.tailscale.setup.serverSignIn": "Sign in to Tailscale on the server.",
+  "server.tailscale.setup.serverWaitsForSignIn":
+    "Tailscale on the server waits for a sign-in. Open the page and approve the server.",
+  "server.tailscale.setup.serverSignInFailed":
+    "Tailscale on the server did not start a sign-in. Run the command on the server, then check again.",
+  "server.tailscale.setup.serverInstall": "Install Tailscale on the server computer and sign in.",
+  "server.tailscale.setup.serverWsl":
+    "This server runs in WSL and uses the Tailscale app for Windows. Install it on Windows and sign in.",
+  "server.tailscale.setup.wslMirroredRequired":
+    "WSL must use mirrored networking: add networkingMode=mirrored under [wsl2] in %UserProfile%\\.wslconfig, then run wsl --shutdown.",
+  "server.tailscale.setup.wslMirroredCheck":
+    "Make sure WSL uses mirrored networking: networkingMode=mirrored under [wsl2] in %UserProfile%\\.wslconfig.",
+  "server.tailscale.setup.copyCommand": "Copy setup command",
+  "server.tailscale.setup.signIn": "Sign in",
+  "server.tailscale.setup.openSignIn": "Open sign-in page",
+  "server.tailscale.setup.getWindowsApp": "Get Tailscale for Windows",
+  "server.tailscale.setup.networkWaiting": "This is checked when Tailscale runs on both computers.",
+  "server.tailscale.setup.networkSame": "This computer and the server are in {tailnet}.",
+  "server.tailscale.setup.networkShared": "The server is shared with the tailnet of this computer.",
+  "server.tailscale.setup.networkOther":
+    "This computer is in {client}, and the server is in {server}. Sign in on this computer with the account of the server, or share the server with your tailnet.",
+  "server.tailscale.setup.shareServer": "Share this server",
+  "server.tailscale.setup.serverFirst": "This is checked when Tailscale runs on the server.",
+  "server.tailscale.setup.httpsOn": "On for the tailnet of the server.",
+  "server.tailscale.setup.httpsOff": "Turn on HTTPS certificates on the DNS page of the Tailscale admin console.",
+  "server.tailscale.setup.turnOnHttps": "Turn on",
+  "server.tailscale.setup.directWaiting": "Available when the steps above are done.",
+  "server.tailscale.setup.directDescription":
+    "Members in your tailnet connect directly, without the OpenBot cloud. The OpenBot cloud stays the fallback.",
+  "server.tailscale.setup.issue.hostOffline": "This turns on when the server is online.",
+  "server.tailscale.setup.issue.tailscaleUnavailable": "Tailscale must be running and signed in on the server.",
+  "server.tailscale.setup.issue.portInUse":
+    "Tailscale Serve already uses ports 443 and 8443 on the server. OpenBot does not change them.",
+  "server.route.label": "Connection",
+  "server.route.direct": "Direct · Tailscale",
+  "server.route.cloud": "Via OpenBot cloud",
   "server.settings.access": "Access",
   "server.settings.publish": "Publish this server",
   "server.settings.published": "Server is published",

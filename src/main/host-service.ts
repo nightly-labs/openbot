@@ -47,6 +47,8 @@ import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifac
 import { appendRemoteDiagnosticLog } from "./remote-diagnostics";
 import { RemoteScreenGateway, type RemoteScreenGatewayCreateRuntime } from "./remote-screen-gateway";
 import { RemoteWorkflowError, remoteDecode } from "./remote-service-effects";
+import type { TailscaleDirectService } from "./tailscale-direct-service";
+import type { TailscaleHostSetup } from "./tailscale-host-setup";
 import { TeamApiServer } from "./team-api-server";
 import type { RemoteDirectoryMember, TeamIdentity, TeamStore } from "./team-store";
 import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
@@ -133,6 +135,12 @@ interface HostServiceOptions {
     push: LiveActivityRelayPush,
   ) => Effect.Effect<"sent" | "gone", RemoteWorkflowError>;
   verifyRemoteSessionTicket?: (ticket: string) => Effect.Effect<VerifiedRemoteSessionTicket, RemoteWorkflowError>;
+  /** The direct Tailscale path. Absent where this host does not offer it. */
+  tailscaleDirect?: TailscaleDirectService;
+  /** The owner's Tailscale setup of this host from a joined client. Absent where the host does not offer it. */
+  tailscaleSetup?: TailscaleHostSetup;
+  /** Opens the Tailscale app when it is installed, and its download page when it is not. */
+  openTailscale?: (installed: boolean) => Effect.Effect<void, RemoteWorkflowError>;
   endRemoteSession?: (sessionId: string) => Effect.Effect<void, RemoteWorkflowError>;
   remoteControlPlaneUrl?: string;
   createRemoteInvite?: (
@@ -283,6 +291,7 @@ export class HostService extends EventEmitter<HostEvents> {
           logger,
         })
       : undefined;
+    const tailscaleSetup = options.tailscaleSetup;
     this.#api = new TeamApiServer({
       appVersion: options.appVersion,
       store: options.store,
@@ -300,6 +309,13 @@ export class HostService extends EventEmitter<HostEvents> {
       admin: {
         ...options.admin,
         identity: { updateIdentity: (input) => this.updateIdentity(input).pipe(Effect.asVoid) },
+        tailscale: tailscaleSetup
+          ? {
+              status: () => tailscaleSetup.status(),
+              setEnabled: (enabled) => tailscaleSetup.setEnabled(enabled),
+              signIn: () => tailscaleSetup.signIn(),
+            }
+          : undefined,
       },
       skills: options.skills,
       sidebarLayout: options.sidebarLayout,
@@ -315,6 +331,16 @@ export class HostService extends EventEmitter<HostEvents> {
       createInvite: (input) => this.createInvite(input),
       onSessionRevoked: (sessionId) => this.#revokeWebRtcSession(sessionId),
       liveActivityPush: this.#liveActivityPush,
+      directEndpoint: options.tailscaleDirect
+        ? {
+            url: () => options.tailscaleDirect?.url() ?? null,
+            refreshMembers: () => this.#refreshDirectMembers(),
+          }
+        : undefined,
+    });
+    options.tailscaleDirect?.attach({
+      start: () => this.#api.startDirectListener(),
+      stop: () => this.#api.stopDirectListener(),
     });
     this.#runtime = ManagedRuntime.make(
       Layer.succeed(
@@ -732,6 +758,9 @@ export class HostService extends EventEmitter<HostEvents> {
       yield* this.#options.store.setEnabledOnLaunch(identity.serverId, true);
       if (yield* this.#cancelSupersededStartEffect(generation)) return this.getStatus();
       this.#setStatus({ phase: "online", enabledOnLaunch: true });
+      // Not awaited: `tailscale serve` can take seconds, and the host is online without it.
+      const tailscaleDirect = this.#options.tailscaleDirect;
+      if (tailscaleDirect) this.#dispatch(tailscaleDirect.hostOnline());
     }).pipe(Effect.result);
     if (Result.isFailure(attempt1)) {
       const error = attempt1.failure.cause;
@@ -1107,6 +1136,48 @@ export class HostService extends EventEmitter<HostEvents> {
    * Whether members and invitations live in the account directory. A local development host keeps
    * them in its own team file, so every read and write of them goes where the others went.
    */
+  readonly getTailscaleStatus = Effect.fn("HostService.getTailscaleStatus")(function* (this: HostService) {
+    const tailscale = this.#options.tailscaleDirect;
+    if (!tailscale)
+      return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.host.tailscaleUnavailable")) });
+    return yield* tailscale.status();
+  });
+
+  /** Only the owner account of this host turns the direct path on or off, as it starts and stops the host. */
+  readonly setTailscaleDirect = Effect.fn("HostService.setTailscaleDirect")(function* (
+    this: HostService,
+    enabled: boolean,
+  ) {
+    const tailscale = this.#options.tailscaleDirect;
+    if (!tailscale)
+      return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.host.tailscaleUnavailable")) });
+    yield* remoteDecode(() => this.#options.store.assertOwnerAccount(this.#options.getSignedInUser()));
+    return yield* tailscale.setEnabled(enabled);
+  });
+
+  readonly openTailscale = Effect.fn("HostService.openTailscale")(function* (this: HostService) {
+    const tailscale = this.#options.tailscaleDirect;
+    const open = this.#options.openTailscale;
+    if (!tailscale || !open) return;
+    const status = yield* tailscale.status();
+    yield* open(status.state !== "not-installed");
+  });
+
+  /**
+   * Reads the account directory again before a direct Tailscale sign-in, so a member that the account
+   * service removed is not signed in from the copy of the last start.
+   */
+  #refreshDirectMembers(): Effect.Effect<void, RemoteWorkflowError> {
+    return Effect.gen({ self: this }, function* () {
+      const hostId = this.#options.store.getIdentity()?.serverId;
+      const list = this.#options.listRemoteMembers;
+      if (!hostId || !this.#usesAccountDirectory() || !list) return;
+      const members = yield* list(hostId);
+      if (!this.#isActiveHost(hostId)) return yield* new RemoteWorkflowError({ cause: new Error("Host changed.") });
+      yield* this.#options.store.syncRemoteDirectory(hostId, members);
+    });
+  }
+
   #usesAccountDirectory(): boolean {
     return !this.#options.localDevelopmentHost;
   }
@@ -1293,6 +1364,7 @@ export class HostService extends EventEmitter<HostEvents> {
 
   readonly #stopRuntime = Effect.fn("HostService.stopRuntime")(function* (this: HostService) {
     this.#webRtcOnline = false;
+    if (this.#options.tailscaleDirect) yield* this.#options.tailscaleDirect.hostOffline();
     // The phones register again when they connect to the next runtime.
     const pendingPushes = yield* Effect.forkChild(this.#liveActivityPush?.dispose() ?? Effect.void);
     return yield* Effect.acquireUseRelease(

@@ -80,7 +80,8 @@ export interface RemoteHostRequestTransport {
 
 /** What the client needs from the stored server list: a server, and the token to speak for it. */
 export interface RemoteServerLookup {
-  require: (serverId: string) => StoredRemoteServerView;
+  /** `path`, when given, lets a lookup keep a route on another transport: see `RemoteDirectRoutes`. */
+  require: (serverId: string, path?: string) => StoredRemoteServerView;
   token: (server: StoredRemoteServerView) => string;
 }
 
@@ -102,6 +103,11 @@ export interface RemoteServerClientOptions {
   servers: RemoteServerLookup;
   connections: RemoteConnectionSink;
   transport: RemoteHostRequestTransport | null;
+  /**
+   * Runs before a request picks its server view: the owner holds a request back while the route to the
+   * server is being chosen, so it goes over the route chosen rather than failing or opening another.
+   */
+  beforeRequest?: (serverId: string, path: string) => Effect.Effect<void>;
 }
 
 export interface RemoteRequestInit {
@@ -123,6 +129,7 @@ export class RemoteServerClient {
   readonly #servers: RemoteServerLookup;
   readonly #connections: RemoteConnectionSink;
   readonly #transport: RemoteHostRequestTransport | null;
+  readonly #beforeRequest: ((serverId: string, path: string) => Effect.Effect<void>) | null;
   // In-flight negotiations, so a burst of calls to a cold server produces one compatibility request
   // rather than one per call. Private to the client: the UI never sees this, unlike the status the
   // negotiation produces.
@@ -133,6 +140,7 @@ export class RemoteServerClient {
     this.#servers = options.servers;
     this.#connections = options.connections;
     this.#transport = options.transport;
+    this.#beforeRequest = options.beforeRequest ?? null;
   }
 
   /** One decoded Team API call. Every failure is reported to the registry before it is rethrown. */
@@ -144,7 +152,8 @@ export class RemoteServerClient {
     decoder: ResponseDecoder<T>,
     init: RemoteRequestInit = {},
   ): Effect.fn.Return<T, RemoteWorkflowError> {
-    const server = yield* remoteDecode(() => this.#servers.require(serverId));
+    if (this.#beforeRequest) yield* this.#beforeRequest(serverId, path);
+    const server = yield* remoteDecode(() => this.#servers.require(serverId, path));
     return yield* Effect.gen({ self: this }, function* () {
       if (server.transport === "webrtc-v2") {
         const compatibility = yield* this.ensureCompatibility(server);
