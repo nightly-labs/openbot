@@ -157,5 +157,7 @@ describe.sequential("AgentService: routine runs that answer only the no-update m
     expect(result.assistantTexts).toEqual([ROUTINE_NO_UPDATE_MARKER]);
     expect(result.unreadCount).toBe(1);
     expect(result.completed.quiet).toBeUndefined();
+    // The chat shows the marker, but the preview does not: it goes back to the one before the run.
+    expect(result.preview).toBe(PREVIEW_BEFORE);
   });
 });

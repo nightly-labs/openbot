@@ -107,7 +107,7 @@ export interface RoutineSchedulerOptions {
  * blocked on a question is `needs-attention`, and answering returns it to `running`. That is why a
  * user can tell a stalled routine from a working one.
  */
-/** The agent preview before a scheduled run, and the routine task the run showed in its place. */
+/** The agent preview before a routine run, and the routine task the run showed in its place. */
 export interface RoutinePreviewBeforeRun {
   previous: string;
   shown: string;
@@ -134,8 +134,8 @@ export class RoutineScheduler implements RoutineDueSource {
    */
   readonly #deliveryTimezones = new Map<string, string>();
   /**
-   * The agent preview before a scheduled run showed its task there, by delivery. A run that ends
-   * quiet puts it back. Memory only: after a restart, the preview keeps the task. Past the cap, the
+   * The agent preview before a routine run showed its task there, by delivery. A run that ends
+   * quiet, or whose last answer is only the no-update marker, puts it back. Memory only: after a restart, the preview keeps the task. Past the cap, the
    * oldest entry goes.
    */
   readonly #previewsBeforeRun = new Map<string, RoutinePreviewBeforeRun>();
@@ -209,7 +209,7 @@ export class RoutineScheduler implements RoutineDueSource {
   }
 
   /**
-   * The preview before the scheduled run of this delivery, and the one the run showed, once: the
+   * The preview before the routine run of this delivery, and the one the run showed, once: the
    * entry goes with the call. Null after a restart, or for a run that saved none.
    */
   takePreviewBeforeRun(deliveryId: string): RoutinePreviewBeforeRun | null {
@@ -786,12 +786,10 @@ export class RoutineScheduler implements RoutineDueSource {
         this.#hooks.syncMailboxMessages(current);
         return current;
       });
-      // Only a scheduled run can end quiet and put the earlier preview back.
-      if (run.kind === "scheduled") {
-        const previous = this.#store.list().find((entry) => entry.id === agent.id)?.preview;
-        if (previous !== undefined)
-          this.#rememberPreviewBeforeRun(deliveryId, { previous, shown: run.instruction.slice(0, 180) });
-      }
+      // A run that ends quiet, or answers only the no-update marker, puts the earlier preview back.
+      const previous = this.#store.list().find((entry) => entry.id === agent.id)?.preview;
+      if (previous !== undefined)
+        this.#rememberPreviewBeforeRun(deliveryId, { previous, shown: run.instruction.slice(0, 180) });
       yield* this.#store.updatePreview(agent.id, run.instruction).pipe(toRoutineOperationFailed);
       yield* routineStep(() => {
         this.#hooks.emit({ type: "agents-changed", agents: this.#hooks.listAgents() });

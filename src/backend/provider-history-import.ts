@@ -1,6 +1,8 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { AgentProviderId, ConversationMessage } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
+import { isImageGenerationItem } from "./agent/image-generation";
+import { isNoUpdateAnswer } from "./agent/routine-quiet-runs";
 import { mergeProviderHistoryMessages, messagesFromThreadItems, threadTurnBaseTime } from "./conversation-snapshots";
 import { databaseRow, decodeConversationMessageJson, requiredStringColumn } from "./database/database-rows";
 import type { DeliveryContext } from "./mailbox-store";
@@ -160,6 +162,7 @@ function importCompletedTurn(
   fragment: ProviderHistoryFragment,
 ): Effect.Effect<number, ProviderClientOperationError> {
   return Effect.gen(function* () {
+    const routine = yield* routineTurnAnswers(input, fragment.turnId);
     let importedCount = 0;
     let afterIndex = -1;
     let complete = false;
@@ -206,17 +209,20 @@ function importCompletedTurn(
           input.findMessageDelivery,
         ),
       };
+      // The turn completion dropped these answers from the chat, so the import does not bring them
+      // back.
+      const pageMessages = routine === "none" ? partial.messages : partial.messages.filter(keptRoutineMessage(routine));
       const reconciled =
         input.provider === "claude"
           ? mergeProviderHistoryMessages(
               // Claude can use a new provider ID for a reply that OpenBot already published under the
               // live turn ID. Read only matching IDs from SQLite, so reconciliation never materializes
               // the full chat or the full turn.
-              readStoredTurnMessages(input.database, input.publicThreadId, fragment.turnId, partial.messages),
-              partial.messages,
+              readStoredTurnMessages(input.database, input.publicThreadId, fragment.turnId, pageMessages),
+              pageMessages,
               input.provider,
             )
-          : [...partial.messages];
+          : [...pageMessages];
       yield* providerSync(() =>
         input.database.importProviderHistoryMessages({
           sessionId: input.sessionId,
@@ -240,6 +246,54 @@ function importCompletedTurn(
     }
     return importedCount;
   });
+}
+
+/**
+ * How a turn that a routine run started answered: `quiet` when each answer is only the no-update
+ * marker, so the turn completion dropped all of them with the turn's thinking, `answered` for any
+ * other routine turn, and `none` for a turn that no routine run started. Decided from the staged
+ * items alone, one bounded page at a time, so it needs no stored state.
+ */
+type RoutineTurnAnswers = "none" | "answered" | "quiet";
+
+function routineTurnAnswers(
+  input: ProviderHistoryImportInput,
+  turnId: string,
+): Effect.Effect<RoutineTurnAnswers, ProviderClientOperationError> {
+  return Effect.gen(function* () {
+    let routine: boolean | undefined;
+    let markers = 0;
+    let reported = false;
+    let afterIndex = -1;
+    while (true) {
+      const page = yield* providerSync(() =>
+        input.database.stagedProviderHistoryItems({ sessionId: input.sessionId, turnId, afterIndex, limit: 50 }),
+      );
+      for (const { item } of page) {
+        if (routine === undefined && item.type === "userMessage" && typeof item.clientId === "string")
+          routine = input.findDelivery(item.clientId)?.delivery.sender.kind === "routine";
+        if (item.type === "agentMessage" && typeof item.text === "string" && item.text && item.phase !== "commentary") {
+          if (isNoUpdateAnswer(item.text)) markers += 1;
+          else reported = true;
+        }
+        if (isImageGenerationItem(item)) reported = true;
+      }
+      const last = page.at(-1);
+      if (routine === false) return "none";
+      if (page.length < 50 || !last || last.itemIndex <= afterIndex) break;
+      afterIndex = last.itemIndex;
+    }
+    if (!routine) return "none";
+    return markers > 0 && !reported ? "quiet" : "answered";
+  });
+}
+
+function keptRoutineMessage(routine: Exclude<RoutineTurnAnswers, "none">) {
+  return (message: ConversationMessage): boolean => {
+    if (message.author !== "assistant") return true;
+    if (routine === "quiet") return false;
+    return message.itemType === "commentary" || !isNoUpdateAnswer(message.text);
+  };
 }
 
 function readStoredTurnMessages(

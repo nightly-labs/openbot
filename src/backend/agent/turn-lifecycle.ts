@@ -39,7 +39,7 @@ import type { MailboxSync } from "./mailbox-sync";
 import { PLAN_UPDATED_METHOD, planFromNotification } from "./plan-updates";
 import { isBalanceDiagnostic, isPlanLimitDiagnostic, isUsageLimitDiagnostic } from "./provider-diagnostics";
 import type { ProviderRuntime } from "./provider-runtime";
-import { settleQuietRoutineTurn } from "./routine-quiet-runs";
+import { isNoUpdateAnswer, settleQuietRoutineTurn } from "./routine-quiet-runs";
 import {
   isForeignReasoningError,
   isNonActionableCodexWarning,
@@ -91,7 +91,7 @@ export interface TurnHooks {
    */
   quietRoutineDelivery(deliveryId: string): boolean;
   /**
-   * The agent preview before the scheduled run of this delivery showed its task, and that task, once.
+   * The agent preview before the routine run of this delivery showed its task, and that task, once.
    * Null after a restart or for any other delivery.
    */
   takeRoutinePreview(deliveryId: string): { previous: string; shown: string } | null;
@@ -635,10 +635,16 @@ export class TurnLifecycle {
     const savedPreviews = deliveries.flatMap(({ delivery }) =>
       delivery.sender.kind === "routine" ? (this.#hooks.takeRoutinePreview(delivery.id) ?? []) : [],
     );
-    if (latestAssistant && !this.#conversation.isExecutionThread(snapshot.threadId)) {
+    // A routine run that answered only the no-update marker, also a Test run that shows it in the
+    // chat, does not put the marker in the preview.
+    const markerAnswer =
+      latestAssistant !== undefined &&
+      deliveries.some(({ delivery }) => delivery.sender.kind === "routine") &&
+      isNoUpdateAnswer(latestAssistant.text);
+    if (latestAssistant && !markerAnswer && !this.#conversation.isExecutionThread(snapshot.threadId)) {
       yield* this.#store.updatePreview(agentId, latestAssistant.text).pipe(toTurnOperationFailed);
       this.#hooks.emit({ type: "agents-changed", agents: this.#hooks.listAgents() });
-    } else if (quiet) {
+    } else if (quiet || (markerAnswer && !this.#conversation.isExecutionThread(snapshot.threadId))) {
       const saved = savedPreviews[0];
       const current = this.#store.list().find((entry) => entry.id === agentId)?.preview;
       if (saved && current === savedPreviews.at(-1)?.shown) {

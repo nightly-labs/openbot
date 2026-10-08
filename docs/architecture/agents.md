@@ -30,6 +30,12 @@ marker and the run history stay. A marker inside a longer answer is a report and
 and script or webhook runs, which are also manual runs, are never quiet. The released Team API event
 projects a fixed key list, so `quiet` stays on this computer.
 
+A routine run whose last answer is only the marker, also a Test run that shows it in the chat, does
+not put the marker in the preview either. The provider history import
+(`src/backend/provider-history-import.ts`) decides from the staged items alone: in a turn that a
+routine delivery started, it skips each answer that is only the marker, and when every answer is
+the marker it skips the turn's thinking too, so a later import does not bring a quiet turn back.
+
 ## Routine calendar feed
 
 `src/main/routine-feed-server.ts` is a loopback HTTP listener that serves the routines of this
