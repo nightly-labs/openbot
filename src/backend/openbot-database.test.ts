@@ -757,6 +757,17 @@ describe("OpenBotDatabase", () => {
     expect(lateAnchor.messages.length).toBeLessThanOrEqual(100);
     expect(lateAnchor.messages.map(({ id }) => id)).toContain("large-106");
 
+    // An anchor at the start of a turn keeps the page's room for that turn, not for earlier turns.
+    const turnStart = database.readConversationPage(
+      agent.id,
+      agent.threadId,
+      { type: "around", messageId: "large-question" },
+      50,
+    );
+    expect(turnStart.messages.map(({ id }) => id)).toEqual(
+      expected.slice(expected.indexOf("large-question"), expected.indexOf("large-question") + 100),
+    );
+
     // With limit 2 the turn before the anchor already fills the page; the rest of the turn still comes.
     for (const limit of [2, 4]) {
       const around = database.readConversationPage(

@@ -537,24 +537,6 @@ export class ConversationQueries {
     );
     if (!anchorRow) return [];
     const anchorKey = pageKeyValues(conversationRowCursor(anchorRow));
-    const olderRows = databaseRows(
-      this.#core.connection
-        .prepare(
-          `${ORDERED_THREAD_MESSAGES}
-           SELECT ${ORDER_KEY_COLUMNS} FROM ordered
-           WHERE (${ORDER_KEY_COLUMNS}) <= (?, ?, ?, ?, ?, ?, ?)
-           ${routineFilter}
-           ORDER BY ${ORDER_KEY_DESC} LIMIT ?`,
-        )
-        .all(threadId, ...anchorKey, PAGE_MESSAGE_LIMIT + 1),
-    );
-    // The older half leaves room after the anchor, also when the anchor's turn alone fills a page.
-    const older = wholeGroups(
-      olderRows,
-      Math.floor(limit / 2) + 1,
-      PAGE_MESSAGE_LIMIT - Math.ceil(limit / 2),
-    ).reverse();
-    const newerCap = PAGE_MESSAGE_LIMIT - older.length;
     const newerRows = databaseRows(
       this.#core.connection
         .prepare(
@@ -564,11 +546,30 @@ export class ConversationQueries {
            ${routineFilter}
            ORDER BY ${ORDER_KEY_COLUMNS} LIMIT ?`,
         )
-        .all(threadId, ...anchorKey, newerCap + 1),
+        .all(threadId, ...anchorKey, PAGE_MESSAGE_LIMIT + 1),
     );
-    // At least one group: the anchor's turn can continue after the anchor, and an around page has no
-    // newer cursor to load the rest of it.
-    return [...older, ...wholeGroups(newerRows, Math.max(limit - older.length, 1), newerCap)];
+    // An around page has no newer cursor, so it keeps room for the rest of the anchor's turn when that
+    // fits on a page, and for at least half the limit when the turn is larger.
+    const anchorGroupId = requiredStringColumn(anchorRow, "group_id");
+    const rowsAfterInTurn = newerRows.findIndex((row) => requiredStringColumn(row, "group_id") !== anchorGroupId);
+    const reserved = Math.max(
+      Math.min(rowsAfterInTurn < 0 ? newerRows.length : rowsAfterInTurn, PAGE_MESSAGE_LIMIT - 1),
+      Math.ceil(limit / 2),
+    );
+    const olderCap = PAGE_MESSAGE_LIMIT - reserved;
+    const olderRows = databaseRows(
+      this.#core.connection
+        .prepare(
+          `${ORDERED_THREAD_MESSAGES}
+           SELECT ${ORDER_KEY_COLUMNS} FROM ordered
+           WHERE (${ORDER_KEY_COLUMNS}) <= (?, ?, ?, ?, ?, ?, ?)
+           ${routineFilter}
+           ORDER BY ${ORDER_KEY_DESC} LIMIT ?`,
+        )
+        .all(threadId, ...anchorKey, olderCap + 1),
+    );
+    const older = wholeGroups(olderRows, Math.floor(limit / 2) + 1, olderCap).reverse();
+    return [...older, ...wholeGroups(newerRows, Math.max(limit - older.length, 1), PAGE_MESSAGE_LIMIT - older.length)];
   }
 
   /** A page cursor from a client. A version 1 cursor, from before pages kept turns whole, gets its row's group. */
