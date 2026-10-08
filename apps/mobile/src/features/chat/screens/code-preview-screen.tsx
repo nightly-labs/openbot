@@ -8,7 +8,7 @@ import { useThemeColor } from "heroui-native/hooks";
 import { AppWindow, ArrowLeft, CodeXml, Ellipsis, Workflow } from "lucide-react-native";
 import { type ReactNode, useEffect, useState } from "react";
 import { View, type ViewStyle } from "react-native";
-import Animated, { cubicBezier, Easing, Keyframe, useReducedMotion } from "react-native-reanimated";
+import Animated, { cubicBezier, Easing, Keyframe } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useUniwind } from "uniwind";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
@@ -21,6 +21,7 @@ import { useMermaidDiagram } from "@/features/chat/model/mermaid-diagrams";
 import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
 import { expoGoDomOptions } from "@/shared/lib/expo-go-dom";
 import { haptics } from "@/shared/lib/haptics";
+import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
 import { useLiquidGlass } from "@/shared/lib/use-liquid-glass";
 

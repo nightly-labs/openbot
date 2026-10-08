@@ -20,7 +20,6 @@ import Animated, {
   useAnimatedStyle,
   useDerivedValue,
   useFrameCallback,
-  useReducedMotion,
   useSharedValue,
   withSequence,
   withSpring,
@@ -28,7 +27,6 @@ import Animated, {
 } from "react-native-reanimated";
 import Svg, { Circle, Path } from "react-native-svg";
 import { scheduleOnRN } from "react-native-worklets";
-
 import {
   CYCLE_SECONDS,
   FPS,
@@ -39,6 +37,7 @@ import {
   prepareReturnToIdleFrames,
   REST_FRAME,
 } from "@/shared/lib/bloub-loader-frames";
+import { useReducedMotion } from "@/shared/lib/motion";
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);

@@ -6,11 +6,11 @@ import Animated, {
   ReduceMotion,
   type SharedValue,
   useAnimatedStyle,
-  useReducedMotion,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
 import Svg, { Defs, FeGaussianBlur, Filter, ForeignObject } from "react-native-svg";
+import { useReducedMotion } from "@/shared/lib/motion";
 
 const COUNTER_TIMING = {
   duration: 260,

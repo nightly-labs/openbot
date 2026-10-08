@@ -1,6 +1,7 @@
 import { type PropsWithChildren, useState } from "react";
 import type { ViewStyle } from "react-native";
-import Animated, { cubicBezier, useReducedMotion } from "react-native-reanimated";
+import Animated, { cubicBezier } from "react-native-reanimated";
+import { useReducedMotion } from "@/shared/lib/motion";
 
 const EASING = cubicBezier(0.23, 1, 0.32, 1);
 const BAR_MS = 240;
