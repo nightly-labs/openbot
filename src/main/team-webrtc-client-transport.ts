@@ -411,13 +411,15 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         // A closed channel refuses the frame before any byte leaves, so the host did not get the
         // request. After the computer sleeps, main can read the host as connected on a connection
         // that the host closed. Connect again and send the same frame once. An upload stays on the
-        // connection that carried its body.
+        // connection that carried its body. Only the connection that refused the frame is marked
+        // lost: a request that fails late must not drop the connection another request just made.
+        const refusedBy = this.#active.get(hostId);
         const envelope = yield* this.#exchange(hostId, requestId, frame).pipe(
           Effect.catchIf(
             (error) => !bodyTransferId && isClosedChannelError(error.cause),
             () =>
               Effect.gen({ self: this }, function* () {
-                if (this.#active.get(hostId)?.connected) this.#onDisconnected(hostId);
+                if (refusedBy?.connected && this.#active.get(hostId) === refusedBy) this.#onDisconnected(hostId);
                 yield* this.#ensureConnected(hostId);
                 return yield* this.#exchange(hostId, requestId, frame);
               }),

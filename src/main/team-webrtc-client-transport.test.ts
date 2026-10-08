@@ -642,10 +642,6 @@ describe("TeamWebRtcClientTransport", () => {
     nowSpy.mockRestore();
   });
 
-  // A response frame whose *body* the released V3 adapter refuses is the same failure as a frame
-  // that is not a response at all: the host is talking a protocol this build cannot read. It has to
-  // carry the same code, because an ordinary request error leaves the caller reconnecting to a host
-  // that will answer the next request with the same nonsense.
   it("connects again and sends a request once more when the bridge finds the channel closed", async () => {
     const bridge = new TeamWebRtcBridge();
     const connect = vi.spyOn(bridge, "connect").mockImplementation(({ peerId }) =>
@@ -693,6 +689,10 @@ describe("TeamWebRtcClientTransport", () => {
     }
   });
 
+  // A response frame whose *body* the released V3 adapter refuses is the same failure as a frame
+  // that is not a response at all: the host is talking a protocol this build cannot read. It has to
+  // carry the same code, because an ordinary request error leaves the caller reconnecting to a host
+  // that will answer the next request with the same nonsense.
   it("reports an undecodable response body as a protocol failure", async () => {
     const bridge = new TeamWebRtcBridge();
     vi.spyOn(bridge, "connect").mockImplementation(({ peerId }) =>
