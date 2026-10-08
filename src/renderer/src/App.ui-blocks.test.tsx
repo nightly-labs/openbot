@@ -5,7 +5,7 @@ import {
   type UiBlockState,
   uiBlockFallbackQuestions,
 } from "@openbot/contracts/ui-blocks";
-import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
+import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { expect, it, vi } from "vitest";
 import { App } from "./App";
 import { confirmOnboardingModel, emitAgentEvent, installOpenbotStub } from "./app-test-harness";
@@ -94,7 +94,7 @@ describe("agent UI blocks in the conversation", () => {
       }),
     );
     // Until the host stores the answer, the card shows what was sent.
-    await waitFor(() => expect(card).toHaveAttribute("data-status", "answered"));
+    await waitFor(() => expect(within(card).getByText("Answered")).toBeVisible());
 
     emitSnapshot(11, "turn-1", [
       blockMessage("turn-1", "ask-1", CHOICE, {
@@ -104,7 +104,7 @@ describe("agent UI blocks in the conversation", () => {
       }),
     ]);
     const frozen = await screen.findByRole("article", { name: "What should I do with the letter?" });
-    await waitFor(() => expect(frozen).toHaveAttribute("data-status", "answered"));
+    await waitFor(() => expect(within(frozen).getByText("Answered")).toBeVisible());
     expect(frozen).toHaveTextContent("Yes, send it");
     expect(screen.queryByRole("button", { name: "Send" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Skip" })).not.toBeInTheDocument();
@@ -160,7 +160,7 @@ describe("agent UI blocks in the conversation", () => {
     emitSnapshot(10, "turn-5", [blockMessage("turn-5", "ask-5", CHOICE, { status: "expired" })]);
 
     const frozen = await screen.findByRole("article", { name: "What should I do with the letter?" });
-    expect(frozen).toHaveAttribute("data-status", "expired");
+    expect(within(frozen).getByText("Expired")).toBeVisible();
     expect(frozen).toHaveTextContent("No answer was given in time");
     expect(screen.getByRole("radio", { name: "Yes, send it" })).toBeDisabled();
   });
