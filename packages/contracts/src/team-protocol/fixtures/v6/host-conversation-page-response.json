@@ -1,0 +1,146 @@
+{
+  "botId": "chief",
+  "threadId": "thread-1",
+  "activeTurnId": "turn-1",
+  "revision": 3,
+  "messages": [
+    {
+      "id": "question-prompt:turn-1:request-1",
+      "turnId": "turn-1",
+      "author": "assistant",
+      "text": "Send the letter?",
+      "createdAt": "2026-10-08T10:00:00.000Z",
+      "status": "completed",
+      "itemType": "question_prompt",
+      "questionPrompt": {
+        "requestId": "request-1",
+        "questions": [
+          {
+            "id": "action",
+            "header": "Send the letter?",
+            "question": "Send the letter?\n\nTo: ada@example.com\n\nHello **Ada**",
+            "isSecret": false,
+            "options": [
+              {
+                "label": "Send",
+                "description": ""
+              },
+              {
+                "label": "Cancel",
+                "description": ""
+              }
+            ]
+          }
+        ],
+        "resolution": null
+      },
+      "uiBlock": {
+        "version": 1,
+        "blockId": "letter",
+        "spec": {
+          "type": "confirm",
+          "title": "Send the letter?",
+          "fields": [
+            {
+              "label": "To",
+              "value": "ada@example.com"
+            }
+          ],
+          "preview": "Hello **Ada**",
+          "actions": [
+            {
+              "id": "send",
+              "label": "Send",
+              "style": "primary"
+            },
+            {
+              "id": "cancel",
+              "label": "Cancel",
+              "style": "ghost"
+            }
+          ]
+        },
+        "state": {
+          "status": "pending"
+        }
+      }
+    },
+    {
+      "id": "ui-block:report",
+      "turnId": "turn-1",
+      "author": "assistant",
+      "text": "**Monthly report** (50%)\n\n- [x] Load sales\n- [ ] Check returns (running)",
+      "createdAt": "2026-10-08T10:02:00.000Z",
+      "status": "completed",
+      "itemType": "ui-block:progress",
+      "uiBlock": {
+        "version": 1,
+        "blockId": "report",
+        "spec": {
+          "type": "progress",
+          "title": "Monthly report",
+          "steps": [
+            {
+              "label": "Load sales",
+              "state": "done"
+            },
+            {
+              "label": "Check returns",
+              "state": "running"
+            }
+          ],
+          "percent": 50
+        },
+        "state": {
+          "status": "pending"
+        }
+      }
+    },
+    {
+      "id": "plain-1",
+      "turnId": "turn-1",
+      "author": "user",
+      "text": "What about last week?",
+      "createdAt": "2026-10-08T10:03:00.000Z",
+      "status": "completed",
+      "replyToMessageId": "ui-block:weekly"
+    }
+  ],
+  "references": {
+    "ui-block:weekly": {
+      "id": "ui-block:weekly",
+      "turnId": "turn-0",
+      "author": "assistant",
+      "text": "**Weekly report**\n\n- [x] Load sales",
+      "createdAt": "2026-10-01T10:00:00.000Z",
+      "status": "completed",
+      "itemType": "ui-block:progress",
+      "uiBlock": {
+        "version": 1,
+        "blockId": "weekly",
+        "spec": {
+          "type": "progress",
+          "title": "Weekly report",
+          "steps": [
+            {
+              "label": "Load sales",
+              "state": "done"
+            }
+          ]
+        },
+        "state": {
+          "status": "closed"
+        }
+      }
+    }
+  },
+  "pageInfo": {
+    "hasOlder": false,
+    "olderCursor": null
+  },
+  "readState": {
+    "unreadCount": 0,
+    "firstUnreadMessageId": null,
+    "throughMessageId": null
+  }
+}

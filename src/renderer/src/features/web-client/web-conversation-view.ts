@@ -1,4 +1,10 @@
-import type { AgentEvent, RespondToApprovalInput, RespondToPromptInput } from "@openbot/contracts/ipc";
+import type {
+  AgentEvent,
+  ConversationMessage,
+  ConversationUiBlock,
+  RespondToApprovalInput,
+  RespondToPromptInput,
+} from "@openbot/contracts/ipc";
 import type { AgentMessage } from "@openbot/ui/data";
 import { createEffect, createMemo, createSignal } from "solid-js";
 import { toAgentMessage, toAgentMessages } from "../../app-message-projection";
@@ -11,6 +17,14 @@ type PromptEvent = Extract<AgentEvent, { type: "prompt" }>;
 function withoutPreviewUrls(message: AgentMessage): AgentMessage {
   if (!message.attachments) return message;
   return { ...message, attachments: message.attachments.map((attachment) => ({ ...attachment, previewUrl: null })) };
+}
+
+/** A message as the web client shows it, with the interactive block the host sent beside it. */
+type WebAgentMessage = AgentMessage & { uiBlock?: ConversationUiBlock };
+
+/** Puts back the block the shared message model does not carry yet. */
+function withUiBlock(message: AgentMessage, source: ConversationMessage | undefined): WebAgentMessage {
+  return source?.uiBlock ? { ...message, uiBlock: source.uiBlock } : message;
 }
 
 /** The selected agent's messages, and the prompt and approval that wait for the user. */
@@ -87,19 +101,21 @@ export function createWebConversationView(options: {
       questions: message.questionPrompt.questions,
     };
   });
-  const messages = createMemo(() =>
-    toAgentMessages(workspace.conversation()?.page?.messages ?? [], workspace.state.selectedId ?? undefined).map(
-      withoutPreviewUrls,
-    ),
-  );
+  const messages = createMemo((): WebAgentMessage[] => {
+    const source = workspace.conversation()?.page?.messages ?? [];
+    const byId = new Map(source.map((message) => [message.id, message]));
+    return toAgentMessages(source, workspace.state.selectedId ?? undefined).map((message) =>
+      withUiBlock(withoutPreviewUrls(message), byId.get(message.id)),
+    );
+  });
   /** The replied-to messages that are not on the loaded pages. The host sends them with each page. */
-  const messageReferences = createMemo(() => {
+  const messageReferences = createMemo((): Record<string, WebAgentMessage> => {
     const page = workspace.conversation()?.page;
     if (!page) return {};
     return Object.fromEntries(
       Object.entries(page.references).map(([id, reference]) => [
         id,
-        withoutPreviewUrls(toAgentMessage(reference, page.agentId)),
+        withUiBlock(withoutPreviewUrls(toAgentMessage(reference, page.agentId)), reference),
       ]),
     );
   });

@@ -1,11 +1,21 @@
-import type { AttachmentImportEvent, AttachmentSummary, ConversationPage } from "@openbot/contracts/ipc";
+import type {
+  AttachmentImportEvent,
+  AttachmentSummary,
+  ConversationMessage,
+  ConversationPage,
+} from "@openbot/contracts/ipc";
+import {
+  decodeTeamProtocolV6WebRtcHttpResponse,
+  encodeTeamProtocolV6WebRtcHttpResponse,
+} from "@openbot/contracts/team-protocol/v6-webrtc-adapter";
 import { render, waitFor } from "@solidjs/testing-library";
-import { flush } from "solid-js";
+import { createRoot, flush } from "solid-js";
 import { assert, beforeEach, describe, expect, it, vi } from "vitest";
 import { STORY_AGENT_SUMMARIES } from "../../preview/fixtures";
 import { createWebWorkspace } from "./web-client-context";
 import { createWebConversationRuntime } from "./web-conversation-runtime";
-import type { WebRuntimeEvents, WebWorkspaceRuntime } from "./web-runtime";
+import { createWebConversationView } from "./web-conversation-view";
+import { decodeWebConversationPage, type WebRuntimeEvents, type WebWorkspaceRuntime } from "./web-runtime";
 
 const page: ConversationPage = {
   agentId: "chief",
@@ -342,6 +352,94 @@ describe("web workspace state", () => {
     expect(app.runtime.send).toHaveBeenCalledWith("chief", "Hello teammate", [], null, "client-1");
     app.unmount();
     expect(app.runtime.dispose).toHaveBeenCalledOnce();
+  });
+  it("keeps the ui block a host sends on the message model, over the WebRTC codec", async () => {
+    const uiBlock = {
+      version: 1 as const,
+      blockId: "letter",
+      spec: {
+        type: "confirm" as const,
+        title: "Send the letter?",
+        actions: [{ id: "send", label: "Send", style: "primary" as const }],
+      },
+      state: { status: "pending" as const },
+    };
+    const question: ConversationMessage = {
+      id: "question-prompt:turn:request",
+      turnId: "turn",
+      author: "assistant",
+      text: "Send the letter?",
+      createdAt: "2026-10-08T10:00:00.000Z",
+      status: "completed",
+      itemType: "question_prompt",
+      questionPrompt: {
+        requestId: "request",
+        questions: [
+          {
+            id: "action",
+            header: "Send the letter?",
+            question: "Send the letter?",
+            isSecret: false,
+            options: [{ label: "Send", description: "" }],
+          },
+        ],
+        resolution: null,
+      },
+      uiBlock,
+    };
+    const reference: ConversationMessage = {
+      id: "ui-block:report",
+      author: "assistant",
+      text: "Report",
+      createdAt: "2026-10-01T10:00:00.000Z",
+      status: "completed",
+      itemType: "ui-block:progress",
+      uiBlock: {
+        version: 1,
+        blockId: "report",
+        spec: { type: "progress", title: "Report", steps: [{ label: "Load", state: "done" }] },
+        state: { status: "closed" },
+      },
+    };
+    const reply: ConversationMessage = {
+      id: "reply",
+      author: "user",
+      text: "And the report?",
+      createdAt: "2026-10-08T10:01:00.000Z",
+      status: "completed",
+      replyToMessageId: reference.id,
+    };
+    const hostPage = {
+      ...page,
+      messages: [question, reply],
+      references: { [reference.id]: reference },
+      readState: { unreadCount: 0, firstUnreadMessageId: null, throughMessageId: null },
+    };
+    // What the browser receives: the host's page through the v6 WebRTC codec and the web decoder.
+    const path = "/v1/agents/chief/conversation-page?limit=50";
+    const received = decodeWebConversationPage(
+      decodeTeamProtocolV6WebRtcHttpResponse(
+        "GET",
+        path,
+        200,
+        encodeTeamProtocolV6WebRtcHttpResponse("GET", path, 200, hostPage),
+      ),
+    );
+    const app = harness({ conversation: vi.fn().mockResolvedValue(received) });
+    await waitFor(() => expect(app.workspace().conversation()?.page?.messages).toHaveLength(2));
+    const workspace = app.workspace();
+    const { view, dispose } = createRoot((dispose) => ({
+      view: createWebConversationView({
+        workspace,
+        remoteAgentAdmin: { settings: () => null, update: vi.fn() },
+        hidden: () => false,
+      }),
+      dispose,
+    }));
+    expect(view.messages().find((message) => message.id === question.id)?.uiBlock).toEqual(uiBlock);
+    expect(view.messages().find((message) => message.id === reply.id)).not.toHaveProperty("uiBlock");
+    expect(view.messageReferences()[reference.id]?.uiBlock).toEqual(reference.uiBlock);
+    dispose();
   });
   it("removes questions expired in authoritative history without an input-resolved event", async () => {
     const app = harness();

@@ -17,6 +17,7 @@ import {
 } from "./browser-view-v1";
 import { withConversationPlans } from "./conversation-plan-v4";
 import { withConversationSenders } from "./conversation-sender-v5";
+import { withConversationUiBlocks } from "./conversation-ui-block-v6";
 import {
   isAgentAnalyticsRoute,
   isAgentCreateRoute,
@@ -280,10 +281,13 @@ export function encodeTeamProtocolV6CurrentHttpResponse(
     );
   if (isConversationRoute(method, path) && status < 400)
     return JSON.stringify(
-      withConversationSenders(
-        withConversationPlans(
-          withExchangeExpectsReply(
-            JSON.parse(encodeTeamProtocolV6BaseCurrentHttpResponse(method, path, status, value, options)),
+      withConversationUiBlocks(
+        withConversationSenders(
+          withConversationPlans(
+            withExchangeExpectsReply(
+              JSON.parse(encodeTeamProtocolV6BaseCurrentHttpResponse(method, path, status, value, options)),
+              value,
+            ),
             value,
           ),
           value,
@@ -331,9 +335,12 @@ export function decodeTeamProtocolV6CurrentHttpResponse(
   if (isQueueSnapshotRoute(method, path) && status < 400)
     return withQueueMarks(decodeTeamProtocolV6BaseCurrentHttpResponse(method, path, status, value), value);
   if (isConversationRoute(method, path) && status < 400)
-    return withConversationSenders(
-      withConversationPlans(
-        withExchangeExpectsReply(decodeTeamProtocolV6BaseCurrentHttpResponse(method, path, status, value), value),
+    return withConversationUiBlocks(
+      withConversationSenders(
+        withConversationPlans(
+          withExchangeExpectsReply(decodeTeamProtocolV6BaseCurrentHttpResponse(method, path, status, value), value),
+          value,
+        ),
         value,
       ),
       value,
