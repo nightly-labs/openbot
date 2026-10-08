@@ -190,6 +190,8 @@ export const messages = {
   "error.backend.steerQueuedOnly": "Направлять можно только сообщения в очереди.",
   "error.backend.promptInactive": "Этот запрос больше не активен.",
   "error.backend.promptAnswerMismatch": "Ответ не соответствует активному вопросу.",
+  "error.backend.uiBlockAnswerInvalid": "Этот ответ не подходит к блоку агента.",
+  "error.backend.uiBlockActionNotAllowed": "Это действие может выбрать только владелец или админ сервера.",
   "error.backend.approvalInactive": "Это подтверждение больше не активно.",
   "error.backend.takeoverInactive": "Этот перехват браузера больше не активен.",
   "error.backend.authSubmitting": "Отправка аутентификации уже выполняется.",
