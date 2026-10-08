@@ -31,7 +31,7 @@ export const messages = {
   "settings.restoreWorkspace.description": "Открывать рабочее пространство и задачи из предыдущего сеанса.",
   "settings.externalLinks.title": "Открывать внешние ссылки в",
   "settings.externalLinks.description": "Выберите, где открываются ссылки из диалогов.",
-  "settings.externalLinks.defaultBrowser": "Браузер по умолчанию",
+  "settings.externalLinks.defaultBrowser": "Основной браузер",
   "settings.externalLinks.openbot": "OpenBot",
   "settings.sendShortcut.title": "Сочетание для отправки",
   "settings.sendShortcut.description":
@@ -103,7 +103,7 @@ export const messages = {
     "Отправлять коды ошибок и предупреждений вместе с ID аккаунта в аналитику OpenBot. Настройка действует для этого браузера.",
   "settings.tab.general.title": "Основные",
   "settings.tab.general.description": "Как OpenBot ведёт себя на этом компьютере.",
-  "settings.tab.computerUse.title": "Управление компьютером",
+  "settings.tab.computerUse.title": "Управление ПК",
   "settings.tab.computerUse.description": "Разрешите OpenBot видеть приложения на этом компьютере и работать с ними.",
   "settings.tab.profile.title": "Профиль",
   "settings.tab.profile.description": "Как вы выглядите в OpenBot.",
@@ -250,8 +250,8 @@ export const messages = {
     "OpenBot перезапустится, когда ни один агент не работает. Новые запуски регулярных задач до этого ждут.",
   "settings.updates.idleRestart.updateDescription":
     "OpenBot установит {target}, когда ни один агент не работает. Новые запуски регулярных задач до этого ждут.",
-  "settings.updates.idleRestart.relaunch": "Перезапустить в простое",
-  "settings.updates.idleRestart.update": "Установить в простое",
+  "settings.updates.idleRestart.relaunch": "Перезапустить при простое",
+  "settings.updates.idleRestart.update": "Установить при простое",
   "settings.updates.allowRemote.title": "Разрешить обновления от администраторов сервера",
   "settings.updates.allowRemote.description":
     "Владельцы и администраторы этого сервера смогут скачать обновление и перезапустить OpenBot на этом компьютере.",

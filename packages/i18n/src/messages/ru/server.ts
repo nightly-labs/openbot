@@ -352,7 +352,7 @@ export const messages = {
   "server.settings.providersSwitch": "Переключиться на этот сервер",
   "server.settings.updatesTitle": "Обновления",
   "server.settings.updatesDescription": "Обновите OpenBot на компьютере, на котором работает этот сервер.",
-  "server.update.hostTitle": "OpenBot на {name}",
+  "server.update.hostTitle": "OpenBot · {name}",
   "server.update.version": "OpenBot {version}",
   "server.update.status.idle": "Проверьте обновления, чтобы найти последний релиз.",
   "server.update.status.checking": "Проверка обновлений…",
@@ -366,7 +366,7 @@ export const messages = {
   "server.update.status.installFailed":
     "{name} не удалось установить обновление. Убедитесь, что другие пользователи этого компьютера не запускают OpenBot, и повторите.",
   "server.update.check": "Проверить обновления",
-  "server.update.start": "Обновить в простое",
+  "server.update.start": "Обновить при простое",
   "server.update.restartNow": "Перезапустить сейчас",
   "server.update.cancel": "Отменить обновление",
   "server.update.scheduledTitle": "{name} перезапустится, когда его агенты освободятся",

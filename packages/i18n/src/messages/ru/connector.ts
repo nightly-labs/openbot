@@ -207,7 +207,7 @@ export const messages = {
   "connector.discord.close": "Закрыть",
   "connector.onePassword.title": "1Password",
   "connector.onePassword.description":
-    "Откройте OpenBot доступ к отдельному хранилищу 1Password через сервисный аккаунт, чтобы агенты могли входить на сайты в браузере OpenBot.",
+    "Дайте OpenBot доступ к отдельному хранилищу 1Password через сервисный аккаунт, чтобы агенты могли входить на сайты в браузере OpenBot.",
   "connector.onePassword.howItWorks":
     "При подключении в вашем аккаунте 1Password создаётся хранилище «Shared with OpenBot» и сервисный аккаунт, который может читать только его. OpenBot подставляет сохранённые логины в своём браузере на этом компьютере, поэтому общими становятся только записи, которые вы переместите в это хранилище. Агенты никогда не видят пароль.",
   "connector.onePassword.connect": "Подключить 1Password",
