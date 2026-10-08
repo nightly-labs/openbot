@@ -37,7 +37,7 @@ export function createWebChannelsPort(
   hostId: () => string,
   eventsEnabled: () => boolean,
 ): ChannelsPort {
-  const files = createWebAttachmentFiles(remote);
+  const files = createWebAttachmentFiles(remote, hostId);
   const channels = remote.channels;
   const admin = remote.admin;
   const eventRoutines = admin ? webEventRoutinesApi(admin.request) : undefined;
@@ -92,6 +92,7 @@ export function createWebChannelsPort(
     fileActions: "browser",
     previewAttachment: files.preview,
     attachmentMedia,
+    visualPage: files.visualPage,
     importAttachments,
   };
 }

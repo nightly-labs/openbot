@@ -498,7 +498,10 @@ Network traffic can also occur when:
   CDN. The server that holds those files gets the request and the network address of the computer,
   but no OpenBot cookies. The page cannot read the app, the conversation or other
   files. `html_preview` draws the page in a hidden window that has its own
-  session in memory. The mobile app does not run the page: it shows the page as its file;
+  session in memory. The web client gets the page through the host connection and runs it in a
+  sandboxed `srcdoc` frame with an opaque origin, so the page cannot read the web client's storage
+  or its host keys; the browser sends no referrer for its requests. The mobile app does not run the
+  page: it shows the page as its file;
 - a user opens an explicitly labeled external support or setup link;
 - a Slack workspace is connected. See [Slack connections](#slack-connections).
 - a Discord server is connected. See [Discord connections](#discord-connections).

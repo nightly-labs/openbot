@@ -1,4 +1,4 @@
-import { chatVisualDocument } from "@openbot/contracts/chat-visual";
+import { CHAT_VISUAL_FRAME_SANDBOX, CHAT_VISUAL_PAGE_LIMIT, chatVisualDocument } from "@openbot/contracts/chat-visual";
 import { isTrustedRendererUrl } from "./trusted-renderer";
 
 /**
@@ -9,9 +9,6 @@ import { isTrustedRendererUrl } from "./trusted-renderer";
  * it cannot read the app, its storage or another attachment, and it cannot open a window or move
  * the app window. It can load files from the network, as a web page can.
  */
-
-/** A larger page is not served: the frame would hold all of it in memory. */
-export const CHAT_VISUAL_PAGE_LIMIT = 8 * 1_024 * 1_024;
 
 const DOCUMENT_MIME_TYPES = new Set(["text/html", "application/xhtml+xml", "image/svg+xml"]);
 
@@ -24,7 +21,7 @@ export function chatVisualResponse(bytes: Uint8Array): Response {
   return new Response(chatVisualDocument(new TextDecoder().decode(bytes)), {
     headers: {
       "Content-Type": "text/html; charset=utf-8",
-      "Content-Security-Policy": "sandbox allow-scripts allow-forms",
+      "Content-Security-Policy": `sandbox ${CHAT_VISUAL_FRAME_SANDBOX}`,
       "Cache-Control": "no-store",
       "X-Content-Type-Options": "nosniff",
     },

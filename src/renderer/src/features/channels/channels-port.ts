@@ -35,6 +35,11 @@ export interface ChannelsPort {
   previewAttachment?: (attachment: AttachmentSummary) => Promise<FilePreview>;
   /** Loads attachment images and media for a client that gets no `previewUrl`. */
   attachmentMedia?: AttachmentMediaSource;
+  /**
+   * The HTML of a visual reply page, for a client that has no page URL. Only the browser client
+   * has it: the frame shows the page as `srcdoc`, which the desktop renderer policy would block.
+   */
+  visualPage?: (attachment: AttachmentSummary) => Promise<string>;
   /** Uploads dropped or pasted files as drafts. Only a browser client has it; the desktop preload imports them. */
   importAttachments?: (files: File[]) => Promise<AttachmentSummary[]>;
 }

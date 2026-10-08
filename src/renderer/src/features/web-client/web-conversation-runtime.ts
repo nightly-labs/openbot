@@ -80,7 +80,7 @@ export function createWebConversationRuntime(
   eventsEnabled?: () => boolean,
 ): ConversationRuntime {
   const listeners = new Set<(event: AttachmentImportEvent) => void>();
-  const files = createWebAttachmentFiles(remote);
+  const files = createWebAttachmentFiles(remote, hostId);
   let importing: { cancelled: boolean; serverId: string } | undefined;
   async function cancelImportFiles() {
     if (!importing) return;
@@ -156,6 +156,7 @@ export function createWebConversationRuntime(
     openUrl: openWebLink,
     previewAttachment: files.preview,
     attachmentMedia,
+    visualPage: files.visualPage,
     async importFiles(files) {
       if (importing || files.length === 0) return;
       const serverId = hostId();

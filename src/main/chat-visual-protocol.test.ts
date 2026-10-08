@@ -1,11 +1,6 @@
-import { isChatVisualMimeType } from "@openbot/contracts/chat-visual";
+import { CHAT_VISUAL_PAGE_LIMIT, isChatVisualMimeType } from "@openbot/contracts/chat-visual";
 import { describe, expect, it } from "vitest";
-import {
-  attachmentCorsHeaders,
-  attachmentDocumentHeaders,
-  CHAT_VISUAL_PAGE_LIMIT,
-  chatVisualResponse,
-} from "./chat-visual-protocol";
+import { attachmentCorsHeaders, attachmentDocumentHeaders, chatVisualResponse } from "./chat-visual-protocol";
 
 const developmentUrl = "http://localhost:5173";
 
