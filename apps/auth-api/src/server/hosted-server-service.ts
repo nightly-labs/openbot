@@ -488,7 +488,8 @@ export class HostedServerService {
            SELECT 1 FROM billing_subscriptions s WHERE s.server_id = hosted_servers.server_id
            AND s.status IN ${OPEN_STATUSES_SQL} AND (s.cancel_at_period_end = 0
              OR s.stripe_subscription_id != hosted_servers.deletion_subscription_id
-             OR s.current_period_end > hosted_servers.deletion_scheduled_at))`,
+             OR (s.stripe_subscription_id = hosted_servers.deletion_subscription_id
+             AND s.current_period_end > hosted_servers.deletion_scheduled_at)))`,
           )
           .bind(row.server_id)
           .run(),
@@ -629,7 +630,8 @@ export class HostedServerService {
          WHERE server_id = ? AND desired_state != 'deleted' AND lifecycle_token = ? AND lifecycle_lease_until > ?
          AND deletion_scheduled_at = ? AND deletion_scheduled_at <= ? AND deletion_subscription_id = ?
          AND NOT EXISTS(SELECT 1 FROM billing_subscriptions s WHERE s.server_id = hosted_servers.server_id
-           AND (s.status IN ${OPEN_STATUSES_SQL} OR s.current_period_end > hosted_servers.deletion_scheduled_at))`,
+           AND (s.status IN ${OPEN_STATUSES_SQL} OR (s.stripe_subscription_id = hosted_servers.deletion_subscription_id
+             AND s.current_period_end > hosted_servers.deletion_scheduled_at)))`,
           )
           .bind(
             dependencies.now(),

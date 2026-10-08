@@ -1023,6 +1023,11 @@ describe("paid server lifecycle data safety", () => {
     const stored = c.stripe.subscriptions.get("sub_1");
     if (!isDynamicRecord(stored)) throw new Error("Missing subscription");
     c.stripe.subscriptions.set("sub_1", { ...stored, status: "canceled" });
+    // An older annual plan ended early. Its later period end must not block this schedule.
+    await c.stripeSync("sub_old", "canceled", server.serverId);
+    c.database
+      .prepare("UPDATE billing_subscriptions SET current_period_end = ? WHERE stripe_subscription_id = ?")
+      .run(c.clock.now + 365 * 86400_000, "sub_old");
     // No webhook: the cron must fetch and persist the terminal Stripe state itself.
     await runApiEffect(c.service.tick());
     expect(c.state(server.serverId)).toMatchObject({ observed_state: "deleted" });

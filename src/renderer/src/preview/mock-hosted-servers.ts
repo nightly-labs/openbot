@@ -1,4 +1,4 @@
-import { BILLING_PLANS } from "@openbot/contracts/billing";
+import { BILLING_PLANS, type BillingServerPlan } from "@openbot/contracts/billing";
 import {
   HOSTED_PLAN_SIZE,
   type HostedServerCatalog,
@@ -6,6 +6,8 @@ import {
   type HostedServerSummary,
 } from "@openbot/contracts/hosted-servers";
 import type { HostedServersDesktopApi } from "@openbot/contracts/ipc";
+
+import { sourceText } from "@openbot/i18n/source";
 
 const CREATED_AT = "2026-09-20T09:30:00.000Z";
 /** How long each mock step takes (payment, then start), so the list shows the transition states. */
@@ -45,7 +47,7 @@ const NEXT_STATE: Partial<Record<HostedServerState, HostedServerState>> = {
 };
 
 /** One stopped server and one whose plan ended, so the preview shows the start and renew actions. */
-export function createMockHostedServers(): HostedServersDesktopApi {
+export function createMockHostedServers(billingPlans?: BillingServerPlan[]): HostedServersDesktopApi {
   let servers: HostedServerSummary[] = [
     {
       serverId: "6f1c2d3e-4b5a-4c6d-8e7f-9a0b1c2d3e4f",
@@ -72,6 +74,30 @@ export function createMockHostedServers(): HostedServersDesktopApi {
       updatedAt: CREATED_AT,
     },
   ];
+  if (billingPlans) {
+    servers = billingPlans.flatMap((plan): HostedServerSummary[] =>
+      plan.serverId
+        ? [
+            {
+              serverId: plan.serverId,
+              name: plan.serverName ?? "Archive server",
+              plan: plan.plan,
+              size: HOSTED_PLAN_SIZE[plan.plan],
+              interval: plan.interval,
+              currency: plan.currency,
+              state: "running",
+              error: null,
+              createdAt: CREATED_AT,
+              updatedAt: CREATED_AT,
+            },
+          ]
+        : [],
+    );
+  }
+  const removePlan = (serverId: string) => {
+    if (billingPlans)
+      billingPlans.splice(0, billingPlans.length, ...billingPlans.filter((plan) => plan.serverId !== serverId));
+  };
   /** The account server's idempotency key: a repeated create request returns the same server. */
   const requests = new Map<string, string>();
   const update = (serverId: string, change: Partial<HostedServerSummary>): HostedServerSummary => {
@@ -87,13 +113,21 @@ export function createMockHostedServers(): HostedServersDesktopApi {
       const server = servers.find((entry) => entry.serverId === input.serverId);
       if (!server) throw new Error("The hosted server does not exist.");
       if (input.action === "delete") {
-        if (input.confirmName !== server.name) throw new Error("Type the server name to delete it.");
+        if (input.confirmName !== server.name) throw new Error(sourceText("error.billing.confirmMismatch"));
         if (input.timing === "now") {
+          removePlan(input.serverId);
           servers = servers.filter((entry) => entry.serverId !== input.serverId);
           return;
         }
       }
-      update(input.serverId, { deletionScheduledAt: input.action === "delete" ? Date.UTC(2026, 10, 8, 12) : null });
+      const plan = billingPlans?.find((entry) => entry.serverId === input.serverId);
+      if (billingPlans && !plan) throw new Error(sourceText("error.billing.lifecycleFailed"));
+      if (plan) plan.cancelAtPeriodEnd = input.action !== "keep";
+      if (input.action !== "cancel") {
+        update(input.serverId, {
+          deletionScheduledAt: input.action === "delete" ? (plan?.currentPeriodEnd ?? Date.UTC(2026, 10, 8, 12)) : null,
+        });
+      }
     },
     list: async () => {
       const stepStartedBefore = Date.now() - MOCK_STEP_MS;
@@ -146,7 +180,8 @@ export function createMockHostedServers(): HostedServersDesktopApi {
     delete: async ({ serverId, confirmName }) => {
       const server = servers.find((entry) => entry.serverId === serverId);
       if (!server) throw new Error("The hosted server does not exist.");
-      if (server.name !== confirmName) throw new Error("Type the server name to delete it.");
+      if (server.name !== confirmName) throw new Error(sourceText("error.billing.confirmMismatch"));
+      removePlan(serverId);
       servers = servers.filter((entry) => entry.serverId !== serverId);
     },
     wake: async (serverId) => update(serverId, { state: "waking" }),
