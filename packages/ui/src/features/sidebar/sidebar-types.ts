@@ -74,6 +74,8 @@ export interface SidebarProps {
   footer?: JSX.Element;
   onExpand: () => void;
   onOpenMarketplace: () => void;
+  /** The agents are still on their way, so an empty list says that it connects rather than that it is empty. */
+  agentsConnecting?: boolean;
   emptyAction?:
     | {
         label: string;
