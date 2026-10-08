@@ -542,6 +542,19 @@ export function GlobalSearch(props: GlobalSearchProps) {
   let dialog: HTMLDivElement | undefined;
   let results: HTMLElement | undefined;
   let scrollToKey: ((key: string) => void) | undefined;
+  // The overlay mounts the search when it opens and removes it when it closes, so the dialog gets no
+  // close event. A dismissed search gives focus back to the element that had it before; an opened
+  // result leaves focus to the view it opens.
+  const focused = document.activeElement;
+  const opener = focused instanceof HTMLElement && focused !== document.body ? focused : undefined;
+  let resultOpened = false;
+  onCleanup(() => {
+    if (resultOpened || !opener) return;
+    requestAnimationFrame(() => {
+      const current = document.activeElement;
+      if (opener.isConnected && (!current || current === document.body)) opener.focus({ preventScroll: true });
+    });
+  });
   const scrollFades = createScrollFades();
   onCleanup(scrollFades.stop);
 
@@ -693,6 +706,7 @@ export function GlobalSearch(props: GlobalSearchProps) {
 
   function activate(result: GlobalSearchResult | null | undefined): void {
     if (!result) return;
+    resultOpened = true;
     props.onOpenChange(false);
     switch (result.kind) {
       case "agent":

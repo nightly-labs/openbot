@@ -18,7 +18,6 @@ export const messages = {
   "sidebar.topbar.expand": "サイドバーを展開",
   "sidebar.topbar.openMarketplace": "Marketplace を開く",
   "sidebar.topbar.marketplace": "Marketplace",
-  "sidebar.empty.noMatches": "一致するものはありません",
   "sidebar.empty.noAgents": "エージェントはまだありません",
   "sidebar.empty.firstAgent": "最初のエージェントを作成",
   "sidebar.section.layoutUnsupported": "このホストはサイドバーのレイアウト変更に対応していません。",

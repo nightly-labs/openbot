@@ -18,7 +18,6 @@ export const messages = {
   "sidebar.topbar.expand": "Seitenleiste erweitern",
   "sidebar.topbar.openMarketplace": "Marketplace öffnen",
   "sidebar.topbar.marketplace": "Marketplace",
-  "sidebar.empty.noMatches": "Keine Treffer",
   "sidebar.empty.noAgents": "Noch keine Agenten",
   "sidebar.empty.firstAgent": "Erstelle deinen ersten Agenten",
   "sidebar.view.label": "Ansicht der Seitenleiste",

@@ -18,7 +18,6 @@ export const messages = {
   "sidebar.topbar.expand": "Развернуть боковую панель",
   "sidebar.topbar.openMarketplace": "Открыть каталог",
   "sidebar.topbar.marketplace": "Каталог",
-  "sidebar.empty.noMatches": "Ничего не найдено",
   "sidebar.empty.noAgents": "Агентов пока нет",
   "sidebar.empty.firstAgent": "Создайте первого агента",
   "sidebar.view.label": "Вид боковой панели",

@@ -18,7 +18,6 @@ export const messages = {
   "sidebar.topbar.expand": "Expandir barra lateral",
   "sidebar.topbar.openMarketplace": "Abrir loja",
   "sidebar.topbar.marketplace": "Loja",
-  "sidebar.empty.noMatches": "Nenhum resultado",
   "sidebar.empty.noAgents": "Nenhum agente ainda",
   "sidebar.empty.firstAgent": "Crie seu primeiro agente",
   "sidebar.section.layoutUnsupported": "Este computador anfitrião não permite alterar a organização da barra lateral.",

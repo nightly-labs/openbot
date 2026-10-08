@@ -18,7 +18,6 @@ export const messages = {
   "sidebar.topbar.expand": "Développer la barre latérale",
   "sidebar.topbar.openMarketplace": "Ouvrir la Marketplace",
   "sidebar.topbar.marketplace": "Marketplace",
-  "sidebar.empty.noMatches": "Aucun résultat",
   "sidebar.empty.noAgents": "Aucun agent pour l’instant",
   "sidebar.empty.firstAgent": "Créez votre premier agent",
   "sidebar.section.layoutUnsupported": "Cet hôte ne prend pas en charge les modifications de la barre latérale.",

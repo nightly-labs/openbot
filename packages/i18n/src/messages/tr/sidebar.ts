@@ -18,7 +18,6 @@ export const messages = {
   "sidebar.topbar.expand": "Kenar çubuğunu genişlet",
   "sidebar.topbar.openMarketplace": "Pazaryerini Aç",
   "sidebar.topbar.marketplace": "Pazaryeri",
-  "sidebar.empty.noMatches": "Eşleşme yok",
   "sidebar.empty.noAgents": "Henüz ajan yok",
   "sidebar.empty.firstAgent": "İlk ajanınızı oluşturun",
   "sidebar.section.layoutUnsupported": "Bu ana makine kenar çubuğu düzeni değişikliklerini desteklemiyor.",

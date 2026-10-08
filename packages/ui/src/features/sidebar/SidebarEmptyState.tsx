@@ -17,13 +17,7 @@ export function SidebarEmptyState() {
     <Show
       when={props.emptyAction}
       fallback={
-        <p class="empty-search">
-          {props.agents.length
-            ? t("sidebar.empty.noMatches")
-            : props.agentsConnecting
-              ? t("common.connecting")
-              : t("sidebar.empty.noAgents")}
-        </p>
+        <p class="empty-search">{props.agentsConnecting ? t("common.connecting") : t("sidebar.empty.noAgents")}</p>
       }
     >
       {(action) => (
