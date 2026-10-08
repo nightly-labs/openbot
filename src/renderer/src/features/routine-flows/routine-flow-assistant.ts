@@ -59,12 +59,13 @@ export function createRoutineFlowAssistant(port: () => RoutineFlowsPort, agentId
     }
     const turnId = asked.turnId ?? endedTurnId;
     let reply = turnId ? latestTurnAnswer(page.messages.slice(index + 1), turnId) : undefined;
-    // A long turn can end past the page around the request. Its answer is its last message, so
-    // the newest page holds it when the turn has just ended.
-    if (!reply && turnId && status === "completed") {
+    // The answer is the last message of the turn, and a long turn ends past the page around the
+    // request, which can hold only an earlier message of it. Once the turn has ended, the newest
+    // page holds its end, so its answer there wins.
+    if (turnId && status === "completed") {
       const latest = await port().agent.readConversationPage({ agentId: forAgent }, "local");
       if (chat.pending !== pending) return;
-      reply = latestTurnAnswer(latest.messages, turnId);
+      reply = latestTurnAnswer(latest.messages, turnId) ?? reply;
     }
     // Without the turn, a queue change can come before the answer does: only an ended turn ends it.
     if (!reply && (status !== "completed" || !turnId)) return;
