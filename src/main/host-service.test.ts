@@ -1,4 +1,4 @@
-import type { Effect } from "effect";
+import { Effect } from "effect";
 import { desktopCall } from "./remote-desktop-effects";
 import { remoteCall } from "./remote-service-effects";
 // @vitest-environment node
@@ -65,6 +65,7 @@ async function createHostService(
     appVersion: "0.4.0",
     store,
     agents: { ...createAgents(), adoptConversationReads: unimplemented, searchConversationFiles: unimplemented },
+    agentsReady: () => Effect.void,
     skills: { listInstalledForChatTags: unimplemented },
     sidebarLayout: {
       getSnapshot: unimplemented,

@@ -511,11 +511,13 @@ describe("TeamApiServer agents", () => {
   });
 
   // A host that wakes publishes before its agents load. An empty roster then opens the provider
-  // setup on the peer as if the server had no agents.
+  // setup on the peer as if the server had no agents. The protocol 5 projection must also see the
+  // loaded roster, or an agent that the frozen codec cannot describe turns the list into a 500.
   it("answers the agent list only after the host's agents load", async () => {
     const source = opencodeFixture[0];
     if (!isAgentSummary(source)) throw new Error("Invalid agent fixture.");
     const chief: AgentSummary = { ...source, id: "chief", provider: "claude", model: "claude-opus-5-5" };
+    const settings: AgentSummary = { ...chief, id: "settings", model: "claude-opus-5[effort=high,fast=false]" };
     let roster: AgentSummary[] = [];
     let finishLoading = (): void => undefined;
     const loaded = new Promise<void>((resolve) => {
@@ -523,14 +525,23 @@ describe("TeamApiServer agents", () => {
     });
     const agentsReady = vi.fn(() => Effect.promise(() => loaded));
     const { start, signIn } = await createTeamApiFixture("agents-ready", { configure: true });
-    const { base } = await start({ agentsReady, agents: createAgents({ listAgents: () => roster }) });
-    const token = await signIn();
+    const { base } = await start({
+      appVersion: "1.0.0",
+      logger: { trace: vi.fn(), debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+      agentsReady,
+      agents: createAgents({ listAgents: () => roster }),
+    });
+    const token = await signIn({ protocol: 5, appVersion: "1.0.0" });
 
     const list = fetch(`${base}/v1/agents`, {
-      headers: { Authorization: `Bearer ${token}`, [TEAM_PROTOCOL_VERSION_HEADER]: "3" },
+      headers: {
+        Authorization: `Bearer ${token}`,
+        [TEAM_PROTOCOL_VERSION_HEADER]: "5",
+        [TEAM_APP_VERSION_HEADER]: "1.0.0",
+      },
     });
     await vi.waitFor(() => expect(agentsReady).toHaveBeenCalled());
-    roster = [chief];
+    roster = [settings, chief];
     finishLoading();
 
     const response = await list;

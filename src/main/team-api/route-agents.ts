@@ -58,7 +58,6 @@ export interface AgentRouteDependencies {
   // The whole service, unlike every other module here, because this one forwards it to four
   // sub-modules that between them reach most of it. The narrowing that means something is theirs.
   agents: TeamApiAgents;
-  agentsReady?: TeamApiOptions["agentsReady"];
   skills?: TeamApiOptions["skills"];
   sidebarLayout: Pick<TeamApiSidebarLayout, "getSnapshot" | "mutate" | "removeAgent" | "withProfileAssignment">;
   duplicateAgent: (agentId: string, operationId: string) => Effect.Effect<DuplicateAgentResult, AgentDuplicationFailed>;
@@ -66,7 +65,7 @@ export interface AgentRouteDependencies {
 
 export async function routeAgents(
   context: TeamApiRequestContext,
-  { agents, agentsReady, skills, sidebarLayout, duplicateAgent }: AgentRouteDependencies,
+  { agents, skills, sidebarLayout, duplicateAgent }: AgentRouteDependencies,
 ): Promise<RouteOutcome> {
   const { method, url, request, response, member, capabilities, json, empty } = context;
   const hidden = hiddenProviderAgentIds(agents.listAgents(), context.protocol);
@@ -175,7 +174,6 @@ export async function routeAgents(
     );
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.agents.all) {
-    if (agentsReady) await runCauseEffect(agentsReady());
     return json(200, agents.listAgents());
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.agents.conversationReads) {

@@ -645,6 +645,10 @@ export class TeamApiServer {
       }
       if (isClientUse(method, url.pathname)) this.#lastClientUseAt = Date.now();
       const context = this.#requestContext(request, response, url, token, authenticated);
+      // Before `hidden`: the response projection must see the agents that the roster sends.
+      if (method === "GET" && url.pathname === TEAM_API_ROUTES.agents.all && this.#options.agentsReady) {
+        await runCauseEffect(this.#options.agentsReady());
+      }
       const hidden = this.#hiddenAgentIds(context.protocol, context.capabilities);
       // Every protocol gets the projection, also with no hidden agent: a provider status row, a
       // model or an auth state of a local-only provider can be in the response.
@@ -774,7 +778,6 @@ export class TeamApiServer {
   #routeAgents(context: TeamApiRequestContext): Promise<RouteOutcome> {
     return routeAgents(context, {
       agents: this.#options.agents,
-      agentsReady: this.#options.agentsReady,
       skills: this.#options.skills,
       sidebarLayout: this.#options.sidebarLayout,
       duplicateAgent: (agentId, operationId) => this.#duplicateAgent(agentId, operationId),
