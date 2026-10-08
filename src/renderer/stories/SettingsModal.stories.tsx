@@ -196,6 +196,10 @@ export const Narrow: Story = {
   parameters: { viewport: { defaultViewport: "settingsNarrow" } },
 };
 
+export const Notifications: Story = {
+  render: () => <SettingsModalStory initialOpen initialTab="notifications" />,
+};
+
 /** No plan yet. Choose a plan: the mock then shows it as active, as after a Stripe payment. */
 export const Billing: Story = {
   render: () => <SettingsModalStory initialOpen initialTab="billing" />,

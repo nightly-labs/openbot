@@ -701,6 +701,7 @@ describe("notification settings", () => {
         onUpdateAccountAvatar={vi.fn(async () => undefined)}
         onTestNotification={vi.fn(async () => undefined)}
         onOpenNotificationSettings={onOpenNotificationSettings}
+        initialTab="notifications"
       />
     ));
   }

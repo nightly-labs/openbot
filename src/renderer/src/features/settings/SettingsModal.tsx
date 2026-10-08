@@ -28,6 +28,7 @@ import { useI18n } from "../../i18n-context";
 import { ComputerUseSetup } from "../computer-use/ComputerUseSetup";
 import { SettingsDynamicIslandTab } from "./SettingsDynamicIslandTab";
 import { SettingsGeneralTab } from "./SettingsGeneralTab";
+import { SettingsNotificationsTab } from "./SettingsNotificationsTab";
 import { navItem, navItems, type SettingsTab } from "./settings-tabs";
 
 export interface SettingsModalProps {
@@ -127,6 +128,7 @@ export function SettingsModal(props: SettingsModalProps) {
     onChange(value: string) {
       if (
         value === "general" ||
+        value === "notifications" ||
         (value === "dynamic-island" && isMac()) ||
         value === "computer-use" ||
         value === "profile" ||
@@ -188,6 +190,14 @@ export function SettingsModal(props: SettingsModalProps) {
             onUpdateSettings={updateSettings}
             selectMount={modalElement}
             turboModePending={props.turboModePending}
+          />
+        </Tabs.Content>
+
+        <Tabs.Content value="notifications" class="settings-modal-tab-panel" data-tab="notifications">
+          <SettingsNotificationsTab
+            value={props.value}
+            onUpdateSetting={updateSetting}
+            onUpdateSettings={updateSettings}
             onTestNotification={props.onTestNotification}
             onOpenNotificationSettings={
               props.appInfo?.platform === "darwin" || props.appInfo?.platform === "win32"
