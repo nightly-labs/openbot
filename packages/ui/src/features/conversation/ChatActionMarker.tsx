@@ -19,6 +19,7 @@ import {
   TriangleAlert,
   X,
 } from "@openbot/ui";
+import type { JSX } from "@solidjs/web";
 import { Dynamic } from "@solidjs/web";
 import { createSignal, createUniqueId, For, Show, untrack } from "solid-js";
 import { avatarHeadColor } from "../../bloub-avatar";
@@ -133,6 +134,84 @@ export function ChatActionMarker(props: ChatActionMarkerProps) {
   );
 }
 
+/** The open state of a group row, which its summary uses to draw the toggle. */
+interface MarkerGroupToggle {
+  expanded: () => boolean;
+  listId: string;
+  toggle: () => void;
+}
+
+/**
+ * The shared body of a group row: the summary, the list of each entry's own marker that opens under
+ * it, and the live text that announces an entry that joins the group.
+ */
+function MarkerGroup(props: {
+  class: string;
+  label: string;
+  listLabel: string;
+  entries: readonly { id: string; marker: SingleChatActionMarkerModel }[];
+  drawnCount: number;
+  agents: AgentProfile[];
+  routineAvailable?: boolean | undefined;
+  onSelectAgent: (agentId: string) => void;
+  onOpenRoutine?: ((routine: { routineId: string; name: string }) => void) | undefined;
+  summary: (control: MarkerGroupToggle) => JSX.Element;
+}) {
+  const { t } = useText();
+  const [expanded, setExpanded] = createSignal(false);
+  // Same exit rule as the routine history: the list stays mounted until its closing animation ends.
+  const [mounted, setMounted] = createSignal(false);
+  const toggle = (): void => {
+    const opening = !expanded();
+    setExpanded(opening);
+    if (opening || prefersReducedMotion()) setMounted(opening);
+  };
+  const listId = createUniqueId();
+  // An entry that joins the group has no row of its own to announce it. The newest one that joined
+  // gets a new node in the live text, so a reader announces it even when its text is the same.
+  const joinedEntries = () => props.entries.slice(Math.max(props.drawnCount, props.entries.length - 1));
+  return (
+    <Marker class={props.class} role="group" aria-label={props.label}>
+      <div class="chat-action-marker-summary">
+        <MarkerContent class="chat-action-marker-content">{props.summary({ expanded, listId, toggle })}</MarkerContent>
+        <Show when={mounted()}>
+          <div
+            class="chat-action-history-panel"
+            data-state={expanded() ? "open" : "closed"}
+            inert={!expanded()}
+            onAnimationEnd={(event) => {
+              if (event.target === event.currentTarget && !expanded()) setMounted(false);
+            }}
+          >
+            <div class="chat-action-history-clip">
+              <ol id={listId} class="chat-action-history chat-action-group-list" aria-label={props.listLabel}>
+                <For each={props.entries} keyed={(entry) => entry.id}>
+                  {(entry) => (
+                    <li class="chat-action-history-entry">
+                      <SingleChatActionMarker
+                        marker={entry().marker}
+                        agents={props.agents}
+                        routineAvailable={props.routineAvailable}
+                        onSelectAgent={props.onSelectAgent}
+                        onOpenRoutine={props.onOpenRoutine}
+                      />
+                    </li>
+                  )}
+                </For>
+              </ol>
+            </div>
+          </div>
+        </Show>
+      </div>
+      <span class="sr-only" role="status" aria-live="polite">
+        <For each={joinedEntries()} keyed={(entry) => entry.id}>
+          {(entry) => <span>{markerAccessibleLabel(entry().marker, props.agents, t)}</span>}
+        </For>
+      </span>
+    </Marker>
+  );
+}
+
 /**
  * Consecutive messages to and from other agents, drawn as one row. The row names how many messages
  * and agents there are, and opens to show each message's own marker.
@@ -144,15 +223,6 @@ function AgentMessageGroupMarker(props: {
   onSelectAgent: (agentId: string) => void;
 }) {
   const { t, format } = useText();
-  const [expanded, setExpanded] = createSignal(false);
-  // Same exit rule as the routine history: the list stays mounted until its closing animation ends.
-  const [mounted, setMounted] = createSignal(false);
-  const toggle = (): void => {
-    const opening = !expanded();
-    setExpanded(opening);
-    if (opening || prefersReducedMotion()) setMounted(opening);
-  };
-  const listId = createUniqueId();
   const agentIds = () => [
     ...new Set(
       props.group.messages.flatMap(({ marker }) =>
@@ -169,32 +239,31 @@ function AgentMessageGroupMarker(props: {
     if (ids.length !== 1) return t("chat.marker.agentCount", { count: ids.length });
     return agents()[0]?.name ?? t("chat.marker.unavailableAgent");
   };
-  // A message that joins the group has no row of its own to announce it. The newest one that joined
-  // gets a new node in the live text, so a reader announces it even when its text is the same.
-  const joinedMessages = () =>
-    props.group.messages.slice(Math.max(props.drawnMessageCount, props.group.messages.length - 1));
   return (
-    <Marker
+    <MarkerGroup
       class="chat-action-marker chat-action-marker-agent-message chat-action-marker-agent-message-group"
-      role="group"
-      aria-label={t("chat.marker.accessible.messageGroup", { label: label(), agents: agentsLabel() })}
-    >
-      <div class="chat-action-marker-summary">
-        <MarkerContent class="chat-action-marker-content">
+      label={t("chat.marker.accessible.messageGroup", { label: label(), agents: agentsLabel() })}
+      listLabel={t("chat.marker.groupMessages")}
+      entries={props.group.messages}
+      drawnCount={props.drawnMessageCount}
+      agents={props.agents}
+      onSelectAgent={props.onSelectAgent}
+      summary={(control) => (
+        <>
           <span class="chat-action-marker-label">{label()}</span>
           <Button
             variant="ghost"
             type="button"
             class="chat-action-target"
             style={agentTargetsStyle(agents())}
-            aria-expanded={expanded() ? "true" : "false"}
-            aria-controls={listId}
-            aria-label={t(expanded() ? "chat.marker.hideMessages" : "chat.marker.showMessages", {
+            aria-expanded={control.expanded() ? "true" : "false"}
+            aria-controls={control.listId}
+            aria-label={t(control.expanded() ? "chat.marker.hideMessages" : "chat.marker.showMessages", {
               count: props.group.messages.length,
               agents: agentsLabel(),
             })}
-            data-cuelume-tap={expanded() ? "close" : "open"}
-            onClick={toggle}
+            data-cuelume-tap={control.expanded() ? "close" : "open"}
+            onClick={control.toggle}
           >
             <span class="chat-action-avatar-stack" aria-hidden="true">
               <For each={agents().slice(0, 3)}>
@@ -206,44 +275,9 @@ function AgentMessageGroupMarker(props: {
           <time class="chat-action-marker-time" datetime={props.group.timestamp}>
             {formatMarkerTime(props.group.timestamp, t, format)}
           </time>
-        </MarkerContent>
-        <Show when={mounted()}>
-          <div
-            class="chat-action-history-panel"
-            data-state={expanded() ? "open" : "closed"}
-            inert={!expanded()}
-            onAnimationEnd={(event) => {
-              if (event.target === event.currentTarget && !expanded()) setMounted(false);
-            }}
-          >
-            <div class="chat-action-history-clip">
-              <ol
-                id={listId}
-                class="chat-action-history chat-action-group-list"
-                aria-label={t("chat.marker.groupMessages")}
-              >
-                <For each={props.group.messages} keyed={(entry) => entry.id}>
-                  {(entry) => (
-                    <li class="chat-action-history-entry">
-                      <SingleChatActionMarker
-                        marker={entry().marker}
-                        agents={props.agents}
-                        onSelectAgent={props.onSelectAgent}
-                      />
-                    </li>
-                  )}
-                </For>
-              </ol>
-            </div>
-          </div>
-        </Show>
-      </div>
-      <span class="sr-only" role="status" aria-live="polite">
-        <For each={joinedMessages()} keyed={(entry) => entry.id}>
-          {(entry) => <span>{markerAccessibleLabel(entry().marker, props.agents, t)}</span>}
-        </For>
-      </span>
-    </Marker>
+        </>
+      )}
+    />
   );
 }
 
@@ -260,15 +294,6 @@ function RoutineRunGroupMarker(props: {
   onOpenRoutine?: ((routine: { routineId: string; name: string }) => void) | undefined;
 }) {
   const { t, format } = useText();
-  const [expanded, setExpanded] = createSignal(false);
-  // Same exit rule as the routine history: the list stays mounted until its closing animation ends.
-  const [mounted, setMounted] = createSignal(false);
-  const toggle = (): void => {
-    const opening = !expanded();
-    setExpanded(opening);
-    if (opening || prefersReducedMotion()) setMounted(opening);
-  };
-  const listId = createUniqueId();
   const count = () => props.group.runs.length;
   const firstTimestamp = () => props.group.runs[0]?.marker.timestamp ?? props.group.timestamp;
   const timeRange = () =>
@@ -276,21 +301,23 @@ function RoutineRunGroupMarker(props: {
       start: formatMarkerTime(firstTimestamp(), t, format),
       end: formatRangeEnd(firstTimestamp(), props.group.timestamp, t, format),
     });
-  // A run that joins the group has no row of its own to announce it. The newest one that joined gets
-  // a new node in the live text, so a reader announces it even when its text is the same.
-  const joinedRuns = () => props.group.runs.slice(Math.max(props.drawnRunCount, props.group.runs.length - 1));
   return (
-    <Marker
+    <MarkerGroup
       class="chat-action-marker chat-action-marker-routine-run chat-action-marker-routine-run-group"
-      role="group"
-      aria-label={t("chat.marker.runGroup.accessible", {
+      label={t("chat.marker.runGroup.accessible", {
         count: count(),
         name: props.group.routineName,
         time: timeRange(),
       })}
-    >
-      <div class="chat-action-marker-summary">
-        <MarkerContent class="chat-action-marker-content">
+      listLabel={t("chat.marker.runGroup.runs")}
+      entries={props.group.runs}
+      drawnCount={props.drawnRunCount}
+      agents={props.agents}
+      routineAvailable={props.routineAvailable}
+      onSelectAgent={props.onSelectAgent}
+      onOpenRoutine={props.onOpenRoutine}
+      summary={(control) => (
+        <>
           <RoutineTarget
             routineId={props.group.routineId}
             routineName={props.group.routineName}
@@ -311,58 +338,21 @@ function RoutineRunGroupMarker(props: {
               size="icon-xs"
               class="chat-action-history-toggle"
               type="button"
-              aria-expanded={expanded() ? "true" : "false"}
-              aria-controls={listId}
-              aria-label={t(expanded() ? "chat.marker.runGroup.hide" : "chat.marker.runGroup.show", {
+              aria-expanded={control.expanded() ? "true" : "false"}
+              aria-controls={control.listId}
+              aria-label={t(control.expanded() ? "chat.marker.runGroup.hide" : "chat.marker.runGroup.show", {
                 count: count(),
                 name: props.group.routineName,
               })}
-              data-cuelume-tap={expanded() ? "close" : "open"}
-              onClick={toggle}
+              data-cuelume-tap={control.expanded() ? "close" : "open"}
+              onClick={control.toggle}
             >
               <ChevronDown aria-hidden="true" />
             </Button>
           </span>
-        </MarkerContent>
-        <Show when={mounted()}>
-          <div
-            class="chat-action-history-panel"
-            data-state={expanded() ? "open" : "closed"}
-            inert={!expanded()}
-            onAnimationEnd={(event) => {
-              if (event.target === event.currentTarget && !expanded()) setMounted(false);
-            }}
-          >
-            <div class="chat-action-history-clip">
-              <ol
-                id={listId}
-                class="chat-action-history chat-action-group-list"
-                aria-label={t("chat.marker.runGroup.runs")}
-              >
-                <For each={props.group.runs} keyed={(entry) => entry.id}>
-                  {(entry) => (
-                    <li class="chat-action-history-entry">
-                      <SingleChatActionMarker
-                        marker={entry().marker}
-                        agents={props.agents}
-                        routineAvailable={props.routineAvailable}
-                        onSelectAgent={props.onSelectAgent}
-                        onOpenRoutine={props.onOpenRoutine}
-                      />
-                    </li>
-                  )}
-                </For>
-              </ol>
-            </div>
-          </div>
-        </Show>
-      </div>
-      <span class="sr-only" role="status" aria-live="polite">
-        <For each={joinedRuns()} keyed={(entry) => entry.id}>
-          {(entry) => <span>{markerAccessibleLabel(entry().marker, props.agents, t)}</span>}
-        </For>
-      </span>
-    </Marker>
+        </>
+      )}
+    />
   );
 }
 
