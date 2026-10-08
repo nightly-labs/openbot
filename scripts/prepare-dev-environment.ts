@@ -4,7 +4,7 @@ import { constants, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSy
 import { dirname, isAbsolute, join, normalize, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { developmentInstanceIdForWorktree } from "../src/main/development-profile";
-import { type DevelopmentEnvOutcome, ensureDevelopmentEnvFile } from "./development-secrets";
+import { type DevelopmentStateOutcome, ensureDevelopmentState } from "./development-secrets";
 
 const scriptsRoot = dirname(fileURLToPath(import.meta.url));
 export const developmentProjectRoot = dirname(scriptsRoot);
@@ -37,15 +37,14 @@ export interface DevelopmentPreparationInput {
   run?: DevelopmentCommandRunner;
 }
 
-export function prepareDevelopmentEnvironment(input: DevelopmentPreparationInput = {}): DevelopmentEnvOutcome {
+export function prepareDevelopmentEnvironment(input: DevelopmentPreparationInput = {}): DevelopmentStateOutcome {
   const projectRoot = input.projectRoot ?? developmentProjectRoot;
   assertSupportedBunVersion(input.bunVersion ?? process.versions.bun ?? "unknown");
-  // Before the env file, so a worktree reuses the main checkout's `.env.dev` identity.
+  // Copy state before generation so a new worktree retains the main checkout's identity.
   const copied = copyWorktreeIncludes(projectRoot, input.mainCheckoutRoot ?? findMainCheckoutRoot(projectRoot));
   for (const path of copied) process.stdout.write(`Copied ${path} from the main checkout.\n`);
-  // Before `bun install`, because a fresh clone has no `.env.dev` and both dev services load one.
-  // Only `.env.production` is still encrypted, so a fork needs no `.env.keys` to reach this point.
-  const envFile = ensureDevelopmentEnvFile(projectRoot);
+  // State generation uses Node built-ins and needs no decryption key or installed packages.
+  const stateOutcome = ensureDevelopmentState(projectRoot);
 
   const executable = input.executable ?? process.execPath;
   const run = input.run ?? execDevelopmentCommand;
@@ -61,7 +60,7 @@ export function prepareDevelopmentEnvironment(input: DevelopmentPreparationInput
     () => (existsSync(join(projectRoot, LOCAL_D1_STATE)) ? migrationFingerprint(projectRoot) : null),
     () => run(executable, ["run", "api:migrate:local"], options),
   );
-  return envFile;
+  return stateOutcome;
 }
 
 /**
@@ -160,9 +159,9 @@ function fingerprintFiles(projectRoot: string, files: string[], extra: string[])
   return hash.digest("hex");
 }
 
-export function prepareDevelopmentWorktree(input: DevelopmentPreparationInput = {}): DevelopmentEnvOutcome {
+export function prepareDevelopmentWorktree(input: DevelopmentPreparationInput = {}): DevelopmentStateOutcome {
   const projectRoot = input.projectRoot ?? developmentProjectRoot;
-  const envFile = prepareDevelopmentEnvironment({ ...input, projectRoot });
+  const stateOutcome = prepareDevelopmentEnvironment({ ...input, projectRoot });
   const executable = input.executable ?? process.execPath;
   const run = input.run ?? execDevelopmentCommand;
   const options = { cwd: projectRoot, stdio: "inherit" as const };
@@ -173,7 +172,7 @@ export function prepareDevelopmentWorktree(input: DevelopmentPreparationInput = 
     env: { ...process.env, OPENBOT_DEV_INSTANCE_ID: instanceId },
   });
   run(executable, ["run", "marketplace:seed:local"], options);
-  return envFile;
+  return stateOutcome;
 }
 
 /**
@@ -238,6 +237,6 @@ if (import.meta.main) {
   // Generating secrets without saying so leaves a contributor guessing where the file came from.
   // stdout rather than a logger, because this runs before `bun install` on a fresh clone.
   if (prepareDevelopmentWorktree() === "created") {
-    process.stdout.write("Generated apps/auth-api/.env.dev for local development.\n");
+    process.stdout.write("Prepared local development state.\n");
   }
 }

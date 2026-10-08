@@ -26,11 +26,11 @@ describe("development environment preparation", () => {
     expect(() => assertSupportedBunVersion(version)).toThrow("OpenBot development requires stable Bun 1.4.2");
   });
 
-  it("generates the development env file before running any command", () => {
+  it("generates development state before running any command", () => {
     const root = createTemporaryRoot();
     const envFilePresent: boolean[] = [];
     const run: DevelopmentCommandRunner = () =>
-      envFilePresent.push(existsSync(join(root, "apps", "auth-api", ".env.dev")));
+      envFilePresent.push(existsSync(join(root, ".openbot", "dev-state.json")));
 
     const outcome = prepareDevelopmentEnvironment({
       projectRoot: root,
@@ -119,29 +119,31 @@ describe("development environment preparation", () => {
     expect(calls[2]?.instanceId).toMatch(/^wt-[a-f0-9]{64}$/u);
   });
 
-  it("copies missing listed files from the main checkout and keeps existing ones", () => {
-    // Each checkout sits one folder deep, so a "../" entry has a real file to reach.
+  it("copies state once while ignoring paths outside the checkout", () => {
     const mainParent = createTemporaryRoot();
     const main = join(mainParent, "main");
     const worktree = join(createTemporaryRoot(), "worktree");
-    mkdirSync(join(main, "apps", "auth-api"), { recursive: true });
+    mkdirSync(join(main, ".openbot"), { recursive: true });
+    mkdirSync(join(main, "remote"));
     mkdirSync(join(worktree, "apps", "auth-api"), { recursive: true });
     writeFileSync(
       join(worktree, ".worktreeinclude"),
-      "# Keys\n.env.keys\nremote/.env.keys\napps/auth-api/.env.dev\n../outside.keys\nremote/../../outside.keys\n/etc/hosts\n",
+      "# State\n.openbot/dev-state.json\nremote/.env.keys\n../outside.keys\nremote/../../outside.keys\n/etc/hosts\n",
     );
-    writeFileSync(join(main, ".env.keys"), "main keys");
     writeFileSync(join(mainParent, "outside.keys"), "outside keys");
-    mkdirSync(join(main, "remote"));
+    writeFileSync(join(main, ".openbot", "dev-state.json"), "main identity");
     writeFileSync(join(main, "remote", ".env.keys"), "remote keys");
-    writeFileSync(join(main, "apps", "auth-api", ".env.dev"), "main identity");
-    writeFileSync(join(worktree, "apps", "auth-api", ".env.dev"), "worktree identity");
+    writeFileSync(join(worktree, "apps", "auth-api", ".env.dev"), "encrypted settings");
 
-    expect(copyWorktreeIncludes(worktree, main)).toEqual([".env.keys", "remote/.env.keys"]);
-    expect(readFileSync(join(worktree, ".env.keys"), "utf8")).toBe("main keys");
+    expect(copyWorktreeIncludes(worktree, main)).toEqual([".openbot/dev-state.json", "remote/.env.keys"]);
+    expect(readFileSync(join(worktree, ".openbot", "dev-state.json"), "utf8")).toBe("main identity");
     expect(readFileSync(join(worktree, "remote", ".env.keys"), "utf8")).toBe("remote keys");
-    expect(readFileSync(join(worktree, "apps", "auth-api", ".env.dev"), "utf8")).toBe("worktree identity");
+    expect(readFileSync(join(worktree, "apps", "auth-api", ".env.dev"), "utf8")).toBe("encrypted settings");
     expect(existsSync(join(worktree, "..", "outside.keys"))).toBe(false);
+    expect(existsSync(join(worktree, ".env.keys"))).toBe(false);
+    writeFileSync(join(main, ".openbot", "dev-state.json"), "changed main identity");
+    expect(copyWorktreeIncludes(worktree, main)).toEqual([]);
+    expect(readFileSync(join(worktree, ".openbot", "dev-state.json"), "utf8")).toBe("main identity");
     expect(copyWorktreeIncludes(main, main)).toEqual([]);
   });
 });

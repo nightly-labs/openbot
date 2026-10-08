@@ -2,8 +2,9 @@ import { BotEngine } from "@norbert_bodziony/bloub";
 import type { AvatarMood } from "@openbot/brand/bloub-avatar-motion";
 import type { AvatarHue } from "@openbot/contracts/ipc";
 import { memo, useId, useMemo } from "react";
-import Animated, { type DerivedValue, useAnimatedProps } from "react-native-reanimated";
+import Animated, { type DerivedValue, type SharedValue, useAnimatedProps } from "react-native-reanimated";
 import Svg, { Circle, Defs, FeColorMatrix, Filter, G, Mask, Path, Rect } from "react-native-svg";
+import { useAgentColorTransition } from "@/features/agents/components/agent-color-glow";
 import { useBloubActivityFrame } from "@/features/agents/components/use-bloub-activity-frame";
 import {
   type BloubActivityFrame,
@@ -32,6 +33,7 @@ const AnimatedColorMatrix = Animated.createAnimatedComponent(FeColorMatrix);
 const AnimatedGroup = Animated.createAnimatedComponent(G);
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+const AnimatedRect = Animated.createAnimatedComponent(Rect);
 
 function AvatarEye({ frame, index }: { frame: DerivedValue<BloubActivityFrame>; index: number }) {
   const props = useAnimatedProps(() => frame.get().eyes[index] ?? { d: "", opacity: 0, matrix: [1, 0, 0, 1, 0, 0] });
@@ -62,8 +64,15 @@ export function BloubAvatar({ agentId, serverId: hostId, hue, seed, size = 54, a
   );
 }
 
+interface AvatarPreviewOptions {
+  disconnected?: boolean;
+  mood?: AvatarMood;
+  /** Eases the body to a new colour instead of swapping it. The value must hold this avatar's colour. */
+  animatedColor?: SharedValue<string>;
+}
+
 export const BloubAvatarPreview = memo(function BloubAvatarPreview(
-  props: Omit<BloubAvatarProps, "agentId"> & AgentPhotoProps & { disconnected?: boolean; mood?: AvatarMood },
+  props: Omit<BloubAvatarProps, "agentId"> & AgentPhotoProps & AvatarPreviewOptions,
 ) {
   return (
     <AgentPhoto {...props} size={props.size ?? 54}>
@@ -79,7 +88,8 @@ const AnimatedAvatarPreview = memo(function AnimatedAvatarPreview({
   disconnected = false,
   mood = "idle",
   animateIdle = true,
-}: Omit<BloubAvatarProps, "agentId"> & { disconnected?: boolean; mood?: AvatarMood }) {
+  animatedColor,
+}: Omit<BloubAvatarProps, "agentId"> & AvatarPreviewOptions) {
   const appearance = useConnectionAppearance(disconnected);
   const colorProps = useAnimatedProps(() => ({ values: [appearance.get().saturation] }));
   const appearanceProps = useAnimatedProps(() => ({ opacity: appearance.get().opacity }));
@@ -110,7 +120,11 @@ const AnimatedAvatarPreview = memo(function AnimatedAvatarPreview({
       {/* Mobile-only feedback: keep the synced avatar profile and color untouched. */}
       <AnimatedGroup filter={`url(#${maskId}-offline)`} animatedProps={appearanceProps}>
         <AnimatedPath fill={AVATAR_PAPER} animatedProps={bodyProps} />
-        <Rect fill={color} height={316} mask={`url(#${maskId})`} width={316} x={-158} y={-158} />
+        {animatedColor ? (
+          <AnimatedBodyColor color={animatedColor} maskId={maskId} />
+        ) : (
+          <Rect fill={color} height={316} mask={`url(#${maskId})`} width={316} x={-158} y={-158} />
+        )}
         <AvatarDot frame={frame} index={0} color={color} />
         <AvatarDot frame={frame} index={1} color={color} />
         <AvatarDot frame={frame} index={2} color={color} />
@@ -118,6 +132,11 @@ const AnimatedAvatarPreview = memo(function AnimatedAvatarPreview({
     </Svg>
   );
 });
+
+function AnimatedBodyColor({ color, maskId }: { color: SharedValue<string>; maskId: string }) {
+  const props = useAnimatedProps(() => ({ fill: color.get() }));
+  return <AnimatedRect animatedProps={props} height={316} mask={`url(#${maskId})`} width={316} x={-158} y={-158} />;
+}
 
 // Choices show the same idle pose without mounting animation clocks, worklets,
 // filters, or masks for every item in the picker.
@@ -137,7 +156,12 @@ export const AvatarThumbnail = memo(function AvatarThumbnail({
   hue,
   size = 48,
   disconnected = false,
-}: Omit<BloubAvatarProps, "agentId"> & { disconnected?: boolean }) {
+  animateColor = false,
+}: Omit<BloubAvatarProps, "agentId"> & {
+  disconnected?: boolean;
+  /** Eases the body to a new colour, for a picker where the colour changes in place. */
+  animateColor?: boolean;
+}) {
   const frame = useMemo(() => {
     const geometry = bloubActivityGeometry(seed);
     return new BotEngine(100, "idle", geometry.radii, geometry.expression).sample(0);
@@ -152,11 +176,19 @@ export const AvatarThumbnail = memo(function AvatarThumbnail({
       viewBox="-158 -158 316 316"
       width={size}
     >
-      <Path
-        d={frame.bodyPath}
-        fill={thumbnailColor(getBloubAvatarColor(seed, hue), disconnected)}
-        opacity={frame.bodyAlpha}
-      />
+      {animateColor ? (
+        <AnimatedThumbnailBody
+          d={frame.bodyPath}
+          color={thumbnailColor(getBloubAvatarColor(seed, hue), disconnected)}
+          opacity={frame.bodyAlpha}
+        />
+      ) : (
+        <Path
+          d={frame.bodyPath}
+          fill={thumbnailColor(getBloubAvatarColor(seed, hue), disconnected)}
+          opacity={frame.bodyAlpha}
+        />
+      )}
       {(["left", "right"] as const).map((side) => {
         const eye = frame.eyes[side === "left" ? 0 : 1];
         return eye ? (
@@ -166,6 +198,12 @@ export const AvatarThumbnail = memo(function AvatarThumbnail({
     </Svg>
   );
 });
+
+function AnimatedThumbnailBody({ d, color, opacity }: { d: string; color: string; opacity: number }) {
+  const animated = useAgentColorTransition(color);
+  const props = useAnimatedProps(() => ({ fill: animated.get() }));
+  return <AnimatedPath d={d} opacity={opacity} animatedProps={props} />;
+}
 
 export function thumbnailColor(color: string, disconnected: boolean) {
   if (!disconnected) return color;
