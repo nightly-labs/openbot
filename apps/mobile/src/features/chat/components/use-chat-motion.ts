@@ -10,12 +10,12 @@ import {
   useAnimatedRef,
   useAnimatedStyle,
   useDerivedValue,
-  useReducedMotion,
   useSharedValue,
   withSpring,
   withTiming,
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
+import { useReducedMotion } from "@/shared/lib/motion";
 import {
   type ChatLayout,
   chatBlankSpace,

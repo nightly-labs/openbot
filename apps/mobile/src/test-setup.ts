@@ -15,3 +15,14 @@ vi.mock("@/shared/lib/text", async () => {
   const english = textFor("en");
   return { currentText: () => english, useText: () => english };
 });
+
+// Native alerts keep their behavior; telemetry is disabled in UI tests.
+vi.mock("@/features/analytics/failure-reports", async () => {
+  const { Alert } = await import("react-native");
+  return {
+    reportMobileNotification: () => {},
+    showWarningAlert: (_operation: string, ...args: Parameters<typeof Alert.alert>) => Alert.alert(...args),
+    showFailureAlert: (_error: unknown, _operation: string, ...args: Parameters<typeof Alert.alert>) =>
+      Alert.alert(...args),
+  };
+});

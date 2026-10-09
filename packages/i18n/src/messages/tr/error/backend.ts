@@ -14,6 +14,7 @@ export const messages = {
   "error.backend.sunshinePortsUnavailable": "Uzak Masaüstü için boş bir Sunshine bağlantı noktası ailesi ayrılamadı.",
   "error.backend.moonlightPortsUnavailable":
     "Uzak Masaüstü için boş bir Moonlight WebRTC bağlantı noktası aralığı ayrılamadı.",
+  "error.backend.iceServerNoPort": "Uzak Masaüstü ICE sunucusu bir bağlantı noktası almadı.",
   "error.backend.remoteDesktopStoppedWhileStarting": "Uzak masaüstü çalışma zamanı başlatılırken durduruldu.",
   "error.backend.sunshineNotStarted": "Sunshine ayrılmış bir bağlantı noktası ailesinde başlamadı.",
   "error.backend.moonlightNoHost": "Moonlight eşleştirilmiş yerel bir ana makineye sahip değil.",
@@ -142,6 +143,25 @@ export const messages = {
   "error.backend.mcpSignInAbandoned": "MCP oturum açma işlemi iptal edildi.",
   "error.backend.mcpSignInNoBrowser": "Bu MCP oturum açma işlemi bir tarayıcı açamaz.",
   "error.backend.mcpSignInNotWebPage": "Oturum açma adresi bir web sayfası değil.",
+  "error.backend.mcpSignInRequired":
+    "Bu sunucu oturum açmanızı istiyor. Tarayıcınızda devam etmek için Oturum aç'ı seçin.",
+  "error.backend.mcpSignInOnHost": "Bu sunucu oturum açılmasını istiyor. Ana bilgisayardaki OpenBot'ta oturum açın.",
+  "error.backend.mcpSignInNeedsHttps":
+    "Bu sunucu oturum açılmasını istiyor ve OpenBot yalnızca https üzerinden oturum açar. URL'yi {url} olarak değiştirin.",
+  "error.backend.mcpSignInCancelled": "Oturum açma iptal edildi.",
+  "error.backend.mcpSignInTimedOut": "Oturum açma tarayıcıda tamamlanmadı.",
+  "error.backend.mcpSignInResponseTimedOut": "Oturum açma yanıtı zamanında gelmedi.",
+  "error.backend.mcpServerExited":
+    "Sunucu yanıt vermeden durdu. Hatasını görmek için komutu bir terminalde çalıştırın.",
+  "error.backend.mcpServerUnreachable": "OpenBot sunucuya ulaşamadı. URL'yi ve ağınızı kontrol edin.",
+  "error.backend.mcpLocalServerOff":
+    "Bu bilgisayarda {address} adresinde yanıt veren bir sunucu yok. Sunucuyu başlatın veya onu çalıştıran uygulamada açın, ardından tekrar deneyin.",
+  "error.backend.mcpServerBlocked":
+    "Bu bilgisayar sunucu bağlantısını engelledi. Güvenlik duvarınızı veya güvenlik yazılımınızı kontrol edin, ardından tekrar deneyin.",
+  "error.backend.mcpServerIncompatible":
+    "Bu adreste bir şey yanıt verdi, ancak Streamable HTTP üzerinden bir MCP sunucusu olarak değil. URL'yi kontrol edin ve sunucuyu çalıştıran uygulamayı güncelleyin.",
+  "error.backend.mcpRemoteBridge":
+    "{reason} Bu komut mcp-remote köprüsünü çalıştırır. Bunun yerine {url} URL'siyle Streamable HTTP'yi seçin; OpenBot oturumunuzu açar.",
   "error.backend.oauthNotHttps": "OAuth uç noktası {origin} https değil, bu nedenle kimlik bilgileri gönderilmedi.",
   "error.backend.oauthTooManyRedirects": "OAuth uç noktası çok fazla kez yönlendirdi.",
   "error.backend.oauthRedirectOrigin":
@@ -158,6 +178,9 @@ export const messages = {
   "error.backend.sharedPathNotFile": "Paylaşılan yol bir dosya değil.",
   "error.backend.workspaceFileOutside": "Çalışma alanı dosyası ajan çalışma alanının içinde olmalıdır.",
   "error.backend.workspacePathNotFile": "Çalışma alanı yolu bir dosya değil.",
+  "error.backend.workspacePathNotDirectory": "Çalışma alanı yolu bir klasör değil.",
+  "error.backend.workspacePathMissing": "{root} ajan çalışma alanında {path} konumunda hiçbir şey yok.",
+  "error.backend.workspacePathMissingForMember": "Ajan çalışma alanında {path} konumunda hiçbir şey yok.",
   "error.backend.useChannelTaskControls": "Bu atama için kanal görevi kontrollerini kullanın.",
   "error.backend.editFinished": "Bu düzenleme zaten tamamlandı.",
   "error.backend.editCancelled": "Bu düzenleme iptal edildi, bu nedenle mesaj orijinal metnini korur.",

@@ -35,6 +35,11 @@ export function DynamicIslandSurface() {
     ...DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
   });
   const [viewState, setViewState] = createSignal<DynamicIslandViewState>("compact");
+  // A failed action keeps the panel open with this message, so an Approve that did not reach the
+  // agent does not look like it worked.
+  const [actionError, setActionError] = createSignal<string>();
+  // Each action and each clear starts a new generation, so a late failure does not show on another panel.
+  let actionGeneration = 0;
   let pointerInside = false;
   let focusInside = false;
   let queuedPresentation: DynamicIslandPresentation | undefined;
@@ -50,6 +55,7 @@ export function DynamicIslandSurface() {
   }
 
   function commitPresentation(next: DynamicIslandPresentation): void {
+    if (presentationIdentity(next) !== presentationIdentity(presentation())) clearActionError();
     setPresentation(next);
     if (next.mode === "idle") {
       setViewState("compact");
@@ -68,6 +74,7 @@ export function DynamicIslandSurface() {
   function changeViewState(next: DynamicIslandViewState, reason: DynamicIslandStateChangeReason): void {
     if (reason === "pointer" || reason === "keyboard" || reason === "escape") performHaptic();
     setViewState(next);
+    if (next === "compact") clearActionError();
     if (next === "compact" && !pointerInside && !focusInside) applyQueuedPresentation();
   }
 
@@ -126,11 +133,18 @@ export function DynamicIslandSurface() {
     endFocusInteraction();
   }
 
+  function clearActionError(): number {
+    setActionError(undefined);
+    return ++actionGeneration;
+  }
+
   async function perform(action: DynamicIslandAction): Promise<void> {
     performHaptic();
+    const generation = clearActionError();
     try {
       await dynamicIslandPort().dynamicIsland.performAction(action);
     } catch {
+      if (generation === actionGeneration) setActionError(t("island.action.failed"));
       return;
     }
     pointerInside = false;
@@ -162,6 +176,7 @@ export function DynamicIslandSurface() {
       pointerInside = false;
       focusInside = false;
       setViewState("compact");
+      clearActionError();
       applyQueuedPresentation();
       void dynamicIslandPort().dynamicIsland.setInteractive({ interactive: false });
     };
@@ -197,6 +212,7 @@ export function DynamicIslandSurface() {
             extendedHoverArea
             onStateChange={changeViewState}
             onAction={perform}
+            actionError={actionError()}
             onHaptic={performHaptic}
           />
         </fieldset>

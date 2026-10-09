@@ -85,7 +85,17 @@ export class ThreadReplay {
       const snapshot = conversationSnapshotValue(objectValue(record?.snapshot));
       const appendedMessage = currentConversationMessage(record?.appendedMessage);
       const streamedMessage = currentConversationMessage(record?.streamedMessage);
+      const importedMessage = currentConversationMessage(record?.importedMessage);
+      const changedMessages = Array.isArray(record?.changedMessages)
+        ? record.changedMessages
+            .map(currentConversationMessage)
+            .filter((message): message is ConversationMessage => message !== null)
+        : [];
+      const removedMessageIds = Array.isArray(record?.removedMessageIds)
+        ? record.removedMessageIds.filter(isString)
+        : [];
       const appendedActiveTurnId = record?.activeTurnId;
+      const hasActiveTurnChange = record !== null && "activeTurnId" in record;
       if (snapshot) {
         latest = snapshot;
         latestSequence = event.sequence;
@@ -108,9 +118,42 @@ export class ThreadReplay {
           latest.activeTurnId = appendedActiveTurnId;
         }
         latestSequence = event.sequence;
-      } else if (latest && appendedMessage) {
-        if (!latest.messages.some((message) => message.id === appendedMessage.id)) {
-          latest.messages.push(structuredClone(appendedMessage));
+      } else if (appendedMessage || importedMessage) {
+        latest ??= {
+          agentId: thread.agent_id,
+          threadId,
+          activeTurnId: null,
+          revision: 0,
+          messages: [],
+        };
+        const message = appendedMessage ?? importedMessage;
+        if (!message) continue;
+        const index = latest.messages.findIndex((current) => current.id === message.id);
+        const previousMessage = latest.messages[index];
+        if (previousMessage && importedMessage) latest.messages[index] = mergeReplayedMessage(previousMessage, message);
+        else if (index < 0) latest.messages.push(structuredClone(message));
+        if (isString(appendedActiveTurnId) || appendedActiveTurnId === null) {
+          latest.activeTurnId = appendedActiveTurnId;
+        }
+        latestSequence = event.sequence;
+      } else if (changedMessages.length > 0 || removedMessageIds.length > 0 || hasActiveTurnChange) {
+        latest ??= {
+          agentId: thread.agent_id,
+          threadId,
+          activeTurnId: null,
+          revision: 0,
+          messages: [],
+        };
+        const changedById = new Map(changedMessages.map((message) => [message.id, message]));
+        latest.messages = latest.messages
+          .filter((message) => !removedMessageIds.includes(message.id))
+          .map((message) => {
+            const changed = changedById.get(message.id);
+            return changed ? mergeReplayedLiveMessage(message, changed) : message;
+          });
+        for (const message of changedMessages) {
+          if (!latest.messages.some((current) => current.id === message.id))
+            latest.messages.push(structuredClone(message));
         }
         if (isString(appendedActiveTurnId) || appendedActiveTurnId === null) {
           latest.activeTurnId = appendedActiveTurnId;
@@ -244,7 +287,10 @@ export class ThreadReplay {
         const eventRecord = objectValue(eventPayload);
         const activityPayload =
           conversationSnapshotValue(objectValue(eventRecord?.snapshot)) ||
-          currentConversationMessage(eventRecord?.appendedMessage)
+          currentConversationMessage(eventRecord?.appendedMessage) ||
+          currentConversationMessage(eventRecord?.importedMessage) ||
+          Array.isArray(eventRecord?.changedMessages) ||
+          Array.isArray(eventRecord?.removedMessageIds)
             ? (eventRecord?.detail ?? {})
             : eventPayload;
         activityInsert.run(
@@ -359,4 +405,46 @@ function turnProviderSessionIdsValue(value: unknown): Array<[string, string | nu
     if (sessionId === null || isString(sessionId)) result.push([turnId, sessionId]);
   }
   return result;
+}
+
+function mergeReplayedMessage(existing: ConversationMessage, imported: ConversationMessage): ConversationMessage {
+  const attachments = mergeReplayValues(existing.attachments, imported.attachments, (value) => value.id);
+  const reactions = mergeReplayValues(existing.reactions, imported.reactions, (value) => JSON.stringify(value));
+  const turnId = existing.turnId ?? imported.turnId;
+  return {
+    ...existing,
+    ...imported,
+    id: existing.id,
+    author: existing.author,
+    createdAt: existing.createdAt,
+    ...(turnId === undefined ? {} : { turnId }),
+    ...(attachments === undefined ? {} : { attachments }),
+    ...(reactions === undefined ? {} : { reactions }),
+    ...(imported.delivery === undefined && existing.delivery ? { delivery: existing.delivery } : {}),
+    ...(imported.exchange === undefined && existing.exchange ? { exchange: existing.exchange } : {}),
+    ...(imported.senderMember === undefined && existing.senderMember ? { senderMember: existing.senderMember } : {}),
+  };
+}
+
+function mergeReplayedLiveMessage(existing: ConversationMessage, updated: ConversationMessage): ConversationMessage {
+  const turnId = updated.turnId ?? existing.turnId;
+  return {
+    ...existing,
+    ...updated,
+    id: existing.id,
+    author: existing.author,
+    createdAt: existing.createdAt,
+    ...(turnId === undefined ? {} : { turnId }),
+  };
+}
+
+function mergeReplayValues<T>(
+  existing: T[] | undefined,
+  imported: T[] | undefined,
+  key: (value: T) => string,
+): T[] | undefined {
+  if (existing === undefined && imported === undefined) return undefined;
+  const values = new Map((existing ?? []).map((value) => [key(value), value]));
+  for (const value of imported ?? []) values.set(key(value), value);
+  return [...values.values()];
 }

@@ -1,4 +1,10 @@
-import { type AttachmentSummary, type BrowserBounds, canPreviewAttachment } from "@openbot/contracts/ipc";
+import {
+  type AttachmentSummary,
+  type BrowserBounds,
+  canPreviewAttachment,
+  type FileAction,
+  type WorkspaceDirectory,
+} from "@openbot/contracts/ipc";
 import { currentText } from "@openbot/ui/text";
 import { createMemo, createSignal } from "solid-js";
 import { attachmentFilePreview } from "../attachment-preview";
@@ -133,19 +139,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     }
   }
 
-  async function downloadAttachments(attachments: AttachmentSummary[]) {
-    const agentId = deps.props.agent?.id;
-    const target = agentId ? { agentId, serverId: deps.props.server?.id ?? "local" } : undefined;
-    try {
-      await conversationRuntime(deps.props).agent.downloadAttachments({
-        attachments: attachments.map(({ id, name }) => ({ id, name })),
-      });
-    } catch (error) {
-      deps.setComposerError(errorMessage(error, t("attachment.error.download")), target);
-    }
-  }
-
-  function attachmentAction(attachment: AttachmentSummary, action: "open" | "reveal" | "download") {
+  function attachmentAction(attachment: AttachmentSummary, action: FileAction) {
     // A runtime has no app to open a file in, so a file it can preview opens in the panel.
     if (action === "open" && deps.props.runtime && canPreviewAttachment(attachment)) {
       void previewAttachment(attachment);
@@ -180,20 +174,51 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
       );
   }
 
-  function openWorkspaceFile(path: string) {
+  /**
+   * A chip can name a folder as well as a file. When the file preview fails, the folder listing is
+   * tried; when that fails too, the preview error stays, because it names the path the agent wrote.
+   */
+  function openWorkspaceFile(path: string, folder?: string) {
     const agentId = deps.props.agent?.id;
     if (!agentId) return;
     const serverId = deps.props.server?.id ?? "local";
     const target = { agentId, serverId };
     const generation = deps.nextFilePreviewGeneration();
+    const current = () => generation === deps.currentFilePreviewGeneration() && deps.props.agent?.id === agentId;
+    const agent = conversationRuntime(deps.props).agent;
+    deps.setComposerError(null, target);
+    void agent.previewWorkspaceFile({ agentId, path }).then(
+      (preview) => {
+        if (!current()) return;
+        deps.setSidebarFilePreview({ ownerAgentId: agentId, source: { kind: "workspace", path, folder }, preview });
+        setActiveRightPanel("file-preview", agentId);
+      },
+      (error) =>
+        agent.listWorkspaceDirectory({ agentId, path }).then(
+          (directory) => {
+            if (!current()) return;
+            showWorkspaceFolder(agentId, path, directory);
+          },
+          () => {
+            if (generation !== deps.currentFilePreviewGeneration()) return;
+            deps.setComposerError(filePreviewError(error, path), target);
+          },
+        ),
+    );
+  }
+
+  function openWorkspaceFolder(path: string) {
+    const agentId = deps.props.agent?.id;
+    if (!agentId) return;
+    const target = { agentId, serverId: deps.props.server?.id ?? "local" };
+    const generation = deps.nextFilePreviewGeneration();
     deps.setComposerError(null, target);
     void conversationRuntime(deps.props)
-      .agent.previewWorkspaceFile({ agentId, path })
+      .agent.listWorkspaceDirectory({ agentId, path })
       .then(
-        (preview) => {
+        (directory) => {
           if (generation !== deps.currentFilePreviewGeneration() || deps.props.agent?.id !== agentId) return;
-          deps.setSidebarFilePreview({ ownerAgentId: agentId, source: { kind: "workspace", path }, preview });
-          setActiveRightPanel("file-preview", agentId);
+          showWorkspaceFolder(agentId, path, directory);
         },
         (error) => {
           if (generation !== deps.currentFilePreviewGeneration()) return;
@@ -202,30 +227,63 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
       );
   }
 
-  function openSidebarFileExternally() {
+  function showWorkspaceFolder(agentId: string, path: string, directory: WorkspaceDirectory) {
+    deps.setSidebarFilePreview({
+      ownerAgentId: agentId,
+      source: { kind: "workspace-folder", path },
+      preview: null,
+      directory,
+    });
+    setActiveRightPanel("file-preview", agentId);
+  }
+
+  /** Opens a file of the folder view, so that the panel can go back to the folder. */
+  function openWorkspaceFolderEntry(path: string) {
     const file = deps.sidebarFilePreview();
-    if (!file) return;
-    const target = { agentId: file.ownerAgentId, serverId: deps.props.server?.id ?? "local" };
-    const source = file.source;
-    const request =
-      source.kind === "attachment"
-        ? conversationRuntime(deps.props).agent.openAttachment({ attachmentId: source.attachment.id, action: "open" })
-        : source.kind === "shared"
-          ? conversationRuntime(deps.props).agent.openSharedFile({ path: source.path })
-          : conversationRuntime(deps.props).agent.openWorkspaceFile({ agentId: file.ownerAgentId, path: source.path });
-    void request.catch((error) => deps.setComposerError(errorMessage(error, t("attachment.error.openFile")), target));
+    openWorkspaceFile(path, file?.directory?.path);
+  }
+
+  /** Back to the folder a file came from, or up one folder. Absent when there is nowhere to go. */
+  function sidebarFileBack(): string | null {
+    const file = deps.sidebarFilePreview();
+    if (file?.directory) return file.directory.parentPath;
+    return file?.source.kind === "workspace" ? (file.source.folder ?? null) : null;
+  }
+
+  function openSidebarFileBack() {
+    const path = sidebarFileBack();
+    if (path !== null) openWorkspaceFolder(path);
+  }
+
+  function openSidebarFileExternally() {
+    sidebarFileAction("open");
   }
 
   function downloadSidebarFile() {
-    const source = deps.sidebarFilePreview()?.source;
-    if (source?.kind !== "attachment") return;
-    attachmentAction(source.attachment, "download");
+    sidebarFileAction("download");
   }
 
   function revealSidebarFile() {
-    const source = deps.sidebarFilePreview()?.source;
-    if (source?.kind !== "attachment") return;
-    attachmentAction(source.attachment, "reveal");
+    sidebarFileAction("reveal");
+  }
+
+  function sidebarFileAction(action: FileAction) {
+    const file = deps.sidebarFilePreview();
+    if (!file) return;
+    const source = file.source;
+    if (source.kind === "attachment") {
+      attachmentAction(source.attachment, action);
+      return;
+    }
+    if (source.kind === "workspace-folder") return;
+    const target = { agentId: file.ownerAgentId, serverId: deps.props.server?.id ?? "local" };
+    const agent = conversationRuntime(deps.props).agent;
+    const request =
+      source.kind === "shared"
+        ? agent.openSharedFile({ path: source.path, action })
+        : agent.openWorkspaceFile({ agentId: file.ownerAgentId, path: source.path, action });
+    const fallback = action === "download" ? t("attachment.error.download") : t("attachment.error.openFile");
+    void request.catch((error) => deps.setComposerError(errorMessage(error, fallback), target));
   }
 
   function closeSidebarFilePreview() {
@@ -254,9 +312,12 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     hideBrowserPanel,
     previewAttachment,
     attachmentAction,
-    downloadAttachments,
     openSharedFile,
     openWorkspaceFile,
+    openWorkspaceFolder,
+    openWorkspaceFolderEntry,
+    sidebarFileBack,
+    openSidebarFileBack,
     openSidebarFileExternally,
     downloadSidebarFile,
     revealSidebarFile,

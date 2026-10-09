@@ -154,6 +154,73 @@ export const messages = {
   "connector.slack.keep": "Bağlı tut",
   "connector.slack.close": "Kapat",
 
+  // Sunucu ayarları > Bağlayıcılar > Discord: bir Discord sunucusu tek OpenBot botunu ekler ve Discord
+  // Düzenleyicisi ajanı her isteği alır, ekibe sorar ve yanıtlar. Her zaman "Discord sunucusu" yazın.
+  "connector.discord.title": "Discord",
+  "connector.discord.description":
+    "Kullanıcılar bir Discord sunucusunun kanalında @OpenBot'tan bahseder. Discord Düzenleyicisi doğru ajana sorar ve yanıtlar.",
+  "connector.discord.statusNotSetUp": "Ayarlanmadı",
+  "connector.discord.statusConnected": "Bağlandı",
+  "connector.discord.statusAttention": "İlgilenilmesi gerekiyor",
+  // {workspace} Discord sunucusunun adıdır.
+  "connector.discord.summaryConnected": "{workspace} · Discord Düzenleyicisi yanıtlıyor",
+  "connector.discord.summaryNoAgent": "{workspace} · Henüz yanıt veren bir ajan yok",
+  "connector.discord.attentionTitle": {
+    one: "{count} Discord sunucusunun ilgilenilmesi gerekiyor",
+    other: "{count} Discord sunucusunun ilgilenilmesi gerekiyor",
+  },
+  "connector.discord.attentionDescription": "Aşağıdaki durum ne yapılması gerektiğini belirtir.",
+  "connector.discord.connect": "Discord'a Bağlan",
+  "connector.discord.addAgent": "Ajan ekle",
+  "connector.discord.actionFailed": "Discord değişikliği kabul etmedi",
+  "connector.discord.workspaceTitle": "Discord sunucusu",
+  "connector.discord.workspaceDescription":
+    "Bir kanalda @OpenBot'tan bahsedin. Devam etmek için OpenBot'a yanıt verin.",
+  "connector.discord.disconnectWorkspace": "Bağlantıyı Kes",
+  "connector.discord.missingScopes":
+    "OpenBot Discord'da şu izinlere sahip değil: {scopes}. Discord sunucusu bağlantısını kesin, ardından tekrar bağlayın.",
+  "connector.discord.retryAt": "Discord OpenBot'tan beklemesini istedi. {time} saatinde tekrar deneyecek.",
+  "connector.discord.reconnect": "Yeniden Bağlan",
+  "connector.discord.resume": "Sürdür",
+  // {action} Pause gibi bir düğmedir; {name} Discord sunucusunun adıdır.
+  "connector.discord.rowAction": "{action}: {name}",
+  "connector.discord.orchestratorTitle": "Discord Düzenleyicisi",
+  "connector.discord.orchestratorDescription":
+    "Bu ajan Discord'dan gelen her isteği alır. Kısa olanları kendisi yanıtlar, diğer işleri doğru ajana iletir ve yanıtı kanalda verir.",
+  "connector.discord.orchestratorNone": "Henüz yanıt veren bir ajan yok",
+  "connector.discord.orchestratorNoneDescription":
+    "Discord Düzenleyicisini ekleyin, aksi takdirde Discord yanıt alamaz.",
+  "connector.discord.channelsNote": "OpenBot, rolünün görebildiği kanalları görür.",
+  // Bağlanma iletişim kutusu. Adımlar sayı olarak gösterilir; ekran okuyucular adları okur.
+  "connector.discord.stepWorkspace": "Discord sunucusu",
+  "connector.discord.stepAgent": "Ajan",
+  "connector.discord.connectTitle": "Bir Discord sunucusuna bağlanın",
+  "connector.discord.connectDescription": "OpenBot, Discord sunucusuna OpenBot adında bir bot ekler.",
+  "connector.discord.connectStepBrowser": "Discord tarayıcınızda açılır",
+  "connector.discord.connectStepAllow": "Sunucuyu seçin, ardından Yetkilendir'e tıklayın",
+  "connector.discord.connectStepReturn": "Discord işlemi tamamlandığında bu iletişim kutusu devam eder",
+  "connector.discord.connectInDiscord": "Discord'da Bağlan",
+  "connector.discord.connectWaiting": "Discord bekleniyor. Yetkilendirmeyi tarayıcınızda tamamlayın.",
+  "connector.discord.agentStepTitle": "Discord Düzenleyicisini ekleyin",
+  // {workspace} Discord sunucusunun adıdır.
+  "connector.discord.agentStepDescription": "Bu yeni ajan, {workspace} içinde @OpenBot'a gönderilen her şeyi yanıtlar.",
+  "connector.discord.orchestratorName": "Discord Düzenleyicisi",
+  "connector.discord.orchestratorRole": "Discord'da yanıt verir ve ekibe sorar",
+  "connector.discord.orchestratorDoesReceive": "Her Discord isteğini ilk olarak alır",
+  "connector.discord.orchestratorDoesDelegate": "Her görevi en uygun ajana iletir",
+  "connector.discord.orchestratorDoesAnswer": "Yanıtı Discord kanalında verir",
+  "connector.discord.orchestratorModel": "Model",
+  "connector.discord.doneTitle": "OpenBot {workspace} içinde",
+  "connector.discord.doneDescription": "Bir kanalda @OpenBot'tan bahsedin. Devam etmek için OpenBot'a yanıt verin.",
+  "connector.discord.done": "Bitti",
+  "connector.discord.disconnectTitle": "{workspace} bağlantısı kesilsin mi?",
+  "connector.discord.disconnectDescription":
+    "OpenBot {workspace} içinde yanıt vermeyi bırakır ve Discord bağlantısını bu bilgisayardan kaldırır.",
+  "connector.discord.disconnectEffect":
+    "{workspace} içindeki kişiler artık @OpenBot aracılığıyla ajanlarınıza ulaşamaz.",
+  "connector.discord.removeEffectKept": "Konuşmalar ve Discord Düzenleyicisi OpenBot'ta kalır.",
+  "connector.discord.keep": "Bağlı tut",
+  "connector.discord.close": "Kapat",
   // Sunucu ayarları > Bağlayıcılar > Telegram: her sohbet tek OpenBot botunu ekler ve Telegram
   // Düzenleyicisi ajanı tüm sohbetlerin mesajlarını alır, ekibe sorar ve yanıtlar.
   "connector.telegram.title": "Telegram",

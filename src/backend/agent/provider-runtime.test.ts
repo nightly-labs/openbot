@@ -13,6 +13,7 @@ import {
   createTestService,
   createUpdatableFakeClaude,
   FakeAgentClient,
+  fakeBrowser,
   fakeClaudeCli,
   fakeCodexCli,
   fakeGrokCli,
@@ -708,7 +709,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
         id: "codex",
         state: "sign-in-required",
         connectionState: "connecting",
-        version: "0.144.1",
+        version: "0.156.0",
       }),
     );
     expect(openExternal).toHaveBeenCalledWith("https://auth.openai.test/connect");
@@ -1688,6 +1689,109 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     expect(service.listAgents().find((agent) => agent.id === "chief")?.provider).toBe("grok");
   });
 
+  it.each(["open", "navigate", "click"])(
+    "cancels a pending browser %s without a late reply or provider failure",
+    async (tool) => {
+      const { store, mailbox } = stores(root);
+      const client = new FakeAgentClient("codex", "", false);
+      const browser = fakeBrowser();
+      let started = false;
+      let stopped = false;
+      browser.handleDynamicTool = () =>
+        Effect.gen(function* () {
+          started = true;
+          return yield* Effect.never;
+        }).pipe(
+          Effect.ensuring(
+            Effect.sync(() => {
+              stopped = true;
+            }),
+          ),
+        );
+      const endControl = vi.spyOn(browser, "endControl");
+      service = createTestService({ store, mailbox, browser, preferredProvider: "codex", clientFactory: () => client });
+      const running = service;
+      const events: AgentEvent[] = [];
+      service.on("event", (event) => events.push(event));
+      await runCauseEffect(service.initialize());
+      await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Open the browser." }));
+      await waitFor(async () => Boolean((await runCauseEffect(running.readConversation("chief"))).activeTurnId));
+      const turnId = (await runCauseEffect(service.readConversation("chief"))).activeTurnId;
+      const threadId = store.activeProviderSession("chief")?.externalSessionId;
+      if (!threadId || !turnId) throw new Error("The browser turn did not start.");
+      const alreadyCancelled = new AbortController();
+      alreadyCancelled.abort();
+      client.emit("request", {
+        id: "already-cancelled-browser",
+        method: "item/tool/call",
+        signal: alreadyCancelled.signal,
+        params: {
+          namespace: "openbot_browser",
+          tool,
+          arguments: {},
+          threadId,
+          turnId,
+          callId: "already-cancelled-browser",
+        },
+      });
+      expect(started).toBe(false);
+      const controller = new AbortController();
+      client.emit("request", {
+        id: "cancel-browser",
+        method: "item/tool/call",
+        signal: controller.signal,
+        params: { namespace: "openbot_browser", tool, arguments: {}, threadId, turnId, callId: "cancel-browser" },
+      });
+      await waitFor(() => started);
+      controller.abort();
+      await waitFor(() => stopped && endControl.mock.calls.length > 0);
+      client.emit("notification", {
+        method: "turn/completed",
+        params: { threadId, turn: { id: turnId, status: "interrupted" } },
+      });
+      await waitFor(async () => (await runCauseEffect(running.readConversation("chief"))).activeTurnId === null);
+      expect(client.responses.some((response) => response.id === "cancel-browser")).toBe(false);
+      expect(client.errors).toEqual([]);
+      expect(events.filter((event) => event.type === "error")).toEqual([]);
+      browser.handleDynamicTool = () => Effect.succeed({ success: true, contentItems: [] });
+      client.emit("request", {
+        id: "retry-browser",
+        method: "item/tool/call",
+        signal: new AbortController().signal,
+        params: {
+          namespace: "openbot_browser",
+          tool,
+          arguments: {},
+          threadId,
+          turnId: "next-turn",
+          callId: "retry-browser",
+        },
+      });
+      await waitFor(() => client.responses.some((response) => response.id === "retry-browser"));
+      expect(client.responses.find((response) => response.id === "retry-browser")?.result).toEqual({
+        success: true,
+        contentItems: [],
+      });
+    },
+  );
+
+  it("keeps cancelled Codex tool diagnostics out of provider errors but reports unexpected failures", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex");
+    service = createTestService({ store, mailbox, preferredProvider: "codex", clientFactory: () => client });
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    await runCauseEffect(service.initialize());
+    client.emit(
+      "diagnostic",
+      "ERROR codex_core:🛠️:router: error=dynamic tool call was cancelled before receiving a response",
+    );
+    client.emit("diagnostic", "ERROR codex_core:🛠️:router: error=dynamic tool call failed unexpectedly");
+    expect(events.filter((event) => event.type === "error")).toEqual([
+      expect.objectContaining({ message: "ERROR codex_core:🛠️:router: error=dynamic tool call failed unexpectedly" }),
+    ]);
+  });
+
   it("keeps Codex's background refresh failures out of the provider error toast", async () => {
     const { store, mailbox } = stores(root);
     const clients = new Map<AgentProvider, FakeAgentClient>();
@@ -1724,7 +1828,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     ]);
   });
 
-  it("keeps Grok's failed tool call out of the provider error toast", async () => {
+  it("keeps failed tool calls out of the provider error toast", async () => {
     process.env.OPENBOT_GROK_PATH = await fakeGrokCli();
     const { store, mailbox } = stores(root);
     const clients = new Map<AgentProvider, FakeAgentClient>();
@@ -1752,10 +1856,40 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
       "diagnostic",
       "tool_error: tool_output_error tool_name='use_tool' effective_tool_name='openbot_browser__click' model_id='grok-4.7' error_kind='tool_output_error'",
     );
+    // The Antigravity harness reports a failed MCP call with an inner error record.
+    client.emit(
+      "diagnostic",
+      "I1007 18:11:18.606862 9452 local_connection.py:579] harness stderr: ERROR: logging before google.Init: E1007 18:11:18.606862 917 errorreport.go:224] error executing cascade step: CORTEX_STEP_TYPE_MCP_TOOL: Error: No node found at given location",
+    );
+    // The other forms from #1524: the tool's error after the MCP method, and the harness's call timeout.
+    client.emit(
+      "diagnostic",
+      'I1007 19:48:10.078135 9984 local_connection.py:579] harness stderr: ERROR: logging before google.Init: E1007 19:48:10.078135 947 errorreport.go:224] error executing cascade step: CORTEX_STEP_TYPE_MCP_TOOL: calling "tools/call": Error: Memory text is required.',
+    );
+    client.emit(
+      "diagnostic",
+      'I1007 19:46:31.115287 9984 local_connection.py:579] harness stderr: ERROR: logging before google.Init: E1007 19:46:31.015978 629 errorreport.go:224] error executing cascade step: CORTEX_STEP_TYPE_MCP_TOOL: MCP tool call to server "openbot_browser" timed out after 3m0s: context deadline exceeded',
+    );
+    client.emit(
+      "diagnostic",
+      "E1007 18:11:18.606862 917 errorreport.go:224] error executing cascade step: CORTEX_STEP_TYPE_MODEL: Error: model request failed",
+    );
+    client.emit(
+      "diagnostic",
+      'E1007 18:11:18.606862 917 errorreport.go:224] error executing cascade step: CORTEX_STEP_TYPE_MCP_TOOL: failed to connect to server "openbot_browser": connection refused',
+    );
     client.emit("diagnostic", "ERROR grok: the model endpoint could not be reached");
 
-    await waitFor(() => events.some((event) => event.type === "error"));
+    await waitFor(() => events.filter((event) => event.type === "error").length >= 3);
     expect(events.filter((event) => event.type === "error")).toEqual([
+      expect.objectContaining({
+        message:
+          "E1007 18:11:18.606862 917 errorreport.go:224] error executing cascade step: CORTEX_STEP_TYPE_MODEL: Error: model request failed",
+      }),
+      expect.objectContaining({
+        message:
+          'E1007 18:11:18.606862 917 errorreport.go:224] error executing cascade step: CORTEX_STEP_TYPE_MCP_TOOL: failed to connect to server "openbot_browser": connection refused',
+      }),
       expect.objectContaining({ message: "ERROR grok: the model endpoint could not be reached" }),
     ]);
   });
@@ -1962,7 +2096,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     ).rejects.toThrow(/working on a turn/u);
 
     expect(service.getStatus().providers).toContainEqual(
-      expect.objectContaining({ id: "codex", state: "available", version: "0.144.1" }),
+      expect.objectContaining({ id: "codex", state: "available", version: "0.156.0" }),
     );
   });
 

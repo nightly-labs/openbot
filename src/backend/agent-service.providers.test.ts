@@ -501,6 +501,8 @@ describe.sequential("AgentService: providers", () => {
         mcpOAuth: {
           accessToken: (url) => Effect.succeed(url === "https://mcp.example.com/mcp" ? token : null),
           signIn: () => null,
+          cancelSignIn: () => false,
+          signedIn: () => false,
           forget: () => Effect.void,
         },
       },
@@ -745,6 +747,8 @@ describe.sequential("AgentService: providers", () => {
         mcpOAuth: {
           accessToken: () => Effect.succeed(null),
           signIn: () => null,
+          cancelSignIn: () => false,
+          signedIn: () => false,
           forget,
         },
       },
@@ -854,6 +858,18 @@ describe.sequential("AgentService: providers", () => {
   it("hands the provider the Computer Use entry while the driver runs, and nothing when it stops", async () => {
     const { store, mailbox } = stores(root);
     const client = new FakeAgentClient("codex", "CODEX_DONE", true, true);
+    const tools = { set_value: { approval_mode: "approve" } };
+    const savedServers = { computer_use: { command: "/old/cua-driver", enabled: false, tools } };
+    client.configRead = {
+      config: { mcp_servers: savedServers },
+      layers: [
+        {
+          name: { type: "user", file: "/test/.codex/config.toml", profile: null },
+          version: "saved-version",
+          config: { mcp_servers: savedServers },
+        },
+      ],
+    };
     let driverRunning = true;
     service = createTestService({
       store,
@@ -889,6 +905,8 @@ describe.sequential("AgentService: providers", () => {
       tools: CODEX_TOOLS,
       mcp_servers: {
         [COMPUTER_USE_MCP_SERVER_NAME]: {
+          enabled: true,
+          tools,
           command: "/opt/cua/bin/cua-driver",
           args: ["mcp", "--socket", "/tmp/openbot-test.sock"],
           env: await launchEnvironment({ CUA_DRIVER_EMBEDDED: "1" }),
@@ -904,11 +922,42 @@ describe.sequential("AgentService: providers", () => {
       queue.deliveries.every((delivery) => delivery.status === "completed"),
     );
     const restart = paramsRecord(client.requests.filter((request) => request.method === "thread/start")[1]?.params);
-    expect(restart?.config).toEqual({ tools: CODEX_TOOLS });
+    expect(restart?.config).toEqual({
+      tools: CODEX_TOOLS,
+      mcp_servers: { computer_use: { enabled: false, tools } },
+    });
     expect(restart?.developerInstructions).toContain("The user turned Computer Use off for you.");
+
+    await runCauseEffect(service.updateAgent({ agentId: "chief", computerUse: true }));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Use Computer Use again." }));
+    await waitForQueue(service, "chief", (queue) =>
+      queue.deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    const enabled = client.requests.filter((request) => request.method === "thread/start").at(-1);
+    expect(paramsRecord(enabled?.params)?.config).toEqual(paramsRecord(start?.params)?.config);
+
+    savedServers.computer_use.tools = { set_value: { approval_mode: "prompt" } };
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Ask for approval again." }));
+    await waitForQueue(service, "chief", (queue) =>
+      queue.deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    const revoked = client.requests.filter((request) => request.method === "thread/start").at(-1);
+    expect(paramsRecord(revoked?.params)?.config).toMatchObject({
+      mcp_servers: { computer_use: { enabled: true, tools: { set_value: { approval_mode: "prompt" } } } },
+    });
 
     driverRunning = false;
     expect(service.enabledMcpServers()).toEqual([]);
+    await runCauseEffect(service.refreshAllAgentRuntimes());
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Continue without the driver." }));
+    await waitForQueue(service, "chief", (queue) =>
+      queue.deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    const unavailable = client.requests.filter((request) => request.method === "thread/start").at(-1);
+    expect(paramsRecord(unavailable?.params)?.config).toEqual({
+      tools: CODEX_TOOLS,
+      mcp_servers: { computer_use: { enabled: false, tools: savedServers.computer_use.tools } },
+    });
   });
 
   /*
@@ -2630,7 +2679,9 @@ describe.sequential("AgentService: providers", () => {
     await expect(runCauseEffect(service.resolveWorkspaceFile(agent.id, "notes:2"))).resolves.toMatchObject({
       path: await realpath(colonName),
     });
-    await expect(runCauseEffect(service.resolveWorkspaceFile(agent.id, "missing.ts:4"))).rejects.toThrow(/ENOENT/u);
+    await expect(runCauseEffect(service.resolveWorkspaceFile(agent.id, "missing.ts:4"))).rejects.toThrow(
+      /Nothing exists at missing\.ts:4 /u,
+    );
 
     const home = process.env.HOME;
     process.env.HOME = root;
@@ -2673,6 +2724,53 @@ describe.sequential("AgentService: providers", () => {
     );
     await expect(runCauseEffect(service.resolveLocalWorkspaceFile(agent.id, page))).resolves.toMatchObject({
       path: realPage,
+    });
+  });
+
+  it("keeps tool file history local and rechecks access after a permission change", async () => {
+    const started = await startService(root, { provider: "codex" });
+    service = started.service;
+    const { store, client } = started;
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Read a file" }));
+    await waitForQueue(service, "chief", (queue) =>
+      queue.deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    const threadId = store.activeProviderSession("chief")?.externalSessionId;
+    if (!threadId) throw new Error("No provider session.");
+    const path = join(root, "private-report.txt");
+    await writeFile(path, "Private report");
+    client.emit(
+      "notification",
+      notification("item/completed", {
+        threadId,
+        turnId: "file-history-turn",
+        filePaths: [path],
+        item: { id: "file-history-item", type: "toolCall", name: "Read", status: "completed" },
+      }),
+    );
+    await vi.waitFor(async () => {
+      await expect(
+        runCauseEffect(started.service.resolveLocalWorkspaceFile("chief", "private-report.txt")),
+      ).resolves.toMatchObject({
+        path: await realpath(path),
+        insideWorkspace: false,
+      });
+    });
+    await expect(runCauseEffect(service.resolveWorkspaceFile("chief", "private-report.txt"))).rejects.toThrow(
+      "Nothing exists",
+    );
+    expect(JSON.stringify(events)).not.toContain(path);
+    await runCauseEffect(store.updateAgent({ agentId: "chief", access: "workspace" }));
+    await expect(runCauseEffect(service.resolveLocalWorkspaceFile("chief", "private-report.txt"))).rejects.toThrow(
+      "Nothing exists",
+    );
+    await runCauseEffect(store.updateAgent({ agentId: "chief", access: "full" }));
+    await expect(
+      runCauseEffect(service.resolveLocalWorkspaceFile("chief", "private-report.txt")),
+    ).resolves.toMatchObject({
+      path: await realpath(path),
     });
   });
 
@@ -2765,7 +2863,7 @@ describe.sequential("AgentService: providers", () => {
         {
           id: "codex",
           state: "available",
-          version: "0.144.1",
+          version: "0.156.0",
           email: "codex@example.com",
         },
         { id: "claude", state: "error", version: null },

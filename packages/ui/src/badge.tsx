@@ -32,14 +32,11 @@ export const badgeVariants = cva("z-badge", {
   },
 });
 
-export type BadgeTone = "neutral" | "accent" | "success" | "warning" | "danger";
 export type BadgeSize = "sm" | "md";
 export type BadgeRadius = "rounded" | "pill";
 
 type BadgeProps<T extends ValidComponent = "span"> = PolymorphicProps<T, BadgeRootProps<T>> &
   VariantProps<typeof badgeVariants> & {
-    /** @deprecated Use a Zaidan `variant` instead. */
-    tone?: BadgeTone;
     /** @deprecated Zaidan badges use one compact size. */
     size?: BadgeSize;
     /** @deprecated Zaidan badges use a pill shape. */
@@ -48,10 +45,10 @@ type BadgeProps<T extends ValidComponent = "span"> = PolymorphicProps<T, BadgeRo
   } & Partial<Pick<ComponentProps<T>, "class" | "children">>;
 
 export function Badge<T extends ValidComponent = "span">(props: BadgeProps<T>): JSX.Element {
-  const others = omit(props, "class", "variant", "tone", "size", "shape", "children", "role");
+  const others = omit(props, "class", "variant", "size", "shape", "children", "role");
   // biome-ignore lint/nursery/noUnsafeTypeAssertion: Solid 2's omit cannot preserve Kobalte's generic polymorphic props.
   const rootProps = others as PolymorphicProps<T, BadgeRootProps<T>>;
-  const variant = () => props.variant ?? legacyBadgeVariant(props.tone);
+  const variant = () => props.variant ?? "secondary";
 
   return (
     <Root<T>
@@ -66,12 +63,4 @@ export function Badge<T extends ValidComponent = "span">(props: BadgeProps<T>): 
       {props.children}
     </Root>
   );
-}
-
-function legacyBadgeVariant(tone: BadgeTone | undefined): NonNullable<VariantProps<typeof badgeVariants>["variant"]> {
-  if (tone === "accent") return "primary-light";
-  if (tone === "success") return "success-light";
-  if (tone === "warning") return "warning-light";
-  if (tone === "danger") return "destructive-light";
-  return "secondary";
 }

@@ -110,8 +110,9 @@ No account API, Signal, IPC contract, or database migration changes are required
 
 ## Messaging connections
 
-The agents of a computer can answer in an external chat platform: Slack and Telegram.
-[messaging.md](../messaging.md) has the setup, the limits and how to add a platform. Every workspace
+The agents of a computer can answer in an external chat platform: Slack, Discord (see **Discord**
+below) and Telegram. [messaging.md](../messaging.md) has the setup, the limits and how to add a
+platform. Every workspace
 installs the one OpenBot Slack app (`apps/slack-app`), and the workspace is linked to the host that
 connected it. People mention @OpenBot or send it a direct message. The workspace's Slack Orchestrator,
 an agent that the connect dialog adds, receives each new conversation, asks its teammates and posts
@@ -127,7 +128,7 @@ the answer. Every answer comes from OpenBot.
   `https://signal.openbot.run/v1/slack/events`. Signal checks Slack's signature with the app's
   signing secret, answers `url_verification`, and reads only the app ID and the workspace ID. Each
   signing secret is bound to its app, and a route is one app in one workspace, so the production and
-  development apps can share a workspace. It passes the exact body to the `ingress` socket (`SlackIngress` in main, a plain `ws` client: no WebRTC, so no hidden
+  development apps can share a workspace. It passes the exact body to the `ingress` socket (`SignalIngress` in main, a plain `ws` client: no WebRTC, so no hidden
   window) that holds a route ticket for that workspace, and returns the host's answer within 2.5 s,
   or 503 so that Slack sends it again. The route ticket is an ES256 JWT that `apps/auth-api` signs
   with its own key for a host that proves its machine token. It names only the workspaces that D1
@@ -218,11 +219,51 @@ transport for its events. `messaging-types.ts` is the seam; the core never reads
   `/invite`.
 - **Deduplication.** An in-memory set drops a redelivered event at once; the mailbox idempotency key
   covers a restart. Events that arrive while no socket is open are lost after Slack's retries.
-- **Screen.** **Server settings → Connectors → Slack** (and **→ Telegram**, one row per chat) on the
-  computer that runs the agents shows each workspace and its orchestrator, and a two-step dialog connects the workspace and adds the
-  orchestrator on the model the user picks (`messaging:*`). A remote server shows
-  no Slack page, because the install returns to the host's own browser. A live connection counts as
-  use, so a hosted server does not idle out.
+- **Screen.** **Server settings → Connectors → Slack** on the computer that runs the agents shows
+  each workspace and its orchestrator, and a two-step dialog connects the workspace and adds the
+  orchestrator on the model the user picks (`messaging:*`). A remote server shows no Slack page,
+  because the install returns to the host's own browser. A live connection counts as use, so a
+  hosted server does not idle out. **Connectors → Discord** is the same page for Discord
+  (`SlackIntegrationPanel` with `platform="discord"`). **Connectors → Telegram** has its own page
+  (`TelegramIntegrationPanel`), with one row per chat and one orchestrator for all chats.
+
+**Discord.** Every guild installs the one OpenBot Discord app (`apps/discord-app`), and a guild is a
+connection with its own Discord Orchestrator (`discord-orchestrator.ts`). Discord pushes a bot's
+messages only over its Gateway WebSocket, and the bot token cannot go to each host, so Signal holds
+the token and does the platform work for the hosts:
+
+- **Install.** As for Slack: `POST /v2/discord/authorize`, `/v2/discord/callback` (scope `bot`, the
+  Worker exchanges the code, revokes the user token it gets, and links the guild in D1
+  `discord_guild_routes`), the page `/discord/connect` and `openbot://discord-guild`. The sealed grant
+  (`@openbot/contracts/discord-guild-grant`, on `host-grant.ts`) names the guild and holds no token.
+  Another account gets `discord_guild_taken`.
+- **Events.** Signal keeps one Gateway connection (`@discordjs/ws`) with the guilds, guild messages
+  and direct messages intents, and no privileged intent. It passes on only a guild message that
+  mentions the bot, and a press of an OpenBot button, which it acknowledges to Discord at once. It
+  normalizes each into `DiscordDelivery` (`@openbot/contracts/signal-protocol/discord-api`), takes the
+  bot's own mention out, and sends a `discord-delivery` frame to the `ingress` socket that holds a
+  Discord route ticket for the guild. The ticket mirrors the Slack one (audience
+  `openbot-discord-route`, `/v2/remote/hosts/:id/discord-route`, `discord-route-revoked`,
+  `/v2/remote/discord-route/validate`). The socket asks for a route only for the platforms whose
+  connections hold it.
+- **Removal.** When the bot leaves a guild, Signal drops its route and asks the account service to
+  unlink it (`/v2/remote/discord-route/removed`, signed), so an offline host does not keep it. After
+  the Gateway lists every guild of the bot, and every 30 minutes, Signal sends those guild IDs
+  (`/v2/remote/discord-route/reconcile`), and the account service unlinks each link of another guild
+  that is older than five minutes. It sends nothing while a Gateway shard is closed, because the list
+  can miss a guild that installed the bot meanwhile. A route ticket that still names a guild the bot is not in is not
+  routed. The `discord-session` frame lists the guilds
+  routed to the socket; a host connection whose guild is not listed stops, and **Reconnect** starts
+  the install again.
+- **Calls.** After `ready`, Signal sends the socket a `discord-session` token. The host's adapter
+  (`discord-driver.ts`) sends typed operations (`DiscordApiRequest`: post, edit, delete, react, list
+  messages, names, a private reply to a button press, upload) to `POST /v1/discord/api` with that
+  bearer. Signal accepts an operation only for a guild routed to that socket, and only for a channel
+  of that guild, and makes the call with `@discordjs/rest`. Every post has no allowed mention, so it
+  pings nobody. Attachments are signed CDN addresses, which the host downloads directly.
+- **Conversations.** A conversation is a reply chain, keyed by its first message. Every OpenBot post
+  replies to that message, so a reply to an OpenBot post names the conversation through the replied
+  post's own reference. A direct message has no guild, so Signal answers it once with a fixed line.
 
 ## Mobile chat queue
 

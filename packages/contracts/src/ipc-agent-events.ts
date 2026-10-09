@@ -67,6 +67,12 @@ export type AgentEvent =
       turnId: string;
       status: string;
       origin?: AgentTurnOrigin;
+      /**
+       * A routine run that had nothing to report and posted no message. It is not news, so it shows
+       * no notification. The Team API carries it on protocol 6 beside the frozen projection; see
+       * `team-protocol/turn-quiet-v6.ts`.
+       */
+      quiet?: true;
     }
   | {
       type: "prompt";
@@ -185,7 +191,8 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
         isString(value.agentId) &&
         isString(value.threadId) &&
         isString(value.turnId) &&
-        (value.origin === undefined || isAgentTurnOrigin(value.origin))
+        (value.origin === undefined || isAgentTurnOrigin(value.origin)) &&
+        (value.quiet === undefined || value.quiet === true)
       );
     case "prompt":
       return (

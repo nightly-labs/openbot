@@ -7,7 +7,6 @@ import {
 import type { AppTextKey } from "@openbot/i18n";
 import {
   Badge,
-  type BadgeTone,
   Button,
   ConfirmDialog,
   Field,
@@ -20,6 +19,7 @@ import {
   ItemTitle,
   Plus,
   SettingsSection,
+  Spinner,
   Text,
   Trash2,
 } from "@openbot/ui";
@@ -29,6 +29,8 @@ import type { SettingsHostedServersStore } from "./stores/hosted-servers-store";
 
 interface SettingsHostedServersTabProps {
   store: SettingsHostedServersStore;
+  excludedServerIds?: readonly string[];
+  inBilling?: boolean;
   /** Opens the add server dialog, where the user picks a plan and pays. */
   onAddServer?: (() => void) | undefined;
 }
@@ -51,21 +53,25 @@ const STATE_LABELS = {
   deleted: "settings.hostedServers.state.deleted",
 } as const satisfies Record<HostedServerState, AppTextKey>;
 
-const STATE_TONES: Record<HostedServerState, BadgeTone> = {
-  awaiting_payment: "warning",
-  creating: "accent",
-  starting: "accent",
-  running: "success",
-  stopping: "neutral",
-  stopped: "neutral",
-  waking: "accent",
-  error: "danger",
-  deleted: "neutral",
+const STATE_VARIANTS: Record<
+  HostedServerState,
+  "warning-light" | "primary-light" | "success-light" | "secondary" | "destructive-light"
+> = {
+  awaiting_payment: "warning-light",
+  creating: "primary-light",
+  starting: "primary-light",
+  running: "success-light",
+  stopping: "secondary",
+  stopped: "secondary",
+  waking: "primary-light",
+  error: "destructive-light",
+  deleted: "secondary",
 };
 
 export function SettingsHostedServersTab(props: SettingsHostedServersTabProps) {
   const { t } = useText();
   const state = () => props.store.state;
+  const servers = () => state().servers.filter((server) => !props.excludedServerIds?.includes(server.serverId));
   // Also a server whose setup failed: it has no sandbox to stop, so it stays in `error`.
   const planEnded = (server: HostedServerSummary) => server.error === "plan_ended";
   const description = (server: HostedServerSummary) => {
@@ -83,7 +89,10 @@ export function SettingsHostedServersTab(props: SettingsHostedServersTabProps) {
   };
 
   return (
-    <SettingsSection title={t("settings.hostedServers.title")} description={t("settings.hostedServers.description")}>
+    <SettingsSection
+      title={t(props.inBilling ? "billing.otherServers" : "settings.hostedServers.title")}
+      description={props.inBilling ? undefined : t("settings.hostedServers.description")}
+    >
       <Show when={props.onAddServer}>
         {(addServer) => (
           <div class="hosted-servers-add">
@@ -100,15 +109,24 @@ export function SettingsHostedServersTab(props: SettingsHostedServersTabProps) {
 
       <Show when={state().error}>{(message) => <p class="settings-modal-error">{message()}</p>}</Show>
       <Show
-        when={state().servers.length > 0}
+        when={servers().length > 0}
         fallback={
-          <Show when={state().loaded}>
+          <Show
+            when={state().loaded}
+            fallback={
+              <Show when={!state().error}>
+                <div class="hosted-servers-loading">
+                  <Spinner label={t("settings.hostedServers.loading")} />
+                </div>
+              </Show>
+            }
+          >
             <Text tone="muted">{t("settings.hostedServers.empty")}</Text>
           </Show>
         }
       >
         <ItemGroup class="settings-modal-card hosted-servers-list" surface="subtle">
-          <For each={state().servers}>
+          <For each={servers()}>
             {(server) => (
               <Item class="hosted-servers-row">
                 <ItemContent>
@@ -116,9 +134,9 @@ export function SettingsHostedServersTab(props: SettingsHostedServersTabProps) {
                     {server.name}
                     <Show
                       when={planEnded(server)}
-                      fallback={<Badge tone={STATE_TONES[server.state]}>{t(STATE_LABELS[server.state])}</Badge>}
+                      fallback={<Badge variant={STATE_VARIANTS[server.state]}>{t(STATE_LABELS[server.state])}</Badge>}
                     >
-                      <Badge tone="warning">{t("settings.hostedServers.state.planEnded")}</Badge>
+                      <Badge variant="warning-light">{t("settings.hostedServers.state.planEnded")}</Badge>
                     </Show>
                   </ItemTitle>
                   <ItemDescription>{description(server)}</ItemDescription>
@@ -171,7 +189,9 @@ export function SettingsHostedServersTab(props: SettingsHostedServersTabProps) {
       </Show>
 
       <ConfirmDialog
-        open={state().pendingDelete !== null}
+        open={
+          state().pendingDelete !== null && !props.excludedServerIds?.includes(state().pendingDelete?.serverId ?? "")
+        }
         title={t("settings.hostedServers.deleteTitle", { name: state().pendingDelete?.name ?? "" })}
         description={t("settings.hostedServers.deleteDescription")}
         confirmLabel={t("common.delete")}

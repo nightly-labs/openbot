@@ -11,7 +11,8 @@ import type { ConversationRuntime } from "./conversation-runtime";
 import type { DrainScheduler } from "./drain-scheduler";
 import type { MailboxSync } from "./mailbox-sync";
 import { openBotToolFailure, openBotToolResult } from "./routine-tools";
-import { ToolOperationFailed, toolStep } from "./tool-operation";
+import { toolCallIdempotencyKey } from "./tool-call-idempotency";
+import { ToolOperationFailed, toolStep, toToolOperationFailed } from "./tool-operation";
 
 export const interruptAgentToolSchema = z.strictObject({
   agentId: z.string().trim().min(1).max(INPUT_LIMITS.identifier),
@@ -80,7 +81,7 @@ export class AgentInterruptTool {
     // routine deletion does, so the turn it starts can be checked and stopped.
     if (this.#mailbox.startingDeliveryForAgent(agentId)) {
       const task = this.#drain.taskFor(agentId);
-      if (task) yield* task.pipe(Effect.mapError((failure) => new ToolOperationFailed({ cause: failure.cause })));
+      if (task) yield* task.pipe(toToolOperationFailed);
     }
     if (this.#mailbox.startingDeliveryForAgent(agentId)) {
       return openBotToolFailure(sourceText("error.backend.interruptStarting"));
@@ -113,11 +114,7 @@ export class AgentInterruptTool {
     // The turn can end, or the user can steer a message into it, while the stop is on its way. The
     // check then runs again on the deliveries the turn has at that moment. No stop, no notice.
     const mayStop = () => ownedBy(this.#mailbox.findDeliveriesByTurn(agentId, turnId), callerAgentId);
-    if (
-      !(yield* this.#hooks
-        .interrupt(agentId, turnId, mayStop)
-        .pipe(Effect.mapError((failure) => new ToolOperationFailed({ cause: failure.cause }))))
-    ) {
+    if (!(yield* this.#hooks.interrupt(agentId, turnId, mayStop).pipe(toToolOperationFailed))) {
       return openBotToolResult({ interruptedTurnId: null, cancelledMessages });
     }
     yield* this.#notifyEffect(params, callerAgentId, agentId, deliveries[0]?.delivery.messageId ?? null, reason);
@@ -188,9 +185,9 @@ export class AgentInterruptTool {
         text,
         replyToMessageId: null,
         expectsReply: false,
-        idempotencyKey: `${params.threadId}:${params.turnId}:${params.callId}`,
+        idempotencyKey: toolCallIdempotencyKey(params),
       })
-      .pipe(Effect.mapError((failure) => new ToolOperationFailed({ cause: failure.cause })));
+      .pipe(toToolOperationFailed);
     this.#mailboxSync.emitQueue(agentId);
     this.#drain.scheduleDrain(agentId);
   });

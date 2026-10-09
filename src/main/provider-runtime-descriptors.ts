@@ -168,6 +168,9 @@ const stageBunx = Effect.fn("ProviderRuntime.stageBunx")((binary: string, bunx: 
   ),
 );
 
+/** The npm package that lists OpenCode's platform packages and carries its LICENSE. */
+export const OPENCODE_UMBRELLA_PACKAGE = "opencode-ai";
+
 interface NpmPackageCheck {
   name: string;
   version: string;
@@ -384,6 +387,13 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
       downloadSmallFile,
     }: ProviderStageContext): Effect.fn.Return<void, ProviderRuntimeFailure> {
       const artifact = lock.opencode.artifacts[spec.target];
+      // The platform tarball carries no licence. The umbrella package on the same registry does, so
+      // an install needs no host other than npm. `verify` checks its hash against the lock. It is
+      // fetched first because it is small: a failed request stops before the binary is unpacked.
+      const umbrella = yield* downloadSmallFile(
+        `${lock.opencode.registry}/${OPENCODE_UMBRELLA_PACKAGE}/-/${OPENCODE_UMBRELLA_PACKAGE}-${spec.version}.tgz`,
+        null,
+      );
       yield* withNpmPackage(
         downloadedPath,
         staging,
@@ -395,18 +405,12 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
         },
         (packageRoot: string) =>
           Effect.gen(function* () {
-            // The platform tarball carries no licence, so it comes from the tagged source like Codex's.
-            const license = yield* downloadSmallFile(
-              `${lock.opencode.repository}/raw/v${spec.version}/LICENSE`,
-              pinnedHash(spec, lock.opencode.licenseSha256),
-            );
             yield* runtimeIO(() => mkdir(join(staging, "bin"), { recursive: true }));
             yield* Effect.all(
               [
                 runtimeIO(() =>
                   copyFile(join(packageRoot, "bin", artifact.executable), join(staging, "bin", artifact.executable)),
                 ),
-                runtimeIO(() => writeFile(join(staging, "LICENSE"), license)),
                 runtimeIO(() =>
                   writeFile(
                     join(staging, "opencode-package.json"),
@@ -423,6 +427,29 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
             if (spec.target !== "win32-x64")
               yield* runtimeIO(() => chmod(join(staging, "bin", artifact.executable), 0o755));
           }),
+      );
+      // A directory beside the staging one, so the sweep of abandoned staging removes it after a crash.
+      const umbrellaRoot = `${staging}.umbrella`;
+      const umbrellaPath = join(umbrellaRoot, `${OPENCODE_UMBRELLA_PACKAGE}.tgz`);
+      yield* Effect.acquireUseRelease(
+        runtimeIO(() => mkdir(umbrellaRoot, { recursive: true })),
+        () =>
+          Effect.gen(function* () {
+            yield* runtimeIO(() => writeFile(umbrellaPath, umbrella, { mode: 0o600 }));
+            yield* withNpmPackage(
+              umbrellaPath,
+              staging,
+              {
+                name: OPENCODE_UMBRELLA_PACKAGE,
+                version: spec.version,
+                archivePathError: sourceText("error.provider.opencodeArchivePath"),
+                mismatchError: sourceText("error.provider.opencodePackageMismatch"),
+              },
+              (packageRoot: string) =>
+                runtimeIO(() => copyFile(join(packageRoot, "LICENSE"), join(staging, "LICENSE"))),
+            );
+          }),
+        () => runtimeIO(() => rm(umbrellaRoot, { recursive: true, force: true })).pipe(Effect.orDie),
       );
     }),
     verify: Effect.fn("ProviderRuntime.opencode.verify")(function* (

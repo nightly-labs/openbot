@@ -1,0 +1,57 @@
+import type { PartialTranslation } from "../../../message";
+import type { messages as source } from "../../en/mobile/liveActivity";
+
+export const messages = {
+  "mobile.liveActivity.appName": "OpenBot",
+  "mobile.liveActivity.badge.working": "Trabajando",
+  "mobile.liveActivity.badge.message": "Mensaje",
+  "mobile.liveActivity.badge.question": "Preguntas",
+  "mobile.liveActivity.badge.approval": "Aprobación",
+  "mobile.liveActivity.badge.takeover": "Tomar el control",
+  "mobile.liveActivity.badge.failed": "Fallido",
+  "mobile.liveActivity.unread": {
+    other: "{count} sin leer",
+  },
+  "mobile.liveActivity.moreRequests": {
+    one: "+{count} solicitud más",
+    other: "+{count} solicitudes más",
+  },
+  "mobile.liveActivity.moreChats": {
+    other: "+{count} más",
+  },
+  "mobile.liveActivity.question.fallback": "{name} necesita una respuesta.",
+  "mobile.liveActivity.approval.fallback": "Revisa la acción solicitada antes de ejecutarla.",
+  "mobile.liveActivity.takeover.fallback": "Completa el paso del navegador para que el agente pueda continuar.",
+  "mobile.liveActivity.failed.fallback": "La tarea se detuvo antes de terminar.",
+  "mobile.liveActivity.failed.title": "{name}: {title}",
+  "mobile.liveActivity.button.decline": "Rechazar",
+  "mobile.liveActivity.button.approve": "Aprobar",
+  "mobile.liveActivity.button.openDetails": "Abrir detalles",
+  "mobile.liveActivity.stale.label": "Sin actualizar",
+  "mobile.liveActivity.stale.detail": "Abre OpenBot para ver el estado actual.",
+  "mobile.liveActivity.confirm.title": "¿Aprobar este comando?",
+  "mobile.liveActivity.confirm.cancel": "Cancelar",
+  "mobile.liveActivity.confirm.approve": "Aprobar",
+  "mobile.liveActivity.requestChanged": "La solicitud cambió. Abre el chat para revisarla.",
+  "mobile.liveActivity.error.openChat": "No se pudo abrir el chat",
+  "mobile.liveActivity.error.openChatFallback": "Vuelve a intentarlo.",
+  "mobile.liveActivity.error.clearFailure": "No se pudo descartar la tarea fallida",
+  "mobile.liveActivity.error.clearFailureFallback": "Abre el chat y vuelve a intentarlo.",
+  "mobile.liveActivity.error.answer": "No se pudo enviar la respuesta",
+  "mobile.liveActivity.error.answerFallback": "Abre el chat y responde allí.",
+  "mobile.liveActivity.error.decision": "No se pudo enviar la decisión",
+  "mobile.liveActivity.error.decisionFallback": "Abre la solicitud en el escritorio.",
+  "mobile.liveActivity.island.taskWorking": "Trabajando en tu solicitud",
+  "mobile.liveActivity.island.questionHeader": "Pregunta de tu agente",
+  "mobile.liveActivity.island.questionText": "Abre OpenBot para responder a esta pregunta.",
+  "mobile.liveActivity.island.optionFallback": "Opción {number}",
+  "mobile.liveActivity.island.takeoverTitle": "El paso del navegador te necesita",
+  "mobile.liveActivity.island.takeoverDetail":
+    "Completa el inicio de sesión, la verificación o el consentimiento en el navegador.",
+  "mobile.liveActivity.island.failureTitle": "Tarea fallida",
+  "mobile.liveActivity.island.failureDetail":
+    "La tarea se detuvo antes de terminar. Abre la conversación para volver a intentarlo.",
+  "mobile.liveActivity.island.approvalCommand": "El comando necesita revisión",
+  "mobile.liveActivity.island.approvalFileChange": "Los cambios de archivos necesitan revisión",
+  "mobile.liveActivity.island.approvalPermissions": "Los permisos necesitan revisión",
+} as const satisfies PartialTranslation<typeof source>;

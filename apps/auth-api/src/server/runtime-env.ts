@@ -25,6 +25,12 @@ const LOCAL_RUNTIME_KEYS = [
   "SLACK_CLIENT_SECRET",
   "SLACK_STATE_SECRET",
   "SLACK_DEV_PUBLIC_ORIGIN",
+  "DISCORD_ROUTE_PRIVATE_JWK",
+  "DISCORD_ROUTE_KEY_ID",
+  "DISCORD_CLIENT_ID",
+  "DISCORD_CLIENT_SECRET",
+  "DISCORD_STATE_SECRET",
+  "DISCORD_DEV_PUBLIC_ORIGIN",
   "TELEGRAM_BOT_ID",
   "TELEGRAM_BOT_USERNAME",
   "STRIPE_SECRET_KEY",
@@ -53,7 +59,7 @@ export function readLocalRuntimeVars(environment: NodeJS.ProcessEnv): Record<str
   const result: Record<string, string> = {};
   for (const key of LOCAL_RUNTIME_KEYS) {
     const value = environment[key];
-    // dotenvx passes the ciphertext on when a developer has no key for `.env.shared`.
+    // A development loader may leave ciphertext when a developer has no key for the shared file.
     if (value === undefined || value.startsWith("encrypted:")) continue;
     result[key] = BOOLEAN_RUNTIME_KEYS.has(key) ? (normalizeBooleanFlag(value) ? "true" : "false") : value;
   }

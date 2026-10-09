@@ -1,8 +1,8 @@
 // @vitest-environment node
 
-// The host half of the Telegram frames on the real `SlackIngress` socket. Signal is a local
+// The host half of the Telegram frames on the real `SignalIngress` socket. Signal is a local
 // WebSocket server. A Signal without the `telegram` capability must get no Telegram frame: Signal
-// closes a socket on a frame it does not know, and that would stop Slack on the same socket too.
+// closes a socket on a frame it does not know, and that would stop Slack and Discord on the same socket.
 // Signal's own checks are in `remote/api/test`.
 
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
@@ -11,7 +11,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { type WebSocket, WebSocketServer } from "ws";
 import { waitFor } from "../backend/agent-service-test-harness";
 import { TelegramCallError } from "../backend/messaging/messaging-types";
-import { SlackIngress } from "./slack-ingress";
+import { SignalIngress } from "./signal-ingress";
 
 class FakeSignal {
   readonly frames: DynamicRecord[] = [];
@@ -90,7 +90,7 @@ class FakeSignal {
 }
 
 let signal: FakeSignal | null = null;
-let ingress: SlackIngress | null = null;
+let ingress: SignalIngress | null = null;
 
 afterEach(async () => {
   if (ingress) await Effect.runPromise(ingress.dispose());
@@ -99,19 +99,22 @@ afterEach(async () => {
   signal = null;
 });
 
-async function open(capabilities: string[] | undefined): Promise<{ signal: FakeSignal; ingress: SlackIngress }> {
+async function open(capabilities: string[] | undefined): Promise<{ signal: FakeSignal; ingress: SignalIngress }> {
   const fake = new FakeSignal(capabilities);
   await fake.start();
   signal = fake;
-  const created = new SlackIngress({
+  const created = new SignalIngress({
     hostId: () => "host-1",
     signedIn: () => true,
     issueTicket: () => Effect.succeed({ ticket: "ticket-1", signalUrl: fake.url }),
     issueSlackRoute: () => Effect.succeed("slack-route"),
+    issueDiscordRoute: () => Effect.succeed("discord-route"),
+    issueWebhookRoute: () => Effect.succeed("webhook-route"),
     issueTelegramRoute: () => Effect.succeed("telegram-route"),
   });
   ingress = created;
-  created.acquire();
+  created.acquire("slack");
+  created.acquire("telegram");
   await waitFor(() => created.state() === "online");
   return { signal: fake, ingress: created };
 }
@@ -149,8 +152,12 @@ describe.sequential("Telegram on the ingress socket", () => {
     expect(cause instanceof TelegramCallError ? cause.errorCode : 0).toBe(403);
 
     const received: string[] = [];
-    ingress.handleTelegram((botId, chatId, body) =>
-      Effect.sync(() => void received.push(`${botId}:${chatId}:${Buffer.from(body).toString()}`)),
+    ingress.handle((chatId, delivery) =>
+      Effect.sync(() => {
+        if (delivery.platform === "telegram")
+          received.push(`${delivery.botId}:${chatId}:${Buffer.from(delivery.body).toString()}`);
+        return { status: 200 as const };
+      }),
     );
     signal.deliver('{"update_id":1}');
     await waitFor(() => received.length === 1);

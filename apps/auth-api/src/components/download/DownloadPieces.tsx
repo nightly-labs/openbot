@@ -1,8 +1,8 @@
 import { PlatformLogo } from "@openbot/brand";
 import { Link } from "@tanstack/solid-router";
 import { createSignal, onCleanup } from "solid-js";
-import { DOWNLOAD_PAGES, type DownloadInstaller } from "../../lib/download-pages";
-import type { DownloadPlatform } from "../../lib/download-platforms";
+import { DOWNLOAD_PAGES, type DownloadInstaller, type DownloadPagePlatform } from "../../lib/download-pages";
+import { EXTERNAL_LINK_REL } from "../../lib/landing-links";
 import { LandingIcon } from "../landing/LandingIcon";
 
 export interface InstallerButtonProps {
@@ -23,6 +23,8 @@ export function InstallerButton(props: InstallerButtonProps) {
       class="download-installer-button"
       data-variant={props.primary ? "primary" : "secondary"}
       href={props.installer.href}
+      target={props.installer.external ? "_blank" : undefined}
+      rel={props.installer.external ? EXTERNAL_LINK_REL : undefined}
       aria-label={props.short ? props.installer.label : undefined}
     >
       <LandingIcon name="download" class="download-installer-icon" />
@@ -64,7 +66,7 @@ export function CommandBlock(props: { code: string }) {
 }
 
 /** A small card in the system's colour that opens its page. */
-export function SystemCard(props: { platform: DownloadPlatform }) {
+export function SystemCard(props: { platform: DownloadPagePlatform }) {
   const page = () => DOWNLOAD_PAGES[props.platform];
   return (
     <Link

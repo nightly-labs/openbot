@@ -285,8 +285,10 @@ async function telegramRoute(provider: Partial<RemoteTokenProvider> = {}) {
     undefined,
     undefined,
     {
-      bot: new TelegramBotApi(config.telegram, { fetch, apiOrigin: "https://telegram.test" }),
-      files: new TelegramFileTokens(config.sessionSecret),
+      telegram: {
+        bot: new TelegramBotApi(config.telegram, { fetch, apiOrigin: "https://telegram.test" }),
+        files: new TelegramFileTokens(config.sessionSecret),
+      },
     },
   );
   const app = createRemoteApiApp(config, signal, signalRuntime(signal));

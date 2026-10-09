@@ -73,7 +73,8 @@ describe("latestRelease", () => {
   it("refuses an npm release whose tarball is not on the registry the lock names", async () => {
     const registry = "https://registry.npmjs.org";
     const fetch = sources({
-      [`${registry}/opencode-darwin-arm64/latest`]: {
+      [`${registry}/opencode-ai/latest`]: { version: "1.19.0" },
+      [`${registry}/opencode-darwin-arm64/1.19.0`]: {
         version: "1.19.0",
         dist: {
           tarball: "https://mirror.example/opencode-darwin-arm64-1.19.0.tgz",

@@ -9,6 +9,8 @@ import { dirname, join } from "node:path";
 import type { Duplex } from "node:stream";
 import {
   BROWSER_VIEW_FRAME_ACK_QUERY,
+  BROWSER_VIEW_MAX_CLIPBOARD_TEXT,
+  decodeBrowserViewCopied,
   decodeBrowserViewFrame,
   encodeBrowserViewInput,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
@@ -16,12 +18,15 @@ import { afterEach, assert, describe, expect, it, vi } from "vitest";
 import type * as Ws from "ws";
 import { z } from "zod";
 import type { BrowserViewportInput } from "../backend/browser-cdp";
+import { browserFailure } from "../backend/browser-effects";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { BrowserViewGateway } from "./browser-view-gateway";
 
 const requireModule = createRequire(import.meta.url);
 const webSockets: typeof Ws = requireModule(join(dirname(requireModule.resolve("ws/package.json")), "index.js"));
 const TEAM_SESSION = "team-session-1";
+/** A page with nothing selected. */
+const noCopy = () => Effect.succeed("");
 
 /** A client that will name the frame it has drawn. The host keeps sizes only for this socket. */
 function acknowledgingViewUrl(origin: string, streamPath: string): string {
@@ -36,6 +41,141 @@ afterEach(async () => {
 });
 
 describe("the live browser view on a host", () => {
+  // Failure modes: a stopped upgrade server rejects new views; old sessions survive a restart;
+  // a restarted view loses frames or input. Exercise the real socket for each case.
+  it("streams frames and input after the Team API stops and starts", async () => {
+    const stopView = vi.fn(() => Effect.void);
+    const dispatch = vi.fn(() => Effect.void);
+    const gateway = new BrowserViewGateway({
+      browser: {
+        startView: (_tabId, onFrame) =>
+          Effect.sync(() => {
+            onFrame({ sequence: 1, width: 1200, height: 800, image: new Uint8Array([0xff, 0xd8, 0xff]) });
+            return stopView;
+          }),
+        copyViewSelection: noCopy,
+        dispatchViewInput: dispatch,
+      },
+      authenticate: () => null,
+    });
+    const origin = await serve(gateway);
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      const session = gateway.createSession({ memberId: "member-1", teamSessionId: TEAM_SESSION, tabId: "tab-1" });
+      const socket = new webSockets.WebSocket(`${origin}${session.streamPath}`, {
+        headers: { "X-OpenBot-WebRTC-Session": TEAM_SESSION },
+      });
+      const frames = collect(socket);
+      await new Promise<void>((resolve, reject) => {
+        socket.once("open", resolve);
+        socket.once("error", reject);
+      });
+      await vi.waitFor(() => expect(frames).toHaveLength(1));
+      assert(frames[0]);
+      expect(decodeBrowserViewFrame(frames[0])).toMatchObject({ sequence: 1, width: 1200, height: 800 });
+      socket.send(
+        encodeBrowserViewInput({ type: "key", action: "down", key: "a", code: "KeyA", text: "", modifiers: 0 }),
+      );
+      await vi.waitFor(() => expect(dispatch).toHaveBeenCalledTimes(attempt));
+      expect(dispatch).toHaveBeenLastCalledWith("tab-1", expect.objectContaining({ type: "key", key: "a" }));
+      const closed = new Promise<void>((resolve) => socket.once("close", () => resolve()));
+      await runCauseEffect(gateway.stop());
+      await closed;
+      expect(stopView).toHaveBeenCalledTimes(attempt);
+      expect(gateway.activeViewCount()).toBe(0);
+      expect(await runCauseEffect(gateway.closeMemberSession(session.id, "member-1"))).toBe(false);
+    }
+  });
+
+  // Failure modes: a paste longer than the old 4 KiB input bound is dropped; a key typed after a paste
+  // lands before it; a copy gets no answer and the client's clipboard write waits for ever; a
+  // protected tab's selection reaches the member; a selection too long to send is sent, or is not
+  // reported.
+  it("pastes the member's text in order and answers every copy", async () => {
+    const dispatched: BrowserViewportInput[] = [];
+    // A tab whose fields hold a secret, a selection too long to send, then one that is sent.
+    const copySelection = vi.fn((_tabId: string, _max: number) => {
+      const call = copySelection.mock.calls.length;
+      if (call === 1) return Effect.fail(browserFailure(new Error("protected")));
+      return Effect.succeed(call === 2 ? null : "copied text");
+    });
+    // A paste takes several CDP calls on a real page. This one gives the event loop a turn, which is
+    // when the key sent right behind it is read from the socket.
+    const pasting = () => new Promise<void>((resolve) => setImmediate(() => setImmediate(resolve)));
+    const gateway = new BrowserViewGateway({
+      browser: {
+        startView: (_tabId, onFrame) =>
+          Effect.sync(() => {
+            onFrame({ sequence: 1, width: 1200, height: 800, image: new Uint8Array([0xff, 0xd8, 0xff]) });
+            return () => Effect.void;
+          }),
+        copyViewSelection: copySelection,
+        dispatchViewInput: (_tabId, input) =>
+          Effect.promise(() => (input.type === "paste" ? pasting() : Promise.resolve())).pipe(
+            Effect.andThen(
+              Effect.sync(() => {
+                dispatched.push(input);
+              }),
+            ),
+          ),
+      },
+      authenticate: () => null,
+    });
+    const origin = await serve(gateway);
+    const session = gateway.createSession({ memberId: "member-1", teamSessionId: TEAM_SESSION, tabId: "tab-1" });
+    const socket = new webSockets.WebSocket(`${origin}${session.streamPath}`, {
+      headers: { "X-OpenBot-WebRTC-Session": TEAM_SESSION },
+    });
+    const answers: string[] = [];
+    socket.on("message", (data, binary) => {
+      if (!binary) answers.push(data.toString());
+    });
+    await new Promise((resolve) => socket.once("open", resolve));
+
+    const text = "a pasted paragraph ".repeat(1_000);
+    const key = { type: "key", action: "char", key: "!", code: "Digit1", text: "!", modifiers: 8 } as const;
+    socket.send(encodeBrowserViewInput({ type: "paste", text }));
+    socket.send(encodeBrowserViewInput(key));
+    // The key and the copy reach the host while the paste still runs. They wait for it.
+    socket.send(encodeBrowserViewInput({ type: "copy" }));
+    await vi.waitFor(() => expect(answers).toHaveLength(1));
+    expect(dispatched).toEqual([{ type: "paste", text }, key]);
+
+    for (const index of [1, 2]) {
+      socket.send(encodeBrowserViewInput({ type: "copy" }));
+      await vi.waitFor(() => expect(answers).toHaveLength(index + 1));
+    }
+    expect(answers.map(decodeBrowserViewCopied)).toEqual([
+      { type: "copied", text: "" },
+      { type: "copyTooLarge" },
+      { type: "copied", text: "copied text" },
+    ]);
+    expect(copySelection).toHaveBeenLastCalledWith("tab-1", BROWSER_VIEW_MAX_CLIPBOARD_TEXT);
+    socket.close();
+    await runCauseEffect(gateway.stop());
+  });
+
+  it("redacts a browser start failure before sending its close reason", async () => {
+    const gateway = new BrowserViewGateway({
+      browser: {
+        startView: () => Effect.fail(browserFailure(new Error("CDP failed: token=secret-value-123456"))),
+        copyViewSelection: noCopy,
+        dispatchViewInput: () => Effect.void,
+      },
+      authenticate: () => null,
+    });
+    const origin = await serve(gateway);
+    const session = gateway.createSession({ memberId: "member-1", teamSessionId: TEAM_SESSION, tabId: "tab-1" });
+    const socket = new webSockets.WebSocket(`${origin}${session.streamPath}`, {
+      headers: { "X-OpenBot-WebRTC-Session": TEAM_SESSION },
+    });
+    const ended = await new Promise<{ code: number; reason: string }>((resolve, reject) => {
+      socket.once("close", (code, reason) => resolve({ code, reason: reason.toString() }));
+      socket.once("error", reject);
+    });
+    expect(ended).toEqual({ code: 1011, reason: "CDP failed: token=[redacted]" });
+    await runCauseEffect(gateway.stop());
+  });
+
   it("sends the tab's frames and dispatches a click at the point on the frame", async () => {
     const dispatched: BrowserViewportInput[] = [];
     let send: ((frame: { sequence: number; width: number; height: number; image: Uint8Array }) => void) | undefined;
@@ -46,6 +186,7 @@ describe("the live browser view on a host", () => {
             send = onFrame;
             return () => Effect.void;
           }),
+        copyViewSelection: noCopy,
         dispatchViewInput: (_tabId, input) =>
           Effect.sync(() => {
             dispatched.push(input);
@@ -97,6 +238,7 @@ describe("the live browser view on a host", () => {
             send = onFrame;
             return () => Effect.void;
           }),
+        copyViewSelection: noCopy,
         dispatchViewInput: (_tabId, input) =>
           Effect.sync(() => {
             dispatched.push(input);
@@ -159,6 +301,7 @@ describe("the live browser view on a host", () => {
             send = onFrame;
             return () => Effect.void;
           }),
+        copyViewSelection: noCopy,
         dispatchViewInput: (_tabId, input) =>
           Effect.sync(() => {
             dispatched.push(input);
@@ -210,6 +353,7 @@ describe("the live browser view on a host", () => {
             send = onFrame;
             return () => Effect.void;
           }),
+        copyViewSelection: noCopy,
         dispatchViewInput: (_tabId, input) =>
           Effect.sync(() => {
             dispatched.push(input);
@@ -272,6 +416,7 @@ describe("the live browser view on a host", () => {
             send = onFrame;
             return () => Effect.void;
           }),
+        copyViewSelection: noCopy,
         dispatchViewInput: (_tabId, input) =>
           Effect.sync(() => {
             dispatched.push(input);
@@ -330,6 +475,7 @@ describe("the live browser view on a host", () => {
             send = onFrame;
             return () => Effect.void;
           }),
+        copyViewSelection: noCopy,
         dispatchViewInput: (_tabId, input) =>
           Effect.sync(() => {
             dispatched.push(input);
@@ -380,6 +526,7 @@ describe("the live browser view on a host", () => {
             send = onFrame;
             return () => Effect.void;
           }),
+        copyViewSelection: noCopy,
         dispatchViewInput: () => Effect.void,
       },
       authenticate: () => null,
@@ -413,6 +560,7 @@ describe("the live browser view on a host", () => {
             send = onFrame;
             return () => Effect.void;
           }),
+        copyViewSelection: noCopy,
         dispatchViewInput: (_tabId, input) =>
           Effect.sync(() => {
             dispatched.push(input);
@@ -468,6 +616,7 @@ describe("the live browser view on a host", () => {
             invalidate = onEnded;
             return stop;
           }),
+        copyViewSelection: noCopy,
         dispatchViewInput: dispatch,
       },
       authenticate: () => null,
@@ -497,6 +646,7 @@ describe("the live browser view on a host", () => {
     const gateway = new BrowserViewGateway({
       browser: {
         startView: () => Effect.succeed(() => Effect.void),
+        copyViewSelection: noCopy,
         dispatchViewInput: () => Effect.void,
       },
       authenticate: (token) => (token === "other-member-token" ? { id: "member-2" } : null),
@@ -520,6 +670,7 @@ describe("the live browser view on a host", () => {
     const gateway = new BrowserViewGateway({
       browser: {
         startView: () => Effect.succeed(() => Effect.void),
+        copyViewSelection: noCopy,
         dispatchViewInput: () => Effect.void,
       },
       authenticate: () => null,
@@ -546,6 +697,7 @@ describe("the live browser view on a host", () => {
     const gateway = new BrowserViewGateway({
       browser: {
         startView,
+        copyViewSelection: noCopy,
         dispatchViewInput: () => Effect.void,
       },
       authenticate: () => null,

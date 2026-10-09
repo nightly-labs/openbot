@@ -1,7 +1,7 @@
 /**
  * Everything that configures the default Electron session: the renderer's Content-Security-Policy,
  * its permission handlers, and the custom protocols that serve the packaged renderer bundle,
- * attachments, avatars and server logos.
+ * attachments, visual reply pages, avatars and server logos.
  *
  * **This module body must stay side-effect free.** The main entry point imports it, and an import
  * evaluates before the entry point's own statements - which is where `app.setPath("userData", ...)`
@@ -10,13 +10,20 @@
  * `session.defaultSession` only when called, and each is called from inside `app.whenReady()`.
  */
 
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { extname, isAbsolute, relative, resolve } from "node:path";
+import { isChatVisualMimeType } from "@openbot/contracts/chat-visual";
 import { LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
 import { app, session } from "electron";
 import type { AgentService } from "../backend/agent-service";
 import { runCauseEffect } from "../backend/effect-boundary";
 import type { MailboxStore } from "../backend/mailbox-store";
+import {
+  attachmentCorsHeaders,
+  attachmentDocumentHeaders,
+  CHAT_VISUAL_PAGE_LIMIT,
+  chatVisualResponse,
+} from "./chat-visual-protocol";
 import { buildContentSecurityPolicy, readSelfHostedSignalOrigin } from "./content-security-policy";
 import { fileResponse } from "./file-response";
 import type { RemoteServerManager } from "./remote-server-manager";
@@ -49,9 +56,17 @@ export function configureRendererPermissions(): void {
   session.defaultSession.setPermissionCheckHandler((_webContents, permission, requestingOrigin, details) =>
     canCheckRendererPermission(permission, requestingOrigin, details),
   );
-  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
+  // The frame that asks decides, not its window: a visual reply frame inside the trusted window
+  // must not get the microphone or the clipboard.
+  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback, details) => {
     const mediaTypes = ("mediaTypes" in details ? details.mediaTypes : undefined) ?? [];
-    callback(canRequestRendererPermission(permission, webContents.getURL(), { mediaTypes }));
+    callback(
+      canRequestRendererPermission(permission, {
+        requestingUrl: details.requestingUrl,
+        isMainFrame: details.isMainFrame,
+        mediaTypes,
+      }),
+    );
   });
 }
 
@@ -72,8 +87,8 @@ export function configureAttachmentProtocol({ mailbox, agents, remoteServers }: 
         fileResponse(attachment.path, {
           "Content-Type": attachment.mimeType,
           "Cache-Control": "no-store",
-          "Access-Control-Allow-Origin": request.headers.get("Origin") ?? "*",
-          Vary: "Origin",
+          ...attachmentCorsHeaders(request.headers.get("Origin")),
+          ...attachmentDocumentHeaders(attachment.mimeType),
           "X-Content-Type-Options": "nosniff",
           "Content-Disposition": "inline",
         }),
@@ -93,12 +108,40 @@ export function configureAttachmentProtocol({ mailbox, agents, remoteServers }: 
         headers: {
           "Content-Type": attachment.mimeType,
           "Cache-Control": "no-store",
-          "Access-Control-Allow-Origin": request.headers.get("Origin") ?? "*",
-          Vary: "Origin",
+          ...attachmentCorsHeaders(request.headers.get("Origin")),
+          ...attachmentDocumentHeaders(attachment.mimeType),
           "X-Content-Type-Options": "nosniff",
           "Content-Disposition": "inline",
         },
       });
+    } catch {
+      return new Response("Not found", { status: 404 });
+    }
+  });
+  // A visual reply page: an HTML attachment with the frame script, in a sandbox. See
+  // `chat-visual-protocol.ts`.
+  session.defaultSession.protocol.handle("openbot-visual", async (request) => {
+    try {
+      const url = new URL(request.url);
+      const id = url.hostname === "file" ? url.pathname.split("/").filter(Boolean).at(-1) : undefined;
+      const attachment = id ? await runCauseEffect(mailbox.resolveAttachment(id)) : null;
+      if (!attachment || !isChatVisualMimeType(attachment.mimeType)) return new Response("Not found", { status: 404 });
+      if ((await stat(attachment.path)).size > CHAT_VISUAL_PAGE_LIMIT)
+        return new Response("Not found", { status: 404 });
+      return chatVisualResponse(await readFile(attachment.path));
+    } catch {
+      return new Response("Not found", { status: 404 });
+    }
+  });
+  session.defaultSession.protocol.handle("openbot-remote-visual", async (request) => {
+    try {
+      const url = new URL(request.url);
+      const serverId = decodeURIComponent(url.hostname);
+      const attachmentId = decodeURIComponent(url.pathname.split("/").filter(Boolean)[0] ?? "");
+      if (!serverId || !attachmentId) return new Response("Not found", { status: 404 });
+      const attachment = await runCauseEffect(remoteServers.downloadAttachment(attachmentId, serverId));
+      if (!isChatVisualMimeType(attachment.mimeType)) return new Response("Not found", { status: 404 });
+      return chatVisualResponse(attachment.bytes);
     } catch {
       return new Response("Not found", { status: 404 });
     }

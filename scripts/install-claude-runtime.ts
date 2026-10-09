@@ -1,11 +1,12 @@
 import { execFileSync } from "node:child_process";
-import { chmod, copyFile, cp, mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { chmod, copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { createOpenBotLogger } from "@openbot/logging";
 import { z } from "zod";
 import { type AgentRuntimeLock, loadAgentRuntimeLock } from "./agent-runtime-lock";
 import { rejectNonRegularFiles, sha256 } from "./remote-desktop-runtime-release";
+import { escapeRegExp, installValidatedTree, isCurrentInstallation, safeArchivePathParts } from "./runtime-install";
 
 const logger = createOpenBotLogger("install-claude-runtime");
 
@@ -41,7 +42,7 @@ export async function installClaudeRuntime(
   const artifact = lock.claude.artifacts[target];
   const targetRoot = claudeRuntimePath(outputRoot, target);
 
-  if (await isCurrentInstallation(targetRoot, target, lock)) {
+  if (await isCurrentInstallation(() => verifyClaudeRuntime(targetRoot, target, lock))) {
     await writeMetadata(outputRoot, targetRoot, lock);
     logger.info(`Using verified bundled Claude Code ${lock.claude.version} for ${target}.`);
     return "current";
@@ -185,37 +186,7 @@ async function stageClaudeRuntime(
 }
 
 function validateArchivePath(name: string): void {
-  if (name.includes("\0") || name.includes("\\")) throw new Error(`Unsafe Claude archive path: ${name}`);
-  const normalized = name.replace(/\/+$/u, "");
-  if (!normalized || normalized.startsWith("/") || /^[A-Za-z]:/u.test(normalized)) {
-    throw new Error(`Unsafe Claude archive path: ${name}`);
-  }
-  const parts = normalized.split("/");
-  if (parts.some((part) => !part || part === "." || part === "..") || parts[0] !== "package") {
-    throw new Error(`Unsafe Claude archive path: ${name}`);
-  }
-}
-
-async function isCurrentInstallation(
-  root: string,
-  target: ClaudeRuntimeTarget,
-  lock: AgentRuntimeLock,
-): Promise<boolean> {
-  try {
-    await verifyClaudeRuntime(root, target, lock);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function installValidatedTree(source: string, destination: string): Promise<void> {
-  const temporaryTarget = join(dirname(destination), `.${destination.split(/[\\/]/u).at(-1)}.installing`);
-  await mkdir(dirname(destination), { recursive: true });
-  await rm(temporaryTarget, { recursive: true, force: true });
-  await cp(source, temporaryTarget, { recursive: true });
-  await rm(destination, { recursive: true, force: true });
-  await rename(temporaryTarget, destination);
+  if (safeArchivePathParts(name, "Claude")[0] !== "package") throw new Error(`Unsafe Claude archive path: ${name}`);
 }
 
 async function writeMetadata(outputRoot: string, targetRoot: string, lock: AgentRuntimeLock): Promise<void> {
@@ -228,10 +199,6 @@ async function writeMetadata(outputRoot: string, targetRoot: string, lock: Agent
       `${JSON.stringify({ name: "claude-code", ...lock.claude }, null, 2)}\n`,
     ),
   ]);
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 }
 
 if (import.meta.main) {

@@ -15,6 +15,7 @@ import {
 } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
+import { BitwardenConnectorPanel } from "../settings/BitwardenConnectorPanel";
 import { GitHubConnectorPanel } from "../settings/GitHubConnectorPanel";
 import { DangerZone, DetailHeader, WizardDialog } from "../settings/IntegrationLayout";
 import { OnePasswordConnectorPanel } from "../settings/OnePasswordConnectorPanel";
@@ -135,6 +136,8 @@ function PluginAppPage(props: { scope: MarketplaceScope; app: PluginApp }) {
           description={t("marketplace.app.disconnect.description", { name: props.app.name })}
           action={t("marketplace.app.disconnect.action")}
           busy={model().appBusy(props.app.id)}
+          // A plugin opens its own uninstall dialog, which lists the apps and skills it removes.
+          confirm={props.app.kind !== "plugin"}
           onAction={() => model().disconnectApp(props.app)}
         />
       </Show>
@@ -323,6 +326,7 @@ export function MarketplaceAppPage(props: { scope: MarketplaceScope; id: string 
       .apps()
       .find((entry) => entry.id === props.id);
   const github = () => (app()?.kind === "github" ? model().github : undefined);
+  const bitwarden = () => (app()?.kind === "bitwarden" ? model().bitwarden : undefined);
   const onePassword = () => (app()?.kind === "onepassword" ? model().onePassword : undefined);
   const plugin = () => {
     const current = app();
@@ -360,6 +364,16 @@ export function MarketplaceAppPage(props: { scope: MarketplaceScope; id: string 
               />
             );
           }}
+        </Match>
+        <Match when={bitwarden()}>
+          {(panel) => (
+            <BitwardenConnectorPanel
+              status={panel()().status}
+              busy={panel()().busy}
+              onConnect={(key) => panel()().onConnect(key)}
+              onDisconnect={() => panel()().onDisconnect()}
+            />
+          )}
         </Match>
         <Match when={onePassword()}>
           {(panel) => {

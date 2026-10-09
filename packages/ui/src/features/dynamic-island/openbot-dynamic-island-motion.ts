@@ -1,4 +1,5 @@
 import type { DynamicIslandPresentation } from "@openbot/contracts/ipc";
+import { computedBlur, computedScale, springKeyframes } from "@openbot/ui/spring-motion";
 import { mix } from "@openbot/ui/utils";
 
 const MODE_SWAP_EXIT_DURATION = 160;
@@ -11,6 +12,8 @@ const MODE_SWAP_OUTGOING_SCALE = 0.985;
 const MODE_SWAP_INCOMING_SCALE = 0.965;
 const MODE_SWAP_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
 const MODE_SWAP_SPRING_SAMPLE_COUNT = 24;
+/** A critically damped spring over the whole animation: keyframe offsets are its time. */
+const MODE_SWAP_SPRING = { response: 1, dampingFraction: 1 } as const;
 
 export type IslandModeSwapSlot = "compact-leading" | "compact-trailing" | "expanded";
 
@@ -42,11 +45,11 @@ export function captureModeLayerStates(root: HTMLElement | undefined): Map<strin
       if (!mode) continue;
       const style = getComputedStyle(layer);
       const contentBlurs = Array.from(layer.querySelectorAll<HTMLElement>("[data-island-motion-content]"), (content) =>
-        readBlur(getComputedStyle(content).filter),
+        computedBlur(getComputedStyle(content).filter),
       );
       captured.set(`${slotName}:${mode}`, {
         opacity: readOpacity(style.opacity),
-        scale: readScale(style.transform),
+        scale: computedScale(style.transform),
         contentBlurs,
         anchor: modeLayerAnchor(layer),
       });
@@ -252,18 +255,7 @@ function modeSwapBlurEntranceKeyframes(startBlur: number): Keyframe[] {
 }
 
 function modeSwapSpringKeyframes(frame: (progress: number) => Keyframe): Keyframe[] {
-  const finalProgress = criticalModeSwapSpringProgress(1);
-  return Array.from({ length: MODE_SWAP_SPRING_SAMPLE_COUNT + 1 }, (_, index) => {
-    const offset = index / MODE_SWAP_SPRING_SAMPLE_COUNT;
-    const progress =
-      index === MODE_SWAP_SPRING_SAMPLE_COUNT ? 1 : criticalModeSwapSpringProgress(offset) / finalProgress;
-    return { ...frame(progress), offset };
-  });
-}
-
-function criticalModeSwapSpringProgress(offset: number): number {
-  const phase = 2 * Math.PI * offset;
-  return 1 - Math.exp(-phase) * (1 + phase);
+  return springKeyframes(MODE_SWAP_SPRING, frame, MODE_SWAP_SPRING_SAMPLE_COUNT);
 }
 
 function modeLayerAnchor(layer: HTMLElement): ModeSwapPoint | undefined {
@@ -292,19 +284,4 @@ function modeSwapTransform(offset: ModeSwapPoint, scale: number): string {
 function readOpacity(value: string): number {
   const opacity = Number.parseFloat(value);
   return Number.isFinite(opacity) ? opacity : 1;
-}
-
-function readScale(transform: string): number {
-  if (!transform || transform === "none") return 1;
-  const matrix = transform.match(/^matrix\(([^)]+)\)$/)?.[1]?.split(",");
-  if (!matrix) return 1;
-  const scale = Number.parseFloat(matrix[0] ?? "1");
-  return Number.isFinite(scale) ? scale : 1;
-}
-
-function readBlur(filter: string): number {
-  const blur = filter.match(/blur\(([-\d.]+)px\)/)?.[1];
-  if (!blur) return 0;
-  const value = Number.parseFloat(blur);
-  return Number.isFinite(value) ? value : 0;
 }

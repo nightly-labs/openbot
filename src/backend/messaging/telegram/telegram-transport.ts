@@ -46,7 +46,7 @@ export class TelegramTransport implements MessagingTransport {
 
   start(sink: TransportSink): void {
     this.#sink = sink;
-    this.#release ??= this.#ingress.acquire();
+    this.#release ??= this.#ingress.acquire("telegram");
     this.#unsubscribe ??= this.#ingress.onState((state) => this.#report(state));
     this.#report(this.#ingress.state());
   }
@@ -69,7 +69,7 @@ export class TelegramTransport implements MessagingTransport {
     delivery: IngressDelivery,
   ) {
     const sink = this.#sink;
-    if (!sink || delivery.kind !== "telegram") return { status: 503 } satisfies IngressAnswer;
+    if (!sink || delivery.platform !== "telegram") return { status: 503 } satisfies IngressAnswer;
     const update = parseTelegramUpdate(delivery.body);
     if (!update) return { status: 400 } satisfies IngressAnswer;
     const updateId = update.update_id;

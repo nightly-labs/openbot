@@ -2,6 +2,7 @@ import { webContents } from "electron";
 import type { BrowserHost } from "../src/backend/browser-host";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import type { DynamicToolCallParams } from "../src/backend/protocol";
+import { bitwardenLoginFixture, runBitwardenBrowserSmoke } from "./bitwarden-browser-smoke";
 import { waitForPresentedFrame } from "./browser-smoke-frames";
 
 /** HTTPS is served inside this isolated session. No credentials or network service are used. */
@@ -13,6 +14,8 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
   await protocol.handle("https", (request) => {
     const url = new URL(request.url);
     if (url.hostname !== "authentication.openbot.test") return new Response("Not found", { status: 404 });
+    if (url.pathname === "/bitwarden-password") return bitwardenLoginFixture("password");
+    if (url.pathname === "/bitwarden-authenticator") return bitwardenLoginFixture("authenticator");
     const html =
       url.pathname === "/complete"
         ? "<h1>Signed in</h1>"
@@ -36,6 +39,7 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
   });
   await runCauseEffect(browser.close(seed.id));
   try {
+    await runBitwardenBrowserSmoke(browser);
     for (const [method, path] of [
       ["password", "login"],
       ["otp", "login"],

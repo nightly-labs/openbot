@@ -21,6 +21,7 @@ import {
   isAgentSummary,
   isRoutine,
   isRoutineCalendar,
+  isRoutineFeed,
   isRoutineRun,
   isSharedTable,
   isSidebarLayoutSnapshot,
@@ -38,6 +39,7 @@ export const decodeRoutineRun = guardedDecoder(isRoutineRun, "routine run respon
 export const decodeRoutineRuns = guardedListDecoder(isRoutineRun, "routine history response");
 export const decodeAutomationRunCommand = guardedDecoder(isString, "run command response");
 export const decodeRoutineCalendar = guardedDecoder(isRoutineCalendar, "routine calendar response");
+export const decodeRoutineFeed = guardedDecoder(isRoutineFeed, "routine feed response");
 
 /** A reply carrying nothing but the provider and a status, so an unexpected field cannot slip in. */
 export function decodeProviderApiKeyState(value: unknown): ProviderApiKeyState {

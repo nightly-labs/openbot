@@ -5,8 +5,7 @@
  * only the subscription webhooks. Local development data only. On the `test` Worker each paid server is
  * a real boat VM, so the check deletes the servers of each scenario when it ends.
  *
- *   bunx dotenvx run -q -f apps/auth-api/.env.shared -fk .env.keys -- \
- *     bun scripts/stripe-flows-e2e.ts --api http://127.0.0.1:<port> [scenario ...]
+ *   bun scripts/stripe-flows-e2e.ts --api http://127.0.0.1:<port> [scenario ...]
  *
  * The Worker must run with `HOSTED_SERVERS_ALLOWED_USER_IDS` set to the IDs that `--print-user-ids`
  * prints, and `stripe listen` must forward to it. The `portal` scenario prints two Customer Portal
@@ -30,6 +29,7 @@ import type { BillingPortalRequest } from "@openbot/contracts/billing";
 import { type Browser, chromium } from "playwright-core";
 import { z } from "zod";
 import { STRIPE_API_VERSION } from "../apps/auth-api/src/server/stripe-client";
+import { developmentChildEnvironment, loadSharedDevelopmentEnvironment } from "./development-environment";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const REPORT = join(ROOT, ".openbot-build", "stripe-flows-e2e.json");
@@ -159,7 +159,7 @@ async function stripe<T>(
   return schema.parse(value);
 }
 
-/** The `boat` scenario only. The development key from `.env.shared` reads the VM of the test server. */
+/** The `boat` scenario only. The shared development key reads the VM of the test server. */
 async function boat(
   method: "GET" | "POST" | "DELETE",
   path: string,
@@ -189,7 +189,7 @@ const REAL_CHECKOUT = process.argv.includes("--checkout");
 
 function d1<T>(sql: string, schema: z.ZodType<T>): T[] {
   const target = REMOTE_D1 ? ["openbot-auth-test", "--remote", "--env", "test"] : ["openbot-auth", "--local"];
-  const env: NodeJS.ProcessEnv = { ...process.env };
+  const env = developmentChildEnvironment(process.env, "app");
   if (REMOTE_D1) delete env.CLOUDFLARE_API_TOKEN;
   const result = spawnSync(
     join(ROOT, "node_modules/.bin/wrangler"),
@@ -392,7 +392,15 @@ class Account {
 /** The `boat` scenario only: the local Chrome, headless, for the Checkout page and the web client. */
 let chrome: Promise<Browser> | null = null;
 const browser = () => {
-  chrome ??= chromium.launch({ channel: "chrome", headless: true });
+  chrome ??= chromium.launch({
+    channel: "chrome",
+    headless: true,
+    env: Object.fromEntries(
+      Object.entries(developmentChildEnvironment(process.env, "app")).filter(
+        (entry): entry is [string, string] => entry[1] !== undefined,
+      ),
+    ),
+  });
   return chrome;
 };
 
@@ -1184,11 +1192,19 @@ async function main(args: string[]) {
     print(SCENARIOS.map(userId).join(","));
     return;
   }
+  const shared = await loadSharedDevelopmentEnvironment(ROOT);
+  for (const [name, value] of Object.entries(shared)) {
+    if (process.env[name] === undefined) process.env[name] = value;
+  }
+  if (!/^(sk|rk)_test_/u.test(process.env.STRIPE_SECRET_KEY ?? ""))
+    throw new Error("STRIPE_SECRET_KEY must be a test-mode key.");
   const api = args[args.indexOf("--api") + 1];
   if (!args.includes("--api") || !api) throw new Error("Pass --api <Worker origin>.");
   const chosen = SCENARIOS.filter((scenario) => args.includes(scenario));
   // A real VM costs money, so `boat` runs only when named.
   const run = chosen.length > 0 ? chosen : SCENARIOS.filter((scenario) => scenario !== "boat");
+  if (run.includes("boat") && !process.env.BOAT_API_KEY?.trim())
+    throw new Error("BOAT_API_KEY is required for the boat scenario.");
   const clocks: string[] = [];
   for (const scenario of run) {
     let account: Account | null = null;

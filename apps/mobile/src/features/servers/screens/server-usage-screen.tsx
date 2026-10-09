@@ -1,4 +1,3 @@
-import { Host, Picker } from "@expo/ui";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams } from "expo-router";
 import { Button, Typography } from "heroui-native";
@@ -16,6 +15,7 @@ import {
   SettingsRow,
   SettingsSection,
 } from "@/features/settings/components/settings-content";
+import { SettingsPicker } from "@/features/settings/components/settings-controls";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
@@ -65,17 +65,17 @@ export function ServerUsageScreen() {
         <SettingsSection>
           <SettingsRow
             trailing={
-              <Host matchContents colorScheme={theme === "dark" ? "dark" : "light"}>
-                <Picker
-                  selectedValue={agentId ?? ""}
-                  onValueChange={(value: string) => selectAgent(value || undefined)}
-                >
-                  <Picker.Item label={t("mobile.server.usage.allAgents")} value="" />
-                  {serverAgents.map((agent) => (
-                    <Picker.Item key={agent.id} label={agent.name} value={agent.id} />
-                  ))}
-                </Picker>
-              </Host>
+              <SettingsPicker
+                value={agentId ?? ""}
+                options={[
+                  { value: "", label: t("mobile.server.usage.allAgents") },
+                  ...serverAgents.map((agent) => ({ value: agent.id, label: agent.name })),
+                ]}
+                enabled
+                dark={theme === "dark"}
+                label={t("mobile.server.usage.agent")}
+                onChange={(value) => selectAgent(value || undefined)}
+              />
             }
           >
             <Typography.Paragraph>{t("mobile.server.usage.agent")}</Typography.Paragraph>

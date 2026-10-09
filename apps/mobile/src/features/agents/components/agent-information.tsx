@@ -16,6 +16,7 @@ import { AgentSkills, CreateSkillAction } from "./agent-skills";
 import { AgentUsageReport } from "./agent-usage-report";
 import { UsageLoading } from "./usage-motion";
 import { UsageRangePicker } from "./usage-range-picker";
+import { useEventRoutines } from "./use-event-routines";
 
 type ListKind = "usage" | "memories" | "routines" | "skills" | "files";
 type RecordKind = "memory" | "routine";
@@ -95,6 +96,7 @@ export function AgentInformation({
   const { t } = useText();
   const { recordId } = useLocalSearchParams<{ recordId?: string }>();
   const workspace = useMobileWorkspace();
+  const role = workspace.servers.find((server) => server.id === agent.serverId)?.role;
   const { session, sessionScope } = useMobileSession();
   const [range, setRange] = useState(() => analyticsRange(agent.id));
   const key = ["agent-info", session?.apiUrl, session?.user.id, sessionScope, agent.serverId, agent.id];
@@ -111,6 +113,13 @@ export function AgentInformation({
     queryKey: [...key, "routines"],
     queryFn: () => workspace.loadAgentRoutines(agent.id, agent.serverId),
   });
+  const { eventsEnabled, eventRoutines, webhookRoutines } = useEventRoutines(
+    { kind: "agent", id: agent.id },
+    agent.serverId,
+    available && (section === "routines" || section === "routine"),
+    key,
+  );
+  const allRoutines = [...(routines.data ?? []), ...webhookRoutines];
   // An owner or admin reads the admin list, which has the enabled state, and can change it.
   const manageSkills = workspace.canManageAgentSkills(agent.serverId);
   const skillsKey = [...key, "skills", manageSkills];
@@ -139,7 +148,6 @@ export function AgentInformation({
     forceStorageScan.current = true;
     void storage.refetch();
   }
-  const role = workspace.servers.find((server) => server.id === agent.serverId)?.role;
   const usage = useQuery({
     ...options,
     enabled: available && section === "usage",
@@ -220,11 +228,14 @@ export function AgentInformation({
           kind="routines"
           list
           available={available}
-          pending={routines.isPending}
-          failed={routines.isError}
-          retry={() => void routines.refetch()}
+          pending={routines.isPending || (eventsEnabled && eventRoutines.isPending)}
+          failed={routines.isError || (eventsEnabled && eventRoutines.isError)}
+          retry={() => {
+            void routines.refetch();
+            if (eventsEnabled) void eventRoutines.refetch();
+          }}
         >
-          {routines.data?.map((routine) => (
+          {allRoutines.map((routine) => (
             <SettingsRow
               key={routine.id}
               supportingText={t(routine.active ? "mobile.agent.info.routineActive" : "mobile.agent.info.routinePaused")}
@@ -238,7 +249,7 @@ export function AgentInformation({
               <Typography.Paragraph numberOfLines={1}>{routine.name}</Typography.Paragraph>
             </SettingsRow>
           ))}
-          {!routines.data?.length ? (
+          {!allRoutines.length ? (
             <SettingsRow>
               <Typography.Paragraph className="text-grouped-secondary">
                 {t("mobile.agent.info.noRoutines")}
@@ -341,16 +352,19 @@ export function AgentInformation({
           <RecordSection
             kind="routine"
             available={available}
-            pending={routines.isPending}
-            failed={routines.isError}
-            retry={() => void routines.refetch()}
+            pending={routines.isPending || (eventsEnabled && eventRoutines.isPending)}
+            failed={routines.isError || (eventsEnabled && eventRoutines.isError)}
+            retry={() => {
+              void routines.refetch();
+              if (eventsEnabled) void eventRoutines.refetch();
+            }}
           >
-            {routines.data?.some((item) => item.id === recordId) ? (
+            {allRoutines.some((item) => item.id === recordId) ? (
               <RoutineEditor
                 key={recordId}
                 agent={agent}
-                available={available && !routines.isError}
-                routine={routines.data.find((item) => item.id === recordId)}
+                available={available && !routines.isError && !(eventsEnabled && eventRoutines.isError)}
+                routine={allRoutines.find((item) => item.id === recordId)}
               />
             ) : (
               <SettingsRow>

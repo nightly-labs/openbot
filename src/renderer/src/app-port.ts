@@ -16,12 +16,14 @@ export interface AppPort {
   setAppLogoColorPreference: OpenBotDesktopApi["setAppLogoColorPreference"];
   agent: Pick<
     OpenBotDesktopApi["agent"],
-    "readConversationPage" | "searchConversationMessages" | "searchConversationFiles" | "listRoutines"
+    "readConversationPage" | "searchConversationMessages" | "searchConversationFiles" | "listRoutines" | "listAgents"
   >;
   agentTemplates: Pick<OpenBotDesktopApi["agentTemplates"], "onOpenLink" | "takePendingLink">;
   hostedSites: OpenBotDesktopApi["hostedSites"];
   billing: OpenBotDesktopApi["billing"];
   hostedServers: OpenBotDesktopApi["hostedServers"];
+  routineFeed: OpenBotDesktopApi["routineFeed"];
+  events: OpenBotDesktopApi["events"];
   plugins: Pick<OpenBotDesktopApi["plugins"], "onOpenListing" | "takePendingListing">;
   servers: Pick<OpenBotDesktopApi["servers"], "onInvite" | "takePendingInvite">;
 }

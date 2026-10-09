@@ -73,6 +73,8 @@ export const messages = {
   "server.rail.notificationSettings": "Réglages des notifications",
   "server.rail.usage": "Utilisation",
   "server.rail.settings": "Réglages du serveur",
+  "server.rail.leave": "Quitter le serveur",
+  "server.rail.delete": "Supprimer le serveur",
   "server.select.failedTitle": "Impossible de sélectionner le serveur",
   "server.select.failedDescription": "Impossible de changer de serveur. Réessayez.",
   "server.select.openAgentFailed": "Impossible d’ouvrir {name}. Retrouvez-le dans la barre latérale.",
@@ -190,6 +192,9 @@ export const messages = {
   "server.members.actionsFor": "Actions pour {name}",
   "server.members.makeMember": "Définir comme membre",
   "server.members.makeAdmin": "Définir comme admin",
+  "server.members.makeAdminTitle": "Définir {name} comme admin ?",
+  "server.members.makeMemberTitle": "Définir {name} comme membre ?",
+  "server.members.roleChangeDescription": "{name} peut être déconnecté de ce serveur et devra alors se reconnecter.",
   "server.invite.invalidEmail": "Saisissez une adresse e-mail valide.",
   "server.invite.title": "Inviter des personnes",
   "server.invite.description":
@@ -234,6 +239,9 @@ export const messages = {
   },
   "server.invite.expires": "Expire le {date}",
   "server.invite.revoke": "Révoquer",
+  "server.invite.revokeTitle": "Révoquer cette invitation ?",
+  "server.invite.revokeDescription":
+    "L’invitation ne fonctionne plus. Les personnes qui l’ont utilisée restent membres.",
   "server.desktop.accessTitle": "Accès au bureau à distance",
   "server.desktop.gatewayDescription":
     "Chaque membre actif du serveur peut contrôler cet hôte. Il n’y a pas de mot de passe distinct pour le bureau à distance.",

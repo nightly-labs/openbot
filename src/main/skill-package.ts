@@ -6,6 +6,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { Effect, Schema } from "effect";
 import { unzipSync, zipSync } from "fflate";
 import { parse as parseYaml } from "yaml";
+import { causeHelpers } from "../backend/effect-boundary";
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const MAX_FILES = 200;
@@ -128,6 +129,5 @@ function slugify(name: string): string {
 export class SkillArchiveFailure extends Schema.TaggedError<SkillArchiveFailure>()("SkillArchiveFailure", {
   cause: Schema.Defect(),
 }) {}
-function archiveIO<A>(operation: () => Promise<A>): Effect.Effect<A, SkillArchiveFailure> {
-  return Effect.tryPromise({ try: operation, catch: (cause) => new SkillArchiveFailure({ cause }) });
-}
+
+const { io: archiveIO } = causeHelpers(SkillArchiveFailure);

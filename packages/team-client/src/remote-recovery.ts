@@ -32,6 +32,7 @@ function remoteRetryDelay(attempt: number): number {
 export interface RemoteRecoveryStatus {
   phase: "connecting" | "waiting" | "cooldown" | "online" | "suspended";
   attempt: number;
+  /** The wait before the next attempt. While connecting, the wait that follows if this attempt fails. */
   remainingSeconds: number;
 }
 
@@ -146,6 +147,8 @@ export function createRemoteConnectionRecovery(
   let interrupted = false;
   let attempt = 0;
   let retryAt: number | null = null;
+  /** Chosen when an attempt starts, so its status can show the wait that follows a failure. */
+  let retryDelay: number | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
 
   function cancelTimer() {
@@ -160,7 +163,8 @@ export function createRemoteConnectionRecovery(
   /** `start` begins the attempt that is due now: a new run, or the next pass of the run that is ending. */
   function scheduleRetry(start: () => void = startRun) {
     if (disposed || suspended) return;
-    retryAt ??= Date.now() + remoteRetryDelay(attempt);
+    retryAt ??= Date.now() + (retryDelay ?? remoteRetryDelay(attempt));
+    retryDelay = null;
     if (!active) return;
     const remaining = Math.max(0, retryAt - Date.now());
     if (remaining === 0 && !running) {
@@ -202,9 +206,10 @@ export function createRemoteConnectionRecovery(
     refreshRequested = false;
     interrupted = false;
     attempt += 1;
+    retryDelay = remoteRetryDelay(attempt);
     // A foreground read is not a lost connection. Keep the workspace usable
     // until the transport reports a failure or the read fails.
-    if (!online) onStatus({ phase: "connecting", attempt, remainingSeconds: 0 });
+    if (!online) onStatus({ phase: "connecting", attempt, remainingSeconds: Math.ceil(retryDelay / 1000) });
     yield* Effect.gen(function* () {
       const result = yield* recoveryCall(connect).pipe(Effect.result);
       if (Result.isFailure(result)) {

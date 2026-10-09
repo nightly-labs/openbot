@@ -41,6 +41,7 @@ describe("AgentSettingsPanel", () => {
           onSetAgentAvatar={vi.fn(async () => undefined)}
         />
       ));
+      await fireEvent.click(await screen.findByRole("button", { name: "Edit instructions" }));
       const instructions = await screen.findByRole("textbox", { name: "Agent instructions" });
       await fireEvent.input(instructions, { target: { value: "Keep the shared form independent." } });
       view.unmount();
@@ -75,6 +76,7 @@ describe("AgentSettingsPanel", () => {
         />
       ));
 
+      await fireEvent.click(await screen.findByRole("button", { name: "Edit instructions" }));
       const instructions = await screen.findByRole("textbox", { name: "Agent instructions" });
       instructions.focus();
       await fireEvent.input(instructions, { target: { value: "Use the reviewed release instructions." } });
@@ -110,6 +112,7 @@ describe("AgentSettingsPanel", () => {
       />
     ));
 
+    await fireEvent.click(await screen.findByRole("button", { name: "Edit instructions" }));
     const instructions = await screen.findByRole("textbox", { name: "Agent instructions" });
     await fireEvent.input(instructions, { target: { value: "Keep this instruction when the panel closes." } });
     view.unmount();
@@ -149,6 +152,7 @@ describe("AgentSettingsPanel", () => {
         />
       ));
 
+      await fireEvent.click(await screen.findByRole("button", { name: "Edit instructions" }));
       const instructions = await screen.findByRole("textbox", { name: "Agent instructions" });
       await fireEvent.input(instructions, { target: { value: "First instruction" } });
       await vi.advanceTimersByTimeAsync(500);
@@ -581,9 +585,13 @@ describe("AgentSettingsPanel", () => {
     expect(await screen.findByText("Could not save agent settings.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Agent model: GPT-5.6 Sol" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Agent reasoning level/ })).toHaveTextContent("Extra high");
+    await fireEvent.click(screen.getByRole("button", { name: "Advanced" }));
     expect(screen.getByText("/mock/OpenBot/Agents/chief")).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Back to settings" }));
+    await fireEvent.click(screen.getByRole("button", { name: /^Permissions/u }));
     expect(screen.getByText(/full computer access/)).toBeInTheDocument();
     expect(screen.getByText(/may ask for approval first/)).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Back to settings" }));
     await fireEvent.click(screen.getByRole("button", { name: "Usage" }));
     expect(onOpenUsage).toHaveBeenCalledWith(screen.getByRole("button", { name: "Usage" }));
     expect(screen.getByRole("button", { name: "Agent model: GPT-5.6 Sol" })).toBeInTheDocument();
@@ -609,6 +617,7 @@ describe("AgentSettingsPanel", () => {
         onSetAgentAvatar={vi.fn(async () => undefined)}
       />
     ));
+    await fireEvent.click(await screen.findByRole("button", { name: /^Permissions/u }));
     expect(await screen.findByText(/asks you first, also when Auto approve is on/)).toBeInTheDocument();
     const chooseFullAccess = async () => {
       await fireEvent.pointerDown(screen.getByRole("button", { name: /Agent access/ }), {
@@ -649,6 +658,7 @@ describe("AgentSettingsPanel", () => {
       />
     ));
 
+    await fireEvent.click(await screen.findByRole("button", { name: /^Permissions/u }));
     expect(await screen.findByText(/Claude acts without asking for approval/)).toBeInTheDocument();
     expect(screen.queryByText(/may ask for approval first/)).not.toBeInTheDocument();
   });

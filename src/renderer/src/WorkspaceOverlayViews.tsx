@@ -1,6 +1,6 @@
 import type { AddedAgent, McpServerConfig, ServerSummary } from "@openbot/contracts/ipc";
 import { MCP_SERVERS_CAPABILITY } from "@openbot/contracts/ipc";
-import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-update-v1";
+import type { BitwardenConnectorPanelProps } from "@openbot/ui/features/settings/BitwardenConnectorPanel";
 import type { ComponentProps } from "@solidjs/web";
 import { createMemo, Loading, omit, Show } from "solid-js";
 import type { AgentTemplateInstallCalls } from "./features/agent-templates/agent-templates-port";
@@ -13,7 +13,12 @@ import type { ServerStorageOptions } from "./features/files/ServerStoragePanel";
 import { canManageStorage, serverHasStorage } from "./features/files/storage-usage";
 import type { ServerSettingsModalProps } from "./features/servers/ServerSettingsModal";
 import type { ServerUpdateOptions } from "./features/servers/ServerUpdatePanel";
-import { remoteAdminServer, serverCanAdminister } from "./features/servers/server-capabilities";
+import {
+  remoteAdminServer,
+  remoteUpdateServer,
+  serverCanAdminister,
+  serverRoleCanAdminister,
+} from "./features/servers/server-capabilities";
 import type { MarketplaceCalls } from "./features/settings/marketplace-calls";
 import type { MarketplaceAgentRow } from "./features/settings/marketplace-controller";
 import { MARKETPLACE_PLUGINS } from "./features/settings/marketplace-plugin-catalog";
@@ -73,6 +78,7 @@ export function MarketplaceOverlay(props: {
   githubConnector?: GitHubConnectorController | undefined;
   /** This computer's 1Password connection. Absent in the web client and on a joined server. */
   onePasswordConnector?: OnePasswordConnectorController | undefined;
+  bitwardenConnector?: BitwardenConnectorPanelProps | undefined;
   /** What the dialog calls. Absent: this computer's bridge. */
   calls?: MarketplaceCalls | undefined;
 }) {
@@ -104,6 +110,7 @@ export function MarketplaceOverlay(props: {
           calls={props.calls}
           githubConnector={props.githubConnector}
           onePasswordConnector={props.onePasswordConnector}
+          bitwardenConnector={props.bitwardenConnector}
           agents={manage() ? props.agents : []}
           activeAgentId={manage() ? props.activeAgentId : ""}
           hostServerId={remoteAdminServer(props.server, "skills-admin-v1")?.id}
@@ -194,7 +201,11 @@ export function ServerSettingsOverlay(
         storage={
           serverHasStorage(props.server) ? { ...props.storage, canManage: canManageStorage(props.server) } : undefined
         }
-        hostUpdate={remoteAdminServer(props.server, HOST_UPDATE_CAPABILITY) ? props.hostUpdate : undefined}
+        hostUpdate={
+          remoteUpdateServer(props.server)
+            ? { ...props.hostUpdate, canManage: serverRoleCanAdminister(props.server) }
+            : undefined
+        }
       />
     </Loading>
   );

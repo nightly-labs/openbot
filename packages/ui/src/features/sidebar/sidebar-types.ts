@@ -19,7 +19,16 @@ import type { SidebarPinnedItem } from "./sidebar-pins";
  * Reading them from the entry component made the pure logic depend on the whole
  * view to borrow a name.
  */
+/**
+ * What the main area shows for the chat picked in the list: its conversation, or its routines. The
+ * list itself is the same in both.
+ */
+export type SidebarView = "agents" | "routines";
+
 export interface SidebarProps {
+  /** The switch over the list is shown only when the caller handles `onViewChange`. */
+  view?: SidebarView;
+  onViewChange?: ((view: SidebarView) => void) | undefined;
   deleteSupported?: boolean;
   marketplaceSupported?: boolean;
   channels?: ChannelSummary[];
@@ -73,7 +82,11 @@ export interface SidebarProps {
   /** A card under the chat list, such as an announcement. The compact sidebar has no room for it. */
   footer?: JSX.Element;
   onExpand: () => void;
+  /** Opens the global search. The search field and the compact search button both call it. */
+  onOpenSearch: () => void;
   onOpenMarketplace: () => void;
+  /** The agents are still on their way, so an empty list says that it connects rather than that it is empty. */
+  agentsConnecting?: boolean;
   emptyAction?:
     | {
         label: string;

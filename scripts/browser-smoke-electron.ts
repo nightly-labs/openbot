@@ -2,9 +2,10 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { BrowserBounds } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
-import { app, BrowserWindow, type WebContents, webContents } from "electron";
+import { app, BrowserWindow, clipboard, type WebContents, webContents } from "electron";
 import { BrowserHost } from "../src/backend/browser-host";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { type DynamicToolResult, getString } from "../src/backend/protocol";
@@ -160,6 +161,15 @@ const server = createServer((request, response) => {
   if (url.pathname === "/headers-report") {
     response.setHeader("content-type", "application/json; charset=utf-8");
     response.end(JSON.stringify(recordedIdentityAgents));
+    return;
+  }
+  if (url.pathname === "/clipboard-frame") {
+    // An editor in a frame of another origin, which keeps the text of the last paste event.
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.end(`<textarea style="position:fixed;inset:0;width:100%;height:100%"></textarea>
+      <script>document.querySelector('textarea').addEventListener('paste', event => {
+        window.__pasteEvent = event.clipboardData.getData('text/plain');
+      });</script>`);
     return;
   }
   if (url.pathname === "/frame") {
@@ -391,6 +401,7 @@ async function main(): Promise<void> {
   const xLive = process.argv.includes("--x-live");
   const whatsappLive = process.argv.includes("--whatsapp-live");
   const canvaLive = process.argv.includes("--canva-live");
+  const framerLive = process.argv.includes("--framer-live");
   const configuredRoot = argumentValue("--smoke-root=");
   const persistencePhase = argumentValue("--persistence-phase=");
   const persistenceOrigin = argumentValue("--persistence-origin=");
@@ -1372,7 +1383,8 @@ async function main(): Promise<void> {
     if (oversizedEnvironment.success || !toolError(oversizedEnvironment).includes("physical viewport")) {
       throw new Error("V2 environment accepted an unsafe physical pixel area.");
     }
-    await runCauseEffect(browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 1200, height: 800 } }));
+    const panelBounds = { x: 0, y: 0, width: 1200, height: 800 };
+    await runCauseEffect(browser.setVisible({ visible: true, bounds: panelBounds }));
     const restoredFill = await callBrowserTool(browser, "set_environment", { tabId: v2Tab.id, preset: "fill" });
     const restoredFillSnapshot = toolTextPayload(restoredFill);
     if (
@@ -1653,11 +1665,12 @@ async function main(): Promise<void> {
       : [];
     const clientHintBrands = getString(identity.requestHeaders, "sec-ch-ua") ?? "";
     const chromiumMajorVersion = process.versions.chrome.split(".")[0];
-    // The page and its requests share one honest identity, tokens included: Google reads a
-    // scrubbed Chromium string as an unknown client and refuses sign-in, while workers leaked
-    // the tokens anyway. Only the match between page and request identity is asserted here.
+    // The page and its requests share one identity: Google refuses sign-in without the build
+    // token, and Framer refuses it with the product token (`--google-live`, `--framer-live`).
     if (
       !navigatorUserAgent?.includes(`Chrome/${chromiumMajorVersion}`) ||
+      !navigatorUserAgent.includes(`Electron/${process.versions.electron}`) ||
+      navigatorUserAgent.includes("OpenBot/") ||
       getString(identity.requestHeaders, "user-agent") !== navigatorUserAgent ||
       identity.navigatorWebdriver !== false ||
       (clientHintBrands.length > 0 &&
@@ -1673,6 +1686,7 @@ async function main(): Promise<void> {
     if (xLive) await runXLiveProbe(browser);
     if (whatsappLive) await runWhatsAppLiveProbe(browser);
     if (canvaLive) await runCanvaLiveProbe(browser);
+    if (framerLive) await runFramerLiveProbe(browser, panelBounds);
     await expectFailure(() => runCauseEffect(browser.act(tab.id, first.revision, { type: "click", ref: save.ref })));
 
     const current = await runCauseEffect(browser.snapshot(tab.id));
@@ -2081,6 +2095,7 @@ async function runLiveViewScenario(browser: BrowserHost, tabId: string, contents
       if (!pressed) await new Promise((resolve) => setTimeout(resolve, 100));
     }
     if (!pressed) throw new Error("A live view click did not reach the page.");
+    await runLiveViewClipboard(browser, tabId, contents);
   } finally {
     await Effect.runPromise(stopView());
   }
@@ -2096,6 +2111,199 @@ async function runLiveViewScenario(browser: BrowserHost, tabId: string, contents
     document.getElementById('live-view-probe')?.remove();
     document.getElementById('live-view-button')?.remove();
   })()`,
+    true,
+  );
+}
+
+/**
+ * A member's paste, select-all, copy and cut in a live view. The text goes in as one insertion and
+ * the selection comes back as text, and the host's own clipboard is neither read nor replaced. The
+ * results go to `.openbot-build/browser-live-view-clipboard.json`.
+ */
+async function runLiveViewClipboard(browser: BrowserHost, tabId: string, contents: WebContents): Promise<void> {
+  const pasted = "pasted by the member\nsecond line";
+  const field = (id: string, type: string) =>
+    contents.executeJavaScript(
+      `(() => {
+      document.getElementById('${id}')?.remove();
+      const field = document.createElement('${type === "textarea" ? "textarea" : "input"}');
+      field.id = '${id}';
+      ${type === "password" ? "field.type = 'password'; field.value = 'host secret';" : ""}
+      field.style.cssText = 'position:fixed;left:10px;top:230px;width:300px;height:60px;z-index:2147483647';
+      document.body.append(field);
+      field.focus();
+      field.select();
+    })()`,
+      true,
+    );
+  const value = (id: string) => contents.executeJavaScript(`document.getElementById('${id}').value`, true);
+
+  await field("live-view-text", "textarea");
+  // The member's Ctrl+V and Cmd+V still reach the page as keys, and must not paste the host's clipboard.
+  for (const modifiers of [2, 4]) {
+    for (const action of ["down", "up"] as const) {
+      await runCauseEffect(
+        browser.dispatchViewInput(tabId, { type: "key", action, key: "v", code: "KeyV", text: "", modifiers }),
+      );
+    }
+  }
+  const afterPasteKeys = await value("live-view-text");
+  if (afterPasteKeys !== "") throw new Error("A live view Ctrl+V or Cmd+V pasted the host clipboard.");
+  await contents.executeJavaScript(
+    `document.getElementById('live-view-text').addEventListener('paste', event => {
+      window.__liveViewPasteEvent = event.clipboardData.getData('text/plain');
+    }, { once: true })`,
+    true,
+  );
+  await runCauseEffect(browser.dispatchViewInput(tabId, { type: "paste", text: pasted }));
+  const pasteEvent = await contents.executeJavaScript("window.__liveViewPasteEvent", true);
+  if (pasteEvent !== pasted) throw new Error("A live view paste fired no paste event with the text.");
+  const afterPaste = await value("live-view-text");
+  if (afterPaste !== pasted) throw new Error(`A live view paste left ${JSON.stringify(afterPaste)} in the field.`);
+  // Cmd+A from a Mac client selects all on any host, because the host names the command.
+  await contents.executeJavaScript(
+    "(field => field.setSelectionRange(field.value.length, field.value.length))(document.getElementById('live-view-text'))",
+    true,
+  );
+  for (const action of ["down", "up"] as const) {
+    await runCauseEffect(
+      browser.dispatchViewInput(tabId, { type: "key", action, key: "a", code: "KeyA", text: "", modifiers: 4 }),
+    );
+  }
+  const copied = await runCauseEffect(browser.copyViewSelection(tabId, 100_000));
+  if (copied !== pasted) throw new Error(`A live view copy after select-all returned ${JSON.stringify(copied)}.`);
+  const tooLarge = await runCauseEffect(browser.copyViewSelection(tabId, pasted.length - 1));
+  if (tooLarge !== null) throw new Error("A live view copy sent a selection longer than its limit.");
+  // The second half of a cut deletes only the text the member has on their clipboard.
+  await runCauseEffect(browser.dispatchViewInput(tabId, { type: "cut", text: "other text" }));
+  const afterStaleCut = await value("live-view-text");
+  if (afterStaleCut !== pasted) throw new Error("A live view cut deleted a selection that had changed.");
+  await runCauseEffect(browser.dispatchViewInput(tabId, { type: "cut", text: pasted }));
+  const afterCut = await value("live-view-text");
+  if (afterCut !== "") throw new Error("A live view cut did not delete the selected text.");
+
+  // A field in a frame of the page's own origin gets the paste event and gives its selection.
+  await contents.executeJavaScript(
+    `new Promise(resolve => {
+      document.getElementById('live-view-frame')?.remove();
+      const frame = document.createElement('iframe');
+      frame.id = 'live-view-frame';
+      frame.style.cssText = 'position:fixed;left:10px;top:300px;width:300px;height:80px;z-index:2147483647';
+      frame.srcdoc = '<textarea></textarea>';
+      frame.onload = () => {
+        const inner = frame.contentDocument.querySelector('textarea');
+        inner.addEventListener('paste', event => { window.__liveViewFramePaste = event.clipboardData.getData('text/plain'); });
+        inner.focus();
+        resolve();
+      };
+      document.body.append(frame);
+    })`,
+    true,
+  );
+  await runCauseEffect(browser.dispatchViewInput(tabId, { type: "paste", text: "in a frame" }));
+  const framePasteEvent = await contents.executeJavaScript("window.__liveViewFramePaste", true);
+  await contents.executeJavaScript(
+    "document.getElementById('live-view-frame').contentDocument.querySelector('textarea').select()",
+    true,
+  );
+  const fromFrame = await runCauseEffect(browser.copyViewSelection(tabId, 100_000));
+  if (framePasteEvent !== "in a frame" || fromFrame !== "in a frame") {
+    throw new Error("A live view paste or copy missed a field in a frame of the same origin.");
+  }
+
+  // A field in a frame of another origin, which runs in its own process: the page's world cannot
+  // reach it, so the host follows the focus through CDP. The member clicks into it, as a user does.
+  await contents.executeJavaScript(
+    `new Promise(resolve => {
+      document.getElementById('live-view-frame')?.remove();
+      const frame = document.createElement('iframe');
+      frame.id = 'live-view-frame';
+      frame.style.cssText = 'position:fixed;left:10px;top:300px;width:300px;height:80px;border:0;z-index:2147483647';
+      frame.src = 'http://localhost:' + location.port + '/clipboard-frame';
+      frame.onload = () => resolve();
+      document.body.append(frame);
+    })`,
+    true,
+  );
+  const crossOriginFrame = contents.mainFrame.framesInSubtree.find((frame) => frame.url.endsWith("/clipboard-frame"));
+  if (!crossOriginFrame) throw new Error("The cross-origin clipboard frame did not load.");
+  // A frame in another process takes clicks only once it draws, so the click repeats until it lands.
+  const focusDeadline = Date.now() + 10_000;
+  while (!(await crossOriginFrame.executeJavaScript("document.activeElement?.tagName === 'TEXTAREA'"))) {
+    if (Date.now() > focusDeadline) {
+      throw new Error("A live view click did not focus the field in a cross-origin frame.");
+    }
+    for (const action of ["move", "down", "up"] as const) {
+      await runCauseEffect(
+        browser.dispatchViewInput(tabId, {
+          type: "pointer",
+          action,
+          x: 160,
+          y: 340,
+          button: "left",
+          clickCount: action === "move" ? 0 : 1,
+          deltaX: 0,
+          deltaY: 0,
+          modifiers: 0,
+        }),
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  await runCauseEffect(browser.dispatchViewInput(tabId, { type: "paste", text: "across origins" }));
+  const crossOriginPasteEvent = await crossOriginFrame.executeJavaScript("window.__pasteEvent");
+  const crossOriginValue = await crossOriginFrame.executeJavaScript("document.querySelector('textarea').value");
+  await crossOriginFrame.executeJavaScript("document.querySelector('textarea').select()");
+  const fromCrossOriginFrame = await runCauseEffect(browser.copyViewSelection(tabId, 100_000));
+  await runCauseEffect(browser.dispatchViewInput(tabId, { type: "cut", text: "across origins" }));
+  const afterCrossOriginCut = await crossOriginFrame.executeJavaScript("document.querySelector('textarea').value");
+  if (
+    crossOriginPasteEvent !== "across origins" ||
+    crossOriginValue !== "across origins" ||
+    fromCrossOriginFrame !== "across origins" ||
+    afterCrossOriginCut !== ""
+  ) {
+    throw new Error(
+      `A live view paste, copy or cut missed a field in a cross-origin frame: ${JSON.stringify({ crossOriginPasteEvent, crossOriginValue, fromCrossOriginFrame, afterCrossOriginCut })}`,
+    );
+  }
+
+  await field("live-view-password", "password");
+  const fromPassword = await runCauseEffect(browser.copyViewSelection(tabId, 100_000));
+  if (fromPassword !== "") throw new Error("A live view copy read a password field.");
+  // Whoever sits at the host may copy something meanwhile, so the check is that the member's text
+  // never reached the host's clipboard, not that the clipboard stayed the same.
+  const hostClipboardHasMemberText = (await clipboard.readText()).includes(pasted);
+  if (hostClipboardHasMemberText) throw new Error("A live view copy or paste wrote the host clipboard.");
+
+  const reportDirectory = join(process.cwd(), ".openbot-build");
+  await mkdir(reportDirectory, { recursive: true });
+  await writeFile(
+    join(reportDirectory, "browser-live-view-clipboard.json"),
+    `${JSON.stringify(
+      {
+        afterPasteKeys,
+        pasteEvent,
+        afterPaste,
+        copied,
+        tooLarge,
+        afterStaleCut,
+        afterCut,
+        framePasteEvent,
+        fromFrame,
+        crossOriginPasteEvent,
+        crossOriginValue,
+        fromCrossOriginFrame,
+        afterCrossOriginCut,
+        fromPassword,
+        hostClipboardHasMemberText,
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  await contents.executeJavaScript(
+    `for (const id of ['live-view-text', 'live-view-password', 'live-view-frame']) document.getElementById(id)?.remove();`,
     true,
   );
 }
@@ -3124,6 +3332,58 @@ async function runCanvaLiveProbe(browser: BrowserHost): Promise<void> {
     throw new Error(`Canva returned an unexpected page: ${page.url} ${page.text.slice(0, 500)}`);
   }
   process.stdout.write("BrowserHost: Canva presentations page loaded without a browser block.\n");
+}
+
+async function runFramerLiveProbe(browser: BrowserHost, panelBounds: BrowserBounds): Promise<void> {
+  // An example.com address gets the same policy verdict as a real one and sends no mail to a
+  // person. The policy also refuses an exact 800x600 viewport, the headless default, so the probe
+  // uses another size for the duration and then restores the panel.
+  await runCauseEffect(browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 760, height: 560 } }));
+  const framerTab = await runCauseEffect(
+    browser.open("https://framer.com/login/", "framer-live-smoke", "framer-live-smoke", true),
+  );
+  try {
+    const deadline = Date.now() + 30_000;
+    let page = await runCauseEffect(browser.snapshot(framerTab.id));
+    let email = page.elements.find((element) => element.tag === "input" && !element.disabled);
+    while (!email && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      page = await runCauseEffect(browser.snapshot(framerTab.id));
+      email = page.elements.find((element) => element.tag === "input" && !element.disabled);
+    }
+    if (!email) throw new Error(`Framer did not show the email field: ${page.url} ${page.text.slice(0, 500)}`);
+    await runCauseEffect(
+      browser.act(framerTab.id, page.revision, {
+        type: "type",
+        ref: email.ref,
+        text: "openbot-framer-probe@example.com",
+        submit: true,
+      }),
+    );
+    let normalized = "";
+    while (Date.now() < deadline) {
+      page = await runCauseEffect(browser.snapshot(framerTab.id));
+      normalized = page.text.toLowerCase();
+      if (
+        normalized.includes("verification failed") ||
+        normalized.includes("cannot log you in") ||
+        normalized.includes("verification link sent")
+      ) {
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    if (normalized.includes("verification failed") || normalized.includes("cannot log you in")) {
+      throw new Error(`Framer refused the embedded browser: ${page.url} ${page.text.slice(0, 500)}`);
+    }
+    if (!normalized.includes("verification link sent")) {
+      throw new Error(`Framer returned an unexpected page: ${page.url} ${page.text.slice(0, 500)}`);
+    }
+    process.stdout.write("BrowserHost: Framer accepted the sign-in request.\n");
+  } finally {
+    await runCauseEffect(browser.close(framerTab.id));
+    await runCauseEffect(browser.setVisible({ visible: true, bounds: panelBounds }));
+  }
 }
 
 async function waitForXSnapshot(

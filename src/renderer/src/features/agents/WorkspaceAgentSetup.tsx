@@ -5,6 +5,7 @@ import { useProviders } from "../../providers";
 import { useCustomAgents } from "../custom-agents/custom-agents-context";
 import { useCustomProviders } from "../custom-providers/custom-providers-context";
 import { useSetup } from "../onboarding/onboarding-context";
+import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
 import { useAgentActions } from "./agent-actions";
 import { resolveCreationModel } from "./agent-creation-model";
@@ -40,7 +41,9 @@ export function WorkspaceAgentSetup() {
     downloadProviderRuntime,
     cancelProviderRuntimeDownload,
     connectProvider,
+    providerAdminServerId,
   } = useProviders();
+  const { openServerSettings } = useServerSettings();
   /** Provider downloads are the local machine's business, never a remote host's. */
   const localProviderDownloads = createMemo(
     () => activeServer()?.kind === "local" && providerRuntimeDownloadsAvailable(),
@@ -91,6 +94,14 @@ export function WorkspaceAgentSetup() {
       onDownloadProvider={localProviderDownloads() ? downloadProviderRuntime : undefined}
       onCancelProviderDownload={localProviderDownloads() ? cancelProviderRuntimeDownload : undefined}
       onConnectProvider={localProviderDownloads() ? connectProvider : undefined}
+      onAddCustomProvider={
+        activeServer()?.kind === "local" || providerAdminServerId() !== undefined
+          ? (trigger: HTMLElement) => {
+              const server = activeServer();
+              if (server) openServerSettings(server.id, trigger, "providers");
+            }
+          : undefined
+      }
       onChange={(next) => {
         const current = agentSetupDraft();
         if (next.provider !== current.provider || next.model !== current.model) setModelTouched(true);

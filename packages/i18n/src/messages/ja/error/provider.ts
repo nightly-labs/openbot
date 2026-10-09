@@ -68,6 +68,7 @@ export const messages = {
   "error.provider.unexpectedVersion": "プロバイダーのランタイムが予期しないバージョンを返しました。",
   "error.provider.metadataNoData": "ランタイムのメタデータのダウンロードでデータが返されませんでした。",
   "error.provider.metadataTooLarge": "ランタイムのメタデータが大きすぎます。",
+  "error.provider.requestFailed": "OpenBot は {url} をダウンロードできませんでした。{reason}",
   "error.provider.installRecordMismatch": "ランタイムのインストール記録が一致しません。",
   "error.provider.runtimeChecksum": "プロバイダーのランタイムのチェックサムが一致しません。",
   "error.provider.codexReleaseShape": "Codex のリリース情報の形式が予期しないものです。",
@@ -104,7 +105,7 @@ export const messages = {
   "error.provider.acpNoModels": "ACP CLI が ACP モデルを通知しませんでした。OpenBot は代替モデルを推測しません。",
   "error.provider.endpointRemoveBusy":
     "このエンドポイントを削除する前に、実行中のターンとキューが終わるまでお待ちください。",
-  "error.provider.codexOutdated": "Codex CLI {version} は古すぎます。OpenBot には 0.144.1 以降が必要です。",
+  "error.provider.codexOutdated": "Codex CLI {version} は古すぎます。OpenBot には 0.156.0 以降が必要です。",
   "error.provider.codexNotStarted": "Codex CLI は見つかりましたが、起動できませんでした。",
   "error.provider.codexNotStartedHint":
     "Codex CLI は見つかりましたが、起動できませんでした。新しいターミナルで `codex --version` を実行してください。",

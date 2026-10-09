@@ -148,7 +148,8 @@ export function routineWeekdayInitial(day: number, text: RoutineText = currentTe
 
 /**
  * The hours chip: "All day", "All day at :30" for runs past the hour, "9 AM–6 PM", or
- * "10:30–11:30 AM" when both ends share a half of the day. The step is on the frequency chip.
+ * "10:30–11:30 AM" when both ends share a half of the day. A 24-hour clock shows "09:00–18:00".
+ * The step is on the frequency chip.
  */
 export function routineHoursLabel(window: RoutineHoursWindow, minute = 0, text: RoutineText = currentText()): string {
   const { t } = text;
@@ -156,6 +157,12 @@ export function routineHoursLabel(window: RoutineHoursWindow, minute = 0, text: 
     return minute > 0
       ? t("routine.hours.allDayAt", { minute: String(minute).padStart(2, "0") })
       : t("routine.hours.allDay");
+  }
+  if (!text.format.hour12) {
+    return t("routine.hours.window", {
+      start: formatRoutineClock(window.start, text),
+      end: formatRoutineClock(window.end, text),
+    });
   }
   const start = splitClock(window.start);
   const end = splitClock(window.end);
@@ -182,8 +189,12 @@ function shortClockDigits(parts: RoutineClockParts): string {
   return parts.minute === 0 ? String(parts.hour) : `${parts.hour}:${String(parts.minute).padStart(2, "0")}`;
 }
 
-/** "9 AM" on the hour and "9:30 AM" otherwise, for labels that must stay short. */
+/**
+ * "9 AM" on the hour and "9:30 AM" otherwise, for labels that must stay short. A 24-hour clock
+ * always shows the minutes: "09:00".
+ */
 export function formatRoutineClockShort(value: RoutineClock, text: RoutineText = currentText()): string {
+  if (!text.format.hour12) return formatRoutineClock(value, text);
   const parts = splitClock(value);
   return routineClockText(shortClockDigits(parts), parts.meridiem === "PM", text);
 }
@@ -315,6 +326,17 @@ export function joinClock(parts: RoutineClockParts): RoutineClock {
   const hour24 = parts.meridiem === "PM" ? hour + 12 : hour;
   const minute = clamp(Math.trunc(parts.minute), 0, 59);
   return `${String(hour24).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+/** The hour on a 24-hour clock: 0 to 23. */
+export function clockHour24(value: RoutineClock): number {
+  return Math.floor(routineTimeMinutes(value) / 60) % 24;
+}
+
+/** A typed hour of a 24-hour clock as the hour and half of the day. Values out of range clamp to 0 or 23. */
+export function clockHourFrom24(hour24: number): Pick<RoutineClockParts, "hour" | "meridiem"> {
+  const hour = clamp(Math.trunc(hour24), 0, 23);
+  return { hour: hour % 12 || 12, meridiem: hour >= 12 ? "PM" : "AM" };
 }
 
 /**

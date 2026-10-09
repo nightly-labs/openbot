@@ -28,7 +28,7 @@ import {
   type StoredServerNotifications,
   serializeStoredRemoteServers,
 } from "./remote-server-stored-shape";
-import { RemoteWorkflowError, remoteCall, remoteDecode } from "./remote-service-effects";
+import { RemoteWorkflowError, remoteCall, remoteDecode, toRemoteWorkflowError } from "./remote-service-effects";
 
 export interface TokenCipher {
   encrypt: (value: string) => Buffer;
@@ -431,9 +431,7 @@ export class RemoteServerStore implements RemoteServerDirectory {
     this: RemoteServerStore,
     snapshot: StoredRemoteServers,
   ): Effect.fn.Return<void, RemoteWorkflowError> {
-    yield* writeJsonFileAtomically(this.#path, serializeStoredRemoteServers(snapshot)).pipe(
-      Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause })),
-    );
+    yield* writeJsonFileAtomically(this.#path, serializeStoredRemoteServers(snapshot)).pipe(toRemoteWorkflowError);
   });
 }
 

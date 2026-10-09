@@ -685,7 +685,7 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       },
     });
     await waitFor(() => events.filter((event) => event.type === "prompt").length === 5);
-    const persistenceFailure = vi.spyOn(store.database, "persistConversation").mockImplementationOnce(() => {
+    const persistenceFailure = vi.spyOn(store.database, "persistConversationChanges").mockImplementationOnce(() => {
       throw new Error("Database write failed.");
     });
     await expect(
@@ -963,7 +963,7 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     await waitFor(() => events.some((event) => event.type === "approval"));
 
     // A compaction turn ends the same way but sends no `turn-completed`, so a client relies on these events.
-    const persistenceFailure = vi.spyOn(store.database, "persistConversation").mockImplementationOnce(() => {
+    const persistenceFailure = vi.spyOn(store.database, "persistConversationChanges").mockImplementationOnce(() => {
       throw new Error("Database write failed.");
     });
     client.emit(

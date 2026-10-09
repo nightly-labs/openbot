@@ -8,6 +8,7 @@ import type {
   McpServerConfig,
   SkillCategory,
 } from "@openbot/contracts/ipc";
+import type { BitwardenConnectorPanelProps } from "../settings/BitwardenConnectorPanel";
 import type { GitHubConnectorPanelProps } from "../settings/GitHubConnectorPanel";
 import type { MarketplacePluginDetail, MarketplacePluginPrompt } from "../settings/marketplace-plugins";
 import type { OnePasswordConnectorPanelProps } from "../settings/OnePasswordConnectorPanel";
@@ -40,6 +41,7 @@ export type MarketplaceApp =
   | (AppBase & { kind: "plugin"; category: SkillCategory; plugin: MarketplacePluginDetail })
   | (AppBase & { kind: "github"; category: SkillCategory })
   | (AppBase & { kind: "onepassword"; category: SkillCategory })
+  | (AppBase & { kind: "bitwarden"; category: SkillCategory })
   | (AppBase & { kind: "custom"; server: McpServerConfig });
 
 /**
@@ -92,6 +94,7 @@ export interface MarketplaceModel {
   github?: (() => GitHubConnectorPanelProps) | undefined;
   /** The 1Password connector page, on the computer that runs OpenBot. */
   onePassword?: (() => OnePasswordConnectorPanelProps) | undefined;
+  bitwarden?: (() => BitwardenConnectorPanelProps) | undefined;
 
   /** The last failure, as a sentence. */
   error: () => string | null;

@@ -4,10 +4,57 @@ import { type DynamicRecord, isDynamicRecord, isNumber, isString } from "@openbo
 import { isGeneratedAgentId } from "@openbot/contracts/validation";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { CHANNEL_SCHEMA_SQL, CHANNEL_SETTINGS_SCHEMA_SQL } from "./channel-schema";
+import { PROVIDER_HISTORY_SCHEMA_SQL } from "./database/provider-history-schema";
 import { MCP_SERVERS_SCHEMA_SQL } from "./mcp-schema";
 import { MESSAGING_SCHEMA_SQL } from "./messaging/messaging-schema";
+import { ROUTINE_FLOW_SCHEMA_SQL } from "./routine-flows/routine-flow-schema";
 
 const BASELINE_SCHEMA_VERSION = 8;
+
+/** Webhook triggers and received deliveries for routines. */
+const WEBHOOK_SCHEMA_SQL = `
+  CREATE TABLE IF NOT EXISTS projection_routine_webhooks (
+    routine_id TEXT PRIMARY KEY REFERENCES projection_agent_routines(routine_id) ON DELETE CASCADE,
+    route_id TEXT NOT NULL UNIQUE,
+    event_type TEXT,
+    filters_json TEXT NOT NULL CHECK(json_valid(filters_json)),
+    secret_ciphertext TEXT NOT NULL,
+    url TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    last_event_sequence INTEGER NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS projection_channel_routine_webhooks (
+    routine_id TEXT PRIMARY KEY REFERENCES projection_channel_routines(routine_id) ON DELETE CASCADE,
+    route_id TEXT NOT NULL UNIQUE,
+    event_type TEXT,
+    filters_json TEXT NOT NULL CHECK(json_valid(filters_json)),
+    secret_ciphertext TEXT NOT NULL,
+    url TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    last_event_sequence INTEGER NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS projection_webhook_route_revocations (
+    route_id TEXT PRIMARY KEY,
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS projection_webhook_receipts (
+    receipt_id TEXT PRIMARY KEY,
+    owner_kind TEXT NOT NULL CHECK(owner_kind IN ('agent', 'channel')),
+    routine_id TEXT NOT NULL,
+    delivery_id TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('started', 'ignored')),
+    reason TEXT CHECK(reason IS NULL OR reason IN ('event-type', 'filter', 'inactive')),
+    run_id TEXT,
+    received_at TEXT NOT NULL,
+    UNIQUE(owner_kind, routine_id, delivery_id)
+  );
+  CREATE INDEX IF NOT EXISTS webhook_receipts_recent
+    ON projection_webhook_receipts(owner_kind, routine_id, received_at DESC, receipt_id);
+  CREATE INDEX IF NOT EXISTS webhook_receipts_received ON projection_webhook_receipts(received_at);
+`;
 
 // This is the frozen compatibility schema for every database that predates v8.
 // Future schema changes must update LATEST_SCHEMA_SQL and append a migration without editing this SQL.
@@ -415,7 +462,10 @@ const LATEST_SCHEMA_SQL =
     withRoutineLimitPolicy(V19_CHANNEL_ROUTINES_END_SQL),
   ) +
   MCP_SERVERS_SCHEMA_SQL +
-  MESSAGING_SCHEMA_SQL;
+  MESSAGING_SCHEMA_SQL +
+  PROVIDER_HISTORY_SCHEMA_SQL +
+  WEBHOOK_SCHEMA_SQL +
+  ROUTINE_FLOW_SCHEMA_SQL;
 
 /** The end of a routine table with the migration 27 column after its last one. */
 function withRoutineLimitPolicy(tableEnd: string): string {
@@ -557,6 +607,23 @@ const MIGRATIONS: readonly OpenBotMigration[] = [
     // The same rebuild as migrations 17, 22, 23, 24 and 26, with foreign keys off for the same reason.
     disableForeignKeys: true,
     up: removeProviderSessionsCheck,
+  },
+  {
+    version: 29,
+    // Provider history is additive durable import state. Existing conversation projections and
+    // provider sessions remain untouched, so foreign keys stay enabled and no vacuum is needed.
+    up: (db) => db.exec(PROVIDER_HISTORY_SCHEMA_SQL),
+  },
+  {
+    version: 30,
+    // Only creates tables, so no foreign-key pause and no vacuum. Existing routines and runs stay as they are.
+    up: (db) => db.exec(WEBHOOK_SCHEMA_SQL),
+  },
+  {
+    version: 31,
+    // Only creates tables, so no foreign-key pause and no vacuum. Existing routines have no links,
+    // so every routine keeps running only its own agent, which is what it did before.
+    up: (db) => db.exec(ROUTINE_FLOW_SCHEMA_SQL),
   },
 ];
 

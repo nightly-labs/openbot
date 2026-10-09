@@ -18,4 +18,10 @@ export type RemoteAuthEvent =
   // A Telegram chat was unlinked from a host or moved to another host. Signal drops the bot's route of
   // the chat when its link is from `through` (milliseconds) or before, and refuses route tickets with
   // such a link.
-  | { type: "telegram-route-revoked"; botId: string; chatId: string; through: number };
+  | { type: "telegram-route-revoked"; botId: string; chatId: string; through: number }
+  // A Discord guild was unlinked or moved to another host. Signal drops its route when its link is
+  // from `through` (milliseconds) or before, and refuses route tickets with such a link.
+  | { type: "discord-route-revoked"; guildId: string; through: number }
+  // A generic webhook route was disabled, deleted or moved to another host. Signal drops it at once
+  // and refuses route tickets that still carry its older link.
+  | { type: "webhook-route-revoked"; routeId: string; through: number };

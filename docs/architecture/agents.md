@@ -16,6 +16,81 @@ changes it, on the computer that runs the agent: the Team API parser and the age
 not accept it, the remote IPC branch refuses it, and duplication does not copy it. When the flag is
 on, the developer instructions name the two file paths, never the token.
 
+## Quiet routine runs
+
+A scheduled run of an agent routine can end without a message. The user asks for it in the routine
+task ("if there is nothing new, answer `[[no-update]]`"); OpenBot adds nothing to the run prompt, and
+there is no setting or column. The marker is a fixed token, not a phrase, so the check does not
+depend on the language of the answer (`src/backend/agent/routine-quiet-runs.ts`). When a turn that
+ran only scheduled routine runs completes and every answer is the marker, the turn drops its answers,
+thinking and plan from the conversation, puts back the agent preview from before the run (the run
+start shows the task there; memory only, so after a restart the task stays), and its `turn-completed`
+event has `quiet: true`, which stops the desktop notification and the completion sound. The run
+marker and the run history stay. A marker inside a longer answer is a report and is shown. Test runs,
+and script or webhook runs, which are also manual runs, are never quiet.
+
+`quiet` reaches remote clients too. The released Team API event projects a fixed key list, so the
+current v6 adapter puts `quiet` beside the frozen `turn-completed` projection
+(`packages/contracts/src/team-protocol/turn-quiet-v6.ts`), in the way `plan` and `senderMember` ride
+beside the conversation projection. The browser client, the phone, and a desktop connected to a
+remote server then show no notification, play no completion sound, and the Dynamic Island shows no
+new reply. A client on protocol 1-5, or a v6 client that predates the flag, drops the key without an
+error and shows the run as finished, as before. Only `true` is a value: any other value is a
+`protocol_error`.
+
+A routine run whose last answer is only the marker, also a Test run that shows it in the chat, does
+not put the marker in the preview either. The provider history import
+(`src/backend/provider-history-import.ts`) decides from the staged items alone: in a turn that a
+routine delivery started, it skips each answer that is only the marker, and when every answer is
+the marker it skips the turn's thinking too, so a later import does not bring a quiet turn back.
+
+## Routine calendar feed
+
+`src/main/routine-feed-server.ts` is a loopback HTTP listener that serves the routines of this
+computer as an iCalendar feed (`src/main/routine-feed-ics.ts`) for Server Settings > Routines. It
+runs only after the user makes a feed URL, and binds `127.0.0.1`. The URL is
+`/routines/<token>.ics`, with an optional `?agent=<id>`: a calendar app cannot send a header, so the
+token is in the path. `<userData>/openbot-routine-feed-v1.json` keeps the token, encrypted with the
+secret storage cipher, and the port, so the URL stays the same after a restart. When the port is not
+free, the listener takes a new one and saves it. **New URL** replaces the token, and **Turn off**
+deletes the file. A wrong token gets 404. A request with an `Origin` header or a foreign `Host`
+gets 403 before the token is checked. Logs never contain the URL.
+
+The feed lists each run of the next 30 days of active routines as one UTC event, placed by the same
+schedule code that fires the run, so it needs no RRULE or time zone rules. Nothing leaves the
+computer: a calendar service that fetches feeds from its own servers, such as Google Calendar or
+iCloud, cannot read it.
+
+## Routine flows
+
+A routine flow hands the answer of an agent routine on to other agents. The Routines view of the
+sidebar shows one canvas for each agent: every routine whose run reaches it, the agents its links
+reach, and the last run of each routine. Only this computer's host keeps flows; the remote IPC
+branch refuses them, and no Team API protocol changes.
+
+- `src/backend/routine-flows/` owns the three tables of migration 31: links, node positions and steps.
+  The rows are written directly, not through `dispatch`, because a step holds the text that one agent
+  gave another, and the event log is never deleted from. `hardDeleteAgent` removes the rows of a
+  deleted agent; a deleted routine or run takes its rows by foreign key.
+- `RoutineFlows` (`routine-flows.ts`) is an Effect service on its own managed runtime. It never
+  listens to a provider. On a turn, queue or routine event it sweeps: it records the answer of a run
+  that ended, settles each step whose delivery ended, and sends the next messages. Sweeps run one at
+  a time, and one more after a sweep runs again for an event that arrived during it. Startup sweeps
+  once, so a flow that a restart stopped continues.
+- A link belongs to one routine and applies only to runs that started after it. An agent with several
+  inputs waits for all of them and gets them in one message. An agent whose inputs all failed is
+  skipped, so a failure never leaves a flow waiting.
+- A handoff is a mailbox delivery from the routine (`RoutineScheduler.enqueueHandoff`). It names the
+  same routine and run, but `reconcileDelivery` finds a run only by its own delivery, so the run status
+  does not change.
+- A canvas shows routines of every trigger kind (`routine-flow-routines.ts`). A webhook routine
+  carries its endpoint, event type and filters; the details panel saves them, rotates the secret and
+  runs a test through the `events` IPC group, as the routine settings do.
+- Agents read and change flows with the `openbot` tools `list_routine_flows`, `connect_routine_agents`
+  and `disconnect_routine_agents` (`routine-flow-tools.ts`). `RoutineFlows` is built after the agent
+  service, so the tool router reads it through a getter. The canvas chat panel sends the user's request
+  to the open agent's own conversation and shows the answer of the turn that read it.
+
 ## Agent communication policy
 
 The shared developer instructions keep routine teammate exchanges internal by default. Agents
@@ -143,6 +218,22 @@ Agents can organize teammates into flat sidebar sections through `list_sections`
 to ungroup an agent; deleting a section also ungroups its agents without deleting them. These tools
 use the same `SidebarLayoutStore` as manual sidebar edits, including persistence, validation,
 and change events delivered to desktop and connected clients.
+
+`html_render` publishes a visual reply: an HTML page that shows above the agent's reply. The router
+stores the page as a generated `text/html` attachment and adds an assistant message with the item
+type `visual-reply:<height>` and the page title as its text (`@openbot/contracts/chat-visual`). A
+client that does not know the item type shows the title and the file. A visual message is not
+readable: unread counts, latest-message previews and mobile read state skip it. The desktop serves
+the page on `openbot-visual:` (`openbot-remote-visual:` for a remote host) with
+`Content-Security-Policy: sandbox allow-scripts allow-forms` and the frame script, and the frame has
+the same sandbox without `allow-same-origin`. The page runs its scripts and can load files from the
+network, but it has an opaque origin, gets no permission, and talks to the app only with the checked
+MCP Apps messages for its height, its theme and a link that the user clicked. Mobile shows the
+page as its file and does not run it: in react-native-webview, a script in any frame can reach the
+bridge to the app. `html_preview` lets the agent look at a page before it publishes it: the main
+process draws it in a hidden window with its own in-memory session (`ChatVisualPreviewer`)
+and returns a PNG, the content height and the console lines. The file preview shows an HTML file in
+the same frame.
 
 Codex fixes dynamic tools at provider-session creation; resume does not update them. A local
 `provider-toolsets` manifest records the tool fingerprint for each new Codex session. Sessions with

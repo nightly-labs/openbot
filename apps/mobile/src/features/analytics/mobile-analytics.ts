@@ -3,11 +3,12 @@ import * as Application from "expo-application";
 import { Platform } from "react-native";
 import { MobileAnalytics } from "./analytics-core";
 import { MOBILE_EVENTS, type MobileEventName, sanitizeMobileEvent } from "./events";
+import { mobileReportQueue } from "./failure-reports";
 
 const metadata = {
   surface: "mobile",
   environment: "production",
-  event_schema_version: 1,
+  event_schema_version: 2,
   platform: Platform.OS,
   app_version: Application.nativeApplicationVersion ?? "unknown",
   build_number: Application.nativeBuildVersion ?? "unknown",
@@ -73,4 +74,4 @@ export const mobileAnalytics = new MobileAnalytics(() => {
       client.clear();
     },
   };
-});
+}, mobileReportQueue);

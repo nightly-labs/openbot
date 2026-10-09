@@ -2,8 +2,8 @@
 
 This directory holds our own control plane for WebRTC connections. The Remote API relays SDP and ICE.
 Team files, chats, commands and video never pass through the Remote API or Cloudflare. The exceptions
-are the OpenBot Slack app and the OpenBot Telegram bot: see [Slack requests](#slack-requests) and
-[Telegram updates](#telegram-updates).
+are the OpenBot Slack app, the OpenBot Discord bot and the OpenBot Telegram bot: see
+[Slack requests](#slack-requests), [Discord](#discord) and [Telegram updates](#telegram-updates).
 
 ## Flow
 
@@ -49,6 +49,51 @@ host. Its public key
 must be in the ticket JWKS that Signal loads (`REMOTE_TICKET_PUBLIC_JWKS` on the Worker, or
 `REMOTE_TICKET_PUBLIC_KEYS` here). Signal does not store or log the body. Without
 `SLACK_SIGNING_SECRET`, the Slack route answers 503.
+
+## Discord
+
+The OpenBot Discord bot is one bot for every guild that installs it. Signal holds its bot token
+(`DISCORD_BOT_TOKEN`) and its application ID (`DISCORD_APPLICATION_ID`). Without both, or with a
+malformed value, Discord is off: Signal logs one line without the value, keeps no Gateway
+connection, and `POST /v1/discord/api` answers 503. The remote sessions and the Slack route keep
+running.
+
+Signal keeps the bot's Gateway connection with the intents `Guilds`, `GuildMessages` and
+`DirectMessages`, and no privileged intent. Discord then gives the bot the text of a message only
+when the message mentions the bot. From the Gateway, Signal reads:
+
+- the names of the guilds, channels and threads, and which guild each channel is in;
+- each guild message that mentions the bot and that a person wrote. Signal passes the message ID,
+  channel, author, text without the bot's mention, the replied message, the Discord CDN addresses of
+  the attachments and the time to the `ingress` socket of the host that the guild is linked to;
+- each press of an OpenBot button. Signal acknowledges it to Discord at once and passes it on;
+- the removal of the bot from a guild, which ends that guild's connection on the host.
+
+A direct message to the bot gets one fixed answer, at most once an hour for each user. Signal does not
+pass it on.
+
+An `ingress` socket names its guilds with a Discord route ticket: an ES256 JWT with the audience
+`openbot-discord-route`, signed by the Worker for the guilds that the account service links to that
+host. Its public key must be in the ticket JWKS that Signal loads, as for the Slack route ticket. The
+account service revokes a guild link through `/internal/auth-events`. After a start, Signal asks the
+account service which links are current until every older ticket has expired.
+
+A socket with a Discord route gets a `discord-session` token and the list of the guilds routed to it. The host sends it as the
+bearer of its calls to `POST /v1/discord/api`: post, edit or delete a message, add or remove a
+reaction, read the messages after one message, read a member or channel name, answer a button press,
+and upload one file of at most 10 MB. Signal makes each call with the bot token, only in a guild that
+is routed to that socket, and only in a channel of that guild. No post can ping anyone. The token is
+valid while the socket is open.
+
+So the answers and files of Discord conversations pass through Signal. Signal does not store them or
+log them, and it does not log a token or Discord's error text.
+
+When the bot leaves a guild, Signal drops its route and asks the account service to unlink it
+(`/v2/remote/discord-route/removed`). After the Gateway lists the bot's guilds, and every 30 minutes,
+Signal sends the account service the guild IDs that the bot is in
+(`/v2/remote/discord-route/reconcile`), and the account service unlinks each older link of another
+guild. Signal sends nothing while a Gateway shard is closed, because the list can then miss a new
+guild. So a link goes also when its host is off and the first unlink failed, or Signal restarted.
 
 ## Telegram updates
 

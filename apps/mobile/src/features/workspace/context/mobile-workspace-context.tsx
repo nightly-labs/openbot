@@ -8,6 +8,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { TEAM_CONVERSATION_UNREAD_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
 import { HOST_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/host-admin-v1";
 import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "@openbot/contracts/team-protocol/live-activity-push-v1";
 import { SKILLS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/skills-admin-v1";
@@ -53,7 +54,8 @@ import {
   useRef,
   useState,
 } from "react";
-import { Alert, View } from "react-native";
+import { View } from "react-native";
+import { showFailureAlert, showWarningAlert } from "@/features/analytics/failure-reports";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { trackWorkspaceActions } from "@/features/analytics/workspace-actions";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
@@ -401,7 +403,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           const saved = reconcileChannelPins(preferenceStore, serverId, channels);
           setPreferences((current) => ({ ...current, [serverId]: saved }));
         } catch {
-          Alert.alert(
+          showFailureAlert(
+            undefined,
+            "settings",
             currentText().t("mobile.workspace.alert.preferencesTitle"),
             currentText().t("mobile.workspace.alert.preferencesBody"),
           );
@@ -427,7 +431,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           return next === current[serverId] ? current : { ...current, [serverId]: next };
         });
       } catch {
-        Alert.alert(
+        showFailureAlert(
+          undefined,
+          "settings",
           currentText().t("mobile.workspace.alert.preferencesTitle"),
           currentText().t("mobile.workspace.alert.preferencesBody"),
         );
@@ -714,6 +720,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         void queryClient.invalidateQueries({
           queryKey: ["server-routines", session.apiUrl, session.user.id, sessionScope, serverId],
         });
+        // Webhook history: a host also sends a routine change when it ignores a request.
+        void queryClient.invalidateQueries({ queryKey: ["routine-webhooks", serverId] });
       }
       if (
         event.type === "channels-changed" ||
@@ -841,7 +849,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         (!activeServerId ||
           !serverCapabilities.current.get(activeServerId)?.includes(TEAM_CONVERSATION_UNREAD_CAPABILITY))
       ) {
-        Alert.alert(
+        showWarningAlert(
+          "team",
           currentText().t("mobile.workspace.alert.updateRequiredTitle"),
           currentText().t("mobile.workspace.alert.updateRequiredUnread"),
         );
@@ -879,7 +888,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         .catch(() => {
           if (generation === loadGeneration.current) void refreshConversationReads().catch(() => undefined);
           if (visibleMessageId === null)
-            Alert.alert(
+            showFailureAlert(
+              undefined,
+              "settings",
               currentText().t("mobile.workspace.alert.markUnreadTitle"),
               currentText().t("mobile.workspace.alert.markUnreadBody"),
             );
@@ -909,7 +920,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         setPreferences((current) => ({ ...current, [serverId]: next }));
         return next;
       } catch {
-        Alert.alert(
+        showFailureAlert(
+          undefined,
+          "settings",
           currentText().t("mobile.workspace.alert.preferencesTitle"),
           currentText().t("mobile.workspace.alert.preferencesBody"),
         );
@@ -956,7 +969,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           setSavedServerOrder({ key: orderKey, ids: serverIds });
           return true;
         } catch {
-          Alert.alert(
+          showFailureAlert(
+            undefined,
+            "settings",
             currentText().t("mobile.workspace.alert.serverOrderTitle"),
             currentText().t("mobile.workspace.alert.serverOrderBody"),
           );
@@ -1028,6 +1043,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         await refreshHosts();
       },
       canEditServerIdentity: (serverId) => administers(serverId, HOST_ADMIN_CAPABILITY),
+      canManageEvents: (serverId) => administers(serverId, EVENTS_CAPABILITY),
       canManageAgentSkills: (serverId) => administers(serverId, SKILLS_ADMIN_CAPABILITY),
       updateServerIdentity: async (serverId, input) => {
         const server = serversRef.current.find((candidate) => candidate.id === serverId);
@@ -1081,6 +1097,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       },
       ...createHostRequestActions({
         request,
+        teamApi,
         queryClient,
         queryScope: [session.apiUrl, session.user.id, sessionScope],
         capabilities: serverCapabilities.current,

@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import { createEffect } from "solid-js";
 import { ComposerNotice } from "./ComposerNotice";
 
 /**
@@ -14,10 +15,15 @@ import { ComposerNotice } from "./ComposerNotice";
  */
 export function ComposerErrorBanner(props: {
   message: string;
+  onShown?: () => void;
   conversationKey?: string | null;
   onDismiss: () => void;
   action?: JSX.Element;
 }): JSX.Element {
+  createEffect(
+    () => `${props.conversationKey ?? ""}\u0000${props.message}`,
+    () => props.onShown?.(),
+  );
   return (
     <ComposerNotice
       tone="danger"

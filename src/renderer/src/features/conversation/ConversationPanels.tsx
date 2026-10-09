@@ -1,13 +1,18 @@
 import type { ServerSummary } from "@openbot/contracts/ipc";
+import { classifyFailure } from "@openbot/telemetry";
 import { useText } from "@openbot/ui/text";
 import { actionToast } from "../../action-toast";
 import { createSettingsPanelWidth, saveSettingsPanelWidth } from "../../components/settings-panel-width";
+import { agentTemplatesPort } from "../agent-templates/agent-templates-port";
+import { createPublishAgent } from "../agent-templates/PublishAgent";
 import { serverCanAdministerAgents } from "../agents/remote-agent-admin";
 import type { AgentFilesOptions } from "../files/AgentFilesSettings";
 import { canManageStorage, serverHasStorage } from "../files/storage-usage";
 import { serverCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
+import { htmlAttachmentPageUrl } from "./chat-visual-url";
 import { useConversationController } from "./conversation-controller-context";
 import { useConversationViewScope } from "./conversation-scope";
+import { desktopEventRoutinesApi } from "./routine-webhooks-api";
 
 const SETTINGS_PANEL_MIN = 180;
 const SETTINGS_PANEL_MAX = 1600;
@@ -51,6 +56,10 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
     previewAttachment,
     openSidebarFileExternally,
     openWorkspaceFile,
+    openWorkspaceFolder,
+    openWorkspaceFolderEntry,
+    sidebarFileBack,
+    openSidebarFileBack,
     navigateBrowserTab,
     props,
     reloadBrowserTab,
@@ -73,6 +82,15 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
     updateRuntimeSettings,
   } = useConversationViewScope();
   const { t, errorMessage } = useText();
+  const publishAgent = createPublishAgent(
+    () => props.runtime?.admin?.agentTemplates ?? agentTemplatesPort().agentTemplates,
+  );
+  // This computer reads the skills of its own agents from the workspace. A joined host publishes its
+  // own agents, for an owner or admin, when it serves `agent-publish-v1`.
+  const canPublish = () =>
+    props.runtime
+      ? props.runtime.admin !== undefined && serverCanAdminister(props.server, "agent-publish-v1")
+      : props.server?.kind === "local";
   let browserPreviewTrigger: HTMLButtonElement | undefined;
   const settingsMaxWidth = () =>
     Math.min(
@@ -96,7 +114,10 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
                 .storage.openLocation({ agentId })
                 .catch((error) =>
                   actionToast.error(t("conversation.panels.openWorkspaceFailed"), {
-                    description: errorMessage(error, t("conversation.panels.tryAgain")),
+                    ...{
+                      description: errorMessage(error, t("conversation.panels.tryAgain")),
+                    },
+                    report: { operation: "turn", source: "action", cause_code: classifyFailure(error) },
                   }),
                 )
           : undefined,
@@ -135,6 +156,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
               <FilePreviewPanel
                 allowExternalOpen={!props.runtime}
                 preview={file().preview}
+                directory={file().directory ?? null}
                 agents={props.agents}
                 defaultWidth={() =>
                   (conversationPanelElement()?.clientWidth || window.innerWidth) * BROWSER_PANEL_DEFAULT_RATIO
@@ -151,12 +173,15 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
                 onWidthChange={setBrowserPanelWidth}
                 onOpenLink={(url) => void openExternalMessageUrl(url)}
                 onOpenSharedFile={openSharedFile}
-                onOpenWorkspaceFile={openWorkspaceFile}
+                onOpenWorkspaceFile={file().directory ? openWorkspaceFolderEntry : openWorkspaceFile}
+                onOpenWorkspaceFolder={openWorkspaceFolder}
+                onBack={sidebarFileBack() === null ? undefined : openSidebarFileBack}
                 sourceUrl={attached()?.previewUrl ?? null}
+                pageUrl={htmlAttachmentPageUrl(attached())}
                 onOpenExternally={openSidebarFileExternally}
-                /* In the browser, "open" saves a shared or workspace file, so it is the download. */
-                onDownload={attached() ? downloadSidebarFile : props.runtime ? openSidebarFileExternally : undefined}
-                onReveal={attached() && !props.runtime ? revealSidebarFile : undefined}
+                onDownload={downloadSidebarFile}
+                /* A browser cannot show a file in the file manager. */
+                onReveal={props.runtime ? undefined : revealSidebarFile}
                 onClose={closeSidebarFilePreview}
               />
             </Loading>
@@ -240,6 +265,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
                 : null
             }
             liveViewRuntime={props.browserRuntime ?? conversationPort().browser}
+            liveViewClipboard={serverSupportsCapability(props.server, "browser-view-clipboard")}
             onBack={() => setActiveRightPanel("browser")}
             onEnterPip={props.runtime ? () => undefined : showBrowserPip}
           />
@@ -306,6 +332,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
                   : undefined
               }
               onOpenUsage={panelProps.onOpenUsage}
+              onPublish={canPublish() ? () => publishAgent.open(agent().id) : undefined}
               agent={agent()}
               runtimeSettings={{
                 provider: settingsProvider(),
@@ -319,6 +346,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
               onDownloadProvider={props.onDownloadProvider}
               onCancelProviderDownload={props.onCancelProviderDownload}
               onConnectProvider={props.onConnectProvider}
+              onAddCustomProvider={props.onManageProviders}
               modelOptions={props.modelOptions}
               working={agentActivity() === "Working"}
               maxWidth={settingsMaxWidth}
@@ -334,6 +362,11 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
               onRoutineSelectionRequestHandled={handleRoutineSettingsRequest}
               onOpenRoutineRun={props.onOpenSearchMessage ? openRoutineRunMessage : undefined}
               files={agentFiles(props.server, agent().id)}
+              eventRoutines={
+                !props.runtime && serverCanAdminister(props.server, "events-v1")
+                  ? desktopEventRoutinesApi(props.server.id)
+                  : undefined
+              }
             />
           </Loading>
         )}
@@ -365,6 +398,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
           );
         }}
       </Show>
+      {publishAgent.dialog()}
     </>
   );
 }

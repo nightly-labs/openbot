@@ -265,7 +265,7 @@ describe("AgentRoutinesSettings", () => {
     await waitFor(() => expect(updateRoutine).toHaveBeenCalledWith(expect.objectContaining({ active: false })));
     expect(screen.getByText("Paused", { selector: "label" })).toBeInTheDocument();
 
-    await fireEvent.click(screen.getByRole("button", { name: "Test run" }));
+    await fireEvent.click(await screen.findByRole("button", { name: "Test run" }));
     await waitFor(() => expect(testRoutine).toHaveBeenCalledWith({ agentId: "chief", routineId: "routine-1" }));
 
     await fireEvent.click(screen.getByRole("button", { name: "Delete" }));
@@ -273,6 +273,17 @@ describe("AgentRoutinesSettings", () => {
     await fireEvent.click(screen.getByRole("button", { name: "Delete now" }));
     await waitFor(() => expect(deleteRoutine).toHaveBeenCalledWith({ agentId: "chief", routineId: "routine-1" }));
     expect(await screen.findByText("No routines yet.")).toBeInTheDocument();
+  });
+
+  it("tells the user how a routine stays silent when there is nothing to report", async () => {
+    setupOpenBot({ routines: { chief: [routine] } });
+    render(() => <AgentRoutinesSettings port={agentRoutinesPort("chief")} onCountChange={vi.fn()} />);
+
+    await fireEvent.click(await screen.findByRole("button", { name: /Morning brief/ }));
+    const instruction = await screen.findByRole("textbox", { name: "Instruction" });
+    expect(instruction).toHaveAccessibleDescription(
+      "To stay silent when there is nothing to report, ask the agent to answer [[no-update]].",
+    );
   });
 
   it("blocks editor navigation while Save is running", async () => {

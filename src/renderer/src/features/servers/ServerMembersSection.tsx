@@ -43,6 +43,7 @@ import {
 } from "@openbot/ui";
 import { teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
 import { useText } from "@openbot/ui/text";
+import { prefersReducedMotion } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, createStore, For, onCleanup, Show, untrack } from "solid-js";
 import { serverRoleCanAdminister } from "./server-capabilities";
@@ -72,6 +73,9 @@ interface InvitePanel {
 
 interface MembersPanel {
   removeId: string | null;
+  /** A role change waits for confirmation: it can end the member's sessions on the server. */
+  roleChange: { memberId: string; role: InviteRole } | null;
+  revokeInviteId: string | null;
   search: string;
 }
 
@@ -87,8 +91,8 @@ interface MembersPanels {
 
 interface ServerMembersSection {
   Panel: () => JSX.Element;
-  /** The member removal confirmation. It stays outside the panel so it keeps its place in the dialog. */
-  RemoveDialog: () => JSX.Element;
+  /** The remove, role and revoke confirmations. They stay outside the panel so they keep their place in the dialog. */
+  ConfirmDialogs: () => JSX.Element;
   /** Forgets the invite and search of the previous server when the dialog shows another one. */
   resetForServer(): void;
 }
@@ -107,7 +111,7 @@ export function createServerMembersSection(host: ServerSettingsSectionHost): Ser
       showQr: false,
       role: "member",
     },
-    members: { removeId: null, search: "" },
+    members: { removeId: null, roleChange: null, revokeInviteId: null, search: "" },
   });
   /** A clock, not panel state: it retires an invite row as its `expiresAt` passes. */
   const [now, setNow] = createSignal(Date.now());
@@ -165,6 +169,14 @@ export function createServerMembersSection(host: ServerSettingsSectionHost): Ser
     );
   });
   const removeMember = createMemo(() => props.members.find((member) => member.id === panels.members.removeId) ?? null);
+  const roleChange = createMemo(() => {
+    const change = panels.members.roleChange;
+    const member = change && props.members.find((item) => item.id === change.memberId);
+    return member && change ? { member, role: change.role } : null;
+  });
+  const revokeInvite = createMemo(
+    () => activeInvites().find((invite) => invite.id === panels.members.revokeInviteId) ?? null,
+  );
   const canInvite = createMemo(
     () =>
       canManage() &&
@@ -208,7 +220,7 @@ export function createServerMembersSection(host: ServerSettingsSectionHost): Ser
 
   function swapInviteLink(next: string): void {
     const element = inviteLinkInput;
-    if (!element || (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false)) {
+    if (!element || prefersReducedMotion()) {
       setPanels((state) => {
         state.invite.link = next;
       });
@@ -259,6 +271,8 @@ export function createServerMembersSection(host: ServerSettingsSectionHost): Ser
       state.invite.result = null;
       state.invite.showQr = false;
       state.members.search = "";
+      state.members.roleChange = null;
+      state.members.revokeInviteId = null;
     });
     resetInviteLink();
   }
@@ -579,7 +593,7 @@ export function createServerMembersSection(host: ServerSettingsSectionHost): Ser
           <ItemDescription class="server-settings-member-meta">{member.email ?? member.username}</ItemDescription>
         </ItemContent>
         <ItemActions class="server-settings-member-actions">
-          <Show when={member.role !== "owner"} fallback={<Badge tone="accent">{t(ROLE_LABELS.owner)}</Badge>}>
+          <Show when={member.role !== "owner"} fallback={<Badge variant="primary-light">{t(ROLE_LABELS.owner)}</Badge>}>
             <Text variant="label-sm" tone="secondary">
               {t(ROLE_LABELS[member.role])}
             </Text>
@@ -587,9 +601,12 @@ export function createServerMembersSection(host: ServerSettingsSectionHost): Ser
               <MemberActionsMenu
                 member={member}
                 mount={host.menuMount()}
-                onRoleChange={(role) =>
-                  void run(`member:${member.id}`, () => props.onUpdateMember({ memberId: member.id, role }))
-                }
+                onRoleChange={(role, trigger) => {
+                  trigger.focus({ preventScroll: true });
+                  setPanels((state) => {
+                    state.members.roleChange = { memberId: member.id, role };
+                  });
+                }}
                 onRemove={(trigger) => {
                   // The confirmation returns focus to the element focused when it opens.
                   trigger.focus({ preventScroll: true });
@@ -654,7 +671,11 @@ export function createServerMembersSection(host: ServerSettingsSectionHost): Ser
                       size="sm"
                       variant="destructive-ghost"
                       disabled={!actionsAvailable() || Boolean(busy())}
-                      onClick={() => void run(`invite:${invite.id}`, () => props.onRevokeInvite(invite.id))}
+                      onClick={() =>
+                        setPanels((state) => {
+                          state.members.revokeInviteId = invite.id;
+                        })
+                      }
                     >
                       {t("server.invite.revoke")}
                     </Button>
@@ -665,6 +686,81 @@ export function createServerMembersSection(host: ServerSettingsSectionHost): Ser
           </Show>
         </ItemGroup>
       </SettingsSection>
+    );
+  }
+
+  function ConfirmDialogs() {
+    return (
+      <>
+        <RemoveDialog />
+        <RoleDialog />
+        <RevokeInviteDialog />
+      </>
+    );
+  }
+
+  function RoleDialog() {
+    return (
+      <Show when={roleChange()}>
+        {(change) => (
+          <ConfirmDialog
+            open
+            tone="default"
+            initialFocus="cancel"
+            pending={busy() === `member:${change().member.id}`}
+            title={t(change().role === "admin" ? "server.members.makeAdminTitle" : "server.members.makeMemberTitle", {
+              name: teamMemberName(change().member),
+            })}
+            description={t("server.members.roleChangeDescription", { name: teamMemberName(change().member) })}
+            confirmLabel={t(change().role === "admin" ? "server.members.makeAdmin" : "server.members.makeMember")}
+            onCancel={() =>
+              setPanels((state) => {
+                state.members.roleChange = null;
+              })
+            }
+            onConfirm={async () => {
+              const { member, role } = change();
+              await run(`member:${member.id}`, async () => {
+                await props.onUpdateMember({ memberId: member.id, role });
+                setPanels((state) => {
+                  state.members.roleChange = null;
+                });
+              });
+            }}
+          />
+        )}
+      </Show>
+    );
+  }
+
+  function RevokeInviteDialog() {
+    return (
+      <Show when={revokeInvite()}>
+        {(invite) => (
+          <ConfirmDialog
+            open
+            initialFocus="cancel"
+            pending={busy() === `invite:${invite().id}`}
+            title={t("server.invite.revokeTitle")}
+            description={t("server.invite.revokeDescription")}
+            confirmLabel={t("server.invite.revoke")}
+            onCancel={() =>
+              setPanels((state) => {
+                state.members.revokeInviteId = null;
+              })
+            }
+            onConfirm={async () => {
+              const id = invite().id;
+              await run(`invite:${id}`, async () => {
+                await props.onRevokeInvite(id);
+                setPanels((state) => {
+                  state.members.revokeInviteId = null;
+                });
+              });
+            }}
+          />
+        )}
+      </Show>
     );
   }
 
@@ -700,13 +796,13 @@ export function createServerMembersSection(host: ServerSettingsSectionHost): Ser
     );
   }
 
-  return { Panel, RemoveDialog, resetForServer };
+  return { Panel, ConfirmDialogs, resetForServer };
 }
 
 function MemberActionsMenu(props: {
   member: TeamPresenceMember;
   mount: HTMLElement | undefined;
-  onRoleChange: (role: InviteRole) => void;
+  onRoleChange: (role: InviteRole, trigger: HTMLElement) => void;
   onRemove: (trigger: HTMLElement) => void;
 }) {
   const { t } = useText();
@@ -725,7 +821,11 @@ function MemberActionsMenu(props: {
       <DropdownMenu.Portal mount={props.mount ?? document.body}>
         <DropdownMenu.Content class="server-settings-member-menu">
           <Show when={!props.member.disabled}>
-            <DropdownMenu.Item onSelect={() => props.onRoleChange(props.member.role === "admin" ? "member" : "admin")}>
+            <DropdownMenu.Item
+              onSelect={() =>
+                triggerElement && props.onRoleChange(props.member.role === "admin" ? "member" : "admin", triggerElement)
+              }
+            >
               {props.member.role === "admin" ? <UserRound aria-hidden="true" /> : <ShieldCheck aria-hidden="true" />}
               {props.member.role === "admin" ? t("server.members.makeMember") : t("server.members.makeAdmin")}
             </DropdownMenu.Item>

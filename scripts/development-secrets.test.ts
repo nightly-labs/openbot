@@ -1,12 +1,14 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { importJWK, jwtVerify, SignJWT } from "jose";
 import { afterEach, describe, expect, it } from "vitest";
 import {
-  createDevelopmentEnvFile,
+  createDevelopmentDefaults,
   createDevelopmentTicketKeyPair,
-  ensureDevelopmentEnvFile,
+  ensureDevelopmentState,
+  readDevelopmentState,
+  setDevelopmentOverrides,
 } from "./development-secrets";
 
 const temporaryRoots: string[] = [];
@@ -36,7 +38,7 @@ describe("generated development secrets", () => {
   });
 
   it("writes secrets the Signal service accepts, and a different set each time", () => {
-    const [first, second] = [readGeneratedValues(), readGeneratedValues()];
+    const [first, second] = [createDevelopmentDefaults(), createDevelopmentDefaults()];
 
     for (const name of ["SKILLS_ADMIN_TOKEN", "SITE_REPORT_HASH_SECRET", "REMOTE_AUTH_WEBHOOK_SECRET"]) {
       expect(new TextEncoder().encode(first[name]).byteLength).toBeGreaterThanOrEqual(32);
@@ -45,7 +47,7 @@ describe("generated development secrets", () => {
   });
 
   it("turns email delivery off and exposes the development sign-in code", () => {
-    const values = readGeneratedValues();
+    const values = createDevelopmentDefaults();
 
     expect(values.AUTH_EXPOSE_DEVELOPMENT_CODE).toBe("true");
     expect([
@@ -57,31 +59,71 @@ describe("generated development secrets", () => {
     ]).toEqual(["", "", "", "", ""]);
   });
 
-  it("keeps an env file that already exists", () => {
+  it("never imports the encrypted development settings into local state", () => {
     const root = createTemporaryRoot();
     const path = join(root, "apps", "auth-api", ".env.dev");
-    writeFileSync(path, "SKILLS_ADMIN_TOKEN=the-developer-own-value\n");
+    const source = "REMOTE_TICKET_PRIVATE_JWK=encrypted:fixture\n";
+    writeFileSync(path, source);
 
-    expect(ensureDevelopmentEnvFile(root)).toBe("kept");
-    expect(readFileSync(path, "utf8")).toBe("SKILLS_ADMIN_TOKEN=the-developer-own-value\n");
+    const state = readDevelopmentState(root);
+    expect(state.defaults.REMOTE_TICKET_PRIVATE_JWK).not.toBe("encrypted:fixture");
+    expect(state.overrides).toEqual({});
+    expect(statSync(join(root, ".openbot", "dev-state.json")).mode & 0o777).toBe(0o600);
+    expect(readFileSync(path, "utf8")).toBe(source);
+    expect(existsSync(join(root, ".openbot", "legacy-env.dev.backup"))).toBe(false);
   });
 
-  it("generates an env file when the checkout has none", () => {
+  it("generates local defaults into state when the checkout has no state", () => {
     const root = createTemporaryRoot();
 
-    expect(ensureDevelopmentEnvFile(root)).toBe("created");
-    expect(readFileSync(join(root, "apps", "auth-api", ".env.dev"), "utf8")).toContain("REMOTE_TICKET_PRIVATE_JWK=");
+    expect(ensureDevelopmentState(root)).toBe("created");
+    const state = readDevelopmentState(root);
+    expect(state.version).toBe(1);
+    expect(state.defaults.REMOTE_TICKET_PRIVATE_JWK).toBeTruthy();
+    expect(state.overrides).toEqual({});
+    expect(exists(join(root, "apps", "auth-api", ".env.dev"))).toBe(false);
+  });
+
+  it("preserves state across restarts and writes overrides atomically", () => {
+    const root = createTemporaryRoot();
+
+    const first = readDevelopmentState(root);
+    const updated = setDevelopmentOverrides(root, { APNS_KEY_ID: "ABC1234567", APNS_PRIVATE_KEY: "private-key" });
+    const second = readDevelopmentState(root);
+
+    expect(second.defaults.REMOTE_TICKET_PRIVATE_JWK).toBe(first.defaults.REMOTE_TICKET_PRIVATE_JWK);
+    expect(updated.overrides).toEqual({ APNS_KEY_ID: "ABC1234567", APNS_PRIVATE_KEY: "private-key" });
+    expect(setDevelopmentOverrides(root, { APNS_PRIVATE_KEY: null }).overrides).toEqual({ APNS_KEY_ID: "ABC1234567" });
+  });
+
+  it("rejects corrupted state without generating a replacement", () => {
+    const root = createTemporaryRoot();
+    mkdirSync(join(root, ".openbot"), { recursive: true });
+    writeFileSync(join(root, ".openbot", "dev-state.json"), "not-json\n");
+
+    expect(() => readDevelopmentState(root)).toThrow(/state file is invalid/i);
+    expect(readFileSync(join(root, ".openbot", "dev-state.json"), "utf8")).toBe("not-json\n");
+  });
+
+  it("rejects a state file without the stable ticket identity", () => {
+    const root = createTemporaryRoot();
+    mkdirSync(join(root, ".openbot"), { recursive: true });
+    writeFileSync(join(root, ".openbot", "dev-state.json"), '{"version":1,"defaults":{},"overrides":{}}\n');
+
+    expect(() => readDevelopmentState(root)).toThrow(/state file has an invalid format/i);
+  });
+
+  it("reports an active state lock without deleting it", () => {
+    const root = createTemporaryRoot();
+    mkdirSync(join(root, ".openbot", "dev-state.json.lock"), { recursive: true });
+
+    expect(() => readDevelopmentState(root)).toThrow(/dev-state\.json\.lock.*do not delete/i);
+    expect(exists(join(root, ".openbot", "dev-state.json.lock"))).toBe(true);
   });
 });
 
-function readGeneratedValues(): Record<string, string> {
-  const values: Record<string, string> = {};
-  for (const line of createDevelopmentEnvFile().split("\n")) {
-    if (line.startsWith("#") || !line.includes("=")) continue;
-    const separator = line.indexOf("=");
-    values[line.slice(0, separator)] = line.slice(separator + 1);
-  }
-  return values;
+function exists(path: string): boolean {
+  return existsSync(path);
 }
 
 function createTemporaryRoot(): string {

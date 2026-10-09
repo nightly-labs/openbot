@@ -23,13 +23,27 @@ import type { ProviderRuntimeManager } from "../provider-runtime-manager";
 import type { ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
 import type { IpcGroupHandlers } from "./define-ipc-group";
-import { parseRemoveMcpServer, parseSaveMcpServer, parseSetMcpServerEnabled, parseTestMcpServer } from "./mcp-inputs";
+import {
+  parseCancelMcpSignIn,
+  parseRemoveMcpServer,
+  parseSaveMcpServer,
+  parseSetMcpServerEnabled,
+  parseTestMcpServer,
+} from "./mcp-inputs";
 import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
 
 /** The AgentService members this registrar reaches, and nothing else. */
 type McpServerService = Pick<
   AgentService,
-  "listMcpServers" | "saveMcpServer" | "removeMcpServer" | "setMcpServerEnabled" | "testMcpServer"
+  | "listMcpServers"
+  | "saveMcpServer"
+  | "removeMcpServer"
+  | "setMcpServerEnabled"
+  | "testMcpServer"
+  | "signInMcpServer"
+  | "cancelMcpSignIn"
+  | "signOutMcpServer"
+  | "listMcpSignIns"
 >;
 
 /** The RemoteServerManager members this registrar reaches, and nothing else. */
@@ -153,9 +167,10 @@ export function mcpServerIpcHandlers({
       // The machine that holds the configuration is the machine that must make the connection, so a
       // test against a remote server runs on that host and not here.
       testMcpServer: scopedHandler(parseTestMcpServer, {
-        // Interactive: the user pressed Test and is in front of the browser a sign-in opens. The
-        // remote branch below carries no such flag; the route it reaches spends the host's stored
-        // credentials instead, and still opens nothing.
+        // Silent: a test spends the sign-in this computer holds and never opens a browser. A server
+        // that asks for one is answered with a sentence that points at Sign in, which the user then
+        // chooses, knowing a browser opens. The remote branch reaches the host's route, which spends
+        // the host's stored credentials in the same way.
         local: async (parsed) => {
           await runCauseEffect(
             prepareToolRuntimeForTest(parsed.config, {
@@ -164,7 +179,7 @@ export function mcpServerIpcHandlers({
               toolRuntimes,
             }),
           );
-          return runCauseEffect(service.testMcpServer(parsed, { interactive: true }));
+          return runCauseEffect(service.testMcpServer(parsed, { storedCredentials: true, signInPlace: "here" }));
         },
         remote: (parsed, serverId) => {
           requireRemoteSupport(serverId);
@@ -177,6 +192,30 @@ export function mcpServerIpcHandlers({
           );
         },
       }),
+      // A sign-in opens the browser of the computer that runs OpenBot, so it exists on that computer
+      // only. A remote host has no Team API route for it: nobody sits in front of the host's browser.
+      signInMcpServer: scopedHandler(parseTestMcpServer, {
+        local: (parsed) => runCauseEffect(service.signInMcpServer(parsed)),
+        remote: () => signInOnHost(),
+      }),
+      cancelMcpSignIn: scopedHandler(parseCancelMcpSignIn, {
+        local: (parsed) => service.cancelMcpSignIn(parsed),
+        remote: () => signInOnHost(),
+      }),
+      // A sign-out names its row the way a removal does, so it is read by the same parser.
+      signOutMcpServer: scopedHandler(parseRemoveMcpServer, {
+        local: (parsed) => runCauseEffect(service.signOutMcpServer(parsed)),
+        remote: () => signInOnHost(),
+      }),
+      // A remote list holds no sign-in state to show, which is not an error.
+      listMcpSignIns: scopedQueryHandler({
+        local: () => service.listMcpSignIns(),
+        remote: () => [],
+      }),
     },
   };
+}
+
+function signInOnHost(): never {
+  throw new Error(sourceText("error.mcp.signInOnHost"));
 }

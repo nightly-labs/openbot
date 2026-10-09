@@ -147,6 +147,74 @@ export const messages = defineMessages("connector", {
   "connector.slack.removeEffectKept": "The conversations and the Slack Orchestrator stay in OpenBot.",
   "connector.slack.keep": "Keep connected",
   "connector.slack.close": "Close",
+
+  // Server settings > Connectors > Discord: a Discord server (a guild) adds the one OpenBot bot, and
+  // the Discord Orchestrator agent receives each request, asks the team and answers. Always write
+  // "Discord server": "server" alone is an OpenBot server.
+  "connector.discord.title": "Discord",
+  "connector.discord.description":
+    "People mention @OpenBot in a channel of a Discord server. The Discord Orchestrator asks the right agent and answers.",
+  "connector.discord.statusNotSetUp": "Not set up",
+  "connector.discord.statusConnected": "Connected",
+  "connector.discord.statusAttention": "Needs attention",
+  // {workspace} is the Discord server name.
+  "connector.discord.summaryConnected": "{workspace} · Discord Orchestrator answers",
+  "connector.discord.summaryNoAgent": "{workspace} · No agent answers yet",
+  "connector.discord.attentionTitle": {
+    one: "{count} Discord server needs attention",
+    other: "{count} Discord servers need attention",
+  },
+  "connector.discord.attentionDescription": "The status below says what to do.",
+  "connector.discord.connect": "Connect Discord",
+  "connector.discord.addAgent": "Add agent",
+  "connector.discord.actionFailed": "Discord did not accept the change",
+  "connector.discord.workspaceTitle": "Discord server",
+  "connector.discord.workspaceDescription": "Mention @OpenBot in a channel. Reply to OpenBot to continue.",
+  "connector.discord.disconnectWorkspace": "Disconnect",
+  "connector.discord.missingScopes":
+    "OpenBot does not have these permissions in Discord: {scopes}. Disconnect the Discord server, then connect it again.",
+  "connector.discord.retryAt": "Discord asked OpenBot to wait. It tries again at {time}.",
+  "connector.discord.reconnect": "Reconnect",
+  "connector.discord.resume": "Resume",
+  // {action} is a button, such as Pause; {name} is the Discord server name.
+  "connector.discord.rowAction": "{action}: {name}",
+  "connector.discord.orchestratorTitle": "Discord Orchestrator",
+  "connector.discord.orchestratorDescription":
+    "This agent receives every request from Discord. It answers short ones itself, gives other work to the right agent, and replies with the answer in the channel.",
+  "connector.discord.orchestratorNone": "No agent answers yet",
+  "connector.discord.orchestratorNoneDescription": "Add the Discord Orchestrator, or Discord gets no answer.",
+  "connector.discord.channelsNote": "OpenBot sees the channels that its role can view.",
+  // The connect dialog. The steps show as numbers; screen readers read the names.
+  "connector.discord.stepWorkspace": "Discord server",
+  "connector.discord.stepAgent": "Agent",
+  "connector.discord.connectTitle": "Connect a Discord server",
+  "connector.discord.connectDescription": "OpenBot adds one bot, named OpenBot, to the Discord server.",
+  "connector.discord.connectStepBrowser": "Discord opens in your browser",
+  "connector.discord.connectStepAllow": "Select the server, then Authorize",
+  "connector.discord.connectStepReturn": "This dialog continues when Discord is done",
+  "connector.discord.connectInDiscord": "Connect in Discord",
+  "connector.discord.connectWaiting": "Waiting for Discord. Finish the authorization in your browser.",
+  "connector.discord.agentStepTitle": "Add the Discord Orchestrator",
+  // {workspace} is the Discord server name.
+  "connector.discord.agentStepDescription":
+    "This new agent answers everything that people send to @OpenBot in {workspace}.",
+  "connector.discord.orchestratorName": "Discord Orchestrator",
+  "connector.discord.orchestratorRole": "Answers in Discord and asks the team",
+  "connector.discord.orchestratorDoesReceive": "Receives every Discord request first",
+  "connector.discord.orchestratorDoesDelegate": "Gives each task to the agent that fits best",
+  "connector.discord.orchestratorDoesAnswer": "Replies with the answer in the Discord channel",
+  "connector.discord.orchestratorModel": "Model",
+  "connector.discord.doneTitle": "OpenBot is in {workspace}",
+  "connector.discord.doneDescription": "Mention @OpenBot in a channel. Reply to OpenBot to continue.",
+  "connector.discord.done": "Done",
+  "connector.discord.disconnectTitle": "Disconnect {workspace}?",
+  "connector.discord.disconnectDescription":
+    "OpenBot stops answering in {workspace} and removes the Discord connection from this computer.",
+  "connector.discord.disconnectEffect": "People in {workspace} can no longer reach your agents through @OpenBot.",
+  "connector.discord.removeEffectKept": "The conversations and the Discord Orchestrator stay in OpenBot.",
+  "connector.discord.keep": "Keep connected",
+  "connector.discord.close": "Close",
+
   // Server settings > Connectors > Telegram: each chat adds the one OpenBot bot, and the Telegram
   // Orchestrator agent receives the messages of all chats, asks the team and answers.
   "connector.telegram.title": "Telegram",
@@ -279,4 +347,18 @@ export const messages = defineMessages("connector", {
   "connector.onePassword.statusConnected": "Connected",
   "connector.onePassword.statusConnecting": "Connecting",
   "connector.onePassword.statusNotSetUp": "Not set up",
+  "connector.bitwarden.title": "Bitwarden",
+  "connector.bitwarden.description": "Fill browser logins from Bitwarden.",
+  "connector.bitwarden.setup":
+    "Install the Bitwarden CLI and sign in with bw login. Create a folder named Shared with OpenBot and put only the logins that agents may use in it. Run bw unlock --raw and paste the session key below. Do not paste your master password.",
+  "connector.bitwarden.scope":
+    "All agents on this computer can use matching logins in Shared with OpenBot. OpenBot uses exact HTTPS origins. It does not use items that require a master password prompt or a custom URI match rule.",
+  "connector.bitwarden.session":
+    "The session key stays in memory. Connect again after 8 hours without vault use or after OpenBot exits. Disconnect stops OpenBot access; it does not lock other Bitwarden clients.",
+  "connector.bitwarden.sessionKey": "Bitwarden session key",
+  "connector.bitwarden.connect": "Connect Bitwarden",
+  "connector.bitwarden.disconnect": "Disconnect Bitwarden",
+  "connector.bitwarden.connected": "Connected",
+  "connector.bitwarden.disconnected": "Not connected",
+  "connector.bitwarden.failed": "Could not connect to Bitwarden.",
 });

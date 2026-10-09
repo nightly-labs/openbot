@@ -14,6 +14,7 @@ export const messages = {
     "リモートデスクトップ用に空いている Sunshine のポート群を確保できませんでした。",
   "error.backend.moonlightPortsUnavailable":
     "リモートデスクトップ用に空いている Moonlight WebRTC のポート範囲を確保できませんでした。",
+  "error.backend.iceServerNoPort": "リモートデスクトップの ICE サーバーにポートが割り当てられませんでした。",
   "error.backend.remoteDesktopStoppedWhileStarting": "リモートデスクトップのランタイムは起動中に停止されました。",
   "error.backend.sunshineNotStarted": "Sunshine は確保したポート群で起動しませんでした。",
   "error.backend.moonlightNoHost": "Moonlight にペアリング済みのローカルホストがありません。",
@@ -147,6 +148,27 @@ export const messages = {
   "error.backend.mcpSignInAbandoned": "MCP のサインインは中止されました。",
   "error.backend.mcpSignInNoBrowser": "この MCP のサインインではブラウザーを開けません。",
   "error.backend.mcpSignInNotWebPage": "サインインのアドレスは Web ページではありません。",
+  "error.backend.mcpSignInRequired":
+    "このサーバーはサインインを求めています。「サインイン」を選んでブラウザーで続けてください。",
+  "error.backend.mcpSignInOnHost":
+    "このサーバーはサインインを求めています。ホストコンピューターの OpenBot でサインインしてください。",
+  "error.backend.mcpSignInNeedsHttps":
+    "このサーバーはサインインを求めていますが、OpenBot は https でのみサインインします。URL を {url} に変更してください。",
+  "error.backend.mcpSignInCancelled": "サインインはキャンセルされました。",
+  "error.backend.mcpSignInTimedOut": "ブラウザーでサインインが完了しませんでした。",
+  "error.backend.mcpSignInResponseTimedOut": "サインインの応答が時間内に届きませんでした。",
+  "error.backend.mcpServerExited":
+    "サーバーは応答する前に停止しました。ターミナルでコマンドを実行してエラーを確認してください。",
+  "error.backend.mcpServerUnreachable":
+    "OpenBot はサーバーに接続できませんでした。URL とネットワークを確認してください。",
+  "error.backend.mcpLocalServerOff":
+    "このコンピューターの {address} で応答するサーバーがありません。サーバーを起動するか、サーバーを実行するアプリでオンにしてから、もう一度お試しください。",
+  "error.backend.mcpServerBlocked":
+    "このコンピューターがサーバーへの接続をブロックしました。ファイアウォールまたはセキュリティソフトを確認してから、もう一度お試しください。",
+  "error.backend.mcpServerIncompatible":
+    "このアドレスで応答がありましたが、Streamable HTTP の MCP サーバーではありません。URL を確認し、サーバーを実行するアプリを更新してください。",
+  "error.backend.mcpRemoteBridge":
+    "{reason} このコマンドは mcp-remote ブリッジを実行します。代わりに URL {url} で Streamable HTTP を選ぶと、OpenBot がサインインします。",
   "error.backend.oauthNotHttps": "OAuth エンドポイント {origin} は https ではないため、認証情報を送信しませんでした。",
   "error.backend.oauthTooManyRedirects": "OAuth エンドポイントのリダイレクトが多すぎます。",
   "error.backend.oauthRedirectOrigin":
@@ -164,6 +186,9 @@ export const messages = {
   "error.backend.workspaceFileOutside":
     "ワークスペースのファイルはエージェントのワークスペース内にある必要があります。",
   "error.backend.workspacePathNotFile": "ワークスペースのパスがファイルではありません。",
+  "error.backend.workspacePathNotDirectory": "ワークスペースのパスがフォルダではありません。",
+  "error.backend.workspacePathMissing": "エージェントのワークスペース {root} に {path} はありません。",
+  "error.backend.workspacePathMissingForMember": "エージェントのワークスペースに {path} はありません。",
   "error.backend.useChannelTaskControls": "この割り当てにはチャンネルのタスク操作を使用してください。",
   "error.backend.editFinished": "この編集はすでに終了しています。",
   "error.backend.editCancelled": "この編集はキャンセルされたため、メッセージは元のテキストのままです。",

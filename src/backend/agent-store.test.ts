@@ -163,10 +163,10 @@ describe("AgentStore", () => {
 
     await runCauseEffect(store.getOrCreate("chief"));
     const threadId = await runCauseEffect(store.ensureThreadId("chief"));
-    // Derived from the agent id, not minted at random. Both conversation read paths call `getOrCreate`,
-    // so reading a chat whose roster row is gone rebuilds the agent with no thread and arrives here --
-    // and a random id would file it against an empty thread while the user's own thread, with every
-    // message in it, stays on disk addressable by nothing.
+    // Derived from the agent id, not minted at random. A `getOrCreate` for an id whose roster row is
+    // gone, such as a message sent to it, rebuilds the agent with no thread and arrives here -- and a
+    // random id would file it against an empty thread while the user's own thread, with every message
+    // in it, stays on disk addressable by nothing.
     expect(threadId).toBe("openbot-thread-chief");
     const restored = new AgentStore(userData, join(root, "home"));
     await runCauseEffect(restored.initialize());
@@ -516,7 +516,7 @@ describe("AgentStore", () => {
       workspacePath,
       provider: "claude",
       // The default of the provider the profile names, not the default of a new agent, which is Codex.
-      model: "claude-opus-5-5",
+      model: "claude-haiku-5-5",
       // The effort has no per-provider default, so an unreadable one is repaired to the one value
       // there is. It is the floor of the range, which is the safe direction for a repair: it costs
       // thinking on the next turn rather than money the user did not ask to spend.
@@ -529,7 +529,7 @@ describe("AgentStore", () => {
 
     // Written back at once, so the next launch reads a profile it accepts instead of repairing again.
     expect(repaired.database.listAgents().find((agent) => agent.id === "chief")).toMatchObject({
-      model: "claude-opus-5-5",
+      model: "claude-haiku-5-5",
       reasoningEffort: "low",
       access: "full",
       avatarSeed: "chief",

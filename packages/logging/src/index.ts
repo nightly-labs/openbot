@@ -103,10 +103,11 @@ let registeredSecretPattern: RegExp | null = null;
 
 /**
  * Masks `value` in every later log line, export and trace, in its raw, JSON-escaped and
- * URL-encoded forms.
+ * URL-encoded forms. `allowShort` is for known passwords and one-time codes; ordinary callers
+ * keep the length limit so values such as port numbers stay readable.
  */
-export function registerSecretValue(value: string): void {
-  if (value.length < MIN_REGISTERED_SECRET_LENGTH) return;
+export function registerSecretValue(value: string, options: { allowShort?: boolean } = {}): void {
+  if (!value || (!options.allowShort && value.length < MIN_REGISTERED_SECRET_LENGTH)) return;
   const size = registeredSecrets.size;
   for (const form of [value, JSON.stringify(value).slice(1, -1), uriEncoded(value)]) {
     if (form !== null) registeredSecrets.add(form);

@@ -19,6 +19,7 @@ import type {
   SkillRead,
 } from "@openbot/ui/features/marketplace/marketplace-model";
 import { serverAddress } from "@openbot/ui/features/marketplace/marketplace-view";
+import type { BitwardenConnectorPanelProps } from "@openbot/ui/features/settings/BitwardenConnectorPanel";
 import type { McpConnectSubject } from "@openbot/ui/features/settings/McpConnectShell";
 import {
   isPluginAppConfig,
@@ -36,6 +37,7 @@ import { type GitHubConnectorController, githubPanelProps } from "../connectors/
 import { type OnePasswordConnectorController, onePasswordPanelProps } from "../connectors/onepassword-connector";
 import { desktopMarketplaceCalls, type MarketplaceCalls } from "./marketplace-calls";
 import { createPluginAppConfig } from "./marketplace-plugin-catalog";
+import { localizedPlugin } from "./marketplace-plugin-text";
 import { agentHomeCache, marketplaceErrorMessage, skillHomeCache } from "./marketplace-shared";
 
 /** An agent of the server that the Marketplace is for. */
@@ -69,6 +71,7 @@ export interface MarketplaceControllerProps {
   githubConnector?: GitHubConnectorController | undefined;
   /** This computer's 1Password connection. Absent on a joined server. */
   onePasswordConnector?: OnePasswordConnectorController | undefined;
+  bitwardenConnector?: BitwardenConnectorPanelProps | undefined;
   /** What the Marketplace calls. Absent: this computer's bridge. */
   calls?: MarketplaceCalls | undefined;
 }
@@ -349,8 +352,11 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     return connector ? onePasswordPanelProps(connector) : undefined;
   });
 
+  /** The catalog listings in the reader's language. Made once per language, not on each status change. */
+  const localPlugins = createMemo(() => (props.plugins ?? []).map((plugin) => localizedPlugin(plugin, t)));
+
   const apps = createMemo((): MarketplaceApp[] => {
-    const plugins = props.plugins ?? [];
+    const plugins = localPlugins();
     const github = props.githubConnector;
     const githubState = github?.status().state;
     return [
@@ -375,6 +381,18 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
               tagline: t("marketplace.app.onePasswordTagline"),
               category: "productivity",
               status: props.onePasswordConnector.status().state === "connected" ? "connected" : "idle",
+            } satisfies MarketplaceApp,
+          ]
+        : []),
+      ...(props.bitwardenConnector
+        ? [
+            {
+              kind: "bitwarden",
+              id: "bitwarden",
+              name: t("connector.bitwarden.title"),
+              tagline: t("connector.bitwarden.description"),
+              category: "productivity",
+              status: props.bitwardenConnector.status.connected ? "connected" : "idle",
             } satisfies MarketplaceApp,
           ]
         : []),
@@ -465,6 +483,13 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     const serverId = props.pluginServerId;
     if (!serverId) throw new Error(t("marketplace.error.connectNoServer"));
     return calls().mcp.testMcpServer({ config }, serverId);
+  }
+
+  /** A browser sign-in for a "link" listing: opens the browser when the server asks for one. */
+  async function signInPluginApp(config: McpServerConfig) {
+    const serverId = props.pluginServerId;
+    if (!serverId) throw new Error(t("marketplace.error.connectNoServer"));
+    return calls().mcp.signInMcpServer({ config }, serverId);
   }
 
   /** Takes back only what this attempt installed. A skill the agent already had is the user's. */
@@ -708,6 +733,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     disconnectApp: (app) => {
       if (app.kind === "plugin") setUninstalling(app.plugin);
       if (app.kind === "github") props.githubConnector?.disconnect();
+      if (app.kind === "bitwarden") props.bitwardenConnector?.onDisconnect();
       if (app.kind === "onepassword") props.onePasswordConnector?.disconnect();
     },
     removeServer,
@@ -720,6 +746,10 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     openUrl: openPluginUrl,
     get github() {
       const panel = githubPanel();
+      return panel ? () => panel : undefined;
+    },
+    get bitwarden() {
+      const panel = props.bitwardenConnector;
       return panel ? () => panel : undefined;
     },
     get onePassword() {
@@ -742,6 +772,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     uninstallBusy: (plugin: MarketplacePluginDetail) => Boolean(busy[`app:${plugin.slug}`]),
     cancelUninstall: () => setUninstalling(null),
     testPluginApp,
+    signInPluginApp,
     openPluginUrl,
   };
 }

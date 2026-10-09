@@ -1,13 +1,28 @@
 import { isRoutineRun, type RoutineRunFields } from "@openbot/contracts/ipc";
+import type { EventActivity, EventRoutineRef, ListEventActivityInput } from "@openbot/contracts/ipc-events";
 import type { AppTextKey } from "@openbot/i18n";
-import { Button, Check, CirclePause, Clock3, TriangleAlert, X } from "@openbot/ui";
-import { For, Show } from "solid-js";
+import { Button, Check, CirclePause, Clock3, Minus, Text, TriangleAlert, X } from "@openbot/ui";
+import { createEffect, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import { type TextValue, useText } from "../../text";
+
+/** The webhook activity of an event routine. Its ignored requests join the runs. */
+interface RoutineHistoryActivity {
+  api: { listActivity: (input: ListEventActivityInput) => Promise<EventActivity[]> };
+  routine: EventRoutineRef;
+}
 
 interface RoutineRunHistoryProps {
   runs: RoutineRunFields[];
-  onOpenRun?: (messageId: string) => void;
+  onOpenRun?: ((messageId: string) => void) | undefined;
+  activity?: RoutineHistoryActivity | undefined;
 }
+
+type HistoryEntry =
+  | { kind: "run"; at: string; run: RoutineRunFields }
+  | { kind: "ignored"; at: string; item: EventActivity };
+
+const VISIBLE_ENTRIES = 10;
+const ACTIVITY_LIMIT = 50;
 
 /**
  * Only an agent run names a message the user can jump to: its mailbox delivery. A channel run
@@ -19,50 +34,132 @@ function runMessageId(run: RoutineRunFields): string | null {
 
 export function RoutineRunHistory(props: RoutineRunHistoryProps) {
   const text = useText();
-  const { t } = text;
-  const visibleRuns = () => props.runs.slice(0, 10);
+  const { t, errorMessage } = text;
+  const [activity, setActivity] = createSignal<EventActivity[]>([]);
+  const [error, setError] = createSignal<string | null>(null);
+  let request = 0;
+
+  async function loadActivity(): Promise<void> {
+    const source = props.activity;
+    const current = ++request;
+    if (!source) {
+      setActivity([]);
+      return;
+    }
+    try {
+      const rows = await source.api.listActivity({
+        owner: source.routine.owner,
+        routineId: source.routine.id,
+        limit: ACTIVITY_LIMIT,
+      });
+      if (current !== request) return;
+      setActivity(rows);
+      setError(null);
+    } catch (cause) {
+      if (current === request) setError(errorMessage(cause, t("routine.history.activityFailed")));
+    }
+  }
+
+  // A run changes the list, so the activity loads again with it. There is no refresh button.
+  createEffect(
+    () => [props.activity?.routine.id, props.activity?.routine.owner, props.runs] as const,
+    ([routineId], previous) => {
+      if (routineId !== previous?.[0]) {
+        setActivity([]);
+        setError(null);
+      }
+      void untrack(loadActivity);
+    },
+  );
+
+  const entries = (): HistoryEntry[] =>
+    [
+      ...props.runs.map((run): HistoryEntry => ({ kind: "run", at: run.scheduledFor, run })),
+      // A started request already shows as its run. The history adds only the requests that did not start a run.
+      ...activity()
+        .filter((item) => item.status === "ignored")
+        .map((item): HistoryEntry => ({ kind: "ignored", at: item.occurredAt, item })),
+    ]
+      .sort((left, right) => Date.parse(right.at) - Date.parse(left.at))
+      .slice(0, VISIBLE_ENTRIES);
+
   return (
     <section class="agent-routine-history" aria-labelledby="routine-history-heading">
       <h3 id="routine-history-heading">{t("routine.history.title")}</h3>
-      <Show when={visibleRuns().length > 0} fallback={<p class="agent-routines-empty">{t("routine.history.empty")}</p>}>
+      <Show when={error()}>
+        {(message) => (
+          <Text variant="caption" tone="danger" role="alert" class="agent-routine-history-error">
+            {message()}
+          </Text>
+        )}
+      </Show>
+      <Show when={entries().length > 0} fallback={<p class="agent-routines-empty">{t("routine.history.empty")}</p>}>
         <div class="agent-routine-run-list">
-          <For each={visibleRuns()}>
-            {(run) => {
-              const label = () =>
-                run.kind === "manual"
-                  ? t("routine.history.manualRun", { time: formatRoutineRunTime(run.scheduledFor, text) })
-                  : formatRoutineRunTime(run.scheduledFor, text);
-              const content = (
-                <>
-                  <span>{label()}</span>
-                  <RoutineRunStatus status={run.status} />
-                </>
-              );
-              return (
-                <Show
-                  when={props.onOpenRun ? runMessageId(run) : null}
-                  fallback={<div class="agent-routine-run-row">{content}</div>}
-                >
-                  {(messageId) => (
-                    <Button
-                      variant="ghost"
-                      type="button"
-                      class="agent-routine-run-row agent-routine-run-link"
-                      aria-label={t("routine.history.openRun", { run: label() })}
-                      data-cuelume-tap="navigate"
-                      onClick={() => props.onOpenRun?.(messageId())}
-                    >
-                      {content}
-                    </Button>
+          <For each={entries()}>
+            {(entry) => (
+              <Switch>
+                <Match when={entry.kind === "run" && entry.run}>
+                  {(run) => <RunRow run={run()} onOpenRun={props.onOpenRun} />}
+                </Match>
+                <Match when={entry.kind === "ignored" && entry.item}>
+                  {(item) => (
+                    <div class="agent-routine-run-row">
+                      <span class="agent-routine-run-text">
+                        <span>{formatRoutineRunTime(item().occurredAt, text)}</span>
+                        <span class="agent-routine-run-note">{ignoredNote(item(), text)}</span>
+                      </span>
+                      {/* The note already says "Ignored", so the icon has no label of its own. */}
+                      <span class="agent-routine-run-icon agent-routine-run-icon-ignored" aria-hidden="true">
+                        <Minus />
+                      </span>
+                    </div>
                   )}
-                </Show>
-              );
-            }}
+                </Match>
+              </Switch>
+            )}
           </For>
         </div>
       </Show>
     </section>
   );
+}
+
+function RunRow(props: { run: RoutineRunFields; onOpenRun?: ((messageId: string) => void) | undefined }) {
+  const text = useText();
+  const { t } = text;
+  const label = () =>
+    props.run.kind === "manual"
+      ? t("routine.history.manualRun", { time: formatRoutineRunTime(props.run.scheduledFor, text) })
+      : formatRoutineRunTime(props.run.scheduledFor, text);
+  const content = (
+    <>
+      <span>{label()}</span>
+      <RoutineRunStatus status={props.run.status} />
+    </>
+  );
+  return (
+    <Show
+      when={props.onOpenRun ? runMessageId(props.run) : null}
+      fallback={<div class="agent-routine-run-row">{content}</div>}
+    >
+      {(messageId) => (
+        <Button
+          variant="ghost"
+          type="button"
+          class="agent-routine-run-row agent-routine-run-link"
+          aria-label={t("routine.history.openRun", { run: label() })}
+          data-cuelume-tap="navigate"
+          onClick={() => props.onOpenRun?.(messageId())}
+        >
+          {content}
+        </Button>
+      )}
+    </Show>
+  );
+}
+
+function ignoredNote(item: EventActivity, text: Pick<TextValue, "t">): string {
+  return text.t(item.reason ? IGNORED_REASON_LABELS[item.reason] : "routine.history.ignored");
 }
 
 function RoutineRunStatus(props: { status: RoutineRunFields["status"] }) {
@@ -112,6 +209,12 @@ function sameCalendarDay(left: Date, right: Date): boolean {
     left.getDate() === right.getDate()
   );
 }
+
+const IGNORED_REASON_LABELS = {
+  "event-type": "routine.history.ignored.eventType",
+  filter: "routine.history.ignored.filter",
+  inactive: "routine.history.ignored.inactive",
+} as const satisfies Record<NonNullable<EventActivity["reason"]>, AppTextKey>;
 
 const RUN_STATUS_LABEL = {
   queued: "routine.runStatus.queued",

@@ -6,6 +6,7 @@ import { dirname } from "node:path";
 import type { VoiceModelStatus } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Exit, Fiber, Result, Schema, Scope, Stream } from "effect";
+import { causeHelpers } from "../backend/effect-boundary";
 
 export const WHISPER_MODEL_NAME = "ggml-medium-q5_0.bin";
 const WHISPER_MODEL_BYTES = 539_212_467;
@@ -186,9 +187,7 @@ export class VoiceOperationError extends Schema.TaggedError<VoiceOperationError>
   cause: Schema.Defect(),
 }) {}
 
-export function voiceIO<A>(operation: () => Promise<A>): Effect.Effect<A, VoiceOperationError> {
-  return Effect.tryPromise({ try: operation, catch: (cause) => new VoiceOperationError({ cause }) });
-}
+export const { io: voiceIO } = causeHelpers(VoiceOperationError);
 
 const isExpectedModel = Effect.fn("VoiceModel.validate")(function* (
   path: string,

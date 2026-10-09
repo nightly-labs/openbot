@@ -16,16 +16,16 @@ of activated accounts that return for another successful turn within one and fou
 
 Every event has these low-cardinality properties:
 
-- `surface`: `desktop`, `desktop_host`, `landing`, `mobile`, or `account_api`;
+- `surface`: `desktop`, `desktop_host`, `landing`, `web`, `mobile`, or `account_api`;
 - `environment`: currently `production` only;
-- `event_schema_version`: the integer schema generation of that surface: currently `6` on `desktop`
-  and `desktop_host`, `8` on `landing` and `account_api`, and `1` on `mobile`;
+- `event_schema_version`: the integer schema generation of that surface: currently `7` on `desktop`
+  and `desktop_host`, `8` on `landing` and `account_api`, `2` on `mobile`, and `1` on `web`;
 - `app_version` and `platform` on desktop surfaces;
 - `acquisition_source` on landing surfaces: `direct`, `search`, `social`, `github`, or `other`;
 - `source_platform` on landing surfaces: an allowlisted platform name, or `unknown`.
 
 Each surface counts its own generations, so a report filters by `surface` and that surface's current
-generation. Desktop and host generation 6 adds the usage events below (`system_tool_used`,
+generation. Desktop and host generation 7 adds safe error causes and durable failure delivery. Generation 6 added the usage events below (`system_tool_used`,
 `system_site_visited`, `system_routine_run`, `system_inventory`), `agent_source` and `agent_listing`
 on host turn and input events, and `plugin` entities and `listing_slug` on `marketplace_action`.
 
@@ -82,7 +82,9 @@ lifecycle. A malformed preference fails closed; a missing preference uses the do
 | `system_turn_started` | How many host turns begin and from which origin? | Host accepted a unique turn start |
 | `system_turn_completed` | Are turns reliable and fast? | Host emitted completion; status describes outcome |
 | `system_agent_input_requested` | Where do agents need human input? | Host requested a prompt answer or approval |
-| `system_operation_failed` | Which host/provider area fails? | Host emitted a safe, allowlisted failure code |
+| `system_operation_failed` | Which host/provider area fails? | Host emitted a safe, allowlisted operation code and cause code. The host sends this once; remote observers do not repeat it |
+| `notification_shown` | Which errors and warnings reach users? | An error/warning toast, shared alert or chat banner, or native error/warning alert is presented. Success, information, and confirmation dialogs are excluded |
+| `client_operation_failed` | Which mobile operations fail? | An existing mobile action event reports a failed result; this diagnostic report has durable delivery |
 | `system_tool_used` | Which tools and plugins do agents use for their tasks? | One row per tool kind, plugin and tool in a completed turn, with call and failure counts (Claude reports no tool failures, so its `failed_count` is 0). `plugin` is a catalog slug, `builtin`, or `custom`; `tool` is sent only for `builtin` and catalog plugins. At most 32 rows per turn |
 | `system_site_visited` | Which websites do users and agents work on? | A browser tab reached a new registrable domain. `actor` is `user` or `agent`; only the eTLD+1 is sent, and IP addresses, single-label names and names with no public suffix are dropped. An intranet host under a public domain is sent as that domain |
 | `system_routine_run` | Do routine runs succeed, and which schedules are used? | A routine run that this host saw running reached `succeeded`, `failed`, `needs-attention`, `interrupted`, or `cancelled` |
@@ -180,3 +182,58 @@ were recorded before this behavior shipped are not re-attributed.
 - Provider conversion uses `connect_completed`, never resolution of the initial connect IPC.
 - An update status with phase `error` or `unsupported` is a failed action.
 - Dashboard counts and profile assignment are smoke-tested after each analytics schema deployment.
+
+## Reliable error reports
+
+The three failure events above use a separate local queue and explicit HTTP transport. Other
+product events keep their existing delivery behavior. Only production clients collect reports.
+The browser app uses `surface: web` and `platform: web`; it enables collection only on
+`https://openbot.run`. Marketing remains `landing` and does not send app notification events.
+
+A report carries a fixed `operation`, `source`, `severity`, and `cause_code`. Notifications also
+carry `presentation` (`toast`, `banner`, or `alert`). Host failures retain `failure_code` and
+`area`, with available provider, model, reasoning effort, and turn origin. Context is captured
+when a turn starts. Account changes invalidate pending scopes; an anonymous report is never
+assigned to a later account. A known structured provider code takes precedence over a narrow
+message match. Unrecognized causes stay `unknown`. `invalid_upload_request` means the provider
+reported that failure; it does not establish why the upload was rejected.
+
+The random `report_id` identifies this report only. It is not a chat, agent, turn, file, or server
+identifier. Reports contain no message, toast text, exception text, stack trace, command, prompt,
+file name, path, or arbitrary provider code. Both disk reads and new reports pass the same
+allowlist before a send. Public model families retain their model ID; other model IDs report
+`custom`, and custom ACP agent model IDs are omitted. Notifications that have only display text
+can report an `unknown` cause. SDK path and referrer capture are not used for these requests.
+
+Host and mobile queues use local files; desktop renderer and web queues use IndexedDB. Web Locks
+serialize browser reads, writes, and sends across tabs. Browsers without Web Locks cannot send
+these reports. Reports use the app version from the build that captured the event. Each queue holds at most 1,000 reports,
+1 MiB, and seven days. Expired reports and then the oldest reports are removed at these limits.
+A successful write must finish before a send. Only HTTP 200 or 202 acknowledges delivery. Failed
+reports remain queued and move behind other reports, so one refused report cannot block them.
+Requests have a 10-second deadline. Retries use exponential delays from one second to five minutes,
+with jitter. Startup, browser network recovery, mobile foreground, and mobile host reconnection
+also trigger a retry. Host retries continue while its process runs.
+
+Each surface queue belongs to one account or to an anonymous session. A stored queue from another
+account is discarded at startup. Opt-out and account changes cancel active sends and clear queued reports. Re-enabling does not
+restore discarded reports. The browser has its own local setting under account settings. Missing
+settings use the enabled default; malformed or unreadable settings disable reporting. Storage
+and transport failures are silent. No report can be guaranteed after disk failure, storage
+removal, expiry, opt-out, or a crash before the first write. Delivery is at least once: if an
+accepted request loses its response, a retry can send the same `report_id` again.
+
+### Reliability report definition
+
+Filter each surface to its current schema generation. Group failures by surface, app version,
+provider, model, operation, and cause. Show `unknown` causes as their own group. Count distinct
+`report_id` values for durable failure events when the query supports it; never sum
+`notification_shown` with `system_operation_failed` as one failure count. Notifications count
+user presentations, and host events count local failures. The same failure can have both.
+Compare failed turns against existing `system_turn_completed` outcomes for a turn failure rate.
+Track notification counts separately by severity and presentation. No external alerts are added.
+
+Run `bun run test:desktop -- packages/telemetry/src/reports.test.ts --maxWorkers=1` to verify a
+refused HTTP send followed by restart and delivery. The test writes the received safe payloads
+and result to `.openbot-build/telemetry/transport.json`. Live project access, dashboard creation,
+and production delivery must be verified after deployment; local tests do not establish them.

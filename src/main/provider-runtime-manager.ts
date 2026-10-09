@@ -22,6 +22,7 @@ import { Deferred, Effect, Exit, Fiber, Result, Scope, Stream } from "effect";
 import lockValue from "../../native-runtime.lock.json";
 import { type AgentRuntimeLock, parseAgentRuntimeLock } from "../../scripts/agent-runtime-lock";
 import { type BundledProviderExecutables, configuredCliPath } from "../backend/cli";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { sha256File } from "../backend/file-hash";
 import { type McpToolRuntimes, NO_MCP_TOOL_RUNTIMES } from "../backend/mcp-provider-shapes";
 import {
@@ -32,7 +33,7 @@ import {
   type RuntimeSpec,
   type RuntimeTarget,
 } from "./provider-runtime-descriptors";
-import { ProviderRuntimeFailure, runRuntime, runtimeIO, runtimeSync } from "./provider-runtime-effects";
+import { ProviderRuntimeFailure, runtimeIO, runtimeSync } from "./provider-runtime-effects";
 import {
   type BlockedVersions,
   fetchBlockedVersions,
@@ -111,6 +112,8 @@ interface ProviderRuntimeManagerEvents {
 }
 
 export interface ProviderRuntimeManagerOptions {
+  /** An off provider must not run even for a managed runtime version check. */
+  isProviderOn?: (provider: ManagedProviderId) => boolean;
   /** The installed runtimes, shared by every profile on this computer. See `providerRuntimeRoot`. */
   root: string;
   /**
@@ -157,6 +160,7 @@ export function providerRuntimeRoot(input: { appData: string; userDataOverride: 
 }
 
 export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerEvents> {
+  readonly #isProviderOn: (provider: ManagedProviderId) => boolean;
   readonly #root: string;
   readonly #downloads: string;
   readonly #target: RuntimeTarget | null;
@@ -188,6 +192,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
 
   constructor(options: ProviderRuntimeManagerOptions) {
     super();
+    this.#isProviderOn = options.isProviderOn ?? (() => true);
     this.#root = options.root;
     this.#downloads = options.downloadRoot ?? join(options.root, ".downloads");
     this.#updateRuntime = options.updateRuntime ?? ((_runtime, install) => install().pipe(Effect.asVoid));
@@ -276,7 +281,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   /** Checks now and then every hour, until `stop`. The caller starts it once the app is up. */
   startUpdateChecks(intervalMs = UPDATE_CHECK_INTERVAL_MS): void {
     if (this.#checkTimer || !this.#target || this.#stopping) return;
-    const check = () => void runRuntime(this.checkForUpdates()).catch(() => undefined);
+    const check = () => void runCauseEffect(this.checkForUpdates()).catch(() => undefined);
     this.#checkTimer = setInterval(check, intervalMs);
     this.#checkTimer.unref();
     check();
@@ -664,6 +669,14 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       const partialPath = this.#partialPath(spec);
       const metadataPath = this.#partialMetadataPath(spec);
       const previous = yield* readPartialState(partialPath, metadataPath, spec);
+      // No digest is Grok's upstream release, which x.ai publishes no hash for and TLS alone vouches for.
+      const digest = spec.archiveDigest;
+      // An earlier attempt can get every byte and then fail while it stages them. A Retry installs
+      // those bytes when they still verify, instead of downloading them again.
+      if (previous.complete && digest && (yield* digestMatches(partialPath, digest))) {
+        this.#setFinishing(spec.runtime);
+        return yield* this.#installEffect(spec, partialPath);
+      }
       let offset = previous.offset;
       let response = yield* Effect.acquireRelease(
         this.#fetchRuntimeEffect(spec, signal, offset, previous.metadata?.etag ?? null),
@@ -710,18 +723,11 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
         }
       });
 
-      this.#setStatus(spec.runtime, {
-        phase: "finishing",
-        progress: null,
-        message: null,
-        version: this.#statuses[spec.runtime].version,
-      });
+      this.#setFinishing(spec.runtime);
       const downloaded = yield* runtimeIO(async () => await stat(partialPath));
       if (downloaded.size !== spec.downloadBytes) {
         return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.downloadSize")) });
       }
-      // No digest is Grok's upstream release, which x.ai publishes no hash for and TLS alone vouches for.
-      const digest = spec.archiveDigest;
       if (digest && !(yield* digestMatches(partialPath, digest))) {
         yield* this.#removePartialEffect(spec);
         return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.downloadIntegrity")) });
@@ -754,11 +760,11 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
                   downloadSmallFile: (url, hash) => this.#downloadSmallFileEffect(url, hash),
                 });
                 if (spec.source === "latest") yield* writeInstallRecord(staging, spec);
-                yield* verifyInstalledRuntime(staging, spec, this.#lock);
+                yield* verifyInstalledRuntime(staging, spec, this.#lock, this.#isProviderOn);
                 const destination = this.#installRoot(spec);
                 yield* runtimeIO(() => mkdir(dirname(destination), { recursive: true }));
                 committed = yield* this.#commitEffect(staging, destination, spec);
-                yield* verifyInstalledRuntime(destination, spec, this.#lock);
+                yield* verifyInstalledRuntime(destination, spec, this.#lock, this.#isProviderOn);
                 return committed;
               }),
             );
@@ -915,7 +921,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   }
 
   #verifiesEffect(installRoot: string, spec: RuntimeSpec): Effect.Effect<boolean, ProviderRuntimeFailure> {
-    return verifyInstalledRuntime(installRoot, spec, this.#lock).pipe(
+    return verifyInstalledRuntime(installRoot, spec, this.#lock, this.#isProviderOn).pipe(
       Effect.as(true),
       Effect.catch(() => Effect.succeed(false)),
     );
@@ -935,7 +941,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
           headers: { "User-Agent": "OpenBot-runtime-installer" },
           signal: AbortSignal.any([signal, controller.signal, AbortSignal.timeout(30_000)]),
         }),
-      );
+      ).pipe(Effect.mapError(({ cause }) => requestFailure(url, cause)));
       if (!response.ok)
         return yield* new ProviderRuntimeFailure({
           cause: new Error(sourceText("error.provider.metadataHttp", { status: response.status })),
@@ -966,7 +972,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
             ...(offset > 0 ? { Range: `bytes=${offset}-`, ...(etag ? { "If-Range": etag } : {}) } : {}),
           },
         }),
-      );
+      ).pipe(Effect.mapError(({ cause }) => requestFailure(spec.url, cause)));
     });
   }
 
@@ -998,6 +1004,15 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
         message,
         version: this.#statuses[runtime].version,
       });
+    });
+  }
+
+  #setFinishing(runtime: ManagedRuntimeId): void {
+    this.#setStatus(runtime, {
+      phase: "finishing",
+      progress: null,
+      message: null,
+      version: this.#statuses[runtime].version,
     });
   }
 
@@ -1118,12 +1133,14 @@ const verifyInstalledRuntime = Effect.fn("ProviderRuntime.verifyInstalledRuntime
   root: string,
   spec: RuntimeSpec,
   lock: AgentRuntimeLock,
+  isProviderOn: (provider: ManagedProviderId) => boolean,
 ): Effect.fn.Return<void, ProviderRuntimeFailure> {
   const descriptor = providerRuntimeDescriptor(spec.runtime);
   const executable = join(root, "bin", spec.executableName);
   yield* runtimeIO(() => access(executable));
   if (spec.source === "lock") yield* descriptor.verify(root, spec, lock);
   else yield* verifyInstallRecord(root, spec);
+  if (!isManagedToolRuntime(spec.runtime) && !isProviderOn(spec.runtime)) return;
   const versionFile = descriptor.versionFile;
   const output = versionFile
     ? yield* runtimeIO(() => readFile(join(root, versionFile), "utf8"))
@@ -1343,16 +1360,17 @@ const readPartialState = Effect.fn("ProviderRuntime.readPartialState")(function*
   partialPath: string,
   metadataPath: string,
   spec: RuntimeSpec,
-): Effect.fn.Return<{ offset: number; metadata: PartialMetadata | null }, ProviderRuntimeFailure> {
+): Effect.fn.Return<{ offset: number; metadata: PartialMetadata | null; complete: boolean }, ProviderRuntimeFailure> {
+  const restart = { offset: 0, metadata: null, complete: false };
   const content = yield* Effect.result(
     Effect.all([runtimeIO(() => readFile(metadataPath, "utf8")), runtimeIO(() => stat(partialPath))], {
       concurrency: "unbounded",
     }),
   );
-  if (Result.isFailure(content)) return { offset: 0, metadata: null };
+  if (Result.isFailure(content)) return restart;
   const [text, partial] = content.success;
   const decoded = yield* Effect.result(runtimeSync(() => JSON.parse(text)));
-  if (Result.isFailure(decoded)) return { offset: 0, metadata: null };
+  if (Result.isFailure(decoded)) return restart;
   const metadata = decoded.success;
   if (
     !isDynamicRecord(metadata) ||
@@ -1362,12 +1380,15 @@ const readPartialState = Effect.fn("ProviderRuntime.readPartialState")(function*
     metadata.url !== spec.url ||
     metadata.expectedBytes !== spec.downloadBytes ||
     partial.size <= 0 ||
-    partial.size >= spec.downloadBytes
+    partial.size > spec.downloadBytes
   )
-    return { offset: 0, metadata: null };
+    return restart;
+  // Every byte arrived and a later step failed. The caller checks the digest before it uses them.
+  if (partial.size === spec.downloadBytes) return { ...restart, complete: true };
   return {
     offset: partial.size,
     metadata: { url: metadata.url, etag: metadata.etag, expectedBytes: metadata.expectedBytes },
+    complete: false,
   };
 });
 
@@ -1409,6 +1430,27 @@ function abortError(): Error {
 
 function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === "AbortError";
+}
+
+/**
+ * A request that got no answer rejects with a bare "fetch failed", and the reason (DNS, TLS, a reset)
+ * is only on its `cause`. The failure names the URL and that reason, for the row and the log.
+ * A cancel stays an abort, which is how a cancelled download is told apart.
+ */
+function requestFailure(url: string, error: unknown): ProviderRuntimeFailure {
+  if (isAbortError(error)) return new ProviderRuntimeFailure({ cause: error });
+  return new ProviderRuntimeFailure({
+    cause: new Error(sourceText("error.provider.requestFailed", { url, reason: requestFailureReason(error) }), {
+      cause: error,
+    }),
+  });
+}
+
+function requestFailureReason(error: unknown): string {
+  if (!(error instanceof Error)) return String(error);
+  const detail = error.cause;
+  if (detail instanceof Error) return detail.message || errorCode(detail) || error.message;
+  return error.message;
 }
 
 /**

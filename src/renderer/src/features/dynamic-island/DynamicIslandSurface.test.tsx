@@ -226,6 +226,7 @@ describe("DynamicIslandSurface", () => {
       "aria-expanded",
       "true",
     );
+    expect(await screen.findByRole("alert")).toHaveTextContent("That did not work. Try again.");
     mock.dispose();
   });
 

@@ -45,11 +45,75 @@ Create the `release` environment in `nightly-labs/openbot`, then add these envir
 Do not use an Apple Development certificate. Direct distribution and native macOS updates require a
 Developer ID Application certificate. Never commit signing credentials to the repository.
 
-The Docker image needs no secret: the `docker-publish` job pushes with `GITHUB_TOKEN`. After the
-first push, GHCR keeps the package `openbot` private. Open the package settings of
-`nightly-labs/openbot` once, make it public, and give the repository write access under **Manage
-Actions access**. (Not confirmed: a repository that pushes a new package usually gets this access
-already.)
+### Docker package access
+
+The Docker image needs no secret: the `docker-publish` job pushes with `GITHUB_TOKEN`.
+[GHCR makes new packages private](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry),
+even when the source repository is public. A successful push does not confirm public access.
+
+After the first push, a package administrator must open the
+[OpenBot package](https://github.com/orgs/nightly-labs/packages/container/package/openbot):
+
+1. Open **Package settings** and set **Change visibility** to **Public**.
+2. Check that the package is linked to `nightly-labs/openbot`. The Dockerfile sets the
+   `org.opencontainers.image.source` label for this link.
+3. Under **Manage Actions access**, check that `nightly-labs/openbot` has write access.
+
+If **Public** is disabled by organization administrators, an organization owner must enable
+**Public** under **Package creation** in the
+[organization package settings](https://github.com/organizations/nightly-labs/settings/packages).
+Make OpenBot public, then restore the previous organization policy. Existing public packages stay
+public when this creation permission is disabled again.
+
+If a release pushed its image but users cannot pull it, check these settings first. Changing
+visibility makes the existing tags public; no rebuild is needed. Tags `0.30.0` and `0.31.0` have
+no `v` prefix. Later releases also publish `v<version>` as an alias.
+
+Check access with an empty Docker configuration, so a saved login cannot hide the fault:
+
+```sh
+anonymous_config=$(mktemp -d)
+docker --config "$anonymous_config" manifest inspect ghcr.io/nightly-labs/openbot:latest
+docker --config "$anonymous_config" manifest inspect ghcr.io/nightly-labs/openbot:0.30.0
+rm -rf "$anonymous_config"
+```
+
+The release workflow checks anonymous access to the version, `v<version>` and `latest` tags,
+including both Linux architectures. A failure leaves the GitHub Release and pushed images in
+place. Correct the package settings, then run the failed job again.
+
+## Hosted-server snapshots
+
+After GitHub publication, `Publish boat server snapshot` builds the Linux x64 release into a boat
+named snapshot (`openbot-server-production-<version>` with dots replaced by hyphens), then selects
+it for new production servers. It uses the tagged hosting scripts,
+the published `SHA256SUMS-linux.txt`, and `https://api.openbot.run`. The builder checks the AppImage
+checksum and installed version and requires an empty host profile before saving the snapshot.
+Existing servers and the test Worker do not change.
+
+Before the first release with this job, configure the `cloudflare-production` GitHub Environment:
+
+- Add `BOAT_TEMPLATE_API_KEY`, a separate boat key with sandbox, file, command and named snapshot
+  access. Keep the limited `BOAT_API_KEY` on the Worker.
+- Keep `CLOUDFLARE_PRODUCTION_DEPLOY_TOKEN` and the `CLOUDFLARE_ACCOUNT_ID` variable used by deployment.
+- Permit the tag pattern `v*.*.*` in addition to the `main` branch. The release job runs on a tag.
+
+`release:preflight` checks these settings. The hosted job and production Worker deployment share
+one concurrency group. The job checks GitHub's latest stable release before building and again
+before selection. It writes only the Worker's `HOSTED_SERVER_TEMPLATE` secret. Normal CI and local
+production deployments preserve it; the old GitHub variable is ignored. `hosting:setup` now sets
+up billing and webhooks only and no longer accepts `--template`.
+
+A failed hosted job leaves the GitHub Release published and the previous template selected.
+Run the failed job again after correcting the cause. A ready snapshot is reused; a save in progress
+is polled; a failed snapshot requires operator inspection. The builder never replaces an existing
+snapshot or deletes old snapshots. It stops at 10 snapshots even if boat permits paid storage above
+that count. Confirm that neither Worker nor any pending create needs a snapshot before removing it.
+
+A successful job reports the selected version in its Actions summary. Verify the first rollout by
+creating a temporary production server and checking its initial installed version. Record the
+result under `.openbot-build/`; remove only that temporary server after the check. This remote check
+is separate from local checks and requires production access.
 
 ## Windows signing
 
@@ -214,7 +278,7 @@ packages have no license file, so set `licenseSha256` to the SHA-256 of `LICENSE
 
 `native-runtime.lock.json` also pins the OpenCode CLI that OpenBot downloads for the OpenCode
 provider before its first update check answers, by npm platform package, asset SHA-256, extracted binary SHA-256, byte counts, and the
-MIT license file it fetches from `github.com/anomalyco/opencode`. Codex, Claude, and Grok are pinned
+MIT license file it takes from the `opencode-ai` npm package. Codex, Claude, and Grok are pinned
 in the same file by hand; OpenCode has a script, because the version, both platform packages, and
 the license have to agree:
 
@@ -394,8 +458,9 @@ The workflow:
     architecture, after it checks the AppImage against its `SHA256SUMS` file. It starts each image
     with `docker/seccomp.json`, waits for `openbot status`, and stops it, which must exit with 0;
 11. after the GitHub Release is published, pushes both images to `ghcr.io/nightly-labs/openbot`
-    with the tags `<version>-amd64` and `<version>-arm64`, joins them under `<version>`, `latest` and
-    `sha-<commit>`, and attests the build provenance of that image. See [Docker](docker.md).
+    with the tags `<version>-amd64` and `<version>-arm64`, joins them under `<version>`, `v<version>`,
+    `latest` and `sha-<commit>`, and attests the build provenance of that image. It then checks
+    anonymous access to both architectures. See [Docker](docker.md).
 
 Users can verify a downloaded artifact with
 `gh attestation verify <file> --repo nightly-labs/openbot`.

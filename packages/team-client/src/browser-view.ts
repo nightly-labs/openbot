@@ -1,9 +1,11 @@
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
   BROWSER_VIEW_FRAME_ACK_QUERY,
+  type BrowserViewCopied,
   type BrowserViewFrame,
   type BrowserViewInput,
   browserViewInputForHost,
+  decodeBrowserViewCopied,
   decodeBrowserViewFrame,
   decodeBrowserViewSessionResponse,
   encodeBrowserViewInput,
@@ -34,7 +36,8 @@ interface View {
   /** Set once the stream close and the session delete are sent, or the host ended the stream. */
   released: boolean;
   frame: (frame: BrowserViewFrame) => void;
-  ended: () => void;
+  ended: (reason?: string) => void;
+  copied: (message: BrowserViewCopied) => void;
 }
 /** One browser tab view per client. All paths still pass the host's stream allowlist. */
 export function createRemoteBrowserView(
@@ -42,14 +45,16 @@ export function createRemoteBrowserView(
   request: (method: string, path: string, body?: { tabId: string }) => Promise<unknown>,
   /** Whether the host advertises `browser-view-frame-point`. An older host closes a view on an input it does not know. */
   namesFrames: () => boolean,
+  /** Whether the host advertises `browser-view-clipboard`. The same holds for a paste and a copy. */
+  clipboard: () => boolean,
 ) {
   let view: View | null = null;
   let generation = 0;
-  function disconnect() {
+  function disconnect(reason?: string) {
     generation += 1;
     const current = view;
     view = null;
-    current?.ended();
+    current?.ended(reason);
   }
   /**
    * Closes one view's stream and host session. A view can be detached before its handle closes it:
@@ -80,7 +85,8 @@ export function createRemoteBrowserView(
   const open = Effect.fn("RemoteBrowserView.open")(function* (
     tabId: string,
     frame: (frame: BrowserViewFrame) => void,
-    ended: () => void,
+    ended: (reason?: string) => void,
+    copied: (message: BrowserViewCopied) => void,
   ): Effect.fn.Return<RemoteBrowserView, BrowserViewError> {
     yield* close().pipe(Effect.catch(() => Effect.void));
     const current = ++generation;
@@ -97,6 +103,7 @@ export function createRemoteBrowserView(
       released: false,
       frame,
       ended,
+      copied,
     };
     view = next;
     const acksFrames = namesFrames();
@@ -120,7 +127,7 @@ export function createRemoteBrowserView(
     const input = Effect.fn("RemoteBrowserView.input")(function* (value: BrowserViewInput) {
       if (view !== next || !next.ready)
         return yield* new BrowserViewError({ message: sourceText("error.remote.browserViewNotConnected") });
-      const wire = browserViewInputForHost(value, acksFrames);
+      const wire = browserViewInputForHost(value, acksFrames, clipboard());
       if (!wire) return;
       yield* sendFrame(
         encodeRemoteDesktopSignalControl({ type: "text", streamId: next.streamId, data: encodeBrowserViewInput(wire) }),
@@ -144,9 +151,18 @@ export function createRemoteBrowserView(
           const control = decodeRemoteDesktopSignalControl(data);
           if (control.streamId !== current.streamId) return;
           if (control.type === "opened") current.ready = true;
+          // Text from the host is the answer to a copy.
+          if (control.type === "text" && current.ready) current.copied(decodeBrowserViewCopied(control.data));
           if (control.type === "close" || control.type === "error") {
             current.released = true;
-            disconnect();
+            disconnect(
+              control.type === "error"
+                ? control.message || sourceText("error.backend.browserViewFailed")
+                : control.reason ||
+                    (control.code !== undefined && control.code !== 1000
+                      ? sourceText("error.backend.browserViewFailed")
+                      : undefined),
+            );
             void runTeamEffect(requestHost("DELETE", TEAM_API_ROUTES.browser.viewSession(current.sessionId))).catch(
               () => undefined,
             );

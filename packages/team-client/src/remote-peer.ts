@@ -30,6 +30,7 @@ import {
 } from "@openbot/contracts/team-protocol/v1-adapter";
 import { sourceText } from "@openbot/i18n/source";
 import { Context, Deferred, Effect, Exit, Layer, ManagedRuntime, Result, Schema, Scope, Semaphore } from "effect";
+import { base64UrlToBytes, bytesToBase64Url } from "./base64";
 import { createEd25519Identity, type Ed25519Identity, signEd25519, verifyEd25519Pem } from "./ed25519";
 
 class RemotePeerError extends Schema.TaggedError<RemotePeerError>()("RemotePeerError", { message: Schema.String }) {}
@@ -205,6 +206,8 @@ interface PeerState {
   /** When the TURN credentials must be renewed. Background time does not move it. */
   turnRefreshDueAt: number;
   iceServers: RTCIceServer[];
+  /** Set by `renewSignal`: the path can be dead while the connection still reports `connected`. */
+  restartIceOnReady: boolean;
   lastEventSequence: number;
   needsResync: boolean;
   connected: Deferred.Deferred<void, RemotePeerError> | null;
@@ -451,6 +454,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     if (state.reconnectTimer !== null) clearTimeout(state.reconnectTimer);
     state.reconnectTimer = null;
     const socket = state.socket;
+    state.restartIceOnReady = true;
     // Clear it first, so the close handler does not schedule a second reconnect.
     state.socket = null;
     socket?.close();
@@ -607,6 +611,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
         turnRefreshTimer: null,
         turnRefreshDueAt: 0,
         iceServers: [],
+        restartIceOnReady: false,
         lastEventSequence: 0,
         needsResync: false,
         connected: null,
@@ -694,6 +699,8 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
   function handleSignal(state: PeerState, message: SignalServerMessage, actions: ActionsRef) {
     return Effect.fn("RemotePeer.handleSignal")(function* () {
       if (state.closed || peer !== state) return;
+      // Webhook frames are for the desktop host's ingress socket, never for a team client.
+      if (message.type === "webhook-ready" || message.type === "webhook-delivery") return;
       if (message.type === "account-profile-changed") {
         // Profile refresh failure must never break the RTC connection.
         yield* notify(peerCall(() => actions.current.onAccountProfileChanged?.()));
@@ -711,6 +718,11 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
         return yield* new RemotePeerError({ message: message.message });
       }
       if (message.type === "ready") {
+        // The host replaces a connection after 10 ICE restarts, so a socket that comes back while the
+        // path is still online, such as on a return to the foreground, keeps the path. A TURN refresh
+        // still restarts ICE, so a relayed path moves to the new credentials.
+        const restartsIce = message.connectionId === null || state.restartIceOnReady || !isPeerOnline(state);
+        state.restartIceOnReady = false;
         state.resumeToken = message.resumeToken;
         // Null on the `ready` that answers a TURN refresh: the credentials are new, the connection is
         // the one already open.
@@ -721,13 +733,15 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
         const connectionId = state.connectionId;
         state.signalReady = true;
         yield* notify(diagnosticCall(state, "signal-ready", `${state.iceServers.length} ICE servers`));
-        scheduleTurnRefresh(state);
+        // A kept path still uses the credentials of its last ICE restart, so keep their deadline.
+        if (state.connection && !restartsIce) resumeTurnRefresh(state);
+        else scheduleTurnRefresh(state);
         if (state.connection) {
           const connection = state.connection;
           yield* peerDecode(() =>
             connection.setConfiguration({ iceServers: state.iceServers, bundlePolicy: "max-bundle" }),
           );
-          yield* restartIce(state);
+          if (restartsIce) yield* restartIce(state);
         }
         if (!state.connection) {
           const connection = yield* peerDecode(() => createPeerConnection(state, state.iceServers, actions));
@@ -783,7 +797,8 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     const connection = new RTCPeerConnection({ iceServers, bundlePolicy: "max-bundle" });
     state.connection = connection;
     connection.onicecandidate = (event) => {
-      if (!event.candidate || !state.connectionId || !canSignal(state)) return;
+      // An empty candidate marks the end of gathering. Signal v1 accepts only candidates.
+      if (!event.candidate?.candidate || !state.connectionId || !canSignal(state)) return;
       sendSignal(state, {
         type: "ice-candidate",
         version: SIGNAL_PROTOCOL_VERSION,
@@ -1321,8 +1336,14 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
 
   function scheduleTurnRefresh(state: PeerState, delay = SIGNAL_TURN_REFRESH_INTERVAL_MS): void {
     if (!active || state.closed || peer !== state) return;
-    if (state.turnRefreshTimer !== null) clearTimeout(state.turnRefreshTimer);
     state.turnRefreshDueAt = Date.now() + delay;
+    armTurnRefresh(state, delay);
+  }
+
+  /** Keeps `turnRefreshDueAt`: until a `ready` answers, the path still uses the old credentials. */
+  function armTurnRefresh(state: PeerState, delay: number): void {
+    if (!active || state.closed || peer !== state) return;
+    if (state.turnRefreshTimer !== null) clearTimeout(state.turnRefreshTimer);
     state.turnRefreshTimer = setTimeout(() => {
       state.turnRefreshTimer = null;
       if (canSignal(state)) {
@@ -1336,7 +1357,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
           // The reconnect path will request fresh TURN credentials.
         }
       }
-      scheduleTurnRefresh(state);
+      armTurnRefresh(state, SIGNAL_TURN_REFRESH_INTERVAL_MS);
     }, delay);
   }
 
@@ -1500,27 +1521,5 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
 
   function randomBase64Url(size: number): string {
     return bytesToBase64Url(crypto.getRandomValues(new Uint8Array(size)));
-  }
-
-  function bytesToBase64Url(bytes: Uint8Array): string {
-    return bytesToBase64(bytes).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, "");
-  }
-
-  function base64UrlToBytes(value: string): Uint8Array<ArrayBuffer> {
-    const padding = "=".repeat((4 - (value.length % 4)) % 4);
-    return base64ToBytes(value.replaceAll("-", "+").replaceAll("_", "/") + padding);
-  }
-
-  function bytesToBase64(bytes: Uint8Array): string {
-    let binary = "";
-    for (const byte of bytes) binary += String.fromCharCode(byte);
-    return btoa(binary);
-  }
-
-  function base64ToBytes(value: string): Uint8Array<ArrayBuffer> {
-    const binary = atob(value);
-    const bytes = new Uint8Array(binary.length);
-    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
-    return bytes;
   }
 }

@@ -69,6 +69,8 @@ export function SettingsRow({
   leading,
   disclosure = true,
   accessibilityLabel,
+  checked,
+  expanded,
 }: PropsWithChildren<{
   supportingText?: string;
   onPress?: () => void;
@@ -78,6 +80,10 @@ export function SettingsRow({
   disclosure?: boolean;
   /** For an action row whose visible text needs its context, such as the item it acts on. */
   accessibilityLabel?: string;
+  /** Makes the row one choice of a list. True when it is the selected choice. */
+  checked?: boolean;
+  /** For a row that shows or hides the rows below it. */
+  expanded?: boolean;
 }>) {
   const muted = String(useCSSVariable("--openbot-text-grouped-secondary"));
   const content = (
@@ -96,9 +102,9 @@ export function SettingsRow({
   );
   return onPress ? (
     <ListGroup.Item
-      accessibilityRole="button"
+      accessibilityRole={checked === undefined ? "button" : "radio"}
       accessibilityLabel={accessibilityLabel}
-      accessibilityState={{ disabled }}
+      accessibilityState={{ disabled, checked, expanded }}
       disabled={disabled}
       onPress={() => {
         void haptics.impact("soft");

@@ -38,6 +38,10 @@ function followConversationBottom(element: HTMLDivElement): void {
 export function createConversationViewScope(props: ConversationProps) {
   const controller = useConversationController();
   const agentReady = () => props.agentStatus.phase === "ready";
+  const providerUpdateRequired = () =>
+    props.agentStatus.providers?.find(
+      (provider) => provider.id === props.agent?.provider && provider.state === "outdated",
+    );
   const {
     drafts,
     setDrafts,
@@ -188,9 +192,12 @@ export function createConversationViewScope(props: ConversationProps) {
     hideBrowserPanel,
     previewAttachment,
     attachmentAction,
-    downloadAttachments,
     openSharedFile,
     openWorkspaceFile,
+    openWorkspaceFolder,
+    openWorkspaceFolderEntry,
+    sidebarFileBack,
+    openSidebarFileBack,
     openSidebarFileExternally,
     downloadSidebarFile,
     revealSidebarFile,
@@ -398,7 +405,7 @@ export function createConversationViewScope(props: ConversationProps) {
   const actions = createComposerActions({
     props,
     attachmentBusy,
-    agentReady,
+    agentReady: () => agentReady() && !providerUpdateRequired(),
     drafts,
     setDrafts,
     editingAgentId,
@@ -1095,10 +1102,10 @@ export function createConversationViewScope(props: ConversationProps) {
     activeChatSearchIndex,
     agentActivity,
     agentReady,
+    providerUpdateRequired,
     agentActivitySpaceReserved,
     activateBrowserTab,
     attachmentAction,
-    downloadAttachments,
     attachmentBusy,
     browserAddress,
     browserSidebarOpen,
@@ -1169,6 +1176,10 @@ export function createConversationViewScope(props: ConversationProps) {
     downloadSidebarFile,
     revealSidebarFile,
     openWorkspaceFile,
+    openWorkspaceFolder,
+    openWorkspaceFolderEntry,
+    sidebarFileBack,
+    openSidebarFileBack,
     awaitingReplies,
     pendingSendFor,
     retryPendingSend,

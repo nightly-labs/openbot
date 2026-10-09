@@ -18,7 +18,6 @@ export const messages = {
   "account.menu.billing": "Faturalandırma",
   "account.menu.accountSettings": "Hesap ayarları",
   "account.menu.marketplace": "Pazaryeri",
-  "account.menu.providersPermissions": "Sağlayıcılar ve izinler",
   "account.menu.help": "Yardım",
   "account.menu.sendFeedback": "Geri bildirim gönder",
   "account.menu.message": "Mesaj",

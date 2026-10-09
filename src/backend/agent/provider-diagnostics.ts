@@ -121,10 +121,27 @@ function bracketBalance(line: string) {
  * and can try again, and the chat marks the step as failed. The user met it as a "Provider error"
  * toast during an embedded-browser click, with nothing to do about it. It belongs in the log.
  *
- * Only Grok's per-call kinds count. Any other failure, the provider's own included, stays visible.
+ * Codex logs a cancelled dynamic tool call when a turn stops before its reply. The turn's
+ * interrupted state is the user feedback; this record does not mean the provider failed.
+ *
+ * Antigravity logs failed MCP calls as `error executing cascade step: CORTEX_STEP_TYPE_MCP_TOOL:`,
+ * followed by the tool's error (`Error: …` or `calling "tools/call": Error: …`) or its own call
+ * timeout. These records describe one tool call, which the agent reads as the tool's result (#1524).
+ * Other MCP step failures, such as a server that does not connect, and other cascade steps stay visible.
  */
 export function isToolCallDiagnostic(message: string): boolean {
-  return /\btool_error:\s*(?:tool_output_error|execution_failure|parse_failure)\b/.test(message);
+  return (
+    /\bcodex_core:[^\r\n]*\brouter:\s*error=dynamic tool call was cancelled before receiving a response\s*$/.test(
+      message,
+    ) ||
+    /\btool_error:\s*(?:tool_output_error|execution_failure|parse_failure)\b/.test(message) ||
+    /\berror executing cascade step:\s*CORTEX_STEP_TYPE_MCP_TOOL:\s*(?:calling "tools\/call":\s*)?Error:/.test(
+      message,
+    ) ||
+    /\berror executing cascade step:\s*CORTEX_STEP_TYPE_MCP_TOOL:\s*MCP tool call to server "[^"]+" timed out\b/.test(
+      message,
+    )
+  );
 }
 
 /**

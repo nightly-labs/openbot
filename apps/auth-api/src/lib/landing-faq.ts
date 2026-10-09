@@ -14,6 +14,11 @@ export const LANDING_FAQ: readonly LandingQuestion[] = [
       "Yes. OpenBot costs $0, with no locked features. You pay only your AI provider, through the plan or API key you already have.",
   },
   {
+    question: "Is OpenBot open source?",
+    answer:
+      "The source code is public on GitHub, under the PolyForm Noncommercial License 1.0.0. You can read, change and run it for any noncommercial purpose. It is not an open-source license as the OSI defines one: commercial use needs a separate license.",
+  },
+  {
     question: "Can I use my ChatGPT or Claude plan?",
     answer:
       "Yes. Codex signs in with your ChatGPT plan, and Claude Code with your Claude plan. Gemini uses a Google AI Pro or Ultra plan. OpenCode has free models that need no account.",
@@ -32,10 +37,6 @@ export const LANDING_FAQ: readonly LandingQuestion[] = [
     question: "Where does my data go?",
     answer:
       "Workspaces, conversations, attachments and browser data stay on the computer that runs OpenBot. The AI provider you choose receives the prompts that your agents send to it, and the pages that agents open use the network.",
-  },
-  {
-    question: "Do I need an account?",
-    answer: "No. The app works without an account. You need one only to invite other people to your team.",
   },
   {
     question: "Which computers can run OpenBot?",

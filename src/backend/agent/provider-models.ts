@@ -119,6 +119,7 @@ export const OPENCODE_FREE_MODEL_FALLBACKS: AgentModelOption[] = [
     description: "Free OpenCode model.",
     defaultReasoningEffort: "medium",
     supportedReasoningEfforts: ["medium"],
+    reasoningEffortConfigurable: false,
   },
   {
     provider: "opencode",
@@ -143,6 +144,7 @@ export const OPENCODE_FREE_MODEL_FALLBACKS: AgentModelOption[] = [
     description: "Free OpenCode model.",
     defaultReasoningEffort: "medium",
     supportedReasoningEfforts: ["medium"],
+    reasoningEffortConfigurable: false,
   },
   {
     provider: "opencode",
@@ -159,6 +161,7 @@ export const OPENCODE_FREE_MODEL_FALLBACKS: AgentModelOption[] = [
     description: "Free OpenCode model.",
     defaultReasoningEffort: "medium",
     supportedReasoningEfforts: ["medium"],
+    reasoningEffortConfigurable: false,
   },
   {
     provider: "opencode",
@@ -167,6 +170,7 @@ export const OPENCODE_FREE_MODEL_FALLBACKS: AgentModelOption[] = [
     description: "Free OpenCode model.",
     defaultReasoningEffort: "medium",
     supportedReasoningEfforts: ["medium"],
+    reasoningEffortConfigurable: false,
   },
   {
     provider: "opencode",
@@ -212,6 +216,14 @@ export const FALLBACK_MODELS: AgentModelOption[] = [
     description: "Most capable for complex, long-running work.",
     defaultReasoningEffort: "medium",
     supportedReasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
+  },
+  {
+    provider: "claude",
+    id: "claude-haiku-5-5",
+    name: "Claude Haiku 5.5",
+    description: "",
+    defaultReasoningEffort: "medium",
+    supportedReasoningEfforts: ["medium"],
   },
   {
     provider: "claude",

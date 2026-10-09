@@ -24,6 +24,8 @@ type MarkdownMessageTextProps = Omit<RichMessageTextProps, "showCitationFooter">
   showCitationFooter?: boolean;
   streaming?: boolean;
   imagesAsLinks?: boolean;
+  /** Opens a markdown image in the image viewer. Without it, an image is only a picture. */
+  onOpenImage?: ((image: HTMLImageElement) => void) | undefined;
 };
 
 type MarkdownContentProps = Omit<
@@ -210,6 +212,7 @@ export function MarkdownMessageText(props: MarkdownMessageTextProps) {
   const contentProps = createMemo(
     (): MarkdownContentProps => ({
       imagesAsLinks: props.imagesAsLinks,
+      onOpenImage: props.onOpenImage,
       agents: props.agents,
       skills: props.skills,
       attachments: props.attachments,
@@ -245,6 +248,7 @@ export function MarkdownInlineText(
   const tokens = createMemo(() => lexInlineTokens(props.body));
   const contentProps = (): MarkdownContentProps => ({
     imagesAsLinks: props.imagesAsLinks,
+    onOpenImage: props.onOpenImage,
     agents: props.agents,
     skills: props.skills,
     attachments: props.attachments,
@@ -649,7 +653,7 @@ function MarkdownInline(props: {
                 ) : (
                   <MarkdownInline
                     tokens={token.tokens}
-                    content={props.content}
+                    content={{ ...props.content, onOpenImage: undefined }}
                     streamingTailAfter={tailInside(token, token.tokens, after())}
                   />
                 )}
@@ -682,7 +686,10 @@ function MarkdownInline(props: {
                 </MessageLink>
               );
             }
-            return url ? (
+            if (!url) {
+              return <RichText body={token.text || token.raw} content={props.content} streamingTailAfter={after()} />;
+            }
+            const image = (
               <img
                 class="message-markdown-image"
                 src={url}
@@ -692,8 +699,24 @@ function MarkdownInline(props: {
                 decoding="async"
                 referrerpolicy="no-referrer"
               />
+            );
+            const onOpenImage = props.content.onOpenImage;
+            return onOpenImage ? (
+              <Button
+                variant="ghost"
+                type="button"
+                class="message-markdown-image-button"
+                aria-label={t("chat.image.preview", { name: markdownImageName(token.text, url) })}
+                data-cuelume-tap="open"
+                onClick={(event) => {
+                  const picture = event.currentTarget.querySelector("img");
+                  if (picture) onOpenImage(picture);
+                }}
+              >
+                {image}
+              </Button>
             ) : (
-              <RichText body={token.text || token.raw} content={props.content} streamingTailAfter={after()} />
+              image
             );
           }
           case "html":
@@ -938,16 +961,20 @@ function LocalFileLink(props: {
   onOpen: (path: string) => void;
 }) {
   const { t } = useText();
-  const name = fileReferenceName(props.path);
+  // A workspace path that ends with a separator is a folder chip, such as `research/eyeliner/`.
+  const folder = props.kind === "workspace" && /[/\\]$/u.test(props.path);
+  const name = fileReferenceName(folder ? props.path.replace(/[/\\]+$/u, "") : props.path);
+  const label = () => {
+    if (props.kind === "shared") return t("chat.file.openShared", { name });
+    return folder ? t("chat.file.openWorkspaceFolder", { name }) : t("chat.file.openWorkspace", { name });
+  };
   return (
     <Button
       variant="ghost"
       type="button"
       class="message-file-reference"
       data-file-tone={attachmentReferenceTone(name)}
-      aria-label={
-        props.kind === "shared" ? t("chat.file.openShared", { name }) : t("chat.file.openWorkspace", { name })
-      }
+      aria-label={label()}
       title={props.path}
       data-cuelume-tap="open"
       onClick={() => props.onOpen(props.path)}
@@ -1124,4 +1151,17 @@ function mentionedFileTarget(value: string, directory: FileDirectoryContext | nu
     path: `${directory.path.replace(/[/\\]+$/u, "")}${separator}${path}`,
     kind: directory.kind,
   };
+}
+
+/** What the image viewer calls a markdown image: its alt text, else the file name in its URL. */
+export function markdownImageName(alt: string, url: string): string {
+  if (alt.trim()) return alt.trim();
+  try {
+    const path = new URL(url).pathname;
+    const name = decodeURIComponent(path.slice(path.lastIndexOf("/") + 1));
+    if (name) return name;
+  } catch {
+    // A URL that does not parse keeps its own text as the name.
+  }
+  return url;
 }

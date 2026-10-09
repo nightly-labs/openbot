@@ -1,3 +1,4 @@
+import { CHAT_VISUAL_ITEM_TYPE_PREFIX } from "@openbot/contracts/chat-visual";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import type {
   AgentExchangeSummary,
@@ -377,13 +378,14 @@ export function withFailureReasons(messages: ChatMessage[], deliveries: readonly
   });
 }
 
-/** Like the host read state, a plan is not a readable message. */
+/** Like the host read state, a plan or a visual page is not a readable message. */
 export function latestReadableMessage(messages: ConversationMessage[]) {
   return messages.findLast(
     (message) =>
       Boolean(message.questionPrompt) ||
       (message.author !== "system" &&
         message.itemType !== CONVERSATION_PLAN_ITEM_TYPE &&
+        !message.itemType?.startsWith(CHAT_VISUAL_ITEM_TYPE_PREFIX) &&
         (message.text.trim().length > 0 || Boolean(message.attachments?.length) || Boolean(message.imageGeneration))),
   );
 }

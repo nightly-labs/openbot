@@ -1,12 +1,9 @@
 /**
- * What the search box and the row labels are made of. Every function here takes its inputs and
- * returns a string or a boolean, so a filtering question can be answered without the component.
+ * What the row labels are made of. Every function here takes its inputs and returns a string, so a
+ * label can be computed without the component.
  */
 
-import type { ChannelSummary, DirectThreadSummary, TeamPresenceMember } from "@openbot/contracts/ipc";
 import type { AppFormat, AppTextKey, AppTranslate } from "@openbot/i18n";
-import type { AgentProfile } from "../../data";
-import { teamMemberName } from "../team/TeamPersonAvatar";
 import type { SidebarAgentState, SidebarRoutinePhase, SidebarWaitReason } from "./sidebar-types";
 
 /** The state line a waiting row reads out and shows as its tooltip title. */
@@ -74,30 +71,4 @@ export function sidebarMessageTime(value: string, format: AppFormat): string {
     month: "short",
     day: "numeric",
   });
-}
-
-export function agentMatchesQuery(agent: AgentProfile, query: string): boolean {
-  return !query || `${agent.name} ${agent.title} ${agent.description} ${agent.preview}`.toLowerCase().includes(query);
-}
-
-export function channelMatchesQuery(channel: ChannelSummary, query: string): boolean {
-  return (
-    !query ||
-    `${channel.name} ${channel.title} ${channel.instructions} ${channel.lastMessage?.text ?? ""}`
-      .toLowerCase()
-      .includes(query)
-  );
-}
-
-export function personMatchesQuery(
-  member: TeamPresenceMember,
-  thread: DirectThreadSummary | undefined,
-  query: string,
-): boolean {
-  return (
-    !query ||
-    `${teamMemberName(member)} ${member.email ?? member.username} ${thread?.lastMessage.text ?? ""}`
-      .toLowerCase()
-      .includes(query)
-  );
 }

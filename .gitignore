@@ -16,7 +16,7 @@ coverage/
 .dev.vars.*
 !.env.example
 !apps/auth-api/.env.production
-!apps/auth-api/.env.shared
+!apps/auth-api/.env.dev
 !remote/.env.production
 *.key
 *.p12
@@ -58,3 +58,6 @@ mise.local.toml
 keys
 # Agent task checklist. Local to one worktree.
 /TASKS.md
+
+# Persistent local development identity and migration recovery.
+.openbot/

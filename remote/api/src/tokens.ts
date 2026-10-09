@@ -1,5 +1,10 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import {
+  DISCORD_ROUTE_AUDIENCE,
+  DISCORD_ROUTE_GUILDS_LIMIT,
+  type DiscordRouteGuild,
+} from "@openbot/contracts/signal-protocol/discord-route";
+import {
   SLACK_ROUTE_AUDIENCE,
   SLACK_ROUTE_TEAMS_LIMIT,
   type SlackRouteTeam,
@@ -13,6 +18,11 @@ import {
   type TelegramReplyParameters,
   type TelegramRouteChat,
 } from "@openbot/contracts/signal-protocol/telegram-route";
+import {
+  WEBHOOK_ROUTE_AUDIENCE,
+  WEBHOOK_ROUTES_LIMIT,
+  type WebhookRoute,
+} from "@openbot/contracts/signal-protocol/webhook-route";
 import { Effect, Result, Schema } from "effect";
 import {
   createLocalJWKSet,
@@ -70,6 +80,18 @@ const slackRouteClaimsSchema = z.object({
     .array(z.object({ id: identifierSchema, appId: identifierSchema, linkedAt: z.number().int().nonnegative() }))
     .max(SLACK_ROUTE_TEAMS_LIMIT),
 });
+const discordRouteClaimsSchema = z.object({
+  hid: identifierSchema,
+  guilds: z
+    .array(z.object({ id: z.string().regex(/^[0-9]{1,20}$/u), linkedAt: z.number().int().nonnegative() }))
+    .max(DISCORD_ROUTE_GUILDS_LIMIT),
+});
+const webhookRouteClaimsSchema = z.object({
+  hid: identifierSchema,
+  routes: z
+    .array(z.object({ id: identifierSchema, linkedAt: z.number().int().nonnegative() }))
+    .max(WEBHOOK_ROUTES_LIMIT),
+});
 const telegramRouteClaimsSchema = z.object({
   hid: identifierSchema,
   chats: z
@@ -114,6 +136,11 @@ export class RemoteTokenService {
     chatId: string,
     code: string,
   ) => Effect.Effect<TelegramChatLink | null, RemoteTokenError>;
+  readonly #validateDiscordRoute: (
+    hostId: string,
+    guilds: DiscordRouteGuild[],
+  ) => Effect.Effect<string[], RemoteTokenError>;
+  readonly #validateWebhookRoute: (hostId: string, routes: WebhookRoute[]) => Effect.Effect<string[], RemoteTokenError>;
   readonly #trustedResumeTokens = new Map<
     string,
     { expiresAt: number; hostId: string; sessionId: string; authEpoch: number }
@@ -141,6 +168,10 @@ export class RemoteTokenService {
         chatId: string,
         code: string,
       ) => Effect.Effect<TelegramChatLink | null, RemoteTokenError>;
+      // Asks the account service which guild links of a route are current. Without it, none is.
+      validateDiscordRoute?: (hostId: string, guilds: DiscordRouteGuild[]) => Effect.Effect<string[], RemoteTokenError>;
+      // Asks the account service which webhook links in a ticket are current. Without it, none is.
+      validateWebhookRoute?: (hostId: string, routes: WebhookRoute[]) => Effect.Effect<string[], RemoteTokenError>;
     } = {},
   ) {
     if (config.ticketJwks) {
@@ -163,6 +194,8 @@ export class RemoteTokenService {
     this.#validateSlackRoute = options.validateSlackRoute ?? (() => Effect.succeed([]));
     this.#validateTelegramRoute = options.validateTelegramRoute ?? (() => Effect.succeed([]));
     this.#linkTelegramChat = options.linkTelegramChat ?? (() => Effect.succeed(null));
+    this.#validateDiscordRoute = options.validateDiscordRoute ?? (() => Effect.succeed([]));
+    this.#validateWebhookRoute = options.validateWebhookRoute ?? (() => Effect.succeed([]));
   }
 
   readonly initialize = Effect.fn("RemoteTokens.initialize")(() =>
@@ -209,6 +242,50 @@ export class RemoteTokenService {
 
   readonly validateSlackRoute = Effect.fn("RemoteTokens.validateSlackRoute")(
     (hostId: string, teams: SlackRouteTeam[]) => this.#validateSlackRoute(hostId, teams),
+  );
+
+  readonly verifyDiscordRoute = Effect.fn("RemoteTokens.verifyDiscordRoute")(
+    (token: string, hostId: string, now = new Date()) =>
+      Effect.gen({ self: this }, function* () {
+        const { payload } = yield* tokenCall(() =>
+          jwtVerify(token, this.#ticketKey, {
+            audience: DISCORD_ROUTE_AUDIENCE,
+            algorithms: ["ES256"],
+            requiredClaims: ["exp"],
+            currentDate: now,
+          }),
+        );
+        const claims = yield* tokenDecode(() => discordRouteClaimsSchema.parse(payload));
+        if (claims.hid !== hostId)
+          return yield* new RemoteTokenError({ message: "The Discord route belongs to another host." });
+        return { guilds: claims.guilds };
+      }),
+  );
+
+  readonly validateDiscordRoute = Effect.fn("RemoteTokens.validateDiscordRoute")(
+    (hostId: string, guilds: DiscordRouteGuild[]) => this.#validateDiscordRoute(hostId, guilds),
+  );
+
+  readonly verifyWebhookRoute = Effect.fn("RemoteTokens.verifyWebhookRoute")(
+    (token: string, hostId: string, now = new Date()) =>
+      Effect.gen({ self: this }, function* () {
+        const { payload } = yield* tokenCall(() =>
+          jwtVerify(token, this.#ticketKey, {
+            audience: WEBHOOK_ROUTE_AUDIENCE,
+            algorithms: ["ES256"],
+            requiredClaims: ["exp"],
+            currentDate: now,
+          }),
+        );
+        const claims = yield* tokenDecode(() => webhookRouteClaimsSchema.parse(payload));
+        if (claims.hid !== hostId)
+          return yield* new RemoteTokenError({ message: "The webhook route belongs to another host." });
+        return { routes: claims.routes };
+      }),
+  );
+
+  readonly validateWebhookRoute = Effect.fn("RemoteTokens.validateWebhookRoute")(
+    (hostId: string, routes: WebhookRoute[]) => this.#validateWebhookRoute(hostId, routes),
   );
 
   readonly verifyTelegramRoute = Effect.fn("RemoteTokens.verifyTelegramRoute")(

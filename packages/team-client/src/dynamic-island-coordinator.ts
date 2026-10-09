@@ -1,3 +1,4 @@
+import { CHAT_VISUAL_ITEM_TYPE_PREFIX } from "@openbot/contracts/chat-visual";
 import type {
   AgentEvent,
   AgentRuntimeWorkItem,
@@ -21,6 +22,8 @@ type ServerRuntime = DynamicIslandPresentationInput & {
   incomingMessageAnchors: Map<string, string>;
   completedAgents: Set<string>;
   lastRecordedMessageIds: Map<string, string>;
+  /** The replies counted during each agent's active turn, so a quiet routine turn can take them back. */
+  turnReplies: Map<string, { turnId: string; count: number }>;
   receivedConversations: Set<string>;
   resolvedPrompts: Map<string, string>;
   /** The failed turn of each agent that the user dismissed from the island. The agent keeps its failed mark. */
@@ -80,6 +83,8 @@ export class DynamicIslandCoordinator {
     const incomingMessageAnchors = activeMessageAnchors(input.liveMessages, previous?.incomingMessageAnchors);
     const completedAgents = new Set(previous?.completedAgents);
     const lastRecordedMessageIds = new Map(previous?.lastRecordedMessageIds);
+    const turnReplies = new Map(previous?.turnReplies);
+    for (const agentId of turnReplies.keys()) if (!agentIds.has(agentId)) turnReplies.delete(agentId);
     for (const agentId of incomingMessageAnchors.keys())
       if (!agentIds.has(agentId)) incomingMessageAnchors.delete(agentId);
     for (const agentId of completedAgents) if (!agentIds.has(agentId)) completedAgents.delete(agentId);
@@ -110,6 +115,7 @@ export class DynamicIslandCoordinator {
       incomingMessageAnchors,
       completedAgents,
       lastRecordedMessageIds,
+      turnReplies,
       receivedConversations: new Set([...receivedConversations, ...Object.keys(input.liveMessages)]),
       resolvedPrompts,
       dismissedFailures,
@@ -217,13 +223,18 @@ export class DynamicIslandCoordinator {
         };
         return;
       case "turn-completed":
+        // A quiet routine run posted no message, so the island has no new reply to show.
         if (
           serverId !== activeServerId &&
           event.status === "completed" &&
+          !event.quiet &&
           runtime.activeTurns[event.agentId] === event.turnId
         ) {
           runtime.completedAgents.add(event.agentId);
         }
+        // The answers of a quiet routine run are gone from the chat, so their count goes too.
+        if (event.quiet && serverId !== activeServerId) this.#takeBackTurnReplies(runtime, event.agentId, event.turnId);
+        runtime.turnReplies.delete(event.agentId);
         runtime.activeTurns[event.agentId] = null;
         if (runtime.turnProgress[event.agentId]?.turnId === event.turnId) delete runtime.turnProgress[event.agentId];
         runtime.pendingPrompts[event.agentId] = undefined;
@@ -323,6 +334,7 @@ export class DynamicIslandCoordinator {
       incomingMessageAnchors: new Map(),
       completedAgents: new Set(),
       lastRecordedMessageIds: new Map(),
+      turnReplies: new Map(),
       receivedConversations: new Set(),
       resolvedPrompts: new Map(),
       dismissedFailures: new Map(),
@@ -341,7 +353,23 @@ export class DynamicIslandCoordinator {
       runtime.unreadMessageIds ??= {};
       runtime.unreadMessageIds[agentId] ??= message.id;
       runtime.lastRecordedMessageIds.set(agentId, message.id);
+      const turnId = runtime.activeTurns[agentId];
+      if (!turnId) continue;
+      const replies = runtime.turnReplies.get(agentId);
+      runtime.turnReplies.set(agentId, { turnId, count: replies?.turnId === turnId ? replies.count + 1 : 1 });
     }
+  }
+
+  #takeBackTurnReplies(runtime: ServerRuntime, agentId: string, turnId: string): void {
+    const replies = runtime.turnReplies.get(agentId);
+    if (replies?.turnId !== turnId) return;
+    const unread = (runtime.unreadReplies[agentId] ?? 0) - replies.count;
+    if (unread > 0) {
+      runtime.unreadReplies[agentId] = unread;
+      return;
+    }
+    delete runtime.unreadReplies[agentId];
+    if (runtime.unreadMessageIds) delete runtime.unreadMessageIds[agentId];
   }
 
   #retainAgentMessages(runtime: ServerRuntime, agentIds: ReadonlySet<string>): void {
@@ -352,6 +380,7 @@ export class DynamicIslandCoordinator {
     for (const agentId of runtime.lastRecordedMessageIds.keys()) {
       if (!agentIds.has(agentId)) runtime.lastRecordedMessageIds.delete(agentId);
     }
+    for (const agentId of runtime.turnReplies.keys()) if (!agentIds.has(agentId)) runtime.turnReplies.delete(agentId);
     for (const agentId of runtime.receivedConversations) {
       if (!agentIds.has(agentId)) runtime.receivedConversations.delete(agentId);
     }
@@ -541,6 +570,7 @@ function toDynamicIslandMessage(
     message.itemType === "commentary" ||
     message.itemType === "question_prompt" ||
     message.itemType === "agent_attachment" ||
+    message.itemType?.startsWith(CHAT_VISUAL_ITEM_TYPE_PREFIX) ||
     message.itemType === "plan"
   ) {
     return [];

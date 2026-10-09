@@ -21,7 +21,6 @@ const idle: ComposerControlsInput = {
   canStop: false,
   stopping: false,
   voiceAvailable: true,
-  dictation: "idle",
 };
 
 describe("composer action", () => {
@@ -30,7 +29,7 @@ describe("composer action", () => {
     expect(composerAction({ ...idle, hasDraft: true })).toMatchObject({ mode: "send", pressable: true });
     // Stop wins over the mic, so a running turn stays one press from stopping.
     expect(composerAction({ ...idle, canStop: true })).toMatchObject({ mode: "stop", pressable: true });
-    // A draft typed or dictated during a turn is queued, so the control sends it.
+    // A draft typed during a turn is queued, so the control sends it.
     expect(composerAction({ ...idle, canStop: true, hasDraft: true }).mode).toBe("send");
     expect(composerAction({ ...idle, disabled: true })).toMatchObject({ mode: "dictate", pressable: false });
   });
@@ -38,23 +37,6 @@ describe("composer action", () => {
   it("keeps the send control without speech recognition or during a send", () => {
     expect(composerAction({ ...idle, voiceAvailable: false })).toMatchObject({ mode: "send", pressable: false });
     expect(composerAction({ ...idle, busy: true })).toMatchObject({ mode: "send", pressable: false, spinner: true });
-  });
-
-  it("holds the control for dictation, even with a draft or a running turn", () => {
-    for (const input of [{}, { hasDraft: true }, { canStop: true }]) {
-      expect(composerAction({ ...idle, ...input, dictation: "listening" })).toMatchObject({
-        mode: "finish-dictation",
-        pressable: true,
-        spinner: false,
-      });
-    }
-    for (const dictation of ["starting", "stopping"] as const) {
-      expect(composerAction({ ...idle, dictation })).toMatchObject({
-        mode: "finish-dictation",
-        pressable: false,
-        spinner: true,
-      });
-    }
   });
 });
 

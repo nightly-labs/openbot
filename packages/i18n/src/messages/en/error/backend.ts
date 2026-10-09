@@ -1,6 +1,11 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.backend", {
+  "error.backend.eventsUnavailable": "Events are not available on this host.",
+  "error.backend.webhookRouteLimit": "A host can have at most {limit} webhook routines.",
+  "error.backend.webhookSettingsInvalid": "Check the webhook settings and try again.",
+  "error.backend.webhookRouteUnavailable":
+    "The public webhook route is not ready. Check the host connection and try again.",
   // Errors that the backend services send: channels, messages, routines, memories, MCP, browser and remote desktop.
   "error.backend.browserViewRemoteOnly": "A live browser view is only for a remote host.",
   "error.backend.browserViewUnsupported": "This remote host does not support a live browser view.",
@@ -12,6 +17,7 @@ export const messages = defineMessages("error.backend", {
   "error.backend.sunshineApiHttp": "Sunshine API failed with HTTP {status}.",
   "error.backend.sunshinePortsUnavailable": "Could not reserve a free Sunshine port family for Remote Desktop.",
   "error.backend.moonlightPortsUnavailable": "Could not reserve a free Moonlight WebRTC port range for Remote Desktop.",
+  "error.backend.iceServerNoPort": "The Remote Desktop ICE server did not get a port.",
   "error.backend.remoteDesktopStoppedWhileStarting": "The remote desktop runtime was stopped while it started.",
   "error.backend.sunshineNotStarted": "Sunshine did not start on a reserved port family.",
   "error.backend.moonlightNoHost": "Moonlight has no paired local host.",
@@ -129,6 +135,16 @@ export const messages = defineMessages("error.backend", {
   "error.backend.memoryTextRequired": "Memory text is required.",
   "error.backend.memoryTextTooLong": "Memory text is too long.",
   "error.backend.mcpServerGone": "This MCP server no longer exists.",
+  "error.backend.routineFlowLinkGone": "This connection no longer exists.",
+  "error.backend.routineFlowSameAgent": "An agent cannot hand work to itself.",
+  "error.backend.routineFlowIntoOwner":
+    "The routine starts with its own agent, so that agent cannot take work from another one.",
+  "error.backend.routineFlowNotOnPath": "This agent is not part of the routine yet. Connect it to the routine first.",
+  "error.backend.routineFlowDuplicate": "These agents are already connected in this routine.",
+  "error.backend.routineFlowCycle": "This connection would make a loop.",
+  "error.backend.routineFlowLinkLimit": "A routine can have at most {limit} connections.",
+  "error.backend.routineFlowHandoffFailed": "The routine could not pass the work on to this agent.",
+  "error.backend.routineFlowRemoteUnsupported": "Routine flows are only available for agents on this computer.",
   "error.backend.mcpServerLimit": "OpenBot keeps up to {limit} MCP servers.",
   "error.backend.mcpServerNameTaken": "An MCP server named {name} already exists.",
   "error.backend.mcpServerNoAnswer": "The server did not answer in {seconds} seconds.",
@@ -141,6 +157,24 @@ export const messages = defineMessages("error.backend", {
   "error.backend.mcpSignInAbandoned": "The MCP sign-in was abandoned.",
   "error.backend.mcpSignInNoBrowser": "This MCP sign-in cannot open a browser.",
   "error.backend.mcpSignInNotWebPage": "The sign-in address is not a web page.",
+  "error.backend.mcpSignInRequired": "This server asks you to sign in. Choose Sign in to continue in your browser.",
+  "error.backend.mcpSignInOnHost": "This server asks for a sign-in. Sign in to it in OpenBot on the host computer.",
+  "error.backend.mcpSignInNeedsHttps":
+    "This server asks for a sign-in, and OpenBot signs in only over https. Change the URL to {url}.",
+  "error.backend.mcpSignInCancelled": "The sign-in was cancelled.",
+  "error.backend.mcpSignInTimedOut": "The sign-in was not finished in the browser.",
+  "error.backend.mcpSignInResponseTimedOut": "The sign-in response did not arrive in time.",
+  "error.backend.mcpServerExited":
+    "The server stopped before it answered. Run the command in a terminal to see its error.",
+  "error.backend.mcpServerUnreachable": "OpenBot could not reach the server. Check the URL and your network.",
+  "error.backend.mcpLocalServerOff":
+    "No server answers at {address} on this computer. Start the server, or turn it on in the app that runs it, then try again.",
+  "error.backend.mcpServerBlocked":
+    "This computer blocked the connection to the server. Check your firewall or security software, then try again.",
+  "error.backend.mcpServerIncompatible":
+    "Something answered at this address, but not as an MCP server over Streamable HTTP. Check the URL, and update the app that runs the server.",
+  "error.backend.mcpRemoteBridge":
+    "{reason} This command runs the mcp-remote bridge. Choose Streamable HTTP with the URL {url} instead, and OpenBot signs you in.",
   "error.backend.oauthNotHttps": "The OAuth endpoint {origin} is not https, so the credentials were not sent.",
   "error.backend.oauthTooManyRedirects": "The OAuth endpoint redirected too many times.",
   "error.backend.oauthRedirectOrigin":
@@ -157,6 +191,9 @@ export const messages = defineMessages("error.backend", {
   "error.backend.sharedPathNotFile": "Shared path is not a file.",
   "error.backend.workspaceFileOutside": "Workspace file must be inside the agent workspace.",
   "error.backend.workspacePathNotFile": "Workspace path is not a file.",
+  "error.backend.workspacePathNotDirectory": "Workspace path is not a folder.",
+  "error.backend.workspacePathMissing": "Nothing exists at {path} in the agent workspace {root}.",
+  "error.backend.workspacePathMissingForMember": "Nothing exists at {path} in the agent workspace.",
   "error.backend.useChannelTaskControls": "Use the channel task controls for this assignment.",
   "error.backend.editFinished": "This edit has already finished.",
   "error.backend.editCancelled": "This edit was cancelled, so the message keeps its original text.",

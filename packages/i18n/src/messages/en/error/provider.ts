@@ -2,6 +2,8 @@ import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.provider", {
   // Provider, provider runtime and custom endpoint errors.
+  "error.provider.computerUseConfig":
+    "OpenBot could not register Computer Use in the Codex configuration. Check that your Codex config.toml is valid and writable, then restart OpenBot. You can turn off Computer Use in the teammate settings to continue without it.",
   "error.provider.endpointsReadOnly":
     "The saved endpoints were written by a newer version of OpenBot, or the file cannot be read. Update OpenBot to change them.",
   "error.provider.endpointNoSecureStorage":
@@ -67,6 +69,7 @@ export const messages = defineMessages("error.provider", {
   "error.provider.unexpectedVersion": "Provider runtime returned an unexpected version.",
   "error.provider.metadataNoData": "Runtime metadata download returned no data.",
   "error.provider.metadataTooLarge": "Runtime metadata is too large.",
+  "error.provider.requestFailed": "OpenBot could not download {url}. {reason}",
   "error.provider.installRecordMismatch": "The runtime install record does not match.",
   "error.provider.runtimeChecksum": "Provider runtime checksum mismatch.",
   "error.provider.codexReleaseShape": "The Codex release has an unexpected shape.",
@@ -101,7 +104,7 @@ export const messages = defineMessages("error.provider", {
   "error.provider.noModelNamed": "{provider} has no model available.",
   "error.provider.acpNoModels": "ACP CLI did not advertise any ACP models. OpenBot will not guess a fallback model.",
   "error.provider.endpointRemoveBusy": "Wait for the active turn and queue to finish before you remove this endpoint.",
-  "error.provider.codexOutdated": "Codex CLI {version} is too old. OpenBot requires 0.144.1 or newer.",
+  "error.provider.codexOutdated": "Codex CLI {version} is too old. OpenBot requires 0.156.0 or newer.",
   "error.provider.codexNotStarted": "Codex CLI was found but could not be started.",
   "error.provider.codexNotStartedHint":
     "Codex CLI was found but could not be started. Run `codex --version` in a new terminal.",
@@ -158,6 +161,8 @@ export const messages = defineMessages("error.provider", {
     "The model provider refused the request because of its rate limit. Wait a few minutes or choose another model, then try again.\n{detail}",
   "error.provider.opencodeBilling":
     "The model provider refused the request because of the account's billing. Waiting does not fix this. Add a payment method or funds in the provider account, or choose another model.\n{detail}",
+  "error.provider.opencodeInvalidUpload":
+    "OpenCode's model provider reported an invalid upload request. Choose another model and continue. Check saved routines before you create them again.\n{detail}",
   "error.provider.opencodeProviderFailed":
     "The model provider failed on its side. Your connection is not the cause. Try again later or choose another model.\n{detail}",
   "error.provider.opencodeNetwork":
@@ -228,4 +233,10 @@ export const messages = defineMessages("error.provider", {
   "error.provider.customAgentNotSaved": "This custom agent is not saved. Refresh the list and try again.",
   "error.provider.customAgentTooMany": "You can save at most {count} custom agents.",
   "error.provider.customAgentEnvValueMissing": "Enter a value for {name}.",
+  "error.provider.off": "{provider} is off in OpenBot. Turn it on in provider settings first.",
+  "error.provider.inUse": "An agent uses {provider}. Change its model before you turn this provider off.",
+  "error.provider.useBusy": "Wait for the provider check or sign-in to finish, then try again.",
+  "error.provider.useSettingsReadOnly":
+    "The saved provider settings cannot be read. Update OpenBot before you change them.",
+  "error.provider.useChangeFailed": "OpenBot could not change the provider setting.",
 });

@@ -23,6 +23,8 @@ import type { LanguageService } from "../language-service";
 import type { LogoColorService } from "../logo-color-service";
 import { MAC_PERMISSION_URLS } from "../mac-permission-urls";
 import { exportDiagnostics, exportOpenBotData } from "../maintenance-service";
+import type { RemoteSessionCache } from "../remote-session-cache";
+import type { RemoteSessionReusePreferenceStore } from "../remote-session-reuse-preference-store";
 import { readSetupState, writeSetupState } from "../setup-store";
 import type { UpdateService } from "../update-service";
 import {
@@ -32,6 +34,7 @@ import {
   parseApprovalAutomation,
   parseBusyMessageModePreference,
   parseExternalDestination,
+  parseRemoteSessionReusePreference,
   parseSetup,
 } from "./app-inputs";
 import { stringPayload } from "./validation";
@@ -72,6 +75,8 @@ export interface AppIpcDependencies {
   analyticsPreferenceFile: string;
   approvalAutomation: ApprovalAutomation;
   busyMessageMode: BusyMessageModePreferenceStore;
+  remoteSessionReuse: RemoteSessionReusePreferenceStore;
+  remoteSessionCache: RemoteSessionCache;
   language: LanguageService;
   logoColor: LogoColorService;
   initializeAgent: () => Promise<void>;
@@ -90,6 +95,8 @@ export function appIpcHandlers({
   analyticsPreferenceFile,
   approvalAutomation,
   busyMessageMode,
+  remoteSessionReuse,
+  remoteSessionCache,
   language,
   logoColor,
   initializeAgent,
@@ -129,6 +136,13 @@ export function appIpcHandlers({
       setBusyMessageModePreference: payloadHandler(parseBusyMessageModePreference, (parsed) =>
         runCauseEffect(busyMessageMode.set(parsed)),
       ),
+      getRemoteSessionReusePreference: handler(() => remoteSessionReuse.get()),
+      // Off removes the kept sessions at once. The sessions of this run then end when the app quits.
+      setRemoteSessionReusePreference: payloadHandler(parseRemoteSessionReusePreference, async (parsed) => {
+        const saved = await runCauseEffect(remoteSessionReuse.set(parsed));
+        await Effect.runPromise(remoteSessionCache.setEnabled(saved.keepBetweenRuns));
+        return saved;
+      }),
       getAppLanguagePreference: handler(() => language.preference),
       setAppLanguagePreference: payloadHandler(parseAppLanguagePreference, (parsed) =>
         runCauseEffect(language.set(parsed)),

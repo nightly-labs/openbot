@@ -212,14 +212,20 @@ export function createProviderCodeLogin(options: ProviderCodeLoginOptions): Prov
     const retry = { label: t("app.provider.newCode"), onClick: () => void startProviderCodeLogin(provider) };
     if (outcome.kind === "expired") {
       actionToast.warning(t("app.provider.codeExpired", { name }), {
-        description: t("app.provider.codeExpiredDescription"),
-        action: retry,
+        ...{
+          description: t("app.provider.codeExpiredDescription"),
+          action: retry,
+        },
+        report: { operation: "provider", source: "action", cause_code: "unknown" },
       });
       return;
     }
     actionToast.error(t("app.provider.connectFailed", { name }), {
-      description: sourceText(outcome.message),
-      action: { ...retry, label: t("common.tryAgain") },
+      ...{
+        description: sourceText(outcome.message),
+        action: { ...retry, label: t("common.tryAgain") },
+      },
+      report: { operation: "provider", source: "action", cause_code: "unknown" },
     });
   }
 

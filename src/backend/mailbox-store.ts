@@ -43,7 +43,7 @@ import {
   type StoredGeneratedAttachment,
   toAttachmentSummary,
 } from "./attachment-files";
-import { StoredStateFailure, storedIO, storedSync } from "./stored-state-effects";
+import { StoredStateFailure, storedIO, storedSync, toStoredStateFailure } from "./stored-state-effects";
 
 export type { ExportedAttachmentFile, GeneratedAttachmentSource } from "./attachment-files";
 
@@ -113,6 +113,10 @@ interface StoredDelivery {
   createdAt: string;
   /** Sent to steer the running turn, and waiting in the queue instead. Shown only while queued. */
   steerFallback?: QueueSteerFallback;
+}
+
+function isActiveDelivery(delivery: StoredDelivery): boolean {
+  return delivery.status === "queued" || delivery.status === "starting" || delivery.status === "running";
 }
 
 interface StoredState {
@@ -667,20 +671,44 @@ export class MailboxStore {
     });
   }
 
-  conversationMessages(agentId: string): ConversationMessage[] {
-    const messages: ConversationMessage[] = [];
+  conversationMessages(
+    agentId: string,
+    options: { fromCreatedAt?: string; limit?: number } = {},
+  ): ConversationMessage[] {
+    const limit = Math.max(1, Math.min(options.limit ?? 100, 100));
     const deliveriesByMessage = new Map<string, StoredDelivery[]>();
-    const positions = this.#queuedPositions();
     for (const delivery of this.#state.deliveries) {
       const deliveries = deliveriesByMessage.get(delivery.messageId) ?? [];
       deliveries.push(delivery);
       deliveriesByMessage.set(delivery.messageId, deliveries);
     }
-    for (const message of this.#state.messages) {
-      if (message.channelId || message.messaging) continue;
+    const selectedStoredMessages: StoredMessage[] = [];
+    let completedCount = 0;
+    for (let index = this.#state.messages.length - 1; index >= 0; index -= 1) {
+      const message = this.#state.messages[index];
+      if (!message || message.channelId || message.messaging) continue;
       // A request the agent sent from a Slack thread belongs to that thread, not to its own chat.
       // The teammate it went to still sees it.
       if (message.messagingReturn && message.sender.kind === "agent" && message.sender.agentId === agentId) continue;
+      const deliveries = deliveriesByMessage.get(message.id) ?? [];
+      const ownMessage = message.sender.kind === "agent" && message.sender.agentId === agentId;
+      let relevant = ownMessage;
+      let active = false;
+      for (const delivery of deliveries) {
+        if (!ownMessage && delivery.recipientAgentId !== agentId) continue;
+        relevant = true;
+        if (isActiveDelivery(delivery)) active = true;
+      }
+      if (!relevant) continue;
+      if (!active && options.fromCreatedAt && message.createdAt < options.fromCreatedAt) continue;
+      if (!active && completedCount >= limit) continue;
+      selectedStoredMessages.push(message);
+      if (!active) completedCount += 1;
+    }
+    selectedStoredMessages.reverse();
+    const messages: ConversationMessage[] = [];
+    const positions = this.#queuedPositions();
+    for (const message of selectedStoredMessages) {
       const deliveries = deliveriesByMessage.get(message.id) ?? [];
       if (message.sender.kind === "agent" && message.sender.agentId === agentId) {
         messages.push({
@@ -956,6 +984,14 @@ export class MailboxStore {
 
   getDelivery(deliveryId: string): DeliveryContext | null {
     const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    return delivery ? this.#context(delivery) : null;
+  }
+
+  /** The delivery of one message to one recipient. A message reaches each recipient once. */
+  deliveryForMessage(messageId: string, recipientAgentId: string): DeliveryContext | null {
+    const delivery = this.#state.deliveries.find(
+      (candidate) => candidate.messageId === messageId && candidate.recipientAgentId === recipientAgentId,
+    );
     return delivery ? this.#context(delivery) : null;
   }
 
@@ -1762,12 +1798,7 @@ export class MailboxStore {
       // markers without their outbox entry, and a failed save restores a copy that has all other changes.
       const managedPaths = new Map<string, string | null>();
       for (const path of new Set(this.#undeletedFileRecords(fileId).map((target) => target.path))) {
-        managedPaths.set(
-          path,
-          yield* this.#files
-            .managedTransferFile(path)
-            .pipe(Effect.mapError((failure) => new StoredStateFailure({ cause: failure.cause }))),
-        );
+        managedPaths.set(path, yield* this.#files.managedTransferFile(path).pipe(toStoredStateFailure));
       }
       const records = this.#fileRecords();
       const targets = this.#undeletedFileRecords(fileId);
@@ -1855,8 +1886,12 @@ export class MailboxStore {
       ...this.#state,
       generatedAttachments: [...this.#state.generatedAttachments, ...staged],
     };
-    const persisted = this.#database.persistConversationAndMailbox(
+    const changedMessages = snapshot.messages.filter((message) =>
+      message.attachments?.some((attachment) => attachmentIds.includes(attachment.id)),
+    );
+    const persisted = this.#database.persistConversationChangesAndMailbox(
       snapshot,
+      changedMessages,
       eventType,
       detail,
       nextState,
@@ -1919,6 +1954,27 @@ export class MailboxStore {
     } catch (cause) {
       return yield* new StoredStateFailure({ cause });
     }
+  }, Effect.uninterruptible).bind(this);
+
+  /**
+   * Writes generated bytes as a staged attachment. `persistGeneratedAttachmentsWithConversation`
+   * saves it with the message that names it; `discardStagedGeneratedAttachments` removes it.
+   */
+  stageGeneratedBytes = Effect.fn("MailboxStore.stageGeneratedBytes")(function* (
+    this: MailboxStore,
+    input: {
+      bytes: Uint8Array;
+      name: string;
+      mimeType: string;
+      ownerAgentId?: string;
+      ownerThreadId?: string | null;
+    },
+  ): Effect.fn.Return<AttachmentSummary, StoredStateFailure> {
+    const attachment = yield* this.#files
+      .storeGenerated(input)
+      .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
+    this.#stagedGeneratedAttachments.set(attachment.id, attachment);
+    return toAttachmentSummary(attachment);
   }, Effect.uninterruptible).bind(this);
 
   listExportAttachments = Effect.fn("MailboxStore.listExportAttachments")(function* (

@@ -76,6 +76,23 @@ describe("OpenBot connected desktop shell", () => {
     expect(restored).toBeEnabled();
   });
 
+  it("shows the stored remote session choice and saves a change, and restores it when the save fails", async () => {
+    vi.mocked(window.openbot.getRemoteSessionReusePreference).mockResolvedValue({ keepBetweenRuns: false });
+    vi.mocked(window.openbot.setRemoteSessionReusePreference).mockRejectedValueOnce(new Error("Write failed"));
+    render(() => <App />);
+    await fireEvent.click(await screen.findByRole("button", { name: "Settings" }));
+    const toggle = await screen.findByRole("switch", { name: "Fast connection to servers" });
+    await waitFor(() => expect(toggle).not.toBeChecked());
+    await fireEvent.click(toggle);
+    await waitFor(() =>
+      expect(window.openbot.setRemoteSessionReusePreference).toHaveBeenCalledWith({ keepBetweenRuns: true }),
+    );
+    await waitFor(() => expect(toggle).not.toBeChecked());
+    await fireEvent.click(toggle);
+    await waitFor(() => expect(window.openbot.setRemoteSessionReusePreference).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(toggle).toBeChecked());
+  });
+
   it.each<ApprovalAutomationPreference & { enabled: boolean }>([
     { defaultAutoApprove: true, autoApproveOverrides: {}, turbo: false, enabled: true },
     { defaultAutoApprove: false, autoApproveOverrides: {}, turbo: false, enabled: false },
@@ -181,7 +198,7 @@ describe("OpenBot connected desktop shell", () => {
     await screen.findByRole("heading", { name: "Chief" });
     await waitFor(() => expect(window.openbot.agent.listInstalledSkills).toHaveBeenCalled());
     await fireEvent.click(screen.getByRole("button", { name: "View agent settings" }));
-    await screen.findByRole("textbox", { name: "Agent name" });
+    await screen.findByRole("button", { name: /^Edit profile of/u });
     vi.mocked(window.openbot.agent.listInstalledSkills).mockResolvedValue([
       {
         skillId: "local-skill-smoke",
@@ -896,6 +913,7 @@ describe("OpenBot connected desktop shell", () => {
     );
 
     await fireEvent.click(screen.getByRole("button", { name: "View agent settings" }));
+    await fireEvent.click(await screen.findByRole("button", { name: /^Edit profile of/u }));
     const name = await screen.findByRole("textbox", { name: "Agent name" });
     await fireEvent.input(name, { target: { value: "Coordinator" } });
     await fireEvent.blur(name);
@@ -926,7 +944,8 @@ describe("OpenBot connected desktop shell", () => {
     await screen.findByRole("heading", { name: "Chief" });
     await fireEvent.click(screen.getByRole("button", { name: "View agent settings" }));
     const settings = await screen.findByRole("complementary", { name: "Agent settings" });
-    await fireEvent.click(within(settings).getByRole("button", { name: "Edit agent avatar" }));
+    await fireEvent.click(within(settings).getByRole("button", { name: /^Edit profile of/u }));
+    await fireEvent.click(await within(settings).findByRole("button", { name: "Edit agent avatar" }));
     const editor = within(settings).getByRole("dialog", { name: "Avatar editor" });
     await fireEvent.click(within(editor).getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(window.openbot.agent.setAvatar).toHaveBeenCalledWith({ agentId: "chief", image: null }));
@@ -981,6 +1000,7 @@ describe("OpenBot connected desktop shell", () => {
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
     await fireEvent.click(screen.getByRole("button", { name: "View agent settings" }));
+    await fireEvent.click(await screen.findByRole("button", { name: /^Edit profile of/u }));
     const name = await screen.findByRole("textbox", { name: "Agent name" });
     name.focus();
     let draft = "";
@@ -1022,6 +1042,8 @@ describe("OpenBot connected desktop shell", () => {
     }
     expect(screen.getByRole("textbox", { name: "Agent title" })).toBe(title);
 
+    await fireEvent.click(screen.getByRole("button", { name: "Back to settings" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Edit instructions" }));
     const description = screen.getByRole("textbox", { name: "Agent instructions" });
     description.focus();
     draft = "";

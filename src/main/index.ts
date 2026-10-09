@@ -1,6 +1,12 @@
 import { join, resolve } from "node:path";
 import { parseInviteUrl, selfHostedApiOrigin } from "@openbot/contracts/invite-links";
-import { type AppLogoColor, type CentralAuthState, IPC_ENDPOINTS } from "@openbot/contracts/ipc";
+import {
+  type AgentEvent,
+  type AppLogoColor,
+  type CentralAuthState,
+  type HostStatus,
+  IPC_ENDPOINTS,
+} from "@openbot/contracts/ipc";
 import { createFormat, resolveLocale, translateFor } from "@openbot/i18n";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { createRemoteDirectoryRefresh } from "@openbot/team-client/remote-directory";
@@ -42,6 +48,7 @@ import { agentTemplateIpcHandlers } from "./ipc/agent-template-handlers";
 import { appIpcHandlers } from "./ipc/app-handlers";
 import { attachmentIpcHandlers } from "./ipc/attachment-handlers";
 import { billingIpcHandlers } from "./ipc/billing-handlers";
+import { bitwardenConnectorIpcHandlers } from "./ipc/bitwarden-connector-handlers";
 import { browserIpcHandlers } from "./ipc/browser-handlers";
 import { channelMemoryIpcHandlers } from "./ipc/channel-memory-handlers";
 import { channelRoutineIpcHandlers } from "./ipc/channel-routine-handlers";
@@ -50,6 +57,7 @@ import { customAgentIpcHandlers } from "./ipc/custom-agent-handlers";
 import { customProviderIpcHandlers } from "./ipc/custom-provider-handlers";
 import { registerIpcGroups } from "./ipc/define-ipc-group";
 import { dynamicIslandIpcHandlers } from "./ipc/dynamic-island-handlers";
+import { eventsIpcHandlers } from "./ipc/events-handlers";
 import { githubConnectorIpcHandlers } from "./ipc/github-connector-handlers";
 import { hostAdminIpcHandlers } from "./ipc/host-admin-handlers";
 import { hostedServerIpcHandlers } from "./ipc/hosted-server-handlers";
@@ -64,6 +72,8 @@ import { pluginIpcHandlers } from "./ipc/plugin-handlers";
 import { providerAdminIpcHandlers } from "./ipc/provider-admin-handlers";
 import { providerDetectionIpcHandlers } from "./ipc/provider-detection-handlers";
 import { providerIpcHandlers } from "./ipc/provider-handlers";
+import { routineFeedIpcHandlers } from "./ipc/routine-feed-handlers";
+import { routineFlowIpcHandlers } from "./ipc/routine-flow-handlers";
 import { routineIpcHandlers } from "./ipc/routine-handlers";
 import { sharedTableIpcHandlers } from "./ipc/shared-table-handlers";
 import { skillIpcHandlers } from "./ipc/skill-handlers";
@@ -186,6 +196,15 @@ protocol.registerSchemesAsPrivileged([
     scheme: "openbot-remote-attachment",
     privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true },
   },
+  // A visual reply page. It needs no fetch or CORS support: only a frame loads it.
+  {
+    scheme: "openbot-visual",
+    privileges: { standard: true, secure: true },
+  },
+  {
+    scheme: "openbot-remote-visual",
+    privileges: { standard: true, secure: true },
+  },
   {
     scheme: "openbot-avatar",
     privileges: { standard: true, secure: true, supportFetchAPI: true },
@@ -228,7 +247,7 @@ let relaunchRequested = false;
  * and the sign-in waiting for that grant lives in this process. It is also never held: a grant is
  * answered by the sign-in that started it, and there is no such sign-in before the app is running.
  */
-type RendererDeepLink = Exclude<DeepLink, { kind: "mcp-auth" | "slack-workspace" }>;
+type RendererDeepLink = Exclude<DeepLink, { kind: "mcp-auth" | "slack-workspace" | "discord-guild" }>;
 
 // One link at a time, of whichever kind: a second replaces the first, because what a user opened
 // last is what they meant. `deepLinkReceiverReady` says a window has asked for it, which is what
@@ -266,7 +285,9 @@ const {
   forwardVoiceModelStatus,
   forwardProviderRuntimeStatus,
   forwardGitHubConnectorStatus,
+  forwardRoutineFlowsChanged,
   forwardOnePasswordConnectorStatus,
+  forwardBitwardenConnectorStatus,
   forwardHostStatus,
   forwardRemoteDesktopSessions,
   forwardServers,
@@ -423,6 +444,8 @@ function registerIpcHandlers({
   logoColor,
   notificationPreference,
   busyMessageMode,
+  remoteSessionReuse,
+  remoteSessionCache,
   agentInitialization,
   sidebarLayout,
   host,
@@ -433,8 +456,11 @@ function registerIpcHandlers({
   hostedSites,
   githubConnector,
   onePasswordConnector,
+  bitwardenConnector,
   billing,
   hostedServers,
+  routineFeed,
+  events,
   customProviderChanges,
   customAgentChanges,
   providerDetection,
@@ -449,6 +475,7 @@ function registerIpcHandlers({
   analytics,
   storageUsage,
   trace,
+  routineFlows,
 }: ApplicationServices): void {
   // Every renderer-to-main endpoint is bound by one of these, one file per domain under ./ipc.
   // Nothing is bound inline here: this is the trust boundary, and a reviewer should be able to read
@@ -467,6 +494,8 @@ function registerIpcHandlers({
       analyticsPreferenceFile,
       approvalAutomation,
       busyMessageMode,
+      remoteSessionReuse,
+      remoteSessionCache,
       language,
       logoColor,
       initializeAgent: () => runCauseEffect(agentInitialization.start()),
@@ -488,7 +517,10 @@ function registerIpcHandlers({
     ...hostedSiteIpcHandlers({ hostedSites, remoteServers, getMainWindow, translate: language.translate }),
     ...githubConnectorIpcHandlers({ githubConnector }),
     ...onePasswordConnectorIpcHandlers({ onePasswordConnector }),
+    ...bitwardenConnectorIpcHandlers({ bitwardenConnector }),
     ...billingIpcHandlers({ billing }),
+    ...routineFeedIpcHandlers({ routineFeed }),
+    ...eventsIpcHandlers({ events, remoteServers }),
     ...hostedServerIpcHandlers({ hostedServers }),
     ...customProviderIpcHandlers(customProviderChanges),
     ...customAgentIpcHandlers(customAgentChanges),
@@ -526,6 +558,7 @@ function registerIpcHandlers({
     ...memoryIpcHandlers({ service, remoteServers }),
     ...sharedTableIpcHandlers({ service, remoteServers }),
     ...routineIpcHandlers({ service, remoteServers }),
+    ...routineFlowIpcHandlers({ routineFlows }),
     ...channelMemoryIpcHandlers({ service, remoteServers }),
     ...channelRoutineIpcHandlers({ service, remoteServers }),
     ...agentAdminIpcHandlers({
@@ -695,6 +728,10 @@ function acceptDeepLink(link: DeepLink): void {
     receiveSlackSignIn(link);
     return;
   }
+  if (link.kind === "discord-guild") {
+    receiveDiscordSignIn(link);
+    return;
+  }
   pendingDeepLink = link;
   const window = windowHolder.current;
   if (!window || window.isDestroyed() || !deepLinkReceiverReady) return;
@@ -722,7 +759,9 @@ function takePendingDeepLink(kind: RendererDeepLink["kind"]): string | null {
 
 /** A link of a kind a renderer can be sent, or null for one it cannot - which includes no link. */
 function takeRendererDeepLink(link: DeepLink | null): RendererDeepLink | null {
-  return link && link.kind !== "mcp-auth" && link.kind !== "slack-workspace" ? link : null;
+  return link && link.kind !== "mcp-auth" && link.kind !== "slack-workspace" && link.kind !== "discord-guild"
+    ? link
+    : null;
 }
 
 /**
@@ -739,6 +778,23 @@ function receiveSlackSignIn(link: Extract<DeepLink, { kind: "slack-workspace" }>
     })
     .catch(() => {
       // The Slack settings show the connection's state. The error can quote Slack.
+    });
+}
+
+/**
+ * Hands a Discord install the sealed guild link it is waiting for. As with a Slack install, a link
+ * this run did not start does nothing and raises no window.
+ */
+function receiveDiscordSignIn(link: Extract<DeepLink, { kind: "discord-guild" }>): void {
+  const messaging = services?.messaging;
+  if (!messaging) return;
+  void Effect.runPromise(messaging.completeDiscordGuild(link.nonce, link.grant))
+    .then((accepted) => {
+      const window = windowHolder.current;
+      if (accepted && window && !window.isDestroyed()) showMainWindow(window);
+    })
+    .catch(() => {
+      // The Discord settings show the connection's state.
     });
 }
 
@@ -884,6 +940,53 @@ if (!hasSingleInstanceLock) {
       setIpcCallObserver((call) => trace.record({ kind: "ipc", ...call }));
       service.on("event", (event) => trace.observeAgentEvent(event));
       service.on("event", (event) => forwardAgentEvent("local", event));
+      // A routine or its owner can be deleted outside the events API. Its route is then revoked here.
+      // Turns and channel messages also send these events, so only a deleted owner starts a sync.
+      let webhookAgentIds = new Set(service.listAgents().map((agent) => agent.id));
+      const onRoutineEvent = (event: AgentEvent): void => {
+        switch (event.type) {
+          case "routines-changed":
+          case "channel-routines-changed":
+            built.eventsRuntime.syncRoutes({ all: false });
+            return;
+          case "agents-changed": {
+            const previous = webhookAgentIds;
+            webhookAgentIds = new Set(event.agents.map((agent) => agent.id));
+            if ([...previous].some((id) => !webhookAgentIds.has(id))) built.eventsRuntime.syncRoutes({ all: false });
+            return;
+          }
+          case "channels-changed":
+            if (!service.routineRecords.ownerExists({ kind: "channel", id: event.channelId }))
+              built.eventsRuntime.syncRoutes({ all: false });
+            return;
+        }
+      };
+      // Routes belong to the signed-in account. A token refresh does not change them.
+      let webhookPrincipalId = centralAuthPrincipalId(built.centralAuth.getState());
+      built.eventsRuntime.setAccountPrincipal(webhookPrincipalId);
+      const refreshWebhookRoutes = (state: CentralAuthState): void => {
+        const principalId = centralAuthPrincipalId(state);
+        if (principalId === webhookPrincipalId) return;
+        webhookPrincipalId = principalId;
+        built.eventsRuntime.setAccountPrincipal(principalId);
+        if (principalId !== null) built.eventsRuntime.syncRoutes({ all: true });
+      };
+      service.on("event", onRoutineEvent);
+      built.centralAuth.on("changed", refreshWebhookRoutes);
+      let webhookHostId = host.getStatus().serverId;
+      const onHostChanged = (status: HostStatus): void => {
+        const hostIdentityChanged = status.serverId !== webhookHostId;
+        webhookHostId = status.serverId;
+        forwardHostStatus(status);
+        const principalId = centralAuthPrincipalId(built.centralAuth.getState());
+        if (hostIdentityChanged && principalId !== null && status.serverId !== null)
+          built.eventsRuntime.syncRoutes({ all: true });
+      };
+      teardown.push(0, "event service listeners", () => {
+        service.off("event", onRoutineEvent);
+        built.centralAuth.off("changed", refreshWebhookRoutes);
+        host.off("changed", onHostChanged);
+      });
       // Internal usage signals for analytics only. They are not agent events, so the renderer and
       // Team API clients never receive them.
       service.on("toolUsage", (usage) => built.analytics.handleToolUsage(usage));
@@ -894,13 +997,15 @@ if (!hasSingleInstanceLock) {
           sendToRenderer(window, IPC_ENDPOINTS.app.approvalAutomation, preference);
         }
       });
-      host.on("changed", forwardHostStatus);
+      host.on("changed", onHostChanged);
       host.on("presence", (snapshot) => forwardTeamPresence("local", snapshot));
       host.on("directMessage", (event) => forwardDirectMessage("local", event));
       host.on("directTyping", (event) => forwardDirectTyping("local", event));
       remoteDesktop.on("changed", forwardRemoteDesktopSessions);
       built.githubConnector.onChanged(forwardGitHubConnectorStatus);
+      built.routineFlows.onChanged(forwardRoutineFlowsChanged);
       built.onePasswordConnector.onChanged(forwardOnePasswordConnectorStatus);
+      built.bitwardenConnector.onChanged(forwardBitwardenConnectorStatus);
       remoteServers.on("changed", forwardServers);
       remoteServers.on("agent", (serverId, event, bufferedLive) => {
         forwardAgentEvent(serverId, event, bufferedLive);
@@ -908,6 +1013,20 @@ if (!hasSingleInstanceLock) {
       remoteServers.on("presence", forwardTeamPresence);
       remoteServers.on("directMessage", forwardDirectMessage);
       remoteServers.on("directTyping", forwardDirectTyping);
+      // The selected server connects while the window loads. Its WebRTC setup takes seconds, and
+      // the first screen waits for it. The other servers start after the load, below. The connection
+      // needs the signed-in account, so it starts only after the account loads. A failed account
+      // load is logged where it starts, and the event connections try again later.
+      void Effect.runPromise(
+        built.centralAuthInitialization.pipe(
+          Effect.flatMap(() =>
+            Effect.sync(() => {
+              if (built.centralAuth.getState().status === "signed_in") remoteServers.connectActiveServer();
+            }),
+          ),
+          Effect.catch(() => Effect.void),
+        ),
+      ).catch((error) => logger.warn("Unable to start the selected server's connection:", toLogValue(error)));
       updater.on("status", forwardUpdateStatus);
       built.requestedUpdate.on("preference", forwardUpdatePreference);
       updater.start();
@@ -944,6 +1063,9 @@ if (!hasSingleInstanceLock) {
       );
       await windows.loadRenderer(mainWindow);
       performance.mark("openbot:renderer-loaded");
+      // `sendToRenderer` dropped the server changes made while the window loaded: the host list and
+      // the connection of the selected server. The renderer can have read the list before them.
+      forwardServers(remoteServers.list());
       // After the load: `sendToRenderer` drops events aimed at a window that is still loading.
       await Effect.runPromise(remoteServers.startEventConnections());
       const reconcileDynamicIsland = () =>

@@ -1,4 +1,5 @@
 import { type AgentProviderId, type AgentStatus, agentProviderDescriptor } from "@openbot/contracts/ipc";
+import { classifyFailure } from "@openbot/telemetry";
 import { toast } from "@openbot/ui";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, flush, onSettled } from "solid-js";
@@ -175,6 +176,13 @@ const Providers = createSimpleContext({
      * Restarts a provider of this computer after its turns end. A joined host has no such action:
      * its provider API has no restart, so the caller offers none there.
      */
+    async function setProviderOn(provider: AgentProviderId, on: boolean): Promise<void> {
+      const server = activeServer();
+      if (server?.kind !== "local") return;
+      const status = await providersPort().setProviderOn({ provider, on });
+      if (activeServer()?.id === server.id) flush(() => applyAgentStatus(status));
+    }
+
     async function restartProvider(provider: AgentProviderId): Promise<void> {
       await changeProviderRestart(provider, providersPort().restartProvider);
     }
@@ -194,7 +202,10 @@ const Providers = createSimpleContext({
       } catch (error) {
         const { t, errorMessage } = currentText();
         const title = t("app.provider.restartFailed", { name: agentProviderDescriptor(provider).displayName });
-        toast.error(title, { description: errorMessage(error, title) });
+        toast.error(title, {
+          ...{ description: errorMessage(error, title) },
+          report: { operation: "provider", source: "system", cause_code: classifyFailure(error) },
+        });
       }
     }
 
@@ -246,6 +257,7 @@ const Providers = createSimpleContext({
       codeLogin,
       openProviderInstallGuide,
       refreshAgentProviders,
+      setProviderOn,
       restartProvider,
       cancelProviderRestart,
     };

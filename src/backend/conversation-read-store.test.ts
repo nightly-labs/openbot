@@ -146,6 +146,41 @@ describe("ConversationReadStore", () => {
     database.close();
   });
 
+  it("marks an older paged boundary without loading the full thread", async () => {
+    const root = await mkdtemp(join(tmpdir(), "openbot-conversation-read-paged-"));
+    roots.push(root);
+    const database = new OpenBotDatabase(root);
+    await runCauseEffect(database.initialize());
+    database.connection
+      .prepare(
+        `INSERT INTO projection_threads (
+          thread_id, agent_id, title, active_turn_id, created_at, updated_at, last_event_sequence
+        ) VALUES (?, ?, ?, NULL, ?, ?, ?)`,
+      )
+      .run("thread-chief", "chief", "Chief", "2026-08-19T09:00:00.000Z", "2026-08-19T09:00:00.000Z", 1);
+    const insert = database.connection.prepare(
+      `INSERT INTO projection_thread_messages (
+        thread_id, message_id, turn_id, author, status, item_type, created_at,
+        ordinal, message_json, last_event_sequence
+      ) VALUES (?, ?, NULL, ?, 'completed', NULL, ?, ?, ?, ?)`,
+    );
+    for (let index = 0; index < 125; index += 1) {
+      const entry = message(`paged-${index}`, "assistant");
+      entry.createdAt = new Date(Date.UTC(2026, 7, 19, 9, 0, index)).toISOString();
+      insert.run("thread-chief", entry.id, entry.author, entry.createdAt, index, JSON.stringify(entry), index + 1);
+    }
+
+    const reads = new ConversationReadStore(database);
+    const first = reads.markReadForThread("member-a", "thread-chief", "paged-5");
+    expect(first).toMatchObject({ throughMessageId: "paged-5", unreadCount: 119, firstUnreadMessageId: "paged-6" });
+    const older = reads.markReadForThread("member-a", "thread-chief", "paged-2");
+    expect(older).toMatchObject({ throughMessageId: "paged-5", unreadCount: 119, firstUnreadMessageId: "paged-6" });
+
+    const unread = reads.markUnreadForThread("member-a", "thread-chief");
+    expect(unread).toMatchObject({ throughMessageId: null, unreadCount: 125, firstUnreadMessageId: "paged-0" });
+    database.close();
+  });
+
   it("baselines agent history that existed before the read-state migration", async () => {
     const root = await mkdtemp(join(tmpdir(), "openbot-conversation-read-migration-"));
     roots.push(root);

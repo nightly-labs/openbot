@@ -84,8 +84,9 @@ Xvfb with `OPENBOT_SERVER=1`. Main (`src/main/server-mode.ts`) then opens the co
 `/run/openbot/control.sock` and publishes the host after each sign-in.
 
 Updates work as on a hosted server (see [Updates](hosted-servers.md#updates)): the timer stages a
-new release, and it starts at the next boot. `sudo openbot update` stages, stops the service,
-applies and starts the service again.
+new release, and it starts at the next boot, or when an owner, an admin or a permitted member
+installs it in Server Settings > Updates. `sudo openbot update` stages, stops the service, applies
+and starts the service again.
 
 ## Control socket
 

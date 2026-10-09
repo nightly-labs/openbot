@@ -5,7 +5,9 @@ import { AGENT_INSTALL_ROUTES } from "./agent-install-v1";
 import { AGENT_PUBLISH_ROUTES } from "./agent-publish-v1";
 import { AGENT_UPDATE_ROUTES } from "./agent-update-v1";
 import { CONTEXT_RESET_ROUTES } from "./context-reset-v1";
+import { EVENTS_ROUTES } from "./events-v1";
 import { HOST_ADMIN_ROUTES } from "./host-admin-v1";
+import { HOST_RELEASE_ROUTES } from "./host-release-v1";
 import { HOST_UPDATE_ROUTES, hostRestartEvent } from "./host-update-v1";
 import { HOSTED_SITES_ROUTES } from "./hosted-sites-v1";
 import { LIVE_ACTIVITY_PUSH_ROUTES } from "./live-activity-push-v1";
@@ -58,6 +60,79 @@ describe("agent-admin-v1", () => {
     expect(() => codec(AGENT_ADMIN_ROUTES.update).request({ agentId: "chief", access: "root" })).toThrow();
     expect(() => codec(AGENT_ADMIN_ROUTES.update).response(200, { ...settings, access: "root" })).toThrow();
     expect(() => codec(AGENT_ADMIN_ROUTES.update).response(200, { access: "full" })).toThrow();
+  });
+});
+
+describe("events-v1", () => {
+  const owner = { kind: "agent", id: "chief" } as const;
+  const routine = {
+    id: "routine-1",
+    owner,
+    name: "Deploy",
+    instruction: "Check the deploy",
+    active: true,
+    timezone: "UTC",
+    trigger: { kind: "webhook", url: "https://signal.example/hooks/route-1", eventType: null, filters: [] },
+    createdAt: "2026-10-07T10:00:00.000Z",
+    updatedAt: "2026-10-07T10:00:00.000Z",
+  };
+
+  it("never returns stored secrets", () => {
+    expect(
+      codec(EVENTS_ROUTES.listRoutines).response(200, [
+        { ...routine, trigger: { ...routine.trigger, secret: "raw-secret" } },
+      ]),
+    ).toEqual([routine]);
+    expect(codec(EVENTS_ROUTES.saveRoutine).response(200, { routine, secret: "shown-once" })).toEqual({
+      routine,
+      secret: "shown-once",
+    });
+    expect(codec(EVENTS_ROUTES.rotateSecret).request({ id: "routine-1", owner })).toEqual({ id: "routine-1", owner });
+  });
+
+  it("bounds event payloads and rejects malformed event routes", () => {
+    expect(() => codec(EVENTS_ROUTES.listActivity).request({ owner })).toThrow();
+    expect(() =>
+      codec(EVENTS_ROUTES.saveRoutine).request({
+        owner,
+        name: "Routine",
+        instruction: "Run it",
+        active: true,
+        timezone: "UTC",
+        trigger: { kind: "webhook", eventType: "example.received", filters: [{ pointer: "/data/~2key", value: "v" }] },
+      }),
+    ).toThrow();
+    let nested: unknown = "value";
+    for (let index = 0; index < 34; index += 1) nested = { nested };
+    expect(() =>
+      codec(EVENTS_ROUTES.saveRoutine).request({
+        owner,
+        name: "Routine",
+        instruction: "Run it",
+        active: true,
+        timezone: "UTC",
+        trigger: { kind: "schedule", schedule: nested },
+      }),
+    ).toThrow();
+    expect(() => codec(EVENTS_ROUTES.status).response(200, { supported: true })).toThrow();
+  });
+
+  it("allows the wider delivery identifier bound without widening generic identifiers", () => {
+    const activity = {
+      kind: "received",
+      id: "receipt-1",
+      deliveryId: "d".repeat(512),
+      eventType: "build.completed",
+      status: "started",
+      reason: null,
+      runId: "run-1",
+      occurredAt: "2026-10-07T10:00:00.000Z",
+    };
+    expect(codec(EVENTS_ROUTES.listActivity).response(200, [activity])).toEqual([activity]);
+    expect(() =>
+      codec(EVENTS_ROUTES.listActivity).response(200, [{ ...activity, deliveryId: "d".repeat(513) }]),
+    ).toThrow();
+    expect(() => codec(EVENTS_ROUTES.listActivity).response(200, [{ ...activity, id: "d".repeat(512) }])).toThrow();
   });
 });
 
@@ -465,5 +540,17 @@ describe("hosted-sites-v1", () => {
     expect(() =>
       codec(HOSTED_SITES_ROUTES.list).response(200, { sites: [{ ...site, status: "uploading" }], limit: 3, used: 1 }),
     ).toThrow();
+  });
+});
+
+describe("host-release-v1", () => {
+  const snapshot = { currentVersion: "0.25.2", latestVersion: "0.26.0", phase: "available", method: "hosted" };
+  it("round-trips release status and omits private fields", () => {
+    for (const path of Object.values(HOST_RELEASE_ROUTES)) {
+      expect(codec(path).request({})).toEqual({});
+      expect(codec(path).response(200, { ...snapshot, privatePath: "/private" })).toEqual(snapshot);
+      expect(() => codec(path).response(200, { ...snapshot, phase: "restart" })).toThrow();
+      expect(() => codec(path).response(200, { ...snapshot, currentVersion: "x".repeat(65) })).toThrow();
+    }
   });
 });

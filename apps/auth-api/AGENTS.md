@@ -1,8 +1,7 @@
 # `apps/auth-api`
 
 The Cloudflare Worker behind accounts, avatars, host configuration, memberships, invitations and
-logical sessions. It never holds chats, files or commands, and the app works without it — a change
-here must not become something core function depends on.
+logical sessions. It never holds chats, files or commands.
 
 ## Mobile development over LAN
 

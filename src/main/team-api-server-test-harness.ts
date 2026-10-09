@@ -103,6 +103,7 @@ export function createAgents(overrides: Partial<TeamApiAgents> = {}, events = ne
     testChannelRoutine: unimplemented,
     listChannelRoutineRuns: unimplemented,
     listConversationReads: unimplemented,
+    readConversation: unimplemented,
     generateProfile: unimplemented,
     saveProfile: unimplemented,
     createAgent: unimplemented,
@@ -122,6 +123,7 @@ export function createAgents(overrides: Partial<TeamApiAgents> = {}, events = ne
     discardDraftAttachment: unimplemented,
     resolveSharedFile: unimplemented,
     resolveWorkspaceFile: unimplemented,
+    listWorkspaceDirectory: unimplemented,
     sendMessage: unimplemented,
     listQueue: unimplemented,
     acknowledgeFailedTurn: unimplemented,
@@ -160,6 +162,7 @@ export function createBrowser(overrides: Partial<TeamApiBrowser> = {}): TeamApiB
     loadUrl: unimplemented,
     startView: unimplemented,
     dispatchViewInput: unimplemented,
+    copyViewSelection: unimplemented,
     ...overrides,
   };
 }

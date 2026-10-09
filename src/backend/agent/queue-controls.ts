@@ -10,6 +10,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { Effect, Schema } from "effect";
 import type { AgentStore } from "../agent-store";
 import type { ChannelAssignment } from "../channel-store";
+import { causeHelpers } from "../effect-boundary";
 import type { MailboxStore } from "../mailbox-store";
 import { decodeRecordResponse } from "../protocol";
 import type { ConversationRuntime } from "./conversation-runtime";
@@ -74,9 +75,7 @@ export class QueueControls {
     if (this.#hooks.channelAssignment(deliveryId))
       return yield* new QueueOperationFailed({ cause: new Error(sourceText("error.backend.useChannelTaskControls")) });
     const sender = this.#mailbox.getDelivery(deliveryId)?.delivery.sender;
-    yield* this.#mailbox
-      .cancel(agentId, deliveryId)
-      .pipe(Effect.mapError((failure) => new QueueOperationFailed({ cause: failure.cause })));
+    yield* this.#mailbox.cancel(agentId, deliveryId).pipe(toQueueOperationFailed);
     this.#mailboxSync.emitQueue(agentId);
     this.#drain.scheduleDrain(agentId);
     // The requester may hold the other answers until this request ends.
@@ -101,10 +100,7 @@ export class QueueControls {
       if (input.action === "save")
         yield* Effect.forEach(
           input.attachmentDraftIds,
-          (id) =>
-            this.#mailbox
-              .discardDraft(id)
-              .pipe(Effect.mapError((failure) => new QueueOperationFailed({ cause: failure.cause }))),
+          (id) => this.#mailbox.discardDraft(id).pipe(toQueueOperationFailed),
           {
             concurrency: "unbounded",
             discard: true,
@@ -156,7 +152,7 @@ export class QueueControls {
             input.editId,
             sender,
           )
-          .pipe(Effect.mapError((failure) => new QueueOperationFailed({ cause: failure.cause })));
+          .pipe(toQueueOperationFailed);
         const snapshot = this.#conversation.snapshotToUpdate(agentId);
         if (snapshot) {
           this.#mailboxSync.syncMailboxMessages(snapshot);
@@ -188,7 +184,7 @@ export class QueueControls {
         undefined,
         sender,
       )
-      .pipe(Effect.mapError((failure) => new QueueOperationFailed({ cause: failure.cause })));
+      .pipe(toQueueOperationFailed);
     const snapshot = this.#conversation.snapshotToUpdate(input.agentId);
     if (snapshot) this.#mailboxSync.syncMailboxMessages(snapshot);
     this.#mailboxSync.emitQueue(input.agentId);
@@ -210,14 +206,12 @@ export class QueueControls {
     const executionDeliveryIds = this.#mailbox.queuedExecutionDeliveryIds(input.agentId);
     yield* this.#mailbox
       .reorderQueue(input.agentId, [...executionDeliveryIds, ...input.deliveryIds])
-      .pipe(Effect.mapError((failure) => new QueueOperationFailed({ cause: failure.cause })));
+      .pipe(toQueueOperationFailed);
     this.#mailboxSync.emitQueue(input.agentId);
   }, Effect.uninterruptible);
 
   readonly steer = Effect.fn("QueueControls.steer")(function* (this: QueueControls, input: SteerQueuedMessageInput) {
-    const agent = yield* this.#store
-      .getOrCreate(input.agentId)
-      .pipe(Effect.mapError((failure) => new QueueOperationFailed({ cause: failure.cause })));
+    const agent = yield* this.#store.existing(input.agentId).pipe(toQueueOperationFailed);
     const { client, session, snapshot, context, turnId } = yield* queueStep(() => {
       const client = this.#providers.requireReadyClientForAgent(agent);
       const session = this.#store.activeProviderSession(agent.id);
@@ -235,9 +229,7 @@ export class QueueControls {
         throw new Error(REMOVED_ENDPOINT_MESSAGE);
       return { client, session, snapshot, context, turnId };
     });
-    yield* this.#mailbox
-      .markSteering(input.deliveryId, turnId)
-      .pipe(Effect.mapError((failure) => new QueueOperationFailed({ cause: failure.cause })));
+    yield* this.#mailbox.markSteering(input.deliveryId, turnId).pipe(toQueueOperationFailed);
     this.#mailboxSync.emitQueue(agent.id);
     yield* client
       .request(
@@ -256,12 +248,12 @@ export class QueueControls {
         decodeRecordResponse,
       )
       .pipe(
-        Effect.mapError((failure) => new QueueOperationFailed({ cause: failure.cause })),
+        toQueueOperationFailed,
         // The turn may have ended while the request was in flight, and found nothing else to start
         // with this message out of the queue, so the drain is asked again.
         Effect.tapError(() =>
           this.#mailbox.restoreUnsteered(input.deliveryId, turnId).pipe(
-            Effect.mapError((failure) => new QueueOperationFailed({ cause: failure.cause })),
+            toQueueOperationFailed,
             Effect.andThen(
               queueStep(() => {
                 this.#mailboxSync.syncMailboxMessages(snapshot);
@@ -272,9 +264,7 @@ export class QueueControls {
           ),
         ),
       );
-    yield* this.#mailbox
-      .markRunning(input.deliveryId, turnId)
-      .pipe(Effect.mapError((failure) => new QueueOperationFailed({ cause: failure.cause })));
+    yield* this.#mailbox.markRunning(input.deliveryId, turnId).pipe(toQueueOperationFailed);
     yield* queueStep(() => {
       this.#mailboxSync.syncMailboxMessages(snapshot);
       this.#mailboxSync.emitQueue(agent.id);
@@ -287,6 +277,4 @@ export class QueueOperationFailed extends Schema.TaggedError<QueueOperationFaile
   cause: Schema.Defect(),
 }) {}
 
-function queueStep<A>(run: () => A): Effect.Effect<A, QueueOperationFailed> {
-  return Effect.try({ try: run, catch: (cause) => new QueueOperationFailed({ cause }) });
-}
+const { sync: queueStep, rewrap: toQueueOperationFailed } = causeHelpers(QueueOperationFailed);

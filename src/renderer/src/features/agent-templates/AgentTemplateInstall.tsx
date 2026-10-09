@@ -1,4 +1,5 @@
 import type { AddedAgent, AgentTemplateDetail, ServerSummary } from "@openbot/contracts/ipc";
+import { classifyFailure } from "@openbot/telemetry";
 import { AgentTemplateInstallDialog } from "@openbot/ui/features/agents/AgentTemplateInstallDialog";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createStore } from "solid-js";
@@ -52,7 +53,9 @@ export function AgentTemplateInstall(props: {
             draft.loading = false;
           });
           props.onClose();
-          actionToast.error(errorMessage(error, t("agentTemplate.install.readFailed")));
+          actionToast.error(errorMessage(error, t("agentTemplate.install.readFailed")), {
+            report: { operation: "agent", source: "action", cause_code: classifyFailure(error) },
+          });
         });
       return () => {
         current = false;

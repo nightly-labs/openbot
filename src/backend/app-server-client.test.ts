@@ -4,10 +4,12 @@ import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { isString } from "@openbot/contracts/runtime-values";
+import { Effect, Fiber } from "effect";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CodexAppServerClient } from "./app-server-client";
 import { runCauseEffect } from "./effect-boundary";
-import { decodeRecordResponse, isRecord } from "./protocol";
+import { type AppServerRequest, decodeRecordResponse, isRecord } from "./protocol";
+import type { ProviderHistoryFragment } from "./provider-history";
 
 const temporaryRoots: string[] = [];
 const clients: CodexAppServerClient[] = [];
@@ -29,6 +31,49 @@ describe("CodexAppServerClient", () => {
 
     expect(result).toEqual({ echoed: "hello" });
     await vi.waitFor(() => expect(notifications).toContain("test/notification"));
+  });
+
+  it("cancels only the interrupted turn, including late tools, and accepts tools after restart", async () => {
+    const client = createClient(await createFakeCodex(), 5_000);
+    const requests: AppServerRequest[] = [];
+    client.on("request", (request) => requests.push(request));
+    client.start();
+    const tool = (threadId: string, turnId: string) =>
+      runCauseEffect(client.request("test/tool", { threadId, turnId }, decodeRecordResponse));
+    await tool("thread-a", "turn-a");
+    await tool("thread-b", "turn-a");
+    const first = requests[0]?.signal;
+    const other = requests[1]?.signal;
+    expect(first?.aborted).toBe(false);
+    await runCauseEffect(
+      client.request("turn/interrupt", { threadId: "thread-a", turnId: "turn-a" }, decodeRecordResponse),
+    );
+    expect(first?.aborted).toBe(true);
+    expect(other?.aborted).toBe(false);
+    await tool("thread-a", "turn-a");
+    expect(requests[2]?.signal?.aborted).toBe(true);
+    await tool("thread-a", "turn-next");
+    expect(requests[3]?.signal?.aborted).toBe(false);
+    await runCauseEffect(
+      client.request(
+        "test/complete",
+        { threadId: "thread-a", turn: { id: "turn-next", status: "interrupted" } },
+        decodeRecordResponse,
+      ),
+    );
+    expect(requests[3]?.signal?.aborted).toBe(true);
+    await runCauseEffect(client.stop());
+    expect(other?.aborted).toBe(true);
+    client.start();
+    await tool("thread-a", "turn-a");
+    expect(requests[4]?.signal?.aborted).toBe(false);
+    await expect(runCauseEffect(client.request("test/partial-exit", {}, decodeRecordResponse))).rejects.toThrow(
+      "exited",
+    );
+    expect(requests[4]?.signal?.aborted).toBe(true);
+    client.start();
+    await tool("thread-a", "turn-a");
+    expect(requests[5]?.signal?.aborted).toBe(false);
   });
 
   it("rejects an invalid response without leaving its caller pending", async () => {
@@ -95,6 +140,159 @@ describe("CodexAppServerClient", () => {
       echoed: "after restart",
     });
   });
+
+  it("reads newest turns with bounded item pages without resuming the thread", async () => {
+    const client = createClient(await createFakeCodex(), 5_000);
+    const observed: Array<{ method: string; params: unknown }> = [];
+    const fragments: ProviderHistoryFragment[] = [];
+    client.on("notification", (notification) => {
+      if (notification.method === "test/observed" && isRecord(notification.params)) {
+        observed.push({ method: String(notification.params.method), params: notification.params.params });
+      }
+    });
+    client.start();
+
+    await runCauseEffect(
+      client.readHistory({ threadId: "history-thread", cwd: "/tmp/workspace", items: "full" }, (fragment) =>
+        Effect.sync(() => {
+          fragments.push(fragment);
+          return true;
+        }),
+      ),
+    );
+    await vi.waitFor(() => expect(observed).toHaveLength(5));
+
+    expect(fragments).toEqual([
+      {
+        turnId: "turn-2",
+        status: "completed",
+        startedAt: 2,
+        itemOffset: 0,
+        items: [{ type: "userMessage", id: "item-2a", text: "first" }],
+        complete: false,
+      },
+      {
+        turnId: "turn-2",
+        status: "completed",
+        startedAt: 2,
+        itemOffset: 1,
+        items: [{ type: "agentMessage", id: "item-2b", text: "second" }],
+        complete: true,
+      },
+      { turnId: "turn-1", status: "failed", startedAt: 1, itemOffset: 0, items: [], complete: true },
+    ]);
+    expect(observed).toEqual([
+      {
+        method: "thread/turns/list",
+        params: {
+          threadId: "history-thread",
+          limit: 50,
+          sortDirection: "desc",
+          itemsView: "notLoaded",
+        },
+      },
+      {
+        method: "thread/items/list",
+        params: {
+          threadId: "history-thread",
+          turnId: "turn-2",
+          limit: 50,
+          sortDirection: "asc",
+        },
+      },
+      {
+        method: "thread/items/list",
+        params: {
+          threadId: "history-thread",
+          turnId: "turn-2",
+          limit: 50,
+          sortDirection: "asc",
+          cursor: "item-next",
+        },
+      },
+      {
+        method: "thread/turns/list",
+        params: {
+          threadId: "history-thread",
+          limit: 50,
+          sortDirection: "desc",
+          itemsView: "notLoaded",
+          cursor: "turn-next",
+        },
+      },
+      {
+        method: "thread/items/list",
+        params: {
+          threadId: "history-thread",
+          turnId: "turn-1",
+          limit: 50,
+          sortDirection: "asc",
+        },
+      },
+    ]);
+  });
+
+  it("fails when Codex repeats a history cursor", async () => {
+    const client = createClient(await createFakeCodex(), 5_000);
+    client.start();
+
+    await expect(
+      runCauseEffect(client.readHistory({ threadId: "repeated-thread", items: "none" }, () => Effect.succeed(true))),
+    ).rejects.toThrow("repeated turn history cursor");
+  });
+
+  it("stops paging when the consumer declines a fragment", async () => {
+    const client = createClient(await createFakeCodex(), 5_000);
+    const observed: Array<{ method: string; params: unknown }> = [];
+    client.on("notification", (notification) => {
+      if (notification.method === "test/observed" && isRecord(notification.params)) {
+        observed.push({ method: String(notification.params.method), params: notification.params.params });
+      }
+    });
+    client.start();
+    let count = 0;
+
+    await runCauseEffect(
+      client.readHistory({ threadId: "history-thread", items: "full" }, () =>
+        Effect.sync(() => {
+          count += 1;
+          return false;
+        }),
+      ),
+    );
+
+    await vi.waitFor(() => expect(observed).toHaveLength(2));
+    expect(count).toBe(1);
+    expect(observed.map(({ method }) => method)).toEqual(["thread/turns/list", "thread/items/list"]);
+  });
+
+  it("propagates a failed page without falling back to a full history read", async () => {
+    const client = createClient(await createFakeCodex(), 5_000);
+    client.start();
+
+    await expect(
+      runCauseEffect(client.readHistory({ threadId: "failed-page-thread", items: "full" }, () => Effect.succeed(true))),
+    ).rejects.toThrow("Codex history page failed");
+  });
+
+  it("cancels a pending history request and clears its request slot", async () => {
+    const client = createClient(await createFakeCodex(), 5_000);
+    const pending = new Promise<void>((resolve) => {
+      client.on("notification", (notification) => {
+        if (notification.method === "test/history-pending") resolve();
+      });
+    });
+    client.start();
+    const history = Effect.runFork(
+      client.readHistory({ threadId: "cancel-thread", items: "full" }, () => Effect.succeed(true)),
+    );
+    await pending;
+
+    await Effect.runPromise(Fiber.interrupt(history));
+    await expect(
+      runCauseEffect(client.request("test/echo", { text: "after cancel" }, decodeEchoResponse)),
+    ).resolves.toEqual({ echoed: "after cancel" });
+  });
 });
 
 function decodeEchoResponse(value: unknown): { echoed: string } {
@@ -133,11 +331,63 @@ process.stdin.on("data", (chunk) => {
         process.stdout.write(response.slice(0, middle));
         process.stdout.write(response.slice(middle));
         process.stdout.write(JSON.stringify({ method: "test/notification", params: {} }) + "\\n");
+      } else if (message.method === "test/tool") {
+        process.stdout.write(JSON.stringify({ id: "tool-" + message.id, method: "item/tool/call", params: message.params }) + "\\n");
+        process.stdout.write(JSON.stringify({ id: message.id, result: {} }) + "\\n");
+      } else if (message.method === "turn/interrupt" || message.method === "test/complete") {
+        if (message.method === "test/complete") process.stdout.write(JSON.stringify({ method: "turn/completed", params: message.params }) + "\\n");
+        process.stdout.write(JSON.stringify({ id: message.id, result: {} }) + "\\n");
       } else if (message.method === "test/error") {
         process.stdout.write(JSON.stringify({ id: message.id, error: { code: 412, message: "Fake RPC failure" } }) + "\\n");
       } else if (message.method === "thread/unsubscribe") {
         process.stdout.write(JSON.stringify({ id: message.id, result: { status: "Unsubscribed" } }) + "\\n");
         process.stdout.write(JSON.stringify({ method: "test/unsubscribed", params: message.params }) + "\\n");
+      } else if (message.method === "thread/resume") {
+        if (message.params.threadId === "cancel-thread") {
+          process.stdout.write(JSON.stringify({ method: "test/history-pending", params: {} }) + "\\n");
+        } else {
+          process.stdout.write(
+            JSON.stringify({ id: message.id, result: { thread: { id: message.params.threadId } } }) + "\\n",
+          );
+          process.stdout.write(
+            JSON.stringify({ method: "test/observed", params: { method: message.method, params: message.params } }) +
+              "\\n",
+          );
+        }
+      } else if (message.method === "thread/turns/list" && message.params.threadId === "cancel-thread") {
+        process.stdout.write(JSON.stringify({ method: "test/history-pending", params: {} }) + "\\n");
+      } else if (message.method === "thread/turns/list") {
+        const page =
+          message.params.threadId === "repeated-thread"
+            ? { data: [], nextCursor: "same-turn-cursor" }
+            : message.params.cursor === "turn-next"
+              ? { data: [{ id: "turn-1", status: "failed", startedAt: 1 }], nextCursor: null }
+              : { data: [{ id: "turn-2", status: "completed", startedAt: 2 }], nextCursor: "turn-next" };
+        process.stdout.write(JSON.stringify({ id: message.id, result: page }) + "\\n");
+        process.stdout.write(
+          JSON.stringify({ method: "test/observed", params: { method: message.method, params: message.params } }) +
+            "\\n",
+        );
+      } else if (message.method === "thread/items/list") {
+        if (message.params.threadId === "failed-page-thread") {
+          process.stdout.write(
+            JSON.stringify({ id: message.id, error: { code: 499, message: "Codex history page failed" } }) + "\\n",
+          );
+        } else {
+          let page;
+          if (message.params.turnId === "turn-1") {
+            page = { data: [], nextCursor: null };
+          } else if (message.params.cursor === "item-next") {
+            page = { data: [{ turnId: "turn-2", item: { type: "agentMessage", id: "item-2b", text: "second" } }], nextCursor: null };
+          } else {
+            page = { data: [{ turnId: "turn-2", item: { type: "userMessage", id: "item-2a", text: "first" } }], nextCursor: "item-next" };
+          }
+          process.stdout.write(JSON.stringify({ id: message.id, result: page }) + "\\n");
+          process.stdout.write(
+            JSON.stringify({ method: "test/observed", params: { method: message.method, params: message.params } }) +
+              "\\n",
+          );
+        }
       } else if (message.method === "test/partial-exit") {
         process.stdout.write('{"id":');
         process.exit(9);

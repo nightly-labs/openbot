@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
-import { expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
 import {
   CHANNEL_PREVIEW_LIMIT,
   CHANNEL_ROUTING_EVENT_ITEM_TYPE_PREFIX,
@@ -15,8 +14,10 @@ import {
   isChannelTask,
   SIGNED_OUT_CHANNEL_MEMBER_ID,
 } from "@openbot/contracts/ipc";
+import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
+import { deleteAggregateHistory } from "./database/database-core";
 import {
   databaseRow,
   databaseRows,
@@ -25,6 +26,7 @@ import {
   requiredStringColumn,
 } from "./database/database-rows";
 import type { OpenBotDatabase } from "./openbot-database";
+import { revokeRoutineWebhooks } from "./webhook-route-store";
 
 export interface ChannelAssignment {
   id: string;
@@ -478,6 +480,7 @@ export class ChannelStore {
           db.prepare("SELECT memory_id FROM projection_channel_memories WHERE channel_id = ?").all(channelId),
         ).map((row) => requiredStringColumn(row, "memory_id"));
         const routineIds = channelRoutineIds(db, channelId);
+        revokeRoutineWebhooks(db, "channel", routineIds, { forget: true });
         deleteAggregateHistory(db, "channel", [channelId]);
         deleteAggregateHistory(db, "channel-memory", memoryIds);
         deleteAggregateHistory(db, "channel-routine", routineIds);
@@ -764,28 +767,16 @@ function channelRoutineIds(db: DatabaseSync, channelId: string): string[] {
   return [...ids];
 }
 
-function deleteAggregateHistory(db: DatabaseSync, aggregateType: string, aggregateIds: readonly string[]): void {
-  if (!aggregateIds.length) return;
-  const placeholders = aggregateIds.map(() => "?").join(", ");
-  db.prepare(
-    `DELETE FROM orchestration_command_receipts WHERE command_id IN (
-       SELECT DISTINCT command_id FROM orchestration_events
-       WHERE aggregate_type = ? AND aggregate_id IN (${placeholders})
-     )`,
-  ).run(aggregateType, ...aggregateIds);
-  db.prepare(`DELETE FROM orchestration_events WHERE aggregate_type = ? AND aggregate_id IN (${placeholders})`).run(
-    aggregateType,
-    ...aggregateIds,
-  );
-}
+const CHANNEL_PREVIEW_SOURCE_LIMIT = CHANNEL_PREVIEW_LIMIT * 16;
 
 /**
  * One line for a sidebar row. A message can carry no text at all (an attachment, or a question
  * the agent asked), so fall back to a description of what arrived instead of showing an empty row.
  */
 function previewText(entry: ChannelMessage): string {
-  // A stored mention is markup (`@[Chief](agent:chief)`), so render it the way a reader sees it.
-  const text = expandChatTagReferences(entry.message.text).trim();
+  // The text is Markdown with mention markup (`@[Chief](agent:chief)`): show what a reader sees.
+  // Only the start is parsed, so a very long message does not slow down every channel list.
+  const text = markdownPreviewText(entry.message.text.slice(0, CHANNEL_PREVIEW_SOURCE_LIMIT));
   if (text.length > 0) return text.slice(0, CHANNEL_PREVIEW_LIMIT);
   if (entry.message.questionPrompt) return "Asked a question";
   if (entry.message.attachments?.length) return "Sent an attachment";

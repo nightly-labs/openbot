@@ -6,9 +6,11 @@ import { useThemeColor } from "heroui-native/hooks";
 import { ChevronRight, Ellipsis } from "lucide-react-native";
 import { useRef, useState } from "react";
 import { Alert, Pressable, View } from "react-native";
-import Animated, { cubicBezier, useReducedMotion } from "react-native-reanimated";
+import Animated, { cubicBezier } from "react-native-reanimated";
+import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { haptics } from "@/shared/lib/haptics";
+import { useReducedMotion } from "@/shared/lib/motion";
 import { currentText, useText } from "@/shared/lib/text";
 
 export function SidebarSectionHeader({
@@ -47,7 +49,9 @@ export function SidebarSectionHeader({
     } catch (error) {
       void haptics.notification("error");
       const text = currentText();
-      Alert.alert(
+      showFailureAlert(
+        error,
+        "agent",
         text.t("mobile.agent.section.changeFailed"),
         text.errorMessage(error, text.t("mobile.agent.section.tryAgain")),
       );

@@ -15,6 +15,7 @@ export const messages = {
   "conversation.globalSearch.appSettings": "Configurações do aplicativo",
   "conversation.globalSearch.results": "Resultados",
   "conversation.globalSearch.empty": "Nenhum resultado",
+  "conversation.globalSearch.failed": "A pesquisa não terminou. Alguns resultados podem estar faltando.",
   "conversation.globalSearch.countMore": "{shown}+",
   "conversation.globalSearch.searching": "Buscando…",
   "conversation.globalSearch.you": "Você",

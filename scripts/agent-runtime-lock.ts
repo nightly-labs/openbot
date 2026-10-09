@@ -161,8 +161,8 @@ const agentRuntimeLockSchema = z.object({
    */
   opencode: z.object({
     registry: z.literal("https://registry.npmjs.org"),
-    /** Canonical name. `github.com/sst/opencode` now redirects here, and the license fetch must not
-     *  have to follow a redirect. */
+    /** Canonical name; `github.com/sst/opencode` now redirects here. The licence comes from the
+     *  `opencode-ai` npm tarball, not from this repository. */
     repository: z.literal("https://github.com/anomalyco/opencode"),
     version: z.string().regex(/^\d+\.\d+\.\d+$/u),
     license: z.literal("MIT"),

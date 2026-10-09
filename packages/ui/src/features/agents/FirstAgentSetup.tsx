@@ -15,6 +15,7 @@ import { createSignal, For, onSettled, Show } from "solid-js";
 import { AVATAR_HUE_CHOICES, avatarCandidateSeeds, avatarHeadColor, avatarHueSwatch } from "../../bloub-avatar";
 import { ProviderModelPicker } from "../../components/ProviderModelPicker";
 import { useText } from "../../text";
+import { prefersReducedMotion } from "../../utils";
 import { AgentAvatar } from "./AgentAvatar";
 import { AVATAR_HUE_LABEL } from "./avatar-hue-label";
 
@@ -55,6 +56,7 @@ export interface FirstAgentSetupProps {
   onDownloadProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onCancelProviderDownload?: (provider: AgentProviderId) => void | Promise<void>;
   onConnectProvider?: (provider: AgentProviderId) => void | Promise<void>;
+  onAddCustomProvider?: (trigger: HTMLElement) => void;
   onChange: (value: FirstAgentDraft) => void;
   onSubmit: (value: FirstAgentDraft) => void | Promise<void>;
   onCancel?: () => void;
@@ -190,11 +192,7 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
   }
 
   function startSuggestionMomentum(): void {
-    if (
-      !suggestionList ||
-      Math.abs(suggestionDragVelocity) < SUGGESTION_MOMENTUM_MINIMUM ||
-      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
-    ) {
+    if (!suggestionList || Math.abs(suggestionDragVelocity) < SUGGESTION_MOMENTUM_MINIMUM || prefersReducedMotion()) {
       return;
     }
 
@@ -458,6 +456,7 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
                       onDownloadProvider={props.onDownloadProvider}
                       onCancelProviderDownload={props.onCancelProviderDownload}
                       onConnectProvider={props.onConnectProvider}
+                      onAddCustomProvider={props.onAddCustomProvider}
                       disabled={props.submitting}
                       onChange={(model, provider) => updateDraft({ model, provider })}
                     />

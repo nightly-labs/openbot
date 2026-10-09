@@ -12,8 +12,7 @@ export function YourWorkStaysOnYourComputer() {
       <h2>What that rules out</h2>
       <p>
         We cannot read your chats. We cannot hand them to anyone who asks us, because we do not hold them. If you delete
-        the database, the conversation is gone rather than merely hidden. And the application keeps working when our
-        servers do not: OpenBot runs without an account at all.
+        the database, the conversation is gone rather than merely hidden.
       </p>
       <p>
         It also changes who is responsible for backups. Nothing is uploaded, so nothing is restored for you. That trade

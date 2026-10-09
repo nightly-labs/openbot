@@ -127,8 +127,8 @@ through `analytics.openbot.run`.
 Analytics is enabled in production by default. Desktop users can disable it under **Settings →
 General → Privacy → Share product analytics**. The preference is stored locally and disables both UI
 analytics and lifecycle analytics emitted by the local host. Website analytics does not use the
-desktop preference. Mobile has its own phone-wide **Settings → General → Privacy → Share product
-analytics** preference, independent of desktop and host collection. It defaults to enabled in a
+desktop preference. Mobile has its own phone-wide **Settings → Privacy → Share product analytics**
+preference, independent of desktop and host collection. It defaults to enabled in a
 configured production build, is read before collection starts, and remains disabled if the stored
 preference cannot be read. Disabling it drops pending mobile events; it does not remove previously
 received events or retract an in-flight request. There is no persistent offline analytics queue.
@@ -195,6 +195,11 @@ The service stores:
   end, and expiration times;
 - the current account avatar file and its content type when the user uploads an avatar.
 - optional host logo files and their content types when the owner uploads a logo.
+- webhook routes: for each webhook routine of a host, the opaque route ID, the host ID, the owner
+  account ID, the link time, and the revocation time. When the routine stops using a route, or the
+  host is deleted, the service sets the revocation time and the route stops working. The service
+  keeps the row with these fields permanently, so that the old public URL never belongs to another
+  host. It does not store the routine, the secret, or request bodies.
 - published agent templates: the agent name, title, instructions, avatar, routine names, schedules
   and instructions, marketplace skill references, the `SKILL.md` text of local skills, the local
   agent ID, a share card image made from these fields, and creation and update times. Anyone
@@ -212,6 +217,19 @@ The service does not store plaintext one-time codes, account session tokens, or 
 tickets in D1. It returns a new plaintext secret only to the client that requested it. The desktop
 app encrypts its account session token with the operating-system storage protection before it writes
 the token to disk.
+
+The desktop app also keeps, for each joined server, the ID of its logical remote session and the
+Signal address, so that the next start asks only for a new ticket. The file
+(`openbot-remote-sessions-v1.bin`) is encrypted with the same storage protection and is not written
+when that protection is unavailable. It names only the account that signed in. A session ID gives no
+access without that account's session token. The app removes the file at sign-out or when another
+account signs in, when it starts with no account signed in, and forgets a server's session when it
+disconnects from the server or removes it. When the app quits, the session stays open in the account
+service for the next start; signing out or disconnecting the device's sign-in ends it, as before.
+Settings → General → Fast connection to servers turns this off. Off, the app removes the file at
+once, keeps nothing on disk, and ends each session when it quits. Turned on during a run, it keeps the
+sessions that are open at that time. The setting is on by default and is stored
+in `openbot-remote-session-reuse-preference-v1.json`.
 
 Account avatar URLs are public, long-lived resources. A person who has the complete URL can request
 the avatar without an account session.
@@ -231,7 +249,8 @@ stores nothing. When boat stops the sandbox, boat keeps a snapshot of its disk u
 the server starts again. Deleting the server
 deletes the sandbox. A hosted server updates itself: it downloads the newest release from GitHub
 Releases, as an installed build does, installs the Ubuntu packages that the release needs from the
-Ubuntu package servers, and starts it at its next start.
+Ubuntu package servers, and starts it at its next start, or when a member with update access installs
+it from Server Settings.
 
 For each hosted server, the account service stores the owner, name, size and the size of a pending
 plan change, the plan, billing interval and currency, the open Stripe Checkout session ID, desired
@@ -326,9 +345,10 @@ Cloudflare processes account and configuration API requests. It does not carry T
 message, command, Remote Desktop media, or Remote Desktop input traffic. It forwards sealed iPhone
 Live Activity updates that it cannot read; see [iPhone Live Activity](#iphone-live-activity). For an
 agent's Slack app, it exchanges the Slack sign-in and serves the install page; see
-[Slack connections](#slack-connections). For the OpenBot Telegram bot, it records which computer
-answers each chat; see [Telegram connections](#telegram-connections). Cloudflare and the email provider can keep their own
-security, delivery, and network logs under their own policies. These provider logs are outside the
+[Slack connections](#slack-connections). It does the same for the Discord app; see
+[Discord connections](#discord-connections). For the OpenBot Telegram bot, it records which
+computer answers each chat; see [Telegram connections](#telegram-connections). Cloudflare and the
+email provider can keep their own security, delivery, and network logs under their own policies. These provider logs are outside the
 OpenBot application database and its daily maintenance task.
 
 Paid server plans use Stripe. You enter card and billing details on Stripe's pages, not in OpenBot.
@@ -365,8 +385,8 @@ Billing is off, and Stripe receives nothing, when the account service has no Str
   or manage Claude credentials.
 - The MCP sign-ins are kept in `~/Library/Application Support/OpenBot`, encrypted by the operating
   system's secret storage in the same way as provider API keys. One record per server address holds
-  the client registration and the access and refresh tokens. Removing the server in settings deletes
-  its record. These values are redacted from logs, exports and diagnostics.
+  the client registration and the access and refresh tokens. Removing the server in settings, or
+  choosing Sign out on it, deletes its record. These values are redacted from logs, exports and diagnostics.
 - The GitHub connection (Server settings > Connectors) is kept in
   `~/Library/Application Support/OpenBot/openbot-github-connector-v1.json`, encrypted by the operating
   system's secret storage. It holds the GitHub access and refresh tokens, the account name, ID and
@@ -375,6 +395,14 @@ Billing is off, and Stripe receives nothing, when the account service has no Str
   the OpenBot GitHub App's installation tokens in plain text, with mode 0600, for `gh` and `git` in
   agent tools. OpenBot deletes that folder when you disconnect and when the app closes; after a crash
   it stays until the next start. The tokens are redacted from logs, exports and diagnostics.
+- The Bitwarden connection keeps a CLI session key in process memory only. OpenBot does not
+  save it to a file. Disconnect, eight hours without vault use, and app exit stop this connection.
+  The log redactor can retain values in memory until exit to mask later messages.
+  The Bitwarden CLI keeps its own encrypted vault cache. OpenBot reads login items in the folder
+  `Shared with OpenBot`. Agents receive item ids, titles, and usernames; passwords and authenticator
+  codes go through the main process to the browser page. This folder is an OpenBot access rule;
+  the CLI session key can decrypt the wider vault. Use a separate Bitwarden account if you need
+  the password manager itself to enforce that separation.
 - The 1Password connection (Marketplace > 1Password) is kept in
   `~/Library/Application Support/OpenBot/openbot-onepassword-connector-v1.json`, encrypted by the
   operating system's secret storage. It holds the service account token and the account ID only.
@@ -383,9 +411,10 @@ Billing is off, and Stripe receives nothing, when the account service has no Str
   is never sent to an agent, a provider, a log or a team member. The token and each filled value
   are redacted from logs, exports and diagnostics.
 - `~/Library/Application Support/OpenBot/logs/trace.ndjson` is a local trace of IPC calls,
-  provider turns, and main-process failures. Each line holds a time, the IPC channel name, the turn
-  origin or the failure origin (`uncaughtException` or `unhandledRejection`), the duration, and the
-  outcome word. The failure's error text goes only to the redacted log. The trace holds no payloads,
+  provider turns, main-process failures, and the steps of each connection to a joined server. Each
+  line holds a time, the IPC channel name, the turn origin, the failure origin (`uncaughtException`
+  or `unhandledRejection`) or the connection step (such as `remote-connect:ticket`), the duration,
+  and the outcome word. A connection step does not name the server. The failure's error text goes only to the redacted log. The trace holds no payloads,
   messages, URLs, paths, or identifiers, and it goes through log redaction before it is written. It
   is kept to two files of 2 MB each and is never sent.
 
@@ -404,9 +433,12 @@ media connection. ICE uses a direct peer-to-peer path when possible. If a direct
 Agents, conversations, queues, direct messages, attachments, browser data, prompts, approvals, and
 Remote Desktop data remain on the host. The central account service does not copy them into D1 or
 R2. The Signal service does not proxy them or write them to logs. The host does not need a public
-inbound port. The one thing Signal passes to a host is the Slack events of an agent's Slack app, and
-the updates and Bot API calls of the OpenBot Telegram bot, in transit; see
-[Slack connections](#slack-connections) and [Telegram connections](#telegram-connections).
+inbound port. The things Signal passes to a host are the Slack events of an agent's Slack app, the
+Discord mentions of the Discord app, the updates of the OpenBot Telegram bot, and the requests to
+webhook routines, in transit; see [Slack connections](#slack-connections),
+[Discord connections](#discord-connections), [Telegram connections](#telegram-connections), and
+[Webhook routines](#webhook-routines). For Discord and Telegram, Signal also carries the host's
+answers to the platform.
 
 An owner or admin of a joined server can manage its host from their own computer, or from the
 browser client at `/app`. A provider API key, a custom endpoint key or header, the code that a
@@ -434,6 +466,9 @@ Network traffic can also occur when:
   pins from `cache.agilebits.com`, checks its SHA-256, and keeps it in
   `~/Library/Application Support/OpenBot/provider-state/1password-cli`. The request carries no user
   data;
+- the user connects Bitwarden. OpenBot runs the installed `bw` CLI to sync with the server already
+  configured in that CLI, including a self-hosted server. It syncs before listing or filling logins.
+  These calls send no OpenBot conversations, files, or agent instructions to Bitwarden;
 - the user connects 1Password. Connect runs the user's own 1Password CLI (`op`) on this computer to
   create the vault "Shared with OpenBot" and a service account that can read only it. OpenBot then
   reads that vault from 1Password's servers with the token: the vault names, the login titles and
@@ -459,9 +494,38 @@ Network traffic can also occur when:
   `downloads.cursor.com` (for the download size) for Cursor, and it reads a list of blocked
   versions from `raw.githubusercontent.com/nightly-labs/openbot`. These requests contain no account, agent,
   conversation or file data;
+- an agent shows a visual reply, an agent checks its page with `html_preview`, or a user opens an
+  HTML file in the file preview. The page is HTML that the agent or the file wrote. It runs its
+  scripts in a sandbox and can load scripts, styles, fonts and images from any address, such as a
+  CDN. The server that holds those files gets the request and the network address of the computer,
+  but no OpenBot cookies. The page cannot read the app, the conversation or other
+  files. `html_preview` draws the page in a hidden window that has its own
+  session in memory. The mobile app does not run the page: it shows the page as its file;
 - a user opens an explicitly labeled external support or setup link;
 - a Slack workspace is connected. See [Slack connections](#slack-connections);
+- a Discord server is connected. See [Discord connections](#discord-connections);
 - a Telegram chat is connected. See [Telegram connections](#telegram-connections).
+
+## Webhook routines
+
+An administrator can give a routine a webhook trigger. The routine then gets a public URL and a
+signing secret. The host stores the trigger and the encrypted secret in its local SQLite database.
+The signing secret is encrypted with the operating system's secret storage. It is shown one time.
+Management screens do not return saved secrets.
+
+Requests to a webhook routine pass through OpenBot's Signal service to the connected host. Signal
+uses the sender's IP address in memory for rate limits. The account service keeps only the route
+metadata above. Neither cloud service stores or logs request bodies. The host verifies the request
+signature before it accepts the event. If the host is offline, the sender receives an error and
+must retry. There is no cloud event queue.
+
+The host keeps a receipt of each request for 7 days, to ignore a repeated delivery. A receipt has
+the delivery ID, the event type, the result, and the run ID, but not the request body. The event is
+added to the run instruction, which the host stores with the run. Event data can reach the
+routine's model provider, as other routine input does.
+
+Change a routine to a schedule, or delete it, to stop its URL. Deleting a routine deletes its
+receipts.
 
 ## Slack connections
 
@@ -500,6 +564,44 @@ answers go from the computer to the Slack Web API directly.
 Anyone who can post in the Slack workspace, guests and Slack Connect members included, can give the
 agents work. The agents run on the host with the access the user gave them. A hosted server stays awake
 while a Slack connection is live.
+
+## Discord connections
+
+A member of a Discord server with the **Manage Server** permission installs the OpenBot Discord app in
+that server from OpenBot on their computer. The account service exchanges that install with Discord,
+because the app's secret lives there, and revokes the Discord sign-in token that it gets at once. It
+records which OpenBot computer answers the Discord server: the Discord server ID, the computer and the
+OpenBot account that connected it. It keeps no Discord token and no message.
+
+Discord has one bot token for every server, so only OpenBot's Signal service (`signal.openbot.run`)
+holds it. Unlike Slack, both directions go through Signal:
+
+- **To the computer.** Signal keeps the bot's connection to Discord. Discord sends it the messages of
+  the channels OpenBot can view, with text only for the messages that mention OpenBot. Signal passes
+  on only those messages and the presses of OpenBot's buttons: the message text, the author's ID and
+  name, the channel, the message it replies to, and the addresses of its files. The computer
+  downloads the files from Discord directly.
+- **From the computer.** The computer sends its posts, edits, reactions, files and name lookups to
+  Signal, which makes each call to Discord for it, only in the Discord servers linked to that
+  computer. To give context, the computer asks Signal for the earlier messages of a channel after the
+  first message of a conversation.
+
+Signal does not store or log a message, a file or a token; it keeps the server and channel names and
+IDs in memory to check each call. It answers a direct message to OpenBot with one fixed sentence and
+passes nothing on.
+
+- **Stored on the host.** The Discord server's name and ID, which agent is its Discord Orchestrator,
+  and one row per conversation that an agent answers, kept as a conversation of that agent with the
+  Discord display name of each author. Files people send are kept with the agent's attachments.
+  Disconnect removes the link and keeps the conversations; deleting an agent removes its
+  conversations.
+- **Given to the Discord Orchestrator.** As for Slack.
+- **Sent to Discord.** As for Slack: the answers, attached files of at most 10 MB, status posts,
+  reactions, and redacted approval requests. A post never pings anyone.
+
+Anyone who can post in a channel that OpenBot can view can give the agents work. The agents run on the
+host with the access the user gave them. A hosted server stays awake while a Discord connection is
+live.
 
 ## Telegram connections
 
@@ -638,8 +740,8 @@ Marketplace submissions from the desktop app show the publisher’s current acco
 
 ### OpenCode
 
-OpenBot downloads the OpenCode CLI from `registry.npmjs.org` and its license from
-`github.com/anomalyco/opencode`, then starts it with `opencode acp`. Prompts, attachments, and tool
+OpenBot downloads the OpenCode CLI and its license (from the `opencode-ai` package) from
+`registry.npmjs.org`, then starts it with `opencode acp`. Prompts, attachments, and tool
 results go to that local process. OpenCode can send them to the model provider selected in its
 configuration. OpenCode's free models are the default, and they reach OpenCode Go with no account,
 so a first OpenCode turn leaves this computer without a sign-in.
@@ -783,7 +885,7 @@ answer, has a signature made with a key that only the phone and the host have, s
 cannot start the action with an `openbot://` link. The app shows the command again before it
 approves it.
 
-Settings > General > Live Activities turns this off. The phone then removes its token from the
+Settings > Live Activities turns this off. The phone then removes its token from the
 host.
 
 ## Optional macOS Host Manager
@@ -832,3 +934,32 @@ automatically, and the tab's back/forward history is cleared after replacement t
 the sensitive document. The destination site receives the value and controls its own processing.
 This protection does not isolate credentials from the operating system or agents with unrestricted
 machine access. Values pasted into ordinary chat are not covered by secure handoff.
+
+## Error and warning reports
+
+Production desktop, browser app, and mobile clients report safe failure categories to the same
+self-hosted OpenPanel service. Reports can include the app version, platform, provider, model,
+operation, severity, and a fixed cause code. They also record whether a problem appeared as a
+toast, shared alert or chat banner, or native error/warning alert. These reports do not include displayed text,
+raw exceptions, stack traces, prompts, messages, file names, paths, commands, or credentials.
+A random report ID helps identify repeated delivery attempts; it is not a conversation or file ID.
+A reported cause describes the error observed by OpenBot and might not explain its root cause.
+
+Validated reports wait in local files on the host and mobile, or IndexedDB in desktop and browser
+clients. Each queue is limited to 1,000 reports, 1 MiB, and seven days. Reports are removed after
+OpenPanel accepts them, when they expire, or when the queue reaches its limits. Network failures
+can cause retries and duplicate delivery. Queue failures do not block the application.
+
+Turning off analytics or changing accounts clears pending reports and cancels active sends.
+Requests already received by OpenPanel cannot be recalled. Anonymous error reports remain
+anonymous. The browser app has its own local analytics setting in account settings, separate
+from desktop and mobile. Collection is enabled by default; a malformed or unreadable setting
+keeps it disabled. Existing OpenPanel retention rules apply after delivery.
+
+### Remote host release checks
+
+When a server administrator checks an OpenBot release, the host requests the public stable
+release manifest from GitHub for its operating system and architecture. The request includes no
+account data, chats, files, commands, or credentials. GitHub receives the host IP address as part
+of the connection. Connected administrators receive the installed version, release version,
+check status, and installation method.

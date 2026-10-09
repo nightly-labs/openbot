@@ -7,6 +7,8 @@ import type {
   RoutineRunFields,
   RoutineSchedule,
 } from "@openbot/contracts/ipc";
+import type { EventRoutine, EventRoutineOwner, EventRoutineTriggerInput } from "@openbot/contracts/ipc-events";
+import type { EventRoutinesApi, RoutineWebhooksApi } from "./routine-webhooks-api";
 
 interface RoutineSaveInput {
   routineId: string | null;
@@ -17,6 +19,16 @@ interface RoutineSaveInput {
   schedule: RoutineSchedule;
   /** Left out, an update keeps the saved policy. */
   limitPolicy?: RoutineLimitPolicy;
+  /** Only the event API reads it. Schedule-only adapters save `schedule`. */
+  trigger?: EventRoutineTriggerInput;
+}
+
+export type RoutineEditorRecord = RoutineFields | EventRoutine;
+
+interface RoutineSaveResult {
+  routine: RoutineEditorRecord;
+  /** The webhook signing secret, set only when this save made a new webhook trigger. It is not shown again. */
+  secret: string | null;
 }
 
 export interface RoutinesPort {
@@ -28,14 +40,16 @@ export interface RoutinesPort {
    * released Team API drops the field, so a remote host would ignore the choice.
    */
   limitPolicy: boolean;
-  list: () => Promise<RoutineFields[]>;
+  list: () => Promise<RoutineEditorRecord[]>;
   listRuns: (routineId: string, limit: number) => Promise<RoutineRunFields[]>;
-  save: (input: RoutineSaveInput) => Promise<RoutineFields>;
+  save: (input: RoutineSaveInput) => Promise<RoutineSaveResult>;
   remove: (routineId: string) => Promise<void>;
   test: (routineId: string) => Promise<void>;
   /** Only for an agent on this computer that allows local scripts. */
   runCommand?: (routineId: string) => Promise<string>;
   subscribe: (reload: () => void) => () => void;
+  /** Webhook triggers and activity, for a host with event support. */
+  events?: { owner: EventRoutineOwner; api: RoutineWebhooksApi };
 }
 
 export function agentRoutinesPort(agentId: string, automation = false, localHost = false): RoutinesPort {
@@ -47,9 +61,11 @@ export function agentRoutinesPort(agentId: string, automation = false, localHost
     listRuns: (routineId, limit) => window.openbot.agent.listRoutineRuns({ agentId, routineId, limit }),
     save: ({ routineId, name, instruction, active, timezone, schedule, limitPolicy }) => {
       const policy = localHost && limitPolicy ? { limitPolicy } : {};
-      return routineId
-        ? window.openbot.agent.updateRoutine({ agentId, routineId, name, instruction, active, schedule, ...policy })
-        : window.openbot.agent.createRoutine({ agentId, name, instruction, active, timezone, schedule, ...policy });
+      return (
+        routineId
+          ? window.openbot.agent.updateRoutine({ agentId, routineId, name, instruction, active, schedule, ...policy })
+          : window.openbot.agent.createRoutine({ agentId, name, instruction, active, timezone, schedule, ...policy })
+      ).then((routine) => ({ routine, secret: null }));
     },
     remove: (routineId) => window.openbot.agent.deleteRoutine({ agentId, routineId }),
     test: async (routineId) => {
@@ -90,9 +106,11 @@ export function channelRoutinesPort(
     listRuns: (routineId, limit) => api.listChannelRoutineRuns({ channelId, routineId, limit }),
     save: ({ routineId, name, instruction, active, timezone, schedule, limitPolicy }) => {
       const policy = localHost && limitPolicy ? { limitPolicy } : {};
-      return routineId
-        ? api.updateChannelRoutine({ channelId, routineId, name, instruction, active, schedule, ...policy })
-        : api.createChannelRoutine({ channelId, name, instruction, active, timezone, schedule, ...policy });
+      return (
+        routineId
+          ? api.updateChannelRoutine({ channelId, routineId, name, instruction, active, schedule, ...policy })
+          : api.createChannelRoutine({ channelId, name, instruction, active, timezone, schedule, ...policy })
+      ).then((routine) => ({ routine, secret: null }));
     },
     remove: (routineId) => api.deleteChannelRoutine({ channelId, routineId }),
     test: async (routineId) => {
@@ -102,5 +120,43 @@ export function channelRoutinesPort(
       api.onEvent((event) => {
         if (event.type === "channel-routines-changed" && event.channelId === channelId) reload();
       }),
+  };
+}
+
+/**
+ * Creates a routine port backed by the event API.
+ *
+ * The event API carries routine records, while the released schedule APIs still own run history,
+ * change notifications and the local run command. Callers pass the legacy port so that switching to
+ * this adapter keeps those views.
+ */
+export function eventRoutinesPort(
+  owner: EventRoutineOwner,
+  api: EventRoutinesApi,
+  legacy: Pick<RoutinesPort, "listRuns" | "subscribe" | "runCommand">,
+): RoutinesPort {
+  const runCommand = legacy.runCommand;
+  return {
+    ownerId: owner.id,
+    ownerNoun: owner.kind,
+    limitPolicy: true,
+    list: () => api.listRoutines({ owner }),
+    listRuns: legacy.listRuns,
+    events: { owner, api },
+    save: ({ routineId, name, instruction, active, timezone, schedule, trigger, limitPolicy }) =>
+      api.saveRoutine({
+        ...(routineId ? { id: routineId } : {}),
+        owner,
+        name,
+        instruction,
+        active,
+        timezone,
+        trigger: trigger ?? { kind: "schedule", schedule },
+        ...(limitPolicy ? { limitPolicy } : {}),
+      }),
+    remove: (routineId) => api.deleteRoutine({ id: routineId, owner }),
+    test: (routineId) => api.testRoutine({ id: routineId, owner }),
+    ...(runCommand ? { runCommand } : {}),
+    subscribe: legacy.subscribe,
   };
 }

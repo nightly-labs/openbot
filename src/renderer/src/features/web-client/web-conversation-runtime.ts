@@ -18,6 +18,7 @@ import { currentText } from "@openbot/ui/text";
 import { Effect } from "effect";
 import { onCleanup } from "solid-js";
 import type { ConversationRuntime } from "../conversation/conversation-runtime";
+import { webEventRoutinesApi } from "../conversation/routine-webhooks-api";
 import { createWebAttachmentFiles, openWebLink } from "./web-attachments";
 import type { WebWorkspaceRuntime } from "./web-runtime";
 
@@ -28,7 +29,10 @@ type HostEvents = (listener: (event: AgentEvent | TeamRealtimeEvent) => void) =>
 function webHostAdmin(
   request: () => TeamApiRequest,
   onHostEvent?: HostEvents,
+  eventsEnabled?: () => boolean,
 ): NonNullable<ConversationRuntime["admin"]> {
+  // `request()` names the connected host at call time, so a host switch reaches the new host.
+  const eventRoutines = webEventRoutinesApi((...args) => request()(...args));
   return {
     skills: {
       listInstalled: (agentId) =>
@@ -61,6 +65,9 @@ function webHostAdmin(
       unpublish: (agentId) =>
         runTeamEffect(unpublishAgentTemplate(request(), agentId).pipe(Effect.mapError((error) => error.cause))),
     },
+    get eventRoutines() {
+      return eventsEnabled?.() === false ? undefined : eventRoutines;
+    },
   };
 }
 
@@ -69,6 +76,7 @@ export function createWebConversationRuntime(
   hostId: () => string,
   adminRequest?: () => TeamApiRequest,
   onHostEvent?: HostEvents,
+  eventsEnabled?: () => boolean,
 ): ConversationRuntime {
   const listeners = new Set<(event: AttachmentImportEvent) => void>();
   const files = createWebAttachmentFiles(remote);
@@ -113,6 +121,7 @@ export function createWebConversationRuntime(
           ? runTeamEffect(listMcpServers(adminRequest()).pipe(Effect.mapError((error) => error.cause)))
           : [];
       },
+      listWorkspaceDirectory: ({ agentId, path }) => remote.workspaceDirectory(agentId, path),
       onAttachmentImport(listener) {
         listeners.add(listener);
         return () => {
@@ -183,6 +192,6 @@ export function createWebConversationRuntime(
       }
     },
     cancelImportFiles,
-    admin: adminRequest ? webHostAdmin(adminRequest, onHostEvent) : undefined,
+    admin: adminRequest ? webHostAdmin(adminRequest, onHostEvent, eventsEnabled) : undefined,
   };
 }

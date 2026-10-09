@@ -71,6 +71,15 @@ The next provider session gets a handoff of only the messages after the last mar
 the request while a turn runs or a message waits in the queue. A client without the capability shows
 the marker as its text. Channel execution threads are not reset.
 
+### Workspace folders
+
+`workspace-directory-v1` adds `POST /v1/workspace-directory` with `{ agentId, path }`. Any member who
+can see the agent can send it, as with `GET /v1/workspace-files`. The host answers the folder entries
+(name, path, kind, size, modification time), at most 500, directories first. The path must stay inside
+the agent workspace; a symbolic link that leaves it is not listed. A missing path answers 404 with a
+message that names the path and the workspace. A client without the capability shows the file preview
+error. The desktop lists a local folder without the containment when the agent has no workspace limit.
+
 ### Agent import from a joined server
 
 `agent-import-v1` lets any member, not only an owner or admin, import a Grok Bot export into the host.
@@ -115,6 +124,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `providers-v4` | Code or link sign-in and managed runtimes, Cursor and Cline included | `providerAdmin` |
 | `host-admin-v1` | Server name and logo | `hostAdmin` |
 | `host-update-v1` | Check for, download and restart into an app update; cancel a restart that waits | `hostAdmin` |
+| `events-v1` | Manage webhook routines, their secrets, and activity | `events` |
 
 These IPC groups take a required server id and route with `scopedHandler`. A key travels only towards
 the host; no response carries one. `providers-v1` has no progress event, so the renderer reads runtime
@@ -153,14 +163,14 @@ form directly.
 `host-update-v1` runs the same update as the host's own Settings. `src/main/requested-update.ts`
 keeps the schedule in memory: who asked, and whether the restart waits until
 `describeRestartReadiness` reports no running work or happens as soon as the update is ready. The
-host user can turn the routes off with "Allow updates from server admins" (`openbot-update-preference-v1.json`,
+host user can turn the routes off with "Allow updates from server members" (`openbot-update-preference-v1.json`,
 default on) and can cancel a restart that waits. The host still advertises the capability when the
 setting is off, so the client can show why. A Host Manager tenant refuses the routes. The client
 reads the status again every second while a check, a download or a restart runs. An admin can also
 set the host's automatic download and automatic install when idle through the settings route; an
 automatic install is a schedule with no requester.
 
-When an admin connects, `host-update-toast.tsx` reads the status once: it offers a new version and
+When a member with update access connects, `host-update-toast.tsx` reads the status once: it offers a new version and
 shows a live percentage while the host downloads. All members get the `host-restart` event
 (`waiting`, `restarting`, `none`) from the host's event stream, and the host sends the current state
 again when a client declares the capability. Like `channelEvent`, the event skips the frozen v1-v3
@@ -168,6 +178,14 @@ event encoders at each hop (host peer, client transport, `remote-peer.ts`, SSE s
 loses the host while a restart waits treats it as the restart: desktop keeps the fast WebRTC retry
 instead of the `host_unavailable` wait for 10 minutes, and web tries again every 5 s for 3 minutes.
 `host-restart-toast.ts` shows the notice until the host is back, for 10 minutes at most.
+
+### Webhook routines
+
+A webhook belongs to its routine. The host keeps the trigger, the encrypted secret, and receipts in
+SQLite. D1 keeps only the route ID, the host, and the owner account.
+Signal sends each signed request to the connected host without a cloud queue. All `events-v1`
+routes need a host administrator. See [Webhook routines](events.md) and the
+[webhook guide](../webhooks.md).
 
 ## Desktop server notifications
 
@@ -200,8 +218,11 @@ creates them and the Customer Portal settings.
   account from `openbot_user_id`. It never moves a known
   customer to another account, and it skips a subscription that names no account.
 - Desktop Settings → Billing and the web Billing dialog render `@openbot/ui/features/billing`: one
-  row for each open plan, with the server name, the plan, its price, and a menu to change or cancel
-  it. The price is the list price of the Stripe Price in the subscription's currency (from
+  row for each open plan, with the server name, the plan, its price, and its renewal controls.
+  Hosted plans support cancellation that keeps data, Keep server, and explicit deletion now or
+  after the paid period. A stored deletion date and subscription ID drive the cron; a fresh
+  terminal Stripe state and a per-server operation lease guard deletion. See
+  [server deletion](../hosted-servers.md#billing-and-server-deletion). The price is the list price of the Stripe Price in the subscription's currency (from
   `currency_options` when that is not the Price's base currency), before discounts and tax. The
   webhook stores it with the subscription. The
   account button opens the Customer Portal for the payment method and invoices.
@@ -268,3 +289,24 @@ A self-hosted server uses the same Linux build, scripts and units on the owner's
 (`src/main/server-mode.ts`, `OPENBOT_SERVER=1`), and the `openbot` terminal command signs it in over
 a Unix socket in the 0700 runtime directory of the service user. Main publishes the host after each
 sign-in. See [self-hosted servers](../self-hosted-server.md).
+
+### Remote release checks
+
+`host-release-v1` adds release status and check routes for all signed-in server members. It does not change
+`host-update-v1`, which still refuses installation requests and checks when updates are managed
+or disabled. The new check reads only the official stable release manifest for the host platform
+and architecture. It never installs files, restarts the host, or changes update preferences.
+The host checks that the manifest contains a compatible asset and returns only version, phase,
+and installation method. Feed errors return a safe status and can be retried.
+
+`HostReleaseService` owns release discovery. `RequestedUpdate` still owns idle restarts and
+`UpdateService` still owns app updates. Desktop and web use the new capability when available;
+older hosts keep their existing update controls. The status poll is passive and does not keep a
+hosted server awake. Mobile shares the protocol codecs but has no new update screen.
+
+`host-member-update-v1` adds `/v1/host/update/status`, `/check`, and `/start` for all active,
+signed-in server members. It reuses the released update snapshot. The start body is empty:
+requests always wait for idle time and preserve any existing schedule. Host restrictions still
+apply. Cancellation, preferences, and forced restarts stay on the administrator-only
+`host-update-v1` routes. Desktop and web clients show member controls only after this capability
+is negotiated; older hosts keep the administrator-only panel.

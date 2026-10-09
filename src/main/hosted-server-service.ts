@@ -4,6 +4,7 @@ import {
   HOSTING_DEVELOPER_KEY_HEADER,
   type HostedServerCatalog,
   type HostedServerCheckout,
+  type HostedServerLifecycleInput,
   type HostedServerList,
   type HostedServerSummary,
   parseHostedServerCatalog,
@@ -33,7 +34,7 @@ const RUNNING_REFRESH_INTERVAL_MS = 15_000;
 export type HostedServerAuthClient = AccountRequestClient;
 
 /**
- * `bun run dev --hosting=test` sets the shared developer key from the encrypted `.env.shared`. This
+ * `bun run dev --hosting=test` sets the shared developer key from the encrypted `.env.dev`. This
  * removes it from `environment`, because agents and their tools inherit the environment of this
  * process. A packaged build never sends it.
  */
@@ -168,6 +169,19 @@ export class HostedServerDesktopService {
       return yield* this.#open(checkout);
     }).pipe(Effect.provide(this.#platform));
   }
+
+  readonly lifecycle = Effect.fn("HostedServer.lifecycle")(
+    function* (this: HostedServerDesktopService, input: HostedServerLifecycleInput) {
+      const platform = yield* AccountServicePlatform;
+      yield* platform.request(
+        `/v2/hosting/servers/${encodeURIComponent(input.serverId)}/lifecycle`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) },
+        () => undefined,
+        30_000,
+      );
+    },
+    (operation) => operation.pipe(Effect.provide(this.#platform)),
+  ).bind(this);
 
   delete(input: DeleteHostedServerInput): Effect.Effect<void, AccountServiceFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<

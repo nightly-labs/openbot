@@ -1,15 +1,15 @@
-// The Slack workspaces and Telegram chats where this computer's agents answer. Tokens only travel towards the host; no
-// result carries one.
+// The Slack workspaces, Discord guilds and Telegram chats where this computer's agents answer. Tokens
+// only travel towards the host; no result carries one.
 
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { MessagingService } from "../../backend/messaging/messaging-service";
 import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import {
-  parseAddSlackOrchestratorInput,
+  parseAddMessagingOrchestratorInput,
   parseAddTelegramOrchestratorInput,
   parseConnectTelegramChatInput,
-  parseSetSlackEnabledInput,
-  parseSlackWorkspaceInput,
+  parseMessagingWorkspaceInput,
+  parseSetMessagingEnabledInput,
 } from "./messaging-inputs";
 
 interface MessagingIpcDependencies {
@@ -18,6 +18,9 @@ interface MessagingIpcDependencies {
     | "slackOverview"
     | "connectSlackWorkspace"
     | "disconnectSlackWorkspace"
+    | "discordOverview"
+    | "connectDiscordGuild"
+    | "disconnectDiscordGuild"
     | "reconnect"
     | "setEnabled"
     | "addOrchestrator"
@@ -33,29 +36,43 @@ export function messagingIpcHandlers({ messaging }: MessagingIpcDependencies): P
     messaging: {
       getSlackOverview: handler(() => messaging.slackOverview()),
       connectSlackWorkspace: handler(() => runCauseEffect(messaging.connectSlackWorkspace())),
-      disconnectSlackWorkspace: payloadHandler(parseSlackWorkspaceInput, ({ workspaceId }) =>
+      disconnectSlackWorkspace: payloadHandler(parseMessagingWorkspaceInput, ({ workspaceId }) =>
         runCauseEffect(messaging.disconnectSlackWorkspace(workspaceId)),
       ),
-      reconnectSlackWorkspace: payloadHandler(parseSlackWorkspaceInput, ({ workspaceId }) =>
+      reconnectSlackWorkspace: payloadHandler(parseMessagingWorkspaceInput, ({ workspaceId }) =>
         runCauseEffect(messaging.reconnect("slack", workspaceId)),
       ),
-      setSlackEnabled: payloadHandler(parseSetSlackEnabledInput, ({ workspaceId, enabled }) =>
+      setSlackEnabled: payloadHandler(parseSetMessagingEnabledInput, ({ workspaceId, enabled }) =>
         runCauseEffect(messaging.setEnabled("slack", workspaceId, enabled)),
       ),
-      addSlackOrchestrator: payloadHandler(parseAddSlackOrchestratorInput, (input) =>
-        runCauseEffect(messaging.addOrchestrator(input)),
+      addSlackOrchestrator: payloadHandler(parseAddMessagingOrchestratorInput, (input) =>
+        runCauseEffect(messaging.addOrchestrator("slack", input)),
+      ),
+      getDiscordOverview: handler(() => messaging.discordOverview()),
+      connectDiscordGuild: handler(() => runCauseEffect(messaging.connectDiscordGuild())),
+      disconnectDiscordGuild: payloadHandler(parseMessagingWorkspaceInput, ({ workspaceId }) =>
+        runCauseEffect(messaging.disconnectDiscordGuild(workspaceId)),
+      ),
+      reconnectDiscordGuild: payloadHandler(parseMessagingWorkspaceInput, ({ workspaceId }) =>
+        runCauseEffect(messaging.reconnect("discord", workspaceId)),
+      ),
+      setDiscordEnabled: payloadHandler(parseSetMessagingEnabledInput, ({ workspaceId, enabled }) =>
+        runCauseEffect(messaging.setEnabled("discord", workspaceId, enabled)),
+      ),
+      addDiscordOrchestrator: payloadHandler(parseAddMessagingOrchestratorInput, (input) =>
+        runCauseEffect(messaging.addOrchestrator("discord", input)),
       ),
       getTelegramOverview: handler(() => messaging.telegramOverview()),
       connectTelegramChat: payloadHandler(parseConnectTelegramChatInput, ({ place }) =>
         runCauseEffect(messaging.connectTelegramChat(place)),
       ),
-      disconnectTelegramChat: payloadHandler(parseSlackWorkspaceInput, ({ workspaceId }) =>
+      disconnectTelegramChat: payloadHandler(parseMessagingWorkspaceInput, ({ workspaceId }) =>
         runCauseEffect(messaging.disconnectTelegramChat(workspaceId)),
       ),
-      reconnectTelegramChat: payloadHandler(parseSlackWorkspaceInput, ({ workspaceId }) =>
+      reconnectTelegramChat: payloadHandler(parseMessagingWorkspaceInput, ({ workspaceId }) =>
         runCauseEffect(messaging.reconnect("telegram", workspaceId)),
       ),
-      setTelegramEnabled: payloadHandler(parseSetSlackEnabledInput, ({ workspaceId, enabled }) =>
+      setTelegramEnabled: payloadHandler(parseSetMessagingEnabledInput, ({ workspaceId, enabled }) =>
         runCauseEffect(messaging.setEnabled("telegram", workspaceId, enabled)),
       ),
       addTelegramOrchestrator: payloadHandler(parseAddTelegramOrchestratorInput, (input) =>

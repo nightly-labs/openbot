@@ -2,44 +2,44 @@
   "schemaVersion": 1,
   "codex": {
     "repository": "https://github.com/openai/codex",
-    "version": "0.153.4",
-    "tag": "rust-v0.153.4",
+    "version": "0.160.1",
+    "tag": "rust-v0.160.1",
     "license": "Apache-2.0",
     "licenseSha256": "d17f227e4df5da1600391338865ce0f3055211760a36688f816941d58232d8dc",
     "artifacts": {
       "darwin-arm64": {
         "asset": "codex-package-aarch64-apple-darwin.tar.gz",
-        "assetSha256": "35438da1fbf7a6db7ddb3bcec84448fa6015ba188461472a97d9d1da7d9c4353",
-        "downloadBytes": 111554884,
-        "installedBytes": 310000000,
+        "assetSha256": "f73527ee09c6db869acbb37b709866b339ea74ef91d2de255e9c74ec960c6314",
+        "downloadBytes": 129977637,
+        "installedBytes": 360000000,
         "executable": "bin/codex"
       },
       "darwin-x64": {
         "asset": "codex-package-x86_64-apple-darwin.tar.gz",
-        "assetSha256": "3ee638d7155c856ef31f3f4a85cb2195de1939962d3924c935b24f0514564a3d",
-        "downloadBytes": 121093282,
-        "installedBytes": 330000000,
+        "assetSha256": "a98f330c9b1652cef2edc7bc2ee4c47a0fe19fa098b686381be3c8842abf0ac0",
+        "downloadBytes": 141316108,
+        "installedBytes": 380000000,
         "executable": "bin/codex"
       },
       "linux-x64": {
         "asset": "codex-package-x86_64-unknown-linux-musl.tar.gz",
-        "assetSha256": "a822187e1a2420c61c5926721bfbd878701ed95547c9bb0d4de4498a16ba1821",
-        "downloadBytes": 126196303,
-        "installedBytes": 360000000,
+        "assetSha256": "340801565906a7028f6baaa9ab6853addaef221f0016a1417a7c1ffdd96c21f0",
+        "downloadBytes": 160785122,
+        "installedBytes": 410000000,
         "executable": "bin/codex"
       },
       "linux-arm64": {
         "asset": "codex-package-aarch64-unknown-linux-musl.tar.gz",
-        "assetSha256": "fc395cb043a1093ab0db34f44aba3199bfaa9ce640cd9be7fd588f44b0da64a4",
-        "downloadBytes": 117238842,
-        "installedBytes": 330000000,
+        "assetSha256": "dff0954438fa455c2197ddb1f421d8d68625d98de610f76bedb6e5bc837ea35b",
+        "downloadBytes": 150931915,
+        "installedBytes": 380000000,
         "executable": "bin/codex"
       },
       "win32-x64": {
         "asset": "codex-package-x86_64-pc-windows-msvc.tar.gz",
-        "assetSha256": "a6ef3442cb12766a88b39311d79244289e4f9763e2c53ff4fbebc2cb653cc5f3",
-        "downloadBytes": 136067504,
-        "installedBytes": 420000000,
+        "assetSha256": "25c6fe4e46d5bff939312fc46de67ace37561f6f1f89b409af63fd8cc6098425",
+        "downloadBytes": 157434529,
+        "installedBytes": 450000000,
         "executable": "bin/codex.exe"
       }
     }
@@ -293,7 +293,7 @@
     }
   },
   "remoteDesktop": {
-    "recipeVersion": 14,
+    "recipeVersion": 15,
     "sunshine": {
       "sourceMode": "upstream-with-patch",
       "repository": "https://github.com/LizardByte/Sunshine.git",
@@ -309,7 +309,7 @@
       "licenseSha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
       "patch": {
         "path": "vendor/remote-desktop/patches/sunshine-v2026.516.143833-openbot.patch",
-        "sha256": "db586815acf867522687b268318d081076ad5192569b745057a3b705d2e79e04"
+        "sha256": "62ac66da2c46be0d996970514469da552166066718ba7e67621ca6e5860ab774"
       },
       "overrides": [],
       "submodules": {
@@ -365,27 +365,27 @@
     "releaseArtifacts": {
       "darwin-arm64": {
         "asset": "remote-desktop-runtime-darwin-arm64.tar.gz",
-        "sha256": "f0d71114add31970a72134b36723534ae5349839b927903d6c3685dd19449c97"
+        "sha256": "762c303817145d903f96875b6900278cce1a8a4b2577b5a9dc6e73274e6d6123"
       },
       "darwin-x64": {
         "asset": "remote-desktop-runtime-darwin-x64.tar.gz",
-        "sha256": "605bc2121520d21710d767b3027caf84c176a093997695446b9f827f17cc908f"
+        "sha256": "50d527080f5df676032b90ac5e83c45d024583359102070efc5055f0b83acac5"
       },
       "win32-x64": {
         "asset": "remote-desktop-runtime-win32-x64.tar.gz",
-        "sha256": "ba225e8967d861a8412606640693e22dd7705120177d758ec93d747cd9549682"
+        "sha256": "43bf54ab83c60f5aba1dfd03dd923345f954fec1c81f8fe98c9bb8ad8aa72e1f"
       },
       "linux-x64": {
         "asset": "remote-desktop-runtime-linux-x64.tar.gz",
-        "sha256": "3d1325700b25296fb02db95c61888a6af59f54d8c84d069a3baa2a6b2567e42d"
+        "sha256": "ff6c27cb6551e7ae2637bb6a3b8703cc69a8572347d9dda429bc7663872a6a9f"
       }
     },
     "artifactRelease": {
       "repository": "nightly-labs/openbot",
-      "tag": "remote-desktop-runtime-f4354fbf4cb43ae955fe388107834fd80c5f97fa17c7fc04e4c2b4f329475816",
-      "inputDigest": "f4354fbf4cb43ae955fe388107834fd80c5f97fa17c7fc04e4c2b4f329475816",
+      "tag": "remote-desktop-runtime-44482c62cb605693ca1b753a7763e0f090457eafde09d89b169a19b221e0ab99",
+      "inputDigest": "44482c62cb605693ca1b753a7763e0f090457eafde09d89b169a19b221e0ab99",
       "manifestAsset": "remote-desktop-runtime-manifest.json",
-      "manifestSha256": "189d91a6d5d1912f3123ff770b468335397ad53ddbb93c88d28cf63209149b22"
+      "manifestSha256": "f47a91eae9668689137b35aa016d37a1b1a9054103382417a1030f1678f618e9"
     }
   },
   "bun": {

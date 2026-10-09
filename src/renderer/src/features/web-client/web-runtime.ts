@@ -39,8 +39,10 @@ import type {
   TeamRealtimeEvent,
   UpdateAgentInput,
   UpdateQueuedMessageInput,
+  WorkspaceDirectory,
 } from "@openbot/contracts/ipc";
 import {
+  decodeWorkspaceDirectory,
   isAccountUsage,
   isAgentModelOption,
   isAgentStatus,
@@ -58,6 +60,7 @@ import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
   decodeBrowserViewInputValue,
+  TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY,
   TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
@@ -68,6 +71,10 @@ import {
 } from "@openbot/contracts/team-protocol/v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
+import {
+  WORKSPACE_DIRECTORY_CAPABILITY,
+  WORKSPACE_DIRECTORY_ROUTES,
+} from "@openbot/contracts/team-protocol/workspace-directory-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import { createRemoteBrowserView, type RemoteBrowserView } from "@openbot/team-client/browser-view";
 import {
@@ -147,6 +154,9 @@ export interface WebWorkspaceRuntime {
   currentMemberId?: () => Promise<string>;
   respondToTakeover(input: RespondToBrowserTakeoverInput): Promise<void>;
   listHosts(): Promise<RemoteTeamHost[]>;
+  /** Ends this account's membership of a host. The account service refuses the owner. */
+  leaveHost(hostId: string, membershipId: string): Promise<void>;
+  removeOwnedHost?: (hostId: string) => Promise<void>;
   previewInvite(url: string): Promise<InvitePreview>;
   acceptInvite(url: string): Promise<RemoteTeamHost>;
   connect(host: RemoteTeamHost): Promise<string[]>;
@@ -184,6 +194,8 @@ export interface WebWorkspaceRuntime {
   sharedFile(path: string): Promise<WebFile>;
   /** A file in one agent's workspace on the host. */
   workspaceFile(agentId: string, path: string): Promise<WebFile>;
+  /** A folder in one agent's workspace on the host. */
+  workspaceDirectory(agentId: string, path: string): Promise<WorkspaceDirectory>;
   react(input: SetMessageReactionInput): Promise<void>;
   setAvatar(agentId: string, image: AvatarImageInput | null): Promise<void>;
   models(): Promise<AgentModelOption[]>;
@@ -277,6 +289,7 @@ export function createWebWorkspaceRuntime(
       ...sessionActions,
       onConnectionUpdate: async (update) => {
         if (update.state !== "online") {
+          browserView.disconnect(update.message ?? undefined);
           const releaseGeneration = liveViewGeneration + 1;
           void releaseLiveView().finally(() => {
             if (liveViewGeneration === releaseGeneration) browserView.disconnect();
@@ -456,6 +469,7 @@ export function createWebWorkspaceRuntime(
     (data) => peer.sendHostStreamData(data),
     request,
     () => capabilities.includes(TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY),
+    () => capabilities.includes(TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY),
   );
   let liveView: RemoteBrowserView | null = null;
   let liveViewGeneration = 0;
@@ -484,7 +498,9 @@ export function createWebWorkspaceRuntime(
           browserView.open(
             tabId,
             (frame) => emitView({ type: "frame", tabId, ...frame }),
-            () => emitView({ type: "stopped", tabId, reason: currentText().t("webClient.error.viewEnded") }),
+            (reason) =>
+              emitView({ type: "stopped", tabId, reason: reason || currentText().t("webClient.error.viewEnded") }),
+            (copied) => emitView({ ...copied, tabId }),
           ),
         );
         if (currentGeneration !== liveViewGeneration) {
@@ -580,6 +596,16 @@ export function createWebWorkspaceRuntime(
     respondToTakeover: (input) =>
       Effect.runPromise(respondToBrowserTakeover(teamApi, input).pipe(Effect.mapError((error) => error.cause))),
     listHosts: () => runTeamEffect(directory.listHosts()),
+    leaveHost: (hostId, membershipId) => runTeamEffect(directory.leaveHost(hostId, membershipId)),
+    async removeOwnedHost(hostId) {
+      const response = await accountFetch(`/api/browser/v2/remote/hosts/${encodeURIComponent(hostId)}`, {
+        method: "DELETE",
+        credentials: "same-origin",
+        headers: { "X-OpenBot-Browser": "1", "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!response.ok) throw new Error(currentText().t("server.settings.actionFailed"));
+    },
     async previewInvite(url) {
       const value = await runTeamEffect(directory.previewInvite(url));
       return {
@@ -809,6 +835,11 @@ export function createWebWorkspaceRuntime(
       // The released URL spells the agent `botId`.
       const query = new URLSearchParams({ botId: agentId, path });
       return decodeWebFile(await request("GET", `${TEAM_API_ROUTES.workspaceFiles}?${query}`));
+    },
+    async workspaceDirectory(agentId, path) {
+      if (!capabilities.includes(WORKSPACE_DIRECTORY_CAPABILITY))
+        throw new Error(currentText().t("error.team.workspaceDirectoryUnsupported"));
+      return decodeWorkspaceDirectory(await request("POST", WORKSPACE_DIRECTORY_ROUTES.list, { agentId, path }));
     },
     async models() {
       return guardedListDecoder(isAgentModelOption, "models")(await request("GET", TEAM_API_ROUTES.agents.models));

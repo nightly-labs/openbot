@@ -1,3 +1,5 @@
+import { CHAT_VISUAL_ITEM_TYPE_PREFIX } from "@openbot/contracts/chat-visual";
+import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import type {
   ConversationFileSearchPage,
   ConversationFileSearchResult,
@@ -78,8 +80,26 @@ export class ConversationQueries {
       threadId,
       activeTurnId: thread?.active_turn_id ?? null,
       revision: thread?.last_event_sequence ?? 0,
-      messages: rows.map((row) => JSON.parse(requiredStringColumn(row, "message_json"))),
+      messages: sortConversationMessages(rows.map((row) => JSON.parse(requiredStringColumn(row, "message_json")))),
     };
+  }
+
+  /**
+   * The assistant messages of one turn, in order. A routine flow reads only the answer of a turn,
+   * so it does not load and parse the whole history of the thread for it.
+   */
+  readTurnAssistantMessages(agentId: string, threadId: string, turnId: string): ConversationMessage[] {
+    const rows = databaseRows(
+      this.#core.connection
+        .prepare(
+          `SELECT message.message_json FROM projection_thread_messages AS message
+           JOIN projection_threads AS thread ON thread.thread_id = message.thread_id
+           WHERE message.thread_id = ? AND thread.agent_id = ? AND message.turn_id = ? AND message.author = 'assistant'
+           ORDER BY message.created_at, message.ordinal, message.message_id`,
+        )
+        .all(threadId, agentId, turnId),
+    );
+    return rows.map((row) => JSON.parse(requiredStringColumn(row, "message_json")));
   }
 
   /**
@@ -99,6 +119,16 @@ export class ConversationQueries {
     return row ? optionalStringColumn(row, "active_turn_id") : null;
   }
 
+  readConversationRevision(agentId: string, threadId: string | null): number {
+    if (!threadId) return 0;
+    const row = databaseRow(
+      this.#core.connection
+        .prepare("SELECT last_event_sequence FROM projection_threads WHERE thread_id = ? AND agent_id = ?")
+        .get(threadId, agentId),
+    );
+    return row ? requiredNumberColumn(row, "last_event_sequence") : 0;
+  }
+
   readConversationRuntime(
     agentId: string,
     threadId: string | null,
@@ -115,6 +145,7 @@ export class ConversationQueries {
                      AND COALESCE(json_extract(message.message_json, '$.itemType'), '') != 'commentary'
                      AND COALESCE(json_extract(message.message_json, '$.itemType'), '') != 'question_prompt'
                      AND COALESCE(json_extract(message.message_json, '$.itemType'), '') != 'agent_attachment'
+                     AND COALESCE(json_extract(message.message_json, '$.itemType'), '') NOT LIKE '${CHAT_VISUAL_ITEM_TYPE_PREFIX}%'
                      AND COALESCE(json_extract(message.message_json, '$.itemType'), '') != 'plan'
                      AND json_extract(message.message_json, '$.senderAgentId') IS NULL
                    ORDER BY message.created_at DESC, message.ordinal DESC, message.message_id DESC
@@ -130,6 +161,51 @@ export class ConversationQueries {
       activeTurnId: optionalStringColumn(row, "active_turn_id"),
       latestMessage: latestMessage ? decodeConversationMessageJson(latestMessage) : null,
     };
+  }
+
+  /** Reads only named messages for a row-level conversation update. */
+  readConversationMessages(
+    agentId: string,
+    threadId: string | null,
+    messageIds: readonly string[],
+  ): ConversationMessage[] {
+    if (!threadId || messageIds.length === 0) return [];
+    const placeholders = messageIds.map(() => "?").join(", ");
+    return databaseRows(
+      this.#core.connection
+        .prepare(
+          `SELECT message_json FROM projection_thread_messages
+           WHERE thread_id = ? AND message_id IN (${placeholders})
+           AND thread_id IN (SELECT thread_id FROM projection_threads WHERE agent_id = ?)
+           ORDER BY created_at, ordinal, message_id`,
+        )
+        .all(threadId, ...messageIds, agentId),
+    ).map((row) => decodeConversationMessageJson(requiredStringColumn(row, "message_json")));
+  }
+
+  /** Reads only messages that restart recovery can change. */
+  readConversationRecoveryMessages(
+    agentId: string,
+    threadId: string | null,
+    activeTurnId: string | null,
+  ): ConversationMessage[] {
+    if (!threadId) return [];
+    const rows = databaseRows(
+      this.#core.connection
+        .prepare(
+          `SELECT message_json FROM projection_thread_messages
+           WHERE thread_id = ?
+             AND thread_id IN (SELECT thread_id FROM projection_threads WHERE agent_id = ?)
+             AND (
+               (? IS NOT NULL AND turn_id = ? AND status = 'streaming')
+               OR json_type(message_json, '$.questionPrompt.resolution') = 'null'
+                  AND json_type(message_json, '$.questionPrompt') = 'object'
+             )
+           ORDER BY created_at, ordinal, message_id`,
+        )
+        .all(threadId, agentId, activeTurnId, activeTurnId),
+    );
+    return rows.map((row) => decodeConversationMessageJson(requiredStringColumn(row, "message_json")));
   }
 
   readConversationPage(
@@ -171,6 +247,8 @@ export class ConversationQueries {
       options.excludeRoutineRunEvents === true,
       options.excludeHostedSiteEvents === true,
     );
+    // The rows come in the shown order, which a cursor follows. A page of a split turn is not sorted
+    // again: it does not hold the turn's first input, which the shared order needs to find a steer.
     const messages = rows.map((row) => decodeConversationMessageJson(requiredStringColumn(row, "message_json")));
     const messageIds = new Set(messages.map((message) => message.id));
     const referenceIdSet = new Set<string>();
@@ -241,30 +319,27 @@ export class ConversationQueries {
     const boundary = databaseRow(
       this.#core.connection
         .prepare(
-          `SELECT created_at, ordinal, message_id FROM projection_thread_messages
-           WHERE thread_id = ? AND message_id = ?`,
+          `${ORDERED_THREAD_MESSAGES}
+           SELECT ${ORDER_KEY_COLUMNS} FROM ordered WHERE message_id = ?`,
         )
         .get(threadId, throughMessageId),
     );
     if (!boundary) return null;
-    const createdAt = requiredStringColumn(boundary, "created_at");
-    const ordinal = requiredNumberColumn(boundary, "ordinal");
-    const messageId = requiredStringColumn(boundary, "message_id");
     const row = databaseRow(
       this.#core.connection
         .prepare(
-          `SELECT message_id FROM projection_thread_messages
-           WHERE thread_id = ?
-             AND (created_at, ordinal, message_id) <= (?, ?, ?)
+          `${ORDERED_THREAD_MESSAGES}
+           SELECT message_id FROM ordered
+           WHERE (${ORDER_KEY_COLUMNS}) <= (?, ?, ?, ?, ?, ?, ?)
              ${conversationMarkerSqlFilter(
                options.excludeRoutineEvents === true,
                options.excludeRoutineRunEvents === true,
                options.excludeHostedSiteEvents === true,
              )}
-           ORDER BY created_at DESC, ordinal DESC, message_id DESC
+           ORDER BY ${ORDER_KEY_DESC}
            LIMIT 1`,
         )
-        .get(threadId, createdAt, ordinal, messageId),
+        .get(threadId, ...pageKeyValues(conversationRowCursor(boundary))),
     );
     return row ? requiredStringColumn(row, "message_id") : null;
   }
@@ -404,109 +479,137 @@ export class ConversationQueries {
     excludeRoutineRunEvents: boolean,
     excludeHostedSiteEvents: boolean,
   ): DynamicRecord[] {
-    const columns = "created_at, ordinal, message_id, message_json";
+    const rows = this.#conversationPageKeys(
+      threadId,
+      anchor,
+      limit,
+      excludeRoutineEvents,
+      excludeRoutineRunEvents,
+      excludeHostedSiteEvents,
+    );
+    if (rows.length === 0) return [];
+    // The group order sorts every row of the thread, so it carries only the keys. The page's
+    // messages are read after it is chosen.
+    const json = new Map(
+      databaseRows(
+        this.#core.connection
+          .prepare(
+            `SELECT message_id, message_json FROM projection_thread_messages
+             WHERE thread_id = ? AND message_id IN (${rows.map(() => "?").join(", ")})`,
+          )
+          .all(threadId, ...rows.map((row) => requiredStringColumn(row, "message_id"))),
+      ).map((row) => [requiredStringColumn(row, "message_id"), requiredStringColumn(row, "message_json")]),
+    );
+    return rows.map((row) => ({ ...row, message_json: json.get(requiredStringColumn(row, "message_id")) }));
+  }
+
+  #conversationPageKeys(
+    threadId: string,
+    anchor: ConversationPageAnchor,
+    limit: number,
+    excludeRoutineEvents: boolean,
+    excludeRoutineRunEvents: boolean,
+    excludeHostedSiteEvents: boolean,
+  ): DynamicRecord[] {
     const routineFilter = conversationMarkerSqlFilter(
       excludeRoutineEvents,
       excludeRoutineRunEvents,
       excludeHostedSiteEvents,
     );
     if (anchor.type === "latest") {
-      return databaseRows(
+      const rows = databaseRows(
         this.#core.connection
           .prepare(
-            `SELECT ${columns} FROM projection_thread_messages
-             WHERE thread_id = ?
-             ${routineFilter}
-             ORDER BY created_at DESC, ordinal DESC, message_id DESC LIMIT ?`,
+            `${ORDERED_THREAD_MESSAGES}
+             SELECT ${ORDER_KEY_COLUMNS} FROM ordered
+             WHERE 1 = 1 ${routineFilter}
+             ORDER BY ${ORDER_KEY_DESC} LIMIT ?`,
           )
-          .all(threadId, limit),
-      ).reverse();
+          .all(threadId, PAGE_MESSAGE_LIMIT + 1),
+      );
+      return wholeGroups(rows, limit, PAGE_MESSAGE_LIMIT).reverse();
     }
     if (anchor.type === "before") {
-      const cursor = decodeConversationCursor(anchor.cursor);
-      return databaseRows(
+      const cursor = this.#pageCursor(threadId, anchor.cursor);
+      const rows = databaseRows(
         this.#core.connection
           .prepare(
-            `SELECT ${columns} FROM projection_thread_messages
-             WHERE thread_id = ? AND (
-               created_at < ? OR
-               (created_at = ? AND ordinal < ?) OR
-               (created_at = ? AND ordinal = ? AND message_id < ?)
-             )
+            `${ORDERED_THREAD_MESSAGES}
+             SELECT ${ORDER_KEY_COLUMNS} FROM ordered
+             WHERE (${ORDER_KEY_COLUMNS}) < (?, ?, ?, ?, ?, ?, ?)
              ${routineFilter}
-             ORDER BY created_at DESC, ordinal DESC, message_id DESC LIMIT ?`,
+             ORDER BY ${ORDER_KEY_DESC} LIMIT ?`,
           )
-          .all(
-            threadId,
-            cursor.createdAt,
-            cursor.createdAt,
-            cursor.ordinal,
-            cursor.createdAt,
-            cursor.ordinal,
-            cursor.messageId,
-            limit,
-          ),
-      ).reverse();
+          .all(threadId, ...pageKeyValues(cursor), PAGE_MESSAGE_LIMIT + 1),
+      );
+      return wholeGroups(rows, limit, PAGE_MESSAGE_LIMIT).reverse();
     }
     const anchorRow = databaseRow(
       this.#core.connection
         .prepare(
-          `SELECT created_at, ordinal, message_id FROM projection_thread_messages
-           WHERE thread_id = ? AND message_id = ?
-           ${routineFilter}`,
+          `${ORDERED_THREAD_MESSAGES}
+           SELECT ${ORDER_KEY_COLUMNS} FROM ordered
+           WHERE message_id = ? ${routineFilter}`,
         )
         .get(threadId, anchor.messageId),
     );
     if (!anchorRow) return [];
-    const cursor = conversationRowCursor(anchorRow);
-    const olderLimit = Math.floor(limit / 2);
-    const older = databaseRows(
+    const anchorKey = pageKeyValues(conversationRowCursor(anchorRow));
+    const newerRows = databaseRows(
       this.#core.connection
         .prepare(
-          `SELECT ${columns} FROM projection_thread_messages
-           WHERE thread_id = ? AND (
-             created_at < ? OR
-             (created_at = ? AND ordinal < ?) OR
-             (created_at = ? AND ordinal = ? AND message_id <= ?)
-           )
+          `${ORDERED_THREAD_MESSAGES}
+           SELECT ${ORDER_KEY_COLUMNS} FROM ordered
+           WHERE (${ORDER_KEY_COLUMNS}) > (?, ?, ?, ?, ?, ?, ?)
            ${routineFilter}
-           ORDER BY created_at DESC, ordinal DESC, message_id DESC LIMIT ?`,
+           ORDER BY ${ORDER_KEY_COLUMNS} LIMIT ?`,
         )
-        .all(
-          threadId,
-          cursor.createdAt,
-          cursor.createdAt,
-          cursor.ordinal,
-          cursor.createdAt,
-          cursor.ordinal,
-          cursor.messageId,
-          olderLimit + 1,
-        ),
-    ).reverse();
-    const newer = databaseRows(
-      this.#core.connection
-        .prepare(
-          `SELECT ${columns} FROM projection_thread_messages
-           WHERE thread_id = ? AND (
-             created_at > ? OR
-             (created_at = ? AND ordinal > ?) OR
-             (created_at = ? AND ordinal = ? AND message_id > ?)
-           )
-           ${routineFilter}
-           ORDER BY created_at, ordinal, message_id LIMIT ?`,
-        )
-        .all(
-          threadId,
-          cursor.createdAt,
-          cursor.createdAt,
-          cursor.ordinal,
-          cursor.createdAt,
-          cursor.ordinal,
-          cursor.messageId,
-          limit - older.length,
-        ),
+        .all(threadId, ...anchorKey, PAGE_MESSAGE_LIMIT + 1),
     );
-    return [...older, ...newer];
+    // An around page has no newer cursor, so it keeps room for the rest of the anchor's turn when that
+    // fits on a page, and for at least half the limit when the turn is larger.
+    const anchorGroupId = requiredStringColumn(anchorRow, "group_id");
+    const rowsAfterInTurn = newerRows.findIndex((row) => requiredStringColumn(row, "group_id") !== anchorGroupId);
+    const reserved = Math.max(
+      Math.min(rowsAfterInTurn < 0 ? newerRows.length : rowsAfterInTurn, PAGE_MESSAGE_LIMIT - 1),
+      Math.ceil(limit / 2),
+    );
+    const olderCap = PAGE_MESSAGE_LIMIT - reserved;
+    const olderRows = databaseRows(
+      this.#core.connection
+        .prepare(
+          `${ORDERED_THREAD_MESSAGES}
+           SELECT ${ORDER_KEY_COLUMNS} FROM ordered
+           WHERE (${ORDER_KEY_COLUMNS}) <= (?, ?, ?, ?, ?, ?, ?)
+           ${routineFilter}
+           ORDER BY ${ORDER_KEY_DESC} LIMIT ?`,
+        )
+        .all(threadId, ...anchorKey, olderCap + 1),
+    );
+    const older = wholeGroups(olderRows, Math.floor(limit / 2) + 1, olderCap).reverse();
+    return [...older, ...wholeGroups(newerRows, Math.max(limit - older.length, 1), PAGE_MESSAGE_LIMIT - older.length)];
+  }
+
+  /** A page cursor from a client. A version 1 cursor, from before pages kept turns whole, gets its row's group. */
+  #pageCursor(threadId: string, value: string): ConversationPageCursor {
+    const cursor = decodeConversationCursor(value);
+    if (cursor.version === 2) return cursor;
+    const row = databaseRow(
+      this.#core.connection
+        .prepare(
+          `${ORDERED_THREAD_MESSAGES}
+           SELECT group_start, group_first, group_id, turn_rank FROM ordered WHERE message_id = ?`,
+        )
+        .get(threadId, cursor.messageId),
+    );
+    return {
+      ...cursor,
+      version: 2,
+      groupStart: row ? requiredStringColumn(row, "group_start") : cursor.createdAt,
+      groupFirst: row ? requiredNumberColumn(row, "group_first") : cursor.ordinal,
+      groupId: row ? requiredStringColumn(row, "group_id") : `message:${cursor.messageId}`,
+      turnRank: row ? requiredNumberColumn(row, "turn_rank") : 0,
+    };
   }
 
   /** How many rows are older than the page, and when the oldest was written: the chat's unloaded length. */
@@ -522,32 +625,19 @@ export class ConversationQueries {
       excludeRoutineRunEvents,
       excludeHostedSiteEvents,
     );
-    // The count reads only the page-order index when no marker is filtered out. The oldest time is the
-    // first row in that index, not a minimum over every older row.
+    // The oldest time is the first row in the time index, not a minimum over every older row.
     const row = databaseRow(
       this.#core.connection
         .prepare(
-          `SELECT COUNT(*) AS older_count,
+          `${ORDERED_THREAD_MESSAGES}
+           SELECT COUNT(*) AS older_count,
              (SELECT created_at FROM projection_thread_messages WHERE thread_id = ? ${routineFilter}
               ORDER BY created_at, ordinal, message_id LIMIT 1) AS oldest_at
-           FROM projection_thread_messages
-           WHERE thread_id = ? AND (
-             created_at < ? OR
-             (created_at = ? AND ordinal < ?) OR
-             (created_at = ? AND ordinal = ? AND message_id < ?)
-           )
+           FROM ordered
+           WHERE (${ORDER_KEY_COLUMNS}) < (?, ?, ?, ?, ?, ?, ?)
            ${routineFilter}`,
         )
-        .get(
-          threadId,
-          threadId,
-          cursor.createdAt,
-          cursor.createdAt,
-          cursor.ordinal,
-          cursor.createdAt,
-          cursor.ordinal,
-          cursor.messageId,
-        ),
+        .get(threadId, threadId, ...pageKeyValues(cursor)),
     );
     return {
       count: row ? requiredNumberColumn(row, "older_count") : 0,
@@ -556,25 +646,114 @@ export class ConversationQueries {
   }
 }
 
+/**
+ * A thread's messages in the order `sortConversationMessages` shows them. A group is a turn, or a
+ * message alone, and starts at its earliest message. A message queued while a turn ran then stays
+ * after that turn's answer, which an ACP agent sends only when the turn ends (#1540).
+ *
+ * Inside a turn, `turn_rank` puts the user's and teammates' input first, then commentary and the plan,
+ * then the answer. From a steer on, the turn's second input, every row has rank 4 and goes by time.
+ * One window runs over each turn in time order, so it counts the inputs up to each row and starts at
+ * the turn's first row. Two groups that start at the same time go by the ordinal of their first row,
+ * as the shared order keeps the earlier of two equal groups.
+ * Pages, cursors and read state use this one order. The one parameter is the thread id.
+ */
+export const ORDERED_THREAD_MESSAGES = `WITH ranked AS (
+  SELECT created_at, ordinal, message_id, author, item_type, NULLIF(turn_id, '') AS turn,
+    CASE
+      WHEN author = 'user' THEN 0
+      WHEN author = 'assistant' THEN CASE WHEN item_type IN ('commentary', 'plan') THEN 1 ELSE 3 END
+      WHEN json_extract(message_json, '$.exchange.direction') = 'incoming' THEN 0
+      ELSE 2
+    END AS role_rank
+  FROM projection_thread_messages WHERE thread_id = ?
+), ordered AS (
+  SELECT created_at, ordinal, message_id, author, item_type,
+    CASE WHEN turn IS NULL THEN created_at ELSE MIN(created_at) OVER turn_by_time END AS group_start,
+    CASE WHEN turn IS NULL THEN ordinal
+      ELSE FIRST_VALUE(ordinal) OVER turn_by_time END AS group_first,
+    CASE WHEN turn IS NULL THEN 'message:' || message_id ELSE 'turn:' || turn END AS group_id,
+    CASE WHEN turn IS NULL THEN 0
+      WHEN SUM(role_rank = 0) OVER turn_by_time >= 2 THEN 4
+      ELSE role_rank END AS turn_rank
+  FROM ranked
+  WINDOW turn_by_time AS (PARTITION BY turn ORDER BY created_at, ordinal)
+)`;
+export const ORDER_KEY_COLUMNS = "group_start, group_first, group_id, turn_rank, created_at, ordinal, message_id";
+export const ORDER_KEY_DESC =
+  "group_start DESC, group_first DESC, group_id DESC, turn_rank DESC, created_at DESC, ordinal DESC, message_id DESC";
+
+/** Page decoders on IPC and every Team API version reject a conversation page of more than 100 messages. */
+const PAGE_MESSAGE_LIMIT = 100;
+
+/**
+ * The first whole groups of `rows`, until there are `target` rows. `rows` holds up to `cap + 1`
+ * rows, so a group that reaches the end may be cut. A group that does not fit waits for the next
+ * page, unless it is the first: a turn larger than `cap` is split rather than never shown.
+ */
+function wholeGroups(rows: readonly DynamicRecord[], target: number, cap: number): DynamicRecord[] {
+  const taken: DynamicRecord[] = [];
+  let start = 0;
+  while (start < rows.length && taken.length < target) {
+    const groupId = requiredStringColumn(rows[start] ?? {}, "group_id");
+    let end = start + 1;
+    while (end < rows.length && requiredStringColumn(rows[end] ?? {}, "group_id") === groupId) end += 1;
+    if (end > cap) {
+      if (taken.length === 0) taken.push(...rows.slice(0, cap));
+      break;
+    }
+    taken.push(...rows.slice(start, end));
+    start = end;
+  }
+  return taken;
+}
+
 interface ConversationPageCursor {
-  version: 1;
+  version: 2;
+  groupStart: string;
+  groupFirst: number;
+  groupId: string;
+  turnRank: number;
   createdAt: string;
   ordinal: number;
   messageId: string;
 }
 
+type ConversationPageCursorV1 = Omit<
+  ConversationPageCursor,
+  "version" | "groupStart" | "groupFirst" | "groupId" | "turnRank"
+> & {
+  version: 1;
+};
+
 function pageLimit(value: number): number {
   if (!Number.isInteger(value) || value < 1) throw new Error("The conversation page limit is invalid.");
-  return Math.min(value, 100);
+  return Math.min(value, PAGE_MESSAGE_LIMIT);
 }
 
 function conversationRowCursor(row: DynamicRecord): ConversationPageCursor {
   return {
-    version: 1,
+    version: 2,
+    groupStart: requiredStringColumn(row, "group_start"),
+    groupFirst: requiredNumberColumn(row, "group_first"),
+    groupId: requiredStringColumn(row, "group_id"),
+    turnRank: requiredNumberColumn(row, "turn_rank"),
     createdAt: requiredStringColumn(row, "created_at"),
     ordinal: requiredNumberColumn(row, "ordinal"),
     messageId: requiredStringColumn(row, "message_id"),
   };
+}
+
+function pageKeyValues(cursor: ConversationPageCursor): [string, number, string, number, string, number, string] {
+  return [
+    cursor.groupStart,
+    cursor.groupFirst,
+    cursor.groupId,
+    cursor.turnRank,
+    cursor.createdAt,
+    cursor.ordinal,
+    cursor.messageId,
+  ];
 }
 
 function conversationMarkerSqlFilter(
@@ -597,12 +776,12 @@ function encodePageCursor(cursor: ConversationPageCursor): string {
   return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
 }
 
-function decodeConversationCursor(value: string): ConversationPageCursor {
+function decodeConversationCursor(value: string): ConversationPageCursor | ConversationPageCursorV1 {
   try {
     const parsed = JSON.parse(Buffer.from(value, "base64url").toString("utf8"));
     if (
       !isDynamicRecord(parsed) ||
-      parsed.version !== 1 ||
+      (parsed.version !== 1 && parsed.version !== 2) ||
       !isString(parsed.createdAt) ||
       !isNumber(parsed.ordinal) ||
       !Number.isInteger(parsed.ordinal) ||
@@ -610,11 +789,25 @@ function decodeConversationCursor(value: string): ConversationPageCursor {
     ) {
       throw new Error("invalid cursor");
     }
+    const row = { createdAt: parsed.createdAt, ordinal: parsed.ordinal, messageId: parsed.messageId };
+    if (parsed.version === 1) return { version: 1, ...row };
+    if (
+      !isString(parsed.groupStart) ||
+      !isNumber(parsed.groupFirst) ||
+      !Number.isInteger(parsed.groupFirst) ||
+      !isString(parsed.groupId) ||
+      !isNumber(parsed.turnRank) ||
+      !Number.isInteger(parsed.turnRank)
+    ) {
+      throw new Error("invalid cursor");
+    }
     return {
-      version: 1,
-      createdAt: parsed.createdAt,
-      ordinal: parsed.ordinal,
-      messageId: parsed.messageId,
+      version: 2,
+      groupStart: parsed.groupStart,
+      groupFirst: parsed.groupFirst,
+      groupId: parsed.groupId,
+      turnRank: parsed.turnRank,
+      ...row,
     };
   } catch {
     throw new Error("The conversation page cursor is invalid.");

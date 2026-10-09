@@ -12,8 +12,8 @@ import * as DocumentPicker from "expo-document-picker";
 import { File } from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
 import { useRef, useState } from "react";
-import { Alert } from "react-native";
 import { attachmentSizeBucket } from "@/features/analytics/events";
+import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { haptics } from "@/shared/lib/haptics";
 import { readFileBase64 } from "@/shared/lib/read-file-base64";
@@ -200,7 +200,9 @@ export function useChatAttachments(
         failure_code: "operation_failed",
       });
       void haptics.notification("error");
-      Alert.alert(
+      showFailureAlert(
+        error,
+        "turn",
         t("mobile.chat.attachment.addFailed"),
         error instanceof Error ? error.message : t("mobile.chat.tryAgain"),
       );
@@ -249,7 +251,9 @@ export function useChatAttachments(
           failure_code: "operation_failed",
         });
         void haptics.notification("error");
-        Alert.alert(
+        showFailureAlert(
+          error,
+          "turn",
           t("mobile.chat.attachment.addFailed"),
           error instanceof Error ? error.message : t("mobile.chat.tryAgain"),
         );

@@ -1,6 +1,7 @@
 /**
- * Messaging connections: a chat platform workspace, such as a Slack workspace that installed the
- * OpenBot app or a Telegram chat that added the OpenBot bot, where the agents of this computer answer. Each new conversation goes to the
+ * Messaging connections: a chat platform workspace, such as a Slack workspace or a Discord guild that
+ * installed the OpenBot app, or a Telegram chat that added the OpenBot bot, where the agents of this
+ * computer answer. Each new conversation goes to the
  * workspace's orchestrator agent, which asks its teammates and answers. The connection belongs to the
  * computer that runs the agents. Tokens travel only towards that host; no result carries one.
  */
@@ -11,7 +12,7 @@ import { isBoundedString, isIdentifier, isNullableBoundedString } from "./ipc-bo
 import { isBoolean, isDynamicRecord, isOneOf } from "./runtime-values";
 import { TELEGRAM_ROUTE_CHATS_LIMIT } from "./signal-protocol/telegram-route";
 
-export const MESSAGING_PLATFORMS = ["slack", "telegram"] as const;
+export const MESSAGING_PLATFORMS = ["slack", "discord", "telegram"] as const;
 export type MessagingPlatform = (typeof MESSAGING_PLATFORMS)[number];
 
 export const MESSAGING_CONNECTION_STATES = [
@@ -24,8 +25,8 @@ export const MESSAGING_CONNECTION_STATES = [
   "rate_limited",
   "secret_storage_unavailable",
   "error",
-  // Slack and Telegram send their events through Signal, and this host cannot reach it: it is signed
-  // out, has no name yet, or Signal is down.
+  // Slack, Discord and Telegram send their events through Signal, and this host cannot reach it: it
+  // is signed out, has no name yet, or Signal is down.
   "relay_unavailable",
   // The OpenBot bot is no longer in the Telegram chat.
   "removed",
@@ -43,7 +44,7 @@ export const MESSAGING_LIMITS = {
 } as const;
 
 export interface MessagingConnection {
-  /** The Slack workspace ID, or the Telegram chat ID. */
+  /** The Slack workspace ID, the Discord guild ID, or the Telegram chat ID. */
   workspaceId: string;
   platform: MessagingPlatform;
   enabled: boolean;
@@ -59,22 +60,23 @@ export interface MessagingConnection {
   orchestratorAgentId: string | null;
 }
 
-/** The Slack workspaces connected on this computer. */
-export interface SlackOverview {
+/** The workspaces of one platform connected on this computer. */
+export interface MessagingOverview {
   connections: MessagingConnection[];
 }
 
-export interface SlackWorkspaceInput {
+/** One workspace of a platform: a Slack workspace ID, a Discord guild ID or a Telegram chat ID. */
+export interface MessagingWorkspaceInput {
   workspaceId: string;
 }
 
-export interface SetSlackEnabledInput {
+export interface SetMessagingEnabledInput {
   workspaceId: string;
   enabled: boolean;
 }
 
 /** Creates the workspace's orchestrator agent. Absent, the provider and model are a new agent's default. */
-export interface AddSlackOrchestratorInput {
+export interface AddMessagingOrchestratorInput {
   workspaceId: string;
   provider?: AgentProviderId;
   model?: AgentModelId;
@@ -82,32 +84,30 @@ export interface AddSlackOrchestratorInput {
 }
 
 /** The new orchestrator, and the sidebar section it went to, which the screen shows collapsed. */
-export interface AddSlackOrchestratorResult {
+export interface AddMessagingOrchestratorResult {
   agentId: string;
   sectionId: string | null;
 }
 
+/** The Slack workspaces connected on this computer. */
+export type SlackOverview = MessagingOverview;
+export type SlackWorkspaceInput = MessagingWorkspaceInput;
+export type SetSlackEnabledInput = SetMessagingEnabledInput;
+export type AddSlackOrchestratorInput = AddMessagingOrchestratorInput;
+export type AddSlackOrchestratorResult = AddMessagingOrchestratorResult;
+
 /** The Telegram chats linked to this computer. Each is one connection; one orchestrator answers all. */
-export interface TelegramOverview {
-  connections: MessagingConnection[];
-}
+export type TelegramOverview = MessagingOverview;
+export type TelegramChatInput = MessagingWorkspaceInput;
+export type SetTelegramEnabledInput = SetMessagingEnabledInput;
 
 /** Where the user adds the OpenBot bot: a group, or a direct chat with the bot. */
 export interface ConnectTelegramChatInput {
   place: "group" | "direct";
 }
 
-export interface TelegramChatInput {
-  workspaceId: string;
-}
-
-export interface SetTelegramEnabledInput {
-  workspaceId: string;
-  enabled: boolean;
-}
-
 /** Creates the Telegram Orchestrator, which every Telegram chat shares. */
-export type AddTelegramOrchestratorInput = Omit<AddSlackOrchestratorInput, "workspaceId">;
+export type AddTelegramOrchestratorInput = Omit<AddMessagingOrchestratorInput, "workspaceId">;
 
 function isScopeList(value: unknown): value is string[] {
   return (
@@ -133,7 +133,7 @@ export function isMessagingConnection(value: unknown): value is MessagingConnect
   );
 }
 
-export function isSlackOverview(value: unknown): value is SlackOverview {
+export function isMessagingOverview(value: unknown): value is MessagingOverview {
   return (
     isDynamicRecord(value) &&
     Array.isArray(value.connections) &&
@@ -142,7 +142,7 @@ export function isSlackOverview(value: unknown): value is SlackOverview {
   );
 }
 
-export function isAddSlackOrchestratorResult(value: unknown): value is AddSlackOrchestratorResult {
+export function isAddMessagingOrchestratorResult(value: unknown): value is AddMessagingOrchestratorResult {
   return (
     isDynamicRecord(value) && isIdentifier(value.agentId) && (value.sectionId === null || isIdentifier(value.sectionId))
   );

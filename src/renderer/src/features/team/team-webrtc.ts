@@ -12,7 +12,7 @@ import { encodeTeamWebRtcPayload, TeamWebRtcPayloadDecoder } from "./team-webrtc
 
 export interface BridgeCommand {
   commandId: string;
-  type: "connect" | "disconnect" | "disconnect-peer" | "send" | "restart-ice" | "close";
+  type: "connect" | "prepare-signal" | "disconnect" | "disconnect-peer" | "send" | "restart-ice" | "close";
   peerId: string;
   signalUrl?: string;
   token?: string;
@@ -61,14 +61,50 @@ interface PeerState {
   reconnectAttempt: number;
   reconnectTimer: number | null;
   turnRefreshTimer: number | null;
+  /** When the credentials of the current path must be renewed. */
+  turnRefreshDueAt: number;
+  /** Opens a new Signal socket when a lost path did not come back. */
+  signalRenewTimer: number | null;
+  /** Reports a lost path that did not come back as a disconnected peer. */
+  disconnectedTimer: number | null;
   iceRestartPending: boolean;
   iceRestarting: boolean;
+  iceRestarts: number;
+  /** Set by `replaceSignal`: after a network change the path can be dead while it still reports `connected`. */
+  restartIceOnReady: boolean;
   signalChain: Promise<void>;
   closed: boolean;
 }
 
+// After a sleep or a network change the path can stay `disconnected` or `failed`. The ICE restart
+// offer goes to the Signal socket from before, which can be half-open, so no answer comes. A new
+// socket restarts ICE on its `ready`; when the path is still lost after the grace time, main
+// connects again with a new ticket. Before this, main read the peer as connected until a restart.
+const SIGNAL_RENEW_DELAY_MS = 8_000;
+const DISCONNECT_GRACE_MS = 15_000;
+
 const peers = new Map<string, PeerState>();
+
+// A Signal socket opened while main waits for the ticket. Its TLS and WebSocket handshakes then do
+// not wait for the ticket. Nothing is sent on it before `connect` names the same address and adds
+// the hello; a socket that no `connect` takes closes.
+interface PreparedSignal {
+  signalUrl: string;
+  socket: WebSocket;
+  /** Signal said something before the hello, which is only a refusal. The socket is not used. */
+  refused: boolean;
+  timer: number;
+  listeners: AbortController;
+}
+const PREPARED_SIGNAL_LIFETIME_MS = 30_000;
+const preparedSignals = new Map<string, PreparedSignal>();
 const dataChannelNames = ["rpc", "events", "files", "desktop"] as const;
+// Chromium keeps the sockets of every earlier ICE generation until the connection closes: one per
+// network interface, and one more per interface for TURN, for each restart. On a host with 10
+// interfaces, about 150 restarts reach the network service's limit of 3,000 sockets, and then no
+// device can connect until the app restarts. A connection that would restart once more than this is
+// dropped instead, and the client connects again on a new one.
+const maximumIceRestarts = 10;
 let mainPort: MessagePort;
 
 const receiveMainPort = (event: MessageEvent): void => {
@@ -100,6 +136,7 @@ async function handleCommand(command: BridgeCommand): Promise<void> {
         (command.iceTransportPolicy !== "all" && command.iceTransportPolicy !== "relay")
       )
         throw new Error("The WebRTC connection command is invalid.");
+      const prepared = takePreparedSignal(command.peerId, command.signalUrl);
       disconnect(command.peerId);
       const state: PeerState = {
         id: command.peerId,
@@ -119,13 +156,21 @@ async function handleCommand(command: BridgeCommand): Promise<void> {
         reconnectAttempt: 0,
         reconnectTimer: null,
         turnRefreshTimer: null,
+        turnRefreshDueAt: 0,
+        signalRenewTimer: null,
+        disconnectedTimer: null,
         iceRestartPending: false,
         iceRestarting: false,
+        iceRestarts: 0,
+        restartIceOnReady: false,
         signalChain: Promise.resolve(),
         closed: false,
       };
       peers.set(state.id, state);
-      connectSignal(state);
+      connectSignal(state, prepared);
+    } else if (command.type === "prepare-signal") {
+      if (!command.signalUrl) throw new Error("The WebRTC connection command is invalid.");
+      prepareSignal(command.peerId, command.signalUrl);
     } else if (command.type === "disconnect") {
       disconnect(command.peerId);
     } else if (command.type === "disconnect-peer") {
@@ -141,6 +186,7 @@ async function handleCommand(command: BridgeCommand): Promise<void> {
     } else if (command.type === "restart-ice") {
       await restartIce(requirePeer(command.peerId));
     } else if (command.type === "close") {
+      for (const peerId of [...preparedSignals.keys()]) dropPreparedSignal(peerId);
       for (const peerId of [...peers.keys()]) disconnect(peerId);
     }
     post({ type: "command-complete", commandId: command.commandId });
@@ -153,11 +199,63 @@ async function handleCommand(command: BridgeCommand): Promise<void> {
   }
 }
 
-function connectSignal(state: PeerState): void {
-  if (state.closed || state.socket) return;
-  const socket = new WebSocket(state.signalUrl);
+function prepareSignal(peerId: string, signalUrl: string): void {
+  // A peer that is already connecting has its own socket.
+  if (peers.has(peerId)) return;
+  dropPreparedSignal(peerId);
+  const socket = new WebSocket(signalUrl);
+  const listeners = new AbortController();
+  const prepared: PreparedSignal = {
+    signalUrl,
+    socket,
+    refused: false,
+    timer: window.setTimeout(() => dropPreparedSignal(peerId), PREPARED_SIGNAL_LIFETIME_MS),
+    listeners,
+  };
+  const drop = () => {
+    if (preparedSignals.get(peerId) === prepared) dropPreparedSignal(peerId);
+  };
+  socket.addEventListener("open", () => post({ type: "signal-open", peerId }), { signal: listeners.signal });
+  socket.addEventListener(
+    "message",
+    () => {
+      prepared.refused = true;
+    },
+    { signal: listeners.signal },
+  );
+  socket.addEventListener("close", drop, { signal: listeners.signal });
+  socket.addEventListener("error", drop, { signal: listeners.signal });
+  preparedSignals.set(peerId, prepared);
+}
+
+/** The prepared socket of a peer when it can carry the hello for `signalUrl`, and forgets it either way. */
+function takePreparedSignal(peerId: string, signalUrl: string): WebSocket | null {
+  const prepared = preparedSignals.get(peerId);
+  if (!prepared) return null;
+  preparedSignals.delete(peerId);
+  clearTimeout(prepared.timer);
+  prepared.listeners.abort();
+  const usable =
+    prepared.signalUrl === signalUrl &&
+    !prepared.refused &&
+    (prepared.socket.readyState === WebSocket.CONNECTING || prepared.socket.readyState === WebSocket.OPEN);
+  if (usable) return prepared.socket;
+  prepared.socket.close(1000, "Peer stopped");
+  return null;
+}
+
+function dropPreparedSignal(peerId: string): void {
+  takePreparedSignal(peerId, "")?.close(1000, "Peer stopped");
+}
+
+function connectSignal(state: PeerState, prepared: WebSocket | null = null): void {
+  if (state.closed || state.socket) {
+    prepared?.close(1000, "Peer stopped");
+    return;
+  }
+  const socket = prepared ?? new WebSocket(state.signalUrl);
   state.socket = socket;
-  socket.addEventListener("open", () => {
+  const sendHello = () => {
     state.reconnectAttempt = 0;
     const hello: SignalClientMessage = {
       type: "hello",
@@ -167,7 +265,14 @@ function connectSignal(state: PeerState): void {
       ...(state.role === "host" ? { multiplex: true } : {}),
     };
     socket.send(JSON.stringify(hello));
-  });
+  };
+  // A prepared socket can be open already. It told main when it opened.
+  const open = prepared?.readyState === WebSocket.OPEN;
+  if (!open)
+    socket.addEventListener("open", () => {
+      post({ type: "signal-open", peerId: state.id });
+      sendHello();
+    });
   socket.addEventListener("message", (event) => {
     if (!isString(event.data)) return;
     state.signalChain = state.signalChain
@@ -197,12 +302,18 @@ function connectSignal(state: PeerState): void {
     if (!state.closed) scheduleSignalReconnect(state);
   });
   socket.addEventListener("error", () => socket.close());
+  if (open) sendHello();
 }
 
 async function handleSignal(state: PeerState, message: SignalServerMessage): Promise<void> {
-  // Signal sends Slack and Telegram frames only to the main process's `ingress` socket, never to this peer.
+  // Signal sends Slack, Discord, webhook and Telegram messages only to the main process's `ingress`
+  // socket, never to this peer.
   if (
     message.type === "slack-delivery" ||
+    message.type === "discord-session" ||
+    message.type === "discord-delivery" ||
+    message.type === "webhook-ready" ||
+    message.type === "webhook-delivery" ||
     message.type === "telegram-delivery" ||
     message.type === "telegram-call-result"
   )
@@ -238,9 +349,18 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
     return;
   }
   if (message.type === "ready") {
-    const shouldRestartWithRefreshedTurn = Boolean(
-      state.role === "client" && state.connectionId && state.peerConnection,
+    // The host replaces a connection after 10 ICE restarts, so a socket that comes back while the
+    // path is still connected keeps the path. A TURN refresh still restarts ICE, so a relayed path
+    // moves to the new credentials.
+    const shouldRestartIce = Boolean(
+      state.role === "client" &&
+        state.connectionId &&
+        state.peerConnection &&
+        (message.connectionId === null ||
+          state.restartIceOnReady ||
+          state.peerConnection.connectionState !== "connected"),
     );
+    state.restartIceOnReady = false;
     state.resumeToken = message.resumeToken;
     // Null on the `ready` that answers a TURN refresh: new credentials for the connection already
     // open, not a new connection.
@@ -261,10 +381,13 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
         bundlePolicy: "max-bundle",
         iceTransportPolicy: state.iceTransportPolicy,
       });
-    scheduleTurnRefresh(state);
+    // A kept path still uses the credentials of its last ICE restart, so keep their deadline.
+    if (state.role === "client" && state.peerConnection && !shouldRestartIce)
+      scheduleTurnRefresh(state, Math.max(0, state.turnRefreshDueAt - Date.now()));
+    else scheduleTurnRefresh(state);
     post({ type: "ice-servers", peerId: state.id, iceServers: state.iceServers });
     post({ type: "signal-ready", peerId: state.id });
-    if (shouldRestartWithRefreshedTurn) state.iceRestartPending = true;
+    if (shouldRestartIce) state.iceRestartPending = true;
     if (state.iceRestartPending) await retryPendingIceRestart(state);
     if (state.role === "client" && state.connectionId && !state.peerConnection) {
       const connection = createPeerConnection(state, state.iceServers);
@@ -303,6 +426,9 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
         payloadDecoders: {},
         reconnectTimer: null,
         turnRefreshTimer: null,
+        turnRefreshDueAt: 0,
+        signalRenewTimer: null,
+        disconnectedTimer: null,
         signalChain: Promise.resolve(),
       };
       state.clients.set(message.sessionId, client);
@@ -342,6 +468,7 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
       disconnect(state.id);
       return;
     }
+    clearPathRecovery(state);
     state.peerConnection?.close();
     state.peerConnection = null;
     state.connectionId = null;
@@ -363,6 +490,10 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
   if (message.channel !== "team" || message.connectionId !== state.connectionId) return;
   if (message.type === "offer") {
     const connection = state.peerConnection ?? createPeerConnection(state, state.iceServers);
+    if (restartsIce(connection, message.sdp) && ++state.iceRestarts > maximumIceRestarts) {
+      dropConnection(state);
+      return;
+    }
     await connection.setRemoteDescription({ type: "offer", sdp: message.sdp });
     const answer = await connection.createAnswer();
     await connection.setLocalDescription(answer);
@@ -393,8 +524,10 @@ function createPeerConnection(state: PeerState, iceServers: RTCIceServer[]): RTC
     iceTransportPolicy: state.iceTransportPolicy,
   });
   state.peerConnection = connection;
+  state.iceRestarts = 0;
   connection.onicecandidate = (event) => {
-    if (!event.candidate || !state.connectionId) return;
+    // An empty candidate marks the end of gathering. Signal v1 accepts only candidates.
+    if (!event.candidate?.candidate || !state.connectionId) return;
     sendSignal(state, {
       type: "ice-candidate",
       version: SIGNAL_PROTOCOL_VERSION,
@@ -411,7 +544,12 @@ function createPeerConnection(state: PeerState, iceServers: RTCIceServer[]): RTC
   };
   connection.onconnectionstatechange = () => {
     if (state.peerConnection !== connection) return;
-    if (connection.connectionState === "connected") void reportSelectedPath(state, connection).catch(() => undefined);
+    if (connection.connectionState === "connected") {
+      clearPathRecovery(state);
+      void reportSelectedPath(state, connection).catch(() => undefined);
+    }
+    if (connection.connectionState === "disconnected" || connection.connectionState === "failed")
+      recoverPath(state, connection);
     if (connection.connectionState === "failed") {
       state.iceRestartPending = true;
       void retryPendingIceRestart(state);
@@ -474,6 +612,13 @@ function bindDataChannel(
       code: "data_channel_error",
       message: sourceText("error.remote.dataChannelFailed", { kind }),
     });
+  // The host can close the connection while this computer sleeps. The path can still read
+  // `connected` and Signal does not tell this end, but the channels close. Without this, main reads
+  // the host as connected and each request fails on a closed channel.
+  channel.onclose = () => {
+    if (state.closed || state.role !== "client" || state.channels[kind] !== channel) return;
+    dropConnection(state);
+  };
 }
 
 function descriptionFingerprint(description: RTCSessionDescription | null): string {
@@ -520,6 +665,7 @@ function waitForWritableChannel(channel: RTCDataChannel): Promise<void> {
 async function restartIce(state: PeerState): Promise<void> {
   const connection = state.peerConnection;
   if (!connection || !state.connectionId || state.role !== "client") return;
+  if (++state.iceRestarts > maximumIceRestarts) return dropConnection(state);
   connection.restartIce();
   const offer = await connection.createOffer({ iceRestart: true });
   await connection.setLocalDescription(offer);
@@ -552,6 +698,52 @@ async function retryPendingIceRestart(state: PeerState): Promise<void> {
   } finally {
     state.iceRestarting = false;
   }
+}
+
+/** Whether an offer for a connection that already has a remote description starts a new ICE generation. */
+function restartsIce(connection: RTCPeerConnection, offer: string): boolean {
+  const current = connection.remoteDescription?.sdp;
+  return current !== undefined && iceUfrag(current) !== iceUfrag(offer);
+}
+
+function iceUfrag(sdp: string): string | undefined {
+  return sdp.match(/^a=ice-ufrag:(\S+)$/mu)?.[1];
+}
+
+/**
+ * Closes a connection that has used up its ICE restarts or lost a data channel. Signal tells the
+ * other end, which closes its own connection, and the client connects again with a new one.
+ */
+function dropConnection(state: PeerState): void {
+  if (state.signalHost) {
+    disconnect(state.id);
+    return;
+  }
+  clearPathRecovery(state);
+  disconnectPeerConnection(state);
+  post({ type: "peer-disconnected", peerId: state.id });
+}
+
+function recoverPath(state: PeerState, connection: RTCPeerConnection): void {
+  if (state.role !== "client" || state.closed || state.disconnectedTimer !== null) return;
+  const lost = () => !state.closed && state.peerConnection === connection && connection.connectionState !== "connected";
+  state.signalRenewTimer = window.setTimeout(() => {
+    state.signalRenewTimer = null;
+    if (lost()) replaceSignal(state);
+  }, SIGNAL_RENEW_DELAY_MS);
+  state.disconnectedTimer = window.setTimeout(() => {
+    state.disconnectedTimer = null;
+    if (!lost()) return;
+    disconnect(state.id);
+    post({ type: "peer-disconnected", peerId: state.id });
+  }, DISCONNECT_GRACE_MS);
+}
+
+function clearPathRecovery(state: PeerState): void {
+  if (state.signalRenewTimer !== null) clearTimeout(state.signalRenewTimer);
+  if (state.disconnectedTimer !== null) clearTimeout(state.disconnectedTimer);
+  state.signalRenewTimer = null;
+  state.disconnectedTimer = null;
 }
 
 function requiredDescriptionSdp(description: RTCSessionDescriptionInit): string {
@@ -587,6 +779,7 @@ function replaceSignal(state: PeerState): void {
   if (state.reconnectTimer !== null) clearTimeout(state.reconnectTimer);
   state.reconnectTimer = null;
   state.reconnectAttempt = 0;
+  state.restartIceOnReady = true;
   const socket = state.socket;
   state.socket = null;
   socket?.close(1000, "Network changed");
@@ -602,20 +795,28 @@ function scheduleSignalReconnect(state: PeerState): void {
   }, delay);
 }
 
-function scheduleTurnRefresh(state: PeerState): void {
+function scheduleTurnRefresh(state: PeerState, delay = SIGNAL_TURN_REFRESH_INTERVAL_MS): void {
+  state.turnRefreshDueAt = Date.now() + delay;
+  armTurnRefresh(state, delay);
+}
+
+/** Keeps `turnRefreshDueAt`: until a `ready` answers, the path still uses the old credentials. */
+function armTurnRefresh(state: PeerState, delay: number): void {
   if (state.turnRefreshTimer !== null) clearTimeout(state.turnRefreshTimer);
   state.turnRefreshTimer = window.setTimeout(() => {
     state.turnRefreshTimer = null;
-    if (!state.socket || state.socket.readyState !== WebSocket.OPEN) return scheduleTurnRefresh(state);
+    if (!state.socket || state.socket.readyState !== WebSocket.OPEN)
+      return armTurnRefresh(state, SIGNAL_TURN_REFRESH_INTERVAL_MS);
     try {
       sendSignal(state, { type: "turn-refresh", version: SIGNAL_PROTOCOL_VERSION, connectionId: state.connectionId });
     } catch {
-      scheduleTurnRefresh(state);
+      armTurnRefresh(state, SIGNAL_TURN_REFRESH_INTERVAL_MS);
     }
-  }, SIGNAL_TURN_REFRESH_INTERVAL_MS);
+  }, delay);
 }
 
 function disconnect(peerId: string): void {
+  dropPreparedSignal(peerId);
   const state = peers.get(peerId);
   if (!state) return;
   state.closed = true;
@@ -627,6 +828,7 @@ function disconnect(peerId: string): void {
   }
   if (state.reconnectTimer !== null) clearTimeout(state.reconnectTimer);
   if (state.turnRefreshTimer !== null) clearTimeout(state.turnRefreshTimer);
+  clearPathRecovery(state);
   disconnectPeerConnection(state);
   state.socket?.close(1000, "Peer stopped");
   peers.delete(peerId);

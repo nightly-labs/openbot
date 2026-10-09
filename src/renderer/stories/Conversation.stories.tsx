@@ -1,80 +1,29 @@
 import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
-import type {
-  AgentEvent,
-  AttachmentSummary,
-  AvatarImageInput,
-  DraftAttachment,
-  QueueSnapshot,
-  UpdateAgentInput,
-} from "@openbot/contracts/ipc";
-import type { AgentMessage as RendererAgentMessage } from "@openbot/ui/data";
+import type { AgentEvent, AttachmentSummary, DraftAttachment, QueueSnapshot } from "@openbot/contracts/ipc";
+import type { AgentMessage as RendererAgentMessage, RoutineRunMarkerModel } from "@openbot/ui/data";
 import { BrowserTakeoverCard } from "@openbot/ui/features/conversation/ConversationPrompts";
 import { Portal } from "@solidjs/web";
-import { createEffect, createSignal, onCleanup, onSettled, type ParentProps, Show } from "solid-js";
+import { createEffect, createSignal, onCleanup, onSettled, Show } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { clipboardFiles } from "../../preload/clipboard-files";
-import { AuthProvider } from "../src/features/account/account-context";
 import { Conversation, createConversationController } from "../src/features/conversation/Conversation";
 import { ConversationView } from "../src/features/conversation/ConversationView";
 import { ConversationControllerProvider } from "../src/features/conversation/conversation-controller-context";
 import { composerDraftKey } from "../src/features/conversation/conversation-keys";
-import { SetupProvider } from "../src/features/onboarding/onboarding-context";
-import { ServersProvider } from "../src/features/servers/servers-context";
-import { SettingsProvider } from "../src/features/settings/settings-context";
-import { UsageProvider } from "../src/features/usage/usage-context";
-import { PlatformProvider } from "../src/platform";
 import browserTakeoverPreviewUrl from "./assets/browser-takeover-preview.svg";
 import {
-  requireFixture,
-  STORY_AGENT_STATUS,
-  STORY_AGENTS,
-  STORY_ATTACHMENTS,
-  STORY_CONVERSATION_MESSAGES,
-  STORY_MODELS,
-  STORY_PRESENCE,
-  STORY_QUEUES,
-  STORY_REMOTE_DESKTOP_SESSION,
-  STORY_SERVERS,
-} from "./fixtures";
+  CONVERSATION_STORY_ARGS,
+  CONVERSATION_STORY_ATTACHMENT,
+  CONVERSATION_STORY_MESSAGES,
+  StoryAppProviders,
+} from "./conversation-story-support";
+import { STORY_AGENT_STATUS, STORY_AGENTS, STORY_ATTACHMENTS, STORY_PRESENCE, STORY_QUEUES } from "./fixtures";
 import { createMockOpenBot } from "./mock-openbot";
 
-const storyAttachment = requireFixture(STORY_ATTACHMENTS[0], "Story attachment");
-
-const messages: RendererAgentMessage[] = STORY_CONVERSATION_MESSAGES.map((message) => ({
-  id: message.id,
-  author: message.author === "user" ? "you" : "agent",
-  body:
-    message.id === "message-agent-1"
-      ? `${message.text}\n\nPlease review ${serializeAttachmentReference(storyAttachment.name, storyAttachment.id)} before editing the implementation notes.\n\nTransformers scale well with data and compute [1], though attention is quadratic in sequence length [2].`
-      : message.text,
-  time: "10:00",
-  itemType: message.itemType,
-  senderAgentId: message.senderAgentId,
-  replyToMessageId: message.replyToMessageId,
-  attachments: message.attachments,
-  citations:
-    message.id === "message-agent-1"
-      ? [
-          {
-            number: 1,
-            label: "Attention Is All You Need",
-            url: "https://arxiv.org/abs/1706.03762",
-            host: "arxiv.org",
-          },
-          {
-            number: 2,
-            label: "Efficient Transformers: A Survey",
-            url: "https://arxiv.org/abs/2009.06732",
-            host: "arxiv.org",
-          },
-        ]
-      : undefined,
-  exchange: message.exchange,
-  reaction: message.reaction,
-  kind: message.exchange ? "exchange" : message.plan ? "plan" : "text",
-  plan: message.plan && { ...message.plan, stopped: false },
-}));
+const storyAttachment = CONVERSATION_STORY_ATTACHMENT;
+const messages = CONVERSATION_STORY_MESSAGES;
+const args = CONVERSATION_STORY_ARGS;
 
 const unreadStoryMessages: RendererAgentMessage[] = [
   ...Array.from(
@@ -486,6 +435,60 @@ const codeBlockMessages: RendererAgentMessage[] = [
   },
 ];
 
+const diagramMessages: RendererAgentMessage[] = [
+  {
+    id: "diagram-user",
+    author: "you",
+    body: "Draw how a message gets to the agent.",
+    time: "10:02",
+    kind: "text",
+  },
+  {
+    id: "diagram-agent",
+    author: "agent",
+    body: [
+      "```mermaid",
+      "flowchart LR",
+      "  Composer --> Queue --> Agent --> Reply",
+      "```",
+      "",
+      "The second diagram has an error, so it stays code with the reason above it:",
+      "",
+      "```mermaid",
+      "flowchart LR",
+      "  Composer --> --> Agent",
+      "```",
+    ].join("\n"),
+    time: "10:03",
+    kind: "text",
+  },
+];
+
+const markdownImageMessages: RendererAgentMessage[] = [
+  {
+    id: "markdown-images-user",
+    author: "you",
+    body: "Show me the logo options.",
+    time: "10:02",
+    kind: "text",
+  },
+  {
+    id: "markdown-images-agent",
+    author: "agent",
+    body: [
+      "These are the three options. Select an image to open it larger.",
+      "",
+      `![Production logo](${generatedImagePreview})`,
+      "",
+      `![Development logo](${generatedImagePreviewAlternate})`,
+      "",
+      `![](${new URL("../src/assets/openbot-logo-preview.png", import.meta.url).href})`,
+    ].join("\n"),
+    time: "10:03",
+    kind: "text",
+  },
+];
+
 const markdownMessages: RendererAgentMessage[] = [
   {
     id: "markdown-user",
@@ -824,26 +827,6 @@ const referenceQueue: QueueSnapshot = {
   ],
 };
 
-/**
- * The domains `ConversationView` and its panels read through `use*()`, nested in the order
- * `app-providers.tsx` uses. Each one talks to the mocked `window.openbot` the story installs.
- */
-function StoryAppProviders(props: ParentProps) {
-  return (
-    <PlatformProvider>
-      <AuthProvider>
-        <SetupProvider>
-          <SettingsProvider>
-            <ServersProvider>
-              <UsageProvider>{props.children}</UsageProvider>
-            </ServersProvider>
-          </SettingsProvider>
-        </SetupProvider>
-      </AuthProvider>
-    </PlatformProvider>
-  );
-}
-
 function MockedConversation(props: {
   args: Parameters<typeof Conversation>[0];
   messages?: RendererAgentMessage[];
@@ -1013,59 +996,6 @@ function RecordingConversation(props: { args: Parameters<typeof Conversation>[0]
   });
   return <MockedConversation args={props.args} />;
 }
-
-const args: Parameters<typeof Conversation>[0] = {
-  agentStatus: STORY_AGENT_STATUS,
-  agent: STORY_AGENTS[0],
-  agents: STORY_AGENTS,
-  modelOptions: STORY_MODELS,
-  messages,
-  unreadCount: 0,
-  firstUnreadMessageId: null,
-  loaded: true,
-  activeTurnId: null,
-  globalOverlayOpen: false,
-  settingsRequest: null,
-  messageFocusRequest: null,
-  queue: undefined,
-  browserTabs: [],
-  activeBrowserTabId: null,
-  browserVisibilitySuspended: false,
-  browserControlState: { sessions: [] },
-  server: STORY_SERVERS[0],
-  presence: STORY_PRESENCE,
-  currentUserEmail: "person@example.com",
-  isOwnSender: (senderId) => senderId === "member-self",
-  remoteDesktopSessionActive: Boolean(STORY_REMOTE_DESKTOP_SESSION),
-  remoteDesktopVisible: false,
-  prompt: undefined,
-  approval: undefined,
-  browserTakeover: undefined,
-  onSelectAgent: fn(),
-  onUpdateAgent: async (_agentId: string, _updates: Omit<UpdateAgentInput, "agentId">) => undefined,
-  onSetAgentAvatar: async (_agentId: string, _image: AvatarImageInput | null) => undefined,
-  onSendMessage: async (_body: string, _attachmentDraftIds: string[], _replyToMessageId: string | null) => ({
-    messageId: `storybook-sent-${Date.now()}`,
-  }),
-  onMarkRead: async () => undefined,
-  onTypingChange: fn(),
-  onAnswerPrompt: async (_answers: Record<string, string[]>) => true,
-  onRespondToApproval: async (_decision: "accept" | "decline") => true,
-  onRespondToBrowserTakeover: async (_decision: "complete" | "cancel") => true,
-  onCancelQueuedMessage: fn(),
-  onSteerQueuedMessage: fn(),
-  onUpdateQueuedMessage: async (
-    _deliveryId: string,
-    _text: string,
-    _keepAttachmentIds: string[],
-    _attachmentDraftIds: string[],
-  ) => true,
-  onReorderQueue: fn(),
-  onActivateBrowserTab: fn(),
-  onCloseBrowserTab: fn(),
-  onOpenRemoteDesktop: async (_serverId: string, _trigger: HTMLElement) => undefined,
-  onStop: fn(),
-};
 
 const meta = {
   title: "Conversation/Conversation",
@@ -1300,6 +1230,20 @@ export const CodeBlockInChat: Story = {
   name: "Code block in chat",
   args: {
     messages: codeBlockMessages,
+  },
+};
+
+export const DiagramsInChat: Story = {
+  name: "Diagrams in chat",
+  args: {
+    messages: diagramMessages,
+  },
+};
+
+export const MarkdownImagesInChat: Story = {
+  name: "Markdown images in chat",
+  args: {
+    messages: markdownImageMessages,
   },
 };
 
@@ -1865,6 +1809,59 @@ export const AgentMessageGroupInChat: Story = {
         createdAt: "2026-08-19T09:06:00.000Z",
         kind: "text",
       },
+    ],
+  },
+};
+
+/** One routine run as the host stores it: a "running" marker, then the final state a minute later. */
+function routineRunMessages(
+  hour: number,
+  minute: number,
+  status: RoutineRunMarkerModel["status"] = "succeeded",
+): RendererAgentMessage[] {
+  const runId = `watch-${hour}-${minute}`;
+  return (["running", status] as const).map((markerStatus, offset) => {
+    const timestamp = new Date(Date.UTC(2026, 7, 19, hour, minute + offset)).toISOString();
+    return {
+      id: `${runId}-${markerStatus}`,
+      author: "agent",
+      body: "Watchdog",
+      time: timestamp.slice(11, 16),
+      createdAt: timestamp,
+      kind: "action-marker",
+      actionMarker: {
+        kind: "routine-run",
+        sourceAgentId: null,
+        routineId: "routine-watch",
+        runId,
+        routineName: "Watchdog",
+        status: markerStatus,
+        timestamp,
+      },
+    };
+  });
+}
+
+/* Consecutive completed runs of one routine show as one row. A failed run keeps its own row. */
+export const RoutineRunGroupInChat: Story = {
+  name: "Routine run group in chat",
+  args: {
+    messages: [
+      {
+        id: "watch-user",
+        author: "you",
+        body: "Check the site every 15 minutes and tell me only when something breaks.",
+        time: "17:00",
+        createdAt: "2026-08-19T17:00:00.000Z",
+        kind: "text",
+      },
+      ...routineRunMessages(17, 15),
+      ...routineRunMessages(17, 30),
+      ...routineRunMessages(17, 45),
+      ...routineRunMessages(18, 0),
+      ...routineRunMessages(18, 15, "failed"),
+      ...routineRunMessages(18, 30),
+      ...routineRunMessages(18, 45),
     ],
   },
 };

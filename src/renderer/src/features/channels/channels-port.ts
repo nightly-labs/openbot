@@ -1,5 +1,6 @@
 import type { AttachmentSummary, FilePreview, OpenBotDesktopApi } from "@openbot/contracts/ipc";
 import type { ChannelMemoriesApi } from "../conversation/memories-port";
+import type { EventRoutinesApi } from "../conversation/routine-webhooks-api";
 import type { ChannelRoutinesApi } from "../conversation/routines-port";
 
 /**
@@ -24,6 +25,7 @@ export interface ChannelsPort {
     ChannelMemoriesApi &
     ChannelRoutinesApi &
     Partial<Pick<OpenBotDesktopApi["agent"], "downloadAttachments">>;
+  eventRoutines?: EventRoutinesApi | undefined;
   browser: Pick<OpenBotDesktopApi["browser"], "capturePreview">;
   openUrl: OpenBotDesktopApi["openUrl"];
   /** `browser` has no file manager to reveal a file in, so that action is hidden. */

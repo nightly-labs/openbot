@@ -1,21 +1,29 @@
-// The /download pages: one per operating system, and a hub that lists them. Each statement here
-// comes from the release configuration, README.md or docs/TROUBLESHOOTING.md. Keep it to what the
+// The /download pages: one per operating system and phone app, and a hub that lists them. Each
+// statement here comes from the release configuration, README.md or docs/TROUBLESHOOTING.md, and for
+// the phone apps from the native module minimums, the Mobile Connect settings and the mobile changelog. Keep it to what the
 // released app does, because these pages are what a search engine shows for "OpenBot for Linux".
 
-import type { DownloadPlatform } from "./download-platforms";
+import { DOWNLOAD_PLATFORM_ORDER, type DownloadPlatform } from "./download-platforms";
 import { LANDING_FAQ, type LandingQuestion } from "./landing-faq";
 import { OPENBOT_ALTERNATE_DOWNLOAD_LINKS, OPENBOT_DOWNLOAD_LINKS, OPENBOT_DOWNLOAD_PAGE_LINKS } from "./landing-links";
+import { MOBILE_APP_ORDER, MOBILE_APPS, type MobilePlatform } from "./mobile-apps";
 import {
   OPENBOT_SITE_URL,
   OPENBOT_SOCIAL_IMAGE_ALT,
   OPENBOT_SOCIAL_IMAGE_META,
   OPENBOT_SOCIAL_IMAGE_URL,
-  OPENBOT_SOFTWARE_APPLICATION,
   OPENBOT_X_HANDLE,
 } from "./site-metadata";
+import { OPENBOT_SOFTWARE_APPLICATION } from "./software-application";
 
-/** The sitemap date of the four pages. Change it when their text changes. */
-export const DOWNLOAD_PAGES_UPDATED_AT = "2026-10-03";
+/** The sitemap date of the pages. Change it when their text changes. */
+export const DOWNLOAD_PAGES_UPDATED_AT = "2026-10-09";
+
+/** A system with its own page: a desktop installer or a phone app. */
+export type DownloadPagePlatform = DownloadPlatform | MobilePlatform;
+
+/** The desktop systems first, then the phone apps, as the hub and the landing page list them. */
+export const DOWNLOAD_PAGE_ORDER: readonly DownloadPagePlatform[] = [...DOWNLOAD_PLATFORM_ORDER, ...MOBILE_APP_ORDER];
 
 export interface DownloadInstaller {
   /** The button text where the system is not on screen, such as a list of every installer. */
@@ -25,6 +33,8 @@ export interface DownloadInstaller {
   /** Which computer the file is for, for a reader who has to choose between two. */
   detail: string;
   href: string;
+  /** A store page on another site, which opens in a new tab. */
+  external?: boolean;
 }
 
 /** One line of the spec sheet: what the computer needs, or what the download is. */
@@ -45,7 +55,7 @@ interface DownloadPageSection {
 }
 
 export interface DownloadPageContent {
-  platform: DownloadPlatform;
+  platform: DownloadPagePlatform;
   /** The name a reader uses for the system, which the headings and the breadcrumb show. */
   name: string;
   title: string;
@@ -65,13 +75,33 @@ export interface DownloadPageContent {
 
 const PROVIDERS_ANSWER = LANDING_FAQ.find((entry) => entry.question === "Which AI models can OpenBot use?")?.answer;
 const FREE_ANSWER =
-  "Yes. The app costs $0, with no locked features, and needs no account. You pay only your AI provider, through the plan or API key you already have.";
+  "Yes. The app costs $0, with no locked features. You pay only your AI provider, through the plan or API key you already have.";
 const CONNECT_STEP: DownloadStep = {
   text: "Connect a provider, such as Codex with your ChatGPT plan or Claude Code with your Claude plan. Then describe the agent you want in one prompt and save it.",
 };
 const UPDATES_NOTE = "OpenBot checks for new versions and updates itself.";
 const NETWORK_NOTE = "The AI provider you choose needs an internet connection. A local model needs none.";
 const UPDATES_SPEC: DownloadSpec = { label: "Updates", value: "Automatic" };
+
+const COMPUTER_STEP: DownloadStep = {
+  text: "Install OpenBot on the Mac, Windows or Linux computer that runs your agents, and sign in to your OpenBot account.",
+};
+const GENERATE_CODE_STEP: DownloadStep = {
+  text: "On the computer, open Settings, then Mobile Connect, and select Generate QR code. The code expires after two minutes and works for one sign-in.",
+};
+const PHONE_NOTES = [
+  "Your chats and files stay on the computer that runs your agents. The phone connects to it over an encrypted connection, directly between your devices when it can, and no cloud stores your chats or files.",
+  "You set up no VPN or tunnel. Remote access needs an OpenBot account.",
+  "The computer must be on and running OpenBot for the phone to reach your agents.",
+  "To remove a phone, open Settings, then Mobile Connect, on the computer and disconnect it. Its access stops at once.",
+];
+const PHONE_COMPUTER_QUESTION: LandingQuestion = {
+  question: "Do I need a computer to use the mobile app?",
+  answer:
+    "Yes. The app controls the agents that run in OpenBot on your Mac, Windows or Linux computer, or on a server that runs OpenBot. Your chats and files stay there.",
+};
+const PHONE_FREE_ANSWER =
+  "Yes. The app costs $0. You pay only your AI provider, through the plan or API key you already have.";
 
 function providersQuestion(system: string): LandingQuestion {
   return {
@@ -82,7 +112,7 @@ function providersQuestion(system: string): LandingQuestion {
   };
 }
 
-export const DOWNLOAD_PAGES: Record<DownloadPlatform, DownloadPageContent> = {
+export const DOWNLOAD_PAGES: Record<DownloadPagePlatform, DownloadPageContent> = {
   macos: {
     platform: "macos",
     name: "macOS",
@@ -252,7 +282,7 @@ export const DOWNLOAD_PAGES: Record<DownloadPlatform, DownloadPageContent> = {
             text: "On Ubuntu 24.04 with systemd, install OpenBot as an always-on server of your account, then sign in with an email code:",
             code: "curl -fsSL https://raw.githubusercontent.com/nightly-labs/openbot/main/scripts/install-server.sh | sudo bash\nsudo openbot login",
           },
-          { text: "Then use it from the desktop app, the iPhone app or openbot.run/app." },
+          { text: "Then use it from the desktop app, the mobile app or openbot.run/app." },
         ],
       },
     ],
@@ -281,6 +311,88 @@ export const DOWNLOAD_PAGES: Record<DownloadPlatform, DownloadPageContent> = {
     ],
     operatingSystem: "Linux (x64 or arm64)",
   },
+  ios: {
+    platform: "ios",
+    name: "iPhone",
+    title: "Download OpenBot for iPhone: your AI agents on your phone",
+    description:
+      "Join the OpenBot for iPhone beta on TestFlight. Chat with the AI agents on your computer, follow their work and send files from anywhere.",
+    heading: "OpenBot for iPhone",
+    intro:
+      "Chat with the agents on your computer from anywhere, follow their progress and send them files. The app is in public beta on TestFlight.",
+    installers: [
+      {
+        label: "Join the TestFlight beta",
+        shortLabel: "TestFlight beta",
+        detail: "Install TestFlight from the App Store first",
+        href: MOBILE_APPS.ios.href,
+        external: true,
+      },
+    ],
+    specs: [
+      { label: "System", value: "iOS 16.4 or later" },
+      { label: "Store", value: "TestFlight public beta" },
+      { label: "Needs", value: "OpenBot on a computer" },
+      { label: "Updates", value: "Through TestFlight" },
+    ],
+    installSteps: [
+      COMPUTER_STEP,
+      { text: "On your iPhone, install TestFlight from the App Store." },
+      { text: "Open the TestFlight invite on your iPhone. In TestFlight, tap Accept, then Install." },
+      GENERATE_CODE_STEP,
+      { text: "Open OpenBot on your iPhone, choose Scan QR code and point the camera at the code." },
+    ],
+    extraSections: [],
+    notes: PHONE_NOTES,
+    faq: [
+      { question: "Is OpenBot for iPhone free?", answer: PHONE_FREE_ANSWER },
+      {
+        question: "Why is the iPhone app on TestFlight?",
+        answer:
+          "OpenBot for iPhone is in public beta. Anyone with the invite link can join, and TestFlight installs each new beta build.",
+      },
+      PHONE_COMPUTER_QUESTION,
+    ],
+    operatingSystem: "iOS 16.4 or later",
+  },
+  android: {
+    platform: "android",
+    name: "Android",
+    title: "Download OpenBot for Android: your AI agents on your phone",
+    description:
+      "Get OpenBot for Android on Google Play. Chat with the AI agents on your computer, follow their work and send files from anywhere.",
+    heading: "OpenBot for Android",
+    intro:
+      "Chat with the agents on your computer from anywhere, follow their progress and send them files. Get the app on Google Play.",
+    installers: [
+      {
+        label: "Get it on Google Play",
+        shortLabel: "Google Play",
+        detail: "For a phone with Android 7.0 or later",
+        href: MOBILE_APPS.android.href,
+        external: true,
+      },
+    ],
+    specs: [
+      { label: "System", value: "Android 7.0 or later" },
+      { label: "Store", value: "Google Play" },
+      { label: "Needs", value: "OpenBot on a computer" },
+      { label: "Updates", value: "Through Google Play" },
+    ],
+    installSteps: [
+      COMPUTER_STEP,
+      { text: "On your phone, install OpenBot from Google Play." },
+      GENERATE_CODE_STEP,
+      { text: "Open OpenBot on your phone, choose Scan QR code and point the camera at the code." },
+    ],
+    extraSections: [],
+    notes: [
+      ...PHONE_NOTES,
+      "The app does not ask for access to all your photos and videos. You choose photos and files with the system picker.",
+    ],
+    faq: [{ question: "Is OpenBot for Android free?", answer: PHONE_FREE_ANSWER }, PHONE_COMPUTER_QUESTION],
+    operatingSystem: "Android 7.0 or later",
+  },
 };
 
 export const DOWNLOAD_HUB = {
@@ -289,18 +401,18 @@ export const DOWNLOAD_HUB = {
     "Download OpenBot, the free app that runs AI agents as a team on your computer. For macOS 13 or later, Windows 10 or later, and Linux on x64 or arm64.",
   heading: "Download OpenBot",
   intro:
-    "Free for Mac, Windows and Linux. Get the installer for this computer, or choose a system below for its requirements and install steps.",
+    "Free for Mac, Windows and Linux, with apps for iPhone and Android. Get the installer for this computer, or choose a system below for its requirements and install steps.",
 } as const;
 
-export function downloadPagePath(platform: DownloadPlatform | "hub"): string {
+export function downloadPagePath(platform: DownloadPagePlatform | "hub"): string {
   return OPENBOT_DOWNLOAD_PAGE_LINKS[platform];
 }
 
-export function downloadPageUrl(platform: DownloadPlatform | "hub", siteUrl: string = OPENBOT_SITE_URL): string {
+export function downloadPageUrl(platform: DownloadPagePlatform | "hub", siteUrl: string = OPENBOT_SITE_URL): string {
   return new URL(downloadPagePath(platform), siteUrl).toString();
 }
 
-function breadcrumbData(platform: DownloadPlatform | "hub", siteUrl: string) {
+function breadcrumbData(platform: DownloadPagePlatform | "hub", siteUrl: string) {
   const trail = [
     { name: "OpenBot", url: siteUrl },
     { name: "Download", url: downloadPageUrl("hub", siteUrl) },
@@ -330,7 +442,7 @@ function faqData(faq: readonly LandingQuestion[]) {
   };
 }
 
-export function downloadPageHead(platform: DownloadPlatform | "hub", siteUrl: string) {
+export function downloadPageHead(platform: DownloadPagePlatform | "hub", siteUrl: string) {
   const page = platform === "hub" ? undefined : DOWNLOAD_PAGES[platform];
   const title = page?.title ?? DOWNLOAD_HUB.title;
   const description = page?.description ?? DOWNLOAD_HUB.description;

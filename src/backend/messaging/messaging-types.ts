@@ -2,11 +2,14 @@
 // `MessagingDriver`: an adapter for its API and a transport for its inbound events. The OpenBot
 // Slack app uses the Events API: Slack posts to Signal, Signal checks Slack's signature, and passes
 // each request of a workspace linked to this host over the `MessagingIngress` socket, which the host
-// opens. The OpenBot Telegram bot works the same way: Telegram posts each update to Signal, which
-// passes it over the same socket, and the host calls the Bot API through Signal, which holds the
-// bot token. No transport needs a public endpoint on the host.
+// opens. The OpenBot Discord app's Gateway connection is in Signal, which holds the bot token: Signal
+// passes each guild's events over the same socket and makes the host's Discord calls. The OpenBot
+// Telegram bot works the same way: Telegram posts each update to Signal, which passes it over the same
+// socket, and the host calls the Bot API through Signal, which holds the bot token. No transport needs
+// a public endpoint on the host.
 
 import type { MessagingConnectionState, MessagingPlatform } from "@openbot/contracts/ipc";
+import type { DiscordApiRequest, DiscordDelivery } from "@openbot/contracts/signal-protocol/discord-api";
 import type {
   TelegramCallMethod,
   TelegramCallParams,
@@ -47,16 +50,18 @@ export interface InboundMessage {
   files: InboundFile[];
 }
 
+interface InboundActionBase {
+  token: string;
+  actorId: string;
+  target: MessageTarget;
+  platformMessageId: string;
+  /** What the platform needs to answer the press privately, such as a Discord interaction id. */
+  replyHandle?: string;
+}
+
 export type InboundAction =
-  | {
-      type: "approval";
-      token: string;
-      decision: "accept" | "decline";
-      actorId: string;
-      target: MessageTarget;
-      platformMessageId: string;
-    }
-  | { type: "stop"; token: string; actorId: string; target: MessageTarget; platformMessageId: string };
+  | (InboundActionBase & { type: "approval"; decision: "accept" | "decline" })
+  | (InboundActionBase & { type: "stop" });
 
 interface MessageButton {
   action: "accept" | "decline" | "stop";
@@ -104,7 +109,13 @@ export interface MessagingAdapter {
   identify(): Effect.Effect<ConnectionIdentity, MessagingAdapterError>;
   post(target: MessageTarget, body: MessageBody): Effect.Effect<string, MessagingAdapterError>;
   edit(target: MessageTarget, messageId: string, body: MessageBody): Effect.Effect<void, MessagingAdapterError>;
-  postPrivate(target: MessageTarget, userId: string, text: string): Effect.Effect<void, MessagingAdapterError>;
+  /** A post that only `userId` sees. `replyHandle` is the one of the press that it answers, if any. */
+  postPrivate(
+    target: MessageTarget,
+    userId: string,
+    text: string,
+    replyHandle?: string,
+  ): Effect.Effect<void, MessagingAdapterError>;
   react(
     target: MessageTarget,
     messageId: string,
@@ -160,15 +171,16 @@ export interface MessagingTransport {
 }
 
 /**
- * One HTTP request that a platform sent to its request URL, as Signal passed it on. Signal has
- * already checked the platform's signature.
+ * One event that Signal passed on. For Slack, the HTTP request that Slack sent to its request URL,
+ * whose signature Signal has checked. For Discord, a Gateway event that Signal normalized. For
+ * Telegram, one update of a chat, whose secret header Signal has checked. Discord and Telegram get no
+ * answer.
  */
-export interface IngressDelivery {
-  /** `telegram` is one Telegram update, which needs no answer. */
-  kind: "events" | "interactivity" | "telegram";
-  retryNum: number | null;
-  body: Uint8Array;
-}
+export type IngressDelivery =
+  | { platform: "slack"; kind: "events" | "interactivity"; retryNum: number | null; body: Uint8Array }
+  | { platform: "discord"; delivery: DiscordDelivery }
+  // `linked` marks the `/start <code>` update that the account service just linked to this host.
+  | { platform: "telegram"; botId: string; body: Uint8Array; linked: boolean };
 
 /** The HTTP answer the platform gets. A body only for a URL check or a button reply. */
 export interface IngressAnswer {
@@ -180,19 +192,14 @@ export interface IngressAnswer {
 /** `unavailable` has a reason the user can act on: sign in, name this computer, or wait for Signal. */
 export type IngressState = "online" | "connecting" | "signed_out" | "no_host" | "unavailable";
 
-/** Handles one request for a workspace, by the platform's workspace id. */
+/**
+ * Handles one request for a workspace, by the platform's workspace id (a Slack team, a Discord guild
+ * or a Telegram chat).
+ */
 export type IngressHandler = (
   workspaceId: string,
   delivery: IngressDelivery,
 ) => Effect.Effect<IngressAnswer, MessagingOperationFailed>;
-
-/** Handles one Telegram update of a chat routed to this host. `linked` marks the update of a new link. */
-export type TelegramIngressHandler = (
-  botId: string,
-  chatId: string,
-  body: Uint8Array,
-  linked: boolean,
-) => Effect.Effect<void, MessagingOperationFailed>;
 
 /**
  * The Bot API of the OpenBot Telegram bot, through Signal, which holds the token. Signal accepts a
@@ -231,20 +238,53 @@ export class TelegramCallError extends Error {
  * the main process owns. It is open while anything holds it.
  */
 export interface MessagingIngress {
-  /** Keeps the relay open until the returned function runs. */
-  acquire(): () => void;
+  /**
+   * Keeps the relay open until the returned function runs. The relay asks Signal for the routes of
+   * the platforms that hold it.
+   */
+  acquire(platform: MessagingPlatform): () => void;
   state(): IngressState;
   onState(listener: (state: IngressState) => void): () => void;
   /** Sets the one handler of the requests the relay receives, or removes it. */
   handle(handler: IngressHandler | null): void;
-  /** Sets the one handler of the Telegram updates the relay receives, or removes it. */
-  handleTelegram(handler: TelegramIngressHandler | null): void;
   readonly telegram: TelegramGateway;
   /**
    * Opens the socket again, such as after the computer wakes, or after a workspace was connected or
    * disconnected: Signal learns the workspaces of this host when the socket connects.
    */
   reconnect(): void;
+  /**
+   * Makes one Discord call through Signal, which holds the bot token, with the session of the open
+   * socket. Waits a short time for the session when the socket is still connecting. `decode` checks
+   * the JSON body of the answer.
+   */
+  discord<A>(
+    request: DiscordApiRequest,
+    decode: (value: unknown) => A,
+    file?: DiscordUploadFile,
+  ): Effect.Effect<A, MessagingAdapterError>;
+  /**
+   * Calls `listener` with the Discord guilds that Signal routes to the socket, each time Signal
+   * sends a session. A guild of this host that is not in it was unlinked, or the bot left it.
+   */
+  onDiscordRoutes(listener: (guildIds: ReadonlySet<string>) => void): () => void;
+}
+
+/** The bytes of one `upload` call. */
+export interface DiscordUploadFile {
+  bytes: Uint8Array;
+  mimeType: string;
+}
+
+/** A Discord call that Signal or Discord refused, with Signal's code. */
+export class DiscordApiError extends Error {
+  constructor(
+    readonly op: string,
+    readonly code: string,
+    readonly retryAfterMs?: number,
+  ) {
+    super(`Discord ${op} failed: ${code}`);
+  }
 }
 
 export interface MessagingDriverOptions {
@@ -254,8 +294,8 @@ export interface MessagingDriverOptions {
 
 export interface MessagingDriver {
   readonly platform: MessagingPlatform;
-  /** The credential a connection must have to start, such as the Slack bot token. */
-  readonly credentialKey: string;
+  /** The stored value without which a connection cannot start, such as Slack's bot token. */
+  readonly requiredCredential: string;
   createAdapter(credentials: Record<string, string>, options: MessagingDriverOptions): MessagingAdapter;
   createTransport(credentials: Record<string, string>, identity: ConnectionIdentity): MessagingTransport;
 }

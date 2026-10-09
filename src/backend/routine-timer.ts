@@ -86,6 +86,10 @@ export class RoutineTimer {
     this.#timer = null;
   }
 
+  get held(): boolean {
+    return this.#held;
+  }
+
   release(): void {
     this.#held = false;
     this.arm();

@@ -6,7 +6,7 @@ import { prefersReducedMotion } from "@openbot/ui/utils";
 import { createEffect, createMemo, createSignal, For, Match, onCleanup, Show, Switch, untrack } from "solid-js";
 import type { AgentMessage, AgentProfile } from "../../data";
 import { useText } from "../../text";
-import { AttachmentCards, AttachmentDownloadAll } from "./AttachmentCards";
+import { AttachmentCards } from "./AttachmentCards";
 import { CodeBlock } from "./CodeBlock";
 import { CodePreview } from "./CodePreview";
 import { ComparisonTable } from "./ComparisonTable";
@@ -16,7 +16,7 @@ import { DataTable, type MessageContentBlock, messageContentBlocks, reuseUnchang
 import { messageFileReferences } from "./FileReference";
 import { ImageGeneration } from "./ImageGeneration";
 import { ImageGallery, ImageLightbox, type ImageLightboxOpening, isLightboxImage } from "./ImageLightbox";
-import { MarkdownInlineText, MarkdownMessageText } from "./MarkdownMessageText";
+import { MarkdownInlineText, MarkdownMessageText, markdownImageName } from "./MarkdownMessageText";
 import { RichMessageText } from "./RichMessageText";
 import { parseSelectionInstruction } from "./SelectionActions";
 import {
@@ -243,7 +243,6 @@ export function MessageBody(props: {
   onAttachmentAction: (attachment: AttachmentSummary, action: "open" | "reveal" | "download") => void;
   onOpenSharedFile?: (path: string) => void;
   onOpenWorkspaceFile?: (path: string) => void;
-  onDownloadAttachments?: (attachments: AttachmentSummary[]) => Promise<void>;
   onDownload?: (attachment: AttachmentSummary) => void;
 }) {
   const { t } = useText();
@@ -278,7 +277,6 @@ export function MessageBody(props: {
       (attachment) => !referencedIds.has(attachment.id) && attachment.id !== generatedAttachmentId,
     );
   });
-  const [downloadingAttachments, setDownloadingAttachments] = createSignal(false);
   const standaloneImageAttachments = createMemo(() =>
     props.message.author === "agent" ? standaloneAttachments().filter(isLightboxImage) : [],
   );
@@ -316,7 +314,8 @@ export function MessageBody(props: {
     content: () => messageContent,
     enabled: () => props.message.author === "agent" && streamingBody.smoothHeight(),
   });
-  const [lightbox, setLightbox] = createSignal<ImageLightboxOpening | null>(null);
+  // A markdown image is a web address, not an attachment, so the viewer has no download for it.
+  const [lightbox, setLightbox] = createSignal<(ImageLightboxOpening & { markdown?: boolean }) | null>(null);
   const lightboxImages = createMemo(() => (props.message.attachments ?? []).filter(isLightboxImage));
   /* An image opens in the viewer with the other images of its message. A quoted message's image
      is not one of them, so it opens alone. Other files open in the preview panel. */
@@ -331,11 +330,37 @@ export function MessageBody(props: {
       props.onAttachmentAction(attachment, "open");
     }
   };
+  /* A markdown image opens with the other markdown images of its message, in the order they show. */
+  let markdownImages = new Map<string, HTMLElement>();
+  const openMarkdownImage = (origin: HTMLImageElement) => {
+    const pictures = [
+      ...(messageContent?.querySelectorAll<HTMLImageElement>(".message-markdown-image-button img") ?? []),
+    ];
+    markdownImages = new Map();
+    const images = pictures.map((picture, position): AttachmentSummary => {
+      const id = `markdown-image:${position}`;
+      if (picture.parentElement) markdownImages.set(id, picture.parentElement);
+      return {
+        id,
+        name: markdownImageName(picture.alt, picture.src),
+        size: 0,
+        kind: "image",
+        mimeType: "image/*",
+        previewKind: "image",
+        previewUrl: picture.src,
+      };
+    });
+    const index = pictures.indexOf(origin);
+    if (index < 0) return;
+    setLightbox({ images, index, origin: origin.parentElement ?? undefined, markdown: true });
+  };
   /* The images, the cards and the text blocks of one message share this parent. */
   const imageThumbnail = (attachment: AttachmentSummary) =>
+    markdownImages.get(attachment.id) ??
     messageContentResize?.parentElement?.querySelector<HTMLElement>(
       `[data-attachment-id="${CSS.escape(attachment.id)}"]`,
-    ) ?? undefined;
+    ) ??
+    undefined;
   const renderMarkdownInline = (body: string) => (
     <MarkdownInlineText
       body={body}
@@ -346,6 +371,7 @@ export function MessageBody(props: {
       onSelectAgent={props.onSelectAgent}
       onOpenLink={props.onOpenLink}
       onOpenAttachment={openAttachment}
+      onOpenImage={openMarkdownImage}
       onOpenSharedFile={props.onOpenSharedFile}
       onOpenWorkspaceFile={props.onOpenWorkspaceFile}
     />
@@ -437,6 +463,7 @@ export function MessageBody(props: {
                             onSelectAgent={props.onSelectAgent}
                             onOpenLink={props.onOpenLink}
                             onOpenAttachment={openAttachment}
+                            onOpenImage={openMarkdownImage}
                             onOpenSharedFile={props.onOpenSharedFile}
                             onOpenWorkspaceFile={props.onOpenWorkspaceFile}
                             showCitationFooter={index === lastTextBlockIndex()}
@@ -494,19 +521,6 @@ export function MessageBody(props: {
       </Switch>
       <Show when={standaloneFileAttachments().length > 0}>
         <div class="message-attachments-group">
-          <Show when={(props.message.attachments?.length ?? 0) > 2 && props.onDownloadAttachments}>
-            <AttachmentDownloadAll
-              count={props.message.attachments?.length ?? 0}
-              pending={downloadingAttachments()}
-              onDownload={() => {
-                if (downloadingAttachments()) return;
-                setDownloadingAttachments(true);
-                void props
-                  .onDownloadAttachments?.(props.message.attachments ?? [])
-                  .finally(() => setDownloadingAttachments(false));
-              }}
-            />
-          </Show>
           <AttachmentCards
             attachments={standaloneFileAttachments()}
             onPreview={openAttachment}
@@ -519,7 +533,7 @@ export function MessageBody(props: {
           <ImageLightbox
             opening={opening()}
             thumbnail={imageThumbnail}
-            onDownload={props.onDownload}
+            onDownload={opening().markdown ? undefined : props.onDownload}
             onClose={() => setLightbox(null)}
           />
         )}

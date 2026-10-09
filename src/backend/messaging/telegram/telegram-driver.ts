@@ -346,7 +346,7 @@ export function telegramDriver(options: TelegramDriverOptions = {}): MessagingDr
   };
   return {
     platform: "telegram",
-    credentialKey: "botId",
+    requiredCredential: "botId",
     createAdapter(credentials, driverOptions) {
       if (!options.ingress) throw new Error(sourceText("error.messaging.telegramUnsupported"));
       const chat = state(credentials);

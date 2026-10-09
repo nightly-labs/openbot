@@ -39,6 +39,7 @@ import {
 } from "@openbot/ui";
 import { ContentExitMotion } from "@openbot/ui/menu-motion";
 import { cx } from "@openbot/ui/utils";
+import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, For, onCleanup, onSettled, Show, untrack } from "solid-js";
 import { currentText, type TextValue, useText } from "../text";
 import { createScrollFades } from "./createScrollFades";
@@ -61,6 +62,8 @@ interface ProviderModelPickerProps {
   variant?: "pill" | "field";
   ariaLabel?: string;
   label?: string;
+  /** A glyph before the field label. The `field` variant only. */
+  icon?: JSX.Element;
   reasoningEffort?: AgentReasoningEffort;
   onReasoningEffortChange?: (effort: AgentReasoningEffort) => void;
   disabled?: boolean;
@@ -75,7 +78,8 @@ interface ProviderModelPickerProps {
   customProviders?: readonly CustomProviderSummary[] | undefined;
   /** The user's own ACP agents; provider `acp`, drawn on the Custom tab with one group each. */
   customAgents?: readonly CustomAgentSummary[] | undefined;
-  onAddCustomProvider?: () => void;
+  /** Receives the picker trigger, so focus returns to it when the opened settings close. */
+  onAddCustomProvider?: (trigger: HTMLElement) => void;
   /**
    * This agent's standing approval, below Effort. Without the callback the row is absent, which is
    * how a remote agent and the setup screen show the picker they always showed: the grant belongs
@@ -149,6 +153,11 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   let root: HTMLDivElement | undefined;
   let popover: HTMLElement | undefined;
 
+  const visibleProviders = createMemo(() =>
+    PROVIDERS.filter(
+      (provider) => !props.agentStatus?.providers?.some((status) => status.id === provider && status.off),
+    ),
+  );
   const customIds = createMemo(() => customProviderIds(props.customProviders ?? []));
   const selectedModel = createMemo(() =>
     props.modelOptions.find((option) => option.provider === props.provider && option.id === props.value),
@@ -221,9 +230,10 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   };
 
   createEffect(
-    () => ({ provider: activeProvider(), open: open() }),
-    ({ provider, open }) => {
-      if (!open) setRailProvider(provider);
+    () => ({ provider: activeProvider(), open: open(), visible: visibleProviders(), rail: railProvider() }),
+    ({ provider, open, visible, rail }) => {
+      if (!open || !visible.includes(rail))
+        setRailProvider(visible.includes(provider) ? provider : (visible[0] ?? CUSTOM_RAIL));
     },
   );
 
@@ -253,7 +263,8 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   function setPickerOpen(next: boolean): void {
     if (props.disabled) return;
     if (next) {
-      setRailProvider(activeProvider());
+      const provider = activeProvider();
+      setRailProvider(visibleProviders().includes(provider) ? provider : (visibleProviders()[0] ?? CUSTOM_RAIL));
       setSearch("");
     }
     setOpen(next);
@@ -287,7 +298,8 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   const triggerEffort = () => {
     const effort = props.reasoningEffort;
     if (!showsReasoningEffort() || !effort || selectedHasVariants()) return;
-    if (!selectedModel()?.supportedReasoningEfforts.includes(effort)) return;
+    const model = selectedModel();
+    if (!model?.supportedReasoningEfforts.includes(effort) || model.reasoningEffortConfigurable === false) return;
     return reasoningLabel(effort, t);
   };
   const triggerSummary = () => [triggerModelName(), triggerEffort()].filter(Boolean).join(" · ");
@@ -315,6 +327,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
             setPickerOpen(true);
           }}
         >
+          <Show when={field() && props.icon}>{props.icon}</Show>
           <Show when={field()}>
             <span class="provider-model-field-label">{props.label ?? t("provider.picker.model")}</span>
           </Show>
@@ -356,7 +369,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
           <Tabs.Root
             value={railProvider()}
             onChange={(value) => {
-              const provider = PROVIDERS.find((candidate) => candidate === value);
+              const provider = visibleProviders().find((candidate) => candidate === value);
               if (provider) selectRailProvider(provider);
             }}
             orientation="vertical"
@@ -364,7 +377,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
             class="provider-model-layout"
           >
             <Tabs.List class="provider-model-rail" aria-label={t("provider.picker.providers")}>
-              <For each={PROVIDERS}>
+              <For each={visibleProviders()}>
                 {(provider) => {
                   const status = () => railStatus(provider);
                   return (
@@ -405,8 +418,9 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                                   ? -1
                                   : 0;
                             if (!delta) return;
-                            const current = PROVIDERS.indexOf(provider);
-                            const next = PROVIDERS[(current + delta + PROVIDERS.length) % PROVIDERS.length];
+                            const providers = visibleProviders();
+                            const current = providers.indexOf(provider);
+                            const next = providers[(current + delta + providers.length) % providers.length];
                             if (next) providerButtons.get(next)?.focus();
                           }}
                         >
@@ -425,7 +439,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
               </For>
             </Tabs.List>
 
-            <For each={PROVIDERS}>
+            <For each={visibleProviders()}>
               {(provider) => {
                 const status = () => railStatus(provider);
                 const models = createMemo(() => pickerModels(railModelOptions(provider)));
@@ -450,7 +464,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                 const effortOptions = createMemo(() => {
                   if (!ownsSelection()) return [];
                   if (selected()?.variants.length) return selected()?.variants ?? [];
-                  return showsReasoningEffort()
+                  return showsReasoningEffort() && selectedModel()?.reasoningEffortConfigurable !== false
                     ? (selectedModel()?.supportedReasoningEfforts ?? []).map((effort) => ({
                         id: effort,
                         name: reasoningLabel(effort, t),
@@ -524,7 +538,15 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                         <span>{railHeadingSummary(provider, status())}</span>
                       </div>
                       <Show when={provider === CUSTOM_RAIL && props.onAddCustomProvider}>
-                        <Button type="button" size="xs" variant="default" onClick={() => props.onAddCustomProvider?.()}>
+                        <Button
+                          type="button"
+                          size="xs"
+                          variant="default"
+                          onClick={() => {
+                            setOpen(false);
+                            if (trigger) props.onAddCustomProvider?.(trigger);
+                          }}
+                        >
                           <Plus />
                           {t("provider.picker.addProvider")}
                         </Button>

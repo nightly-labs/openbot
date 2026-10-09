@@ -4,7 +4,7 @@ import { Deferred, Effect } from "effect";
 import type { Rectangle } from "electron";
 import { writeJsonFileAtomically } from "../backend/atomic-json-file";
 import { isMissingFileError } from "../backend/file-errors";
-import { RemoteWorkflowError, remoteCall, remoteDecode } from "./remote-service-effects";
+import { type RemoteWorkflowError, remoteCall, remoteDecode, toRemoteWorkflowError } from "./remote-service-effects";
 
 interface WindowSize {
   width: number;
@@ -97,9 +97,7 @@ export const readMainWindowBounds = Effect.fn("MainWindow.readBounds")(
 );
 
 export const writeMainWindowBounds = Effect.fn("MainWindow.writeBounds")(function* (path: string, bounds: Rectangle) {
-  yield* writeJsonFileAtomically(path, { version: 1, ...bounds }).pipe(
-    Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause })),
-  );
+  yield* writeJsonFileAtomically(path, { version: 1, ...bounds }).pipe(toRemoteWorkflowError);
 });
 
 /**

@@ -325,7 +325,7 @@ describe.sequential("AgentService: queue", () => {
       runCauseEffect(service.createAgent({ ...CREATE_AGENT_INPUT, name: "Chosen Agent", avatarSeed: "setup:chosen" })),
     ).resolves.toMatchObject({
       provider: "claude",
-      model: "claude-opus-5-5",
+      model: "claude-haiku-5-5",
     });
     // A template, a marketplace agent or an import names no model, and starts on the same choice.
     await expect(
@@ -337,7 +337,7 @@ describe.sequential("AgentService: queue", () => {
           avatarHue: null,
         }),
       ),
-    ).resolves.toMatchObject({ provider: "claude", model: "claude-opus-5-5" });
+    ).resolves.toMatchObject({ provider: "claude", model: "claude-haiku-5-5" });
 
     // A Codex model saved in setup is a choice too, not the built-in Luna 6 the record starts on.
     await runCauseEffect(service.setPreferredProvider("codex", "gpt-5.6-terra"));
@@ -403,7 +403,7 @@ describe.sequential("AgentService: queue", () => {
         {
           id: "codex",
           state: "available",
-          version: "0.144.1",
+          version: "0.156.0",
           email: "codex@example.com",
         },
         {
@@ -429,13 +429,13 @@ describe.sequential("AgentService: queue", () => {
         }),
       ),
     ).resolves.toMatchObject({
-      model: "claude-opus-5-5",
-      reasoningEffort: "high",
+      model: "claude-haiku-5-5",
+      reasoningEffort: "medium",
     });
     await runCauseEffect(service.setPreferredProvider("codex"));
     expect(service.getStatus()).toMatchObject({
       auth: { kind: "chatgpt", email: "codex@example.com" },
-      cliVersion: "0.144.1",
+      cliVersion: "0.156.0",
     });
     // The store default, which is what a new agent on the default provider keeps: `low`, not the
     // `medium` the Codex CLI reports for every GPT-5.6 model.
@@ -461,7 +461,7 @@ describe.sequential("AgentService: queue", () => {
       ),
     ).resolves.toMatchObject({
       provider: "claude",
-      model: "claude-opus-5-5",
+      model: "claude-haiku-5-5",
     });
   });
 
@@ -1179,6 +1179,22 @@ describe.sequential("AgentService: queue", () => {
     }
   });
 
+  it("does not replay a provider turn when its first running marker fails", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex");
+    service = createTestService({ store, mailbox, clientFactory: () => client });
+    vi.spyOn(mailbox, "markRunning").mockImplementationOnce(() =>
+      Effect.fail(new StoredStateFailure({ cause: new Error("Running marker write failed.") })),
+    );
+    await runCauseEffect(service.initialize());
+
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Run once" }));
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "completed");
+
+    expect(client.requests.filter((request) => request.method === "turn/start")).toHaveLength(1);
+    expect(service.listQueue("chief").deliveries[0]?.status).toBe("completed");
+  });
+
   it("queues FIFO instead of steering and continues draining after an interrupt", async () => {
     const { store, mailbox } = stores(root);
     service = createTestService({ store, mailbox });
@@ -1218,6 +1234,42 @@ describe.sequential("AgentService: queue", () => {
     for (let index = 1; index < conversationSignatures.length; index += 1) {
       expect(conversationSignatures[index]).not.toBe(conversationSignatures[index - 1]);
     }
+  });
+
+  it("delivers an agent message once when the provider's thread and call ids are long", async () => {
+    const {
+      service: agentService,
+      client,
+      store,
+      mailbox,
+    } = await startService(root, { provider: "codex", autoComplete: false });
+    service = agentService;
+    await Promise.all([runCauseEffect(store.getOrCreate("chief")), runCauseEffect(store.getOrCreate("worker"))]);
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Coordinate the report." }));
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "running");
+    const chiefThreadId = store.activeProviderSession("chief")?.externalSessionId;
+    assert(chiefThreadId);
+    // Custom ACP threads add an agent id and a folder tag to a UUID session, so the joined ids pass the limit.
+    const callId = "c".repeat(INPUT_LIMITS.identifier);
+
+    const send = () =>
+      callOpenBotTool(
+        client,
+        chiefThreadId,
+        "send_message",
+        { recipientAgentIds: ["worker"], text: "Draft the report." },
+        "provider-turn",
+        callId,
+      );
+    const first = openBotToolPayload((await send()).result);
+    const retry = openBotToolPayload((await send()).result);
+
+    expect(first).toMatchObject({ messageId: expect.any(String) });
+    expect(retry.messageId).toBe(first.messageId);
+    await waitForQueue(service, "worker", (queue) => queue.deliveries.length > 0);
+    expect(service.listQueue("worker").deliveries).toHaveLength(1);
+    // The automatic result of the turn still sees that this turn already wrote to the worker.
+    expect(mailbox.hasAgentMessageFromTurnTo("chief", "provider-turn", "worker")).toBe(true);
   });
 
   it("lets an agent stop the turn its own message started and drops its queued follow-up", async () => {
@@ -2753,5 +2805,64 @@ describe.sequential("AgentService: queue", () => {
     const listResponse = (await protocolMessages(logPath)).find((message) => message.id === "agent-tool-configured-0");
     expect(JSON.stringify(listResponse?.result)).toContain('\\"title\\":\\"Design\\"');
     expect(JSON.stringify(listResponse?.result)).toContain('\\"description\\":\\"\\"');
+  });
+
+  it("keeps a message queued during a Grok turn after that turn's answer on reload (#1540)", async () => {
+    process.env.OPENBOT_GROK_PATH = await fakeGrokCli();
+    const started = await startService(root, {
+      provider: "grok",
+      preferredProvider: "grok",
+      client: (provider) => new FakeAgentClient(provider, "", false),
+    });
+    service = started.service;
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    const turnStarts = () => events.filter((event) => event.type === "turn-started");
+    const answer = (text: string) => {
+      const active = turnStarts().at(-1);
+      const client = started.clientFor("grok");
+      const threadId = started.store.activeProviderSession("chief")?.externalSessionId;
+      if (active?.type !== "turn-started" || !client || !threadId) throw new Error("The Grok turn did not start.");
+      // An ACP agent sends its answer only when the prompt ends.
+      vi.setSystemTime(Date.now() + 60_000);
+      client.emit(
+        "notification",
+        notification("item/completed", {
+          threadId,
+          turnId: active.turnId,
+          item: { id: `${active.turnId}:assistant`, type: "agentMessage", phase: "final_answer", text },
+        }),
+      );
+      client.emit(
+        "notification",
+        notification("turn/completed", { threadId, turn: { id: active.turnId, status: "completed" } }),
+      );
+    };
+
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      await runCauseEffect(service.sendMessage({ agentId: "chief", text: "First question" }));
+      await waitFor(() => turnStarts().length === 1);
+      await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Queued question" }));
+      await waitForQueue(service, "chief", (queue) => queue.deliveries[1]?.status === "queued");
+      answer("First answer");
+      await waitFor(() => turnStarts().length === 2);
+      answer("Second answer");
+      await waitForQueue(service, "chief", (queue) =>
+        queue.deliveries.every((delivery) => delivery.status === "completed"),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+
+    const expected = ["First question", "First answer", "Queued question", "Second answer"];
+    const live = events.findLast((event) => event.type === "conversation");
+    expect(live?.type === "conversation" ? live.snapshot.messages.map((message) => message.text) : []).toEqual(
+      expected,
+    );
+    const page = await runCauseEffect(service.readConversationPageFor("chief", "user", { type: "latest" }, 50));
+    expect(page.messages.map((message) => message.text)).toEqual(expected);
+    const reloaded = await runCauseEffect(service.readConversation("chief"));
+    expect(reloaded.messages.map((message) => message.text)).toEqual(expected);
   });
 });

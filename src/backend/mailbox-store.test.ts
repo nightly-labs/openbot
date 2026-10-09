@@ -1485,6 +1485,48 @@ describe("MailboxStore", () => {
     );
   });
 
+  it("filters mailbox history per agent and keeps old active deliveries with attachments", async () => {
+    const source = join(root, "old-mailbox.txt");
+    await writeFile(source, "Keep this attachment");
+    const [draft] = await runCauseEffect(store.prepareAttachments([source]));
+    assert(draft);
+    const completed = await runCauseEffect(
+      store.enqueue({
+        sender: { kind: "user" },
+        recipientAgentIds: ["chief"],
+        text: "Old completed message",
+        draftIds: [draft.id],
+      }),
+    );
+    const completedDelivery = required(completed.deliveries[0]);
+    await runCauseEffect(store.markTerminal(completedDelivery.id, "completed"));
+    const savedAttachment = required(store.getDelivery(completedDelivery.id)?.managedAttachments[0]);
+    const active = await runCauseEffect(
+      store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Old active message" }),
+    );
+    const activeDelivery = required(active.deliveries[0]);
+    await runCauseEffect(store.markStarting(activeDelivery.id));
+    await runCauseEffect(store.markRunning(activeDelivery.id, "turn-old"));
+    for (let index = 0; index < 100; index += 1) {
+      await runCauseEffect(
+        store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["sales"], text: `Unrelated ${index}` }),
+      );
+    }
+
+    const messages = store.conversationMessages("chief", { limit: 1 });
+
+    expect(messages.map((message) => message.text)).toEqual(["Old completed message", "Old active message"]);
+    expect(messages[0]).toMatchObject({
+      id: completedDelivery.id,
+      attachments: [expect.objectContaining({ id: savedAttachment.id })],
+    });
+    expect(messages[1]).toMatchObject({
+      id: activeDelivery.id,
+      delivery: { id: activeDelivery.id, status: "running" },
+    });
+    expect(messages.map((message) => message.text)).not.toContain("Unrelated 99");
+  });
+
   it("persists queue order and edits a queued message copy-on-write", async () => {
     const original = join(root, "original.txt");
     const replacement = join(root, "replacement.txt");

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Linking } from "react-native";
+import { Linking } from "react-native";
 import { type SharedValue, useSharedValue, withTiming } from "react-native-reanimated";
+import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { AUTOMATIC_DICTATION_LANGUAGE, useDictationLanguage } from "@/features/settings/model/dictation-language";
 import { haptics } from "@/shared/lib/haptics";
 import { phoneLanguages } from "@/shared/lib/phone-languages";
@@ -93,7 +94,9 @@ async function recognitionOptions(module: Recognizer, supported: Promise<Support
 function showNotice(notice: DictationNotice): void {
   void haptics.notification("error");
   const { t } = currentText();
-  Alert.alert(
+  showFailureAlert(
+    undefined,
+    "voice",
     t(notice.title),
     t(notice.message),
     notice.openSettings
@@ -110,8 +113,11 @@ export interface VoiceDictation {
   phase: DictationPhase;
   /** Input level from 0 to 1, for the listening indicator. */
   level: SharedValue<number>;
-  /** Starts listening. The speech goes after `base` in the draft. */
-  start: (base: string) => void;
+  /**
+   * Starts listening. The speech goes after `base` in the draft. False when it
+   * cannot start: no recognizer, or another session still runs.
+   */
+  start: (base: string) => boolean;
   /** Stops listening and keeps the text. Resolves after the final result. */
   finish: () => Promise<void>;
   /** Stops listening and puts back the draft from before the mic. */
@@ -194,6 +200,9 @@ export function useVoiceDictation({
           current.fallback = "pending";
           return;
         }
+        // The user stopped it. Android reports its own stop as a "client" error,
+        // and with nothing said any error there loses nothing. No message.
+        if (phaseRef.current === "stopping" && (!current.heard || event.error === "client")) return;
         const notice = dictationNotice(event.error);
         if (notice) showNotice(notice);
       }),
@@ -220,9 +229,9 @@ export function useVoiceDictation({
   }, [id, level, settle, update]);
 
   const start = useCallback(
-    (base: string) => {
+    (base: string): boolean => {
       const module = speechRecognition;
-      if (!module || !available || owner || phaseRef.current !== "idle") return;
+      if (!module || !available || owner || phaseRef.current !== "idle") return false;
       owner = id;
       const current: DictationSession = {
         base,
@@ -265,6 +274,7 @@ export function useVoiceDictation({
           showNotice(dictationFailedNotice);
         }
       })();
+      return true;
     },
     [available, id, settle, update],
   );

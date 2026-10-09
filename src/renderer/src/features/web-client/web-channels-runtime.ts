@@ -2,6 +2,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AgentEvent, AttachmentSummary, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 import { currentText } from "@openbot/ui/text";
 import type { ChannelsPort } from "../channels/channels-port";
+import { webEventRoutinesApi } from "../conversation/routine-webhooks-api";
 import { createWebAttachmentFiles, openWebLink } from "./web-attachments";
 import type { WebWorkspaceRuntime } from "./web-runtime";
 
@@ -32,9 +33,12 @@ export function createWebChannelsPort(
   remote: WebWorkspaceRuntime,
   onHostEvent: (listener: (event: AgentEvent | TeamRealtimeEvent) => void) => () => void,
   hostId: () => string,
+  eventsEnabled: () => boolean,
 ): ChannelsPort {
   const files = createWebAttachmentFiles(remote);
   const channels = remote.channels;
+  const admin = remote.admin;
+  const eventRoutines = admin ? webEventRoutinesApi(admin.request) : undefined;
   async function importAttachments(chosen: File[]): Promise<AttachmentSummary[]> {
     if (chosen.length > INPUT_LIMITS.attachments)
       throw new Error(currentText().t("webClient.error.attachmentLimit", { limit: INPUT_LIMITS.attachments }));
@@ -75,6 +79,9 @@ export function createWebChannelsPort(
       respondToPrompt: (input) => remote.answer(input),
       respondToBrowserTakeover: (input) => remote.respondToTakeover(input),
       respondToBrowserSecret: (input) => remote.respondToBrowserSecret?.(input) ?? unavailable(),
+    },
+    get eventRoutines() {
+      return eventsEnabled() ? eventRoutines : undefined;
     },
     browser: { capturePreview: remote.browserPreview ?? unavailable },
     openUrl: openWebLink,

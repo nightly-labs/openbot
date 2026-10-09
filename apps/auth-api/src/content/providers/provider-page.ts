@@ -69,7 +69,7 @@ export const OPENBOT_ADDS: readonly ProviderAdd[] = [
   },
   {
     icon: "tag",
-    title: "No account on one computer",
-    text: "OpenBot is free for noncommercial use, and it needs no account on one computer. Your agents use the plans you already pay for.",
+    title: "Use your AI plans",
+    text: "OpenBot is free for noncommercial use. Your agents use the plans you already pay for.",
   },
 ];

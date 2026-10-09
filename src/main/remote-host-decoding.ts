@@ -1,3 +1,4 @@
+import { decodeHostReleaseStatus, type HostReleaseStatus } from "@openbot/contracts/ipc";
 // What the Team API client will accept from a remote host. `packages/contracts/src/ipc-decoding.ts`
 // supplies the primitives; this family says which shapes survive them.
 //
@@ -21,3 +22,11 @@ import { emptyDecoder } from "@openbot/contracts/ipc-decoding";
 export type ResponseDecoder<T> = (value: unknown) => T;
 
 export const decodeVoid = emptyDecoder("The remote server returned data.");
+
+/** Discards the reply of a route whose team-protocol codec has already checked it. */
+export const acceptEmpty = (): undefined => undefined;
+
+/** The web client uses the same remote boundary; the preload has its own decoder. */
+export function decodeHostReleaseStatusFromHost(value: unknown): HostReleaseStatus {
+  return decodeHostReleaseStatus(value);
+}

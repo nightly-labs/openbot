@@ -1,3 +1,4 @@
+import { CHAT_VISUAL_ITEM_TYPE_PREFIX } from "@openbot/contracts/chat-visual";
 import type {
   ConversationMessageAuthor,
   ConversationReadState,
@@ -56,6 +57,7 @@ function isIncoming(message: { itemType?: string }, fromUser: boolean): boolean 
     !fromUser &&
     message.itemType !== "commentary" &&
     message.itemType !== "agent_attachment" &&
+    !message.itemType?.startsWith(CHAT_VISUAL_ITEM_TYPE_PREFIX) &&
     message.itemType !== AGENT_EXCHANGE_ITEM_TYPE &&
     message.itemType !== "plan" &&
     !isRoutineEventItem(message)

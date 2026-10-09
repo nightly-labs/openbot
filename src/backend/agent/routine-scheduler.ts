@@ -23,11 +23,12 @@ import { sourceText } from "@openbot/i18n/source";
 import { collapseMissedOccurrences, RoutineInputError } from "@openbot/team-client/routine-schedule";
 import { Effect, Schema } from "effect";
 import { AgentRoutineStore } from "../agent-routine-store";
-import type { AgentStore } from "../agent-store";
+import { AGENT_PREVIEW_MAX_LENGTH, type AgentStore } from "../agent-store";
+import { causeHelpers } from "../effect-boundary";
 import type { MailboxStore } from "../mailbox-store";
 import type { DynamicToolCallParams } from "../protocol";
 import { recordRestartActivity } from "../restart-activity";
-import type { RoutineHoldWindow } from "../routine-store";
+import type { OwnedRoutineRecord, ReceivedWebhookEvent, RoutineHoldWindow, RoutineRecordInput } from "../routine-store";
 import type { RoutineDueSource, RoutineTimer } from "../routine-timer";
 import { type ConversationRuntime, withDatabaseTransaction } from "./conversation-runtime";
 import { routineStatusForDelivery } from "./delivery-content";
@@ -45,6 +46,15 @@ import {
 export interface RoutineMutationOptions {
   recordConversationEvent?: boolean;
   turnId?: string;
+}
+
+/**
+ * Released routine routes see schedule routines only, so a member cannot delete or start a webhook
+ * routine through them. Only `RoutineRecords`, behind the administrator-only events surface, sets
+ * `webhook`.
+ */
+export interface RoutineTriggerAccess {
+  webhook?: boolean | undefined;
 }
 
 /**
@@ -74,6 +84,11 @@ export interface RoutineHooks {
 
 /** Enough for every message a busy host queues between restarts; each entry is a few bytes. */
 const DELIVERY_TIMEZONE_LIMIT = 10_000;
+/**
+ * Enough for every routine run a busy host starts between restarts; each entry holds two previews of
+ * at most `AGENT_PREVIEW_MAX_LENGTH` characters.
+ */
+const PREVIEW_BEFORE_RUN_LIMIT = 10_000;
 
 export interface RoutineSchedulerOptions {
   store: AgentStore;
@@ -82,6 +97,12 @@ export interface RoutineSchedulerOptions {
   hooks: RoutineHooks;
   /** Shared with every other routine owner, so one wake time is derived across all of them. */
   timer: RoutineTimer;
+}
+
+/** The agent preview before a routine run, and the routine task the run showed in its place. */
+export interface RoutinePreviewBeforeRun {
+  previous: string;
+  shown: string;
 }
 
 /**
@@ -117,6 +138,12 @@ export class RoutineScheduler implements RoutineDueSource {
    * the oldest entry goes.
    */
   readonly #deliveryTimezones = new Map<string, string>();
+  /**
+   * The agent preview before a routine run showed its task there, by delivery. A run that ends
+   * quiet, or whose last answer is only the no-update marker, puts it back. Memory only: after a
+   * restart, the preview keeps the task. Past the cap, the oldest entry goes.
+   */
+  readonly #previewsBeforeRun = new Map<string, RoutinePreviewBeforeRun & { agentId: string }>();
 
   constructor(options: RoutineSchedulerOptions) {
     this.#store = options.store;
@@ -166,7 +193,7 @@ export class RoutineScheduler implements RoutineDueSource {
    */
   hasActiveRuns(): boolean {
     for (const agent of this.#hooks.listAgents()) {
-      for (const routine of this.#routines.list(agent.id)) {
+      for (const routine of this.#routines.listRecords(agent.id)) {
         if (this.#routines.activeRuns(agent.id, routine.id).length > 0) return true;
       }
     }
@@ -175,6 +202,38 @@ export class RoutineScheduler implements RoutineDueSource {
 
   runForDelivery(deliveryId: string): RoutineRun | null {
     return this.#routines.runForDelivery(deliveryId);
+  }
+
+  /**
+   * Whether the run of this delivery may end without a message, when the agent answers only the
+   * no-update marker. Only a scheduled run: a Test run and a script or webhook run are started by
+   * someone who waits for the result.
+   */
+  quietRunForDelivery(deliveryId: string): boolean {
+    return this.#routines.runForDelivery(deliveryId)?.kind === "scheduled";
+  }
+
+  /**
+   * The preview before the routine run of this delivery, and the one the run showed, once: the
+   * entry goes with the call. Null after a restart, or for a run that saved none.
+   */
+  takePreviewBeforeRun(deliveryId: string): RoutinePreviewBeforeRun | null {
+    const entry = this.#previewsBeforeRun.get(deliveryId);
+    this.#previewsBeforeRun.delete(deliveryId);
+    return entry ? { previous: entry.previous, shown: entry.shown } : null;
+  }
+
+  #rememberPreviewBeforeRun(deliveryId: string, agentId: string, preview: string, shown: string): void {
+    // A run queued while an earlier run of the agent still shows its task keeps the preview from
+    // before that run, so the last quiet run puts that one back, not the earlier task.
+    let previous = preview;
+    for (const entry of this.#previewsBeforeRun.values()) {
+      if (entry.agentId === agentId && entry.shown === preview) previous = entry.previous;
+    }
+    this.#previewsBeforeRun.set(deliveryId, { agentId, previous, shown });
+    if (this.#previewsBeforeRun.size <= PREVIEW_BEFORE_RUN_LIMIT) return;
+    const [oldest] = this.#previewsBeforeRun.keys();
+    if (oldest !== undefined) this.#previewsBeforeRun.delete(oldest);
   }
 
   duplicate(sourceAgentId: string, targetAgentId: string, now: Date): Map<string, Routine> {
@@ -219,15 +278,76 @@ export class RoutineScheduler implements RoutineDueSource {
     return routine;
   }
 
+  /** Routines of every trigger kind, for the events surface. */
+  listRecords(agentId: string): OwnedRoutineRecord[] {
+    this.#conversation.requireKnownAgent(agentId);
+    return this.#routines.listRecords(agentId);
+  }
+
+  /** Unchecked read of every trigger kind, for callers that already hold the agent. */
+  listRecordsFor(agentId: string): OwnedRoutineRecord[] {
+    return this.#routines.listRecords(agentId);
+  }
+
+  getRecord(agentId: string, routineId: string): OwnedRoutineRecord | null {
+    this.#conversation.requireKnownAgent(agentId);
+    return this.#routines.getRecord(agentId, routineId);
+  }
+
+  /**
+   * Saves a routine of either trigger kind. Only a schedule routine gets a conversation event: the
+   * released routine views that the event links to do not show webhook routines.
+   */
+  saveRecord(agentId: string, routineId: string | undefined, input: RoutineRecordInput): OwnedRoutineRecord {
+    this.#conversation.requireKnownAgent(agentId);
+    const routine =
+      input.trigger.kind === "schedule"
+        ? this.#mutateWithConversation(
+            agentId,
+            routineId === undefined ? "created" : "updated",
+            () => this.#routines.saveRecord(agentId, routineId, input),
+            (saved) => saved,
+          )
+        : this.#routines.saveRecord(agentId, routineId, input);
+    this.stateChanged(agentId);
+    this.arm();
+    return routine;
+  }
+
+  /**
+   * Starts a run for one verified webhook request. An agent that is held or being deleted is
+   * unavailable, so the sender retries later and nothing is written.
+   */
+  readonly receiveWebhook = Effect.fn("RoutineScheduler.receiveWebhook")(function* (
+    this: RoutineScheduler,
+    agentId: string,
+    routineId: string,
+    event: ReceivedWebhookEvent,
+  ) {
+    if (!this.mayDrain(agentId)) return { kind: "unavailable" } as const;
+    const result = yield* routineStep(() => this.#routines.receiveWebhook(agentId, routineId, event));
+    if (result.kind === "started") {
+      yield* this.#enqueueRunEffect(result.run).pipe(
+        Effect.catch((failure) =>
+          Effect.sync(() => this.#hooks.emitError("routine_delivery_failed", failure.cause, agentId)),
+        ),
+      );
+    }
+    yield* routineStep(() => this.stateChanged(agentId));
+    return result;
+  }, Effect.uninterruptible);
+
   readonly delete = Effect.fn("RoutineScheduler.delete")(function* (
     this: RoutineScheduler,
     input: DeleteRoutineInput,
-    options: RoutineMutationOptions = {},
+    options: RoutineMutationOptions & RoutineTriggerAccess = {},
   ) {
     const routine = yield* routineStep(() => {
       this.#conversation.requireKnownAgent(input.agentId);
-      const routine = this.#routines.get(input.agentId, input.routineId);
-      if (!routine) throw new RoutineInputError(sourceText("error.backend.routineGone"));
+      const routine = this.#routines.getRecord(input.agentId, input.routineId);
+      if (!routine || (routine.trigger.kind === "webhook" && !options.webhook)) {
+        throw new RoutineInputError(sourceText("error.backend.routineGone"));
+      }
       if (this.#deletionAgents.has(input.agentId)) {
         throw new RoutineInputError(sourceText("error.backend.routineDeletionBusy"));
       }
@@ -242,7 +362,7 @@ export class RoutineScheduler implements RoutineDueSource {
             this.#routines.activeRuns(input.agentId, input.routineId),
           );
           yield* routineStep(() => {
-            if (options.recordConversationEvent === false) {
+            if (options.recordConversationEvent === false || routine.trigger.kind !== "schedule") {
               withDatabaseTransaction(
                 this.#store.database,
                 () => {
@@ -269,14 +389,16 @@ export class RoutineScheduler implements RoutineDueSource {
                 options.turnId,
                 {
                   beforeMutate: (snapshot) => {
+                    const transitionMessages: ConversationMessage[] = [];
                     for (const run of activeRuns) {
                       if (run.status === "queued" && run.deliveryId) {
                         if (this.#mailbox.getDelivery(run.deliveryId)?.delivery.status === "queued") {
                           this.#mailbox.cancelNow(input.agentId, run.deliveryId);
                         }
                       }
-                      this.#appendRunTransition(snapshot, run, "cancelled");
+                      transitionMessages.push(this.#appendRunTransition(snapshot, run, "cancelled").message);
                     }
+                    return transitionMessages;
                   },
                   onRollback: () => this.#mailbox.restorePersistedState(),
                 },
@@ -295,7 +417,18 @@ export class RoutineScheduler implements RoutineDueSource {
     );
   }, Effect.uninterruptible);
 
-  readonly test = Effect.fn("RoutineScheduler.test")(function* (this: RoutineScheduler, input: TestRoutineInput) {
+  readonly test = Effect.fn("RoutineScheduler.test")(function* (
+    this: RoutineScheduler,
+    input: TestRoutineInput,
+    access: RoutineTriggerAccess = {},
+  ) {
+    if (!access.webhook) {
+      yield* routineStep(() => {
+        if (this.getRecord(input.agentId, input.routineId)?.trigger.kind === "webhook") {
+          throw new RoutineInputError(sourceText("error.backend.routineGone"));
+        }
+      });
+    }
     return yield* this.runWithPayload({ ...input, payload: "" });
   });
 
@@ -307,7 +440,7 @@ export class RoutineScheduler implements RoutineDueSource {
     const run = yield* routineStep(() => {
       if (!this.mayDrain(input.agentId)) throw new RoutineInputError(sourceText("error.backend.routineWaitForAgent"));
       this.#conversation.requireKnownAgent(input.agentId);
-      const routine = this.#routines.get(input.agentId, input.routineId);
+      const routine = this.#routines.getRecord(input.agentId, input.routineId);
       if (!routine) throw new RoutineInputError(sourceText("error.backend.routineGone"));
       const payload = input.payload.trim();
       const instruction = payload
@@ -320,7 +453,12 @@ export class RoutineScheduler implements RoutineDueSource {
             "--- end of event ---",
           ].join("\n")
         : routine.instruction;
-      return this.#routines.createRun({ ...routine, instruction }, null, "manual", new Date().toISOString());
+      return this.#routines.createRun(
+        { id: routine.id, agentId: routine.ownerId, name: routine.name, instruction },
+        null,
+        "manual",
+        new Date().toISOString(),
+      );
     });
     const queued = yield* this.#enqueueRunEffect(run);
     yield* routineStep(() => this.stateChanged(input.agentId));
@@ -329,7 +467,7 @@ export class RoutineScheduler implements RoutineDueSource {
 
   listRuns(input: ListRoutineRunsInput): RoutineRun[] {
     this.#conversation.requireKnownAgent(input.agentId);
-    if (!this.#routines.get(input.agentId, input.routineId))
+    if (!this.#routines.getRecord(input.agentId, input.routineId))
       throw new RoutineInputError(sourceText("error.backend.routineGone"));
     return this.#routines.listRuns(input.agentId, input.routineId, input.limit);
   }
@@ -612,6 +750,58 @@ export class RoutineScheduler implements RoutineDueSource {
     });
   }
 
+  /**
+   * Hands a routine run's work on to another agent: the next step of the routine's flow. The
+   * delivery names the same routine and run, so the agent reads it as that routine, but the run
+   * keeps its own delivery and status: `reconcileDelivery` finds a run by its delivery only. An agent
+   * that no longer exists fails the handoff rather than coming back.
+   */
+  readonly enqueueHandoff = Effect.fn("RoutineScheduler.enqueueHandoff")(function* (
+    this: RoutineScheduler,
+    input: {
+      run: Pick<RoutineRun, "id" | "routineId" | "routineName" | "scheduledFor">;
+      agentId: string;
+      text: string;
+      idempotencyKey: string;
+    },
+  ) {
+    const agent = yield* routineStep(() => {
+      const found = this.#hooks.listAgents().find((candidate) => candidate.id === input.agentId);
+      if (!found) throw new Error(sourceText("error.agent.unknown", { id: input.agentId }));
+      return found;
+    });
+    const validateRecipient = yield* routineStep(() => this.#mailbox.prepareDelivery([agent.id]));
+    yield* routineStep(validateRecipient);
+    const receipt = yield* this.#mailbox
+      .enqueue({
+        sender: {
+          kind: "routine",
+          routineId: input.run.routineId,
+          runId: input.run.id,
+          routineName: input.run.routineName,
+          scheduledFor: input.run.scheduledFor,
+        },
+        recipientAgentIds: [agent.id],
+        text: input.text,
+        draftIds: [],
+        replyToMessageId: null,
+        idempotencyKey: input.idempotencyKey,
+      })
+      .pipe(Effect.mapError((failure) => new RoutineOperationFailed({ cause: failure.cause })));
+    const deliveryId = receipt.deliveries[0]?.id;
+    if (!deliveryId)
+      return yield* new RoutineOperationFailed({ cause: new Error("Unable to create the routine handoff delivery.") });
+    yield* routineStep(() => {
+      const snapshot = this.#conversation.ensureSnapshot(agent.id, agent.threadId);
+      this.#hooks.syncMailboxMessages(snapshot);
+      this.#hooks.emit({ type: "agents-changed", agents: this.#hooks.listAgents() });
+      this.#conversation.emitConversation(snapshot);
+      this.#hooks.emitQueue(agent.id);
+      this.#hooks.scheduleDrain(agent.id);
+    });
+    return deliveryId;
+  }, Effect.uninterruptible);
+
   readonly #enqueueRunEffect = Effect.fn("RoutineScheduler.enqueueRun")(function* (
     this: RoutineScheduler,
     run: RoutineRun,
@@ -620,7 +810,7 @@ export class RoutineScheduler implements RoutineDueSource {
     // reset, and a routine set to skip has no use for a late result.
     const skipped = yield* routineStep(() => {
       if (
-        this.#routines.get(run.agentId, run.routineId)?.limitPolicy !== "skip" ||
+        this.#routines.getRecord(run.agentId, run.routineId)?.limitPolicy !== "skip" ||
         !this.#hooks.usageLimited(run.agentId)
       )
         return null;
@@ -631,9 +821,7 @@ export class RoutineScheduler implements RoutineDueSource {
     if (skipped) return skipped;
     recordRestartActivity();
     const validateRecipient = yield* routineStep(() => this.#mailbox.prepareDelivery([run.agentId]));
-    const agent = yield* this.#store
-      .getOrCreate(run.agentId)
-      .pipe(Effect.mapError((failure) => new RoutineOperationFailed({ cause: failure.cause })));
+    const agent = yield* this.#store.getOrCreate(run.agentId).pipe(toRoutineOperationFailed);
     return yield* Effect.gen({ self: this }, function* () {
       yield* routineStep(validateRecipient);
       const receipt = yield* this.#mailbox
@@ -651,7 +839,7 @@ export class RoutineScheduler implements RoutineDueSource {
           replyToMessageId: null,
           idempotencyKey: run.triggerId ? `routine:${run.triggerId}:${run.scheduledFor}` : `routine:manual:${run.id}`,
         })
-        .pipe(Effect.mapError((failure) => new RoutineOperationFailed({ cause: failure.cause })));
+        .pipe(toRoutineOperationFailed);
       const deliveryId = receipt.deliveries[0]?.id;
       if (!deliveryId)
         return yield* new RoutineOperationFailed({ cause: new Error("Unable to create the routine delivery.") });
@@ -661,9 +849,16 @@ export class RoutineScheduler implements RoutineDueSource {
         this.#hooks.syncMailboxMessages(current);
         return current;
       });
-      yield* this.#store
-        .updatePreview(agent.id, run.instruction)
-        .pipe(Effect.mapError((failure) => new RoutineOperationFailed({ cause: failure.cause })));
+      // A run that ends quiet, or answers only the no-update marker, puts the earlier preview back.
+      const previous = this.#store.list().find((entry) => entry.id === agent.id)?.preview;
+      if (previous !== undefined)
+        this.#rememberPreviewBeforeRun(
+          deliveryId,
+          agent.id,
+          previous,
+          run.instruction.slice(0, AGENT_PREVIEW_MAX_LENGTH),
+        );
+      yield* this.#store.updatePreview(agent.id, run.instruction).pipe(toRoutineOperationFailed);
       yield* routineStep(() => {
         this.#hooks.emit({ type: "agents-changed", agents: this.#hooks.listAgents() });
         this.#conversation.emitConversation(snapshot, "routine.run-queued", {
@@ -798,13 +993,16 @@ export class RoutineScheduler implements RoutineDueSource {
     mutate: () => T,
     eventRoutine: (result: T) => Pick<Routine, "id" | "name">,
     turnId?: string,
-    transactionHooks?: { beforeMutate?: (snapshot: ConversationSnapshot) => void; onRollback?: () => void },
+    transactionHooks?: {
+      beforeMutate?: (snapshot: ConversationSnapshot) => readonly ConversationMessage[];
+      onRollback?: () => void;
+    },
   ): T {
     const database = this.#store.database;
     return this.#conversation.withConversationTransaction(
       agentId,
-      ({ snapshot: nextSnapshot }) => {
-        transactionHooks?.beforeMutate?.(nextSnapshot);
+      ({ threadId, snapshot: nextSnapshot }) => {
+        const changedMessages = transactionHooks?.beforeMutate?.(nextSnapshot) ?? [];
         const result = mutate();
         const routine = eventRoutine(result);
         const createdAt = new Date().toISOString();
@@ -820,14 +1018,20 @@ export class RoutineScheduler implements RoutineDueSource {
         };
         nextSnapshot.messages.push(message);
         sortConversationMessages(nextSnapshot.messages);
-        // persistConversation returns a fresh snapshot, so the published one is not `nextSnapshot`.
-        const persisted = database.persistConversation(nextSnapshot, `routine.${action}`, {
-          action,
-          routineId: routine.id,
-          routineName: routine.name,
-          messageId: message.id,
+        nextSnapshot.revision = database.persistConversationChanges({
+          agentId,
+          threadId,
+          activeTurnId: nextSnapshot.activeTurnId,
+          changedMessages: [...changedMessages, message],
+          eventType: `routine.${action}`,
+          detail: {
+            action,
+            routineId: routine.id,
+            routineName: routine.name,
+            messageId: message.id,
+          },
         });
-        return { result, snapshot: persisted };
+        return { result, snapshot: nextSnapshot };
       },
       transactionHooks?.onRollback,
     );
@@ -838,6 +1042,6 @@ export class RoutineOperationFailed extends Schema.TaggedError<RoutineOperationF
   cause: Schema.Defect(),
 }) {}
 
-function routineStep<A>(run: () => A): Effect.Effect<A, RoutineOperationFailed> {
-  return Effect.try({ try: run, catch: (cause) => new RoutineOperationFailed({ cause }) });
-}
+const { sync: routineStep, rewrap: toRoutineOperationFailed } = causeHelpers(RoutineOperationFailed);
+
+export { toRoutineOperationFailed };

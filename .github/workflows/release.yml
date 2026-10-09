@@ -309,7 +309,8 @@ jobs:
           bun run check:desktop
           bun run test:desktop -- --maxWorkers=2
           bun run test:sites
-          bun run check:api
+          # The account service build needs more than the default Node heap of this 7 GB runner (about 2 GB).
+          NODE_OPTIONS=--max-old-space-size=4096 bun run check:api
 
       - name: Install and verify native runtimes
         run: |
@@ -1015,6 +1016,40 @@ jobs:
               --title "OpenBot $RELEASE_TAG"
           fi
 
+  hosted-release:
+    name: Publish boat server snapshot
+    needs: [validate, publish]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment: cloudflare-production
+    permissions:
+      contents: read
+    # The same lock as the production Worker deploy. Keep every pending release.
+    concurrency:
+      group: cloudflare-production-worker
+      cancel-in-progress: false
+      queue: max
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install: ignore-scripts
+
+      - name: Build and select production snapshot
+        env:
+          RELEASE_TAG: ${{ needs.validate.outputs.release_tag }}
+          GH_TOKEN: ${{ github.token }}
+          BOAT_TEMPLATE_API_KEY: ${{ secrets.BOAT_TEMPLATE_API_KEY }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PRODUCTION_DEPLOY_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: bash scripts/hosting/release-boat-template.sh
+
   # Pushes the images that the `docker` job checked, after the GitHub Release exists, so `latest` on
   # GHCR never names a release that did not publish. It runs no build code: it only loads, tags and
   # pushes. Each architecture also keeps its own tag; the release tags name an index of both.
@@ -1060,7 +1095,8 @@ jobs:
             docker rmi openbot:release
           done
           docker buildx imagetools create \
-            --tag "$IMAGE:$RELEASE_VERSION" --tag "$IMAGE:latest" --tag "$IMAGE:sha-${GITHUB_SHA::7}" \
+            --tag "$IMAGE:$RELEASE_VERSION" --tag "$IMAGE:v$RELEASE_VERSION" \
+            --tag "$IMAGE:latest" --tag "$IMAGE:sha-${GITHUB_SHA::7}" \
             "$IMAGE:$RELEASE_VERSION-amd64" "$IMAGE:$RELEASE_VERSION-arm64"
           digest=$(docker buildx imagetools inspect "$IMAGE:$RELEASE_VERSION" --format '{{json .Manifest}}' | jq -r .digest)
           [[ $digest =~ ^sha256:[0-9a-f]{64}$ ]]
@@ -1073,3 +1109,19 @@ jobs:
           subject-name: ${{ env.IMAGE }}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
+
+      # An authenticated push can succeed while the package is still private.
+      - name: Verify anonymous Docker image access
+        shell: bash
+        run: |
+          set -euo pipefail
+          anonymous_config=$(mktemp -d)
+          trap 'rm -rf "$anonymous_config"' EXIT
+          for tag in "$RELEASE_VERSION" "v$RELEASE_VERSION" latest; do
+            if ! docker --config "$anonymous_config" manifest inspect "$IMAGE:$tag" > "$anonymous_config/manifest.json"; then
+              echo "::error::Cannot read $IMAGE:$tag without authentication. Check the GHCR package visibility and set it to Public. See docs/RELEASING.md."
+              exit 1
+            fi
+            jq -e '[.manifests[].platform | select(.os == "linux") | .architecture] | sort == ["amd64", "arm64"]' \
+              "$anonymous_config/manifest.json" >/dev/null
+          done

@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { Context, Effect, Layer, ManagedRuntime, Schema } from "effect";
 import { createRemoteApiApp, prometheusMetrics } from "./app";
 import { readRemoteApiConfig } from "./config";
+import { DiscordGateway } from "./discord-gateway";
 import { SignalService } from "./signal-service";
 import { TelegramBotApi } from "./telegram";
 import {
@@ -24,6 +25,8 @@ const TelegramValidation = Schema.Struct({
   chats: Schema.Array(Schema.Struct({ id: Schema.String, botId: Schema.String, linkedAt: Schema.Int })),
 });
 const TelegramLink = Schema.Struct({ hostId: Schema.String, linkedAt: Schema.Int });
+const DiscordValidation = Schema.Struct({ guilds: Schema.Array(Schema.String) });
+const WebhookValidation = Schema.Struct({ routes: Schema.Array(Schema.String) });
 
 class ControlPlane extends Context.Service<
   ControlPlane,
@@ -46,6 +49,16 @@ class ControlPlane extends Context.Service<
       chatId: string,
       code: string,
     ): Effect.Effect<TelegramChatLink | null, ControlPlaneError>;
+    validateDiscordRoute(
+      hostId: string,
+      guilds: import("@openbot/contracts/signal-protocol/discord-route").DiscordRouteGuild[],
+    ): Effect.Effect<string[], ControlPlaneError>;
+    validateWebhookRoute(
+      hostId: string,
+      routes: import("@openbot/contracts/signal-protocol/webhook-route").WebhookRoute[],
+    ): Effect.Effect<string[], ControlPlaneError>;
+    discordGuildRemoved(guildId: string): Effect.Effect<void, ControlPlaneError>;
+    reconcileDiscordGuilds(guildIds: string[], before: number): Effect.Effect<void, ControlPlaneError>;
   }
 >()("@openbot/remote-api/ControlPlane") {
   static layer = Layer.sync(ControlPlane, () => {
@@ -113,6 +126,66 @@ class ControlPlane extends Context.Service<
           releaseResponse,
         ),
       ),
+      validateDiscordRoute: Effect.fn("ControlPlane.validateDiscordRoute")((hostId, guilds) =>
+        Effect.acquireUseRelease(
+          ask("/v2/remote/discord-route/validate", { hostId, guilds }),
+          (response) =>
+            Effect.gen(function* () {
+              if (!response.ok)
+                return yield* new ControlPlaneError({
+                  message: "The account service did not confirm the Discord route.",
+                });
+              const result = yield* readJson(response).pipe(
+                Effect.flatMap(Schema.decodeUnknownEffect(DiscordValidation)),
+                Effect.mapError(() => new ControlPlaneError({ message: "The account service response is invalid." })),
+              );
+              return [...result.guilds];
+            }),
+          releaseResponse,
+        ),
+      ),
+      validateWebhookRoute: Effect.fn("ControlPlane.validateWebhookRoute")((hostId, routes) =>
+        Effect.acquireUseRelease(
+          ask("/v2/remote/webhook-route/validate", { hostId, routes }),
+          (response) =>
+            Effect.gen(function* () {
+              if (!response.ok)
+                return yield* new ControlPlaneError({
+                  message: "The account service did not confirm the webhook route.",
+                });
+              const result = yield* readJson(response).pipe(
+                Effect.flatMap(Schema.decodeUnknownEffect(WebhookValidation)),
+                Effect.mapError(() => new ControlPlaneError({ message: "The account service response is invalid." })),
+              );
+              return [...result.routes];
+            }),
+          releaseResponse,
+        ),
+      ),
+      reconcileDiscordGuilds: Effect.fn("ControlPlane.reconcileDiscordGuilds")((guildIds, before) =>
+        Effect.acquireUseRelease(
+          ask("/v2/remote/discord-route/reconcile", { guilds: guildIds, before }),
+          (response) =>
+            response.ok
+              ? Effect.void
+              : Effect.fail(
+                  new ControlPlaneError({ message: "The account service did not reconcile the Discord guilds." }),
+                ),
+          releaseResponse,
+        ),
+      ),
+      discordGuildRemoved: Effect.fn("ControlPlane.discordGuildRemoved")((guildId) =>
+        Effect.acquireUseRelease(
+          ask("/v2/remote/discord-route/removed", { guildId }),
+          (response) =>
+            response.ok
+              ? Effect.void
+              : Effect.fail(
+                  new ControlPlaneError({ message: "The account service did not unlink the Discord guild." }),
+                ),
+          releaseResponse,
+        ),
+      ),
       validateTelegramRoute: Effect.fn("ControlPlane.validateTelegramRoute")((hostId, chats) =>
         Effect.acquireUseRelease(
           ask("/v2/remote/telegram-route/validate", {
@@ -176,6 +249,14 @@ const tokens = new RemoteTokenService(
       controlPlaneService
         .linkTelegramChat(botId, chatId, code)
         .pipe(Effect.mapError((error) => new RemoteTokenError({ message: error.message }))),
+    validateDiscordRoute: (hostId, guilds) =>
+      controlPlaneService
+        .validateDiscordRoute(hostId, guilds)
+        .pipe(Effect.mapError((error) => new RemoteTokenError({ message: error.message }))),
+    validateWebhookRoute: (hostId, routes) =>
+      controlPlaneService
+        .validateWebhookRoute(hostId, routes)
+        .pipe(Effect.mapError((error) => new RemoteTokenError({ message: error.message }))),
   },
 );
 await controlPlane.runPromise(tokens.initialize());
@@ -185,9 +266,12 @@ const signal = new SignalService(
   config.maximumConnectionsPerIp,
   config.maximumMessagesPerMinute,
   undefined,
-  config.telegram
-    ? { bot: new TelegramBotApi(config.telegram), files: new TelegramFileTokens(config.sessionSecret) }
-    : null,
+  {
+    discord: config.discord !== null,
+    telegram: config.telegram
+      ? { bot: new TelegramBotApi(config.telegram), files: new TelegramFileTokens(config.sessionSecret) }
+      : null,
+  },
 );
 const tlsPaths =
   config.tlsCertificatePath && config.tlsPrivateKeyPath
@@ -195,7 +279,20 @@ const tlsPaths =
     : undefined;
 
 const signalRuntime = ManagedRuntime.make(signal.dependencies);
-const app = createRemoteApiApp(config, signal, signalRuntime);
+// The Discord bot's Gateway connection lives in this runtime. Disposal closes it.
+const discordRuntime = config.discord
+  ? ManagedRuntime.make(
+      DiscordGateway.layer(config.discord, signal, {
+        removed: (guildId) => controlPlaneService.discordGuildRemoved(guildId),
+        reconcile: (guildIds, before) => controlPlaneService.reconcileDiscordGuilds(guildIds, before),
+      }),
+    )
+  : null;
+const discord = discordRuntime ? await discordRuntime.runPromise(DiscordGateway) : null;
+if (!discord) {
+  console.log("OpenBot Discord is off: DISCORD_BOT_TOKEN and DISCORD_APPLICATION_ID are not both set and valid.");
+}
+const app = createRemoteApiApp(config, signal, signalRuntime, discord?.api ?? null);
 const listen = () =>
   app.listen({
     hostname: config.host,
@@ -293,6 +390,7 @@ const shutdown = () => {
       await app.stop(true);
     } finally {
       try {
+        await discordRuntime?.dispose();
         await signalRuntime.dispose();
         signal.close();
       } finally {

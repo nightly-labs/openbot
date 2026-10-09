@@ -128,6 +128,8 @@ export const messages = {
   "mobile.chat.composer.messageAgent": "{name} へのメッセージ",
   "mobile.chat.composer.pasteFailed": "貼り付けたテキストを添付できませんでした",
   "mobile.chat.composer.cancelDictation": "音声入力をキャンセル",
+  "mobile.chat.voice.listening": "聞き取り中…",
+  "mobile.chat.voice.continue": "音声入力を続ける",
   "mobile.chat.composer.addAttachment": "添付ファイルを追加",
   "mobile.chat.composer.ask": "{name} に質問",
   "mobile.chat.composer.stopFailed": "エージェントを停止できませんでした。すでに終了している可能性があります。",

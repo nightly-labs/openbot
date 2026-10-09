@@ -472,7 +472,7 @@ describe("OpenBot connected desktop shell", () => {
     await waitFor(() => expect(window.openbot.servers.previewInvite).toHaveBeenCalledWith({ inviteUrl }));
   });
 
-  it("saves a different default provider from the account menu and drops its model", async () => {
+  it("saves a different default provider from server settings and drops its model", async () => {
     vi.mocked(window.openbot.getSetupState).mockResolvedValueOnce({
       completed: true,
       preferredProvider: "codex",
@@ -481,19 +481,18 @@ describe("OpenBot connected desktop shell", () => {
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
 
-    await fireEvent.click(await screen.findByRole("button", { name: "Open account actions" }));
-    await fireEvent.click(screen.getByRole("button", { name: "Providers & permissions" }));
-
-    await screen.findByRole("dialog", { name: "Providers & permissions" });
+    await fireEvent.contextMenu(screen.getByRole("button", { name: "Local server" }));
+    await fireEvent.pointerUp(screen.getByRole("menuitem", { name: "Server settings" }), { button: 0 });
+    await fireEvent.click(await screen.findByRole("tab", { name: "Providers" }));
     const providers = screen.getByRole("radiogroup", { name: "Default provider" });
     await fireEvent.click(within(providers).getByRole("radio", { name: /Claude.*Connected/ }));
-    await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
     // The model belongs to the provider that was replaced, so this save must clear it.
-    expect(window.openbot.saveSetup).toHaveBeenLastCalledWith({ preferredProvider: "claude", preferredModel: null });
-    expect(screen.queryByRole("dialog", { name: "Providers & permissions" })).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(window.openbot.saveSetup).toHaveBeenLastCalledWith({ preferredProvider: "claude", preferredModel: null }),
+    );
   });
 
-  it("keeps the chosen model when the account menu review leaves the provider alone", async () => {
+  it("keeps the chosen model when provider settings leaves the provider alone", async () => {
     vi.mocked(window.openbot.getSetupState).mockResolvedValueOnce({
       completed: true,
       preferredProvider: "codex",
@@ -502,18 +501,15 @@ describe("OpenBot connected desktop shell", () => {
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
 
-    await fireEvent.click(await screen.findByRole("button", { name: "Open account actions" }));
-    await fireEvent.click(screen.getByRole("button", { name: "Providers & permissions" }));
+    await fireEvent.contextMenu(screen.getByRole("button", { name: "Local server" }));
+    await fireEvent.pointerUp(screen.getByRole("menuitem", { name: "Server settings" }), { button: 0 });
+    await fireEvent.click(await screen.findByRole("tab", { name: "Providers" }));
+    const providers = screen.getByRole("radiogroup", { name: "Default provider" });
+    await fireEvent.click(within(providers).getByRole("radio", { name: /ChatGPT/ }));
 
-    await screen.findByRole("dialog", { name: "Providers & permissions" });
-    await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
-
-    // The review screen names a provider alone. It must not send the agents to a hosted model when
-    // the user chose a local endpoint during onboarding.
-    expect(window.openbot.saveSetup).toHaveBeenLastCalledWith({
-      preferredProvider: "codex",
-      preferredModel: CUSTOM_ENDPOINT_MODEL,
-    });
+    expect(within(providers).getByRole("radio", { name: /ChatGPT/ })).toBeChecked();
+    await fireEvent.click(screen.getByRole("button", { name: "Close server settings" }));
+    expect(window.openbot.saveSetup).not.toHaveBeenCalled();
   });
 
   it("opens the required first-agent setup for a new user", async () => {

@@ -6,18 +6,73 @@
  * in `@openbot/contracts/ipc` so that a saved row can never hold something the form never previewed.
  */
 
-import { type McpServerConfig, normalizeMcpConfig, type ProviderRuntimeStatus } from "@openbot/contracts/ipc";
-import type { AppTranslate } from "@openbot/i18n";
+import {
+  MCP_SIGN_IN_TIMEOUT_MS,
+  type McpServerConfig,
+  type McpSignInState,
+  normalizeMcpConfig,
+  type ProviderRuntimeStatus,
+} from "@openbot/contracts/ipc";
+import { type AppTextKey, type AppTranslate, matchingSourceKeys } from "@openbot/i18n";
 import { currentText } from "@openbot/ui/text";
 
 export type {
   McpServerConfig,
+  McpSignInState,
   McpTestResult,
 } from "@openbot/contracts/ipc";
 export { mcpConfigErrors, mcpConfigIsValid, normalizeMcpConfig } from "@openbot/contracts/ipc";
 
 /** The badge variants this panel uses, narrowed from the shared `Badge` set. */
-export type McpStatusVariant = "success-light" | "destructive-light" | "secondary";
+export type McpStatusVariant = "success-light" | "destructive-light" | "warning-light" | "secondary";
+
+/**
+ * What kind of failure a test answered, so the badge can tell a sign-in to finish from a server
+ * that refused, never answered, never started, or could not be reached.
+ */
+export type McpFailureKind = "sign-in" | "refused" | "url" | "timeout" | "startup" | "unreachable" | "other";
+
+/**
+ * The failure kind of each sentence main or a host sends. Read from the English before it is
+ * translated: the key is the contract, and text from an older host matches none and reads `other`.
+ */
+const FAILURE_KINDS: Partial<Record<string, McpFailureKind>> = {
+  "error.backend.mcpSignInRequired": "sign-in",
+  "error.backend.mcpSignInOnHost": "sign-in",
+  "error.backend.mcpSignInTimedOut": "sign-in",
+  "error.mcp.signInOnHost": "sign-in",
+  "error.backend.mcpSignInNotAccepted": "refused",
+  "error.backend.mcpServerHttpCredentials": "refused",
+  "error.backend.mcpRegistrationRefused": "refused",
+  "error.backend.mcpSignInNeedsHttps": "url",
+  "error.backend.mcpServerHttpUrl": "url",
+  "error.backend.mcpServerNoAnswer": "timeout",
+  "error.backend.mcpSignInResponseTimedOut": "timeout",
+  "error.backend.mcpServerExited": "startup",
+  "error.backend.mcpCommandNotFound": "startup",
+  "error.backend.mcpRemoteBridge": "startup",
+  "error.backend.mcpServerUnreachable": "unreachable",
+};
+
+const FAILURE_LABELS = {
+  "sign-in": "mcp.status.signInNeeded",
+  refused: "mcp.status.refused",
+  url: "mcp.status.checkUrl",
+  timeout: "mcp.status.noAnswer",
+  startup: "mcp.status.didNotStart",
+  unreachable: "mcp.status.unreachable",
+  other: "mcp.status.failed",
+} as const satisfies Record<McpFailureKind, AppTextKey>;
+
+export function mcpFailureKind(sourceText: string): McpFailureKind {
+  const key = matchingSourceKeys(sourceText)[0];
+  return (key && FAILURE_KINDS[key]) || "other";
+}
+
+/** Whether a test answered that the user cancelled a sign-in, which is not a failure to show. */
+export function isMcpSignInCancelled(sourceText: string): boolean {
+  return matchingSourceKeys(sourceText)[0] === "error.backend.mcpSignInCancelled";
+}
 
 /**
  * What the panel knows about one server's test, for as long as the panel is open.
@@ -27,12 +82,20 @@ export type McpStatusVariant = "success-light" | "destructive-light" | "secondar
  */
 export type McpTestState =
   | { status: "testing" }
+  /** A sign-in the user started, waiting for the browser to come back. */
+  | { status: "signing-in" }
   | { status: "passed"; toolCount: number }
-  | { status: "failed"; error: string };
+  | { status: "failed"; error: string; kind: McpFailureKind };
+
+/** The sign-in states main answers with, as the lookup by row id the panel reads. */
+export function mcpSignInRecord(states: readonly McpSignInState[]): Record<string, boolean> {
+  return Object.fromEntries(states.map((state) => [state.mcpServerId, state.signedIn]));
+}
 
 /** The whole sentence a test produced, for the form. The row shows the short badge instead. */
 export function mcpTestMessage(test: McpTestState, t: AppTranslate): string {
   if (test.status === "testing") return t("common.connecting");
+  if (test.status === "signing-in") return t("mcp.panel.signInWaiting", { count: MCP_SIGN_IN_TIMEOUT_MS / 60_000 });
   if (test.status === "failed") return test.error;
   return t("mcp.test.connected", { count: test.toolCount });
 }
@@ -86,13 +149,14 @@ export function mcpConfigChanged(draft: McpServerConfig, baseline: McpServerConf
  */
 export function mcpStatusLabel(config: McpServerConfig, t: AppTranslate, test?: McpTestState): string {
   if (test?.status === "testing") return t("mcp.status.testing");
-  if (test?.status === "failed") return t("mcp.status.failed");
+  if (test?.status === "signing-in") return t("mcp.status.signingIn");
+  if (test?.status === "failed") return t(FAILURE_LABELS[test.kind]);
   if (test) return mcpTestMessage(test, t);
   return config.enabled ? t("mcp.status.enabled") : t("mcp.status.disabled");
 }
 
 export function mcpStatusVariant(test?: McpTestState): McpStatusVariant {
-  if (test?.status === "failed") return "destructive-light";
+  if (test?.status === "failed") return test.kind === "sign-in" ? "warning-light" : "destructive-light";
   if (test?.status === "passed") return "success-light";
   return "secondary";
 }

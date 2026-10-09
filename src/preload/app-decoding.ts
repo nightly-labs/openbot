@@ -23,6 +23,7 @@ import {
   type AppLogoColorPreference,
   type ApprovalAutomationPreference,
   type AppSetupState,
+  type BitwardenConnectorStatus,
   type BusyMessageModePreference,
   type CentralAuthIssue,
   type CentralAuthState,
@@ -71,6 +72,7 @@ import {
   parseOnePasswordConnectorStatus,
   type RemoteDesktopSetupStatus,
   type RemoteDesktopTestStatus,
+  type RemoteSessionReusePreference,
   UPDATE_PHASES,
   type UpdatePreference,
   type UpdateStatus,
@@ -258,6 +260,12 @@ export function decodeUpdatePreference(value: unknown): UpdatePreference {
   };
 }
 
+export function decodeRemoteSessionReusePreference(value: unknown): RemoteSessionReusePreference {
+  return {
+    keepBetweenRuns: requiredBoolean(decodeRecord(value, "remote session preference"), "keepBetweenRuns"),
+  };
+}
+
 export function decodeNotificationPreference(value: unknown): NotificationPreference {
   return {
     desktopNotifications: requiredBoolean(decodeRecord(value, "notification preference"), "desktopNotifications"),
@@ -441,4 +449,10 @@ export function decodeRemoteDesktopSetupFromMain(value: unknown): RemoteDesktopS
 export function decodeRemoteDesktopTestFromMain(value: unknown): RemoteDesktopTestStatus {
   if (!isRemoteDesktopTestStatus(value)) throw new Error("Invalid remote desktop test response.");
   return { ...value };
+}
+
+export function decodeBitwardenConnectorStatus(value: unknown): BitwardenConnectorStatus {
+  if (!value || typeof value !== "object" || !("connected" in value) || typeof value.connected !== "boolean")
+    throw new Error("Invalid Bitwarden connector response.");
+  return { connected: value.connected };
 }

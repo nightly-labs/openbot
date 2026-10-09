@@ -1,9 +1,12 @@
 import { randomUUID } from "node:crypto";
+import { chatVisualItemType } from "@openbot/contracts/chat-visual";
+import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentModelOption,
   AgentSummary,
   AvatarImageInput,
+  ConversationMessage,
   CreateAgentInput,
   McpServerConfig,
   SidebarLayoutSnapshot,
@@ -29,7 +32,9 @@ import { OPENBOT_BROWSER_NAMESPACE } from "../browser-tools";
 import type { ChannelService } from "../channel-service";
 import type { MailboxStore } from "../mailbox-store";
 import { agentMcpServers } from "../mcp-provider-shapes";
-import { type AppServerRequest, type DynamicToolCallParams, isRecord } from "../protocol";
+import { CHAT_VISUAL_PREVIEW_DEFAULT_WIDTH, htmlPreviewToolSchema, htmlRenderToolSchema } from "../openbot-tools";
+import { type AppServerRequest, type DynamicToolCallParams, type DynamicToolResult, isRecord } from "../protocol";
+import { handleRoutineFlowTool, type RoutineFlowTools } from "../routine-flows/routine-flow-tools";
 import type { StoredStateFailure } from "../stored-state-effects";
 import { AgentInterruptTool } from "./agent-interrupt-tool";
 import type { AgentMemories } from "./agent-memories";
@@ -38,9 +43,10 @@ import type { AttachmentGateway } from "./attachment-gateway";
 import type { AttentionRegistry } from "./attention-registry";
 import { loadAvatarFile } from "./avatar-file";
 import type { BrowserUploads } from "./browser-uploads";
+import type { ChatVisualPreviewHost } from "./chat-visual-preview";
 import type { ConversationRuntime } from "./conversation-runtime";
 import { handleDataTool } from "./data-tools";
-import { responseAttachmentMessageId } from "./delivery-content";
+import { responseAttachmentMessageId, visualReplyFileName, visualReplyMessageId } from "./delivery-content";
 import type { DrainScheduler } from "./drain-scheduler";
 import type { HostedSiteCoordinator } from "./hosted-site-coordinator";
 import { isHostedSiteMutationTool } from "./hosted-site-events";
@@ -65,7 +71,8 @@ import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from 
 import { type AgentSidebar, handleSidebarTool } from "./sidebar-tools";
 import { LOCAL_SKILL_TOOL_DEFINITIONS, type LocalSkillTools, runLocalSkillTool } from "./skill-tools";
 import { isDynamicToolCall } from "./thread-items";
-import { ToolOperationFailed, toolStep } from "./tool-operation";
+import { toolCallIdempotencyKey } from "./tool-call-idempotency";
+import { ToolOperationFailed, toolStep, toToolOperationFailed } from "./tool-operation";
 import type { AgentBrowserHost } from "./turn-lifecycle";
 
 const logger = createOpenBotLogger("openbot-tool-router");
@@ -111,7 +118,10 @@ export interface OpenBotToolRouterOptions {
   tables: AgentTables | null;
   sidebarLayout: AgentSidebar | null;
   localSkillTools?: () => LocalSkillTools;
+  routineFlowTools?: () => RoutineFlowTools;
   approvalAutomation?: ApprovalAutomationPolicy;
+  /** Draws pages for `html_preview`; null where no window can draw one. */
+  visualPreview?: ChatVisualPreviewHost | null;
   hooks: OpenBotToolRouterHooks;
 }
 
@@ -139,7 +149,9 @@ export class OpenBotToolRouter {
   readonly #tables: AgentTables | null;
   readonly #sidebarLayout: AgentSidebar | null;
   readonly #localSkillTools?: () => LocalSkillTools;
+  readonly #routineFlowTools: (() => RoutineFlowTools) | undefined;
   readonly #approvalAutomation: ApprovalAutomationPolicy;
+  readonly #visualPreview: ChatVisualPreviewHost | null;
   readonly #hooks: OpenBotToolRouterHooks;
   readonly #interruptTool: AgentInterruptTool;
 
@@ -160,7 +172,9 @@ export class OpenBotToolRouter {
     this.#tables = options.tables;
     this.#sidebarLayout = options.sidebarLayout;
     this.#localSkillTools = options.localSkillTools;
+    this.#routineFlowTools = options.routineFlowTools;
     this.#approvalAutomation = options.approvalAutomation ?? NO_APPROVAL_AUTOMATION;
+    this.#visualPreview = options.visualPreview ?? null;
     this.#hooks = options.hooks;
     this.#interruptTool = new AgentInterruptTool({
       store: options.store,
@@ -181,6 +195,7 @@ export class OpenBotToolRouter {
     client: AgentClient,
     request: AppServerRequest,
   ) {
+    if (request.signal?.aborted) return;
     request.signal?.addEventListener("abort", () => this.#attention.cancelRequest(client, request.id), {
       once: true,
     });
@@ -233,14 +248,26 @@ export class OpenBotToolRouter {
               threadId: this.#conversation.publicThreadId(agentId, request.params.threadId),
               ownerAgentId: agentId,
             };
-            client.respond(
-              request.id,
-              request.params.tool === "upload_files"
-                ? yield* this.#browserUploads.uploadFiles(agentId, params)
-                : request.params.tool === "list_logins"
-                  ? yield* this.#attention.listVaultLogins(params)
-                  : yield* this.#browser.handleDynamicTool(params),
+            const operation = Effect.gen({ self: this }, function* () {
+              return yield* params.tool === "upload_files"
+                ? this.#browserUploads.uploadFiles(agentId, params)
+                : params.tool === "list_logins"
+                  ? this.#attention.listVaultLogins(params)
+                  : this.#browser.handleDynamicTool(params);
+            });
+            const signal = request.signal;
+            const cancelled = Effect.callback<never>((resume) => {
+              const abort = () => resume(Effect.interrupt);
+              if (signal?.aborted) abort();
+              else signal?.addEventListener("abort", abort, { once: true });
+              return Effect.sync(() => signal?.removeEventListener("abort", abort));
+            });
+            if (signal?.aborted) return;
+            const result = yield* operation.pipe(
+              Effect.raceFirst(cancelled),
+              Effect.onInterrupt(() => Effect.sync(() => this.#browser.endControl(params.threadId, params.turnId))),
             );
+            if (!signal?.aborted && client.running) client.respond(request.id, result);
             return;
           }
           if (request.params.namespace === "openbot") {
@@ -266,7 +293,10 @@ export class OpenBotToolRouter {
               Effect.catchDefect((defect) => (profileTool ? profileFailure(defect) : Effect.die(defect))),
               Effect.tap((result) => Effect.sync(() => client.respond(request.id, result))),
             );
-            yield* tool === "attach_files_to_response" ? Effect.uninterruptible(response) : response;
+            // Both store a file and then add the message that names it.
+            yield* tool === "attach_files_to_response" || tool === "html_render"
+              ? Effect.uninterruptible(response)
+              : response;
             return;
           }
           throw new Error(`Unsupported dynamic tool namespace: ${request.params.namespace}`);
@@ -315,9 +345,7 @@ export class OpenBotToolRouter {
           if (!this.#localSkillTools) throw new Error("Skill tools are unavailable.");
           return this.#localSkillTools();
         });
-        return (yield* tools
-          .listInstalled(agent.id)
-          .pipe(Effect.mapError((failure) => new ToolOperationFailed({ cause: failure.cause })))).map((skill) => ({
+        return (yield* tools.listInstalled(agent.id).pipe(toToolOperationFailed)).map((skill) => ({
           skillId: skill.skillId,
           name: skill.name,
           ...(skill.description ? { description: skill.description } : {}),
@@ -427,7 +455,7 @@ export class OpenBotToolRouter {
             (event) => {
               const executionThreadId = this.#conversation.publicThreadId(senderAgentId, params.threadId);
               const snapshot = structuredClone(this.#conversation.ensureSnapshot(senderAgentId, executionThreadId));
-              snapshot.messages.push({
+              const message: ConversationMessage = {
                 id: randomUUID(),
                 turnId: params.turnId,
                 author: "system",
@@ -436,8 +464,17 @@ export class OpenBotToolRouter {
                 createdAt: new Date().toISOString(),
                 itemType: skillConversationEventItemType(event),
                 text: redactText(event.skillName),
+              };
+              snapshot.messages.push(message);
+              snapshot.revision = this.#store.database.persistConversationChanges({
+                agentId: senderAgentId,
+                threadId: executionThreadId,
+                activeTurnId: snapshot.activeTurnId,
+                changedMessages: [message],
+                eventType: `skill.${event.action}`,
+                detail: event,
               });
-              const persisted = this.#store.database.persistConversation(snapshot, `skill.${event.action}`, event);
+              const persisted = snapshot;
               this.#conversation.setSnapshot(senderAgentId, persisted);
               this.#conversation.publishConversation(persisted);
             },
@@ -478,6 +515,16 @@ export class OpenBotToolRouter {
           },
         ],
       };
+    }
+
+    if (params.tool === "html_preview") {
+      return yield* this.#previewVisual(params);
+    }
+
+    if (params.tool === "html_render") {
+      if (channelId)
+        return openBotToolFailure("A channel cannot show an HTML page. Send the result as text or a file.");
+      return yield* this.#renderVisual(params, senderAgentId, executionThreadId);
     }
 
     if (params.tool === "list_sites") {
@@ -558,6 +605,15 @@ export class OpenBotToolRouter {
     const routineResult = yield* this.#routines.handleTool(params, senderAgentId);
     if (routineResult) return routineResult;
 
+    const flowResult = yield* handleRoutineFlowTool(
+      params.tool,
+      params.arguments,
+      senderAgentId,
+      this.#routineFlowTools?.() ?? null,
+      new Set(this.#hooks.listAgents().map((agent) => agent.id)),
+    );
+    if (flowResult) return flowResult;
+
     const memoryResult = this.#memories.handleTool(params, senderAgentId);
     if (memoryResult) return memoryResult;
 
@@ -570,7 +626,7 @@ export class OpenBotToolRouter {
         throw new Error("app must be a Marketplace plugin slug, or github.");
       }
       const snapshot = structuredClone(this.#conversation.ensureSnapshot(senderAgentId, executionThreadId));
-      snapshot.messages.push({
+      const message: ConversationMessage = {
         id: randomUUID(),
         turnId: params.turnId,
         author: "system",
@@ -579,10 +635,19 @@ export class OpenBotToolRouter {
         createdAt: new Date().toISOString(),
         itemType: marketplaceSuggestionItemType({ appId: args.app }),
         text: sourceText("status.agent.marketplaceSuggested", { app: args.app }),
+      };
+      snapshot.messages.push(message);
+      snapshot.revision = this.#store.database.persistConversationChanges({
+        agentId: senderAgentId,
+        threadId: executionThreadId,
+        activeTurnId: snapshot.activeTurnId,
+        changedMessages: [message],
+        eventType: "marketplace.suggested",
+        detail: {
+          appId: args.app,
+        },
       });
-      const persisted = this.#store.database.persistConversation(snapshot, "marketplace.suggested", {
-        appId: args.app,
-      });
+      const persisted = snapshot;
       this.#conversation.setSnapshot(senderAgentId, persisted);
       this.#conversation.publishConversation(persisted);
       return openBotToolResult({ status: "suggested", app: args.app });
@@ -591,6 +656,102 @@ export class OpenBotToolRouter {
     if (params.tool === "react_to_user_message") return yield* this.#react(params, senderAgentId);
 
     return yield* this.#sendMessage(params, senderAgentId);
+  });
+
+  /**
+   * `html_render`: stores the page as an HTML attachment and adds a visual reply message, which the
+   * app shows in a sandboxed frame above the final answer. A retried call finds its message by id.
+   */
+  readonly #renderVisual = Effect.fn("OpenBotToolRouter.renderVisual")(function* (
+    this: OpenBotToolRouter,
+    params: DynamicToolCallParams,
+    senderAgentId: string,
+    executionThreadId: string,
+  ) {
+    // The agent can correct its page, so it gets the reason. The reason does not repeat the page.
+    const parsed = htmlRenderToolSchema.safeParse(params.arguments, { reportInput: true });
+    if (!parsed.success) return openBotToolFailure(profileToolErrorMessage(parsed.error));
+    const args = parsed.data;
+    const messageId = visualReplyMessageId(params.threadId, params.turnId, params.callId);
+    if (
+      this.#conversation.ensureSnapshot(senderAgentId, executionThreadId).messages.some(({ id }) => id === messageId)
+    ) {
+      return openBotToolResult({ status: "shown", messageId });
+    }
+    // The page and its message are saved together, so a failed save keeps no page and a retry stores one.
+    const attachment = yield* this.#mailbox
+      .stageGeneratedBytes({
+        bytes: new TextEncoder().encode(args.html),
+        name: `${visualReplyFileName(args.title)}.html`,
+        mimeType: "text/html",
+        ownerAgentId: senderAgentId,
+        ownerThreadId: executionThreadId,
+      })
+      .pipe(toToolOperationFailed);
+    // A concurrent `attach_files_to_response` keeps the live snapshot while it reads files, then saves
+    // it. A replaced snapshot would make that save delete this message, so the message goes in place.
+    const snapshot = this.#conversation.ensureSnapshot(senderAgentId, executionThreadId);
+    snapshot.messages.push({
+      id: messageId,
+      turnId: params.turnId,
+      author: "assistant",
+      source: "assistant",
+      text: args.title,
+      createdAt: new Date().toISOString(),
+      status: "completed",
+      itemType: chatVisualItemType(args.height),
+      attachments: [attachment],
+    });
+    sortConversationMessages(snapshot.messages);
+    try {
+      const persisted = this.#mailbox.persistGeneratedAttachmentsWithConversation(
+        snapshot,
+        "response.visual-added",
+        { turnId: params.turnId, messageId, attachmentId: attachment.id },
+        [attachment.id],
+      );
+      snapshot.revision = persisted.revision;
+    } catch (error) {
+      const messageIndex = snapshot.messages.findIndex((candidate) => candidate.id === messageId);
+      if (messageIndex >= 0) snapshot.messages.splice(messageIndex, 1);
+      yield* this.#mailbox.discardStagedGeneratedAttachments([attachment.id]).pipe(toToolOperationFailed);
+      throw error;
+    }
+    this.#conversation.publishConversation(snapshot);
+    return openBotToolResult({ status: "shown", messageId });
+  });
+
+  /**
+   * `html_preview`: draws the page out of view and gives the agent the image, the content height and
+   * the console output. A page that fails to draw is a result the agent can correct.
+   */
+  readonly #previewVisual = Effect.fn("OpenBotToolRouter.previewVisual")(function* (
+    this: OpenBotToolRouter,
+    params: DynamicToolCallParams,
+  ) {
+    const parsed = htmlPreviewToolSchema.safeParse(params.arguments, { reportInput: true });
+    if (!parsed.success) return openBotToolFailure(profileToolErrorMessage(parsed.error));
+    const args = parsed.data;
+    const preview = this.#visualPreview;
+    if (!preview) return openBotToolFailure("This OpenBot cannot draw a page. Call html_render without a preview.");
+    return yield* preview
+      .capture({
+        html: args.html,
+        width: args.width ?? CHAT_VISUAL_PREVIEW_DEFAULT_WIDTH,
+        appearance: args.appearance ?? "dark",
+      })
+      .pipe(
+        Effect.map(
+          ({ imageUrl, contentHeight, console }): DynamicToolResult => ({
+            success: true,
+            contentItems: [
+              { type: "inputText", text: JSON.stringify({ contentHeight, console }) },
+              { type: "inputImage", imageUrl },
+            ],
+          }),
+        ),
+        Effect.catchTag("ChatVisualPreviewFailed", (failure) => Effect.succeed(openBotToolFailure(failure.reason))),
+      );
   });
 
   readonly #createAgent = Effect.fn("OpenBotToolRouter.createAgent")(
@@ -643,10 +804,7 @@ export class OpenBotToolRouter {
           },
           (agent) =>
             Effect.gen({ self: this }, function* () {
-              if (assign)
-                yield* assign(agent.id).pipe(
-                  Effect.mapError((failure) => new ToolOperationFailed({ cause: failure.cause })),
-                );
+              if (assign) yield* assign(agent.id).pipe(toToolOperationFailed);
               if (lateEffort !== undefined) {
                 const models = this.#hooks.listModels();
                 const model = models.find(
@@ -673,16 +831,14 @@ export class OpenBotToolRouter {
                   ...(lateEffort === undefined ? {} : { reasoningEffort: lateEffort }),
                   ...limits,
                 })
-                .pipe(Effect.mapError((failure) => new ToolOperationFailed({ cause: failure.cause })));
+                .pipe(toToolOperationFailed);
             }).pipe(Effect.catchDefect((cause) => Effect.fail(new ToolOperationFailed({ cause })))),
         );
       const sidebar = this.#sidebarLayout;
       const created =
         sidebar && sectionId !== null
-          ? yield* sidebar
-              .withProfileAssignment(sectionId, create)
-              .pipe(Effect.mapError((failure) => new ToolOperationFailed({ cause: failure.cause })))
-          : yield* create().pipe(Effect.mapError((failure) => new ToolOperationFailed({ cause: failure.cause })));
+          ? yield* sidebar.withProfileAssignment(sectionId, create).pipe(toToolOperationFailed)
+          : yield* create().pipe(toToolOperationFailed);
       return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(created) }] };
     },
     Effect.catchDefect((cause) => Effect.fail(new ToolOperationFailed({ cause }))),
@@ -728,9 +884,7 @@ export class OpenBotToolRouter {
       const image =
         avatarPath === undefined
           ? undefined
-          : yield* loadAvatarFile(avatarPath, sender.workspacePath).pipe(
-              Effect.mapError((failure) => new ToolOperationFailed({ cause: failure.cause })),
-            );
+          : yield* loadAvatarFile(avatarPath, sender.workspacePath).pipe(toToolOperationFailed);
       const input: UpdateAgentInput = {
         agentId,
         ...fields,
@@ -740,17 +894,11 @@ export class OpenBotToolRouter {
         ...(computerUse === false ? { computerUse } : {}),
         ...(avatarHue === undefined ? {} : { avatarHue }),
       };
-      let updated = yield* this.#hooks
-        .updateAgent(input, senderAgentId)
-        .pipe(Effect.mapError((failure) => new ToolOperationFailed({ cause: failure.cause })));
+      let updated = yield* this.#hooks.updateAgent(input, senderAgentId).pipe(toToolOperationFailed);
       if (image !== undefined) {
-        updated = yield* this.#hooks
-          .setAvatar(agentId, image)
-          .pipe(Effect.mapError((failure) => new ToolOperationFailed({ cause: failure.cause })));
+        updated = yield* this.#hooks.setAvatar(agentId, image).pipe(toToolOperationFailed);
       } else if (args.avatarSeed !== undefined || args.avatarHue !== undefined) {
-        updated = yield* this.#hooks
-          .setAvatar(agentId, null)
-          .pipe(Effect.mapError((failure) => new ToolOperationFailed({ cause: failure.cause })));
+        updated = yield* this.#hooks.setAvatar(agentId, null).pipe(toToolOperationFailed);
       }
       return {
         success: true,
@@ -797,7 +945,7 @@ export class OpenBotToolRouter {
       const emoji = args.emoji;
       yield* this.#mailbox
         .setReaction(senderAgentId, delivery.delivery.id, { kind: "agent", agentId: senderAgentId }, emoji)
-        .pipe(Effect.mapError((failure) => new ToolOperationFailed({ cause: failure.cause })));
+        .pipe(toToolOperationFailed);
       const snapshot = this.#conversation.ensureSnapshot(senderAgentId, params.threadId);
       this.#mailboxSync.syncMailboxMessages(snapshot);
       this.#conversation.emitConversation(snapshot);
@@ -857,9 +1005,9 @@ export class OpenBotToolRouter {
           replyToMessageId: replyToMessageId ?? null,
           expectsReply,
           ...(messagingReturn ? { messagingReturn } : {}),
-          idempotencyKey: `${params.threadId}:${params.turnId}:${params.callId}`,
+          idempotencyKey: toolCallIdempotencyKey(params),
         })
-        .pipe(Effect.mapError((failure) => new ToolOperationFailed({ cause: failure.cause })));
+        .pipe(toToolOperationFailed);
       for (const recipient of recipientValues) {
         this.#mailboxSync.emitQueue(recipient);
         this.#drain.scheduleDrain(recipient);

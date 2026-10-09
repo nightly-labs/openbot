@@ -7,6 +7,7 @@ import { createHostedBilling } from "./hosted-billing";
 import type { HostedServerBindings } from "./hosted-server-service";
 import { HostedSiteService } from "./hosted-site-service";
 import { enforceMarketplaceIngress, MarketplaceRateLimitError } from "./marketplace-request-policy";
+import { pageMarkdownResponse } from "./page-markdown";
 import { deliverPendingRemoteAuthEvents, RemoteControlPlane } from "./remote-control-plane";
 import type { WorkerBindings } from "./types";
 
@@ -58,6 +59,9 @@ export function createWorkerHandler(
         ),
       );
       if (earlyResponse) return earlyResponse;
+      // Drawn from the HTML pages, so it renders them through the same handler.
+      const markdown = await pageMarkdownResponse(request, fetchHandler);
+      if (markdown) return markdown;
       const response = Promise.resolve(fetchHandler(request)).then((result) =>
         permanentTrailingSlashRedirect(request, result),
       );

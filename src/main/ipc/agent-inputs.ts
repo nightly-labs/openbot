@@ -15,6 +15,7 @@ import {
   type DeleteRoutineInput,
   type DownloadAttachmentsInput,
   type EditQueuedMessageInput,
+  type FileAction,
   type ImportAttachmentsInput,
   type InterruptTurnInput,
   isAgentAccess,
@@ -638,9 +639,17 @@ export function parseOpenAttachment(value: unknown): OpenAttachmentInput {
   };
 }
 
+const FILE_ACTIONS: readonly FileAction[] = ["open", "reveal", "download"];
+
+function parseFileAction(value: unknown): FileAction {
+  if (value === undefined) return "open";
+  if (!isOneOf(FILE_ACTIONS, value)) throw new Error("Invalid file action.");
+  return value;
+}
+
 export function parseOpenSharedFile(value: unknown): OpenSharedFileInput {
   if (!isObject(value)) throw new Error("Invalid shared file request.");
-  return { path: requireString(value.path, "path", INPUT_LIMITS.path) };
+  return { path: requireString(value.path, "path", INPUT_LIMITS.path), action: parseFileAction(value.action) };
 }
 
 export function parseOpenWorkspaceFile(value: unknown): OpenWorkspaceFileInput {
@@ -648,6 +657,7 @@ export function parseOpenWorkspaceFile(value: unknown): OpenWorkspaceFileInput {
   return {
     agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
     path: requireString(value.path, "path", INPUT_LIMITS.path),
+    action: parseFileAction(value.action),
   };
 }
 

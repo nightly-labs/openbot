@@ -80,6 +80,7 @@ export const HOSTED_SERVER_CONTACT_URL = "mailto:hello@openbot.run";
 export const HOSTING_DEVELOPER_KEY_HEADER = "OpenBot-Hosting-Developer-Key";
 
 export interface HostedServerSummary {
+  deletionScheduledAt?: number | null;
   /** The same value as the Remote host id of the server. */
   serverId: string;
   name: string;
@@ -105,6 +106,7 @@ export interface HostedServerStatus {
 }
 
 export interface HostedServerList {
+  lifecycleAvailable?: boolean;
   /** False when this account cannot create hosted servers, or when the account server has no billing. */
   available: boolean;
   servers: HostedServerSummary[];
@@ -152,6 +154,12 @@ export function parseHostedServerSummary(value: unknown): HostedServerSummary | 
   const error: HostedServerError | null =
     state !== value.state ? "provider_error" : isOneOf(HOSTED_SERVER_ERRORS, value.error) ? value.error : null;
   return {
+    deletionScheduledAt:
+      typeof value.deletionScheduledAt === "number" &&
+      Number.isSafeInteger(value.deletionScheduledAt) &&
+      value.deletionScheduledAt > 0
+        ? value.deletionScheduledAt
+        : null,
     serverId: value.serverId,
     name: value.name,
     size: value.size,
@@ -198,7 +206,7 @@ export function parseHostedServerList(value: unknown): HostedServerList | null {
     isNumber(value.maxServers) && Number.isSafeInteger(value.maxServers) && value.maxServers >= 0
       ? value.maxServers
       : null;
-  return { available: value.available, servers, maxServers };
+  return { available: value.available, lifecycleAvailable: value.lifecycleAvailable === true, servers, maxServers };
 }
 
 /** Returns null for a value that is not a redeemed claim. */
@@ -355,4 +363,47 @@ export function parseHostedServerActivityReport(value: unknown): HostedServerAct
   if (value.nextRunAt === undefined) return { inUse: value.inUse };
   if (value.nextRunAt !== null && !(isNumber(value.nextRunAt) && Number.isSafeInteger(value.nextRunAt))) return null;
   return { inUse: value.inUse, nextRunAt: value.nextRunAt };
+}
+
+export interface HostedServerLifecycleInput {
+  serverId: string;
+  action: "cancel" | "keep" | "delete";
+  timing?: "period-end" | "now";
+  confirmName?: string;
+  expectedPeriodEnd?: number;
+}
+
+/** Reject malformed mutations before they cross the account boundary. */
+export function parseHostedServerLifecycleInput(value: unknown): HostedServerLifecycleInput | null {
+  if (
+    !isDynamicRecord(value) ||
+    !isString(value.serverId) ||
+    !value.serverId ||
+    value.serverId.length > INPUT_LIMITS.identifier ||
+    !isOneOf(["cancel", "keep", "delete"] as const, value.action)
+  )
+    return null;
+  if (
+    value.expectedPeriodEnd !== undefined &&
+    (!isNumber(value.expectedPeriodEnd) ||
+      !Number.isSafeInteger(value.expectedPeriodEnd) ||
+      value.expectedPeriodEnd <= 0)
+  )
+    return null;
+  if (value.action === "delete") {
+    if (
+      !isOneOf(["period-end", "now"] as const, value.timing) ||
+      !isString(value.confirmName) ||
+      value.confirmName.length > INPUT_LIMITS.serverName
+    )
+      return null;
+    return {
+      serverId: value.serverId,
+      action: value.action,
+      timing: value.timing,
+      confirmName: value.confirmName,
+      ...(value.expectedPeriodEnd === undefined ? {} : { expectedPeriodEnd: value.expectedPeriodEnd }),
+    };
+  }
+  return { serverId: value.serverId, action: value.action };
 }

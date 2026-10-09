@@ -1,3 +1,5 @@
+import { HOST_MEMBER_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-member-update-v1";
+import { HOST_RELEASE_ROUTES } from "@openbot/contracts/team-protocol/host-release-v1";
 // Admin requests to one host: agent settings and skills, shared tables, agent share links, the server name and logo,
 // the app update, MCP servers, storage, hosted sites and providers.
 //
@@ -26,6 +28,7 @@ import {
   decodeHostAddedAgent,
   decodeHostAgentTemplatePreview,
   decodeHostAgentTemplatePublication,
+  decodeHostReleaseStatus,
   decodeHostUpdateStatus,
   decodeInstalledSkills,
   decodeMcpServerConfigs,
@@ -36,6 +39,7 @@ import {
   decodeStorageUsage,
   type GetStorageUsageInput,
   type HostedSiteList,
+  type HostReleaseStatus,
   type HostUpdateSettingsChange,
   type HostUpdateStatus,
   type InstallAgentTemplateInput,
@@ -64,11 +68,28 @@ import {
   type UpdateRestartMode,
 } from "@openbot/contracts/ipc";
 import { guardedListDecoder } from "@openbot/contracts/ipc-decoding";
+import {
+  decodeEventActivity,
+  decodeEventRoutines,
+  decodeEventStatus,
+  decodeSaveEventRoutineResult,
+  decodeWebhookSecret,
+  type EventActivity,
+  type EventRoutine,
+  type EventRoutineRef,
+  type EventStatus,
+  type ListEventActivityInput,
+  type ListEventRoutinesInput,
+  type SaveEventRoutineInput,
+  type SaveEventRoutineResult,
+  type WebhookSecret,
+} from "@openbot/contracts/ipc-events";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/agent-admin-v1";
 import { AGENT_INSTALL_ROUTES } from "@openbot/contracts/team-protocol/agent-install-v1";
 import { AGENT_PUBLISH_IMAGE_BYTES, AGENT_PUBLISH_ROUTES } from "@openbot/contracts/team-protocol/agent-publish-v1";
 import { AGENT_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/agent-update-v1";
+import { EVENTS_ROUTES } from "@openbot/contracts/team-protocol/events-v1";
 import { HOST_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/host-admin-v1";
 import { HOST_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-update-v1";
 import { HOSTED_SITES_ROUTES } from "@openbot/contracts/team-protocol/hosted-sites-v1";
@@ -82,6 +103,7 @@ import { SKILLS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/skills-adm
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { Effect, Schema } from "effect";
+import { bytesToBase64 } from "./base64";
 import type { TeamApiRequest } from "./team-api-requests";
 
 export class TeamAdminRequestError extends Schema.TaggedError<TeamAdminRequestError>()("TeamAdminRequestError", {
@@ -110,14 +132,17 @@ function decodeAgentStatus(value: unknown): AgentStatus {
   return value;
 }
 
-function bytesToBase64(bytes: Uint8Array): string {
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary);
-}
-
 function keyValues(rows: McpServerConfig["env"]): TeamProtocolV2Json {
   return rows.map(({ key, value }) => ({ key, value }));
+}
+
+function eventBody(value: unknown): TeamProtocolV2Json {
+  if (value === null || typeof value === "string" || typeof value === "boolean" || typeof value === "number")
+    return value;
+  if (Array.isArray(value)) return value.map(eventBody);
+  if (typeof value === "object" && value !== null)
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, eventBody(item)]));
+  throw new Error("Invalid event request.");
 }
 
 function mcpConfig(config: McpServerConfig): TeamProtocolV2Json {
@@ -243,6 +268,53 @@ export function deleteSharedTable(request: TeamApiRequest, name: string): Effect
   return adminCall(() => request("POST", SHARED_TABLES_ROUTES.delete, ignoreResponse, { name }));
 }
 
+export function getEventStatus(request: TeamApiRequest): Effect.Effect<EventStatus, TeamAdminRequestError> {
+  return adminCall(() => request("POST", EVENTS_ROUTES.status, decodeEventStatus, {}));
+}
+
+export function listEventRoutines(
+  request: TeamApiRequest,
+  input: ListEventRoutinesInput,
+): Effect.Effect<EventRoutine[], TeamAdminRequestError> {
+  return adminCall(() => request("POST", EVENTS_ROUTES.listRoutines, decodeEventRoutines, eventBody(input)));
+}
+
+/** The result has the new signing secret only when the routine became a webhook routine. */
+export function saveEventRoutine(
+  request: TeamApiRequest,
+  input: SaveEventRoutineInput,
+): Effect.Effect<SaveEventRoutineResult, TeamAdminRequestError> {
+  return adminCall(() => request("POST", EVENTS_ROUTES.saveRoutine, decodeSaveEventRoutineResult, eventBody(input)));
+}
+
+export function deleteEventRoutine(
+  request: TeamApiRequest,
+  input: EventRoutineRef,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", EVENTS_ROUTES.deleteRoutine, ignoreResponse, eventBody(input)));
+}
+
+export function testEventRoutine(
+  request: TeamApiRequest,
+  input: EventRoutineRef,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", EVENTS_ROUTES.testRoutine, ignoreResponse, eventBody(input)));
+}
+
+export function rotateEventRoutineSecret(
+  request: TeamApiRequest,
+  input: EventRoutineRef,
+): Effect.Effect<WebhookSecret, TeamAdminRequestError> {
+  return adminCall(() => request("POST", EVENTS_ROUTES.rotateSecret, decodeWebhookSecret, eventBody(input)));
+}
+
+export function listEventActivity(
+  request: TeamApiRequest,
+  input: ListEventActivityInput,
+): Effect.Effect<EventActivity[], TeamAdminRequestError> {
+  return adminCall(() => request("POST", EVENTS_ROUTES.listActivity, decodeEventActivity, eventBody(input)));
+}
+
 /** An absent field stays unchanged; a `null` logo removes it. */
 export function updateHostIdentity(
   request: TeamApiRequest,
@@ -255,21 +327,49 @@ export function updateHostIdentity(
   return adminCall(() => request("POST", HOST_ADMIN_ROUTES.identity, ignoreResponse, body));
 }
 
-export function getHostUpdateStatus(request: TeamApiRequest): Effect.Effect<HostUpdateStatus, TeamAdminRequestError> {
-  return adminCall(() => request("POST", HOST_UPDATE_ROUTES.status, decodeHostUpdateStatus, {}));
+export function getHostUpdateStatus(
+  request: TeamApiRequest,
+  memberAccess = false,
+): Effect.Effect<HostUpdateStatus, TeamAdminRequestError> {
+  return adminCall(() =>
+    request(
+      "POST",
+      memberAccess ? HOST_MEMBER_UPDATE_ROUTES.status : HOST_UPDATE_ROUTES.status,
+      decodeHostUpdateStatus,
+      {},
+    ),
+  );
 }
 
 /** The host starts the check and answers at once; read the status again for the outcome. */
-export function checkHostForUpdate(request: TeamApiRequest): Effect.Effect<HostUpdateStatus, TeamAdminRequestError> {
-  return adminCall(() => request("POST", HOST_UPDATE_ROUTES.check, decodeHostUpdateStatus, {}));
+export function checkHostForUpdate(
+  request: TeamApiRequest,
+  memberAccess = false,
+): Effect.Effect<HostUpdateStatus, TeamAdminRequestError> {
+  return adminCall(() =>
+    request(
+      "POST",
+      memberAccess ? HOST_MEMBER_UPDATE_ROUTES.check : HOST_UPDATE_ROUTES.check,
+      decodeHostUpdateStatus,
+      {},
+    ),
+  );
 }
 
 /** A second start replaces the restart mode of the first, which is how an admin skips the wait. */
 export function startHostUpdate(
   request: TeamApiRequest,
   restart: UpdateRestartMode,
+  memberAccess = false,
 ): Effect.Effect<HostUpdateStatus, TeamAdminRequestError> {
-  return adminCall(() => request("POST", HOST_UPDATE_ROUTES.start, decodeHostUpdateStatus, { restart }));
+  return adminCall(() =>
+    request(
+      "POST",
+      memberAccess ? HOST_MEMBER_UPDATE_ROUTES.start : HOST_UPDATE_ROUTES.start,
+      decodeHostUpdateStatus,
+      memberAccess ? {} : { restart },
+    ),
+  );
 }
 
 export function cancelHostUpdate(request: TeamApiRequest): Effect.Effect<HostUpdateStatus, TeamAdminRequestError> {
@@ -488,4 +588,12 @@ export function deleteCustomProvider(
   return adminCall(() =>
     request("POST", PROVIDERS_ADMIN_ROUTES.customDelete, decodeCustomProviderResult, { id: input.id }),
   );
+}
+
+export function getHostReleaseStatus(request: TeamApiRequest): Effect.Effect<HostReleaseStatus, TeamAdminRequestError> {
+  return adminCall(() => request("POST", HOST_RELEASE_ROUTES.status, decodeHostReleaseStatus, {}));
+}
+
+export function checkHostRelease(request: TeamApiRequest): Effect.Effect<HostReleaseStatus, TeamAdminRequestError> {
+  return adminCall(() => request("POST", HOST_RELEASE_ROUTES.check, decodeHostReleaseStatus, {}));
 }

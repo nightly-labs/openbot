@@ -9,9 +9,11 @@ import {
   BROWSER_VIEW_FRAME_ACK_QUERY,
   type BrowserViewInput,
   browserViewInputForHost,
+  decodeBrowserViewCopied,
   decodeBrowserViewFrame,
   encodeBrowserViewInput,
   TEAM_BROWSER_VIEW_CAPABILITY,
+  TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY,
   TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { sourceText } from "@openbot/i18n/source";
@@ -66,7 +68,16 @@ export class BrowserViewClient {
       const view: ActiveView = { serverId, sessionId: stream.sessionId, tabId, socket };
       this.#view = view;
       socket.addEventListener("message", (message) => {
-        if (this.#view !== view || typeof message.data === "string") return;
+        if (this.#view !== view) return;
+        // Text is the answer to a copy. A host that sends something else is not answering one.
+        if (typeof message.data === "string") {
+          try {
+            this.#options.onEvent({ ...decodeBrowserViewCopied(message.data), tabId });
+          } catch {
+            socket.close(1000, "Invalid browser view message");
+          }
+          return;
+        }
         try {
           const frame = decodeBrowserViewFrame(new Uint8Array(message.data));
           this.#options.onEvent({ type: "frame", tabId, ...frame });
@@ -79,7 +90,14 @@ export class BrowserViewClient {
         this.#events.add(fiber);
         fiber.addObserver(() => this.#events.delete(fiber));
       };
-      socket.addEventListener("close", () => ended(sourceText("error.backend.browserViewEnded")));
+      socket.addEventListener("close", (event) =>
+        ended(
+          event.reason ||
+            (event.code === 1000
+              ? sourceText("error.backend.browserViewEnded")
+              : sourceText("error.backend.browserViewFailed")),
+        ),
+      );
       socket.addEventListener("error", () => ended(sourceText("error.backend.browserViewFailed")));
     },
     (operation) => this.#queue(operation),
@@ -106,7 +124,8 @@ export class BrowserViewClient {
       view.serverId,
       TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
     );
-    const wire = browserViewInputForHost(input, namesFrames);
+    const clipboard = this.#options.servers.supportsCapability(view.serverId, TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY);
+    const wire = browserViewInputForHost(input, namesFrames, clipboard);
     if (!wire) return;
     view.socket.send(encodeBrowserViewInput(wire));
   }

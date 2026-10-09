@@ -129,6 +129,8 @@ export const messages = {
   "mobile.chat.composer.messageAgent": "Enviar mensagem a {name}",
   "mobile.chat.composer.pasteFailed": "Não foi possível anexar o texto colado",
   "mobile.chat.composer.cancelDictation": "Cancelar ditado",
+  "mobile.chat.voice.listening": "Ouvindo…",
+  "mobile.chat.voice.continue": "Continuar ditado",
   "mobile.chat.composer.addAttachment": "Adicionar anexo",
   "mobile.chat.composer.ask": "Perguntar a {name}",
   "mobile.chat.composer.stopFailed": "Não foi possível parar o agente. Ele pode já ter terminado.",

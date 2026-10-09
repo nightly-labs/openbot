@@ -11,12 +11,13 @@ import {
 import { isBoolean, isDynamicRecord, isFunction, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { normalizeEmailAddress } from "@openbot/contracts/validation";
 import { OpenPanelBase, type OpenPanelOptions } from "@openpanel/web";
+import { configureDesktopReports, configureErrorReports } from "./error-reports";
 import { MARKETPLACE_PLUGINS } from "./features/settings/marketplace-plugin-catalog";
 
 export const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
 const OPENPANEL_CLIENT_ID = "6c989975-87ef-4f0c-857e-ab449a65b5c2";
 const MAX_PENDING_EVENTS = 100;
-const ANALYTICS_SCHEMA_VERSION = 6;
+const ANALYTICS_SCHEMA_VERSION = 7;
 const CURATED_LISTING_PATTERN = /^openbot-curated-(?:skill|agent)-([a-z0-9][a-z0-9-]{0,63})$/u;
 const PLUGIN_SLUGS = new Set(MARKETPLACE_PLUGINS.map((plugin) => plugin.slug));
 
@@ -370,6 +371,7 @@ const ROUTINE_TRIGGER_TYPES = new Set([
   "interval",
   "advanced",
   "custom",
+  "webhook",
 ]);
 
 const UPDATE_PHASES = new Set([
@@ -490,6 +492,7 @@ export class DesktopAnalytics {
   }
 
   configure(appInfo: AppInfo): boolean {
+    configureDesktopReports(appInfo, this.#trackingEnabled, this.#identity);
     if (this.#client) return true;
     if (!shouldEnableDesktopAnalytics(appInfo, this.#productionBuild)) {
       this.#disabled = true;
@@ -528,6 +531,7 @@ export class DesktopAnalytics {
     const normalized = user ? normalizeAnalyticsIdentity(user) : null;
     if (previous?.id === normalized?.id && previous?.email === normalized?.email) return;
     this.#identity = normalized;
+    configureErrorReports(this.#trackingEnabled, normalized?.id ?? null);
     if (!this.#client || !this.#trackingEnabled) return;
     if (previous && (!normalized || previous.id !== normalized.id || previous.email !== normalized.email)) {
       if (!normalized || previous.id !== normalized.id) {
@@ -548,6 +552,7 @@ export class DesktopAnalytics {
   setTrackingEnabled(enabled: boolean): void {
     if (this.#trackingEnabled === enabled) return;
     this.#trackingEnabled = enabled;
+    configureErrorReports(enabled, this.#identity?.id ?? null);
     if (!enabled) {
       this.#pending = [];
       this.#clientQueue.operations = [];

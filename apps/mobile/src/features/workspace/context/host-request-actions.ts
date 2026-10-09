@@ -26,6 +26,7 @@ import {
   TEAM_MEDIA_ATTACHMENTS_CAPABILITY,
   TEAM_SEMANTIC_TAGS_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
+import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
 import { TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { SKILLS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
@@ -34,9 +35,15 @@ import { readHostAnalytics, runTeamEffect } from "@openbot/team-client";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import { buildRoutineCalendar, type RoutineCalendarSource } from "@openbot/team-client/routine-calendar";
 import {
+  deleteEventRoutine,
   installAgentTemplate,
   listAgentSkills,
+  listEventActivity,
+  listEventRoutines,
+  rotateEventRoutineSecret,
+  saveEventRoutine,
   setAgentSkillEnabled,
+  testEventRoutine,
   uninstallAgentSkill,
 } from "@openbot/team-client/team-admin-requests";
 import { type TeamApiRequest, TeamRequestError } from "@openbot/team-client/team-api-requests";
@@ -72,6 +79,12 @@ type HostRequestActions = Pick<
   | "loadAgentMemories"
   | "loadAgentRoutines"
   | "loadRoutineCalendar"
+  | "listEventRoutines"
+  | "saveEventRoutine"
+  | "deleteEventRoutine"
+  | "testEventRoutine"
+  | "rotateEventRoutineSecret"
+  | "listEventActivity"
   | "loadHostAnalytics"
   | "searchMessages"
   | "loadAgentSkills"
@@ -93,15 +106,22 @@ type HostRequestActions = Pick<
   | "downloadAttachment"
 >;
 
+/** Runs a Team API request. A failure rejects with the error of the host, not its Effect wrapper. */
+function runTeamRequest<A>(operation: Effect.Effect<A, { readonly cause: unknown }>): Promise<A> {
+  return runTeamEffect(operation.pipe(Effect.mapError((error) => error.cause)));
+}
+
 /** Workspace actions that only send host requests and read advertised capabilities. */
 export function createHostRequestActions({
   request,
+  teamApi,
   queryClient,
   queryScope,
   capabilities,
   attachmentDownloads,
 }: {
   request: WorkspaceRequest;
+  teamApi: (serverId: string) => TeamApiRequest;
   queryClient: QueryClient;
   /** The API URL, user ID and session scope that start each account query key. */
   queryScope: readonly [apiUrl: string, userId: string, sessionScope: number];
@@ -112,9 +132,22 @@ export function createHostRequestActions({
   function skillsAdmin(serverId: string): TeamApiRequest {
     if (!capabilities.get(serverId)?.includes(SKILLS_ADMIN_CAPABILITY))
       throw new Error(currentText().t("mobile.agent.skill.manageUnsupported"));
-    return (method, path, decode, body, upload) => request(method, path, decode, body, serverId, upload);
+    return teamApi(serverId);
+  }
+  /** The event admin routes are optional and reject members on the host. */
+  function eventsAdmin(serverId: string): TeamApiRequest {
+    if (!capabilities.get(serverId)?.includes(EVENTS_CAPABILITY))
+      throw new Error(currentText().t("mobile.agent.record.eventsUnsupported"));
+    return teamApi(serverId);
   }
   return {
+    listEventRoutines: (owner, serverId) => runTeamRequest(listEventRoutines(eventsAdmin(serverId), { owner })),
+    saveEventRoutine: (input, serverId) => runTeamRequest(saveEventRoutine(eventsAdmin(serverId), input)),
+    deleteEventRoutine: (input, serverId) => runTeamRequest(deleteEventRoutine(eventsAdmin(serverId), input)),
+    testEventRoutine: (input, serverId) => runTeamRequest(testEventRoutine(eventsAdmin(serverId), input)),
+    rotateEventRoutineSecret: (input, serverId) =>
+      runTeamRequest(rotateEventRoutineSecret(eventsAdmin(serverId), input)),
+    listEventActivity: (input, serverId) => runTeamRequest(listEventActivity(eventsAdmin(serverId), input)),
     saveAgentMemory: async (agentId, text, serverId, memoryId) => {
       await saveAgentRecord(queryClient, ["agent-info", ...queryScope, serverId, agentId, "memories"], () =>
         request(
@@ -221,25 +254,18 @@ export function createHostRequestActions({
         serverId,
       ),
     loadRoutineCalendar: (input, serverId) =>
-      runTeamEffect(
+      runTeamRequest(
         buildRoutineCalendar(
           { from: new Date(input.from), to: new Date(input.to) },
           new Date(),
           routineCalendarSource(
-            request,
-            serverId,
+            teamApi(serverId),
             capabilities.get(serverId)?.includes(CHANNEL_CHATS_CAPABILITY) ?? false,
           ),
-        ).pipe(Effect.mapError((error) => error.cause)),
+        ),
       ),
     loadHostAnalytics: (input, serverId) =>
-      runTeamEffect(
-        readHostAnalytics(
-          (method, path, decode) => request(method, path, decode, undefined, serverId),
-          capabilities.get(serverId) ?? [],
-          input,
-        ).pipe(Effect.mapError((error) => error.cause)),
-      ),
+      runTeamRequest(readHostAnalytics(teamApi(serverId), capabilities.get(serverId) ?? [], input)),
     searchMessages: (query, serverId, cursor) =>
       request(
         "GET",
@@ -251,18 +277,13 @@ export function createHostRequestActions({
       ),
     // A host too old to know the route answers 404, so ask its advertised capabilities first.
     loadAgentSkills: async (agentId, serverId, manage = false) => {
-      if (manage)
-        return runTeamEffect(
-          listAgentSkills(skillsAdmin(serverId), agentId).pipe(Effect.mapError((error) => error.cause)),
-        );
+      if (manage) return runTeamRequest(listAgentSkills(skillsAdmin(serverId), agentId));
       return capabilities.get(serverId)?.includes(TEAM_SEMANTIC_TAGS_CAPABILITY)
         ? request("GET", TEAM_API_ROUTES.agent.skills(agentId), decodeInstalledSkills, undefined, serverId)
         : null;
     },
-    setAgentSkillEnabled: async (input, serverId) =>
-      runTeamEffect(setAgentSkillEnabled(skillsAdmin(serverId), input).pipe(Effect.mapError((error) => error.cause))),
-    uninstallAgentSkill: async (input, serverId) =>
-      runTeamEffect(uninstallAgentSkill(skillsAdmin(serverId), input).pipe(Effect.mapError((error) => error.cause))),
+    setAgentSkillEnabled: async (input, serverId) => runTeamRequest(setAgentSkillEnabled(skillsAdmin(serverId), input)),
+    uninstallAgentSkill: async (input, serverId) => runTeamRequest(uninstallAgentSkill(skillsAdmin(serverId), input)),
     loadAgentStorage: async (agentId, serverId, force = false) => {
       if (!capabilities.get(serverId)?.includes(STORAGE_CAPABILITY)) return null;
       const input = { scope: "agent" as const, agentId, ...(force ? { force: true } : {}) };
@@ -290,12 +311,7 @@ export function createHostRequestActions({
       // A host too old to know the route answers 404, so refuse before the request.
       if (!capabilities.get(serverId)?.includes(AGENT_INSTALL_CAPABILITY))
         return Promise.reject(new Error(currentText().t("mobile.link.template.error.unsupported")));
-      return runTeamEffect(
-        installAgentTemplate(
-          (method, path, decode, body, upload) => request(method, path, decode, body, serverId, upload),
-          input,
-        ).pipe(Effect.mapError((error) => error.cause)),
-      );
+      return runTeamRequest(installAgentTemplate(teamApi(serverId), input));
     },
     loadAgentAvatar: (agentId, avatarUrl, serverId) => requestAgentAvatar(request, agentId, avatarUrl, serverId),
     duplicateAgent: async (agentId) => {
@@ -375,15 +391,11 @@ export function createHostRequestActions({
 }
 
 /** The routes that the desktop calendar reads from a remote host, so both place the same runs. */
-function routineCalendarSource(
-  request: WorkspaceRequest,
-  serverId: string,
-  channels: boolean,
-): RoutineCalendarSource<TeamRequestError> {
+function routineCalendarSource(request: TeamApiRequest, channels: boolean): RoutineCalendarSource<TeamRequestError> {
   /** One request to this server as an Effect. */
   const send = <T>(method: string, path: string, decode: (value: unknown) => T, body?: TeamProtocolV2Json) =>
     Effect.tryPromise({
-      try: () => request(method, path, decode, body, serverId),
+      try: () => request(method, path, decode, body),
       catch: (cause) => new TeamRequestError({ cause }),
     });
   return {

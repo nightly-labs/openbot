@@ -3,7 +3,7 @@
   "name": "OpenBot",
   "short_name": "OpenBot",
   "description": "Run Codex and Claude side by side as persistent AI teammates, each with its own workspace, queue, and context.",
-  "start_url": "/",
+  "start_url": "/app",
   "scope": "/",
   "display": "standalone",
   "background_color": "#1a1a1a",

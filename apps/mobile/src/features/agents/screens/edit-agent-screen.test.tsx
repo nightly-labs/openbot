@@ -237,6 +237,13 @@ const workspace = {
     async () => [],
   ),
   canManageAgentSkills: vi.fn((_serverId: string) => false),
+  canManageEvents: vi.fn((_serverId: string) => false),
+  listEventRoutines: vi.fn(async () => []),
+  saveEventRoutine: vi.fn(async () => null),
+  deleteEventRoutine: vi.fn(async () => {}),
+  testEventRoutine: vi.fn(async () => {}),
+  rotateEventRoutineSecret: vi.fn(async () => null),
+  listEventActivity: vi.fn(async () => []),
   setAgentSkillEnabled: vi.fn<(input: SetEnabledSkillInput, serverId: string) => Promise<InstalledSkill>>(),
   uninstallAgentSkill: vi.fn<(input: UninstallSkillInput, serverId: string) => Promise<void>>(),
   loadAgentStorage: vi.fn<(agentId: string, serverId: string, force?: boolean) => Promise<StorageUsage | null>>(
@@ -449,6 +456,10 @@ vi.mock("@/features/agents/components/bloub-avatar", () => ({
   BloubAvatarThumbnail: () => null,
   AvatarThumbnail: () => null,
 }));
+vi.mock("@/features/agents/components/agent-color-glow", () => ({
+  AgentColorGlow: () => null,
+  useAgentColorTransition: (color: string) => color,
+}));
 vi.mock("@/features/agents/components/agent-pin-avatar", () => ({
   AgentPinAvatar: ({ children }: PropsWithChildren) => children,
 }));
@@ -538,7 +549,7 @@ vi.mock("@expo/ui/community/datetime-picker", () => ({
       />
     ),
 }));
-vi.mock("uniwind", () => ({ useUniwind: () => ({ theme: "light" }) }));
+vi.mock("uniwind", () => ({ useUniwind: () => ({ theme: "light" }), useCSSVariable: () => "gray" }));
 vi.mock("@expo/ui", () => {
   const Picker = ({
     label,
@@ -596,6 +607,14 @@ vi.mock("@/shared/lib/haptics", () => ({
   haptics: { impact: async () => {}, notification: async () => {}, selection: async () => {} },
 }));
 vi.mock("lucide-react-native", () => ({
+  AlarmClock: () => null,
+  Check: () => null,
+  ChevronDown: () => null,
+  ChevronsDownUp: () => null,
+  ChevronsUpDown: () => null,
+  Copy: () => null,
+  RefreshCw: () => null,
+  Webhook: () => null,
   ChevronRight: () => null,
   Ellipsis: () => null,
   ArrowLeft: () => null,
@@ -1645,7 +1664,8 @@ it("saves the selected monthly day and wall-clock time", async () => {
   await edit("Routine name", "Monthly check");
   await edit("Routine instructions", "Check updates");
   await edit("Time zone", "Europe/Warsaw");
-  await act(() => fireEvent.change(screen.getByDisplayValue("Daily"), { target: { value: "monthly" } }));
+  await click("Daily");
+  await click("Monthly");
   await act(() => fireEvent.change(screen.getByLabelText("Time"), { target: { value: "17:45" } }));
   // A new monthly run starts on today's date, as on desktop.
   await act(() =>

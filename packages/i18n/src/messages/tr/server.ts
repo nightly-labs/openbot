@@ -137,6 +137,8 @@ export const messages = {
   "server.rail.usage": "Kullanım",
   "server.rail.schedule": "Zamanlama",
   "server.rail.settings": "Sunucu ayarları",
+  "server.rail.leave": "Sunucudan ayrıl",
+  "server.rail.delete": "Sunucuyu sil",
   "server.select.failedTitle": "Sunucu seçilemedi",
   "server.select.failedDescription": "Sunucular arasında geçiş yapılamadı. Tekrar deneyin.",
   "server.select.openAgentFailed": "{name} açılamadı. Onu kenar çubuğunda bulun.",
@@ -259,6 +261,10 @@ export const messages = {
   "server.members.actionsFor": "{name} için eylemler",
   "server.members.makeMember": "Üye yap",
   "server.members.makeAdmin": "Yönetici yap",
+  "server.members.makeAdminTitle": "{name} yönetici yapılsın mı?",
+  "server.members.makeMemberTitle": "{name} üye yapılsın mı?",
+  "server.members.roleChangeDescription":
+    "{name} adlı kişinin bu sunucuyla bağlantısı kesilebilir ve yeniden bağlanması gerekebilir.",
   "server.invite.invalidEmail": "Geçerli bir e-posta adresi girin.",
   "server.invite.title": "Kişileri davet edin",
   "server.invite.description":
@@ -302,6 +308,8 @@ export const messages = {
   },
   "server.invite.expires": "Bitiş: {date}",
   "server.invite.revoke": "İptal et",
+  "server.invite.revokeTitle": "Bu davet iptal edilsin mi?",
+  "server.invite.revokeDescription": "Davet artık çalışmaz. Bu davetle katılanlar üye olarak kalır.",
   "server.desktop.accessTitle": "Uzak masaüstü erişimi",
   "server.desktop.gatewayDescription":
     "Her etkin sunucu üyesi bu ana makineyi kontrol edebilir. Ayrı bir uzak masaüstü şifresi yoktur.",
@@ -360,7 +368,7 @@ export const messages = {
   "server.update.waitingFor": "{reasons} bekleniyor.",
   "server.update.disabledTitle": "Uzaktan güncellemeler kapalı",
   "server.update.disabledDescription":
-    "{name} kullanıcısı, sunucu yöneticilerinden gelen güncellemeleri kapattı. Onlardan OpenBot'u güncellemelerini veya bu ayarı açmalarını isteyin.",
+    "{name} kullanıcısı sunucu üyelerinin güncelleme yapmasını kapattı. OpenBot uygulamasını güncellemesini veya ayarı açmasını isteyin.",
   "server.update.managedTitle": "Güncellemeleri bir Ana Makine Yöneticisi kontrol ediyor",
   "server.update.managedDescription":
     "OpenBot Ana Makine Yöneticisi {name} makinesini günceller. Ana makine yöneticisiyle iletişime geçin.",

@@ -26,7 +26,7 @@ import {
   X,
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createSignal, createUniqueId, For, Show } from "solid-js";
+import { createEffect, createSignal, createStore, createUniqueId, For, Show } from "solid-js";
 import { providerUpdateAvailable, providerVersionLabel } from "../features/provider-updates/provider-update";
 import { useText } from "../text";
 import { MoreProvidersDialog } from "./MoreProvidersDialog";
@@ -156,7 +156,7 @@ export interface ProviderPickerProps {
 }
 
 export function ProviderPicker(props: ProviderPickerProps) {
-  const { t, format, sourceText } = useText();
+  const { t, format, sourceText, errorMessage } = useText();
   // Rows are keyed by position, so a row's input can show another provider after the list changes.
   // The input is found by its current value, not by the provider it was made for.
   const inputs = new Set<HTMLInputElement>();
@@ -185,6 +185,26 @@ export function ProviderPicker(props: ProviderPickerProps) {
    */
   let moreChoice: AgentProviderId | "custom" | null = null;
   let focused = false;
+  const [useChanges, setUseChanges] = createStore<
+    Partial<Record<AgentProviderId, { pending: boolean; error: string | null }>>
+  >({});
+  async function setProviderOn(provider: AgentProviderId, on: boolean) {
+    if (useChanges[provider]?.pending) return;
+    setUseChanges((state) => {
+      state[provider] = { pending: true, error: null };
+    });
+    try {
+      await props.onSetProviderOn?.(provider, on);
+    } catch (error) {
+      setUseChanges((state) => {
+        state[provider] = { pending: false, error: errorMessage(error, t("error.provider.useChangeFailed")) };
+      });
+      return;
+    }
+    setUseChanges((state) => {
+      state[provider] = { pending: false, error: null };
+    });
+  }
   /**
    * The last switch the user tried to turn off while agents use its provider. Each attempt is a new
    * object, so the message is drawn again and a screen reader announces it again.
@@ -227,7 +247,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
         <span class="provider-picker-state">
           {/* Count only; endpoint naming is the model picker's job. Moves beside Add when it opens the list. */}
           <Show when={endpointCount() > 0 && !countManageable()}>
-            <Badge class="provider-picker-custom-count" tone="neutral" shape="pill">
+            <Badge class="provider-picker-custom-count" variant="secondary" shape="pill">
               {endpointCountLabel()}
             </Badge>
           </Show>
@@ -235,7 +255,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
           <Show when={!customReady()}>
             <Badge
               class={`provider-picker-status provider-picker-status-${engine().state}`}
-              tone={providerStatusTone(engine().state)}
+              variant={providerStatusVariant(engine().state)}
               shape="pill"
             >
               {providerStatusLabel(t, format, engine().state)}
@@ -511,7 +531,11 @@ export function ProviderPicker(props: ProviderPickerProps) {
                       <Show
                         when={!off()}
                         fallback={
-                          <Badge class="provider-picker-status provider-picker-status-off" tone="neutral" shape="pill">
+                          <Badge
+                            class="provider-picker-status provider-picker-status-off"
+                            variant="secondary"
+                            shape="pill"
+                          >
                             {t("provider.status.off")}
                           </Badge>
                         }
@@ -526,14 +550,18 @@ export function ProviderPicker(props: ProviderPickerProps) {
                             (option().keyStatus === "missing" || option().keyStatus === "unreadable")
                           }
                         >
-                          <Badge class="provider-picker-status provider-picker-key-status" tone="neutral" shape="pill">
+                          <Badge
+                            class="provider-picker-status provider-picker-key-status"
+                            variant="secondary"
+                            shape="pill"
+                          >
                             {t("provider.key.free")}
                           </Badge>
                         </Show>
                         <Show when={runtimeStatus()?.phase !== "not-downloaded" || updatable()}>
                           <Badge
                             class={`provider-picker-status provider-picker-status-${visualState()}`}
-                            tone={providerStatusTone(visualState())}
+                            variant={providerStatusVariant(visualState())}
                             shape="pill"
                           >
                             {providerStatusLabel(t, format, state(), connecting(), runtimeStatus(), updatable())}
@@ -724,7 +752,10 @@ export function ProviderPicker(props: ProviderPickerProps) {
                         size="sm"
                         class="provider-picker-use"
                         checked={!off()}
-                        disabled={Boolean(props.disabled || props.refreshingProviders)}
+                        disabled={Boolean(
+                          props.disabled || props.refreshingProviders || useChanges[option().id]?.pending,
+                        )}
+                        aria-busy={useChanges[option().id]?.pending ? "true" : "false"}
                         aria-label={t("provider.aria.use", { name: option().name })}
                         aria-describedby={refusal() ? usedById() : undefined}
                         onChange={(on: boolean) => {
@@ -733,13 +764,20 @@ export function ProviderPicker(props: ProviderPickerProps) {
                             return;
                           }
                           setRefusedOff(null);
-                          void props.onSetProviderOn?.(option().id, on);
+                          void setProviderOn(option().id, on);
                         }}
                       />
                     </Show>
                   </div>
                   {/* Outside the label: inside it, the message would be part of the radio's name, and
                     a click on it would choose the provider. */}
+                  <Show when={useChanges[option().id]?.error}>
+                    {(message) => (
+                      <small class="provider-picker-check-error provider-picker-used-by" role="alert">
+                        {message()}
+                      </small>
+                    )}
+                  </Show>
                   <Show when={refusal()} keyed>
                     <small id={usedById()} class="provider-picker-check-error provider-picker-used-by" role="alert">
                       {t("provider.use.inUse", {
@@ -856,13 +894,15 @@ function servesCustomProvider(openCode: ProviderPickerOption | undefined): boole
 
 type ProviderVisualState = AgentProviderState | ProviderRuntimePhase | "connecting" | "update-available";
 
-function providerStatusTone(state: ProviderVisualState): "success" | "warning" | "danger" | "neutral" {
-  if (state === "available") return "success";
-  if (state === "ready") return "success";
-  if (state === "error" || state === "download-error") return "danger";
-  if (state === "sign-in-required" || state === "outdated" || state === "finishing") return "warning";
-  if (state === "update-available") return "warning";
-  return "neutral";
+function providerStatusVariant(
+  state: ProviderVisualState,
+): "success-light" | "warning-light" | "destructive-light" | "secondary" {
+  if (state === "available") return "success-light";
+  if (state === "ready") return "success-light";
+  if (state === "error" || state === "download-error") return "destructive-light";
+  if (state === "sign-in-required" || state === "outdated" || state === "finishing") return "warning-light";
+  if (state === "update-available") return "warning-light";
+  return "secondary";
 }
 
 /** Badge text, translated where drawn; downloads report a percentage, not a key. */

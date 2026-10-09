@@ -1,6 +1,7 @@
 import {
   browserViewStreamPath,
   decodeBrowserViewInput,
+  encodeBrowserViewCopied,
   encodeBrowserViewFrame,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import {
@@ -15,13 +16,46 @@ import { runTeamEffect } from "./effect-boundary";
 const sessionId = "11111111-1111-4111-8111-111111111111";
 const tabId = "22222222-2222-4222-8222-222222222222";
 describe("remote browser view", () => {
+  it.each([
+    { type: "error", message: "The host stream socket failed." },
+    { type: "close", code: 1011, reason: "The live view of this page failed." },
+    { type: "close", code: 1011 },
+  ] as const)("reports a $type failure and releases the host session", async (failure) => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    const request = vi.fn().mockResolvedValue({ id: sessionId, tabId, streamPath: browserViewStreamPath(sessionId) });
+    const client = createRemoteBrowserView(
+      send,
+      request,
+      () => false,
+      () => false,
+    );
+    const ended = vi.fn();
+    await runTeamEffect(client.open(tabId, vi.fn(), ended, vi.fn()));
+    const streamId = decodeRemoteDesktopSignalControl(send.mock.calls[0]?.[0]).streamId;
+    client.receive(encodeRemoteDesktopSignalControl({ ...failure, streamId }));
+    expect(ended).toHaveBeenCalledWith(
+      failure.type === "error" ? failure.message : "The live view of this page failed.",
+    );
+    await vi.waitFor(() =>
+      expect(request).toHaveBeenLastCalledWith("DELETE", `/v1/browser/view/sessions/${sessionId}`),
+    );
+    client.receive(encodeRemoteDesktopSignalControl({ type: "close", streamId, code: 1006 }));
+    expect(ended).toHaveBeenCalledOnce();
+  });
+
   it("routes frames only to the current opened stream and closes the host session", async () => {
     const send = vi.fn().mockResolvedValue(undefined);
     const request = vi.fn().mockResolvedValue({ id: sessionId, tabId, streamPath: browserViewStreamPath(sessionId) });
-    const client = createRemoteBrowserView(send, request, () => false);
+    const client = createRemoteBrowserView(
+      send,
+      request,
+      () => false,
+      () => false,
+    );
     const frame = vi.fn();
     const ended = vi.fn();
-    const view = await runTeamEffect(client.open(tabId, frame, ended));
+    const copied = vi.fn();
+    const view = await runTeamEffect(client.open(tabId, frame, ended, copied));
     const [openCall] = send.mock.calls;
     assert(openCall);
     const control = decodeRemoteDesktopSignalControl(openCall[0]);
@@ -33,6 +67,10 @@ describe("remote browser view", () => {
     expect(frame).not.toHaveBeenCalled();
     client.receive(encodeRemoteDesktopSignalBinary(control.streamId, bytes));
     expect(frame).toHaveBeenCalledWith({ sequence: 1, width: 10, height: 20, image: new Uint8Array([1, 2, 3]) });
+    const answer = encodeBrowserViewCopied({ type: "copied", text: "selected" });
+    client.receive(encodeRemoteDesktopSignalControl({ type: "text", streamId: "other", data: answer }));
+    client.receive(encodeRemoteDesktopSignalControl({ type: "text", streamId: control.streamId, data: answer }));
+    expect(copied.mock.calls).toEqual([[{ type: "copied", text: "selected" }]]);
     await runTeamEffect(view.close());
     expect(request).toHaveBeenLastCalledWith("DELETE", `/v1/browser/view/sessions/${sessionId}`);
     expect(ended).toHaveBeenCalledOnce();
@@ -52,8 +90,13 @@ describe("remote browser view", () => {
       )
       .mockResolvedValue(undefined);
     const send = vi.fn().mockResolvedValue(undefined);
-    const client = createRemoteBrowserView(send, request, () => false);
-    const opening = runTeamEffect(client.open(tabId, vi.fn(), vi.fn()));
+    const client = createRemoteBrowserView(
+      send,
+      request,
+      () => false,
+      () => false,
+    );
+    const opening = runTeamEffect(client.open(tabId, vi.fn(), vi.fn(), vi.fn()));
     const rejected = expect(opening).rejects.toThrow("view changed");
     await vi.waitFor(() => expect(request).toHaveBeenCalledOnce());
     client.disconnect();
@@ -74,8 +117,13 @@ describe("remote browser view", () => {
       )
       .mockResolvedValue(undefined);
     const request = vi.fn().mockResolvedValue({ id: sessionId, tabId, streamPath: browserViewStreamPath(sessionId) });
-    const client = createRemoteBrowserView(send, request, () => false);
-    const opening = runTeamEffect(client.open(tabId, vi.fn(), vi.fn()));
+    const client = createRemoteBrowserView(
+      send,
+      request,
+      () => false,
+      () => false,
+    );
+    const opening = runTeamEffect(client.open(tabId, vi.fn(), vi.fn(), vi.fn()));
     await vi.waitFor(() => expect(send).toHaveBeenCalledOnce());
     client.disconnect();
     opened?.();
@@ -91,8 +139,13 @@ describe("remote browser view", () => {
     const opened = async (namesFrames: boolean) => {
       const send = vi.fn().mockResolvedValue(undefined);
       const request = vi.fn().mockResolvedValue({ id: sessionId, tabId, streamPath: browserViewStreamPath(sessionId) });
-      const client = createRemoteBrowserView(send, request, () => namesFrames);
-      const view = await runTeamEffect(client.open(tabId, vi.fn(), vi.fn()));
+      const client = createRemoteBrowserView(
+        send,
+        request,
+        () => namesFrames,
+        () => false,
+      );
+      const view = await runTeamEffect(client.open(tabId, vi.fn(), vi.fn(), vi.fn()));
       const [openCall] = send.mock.calls;
       assert(openCall);
       const control = decodeRemoteDesktopSignalControl(openCall[0]);

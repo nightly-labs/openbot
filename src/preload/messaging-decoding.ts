@@ -1,22 +1,23 @@
-// What main answers for the Slack workspaces and Telegram chats of this computer. These guard the renderer.
+// What main answers for the Slack workspaces, Discord servers and Telegram chats of this computer.
+// These guard the renderer.
 
 import {
-  type AddSlackOrchestratorResult,
-  isAddSlackOrchestratorResult,
-  isSlackOverview,
+  type AddMessagingOrchestratorResult,
+  isAddMessagingOrchestratorResult,
+  isMessagingOverview,
   isTelegramOverview,
-  type SlackOverview,
+  type MessagingOverview,
   type TelegramOverview,
 } from "@openbot/contracts/ipc";
 
 /** The orchestrator that main created, and the sidebar section it went to. */
-export function decodeAddSlackOrchestratorReply(value: unknown): AddSlackOrchestratorResult {
-  if (!isAddSlackOrchestratorResult(value)) throw new Error("Invalid Slack orchestrator response.");
+export function decodeAddOrchestratorReply(value: unknown): AddMessagingOrchestratorResult {
+  if (!isAddMessagingOrchestratorResult(value)) throw new Error("Invalid messaging orchestrator response.");
   return value;
 }
 
-export function decodeSlackOverviewReply(value: unknown): SlackOverview {
-  if (!isSlackOverview(value)) throw new Error("Invalid Slack overview response.");
+export function decodeMessagingOverviewReply(value: unknown): MessagingOverview {
+  if (!isMessagingOverview(value)) throw new Error("Invalid messaging overview response.");
   return value;
 }
 

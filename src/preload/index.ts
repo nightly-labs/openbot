@@ -17,9 +17,11 @@ import {
   decodeChannelSummaries,
   decodeHostUpdateStatus,
   decodeMcpServerConfigs,
+  decodeMcpSignInStates,
   decodeMcpTestResult,
   decodeOptionalStorageUsage,
   decodeSaveAgentProfileResult,
+  decodeWorkspaceDirectory,
   type EventEndpoint,
   type GroupApi,
   groupApiMethodName,
@@ -33,6 +35,13 @@ import {
   type ServerSummary,
   type Untyped,
 } from "@openbot/contracts/ipc";
+import {
+  decodeEventActivity,
+  decodeEventRoutines,
+  decodeEventStatus,
+  decodeSaveEventRoutineResult,
+  decodeWebhookSecret,
+} from "@openbot/contracts/ipc-events";
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import {
   decodeAccountUsageFromMain,
@@ -50,6 +59,7 @@ import {
   decodeProviderCodeLoginStart,
   decodeRoutine,
   decodeRoutineCalendar,
+  decodeRoutineFeed,
   decodeRoutineRun,
   decodeRoutineRuns,
   decodeRoutines,
@@ -67,6 +77,7 @@ import {
   decodeApprovalAutomationPreference,
   decodeAppSetupState,
   decodeBillingState,
+  decodeBitwardenConnectorStatus,
   decodeBusyMessageModePreference,
   decodeCentralAuthState,
   decodeCustomAgentCheckResult,
@@ -96,6 +107,7 @@ import {
   decodeProviderDetectionSettings,
   decodeRemoteDesktopSetupFromMain,
   decodeRemoteDesktopTestFromMain,
+  decodeRemoteSessionReusePreference,
   decodeUpdatePreference,
   decodeUpdateStatus,
   decodeVoiceModelStatus,
@@ -136,12 +148,14 @@ import {
   decodeDynamicIslandPreference,
   decodeDynamicIslandPresentation,
 } from "./dynamic-island-decoding";
+import { decodeHostReleaseStatusFromMain } from "./host-release-decoding";
 import {
-  decodeAddSlackOrchestratorReply,
-  decodeSlackOverviewReply,
+  decodeAddOrchestratorReply,
+  decodeMessagingOverviewReply,
   decodeTelegramOverviewReply,
 } from "./messaging-decoding";
 import { decodeProviderRuntimeSnapshot } from "./provider-runtime";
+import { decodeRoutineFlowCanvas, decodeRoutineFlowLink, decodeRoutineFlowsChanged } from "./routine-flow-decoding";
 import {
   decodeAgentInstallation,
   decodeAgentPublicationPreview,
@@ -459,6 +473,8 @@ const openbotApi: OpenBotDesktopApi = {
     approvalAutomation: decodeApprovalAutomationPreference,
     getBusyMessageModePreference: decodeBusyMessageModePreference,
     setBusyMessageModePreference: decodeBusyMessageModePreference,
+    getRemoteSessionReusePreference: decodeRemoteSessionReusePreference,
+    setRemoteSessionReusePreference: decodeRemoteSessionReusePreference,
     getAppLanguagePreference: decodeAppLanguagePreference,
     setAppLanguagePreference: decodeAppLanguagePreference,
     appLanguagePreference: decodeAppLanguagePreference,
@@ -472,6 +488,7 @@ const openbotApi: OpenBotDesktopApi = {
   ...bridgeGroup(IPC_ENDPOINTS.providers, {
     connectProvider: decodeAgentStatusFromMain,
     refreshAgentProviders: decodeAgentStatusFromMain,
+    setProviderOn: decodeAgentStatusFromMain,
     restartProvider: decodeAgentStatusFromMain,
     cancelProviderRestart: decodeAgentStatusFromMain,
     updateProviderCli: decodeAgentStatusFromMain,
@@ -510,6 +527,15 @@ const openbotApi: OpenBotDesktopApi = {
     cancel: decodeProviderRuntimeSnapshot,
     checkForUpdates: decodeProviderRuntimeSnapshot,
     event: decodeProviderRuntimeSnapshot,
+  }),
+  routineFlows: bridgeGroup(IPC_ENDPOINTS.routineFlows, {
+    canvas: decodeRoutineFlowCanvas,
+    savePosition: decodeVoid,
+    removePosition: decodeVoid,
+    connect: decodeRoutineFlowLink,
+    disconnect: decodeVoid,
+    updateLink: decodeRoutineFlowLink,
+    changed: decodeRoutineFlowsChanged,
   }),
   voice: bridgeGroup(IPC_ENDPOINTS.voice, {
     getModelStatus: decodeVoiceModelStatus,
@@ -565,6 +591,12 @@ const openbotApi: OpenBotDesktopApi = {
     openInstall: decodeVoid,
     changed: decodeGitHubConnectorStatus,
   }),
+  bitwardenConnector: bridgeGroup(IPC_ENDPOINTS.bitwardenConnector, {
+    status: decodeBitwardenConnectorStatus,
+    connect: decodeBitwardenConnectorStatus,
+    disconnect: decodeBitwardenConnectorStatus,
+    changed: decodeBitwardenConnectorStatus,
+  }),
   onePasswordConnector: bridgeGroup(IPC_ENDPOINTS.onePasswordConnector, {
     status: decodeOnePasswordConnectorStatus,
     checkSetup: decodeOnePasswordConnectorStatus,
@@ -576,11 +608,17 @@ const openbotApi: OpenBotDesktopApi = {
     disconnect: decodeOnePasswordConnectorStatus,
     changed: decodeOnePasswordConnectorStatus,
   }),
+  routineFeed: bridgeGroup(IPC_ENDPOINTS.routineFeed, {
+    get: decodeRoutineFeed,
+    create: decodeRoutineFeed,
+    remove: decodeRoutineFeed,
+  }),
   billing: bridgeGroup(IPC_ENDPOINTS.billing, {
     getState: decodeBillingState,
     openPortal: decodeVoid,
   }),
   hostedServers: bridgeGroup(IPC_ENDPOINTS.hostedServers, {
+    lifecycle: decodeVoid,
     list: decodeHostedServerList,
     plans: decodeHostedServerCatalog,
     create: decodeHostedServer,
@@ -623,22 +661,30 @@ const openbotApi: OpenBotDesktopApi = {
     deleteCustomProvider: decodeCustomProviderResult,
   }),
   messaging: bridgeGroup(IPC_ENDPOINTS.messaging, {
-    getSlackOverview: decodeSlackOverviewReply,
+    getSlackOverview: decodeMessagingOverviewReply,
     connectSlackWorkspace: decodeVoid,
     disconnectSlackWorkspace: decodeVoid,
     reconnectSlackWorkspace: decodeVoid,
     setSlackEnabled: decodeVoid,
-    addSlackOrchestrator: decodeAddSlackOrchestratorReply,
+    addSlackOrchestrator: decodeAddOrchestratorReply,
+    getDiscordOverview: decodeMessagingOverviewReply,
+    connectDiscordGuild: decodeVoid,
+    disconnectDiscordGuild: decodeVoid,
+    reconnectDiscordGuild: decodeVoid,
+    setDiscordEnabled: decodeVoid,
+    addDiscordOrchestrator: decodeAddOrchestratorReply,
     getTelegramOverview: decodeTelegramOverviewReply,
     connectTelegramChat: decodeVoid,
     disconnectTelegramChat: decodeVoid,
     reconnectTelegramChat: decodeVoid,
     setTelegramEnabled: decodeVoid,
-    addTelegramOrchestrator: decodeAddSlackOrchestratorReply,
+    addTelegramOrchestrator: decodeAddOrchestratorReply,
   }),
   hostAdmin: bridgeGroup(IPC_ENDPOINTS.hostAdmin, {
     updateIdentity: decodeServer,
     getUpdateStatus: decodeHostUpdateStatus,
+    getReleaseStatus: (value) => (value === null ? null : decodeHostReleaseStatusFromMain(value)),
+    checkRelease: decodeHostReleaseStatusFromMain,
     checkForUpdate: decodeHostUpdateStatus,
     startUpdate: decodeHostUpdateStatus,
     cancelUpdate: decodeHostUpdateStatus,
@@ -712,6 +758,10 @@ const openbotApi: OpenBotDesktopApi = {
       removeMcpServer: decodeMcpServerConfigs,
       setMcpServerEnabled: decodeMcpServerConfigs,
       testMcpServer: decodeMcpTestResult,
+      signInMcpServer: decodeMcpTestResult,
+      cancelMcpSignIn: decodeVoid,
+      signOutMcpServer: decodeMcpSignInStates,
+      listMcpSignIns: decodeMcpSignInStates,
     }),
     ...bridgeGroup(IPC_ENDPOINTS.agentAdmin, {
       getAgentAdminSettings: decodeAgentAdminSettings,
@@ -732,6 +782,7 @@ const openbotApi: OpenBotDesktopApi = {
       openWorkspaceFile: decodeVoid,
       previewSharedFile: decodeFilePreview,
       previewWorkspaceFile: decodeFilePreview,
+      listWorkspaceDirectory: decodeWorkspaceDirectory,
     }),
     onAttachmentImport: (listener) => {
       attachmentImportListeners.add(listener);
@@ -836,6 +887,17 @@ const openbotApi: OpenBotDesktopApi = {
     revokeInvite: decodeVoid,
     createInvite: decodeInviteSummary,
     event: decodeHostStatus,
+  }),
+  // The shared strict contract decoders, as MCP does: main decodes a remote answer with the same
+  // decoder before it reaches this point.
+  events: bridgeGroup(IPC_ENDPOINTS.events, {
+    getStatus: decodeEventStatus,
+    listRoutines: decodeEventRoutines,
+    saveRoutine: decodeSaveEventRoutineResult,
+    deleteRoutine: decodeVoid,
+    testRoutine: decodeVoid,
+    rotateSecret: decodeWebhookSecret,
+    listActivity: decodeEventActivity,
   }),
   // The shared contract decoder, as MCP does: it already bounds every row, and a remote answer was
   // decoded in main before it reached this point.

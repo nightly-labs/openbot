@@ -8,15 +8,14 @@ import Animated, {
   interpolateColor,
   ReduceMotion,
   useAnimatedStyle,
-  useReducedMotion,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
 import { useCSSVariable } from "uniwind";
-
 import { QrScanner } from "@/features/auth/components/qr-scanner";
+import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
 import { ScanQrButton } from "./scan-qr-button";
 import { ScannerCloseButton } from "./scanner-close-button";

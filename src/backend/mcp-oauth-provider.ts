@@ -28,6 +28,7 @@ import {
   OAuthTokensSchema,
 } from "@modelcontextprotocol/sdk/shared/auth.js";
 import type { FetchLike } from "@modelcontextprotocol/sdk/shared/transport.js";
+import { MCP_SIGN_IN_TIMEOUT_MS } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { z } from "zod";
 import { runCauseEffect } from "./effect-boundary";
@@ -86,9 +87,6 @@ export interface McpOAuthOptions {
   refreshTimeoutMs?: number;
 }
 
-/** Long enough to find the right account and read a consent page, short enough to end by itself. */
-const MCP_SIGN_IN_TIMEOUT_MS = 5 * 60 * 1000;
-
 /**
  * How long a token exchange may hold a thread start or a test. The probe and the hand-off both
  * resolve every token before they connect, so an authorization server that accepts a connection
@@ -124,6 +122,12 @@ export interface McpSignIn {
    * is not the cause.
    */
   registrationFailed: () => boolean;
+  /**
+   * Whether the user cancelled this attempt. A cancel can land during discovery, registration or
+   * the token exchange, where the step it stops fails with its own words; the reader says
+   * "cancelled" instead, because that is what the user did.
+   */
+  cancelled: () => boolean;
 }
 
 /**
@@ -132,6 +136,10 @@ export interface McpSignIn {
 export interface McpOAuthAuthority {
   accessToken: (url: string) => Effect.Effect<string | null, McpOperationError>;
   signIn: (url: string) => McpSignIn | null;
+  /** Ends the sign-in waiting for this URL's browser, if one is. Answers whether one was. */
+  cancelSignIn: (url: string) => boolean;
+  /** Whether this computer holds a token for this URL. Never the token itself. */
+  signedIn: (url: string) => boolean;
   forget: (url: string) => Effect.Effect<void, McpOperationError>;
 }
 
@@ -145,6 +153,12 @@ export class McpOAuth implements McpOAuthAuthority {
    * `openbot://mcp-auth` link do nothing.
    */
   readonly #waiting = new Map<string, (code: string) => void>();
+  /**
+   * The cancel of the sign-in still running for each server. A user who presses Cancel names the
+   * server, not the `state`, and one attempt per server is kept: a second Sign in replaces the
+   * first rather than leaving two browser tabs that race to answer.
+   */
+  readonly #attempts = new Map<string, () => void>();
   /** The refresh already running for a server, so two hand-offs share one exchange. See `#refresh`. */
   readonly #scope = Scope.makeUnsafe();
   readonly #refreshing = new Map<string, Fiber.Fiber<void>>();
@@ -179,6 +193,10 @@ export class McpOAuth implements McpOAuthAuthority {
     if (!stored?.tokens) return null;
     const fallback = stored.tokens.access_token;
     if (!expiringSoon(stored)) return fallback;
+    // The SDK binds credentials saved by new versions to the authorization server. An older
+    // record without that binding must not trigger discovery and then spend its refresh token at
+    // whichever server the MCP resource names. Keep the access token for the resource instead.
+    if (!credentialIssuer(stored.tokens, stored)) return fallback;
     yield* this.#refresh(resource);
     return yield* mcpSync(() => this.#options.storage.read(resource)?.tokens?.access_token ?? fallback);
   }).bind(this);
@@ -237,30 +255,48 @@ export class McpOAuth implements McpOAuthAuthority {
   );
 
   readonly close = Effect.fn("McpOAuth.close")(() =>
-    Scope.close(this.#scope, Exit.void).pipe(Effect.ensuring(Effect.sync(() => this.#waiting.clear()))),
+    Scope.close(this.#scope, Exit.void).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          for (const cancel of [...this.#attempts.values()]) cancel();
+          this.#waiting.clear();
+        }),
+      ),
+    ),
   );
 
   /** A sign-in the user asked for, or `null` when the URL is not one this can sign in to. */
   signIn(url: string): McpSignIn | null {
     const resource = normalizeResource(url);
     if (!resource) return null;
+    this.#attempts.get(resource)?.();
     const state = randomUUID();
-    const grant = Deferred.makeUnsafe<string>();
+    const grant = Deferred.makeUnsafe<string, Error>();
     this.#waiting.set(state, (code) => {
       Deferred.doneUnsafe(grant, Effect.succeed(code));
     });
     // Set when the probe moves on: a discovery slow enough to outlast it must neither open a
     // browser afterwards nor wait out a grant nobody will answer.
     let abandoned = false;
+    let cancelled = false;
     const provider = this.#provider(resource, state, () => abandoned);
     const abandon = () => {
       abandoned = true;
       this.#waiting.delete(state);
+      if (this.#attempts.get(resource) === cancel) this.#attempts.delete(resource);
     };
+    // The user said stop: the wait ends now rather than at its deadline, with its own sentence.
+    const cancel = () => {
+      cancelled = true;
+      Deferred.doneUnsafe(grant, Effect.fail(new Error(sourceText("error.backend.mcpSignInCancelled"))));
+      abandon();
+    };
+    this.#attempts.set(resource, cancel);
     return {
       provider,
       complete: () =>
         Effect.gen({ self: this }, function* () {
+          if (cancelled) return yield* mcpFailure(new Error(sourceText("error.backend.mcpSignInCancelled")));
           if (abandoned) return yield* mcpFailure(new Error(sourceText("error.backend.mcpSignInAbandonedGeneric")));
           // Aborts with the wait: a token endpoint that never completes must not keep a request
           // running after this attempt ends, or its late response would write credentials a later
@@ -270,7 +306,7 @@ export class McpOAuth implements McpOAuthAuthority {
             const code = yield* withTimeout(
               Deferred.await(grant),
               this.#options.signInTimeoutMs ?? MCP_SIGN_IN_TIMEOUT_MS,
-              "The sign-in was not finished in the browser.",
+              sourceText("error.backend.mcpSignInTimedOut"),
             ).pipe(Effect.mapError(mcpFailure));
             // The grant is a credential until it is spent, and a token endpoint that refuses it
             // commonly quotes it back in `error_description`.
@@ -290,7 +326,7 @@ export class McpOAuth implements McpOAuthAuthority {
                 }),
               ),
               this.#options.refreshTimeoutMs ?? MCP_TOKEN_TIMEOUT_MS,
-              "The sign-in response did not arrive in time.",
+              sourceText("error.backend.mcpSignInResponseTimedOut"),
             ).pipe(Effect.mapError(mcpFailure));
           }).pipe(
             Effect.ensuring(
@@ -304,6 +340,7 @@ export class McpOAuth implements McpOAuthAuthority {
       abandon,
       secrets: () => provider.secrets(),
       registrationFailed: () => provider.registrationPending,
+      cancelled: () => cancelled,
     };
   }
 
@@ -319,7 +356,19 @@ export class McpOAuth implements McpOAuthAuthority {
     return true;
   }
 
-  /** Forgets one server's registration and tokens. Used when the row that named it is removed. */
+  cancelSignIn(url: string): boolean {
+    const resource = normalizeResource(url);
+    const cancel = resource ? this.#attempts.get(resource) : undefined;
+    cancel?.();
+    return cancel !== undefined;
+  }
+
+  signedIn(url: string): boolean {
+    const resource = normalizeResource(url);
+    return resource !== null && Boolean(this.#options.storage.read(resource)?.tokens);
+  }
+
+  /** Forgets one server's registration and tokens. Used when the row is removed or signed out. */
   readonly forget = Effect.fn("McpOAuth.forget")(function* (this: McpOAuth, url: string) {
     const resource = normalizeResource(url);
     if (!resource) return;
@@ -331,6 +380,7 @@ export class McpOAuth implements McpOAuthAuthority {
   #provider(resource: string, state: string | null, isAbandoned: () => boolean = () => false): McpOAuthClientProvider {
     const generation = this.#generations.get(resource) ?? 0;
     const storage = this.#options.storage;
+    const stored = storage.read(resource);
     // The store as this run saw it: reads answer from disk, but a write or a removal lands only
     // while no `forget` has removed the server - and no abandon has ended the run - since this
     // provider was built.
@@ -362,6 +412,8 @@ export class McpOAuth implements McpOAuthAuthority {
       redirectUrl: this.#options.redirectUrl,
       openExternal: this.#options.openExternal,
       isAbandoned,
+      legacyIssuer: legacyIssuer(stored),
+      hasUnboundCredentials: hasUnboundCredentials(stored),
     });
   }
 }
@@ -374,6 +426,10 @@ interface ClientProviderOptions {
   openExternal: (url: string) => Promise<void>;
   /** Whether the sign-in that built this provider has been abandoned since. */
   isAbandoned: () => boolean;
+  /** The issuer from a pre-1.31 record, captured before the SDK can write new discovery state. */
+  legacyIssuer: string | undefined;
+  /** Whether this provider started with credentials that have no issuer binding. */
+  hasUnboundCredentials: boolean;
 }
 
 /**
@@ -400,6 +456,10 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   #redirectAddressChecked = false;
   /** Set once the grant is in hand: from there the client on file is the one that must spend it. */
   #exchangingCode = false;
+  /** Issuer selected by the SDK for this auth attempt, captured before credentials are read. */
+  #activeIssuer: string | undefined;
+  /** Full discovery for this attempt, including custom protected-resource metadata. */
+  #discoveryState: OAuthDiscoveryState | undefined;
   /** Set when the SDK is told to register, and cleared when it saves what it registered. */
   #registrationPending = false;
 
@@ -459,8 +519,8 @@ class McpOAuthClientProvider implements OAuthClientProvider {
    */
   clientInformation(): OAuthClientInformationFull | undefined {
     const record = this.#record();
-    const client = record.client;
-    this.recordSecret(client?.client_secret);
+    const client = this.#credential(record.client);
+    this.recordSecret(record.client?.client_secret);
     if (!client) return this.#register();
     if (!this.#options.state || this.#exchangingCode) return client;
     if (client.redirect_uris.includes(this.#options.redirectUrl)) return client;
@@ -498,7 +558,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   }
 
   tokens(): OAuthTokens | undefined {
-    const tokens = this.#record().tokens;
+    const tokens = this.#credential(this.#record().tokens);
     this.#recordTokens(tokens);
     return tokens;
   }
@@ -559,6 +619,16 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   saveDiscoveryState(discovery: OAuthDiscoveryState): Promise<void> {
     return runCauseEffect(
       Effect.gen({ self: this }, function* () {
+        this.#activeIssuer = discovery.authorizationServerUrl;
+        this.#discoveryState = discovery;
+        // A pre-1.31 record has no safe issuer when its discovery state is absent. Do not let a
+        // malicious resource install its authorization server as the binding for that record.
+        // When old discovery exists, keep it until the old credentials have been stamped.
+        if (
+          this.#options.hasUnboundCredentials &&
+          (!this.#options.legacyIssuer || !issuersMatch(this.#options.legacyIssuer, discovery.authorizationServerUrl))
+        )
+          return;
         yield* this.#save({
           discovery: {
             authorizationServerUrl: discovery.authorizationServerUrl,
@@ -570,7 +640,18 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   }
 
   discoveryState(): OAuthDiscoveryState | undefined {
-    return this.#record().discovery;
+    const stored = this.#record().discovery;
+    const discovery =
+      this.#discoveryState ??
+      (stored
+        ? {
+            authorizationServerUrl: stored.authorizationServerUrl,
+            ...(stored.resourceMetadataUrl ? { resourceMetadataUrl: stored.resourceMetadataUrl } : {}),
+          }
+        : undefined);
+    this.#discoveryState = discovery;
+    this.#activeIssuer = discovery?.authorizationServerUrl;
+    return discovery;
   }
 
   saveCodeVerifier(codeVerifier: string): void {
@@ -593,7 +674,11 @@ class McpOAuthClientProvider implements OAuthClientProvider {
       Effect.gen({ self: this }, function* () {
         if (scope === "verifier" || scope === "discovery") {
           if (scope === "verifier") this.#codeVerifier = null;
-          else yield* this.#save({ discovery: undefined });
+          else {
+            this.#discoveryState = undefined;
+            this.#activeIssuer = undefined;
+            yield* this.#save({ discovery: undefined });
+          }
           return;
         }
         if (scope === "all") {
@@ -614,12 +699,32 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     return this.#options.storage.read(this.#options.resource) ?? {};
   }
 
+  #credential<T extends Pick<OAuthTokens, "issuer">>(credential: T | undefined): T | undefined {
+    if (!credential) return undefined;
+    if (typeof credential.issuer === "string") return credential;
+    // Let SDK 1.31 stamp a trusted legacy value when the exchange succeeds. Returning a copy
+    // with an issuer here would make the SDK treat it as already stamped and leave the record
+    // unbound after the migration.
+    return this.#options.legacyIssuer &&
+      this.#activeIssuer &&
+      issuersMatch(this.#options.legacyIssuer, this.#activeIssuer)
+      ? credential
+      : undefined;
+  }
+
   readonly #save = Effect.fn("McpOAuthClientProvider.save")(function* (
     this: McpOAuthClientProvider,
     part: Partial<McpOAuthRecord>,
   ): Effect.fn.Return<void, McpOperationError> {
     const record = yield* mcpSync(() => this.#record());
-    yield* this.#options.storage.write(this.#options.resource, { ...record, ...part });
+    const next = { ...record, ...part };
+    if (!("discovery" in part) && this.#discoveryState && !hasUnboundCredentials(next)) {
+      next.discovery = {
+        authorizationServerUrl: this.#discoveryState.authorizationServerUrl,
+        resourceMetadataUrl: this.#discoveryState.resourceMetadataUrl,
+      };
+    }
+    yield* this.#options.storage.write(this.#options.resource, next);
   });
 }
 
@@ -642,8 +747,41 @@ export function normalizeResource(url: string): string | null {
   }
 }
 
+/** A legacy binding is useful only when it names an endpoint this client would send credentials to. */
+function legacyIssuer(record: McpOAuthRecord | null): string | undefined {
+  const issuer = record?.discovery?.authorizationServerUrl;
+  if (!issuer) return undefined;
+  try {
+    const parsed = new URL(issuer);
+    return isSecureEndpoint(parsed) ? parsed.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function hasUnboundCredentials(record: McpOAuthRecord | null): boolean {
+  return Boolean(
+    (record?.client && typeof record.client.issuer !== "string") ||
+      (record?.tokens && typeof record.tokens.issuer !== "string"),
+  );
+}
+
+function credentialIssuer(credential: Pick<OAuthTokens, "issuer">, record: McpOAuthRecord): string | undefined {
+  return typeof credential.issuer === "string" ? credential.issuer : legacyIssuer(record);
+}
+
+function issuersMatch(left: string, right: string): boolean {
+  try {
+    const a = new URL(left).toString();
+    const b = new URL(right).toString();
+    return a === b || (a.endsWith("/") && a.slice(0, -1) === b) || (b.endsWith("/") && b.slice(0, -1) === a);
+  } catch {
+    return left === right;
+  }
+}
+
 /** The names that never leave this machine. `::1` arrives from `URL` inside brackets. */
-function isLoopback(hostname: string): boolean {
+export function isLoopback(hostname: string): boolean {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
 }
 

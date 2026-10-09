@@ -81,6 +81,8 @@ export interface OpenBotDynamicIslandProps {
   suppressInitialHover?: boolean;
   onStateChange: (state: DynamicIslandViewState, reason: DynamicIslandStateChangeReason) => void;
   onAction: (action: DynamicIslandAction) => void | Promise<void>;
+  /** Shown next to the actions of an attention panel when the last action failed. */
+  actionError?: string | undefined;
   onHaptic?: () => void;
 }
 
@@ -691,6 +693,7 @@ export function OpenBotDynamicIsland(props: OpenBotDynamicIslandProps): JSX.Elem
               presentation={visiblePresentation()}
               displayMode={props.displayMode}
               onAction={props.onAction}
+              actionError={props.actionError}
               onHaptic={props.onHaptic}
               onClose={() => props.onStateChange("compact", "pointer")}
             />
@@ -953,6 +956,7 @@ function ExpandedContent(props: {
   presentation: DynamicIslandPresentation;
   displayMode?: "notch" | "island";
   onAction: (action: DynamicIslandAction) => void | Promise<void>;
+  actionError?: string | undefined;
   onHaptic?: () => void;
   onClose: () => void;
 }): JSX.Element {
@@ -1027,10 +1031,24 @@ function ExpandedContent(props: {
         )}
       </Match>
       <Match when={props.presentation.mode === "takeover" ? props.presentation.item : undefined}>
-        {(item) => <TakeoverContent item={item()} serverId={props.presentation.serverId} onAction={props.onAction} />}
+        {(item) => (
+          <TakeoverContent
+            item={item()}
+            serverId={props.presentation.serverId}
+            actionError={props.actionError}
+            onAction={props.onAction}
+          />
+        )}
       </Match>
       <Match when={props.presentation.mode === "failed" ? props.presentation.item : undefined}>
-        {(item) => <FailureContent item={item()} serverId={props.presentation.serverId} onAction={props.onAction} />}
+        {(item) => (
+          <FailureContent
+            item={item()}
+            serverId={props.presentation.serverId}
+            actionError={props.actionError}
+            onAction={props.onAction}
+          />
+        )}
       </Match>
       <Match when={props.presentation.mode === "question" ? props.presentation : undefined}>
         {(presentation) => (
@@ -1038,6 +1056,7 @@ function ExpandedContent(props: {
             item={presentation().item}
             serverId={presentation().serverId}
             remainingCount={presentation().remainingCount}
+            actionError={props.actionError}
             onAction={props.onAction}
             onHaptic={props.onHaptic}
             onClose={props.onClose}
@@ -1050,6 +1069,7 @@ function ExpandedContent(props: {
             item={presentation().item}
             serverId={presentation().serverId}
             remainingCount={presentation().remainingCount}
+            actionError={props.actionError}
             onAction={props.onAction}
           />
         )}
@@ -1061,6 +1081,7 @@ function ExpandedContent(props: {
 function FailureContent(props: {
   item: DynamicIslandFailureItem;
   serverId: string;
+  actionError?: string | undefined;
   onAction: (action: DynamicIslandAction) => void | Promise<void>;
 }): JSX.Element {
   const { t } = useText();
@@ -1070,6 +1091,7 @@ function FailureContent(props: {
       name={props.item.agent.name}
       status={t("island.status.failed")}
       description={props.item.detail ?? t("island.failure.fallback")}
+      actionError={props.actionError}
       action={
         <>
           <Button
@@ -1108,6 +1130,7 @@ function FailureContent(props: {
 function TakeoverContent(props: {
   item: DynamicIslandTakeoverItem;
   serverId: string;
+  actionError?: string | undefined;
   onAction: (action: DynamicIslandAction) => void | Promise<void>;
 }): JSX.Element {
   const { t } = useText();
@@ -1117,6 +1140,7 @@ function TakeoverContent(props: {
       name={props.item.agent.name}
       status={t("island.status.needsYou")}
       description={props.item.detail ?? t("island.takeover.fallback")}
+      actionError={props.actionError}
       action={
         <Button
           size="sm"
@@ -1141,6 +1165,7 @@ function NotificationContent(props: {
   name: string;
   status: string;
   description: string;
+  actionError?: string | undefined;
   action: JSX.Element;
 }): JSX.Element {
   return (
@@ -1149,6 +1174,7 @@ function NotificationContent(props: {
         <DynamicIslandIdentity name={props.name} status={props.status} description={props.description} />
       </IslandContentSwap>
       <div class="dynamic-island-surface-actions" data-island-motion-content>
+        <IslandActionError message={props.actionError} />
         {props.action}
       </div>
     </div>
@@ -1160,6 +1186,7 @@ export function ApprovalContent(props: {
   serverId: string;
   remainingCount: number;
   allowDesktopReview?: boolean;
+  actionError?: string | undefined;
   onAction: (action: DynamicIslandAction) => void | Promise<void>;
 }): JSX.Element {
   const { t, sourceText } = useText();
@@ -1197,6 +1224,7 @@ export function ApprovalContent(props: {
         </div>
       </IslandContentSwap>
       <div class="dynamic-island-surface-actions" data-island-motion-content>
+        <IslandActionError message={props.actionError} />
         <Show when={props.allowDesktopReview !== false}>
           <Button size="sm" variant="ghost" onClick={openInOpenBot}>
             {t("island.action.reviewInOpenBot")}
@@ -1222,6 +1250,7 @@ function QuestionContent(props: {
   item: DynamicIslandPromptItem;
   serverId: string;
   remainingCount: number;
+  actionError?: string | undefined;
   onAction: (action: DynamicIslandAction) => void | Promise<void>;
   onHaptic?: () => void;
   onClose: () => void;
@@ -1378,7 +1407,8 @@ function QuestionContent(props: {
         </div>
       </div>
       <div class="dynamic-island-surface-actions dynamic-island-surface-question-actions" data-island-motion-content>
-        <Show when={props.remainingCount > 0}>
+        <IslandActionError message={props.actionError} />
+        <Show when={!props.actionError && props.remainingCount > 0}>
           <small class="dynamic-island-surface-more">{t("island.moreRequests", { count: props.remainingCount })}</small>
         </Show>
         <Button size="sm" variant="ghost" onClick={props.onClose}>
@@ -1389,6 +1419,18 @@ function QuestionContent(props: {
         </Button>
       </div>
     </div>
+  );
+}
+
+function IslandActionError(props: { message: string | undefined }): JSX.Element {
+  return (
+    <Show when={props.message}>
+      {(message) => (
+        <p class="dynamic-island-surface-action-error" role="alert">
+          {message()}
+        </p>
+      )}
+    </Show>
   );
 }
 

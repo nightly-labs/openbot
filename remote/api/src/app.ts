@@ -1,4 +1,15 @@
 import type { RemoteAuthEvent } from "@openbot/contracts/signal-protocol/auth-events";
+import {
+  DISCORD_UPLOAD_BYTES_LIMIT,
+  type DiscordApiErrorBody,
+  type DiscordApiErrorCode,
+  type DiscordApiRequest,
+} from "@openbot/contracts/signal-protocol/discord-api";
+import { DISCORD_API_PATH } from "@openbot/contracts/signal-protocol/discord-route";
+import {
+  WEBHOOK_DELIVERY_BODY_BYTES_LIMIT,
+  type WebhookDeliveryStatus,
+} from "@openbot/contracts/signal-protocol/messages";
 import { SLACK_EVENTS_PATH } from "@openbot/contracts/signal-protocol/slack-route";
 import {
   TELEGRAM_BOT_ID_PATTERN,
@@ -11,10 +22,21 @@ import {
   TELEGRAM_UPLOADS_PATH,
   type TelegramUploadAnswer,
 } from "@openbot/contracts/signal-protocol/telegram-route";
-import type { ManagedRuntime } from "effect";
+import {
+  WEBHOOK_DELIVERY_ID_HEADER,
+  WEBHOOK_DELIVERY_ID_PATTERN,
+  WEBHOOK_EVENTS_PATH,
+  WEBHOOK_ROUTE_ID_PATTERN,
+  WEBHOOK_SIGNATURE_HEADER,
+  WEBHOOK_SIGNATURE_PATTERN,
+  WEBHOOK_TIMESTAMP_HEADER,
+  WEBHOOK_TIMESTAMP_PATTERN,
+} from "@openbot/contracts/signal-protocol/webhook-route";
+import { Effect, type ManagedRuntime, Result } from "effect";
 import { Elysia } from "elysia";
 import { z } from "zod";
 import type { RemoteApiConfig } from "./config";
+import { type DiscordApi, type DiscordUpload, decodeDiscordApiRequest } from "./discord-api";
 import { SLACK_DELIVERY_BODY_BYTES_LIMIT, type SlackDeliveryKind } from "./protocol";
 import type { SignalService, SignalSocket, SignalTokens, SlackDeliveryResponse } from "./signal-service";
 import { telegramFailure } from "./telegram";
@@ -22,6 +44,11 @@ import { verifySlackSignature, verifyWebhookSignature } from "./tokens";
 
 const SLACK_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
 const SLACK_RETRY_REASON_PATTERN = /^[a-z0-9_]{1,64}$/u;
+const DISCORD_SESSION_PATTERN = /^Bearer ([A-Za-z0-9_-]{43})$/u;
+// A JSON call holds at most 2,000 characters of text and five buttons.
+const DISCORD_JSON_BODY_BYTES_LIMIT = 64 * 1024;
+// The multipart fields and boundaries around one file.
+const DISCORD_UPLOAD_BODY_BYTES_LIMIT = DISCORD_UPLOAD_BYTES_LIMIT + 64 * 1024;
 
 const slackRequestSchema = z.object({
   type: z.string().optional(),
@@ -66,6 +93,16 @@ const authEventSchema = z.discriminatedUnion("type", [
     through: z.number().int().nonnegative(),
   }),
   z.object({
+    type: z.literal("discord-route-revoked"),
+    guildId: z.string().min(1),
+    through: z.number().int().nonnegative(),
+  }),
+  z.object({
+    type: z.literal("webhook-route-revoked"),
+    routeId: z.string().min(1),
+    through: z.number().int().nonnegative(),
+  }),
+  z.object({
     type: z.literal("telegram-route-revoked"),
     botId: z.string().regex(TELEGRAM_BOT_ID_PATTERN),
     chatId: z.string().regex(TELEGRAM_CHAT_ID_PATTERN),
@@ -77,6 +114,8 @@ export function createRemoteApiApp(
   config: RemoteApiConfig,
   signal: SignalService,
   runtime: ManagedRuntime.ManagedRuntime<SignalTokens, never>,
+  // Null when Signal has no Discord bot token: the Discord route answers 503.
+  discord: DiscordApi | null = null,
 ) {
   const app = new Elysia()
     .get("/health/live", () => ({ service: "openbot-remote-api", status: "live" }))
@@ -100,6 +139,8 @@ export function createRemoteApiApp(
       else if (event.type === "slack-route-revoked") signal.revokeSlackRoute(event.appId, event.teamId, event.through);
       else if (event.type === "telegram-route-revoked")
         signal.revokeTelegramRoute(event.botId, event.chatId, event.through);
+      else if (event.type === "discord-route-revoked") signal.revokeDiscordRoute(event.guildId, event.through);
+      else if (event.type === "webhook-route-revoked") signal.revokeWebhookRoute(event.routeId, event.through);
       else signal.revokeSession(event.sessionId);
       return new Response(null, { status: 204 });
     })
@@ -153,6 +194,74 @@ export function createRemoteApiApp(
             { signal: request.signal },
           ),
         );
+      },
+      { parse: "none" },
+    )
+    // The host authenticates each generic webhook request with the secret of its webhook routine. Signal
+    // only bounds the body, limits ingress and relays the exact bytes plus signed header values. It
+    // checks the headers and that a host holds the route before it spends a rate window or reads the body.
+    .post(
+      `${WEBHOOK_EVENTS_PATH}/:routeId`,
+      async ({ request, params, server }) => {
+        const routeId = params.routeId;
+        if (!WEBHOOK_ROUTE_ID_PATTERN.test(routeId)) return webhookResponse(404);
+        const declaredLength = Number(request.headers.get("content-length") ?? "0");
+        if (!Number.isFinite(declaredLength) || declaredLength > WEBHOOK_DELIVERY_BODY_BYTES_LIMIT) {
+          return webhookResponse(413);
+        }
+        const mediaType = request.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();
+        if (mediaType !== "application/json") return webhookResponse(415);
+        const timestamp = request.headers.get(WEBHOOK_TIMESTAMP_HEADER) ?? "";
+        const deliveryId = request.headers.get(WEBHOOK_DELIVERY_ID_HEADER) ?? "";
+        const signature = request.headers.get(WEBHOOK_SIGNATURE_HEADER) ?? "";
+        if (
+          !WEBHOOK_TIMESTAMP_PATTERN.test(timestamp) ||
+          !WEBHOOK_DELIVERY_ID_PATTERN.test(deliveryId) ||
+          !WEBHOOK_SIGNATURE_PATTERN.test(signature)
+        ) {
+          return webhookResponse(401);
+        }
+        if (!signal.holdsWebhookRoute(routeId)) return webhookResponse(503);
+        const address = signalClientIp(
+          server?.requestIP(request)?.address,
+          request.headers.get("x-forwarded-for"),
+          config.trustProxy,
+        );
+        if (!signal.acceptWebhookRequest(`${routeId}:${address}`)) return webhookResponse(429);
+        const body = await readBounded(request, WEBHOOK_DELIVERY_BODY_BYTES_LIMIT);
+        if (!body) return webhookResponse(413);
+        const result = await runtime.runPromise(
+          signal.deliverWebhook(routeId, { timestamp, deliveryId, signature, body }),
+          { signal: request.signal },
+        );
+        return webhookResponse(result.status);
+      },
+      { parse: "none" },
+    )
+    // The Discord calls of a host, with the `discord-session` token of its `ingress` socket. Signal makes
+    // each call with the bot token, only in a guild routed to that socket. Nothing here stores or logs
+    // the body or Discord's answer.
+    .post(
+      DISCORD_API_PATH,
+      async ({ request }) => {
+        if (!discord) return discordError(503, "unavailable");
+        const token = DISCORD_SESSION_PATTERN.exec(request.headers.get("authorization") ?? "")?.[1];
+        const session = token ? signal.discordCaller(token, null) : null;
+        if (!token || !session?.ok) return discordError(401, "unauthorized");
+        const retryAfterMs = signal.acceptDiscordCall(session.hostId);
+        if (retryAfterMs !== null) return discordError(429, "rate_limited", retryAfterMs);
+        const input = await readDiscordCall(request);
+        if ("status" in input) return discordError(input.status, "invalid_request");
+        const caller = signal.discordCaller(token, input.request.guildId);
+        if (!caller.ok) return discordError(caller.code === "unauthorized" ? 401 : 403, caller.code);
+        const result = await runtime.runPromise(discord.call(input.request, input.file).pipe(Effect.result), {
+          signal: request.signal,
+        });
+        signal.recordDiscordCall(Result.isSuccess(result));
+        if (Result.isFailure(result)) {
+          return discordError(result.failure.status, result.failure.code, result.failure.retryAfterMs);
+        }
+        return Response.json(result.success, { headers: { "Cache-Control": "no-store" } });
       },
       { parse: "none" },
     )
@@ -343,27 +452,71 @@ async function readBody(request: Request, limit: number): Promise<Uint8Array<Arr
     await request.body?.cancel();
     return null;
   }
-  const reader = request.body?.getReader();
-  if (!reader) return new Uint8Array();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.byteLength;
-    if (total > limit) {
-      await reader.cancel();
-      return null;
+  return readBounded(request, limit);
+}
+
+function webhookResponse(status: WebhookDeliveryStatus | 415): Response {
+  return new Response(null, { status, headers: { "Cache-Control": "no-store" } });
+}
+
+/**
+ * The request of one Discord call: JSON, or `multipart/form-data` with the JSON in `request` and the
+ * bytes in `file` for an upload. Signal stops reading at the size limit.
+ */
+async function readDiscordCall(
+  request: Request,
+): Promise<{ request: DiscordApiRequest; file: DiscordUpload | null } | { status: 400 | 413 }> {
+  const contentType = request.headers.get("content-type") ?? "";
+  const mediaType = contentType.split(";", 1)[0]?.trim().toLowerCase();
+  const multipart = mediaType === "multipart/form-data";
+  if (!multipart && mediaType !== "application/json") return { status: 400 };
+  const limit = multipart ? DISCORD_UPLOAD_BODY_BYTES_LIMIT : DISCORD_JSON_BODY_BYTES_LIMIT;
+  const declaredLength = Number(request.headers.get("content-length") ?? "0");
+  if (!Number.isFinite(declaredLength) || declaredLength > limit) return { status: 413 };
+  try {
+    const body = await readBounded(request, limit);
+    if (!body) return { status: 413 };
+    if (!multipart) {
+      const call = decodeDiscordApiRequest(JSON.parse(new TextDecoder().decode(body)));
+      return call && call.op !== "upload" ? { request: call, file: null } : { status: 400 };
     }
-    chunks.push(value);
+    const form = await new Response(body, { headers: { "Content-Type": contentType } }).formData();
+    const fields = form.get("request");
+    const file = form.get("file");
+    if (typeof fields !== "string" || !(file instanceof Blob)) return { status: 400 };
+    if (file.size > DISCORD_UPLOAD_BYTES_LIMIT) return { status: 413 };
+    const call = decodeDiscordApiRequest(JSON.parse(fields));
+    if (call?.op !== "upload" || file.size === 0) return { status: 400 };
+    return {
+      request: call,
+      file: { name: call.filename, data: new Uint8Array(await file.arrayBuffer()), contentType: file.type || null },
+    };
+  } catch {
+    return { status: 400 };
   }
-  const body = new Uint8Array(total);
+}
+
+/** The body, or null when it is larger than `limit` bytes. */
+async function readBounded(request: Request, limit: number): Promise<Uint8Array<ArrayBuffer> | null> {
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for await (const chunk of request.body ?? []) {
+    size += chunk.byteLength;
+    if (size > limit) return null;
+    chunks.push(chunk);
+  }
+  const body = new Uint8Array(size);
   let offset = 0;
   for (const chunk of chunks) {
     body.set(chunk, offset);
     offset += chunk.byteLength;
   }
   return body;
+}
+
+function discordError(status: number, code: DiscordApiErrorCode, retryAfterMs?: number): Response {
+  const body: DiscordApiErrorBody = { error: retryAfterMs === undefined ? { code } : { code, retryAfterMs } };
+  return Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 }
 
 /** Passes at most `limit` bytes, and fails the stream past them. */
@@ -441,6 +594,14 @@ export function prometheusMetrics(signal: SignalService): string {
     `openbot_remote_telegram_calls_total ${metrics.telegramCalls}`,
     "# TYPE openbot_remote_telegram_calls_refused_total counter",
     `openbot_remote_telegram_calls_refused_total ${metrics.telegramCallsRefused}`,
+    "# TYPE openbot_remote_discord_deliveries_total counter",
+    `openbot_remote_discord_deliveries_total ${metrics.discordDeliveries}`,
+    "# TYPE openbot_remote_discord_deliveries_unavailable_total counter",
+    `openbot_remote_discord_deliveries_unavailable_total ${metrics.discordDeliveriesUnavailable}`,
+    "# TYPE openbot_remote_discord_api_calls_total counter",
+    `openbot_remote_discord_api_calls_total ${metrics.discordApiCalls}`,
+    "# TYPE openbot_remote_discord_api_failures_total counter",
+    `openbot_remote_discord_api_failures_total ${metrics.discordApiFailures}`,
     "",
   ].join("\n");
 }

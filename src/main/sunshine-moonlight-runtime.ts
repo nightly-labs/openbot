@@ -18,6 +18,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result, Schema } from "effect";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { LifecycleGate } from "./lifecycle-gate";
+import { listenLoopback } from "./listen-loopback";
 import { desktopCall, desktopFailure, desktopSync, type RemoteDesktopOperationError } from "./remote-desktop-effects";
 import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifact";
 import { forwardDiagnosticLines, stopRemoteProcess } from "./remote-diagnostics";
@@ -1099,20 +1100,12 @@ export class SunshineMoonlightRuntime {
       ),
       (server) =>
         Effect.gen({ self: this }, function* () {
-          yield* Effect.callback<void, RemoteDesktopOperationError>((resume) => {
-            const failed = (cause: Error) => resume(Effect.fail(desktopFailure(cause)));
-            server.once("error", failed);
-            server.listen(0, "127.0.0.1", () => resume(Effect.void));
-            return Effect.sync(() => {
-              server.removeListener("error", failed);
-            });
-          });
-          const address = yield* Schema.decodeUnknownEffect(localAddressSchema)(server.address()).pipe(
-            Effect.mapError(desktopFailure),
+          const port = yield* desktopCall(() =>
+            listenLoopback(server, () => new Error(sourceText("error.backend.iceServerNoPort"))),
           );
           this.#iceServer = server;
           retained = true;
-          return `http://127.0.0.1:${address.port}/ice`;
+          return `http://127.0.0.1:${port}/ice`;
         }),
       (server) => (retained ? Effect.void : closeSocketEffect(server).pipe(Effect.catch(() => Effect.void))),
     );

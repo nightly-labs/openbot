@@ -44,19 +44,20 @@ export function SheetScrollEdgeEffect({ style, edge = "top", surface = "canvas" 
           </Svg>
         }
       >
-        <View className="flex-1">
-          <BlurView intensity={surface === "sheet" ? 60 : 100} style={{ flex: 1 }} tint={blurTint} />
-          {surface === "canvas" ? (
+        {surface === "sheet" ? (
+          // Android has no sheet blur. The opaque sheet color fades the content into the header.
+          <View className="flex-1 bg-sheet" />
+        ) : (
+          <View className="flex-1">
+            <BlurView intensity={100} style={{ flex: 1 }} tint={blurTint} />
             <BlurView
               intensity={60}
               style={{ bottom: 0, left: 0, position: "absolute", right: 0, top: 0 }}
               tint={blurTint}
             />
-          ) : null}
-          <View
-            className={surface === "sheet" ? "absolute inset-0 bg-sheet/60" : "absolute inset-0 bg-scroll-edge-overlay"}
-          />
-        </View>
+            <View className="absolute inset-0 bg-scroll-edge-overlay" />
+          </View>
+        )}
       </MaskedView>
     </View>
   );

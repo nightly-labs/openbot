@@ -551,3 +551,249 @@
 .routine-schedule-picker[data-fit="minimal"] .routine-trigger-chips {
   gap: var(--openbot-space-1);
 }
+
+/*
+ * The end of a trigger row: the menu that changes the trigger. It sits one padding from the end,
+ * as the icon does at the start. The menu button has the size of a chip, so the row stays as tall
+ * as an input.
+ */
+.routine-trigger-action {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-self: center;
+  margin-inline-start: calc(var(--openbot-space-1) * -1);
+}
+
+.routine-trigger-action:empty {
+  display: none;
+}
+
+:is(.routine-trigger-row, .routine-trigger-card-header) .routine-trigger-action .ui-button {
+  width: var(--openbot-control-sm);
+  height: var(--openbot-control-sm);
+  border-radius: var(--openbot-radius-xs);
+}
+
+/*
+ * The webhook trigger: a header, then one full-width row for each value. The header icon starts
+ * where the row text starts, and the row actions share one column with the menu button.
+ */
+.routine-trigger-card {
+  display: grid;
+  min-width: 0;
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-shadow-popover-ambient);
+}
+
+.routine-trigger-card-header {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  padding: var(--openbot-space-1) var(--openbot-space-1) var(--openbot-space-1) var(--openbot-space-3);
+}
+
+:is(.routine-trigger-card-header, .routine-trigger-menu) .routine-trigger-icon {
+  width: var(--openbot-control-sm);
+  height: var(--openbot-control-sm);
+}
+
+.routine-trigger-card-title {
+  min-width: 0;
+  flex: 1;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
+  /* Mostly lowercase text looks low when its line box is centered. Center the x-height on the icon. */
+  text-box: trim-both ex alphabetic;
+}
+
+.routine-webhook-field {
+  display: grid;
+  /* An action, the row padding and the top border, so a row without an action has the same height. */
+  min-height: calc(var(--openbot-control-sm) + var(--openbot-space-2) + 1px);
+  grid-template-columns: minmax(84px, auto) minmax(0, 1fr) var(--openbot-control-sm);
+  align-items: center;
+  gap: var(--openbot-space-3);
+  border: 0;
+  border-top: 1px solid var(--openbot-border);
+  margin: 0;
+  background: none;
+  padding: var(--openbot-space-1) var(--openbot-space-1) var(--openbot-space-1) var(--openbot-space-3);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.routine-webhook-label {
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  white-space: nowrap;
+}
+
+.routine-webhook-value {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+code.routine-webhook-value {
+  font-family: inherit;
+}
+
+/* A new secret wraps in a fixed-width font, so the user can read each character before copying it. */
+code.routine-webhook-secret {
+  padding-block: var(--openbot-space-1-5);
+  font-family: var(--openbot-font-mono);
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.routine-webhook-field > :last-child {
+  justify-self: center;
+}
+
+.routine-webhook-field > .ui-icon-button {
+  width: var(--openbot-control-sm);
+  height: var(--openbot-control-sm);
+}
+
+/* The Events row is a ghost Button; two classes keep the row layout over the button styles. */
+.routine-webhook-field.routine-webhook-events-toggle {
+  width: auto;
+  min-width: 0;
+  height: auto;
+  justify-content: stretch;
+  border-radius: 0 0 calc(var(--openbot-radius-md) - 1px) calc(var(--openbot-radius-md) - 1px);
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.routine-webhook-field.routine-webhook-events-toggle[aria-expanded="true"] {
+  background: none;
+}
+
+.routine-webhook-field.routine-webhook-events-toggle:hover {
+  background: var(--openbot-bg-control-hover);
+}
+
+.routine-webhook-events-toggle:focus-visible {
+  outline: 0;
+  box-shadow: var(--routine-focus-ring, 0 0 0 1px var(--openbot-text-muted));
+}
+
+.routine-webhook-events-toggle > svg {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  stroke-width: var(--openbot-icon-stroke);
+  color: var(--openbot-text-muted);
+}
+
+/* A status sentence wraps; a URL or a secret stays on one line. */
+.ui-text.routine-webhook-value {
+  white-space: normal;
+}
+
+.routine-webhook-note {
+  padding: 0 var(--openbot-space-3) var(--openbot-space-2);
+}
+
+.routine-trigger-card-header + .routine-webhook-note {
+  border-top: 1px solid var(--openbot-border);
+  padding-top: var(--openbot-space-2);
+}
+
+.routine-webhook-secret-note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--openbot-space-2);
+}
+
+.routine-webhook-events {
+  display: grid;
+  gap: var(--openbot-space-3);
+  border-top: 1px solid var(--openbot-border);
+  padding: var(--openbot-space-3);
+}
+
+.routine-webhook-events .settings-field {
+  display: grid;
+  margin: 0;
+  gap: var(--openbot-space-1-5);
+}
+
+.routine-webhook-events .settings-field > span {
+  margin: 0;
+}
+
+/* Hints are captions, not field labels. */
+.routine-webhook-events .settings-field > .ui-text {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.routine-webhook-add-filter {
+  justify-self: start;
+  margin-left: calc(var(--openbot-space-2) * -1);
+  padding-inline: var(--openbot-space-2);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-md);
+  font-weight: inherit;
+}
+
+/* A quiet link under the rows. Its text starts under the row labels. */
+.routine-webhook-filter-link {
+  justify-self: start;
+  margin: 0 0 var(--openbot-space-1) var(--openbot-space-1);
+  padding-inline: var(--openbot-space-2);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  font-weight: inherit;
+}
+
+.routine-webhook-add-filter svg,
+.routine-webhook-filter-link svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+/* The trigger menu: a name and one line that tells when the routine runs. */
+.routine-trigger-menu {
+  width: 300px;
+  max-height: min(70vh, 560px);
+  overflow-y: auto;
+}
+
+.routine-trigger-menu.ui-action-menu .routine-trigger-menu-item[role="menuitemradio"] {
+  height: auto;
+  padding-block: var(--openbot-space-1-5);
+  gap: var(--openbot-space-3);
+  white-space: normal;
+}
+
+.routine-trigger-menu-text {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+}
+
+.routine-trigger-menu-description {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.routine-trigger-menu.ui-action-menu .routine-trigger-menu-item > .routine-trigger-menu-check {
+  color: var(--openbot-text-primary);
+}

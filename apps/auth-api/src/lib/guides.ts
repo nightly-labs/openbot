@@ -21,6 +21,14 @@ export const GUIDES_COLLECTION: ContentCollection<"guides"> = {
   imageEyebrow: "OPENBOT · GUIDES",
   articles: publishedFirst([
     {
+      slug: "openbot-hosted-servers",
+      title: "OpenBot Hosted Servers: Plans, Pricing, and How They Work",
+      description:
+        "Compare OpenBot hosted server plans, pricing, storage, and team limits. Learn how to set one up and when self-hosting may suit you better.",
+      publishedAt: "2026-10-07",
+      author: NEWS_AUTHOR,
+    },
+    {
       slug: "openbot-marketplace",
       title: "How to Use the OpenBot Marketplace: Agents, Skills, and Plugins",
       description:

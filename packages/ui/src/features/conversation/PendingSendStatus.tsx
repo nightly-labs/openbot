@@ -7,6 +7,8 @@ export interface PendingSendStatusProps {
   state: "waiting" | "sending" | "failed";
   /** Why the send failed, when the host or the connection said. */
   error?: string | null;
+  /** The composer shows the update notice; keep recovery actions without a second error. */
+  updateRequired?: boolean;
   /** The host drops a repeated send of this message, so Retry cannot store it twice. */
   retrySafe: boolean;
   /** Edit needs an empty composer, so the failed message replaces nothing the user wrote. */
@@ -30,14 +32,16 @@ export function PendingSendStatus(props: PendingSendStatusProps): JSX.Element {
   };
   return (
     <div class="pending-send-status" data-state={props.state}>
-      <span role="status" class="pending-send-label">
-        {label()}
-        <Show when={props.state === "failed" && props.error}>
-          {(error) => <span class="pending-send-error">{error()}</span>}
-        </Show>
-      </span>
+      <Show when={!props.updateRequired || props.state !== "failed"}>
+        <span role="status" class="pending-send-label">
+          {label()}
+          <Show when={props.state === "failed" && props.error}>
+            {(error) => <span class="pending-send-error">{error()}</span>}
+          </Show>
+        </span>
+      </Show>
       <Show when={props.state === "failed"}>
-        <Show when={props.retrySafe}>
+        <Show when={props.retrySafe && !props.updateRequired}>
           <Button variant="ghost" size="xs" onClick={() => props.onRetry()}>
             {t("common.retry")}
           </Button>

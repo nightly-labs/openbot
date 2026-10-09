@@ -11,11 +11,14 @@
     "check": "bun run typecheck && bun run test"
   },
   "dependencies": {
+    "@discordjs/rest": "2.6.3",
+    "@discordjs/ws": "2.0.4",
     "@openbot/contracts": "workspace:*",
+    "discord-api-types": "0.38.56",
+    "effect": "catalog:",
     "elysia": "1.4.30",
     "jose": "catalog:",
-    "zod": "catalog:",
-    "effect": "catalog:"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/bun": "1.4.0",

@@ -15,7 +15,7 @@ import { parseHostedServerList } from "@openbot/contracts/hosted-servers";
 import type { CentralAuthState, CentralAuthUser } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import type { CentralAuthManager } from "./central-auth-manager";
-import { RemoteWorkflowError } from "./remote-service-effects";
+import { RemoteWorkflowError, toRemoteWorkflowError } from "./remote-service-effects";
 import type { TeamStore } from "./team-store";
 
 const HOST_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
@@ -78,9 +78,7 @@ export const applyHostedServerAccount = Effect.fn("HostedServer.applyAccount")(f
         cause: new Error("The hosted server has no secret storage for its session."),
       });
     const claim = environment.claim;
-    const redeemed = yield* centralAuth
-      .redeemHostedServerClaim(claim)
-      .pipe(Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause })));
+    const redeemed = yield* centralAuth.redeemHostedServerClaim(claim).pipe(toRemoteWorkflowError);
     if (redeemed.hostId !== environment.hostId)
       return yield* new RemoteWorkflowError({ cause: new Error("The claim is for a different hosted server.") });
     user = redeemed.user;
@@ -112,7 +110,7 @@ const hostedServerName = Effect.fn("HostedServer.name")(function* (
       if (!parsed) throw new Error("Invalid hosted server list.");
       return parsed;
     })
-    .pipe(Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause })));
+    .pipe(toRemoteWorkflowError);
   const server = list.servers.find((entry) => entry.serverId === hostId);
   if (!server)
     return yield* new RemoteWorkflowError({

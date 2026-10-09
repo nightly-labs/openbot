@@ -1,4 +1,5 @@
 import { type AgentTemplatePreview, isAgentTemplateCardPng } from "@openbot/contracts/ipc";
+import { classifyFailure } from "@openbot/telemetry";
 import { toast } from "@openbot/ui";
 import { PublishAgentDialog } from "@openbot/ui/features/agents/PublishAgentDialog";
 import { currentText } from "@openbot/ui/text";
@@ -16,8 +17,8 @@ interface PublishState {
 }
 
 /**
- * The publish dialog of the conversation header, and the calls behind it. `open` is what the header
- * button runs; `dialog` is mounted once beside the header. `calls` is read on each call; by default
+ * The publish dialog for agent settings and the calls behind it. `open` is what the settings
+ * action runs; `dialog` is mounted once beside the conversation panels. `calls` is read on each call; by default
  * it is this computer's.
  */
 export function createPublishAgent(calls: () => AgentTemplatePublishCalls = () => agentTemplatesPort().agentTemplates) {
@@ -45,7 +46,9 @@ export function createPublishAgent(calls: () => AgentTemplatePublishCalls = () =
         draft.loading = false;
       });
       const { t, errorMessage } = currentText();
-      actionToast.error(errorMessage(error, t("agentTemplate.publish.readFailed")));
+      actionToast.error(errorMessage(error, t("agentTemplate.publish.readFailed")), {
+        report: { operation: "agent", source: "action", cause_code: classifyFailure(error) },
+      });
     }
   }
 

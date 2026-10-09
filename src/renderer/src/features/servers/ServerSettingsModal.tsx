@@ -10,6 +10,7 @@ import type {
   UpdateTeamMemberInput,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
+import { classifyFailure } from "@openbot/telemetry";
 import {
   Alert,
   AlertActions,
@@ -19,6 +20,7 @@ import {
   AlertTitle,
   Blocks,
   Button,
+  CalendarClock,
   ChevronRight,
   Download,
   Globe2,
@@ -34,6 +36,7 @@ import {
   UsersRound,
 } from "@openbot/ui";
 import type { AgentProfile } from "@openbot/ui/data";
+import type { BitwardenConnectorPanelProps } from "@openbot/ui/features/settings/BitwardenConnectorPanel";
 import { SaveBarDock, SettingsDialogShell } from "@openbot/ui/features/settings/SettingsDialogShell";
 import { SettingsHostedSitesTab } from "@openbot/ui/features/settings/SettingsHostedSitesTab";
 import {
@@ -44,6 +47,7 @@ import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, onCleanup, Show, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { ConnectorsPanel } from "../connectors/ConnectorsPanel";
+import type { DiscordConnectorController } from "../connectors/discord-connector";
 import type { GitHubConnectorController } from "../connectors/github-connector";
 import type { OnePasswordConnectorController } from "../connectors/onepassword-connector";
 import type { SlackConnectorController } from "../connectors/slack-connector";
@@ -54,8 +58,9 @@ import type { McpServerConfig, McpTestResult } from "./mcp-servers";
 import { ServerDesktopPanel } from "./ServerDesktopPanel";
 import { createServerGeneralSection } from "./ServerGeneralSection";
 import { type ServerImportOptions, ServerImportPanel } from "./ServerImportPanel";
-import { type McpPanelDetail, ServerMcpPanel } from "./ServerMcpPanel";
+import { type McpPanelDetail, type McpPanelSignIn, ServerMcpPanel } from "./ServerMcpPanel";
 import { createServerMembersSection } from "./ServerMembersSection";
+import { type ServerRoutineFeedOptions, ServerRoutineFeedPanel } from "./ServerRoutineFeedPanel";
 import { type ServerUpdateOptions, ServerUpdatePanel } from "./ServerUpdatePanel";
 import { serverRoleCanAdminister } from "./server-capabilities";
 import type { ServerSettingsSectionHost } from "./server-settings-section";
@@ -110,6 +115,8 @@ export interface ServerSettingsModalProps {
   onRemoveMcpServer?: (id: string) => Promise<void>;
   onSetMcpServerEnabled?: (id: string, enabled: boolean) => Promise<void>;
   onTestMcpServer?: (config: McpServerConfig) => Promise<McpTestResult>;
+  /** Browser sign-in for http MCP servers. Only the server on this computer gets it. */
+  mcpSignIn?: McpPanelSignIn | undefined;
   /**
    * Fired when the MCP section becomes visible. The list is read then, not when the dialog opens,
    * because most visits to this dialog never reach that section.
@@ -142,21 +149,28 @@ export interface ServerSettingsModalProps {
   agentImport?: ServerImportOptions | undefined;
   /**
    * The Connectors section appears only when a caller supplies one of these: the GitHub connection
-   * and the Slack and Telegram apps belong to this computer, so a remote server passes none, and a build
-   * without a GitHub App passes no GitHub.
+   * and the Slack, Discord and Telegram apps belong to this computer, so a remote server passes none,
+   * and a build without a GitHub App passes no GitHub.
    */
   githubConnector?: GitHubConnectorController | undefined;
   /** This computer's 1Password connection. A remote server passes none. */
   onePasswordConnector?: OnePasswordConnectorController | undefined;
+  bitwardenConnector?: BitwardenConnectorPanelProps | undefined;
   slackConnector?: SlackConnectorController | undefined;
+  discordConnector?: DiscordConnectorController | undefined;
   telegramConnector?: TelegramConnectorController | undefined;
-  /** This computer's agents, for the Slack and Telegram pages. */
+  /** This computer's agents, for the Slack, Discord and Telegram pages. */
   connectorAgents?: AgentProfile[] | undefined;
   /**
    * The Updates section appears only when a caller supplies this: a remote host with
    * `host-update-v1` that this member administers.
    */
   hostUpdate?: ServerUpdateOptions | undefined;
+  /**
+   * The Routines section appears only when a caller supplies this: the feed listens on this
+   * computer, so a remote server passes nothing.
+   */
+  routineFeed?: ServerRoutineFeedOptions | undefined;
   /** The section to show when the dialog opens. Updates shows General when the server has no Updates section. */
   initialSection?: ServerSettingsSection | null;
 }
@@ -179,6 +193,7 @@ export type ServerSettingsSection =
   | "providers"
   | "updates"
   | "import"
+  | "routines"
   | "connectors";
 type Section = ServerSettingsSection;
 
@@ -192,6 +207,7 @@ const sections = {
   providers: { title: "server.settings.providersTitle", description: "server.settings.providersDescription" },
   updates: { title: "server.settings.updatesTitle", description: "server.settings.updatesDescription" },
   import: { title: "server.settings.importTitle", description: "server.settings.importDescription" },
+  routines: { title: "server.settings.routinesTitle", description: "server.settings.routinesDescription" },
   connectors: { title: "server.settings.connectorsTitle", description: "server.settings.connectorsDescription" },
 } as const satisfies Record<Section, { title: AppTextKey; description: AppTextKey }>;
 
@@ -232,7 +248,10 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
       return true;
     } catch (error) {
       actionToast.error(t("server.settings.actionFailedTitle"), {
-        description: errorMessage(error, t("server.settings.actionFailed")),
+        ...{
+          description: errorMessage(error, t("server.settings.actionFailed")),
+        },
+        report: { operation: "settings", source: "action", cause_code: classifyFailure(error) },
       });
       return false;
     } finally {
@@ -250,7 +269,10 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     busy,
     run,
     showCopyError() {
-      actionToast.error(t("server.settings.copyFailedTitle"), { description: t("server.settings.copyFailed") });
+      actionToast.error(t("server.settings.copyFailedTitle"), {
+        ...{ description: t("server.settings.copyFailed") },
+        report: { operation: "settings", source: "action", cause_code: "unknown" },
+      });
     },
   };
   const general = createServerGeneralSection(host, { onSetUpDesktop: () => setSection("desktop") });
@@ -358,6 +380,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         value === "providers" ||
         value === "updates" ||
         value === "import" ||
+        value === "routines" ||
         value === "connectors"
       )
         setSection(value);
@@ -555,9 +578,20 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                 <span>{t(sections.import.title)}</span>
               </Tabs.Trigger>
             </Show>
+            <Show when={props.routineFeed}>
+              <Tabs.Trigger class="settings-modal-nav-item" value="routines">
+                <CalendarClock aria-hidden="true" />
+                <span>{t(sections.routines.title)}</span>
+              </Tabs.Trigger>
+            </Show>
             <Show
               when={
-                props.githubConnector || props.onePasswordConnector || props.slackConnector || props.telegramConnector
+                props.githubConnector ||
+                props.onePasswordConnector ||
+                props.bitwardenConnector ||
+                props.slackConnector ||
+                props.discordConnector ||
+                props.telegramConnector
               }
             >
               <Tabs.Trigger class="settings-modal-nav-item" value="connectors">
@@ -597,6 +631,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                   props.onTestMcpServer?.(config) ??
                   Promise.resolve({ toolCount: 0, error: t("mcp.panel.testUnavailable") })
                 }
+                signIn={props.mcpSignIn}
               />
             </Tabs.Content>
           )}
@@ -675,14 +710,36 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
             </Tabs.Content>
           )}
         </Show>
+        <Show when={props.routineFeed}>
+          {(routineFeed) => (
+            <Tabs.Content value="routines" class="settings-modal-tab-panel server-settings-panel" data-tab="routines">
+              <ServerRoutineFeedPanel
+                {...routineFeed()}
+                busy={busy}
+                run={run}
+                menuMount={modalElement}
+                showCopyError={host.showCopyError}
+              />
+            </Tabs.Content>
+          )}
+        </Show>
         <Show
-          when={props.githubConnector || props.onePasswordConnector || props.slackConnector || props.telegramConnector}
+          when={
+            props.githubConnector ||
+            props.onePasswordConnector ||
+            props.bitwardenConnector ||
+            props.slackConnector ||
+            props.discordConnector ||
+            props.telegramConnector
+          }
         >
           <Tabs.Content value="connectors" class="settings-modal-tab-panel server-settings-panel" data-tab="connectors">
             <ConnectorsPanel
               github={props.githubConnector}
               onePassword={props.onePasswordConnector}
+              bitwarden={props.bitwardenConnector}
               slack={props.slackConnector}
+              discord={props.discordConnector}
               telegram={props.telegramConnector}
               agents={props.connectorAgents ?? []}
             />
@@ -690,7 +747,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         </Show>
       </SettingsDialogShell>
 
-      <members.RemoveDialog />
+      <members.ConfirmDialogs />
       <general.LeaveDialog />
     </Tabs.Root>
   );

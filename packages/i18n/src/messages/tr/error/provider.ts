@@ -68,6 +68,7 @@ export const messages = {
   "error.provider.unexpectedVersion": "Sağlayıcı çalışma zamanı beklenmeyen bir sürüm döndürdü.",
   "error.provider.metadataNoData": "Çalışma zamanı meta veri indirmesi veri döndürmedi.",
   "error.provider.metadataTooLarge": "Çalışma zamanı meta verileri çok büyük.",
+  "error.provider.requestFailed": "OpenBot {url} adresini indiremedi. {reason}",
   "error.provider.installRecordMismatch": "Çalışma zamanı kurulum kaydı eşleşmiyor.",
   "error.provider.runtimeChecksum": "Sağlayıcı çalışma zamanı sağlama toplamı (checksum) eşleşmiyor.",
   "error.provider.codexReleaseShape": "Codex sürümü beklenmeyen bir yapıya sahip.",
@@ -102,7 +103,7 @@ export const messages = {
   "error.provider.noModelNamed": "{provider} sağlayıcısının kullanılabilir modeli yok.",
   "error.provider.acpNoModels": "ACP CLI hiçbir ACP modeli tanıtmadı. OpenBot bir yedek model tahmin etmeyecektir.",
   "error.provider.endpointRemoveBusy": "Bu uç noktayı kaldırmadan önce etkin turun ve kuyruğun bitmesini bekleyin.",
-  "error.provider.codexOutdated": "Codex CLI {version} çok eski. OpenBot 0.144.1 veya daha yenisini gerektirir.",
+  "error.provider.codexOutdated": "Codex CLI {version} çok eski. OpenBot 0.156.0 veya daha yenisini gerektirir.",
   "error.provider.codexNotStarted": "Codex CLI bulundu ancak başlatılamadı.",
   "error.provider.codexNotStartedHint":
     "Codex CLI bulundu ancak başlatılamadı. Yeni bir terminalde `codex --version` komutunu çalıştırın.",

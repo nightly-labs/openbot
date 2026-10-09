@@ -335,3 +335,15 @@ export function isRoutineCalendar(value: unknown): value is RoutineCalendar {
     value.runs.every(isRoutineCalendarRun)
   );
 }
+
+/**
+ * The iCalendar feed of this computer's routines. `url` holds the private token: anyone who has it
+ * can read the routine names and times. Null while the feed is off.
+ */
+export interface RoutineFeed {
+  url: string | null;
+}
+
+export function isRoutineFeed(value: unknown): value is RoutineFeed {
+  return isDynamicRecord(value) && (value.url === null || isString(value.url));
+}

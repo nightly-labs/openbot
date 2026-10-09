@@ -17,6 +17,7 @@ import { isBoolean } from "@openbot/contracts/runtime-values";
 import { Effect, Result, Schema } from "effect";
 import type { AgentClient } from "../agent-client";
 import type { AgentStore } from "../agent-store";
+import { causeHelpers } from "../effect-boundary";
 import type { PendingHostedSiteTerminalEvent } from "../openbot-database";
 import { type AppServerRequest, type DynamicToolCallParams, isRecord, type RequestId } from "../protocol";
 import type { ConversationRuntime } from "./conversation-runtime";
@@ -531,6 +532,6 @@ export class HostedSiteOperationFailed extends Schema.TaggedError<HostedSiteOper
   { cause: Schema.Defect() },
 ) {}
 
-function siteStep<A>(run: () => A): Effect.Effect<A, HostedSiteOperationFailed> {
-  return Effect.try({ try: run, catch: (cause) => new HostedSiteOperationFailed({ cause }) });
-}
+const { sync: siteStep, rewrap: toHostedSiteOperationFailed } = causeHelpers(HostedSiteOperationFailed);
+
+export { toHostedSiteOperationFailed };

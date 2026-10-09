@@ -32,6 +32,7 @@ import {
   DEFAULT_BUSY_MESSAGE_MODE,
   DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
   DEFAULT_PROVIDER_DETECTION_SETTINGS,
+  DEFAULT_REMOTE_SESSION_REUSE_PREFERENCE,
   type DirectConversationSnapshot,
   type DirectMessageRealtimeEvent,
   type DirectTypingRealtimeEvent,
@@ -52,6 +53,7 @@ import {
   type QueuedMessageReceipt,
   type QueueSnapshot,
   type RemoteDesktopSession,
+  type RemoteSessionReusePreference,
   type ReorderQueueInput,
   type RespondToPromptInput,
   type Routine,
@@ -71,6 +73,7 @@ import {
   type UpdatePreference,
   type UpdateQueuedMessageInput,
   type UpdateStatus,
+  type WorkspaceDirectory,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { AGENT_IMPORT_PREVIEW, AGENT_IMPORT_SKILL } from "../../stories/agent-import-fixtures";
@@ -99,9 +102,11 @@ import {
 } from "./fixtures";
 import { mockAgentAnalytics, mockHostAnalytics } from "./mock-agent-analytics";
 import { createMockAuth, type MockAuthOptions } from "./mock-auth";
-import { createMockBilling } from "./mock-billing";
+import { createMockBilling, previewBillingServers } from "./mock-billing";
+import { createMockBitwardenConnector } from "./mock-bitwarden-connector";
 import { createMockBrowser, type MockBrowserOptions } from "./mock-browser";
 import { createMockChannels } from "./mock-channels";
+import { createMockEvents } from "./mock-events";
 import { createMockGitHubConnector } from "./mock-github-connector";
 import { createMockHostUpdate, type MockHostUpdateOptions } from "./mock-host-update";
 import { createMockHostedServers } from "./mock-hosted-servers";
@@ -109,6 +114,8 @@ import { createMockMessaging } from "./mock-messaging";
 import { createMockOnePasswordConnector } from "./mock-onepassword-connector";
 import { createMockProviderRuntimes, type MockProviderRuntimeOptions } from "./mock-provider-runtimes";
 import { mockRoutineCalendar } from "./mock-routine-calendar";
+import { createMockRoutineFeed } from "./mock-routine-feed";
+import { mockRoutineFlows } from "./mock-routine-flows";
 import { applySidebarLayoutAction } from "./mock-sidebar-layout";
 import { createMockSkills, type MockSkillsOptions } from "./mock-skills";
 import { createMockStorage } from "./mock-storage";
@@ -194,6 +201,24 @@ function mockFilePreview(path: string, fallbackName: string): FilePreview {
   );
 }
 
+function mockWorkspaceDirectory(path: string): WorkspaceDirectory {
+  const folder = path.replace(/\/+$/u, "") || ".";
+  const child = (name: string) => (folder === "." ? name : `${folder}/${name}`);
+  const modifiedAt = Date.UTC(2026, 9, 1, 9, 30);
+  return {
+    name: folder.split("/").at(-1) ?? folder,
+    path: folder,
+    root: "/Users/demo/OpenBot/Agents/research",
+    parentPath: folder === "." ? null : folder.split("/").slice(0, -1).join("/") || ".",
+    entries: [
+      { name: "sources", path: child("sources"), kind: "directory", size: 0, modifiedAt },
+      { name: "brief.md", path: child("brief.md"), kind: "file", size: 4_812, modifiedAt },
+      { name: "notes.txt", path: child("notes.txt"), kind: "file", size: 1_204, modifiedAt },
+    ],
+    truncated: false,
+  };
+}
+
 /** What each story server answers with when it is tested, so a story reads the same way twice. */
 const MOCK_MCP_TOOL_COUNTS: Record<string, number> = { "Local SQLite": 12, Linear: 1, Figma: 6 };
 
@@ -217,6 +242,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let analyticsPreference = clone<AnalyticsPreference>(options.analyticsPreference ?? { enabled: true });
   let approvalAutomation = clone<ApprovalAutomationPreference>(DEFAULT_APPROVAL_AUTOMATION_PREFERENCE);
   let busyMessageMode: BusyMessageModePreference = { mode: DEFAULT_BUSY_MESSAGE_MODE };
+  let remoteSessionReuse: RemoteSessionReusePreference = { ...DEFAULT_REMOTE_SESSION_REUSE_PREFERENCE };
   let languagePreference = clone<AppLanguagePreference>(options.languagePreference ?? { language: "system" });
   const languageListeners = new Set<(preference: AppLanguagePreference) => void>();
   let logoColorPreference: AppLogoColorPreference = { color: DEFAULT_APP_LOGO_COLOR };
@@ -224,9 +250,15 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   const approvalAutomationListeners = new Set<(preference: ApprovalAutomationPreference) => void>();
   let dynamicIslandPreference: DynamicIslandPreference = { ...DEFAULT_DYNAMIC_ISLAND_PREFERENCE };
   let dynamicIslandPresentation: DynamicIslandPresentation = { serverId: "local", mode: "idle" };
-  const agentStatus = clone(options.agentStatus ?? STORY_AGENT_STATUS);
+  let agentStatus = clone(options.agentStatus ?? STORY_AGENT_STATUS);
   let agents = clone(options.agents ?? STORY_AGENT_SUMMARIES);
   let mcpServers = clone(STORY_MCP_SERVERS);
+  let mcpSignedIn = new Set<string>();
+  let cancelPendingMcpSignIn: (() => void) | null = null;
+  const mcpSignInStates = () =>
+    mcpServers
+      .filter((server) => server.transport === "http")
+      .map((server) => ({ mcpServerId: server.id, signedIn: mcpSignedIn.has(server.id) }));
   let sidebarLayout: SidebarLayoutSnapshot = {
     revision: 0,
     sections: [],
@@ -421,6 +453,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   const { installedSkills, readInstalledSkills } = mockSkills;
   const mockBrowser = createMockBrowser(options, runtime, emitAgentEvent);
   const mockTeam = createMockTeam(options, runtime, emitAgentEvent, () => agents);
+  const mockEvents = createMockEvents();
+  const billingPlans = previewBillingServers();
 
   const api: OpenBotDesktopApi = {
     getAppInfo: async () => clone(appInfo),
@@ -452,6 +486,11 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       return () => approvalAutomationListeners.delete(listener);
     },
     getBusyMessageModePreference: async () => clone(busyMessageMode),
+    getRemoteSessionReusePreference: async () => clone(remoteSessionReuse),
+    setRemoteSessionReusePreference: async ({ keepBetweenRuns }) => {
+      remoteSessionReuse = { keepBetweenRuns };
+      return clone(remoteSessionReuse);
+    },
     setBusyMessageModePreference: async ({ mode }) => {
       busyMessageMode = { mode };
       return clone(busyMessageMode);
@@ -523,6 +562,17 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     updateProviderCli: async () => clone(agentStatus),
     refreshAgentProviders: async () => clone(agentStatus),
     // The preview runs no provider process, so a restart has nothing to wait for.
+    setProviderOn: async ({ provider, on }) => {
+      if (!on && agents.some((agent) => agent.provider === provider))
+        throw new Error(sourceText("error.provider.inUse", { provider }));
+      if (agentStatus.providers)
+        agentStatus = {
+          ...agentStatus,
+          providers: agentStatus.providers.map((row) => (row.id === provider ? { ...row, off: !on } : row)),
+        };
+      emitAgentEvent({ type: "status", status: clone(agentStatus) });
+      return clone(agentStatus);
+    },
     restartProvider: async () => clone(agentStatus),
     cancelProviderRestart: async () => clone(agentStatus),
     // A code that never completes: the preview has no provider to finish the sign-in, so this shows
@@ -555,6 +605,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       transcribe: async () => ({ text: "Mock voice transcript" }),
       onModelStatus: () => () => undefined,
     },
+    routineFlows: mockRoutineFlows({ routines, routineRuns }),
     auth: mockAuth.auth,
     skills: mockSkills.skills,
     hostedSites: {
@@ -602,8 +653,10 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     },
     githubConnector: createMockGitHubConnector(),
     onePasswordConnector: createMockOnePasswordConnector(),
-    billing: createMockBilling(),
-    hostedServers: createMockHostedServers(),
+    bitwardenConnector: createMockBitwardenConnector(),
+    billing: createMockBilling(billingPlans),
+    routineFeed: createMockRoutineFeed(),
+    hostedServers: createMockHostedServers(billingPlans),
     customProviders: {
       list: async () => clone(customProviders),
       /**
@@ -701,7 +754,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
     },
     // Preview has one host, so every server answers for the same agents.
-    // The Slack and Telegram Orchestrators of the preview are its first agent.
+    // The Slack, Discord and Telegram Orchestrators of the preview are its first agent.
     messaging: createMockMessaging(() => agents[0]?.id ?? "preview-agent"),
     // Preview has one host, so every server answers from the same providers as this computer.
     providerAdmin: {
@@ -942,7 +995,12 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
       // A saved endpoint's models are composed here, not stored, so a removal drops them the way a
       // respawned OpenCode would: it lists what its config names and nothing else.
-      listModels: async () => clone([...models, ...customProviders.flatMap(mockCustomProviderModels)]),
+      listModels: async () =>
+        clone(
+          [...models, ...customProviders.flatMap(mockCustomProviderModels)].filter(
+            (model) => !agentStatus.providers?.some((row) => row.id === model.provider && row.off),
+          ),
+        ),
       listAgents: async () => clone(agents),
       listInstalledSkills: async (agentId) => clone(readInstalledSkills(agentId)),
       ...mockChannels,
@@ -1014,6 +1072,28 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           return { toolCount: 0, error: `Command not found: ${command}` };
         return { toolCount: MOCK_MCP_TOOL_COUNTS[config.name] ?? 4, error: null };
       },
+      /** The browser is pretended: the sign-in lands after a moment unless Cancel comes first. */
+      signInMcpServer: ({ config }) =>
+        new Promise((resolve) => {
+          let settled = false;
+          const settle = (error: string | null) => {
+            if (settled) return;
+            settled = true;
+            cancelPendingMcpSignIn = null;
+            if (!error && config.id) mcpSignedIn = new Set(mcpSignedIn).add(config.id);
+            resolve({ toolCount: error ? 0 : (MOCK_MCP_TOOL_COUNTS[config.name] ?? 4), error });
+          };
+          cancelPendingMcpSignIn = () => settle(sourceText("error.backend.mcpSignInCancelled"));
+          schedule(() => settle(null), 1500);
+        }),
+      cancelMcpSignIn: async () => {
+        cancelPendingMcpSignIn?.();
+      },
+      signOutMcpServer: async ({ mcpServerId }) => {
+        mcpSignedIn = new Set([...mcpSignedIn].filter((id) => id !== mcpServerId));
+        return mcpSignInStates();
+      },
+      listMcpSignIns: async () => mcpSignInStates(),
       getSidebarLayout: async () => clone(sidebarLayout),
       mutateSidebarLayout: async (action) => {
         sidebarLayout = applySidebarLayoutAction(sidebarLayout, action);
@@ -1357,7 +1437,12 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       openSharedFile: async (_input: OpenSharedFileInput) => undefined,
       openWorkspaceFile: async (_input: OpenWorkspaceFileInput) => undefined,
       previewSharedFile: async (input: OpenSharedFileInput) => mockFilePreview(input.path, "shared-file"),
-      previewWorkspaceFile: async (input: OpenWorkspaceFileInput) => mockFilePreview(input.path, "workspace-file"),
+      previewWorkspaceFile: async (input: OpenWorkspaceFileInput) => {
+        // A path with no extension is a folder here, so a folder chip reaches the listing as on desktop.
+        if (!/\.[^/]+$/u.test(input.path)) throw new Error("Workspace path is not a file.");
+        return mockFilePreview(input.path, "workspace-file");
+      },
+      listWorkspaceDirectory: async (input: OpenWorkspaceFileInput) => mockWorkspaceDirectory(input.path),
       sendMessage: async (input: SendMessageInput) => {
         // As on a host, a repeated client id answers with the first receipt and stores nothing.
         const repeated = input.clientMessageId ? sentReceipts.get(input.clientMessageId) : undefined;
@@ -1659,6 +1744,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
     },
     host: mockTeam.host,
+    events: mockEvents,
     // Preview has one host, so every server's name and logo are this computer's.
     hostAdmin: {
       updateIdentity: async (input, serverId) => {

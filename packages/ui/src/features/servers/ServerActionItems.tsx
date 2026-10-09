@@ -1,6 +1,16 @@
 import type { ServerNotificationLevel, ServerSummary } from "@openbot/contracts/ipc";
 import type { AppFormat, AppTextKey, AppTranslate } from "@openbot/i18n";
-import { Bell, BellOff, CalendarClock, ChartArea, Check, ChevronRight, type ContextMenu } from "@openbot/ui";
+import {
+  Bell,
+  BellOff,
+  CalendarClock,
+  ChartArea,
+  Check,
+  ChevronRight,
+  type ContextMenu,
+  LogOut,
+  Trash2,
+} from "@openbot/ui";
 import { For, Show } from "solid-js";
 import { useText } from "../../text";
 
@@ -55,9 +65,16 @@ export interface ServerActionCallbacks {
   onOpenUsage?: ((serverId: string, trigger: HTMLElement | null) => void) | undefined;
   onOpenSchedule?: ((serverId: string, trigger: HTMLElement | null) => void) | undefined;
   onOpenSettings?: ((serverId: string, trigger: HTMLElement | null) => void) | undefined;
+  /** Asks to leave a joined server. The menu shows it for a remote server that the user does not own. */
+  onLeave?: ((serverId: string, trigger: HTMLElement | null) => void) | undefined;
+  /** Asks to delete a hosted server. The menu shows it only when `canDelete` accepts the server. */
+  onDelete?: ((serverId: string, trigger: HTMLElement | null) => void) | undefined;
+  onRemove?: ((serverId: string, trigger: HTMLElement | null) => void) | undefined;
+  canRemove?: ((serverId: string) => boolean) | undefined;
+  canDelete?: ((serverId: string) => boolean) | undefined;
 }
 
-/** Mute, notification level, usage, schedule and settings for one server. */
+/** Mute, notification level, usage, schedule, settings, and leave or delete for one server. */
 export function ServerActionItems(
   props: ServerActionCallbacks & {
     menu: ServerActionMenu;
@@ -68,6 +85,15 @@ export function ServerActionItems(
 ) {
   const { t, format } = useText();
   const muteDescription = () => serverMuteDescription(props.server, t, format);
+  // The owner cannot leave. The local server is this computer, so it has neither action.
+  const canLeave = () => Boolean(props.onLeave) && props.server.kind === "remote" && props.server.role !== "owner";
+  const canDelete = () =>
+    Boolean(props.onDelete) && props.server.kind === "remote" && Boolean(props.canDelete?.(props.server.id));
+  const canRemove = () =>
+    Boolean(props.onRemove) &&
+    props.server.kind === "remote" &&
+    props.server.role === "owner" &&
+    Boolean(props.canRemove?.(props.server.id));
   // A component, so the JSX below can use it as a tag. The menu does not change after render.
   const Menu = props.menu;
   return (
@@ -162,12 +188,42 @@ export function ServerActionItems(
           <span>{t("server.rail.settings")}</span>
         </Menu.Item>
       </Show>
+      <Show when={canLeave() || canDelete() || canRemove()}>
+        <Menu.Separator />
+        <Show when={canLeave()}>
+          <Menu.Item
+            class="ui-action-menu-danger agent-context-danger"
+            onSelect={() => props.onLeave?.(props.server.id, props.trigger())}
+          >
+            <LogOut class="agent-context-icon size-4" aria-hidden="true" />
+            <span>{t("server.rail.leave")}</span>
+          </Menu.Item>
+        </Show>
+        <Show when={canRemove()}>
+          <Menu.Item
+            class="ui-action-menu-danger agent-context-danger"
+            onSelect={() => props.onRemove?.(props.server.id, props.trigger())}
+          >
+            <Trash2 class="agent-context-icon size-4" aria-hidden="true" />
+            <span>{t("server.rail.remove")}</span>
+          </Menu.Item>
+        </Show>
+        <Show when={canDelete()}>
+          <Menu.Item
+            class="ui-action-menu-danger agent-context-danger"
+            onSelect={() => props.onDelete?.(props.server.id, props.trigger())}
+          >
+            <Trash2 class="agent-context-icon size-4" aria-hidden="true" />
+            <span>{t("server.rail.delete")}</span>
+          </Menu.Item>
+        </Show>
+      </Show>
     </>
   );
 }
 
 /** Two stacked server units. */
-export function ServerSettingsGlyph() {
+function ServerSettingsGlyph() {
   return (
     <svg
       aria-hidden="true"

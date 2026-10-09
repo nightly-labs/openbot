@@ -166,8 +166,8 @@ deliveries while it writes, and reports success only after a new process runs wi
 
 That one variable turns on two products: OpenCode reports OpenCode Zen and OpenCode Go as a single
 catalog, on the separate endpoints `opencode.ai/zen/v1` and `opencode.ai/zen/go/v1`, and OpenBot
-supports only Go. So `isOpencodeModelUnusableWithStoredKey` in `src/backend/agent/provider-runtime.ts`
-drops the paid Zen models from `#refreshModelCatalog` while OpenBot is the one supplying the key;
+supports only Go. So `isOpencodeModelUnusableWithStoredKey` in `src/backend/agent/model-catalog.ts`
+drops the paid Zen models from `ModelCatalog.refresh` while OpenBot is the one supplying the key;
 with no key stored those models can only come from the user's own OpenCode sign-in, which does
 buy them. Neither `/models` endpoint authenticates, so entitlement cannot be read back and the
 split is a product rule rather than a check.
@@ -324,3 +324,18 @@ refused. Both are local only: `providerAdmin` and the Team API take `PeerCustomP
 (`list`, `save` and `remove`), so a peer cannot reach them. The renderer
 store (`features/custom-providers/stores/provider-detection-store.ts`) marks the found rows that are
 saved, and a joined host gets no detection and no Edit.
+
+### Local provider switches
+
+The Providers section can turn each built-in provider off on this computer.
+`ProviderUseSettingsStore` saves the choices in `openbot-provider-use-v1.json`.
+A missing file leaves all providers on. An unreadable or newer file stays unchanged.
+
+`ProviderRuntime` filters off providers before CLI checks and model discovery. It also
+refuses explicit connection and sign-in requests for them. The managed runtime loader
+skips their executable version checks. Turning a provider on checks it again.
+
+`AgentService` uses the model-assignment lock when it turns a provider off. It refuses
+the change while an agent uses the provider. New model assignments use the same lock.
+The switch is local IPC only; released Team API adapters stay unchanged. Remote
+clients receive the host's filtered model list.

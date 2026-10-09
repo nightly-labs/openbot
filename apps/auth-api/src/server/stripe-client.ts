@@ -1,6 +1,7 @@
 import { BILLING_CURRENCIES, BILLING_METADATA, type BillingCurrency } from "@openbot/contracts/billing";
 import { isOneOf } from "@openbot/contracts/runtime-values";
 import { Effect, Option, Result, Schema } from "effect";
+import { constantTimeEqual, hexToBytes, importHmacSha256Key } from "./crypto";
 
 /** Stripe changes response shapes by API version, so every request names the version this code reads. */
 export const STRIPE_API_VERSION = "2025-03-31.basil";
@@ -143,6 +144,21 @@ export class StripeClient {
       "GET",
       `/v1/subscriptions/${encodeURIComponent(subscriptionId)}?${query}`,
       null,
+      subscriptionSchema,
+    );
+  }).bind(this);
+
+  readonly setRenewal = Effect.fn("StripeClient.setRenewal")(function* (
+    this: StripeClient,
+    subscriptionId: string,
+    cancelAtPeriodEnd: boolean,
+  ): Effect.fn.Return<StripeSubscription, StripeRequestError | StripeTransportError> {
+    const body = new URLSearchParams({ cancel_at_period_end: String(cancelAtPeriodEnd) });
+    if (!cancelAtPeriodEnd) body.set("cancel_at", "");
+    return yield* this.#requestEffect(
+      "POST",
+      `/v1/subscriptions/${encodeURIComponent(subscriptionId)}`,
+      body,
       subscriptionSchema,
     );
   }).bind(this);
@@ -366,10 +382,7 @@ export const verifyStripeSignature = Effect.fn("verifyStripeSignature")(function
   if (!timestamp || !/^\d{1,12}$/u.test(timestamp) || signatures.length === 0) return false;
   if (Math.abs(now / 1_000 - Number(timestamp)) > toleranceSeconds) return false;
   const key = yield* Effect.tryPromise({
-    try: () =>
-      crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, [
-        "sign",
-      ]),
+    try: () => importHmacSha256Key(secret, "sign"),
     catch: () => new StripeTransportError({}),
   });
   const expected = new Uint8Array(
@@ -381,22 +394,7 @@ export const verifyStripeSignature = Effect.fn("verifyStripeSignature")(function
   let matched = false;
   for (const signature of signatures) {
     // Every candidate is compared in full, so the time does not show which one matched.
-    if (constantTimeEqual(expected, hexBytes(signature))) matched = true;
+    if (constantTimeEqual(expected, hexToBytes(signature))) matched = true;
   }
   return matched;
 });
-
-function hexBytes(value: string): Uint8Array {
-  const bytes = new Uint8Array(value.length / 2);
-  for (let index = 0; index < bytes.length; index += 1) {
-    bytes[index] = Number.parseInt(value.slice(index * 2, index * 2 + 2), 16);
-  }
-  return bytes;
-}
-
-function constantTimeEqual(left: Uint8Array, right: Uint8Array): boolean {
-  if (left.byteLength !== right.byteLength) return false;
-  let difference = 0;
-  for (let index = 0; index < left.byteLength; index += 1) difference |= (left[index] ?? 0) ^ (right[index] ?? 0);
-  return difference === 0;
-}

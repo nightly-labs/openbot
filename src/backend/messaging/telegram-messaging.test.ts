@@ -27,7 +27,7 @@ import {
 import { runCauseEffect } from "../effect-boundary";
 import { SidebarLayoutStore } from "../sidebar-layout-store";
 import { type MessagingCredentials, MessagingService } from "./messaging-service";
-import type { MessagingIngress, TelegramGateway, TelegramIngressHandler } from "./messaging-types";
+import type { IngressHandler, MessagingIngress, TelegramGateway } from "./messaging-types";
 import { telegramDriver } from "./telegram/telegram-driver";
 
 const REPORT_DIR = resolve(import.meta.dirname, "../../../.openbot-build/telegram-e2e");
@@ -51,7 +51,7 @@ interface TelegramCall {
  */
 class FakeSignal implements MessagingIngress {
   readonly calls: TelegramCall[] = [];
-  #handler: TelegramIngressHandler | null = null;
+  #handler: IngressHandler | null = null;
   #messageId = 5_000;
   #updateId = 1;
   holders = 0;
@@ -66,10 +66,11 @@ class FakeSignal implements MessagingIngress {
   };
   state = () => "online" as const;
   onState = () => () => undefined;
-  handle = () => undefined;
   reconnect = () => undefined;
+  discord = () => Effect.die("This test makes no Discord call.");
+  onDiscordRoutes = () => () => undefined;
 
-  handleTelegram(handler: TelegramIngressHandler | null): void {
+  handle(handler: IngressHandler | null): void {
     this.#handler = handler;
   }
 
@@ -107,7 +108,7 @@ class FakeSignal implements MessagingIngress {
     if (!handler) throw new Error("The host does not take Telegram updates.");
     if (this.holders === 0) throw new Error("The host has no ingress socket open.");
     const body = Buffer.from(JSON.stringify({ update_id: ++this.#updateId, ...update }));
-    await runCauseEffect(handler(BOT_ID, CHAT_ID, body, linked));
+    await runCauseEffect(handler(CHAT_ID, { platform: "telegram", botId: BOT_ID, body, linked }));
   }
 
   of(method: string): TelegramCall[] {

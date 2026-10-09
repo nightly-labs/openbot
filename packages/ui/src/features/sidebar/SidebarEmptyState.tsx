@@ -1,7 +1,7 @@
 /**
- * What the list shows with nothing in it. Two different empty states: a search that matched nothing
- * says so, while a brand new profile offers `props.emptyAction` - the first agent, rendered as a
- * pressed row so the sidebar is never a blank column.
+ * What the list shows with nothing in it. A brand new profile offers `props.emptyAction` - the first
+ * agent, rendered as a pressed row so the sidebar is never a blank column. A roster still on its way
+ * from a joined server says that it connects.
  */
 
 import { Button } from "@openbot/ui";
@@ -11,19 +11,13 @@ import { AgentAvatar } from "../agents/AgentAvatar";
 import { useSidebarScope } from "./sidebar-scope";
 
 export function SidebarEmptyState() {
-  const { props, query } = useSidebarScope();
+  const { props } = useSidebarScope();
   const { t } = useText();
   return (
     <Show
-      when={!query().trim() && props.emptyAction}
+      when={props.emptyAction}
       fallback={
-        <p class="empty-search">
-          {query().trim()
-            ? t("sidebar.empty.noMatches")
-            : props.agents.length
-              ? t("sidebar.empty.noMatches")
-              : t("sidebar.empty.noAgents")}
-        </p>
+        <p class="empty-search">{props.agentsConnecting ? t("common.connecting") : t("sidebar.empty.noAgents")}</p>
       }
     >
       {(action) => (

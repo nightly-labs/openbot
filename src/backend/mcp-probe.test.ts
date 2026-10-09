@@ -1,9 +1,16 @@
 import { chmod, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
+import {
+  createServer as createHttpServer,
+  Server as HttpServer,
+  type IncomingMessage,
+  type ServerResponse,
+} from "node:http";
+import { createServer as createNetServer, type Server as NetServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { decodeMcpTestResult, type McpServerConfig } from "@openbot/contracts/ipc";
 import { afterEach, describe, expect, it } from "vitest";
-import { describeMcpError, testMcpServer } from "./mcp-probe";
+import { describeMcpError, describeSignInChallenge, testMcpServer } from "./mcp-probe";
 import { runMcp } from "./mcp-test-runtime";
 
 // A newline-delimited JSON-RPC server, written here rather than built on the SDK so the child is
@@ -165,6 +172,134 @@ describe("testMcpServer", () => {
     expect(result.toolCount).toBe(0);
     expect(result.error).toContain("The server did not answer in");
   });
+
+  it("says a server stopped rather than timed out, and points an mcp-remote bridge at Streamable HTTP", async () => {
+    const exited = await scriptConfig("process.exit(3);\n");
+    expect(await runMcp(testMcpServer(exited))).toEqual({
+      toolCount: 0,
+      error: "The server stopped before it answered. Run the command in a terminal to see its error.",
+    });
+
+    // The query can carry a key, so the address the hint names leaves it out.
+    const bridge = { ...exited, args: [...exited.args, "mcp-remote", "https://mcp.example.com/mcp?token=private"] };
+    expect(await runMcp(testMcpServer(bridge))).toEqual({
+      toolCount: 0,
+      error:
+        "The server stopped before it answered. Run the command in a terminal to see its error. This command runs the mcp-remote bridge. Choose Streamable HTTP with the URL https://mcp.example.com/mcp instead, and OpenBot signs you in.",
+    });
+  });
+});
+
+// A server another app runs on this computer, such as the Figma desktop app at 127.0.0.1:3845.
+describe("testMcpServer over http on this computer", () => {
+  const listeners: NetServer[] = [];
+
+  afterEach(async () => {
+    await Promise.all(
+      listeners.splice(0).map(
+        (server) =>
+          new Promise<void>((resolve) => {
+            if (server instanceof HttpServer) server.closeAllConnections();
+            server.close(() => resolve());
+          }),
+      ),
+    );
+  });
+
+  async function listen<T extends NetServer>(server: T, port = 0): Promise<string> {
+    listeners.push(server);
+    await new Promise<void>((resolve) => server.listen(port, "127.0.0.1", resolve));
+    const address = server.address();
+    if (address === null || typeof address === "string") throw new Error("The server has no port.");
+    return `http://127.0.0.1:${address.port}/mcp`;
+  }
+
+  /** JSON-RPC over Streamable HTTP with JSON answers, as plain as the stdio fake above. */
+  async function answerMcp(request: IncomingMessage, response: ServerResponse) {
+    if (request.method !== "POST") {
+      response.writeHead(405).end();
+      return;
+    }
+    let body = "";
+    for await (const chunk of request) body += chunk;
+    const message = JSON.parse(body);
+    if (message.id === undefined) {
+      response.writeHead(202).end();
+      return;
+    }
+    const result =
+      message.method === "initialize"
+        ? {
+            protocolVersion: message.params.protocolVersion,
+            capabilities: { tools: {} },
+            serverInfo: { name: "fake", version: "1" },
+          }
+        : {
+            tools: [
+              { name: "one", inputSchema: { type: "object" } },
+              { name: "two", inputSchema: { type: "object" } },
+            ],
+          };
+    response
+      .writeHead(200, { "content-type": "application/json" })
+      .end(JSON.stringify({ jsonrpc: "2.0", id: message.id, result }));
+  }
+
+  it("connects to a local server that answers MCP over Streamable HTTP", async () => {
+    const url = await listen(createHttpServer((request, response) => void answerMcp(request, response)));
+    expect(await runMcp(testMcpServer(config({ transport: "http", url })))).toEqual({ toolCount: 2, error: null });
+  });
+
+  it("says no server runs at a local address that refuses", async () => {
+    const off = createHttpServer();
+    const url = await listen(off);
+    await new Promise<void>((resolve) => off.close(() => resolve()));
+    listeners.splice(listeners.indexOf(off), 1);
+
+    expect(await runMcp(testMcpServer(config({ transport: "http", url })))).toEqual({
+      toolCount: 0,
+      error: `No server answers at ${new URL(url).origin} on this computer. Start the server, or turn it on in the app that runs it, then try again.`,
+    });
+  });
+
+  const INCOMPATIBLE =
+    "Something answered at this address, but not as an MCP server over Streamable HTTP. Check the URL, and update the app that runs the server.";
+
+  it.each<[string, () => NetServer]>([
+    [
+      "a web page",
+      () =>
+        createHttpServer((_request, response) => response.writeHead(200, { "content-type": "text/html" }).end("<p>")),
+    ],
+    [
+      "bytes that are not HTTP",
+      () => createNetServer((socket) => socket.end("NOT HTTP\r\n\r\n", () => socket.destroy())),
+    ],
+    ["a refused POST", () => createHttpServer((_request, response) => response.writeHead(405).end())],
+  ])("explains %s as an answer that is not MCP", async (_name, server) => {
+    const url = await listen(server());
+    expect(await runMcp(testMcpServer(config({ transport: "http", url })))).toEqual({
+      toolCount: 0,
+      error: INCOMPATIBLE,
+    });
+  });
+});
+
+describe("describeSignInChallenge", () => {
+  it("names the https address instead of signing in over plain http", () => {
+    // Granola redirects plain http to https and then asks for a sign-in; the agents would still use
+    // the http address, so the user is asked to change it rather than have it changed silently.
+    expect(
+      describeSignInChallenge(
+        "http://mcp.granola.ai/mcp?key=private",
+        "https://mcp.granola.ai/mcp?key=private",
+        "here",
+      ),
+    ).toBe(
+      "This server asks for a sign-in, and OpenBot signs in only over https. Change the URL to https://mcp.granola.ai/mcp.",
+    );
+    expect(describeSignInChallenge("https://mcp.granola.ai/mcp", "https://mcp.granola.ai/mcp", null)).toBeNull();
+  });
 });
 
 describe("describeMcpError", () => {
@@ -192,6 +327,23 @@ describe("describeMcpError", () => {
     } finally {
       delete process.env.OPENBOT_TEST_MCP_TOKEN;
     }
+  });
+
+  it("names a connection this computer blocked, and keeps the network sentence for a remote refusal", () => {
+    const fetchFailed = (code: string) =>
+      new TypeError("fetch failed", { cause: Object.assign(new Error(`connect ${code}`), { code }) });
+    expect(
+      describeMcpError(fetchFailed("EACCES"), config({ transport: "http", url: "http://127.0.0.1:3845/mcp" }), 10_000),
+    ).toBe(
+      "This computer blocked the connection to the server. Check your firewall or security software, then try again.",
+    );
+    expect(
+      describeMcpError(
+        fetchFailed("ECONNREFUSED"),
+        config({ transport: "http", url: "https://mcp.example.com/mcp" }),
+        10_000,
+      ),
+    ).toBe("OpenBot could not reach the server. Check the URL and your network.");
   });
 
   it("reports an http status rather than the transport's own words", () => {

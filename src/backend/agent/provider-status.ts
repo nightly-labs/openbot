@@ -2,9 +2,19 @@ import type { ChildProcess } from "node:child_process";
 import type { AgentProviderStatus } from "@openbot/contracts/ipc";
 import { redactText } from "@openbot/logging";
 import { Effect, Schema } from "effect";
-import type { AgentProvider } from "../agent-client";
+import { type AgentProvider, RequestTimeoutError } from "../agent-client";
 import { CodexCliError } from "../cli";
 import { stopProcessTree } from "../windows-process-tree";
+import { TimeoutError } from "../with-timeout";
+
+/** The CLI did not answer in time: its `--version`, or a request of its start, such as `initialize`. */
+export function isProviderTimeout(error: unknown): boolean {
+  return (
+    (error instanceof CodexCliError && error.code === "timeout") ||
+    error instanceof TimeoutError ||
+    error instanceof RequestTimeoutError
+  );
+}
 
 export function setProviderStatus(
   statuses: AgentProviderStatus[],
@@ -39,6 +49,11 @@ export function providerFailureStatus(
   if (error instanceof CodexCliError) {
     // A CLI that did not answer in time is not broken, so the message must not ask for a reinstall.
     if (error.code === "timeout") return { state: "error", version: version ?? null, message };
+    // An app update can require a newer CLI than the one in the runtime store.
+    // Keep the version error so the user can update the provider in OpenBot.
+    if (error.code === "outdated") {
+      return { state: "outdated", version: version ?? null, message };
+    }
     if (provider === "codex" || provider === "claude") {
       const label = provider === "codex" ? "ChatGPT" : "Claude";
       const bundledMessage =
@@ -49,9 +64,6 @@ export function providerFailureStatus(
     }
     if (error.code === "missing") {
       return { state: "not-installed", version: null, message };
-    }
-    if (error.code === "outdated") {
-      return { state: "outdated", version: version ?? null, message };
     }
   }
   return { state: "error", version: version ?? null, message };

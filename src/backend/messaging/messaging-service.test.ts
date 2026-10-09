@@ -74,7 +74,8 @@ class FakeSlack {
         ? JSON.stringify({ type: "event_callback", api_app_id: this.appId, event_id: randomUUID(), ...payload })
         : new URLSearchParams({ payload: JSON.stringify(payload) }).toString();
     const answer = await runCauseEffect(
-      messaging?.deliverSlack("T1", {
+      messaging?.deliver("T1", {
+        platform: "slack",
         kind: type === "events_api" ? "events" : "interactivity",
         retryNum: null,
         body: Buffer.from(body),
@@ -201,7 +202,6 @@ const onlineIngress: MessagingIngress = {
   state: () => "online",
   onState: () => () => undefined,
   handle: () => undefined,
-  handleTelegram: () => undefined,
   reconnect: () => undefined,
   telegram: {
     available: () => false,
@@ -209,6 +209,8 @@ const onlineIngress: MessagingIngress = {
     download: () => Effect.die("Slack tests make no Telegram call."),
     upload: () => Effect.die("Slack tests make no Telegram call."),
   },
+  discord: () => Effect.die(new Error("No Discord in this test.")),
+  onDiscordRoutes: () => () => undefined,
 };
 
 class MemoryCredentials implements MessagingCredentials {
@@ -465,10 +467,13 @@ describe.sequential("Slack messaging end to end", () => {
     expect(turnStarts(client)).toEqual([]);
 
     // The orchestrator is a new agent with its remit and the facts it starts with.
-    const added = await runCauseEffect(messaging?.addOrchestrator({ workspaceId: "T1" }) ?? Effect.succeed(undefined));
+    const added = await runCauseEffect(
+      messaging?.addOrchestrator("slack", { workspaceId: "T1" }) ?? Effect.succeed(undefined),
+    );
     const orchestratorId = added?.agentId ?? "";
     expect(
-      (await runCauseEffect(messaging?.addOrchestrator({ workspaceId: "T1" }) ?? Effect.succeed(undefined)))?.agentId,
+      (await runCauseEffect(messaging?.addOrchestrator("slack", { workspaceId: "T1" }) ?? Effect.succeed(undefined)))
+        ?.agentId,
     ).toBe(orchestratorId);
     // It sits in the sidebar's Integrations section, which the screen shows collapsed.
     const layout = sidebar?.getSnapshot();

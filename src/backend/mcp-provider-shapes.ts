@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 import {
   type AgentProviderId,
   COMPUTER_USE_MCP_SERVER_ID,
+  COMPUTER_USE_MCP_SERVER_NAME,
   isReservedMcpServerName,
   type McpServerConfig,
 } from "@openbot/contracts/ipc";
@@ -13,6 +14,7 @@ import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Schema } from "effect";
 import { runInLoginShell } from "./cli";
+import { causeHelpers } from "./effect-boundary";
 import type { McpOperationError } from "./mcp-effects";
 import { getRecord } from "./protocol";
 
@@ -543,7 +545,7 @@ export function acpMcpServers(servers: readonly UsableMcpServer[]): McpHandoff<A
  * reported as a drop.
  */
 export type CodexMcpServer =
-  | { command: string; args: string[]; env: Record<string, string> }
+  | { command: string; args: string[]; env: Record<string, string>; enabled?: boolean; tools?: DynamicRecord }
   | { url: string; http_headers: Record<string, string> };
 
 export const codexDisabledServers = Effect.fn("McpShape.codexDisabledServers")(function* (
@@ -551,12 +553,18 @@ export const codexDisabledServers = Effect.fn("McpShape.codexDisabledServers")(f
 ) {
   const config = yield* readConfig();
   const configured = getRecord(getRecord(config, "config"), "mcp_servers");
-  return Object.fromEntries(Object.keys(configured ?? {}).map((name) => [name, { enabled: false } as const]));
+  return Object.fromEntries(
+    Object.keys(configured ?? {}).map((name) => {
+      const tools = name === COMPUTER_USE_MCP_SERVER_NAME ? getRecord(getRecord(configured, name), "tools") : null;
+      return [name, { enabled: false, ...(tools ? { tools } : {}) } satisfies CodexDisabledMcpServer];
+    }),
+  );
 });
 
 /** A name Codex found in its own file and must not start. It carries no command; that is the point. */
 export interface CodexDisabledMcpServer {
   enabled: false;
+  tools?: DynamicRecord;
 }
 
 /** A server name in the form Codex accepts. Claude makes the same change by itself. */
@@ -659,6 +667,7 @@ export function mcpHandoffHeaders(server: ResolvedMcpServer): Record<string, str
 export class McpShapeFailed extends Schema.TaggedError<McpShapeFailed>()("McpShapeFailed", {
   cause: Schema.Defect(),
 }) {}
-function mcpShapeIo<A>(run: () => Promise<A>): Effect.Effect<A, McpShapeFailed> {
-  return Effect.tryPromise({ try: run, catch: (cause) => new McpShapeFailed({ cause }) });
-}
+
+const { io: mcpShapeIo, rewrap: toMcpShapeFailed } = causeHelpers(McpShapeFailed);
+
+export { toMcpShapeFailed };

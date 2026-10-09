@@ -161,7 +161,7 @@ export class McpServerStore {
    * wrote by hand, and changed arguments are the user's own edits: both stay as they are. Every
    * other column (id, enabled state, position, credentials, working directory) is kept, so the
    * row the user sees is the row they had, reaching its server natively. The converted row holds
-   * no sign-in yet; the next Test on it signs in through the browser like any new installation.
+   * no sign-in yet; Sign in on it opens the browser like any new installation.
    *
    * This is a data rewrite rather than a schema migration: no DDL changes, and running it again
    * converts nothing, so it runs on every startup rather than behind a schema version.

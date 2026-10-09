@@ -1,5 +1,6 @@
+import { createHash } from "node:crypto";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
-import type { AgentEvent, AgentSummary, ConversationSnapshot } from "@openbot/contracts/ipc";
+import type { AgentEvent, AgentSummary, ConversationMessage, ConversationSnapshot } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import type { AgentClient } from "../agent-client";
 import type { AgentStore } from "../agent-store";
@@ -17,7 +18,14 @@ interface TransactionScope {
  * opened. A chat that goes is read again from the database when it is next needed, the same as a
  * chat that was not opened since the app started.
  */
-const READ_SNAPSHOT_LIMIT = 16;
+/** The most recent completed messages retained in the process for one conversation. */
+export const CONVERSATION_CACHE_MESSAGE_LIMIT = 100;
+
+/** The maximum serialized size retained for one completed conversation. */
+export const CONVERSATION_CACHE_BYTES_LIMIT = 8 * 1024 * 1024;
+
+/** The maximum serialized size retained by all completed conversation caches. */
+export const CONVERSATION_CACHE_TOTAL_BYTES_LIMIT = 64 * 1024 * 1024;
 
 /** Only the caller that opened the transaction holds a scope, so a nested call finds the owner's. */
 const openTransactions = new WeakMap<OpenBotDatabase, TransactionScope>();
@@ -114,6 +122,16 @@ interface EvictedSnapshot {
   snapshot: WeakRef<ConversationSnapshot>;
 }
 
+interface CachedSnapshot {
+  snapshot: ConversationSnapshot;
+  bytes: number;
+  usedAt: number;
+  signature: string;
+  activeTurnId: string | null;
+  messageSignatures: Map<string, string>;
+  omittedMessageIds: Set<string>;
+}
+
 export interface ConversationTransaction {
   threadId: string;
   snapshot: ConversationSnapshot;
@@ -141,6 +159,9 @@ export class ConversationRuntime {
    */
   readonly #listAgents: () => AgentSummary[];
   readonly #snapshots = new Map<string, ConversationSnapshot>();
+  /** Completed snapshots are bounded views. SQLite remains the source of truth for the rest. */
+  readonly #cachedSnapshots = new Map<string, CachedSnapshot>();
+  #cachedSnapshotBytes = 0;
   readonly #snapshotUsedAt = new Map<string, number>();
   /**
    * An idle snapshot leaves `snapshots` but stays here while a caller still holds it, for example
@@ -150,18 +171,11 @@ export class ConversationRuntime {
    */
   readonly #evictedSnapshots = new Map<string, EvictedSnapshot>();
   #evictionTimer: NodeJS.Timeout | null = null;
-  /**
-   * The cached chats that `setSnapshot` stored and that no turn code took since, oldest first. Only
-   * these can go. `ensureSnapshot` gives its object to code that can change it across an `await`
-   * before it saves it, so a copy read again from the database could lose that change.
-   */
-  readonly #readSnapshots = new Set<string>();
-  /** The chats that the limit dropped. `snapshotToUpdate` reads them again, so they still get updates. */
-  readonly #droppedSnapshots = new Set<string>();
   readonly #conversationSignatures = new Map<string, string>();
   readonly #threadToAgent = new Map<string, string>();
   readonly #loadedThreads = new Map<string, AgentClient>();
   readonly #executionSnapshots = new Map<string, ConversationSnapshot>();
+  readonly #cachedExecutionSnapshots = new Map<string, CachedSnapshot>();
   readonly #publicThreads = new Map<string, string>();
   readonly #forgottenExecutionThreads = new Set<string>();
 
@@ -171,18 +185,30 @@ export class ConversationRuntime {
     this.#listAgents = listAgents;
   }
 
-  /** The agent's snapshot when it is loaded. An evicted snapshot comes back, so eviction is not visible. */
+  /**
+   * The agent's working snapshot, or its bounded recent-history view.
+   *
+   * A completed chat can contain more messages than the working cache. This method returns only the
+   * bounded working projection; the database remains the source for older messages.
+   */
   snapshot(agentId: string): ConversationSnapshot | undefined {
     const live = this.#snapshots.get(agentId);
     if (live) {
-      this.#snapshotUsedAt.set(agentId, Date.now());
+      const now = Date.now();
+      this.#snapshotUsedAt.set(agentId, now);
+      const cached = this.#cachedSnapshots.get(agentId);
+      if (cached) cached.usedAt = now;
       return live;
     }
     const evicted = this.#evictedSnapshots.get(agentId);
     if (!evicted) return undefined;
-    const snapshot = evicted.snapshot.deref() ?? this.#store.database.readConversation(agentId, evicted.threadId);
-    this.#keepSnapshot(agentId, snapshot);
-    return snapshot;
+    const retained = evicted.snapshot.deref();
+    const snapshot =
+      retained ??
+      pageSnapshot(this.#store.database.readConversationPage(agentId, evicted.threadId, { type: "latest" }, 100));
+    if (retained) this.#restoreEvictedSnapshot(agentId, snapshot);
+    else this.#keepSnapshot(agentId, snapshot);
+    return this.#snapshots.get(agentId) ?? snapshot;
   }
 
   /**
@@ -199,19 +225,24 @@ export class ConversationRuntime {
    * unloaded.
    */
   snapshotToUpdate(agentId: string): ConversationSnapshot | undefined {
-    const cached = this.snapshot(agentId);
-    if (cached || !this.#droppedSnapshots.has(agentId)) return cached;
-    const agent = this.#store.list().find((candidate) => candidate.id === agentId);
-    const snapshot = this.#store.database.readConversation(agentId, agent?.threadId ?? null);
-    this.#keepSnapshot(agentId, snapshot);
-    this.#rememberRead(agentId);
-    return snapshot;
+    // Queue and mailbox notifications must not load every agent's recent page at startup. A
+    // mutating provider path calls `ensureSnapshot` explicitly; this helper only updates a cache
+    // that is already loaded or that was deliberately idle-evicted and can be restored safely.
+    return this.snapshot(agentId);
   }
 
   setSnapshot(agentId: string, snapshot: ConversationSnapshot): void {
     if (snapshot.threadId && this.#forgottenExecutionThreads.has(snapshot.threadId)) return;
+    const current = this.#snapshots.get(agentId);
+    if (current?.activeTurnId && current.activeTurnId === snapshot.activeTurnId) {
+      const bounded = boundedConversationSnapshot(snapshot).snapshot;
+      copySnapshotContents(current, bounded);
+      this.#keepSnapshot(agentId, current);
+      this.#rememberRead(agentId);
+      return;
+    }
     if (snapshot.threadId && snapshot.threadId !== this.#store.list().find((agent) => agent.id === agentId)?.threadId)
-      this.#executionSnapshots.set(snapshot.threadId, snapshot);
+      this.#setExecutionSnapshot(snapshot.threadId, snapshot);
     else {
       this.#keepSnapshot(agentId, snapshot);
       this.#rememberRead(agentId);
@@ -220,7 +251,14 @@ export class ConversationRuntime {
 
   #keepSnapshot(agentId: string, snapshot: ConversationSnapshot): void {
     this.#evictedSnapshots.delete(agentId);
-    this.#snapshots.set(agentId, snapshot);
+    this.#dropCachedSnapshot(agentId);
+    const cached = boundedConversationSnapshot(snapshot);
+    const current = this.#snapshots.get(agentId);
+    const retained = current === snapshot ? copySnapshotContents(snapshot, cached.snapshot) : cached.snapshot;
+    this.#snapshots.set(agentId, retained);
+    this.#cachedSnapshots.set(agentId, retained === cached.snapshot ? cached : { ...cached, snapshot: retained });
+    this.#cachedSnapshotBytes += cached.bytes;
+    this.#evictCachedSnapshots();
     this.#snapshotUsedAt.set(agentId, Date.now());
     this.#evictionTimer ??= setInterval(() => {
       try {
@@ -232,6 +270,112 @@ export class ConversationRuntime {
       }
     }, CONVERSATION_SNAPSHOT_IDLE_MS);
     this.#evictionTimer.unref?.();
+  }
+
+  #setExecutionSnapshot(threadId: string, snapshot: ConversationSnapshot): void {
+    this.#dropCachedExecutionSnapshot(threadId);
+    const cached = boundedConversationSnapshot(snapshot);
+    const current = this.#executionSnapshots.get(threadId);
+    const retained = current === snapshot ? copySnapshotContents(snapshot, cached.snapshot) : cached.snapshot;
+    this.#executionSnapshots.set(threadId, retained);
+    this.#cachedExecutionSnapshots.set(
+      threadId,
+      retained === cached.snapshot ? cached : { ...cached, snapshot: retained },
+    );
+    this.#cachedSnapshotBytes += cached.bytes;
+    this.#evictCachedSnapshots();
+  }
+
+  #restoreEvictedSnapshot(agentId: string, snapshot: ConversationSnapshot): void {
+    this.#evictedSnapshots.delete(agentId);
+    this.#keepSnapshot(agentId, snapshot);
+  }
+
+  #dropCachedSnapshot(agentId: string): void {
+    const cached = this.#cachedSnapshots.get(agentId);
+    if (!cached) return;
+    this.#cachedSnapshotBytes -= cached.bytes;
+    this.#cachedSnapshots.delete(agentId);
+  }
+
+  #dropCachedExecutionSnapshot(threadId: string): void {
+    const cached = this.#cachedExecutionSnapshots.get(threadId);
+    if (!cached) return;
+    this.#cachedSnapshotBytes -= cached.bytes;
+    this.#cachedExecutionSnapshots.delete(threadId);
+  }
+
+  #evictCachedSnapshots(): void {
+    while (this.#cachedSnapshotBytes > CONVERSATION_CACHE_TOTAL_BYTES_LIMIT) {
+      let oldest:
+        | { kind: "agent"; id: string; usedAt: number }
+        | { kind: "execution"; id: string; usedAt: number }
+        | undefined;
+      for (const [id, cached] of this.#cachedSnapshots) {
+        if (!this.#cacheIsCommitted(cached)) continue;
+        if (cached.snapshot.messages.every((message) => isActiveMessage(message, cached.snapshot.activeTurnId)))
+          continue;
+        if (!oldest || cached.usedAt < oldest.usedAt) oldest = { kind: "agent", id, usedAt: cached.usedAt };
+      }
+      for (const [id, cached] of this.#cachedExecutionSnapshots) {
+        if (!this.#cacheIsCommitted(cached)) continue;
+        if (cached.snapshot.messages.every((message) => isActiveMessage(message, cached.snapshot.activeTurnId)))
+          continue;
+        if (!oldest || cached.usedAt < oldest.usedAt) oldest = { kind: "execution", id, usedAt: cached.usedAt };
+      }
+      if (!oldest) return;
+      if (oldest.kind === "agent") {
+        const cached = this.#cachedSnapshots.get(oldest.id);
+        if (cached?.snapshot.activeTurnId) {
+          if (!this.#trimCompletedCache(cached)) return;
+        } else {
+          // Keep the same recovery path as idle eviction. A caller may still hold this snapshot
+          // while the process budget evicts it; dropping the map entry without a marker would make
+          // queue and mailbox updates skip this agent until a full conversation read.
+          if (cached?.snapshot.threadId) {
+            this.#evictedSnapshots.set(oldest.id, {
+              threadId: cached.snapshot.threadId,
+              snapshot: new WeakRef(cached.snapshot),
+            });
+          }
+          this.#dropCachedSnapshot(oldest.id);
+          this.#snapshots.delete(oldest.id);
+          this.#snapshotUsedAt.delete(oldest.id);
+        }
+      } else {
+        const cached = this.#cachedExecutionSnapshots.get(oldest.id);
+        if (cached?.snapshot.activeTurnId) {
+          if (!this.#trimCompletedCache(cached)) return;
+        } else {
+          // Keep the execution-thread identity for routing, but release its message objects. The
+          // next ensureSnapshot call sees the empty projection and rebuilds the recent page from
+          // SQLite instead of retaining an evicted transcript through this strong map reference.
+          const snapshot = this.#executionSnapshots.get(oldest.id);
+          if (snapshot) snapshot.messages = [];
+          this.#dropCachedExecutionSnapshot(oldest.id);
+        }
+      }
+    }
+  }
+
+  #cacheIsCommitted(cached: CachedSnapshot): boolean {
+    return cached.signature === conversationContentSignature(cached.snapshot);
+  }
+
+  #trimCompletedCache(cached: CachedSnapshot): boolean {
+    const activeTurnId = cached.snapshot.activeTurnId;
+    const index = cached.snapshot.messages.findIndex((message) => !isActiveMessage(message, activeTurnId));
+    if (index < 0) return false;
+    const [removed] = cached.snapshot.messages.splice(index, 1);
+    if (!removed) return false;
+    const previousBytes = cached.bytes;
+    cached.omittedMessageIds.add(removed.id);
+    cached.messageSignatures.delete(removed.id);
+    cached.bytes = completedCacheBytes(cached.snapshot);
+    cached.signature = conversationContentSignature(cached.snapshot);
+    cached.activeTurnId = cached.snapshot.activeTurnId;
+    this.#cachedSnapshotBytes += cached.bytes - previousBytes;
+    return true;
   }
 
   /**
@@ -249,12 +393,15 @@ export class ConversationRuntime {
       // A snapshot that must stay is read again only after one more idle period.
       this.#snapshotUsedAt.set(agentId, now);
       if (!snapshot.threadId || snapshot.activeTurnId) continue;
-      const persisted = this.#store.database.readConversation(agentId, snapshot.threadId);
-      if (conversationContentSignature(persisted) !== conversationContentSignature(snapshot)) continue;
+      const cached = this.#cachedSnapshots.get(agentId);
+      if (cached && cached.signature !== conversationContentSignature(snapshot)) continue;
+      this.#dropCachedSnapshot(agentId);
       this.#snapshots.delete(agentId);
       this.#snapshotUsedAt.delete(agentId);
-      this.#readSnapshots.delete(agentId);
-      this.#evictedSnapshots.set(agentId, { threadId: snapshot.threadId, snapshot: new WeakRef(snapshot) });
+      this.#evictedSnapshots.set(agentId, {
+        threadId: snapshot.threadId,
+        snapshot: new WeakRef(snapshot),
+      });
     }
     if (this.#snapshots.size === 0) this.dispose();
   }
@@ -266,17 +413,9 @@ export class ConversationRuntime {
 
   /** Makes this chat the newest read chat, then drops the oldest read chats past the limit. */
   #rememberRead(agentId: string): void {
-    this.#droppedSnapshots.delete(agentId);
-    this.#readSnapshots.delete(agentId);
-    this.#readSnapshots.add(agentId);
-    for (const id of this.#readSnapshots) {
-      if (this.#readSnapshots.size <= READ_SNAPSHOT_LIMIT) return;
-      if (this.#snapshots.get(id)?.activeTurnId) continue;
-      this.#readSnapshots.delete(id);
-      this.#snapshots.delete(id);
-      this.#snapshotUsedAt.delete(id);
-      this.#droppedSnapshots.add(id);
-    }
+    const cached = this.#cachedSnapshots.get(agentId);
+    if (cached) cached.usedAt = Date.now();
+    this.#evictCachedSnapshots();
   }
 
   activeSnapshots(): IterableIterator<[string, ConversationSnapshot]> {
@@ -296,7 +435,14 @@ export class ConversationRuntime {
   registerExecutionThread(agentId: string, threadId: string): void {
     if (this.#forgottenExecutionThreads.has(threadId)) return;
     if (!this.#executionSnapshots.has(threadId)) {
-      this.#executionSnapshots.set(threadId, this.#store.database.readConversation(agentId, threadId));
+      const page = this.#store.database.readConversationPage(agentId, threadId, { type: "latest" }, 100);
+      this.#setExecutionSnapshot(threadId, {
+        agentId,
+        threadId: page.threadId,
+        activeTurnId: page.activeTurnId,
+        revision: page.revision,
+        messages: page.messages,
+      });
     }
   }
 
@@ -312,22 +458,39 @@ export class ConversationRuntime {
   ensureSnapshot(agentId: string, threadId: string | null): ConversationSnapshot {
     const publicId = threadId ? (this.#publicThreads.get(threadId) ?? threadId) : null;
     const execution = publicId ? this.#executionSnapshots.get(publicId) : undefined;
-    if (execution) {
+    if (execution && publicId) {
       if (execution.agentId !== agentId) throw new Error("Execution thread belongs to another agent.");
+      if (!this.#cachedExecutionSnapshots.has(publicId) && execution.messages.length === 0) {
+        const page = this.#store.database.readConversationPage(agentId, publicId, { type: "latest" }, 100);
+        this.#setExecutionSnapshot(publicId, {
+          agentId,
+          threadId: page.threadId,
+          activeTurnId: page.activeTurnId,
+          revision: page.revision,
+          messages: page.messages,
+        });
+        return this.#executionSnapshots.get(publicId) ?? execution;
+      }
       return execution;
     }
-    let snapshot = this.snapshot(agentId);
-    if (!snapshot) {
-      const agent = this.#store.list().find((candidate) => candidate.id === agentId);
-      const publicThreadId = agent?.threadId ?? threadId;
-      snapshot = this.#store.database.readConversation(agentId, publicThreadId);
-      this.#keepSnapshot(agentId, snapshot);
-    } else if (threadId && !snapshot.threadId) {
-      snapshot.threadId = threadId;
+    const cached = this.#snapshots.get(agentId);
+    if (cached && (!threadId || cached.threadId === threadId)) return cached;
+    const agent = this.#store.list().find((candidate) => candidate.id === agentId);
+    const publicThreadId = agent?.threadId ?? threadId;
+    const page = this.#store.database.readConversationPage(agentId, publicThreadId, { type: "latest" }, 100);
+    const snapshot: ConversationSnapshot = {
+      agentId,
+      threadId: page.threadId ?? publicThreadId,
+      activeTurnId: page.activeTurnId,
+      revision: page.revision,
+      messages: page.messages,
+    };
+    if (publicId && this.#executionSnapshots.has(publicId)) {
+      this.#setExecutionSnapshot(publicId, snapshot);
+      return this.#executionSnapshots.get(publicId) ?? snapshot;
     }
-    this.#readSnapshots.delete(agentId);
-    this.#droppedSnapshots.delete(agentId);
-    return snapshot;
+    this.#keepSnapshot(agentId, snapshot);
+    return this.#snapshots.get(agentId) ?? snapshot;
   }
 
   publicThreadId(agentId: string, fallback: string): string {
@@ -354,18 +517,68 @@ export class ConversationRuntime {
     },
   ): void {
     if (snapshot.threadId && this.#forgottenExecutionThreads.has(snapshot.threadId)) return;
-    // A caller that held an evicted snapshot across an `await` puts it back here, so that
-    // `workingSnapshot` sees a turn that the caller started on it.
-    if (this.#evictedSnapshots.get(snapshot.agentId)?.snapshot.deref() === snapshot)
-      this.#keepSnapshot(snapshot.agentId, snapshot);
     sortConversationMessages(snapshot.messages);
     const signature = conversationContentSignature(snapshot);
-    if (this.#conversationSignatures.get(snapshot.threadId ?? snapshot.agentId) === signature) return;
+    if (this.#conversationSignatures.get(snapshot.threadId ?? snapshot.agentId) === signature) {
+      this.#retainPublishedSnapshot(snapshot);
+      return;
+    }
     if (snapshot.threadId) {
-      const persisted = this.#store.database.persistConversation(snapshot, eventType, detail);
-      snapshot.revision = persisted.revision;
+      const cached = this.#cachedSnapshot(snapshot);
+      const changedMessages = this.#changedMessages(snapshot);
+      const removedMessageIds = this.#removedMessageIds(snapshot);
+      if (
+        !cached ||
+        changedMessages.length > 0 ||
+        removedMessageIds.length > 0 ||
+        cached.activeTurnId !== snapshot.activeTurnId
+      ) {
+        snapshot.revision = this.#store.database.persistConversationChanges({
+          agentId: snapshot.agentId,
+          threadId: snapshot.threadId,
+          activeTurnId: snapshot.activeTurnId,
+          changedMessages,
+          removedMessageIds,
+          eventType,
+          detail,
+        });
+      }
     }
     this.publishConversation(snapshot, signature);
+    this.#retainPublishedSnapshot(snapshot);
+  }
+
+  #retainPublishedSnapshot(snapshot: ConversationSnapshot): void {
+    if (snapshot.threadId && this.#executionSnapshots.has(snapshot.threadId))
+      this.#setExecutionSnapshot(snapshot.threadId, snapshot);
+    else this.#keepSnapshot(snapshot.agentId, snapshot);
+  }
+
+  #cachedSnapshot(snapshot: ConversationSnapshot): CachedSnapshot | undefined {
+    const cached = this.#cachedSnapshots.get(snapshot.agentId);
+    if (cached?.snapshot === snapshot) return cached;
+    if (snapshot.threadId) {
+      const execution = this.#cachedExecutionSnapshots.get(snapshot.threadId);
+      if (execution?.snapshot === snapshot) return execution;
+    }
+    return undefined;
+  }
+
+  #changedMessages(snapshot: ConversationSnapshot): ConversationMessage[] {
+    const cached = this.#cachedSnapshot(snapshot);
+    if (!cached) return structuredClone(snapshot.messages);
+    return snapshot.messages.filter(
+      (message) => cached.messageSignatures.get(message.id) !== messageSignature(message),
+    );
+  }
+
+  #removedMessageIds(snapshot: ConversationSnapshot): string[] {
+    const cached = this.#cachedSnapshot(snapshot);
+    if (!cached) return [];
+    const currentIds = new Set(snapshot.messages.map((message) => message.id));
+    return [...cached.messageSignatures.keys()].filter(
+      (messageId) => !currentIds.has(messageId) && !cached.omittedMessageIds.has(messageId),
+    );
   }
 
   publishConversation(snapshot: ConversationSnapshot, signature = conversationContentSignature(snapshot)): void {
@@ -437,6 +650,7 @@ export class ConversationRuntime {
   forgetExecutionThread(threadId: string): void {
     this.#forgottenExecutionThreads.add(threadId);
     this.#executionSnapshots.delete(threadId);
+    this.#dropCachedExecutionSnapshot(threadId);
     this.#conversationSignatures.delete(threadId);
   }
 
@@ -448,15 +662,15 @@ export class ConversationRuntime {
     for (const [id, snapshot] of this.#executionSnapshots) {
       if (snapshot.agentId !== agentId) continue;
       this.#executionSnapshots.delete(id);
+      this.#dropCachedExecutionSnapshot(id);
       this.#conversationSignatures.delete(id);
     }
     const threadId = (this.#snapshots.get(agentId) ?? this.#evictedSnapshots.get(agentId))?.threadId;
     if (threadId) this.#conversationSignatures.delete(threadId);
     this.#snapshots.delete(agentId);
+    this.#dropCachedSnapshot(agentId);
     this.#snapshotUsedAt.delete(agentId);
     this.#evictedSnapshots.delete(agentId);
-    this.#readSnapshots.delete(agentId);
-    this.#droppedSnapshots.delete(agentId);
     this.#conversationSignatures.delete(agentId);
   }
 
@@ -493,7 +707,6 @@ export class ConversationRuntime {
         this.#snapshots.delete(agentId);
         this.#snapshotUsedAt.delete(agentId);
       }
-      this.#readSnapshots.delete(agentId);
     };
     let published: ConversationSnapshot | undefined;
     return withDatabaseTransaction(
@@ -510,8 +723,6 @@ export class ConversationRuntime {
       () => {
         if (!published) return;
         this.#keepSnapshot(agentId, published);
-        this.#readSnapshots.delete(agentId);
-        this.#droppedSnapshots.delete(agentId);
         this.publishConversation(published);
       },
     );
@@ -522,4 +733,86 @@ export class ConversationRuntime {
     if (!agent) throw new Error(sourceText("error.agent.unknown", { id: agentId }));
     return agent;
   }
+}
+
+function boundedConversationSnapshot(snapshot: ConversationSnapshot): CachedSnapshot {
+  const activeMessages = snapshot.activeTurnId
+    ? snapshot.messages.filter((message) => isActiveMessage(message, snapshot.activeTurnId))
+    : [];
+  const allCompletedMessages = snapshot.messages.filter((message) => !activeMessages.includes(message));
+  const completedMessages = allCompletedMessages.slice(-CONVERSATION_CACHE_MESSAGE_LIMIT);
+  const completedSnapshot = { ...snapshot, messages: completedMessages };
+  let completedBytes = conversationSnapshotBytes(completedSnapshot);
+  while (completedMessages.length > 0 && completedBytes > CONVERSATION_CACHE_BYTES_LIMIT) {
+    completedMessages.shift();
+    completedBytes = conversationSnapshotBytes({ ...snapshot, messages: completedMessages });
+  }
+  const retainedAllMessages =
+    completedMessages.length === allCompletedMessages.length &&
+    completedMessages.length + activeMessages.length === snapshot.messages.length;
+  const retained = new Set([...completedMessages, ...activeMessages]);
+  const bounded: ConversationSnapshot = retainedAllMessages
+    ? snapshot
+    : {
+        ...snapshot,
+        messages: snapshot.messages.filter((message) => retained.has(message)),
+      };
+  const messages = bounded.messages;
+  const retainedIds = new Set(messages.map((message) => message.id));
+  return {
+    snapshot: bounded,
+    // Active-turn messages are working state. The process-wide budget covers completed history
+    // only, so one large streamed response cannot evict every idle conversation.
+    bytes: completedBytes,
+    usedAt: Date.now(),
+    signature: conversationContentSignature(bounded),
+    activeTurnId: bounded.activeTurnId,
+    messageSignatures: new Map(messages.map((message) => [message.id, messageSignature(message)])),
+    omittedMessageIds: new Set(
+      snapshot.messages.flatMap((message) => (retainedIds.has(message.id) ? [] : [message.id])),
+    ),
+  };
+}
+
+function isActiveMessage(message: ConversationMessage, activeTurnId: string | null): boolean {
+  return activeTurnId !== null && (message.turnId === activeTurnId || message.status === "streaming");
+}
+
+function completedCacheBytes(snapshot: ConversationSnapshot): number {
+  return conversationSnapshotBytes({
+    ...snapshot,
+    messages: snapshot.messages.filter((message) => !isActiveMessage(message, snapshot.activeTurnId)),
+  });
+}
+
+function pageSnapshot(page: {
+  agentId: string;
+  threadId: string | null;
+  activeTurnId: string | null;
+  revision: number;
+  messages: ConversationMessage[];
+}): ConversationSnapshot {
+  return {
+    agentId: page.agentId,
+    threadId: page.threadId,
+    activeTurnId: page.activeTurnId,
+    revision: page.revision,
+    messages: page.messages,
+  };
+}
+
+function copySnapshotContents(target: ConversationSnapshot, source: ConversationSnapshot): ConversationSnapshot {
+  target.threadId = source.threadId;
+  target.activeTurnId = source.activeTurnId;
+  target.revision = source.revision;
+  target.messages = source.messages;
+  return target;
+}
+
+function conversationSnapshotBytes(snapshot: ConversationSnapshot): number {
+  return Buffer.byteLength(JSON.stringify(snapshot), "utf8");
+}
+
+function messageSignature(message: ConversationMessage): string {
+  return createHash("sha256").update(JSON.stringify(message)).digest("hex");
 }

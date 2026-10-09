@@ -571,6 +571,8 @@ export function installOpenbotStub(): void {
       setApprovalAutomation: vi.fn(async () => ({ turbo: false, defaultAutoApprove: false, autoApproveOverrides: {} })),
       getBusyMessageModePreference: vi.fn().mockResolvedValue({ mode: "queue" }),
       setBusyMessageModePreference: vi.fn(async ({ mode }) => ({ mode })),
+      getRemoteSessionReusePreference: vi.fn().mockResolvedValue({ keepBetweenRuns: true }),
+      setRemoteSessionReusePreference: vi.fn(async ({ keepBetweenRuns }) => ({ keepBetweenRuns })),
       getAppLanguagePreference: vi.fn().mockResolvedValue({ language: "system" }),
       setAppLanguagePreference: vi.fn(async ({ language }) => ({ language })),
       openExternal: vi.fn().mockResolvedValue(undefined),
@@ -645,6 +647,7 @@ export function installOpenbotStub(): void {
       status: vi.fn().mockResolvedValue(DISCONNECTED_GITHUB_CONNECTOR),
       repositories: vi.fn().mockResolvedValue({ repositories: [], total: 0 }),
     }),
+    bitwardenConnector: stubGroup("bitwardenConnector", { status: vi.fn().mockResolvedValue({ connected: false }) }),
     onePasswordConnector: stubGroup("onePasswordConnector", {
       status: vi.fn().mockResolvedValue(DISCONNECTED_ONEPASSWORD_CONNECTOR),
     }),
@@ -654,6 +657,8 @@ export function installOpenbotStub(): void {
     agentTemplates: stubGroup("agentTemplates", {
       takePendingLink: vi.fn().mockResolvedValue(null),
     }),
+    // No renderer test reaches routine flows yet; a request rejects as not stubbed.
+    routineFlows: stubGroup("routineFlows", {}),
     voice: stubGroup("voice", {
       getModelStatus: vi.fn().mockResolvedValue({ phase: "ready", progress: 100, message: null }),
       prepareModel: vi.fn().mockResolvedValue({ phase: "ready", progress: 100, message: null }),
@@ -703,6 +708,10 @@ export function installOpenbotStub(): void {
       removeMcpServer: notStubbed("agent.removeMcpServer"),
       setMcpServerEnabled: notStubbed("agent.setMcpServerEnabled"),
       testMcpServer: notStubbed("agent.testMcpServer"),
+      signInMcpServer: notStubbed("agent.signInMcpServer"),
+      cancelMcpSignIn: notStubbed("agent.cancelMcpSignIn"),
+      signOutMcpServer: notStubbed("agent.signOutMcpServer"),
+      listMcpSignIns: notStubbed("agent.listMcpSignIns"),
       getAgentAdminSettings: notStubbed("agent.getAgentAdminSettings"),
       updateAgentAdminSettings: notStubbed("agent.updateAgentAdminSettings"),
       listAgentSkills: notStubbed("agent.listAgentSkills"),
@@ -924,6 +933,8 @@ export function installOpenbotStub(): void {
         previewKind: "markdown",
         bytes: new TextEncoder().encode("# Preview"),
       }),
+      // A path a test previews is a file, so it is not a folder either.
+      listWorkspaceDirectory: vi.fn().mockRejectedValue(new Error("Workspace path is not a folder.")),
       sendMessage: vi.fn().mockResolvedValue({
         messageId: "message-1",
         deliveries: [{ id: "delivery-1", recipientAgentId: "chief", status: "queued", position: 1 }],
@@ -1196,6 +1207,10 @@ export function installOpenbotStub(): void {
     }),
     customAgents: stubGroup("customAgents", {
       list: vi.fn().mockResolvedValue([]),
+    }),
+    // A channel on this computer reads its routine count through the events group.
+    events: stubGroup("events", {
+      listRoutines: vi.fn().mockResolvedValue([]),
     }),
     // Onboarding and the Providers section of Server settings scan on their own, so a scan finds nothing by default.
     providerDetection: stubGroup("providerDetection", {

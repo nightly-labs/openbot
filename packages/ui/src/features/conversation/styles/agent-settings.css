@@ -4,7 +4,7 @@
   display: grid;
   width: 62px;
   height: 62px;
-  margin: 0 auto 36px;
+  margin: var(--openbot-space-2) auto var(--openbot-space-4);
   place-items: center;
 }
 
@@ -20,6 +20,7 @@
 }
 
 .agent-settings-avatar .agent-avatar {
+  --agent-avatar-optical-offset: calc(62px * -0.14);
   width: 62px;
   height: 62px;
 }
@@ -216,23 +217,6 @@
   padding: 9px 2px;
 }
 
-.agent-routine-run-row > span:nth-child(2) {
-  display: grid;
-  gap: 2px;
-}
-
-.agent-routine-run-row strong {
-  color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-sm);
-}
-
-.agent-routine-run-row small,
-.agent-routine-run-row em {
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
-  font-style: normal;
-}
-
 .agent-routines-overlay {
   top: 0;
   overflow: hidden;
@@ -353,8 +337,9 @@
   margin-top: 0;
 }
 
-/* The schedule is a field between Name and Instruction, so its heading matches their labels. */
-.agent-routine-when h3 {
+/* The schedule and history are fields, so their headings match the field labels. */
+.agent-routine-when h3,
+.agent-routine-history h3 {
   margin: 0 0 var(--openbot-space-1-5) var(--openbot-space-2);
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-md);
@@ -362,11 +347,12 @@
   line-height: var(--openbot-leading-md);
 }
 
-.agent-routine-history h3 {
-  margin: 0 0 8px;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
-  line-height: var(--openbot-leading-sm);
+/* A pointer and value row in the webhook filters. A JSON Pointer is longer than its value. */
+.agent-routine-event-filter {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr) auto;
+  align-items: center;
+  gap: var(--openbot-space-2);
 }
 
 .agent-routine-history {
@@ -389,7 +375,7 @@
   gap: 12px;
   border: 0;
   border-radius: var(--openbot-radius-sm);
-  padding: 5px var(--openbot-space-3);
+  padding: 5px var(--openbot-space-2);
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-sm);
   text-align: left;
@@ -397,6 +383,27 @@
 
 .ui-button.agent-routine-run-link {
   cursor: pointer;
+}
+
+/* An ignored webhook request: the time, then a muted note. */
+.agent-routine-run-text {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  gap: var(--openbot-space-2);
+  white-space: nowrap;
+}
+
+.agent-routine-run-note {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--openbot-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-routine-history-error {
+  margin-bottom: var(--openbot-space-2);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -1005,32 +1012,149 @@
   }
 }
 
-/* Runtime rows follow the flat link list above them: full-width rows, hairline dividers, the
-   label on the left and the current value on the right. */
-.agent-settings-runtime {
-  margin: var(--settings-panel-section-gap) 0 22px;
+/* The root list and each page behind it: one column of cards with an even gap. */
+.agent-settings-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-4);
 }
 
-.agent-settings-runtime-rows {
+.agent-settings-page > .settings-field {
+  margin: 0;
+}
+
+.ui-button.agent-settings-profile-card {
+  display: flex;
+  width: 100%;
+  height: auto;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--openbot-space-3);
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-surface);
+  padding: var(--openbot-space-3);
+  color: var(--openbot-text-primary);
+  text-align: left;
+}
+
+.agent-settings-profile-card .agent-settings-profile-avatar {
+  --agent-avatar-optical-offset: calc(44px * -0.14);
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+}
+
+.agent-settings-profile-text {
   display: grid;
-  border-top: 1px solid var(--openbot-border);
-  border-bottom: 1px solid var(--openbot-border);
+  min-width: 0;
+  flex: 1 1 auto;
+  gap: 2px;
 }
 
-.agent-settings-runtime-rows > * + * {
-  border-top: 1px solid var(--openbot-border);
+.agent-settings-profile-name,
+.agent-settings-profile-subtitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-settings-profile-name {
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-semibold);
+  line-height: var(--openbot-leading-lg);
+}
+
+.agent-settings-profile-subtitle {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.agent-settings-card-chevron {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex: 0 0 auto;
+  color: var(--openbot-text-muted);
+}
+
+.ui-button.agent-settings-instructions-card {
+  display: grid;
+  width: 100%;
+  height: auto;
+  justify-content: stretch;
+  justify-items: stretch;
+  gap: var(--openbot-space-1);
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-surface);
+  padding: 10px var(--openbot-space-3);
+  color: var(--openbot-text-primary);
+  text-align: left;
+}
+
+.agent-settings-instructions-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--openbot-space-2);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-medium);
+  line-height: var(--openbot-leading-md);
+}
+
+.agent-settings-instructions-preview {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-regular);
+  line-height: var(--openbot-leading-sm);
+  white-space: pre-line;
+}
+
+.agent-settings-instructions-preview-empty {
+  color: var(--openbot-text-muted);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ui-button.agent-settings-profile-card:hover:not(:disabled),
+  .ui-button.agent-settings-instructions-card:hover:not(:disabled) {
+    background: var(--openbot-bg-control-hover);
+    color: var(--openbot-text-primary);
+  }
+}
+
+.agent-settings-instructions-input {
+  min-height: 280px;
+}
+
+/* A switch row inside an inset group: as tall as a link row, the switch on the right. */
+.agent-settings-switch-row {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--openbot-space-2);
+  padding: 0 var(--openbot-space-3);
+}
+
+.agent-settings-switch-row > .settings-link-label {
+  flex: 1 1 auto;
 }
 
 .agent-settings-runtime-rows .provider-model-trigger-field,
 .agent-settings-runtime-rows .agent-settings-runtime-row {
   width: 100%;
   height: auto;
-  min-height: 42px;
-  gap: var(--openbot-space-3);
+  min-height: 40px;
+  gap: var(--openbot-space-2);
   border: 0;
   border-radius: 0;
   background: transparent;
-  padding: 0 var(--openbot-space-1);
+  padding: 0 var(--openbot-space-3);
   box-shadow: none;
   font-size: var(--openbot-text-md);
 }
@@ -1086,7 +1210,7 @@
 .agent-settings-runtime-path {
   display: grid;
   gap: 2px;
-  padding: 11px var(--openbot-space-1);
+  padding: 11px var(--openbot-space-3);
 }
 
 .agent-settings-runtime-path > span:last-child {
@@ -1104,7 +1228,7 @@
 }
 
 .agent-settings-save-error {
-  margin: -8px 2px 15px;
+  margin: 0 var(--openbot-space-1);
   color: var(--openbot-danger);
   font-size: var(--openbot-text-sm);
   line-height: 16px;
@@ -1116,7 +1240,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 4px;
+  margin: 0;
   border-radius: var(--openbot-radius-lg);
   background: var(--openbot-border);
   padding: 13px 12px;

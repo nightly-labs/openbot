@@ -1,4 +1,5 @@
 import type { TelegramOverview } from "@openbot/contracts/ipc";
+import { classifyFailure } from "@openbot/telemetry";
 import type {
   TelegramChatPlace,
   TelegramOrchestratorChoice,
@@ -64,7 +65,10 @@ export function createTelegramConnector(
       .catch((error: unknown) => {
         const { t, errorMessage } = currentText();
         actionToast.error(t("connector.telegram.actionFailed"), {
-          description: errorMessage(error, t("connector.telegram.actionFailed")),
+          ...{
+            description: errorMessage(error, t("connector.telegram.actionFailed")),
+          },
+          report: { operation: "other", source: "action", cause_code: classifyFailure(error) },
         });
       })
       .finally(() => {

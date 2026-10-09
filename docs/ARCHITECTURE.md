@@ -28,6 +28,7 @@ The architecture notes are in one file for each topic:
   - [OpenCode and ACP](architecture/providers.md#opencode-and-acp)
 - [Agents](architecture/agents.md)
   - [Local script runs](architecture/agents.md#local-script-runs)
+  - [Routine flows](architecture/agents.md#routine-flows)
   - [Agent communication policy](architecture/agents.md#agent-communication-policy)
   - [Prompt-driven agent profiles](architecture/agents.md#prompt-driven-agent-profiles)
   - [Agent import](architecture/agents.md#agent-import)

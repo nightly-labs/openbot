@@ -4,6 +4,8 @@ import type { AgentAdminSettingsService } from "../agent-admin-settings";
 import type { AgentMarketplaceService } from "../agent-marketplace-service";
 import type { AgentTemplateService } from "../agent-template-service";
 import type { PeerCustomProviderChanges } from "../custom-provider-changes";
+import type { HostEventsApi } from "../host-events-api";
+import type { HostReleaseService } from "../host-release-service";
 import type { HostService } from "../host-service";
 import type { ProviderCredentialStore } from "../provider-credential-store";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
@@ -87,6 +89,7 @@ type TeamApiAgentMethods = Pick<
   | "listChannelRoutineRuns"
   | "setAvatar"
   | "resolveAvatar"
+  | "readConversation"
   | "readConversationFor"
   | "readConversationPageFor"
   | "searchConversationMessages"
@@ -96,6 +99,7 @@ type TeamApiAgentMethods = Pick<
   | "discardDraftAttachment"
   | "resolveSharedFile"
   | "resolveWorkspaceFile"
+  | "listWorkspaceDirectory"
   | "sendMessage"
   | "listQueue"
   | "acknowledgeFailedTurn"
@@ -140,6 +144,8 @@ export type TeamApiAgentImport = Pick<AgentImportService, "stageUpload" | "apply
  * `#protocolSupport` advertises its capability on; every route behind it requires an owner or admin.
  */
 export interface TeamApiAdmin {
+  /** Read-only release discovery, independent of permission to install. */
+  release?: Pick<HostReleaseService, "snapshot" | "check">;
   /** `agent-admin-v1`: access and auto-approve of one agent. */
   agents?: AgentAdminSettingsService;
   /** `skills-admin-v1`: list, install, remove and enable the skills of one agent. */
@@ -158,7 +164,7 @@ export interface TeamApiAdmin {
   /** `host-admin-v1`: the server name and logo. */
   identity?: TeamApiHostIdentity;
   /** `host-update-v1`: the app update of this computer. Advertised also when the host user turned it off. */
-  update?: Pick<RequestedUpdate, "snapshot" | "check" | "start" | "cancel" | "changeSettings">;
+  update?: Pick<RequestedUpdate, "snapshot" | "check" | "start" | "requestWhenIdle" | "cancel" | "changeSettings">;
 }
 
 interface TeamApiHostIdentity {
@@ -205,6 +211,7 @@ export type TeamApiBrowser = Pick<
   // cannot, because frames outlive the request that asked for them.
   | "startView"
   | "dispatchViewInput"
+  | "copyViewSelection"
 >;
 export type TeamApiBrowserView = Pick<
   BrowserViewGateway,
@@ -227,6 +234,8 @@ export type TeamApiRemoteScreen = Pick<
   Partial<Pick<RemoteScreenGateway, "checkSetup" | "test">>;
 
 export interface TeamApiOptions {
+  /** `events-v1`: admin-only event source and routine management. */
+  events?: HostEventsApi;
   channels?: ChannelService;
   mcpServers?: TeamApiMcpServers;
   /** Starts and waits for the managed tool runtimes behind the MCP save, enable, and test routes. */
@@ -238,6 +247,11 @@ export interface TeamApiOptions {
   appVersion?: string;
   store: TeamStore;
   agents: TeamApiAgents;
+  /**
+   * Waits for the agent initialization in progress. A host that wakes publishes before its agents
+   * load, and an empty roster then would tell a peer that the server has no agents.
+   */
+  agentsReady?: () => Effect.Effect<void>;
   skills?: Pick<SkillMarketplaceService, "listInstalledForChatTags">;
   sidebarLayout?: TeamApiSidebarLayout;
   mailbox: TeamApiMailbox;

@@ -14,18 +14,15 @@ import { sourceText } from "@openbot/i18n/source";
 import { Effect, Schema, Semaphore } from "effect";
 import { z } from "zod";
 import { writeFileAtomically } from "../backend/atomic-json-file";
+import { causeHelpers } from "../backend/effect-boundary";
 import type { CustomProviderConfig } from "../backend/opencode-config";
 
 export class CustomProviderFailure extends Schema.TaggedError<CustomProviderFailure>()("CustomProviderFailure", {
   cause: Schema.Defect(),
 }) {}
 
-function providerIO<A>(operation: () => Promise<A>): Effect.Effect<A, CustomProviderFailure> {
-  return Effect.tryPromise({ try: operation, catch: (cause) => new CustomProviderFailure({ cause }) });
-}
-function providerSync<A>(operation: () => A): Effect.Effect<A, CustomProviderFailure> {
-  return Effect.try({ try: operation, catch: (cause) => new CustomProviderFailure({ cause }) });
-}
+const { io: providerIO, sync: providerSync } = causeHelpers(CustomProviderFailure);
+
 export interface CustomProviderCipher {
   canPersist: () => boolean;
   encrypt: (value: string) => Buffer;

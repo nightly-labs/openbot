@@ -29,8 +29,7 @@ function MockedInitialSetup(props: { args: InitialSetupArgs }) {
 }
 
 const args: InitialSetupArgs = {
-  reviewing: true,
-  state: { completed: true, preferredProvider: "codex", preferredModel: null },
+  state: { completed: false, preferredProvider: "codex", preferredModel: null },
   agentStatus: openCodeInstalledAgentStatus,
   platform: "darwin",
   accountEmail: "ada@example.com",
@@ -65,10 +64,5 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Providers & permissions, opened from the account menu. */
-export const Review: Story = {};
-
-/** The saved model is one of a custom endpoint, so the custom row holds the check. */
-export const ReviewCustomProvider: Story = {
-  args: { state: { completed: true, preferredProvider: "opencode", preferredModel: "studio-local/qwen3-coder:30b" } },
-};
+/** First-run choice between this computer and a remote server. */
+export const FirstRun: Story = {};

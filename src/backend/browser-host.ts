@@ -23,6 +23,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText, toLogValue } from "@openbot/logging";
 import { Deferred, Effect, Exit, Fiber, Scope, Semaphore } from "effect";
 import {
+  app,
   type BrowserWindow,
   type BrowserWindowConstructorOptions,
   clipboard,
@@ -53,6 +54,7 @@ import {
   restoreWebContentsFocus,
   toPublicTab,
 } from "./browser-host-tab";
+import { sessionBrowserUserAgent } from "./browser-identity";
 import { describeBrowserTarget, navigateAndWait } from "./browser-navigation";
 import {
   browserLoadOptions,
@@ -516,38 +518,40 @@ export class BrowserHost {
     this.#syncAttachedView();
     if (!focus) restoreWebContentsFocus(previouslyFocused, tab.contents);
     this.#emitChanged();
-    yield* this.#persistState();
+    return yield* Effect.gen({ self: this }, function* () {
+      yield* this.#persistState();
 
-    yield* Effect.gen({ self: this }, function* () {
-      yield* browserCall(() => tab.contents.loadURL(normalizedUrl, browserLoadOptions()));
-      if (focus) {
-        this.#focusTab(tab);
-        setImmediate(() => this.#focusTab(tab));
-      } else restoreWebContentsFocus(previouslyFocused, tab.contents);
-    }).pipe(
-      Effect.catch((operationFailure) =>
-        Effect.gen({ self: this }, function* () {
-          const error = operationFailure.cause;
-          if (this.#tabs.get(tab.id) === tab) {
-            this.#unmountView(tab.view);
-            this.#tabs.delete(tab.id);
-            yield* tab.engine.destroy();
-            tab.contents.close();
-            if (this.#activeTabId === tab.id) {
-              this.#activeTabId = this.#tabs.keys().next().value ?? null;
+      yield* Effect.gen({ self: this }, function* () {
+        yield* browserCall(() => tab.contents.loadURL(normalizedUrl, browserLoadOptions()));
+        if (focus) {
+          this.#focusTab(tab);
+          setImmediate(() => this.#focusTab(tab));
+        } else restoreWebContentsFocus(previouslyFocused, tab.contents);
+      }).pipe(
+        Effect.catch((operationFailure) =>
+          Effect.gen({ self: this }, function* () {
+            const error = operationFailure.cause;
+            if (this.#tabs.get(tab.id) === tab) {
+              this.#unmountView(tab.view);
+              this.#tabs.delete(tab.id);
+              yield* tab.engine.destroy();
+              tab.contents.close();
+              if (this.#activeTabId === tab.id) {
+                this.#activeTabId = this.#tabs.keys().next().value ?? null;
+              }
+              this.#syncAttachedView();
             }
-            this.#syncAttachedView();
-          }
-          this.#emitChanged();
-          yield* this.#persistState();
-          return yield* browserFailure(
-            new Error(sourceText("error.backend.browserOpenFailed", { url: normalizedUrl, reason: String(error) })),
-          );
-        }),
-      ),
-    );
+            this.#emitChanged();
+            yield* this.#persistState();
+            return yield* browserFailure(
+              new Error(sourceText("error.backend.browserOpenFailed", { url: normalizedUrl, reason: String(error) })),
+            );
+          }),
+        ),
+      );
 
-    return toPublicTab(tab);
+      return toPublicTab(tab);
+    }).pipe(Effect.onInterrupt(() => this.close(tab.id).pipe(Effect.ignore)));
   }).bind(this);
 
   #hasTabCapacity(ownerThreadId: string | null, ownerAgentId: string | null): boolean {
@@ -1201,6 +1205,18 @@ export class BrowserHost {
     yield* tab.engine.dispatchViewportInput(input);
   }).bind(this);
 
+  /** A live view's copy. A protected tab refuses it as it refuses input: its fields hold a secret. */
+  readonly copyViewSelection = Effect.fn("BrowserHost.copyViewSelection")(function* (
+    this: BrowserHost,
+    tabId: string,
+    max: number,
+  ): Effect.fn.Return<string | null, BrowserOperationError> {
+    const tab = yield* this.#requireTab(tabId);
+    if (tab.secret?.submitted)
+      return yield* browserFailure(new Error(sourceText("error.backend.browserInputProtected")));
+    return yield* tab.engine.viewportSelectionText(max);
+  }).bind(this);
+
   readonly #toolHandlers: BrowserToolHandlers = {
     open: ({ args }, params) =>
       Effect.gen({ self: this }, function* () {
@@ -1629,10 +1645,11 @@ export class BrowserHost {
   }
 
   #configureSession(): void {
-    // The embedded browser keeps its native identity everywhere: scrubbing the build and
-    // product tokens made Google read it as an unknown client and refuse sign-in, while
-    // workers leaked the tokens anyway. Only the languages are rewritten, from the system.
-    this.#session.setUserAgent(this.#session.getUserAgent(), preferredBrowserLanguageCodes());
+    // One identity for pages, frames and workers. It keeps the build token that Google needs
+    // and drops the product token that Framer refuses; the languages come from the system.
+    // Service workers read the process fallback instead of the session, so it changes too.
+    app.userAgentFallback = sessionBrowserUserAgent(app.userAgentFallback);
+    this.#session.setUserAgent(sessionBrowserUserAgent(this.#session.getUserAgent()), preferredBrowserLanguageCodes());
     this.#session.webRequest.onBeforeSendHeaders((details, callback) => {
       callback({
         requestHeaders: browserRequestHeaders(details.url, details.requestHeaders),

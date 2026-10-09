@@ -85,6 +85,11 @@ export function articleUrl(collection: ContentCollection, slug: string, siteUrl 
   return new URL(articlePath(collection, slug), siteUrl).toString();
 }
 
+/** The article's text as Markdown, which `src/server/page-markdown.ts` serves. */
+export function articleMarkdownUrl(collection: ContentCollection, slug: string, siteUrl = OPENBOT_SITE_URL): string {
+  return new URL(`${articlePath(collection, slug)}.md`, siteUrl).toString();
+}
+
 export function collectionIndexUrl(collection: ContentCollection, siteUrl = OPENBOT_SITE_URL): string {
   return new URL(collection.indexRoute, siteUrl).toString();
 }

@@ -50,19 +50,20 @@ export function previewBillingServers(now = Date.now()): BillingServerPlan[] {
  * cancel ends the plan at the period end, and the plain Portal renews it.
  */
 export function createMockBilling(servers: BillingServerPlan[] = previewBillingServers()): BillingDesktopApi {
-  let state: BillingState = { available: true, hasCustomer: servers.length > 0, servers: structuredClone(servers) };
+  const state: BillingState = { available: true, hasCustomer: servers.length > 0, servers };
   return {
     getState: async () => structuredClone(state),
     openPortal: async (request) => {
       if (request.flow === "update") return;
-      state = {
-        ...state,
-        servers: state.servers.map((server) =>
+      servers.splice(
+        0,
+        servers.length,
+        ...servers.map((server) =>
           request.flow === "manage" || server.subscriptionId === request.subscriptionId
             ? { ...server, cancelAtPeriodEnd: request.flow === "cancel" }
             : server,
         ),
-      };
+      );
     },
   };
 }

@@ -4,7 +4,6 @@ import { SERVER_NOTIFICATION_LEVELS } from "@openbot/contracts/ipc";
 import {
   Badge,
   Button,
-  ConfirmDialog,
   CopyButton,
   Image,
   ImageRemoveButton,
@@ -23,9 +22,9 @@ import {
   SettingsSection,
   SwitchField,
   Text,
-  toast,
 } from "@openbot/ui";
 import { avatarImageDataUrl, normalizeAvatarFile } from "@openbot/ui/avatar-image";
+import { LeaveServerDialog } from "@openbot/ui/features/servers/LeaveServerDialog";
 import {
   SERVER_NOTIFICATION_LEVEL_LABELS,
   serverMuteDescription,
@@ -420,7 +419,7 @@ export function createServerGeneralSection(
               <Show
                 when={address()}
                 fallback={
-                  <Badge tone="neutral" size="md" shape="pill">
+                  <Badge variant="secondary" size="md" shape="pill">
                     {t("server.settings.private")}
                   </Badge>
                 }
@@ -554,29 +553,15 @@ export function createServerGeneralSection(
   function LeaveDialog() {
     return (
       <Show when={panels.confirmLeave && canLeave()}>
-        <ConfirmDialog
-          open
-          initialFocus="cancel"
-          pending={busy() === "leave"}
-          title={t("server.settings.leaveConfirmTitle", { name: props.server.name })}
-          description={t("server.settings.leaveConfirmDescription")}
-          confirmLabel={t("server.settings.leaveTitle")}
-          pendingLabel={t("server.settings.leaving")}
-          onCancel={() =>
+        <LeaveServerDialog
+          server={props.server}
+          onClose={() =>
             setPanels((state) => {
               state.confirmLeave = false;
             })
           }
-          onConfirm={async () => {
-            // Read now: a successful leave takes the server out of the list and unmounts this dialog.
-            const name = props.server.name;
-            await run("leave", async () => {
-              await props.onLeaveServer?.();
-              setPanels((state) => {
-                state.confirmLeave = false;
-              });
-              toast.success(t("server.settings.leftTitle", { name }));
-            });
+          onLeave={async () => {
+            await props.onLeaveServer?.();
           }}
         />
       </Show>

@@ -18,6 +18,8 @@ describe("completion sound", () => {
       false,
     );
     expect(shouldPlayCompletionSound(completed("completed"), [], storage())).toBe(false);
+    // A quiet routine run posted nothing, so there is no reply to announce.
+    expect(shouldPlayCompletionSound({ ...completed("completed"), quiet: true }, [agent], storage())).toBe(false);
     expect(shouldPlayCompletionSound({ type: "agents-changed", agents: [] }, [agent], storage())).toBe(false);
   });
 
@@ -84,7 +86,7 @@ describe("voice recording", () => {
   });
 });
 
-function completed(status: string): AgentEvent {
+function completed(status: string): Extract<AgentEvent, { type: "turn-completed" }> {
   return {
     type: "turn-completed",
     agentId: "chief",

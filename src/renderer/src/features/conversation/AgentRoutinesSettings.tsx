@@ -1,11 +1,17 @@
+import {
+  type EventFilterDraft,
+  eventFilterDraft,
+  eventFilterDraftsValid,
+  eventFiltersFromDrafts,
+} from "@openbot/contracts/event-filter-value";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   ROUTINE_LIMIT_POLICIES,
-  type RoutineFields,
   type RoutineLimitPolicy,
   type RoutineRunFields,
   type RoutineSchedule,
 } from "@openbot/contracts/ipc";
+import type { EventRoutine, RoutineWebhookTriggerInput } from "@openbot/contracts/ipc-events";
 import type { AppTextKey } from "@openbot/i18n";
 import {
   Button,
@@ -13,6 +19,7 @@ import {
   Clock3,
   ConfirmDialog,
   Input,
+  Link,
   Plus,
   Select,
   SelectContent,
@@ -20,6 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
   Switch,
+  Text,
   Textarea,
   toast,
 } from "@openbot/ui";
@@ -27,10 +35,13 @@ import { createScrollFades } from "@openbot/ui/components/createScrollFades";
 import { SettingsBackIcon, SettingsForwardIcon } from "@openbot/ui/components/SettingsPanel";
 import { RoutineRunHistory } from "@openbot/ui/features/conversation/RoutineRunHistory";
 import { RoutineSchedulePicker } from "@openbot/ui/features/conversation/RoutineSchedulePicker";
+import { RoutineTriggerMenu } from "@openbot/ui/features/conversation/RoutineTriggerMenu";
+import { RoutineWebhookTrigger } from "@openbot/ui/features/conversation/RoutineWebhookTrigger";
 import {
   ROUTINE_EVERY_DAY,
   type RoutineScheduleDraft,
   routineDraftSummary,
+  switchDraftKind,
 } from "@openbot/ui/features/conversation/routine-schedule-draft";
 import {
   ROUTINE_SAVED_DRAFT_KINDS,
@@ -40,10 +51,11 @@ import {
 } from "@openbot/ui/features/conversation/routine-schedule-saved";
 import { type RoutineText, routineScheduleSummary } from "@openbot/ui/features/conversation/routine-schedule-ui";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createSignal, For, onCleanup, Show, untrack } from "solid-js";
+import type { JSX } from "@solidjs/web";
+import { createEffect, createSignal, createStore, For, onCleanup, Show, untrack } from "solid-js";
 import { type DesktopAnalyticsScope, desktopAnalytics } from "../../analytics";
 import { writeClipboardText } from "../../clipboard";
-import type { RoutinesPort } from "./routines-port";
+import type { RoutineEditorRecord, RoutinesPort } from "./routines-port";
 
 export interface RoutineSelectionRequest {
   routineId: string;
@@ -54,7 +66,7 @@ export interface RoutineSelectionRequest {
 type PendingRoutineExit =
   | "list"
   | "close"
-  | { kind: "routine-selection"; routine: RoutineFields | null; routineName: string }
+  | { kind: "routine-selection"; routine: RoutineEditorRecord | null; routineName: string }
   | { kind: "conversation-message"; messageId: string };
 
 interface RoutineDraft {
@@ -66,6 +78,14 @@ interface RoutineDraft {
   schedule: RoutineSchedule;
   scheduleDraft: RoutineScheduleDraft;
   limitPolicy: RoutineLimitPolicy;
+  triggerKind: "schedule" | "webhook";
+  eventType: string;
+  eventFilters: EventFilterDraft[];
+}
+
+interface WebhookEditorState {
+  secret: string | null;
+  connected: boolean | null;
 }
 
 const LIMIT_POLICY_LABELS = {
@@ -89,9 +109,14 @@ interface AgentRoutinesSettingsProps {
 export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
   const text = useText();
   const { t, errorMessage } = text;
-  const [routines, setRoutines] = createSignal<RoutineFields[]>([]);
+  const [routines, setRoutines] = createSignal<RoutineEditorRecord[]>([]);
   const [draft, setDraft] = createSignal<RoutineDraft | null>(null);
   const [runs, setRuns] = createSignal<RoutineRunFields[]>([]);
+  // Webhook state that is not part of the saved routine. `secret` is the one-time reveal after a save or a regeneration.
+  const [webhook, setWebhook] = createStore<WebhookEditorState>({
+    secret: null,
+    connected: null,
+  });
   const [loading, setLoading] = createSignal(true);
   const [routinesLoaded, setRoutinesLoaded] = createSignal(false);
   const [saving, setSaving] = createSignal(false);
@@ -103,7 +128,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
   const scrollFades = createScrollFades();
   let draftRevision = 0;
   // The saved routine the open draft started from. A field that still matches it is unedited.
-  let draftBase: RoutineFields | null = null;
+  let draftBase: RoutineEditorRecord | null = null;
 
   onCleanup(scrollFades.stop);
 
@@ -159,6 +184,24 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     },
   );
 
+  createEffect(
+    () => (draft()?.triggerKind === "webhook" ? props.port.events?.api : undefined),
+    (api) => {
+      if (!api) return;
+      // The status only explains a missing URL, so a failed check leaves the connection unknown.
+      void api.getStatus().then(
+        (status) =>
+          setWebhook((state) => {
+            state.connected = status.connected;
+          }),
+        () =>
+          setWebhook((state) => {
+            state.connected = null;
+          }),
+      );
+    },
+  );
+
   let lastSelectionRequestNonce: number | undefined;
   createEffect(
     () => ({
@@ -187,13 +230,17 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
    * Takes a change saved elsewhere, such as from a chat card, into each field the person did not
    * edit here. Without it, the next Save would write the old values back.
    */
-  function refreshDraft(routine: RoutineFields): void {
+  function refreshDraft(routine: RoutineEditorRecord): void {
     const base = draftBase;
     draftBase = routine;
     if (base?.id !== routine.id) return;
     setDraft((current) => {
       if (current?.id !== routine.id) return current;
-      const scheduleEdited = JSON.stringify(current.schedule) !== JSON.stringify(base.trigger.schedule);
+      const scheduleEdited = JSON.stringify(current.schedule) !== JSON.stringify(routineScheduleOf(base));
+      const triggerEdited = current.triggerKind !== routineTriggerKind(base);
+      const webhookEdited =
+        current.triggerKind === "webhook" &&
+        JSON.stringify(webhookTriggerOf(current)) !== JSON.stringify(webhookTriggerOf(base));
       return {
         ...current,
         name: current.name === base.name ? routine.name : current.name,
@@ -201,17 +248,12 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
         active: current.active === base.active ? routine.active : current.active,
         limitPolicy:
           current.limitPolicy === (base.limitPolicy ?? "wait") ? (routine.limitPolicy ?? "wait") : current.limitPolicy,
-        ...(scheduleEdited
-          ? {}
-          : {
-              schedule: structuredClone(routine.trigger.schedule),
-              scheduleDraft: routineScheduleToDraft(routine.trigger.schedule),
-            }),
+        ...(triggerEdited || scheduleEdited || webhookEdited ? {} : triggerDraftOf(routine)),
       };
     });
   }
 
-  function openRoutine(routine: RoutineFields): void {
+  function openRoutine(routine: RoutineEditorRecord): void {
     draftBase = routine;
     setConfirmDelete(false);
     setError(null);
@@ -222,10 +264,10 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       name: routine.name,
       instruction: routine.instruction,
       active: routine.active,
-      schedule: structuredClone(routine.trigger.schedule),
-      scheduleDraft: routineScheduleToDraft(routine.trigger.schedule),
       limitPolicy: routine.limitPolicy ?? "wait",
+      ...triggerDraftOf(routine),
     });
+    resetWebhookState();
     void loadRuns(routine.id);
   }
 
@@ -244,6 +286,16 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       schedule: routineScheduleFromDraft(NEW_ROUTINE_SCHEDULE),
       scheduleDraft: NEW_ROUTINE_SCHEDULE,
       limitPolicy: "wait",
+      triggerKind: "schedule",
+      eventType: "",
+      eventFilters: [],
+    });
+    resetWebhookState();
+  }
+
+  function resetWebhookState(): void {
+    setWebhook((state) => {
+      state.secret = null;
     });
   }
 
@@ -256,9 +308,10 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     setDirty(false);
     setConfirmDelete(false);
     setPendingExit(null);
+    resetWebhookState();
   }
 
-  function requestRoutineSelection(request: RoutineSelectionRequest, routine: RoutineFields | null): void {
+  function requestRoutineSelection(request: RoutineSelectionRequest, routine: RoutineEditorRecord | null): void {
     const current = draft();
     if (routine && current?.id === routine.id) {
       if (!dirty()) openRoutine(routine);
@@ -333,15 +386,19 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     const action = current.id ? "update" : "create";
     const analytics = desktopAnalytics.scope();
     try {
-      const saved = await props.port.save({
+      const result = await props.port.save({
         routineId: current.id,
         name: current.name.trim(),
         instruction: current.instruction.trim(),
         active: current.active,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+        // An update keeps the saved zone, so an edit on a computer in another zone does not move the schedule.
+        timezone:
+          (current.id ? draftBase?.timezone : undefined) ?? (Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"),
         schedule: current.schedule,
+        trigger: webhookTriggerOf(current) ?? { kind: "schedule", schedule: current.schedule },
         limitPolicy: current.limitPolicy,
       });
+      const saved = result.routine;
       setRoutines((items) => {
         const next = [saved, ...items.filter((routine) => routine.id !== saved.id)];
         props.onCountChange(next.length);
@@ -351,9 +408,15 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       if (draft()?.id === current.id) draftBase = saved;
       if (draftRevision === savingRevision) setDirty(false);
       if (!current.id) void loadRuns(saved.id);
-      trackRoutineAction(analytics, action, current.schedule, startedAt, "succeeded");
+      if (result.secret && draft()?.id === saved.id) {
+        const secret = result.secret;
+        setWebhook((state) => {
+          state.secret = secret;
+        });
+      }
+      trackRoutineAction(analytics, action, current, startedAt, "succeeded");
     } catch (caught) {
-      trackRoutineAction(analytics, action, current.schedule, startedAt, "failed");
+      trackRoutineAction(analytics, action, current, startedAt, "failed");
       setError(errorMessage(caught, t("routine.settings.saveFailed")));
     } finally {
       setSaving(false);
@@ -376,9 +439,9 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
         return next;
       });
       closeEditor();
-      trackRoutineAction(analytics, "delete", current.schedule, startedAt, "succeeded");
+      trackRoutineAction(analytics, "delete", current, startedAt, "succeeded");
     } catch (caught) {
-      trackRoutineAction(analytics, "delete", current.schedule, startedAt, "failed");
+      trackRoutineAction(analytics, "delete", current, startedAt, "failed");
       setError(errorMessage(caught, t("routine.settings.deleteFailed")));
     }
   }
@@ -392,15 +455,68 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     const analytics = desktopAnalytics.scope();
     try {
       await props.port.test(current.id);
-      trackRoutineAction(analytics, "test", current.schedule, startedAt, "succeeded");
+      trackRoutineAction(analytics, "test", current, startedAt, "succeeded");
       await loadRuns(current.id);
     } catch (caught) {
-      trackRoutineAction(analytics, "test", current.schedule, startedAt, "failed");
+      trackRoutineAction(analytics, "test", current, startedAt, "failed");
       setError(errorMessage(caught, t("routine.settings.testFailed")));
     } finally {
       setTesting(false);
     }
   }
+
+  /**
+   * The menu that changes the trigger. A host without events keeps the schedule chips only. It reads
+   * the draft through `current` in its props, so a draft change does not make a new menu.
+   */
+  function triggerMenu(current: () => RoutineDraft): JSX.Element {
+    if (!props.port.events) return undefined;
+    return (
+      <RoutineTriggerMenu
+        value={current().triggerKind === "webhook" ? "webhook" : current().scheduleDraft.kind}
+        kinds={ROUTINE_SAVED_DRAFT_KINDS}
+        onSelect={(choice) =>
+          changeDraft((value) => {
+            if (choice === "webhook") return { ...value, triggerKind: "webhook" };
+            const scheduleDraft = switchDraftKind(value.scheduleDraft, choice, new Date());
+            return {
+              ...value,
+              triggerKind: "schedule",
+              schedule: routineScheduleFromDraft(scheduleDraft),
+              scheduleDraft,
+            };
+          })
+        }
+      />
+    );
+  }
+
+  async function regenerateSecret(): Promise<void> {
+    const events = props.port.events;
+    const id = draft()?.id;
+    if (!events || !id) return;
+    const { secret } = await events.api.rotateSecret({ id, owner: events.owner });
+    if (draft()?.id !== id) return;
+    setWebhook((state) => {
+      state.secret = secret;
+    });
+  }
+
+  /** The saved record of the open draft. Its trigger, not the draft, says whether a URL and a secret exist. */
+  const savedRoutine = () => {
+    const id = draft()?.id;
+    return id ? routines().find((routine) => routine.id === id) : undefined;
+  };
+  const savedWebhook = () => {
+    const routine = savedRoutine();
+    return routine && isEventRoutine(routine) && routine.trigger.kind === "webhook" ? routine.trigger : null;
+  };
+  /** Only a saved webhook routine receives requests, so only it loads webhook activity. */
+  const webhookActivity = () => {
+    const events = props.port.events;
+    const id = draft()?.id;
+    return events && id && savedWebhook() ? { api: events.api, routine: { id, owner: events.owner } } : undefined;
+  };
 
   async function copyRunCommand(): Promise<void> {
     const routineId = draft()?.id;
@@ -482,15 +598,18 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                             }
                           >
                             <Show when={routine.active} fallback={<CirclePause aria-hidden="true" />}>
-                              <Clock3 aria-hidden="true" />
+                              <Show
+                                when={routineTriggerKind(routine) === "webhook"}
+                                fallback={<Clock3 aria-hidden="true" />}
+                              >
+                                <Link aria-hidden="true" />
+                              </Show>
                             </Show>
                           </span>
                           <span>
                             <strong>{routine.name}</strong>
                             <small>
-                              {routine.active
-                                ? routineListSummary(routine.trigger.schedule, text)
-                                : t("routine.settings.paused")}
+                              {routine.active ? routineListSummary(routine, text) : t("routine.settings.paused")}
                             </small>
                           </span>
                         </Button>
@@ -582,21 +701,42 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
               </label>
               <section class="agent-routine-when" aria-labelledby="agent-routine-when-heading">
                 <h3 id="agent-routine-when-heading">{t("routine.settings.whenToRun")}</h3>
-                <RoutineSchedulePicker
-                  schedule={current().scheduleDraft}
-                  kinds={ROUTINE_SAVED_DRAFT_KINDS}
-                  onChange={(scheduleDraft) =>
-                    changeDraft((value) => ({
-                      ...value,
-                      schedule: routineScheduleFromDraft(scheduleDraft),
-                      scheduleDraft,
-                    }))
+                <Show
+                  when={current().triggerKind === "schedule"}
+                  fallback={
+                    <RoutineWebhookTrigger
+                      url={savedWebhook()?.url ?? null}
+                      saved={savedWebhook() !== null}
+                      connected={webhook.connected}
+                      eventType={current().eventType}
+                      filters={current().eventFilters}
+                      onEventTypeChange={(eventType) => changeDraft((value) => ({ ...value, eventType }))}
+                      onFiltersChange={(eventFilters) => changeDraft((value) => ({ ...value, eventFilters }))}
+                      secret={webhook.secret}
+                      onSecretDismiss={resetWebhookState}
+                      onRegenerateSecret={regenerateSecret}
+                      menu={triggerMenu(current)}
+                    />
                   }
-                />
+                >
+                  <RoutineSchedulePicker
+                    schedule={current().scheduleDraft}
+                    kinds={ROUTINE_SAVED_DRAFT_KINDS}
+                    action={triggerMenu(current)}
+                    onChange={(scheduleDraft) =>
+                      changeDraft((value) => ({
+                        ...value,
+                        schedule: routineScheduleFromDraft(scheduleDraft),
+                        scheduleDraft,
+                      }))
+                    }
+                  />
+                </Show>
               </section>
-              <label class="settings-field agent-routine-instruction-field">
-                <span>{t("routine.settings.instruction")}</span>
+              <div class="settings-field agent-routine-instruction-field">
+                <span id="agent-routine-instruction-label">{t("routine.settings.instruction")}</span>
                 <Textarea
+                  aria-labelledby="agent-routine-instruction-label"
                   value={current().instruction}
                   placeholder={
                     props.port.ownerNoun === "channel"
@@ -604,9 +744,16 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                       : t("routine.settings.instructionPlaceholderAgent")
                   }
                   maxlength={INPUT_LIMITS.routineInstruction}
+                  aria-describedby={props.port.ownerNoun === "channel" ? undefined : "agent-routine-no-update-hint"}
                   onValueChange={(instruction) => changeDraft((value) => ({ ...value, instruction }))}
                 />
-              </label>
+                {/* A scheduled run of an agent routine that answers only the marker posts nothing. */}
+                <Show when={props.port.ownerNoun !== "channel"}>
+                  <Text id="agent-routine-no-update-hint" variant="caption" tone="muted">
+                    {t("routine.settings.instructionNoUpdateHint")}
+                  </Text>
+                </Show>
+              </div>
               <Show when={props.port.limitPolicy}>
                 <div class="settings-field">
                   <span id="agent-routine-limit-policy-label">{t("routine.settings.limitPolicy")}</span>
@@ -630,7 +777,11 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                 </div>
               </Show>
 
-              <RoutineRunHistory runs={runs()} onOpenRun={props.onOpenRun ? requestOpenRun : undefined} />
+              <RoutineRunHistory
+                runs={runs()}
+                onOpenRun={props.onOpenRun ? requestOpenRun : undefined}
+                activity={webhookActivity()}
+              />
             </div>
           )}
         </Show>
@@ -660,30 +811,83 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
  * The list row reads the schedule as the chips do. A schedule the chips show only as cron, such
  * as an interval, keeps its own summary: "Every 15 minutes", not the cron text.
  */
-function routineListSummary(schedule: RoutineSchedule, text: RoutineText): string {
+function routineListSummary(routine: RoutineEditorRecord, text: RoutineText): string {
+  if (isEventRoutine(routine) && routine.trigger.kind === "webhook") {
+    const eventType = routine.trigger.eventType;
+    return eventType
+      ? text.t("routine.settings.webhookSummary", { eventType })
+      : text.t("routine.settings.webhookSummaryAny");
+  }
+  const schedule = routineScheduleOf(routine);
   const draft = routineScheduleToDraft(schedule);
   if (draft.kind === "custom") return routineScheduleSummary(schedule, false, text);
   return routineDraftSummary(draft, text);
 }
 
+function isEventRoutine(routine: RoutineEditorRecord): routine is EventRoutine {
+  return "owner" in routine;
+}
+
+function routineTriggerKind(routine: RoutineEditorRecord): RoutineDraft["triggerKind"] {
+  return isEventRoutine(routine) && routine.trigger.kind === "webhook" ? "webhook" : "schedule";
+}
+
+function routineScheduleOf(routine: RoutineEditorRecord): RoutineSchedule {
+  if (isEventRoutine(routine)) {
+    return routine.trigger.kind === "schedule" ? routine.trigger.schedule : { kind: "daily", time: "09:00" };
+  }
+  return routine.trigger.schedule;
+}
+
+/** The trigger fields of a draft that opens `routine`. */
+function triggerDraftOf(
+  routine: RoutineEditorRecord,
+): Pick<RoutineDraft, "schedule" | "scheduleDraft" | "triggerKind" | "eventType" | "eventFilters"> {
+  const trigger = isEventRoutine(routine) && routine.trigger.kind === "webhook" ? routine.trigger : null;
+  return {
+    schedule: structuredClone(routineScheduleOf(routine)),
+    scheduleDraft: routineScheduleToDraft(routineScheduleOf(routine)),
+    triggerKind: routineTriggerKind(routine),
+    eventType: trigger?.eventType ?? "",
+    eventFilters: trigger?.filters.map(eventFilterDraft) ?? [],
+  };
+}
+
+/** The webhook trigger that a save sends, or that a saved routine has. The host-made URL is not part of it. */
+function webhookTriggerOf(routine: RoutineEditorRecord | RoutineDraft): RoutineWebhookTriggerInput | null {
+  if ("triggerKind" in routine) {
+    return routine.triggerKind === "webhook"
+      ? {
+          kind: "webhook",
+          eventType: routine.eventType.trim() || null,
+          filters: eventFiltersFromDrafts(routine.eventFilters),
+        }
+      : null;
+  }
+  if (!isEventRoutine(routine) || routine.trigger.kind !== "webhook") return null;
+  return { kind: "webhook", eventType: routine.trigger.eventType, filters: routine.trigger.filters };
+}
+
 function validDraft(draft: RoutineDraft): boolean {
-  return Boolean(draft.name.trim() && draft.instruction.trim()) && routineDraftProblem(draft.scheduleDraft) === null;
+  if (!draft.name.trim() || !draft.instruction.trim()) return false;
+  if (draft.triggerKind === "webhook") return eventFilterDraftsValid(draft.eventFilters);
+  return routineDraftProblem(draft.scheduleDraft) === null;
 }
 
 function isBlankNewDraft(draft: RoutineDraft): boolean {
-  return draft.id === null && !draft.name.trim() && !draft.instruction.trim();
+  return draft.id === null && draft.triggerKind === "schedule" && !draft.name.trim() && !draft.instruction.trim();
 }
 
 function trackRoutineAction(
   analytics: DesktopAnalyticsScope,
   action: "create" | "update" | "delete" | "test",
-  schedule: RoutineSchedule,
+  routine: Pick<RoutineDraft, "triggerKind" | "schedule">,
   startedAt: number,
   result: "succeeded" | "failed",
 ): void {
   analytics.track("routine_action", {
     action,
-    trigger_type: schedule.kind,
+    trigger_type: routine.triggerKind === "webhook" ? "webhook" : routine.schedule.kind,
     duration_ms: Math.max(0, Math.round(performance.now() - startedAt)),
     result,
     ...(result === "failed" ? { failure_code: `${action}_failed` } : {}),

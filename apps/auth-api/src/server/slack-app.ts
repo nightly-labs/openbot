@@ -9,7 +9,7 @@ import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { SLACK_BOT_SCOPES } from "@openbot/contracts/slack-app";
 import { isRawP256PublicKey, sealSlackWorkspaceGrant } from "@openbot/contracts/slack-workspace-grant";
 import { Effect, Schema } from "effect";
-import { hmacSha256 } from "./crypto";
+import { decodeBase64Url, encodeBase64Url, hmacSha256, importHmacSha256Key } from "./crypto";
 import { authEventStatement } from "./remote-control-plane";
 import type { AuthUser, WorkerBindings } from "./types";
 
@@ -242,7 +242,7 @@ export class SlackAppService {
     this: SlackAppService,
     payload: StatePayload,
   ): Effect.fn.Return<string, SlackAppError | SlackOperationError> {
-    const body = toBase64Url(new TextEncoder().encode(JSON.stringify(payload)));
+    const body = encodeBase64Url(new TextEncoder().encode(JSON.stringify(payload)));
     return `${body}.${yield* hmacSha256(this.#stateSecret, body).pipe(Effect.mapError((error) => (error instanceof SlackAppError ? error : new SlackOperationError({}))))}`;
   });
 
@@ -253,24 +253,17 @@ export class SlackAppService {
     const [body, signature, extra] = state.split(".");
     if (!body || !signature || extra !== undefined) return yield* invalidState();
     const key = yield* Effect.tryPromise({
-      try: () =>
-        crypto.subtle.importKey(
-          "raw",
-          new TextEncoder().encode(this.#stateSecret),
-          { name: "HMAC", hash: "SHA-256" },
-          false,
-          ["verify"],
-        ),
+      try: () => importHmacSha256Key(this.#stateSecret, "verify"),
       catch: invalidState,
     });
-    const bytes = yield* Effect.try({ try: () => fromBase64Url(signature), catch: invalidState });
+    const bytes = yield* Effect.try({ try: () => decodeBase64Url(signature), catch: invalidState });
     const valid = yield* Effect.tryPromise({
       try: () => crypto.subtle.verify("HMAC", key, bytes, new TextEncoder().encode(body)),
       catch: invalidState,
     });
     if (!valid) return yield* invalidState();
     const payload = yield* Effect.try({
-      try: (): unknown => JSON.parse(new TextDecoder().decode(fromBase64Url(body))),
+      try: (): unknown => JSON.parse(new TextDecoder().decode(decodeBase64Url(body))),
       catch: invalidState,
     });
     const decoded = yield* Schema.decodeUnknownEffect(StatePayload)(payload).pipe(Effect.mapError(invalidState));
@@ -282,18 +275,4 @@ export class SlackAppService {
 
 function invalidState(): SlackAppError {
   return new SlackAppError(400, "slack_state_invalid", "The Slack sign-in expired. Start it again.");
-}
-
-function toBase64Url(value: Uint8Array): string {
-  let binary = "";
-  for (const byte of value) binary += String.fromCharCode(byte);
-  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, "");
-}
-
-function fromBase64Url(value: string): Uint8Array<ArrayBuffer> {
-  const padded = value
-    .replaceAll("-", "+")
-    .replaceAll("_", "/")
-    .padEnd(Math.ceil(value.length / 4) * 4, "=");
-  return Uint8Array.from(atob(padded), (character) => character.charCodeAt(0));
 }

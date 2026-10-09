@@ -1,6 +1,6 @@
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { isNumber, isString } from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
 import { type AgentProvider, RequestTimeoutError } from "./agent-client";
 import { cliSpawnTarget } from "./cli";
@@ -14,8 +14,15 @@ import {
   type ResponseDecoder,
   type RpcError,
   type RpcMessage,
+  type ThreadItem,
 } from "./protocol";
 import { ProviderClientOperationError } from "./provider-client-effects";
+import {
+  PROVIDER_HISTORY_PAGE_SIZE,
+  type ProviderHistoryConsumer,
+  type ProviderHistoryFragment,
+  type ProviderHistoryRequest,
+} from "./provider-history";
 import { createDiagnosticStream } from "./stderr-diagnostics";
 
 interface PendingRequest {
@@ -47,6 +54,8 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
   readonly #requestTimeoutMs: number;
   #decoder = new JsonLineDecoder();
   readonly #pending = new Map<RequestId, PendingRequest>();
+  readonly #toolRequests = new Map<RequestId, { threadId: string; turnId: string; controller: AbortController }>();
+  readonly #interruptedTurns = new Set<string>();
   #process: ChildProcessWithoutNullStreams | null = null;
   #nextId = 1;
   #stopping = false;
@@ -108,6 +117,7 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
     const child = this.#process;
     if (!child) return;
     this.#stopping = true;
+    this.#cancelToolRequests();
     this.#process = null;
     for (const pending of this.#pending.values()) pending.reject(new Error("Codex App Server stopped."));
     this.#pending.clear();
@@ -147,6 +157,88 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
     yield* this.request("thread/unsubscribe", { threadId }, decodeRecordResponse);
   });
 
+  /**
+   * Reads Codex history without asking the app server for the legacy full thread snapshot.
+   *
+   * The app server returns turns newest first. Items are read one turn at a time in ascending
+   * order, so consumers can persist each fragment and stop without retaining the transcript.
+   * Cursors belong to this adapter and never cross the provider-history boundary.
+   */
+  readonly readHistory = Effect.fn("CodexAppServer.readHistory")(function* (
+    this: CodexAppServerClient,
+    request: ProviderHistoryRequest,
+    consume: ProviderHistoryConsumer,
+  ) {
+    // These endpoints read the persisted rollout directly. Do not resume here: a resume applies
+    // runtime settings and can reopen an archived thread while this operation only needs history.
+    let cursor: string | undefined;
+    const seenTurnCursors = new Set<string>();
+    while (true) {
+      const page = yield* this.request(
+        "thread/turns/list",
+        {
+          threadId: request.threadId,
+          limit: PROVIDER_HISTORY_PAGE_SIZE,
+          sortDirection: "desc",
+          itemsView: "notLoaded",
+          ...(cursor === undefined ? {} : { cursor }),
+        },
+        decodeTurnHistoryPage,
+      );
+
+      for (const turn of page.data) {
+        if (request.items === "none") {
+          if (!(yield* consume(toHistoryFragment(turn, [], true)))) return;
+          continue;
+        }
+
+        let itemCursor: string | undefined;
+        const seenItemCursors = new Set<string>();
+        let itemOffset = 0;
+        while (true) {
+          const itemPage = yield* this.request(
+            "thread/items/list",
+            {
+              threadId: request.threadId,
+              turnId: turn.id,
+              limit: PROVIDER_HISTORY_PAGE_SIZE,
+              sortDirection: "asc",
+              ...(itemCursor === undefined ? {} : { cursor: itemCursor }),
+            },
+            decodeItemHistoryPage,
+          );
+          if (itemPage.data.some((entry) => entry.turnId !== turn.id)) {
+            return yield* new ProviderClientOperationError({
+              cause: new Error("Codex returned an item for the wrong turn."),
+            });
+          }
+          const complete = itemPage.nextCursor === null;
+          if (
+            !(yield* consume(
+              toHistoryFragment(
+                turn,
+                itemPage.data.map((entry) => entry.item),
+                complete,
+                itemOffset,
+              ),
+            ))
+          )
+            return;
+          itemOffset += itemPage.data.length;
+          if (complete) break;
+          const nextItemCursor = freshCursor(itemPage.nextCursor, itemCursor, seenItemCursors, "item");
+          if (nextItemCursor instanceof ProviderClientOperationError) return yield* nextItemCursor;
+          itemCursor = nextItemCursor;
+        }
+      }
+
+      if (page.nextCursor === null) return;
+      const nextTurnCursor = freshCursor(page.nextCursor, cursor, seenTurnCursors, "turn");
+      if (nextTurnCursor instanceof ProviderClientOperationError) return yield* nextTurnCursor;
+      cursor = nextTurnCursor;
+    }
+  });
+
   readonly request = Effect.fn("CodexAppServer.request")(function* <T>(
     this: CodexAppServerClient,
     method: string,
@@ -167,7 +259,11 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
         reject: (cause) => resume(Effect.fail(new ProviderClientOperationError({ cause }))),
       });
       try {
-        this.#write({ method, id, params });
+        this.#write({ method, id, params: method === "thread/resume" ? metadataOnlyResumeParams(params) : params });
+        if (method === "turn/interrupt" && isRecord(params) && isString(params.threadId) && isString(params.turnId)) {
+          this.#interruptedTurns.add(JSON.stringify([params.threadId, params.turnId]));
+          this.#cancelToolRequests(params.threadId, params.turnId);
+        }
       } catch (cause) {
         resume(Effect.fail(new ProviderClientOperationError({ cause })));
       }
@@ -187,10 +283,12 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
   }
 
   respond(id: RequestId, result: unknown): void {
+    this.#toolRequests.delete(id);
     this.#write({ id, result });
   }
 
   respondError(id: RequestId, error: RpcError): void {
+    this.#toolRequests.delete(id);
     this.#write({ id, error });
   }
 
@@ -204,12 +302,42 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
   #handleMessage(message: RpcMessage): void {
     if ("method" in message) {
       if ("id" in message) {
+        let signal: AbortSignal | undefined;
+        if (
+          message.method === "item/tool/call" &&
+          isRecord(message.params) &&
+          isString(message.params.threadId) &&
+          isString(message.params.turnId)
+        ) {
+          const controller = new AbortController();
+          this.#toolRequests.set(message.id, {
+            threadId: message.params.threadId,
+            turnId: message.params.turnId,
+            controller,
+          });
+          signal = controller.signal;
+          if (this.#interruptedTurns.has(JSON.stringify([message.params.threadId, message.params.turnId]))) {
+            this.#toolRequests.delete(message.id);
+            controller.abort();
+          }
+        }
         this.emit("request", {
+          ...(signal ? { signal } : {}),
           method: message.method,
           id: message.id,
           params: message.params,
         });
       } else {
+        if (
+          message.method === "turn/completed" &&
+          isRecord(message.params) &&
+          isString(message.params.threadId) &&
+          isRecord(message.params.turn) &&
+          isString(message.params.turn.id)
+        ) {
+          this.#cancelToolRequests(message.params.threadId, message.params.turn.id);
+          this.#interruptedTurns.delete(JSON.stringify([message.params.threadId, message.params.turn.id]));
+        }
         this.emit("notification", { method: message.method, params: message.params });
       }
       return;
@@ -230,8 +358,18 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
     pending.resolve(message.result);
   }
 
+  #cancelToolRequests(threadId?: string, turnId?: string): void {
+    if (threadId === undefined) this.#interruptedTurns.clear();
+    for (const [id, request] of this.#toolRequests) {
+      if (threadId !== undefined && (request.threadId !== threadId || request.turnId !== turnId)) continue;
+      this.#toolRequests.delete(id);
+      request.controller.abort();
+    }
+  }
+
   #fail(error: Error, child: ChildProcessWithoutNullStreams): void {
     if (this.#process !== child) return;
+    this.#cancelToolRequests();
     this.#process = null;
 
     for (const pending of this.#pending.values()) {
@@ -242,6 +380,101 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
     if (child.exitCode === null) child.kill("SIGTERM");
     if (!this.#stopping) this.emit("exit", error);
   }
+}
+
+interface HistoryTurn {
+  id: string;
+  status?: string;
+  startedAt?: number;
+}
+
+interface HistoryTurnPage {
+  data: HistoryTurn[];
+  nextCursor: string | null;
+}
+
+interface HistoryItemPage {
+  data: Array<{ turnId: string; item: ThreadItem }>;
+  nextCursor: string | null;
+}
+
+function metadataOnlyResumeParams(params: unknown): DynamicRecord {
+  return { ...(isRecord(params) ? params : {}), excludeTurns: true };
+}
+
+function decodeTurnHistoryPage(value: unknown): HistoryTurnPage {
+  const record = decodeRecordResponse(value);
+  if (!Array.isArray(record.data)) throw new Error("Invalid Codex turn history page.");
+  return {
+    // Do not retain `items` from the response. `itemsView: notLoaded` is the memory boundary, and
+    // the item endpoint below is the only path that materializes item records.
+    data: record.data.map(decodeHistoryTurn),
+    nextCursor: nullableString(record.nextCursor, "turn history cursor"),
+  };
+}
+
+function decodeHistoryTurn(value: unknown): HistoryTurn {
+  if (!isRecord(value) || !isString(value.id)) throw new Error("Invalid Codex history turn.");
+  const status = value.status;
+  const startedAt = value.startedAt;
+  return {
+    id: value.id,
+    ...(isString(status) ? { status } : {}),
+    ...(typeof startedAt === "number" && Number.isFinite(startedAt) ? { startedAt } : {}),
+  };
+}
+
+function decodeItemHistoryPage(value: unknown): HistoryItemPage {
+  const record = decodeRecordResponse(value);
+  if (!Array.isArray(record.data)) throw new Error("Invalid Codex item history page.");
+  return {
+    data: record.data.map(decodeHistoryItemEntry),
+    nextCursor: nullableString(record.nextCursor, "item history cursor"),
+  };
+}
+
+function decodeHistoryItemEntry(value: unknown): { turnId: string; item: ThreadItem } {
+  if (!isRecord(value) || !isString(value.turnId) || !isRecord(value.item) || !isString(value.item.type)) {
+    throw new Error("Invalid Codex history item.");
+  }
+  // Preserve provider item fields (tool output, image metadata, command status, and so on) while
+  // validating the discriminator at the untrusted app-server boundary.
+  return { turnId: value.turnId, item: { ...value.item, type: value.item.type } };
+}
+
+function nullableString(value: unknown, label: string): string | null {
+  if (value === undefined || value === null) return null;
+  if (!isString(value)) throw new Error(`Invalid ${label}.`);
+  return value;
+}
+
+function toHistoryFragment(
+  turn: HistoryTurn,
+  items: ThreadItem[],
+  complete: boolean,
+  itemOffset?: number,
+): ProviderHistoryFragment {
+  return {
+    turnId: turn.id,
+    ...(turn.status === undefined ? {} : { status: turn.status }),
+    ...(turn.startedAt === undefined ? {} : { startedAt: turn.startedAt }),
+    ...(itemOffset === undefined ? {} : { itemOffset }),
+    items,
+    complete,
+  };
+}
+
+function freshCursor(
+  nextCursor: string | null,
+  currentCursor: string | undefined,
+  seenCursors: Set<string>,
+  kind: "turn" | "item",
+): string | ProviderClientOperationError {
+  if (nextCursor === null || nextCursor === currentCursor || seenCursors.has(nextCursor)) {
+    return new ProviderClientOperationError({ cause: new Error(`Codex returned a repeated ${kind} history cursor.`) });
+  }
+  seenCursors.add(nextCursor);
+  return nextCursor;
 }
 
 /**

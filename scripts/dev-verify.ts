@@ -82,6 +82,7 @@ function isDesktopTest(file: string): boolean {
     "packages/contracts/",
     "packages/i18n/",
     "packages/logging/",
+    "packages/telemetry/",
     "packages/user-errors/",
     "packages/team-client/",
     "apps/mobile/src/",
@@ -281,7 +282,7 @@ function readinessReasons(setup: DevVerificationReport["setup"], runtime: DevVer
   const reasons: string[] = [];
   if (!setup.bun.ready) reasons.push(`Bun ${setup.bun.expected} is required; current version is ${setup.bun.current}.`);
   if (!setup.dependencies) reasons.push("node_modules is missing. Run bun run dev:prepare.");
-  if (!setup.developmentEnv) reasons.push("apps/auth-api/.env.dev is missing. Run bun run dev:prepare.");
+  if (!setup.developmentEnv) reasons.push(".openbot/dev-state.json is missing. Run bun run dev:prepare.");
   if (runtime.orphanedStack) reasons.push("This worktree has an orphaned dev stack. Inspect bun run dev:status.");
   if (runtime.ambiguousApp) reasons.push("More than one app instance matches this worktree.");
   return reasons;
@@ -316,7 +317,7 @@ async function createDevVerificationState(
   const setup = {
     bun: { ready: bunCurrent === supportedBunVersion, current: bunCurrent, expected: supportedBunVersion },
     dependencies: existsSync(resolve(projectRoot, "node_modules")),
-    developmentEnv: existsSync(resolve(projectRoot, "apps/auth-api/.env.dev")),
+    developmentEnv: existsSync(resolve(projectRoot, ".openbot/dev-state.json")),
   };
   const setupReady = setup.bun.ready && setup.dependencies && setup.developmentEnv;
 

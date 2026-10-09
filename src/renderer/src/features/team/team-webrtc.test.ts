@@ -24,12 +24,13 @@ interface TestPort {
 }
 
 class SignalSocket extends EventTarget {
+  static readonly CONNECTING = 0;
   static readonly OPEN = 1;
   static readonly instances: SignalSocket[] = [];
   readyState = 1;
   readonly send = vi.fn<(data: string) => void>();
   readonly close = vi.fn();
-  constructor() {
+  constructor(readonly url = "") {
     super();
     SignalSocket.instances.push(this);
   }
@@ -50,6 +51,7 @@ class DataChannel {
   onopen: (() => void) | null = null;
   onmessage: ((event: { data: string }) => void) | null = null;
   onerror: (() => void) | null = null;
+  onclose: (() => void) | null = null;
   readonly send = vi.fn();
   constructor(readonly label: string) {}
 }
@@ -59,10 +61,13 @@ class PeerConnection {
   localDescription: { type: string; sdp: string } | null = null;
   remoteDescription: { type: string; sdp: string } | null = null;
   ondatachannel: ((event: { channel: DataChannel }) => void) | null = null;
-  onicecandidate: (() => void) | null = null;
+  onicecandidate: ((event: { candidate: RTCIceCandidateInit | null }) => void) | null = null;
   onconnectionstatechange: (() => void) | null = null;
+  connectionState = "new";
+  readonly channels: DataChannel[] = [];
   readonly close = vi.fn();
   readonly setConfiguration = vi.fn();
+  readonly restartIce = vi.fn();
   constructor() {
     PeerConnection.instances.push(this);
   }
@@ -74,6 +79,14 @@ class PeerConnection {
   }
   async createAnswer() {
     return { type: "answer", sdp: "a=fingerprint:sha-256 HOST" };
+  }
+  async createOffer() {
+    return { type: "offer", sdp: "a=fingerprint:sha-256 CLIENT" };
+  }
+  createDataChannel(label: string): DataChannel {
+    const channel = new DataChannel(label);
+    this.channels.push(channel);
+    return channel;
   }
 }
 
@@ -164,6 +177,18 @@ it("routes two phones independently and disconnects or resumes only the addresse
   const [rtc1, rtc2] = PeerConnection.instances;
   if (!rtc1 || !rtc2) throw new Error("Each phone needs its own RTC connection.");
   expect(rtc1.close).not.toHaveBeenCalled();
+  const candidate = {
+    candidate: "candidate:1 1 UDP 2122260223 192.0.2.1 5000 typ host",
+    sdpMid: "0",
+    sdpMLineIndex: 0,
+  };
+  rtc1.onicecandidate?.({ candidate });
+  rtc1.onicecandidate?.({ candidate: { ...candidate, candidate: "" } });
+  rtc1.onicecandidate?.({ candidate: null });
+  expect(signal.send.mock.calls.map(([data]) => JSON.parse(data))).toEqual([
+    { type: "ice-candidate", version: 1, connectionId: "connection-1", channel: "team", ...candidate },
+  ]);
+  signal.send.mockClear();
   for (const index of [1, 2])
     signal.message({
       type: "offer",
@@ -256,6 +281,176 @@ it("stops a peer that Signal sends a frame it cannot read", async () => {
   expect(posted("peer-error")[0]).toMatchObject({ peerId: "client-1", code: "protocol_error" });
   expect(posted("peer-disconnected")).toHaveLength(1);
   expect(signal.close).toHaveBeenCalled();
+});
+
+// After a sleep the Signal socket can be half-open, so the ICE restart offer got no answer. The peer
+// stayed `failed` while main read the host as connected, until the app restarted.
+it("renews Signal for a lost client path, and reports the peer when the path does not come back", async () => {
+  vi.useFakeTimers();
+  const { posted, command } = await startBridge();
+  await command({
+    type: "connect",
+    peerId: "host-1",
+    peer: "client",
+    signalUrl: "wss://signal.example.test",
+    token: "test",
+    iceTransportPolicy: "all",
+  });
+  const signal = SignalSocket.instances[0];
+  if (!signal) throw new Error("No Signal socket.");
+  signal.dispatchEvent(new Event("open"));
+  signal.message({ type: "ready", version: 1, connectionId: "connection-1", resumeToken: "resume", iceServers: [] });
+  await vi.waitFor(() => expect(PeerConnection.instances).toHaveLength(1));
+  const rtc = PeerConnection.instances[0];
+  if (!rtc) throw new Error("No RTC connection.");
+  const setState = (state: string) => {
+    rtc.connectionState = state;
+    rtc.onconnectionstatechange?.();
+  };
+
+  setState("connected");
+  setState("disconnected");
+  setState("connected");
+  await vi.advanceTimersByTimeAsync(20_000);
+  expect(SignalSocket.instances).toHaveLength(1);
+  expect(posted("peer-disconnected")).toEqual([]);
+
+  setState("failed");
+  await vi.advanceTimersByTimeAsync(8_000);
+  expect(signal.close).toHaveBeenCalled();
+  expect(SignalSocket.instances).toHaveLength(2);
+  expect(posted("peer-disconnected")).toEqual([]);
+  await vi.advanceTimersByTimeAsync(7_000);
+  expect(posted("peer-disconnected")).toEqual([{ type: "peer-disconnected", peerId: "host-1" }]);
+  expect(rtc.close).toHaveBeenCalled();
+});
+
+// The host can close the connection while the client computer sleeps. The path still read
+// `connected`, so main read the host as connected and each stop request failed on a closed channel.
+it("reports the client peer when the host closes a data channel on a connected path", async () => {
+  const { posted, command } = await startBridge();
+  await command({
+    type: "connect",
+    peerId: "host-1",
+    peer: "client",
+    signalUrl: "wss://signal.example.test",
+    token: "test",
+    iceTransportPolicy: "all",
+  });
+  const signal = SignalSocket.instances[0];
+  if (!signal) throw new Error("No Signal socket.");
+  signal.dispatchEvent(new Event("open"));
+  signal.message({ type: "ready", version: 1, connectionId: "connection-1", resumeToken: "resume", iceServers: [] });
+  await vi.waitFor(() => expect(PeerConnection.instances[0]?.channels).toHaveLength(4));
+  const rtc = PeerConnection.instances[0];
+  const rpc = rtc?.channels[0];
+  if (!rtc || !rpc) throw new Error("No RTC connection.");
+  rtc.connectionState = "connected";
+  rtc.onconnectionstatechange?.();
+
+  rpc.readyState = "closed";
+  rpc.onclose?.();
+
+  expect(posted("peer-disconnected")).toEqual([{ type: "peer-disconnected", peerId: "host-1" }]);
+  expect(rtc.close).toHaveBeenCalled();
+  expect(signal.send.mock.calls.map(([data]) => JSON.parse(data))).toContainEqual(
+    expect.objectContaining({ type: "disconnect", connectionId: "connection-1" }),
+  );
+  await command({ type: "close", peerId: "all" });
+});
+
+// Main opens the client's Signal socket while the account service makes the ticket, so the TLS and
+// WebSocket handshakes do not wait for it. Nothing may go on that socket before the hello of the
+// ticket, and only a `connect` to the same address may use it.
+describe("prepared Signal socket", () => {
+  const signalUrl = "wss://signal.example.test/v1/signal";
+  const connect = {
+    type: "connect" as const,
+    peerId: "host-1",
+    peer: "client" as const,
+    signalUrl,
+    token: "ticket-1",
+    iceTransportPolicy: "all" as const,
+  };
+  const hellos = (socket: SignalSocket) =>
+    socket.send.mock.calls.map(([data]) => JSON.parse(data)).filter((message) => message.type === "hello");
+
+  it("sends the hello of the ticket on the socket that opened before it", async () => {
+    vi.useFakeTimers();
+    const { posted, command } = await startBridge();
+    await command({ type: "prepare-signal", peerId: "host-1", signalUrl });
+    const prepared = SignalSocket.instances[0];
+    if (!prepared) throw new Error("No Signal socket.");
+    expect(prepared.url).toBe(signalUrl);
+    prepared.dispatchEvent(new Event("open"));
+    expect(posted("signal-open")).toEqual([{ type: "signal-open", peerId: "host-1" }]);
+    expect(prepared.send).not.toHaveBeenCalled();
+
+    await command(connect);
+    expect(SignalSocket.instances).toHaveLength(1);
+    expect(hellos(prepared)).toEqual([expect.objectContaining({ peer: "client", token: "ticket-1" })]);
+    prepared.message({
+      type: "ready",
+      version: 1,
+      connectionId: "connection-1",
+      resumeToken: "resume",
+      iceServers: [],
+    });
+    await vi.waitFor(() => expect(posted("signal-ready")).toHaveLength(1));
+    // The lifetime of a prepared socket does not apply to one a peer uses.
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(prepared.close).not.toHaveBeenCalled();
+  });
+
+  it("sends the hello when a socket that is still opening opens", async () => {
+    const { command } = await startBridge();
+    await command({ type: "prepare-signal", peerId: "host-1", signalUrl });
+    const prepared = SignalSocket.instances[0];
+    if (!prepared) throw new Error("No Signal socket.");
+    prepared.readyState = SignalSocket.CONNECTING;
+    await command(connect);
+    expect(prepared.send).not.toHaveBeenCalled();
+    prepared.readyState = SignalSocket.OPEN;
+    prepared.dispatchEvent(new Event("open"));
+    expect(hellos(prepared)).toHaveLength(1);
+    expect(SignalSocket.instances).toHaveLength(1);
+  });
+
+  it("does not use a socket of another address, or one that Signal already answered", async () => {
+    const { command } = await startBridge();
+    await command({ type: "prepare-signal", peerId: "host-1", signalUrl: "wss://old-signal.example.test/v1/signal" });
+    const other = SignalSocket.instances[0];
+    if (!other) throw new Error("No Signal socket.");
+    await command(connect);
+    expect(other.close).toHaveBeenCalled();
+    expect(other.send).not.toHaveBeenCalled();
+    expect(SignalSocket.instances[1]?.url).toBe(signalUrl);
+
+    await command({ type: "disconnect", peerId: "host-1" });
+    await command({ type: "prepare-signal", peerId: "host-1", signalUrl });
+    const refused = SignalSocket.instances[2];
+    if (!refused) throw new Error("No Signal socket.");
+    refused.message({ type: "error", version: 1, code: "rate_limited", message: "Too many." });
+    await command(connect);
+    expect(refused.close).toHaveBeenCalled();
+    expect(refused.send).not.toHaveBeenCalled();
+    expect(SignalSocket.instances).toHaveLength(4);
+  });
+
+  it("closes a socket that no connect takes", async () => {
+    vi.useFakeTimers();
+    const { command } = await startBridge();
+    await command({ type: "prepare-signal", peerId: "host-1", signalUrl });
+    await command({ type: "prepare-signal", peerId: "host-2", signalUrl });
+    const [cancelled, unused] = SignalSocket.instances;
+    if (!cancelled || !unused) throw new Error("No Signal socket.");
+    await command({ type: "disconnect", peerId: "host-1" });
+    expect(cancelled.close).toHaveBeenCalled();
+    expect(unused.close).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(unused.close).toHaveBeenCalled();
+    expect(unused.send).not.toHaveBeenCalled();
+  });
 });
 
 describe("Team WebRTC payload framing", () => {

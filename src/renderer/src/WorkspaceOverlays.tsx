@@ -1,6 +1,9 @@
 import type { CentralAuthUser, ServerSummary } from "@openbot/contracts/ipc";
+import { classifyFailure } from "@openbot/telemetry";
 import type { CustomAgentSettingsApi } from "@openbot/ui/features/custom-providers/CustomAgentSettings";
 import { providerDiagnosticsText } from "@openbot/ui/features/provider-diagnostics/provider-diagnostics";
+import { LeaveServerDialog } from "@openbot/ui/features/servers/LeaveServerDialog";
+import type { BitwardenConnectorPanelProps } from "@openbot/ui/features/settings/BitwardenConnectorPanel";
 import type { HostedSiteDeleteResult } from "@openbot/ui/features/settings/stores/hosted-sites-store";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, Loading, Show } from "solid-js";
@@ -10,6 +13,8 @@ import { appPort } from "./app-port";
 import { useAuth } from "./features/account/account-context";
 import { resolveCreationModel } from "./features/agents/agent-creation-model";
 import { useAgents } from "./features/agents/agents-context";
+import { createBitwardenConnector } from "./features/connectors/bitwarden-connector";
+import { createDiscordConnector } from "./features/connectors/discord-connector";
 import { createGitHubConnector, type GitHubConnectorController } from "./features/connectors/github-connector";
 import {
   createOnePasswordConnector,
@@ -22,7 +27,6 @@ import { useCustomProviders } from "./features/custom-providers/custom-providers
 import { useProviderDetection } from "./features/custom-providers/provider-detection-context";
 import type { ServerStorageOptions } from "./features/files/ServerStoragePanel";
 import { useSetup } from "./features/onboarding/onboarding-context";
-import { useSetupProviderProps } from "./features/onboarding/setup-provider-props";
 import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-context";
 import { AddServerOverlay } from "./features/servers/AddServerOverlay";
 import { mcpToolRuntimeNote } from "./features/servers/mcp-servers";
@@ -37,7 +41,7 @@ import { useSettings } from "./features/settings/settings-context";
 import { useSidebar } from "./features/sidebar/sidebar-context";
 import { useUpdates } from "./features/updates/updates-context";
 import { useGlobalSearchSources } from "./global-search-sources";
-import { InitialSetup, RemoteDesktopWorkspace, SettingsModal } from "./lazy-views";
+import { RemoteDesktopWorkspace, SettingsModal } from "./lazy-views";
 import { useNavigation } from "./navigation";
 import { usePlatform } from "./platform";
 import { useProviders } from "./providers";
@@ -81,6 +85,8 @@ export function WorkspaceOverlays(props: AccountProps) {
     server?.kind === "local" && github.status().available ? github : undefined;
   /* The 1Password connection of this computer. The browser that fills its logins runs here too. */
   const onePassword = createOnePasswordConnector();
+  const bitwarden = createBitwardenConnector();
+  const bitwardenFor = (server: ServerSummary | undefined) => (server?.kind === "local" ? bitwarden : undefined);
   const onePasswordFor = (server: ServerSummary | undefined) => (server?.kind === "local" ? onePassword : undefined);
   /* The overlays mount with the app. A first read that failed then must not hide GitHub for good, and
      the sign-in can change outside this window, so each window reads the status again when it opens. */
@@ -92,52 +98,25 @@ export function WorkspaceOverlays(props: AccountProps) {
   );
   return (
     <>
-      <PermissionsReview account={props.account} />
       <SkillsMarketplace
         githubConnector={githubFor(activeServer())}
         onePasswordConnector={onePasswordFor(activeServer())}
+        bitwardenConnector={bitwardenFor(activeServer())}
       />
       <SharedAgentInstall />
       <JoinServer account={props.account} />
       <AddServer />
+      <LeaveServer />
       <ServerSettings
         githubConnector={githubFor(serverSettingsTarget())}
         onePasswordConnector={onePasswordFor(serverSettingsTarget())}
+        bitwardenConnector={bitwardenFor(serverSettingsTarget())}
       />
       <AppSettings account={props.account} />
       <GlobalMessageSearch />
       <RemoteDesktop />
       <ChannelCreateOverlay />
     </>
-  );
-}
-
-/** The permissions half of first-run setup, reopened after the fact. */
-function PermissionsReview(props: AccountProps) {
-  const platform = usePlatform();
-  const auth = useAuth();
-  const setup = useSetup();
-  const { activeServer } = useServers();
-  const { joinRemoteDuringSetup } = useServerSelection();
-  const setupProviders = useSetupProviderProps(() => activeServer()?.kind === "local");
-
-  return (
-    <Show when={setup.permissionsOpen()}>
-      <Loading>
-        <InitialSetup
-          {...setupProviders}
-          reviewing
-          state={setup.setupState() ?? { completed: true, preferredProvider: "codex", preferredModel: null }}
-          platform={platform.appInfo()?.platform ?? "darwin"}
-          accountEmail={props.account().email}
-          onSave={setup.saveSetup}
-          onPreviewInvite={setup.previewInvite}
-          onJoinRemote={joinRemoteDuringSetup}
-          onLogout={platform.landingPreview ? undefined : auth.logoutCentralAccount}
-          onClose={() => setup.setPermissionsOpen(false)}
-        />
-      </Loading>
-    </Show>
   );
 }
 
@@ -151,6 +130,7 @@ function PermissionsReview(props: AccountProps) {
 function SkillsMarketplace(props: {
   githubConnector: GitHubConnectorController | undefined;
   onePasswordConnector: OnePasswordConnectorController | undefined;
+  bitwardenConnector: BitwardenConnectorPanelProps | undefined;
 }) {
   const {
     skillsMarketplaceOpen,
@@ -183,6 +163,7 @@ function SkillsMarketplace(props: {
       }}
       githubConnector={props.githubConnector}
       onePasswordConnector={props.onePasswordConnector}
+      bitwardenConnector={props.bitwardenConnector}
     />
   );
 }
@@ -253,6 +234,19 @@ function AddServer() {
   );
 }
 
+/** The leave confirmation that the server menu opens. */
+function LeaveServer() {
+  const { leaveConfirmServer, leaveRestoreTarget, cancelLeaveServer, leaveConfirmedServer } = useServerSettings();
+  return (
+    <LeaveServerDialog
+      server={leaveConfirmServer()}
+      onClose={cancelLeaveServer}
+      onLeave={leaveConfirmedServer}
+      restoreFocusTarget={leaveRestoreTarget()}
+    />
+  );
+}
+
 /**
  * Settings for one server, which is any server on the rail rather than the
  * active one - hence the target held by the domain instead of `activeServer()`.
@@ -260,6 +254,7 @@ function AddServer() {
 function ServerSettings(props: {
   githubConnector: GitHubConnectorController | undefined;
   onePasswordConnector: OnePasswordConnectorController | undefined;
+  bitwardenConnector: BitwardenConnectorPanelProps | undefined;
 }) {
   const platform = usePlatform();
   const { hostStatus, setServerMuted, setServerNotificationLevel, activeServer } = useServers();
@@ -267,7 +262,7 @@ function ServerSettings(props: {
   const { selectServer } = useServerSelection();
   const { setPendingAgentSelection } = useServerSwitch();
   const { agentList, agentStatus, modelOptions, serverSetupChoice } = useAgents();
-  const { setupState } = useSetup();
+  const { setupState, saveSetup } = useSetup();
   const {
     toolRuntimeStatuses,
     providerAdminServerId,
@@ -279,6 +274,7 @@ function ServerSettings(props: {
     cancelProviderRuntimeDownload,
     connectProvider,
     openProviderInstallGuide,
+    setProviderOn,
     restartProvider,
     cancelProviderRestart,
     codeLogin,
@@ -338,14 +334,19 @@ function ServerSettings(props: {
     revokeServerInvite,
     serverSettingsMcp,
     serverSettingsMcpError,
+    serverSettingsMcpSignIns,
+    signInMcpServer,
+    cancelMcpSignIn,
+    signOutMcpServer,
     refreshMcpServers,
     saveMcpServer,
     removeMcpServer,
     setMcpServerEnabled,
     testMcpServer,
   } = useServerSettings();
-  // The Slack and Telegram Orchestrators run on this computer, so their pickers list this computer's
-  // models: none while a joined server is on screen, and then they start on a new agent's default.
+  // The Slack, Discord and Telegram Orchestrators run on this computer, so their pickers list this
+  // computer's models: none while a joined server is on screen, and then they start on a new agent's
+  // default.
   const { collapseSidebarSection } = useSidebar();
   const orchestratorModels = () => {
     const options = modelOptions();
@@ -364,6 +365,7 @@ function ServerSettings(props: {
     if (activeServer()?.kind === "local") collapseSidebarSection(sectionId);
   };
   const slack = createSlackConnector(undefined, orchestratorModels, collapseOrchestratorSection);
+  const discord = createDiscordConnector(undefined, orchestratorModels, collapseOrchestratorSection);
   const telegram = createTelegramConnector(undefined, orchestratorModels, collapseOrchestratorSection);
   // The workspace belongs to the selected server. For another server, the switch comes first and
   // the agent is published for the scope it lands in; a message there opens as its agent's chat.
@@ -389,6 +391,10 @@ function ServerSettings(props: {
      */
     const endpoints = local ? localEndpoints : hostCustomProviders;
     return {
+      get defaultProvider() {
+        const state = setupState();
+        return local && state ? { ...state, save: saveSetup } : undefined;
+      },
       get agentStatus() {
         return agentStatus();
       },
@@ -425,6 +431,17 @@ function ServerSettings(props: {
       get onInstallProvider() {
         return local && providerRuntimeDownloadsAvailable() ? openProviderInstallGuide : undefined;
       },
+      onSetProviderOn: local ? setProviderOn : undefined,
+      get providerUsers() {
+        return Object.fromEntries(
+          (agentStatus().providers ?? []).map((provider) => [
+            provider.id,
+            agentList()
+              .filter((agent) => agent.provider === provider.id)
+              .map((agent) => agent.name),
+          ]),
+        );
+      },
       onRestartProvider: local ? restartProvider : undefined,
       onCancelProviderRestart: local ? cancelProviderRestart : undefined,
       get providerDetection() {
@@ -459,7 +476,10 @@ function ServerSettings(props: {
       (error: unknown) => {
         const text = currentText();
         actionToast.error(text.t("server.select.failedTitle"), {
-          description: text.errorMessage(error, text.t("server.select.failedDescription")),
+          ...{
+            description: text.errorMessage(error, text.t("server.select.failedDescription")),
+          },
+          report: { operation: "other", source: "action", cause_code: classifyFailure(error) },
         });
         openServerSettings(server.id, null, "providers");
       },
@@ -515,6 +535,17 @@ function ServerSettings(props: {
           onRemoveMcpServer={removeMcpServer}
           onSetMcpServerEnabled={setMcpServerEnabled}
           onTestMcpServer={testMcpServer}
+          // A sign-in opens this computer's browser, so only this computer's server offers one.
+          mcpSignIn={
+            server().kind === "local"
+              ? {
+                  signedIn: serverSettingsMcpSignIns(),
+                  start: signInMcpServer,
+                  cancel: cancelMcpSignIn,
+                  signOut: signOutMcpServer,
+                }
+              : undefined
+          }
           storage={storageOptions(server())}
           providers={providerSettings(server())}
           onSwitchToManageProviders={
@@ -546,12 +577,20 @@ function ServerSettings(props: {
           }
           githubConnector={props.githubConnector}
           onePasswordConnector={props.onePasswordConnector}
-          // Slack is connected on the computer that runs the agents: Slack opens this computer's browser
-          // and returns to its `openbot://` link.
+          bitwardenConnector={props.bitwardenConnector}
+          // Slack and Discord are connected on the computer that runs the agents: they open this
+          // computer's browser and return to its `openbot://` link.
           slackConnector={server().kind === "local" ? slack : undefined}
+          discordConnector={server().kind === "local" ? discord : undefined}
           // A Telegram chat links to this computer: main opens the `t.me` link in this computer's browser.
           telegramConnector={server().kind === "local" ? telegram : undefined}
           connectorAgents={agentList()}
+          // The feed listens on this computer, so a calendar app on another one cannot read it.
+          routineFeed={
+            server().kind === "local"
+              ? { api: appPort().routineFeed, listAgents: () => appPort().agent.listAgents(server().id) }
+              : undefined
+          }
         />
       )}
     </Show>
@@ -584,6 +623,7 @@ function AppSettings(props: AccountProps) {
     appSettingsOpen,
     setAppSettingsOpen,
     appSettingsTab,
+    hostedServerDeleteRequest,
     generalSettings,
     builtInDisplayGeometry,
     updateGeneralSettings,
@@ -625,6 +665,7 @@ function AppSettings(props: AccountProps) {
         onOpenNotificationSettings={openNotificationSettings}
         restoreFocusTarget={appSettingsRestoreTarget()}
         openTab={appSettingsTab()}
+        hostedServerDeleteRequest={hostedServerDeleteRequest()}
       />
     </Loading>
   );

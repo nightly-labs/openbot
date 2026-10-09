@@ -3,7 +3,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { type DynamicRecord, isNumber } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
-import { AcpAgentClient } from "./acp-client";
+import { AcpAgentClient, type AcpHistoryPersistence } from "./acp-client";
 import type { GrokCliInfo } from "./cli";
 import type {
   McpAuthorizationSource,
@@ -26,6 +26,7 @@ export class GrokAgentClient extends AcpAgentClient {
     mcpAuthorization?: McpAuthorizationSource,
     confinement?: ProcessConfinement,
     agentEnvironment?: () => Readonly<Record<string, string>>,
+    history?: AcpHistoryPersistence,
   ) {
     super(cli, requestTimeoutMs, {
       provider: "grok",
@@ -44,6 +45,7 @@ export class GrokAgentClient extends AcpAgentClient {
       ],
       env: { GROK_OAUTH2_REFERRER: "openbot" },
       ...(agentEnvironment ? { extraEnv: () => ({ ...agentEnvironment() }) } : {}),
+      history,
       signInMessage: sourceText("error.provider.grokSignIn"),
       authenticate,
       readAccount: (connection) =>

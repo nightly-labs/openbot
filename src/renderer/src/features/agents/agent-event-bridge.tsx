@@ -1,6 +1,7 @@
 import type { AgentEvent, AgentRuntimeSnapshot } from "@openbot/contracts/ipc";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
 import { reconcileQueuesWithRuntimeWork } from "@openbot/team-client/dynamic-island-coordinator";
+import { classifyFailure } from "@openbot/telemetry";
 import { toast } from "@openbot/ui";
 import { currentText } from "@openbot/ui/text";
 import { classifyUserError } from "@openbot/user-errors";
@@ -85,15 +86,19 @@ export function AgentEventBridge() {
     agentList().some((agent) => agent.id === agentId && agent.notifications),
   );
   let readRefresh = 0;
+  let modelRefresh = 0;
 
   function handleAgentEvent(event: AgentEvent) {
     switch (event.type) {
       case "status":
         applyAgentStatus(event.status);
-        if (event.status.phase === "ready") {
+        if (event.status.phase === "ready" || event.status.phase === "blocked") {
+          const request = ++modelRefresh;
           void agentsPort()
             .agent.listModels()
-            .then(setModelOptions)
+            .then((models) => {
+              if (request === modelRefresh) setModelOptions(models);
+            })
             .catch(() => undefined);
         }
         return;
@@ -288,7 +293,10 @@ export function AgentEventBridge() {
           // Codex ignored a setting and runs without it. The provider works, so this is a warning
           // about the user's file, not a provider error.
           if (event.code === "codex_config_ignored") {
-            toast.warning(currentText().t("agent.error.codexConfigIgnored"), { description: toastKey });
+            toast.warning(currentText().t("agent.error.codexConfigIgnored"), {
+              ...{ description: toastKey },
+              report: { operation: "provider", source: "provider", cause_code: classifyFailure(event.message) },
+            });
             return;
           }
           // An MCP server left out at hand-off is not the provider failing, and calling it a
@@ -296,7 +304,10 @@ export function AgentEventBridge() {
           const { t } = currentText();
           const title =
             event.code === "mcp_server_not_started" ? t("agent.error.mcpNotStarted") : t("agent.error.provider");
-          toast.error(title, { description: toastKey });
+          toast.error(title, {
+            ...{ description: toastKey },
+            report: { operation: "provider", source: "provider", cause_code: classifyFailure(event.message) },
+          });
         }
       }
     }

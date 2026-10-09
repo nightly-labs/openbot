@@ -2,6 +2,7 @@ import { createSignal } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import FilePreviewPanel from "../src/features/conversation/FilePreviewPanel";
+import { INLINE_SVG_CHART, publishChatVisualPage } from "./chat-visual-fixtures";
 import {
   AUDIO_PREVIEW,
   IMAGE_PREVIEW,
@@ -102,7 +103,75 @@ export const Spreadsheet: Story = {
   args: { preview: XLSX_PREVIEW },
 };
 
+const HTML_BYTES = new TextEncoder().encode(INLINE_SVG_CHART);
+
+/**
+ * An HTML file: the page with its scripts, in the sandbox of a visual reply. The code button shows
+ * the source. The Storybook server serves the page, as the app's page scheme does.
+ */
+export const HtmlPage: Story = {
+  name: "HTML page",
+  args: {
+    preview: {
+      name: "weekly-signups.html",
+      size: HTML_BYTES.length,
+      mimeType: "text/html",
+      previewKind: "text",
+      bytes: HTML_BYTES,
+    },
+  },
+  render: (args) => {
+    const [pageUrl, setPageUrl] = createSignal<string | null>(null);
+    void publishChatVisualPage(INLINE_SVG_CHART).then(setPageUrl);
+    return meta.render({
+      ...args,
+      get pageUrl() {
+        return pageUrl();
+      },
+    });
+  },
+};
+
 /** A kind that the panel cannot show. The user opens the file externally. */
 export const Unsupported: Story = {
   args: { preview: UNSUPPORTED_PREVIEW },
+};
+
+/** A folder chip from a chat: the files and subfolders with their size and date. */
+export const Folder: Story = {
+  args: {
+    preview: null,
+    directory: {
+      name: "eyeliner",
+      path: "research/eyeliner",
+      root: "/Users/demo/OpenBot/Agents/research",
+      parentPath: "research",
+      entries: [
+        {
+          name: "sources",
+          path: "research/eyeliner/sources",
+          kind: "directory",
+          size: 0,
+          modifiedAt: 1_790_000_000_000,
+        },
+        {
+          name: "brief.md",
+          path: "research/eyeliner/brief.md",
+          kind: "file",
+          size: 4_812,
+          modifiedAt: 1_790_000_000_000,
+        },
+        {
+          name: "notes.txt",
+          path: "research/eyeliner/notes.txt",
+          kind: "file",
+          size: 1_204,
+          modifiedAt: 1_789_000_000_000,
+        },
+      ],
+      truncated: false,
+    },
+    onOpenWorkspaceFolder: fn(),
+    onBack: fn(),
+  },
 };

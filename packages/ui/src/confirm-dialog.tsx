@@ -1,9 +1,10 @@
 import type { JSX } from "@solidjs/web";
-import { createSignal, Show } from "solid-js";
+import { createSignal, onSettled, Show } from "solid-js";
 import { Alert, AlertContent, AlertDescription, AlertIcon } from "./alert";
 import { Button } from "./button";
 import { AlertDialog } from "./complex";
 import { ShieldCheck, Trash2, TriangleAlert } from "./icons";
+import { useText } from "./text";
 
 export type ConfirmDialogTone = "destructive" | "default";
 
@@ -34,10 +35,11 @@ export interface ConfirmDialogProps {
   /** The button that gets focus when the dialog opens. */
   initialFocus?: "confirm" | "cancel";
   /** Gets focus when the dialog closes, when the element that opened it closes with it, such as a menu item. */
-  restoreFocusTarget?: HTMLElement;
+  restoreFocusTarget?: HTMLElement | null | undefined;
 }
 
 export function ConfirmDialog(props: ConfirmDialogProps): JSX.Element {
+  const { t } = useText();
   const [running, setRunning] = createSignal(false);
   const pending = () => Boolean(props.pending) || running();
   const tone = () => props.tone ?? "destructive";
@@ -45,6 +47,10 @@ export function ConfirmDialog(props: ConfirmDialogProps): JSX.Element {
   let cancelButton: HTMLButtonElement | undefined;
   // A controlled dialog has no Kobalte trigger, so it keeps the element that opened it itself.
   let restoreTarget: HTMLElement | undefined;
+  let restoreFrame: number | undefined;
+  onSettled(() => () => {
+    if (restoreFrame !== undefined) cancelAnimationFrame(restoreFrame);
+  });
 
   async function confirm(): Promise<void> {
     if (pending()) return;
@@ -82,6 +88,12 @@ export function ConfirmDialog(props: ConfirmDialogProps): JSX.Element {
               if (!target?.isConnected) return;
               event.preventDefault();
               target.focus({ preventScroll: true });
+              // The enclosing dialog resumes its focus trap after the child closes.
+              restoreFrame = requestAnimationFrame(() => {
+                restoreFrame = requestAnimationFrame(() => {
+                  if (!props.open && target.isConnected) target.focus({ preventScroll: true });
+                });
+              });
             }}
           >
             <div class="ui-confirm-dialog-main">
@@ -108,7 +120,7 @@ export function ConfirmDialog(props: ConfirmDialogProps): JSX.Element {
                   <div class="ui-confirm-dialog-body">{props.children}</div>
                 </Show>
                 <Show when={props.error}>
-                  <Alert tone="danger" role="alert" class="ui-confirm-dialog-error">
+                  <Alert tone="danger" report={false} role="alert" class="ui-confirm-dialog-error">
                     <AlertIcon>
                       <TriangleAlert />
                     </AlertIcon>
@@ -130,7 +142,7 @@ export function ConfirmDialog(props: ConfirmDialogProps): JSX.Element {
                 disabled={pending()}
                 onClick={() => props.onCancel()}
               >
-                {props.cancelLabel ?? "Cancel"}
+                {props.cancelLabel ?? t("common.cancel")}
               </Button>
               <Button
                 ref={(element: HTMLButtonElement) => {

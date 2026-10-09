@@ -3,6 +3,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result, Schema } from "effect";
 import type { AgentClient } from "./../agent-client";
 import { type CodexCliInfo, resolveCodexCli } from "./../cli";
+import { causeHelpers } from "../effect-boundary";
 import {
   type AccountLoginCompletedResult,
   type AccountReadResult,
@@ -86,7 +87,7 @@ export class CodexLoginFlow {
             },
             decodeAccountLoginStartResult,
           )
-          .pipe(Effect.mapError((failure) => new CodexLoginFailed({ cause: failure.cause })));
+          .pipe(toCodexLoginFailed);
         this.#track(client, cli, login.loginId);
         const opened = yield* Effect.result(loginIo(() => openExternal(login.authUrl)));
         if (Result.isFailure(opened)) {
@@ -112,7 +113,7 @@ export class CodexLoginFlow {
       Effect.gen({ self: this }, function* () {
         const login = yield* client
           .request("account/login/start", { type: "chatgptDeviceCode" }, decodeAccountDeviceCodeLoginStartResult)
-          .pipe(Effect.mapError((failure) => new CodexLoginFailed({ cause: failure.cause })));
+          .pipe(toCodexLoginFailed);
         this.#track(client, cli, login.loginId);
         const result: ProviderCodeLoginStart = {
           kind: "code",
@@ -146,7 +147,7 @@ export class CodexLoginFlow {
     yield* Effect.gen({ self: this }, function* () {
       const account = yield* pending.client
         .request("account/read", { refreshToken: true }, decodeAccountReadResult)
-        .pipe(Effect.mapError((failure) => new CodexLoginFailed({ cause: failure.cause })));
+        .pipe(toCodexLoginFailed);
       if (account.account?.type !== "chatgpt") {
         return yield* new CodexLoginFailed({
           cause: new Error(sourceText("error.provider.noAuthenticatedAccount", { provider: "ChatGPT" })),
@@ -158,7 +159,7 @@ export class CodexLoginFlow {
         .activate(pending.client, pending.cli, value, {
           isCurrent: () => this.#pending === pending,
         })
-        .pipe(Effect.mapError((failure) => new CodexLoginFailed({ cause: failure.cause })));
+        .pipe(toCodexLoginFailed);
       if (this.#pending === pending) this.#pending = null;
     }).pipe(Effect.catch(() => this.#fail(pending, UNVERIFIED_MESSAGE)));
   }, Effect.uninterruptible).bind(this);
@@ -180,12 +181,9 @@ export class CodexLoginFlow {
     clearTimeout(pending.timer);
     yield* pending.client
       .request("account/login/cancel", { loginId: pending.loginId }, decodeRecordResponse)
-      .pipe(Effect.mapError((failure) => new CodexLoginFailed({ cause: failure.cause })))
+      .pipe(toCodexLoginFailed)
       .pipe(Effect.ignore);
-    yield* pending.client
-      .stop()
-      .pipe(Effect.mapError((failure) => new CodexLoginFailed({ cause: failure.cause })))
-      .pipe(Effect.ignore);
+    yield* pending.client.stop().pipe(toCodexLoginFailed).pipe(Effect.ignore);
     if (message) this.#host.setFailure(new Error(message), pending.cli.version);
     else this.#host.clearConnectionState();
   }, Effect.uninterruptible).bind(this);
@@ -204,24 +202,19 @@ export class CodexLoginFlow {
       Effect.gen({ self: this }, function* () {
         const result = yield* pending.client
           .request("account/read", { refreshToken: true }, decodeAccountReadResult)
-          .pipe(Effect.mapError((failure) => new CodexLoginFailed({ cause: failure.cause })));
+          .pipe(toCodexLoginFailed);
         const account = result.account;
         if (account?.type !== "chatgpt") return false;
-        yield* this.#host
-          .activate(pending.client, pending.cli, account)
-          .pipe(Effect.mapError((failure) => new CodexLoginFailed({ cause: failure.cause })));
+        yield* this.#host.activate(pending.client, pending.cli, account).pipe(toCodexLoginFailed);
         return true;
       }),
     );
     if (Result.isSuccess(activated) && activated.success) return;
     yield* pending.client
       .request("account/login/cancel", { loginId: pending.loginId }, decodeRecordResponse)
-      .pipe(Effect.mapError((failure) => new CodexLoginFailed({ cause: failure.cause })))
+      .pipe(toCodexLoginFailed)
       .pipe(Effect.ignore);
-    yield* pending.client
-      .stop()
-      .pipe(Effect.mapError((failure) => new CodexLoginFailed({ cause: failure.cause })))
-      .pipe(Effect.ignore);
+    yield* pending.client.stop().pipe(toCodexLoginFailed).pipe(Effect.ignore);
     this.#host.clearConnectionState();
   }, Effect.uninterruptible).bind(this);
 
@@ -242,7 +235,7 @@ export class CodexLoginFlow {
     return yield* Effect.gen({ self: this }, function* () {
       const bundledExecutable = this.#host.bundledExecutable();
       const resolved = yield* resolveCodexCli(bundledExecutable === undefined ? {} : { bundledExecutable }).pipe(
-        Effect.mapError((failure) => new CodexLoginFailed({ cause: failure.cause })),
+        toCodexLoginFailed,
       );
       cli = resolved;
       return yield* Effect.acquireUseRelease(
@@ -259,17 +252,15 @@ export class CodexLoginFlow {
                 },
                 decodeRecordResponse,
               )
-              .pipe(Effect.mapError((failure) => new CodexLoginFailed({ cause: failure.cause })));
+              .pipe(toCodexLoginFailed);
             yield* loginStep(() => client.notify("initialized"));
             if (!this.#host.hasActiveClient()) {
               const existing = yield* client
                 .request("account/read", { refreshToken: false }, decodeAccountReadResult)
-                .pipe(Effect.mapError((failure) => new CodexLoginFailed({ cause: failure.cause })));
+                .pipe(toCodexLoginFailed);
               const account = existing.account;
               if (account?.type === "chatgpt") {
-                yield* this.#host
-                  .activate(client, resolved, account)
-                  .pipe(Effect.mapError((failure) => new CodexLoginFailed({ cause: failure.cause })));
+                yield* this.#host.activate(client, resolved, account).pipe(toCodexLoginFailed);
                 return null;
               }
             }
@@ -277,10 +268,7 @@ export class CodexLoginFlow {
           }),
         (client) =>
           this.#pending?.client !== client && !this.#host.hasActiveClient(client)
-            ? client
-                .stop()
-                .pipe(Effect.mapError((failure) => new CodexLoginFailed({ cause: failure.cause })))
-                .pipe(Effect.ignore)
+            ? client.stop().pipe(toCodexLoginFailed).pipe(Effect.ignore)
             : Effect.void,
       );
     }).pipe(
@@ -323,10 +311,7 @@ export class CodexLoginFlow {
     if (this.#pending !== pending) return;
     clearTimeout(pending.timer);
     this.#pending = null;
-    yield* pending.client
-      .stop()
-      .pipe(Effect.mapError((failure) => new CodexLoginFailed({ cause: failure.cause })))
-      .pipe(Effect.ignore);
+    yield* pending.client.stop().pipe(toCodexLoginFailed).pipe(Effect.ignore);
     this.#host.setFailure(new Error(message), pending.cli.version);
   }, Effect.uninterruptible);
 }
@@ -334,9 +319,7 @@ export class CodexLoginFlow {
 export class CodexLoginFailed extends Schema.TaggedError<CodexLoginFailed>()("CodexLoginFailed", {
   cause: Schema.Defect(),
 }) {}
-function loginIo<A>(run: () => Promise<A>): Effect.Effect<A, CodexLoginFailed> {
-  return Effect.tryPromise({ try: run, catch: (cause) => new CodexLoginFailed({ cause }) });
-}
-function loginStep<A>(run: () => A): Effect.Effect<A, CodexLoginFailed> {
-  return Effect.try({ try: run, catch: (cause) => new CodexLoginFailed({ cause }) });
-}
+
+const { io: loginIo, sync: loginStep, rewrap: toCodexLoginFailed } = causeHelpers(CodexLoginFailed);
+
+export { toCodexLoginFailed };

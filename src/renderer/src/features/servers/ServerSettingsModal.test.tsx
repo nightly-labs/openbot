@@ -894,6 +894,9 @@ describe("ServerSettingsModal", () => {
     expect(screen.queryByText("Server Owner")).not.toBeInTheDocument();
 
     await fireEvent.click(screen.getByRole("button", { name: "Revoke" }));
+    const revokeDialog = await screen.findByRole("alertdialog", { name: "Revoke this invitation?" });
+    expect(onRevokeInvite).not.toHaveBeenCalled();
+    await fireEvent.click(within(revokeDialog).getByRole("button", { name: "Revoke" }));
     await waitFor(() => expect(onRevokeInvite).toHaveBeenCalledWith("invite-old"));
     const memberActions = screen.getByRole("button", { name: "Actions for Alice Chen" });
     await fireEvent.pointerDown(memberActions, { button: 0 });
@@ -901,6 +904,9 @@ describe("ServerSettingsModal", () => {
     expect(screen.queryByRole("menuitem", { name: "Pause access" })).not.toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "Restore access" })).not.toBeInTheDocument();
     await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Make admin" }), { button: 0 });
+    const roleDialog = await screen.findByRole("alertdialog", { name: "Make Alice Chen an admin?" });
+    expect(onUpdateMember).not.toHaveBeenCalled();
+    await fireEvent.click(within(roleDialog).getByRole("button", { name: "Make admin" }));
     await waitFor(() => expect(onUpdateMember).toHaveBeenCalledWith({ memberId: "alice-1", role: "admin" }));
   });
 
@@ -1147,6 +1153,7 @@ describe("ServerSettingsModal providers", () => {
   // the previous version closed the dialog before the call and dropped the promise, which made a
   // refused endpoint look like a saved one.
   it("keeps the custom endpoint form open when the save fails, and closes it when the next one works", async () => {
+    const saveDefault = vi.fn(async () => undefined);
     const onAddCustomProvider = vi
       .fn<(value: SaveCustomProviderInput) => Promise<CustomProviderRestart>>()
       .mockRejectedValueOnce(new Error("Studio Local refused the API key."))
@@ -1154,7 +1161,16 @@ describe("ServerSettingsModal providers", () => {
     render(() => (
       <ProvidersSection
         agentStatus={openCodeReadyStatus}
-        customProviders={[]}
+        defaultProvider={{ preferredProvider: "opencode", preferredModel: "old-endpoint/model-a", save: saveDefault }}
+        customProviders={[
+          {
+            id: "old-endpoint",
+            name: "Old endpoint",
+            baseUrl: "http://localhost:11434/v1",
+            hasApiKey: false,
+            models: [{ id: "model-a", name: "Model A" }],
+          },
+        ]}
         onAddCustomProvider={onAddCustomProvider}
       />
     ));
@@ -1172,6 +1188,7 @@ describe("ServerSettingsModal providers", () => {
     expect(await screen.findByText("Studio Local refused the API key.")).toBeInTheDocument();
     // Still open, still holding the endpoint: the user retries rather than types it again.
     expect(screen.getByLabelText(/^Provider ID/u)).toHaveValue("studio-local");
+    expect(saveDefault).not.toHaveBeenCalled();
     await waitFor(() => expect(onAddCustomProvider).toHaveBeenCalledTimes(1));
     expect(onAddCustomProvider).toHaveBeenCalledWith({
       id: "studio-local",
@@ -1185,15 +1202,18 @@ describe("ServerSettingsModal providers", () => {
     await fireEvent.click(screen.getByRole("button", { name: "Submit" }));
     await waitFor(() => expect(screen.queryByLabelText(/^Provider ID/u)).not.toBeInTheDocument());
     expect(screen.getByRole("status")).toHaveTextContent("Saved. OpenBot is loading the models.");
+    await waitFor(() => expect(saveDefault).toHaveBeenCalledWith("opencode", "studio-local/glm-5-air"));
   });
 
   // A removal discards the key and drops the models, and neither is undoable, so the callback must
   // run only after the user answers the question.
   it("removes a custom endpoint only after the confirmation is accepted", async () => {
+    const saveDefault = vi.fn(async () => undefined);
     const onDeleteCustomProvider = vi.fn<(id: string) => Promise<CustomProviderRestart>>(async () => "restarted");
     render(() => (
       <ProvidersSection
         agentStatus={openCodeReadyStatus}
+        defaultProvider={{ preferredProvider: "opencode", preferredModel: "studio-local/model-a", save: saveDefault }}
         customProviders={[
           {
             id: "studio-local",
@@ -1218,11 +1238,13 @@ describe("ServerSettingsModal providers", () => {
     await fireEvent.click(within(declined).getByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
     expect(onDeleteCustomProvider).not.toHaveBeenCalled();
+    expect(saveDefault).not.toHaveBeenCalled();
 
     await fireEvent.click(screen.getByRole("button", { name: "Delete Studio Local" }));
     const accepted = await screen.findByRole("alertdialog", { name: "Remove Studio Local?" });
     await fireEvent.click(within(accepted).getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(onDeleteCustomProvider).toHaveBeenCalledWith("studio-local"));
+    await waitFor(() => expect(saveDefault).toHaveBeenCalledWith("opencode", null));
     // The outcome is read inside the dialog, which stays open: the section behind it is hidden.
     expect(await screen.findByRole("status")).toHaveTextContent("Removed. OpenBot is loading the models.");
   });

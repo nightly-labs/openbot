@@ -23,7 +23,9 @@ import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Exit } from "effect";
 import { assertAgentArgs, assertWindowsScriptArgs, resolveAgentCommand } from "./acp-agent-command";
+import type { AcpHistoryPersistence } from "./acp-client";
 import type { AgentClient, DiagnosticOrigin } from "./agent-client";
+import { causeHelpers } from "./effect-boundary";
 import {
   type AppServerNotification,
   type AppServerRequest,
@@ -36,8 +38,12 @@ import {
   type RequestId,
   type ResponseDecoder,
   type RpcError,
+  type ThreadItem,
 } from "./protocol";
-import { ProviderClientOperationError } from "./provider-client-effects";
+import { ProviderClientOperationError, toProviderClientOperationError } from "./provider-client-effects";
+import type { ProviderHistoryConsumer, ProviderHistoryFragment, ProviderHistoryRequest } from "./provider-history";
+
+const { sync: customStep } = causeHelpers(ProviderClientOperationError);
 
 export interface CustomAgentConfig {
   readonly id: string;
@@ -58,6 +64,7 @@ export type CustomAgentChildFactory = (
   config: CustomAgentConfig,
   executable: string,
   folder: string | null,
+  history?: AcpHistoryPersistence,
 ) => AgentClient;
 
 const MODEL_LIST_TIMEOUT_MS = 5_000;
@@ -123,6 +130,7 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
   readonly #source: CustomAgentSource;
   readonly #createChild: CustomAgentChildFactory;
   readonly #resolve: typeof resolveAgentCommand;
+  readonly #history: AcpHistoryPersistence | undefined;
   readonly #children = new Map<string, Deferred.Deferred<AgentClient, ProviderClientOperationError>>();
   /** The process that opened or loaded each session, by the routed id that the caller knows. */
   readonly #sessions = new Map<string, HeldSession>();
@@ -135,16 +143,76 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
   readonly #lastModels = new Map<string, ModelEntry[]>();
   #running = false;
 
-  constructor(source: CustomAgentSource, createChild: CustomAgentChildFactory, resolve = resolveAgentCommand) {
+  constructor(
+    source: CustomAgentSource,
+    createChild: CustomAgentChildFactory,
+    resolve = resolveAgentCommand,
+    history?: AcpHistoryPersistence,
+  ) {
     super();
     this.#source = source;
     this.#createChild = createChild;
     this.#resolve = resolve;
+    this.#history = history;
   }
 
   get running(): boolean {
     return this.#running;
   }
+
+  /** Keep a custom ACP process alive when one of its held sessions cannot resume or load. */
+  canReleaseProcess(): boolean {
+    const children = new Set([...this.#sessions.values()].map(({ child }) => child));
+    return [...children].every((child) => child.canReleaseProcess?.() !== false);
+  }
+
+  /** Routes durable history reads to the process that owns the custom session. */
+  readonly readHistory = Effect.fn("CustomAcp.readHistory")(function* (
+    this: CustomAcpAgentsClient,
+    request: ProviderHistoryRequest,
+    consume: ProviderHistoryConsumer,
+  ): Effect.fn.Return<void, ProviderClientOperationError> {
+    const history = this.#history;
+    const durableReplay = history?.append && history.read;
+    const complete = history?.complete;
+    if (request.providerOnly && complete && (yield* complete(request))) return;
+    let stopped = false;
+    const reader = history?.read;
+    const readStored = (storedRequest: ProviderHistoryRequest) =>
+      reader
+        ? reader(storedRequest, (fragment) =>
+            consume(fragment).pipe(
+              Effect.tap((continueReading) =>
+                Effect.sync(() => {
+                  stopped = !continueReading;
+                }),
+              ),
+            ),
+          )
+        : Effect.void;
+    if (!request.providerOnly && history?.read) {
+      if (!durableReplay) {
+        yield* readStored(request);
+        if (stopped) return;
+        if (complete && (yield* complete(request))) return;
+      } else if (complete && (yield* complete(request))) {
+        yield* readStored(request);
+        return;
+      }
+    }
+    const agentId = sessionAgent(request.threadId);
+    if (!agentId || !request.cwd) {
+      if (history && durableReplay && !request.providerOnly) yield* readStored(request);
+      return;
+    }
+    const child = yield* this.#child(agentId, request.cwd).pipe(toProviderClientOperationError);
+    if (!child.readHistory) return;
+    const sessionId = ownSessionId(request.threadId, agentId, request.cwd);
+    // Call it on the child: a client's reader uses its own instance state.
+    yield* child
+      .readHistory({ ...request, threadId: sessionId, ...(durableReplay ? { providerOnly: true } : {}) }, consume)
+      .pipe(toProviderClientOperationError);
+  });
 
   start(): void {
     this.#running = true;
@@ -173,10 +241,7 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
   ) {
     const held = this.#sessions.get(externalThreadId);
     const release = held?.child.releaseThread?.bind(held.child);
-    if (held && release)
-      yield* release(held.sessionId).pipe(
-        Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })),
-      );
+    if (held && release) yield* release(held.sessionId).pipe(toProviderClientOperationError);
   });
 
   readonly request = Effect.fn("CustomAcp.request")(
@@ -212,12 +277,10 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
         case "thread/start": {
           const agentId = yield* customStep(() => this.#modelAgent(params));
           const cwd = yield* customStep(() => requiredCwd(params));
-          const child = yield* this.#child(agentId, cwd).pipe(
-            Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })),
-          );
+          const child = yield* this.#child(agentId, cwd).pipe(toProviderClientOperationError);
           const response = yield* child
             .request(method, forChild(params, null), decodeRecordResponse, timeoutMs)
-            .pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })));
+            .pipe(toProviderClientOperationError);
           return yield* customStep(() =>
             decoder(
               withThreadId(response, (sessionId) => {
@@ -232,15 +295,13 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
           const threadId = getString(params, "threadId") ?? "";
           const agentId = yield* customStep(() => this.#routedAgent(params));
           const cwd = yield* customStep(() => requiredCwd(params));
-          const child = yield* this.#child(agentId, cwd).pipe(
-            Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })),
-          );
+          const child = yield* this.#child(agentId, cwd).pipe(toProviderClientOperationError);
           const held = { child, sessionId: ownSessionId(threadId, agentId, cwd) };
           // Held before the agent answers, so what it sends while it loads the session reaches the
           // caller under the id the caller knows, a saved id with no folder tag included.
           this.#sessions.set(threadId, held);
           return yield* child.request(method, forChild(params, held.sessionId), decodeRecordResponse, timeoutMs).pipe(
-            Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })),
+            toProviderClientOperationError,
             Effect.flatMap((response) => customStep(() => decoder(withThreadId(response, () => threadId)))),
             Effect.onError(() =>
               Effect.sync(() => {
@@ -251,6 +312,45 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
         }
         case "thread/read": {
           const threadId = getString(params, "threadId") ?? "";
+          if (isRecord(params) && params.includeTurns === true) {
+            const turns = new Map<string, { id: string; status?: string; startedAt?: number; items: ThreadItem[] }>();
+            const seenItems = new Map<string, Set<string>>();
+            const cwd = getString(params, "cwd");
+            yield* this.readHistory(
+              {
+                threadId,
+                items: "full",
+                ...(cwd === null ? {} : { cwd }),
+              },
+              (fragment) =>
+                Effect.sync(() => {
+                  let turn = turns.get(fragment.turnId);
+                  if (!turn) {
+                    turn = { id: fragment.turnId, items: [] };
+                    turns.set(fragment.turnId, turn);
+                  }
+                  if (fragment.status !== undefined) turn.status = fragment.status;
+                  if (fragment.startedAt !== undefined) turn.startedAt = fragment.startedAt;
+                  const ids = seenItems.get(fragment.turnId) ?? new Set<string>();
+                  for (const item of fragment.items) {
+                    if (item.id && ids.has(item.id)) continue;
+                    if (item.id) ids.add(item.id);
+                    turn.items.push(item);
+                  }
+                  seenItems.set(fragment.turnId, ids);
+                  return true;
+                }),
+            );
+            return yield* customStep(() =>
+              decoder({
+                thread: {
+                  id: threadId,
+                  // readHistory is newest-first; the released response is chronological.
+                  turns: [...turns.values()].reverse(),
+                },
+              }),
+            );
+          }
           const agentId = sessionAgent(threadId);
           // A read has nothing to recover: a session of an agent that is gone has no turns to show.
           if (!agentId || !this.#source().some((config) => config.id === agentId)) {
@@ -262,16 +362,14 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
             this.#sessions.get(threadId) ??
             (cwd
               ? {
-                  child: yield* this.#child(agentId, cwd).pipe(
-                    Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })),
-                  ),
+                  child: yield* this.#child(agentId, cwd).pipe(toProviderClientOperationError),
                   sessionId: ownSessionId(threadId, agentId, cwd),
                 }
               : null);
           if (!held) return yield* customStep(() => decoder({ thread: { id: threadId, turns: [] } }));
           const response = yield* held.child
             .request(method, forChild(params, held.sessionId), decodeRecordResponse, timeoutMs)
-            .pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })));
+            .pipe(toProviderClientOperationError);
           return yield* customStep(() => decoder(withThreadId(response, () => threadId)));
         }
         case "turn/start":
@@ -283,14 +381,14 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
           if (!held) return yield* new ProviderClientOperationError({ cause: unknownSession(threadId) });
           return yield* held.child
             .request(method, forChild(params, held.sessionId), decoder, timeoutMs)
-            .pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })));
+            .pipe(toProviderClientOperationError);
         }
         case "turn/interrupt": {
           const held = this.#sessions.get(getString(params, "threadId") ?? "");
           if (!held) return yield* customStep(() => decoder({}));
           return yield* held.child
             .request(method, forChild(params, held.sessionId), decoder, timeoutMs)
-            .pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })));
+            .pipe(toProviderClientOperationError);
         }
         default:
           return yield* new ProviderClientOperationError({
@@ -377,34 +475,54 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
           cause: new Error(sourceText("error.provider.customAgentMissing")),
         });
       yield* customStep(() => assertAgentArgs(config.args));
-      const executable = yield* this.#resolve(config.command).pipe(
-        Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })),
-      );
+      const executable = yield* this.#resolve(config.command).pipe(toProviderClientOperationError);
       if (!executable)
         return yield* new ProviderClientOperationError({
           cause: new Error(sourceText("error.provider.customAgentNotFound", { command: config.command })),
         });
       yield* customStep(() => assertWindowsScriptArgs(executable, config.args));
-      const child = yield* customStep(() => this.#createChild(config, executable, folder));
       const prefix = folder === null ? agentId : `${agentId}:${folderTag(folder)}`;
-      const route = (sessionId: string) => this.#routedSessionId(child, prefix, sessionId);
-      child.on("notification", (notification) => {
+      let child: AgentClient | null = null;
+      const history =
+        folder === null || !this.#history
+          ? undefined
+          : {
+              read: (request: ProviderHistoryRequest, consume: ProviderHistoryConsumer) =>
+                this.#history?.read?.(
+                  {
+                    ...request,
+                    threadId: child
+                      ? this.#routedSessionId(child, prefix, request.threadId)
+                      : `${prefix}:${request.threadId}`,
+                  },
+                  consume,
+                ) ?? Effect.void,
+              append: (sessionId: string, fragment: ProviderHistoryFragment) =>
+                this.#history?.append?.(
+                  child ? this.#routedSessionId(child, prefix, sessionId) : `${prefix}:${sessionId}`,
+                  fragment,
+                ) ?? Effect.void,
+            };
+      const created = yield* customStep(() => this.#createChild(config, executable, folder, history));
+      child = created;
+      const route = (sessionId: string) => this.#routedSessionId(created, prefix, sessionId);
+      created.on("notification", (notification) => {
         this.emit("notification", withRoutedThreadId(notification, route));
       });
-      child.on("request", (request) => {
+      created.on("request", (request) => {
         this.#nextRequestId += 1;
         const id = `${agentId}:${this.#nextRequestId}`;
-        this.#requests.set(id, { child, id: request.id });
+        this.#requests.set(id, { child: created, id: request.id });
         this.emit("request", withRoutedThreadId({ ...request, id }, route));
       });
-      child.on("diagnostic", (message, origin) => this.emit("diagnostic", this.#redact(message), origin));
-      child.once("exit", (error) => this.#childExited(key, folder, child, this.#redactError(error)));
-      yield* customStep(() => child.start());
-      yield* child
+      created.on("diagnostic", (message, origin) => this.emit("diagnostic", this.#redact(message), origin));
+      created.once("exit", (error) => this.#childExited(key, folder, created, this.#redactError(error)));
+      yield* customStep(() => created.start());
+      yield* created
         .request("initialize", {}, decodeRecordResponse)
-        .pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })))
-        .pipe(Effect.onError(() => child.stop().pipe(Effect.catch(() => Effect.void))));
-      return child;
+        .pipe(toProviderClientOperationError)
+        .pipe(Effect.onError(() => created.stop().pipe(Effect.catch(() => Effect.void))));
+      return created;
     },
     Effect.mapError((error) => new ProviderClientOperationError({ cause: this.#redactError(error.cause) })),
   );
@@ -466,12 +584,12 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
       configs,
       (config) =>
         this.#child(config.id, null)
-          .pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })))
+          .pipe(toProviderClientOperationError)
           .pipe(
             Effect.flatMap((child) =>
               child
                 .request("model/list", params, decodeModelListResponse, timeoutMs)
-                .pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause }))),
+                .pipe(toProviderClientOperationError),
             ),
             Effect.timeoutOrElse({
               duration: timeoutMs,
@@ -547,8 +665,4 @@ function withThreadId(response: DynamicRecord, route: (sessionId: string) => str
   const id = getString(thread, "id");
   if (!thread || id === null) return response;
   return { ...response, thread: { ...thread, id: route(id) } };
-}
-
-function customStep<A>(run: () => A): Effect.Effect<A, ProviderClientOperationError> {
-  return Effect.try({ try: run, catch: (cause) => new ProviderClientOperationError({ cause }) });
 }

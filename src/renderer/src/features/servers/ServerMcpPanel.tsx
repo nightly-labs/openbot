@@ -16,6 +16,8 @@ import {
   ItemGroup,
   ItemMedia,
   ItemTitle,
+  LogIn,
+  LogOut,
   Pencil,
   Plug,
   Plus,
@@ -30,6 +32,7 @@ import type { JSX } from "@solidjs/web";
 import { createMemo, createStore, For, onCleanup, Show } from "solid-js";
 import {
   emptyMcpConfig,
+  isMcpSignInCancelled,
   type McpServerConfig,
   type McpTestResult,
   type McpTestState,
@@ -37,6 +40,7 @@ import {
   mcpConfigDraft,
   mcpConfigErrors,
   mcpConfigIsValid,
+  mcpFailureKind,
   mcpProviderLimitNote,
   mcpStatusLabel,
   mcpStatusVariant,
@@ -88,7 +92,25 @@ export interface ServerMcpPanelProps {
   onSetEnabled: (id: string, enabled: boolean) => Promise<void>;
   /** Test an unsaved draft config. */
   onTest: (config: McpServerConfig) => Promise<McpTestResult>;
+  /**
+   * Browser sign-in for http servers. Only the computer that runs OpenBot can open its browser, so
+   * the caller leaves this out for a remote server: that host signs in for itself.
+   */
+  signIn?: McpPanelSignIn;
 }
+
+export interface McpPanelSignIn {
+  /** Whether this computer holds a sign-in, by row id. A yes or no only. */
+  signedIn: Record<string, boolean>;
+  /** Opens the browser when the server asks, and answers once it came back and the server took the token. */
+  start: (config: McpServerConfig) => Promise<McpTestResult>;
+  /** Stops the wait for the browser; the pending `start` then answers that it was cancelled. */
+  cancel: (url: string) => Promise<void>;
+  signOut: (id: string) => Promise<void>;
+}
+
+/** A test or a sign-in that has answered. */
+type SettledTest = Exclude<McpTestState, { status: "testing" } | { status: "signing-in" }>;
 
 /** One record for form view/edit/draft/touched, which change together. */
 interface McpPanelState {
@@ -144,6 +166,15 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
   const formTest = createMemo(() =>
     state.formTestConfig && !mcpConfigChanged(state.draft, state.formTestConfig) ? state.formTest : null,
   );
+  /** A test or a sign-in of the form is running; the form's two buttons wait for it. */
+  const formWaiting = () => formSignIn() !== null || formTest()?.status === "testing";
+  /**
+   * The config of a form sign-in still waiting for the browser. Unlike a test result it outlives
+   * edits to the draft: the browser is still out, so Cancel stays bound to the address it signs in to.
+   */
+  function formSignIn(): McpServerConfig | null {
+    return state.formTest?.status === "signing-in" ? state.formTestConfig : null;
+  }
   /** Row test result while it still describes the row; the enabled switch is not compared. */
   const rowTest = (config: McpServerConfig): McpTestState | undefined => {
     const entry = state.tests[config.id];
@@ -179,29 +210,76 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
     }
   }
 
+  /** Read from the English main sent, before it is translated: its key names the failure kind. */
+  function settled(result: McpTestResult): SettledTest {
+    if (result.error) return { status: "failed", error: sourceText(result.error), kind: mcpFailureKind(result.error) };
+    return { status: "passed", toolCount: result.toolCount };
+  }
+
+  function thrown(error: unknown): SettledTest {
+    if (!(error instanceof Error)) return { status: "failed", error: t("mcp.panel.noAnswer"), kind: "other" };
+    return { status: "failed", error: sourceText(error.message), kind: mcpFailureKind(error.message) };
+  }
+
   /** Tests run without the busy latch so a slow server never blocks saving another. */
-  async function runTest(config: McpServerConfig): Promise<Exclude<McpTestState, { status: "testing" }>> {
+  async function runTest(config: McpServerConfig): Promise<SettledTest> {
     try {
-      const result = await props.onTest(config);
-      if (result.error) return { status: "failed", error: sourceText(result.error) };
-      return { status: "passed", toolCount: result.toolCount };
+      return settled(await props.onTest(config));
     } catch (error) {
-      return { status: "failed", error: error instanceof Error ? sourceText(error.message) : t("mcp.panel.noAnswer") };
+      return thrown(error);
     }
   }
 
-  async function testRow(config: McpServerConfig): Promise<void> {
+  /** A sign-in, read as a test is. `null` when the user cancelled it: that is not a failure to show. */
+  async function runSignIn(config: McpServerConfig): Promise<SettledTest | null> {
+    const signIn = props.signIn;
+    if (!signIn) return null;
+    try {
+      const result = await signIn.start(config);
+      return result.error && isMcpSignInCancelled(result.error) ? null : settled(result);
+    } catch (error) {
+      return thrown(error);
+    }
+  }
+
+  /** Sign in is offered for an http server, and only where this computer can open the browser. */
+  const canSignIn = (config: McpServerConfig) => Boolean(props.signIn) && config.transport === "http";
+
+  /**
+   * Counts each row's tests and sign-ins. A row can start a second one while the first still waits
+   * - a Test during a sign-in, or a second Sign in that cancels the first - and only the newest
+   * answer may describe the row.
+   */
+  const rowRuns: Record<string, number> = {};
+
+  /** A row's test or sign-in: its pending state, then its answer. `null` clears the row. */
+  async function runRow(
+    config: McpServerConfig,
+    pending: "testing" | "signing-in",
+    answer: (config: McpServerConfig) => Promise<SettledTest | null>,
+  ): Promise<void> {
+    const run = (rowRuns[config.id] ?? 0) + 1;
+    rowRuns[config.id] = run;
     const tested = normalizeMcpConfig(config);
     setState((current) => {
-      current.tests[config.id] = { test: { status: "testing" }, config: tested };
+      current.tests[config.id] = { test: { status: pending }, config: tested };
     });
-    const test = await runTest(tested);
+    const test = await answer(tested);
+    if (rowRuns[config.id] !== run) return;
     setState((current) => {
-      current.tests[config.id] = { test, config: tested };
+      if (test) current.tests[config.id] = { test, config: tested };
+      else delete current.tests[config.id];
     });
   }
 
-  async function testDraft(): Promise<void> {
+  const testRow = (config: McpServerConfig) => runRow(config, "testing", runTest);
+  const signInRow = (config: McpServerConfig) => runRow(config, "signing-in", runSignIn);
+
+  /** The form's test or sign-in, which answers for the draft on screen and not for any stored row. */
+  async function runDraft(
+    pending: "testing" | "signing-in",
+    answer: (config: McpServerConfig) => Promise<SettledTest | null>,
+  ): Promise<void> {
     setState((current) => {
       current.touched = true;
     });
@@ -209,17 +287,49 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
     const run = ++draftTestRun;
     const tested = normalizeMcpConfig(state.draft);
     setState((current) => {
-      current.formTest = { status: "testing" };
+      current.formTest = { status: pending };
       current.formTestConfig = tested;
     });
-    const test = await runTest(tested);
+    const test = await answer(tested);
     if (run !== draftTestRun) return;
     setState((current) => {
       current.formTest = test;
+      if (!test) current.formTestConfig = null;
+    });
+  }
+
+  const testDraft = () => runDraft("testing", runTest);
+  const signInDraft = () => runDraft("signing-in", runSignIn);
+
+  /**
+   * Not behind the busy latch: a save or a toggle elsewhere in the panel must not leave the user
+   * unable to stop a browser wait. The pending sign-in answers "cancelled" and clears itself.
+   */
+  function cancelSignIn(url: string): void {
+    props.signIn?.cancel(url).catch((error: unknown) => {
+      setState((current) => {
+        current.error = error instanceof Error ? sourceText(error.message) : t("mcp.panel.saveFailed");
+      });
+    });
+  }
+
+  function signOut(config: McpServerConfig): void {
+    const signIn = props.signIn;
+    if (!signIn) return;
+    void run(`sign-out:${config.id}`, async () => {
+      await signIn.signOut(config.id);
+      rowRuns[config.id] = (rowRuns[config.id] ?? 0) + 1;
+      setState((current) => {
+        delete current.tests[config.id];
+      });
     });
   }
 
   function openForm(config: McpServerConfig | null): void {
+    // The row's Cancel is not on the form, and an edit can change the address it signs in to: a
+    // sign-in still waiting on this row ends here rather than storing a token for the old address.
+    const pending = config ? state.tests[config.id] : undefined;
+    if (pending?.test.status === "signing-in") cancelSignIn(pending.config.url);
     const draft = config ? mcpConfigDraft(config) : emptyMcpConfig();
     setState((current) => {
       current.view = "form";
@@ -243,7 +353,14 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
     });
   }
 
+  /** Leaving or resetting the form drops its Cancel, so a sign-in still waiting ends with it. */
+  function endFormSignIn(): void {
+    const pending = formSignIn();
+    if (pending) cancelSignIn(pending.url);
+  }
+
   function backToList(): void {
+    endFormSignIn();
     props.onDetailChange?.(null);
     setState((current) => {
       current.view = "list";
@@ -270,6 +387,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
 
   /** Puts the form back to what is stored, the way the General tab's save bar resets its fields. */
   function resetForm(): void {
+    endFormSignIn();
     setState((current) => {
       current.draft = mcpConfigDraft(current.baseline);
       current.touched = false;
@@ -379,13 +497,60 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                       <div class="server-mcp-row-title">
                         <ItemTitle>{config().name}</ItemTitle>
                         <Badge variant={mcpStatusVariant(test())}>{mcpStatusLabel(config(), t, test())}</Badge>
+                        <Show when={canSignIn(config()) && props.signIn?.signedIn[config().id]}>
+                          <Badge variant="outline">{t("mcp.status.signedIn")}</Badge>
+                        </Show>
                       </div>
-                      <Show when={test()?.status === "failed" && test()}>
-                        {(failed) => <ItemDescription>{mcpTestMessage(failed(), t)}</ItemDescription>}
+                      <Show when={test()?.status === "signing-in" && test()}>
+                        {(waiting) => (
+                          <>
+                            <ItemDescription>{mcpTestMessage(waiting(), t)}</ItemDescription>
+                            <div class="server-mcp-row-next">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                disabled={!props.canManage}
+                                aria-label={t("mcp.panel.cancelSignInTo", { name: config().name })}
+                                onClick={() => cancelSignIn(config().url)}
+                              >
+                                {t("mcp.panel.cancelSignIn")}
+                              </Button>
+                            </div>
+                          </>
+                        )}
                       </Show>
-                      {/* Only when no failure is shown: a test the user just ran answers about this
+                      <Show when={test()?.status === "failed" && test()}>
+                        {(failed) => (
+                          <>
+                            <ItemDescription>{mcpTestMessage(failed(), t)}</ItemDescription>
+                            <Show when={asksForSignIn(failed()) && canSignIn(config())}>
+                              <div class="server-mcp-row-next">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={disabled()}
+                                  aria-label={t("mcp.panel.signInTo", { name: config().name })}
+                                  onClick={() => void signInRow(config())}
+                                >
+                                  <LogIn aria-hidden="true" />
+                                  {t("mcp.panel.signIn")}
+                                </Button>
+                              </div>
+                            </Show>
+                          </>
+                        )}
+                      </Show>
+                      {/* Only when no answer is shown: a test the user just ran answers about this
                           server now, and the standing limit must not push it out of the slot. */}
-                      <Show when={test()?.status !== "failed" && mcpProviderLimitNote(config(), t)}>
+                      <Show
+                        when={
+                          test()?.status !== "failed" &&
+                          test()?.status !== "signing-in" &&
+                          mcpProviderLimitNote(config(), t)
+                        }
+                      >
                         {(note) => <ItemDescription>{note()}</ItemDescription>}
                       </Show>
                     </ItemContent>
@@ -402,7 +567,19 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                         name={config().name}
                         mount={props.menuMount}
                         disabled={disabled()}
+                        // A Test would replace the sign-in waiting on this row, and with it Cancel.
+                        testDisabled={test()?.status === "signing-in"}
                         onTest={() => void testRow(config())}
+                        signIn={
+                          canSignIn(config())
+                            ? {
+                                signedIn: Boolean(props.signIn?.signedIn[config().id]),
+                                busy: test()?.status === "signing-in",
+                                onSignIn: () => void signInRow(config()),
+                                onSignOut: () => signOut(config()),
+                              }
+                            : undefined
+                        }
                         onEdit={() => openForm(config())}
                         onRemove={(trigger) => {
                           // The confirmation returns focus to the element focused when it opens.
@@ -752,22 +929,36 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
           title={t("mcp.panel.testTitle")}
           description={t("mcp.panel.testDescription")}
           actions={
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={!props.canManage || formTest()?.status === "testing"}
-              loading={formTest()?.status === "testing"}
-              loadingLabel={t("common.connecting")}
-              onClick={() => void testDraft()}
-            >
-              <Plug aria-hidden="true" />
-              {t("mcp.panel.testConnection")}
-            </Button>
+            <>
+              <Show when={canSignIn(state.draft)}>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={!props.canManage || formWaiting()}
+                  onClick={() => void signInDraft()}
+                >
+                  <LogIn aria-hidden="true" />
+                  {t("mcp.panel.signIn")}
+                </Button>
+              </Show>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={!props.canManage || formWaiting()}
+                loading={formTest()?.status === "testing"}
+                loadingLabel={t("common.connecting")}
+                onClick={() => void testDraft()}
+              >
+                <Plug aria-hidden="true" />
+                {t("mcp.panel.testConnection")}
+              </Button>
+            </>
           }
         >
           <Show
-            when={formTest()}
+            when={formSignIn() ? state.formTest : formTest()}
             fallback={
               <Text variant="caption" tone="muted">
                 {t("mcp.panel.notTested")}
@@ -775,9 +966,26 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
             }
           >
             {(test) => (
-              <Text class="server-mcp-test-result" variant="caption" tone={mcpTestTone(test())} role="status">
-                {mcpTestMessage(test(), t)}
-              </Text>
+              <>
+                <Text class="server-mcp-test-result" variant="caption" tone={mcpTestTone(test())} role="status">
+                  {mcpTestMessage(test(), t)}
+                </Text>
+                <Show when={formSignIn()}>
+                  {(pending) => (
+                    <div class="server-mcp-row-next">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={!props.canManage}
+                        onClick={() => cancelSignIn(pending().url)}
+                      >
+                        {t("mcp.panel.cancelSignIn")}
+                      </Button>
+                    </div>
+                  )}
+                </Show>
+              </>
             )}
           </Show>
         </SettingsSection>
@@ -872,7 +1080,10 @@ function McpRowMenu(props: {
   name: string;
   mount?: HTMLElement;
   disabled: boolean;
+  testDisabled: boolean;
   onTest: () => void;
+  /** Present for an http row on this computer: Sign in, or Sign out once a sign-in is held. */
+  signIn?: { signedIn: boolean; busy: boolean; onSignIn: () => void; onSignOut: () => void } | undefined;
   onEdit: () => void;
   onRemove: (trigger: HTMLElement) => void;
 }) {
@@ -890,10 +1101,28 @@ function McpRowMenu(props: {
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal mount={props.mount}>
         <DropdownMenu.Content class="server-mcp-row-menu">
-          <DropdownMenu.Item onSelect={() => props.onTest()}>
+          <DropdownMenu.Item disabled={props.testDisabled} onSelect={() => props.onTest()}>
             <Plug aria-hidden="true" />
             {t("mcp.panel.testConnection")}
           </DropdownMenu.Item>
+          <Show when={props.signIn}>
+            {(signIn) => (
+              <Show
+                when={signIn().signedIn}
+                fallback={
+                  <DropdownMenu.Item disabled={signIn().busy} onSelect={() => signIn().onSignIn()}>
+                    <LogIn aria-hidden="true" />
+                    {t("mcp.panel.signIn")}
+                  </DropdownMenu.Item>
+                }
+              >
+                <DropdownMenu.Item onSelect={() => signIn().onSignOut()}>
+                  <LogOut aria-hidden="true" />
+                  {t("mcp.panel.signOut")}
+                </DropdownMenu.Item>
+              </Show>
+            )}
+          </Show>
           <DropdownMenu.Item onSelect={() => props.onEdit()}>
             <Pencil aria-hidden="true" />
             {t("common.edit")}
@@ -910,6 +1139,11 @@ function McpRowMenu(props: {
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
   );
+}
+
+/** A server that asked for a sign-in: the row offers Sign in beside the sentence. */
+function asksForSignIn(test: McpTestState): boolean {
+  return test.status === "failed" && test.kind === "sign-in";
 }
 
 /** A failed test is the only one that reads as an error; a pass is a plain, quiet sentence. */

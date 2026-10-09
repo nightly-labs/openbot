@@ -7,10 +7,11 @@ import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { AppWindow, ArrowLeft, CodeXml, Ellipsis, Workflow } from "lucide-react-native";
 import { type ReactNode, useEffect, useState } from "react";
-import { Alert, View, type ViewStyle } from "react-native";
-import Animated, { cubicBezier, Easing, Keyframe, useReducedMotion } from "react-native-reanimated";
+import { View, type ViewStyle } from "react-native";
+import Animated, { cubicBezier, Easing, Keyframe } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useUniwind } from "uniwind";
+import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { ChatGlassIconButton } from "@/features/chat/components/chat-glass-icon-button";
 import { CodeDocument } from "@/features/chat/components/code-document";
 import DiagramCanvas from "@/features/chat/components/diagram-canvas.dom";
@@ -20,6 +21,7 @@ import { useMermaidDiagram } from "@/features/chat/model/mermaid-diagrams";
 import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
 import { expoGoDomOptions } from "@/shared/lib/expo-go-dom";
 import { haptics } from "@/shared/lib/haptics";
+import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
 import { useLiquidGlass } from "@/shared/lib/use-liquid-glass";
 
@@ -94,7 +96,7 @@ function PreviewContent({ entry }: { entry: CodePreviewEntry }) {
       void haptics.notification("success");
     } catch {
       void haptics.notification("error");
-      Alert.alert(t("mobile.chat.code.copyFailed"), t("mobile.chat.copyFailedMessage"));
+      showFailureAlert(undefined, "turn", t("mobile.chat.code.copyFailed"), t("mobile.chat.copyFailedMessage"));
     }
   };
   const wrapAction: MenuAction = {

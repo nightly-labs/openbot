@@ -76,6 +76,7 @@ export const messages = {
   "error.provider.metadataNoData":
     "Le téléchargement des métadonnées de l’environnement d’exécution n’a renvoyé aucune donnée.",
   "error.provider.metadataTooLarge": "Les métadonnées de l’environnement d’exécution sont trop volumineuses.",
+  "error.provider.requestFailed": "OpenBot n’a pas pu télécharger {url}. {reason}",
   "error.provider.installRecordMismatch":
     "L’enregistrement d’installation de l’environnement d’exécution ne correspond pas.",
   "error.provider.runtimeChecksum":
@@ -116,7 +117,7 @@ export const messages = {
   "error.provider.endpointRemoveBusy":
     "Attendez la fin du tour actif et de la file d’attente avant de supprimer ce point de terminaison.",
   "error.provider.codexOutdated":
-    "La CLI Codex {version} est trop ancienne. OpenBot nécessite la version 0.144.1 ou plus récente.",
+    "La CLI Codex {version} est trop ancienne. OpenBot nécessite la version 0.156.0 ou plus récente.",
   "error.provider.codexNotStarted": "La CLI Codex a été trouvée mais n’a pas pu démarrer.",
   "error.provider.codexNotStartedHint":
     "La CLI Codex a été trouvée mais n’a pas pu démarrer. Exécutez `codex --version` dans un nouveau terminal.",

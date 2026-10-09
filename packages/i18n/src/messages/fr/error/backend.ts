@@ -14,6 +14,7 @@ export const messages = {
     "Impossible de réserver une famille de ports Sunshine libre pour le Bureau à distance.",
   "error.backend.moonlightPortsUnavailable":
     "Impossible de réserver une plage de ports WebRTC Moonlight libre pour le Bureau à distance.",
+  "error.backend.iceServerNoPort": "Le serveur ICE du Bureau à distance n’a pas obtenu de port.",
   "error.backend.remoteDesktopStoppedWhileStarting":
     "L’environnement du bureau à distance a été arrêté pendant son démarrage.",
   "error.backend.sunshineNotStarted": "Sunshine n’a pas démarré sur une famille de ports réservée.",
@@ -151,6 +152,26 @@ export const messages = {
   "error.backend.mcpSignInAbandoned": "La connexion MCP a été abandonnée.",
   "error.backend.mcpSignInNoBrowser": "Cette connexion MCP ne peut pas ouvrir de navigateur.",
   "error.backend.mcpSignInNotWebPage": "L’adresse de connexion n’est pas une page web.",
+  "error.backend.mcpSignInRequired":
+    "Ce serveur demande une connexion. Choisissez Se connecter pour continuer dans votre navigateur.",
+  "error.backend.mcpSignInOnHost":
+    "Ce serveur demande une connexion. Connectez-vous-y dans OpenBot sur l’ordinateur hôte.",
+  "error.backend.mcpSignInNeedsHttps":
+    "Ce serveur demande une connexion, et OpenBot ne se connecte qu’en https. Remplacez l’URL par {url}.",
+  "error.backend.mcpSignInCancelled": "La connexion a été annulée.",
+  "error.backend.mcpSignInTimedOut": "La connexion n’a pas été terminée dans le navigateur.",
+  "error.backend.mcpSignInResponseTimedOut": "La réponse à la connexion n’est pas arrivée à temps.",
+  "error.backend.mcpServerExited":
+    "Le serveur s’est arrêté avant de répondre. Exécutez la commande dans un terminal pour voir son erreur.",
+  "error.backend.mcpServerUnreachable": "OpenBot n’a pas pu joindre le serveur. Vérifiez l’URL et votre réseau.",
+  "error.backend.mcpLocalServerOff":
+    "Aucun serveur ne répond à {address} sur cet ordinateur. Démarrez le serveur ou activez-le dans l’app qui l’exécute, puis réessayez.",
+  "error.backend.mcpServerBlocked":
+    "Cet ordinateur a bloqué la connexion au serveur. Vérifiez votre pare-feu ou votre logiciel de sécurité, puis réessayez.",
+  "error.backend.mcpServerIncompatible":
+    "Quelque chose a répondu à cette adresse, mais pas comme un serveur MCP en Streamable HTTP. Vérifiez l’URL et mettez à jour l’app qui exécute le serveur.",
+  "error.backend.mcpRemoteBridge":
+    "{reason} Cette commande lance la passerelle mcp-remote. Choisissez plutôt Streamable HTTP avec l’URL {url}, et OpenBot vous connecte.",
   "error.backend.oauthNotHttps":
     "Le point de terminaison OAuth {origin} n’utilise pas https : les identifiants n’ont pas été envoyés.",
   "error.backend.oauthTooManyRedirects": "Le point de terminaison OAuth a effectué trop de redirections.",
@@ -168,6 +189,9 @@ export const messages = {
   "error.backend.sharedPathNotFile": "Le chemin partagé n’est pas un fichier.",
   "error.backend.workspaceFileOutside": "Le fichier doit se trouver dans l’espace de travail de l’agent.",
   "error.backend.workspacePathNotFile": "Le chemin de l’espace de travail n’est pas un fichier.",
+  "error.backend.workspacePathNotDirectory": "Le chemin de l’espace de travail n’est pas un dossier.",
+  "error.backend.workspacePathMissing": "Rien n’existe à {path} dans l’espace de travail de l’agent {root}.",
+  "error.backend.workspacePathMissingForMember": "Rien n’existe à {path} dans l’espace de travail de l’agent.",
   "error.backend.useChannelTaskControls": "Utilisez les commandes de tâche du canal pour cette tâche.",
   "error.backend.editFinished": "Cette modification est déjà terminée.",
   "error.backend.editCancelled": "Cette modification a été annulée : le message garde son texte d’origine.",

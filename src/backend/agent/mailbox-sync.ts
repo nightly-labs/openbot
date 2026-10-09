@@ -1,5 +1,14 @@
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
-import type { AgentEvent, AgentSummary, ConversationSnapshot, QueueHold, QueueSnapshot } from "@openbot/contracts/ipc";
+import type {
+  AgentEvent,
+  AgentSummary,
+  ConversationMessage,
+  ConversationSnapshot,
+  QueueHold,
+  QueueSnapshot,
+} from "@openbot/contracts/ipc";
+import { Effect, type Scope } from "effect";
+import { isMailboxMessageCopy } from "../conversation-snapshots";
 import type { MailboxStore } from "../mailbox-store";
 import type { OpenBotDatabase } from "../openbot-database";
 import type { ConversationRuntime } from "./conversation-runtime";
@@ -18,6 +27,7 @@ export interface MailboxSyncOptions {
   mailbox: MailboxStore;
   conversation: ConversationRuntime;
   routines: RoutineScheduler;
+  scope: () => Scope.Scope;
   hooks: MailboxSyncHooks;
 }
 
@@ -35,6 +45,7 @@ export class MailboxSync {
   readonly #mailbox: MailboxStore;
   readonly #conversation: ConversationRuntime;
   readonly #routines: RoutineScheduler;
+  readonly #scope: () => Scope.Scope;
   readonly #hooks: MailboxSyncHooks;
 
   constructor(options: MailboxSyncOptions) {
@@ -42,6 +53,7 @@ export class MailboxSync {
     this.#mailbox = options.mailbox;
     this.#conversation = options.conversation;
     this.#routines = options.routines;
+    this.#scope = options.scope;
     this.#hooks = options.hooks;
   }
 
@@ -49,7 +61,8 @@ export class MailboxSync {
     const context = this.#mailbox.getDelivery(deliveryId);
     const message = snapshot.messages.find((candidate) => candidate.id === deliveryId);
     if (!context || !message) return;
-    message.turnId = context.delivery.turnId ?? undefined;
+    if (context.delivery.turnId === null) delete message.turnId;
+    else message.turnId = context.delivery.turnId;
     message.delivery = {
       id: context.delivery.id,
       status: context.delivery.status,
@@ -57,10 +70,23 @@ export class MailboxSync {
     };
   }
 
-  syncMailboxMessages(snapshot: ConversationSnapshot): void {
+  syncMailboxMessages(snapshot: ConversationSnapshot, mailboxMessages?: readonly ConversationMessage[]): void {
     if (this.#conversation.isExecutionThread(snapshot.threadId)) return;
+    const fromCreatedAt = snapshot.messages[0]?.createdAt;
+    const incomingMailboxMessages =
+      mailboxMessages ??
+      this.#mailbox.conversationMessages(snapshot.agentId, fromCreatedAt === undefined ? {} : { fromCreatedAt });
+    const incomingMessages = new Map(
+      incomingMailboxMessages.flatMap((message) =>
+        message.exchange?.direction === "incoming" ? [[message.exchange.messageId, message] as const] : [],
+      ),
+    );
+    for (let index = snapshot.messages.length - 1; index >= 0; index--) {
+      const message = snapshot.messages[index];
+      if (message && isMailboxMessageCopy(message, incomingMessages)) snapshot.messages.splice(index, 1);
+    }
     const indexes = new Map(snapshot.messages.map((message, index) => [message.id, index]));
-    for (const mailboxMessage of this.#mailbox.conversationMessages(snapshot.agentId)) {
+    for (const mailboxMessage of incomingMailboxMessages) {
       const index = indexes.get(mailboxMessage.id);
       if (index !== undefined) snapshot.messages[index] = mailboxMessage;
       else {
@@ -78,15 +104,43 @@ export class MailboxSync {
 
   reconcilePersistedMailboxMessages(agent: AgentSummary): void {
     if (!agent.threadId) return;
-    const persisted = this.#database.readConversation(agent.id, agent.threadId);
+    const page = this.#database.readConversationPage(agent.id, agent.threadId, { type: "latest" }, 100);
+    const persisted: ConversationSnapshot = {
+      agentId: page.agentId,
+      threadId: page.threadId,
+      activeTurnId: page.activeTurnId,
+      revision: page.revision,
+      messages: page.messages,
+    };
+    const previousMessageIds = new Set(persisted.messages.map((message) => message.id));
     const previousSignature = conversationContentSignature(persisted);
-    this.syncMailboxMessages(persisted);
+    const oldest = persisted.messages[0]?.createdAt;
+    this.syncMailboxMessages(
+      persisted,
+      this.#mailbox.conversationMessages(agent.id, oldest === undefined ? {} : { fromCreatedAt: oldest }),
+    );
     if (conversationContentSignature(persisted) === previousSignature) return;
-    this.#database.persistConversation(persisted, "conversation.mailbox-reconciled", {
-      messageCount: persisted.messages.length,
+    this.#database.persistConversationChanges({
+      agentId: agent.id,
+      threadId: agent.threadId,
+      activeTurnId: persisted.activeTurnId,
+      changedMessages: persisted.messages,
+      removedMessageIds: [...previousMessageIds].filter(
+        (messageId) => !persisted.messages.some((message) => message.id === messageId),
+      ),
+      eventType: "conversation.mailbox-reconciled",
+      detail: {
+        messageCount: persisted.messages.length,
+      },
     });
     const live = this.#conversation.snapshot(agent.id);
-    if (live) this.syncMailboxMessages(live);
+    if (live) {
+      const liveOldest = live.messages[0]?.createdAt;
+      this.syncMailboxMessages(
+        live,
+        this.#mailbox.conversationMessages(agent.id, liveOldest === undefined ? {} : { fromCreatedAt: liveOldest }),
+      );
+    }
   }
 
   /**
@@ -121,15 +175,39 @@ export class MailboxSync {
     }
   }
 
-  retryDeliveryReconciliation(agentId: string): void {
+  retryDeliveryReconciliation(agentId: string, turnId?: string, deliveryIds: readonly string[] = []): void {
     queueMicrotask(() => {
-      try {
-        this.emitQueue(agentId);
-        const snapshot = this.#conversation.snapshotToUpdate(agentId);
-        if (snapshot) this.#conversation.emitConversation(snapshot);
-      } catch (error) {
-        this.#hooks.emitError("delivery_reconciliation_pending", error, agentId);
-      }
+      Effect.runFork(
+        Effect.gen({ self: this }, function* () {
+          // A provider response can arrive before the mailbox writes complete. Associate every
+          // still-starting row with the confirmed turn before publishing the retry. This is safe:
+          // the turn id came from the provider, and it prevents a second drain from replaying it.
+          // Check the active marker again so a delayed retry cannot claim a new turn's rows.
+          const activeTurn = this.#conversation.workingSnapshot(agentId)?.activeTurnId;
+          if (turnId && activeTurn === turnId) {
+            const accepted = new Set(deliveryIds);
+            for (const deliveryId of accepted) {
+              const current = this.#mailbox.getDelivery(deliveryId)?.delivery;
+              if (current?.recipientAgentId !== agentId || current.status !== "starting" || current.turnId !== null)
+                continue;
+              yield* this.#mailbox.markRunning(deliveryId, turnId);
+            }
+          }
+          yield* Effect.sync(() => {
+            this.emitQueue(agentId);
+            const snapshot = this.#conversation.snapshotToUpdate(agentId);
+            if (snapshot) this.#conversation.emitConversation(snapshot);
+          });
+        })
+          .pipe(
+            Effect.catch((failure) =>
+              Effect.sync(() => {
+                this.#hooks.emitError("delivery_reconciliation_pending", failure, agentId);
+              }),
+            ),
+          )
+          .pipe(Effect.forkIn(this.#scope(), { startImmediately: true })),
+      );
     });
   }
 }

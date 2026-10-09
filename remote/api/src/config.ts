@@ -26,6 +26,14 @@ export interface RemoteApiConfig {
   // The OpenBot Telegram bots, production and development, which share this Signal. Without them,
   // the Telegram routes answer 404 and `ready` names no `telegram` capability.
   telegram: TelegramConfig | null;
+  // The OpenBot Discord bot. Without it, Signal keeps no Gateway connection and the Discord API route
+  // answers 503.
+  discord: DiscordBotConfig | null;
+}
+
+export interface DiscordBotConfig {
+  botToken: string;
+  applicationId: string;
 }
 
 interface SlackSigningSecret {
@@ -108,6 +116,19 @@ function httpsOrigin(value: string): string | null {
   }
 }
 
+/**
+ * `DISCORD_BOT_TOKEN` and `DISCORD_APPLICATION_ID` turn on the Discord bot together. A missing or
+ * malformed value turns off only Discord: the remote sessions and the Slack route keep running.
+ */
+function readDiscordBot(token: string | undefined, applicationId: string | undefined): DiscordBotConfig | null {
+  const botToken = token?.trim();
+  const id = applicationId?.trim();
+  if (!botToken || !id) return null;
+  if (!/^[A-Za-z0-9_-]{1,128}\.[A-Za-z0-9_-]{1,128}\.[A-Za-z0-9_-]{1,256}$/u.test(botToken)) return null;
+  if (!/^[0-9]{17,20}$/u.test(id)) return null;
+  return { botToken, applicationId: id };
+}
+
 export function readRemoteApiConfig(environment: Record<string, string | undefined> = process.env): RemoteApiConfig {
   const tlsDisabled = environment.REMOTE_TLS_DISABLED === "true";
   const ticketJwks = optional(environment.REMOTE_TICKET_PUBLIC_KEYS ?? environment.REMOTE_TICKET_PUBLIC_JWKS);
@@ -136,6 +157,7 @@ export function readRemoteApiConfig(environment: Record<string, string | undefin
     trustProxy: environment.REMOTE_TRUST_PROXY === "true",
     slackSigningSecrets: readSlackSigningSecrets(environment.SLACK_SIGNING_SECRET),
     telegram: readTelegramConfig(environment),
+    discord: readDiscordBot(environment.DISCORD_BOT_TOKEN, environment.DISCORD_APPLICATION_ID),
   };
 }
 

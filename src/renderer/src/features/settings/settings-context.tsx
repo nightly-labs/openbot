@@ -67,6 +67,12 @@ const Settings = createSimpleContext({
     const [appSettingsOpen, setAppSettingsOpen] = createSignal(false);
     /** The tab that the next opening shows. Undefined keeps the tab that was open last. */
     const [appSettingsTab, setAppSettingsTab] = createSignal<SettingsTab | undefined>();
+    /** A hosted server that the server menu asked to delete. The nonce repeats a request for the same server. */
+    const [hostedServerDeleteRequest, setHostedServerDeleteRequest] = createSignal<{
+      serverId: string;
+      nonce: number;
+    } | null>(null);
+    let hostedServerDeleteNonce = 0;
     const [generalSettings, setGeneralSettings] = createSignal<GeneralSettingsValue>({
       ...DEFAULT_GENERAL_SETTINGS,
       taskCompletionSound: isCompletionSoundEnabled(),
@@ -97,6 +103,7 @@ const Settings = createSimpleContext({
     let autoInstallUpdatesChanged = false;
     let desktopNotificationsChanged = false;
     let busyMessageModeChanged = false;
+    let keepRemoteSessionsChanged = false;
     let turboModeChanged = false;
     const [turboModePending, setTurboModePending] = createSignal(false);
 
@@ -139,6 +146,16 @@ const Settings = createSimpleContext({
 
     function updateGeneralSettings(value: GeneralSettingsValue): void {
       const previous = generalSettings();
+      function persistField<Key extends keyof GeneralSettingsValue, Response>(
+        key: Key,
+        request: Promise<Response>,
+        read: (response: Response) => GeneralSettingsValue[Key],
+      ): void {
+        void request
+          .then((response) => setGeneralSettings((current) => ({ ...current, [key]: read(response) })))
+          .catch(() => setGeneralSettings((current) => ({ ...current, [key]: previous[key] })));
+      }
+
       const turboMode = turboModePending() ? previous.turboMode : value.turboMode;
       setGeneralSettings({ ...value, turboMode });
       if (previous.taskCompletionSound !== value.taskCompletionSound) {
@@ -180,60 +197,58 @@ const Settings = createSimpleContext({
             const { t } = currentText();
             actionToast.error(
               previous.turboMode ? t("settings.turbo.turnOffFailed") : t("settings.turbo.turnOnFailed"),
+              { report: { operation: "settings", source: "action", cause_code: "unknown" } },
             );
           })
           .finally(() => setTurboModePending(false));
       }
       if (previous.autoDownloadUpdates !== value.autoDownloadUpdates) {
         autoDownloadUpdatesChanged = true;
-        void settingsPort()
-          .update.setPreference({ autoDownload: value.autoDownloadUpdates })
-          .then((preference) =>
-            setGeneralSettings((current) => ({ ...current, autoDownloadUpdates: preference.autoDownload })),
-          )
-          .catch(() =>
-            setGeneralSettings((current) => ({ ...current, autoDownloadUpdates: previous.autoDownloadUpdates })),
-          );
+        persistField(
+          "autoDownloadUpdates",
+          settingsPort().update.setPreference({ autoDownload: value.autoDownloadUpdates }),
+          (preference) => preference.autoDownload,
+        );
       }
       if (previous.allowRemoteUpdates !== value.allowRemoteUpdates) {
         allowRemoteUpdatesChanged = true;
-        void settingsPort()
-          .update.setPreference({ allowRemoteUpdates: value.allowRemoteUpdates })
-          .then((preference) =>
-            setGeneralSettings((current) => ({ ...current, allowRemoteUpdates: preference.allowRemoteUpdates })),
-          )
-          .catch(() =>
-            setGeneralSettings((current) => ({ ...current, allowRemoteUpdates: previous.allowRemoteUpdates })),
-          );
+        persistField(
+          "allowRemoteUpdates",
+          settingsPort().update.setPreference({ allowRemoteUpdates: value.allowRemoteUpdates }),
+          (preference) => preference.allowRemoteUpdates,
+        );
       }
       if (previous.autoInstallUpdates !== value.autoInstallUpdates) {
         autoInstallUpdatesChanged = true;
-        void settingsPort()
-          .update.setPreference({ autoInstall: value.autoInstallUpdates })
-          .then((preference) =>
-            setGeneralSettings((current) => ({ ...current, autoInstallUpdates: preference.autoInstall })),
-          )
-          .catch(() =>
-            setGeneralSettings((current) => ({ ...current, autoInstallUpdates: previous.autoInstallUpdates })),
-          );
+        persistField(
+          "autoInstallUpdates",
+          settingsPort().update.setPreference({ autoInstall: value.autoInstallUpdates }),
+          (preference) => preference.autoInstall,
+        );
       }
       if (previous.desktopNotifications !== value.desktopNotifications) {
         desktopNotificationsChanged = true;
-        void settingsPort()
-          .notifications.setPreference({ desktopNotifications: value.desktopNotifications })
-          .then((preference) =>
-            setGeneralSettings((current) => ({ ...current, desktopNotifications: preference.desktopNotifications })),
-          )
-          .catch(() =>
-            setGeneralSettings((current) => ({ ...current, desktopNotifications: previous.desktopNotifications })),
-          );
+        persistField(
+          "desktopNotifications",
+          settingsPort().notifications.setPreference({ desktopNotifications: value.desktopNotifications }),
+          (preference) => preference.desktopNotifications,
+        );
       }
       if (previous.busyMessageMode !== value.busyMessageMode) {
         busyMessageModeChanged = true;
-        void settingsPort()
-          .setBusyMessageModePreference({ mode: value.busyMessageMode })
-          .then((preference) => setGeneralSettings((current) => ({ ...current, busyMessageMode: preference.mode })))
-          .catch(() => setGeneralSettings((current) => ({ ...current, busyMessageMode: previous.busyMessageMode })));
+        persistField(
+          "busyMessageMode",
+          settingsPort().setBusyMessageModePreference({ mode: value.busyMessageMode }),
+          (preference) => preference.mode,
+        );
+      }
+      if (previous.keepRemoteSessions !== value.keepRemoteSessions) {
+        keepRemoteSessionsChanged = true;
+        persistField(
+          "keepRemoteSessions",
+          settingsPort().setRemoteSessionReusePreference({ keepBetweenRuns: value.keepRemoteSessions }),
+          (preference) => preference.keepBetweenRuns,
+        );
       }
       if (
         previous.macBookNotch !== value.macBookNotch ||
@@ -309,6 +324,12 @@ const Settings = createSimpleContext({
       setAppSettingsOpen(true);
     }
 
+    /** Opens the Hosted servers tab with the delete confirmation of one server. */
+    function openHostedServerDelete(serverId: string, trigger?: HTMLElement | null): void {
+      setHostedServerDeleteRequest({ serverId, nonce: ++hostedServerDeleteNonce });
+      openAppSettings(trigger, "hosted-servers");
+    }
+
     onSettled(() => {
       // The native Preferences menu item sends the same request from main, so the shortcut below only
       // covers the window itself: both land here, and the dialog owns the open state either way.
@@ -381,6 +402,13 @@ const Settings = createSimpleContext({
         })
         .catch(() => undefined);
       void settingsPort()
+        .getRemoteSessionReusePreference()
+        .then((preference) => {
+          if (keepRemoteSessionsChanged) return;
+          setGeneralSettings((current) => ({ ...current, keepRemoteSessions: preference.keepBetweenRuns }));
+        })
+        .catch(() => undefined);
+      void settingsPort()
         .notifications.getPreference()
         .then((preference) => {
           if (desktopNotificationsChanged) return;
@@ -425,6 +453,8 @@ const Settings = createSimpleContext({
       appSettingsRestoreTarget: () => appSettingsRestoreTarget,
       appSettingsTab,
       openAppSettings,
+      hostedServerDeleteRequest,
+      openHostedServerDelete,
       skillsMarketplaceOpen,
       setSkillsMarketplaceOpen,
       pendingPluginSlug,

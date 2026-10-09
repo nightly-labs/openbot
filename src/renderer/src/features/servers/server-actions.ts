@@ -1,8 +1,10 @@
 import type { ServerSummary } from "@openbot/contracts/ipc";
+import { classifyFailure } from "@openbot/telemetry";
 import type { ServerActionCallbacks } from "@openbot/ui/features/servers/ServerActionItems";
 import { useText } from "@openbot/ui/text";
 import { actionToast } from "../../action-toast";
 import { usePlatform } from "../../platform";
+import { useSettings } from "../settings/settings-context";
 import { useUsage } from "../usage/usage-context";
 import { useServerSelection } from "./server-selection";
 import { useServerSettings } from "./server-settings";
@@ -24,10 +26,12 @@ export function useServerActions() {
     setJoinServerOpen,
     setAddServerOpen,
     hostedServersAvailable,
+    hostedServerIds,
     refreshHostedServersAvailable,
   } = useServers();
   const { selectServer } = useServerSelection();
-  const { openServerSettings } = useServerSettings();
+  const { openServerSettings, requestLeaveServer } = useServerSettings();
+  const { openHostedServerDelete } = useSettings();
 
   /** Local servers above the saved remote-server order, as the rail draws them. */
   function orderedServers(): ServerSummary[] {
@@ -39,7 +43,10 @@ export function useServerActions() {
 
   function selectFailed(error: unknown): void {
     actionToast.error(t("server.select.failedTitle"), {
-      description: errorMessage(error, t("server.select.failedDescription")),
+      ...{
+        description: errorMessage(error, t("server.select.failedDescription")),
+      },
+      report: { operation: "team", source: "action", cause_code: classifyFailure(error) },
     });
   }
 
@@ -59,7 +66,7 @@ export function useServerActions() {
     void refreshHostedServersAvailable();
   }
 
-  const callbacks: Required<ServerActionCallbacks> = {
+  const callbacks = {
     onSetMuted: (serverId, muted, durationMs) => void setServerMuted(serverId, muted, durationMs),
     onSetNotificationLevel: (serverId, level) => void setServerNotificationLevel(serverId, level),
     onOpenUsage: openUsage,
@@ -74,7 +81,10 @@ export function useServerActions() {
       );
     },
     onOpenSettings: openServerSettings,
-  };
+    onLeave: requestLeaveServer,
+    onDelete: openHostedServerDelete,
+    canDelete: (serverId) => hostedServerIds().has(serverId),
+  } satisfies ServerActionCallbacks;
 
   return { orderedServers, select, add, addCreatesServer: hostedServersAvailable, callbacks };
 }
