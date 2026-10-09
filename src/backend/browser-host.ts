@@ -501,6 +501,11 @@ export class BrowserHost {
     this.#controls.clear();
   }
 
+  /** Whether `openPrivate` opened this tab, or a popup of one: it holds a sign-in that is not for every member. */
+  isPrivate(tabId: string): boolean {
+    return Boolean(this.#tabs.get(tabId)?.privateSession);
+  }
+
   listTabs(): BrowserTab[] {
     return [...this.#tabs.values()]
       .filter((tab) => !tab.closing && !tab.contents.isDestroyed())
@@ -695,6 +700,20 @@ export class BrowserHost {
         }),
       true,
     );
+  }).bind(this);
+
+  /**
+   * Closes a tab that `openPrivate` opened, and every tab of its session with it. A popup the page
+   * opened without an opener is not its child, but it holds the same sign-in.
+   */
+  readonly closePrivate = Effect.fn("BrowserHost.closePrivate")(function* (
+    this: BrowserHost,
+    tabId: string,
+  ): Effect.fn.Return<void, BrowserOperationError> {
+    const privateSession = this.#tabs.get(tabId)?.privateSession;
+    if (!privateSession) return yield* this.close(tabId);
+    const tabIds = [...this.#tabs.values()].filter((tab) => tab.privateSession === privateSession).map((tab) => tab.id);
+    yield* Effect.forEach(tabIds, (id) => this.close(id), { discard: true });
   }).bind(this);
 
   readonly close = Effect.fn("BrowserHost.close")(function* (

@@ -241,6 +241,10 @@ export function createWebServerSettings(options: {
         setMcpSignInPage(url, status.tabId);
         await new Promise((resolve) => setTimeout(resolve, MCP_SIGN_IN_POLL_MS));
       }
+    } catch (error) {
+      // Nobody watches the page any more, so it must not stay open on the host for the full timeout.
+      void run(cancelMcpSignInRequest(admin.request, { url })).catch(() => undefined);
+      throw error;
     } finally {
       setMcpSignInPage(url, null);
       void refreshMcpSignIns().catch(() => undefined);

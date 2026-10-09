@@ -1348,7 +1348,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       if (mcpSignInSupported()) void serverSettings.refreshMcpSignIns().catch(() => undefined);
                     }}
                     onRetryMcpServers={() => void serverSettings.refreshMcp()}
-                    onSaveMcpServer={serverSettings.saveMcpServer}
+                    onSaveMcpServer={async (config) => {
+                      await serverSettings.saveMcpServer(config);
+                      // A saved row can name an address the host is already signed in to.
+                      if (mcpSignInSupported()) void serverSettings.refreshMcpSignIns().catch(() => undefined);
+                    }}
                     onRemoveMcpServer={serverSettings.removeMcpServer}
                     onSetMcpServerEnabled={serverSettings.setMcpServerEnabled}
                     onTestMcpServer={serverSettings.testMcpServer}

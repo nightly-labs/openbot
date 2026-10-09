@@ -27,7 +27,7 @@ type HostSignIn = McpSignInStatus;
 
 export interface McpHostSignInDependencies {
   service: Pick<AgentService, "signInMcpServer" | "cancelMcpSignIn" | "signOutMcpServer" | "listMcpSignIns">;
-  browser: Pick<BrowserHost, "openPrivate" | "close">;
+  browser: Pick<BrowserHost, "openPrivate" | "closePrivate">;
 }
 
 /**
@@ -118,7 +118,7 @@ export class McpHostSignIns {
 
   #closeTab(tabId: string) {
     return this.#dependencies.browser
-      .close(tabId)
+      .closePrivate(tabId)
       .pipe(
         Effect.catch((error) =>
           Effect.sync(() => logger.warn("Unable to close an MCP sign-in tab", { error: toLogValue(error) })),

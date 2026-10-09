@@ -35,6 +35,7 @@ import { createEffect, createMemo, createStore, For, onCleanup, Show } from "sol
 import {
   emptyMcpConfig,
   isMcpSignInCancelled,
+  isMcpSignInOnHost,
   type McpServerConfig,
   type McpTestResult,
   type McpTestState,
@@ -228,8 +229,13 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
 
   /** Read from the English main sent, before it is translated: its key names the failure kind. */
   function settled(result: McpTestResult): SettledTest {
-    if (result.error) return { status: "failed", error: sourceText(result.error), kind: mcpFailureKind(result.error) };
+    if (result.error) return { status: "failed", error: failureText(result.error), kind: mcpFailureKind(result.error) };
     return { status: "passed", toolCount: result.toolCount };
+  }
+
+  /** A host tells every caller to sign in on the host; a panel that can sign in to it says Sign in instead. */
+  function failureText(error: string): string {
+    return props.signIn && isMcpSignInOnHost(error) ? t("error.backend.mcpSignInRequired") : sourceText(error);
   }
 
   function thrown(error: unknown): SettledTest {
@@ -342,19 +348,25 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
     });
   }
 
-  /** A joined server's waiting sign-in whose page the host opened. The form's comes first. */
-  const remotePage = createMemo(() => {
-    const remote = props.signIn?.remote;
-    if (!remote) return null;
-    const form = formSignIn();
-    const waiting = form
-      ? { url: form.url, name: state.draft.name, rowId: null }
-      : Object.entries(state.tests)
-          .filter(([, entry]) => entry.test.status === "signing-in")
-          .map(([rowId, entry]) => ({ url: entry.config.url, name: entry.config.name, rowId }))[0];
-    const tabId = waiting ? remote.pages[waiting.url] : undefined;
-    return waiting && tabId ? { ...waiting, tabId, remote } : null;
-  });
+  /**
+   * A joined server's waiting sign-in whose page the host opened. The form's comes first. The same
+   * page stays the same value, so another row's answer does not open its dialog again.
+   */
+  const remotePage = createMemo(
+    () => {
+      const remote = props.signIn?.remote;
+      if (!remote) return null;
+      const form = formSignIn();
+      const waiting = form
+        ? { url: form.url, name: state.draft.name, rowId: null }
+        : Object.entries(state.tests)
+            .filter(([, entry]) => entry.test.status === "signing-in")
+            .map(([rowId, entry]) => ({ url: entry.config.url, name: entry.config.name, rowId }))[0];
+      const tabId = waiting ? remote.pages[waiting.url] : undefined;
+      return waiting && tabId ? { ...waiting, tabId, remote } : null;
+    },
+    { equals: (previous, next) => previous?.tabId === next?.tabId },
+  );
 
   // The dialog leaves with its sign-in, before it can give the focus back, and what opened it can be
   // gone: a row's Sign in button leaves as the wait starts. The row's menu button, or the form's

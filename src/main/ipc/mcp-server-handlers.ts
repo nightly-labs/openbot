@@ -168,7 +168,15 @@ export function mcpServerIpcHandlers({
         remotePages.set(key, status.tabId);
         yield* Effect.sleep(REMOTE_SIGN_IN_POLL);
       }
-    }).pipe(Effect.ensuring(Effect.sync(() => remotePages.delete(key))));
+    }).pipe(
+      // Nobody watches the page any more, so it must not stay open on the host for the full timeout.
+      Effect.onError(() =>
+        remoteServers
+          .request(serverId, MCP_SIGN_IN_ROUTES.cancel, () => undefined, { method: "POST", body })
+          .pipe(Effect.ignore),
+      ),
+      Effect.ensuring(Effect.sync(() => remotePages.delete(key))),
+    );
   });
 
   return {

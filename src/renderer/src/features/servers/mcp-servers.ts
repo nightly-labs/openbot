@@ -69,6 +69,11 @@ export function mcpFailureKind(sourceText: string): McpFailureKind {
   return (key && FAILURE_KINDS[key]) || "other";
 }
 
+/** Whether a host answered that its own browser must sign in, which a host with `mcp-sign-in-v1` no longer needs. */
+export function isMcpSignInOnHost(sourceText: string): boolean {
+  return matchingSourceKeys(sourceText)[0] === "error.backend.mcpSignInOnHost";
+}
+
 /** Whether a test answered that the user cancelled a sign-in, which is not a failure to show. */
 export function isMcpSignInCancelled(sourceText: string): boolean {
   return matchingSourceKeys(sourceText)[0] === "error.backend.mcpSignInCancelled";

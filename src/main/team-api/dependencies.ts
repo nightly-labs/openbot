@@ -214,6 +214,7 @@ export type TeamApiBrowser = Pick<
   | "setVisible"
   | "getDisplayState"
   | "loadUrl"
+  | "isPrivate"
   // The live view, behind `browser-view`. `browser-view-gateway.ts` is what reaches these; a route
   // cannot, because frames outlive the request that asked for them.
   | "startView"
