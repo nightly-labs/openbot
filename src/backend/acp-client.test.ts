@@ -215,11 +215,14 @@ function handle(message) {
     return;
   }
   if (message.method === "session/close") {
+    if (process.env.OPENBOT_FAKE_ACP_IGNORE_CLOSE === "1") return;
     const closeLog = process.env.OPENBOT_FAKE_ACP_CLOSE_LOG;
     if (closeLog) fs.appendFileSync(closeLog, JSON.stringify(message.params) + NL);
     write({ jsonrpc: "2.0", id: message.id, result: {} });
     return;
   }
+  if (message.method === "session/prompt" && process.env.OPENBOT_FAKE_ACP_PROMPT_LOG)
+    fs.appendFileSync(process.env.OPENBOT_FAKE_ACP_PROMPT_LOG, JSON.stringify(message.params) + NL);
   const failureFile = process.env.OPENBOT_FAKE_ACP_FAILURE_FILE;
   if (failureFile && fs.existsSync(failureFile)) {
     const failure = JSON.parse(fs.readFileSync(failureFile, "utf8"));
@@ -229,8 +232,6 @@ function handle(message) {
     }
   }
   if (message.method === "session/prompt") {
-    const promptLog = process.env.OPENBOT_FAKE_ACP_PROMPT_LOG;
-    if (promptLog) fs.appendFileSync(promptLog, JSON.stringify(message.params) + NL);
     if (process.env.OPENBOT_FAKE_ACP_PROMPT_TOOL) {
       write({
         jsonrpc: "2.0",
@@ -904,6 +905,7 @@ describe("ACP missing session errors", () => {
     const fake = await createFakeOpencodeAgent();
     const failureFile = join(fake.directory, "failure.json");
     vi.stubEnv("OPENBOT_FAKE_ACP_FAILURE_FILE", failureFile);
+    vi.stubEnv("OPENBOT_FAKE_ACP_IGNORE_CLOSE", "1");
     vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_SESSION", "1");
     vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_LOG", fake.loadLog);
     vi.stubEnv("OPENBOT_FAKE_ACP_PROMPT_LOG", fake.promptLog);
@@ -944,8 +946,11 @@ describe("ACP missing session errors", () => {
     await vi.waitFor(() => expect(completed).toHaveLength(2));
     expect(completed[1]).toMatchObject({ turn: { status: "completed" } });
     const prompts = await fake.readPrompts();
-    expect(prompts).toHaveLength(1);
-    expect(JSON.parse(prompts[0] ?? "{}")).toMatchObject({ prompt: [{ type: "text", text: "New input" }] });
+    expect(prompts.map((prompt) => JSON.parse(prompt))).toMatchObject([
+      { prompt: [{ type: "text", text: "Old input" }] },
+      { prompt: [{ type: "text", text: "New input" }] },
+    ]);
+    expect(prompts).toHaveLength(2);
   });
 
   it.each([
@@ -957,6 +962,7 @@ describe("ACP missing session errors", () => {
     const fake = await createFakeOpencodeAgent();
     const failureFile = join(fake.directory, "failure.json");
     vi.stubEnv("OPENBOT_FAKE_ACP_FAILURE_FILE", failureFile);
+    vi.stubEnv("OPENBOT_FAKE_ACP_IGNORE_CLOSE", "1");
     vi.stubEnv("OPENBOT_FAKE_ACP_CONFIG_MODELS", "1");
     vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_SESSION", "1");
     vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_LOG", fake.loadLog);

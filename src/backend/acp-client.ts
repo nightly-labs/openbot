@@ -684,6 +684,15 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     yield* this.#threads.close(thread).pipe(toProviderClientOperationError);
   });
 
+  /** The provider already removed this session. Do not wait for another remote cleanup request. */
+  #forgetMissingSession(sessionId: string): void {
+    this.#threads.forget(sessionId);
+    const thread = this.#threads.get(sessionId);
+    if (!thread) return;
+    this.#threads.detach(thread);
+    thread.mcp.close();
+  }
+
   readonly #closeSession = Effect.fn("AcpAgentClient.closeSession")(function* (
     this: AcpAgentClient,
     thread: AcpThread,
@@ -711,7 +720,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         isSessionNotFound(error, sessionId, this.provider)
       ) {
         // No prompt was sent. Drop the stale handle so the queue can load or replace the session.
-        yield* this.releaseThread(sessionId);
+        this.#forgetMissingSession(sessionId);
         return yield* providerFailure(new MissingAcpSessionError(`ACP session not found: ${sessionId}`, error));
       }
       if (
@@ -1982,7 +1991,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     // A prompt can have run tools. Never replay it. Drop the handle before publishing completion
     // so only new input can reload the session, including input already waiting in the queue.
     if (status === "failed" && isSessionNotFound(error, thread.id, this.provider)) {
-      yield* this.releaseThread(thread.id);
+      this.#forgetMissingSession(thread.id);
     }
     this.#completeThought(thread, turn);
     for (const item of turn.toolItems.values()) turn.messages.push(item);
