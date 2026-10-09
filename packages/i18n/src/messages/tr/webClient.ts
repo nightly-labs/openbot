@@ -27,7 +27,6 @@ export const messages = {
   "webClient.connect.stepRemote": "Uzaktan erişimi açın.",
   "webClient.notice.download": "OpenBot'u İndir",
   "webClient.notice.join": "Davet ile katıl",
-  "webClient.notice.reconnect": "Yeniden bağlan",
   "webClient.notice.refreshHosts": "Ana makineleri yenile",
   "webClient.agent.modelsFailed": "Ana makine modelleri yüklenemedi.",
   "webClient.agent.refreshFailed":

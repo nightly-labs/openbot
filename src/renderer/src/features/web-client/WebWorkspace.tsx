@@ -992,8 +992,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                     workspace.state.recovery?.phase === "suspended" &&
                     !workspace.state.hostedSleep &&
                     !workspace.state.hostedIssue
-                      ? (workspace.state.connectionError ?? undefined)
-                      : undefined
+                      ? workspace.state.connectionError
+                      : null
                   }
                   phase={
                     workspace.state.hostedSleep ??
@@ -1032,8 +1032,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   name={workspace.selected()?.name ?? ""}
                   phase={workspace.conversation()?.error ? "blocked" : "loading"}
                   initial={false}
-                  detail={workspace.conversation()?.error ?? undefined}
-                  busy={workspace.conversation()?.loading}
+                  detail={workspace.conversation()?.error ?? null}
+                  busy={workspace.conversation()?.loading === true}
                   onRetry={() => {
                     const id = workspace.state.selectedId;
                     if (id) void workspace.select(id);

@@ -1037,7 +1037,7 @@ export function createWebWorkspace(
         loading: true,
       };
       draft.conversations[id].loading = true;
-      draft.conversations[id].error = undefined;
+      draft.conversations[id].error = null;
     });
     try {
       await load(id);

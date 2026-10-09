@@ -27,7 +27,6 @@ export const messages = {
   "webClient.connect.stepRemote": "Activez l’accès à distance.",
   "webClient.notice.download": "Télécharger OpenBot",
   "webClient.notice.join": "Rejoindre avec une invitation",
-  "webClient.notice.reconnect": "Se reconnecter",
   "webClient.notice.refreshHosts": "Actualiser les hôtes",
   "webClient.agent.modelsFailed": "Impossible de charger les modèles de l’hôte.",
   "webClient.agent.refreshFailed":

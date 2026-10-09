@@ -20,7 +20,7 @@ export interface ServerConnectionNoticeProps {
   issue?: HostedServerIssue | null;
   remainingSeconds?: number;
   busy?: boolean;
-  detail?: string;
+  detail?: string | null;
   onRetry: () => void;
   onManage?: () => void;
 }

@@ -26,7 +26,6 @@ export const messages = defineMessages("webClient", {
   "webClient.connect.stepRemote": "Turn on remote access.",
   "webClient.notice.download": "Download OpenBot",
   "webClient.notice.join": "Join with invitation",
-  "webClient.notice.reconnect": "Reconnect",
   "webClient.notice.refreshHosts": "Refresh hosts",
   "webClient.agent.modelsFailed": "Could not load the host models.",
   "webClient.agent.refreshFailed":

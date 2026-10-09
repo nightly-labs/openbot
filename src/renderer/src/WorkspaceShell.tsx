@@ -135,8 +135,8 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
             <ServerConnectionNotice
               name={activeServer()?.name ?? ""}
               initial={!scope.connection.hasContent}
-              issue={activeServer()?.hostedIssue}
-              detail={activeServer()?.issue?.message}
+              issue={activeServer()?.hostedIssue ?? null}
+              detail={activeServer()?.issue?.message ?? null}
               phase={
                 activeServer()?.hostedSleep ??
                 (serversLoadFailed()
@@ -174,8 +174,8 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
               name={activeAgent()?.name ?? ""}
               phase={activeConversation()?.loadError ? "blocked" : "loading"}
               initial={false}
-              detail={activeConversation()?.loadError ?? undefined}
-              busy={activeConversation()?.loading}
+              detail={activeConversation()?.loadError ?? null}
+              busy={activeConversation()?.loading === true}
               onRetry={retryConversation}
             />
           </Show>

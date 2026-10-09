@@ -10,6 +10,7 @@ import {
   type DirectConversationSnapshot,
   type DirectMessage,
   type DirectThreadSummary,
+  type HostedServerIssue,
   type HostStatus,
   type InvitePreview,
   type InviteSummary,
@@ -431,7 +432,7 @@ function teamRole(value: unknown): TeamRole {
   return value;
 }
 
-function decodeHostedIssue(value: unknown): ServerSummary["hostedIssue"] {
+function decodeHostedIssue(value: unknown): HostedServerIssue | null {
   if (value === null || value === "plan_ended" || value === "wake_failed" || value === "start_timeout") return value;
   throw new Error("Invalid hostedIssue.");
 }

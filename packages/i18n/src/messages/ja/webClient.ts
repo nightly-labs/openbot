@@ -27,7 +27,6 @@ export const messages = {
   "webClient.connect.stepRemote": "リモートアクセスをオンにします。",
   "webClient.notice.download": "OpenBot をダウンロード",
   "webClient.notice.join": "招待で参加",
-  "webClient.notice.reconnect": "再接続",
   "webClient.notice.refreshHosts": "ホストを更新",
   "webClient.agent.modelsFailed": "ホストのモデルを読み込めませんでした。",
   "webClient.agent.refreshFailed":
