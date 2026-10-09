@@ -462,6 +462,25 @@ describe.sequential("AgentService: providers", () => {
       }),
     );
 
+    // The unsupported entry must not choose the transport for the usable normalized name.
+    await runCauseEffect(
+      service.saveMcpServer({
+        config: {
+          id: "",
+          name: "Local_SQLite",
+          transport: "http",
+          enabled: true,
+          command: "",
+          args: [],
+          env: [],
+          envPassthrough: [],
+          workingDirectory: "",
+          url: "https://example.com/mcp",
+          headers: [],
+        },
+      }),
+    );
+
     await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Start." }));
     await waitForQueue(service, "chief", (queue) =>
       queue.deliveries.every((delivery) => delivery.status === "completed"),
@@ -473,12 +492,36 @@ describe.sequential("AgentService: providers", () => {
       message: expect.stringContaining('did not get the MCP server "Local SQLite"'),
     });
 
-    // Reported, and still not sent: the point of the report is that the server is missing.
+    // The HTTP server wins the normalized name in both registration and the runtime.
     const starts = client.requests.filter((request) => request.method === "thread/start");
     expect(paramsRecord(starts.at(-1)?.params)?.config).toEqual({
       tools: CODEX_TOOLS,
-      mcp_servers: { Local_SQLite: { enabled: false } },
+      mcp_servers: { Local_SQLite: { enabled: true, url: "https://example.com/mcp", http_headers: {} } },
     });
+
+    expect(client.configRead).toMatchObject({
+      config: {
+        mcp_servers: {
+          Local_SQLite: { url: "http://127.0.0.1:1", enabled: false },
+        },
+      },
+    });
+    expect(client.requests.filter((request) => request.method === "config/batchWrite")).toEqual([
+      {
+        method: "config/batchWrite",
+        params: {
+          edits: [
+            {
+              keyPath: "mcp_servers.Local_SQLite",
+              value: { url: "http://127.0.0.1:1", enabled: false },
+              mergeStrategy: "replace",
+            },
+          ],
+          filePath: "/test/.codex/config.toml",
+          expectedVersion: "config-version",
+        },
+      },
+    ]);
 
     await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Again." }));
     await waitForQueue(service, "chief", (queue) =>
@@ -694,7 +737,7 @@ describe.sequential("AgentService: providers", () => {
     if (!firstSession) throw new Error("The Codex session did not start.");
     // No runtime yet, so the server is dropped from the session while the stored row stays.
     const firstStart = client.requests.filter((request) => request.method === "thread/start").at(-1);
-    expect(paramsRecord(firstStart?.params)?.config).toMatchObject({ mcp_servers: { Npx_tool: { enabled: false } } });
+    expect(paramsRecord(firstStart?.params)?.config ?? {}).not.toHaveProperty("mcp_servers");
 
     // Bun finishes downloading between the turns. Nothing about the stored set changed.
     toolRuntimes = { binDirectories: ["/tmp/fake-bun-bin"], commandAliases: { npx: "/tmp/fake-bun-bin/bunx" } };
@@ -857,12 +900,11 @@ describe.sequential("AgentService: providers", () => {
     expect(client.releasedThreads).toEqual([firstSession]);
     const starts = client.requests.filter((request) => request.method === "thread/start");
     expect(starts).toHaveLength(2);
-    // `Database` stays disabled: the Codex configuration shape for a working directory is unconfirmed,
+    // `Database` is left out: the Codex configuration shape for a working directory is unconfirmed,
     // and a server told to open `./data.db` from the wrong place creates a second database.
     expect(paramsRecord(starts[1]?.params)?.config).toEqual({
       tools: CODEX_TOOLS,
       mcp_servers: {
-        Database: { enabled: false },
         Filesystem: { enabled: true, command: "/bin/echo", args: ["ready"], env: await launchEnvironment() },
       },
     });

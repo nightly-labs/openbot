@@ -1,24 +1,15 @@
 // @vitest-environment node
-import { COMPUTER_USE_MCP_SERVER_ID, COMPUTER_USE_MCP_SERVER_NAME, type McpServerConfig } from "@openbot/contracts/ipc";
 import { describe, expect, it } from "vitest";
 import { FakeAgentClient } from "../agent-service-test-harness";
 import { runCauseEffect } from "../effect-boundary";
-import { codexDisabledServers, toMcpShapeFailed } from "../mcp-provider-shapes";
+import { type CodexMcpServer, codexDisabledServers, toMcpShapeFailed } from "../mcp-provider-shapes";
 import { readCodexMcpConfig } from "./codex-mcp-config";
 
-const server: McpServerConfig = {
-  id: COMPUTER_USE_MCP_SERVER_ID,
-  name: COMPUTER_USE_MCP_SERVER_NAME,
-  transport: "stdio",
-  enabled: true,
+const server = {
   command: "C:\\OpenBot\\cua-driver.exe",
   args: ["mcp", "--socket", "\\\\.\\pipe\\openbot-test"],
-  env: [{ key: "PRIVATE_TOKEN", value: "must-not-be-saved" }],
-  envPassthrough: [],
-  workingDirectory: "",
-  url: "",
-  headers: [],
-};
+  env: { PRIVATE_TOKEN: "must-not-be-saved" },
+} satisfies CodexMcpServer;
 
 function configResponse(
   servers: Record<
@@ -48,8 +39,8 @@ describe("Codex MCP registration", () => {
     client.configRead = configResponse();
     expect(
       await Promise.all([
-        runCauseEffect(readCodexMcpConfig(client, [server])),
-        runCauseEffect(readCodexMcpConfig(client, [server])),
+        runCauseEffect(readCodexMcpConfig(client, { computer_use: server })),
+        runCauseEffect(readCodexMcpConfig(client, { computer_use: server })),
       ]),
     ).toEqual([saved, saved]);
     expect(client.requests).toEqual([
@@ -84,7 +75,7 @@ describe("Codex MCP registration", () => {
     for (const client of [new FakeAgentClient("codex"), new FakeAgentClient("codex")]) {
       client.configRead = saved;
       const disabled = await runCauseEffect(
-        codexDisabledServers(() => readCodexMcpConfig(client, [server]).pipe(toMcpShapeFailed)),
+        codexDisabledServers(() => readCodexMcpConfig(client, { computer_use: server }).pipe(toMcpShapeFailed)),
       );
       expect(disabled.computer_use).toEqual({
         enabled: false,
@@ -101,19 +92,10 @@ describe("Codex MCP registration", () => {
   it("registers custom HTTP and stdio servers without URLs, arguments, or secrets", async () => {
     const client = new FakeAgentClient("codex");
     client.configRead = configResponse();
-    const configs: McpServerConfig[] = [
-      {
-        ...server,
-        id: "http",
-        name: "T3 MCP",
-        transport: "http",
-        url: "https://example.com/mcp?secret=private-url",
-        headers: [{ key: "Authorization", value: "private-header" }],
-      },
-      { ...server, id: "stdio", name: "Local MCP", args: ["private-argument"] },
-      { ...server, id: "duplicate", name: "T3_MCP" },
-      { ...server, id: "disabled", name: "Disabled", enabled: false },
-    ];
+    const configs: Record<string, CodexMcpServer> = {
+      T3_MCP: { url: "https://example.com/mcp?secret=private-url", http_headers: { Authorization: "private-header" } },
+      Local_MCP: { ...server, args: ["private-argument"] },
+    };
     const response = await runCauseEffect(readCodexMcpConfig(client, configs));
     expect(response).toMatchObject({
       config: {
@@ -143,14 +125,16 @@ describe("Codex MCP registration", () => {
   });
 
   it("keeps custom tool approvals and revocations across client restarts without changing user entries", async () => {
-    const custom = { ...server, id: "custom", name: "T3 MCP", transport: "http" as const };
+    const custom = { url: "https://example.com/mcp", http_headers: {} };
     for (const mode of ["approve", "prompt"]) {
       const tools = { t3_thread_read: { approval_mode: mode } };
       const saved = configResponse({ T3_MCP: { command: "user-command", enabled: true, tools } });
       const client = new FakeAgentClient("codex");
       client.configRead = saved;
       expect(
-        await runCauseEffect(codexDisabledServers(() => readCodexMcpConfig(client, [custom]).pipe(toMcpShapeFailed))),
+        await runCauseEffect(
+          codexDisabledServers(() => readCodexMcpConfig(client, { T3_MCP: custom }).pipe(toMcpShapeFailed)),
+        ),
       ).toEqual({ T3_MCP: { enabled: false, tools } });
       expect(client.requests.map((request) => request.method)).toEqual(["config/read"]);
       expect(client.configRead).toEqual(saved);
@@ -161,9 +145,12 @@ describe("Codex MCP registration", () => {
     const client = new FakeAgentClient("codex");
     const tools = { t3_thread_read: { approval_mode: "prompt" } };
     client.configRead = configResponse({ T3_MCP: { command: "openbot-mcp", enabled: false, tools } });
-    const custom = { ...server, id: "custom", name: "T3 MCP" };
     for (const transport of ["http", "stdio"] as const) {
-      const response = await runCauseEffect(readCodexMcpConfig(client, [{ ...custom, transport }]));
+      const response = await runCauseEffect(
+        readCodexMcpConfig(client, {
+          T3_MCP: transport === "http" ? { url: "https://example.com/mcp", http_headers: {} } : server,
+        }),
+      );
       expect(response).toMatchObject({
         config: {
           mcp_servers: {
@@ -182,14 +169,16 @@ describe("Codex MCP registration", () => {
   it("does not register a server when no MCP servers are enabled", async () => {
     const client = new FakeAgentClient("codex");
     client.configRead = configResponse();
-    await runCauseEffect(readCodexMcpConfig(client, []));
+    await runCauseEffect(readCodexMcpConfig(client, {}));
     expect(client.requests).toEqual([{ method: "config/read", params: { includeLayers: false } }]);
   });
 
   it("does not write without a user config version", async () => {
     const client = new FakeAgentClient("codex");
     client.configRead = { config: {} };
-    await expect(runCauseEffect(readCodexMcpConfig(client, [server]))).rejects.toThrow("valid and writable");
+    await expect(runCauseEffect(readCodexMcpConfig(client, { computer_use: server }))).rejects.toThrow(
+      "valid and writable",
+    );
     expect(client.requests.map((request) => request.method)).toEqual(["config/read"]);
   });
 
@@ -198,7 +187,9 @@ describe("Codex MCP registration", () => {
       if (method === "config/batchWrite") throw new Error("Config version changed");
     });
     client.configRead = configResponse();
-    await expect(runCauseEffect(readCodexMcpConfig(client, [server]))).rejects.toThrow("Config version changed");
+    await expect(runCauseEffect(readCodexMcpConfig(client, { computer_use: server }))).rejects.toThrow(
+      "Config version changed",
+    );
     expect(client.requests.map((request) => request.method)).toEqual(["config/read", "config/batchWrite"]);
   });
 });

@@ -1,8 +1,7 @@
-import { isReservedMcpServerName, type McpServerConfig } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Semaphore } from "effect";
 import type { AgentClient } from "../agent-client";
-import { codexMcpServerName } from "../mcp-provider-shapes";
+import type { CodexMcpServer } from "../mcp-provider-shapes";
 import { decodeRecordResponse, getArray, getRecord, getString, isRecord } from "../protocol";
 import { ProviderClientOperationError } from "../provider-client-effects";
 
@@ -14,11 +13,11 @@ const placeholderUrl = "http://127.0.0.1:1";
 /** Codex can save tool approvals only for servers present in a file-backed config layer. */
 export const readCodexMcpConfig = Effect.fn("Agent.readCodexMcpConfig")(function* (
   client: AgentClient,
-  configs: readonly McpServerConfig[],
+  servers: Readonly<Record<string, CodexMcpServer>>,
 ) {
-  const servers = configs.filter((server) => server.enabled && !isReservedMcpServerName(server.name));
-  const response = yield* client.request("config/read", { includeLayers: servers.length > 0 }, decodeRecordResponse);
-  if (servers.length === 0) return response;
+  const entries = Object.entries(servers);
+  const response = yield* client.request("config/read", { includeLayers: entries.length > 0 }, decodeRecordResponse);
+  if (entries.length === 0) return response;
 
   const userLayer = getArray(response, "layers")
     .filter(isRecord)
@@ -34,20 +33,10 @@ export const readCodexMcpConfig = Effect.fn("Agent.readCodexMcpConfig")(function
     });
   }
   const saved = getRecord(getRecord(userLayer, "config"), "mcp_servers");
-  const registrations = new Map<string, { command: string; enabled: false } | { url: string; enabled: false }>();
-  for (const server of servers) {
-    const name = codexMcpServerName(server.name);
-    if (!registrations.has(name)) {
-      registrations.set(
-        name,
-        server.transport === "stdio"
-          ? { command: placeholderCommand, enabled: false }
-          : { url: placeholderUrl, enabled: false },
-      );
-    }
-  }
   const edits = [];
-  for (const [name, registration] of registrations) {
+  for (const [name, server] of entries) {
+    const registration =
+      "command" in server ? { command: placeholderCommand, enabled: false } : { url: placeholderUrl, enabled: false };
     const existing = getRecord(saved, name);
     // Codex merges file and thread transport fields. Update only our own placeholder when
     // the user changes transport, and keep the saved policies. Leave user entries unchanged.

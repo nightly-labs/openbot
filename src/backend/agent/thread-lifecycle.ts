@@ -390,7 +390,7 @@ export class ThreadLifecycle {
     const toolRuntimes = this.#toolRuntimes();
     // The same reading rule as above, and for the same reason: the manifest has to record the set
     // this session was started with, including the names swept out of the provider's own file.
-    const disabled = yield* this.codexOwnServersEffect(client, mcpServers);
+    const disabled = yield* this.codexOwnServersEffect(client, mcpServers, toolRuntimes);
     // The same single reading, so the manifest records the variables this session was started with.
     const environment = this.#agentEnvironment();
     const config = yield* this.codexConfigEffect(agent, client, mcpServers, disabled, toolRuntimes, environment);
@@ -559,11 +559,15 @@ export class ThreadLifecycle {
     this: ThreadLifecycle,
     client: AgentClient,
     configs: readonly McpServerConfig[],
+    toolRuntimes: McpToolRuntimes,
   ): Effect.fn.Return<Record<string, CodexDisabledMcpServer>, ThreadOperationFailed> {
     if (client.provider !== "codex") return {};
-    return yield* codexDisabledServers(() => readCodexMcpConfig(client, configs).pipe(toMcpShapeFailed)).pipe(
+    // Register only the servers selected by the runtime adapter, including name collisions.
+    const usable = yield* usableMcpServers(configs, toolRuntimes).pipe(toThreadOperationFailed);
+    const { servers } = codexMcpServers(usable);
+    return yield* codexDisabledServers(() => readCodexMcpConfig(client, servers).pipe(toMcpShapeFailed)).pipe(
       Effect.catch(() =>
-        configs.length > 0
+        Object.keys(servers).length > 0
           ? Effect.fail(
               new ThreadOperationFailed({
                 cause: new Error(
@@ -676,15 +680,11 @@ export class ThreadLifecycle {
       if (missingSessionFile(stored.failure.cause)) return false;
       return yield* stored.failure;
     }
-    const disabled = yield* this.codexOwnServersEffect(client, this.#agentMcpServers(agent));
+    const configs = this.#agentMcpServers(agent);
+    const toolRuntimes = this.#toolRuntimes();
+    const disabled = yield* this.codexOwnServersEffect(client, configs, toolRuntimes);
     const fingerprint = yield* threadStep(() =>
-      this.toolFingerprint(
-        agent,
-        this.#agentMcpServers(agent),
-        disabled,
-        this.#toolRuntimes(),
-        this.#agentEnvironment(),
-      ),
+      this.toolFingerprint(agent, configs, disabled, toolRuntimes, this.#agentEnvironment()),
     );
     return stored.success === fingerprint;
   });
@@ -712,6 +712,8 @@ export class ThreadLifecycle {
     client: AgentClient,
     externalThreadId: string,
   ): Effect.fn.Return<DynamicRecord, ThreadOperationFailed> {
+    const configs = this.#agentMcpServers(agent);
+    const toolRuntimes = this.#toolRuntimes();
     return {
       threadId: externalThreadId,
       model: agent.model,
@@ -727,9 +729,9 @@ export class ThreadLifecycle {
       ...(yield* this.codexConfigEffect(
         agent,
         client,
-        this.#agentMcpServers(agent),
-        yield* this.codexOwnServersEffect(client, this.#agentMcpServers(agent)),
-        this.#toolRuntimes(),
+        configs,
+        yield* this.codexOwnServersEffect(client, configs, toolRuntimes),
+        toolRuntimes,
         this.#agentEnvironment(),
       )),
     };
