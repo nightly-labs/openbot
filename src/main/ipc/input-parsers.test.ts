@@ -258,6 +258,7 @@ describe("app IPC input parsing", () => {
         {
           agent: { id: "chief", name: "Chief", avatarSeed: "chief", avatarHue: 215, avatarUrl: null },
           task: "Checking the release",
+          turnId: "turn-1",
         },
       ],
     } as const;
@@ -302,6 +303,11 @@ describe("app IPC input parsing", () => {
       }),
     ).toThrowError("Dynamic Island preference is required.");
     expect(parseDynamicIslandInteractive({ interactive: false })).toEqual({ interactive: false });
+    expect(parseDynamicIslandInteractive({ interactive: true, keyboard: true })).toEqual({
+      interactive: true,
+      keyboard: true,
+    });
+    expect(() => parseDynamicIslandInteractive({ interactive: true, keyboard: "yes" })).toThrow();
     expect(parseDynamicIslandPresentation(presentation)).toEqual(presentation);
     const takeoverPresentation = {
       serverId: "local",
@@ -361,6 +367,19 @@ describe("app IPC input parsing", () => {
     expect(() =>
       parseDynamicIslandPresentation({ ...presentation, working: Array(4).fill(presentation.working[0]) }),
     ).toThrow();
+    const reply = {
+      type: "send-message",
+      serverId: "local",
+      agentId: "chief",
+      text: "Use both.",
+      clientMessageId: "c-1",
+    };
+    expect(parseDynamicIslandAction(reply)).toEqual(reply);
+    expect(() => parseDynamicIslandAction({ ...reply, text: "   " })).toThrow();
+    expect(() => parseDynamicIslandAction({ ...reply, clientMessageId: undefined })).toThrow();
+    const stop = { type: "stop-agent", serverId: "local", agentId: "chief", turnId: "turn-1" };
+    expect(parseDynamicIslandAction(stop)).toEqual(stop);
+    expect(() => parseDynamicIslandAction({ ...stop, turnId: "" })).toThrow();
     expect(() => parseDynamicIslandAction({ type: "approve", serverId: "local", agentId: "chief" })).toThrow();
     expect(() =>
       parseDynamicIslandAction({

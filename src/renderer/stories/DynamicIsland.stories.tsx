@@ -14,7 +14,7 @@ import { DynamicIslandDisplayComparison } from "./DynamicIslandDisplayComparison
 import { STORY_AGENTS } from "./fixtures";
 
 type Scenario = "idle" | "working" | "chat" | "question" | "approval" | "takeover" | "failed";
-type QuestionVariant = "standard" | "short" | "long" | "multiple";
+type QuestionVariant = "standard" | "short" | "long" | "multiple" | "typed";
 type WorkingVariant = "single" | "multiple";
 
 interface DynamicIslandDemoProps {
@@ -22,6 +22,7 @@ interface DynamicIslandDemoProps {
   questionVariant?: QuestionVariant;
   workingVariant?: WorkingVariant;
   defaultState?: DynamicIslandViewState;
+  inlineReply?: boolean;
   onAction: (action: DynamicIslandAction) => void;
 }
 
@@ -44,6 +45,7 @@ function DynamicIslandDemo(props: DynamicIslandDemoProps): JSX.Element {
           suppressInitialHover
           onStateChange={preview.onStateChange}
           onAction={props.onAction}
+          inlineReply={props.inlineReply}
         />
       )}
     />
@@ -57,9 +59,9 @@ function presentationFor(
 ): DynamicIslandPresentation {
   if (scenario === "working") {
     const working = [
-      { agent: AGENT_IDENTITIES[0], task: "Planning the launch sequence" },
-      { agent: AGENT_IDENTITIES[1], task: "Checking primary sources" },
-      { agent: AGENT_IDENTITIES[2], task: "Drafting partner follow-ups" },
+      { agent: AGENT_IDENTITIES[0], task: "Planning the launch sequence", turnId: "turn-1" },
+      { agent: AGENT_IDENTITIES[1], task: "Checking primary sources", turnId: "turn-2" },
+      { agent: AGENT_IDENTITIES[2], task: "Drafting partner follow-ups", turnId: "turn-3" },
     ];
     return {
       serverId: "local",
@@ -133,6 +135,24 @@ function presentationFor(
 }
 
 function questionFixture(variant: QuestionVariant): DynamicIslandPromptItem {
+  if (variant === "typed") {
+    return {
+      requestId: "research-typed-question",
+      agent: AGENT_IDENTITIES[1],
+      title: "Name the region",
+      detail: "Which region should the market-size estimate cover?",
+      questions: [
+        {
+          id: "region",
+          header: "Name the region",
+          question: "Which region should the market-size estimate cover?",
+          isSecret: false,
+          options: null,
+        },
+      ],
+    };
+  }
+
   if (variant === "short") {
     const options = [
       { label: "Send it", description: "Use this draft" },
@@ -272,7 +292,7 @@ const meta = {
   args: { scenario: "working", defaultState: "compact", onAction: fn() },
   argTypes: {
     scenario: { control: "select", options: SCENARIOS },
-    questionVariant: { control: "select", options: ["standard", "short", "long", "multiple"] },
+    questionVariant: { control: "select", options: ["standard", "short", "long", "multiple", "typed"] },
     workingVariant: { control: "select", options: ["single", "multiple"] },
     defaultState: { control: "select", options: ["compact", "expanded"] },
   },
@@ -314,4 +334,21 @@ export const OpenChatReturnsToIdle: Story = {
       },
     },
   },
+};
+
+/** Issue #1704: reply, answer and stop on the island. The main window stays where it is. */
+export const InlineReplyMessage: Story = {
+  args: { scenario: "chat", defaultState: "expanded", inlineReply: true },
+};
+
+export const InlineReplyQuestion: Story = {
+  args: { scenario: "question", defaultState: "expanded", inlineReply: true },
+};
+
+export const InlineReplyTypedQuestion: Story = {
+  args: { scenario: "question", questionVariant: "typed", defaultState: "expanded", inlineReply: true },
+};
+
+export const InlineReplyWorking: Story = {
+  args: { scenario: "working", defaultState: "expanded", inlineReply: true },
 };

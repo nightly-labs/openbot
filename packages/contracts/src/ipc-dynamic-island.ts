@@ -61,6 +61,8 @@ export interface DynamicIslandAgentIdentity {
 export interface DynamicIslandWorkingItem {
   agent: DynamicIslandAgentIdentity;
   task: string;
+  /** The turn that Stop interrupts. It is null while a queued delivery runs before its turn starts. */
+  turnId: string | null;
 }
 
 export interface DynamicIslandMessageItem {
@@ -141,6 +143,12 @@ export type DynamicIslandAction =
   | { type: "open-app" }
   | { type: "open-agent"; serverId: string; agentId: string }
   | { type: "open-message"; serverId: string; agentId: string; messageId: string }
+  /**
+   * A short reply typed on the island. The main window stays where it is. A retry of the same draft
+   * keeps its `clientMessageId`, so the agent gets the message once.
+   */
+  | { type: "send-message"; serverId: string; agentId: string; text: string; clientMessageId: string }
+  | { type: "stop-agent"; serverId: string; agentId: string; turnId: string }
   | { type: "open-failure"; serverId: string; agentId: string; turnId: string }
   | { type: "dismiss-failure"; serverId: string; agentId: string; turnId: string }
   | { type: "review-attention"; serverId: string; agentId: string; requestId: string | number }
@@ -161,6 +169,8 @@ export type DynamicIslandAction =
 
 export interface SetDynamicIslandInteractiveInput {
   interactive: boolean;
+  /** The island needs key input for a text field. Main makes the panel key without activating the app. */
+  keyboard?: boolean;
 }
 
 export interface DynamicIslandNotchSize {
@@ -198,7 +208,11 @@ export function isDynamicIslandSizePercent(
 }
 
 export function isDynamicIslandInteractive(value: unknown): value is SetDynamicIslandInteractiveInput {
-  return isDynamicRecord(value) && isBoolean(value.interactive);
+  return (
+    isDynamicRecord(value) &&
+    isBoolean(value.interactive) &&
+    (value.keyboard === undefined || isBoolean(value.keyboard))
+  );
 }
 
 export function isDynamicIslandNotchSize(value: unknown): value is DynamicIslandNotchSize {
@@ -225,7 +239,16 @@ export function isDynamicIslandAction(value: unknown): value is DynamicIslandAct
   if (!isShortString(value.serverId, 160) || !isShortString(value.agentId, 160)) return false;
   if (value.type === "open-agent") return true;
   if (value.type === "open-message") return isShortString(value.messageId, 160);
-  if (value.type === "open-failure" || value.type === "dismiss-failure") return isShortString(value.turnId, 160);
+  if (value.type === "send-message") {
+    return (
+      isShortString(value.text, INPUT_LIMITS.directMessageText) &&
+      value.text.trim().length > 0 &&
+      isShortString(value.clientMessageId, INPUT_LIMITS.identifier)
+    );
+  }
+  if (value.type === "stop-agent" || value.type === "open-failure" || value.type === "dismiss-failure") {
+    return isShortString(value.turnId, 160);
+  }
   if (value.type === "review-attention") {
     return isDynamicIslandRequestId(value.requestId);
   }
@@ -265,7 +288,12 @@ function isAgentIdentity(value: unknown): value is DynamicIslandAgentIdentity {
 }
 
 function isWorkingItem(value: unknown): value is DynamicIslandWorkingItem {
-  return isDynamicRecord(value) && isAgentIdentity(value.agent) && isShortString(value.task, 240);
+  return (
+    isDynamicRecord(value) &&
+    isAgentIdentity(value.agent) &&
+    isShortString(value.task, 240) &&
+    isNullableShortString(value.turnId, 160)
+  );
 }
 
 function isMessageItem(value: unknown): value is DynamicIslandMessageItem {

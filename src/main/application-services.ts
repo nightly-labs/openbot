@@ -169,6 +169,7 @@ import { startProviderLog } from "./provider-log";
 import { toProviderRuntimeFailure } from "./provider-runtime-effects";
 import { ProviderRuntimeManager, providerRuntimeRoot, runtimeTarget } from "./provider-runtime-manager";
 import { ProviderUseSettingsStore } from "./provider-use-settings-store";
+import { decodeQueuedMessageReceipt } from "./remote-agent-decoding";
 import { RemoteConnectTrace } from "./remote-connect-trace";
 import { RemoteDesktopManager } from "./remote-desktop-manager";
 import { resolveRemoteDesktopRuntime } from "./remote-desktop-runtime-artifact";
@@ -658,7 +659,8 @@ export async function createApplicationServices({
   // startup because its window must be able to appear immediately, but the two services its
   // critical actions drive are built hundreds of lines below. A single named local rather than
   // two lazy getters, so the gap is visible and bounded.
-  let criticalActionTargets: { agents: AgentService; remoteServers: RemoteServerManager } | null = null;
+  let criticalActionTargets: { agents: AgentService; host: HostService; remoteServers: RemoteServerManager } | null =
+    null;
   const dynamicIsland = new DynamicIslandWindowController({
     platform: process.platform,
     preferencePath: join(app.getPath("userData"), DYNAMIC_ISLAND_PREFERENCE_FILE),
@@ -674,10 +676,14 @@ export async function createApplicationServices({
         if (!criticalActionTargets) {
           return Effect.fail(new DynamicIslandFailed({ cause: new Error(sourceText("error.app.notReady")) }));
         }
-        const { agents, remoteServers } = criticalActionTargets;
-        return performDynamicIslandCriticalAction(action, agents, remoteServers, decodeVoid).pipe(
-          toDynamicIslandFailed,
-        );
+        const { agents, host, remoteServers } = criticalActionTargets;
+        return performDynamicIslandCriticalAction(
+          action,
+          agents,
+          remoteServers,
+          { decodeVoid, decodeQueuedMessageReceipt },
+          () => host.conversationSender(),
+        ).pipe(toDynamicIslandFailed);
       }),
   });
   teardown.push(TEARDOWN_ORDER.dynamicIsland, "the Dynamic Island", () => dynamicIsland.destroy());
@@ -1840,7 +1846,7 @@ export async function createApplicationServices({
   teamWebRtcBridge.on("accountServersChanged", () => void Effect.runPromise(remoteServers.invalidateDirectory()));
   teardown.push(TEARDOWN_ORDER.remoteServers, "the remote servers", () => runCauseEffect(remoteServers.stop()));
   await runCauseEffect(remoteServers.initialize());
-  criticalActionTargets = { agents: service, remoteServers };
+  criticalActionTargets = { agents: service, host, remoteServers };
   // After `remoteServers.initialize()`. The client half polls for the host's connection file and
   // throws when it never appears, before any window is shown - see the module it lives in. It reads
   // the joined servers to choose between WebRTC and HTTP, so it waits for the account's host list.
