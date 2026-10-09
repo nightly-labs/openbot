@@ -54,7 +54,7 @@ export function createHostedBilling(
         webhookSecret: bindings.STRIPE_WEBHOOK_SECRET?.trim() || null,
         fetch: (input, init) => fetch(input, init),
         analytics,
-        sales,
+        ...(sales ? { sales } : {}),
         onSubscriptionSynced: (sync) =>
           hosting.onSubscriptionSynced(sync).pipe(Effect.andThen(() => options.planChanged(sync.serverId))),
       })
