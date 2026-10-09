@@ -382,3 +382,6 @@
   display: flex;
   flex-direction: column;
 }
+.server-connection-content[hidden] {
+  display: none;
+}

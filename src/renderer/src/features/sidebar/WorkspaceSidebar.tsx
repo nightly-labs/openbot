@@ -45,8 +45,15 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
   const { openServerSettings } = useServerSettings();
   const serverActions = useServerActions();
   const { setSkillsMarketplaceOpen } = useSettings();
-  const { agentList, agentListConnecting, activeAgent, agentSetupDraft, duplicatingAgentIds, openBotSetup } =
-    useAgents();
+  const {
+    agentList,
+    agentListConnecting,
+    agentListSettled,
+    activeAgent,
+    agentSetupDraft,
+    duplicatingAgentIds,
+    openBotSetup,
+  } = useAgents();
   const { editAgent, duplicateAgent, deleteAgent } = useAgentActions();
   const { activeTurns, queues, failedTurns, usageLimits, pendingPrompts, pendingApprovals } = useTurns();
   const { unreadReplies, recentReplies, markAllAgentMessagesRead } = useConversation();
@@ -212,7 +219,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
       onOpenMarketplace={() => setSkillsMarketplaceOpen(true)}
       agentsConnecting={agentListConnecting()}
       emptyAction={
-        agentList().length === 0 && !agentListConnecting()
+        agentList().length === 0 && agentListSettled()
           ? {
               label: t("sidebar.empty.firstAgent"),
               avatarSeed: agentSetupDraft().avatarSeed,

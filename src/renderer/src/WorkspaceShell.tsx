@@ -136,6 +136,7 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
               name={activeServer()?.name ?? ""}
               initial={!scope.connection.hasContent}
               issue={activeServer()?.hostedIssue}
+              detail={activeServer()?.issue?.message}
               phase={
                 activeServer()?.hostedSleep ??
                 (serversLoadFailed()

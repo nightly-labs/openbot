@@ -114,10 +114,11 @@ const ServerScope = createSimpleContext({
     let loadGeneration = 0;
     async function loadWorkspace(): Promise<void> {
       const generation = ++loadGeneration;
-      const isCurrent = () => scopeIsCurrent() && generation === loadGeneration;
       const serverId = activeServerId();
       const server = selectedServer();
       const sequence = server?.connectionSequence;
+      const isCurrent = () =>
+        scopeIsCurrent() && generation === loadGeneration && sequence === selectedServer()?.connectionSequence;
       if (!isCurrent() || !transportReady()) return;
       setConnection((draft) => {
         draft.failed = false;

@@ -1355,6 +1355,7 @@ describe("OpenBot connected desktop shell", () => {
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Studio Mac server" })).toHaveAttribute("aria-pressed", "true"),
     );
+    await screen.findByRole("heading", { name: "Chief" });
     emitAgentEvent?.({
       type: "browser-changed",
       tabs: [browserTab("remote-tab-during-switch", "Remote page", { url: "https://example.com/remote" })],

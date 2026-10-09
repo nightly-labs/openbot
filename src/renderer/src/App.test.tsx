@@ -18,6 +18,7 @@ import {
   emitAgentEvent,
   emitDynamicIslandAction,
   emitPresence,
+  emitServers,
   installOpenbotStub,
   presenceMember,
   testConversationPage,
@@ -26,6 +27,7 @@ import {
 import { AGENT_SELECTION_STORAGE_KEY } from "./features/agents/agent-selection";
 import { useAgents } from "./features/agents/agents-context";
 import { useConversation } from "./features/conversation/conversation-context";
+import { useServerScope } from "./features/servers/server-scope";
 import { useServers } from "./features/servers/servers-context";
 import { SIDEBAR_PINS_STORAGE_KEY } from "./features/sidebar/sidebar-pins-storage";
 import { SIDEBAR_COLLAPSED_STORAGE_KEY } from "./features/sidebar/sidebar-sections-storage";
@@ -142,26 +144,35 @@ describe("OpenBot connected desktop shell", () => {
   // roster offered the first agent and asked for a local CLI setup that the server does not need.
   it("shows that a joined server connects until its agents come back", async () => {
     // Main reports a joined host as offline until its first connection after a launch is up.
-    vi.mocked(window.openbot.servers.list).mockResolvedValue([
-      testServer("local", false),
-      { ...testServer("remote-1", true), state: "offline" },
-    ]);
+    const local = testServer("local", false);
+    const remote = testServer("remote-1", true);
+    vi.mocked(window.openbot.servers.list).mockResolvedValue([local, { ...remote, state: "offline" }]);
+    const status = await window.openbot.agent.getStatus();
     let resolveAgents: (agents: AgentSummary[]) => void = () => undefined;
-    vi.mocked(window.openbot.agent.listAgents).mockReturnValue(
+    const agentsRead = new Promise<AgentSummary[]>((resolve) => {
+      resolveAgents = resolve;
+    });
+    vi.mocked(window.openbot.agent.listAgents).mockReturnValue(agentsRead);
+    // The host answers the status read over the same connection, so it waits too.
+    let resolveStatus: ((status: AgentStatus) => void) | undefined;
+    vi.mocked(window.openbot.agent.getStatus).mockReturnValue(
       new Promise((resolve) => {
-        resolveAgents = resolve;
+        resolveStatus = resolve;
       }),
     );
-    // The host answers the status read over the same connection, so it waits too.
-    vi.mocked(window.openbot.agent.getStatus).mockReturnValue(new Promise(() => undefined));
     render(() => <App />);
 
     expect(await screen.findByText("Connecting…", { selector: ".empty-search" })).toBeInTheDocument();
-    expect(screen.getByText("Connecting…", { selector: ".composer-editor-placeholder" })).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Message Chief" })).not.toBeInTheDocument();
     expect(screen.queryByText("Complete agent CLI setup to start")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Create your first agent" })).not.toBeInTheDocument();
 
+    emitServers?.([local, remote]);
+    await waitFor(() => expect(window.openbot.agent.listAgents).toHaveBeenCalledOnce());
     resolveAgents(AGENTS);
+    await agentsRead;
+    expect(screen.queryByRole("heading", { name: "Chief" })).not.toBeInTheDocument();
+    resolveStatus?.(status);
     expect(await screen.findByRole("heading", { name: "Chief" })).toBeVisible();
     expect(screen.queryByText("Connecting…", { selector: ".empty-search" })).not.toBeInTheDocument();
   });
@@ -170,15 +181,18 @@ describe("OpenBot connected desktop shell", () => {
     window.localStorage.setItem(AGENT_SELECTION_STORAGE_KEY, JSON.stringify({ local: "sales-outbound" }));
     vi.mocked(window.openbot.agent.listAgents).mockRejectedValueOnce(new Error("Offline"));
     function LoadStatus() {
-      const { agentStatus } = useAgents();
-      return <output aria-label="Agent load status">{agentStatus().message}</output>;
+      const { connection } = useServerScope();
+      return <output aria-label="Agent load status">{connection.failed ? "Failed" : "Loading"}</output>;
     }
     const view = render(() => (
       <AppProviders>
         <LoadStatus />
       </AppProviders>
     ));
-    await waitFor(() => expect(screen.getByLabelText("Agent load status")).toHaveTextContent("Offline"));
+    await waitFor(() => expect(screen.getByLabelText("Agent load status")).toHaveTextContent("Failed"));
+    expect(JSON.parse(window.localStorage.getItem(AGENT_SELECTION_STORAGE_KEY) ?? "{}")).toEqual({
+      local: "sales-outbound",
+    });
     view.unmount();
     render(() => <App />);
     expect(await screen.findByRole("heading", { name: "Sales Outbound" })).toBeVisible();

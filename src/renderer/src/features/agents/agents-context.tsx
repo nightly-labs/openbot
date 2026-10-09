@@ -70,7 +70,7 @@ const Agents = createSimpleContext({
     const { uiErrors, setUiErrors, appendUiError } = useUiErrors();
 
     const [agentList, setAgentList] = createSignal<AgentProfile[]>([]);
-    /** The first roster read of this scope came back, or failed. */
+    /** The first roster read of this scope succeeded. */
     const [agentListSettled, setAgentListSettled] = createSignal(false);
     const [duplicatingAgentIds, setDuplicatingAgentIds] = createSignal<Set<string>>(new Set());
     const [modelOptions, setModelOptions] = createSignal<AgentModelOption[]>([]);
@@ -101,15 +101,16 @@ const Agents = createSimpleContext({
         remoteAdminServer(activeServer(), "providers-v1") !== undefined,
     );
     /**
-     * A joined server whose roster has not come back yet. Its host answers over the remote connection,
+     * A server whose roster has not come back yet. A remote host answers over the remote connection,
      * which takes seconds after a launch, so an empty list here does not mean the server has no
      * agents. Main reports such a host as `offline` until the first connection is up, so that state
-     * counts as connecting too. A failed connection reports `error` or an issue, a failed read
-     * settles the roster, and an incompatible or sleeping server keeps its own state.
+     * counts as connecting too. A failed connection reports `error` or an issue, and an incompatible
+     * or sleeping server keeps its own state. Only a successful read can settle the roster.
      */
     const agentListConnecting = createMemo(() => {
       if (agentListSettled()) return false;
       const server = activeServer();
+      if (!server || server.kind === "local") return true;
       return (
         server?.kind === "remote" &&
         (server.state === "offline" || server.state === "connecting" || server.state === "online") &&
@@ -274,6 +275,7 @@ const Agents = createSimpleContext({
       agentList,
       setAgentList,
       agentListConnecting,
+      agentListSettled,
       setAgentListSettled,
       duplicatingAgentIds,
       setDuplicatingAgentIds,

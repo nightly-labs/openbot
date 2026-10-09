@@ -80,8 +80,8 @@ export function WorkspaceFrame(props: WorkspaceFrameProps) {
         aria-hidden={props.usageOpen ? "true" : undefined}
       >
         {props.connection}
-        <div class="server-connection-content">
-          <Show when={props.blockedServer} keyed fallback={<Show when={!props.initialLoading}>{props.children}</Show>}>
+        <div class="server-connection-content" hidden={props.initialLoading && !props.blockedServer}>
+          <Show when={props.blockedServer} keyed fallback={props.children}>
             {(server) => <RemoteCompatibilityScreen server={server} onRetry={() => props.onRetryServer(server.id)} />}
           </Show>
         </div>
