@@ -74,9 +74,9 @@ export const messages = {
     other:
       "Un compte peut avoir {count} serveurs payants. Pour ajouter un serveur, supprimez-en d’abord un dans OpenBot sur votre ordinateur.",
   },
-  "mobile.server.hosted.heroTitle": "Votre propre serveur dans le cloud",
+  "mobile.server.hosted.heroTitle": "Exécutez OpenBot 24 h/24 sur un serveur externe",
   "mobile.server.hosted.heroDescription":
-    "Il fonctionne quand votre ordinateur est éteint, et démarre quand vous l’utilisez.",
+    "Les serveurs OpenBot font tourner vos agents et vos routines, même quand votre ordinateur est éteint. Nous gérons l’infrastructure et la maintenance : votre serveur est prêt à l’emploi, sans configuration technique.",
   "mobile.server.hosted.securePayment": "Paiement sécurisé avec Stripe",
   "mobile.server.hosted.joinHint": "Utilisez une invitation du propriétaire d’un serveur.",
   "mobile.server.hosted.contactHint": "Pour un Mac ou une offre pour votre entreprise.",

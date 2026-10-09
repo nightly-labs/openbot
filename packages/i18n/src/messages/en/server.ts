@@ -38,8 +38,9 @@ export const messages = defineMessages("server", {
   "server.join.emailBound": "This invitation only works for its email recipient.",
   "server.join.unknownDate": "Unknown",
   // The dialog that the plus button on the server rail opens. {price} is a formatted amount, such as "€20".
-  "server.add.title": "Run OpenBot in the cloud",
-  "server.add.description": "OpenBot runs the server for you. Choose a plan to start.",
+  "server.add.title": "Run OpenBot 24/7 on an external server",
+  "server.add.description":
+    "OpenBot Servers keep your agents and routines running, even when your computer is off. We handle the infrastructure and maintenance, so your server is ready to use without any technical setup.",
   "server.add.billing.label": "Billing period",
   "server.add.currency.label": "Currency",
   "server.add.billing.monthly": "Monthly",

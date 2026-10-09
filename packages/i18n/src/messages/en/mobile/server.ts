@@ -76,8 +76,9 @@ export const messages = defineMessages("mobile.server", {
     one: "An account can have {count} paid server. To add a server, delete one in OpenBot on your computer first.",
     other: "An account can have {count} paid servers. To add a server, delete one in OpenBot on your computer first.",
   },
-  "mobile.server.hosted.heroTitle": "Your own server in the cloud",
-  "mobile.server.hosted.heroDescription": "It works when your computer is off, and starts when you use it.",
+  "mobile.server.hosted.heroTitle": "Run OpenBot 24/7 on an external server",
+  "mobile.server.hosted.heroDescription":
+    "OpenBot Servers keep your agents and routines running, even when your computer is off. We handle the infrastructure and maintenance, so your server is ready to use without any technical setup.",
   "mobile.server.hosted.securePayment": "Secure payment with Stripe",
   "mobile.server.hosted.joinHint": "Use an invitation from a server owner.",
   "mobile.server.hosted.contactHint": "For a Mac or a plan for your company.",

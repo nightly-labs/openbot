@@ -38,8 +38,9 @@ export const messages = {
   "server.join.account": "Cuenta",
   "server.join.emailBound": "Esta invitación solo funciona para el destinatario del correo electrónico.",
   "server.join.unknownDate": "Desconocida",
-  "server.add.title": "Ejecuta OpenBot en la nube",
-  "server.add.description": "OpenBot ejecuta el servidor por ti. Elige un plan para empezar.",
+  "server.add.title": "Ejecuta OpenBot 24/7 en un servidor externo",
+  "server.add.description":
+    "Los servidores de OpenBot mantienen tus agentes y rutinas en marcha, incluso con tu ordenador apagado. Nos ocupamos de la infraestructura y el mantenimiento, para que tu servidor esté listo sin ninguna configuración técnica.",
   "server.add.billing.label": "Periodo de facturación",
   "server.add.currency.label": "Moneda",
   "server.add.billing.monthly": "Mensual",

@@ -303,7 +303,7 @@ function PlansLoading() {
   );
 }
 
-/** The sheet's own header: a title and one short line. */
+/** The sheet's own header: what a hosted server gives, before the plans. */
 function PlansHeader({ description }: { description: string }) {
   const { t } = useText();
   return (

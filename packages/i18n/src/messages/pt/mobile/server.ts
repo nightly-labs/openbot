@@ -74,9 +74,9 @@ export const messages = {
     other:
       "Uma conta pode ter {count} servidores pagos. Para adicionar um servidor, exclua um primeiro no OpenBot do seu computador.",
   },
-  "mobile.server.hosted.heroTitle": "Seu próprio servidor na nuvem",
+  "mobile.server.hosted.heroTitle": "Execute o OpenBot 24/7 em um servidor externo",
   "mobile.server.hosted.heroDescription":
-    "Ele funciona quando seu computador está desligado e inicia quando você o usa.",
+    "Os servidores do OpenBot mantêm seus agentes e rotinas em execução, mesmo com o computador desligado. Cuidamos da infraestrutura e da manutenção, para que seu servidor esteja pronto sem nenhuma configuração técnica.",
   "mobile.server.hosted.securePayment": "Pagamento seguro com a Stripe",
   "mobile.server.hosted.joinHint": "Use um convite do dono de um servidor.",
   "mobile.server.hosted.contactHint": "Para um Mac ou um plano para sua empresa.",

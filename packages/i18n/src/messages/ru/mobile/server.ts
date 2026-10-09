@@ -86,8 +86,9 @@ export const messages = {
     other:
       "На аккаунте может быть {count} платных сервера. Чтобы добавить сервер, сначала удалите один в OpenBot на компьютере.",
   },
-  "mobile.server.hosted.heroTitle": "Ваш собственный сервер в облаке",
-  "mobile.server.hosted.heroDescription": "Работает, когда компьютер выключен, и запускается, когда он нужен.",
+  "mobile.server.hosted.heroTitle": "Запустите OpenBot 24/7 на внешнем сервере",
+  "mobile.server.hosted.heroDescription":
+    "Серверы OpenBot поддерживают работу ваших агентов и регулярных задач, даже когда компьютер выключен. Мы берём на себя инфраструктуру и обслуживание, поэтому сервер готов к работе без технической настройки.",
   "mobile.server.hosted.securePayment": "Безопасная оплата через Stripe",
   "mobile.server.hosted.joinHint": "Используйте приглашение от владельца сервера.",
   "mobile.server.hosted.contactHint": "Для Mac или тарифа для вашей компании.",

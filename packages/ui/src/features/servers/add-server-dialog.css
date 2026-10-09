@@ -39,6 +39,33 @@
   align-self: stretch;
 }
 
+/* What the plans buy, before the prices. */
+.add-server-intro {
+  gap: var(--openbot-space-2);
+  padding-block: var(--openbot-space-2);
+}
+
+.add-server-intro .ui-heading,
+.add-server-intro .ui-text {
+  margin: 0;
+  text-wrap: balance;
+}
+
+/* The inline padding keeps the title clear of the close button of the shell. */
+.add-server-intro .ui-heading {
+  padding-inline: calc(var(--openbot-control-md) + var(--openbot-space-2));
+  font-size: var(--openbot-text-3xl);
+  font-weight: var(--openbot-weight-bold);
+  line-height: var(--openbot-leading-3xl);
+  letter-spacing: var(--openbot-tracking-tight);
+}
+
+.add-server-intro .ui-text {
+  max-width: 560px;
+  font-size: var(--openbot-text-lg);
+  line-height: var(--openbot-leading-lg);
+}
+
 /* The billing switch is in the centre. The same inline padding on the two sides keeps it clear of
  * the close button of the shell. */
 .add-server-bar {
@@ -757,6 +784,16 @@
 }
 
 @media (max-width: 560px) {
+  .add-server-intro .ui-heading {
+    font-size: var(--openbot-text-2xl);
+    line-height: var(--openbot-leading-2xl);
+  }
+
+  .add-server-intro .ui-text {
+    font-size: var(--openbot-text-md);
+    line-height: var(--openbot-leading-md);
+  }
+
   /* The switch goes under the close button and fills the width. */
   .add-server-bar {
     padding: calc(var(--openbot-control-md) + var(--openbot-space-1)) 0 0;

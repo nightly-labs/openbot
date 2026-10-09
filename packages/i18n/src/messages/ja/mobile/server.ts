@@ -73,8 +73,9 @@ export const messages = {
     other:
       "1 つのアカウントで持てる有料サーバーは {count} 台までです。サーバーを追加するには、先にコンピューターの OpenBot でサーバーを削除してください。",
   },
-  "mobile.server.hosted.heroTitle": "クラウド上の専用サーバー",
-  "mobile.server.hosted.heroDescription": "コンピューターの電源が切れていても動作し、使うときに起動します。",
+  "mobile.server.hosted.heroTitle": "外部サーバーで OpenBot を 24 時間 365 日実行",
+  "mobile.server.hosted.heroDescription":
+    "OpenBot サーバーは、コンピューターの電源が切れていてもエージェントとルーティンを動かし続けます。インフラと保守は私たちが担当するため、技術的な設定なしですぐに使えます。",
   "mobile.server.hosted.securePayment": "Stripe による安全な支払い",
   "mobile.server.hosted.joinHint": "サーバーのオーナーからの招待を使います。",
   "mobile.server.hosted.contactHint": "Mac や会社向けのプランについて。",

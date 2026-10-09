@@ -291,6 +291,15 @@ export function AddServerDialog(props: AddServerDialogProps) {
                     class="add-server-step add-server-pricing"
                     ref={(element: HTMLDivElement) => (pricing = element)}
                   >
+                    <header class="join-server-header add-server-intro">
+                      <Heading as="h2" size="lg">
+                        {t("server.add.title")}
+                      </Heading>
+                      <Text as="p" tone="muted">
+                        {t("server.add.description")}
+                      </Text>
+                    </header>
+
                     <div class="add-server-bar">
                       <HostedCurrencySelect
                         currency={currency()}

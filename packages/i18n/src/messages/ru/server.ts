@@ -38,8 +38,9 @@ export const messages = {
   "server.join.account": "Аккаунт",
   "server.join.emailBound": "Это приглашение работает только для получателя на указанную почту.",
   "server.join.unknownDate": "Неизвестно",
-  "server.add.title": "Запустите OpenBot в облаке",
-  "server.add.description": "OpenBot запустит сервер за вас. Выберите тариф, чтобы начать.",
+  "server.add.title": "Запустите OpenBot 24/7 на внешнем сервере",
+  "server.add.description":
+    "Серверы OpenBot поддерживают работу ваших агентов и регулярных задач, даже когда компьютер выключен. Мы берём на себя инфраструктуру и обслуживание, поэтому сервер готов к работе без технической настройки.",
   "server.add.billing.label": "Период оплаты",
   "server.add.currency.label": "Валюта",
   "server.add.billing.monthly": "Помесячно",

@@ -39,8 +39,9 @@ export const messages = {
   "server.join.emailBound": "Bu davet yalnızca e-posta alıcısı için geçerlidir.",
   "server.join.unknownDate": "Bilinmiyor",
   // Sunucu çubuğundaki artı düğmesinin açtığı iletişim kutusu. {price} "€20" gibi biçimlendirilmiş bir tutardır.
-  "server.add.title": "OpenBot'u bulutta çalıştırın",
-  "server.add.description": "OpenBot sunucuyu sizin için çalıştırır. Başlamak için bir plan seçin.",
+  "server.add.title": "OpenBot'u harici bir sunucuda 7/24 çalıştırın",
+  "server.add.description":
+    "OpenBot Sunucuları, bilgisayarınız kapalıyken bile ajanlarınızı ve rutinlerinizi çalışır durumda tutar. Altyapı ve bakımla biz ilgileniriz; sunucunuz teknik bir kurulum gerektirmeden kullanıma hazır olur.",
   "server.add.billing.label": "Faturalandırma dönemi",
   "server.add.currency.label": "Para birimi",
   "server.add.billing.monthly": "Aylık",
