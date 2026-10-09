@@ -6,6 +6,268 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.34.0] - 2026-10-09
+
+### Added
+
+- A Routines view in the sidebar. Open an agent to see its routines on a canvas: when each one runs next, its last runs, and what each agent received and answered in the last run.
+- Routine flows. On the canvas, connect one agent to another inside a routine, and the routine sends the first agent's answer on to the next agent when it runs. An agent with several inputs waits for all of them. Routine flows are available for agents on this computer.
+- Ask an agent to edit the canvas. The chat panel on the Routines view sends your request to the open agent, which can add or remove routine links, and create or change routines, with its tools.
+- Change an agent's task in a routine from the routine details panel. For the routine's own agent, this changes what the routine asks for.
+- Right-click the routine canvas to add an agent at that spot: one you already have, or a new one with its name, what it does, and its model.
+- Webhook routines show on the routine canvas. Their details set the webhook: copy the endpoint, regenerate the signing secret, and choose the event type and filters that start a run. Run now tests them.
+- All signed-in server members can check for releases and request an idle update on supported installations. Administrators keep control of cancellation, forced restarts, and automatic-update settings.
+- Turn built-in providers off or on in this computer's provider settings. OpenBot saves the choice, stops unused provider processes, skips their CLI checks, and removes their models from the picker. Change an agent's model before you turn its provider off.
+- Russian interface. Choose Русский in Settings > General > Language, or keep System default on a
+  computer that uses Russian. The web client uses it too.
+- Add Spanish and German to the language settings. Translate desktop and web-client screens,
+  including setup, agent controls, routines, files, connections, status messages and errors.
+- The server menu on the server rail and on the sidebar title now has "Leave server" for a server that you joined and "Delete server" for a server that you host. The desktop app and the web client both show these actions.
+- Update a hosted server, or a server that you installed on Linux, from Server Settings > Updates.
+  Download, **Update when idle**, **Restart now** and automatic updates now work there as on a
+  computer. Before, the server got a new release only when it started again.
+- Remove an old server that you own from the web side panel, even when its computer is offline. Removal ends remote access for all members and keeps files and chats on the computer. Paid hosted servers still use Billing.
+- Let a scheduled run of an agent routine stay silent when it has nothing to report. Ask the agent in
+  the routine task to answer `[[no-update]]` in that case. When every answer of the run is only
+  `[[no-update]]`, the run posts no message, adds no unread message, does not change the chat
+  preview and shows no notification. The run marker stays in the chat, and the run stays in the
+  routine **History**. Test runs, and script or webhook runs, always show their result.
+  The browser client, the phone, and a desktop connected to a remote server stay silent for a
+  quiet run too. An older client shows the run as finished, as before.
+- Sign in to a custom Streamable HTTP MCP server in your browser, for servers such as Granola that
+  use OAuth. Choose Sign in on the server's row or in its form. The panel shows that it waits for the
+  browser, lets you cancel, and marks the row Signed in. Sign out deletes the stored sign-in.
+- The Custom tab of the model picker now has an "Add provider" button. It opens the Providers
+  section of the server settings, where you add an endpoint. Before, the tab had no way to add one.
+  The button shows on this computer, and on a host where you are an owner or admin.
+- The iPhone and Android apps have their own download pages, `/download/ios` and `/download/android`,
+  with the system requirements, the install steps and how to connect the phone to your computer.
+- Telegram: add the OpenBot bot to a Telegram group or start a direct chat with it from **Server settings → Connectors → Telegram**. People mention the bot or reply to it, and the Telegram Orchestrator asks the right agent and posts the answer in the same reply chain, with approvals, stop and files as in Slack.
+- OpenBot sends the page's mouse cursor to the mobile app, which shows it on the live browser view.
+- A right-click from the mobile app opens the page's menu on the phone, not on the screen of the
+  server. While the phone shows a tab, the page keeps one size, so it does not change shape when
+  the OpenBot window changes size. A tab that an agent gave its own size keeps that size.
+
+### Changed
+
+- Update the Bun development and build toolchain to 1.4.2 across desktop, mobile, and server workflows. **Developers must install Bun 1.4.2 with the command in the README before they start development.**
+- The Routines tab of the sidebar shows only agents. Channels have no routines, so they stay in the
+  Agents tab. When you open the Routines tab, an open channel closes.
+- Development commands can start without shared secrets and load the encrypted shared development settings when the developer has the development key.
+- Local development identity and overrides persist in ignored state, and the APNs helper writes to that state.
+- Encrypted development settings use `.env.dev` and the shell key `DOTENV_PRIVATE_KEY_DEV`; production settings remain unchanged.
+- The update resets old generated `.env.dev` settings. Existing identity keys and overrides in `.openbot/dev-state.json` remain unchanged.
+- Development commands keep account and decryption secrets out of browser and tunnel processes, and secret-dependent E2E commands check required keys before changing test data.
+- New hosted servers start from a snapshot built from the latest completed desktop release. Releases now build and select the production boat snapshot automatically. Failed snapshot builds keep the previous template active.
+- Marketplace app listings in Russian. The tagline, description, server description and example
+  requests of each catalog app now follow the interface language. Before, they were always in
+  English.
+- Manage paid servers in Billing on desktop and web. Cancel renewal and keep the data, stop a
+  scheduled deletion with Keep server, or delete a server now or after its paid period.
+- Remove the shadow from confirmation dialogs.
+- Settings has a Notifications tab for desktop notifications, the test notification and sounds.
+  General is shorter: Language is first, and the settings are in four groups with shorter text.
+- Consecutive completed runs of one routine show as one row in the chat, with the number of runs and the time of the first and the newest run. Open the row to see each run. A run that fails, stops or needs attention keeps its own row.
+- Set the default provider for new local agents in Server settings → Providers. Computer permissions remain in Settings → Computer Use.
+- Open a joined server faster when OpenBot starts. The window no longer waits for the account's
+  server list, the selected server connects while the window loads, and the hidden connection window
+  loads while the session is made. A server that has no saved key still waits for the server list.
+- Write the time of each step of a connection to a joined server to the local trace file, for
+  diagnostics. The trace does not name the server.
+- Connect to a joined server faster when OpenBot starts again. The app keeps the server's remote
+  session between runs, so the start asks only for a new ticket. It opens the Signal connection while
+  it waits for that ticket. The kept session is encrypted, and the app forgets it at sign-out or when
+  it starts with no account signed in.
+- Add Settings → General → Fast connection to servers, on by default. Turn it off to end each remote
+  session when OpenBot quits and to keep nothing between runs, as before.
+- Write the time when the Signal connection opens to the local trace file
+  (`remote-connect:signal-socket`).
+- When you turn on Settings → General → Fast connection to servers, OpenBot also keeps the remote
+  sessions that are open at that time.
+- When a remote connect fails before it gets its ticket, OpenBot closes the Signal connection that
+  it opened early.
+- Moved Publish from the chat header to the agent side panel. Click the agent name to find it.
+- The search field in the sidebar now opens the global search, the same as Cmd+K (Ctrl+K). It no longer filters the sidebar list.
+- The agent settings panel is shorter. It shows the profile, the instructions, and the model, Knows,
+  Does and Rules groups. Each group row has an icon. Profile, Instructions, Permissions and Advanced
+  open on their own page; the back button returns to the list.
+- On the web, the loading crew now covers the chat while a hosted server wakes. When the server is online, the crew jumps out and the chat shows.
+- Test connection no longer opens a browser. It uses the sign-in that this computer already has, and
+  a server that asks for a sign-in shows a Sign in button.
+- A failed test now says what kind of failure it was: a sign-in is needed, the server refused, the
+  URL is wrong, the server did not answer, it did not start, or it could not be reached.
+- Group the models of a custom ACP agent by the provider that serves each one. An agent that lists
+  `<provider>/<model>` names now shows one section per provider in the model picker, instead of a
+  single undifferentiated list.
+- The changelog page names the mobile app "OpenBot Mobile", because the app is now also on Android.
+  Next to the TestFlight link, a button opens the Android app on Google Play.
+- The download section of the home page and the `/download` page have iPhone and Android tiles,
+  in the same style as the desktop tiles. The links to the requirements pages show iPhone and
+  Android in a separate group after macOS, Windows and Linux.
+- Run independent CI checks and browser setup steps in parallel, with separate logs for each step.
+- Remove the large package-cache restore from CI setup.
+- In a file attachment card, the download and open icons are smaller.
+- Let long message drafts grow to one-third of the window height before scrolling. Keep the cursor visible when the input size changes.
+- Show install steps for Android in Settings > Mobile Connect. Choose iPhone or Android to see the
+  QR code and the steps for that phone: the Google Play listing for Android, or the TestFlight beta
+  for iPhone. The two cards are numbered, so you install the app first and then sign in. The list
+  of connected phones shows the logo of each platform.
+- Show the platform logo, a link and the OpenBot logo in the middle of the install QR codes.
+- Show what a hosted server gives at the top of the add-server dialog: it runs OpenBot 24/7 on an
+  external server, keeps agents and routines running when the computer is off, and needs no
+  technical setup.
+- Telegram: code blocks in answers keep their language, such as `python`, so Telegram colors the code.
+- First run now asks one question, with two equal answers: "Start free", or "I have a subscription"
+  (ChatGPT, Claude or Grok). "Start free" needs no subscription and no sign-in: your agents use the
+  free models of OpenCode, which starts to download when first run opens. Before, you had to find
+  OpenCode at the end of the provider list.
+- First run has fewer steps. With "Start free", the only other step on macOS asks for the Computer Use
+  permissions. The sound and example-job steps are gone. You can still choose sounds in Settings.
+- First run changes steps calmly: the old step blurs and fades out, and the next one comes into
+  focus. When setup is done, the setup screen blurs away into the app. With reduced motion, the steps
+  change at once.
+- When you open OpenBot from first run before the free models are ready, a splash shows: the agents
+  from the first screen jump in a slow wave, and a line under them fills with the download. The app
+  then opens from the splash. Before, a small spinner showed in a button.
+- The agents on the first screen and on the splash follow the pointer with their eyes. An agent
+  grows a little under the pointer, and nods when you click it. With reduced motion, they stay still.
+- In the setup provider list, ChatGPT, Claude and Grok show their version under the name, not
+  "Included with OpenBot". Before, an "Update available" badge cut that line off.
+- The sign-in screen says that the email address also creates an account, and that your chats and
+  files stay on the computer that runs OpenBot.
+
+### Removed
+
+- Removed the repeated Providers & permissions screen from the account menu. First-run setup remains available.
+- Remove the outdated Product Hunt launch banner from the landing page.
+
+### Fixed
+
+- Open Settings on the Hosted servers tab at once from "Manage servers". Before, the dialog showed
+  another tab first and then jumped when the server list loaded. A slow list now shows a loading
+  indicator, and a list that fails to load shows its error on the tab.
+- OpenCode models with no reasoning setting, such as Big Pickle, Kimi, MiMo and Nemotron, now show "Set by OpenCode" in agent settings. Before, the Reasoning control showed "Medium" as the only level, but OpenBot sent no level and OpenCode used the model's own default. Other ACP agents, such as Cursor, show the same "Set by" text for a model that has no reasoning setting.
+- OpenCode MiniMax M3 now offers Low (thinking off) and High (thinking on). Before, it offered only Low, so thinking could not be turned on.
+- Remote hosts can check for compatible OpenBot releases even when they cannot update themselves. Server Settings shows the installed and latest versions, explains the correct update path for hosted servers, system services, containers, and Host Manager installations, and hides installation controls that cannot work.
+- Server update status refreshes after a lost connection and does not show a reply from a previously selected host.
+- Show the latest message of a chat or channel in the sidebar as plain text. Before, the preview
+  showed raw Markdown, such as `**2 new emails**` with its asterisks, while the chat itself showed
+  the same text in bold.
+- Show "Connecting…" in the sidebar and the message box while a joined server connects after you
+  open OpenBot. Before, the app showed "Create your first agent" and asked you to complete agent CLI
+  setup for some seconds, until the server sent its agents.
+- Grok chats keep their message order after a reload and when you load older messages. Before, a message that you sent while Grok worked could show above Grok's answer to the message before it.
+- A message that you send to a running turn now shows after what the agent did before it. Before, it moved up to the turn's first message.
+- Grok's thinking after a tool call shows as its own step. Before, it joined the thinking from before the tool call.
+- When you read a chat through an event that came while the agent worked, the agent's answer above it is read too. Before, it stayed unread.
+- Agents on a custom ACP provider can send messages to teammates and stop their work again. Before,
+  the message failed with "The idempotency key is too long."
+- Cancelling a browser task no longer shows the raw Codex tool cancellation error. Pending browser work stops, incomplete new tabs close, and existing tabs remain available for the next request.
+- Reduce idle animation work for active tasks and pending replies. Pause their repeated animations when the window is hidden or the rows are closed.
+- File chips can now find files outside the workspace from recent ACP and Claude file tool calls. Previously, a chip with only a file name could report a missing file. This lookup is local to the desktop and requires Full access. The last 200 paths per thread stay in memory until OpenBot closes.
+- Return keyboard focus to the server control after a confirmation closes.
+- Prevent a server connection from closing with “Signal message is invalid” when the browser sends an empty ICE completion marker.
+- The web app now opens the last server you selected in that browser. Each account keeps its own selection.
+- Keep a deleted agent deleted when another device still shows it. Before, opening its chat or
+  marking it read on that device created the agent again, with an empty chat.
+- Test or delete a webhook routine on a remote server without losing the connection. Before, the app
+  read the host's empty answer as unsafe data and stopped every request to that server until you
+  chose Retry.
+- Show routine times on a 24-hour clock when the date format of the computer uses one, such as
+  French, Japanese or Russian. Before, the schedule summaries, the time chip and the time editor
+  always used AM and PM.
+- A server that wakes from sleep no longer shows "Set up" with the provider choice before its agents
+  load. Before, the server sent an empty agent list while it started, until a reconnect sent the
+  agents.
+- Keep a deleted agent deleted when another device reacts to its message, stops its turn, or steers a
+  queued message into its turn. Before, these actions created the agent again.
+- OpenBot starts when an unsent message with a skill or MCP server tag is saved in the message box.
+  Before, the app stayed on the startup logo at each launch until you removed the saved draft.
+- Copy, cut, paste and select all now work in the browser of a remote server, with Ctrl or Cmd and
+  C, X, V and A. Before, the shortcuts did nothing: the page used the clipboard of the server, not
+  your clipboard. The server must also have this update; an older server shows a message that tells
+  you to update it.
+- Keep the conversation usable when Cursor reports a missing provider session as "Invalid params". OpenBot now uses its saved conversation to continue in a new provider session.
+- When you close the global search with Escape, focus goes back to the control that had it before.
+- On the web, a hosted server that sleeps or wakes no longer shows a connection error.
+- A custom MCP server that asks for an OAuth sign-in no longer shows "The server answered 401. Check
+  the API key or other credentials." It now asks you to sign in. An `http://` address for such a
+  server tells you the `https://` address to use, and a test from another computer tells you to sign
+  in on the host.
+- A STDIO server that stops before it answers now says so, instead of a timeout. A command that runs
+  the `mcp-remote` bridge points you to Streamable HTTP with the same URL.
+- When Approve, Decline, an answer, Take over or Open details fails in the Dynamic Island, the
+  island now stays open and shows "That did not work. Try again." next to the buttons. Before, the
+  click did nothing that you could see, and the agent stayed blocked.
+- When a message or file search fails, the search window now says "Search did not finish. Some
+  results can be missing." and shows a Retry button. Before, a failed search showed "No results",
+  and a failed next page stopped the list with no message.
+- In a language other than English, the Cancel button of many confirmation dialogs, the Copy and
+  Copied labels, and the name that an agent gets when you clear its name now use your language.
+  Before, they stayed in English.
+- Server settings now ask before they change a member's role or revoke an invitation. A role
+  change can disconnect the member from the server. Before, one click in the menu or on Revoke did
+  the action at once.
+- Disconnecting 1Password, or an app from the Marketplace, now asks for confirmation first.
+  Before, one click forgot the 1Password token or removed the app and its skills.
+- The Computer Use rim no longer shows over the OpenBot window. When the window that an agent works
+  in is behind OpenBot, OpenBot now covers that part of the rim, as other windows do. When OpenBot
+  covers all of that window, no rim shows.
+- Center the agent avatar with the name in the profile card of the agent settings panel, and center the
+  avatar on the profile page.
+- Antigravity no longer shows "Provider error" notifications for a failed MCP tool call or a timed-out OpenBot browser call. The agent gets the failure as the tool result and can try again.
+- When an agent calls a memory tool with missing text, text that is too long, or a memory ID that it cannot use, the agent now gets a failed tool result that it can correct. The user no longer sees a "Provider error" notification.
+- Keep the connection to a server when a desktop client that is connected to it reconnects to the
+  signal server while the connection still works. Before, each such reconnect restarted the
+  connection path, and after 10 restarts the server closed the connection. The chat then stopped
+  for a few seconds while the client connected again.
+- Let a desktop client stop an agent on a remote server after the computer wakes from a long
+  sleep. Before, the server could close the connection during the sleep while the client still
+  showed it as connected. Each stop then failed with "The WebRTC channel is not open." Now the
+  client connects again when the server closes the connection. When a request could not go out on
+  the closed connection, the client sends it again on the new connection.
+- An OpenCode CLI update no longer stops with only "fetch failed" after the download completes. OpenBot now gets the OpenCode license from npm, the same place as the CLI, so the update needs no GitHub connection.
+- When a runtime download request fails, the error now shows the address and the network reason.
+- A Retry after a failed runtime install now uses the download it already has when that download passes its check, and does not download it again.
+- Read the history of a custom ACP agent from its process. Before, startup could stop with "Cannot
+  read properties of undefined (reading 'options')" and the local agent backend did not start, and a
+  read of the agent's conversation history could fail with the same error.
+- OpenBot reads your joined servers again when it opens before your account finishes loading.
+  Before, the first read could stop with "Sign in to OpenBot first.", and the server list did not
+  update until a later check. In 0.33.0, OpenBot could fail to start with this error.
+- The installed OpenBot web app now opens the app at `/app`. Before, it opened the landing page.
+- Connect Figma, or another MCP server on this computer, no longer stops with only "fetch failed".
+  When nothing answers at the local address, the dialog tells you to turn the server on in its app
+  and try again. A connection that this computer blocks, or an address that answers but is not an
+  MCP server over Streamable HTTP, now has its own message.
+- In an attachment card, the download and open icons now have the same size and alignment.
+- OpenBot stays open when a Browser tab opens the Chrome Web Store. Before, the app could close a
+  few seconds after the page loaded, and again at each start while the tab was saved.
+- Keep the message cursor in place when you add or end lists, insert blank lines, or update attachments. Line breaks and multiline paste now work with undo and redo.
+- Keep text selection and arrow-key movement stable when you use inline tags or leave a suggestion list.
+- Dragging in the live browser view of a remote member now selects text and moves sliders. Before,
+  the page released the mouse button at the first movement.
+- When a phone or another computer answers an approval or a question that is no longer waiting, the server now says that the request is closed. Before, it showed a general "Request failed" error.
+- Show clear loading and recovery states for remote servers on desktop and web. Keep loaded conversations and drafts visible during temporary connection loss.
+- Retry web connections automatically, report hosted-server start failures, and let Retry start a sleeping server again.
+- Limit initial remote reads so a server that does not respond cannot leave the workspace loading indefinitely.
+- Copying selected message text keeps agent, skill, and file references on the same line. Reference names are no longer missing from the copied text.
+- Show channels in the sidebar again after the desktop app starts, or after it connects to a remote
+  server again. Before, the sidebar showed only agents, and **New agent or channel** offered only a
+  new agent, until the app window lost focus and got it back.
+- A phone or another peer that cannot see an agent (a custom ACP agent before protocol 5, or a
+  Cursor or Cline agent before protocol 6) now gets the channel list when one of the channels is
+  led by that agent. Before, the whole list failed and the phone showed no channels. The channel
+  shows with the members the peer can see and no lead.
+- Saving such a channel from that peer, for example a rename, keeps the hidden members and the
+  hidden lead. A lead the peer picks itself still wins.
+- Keep remote routine runs quiet through a new optional capability. Older clients still receive the released turn completion event.
+- Remove Telegram chat links and unused link codes when you remove a server from your account. Other servers keep their links.
+
+### Security
+
+- Update remote-desktop dependencies to fix reported security vulnerabilities.
+
 ## [0.33.0] - 2026-10-07
 
 ### Added
