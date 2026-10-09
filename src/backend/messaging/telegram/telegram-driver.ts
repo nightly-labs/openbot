@@ -55,6 +55,7 @@ interface TelegramCredentials {
 /** The Bot API side of one chat, through Signal. It never logs message text. */
 class TelegramAdapter implements MessagingAdapter {
   readonly platform = "telegram" as const;
+  readonly #ingress: MessagingIngress;
   readonly #gateway: TelegramGateway;
   readonly #botId: string;
   readonly #chatId: string;
@@ -62,12 +63,13 @@ class TelegramAdapter implements MessagingAdapter {
   readonly #rateLimited: (retryAt: string) => void;
 
   constructor(
-    gateway: TelegramGateway,
+    ingress: MessagingIngress,
     credentials: TelegramCredentials,
     state: TelegramChatState,
     options: MessagingDriverOptions,
   ) {
-    this.#gateway = gateway;
+    this.#ingress = ingress;
+    this.#gateway = ingress.telegram;
     this.#botId = credentials.botId;
     this.#chatId = credentials.chatId;
     this.#state = state;
@@ -77,11 +79,16 @@ class TelegramAdapter implements MessagingAdapter {
   /**
    * The chat was linked through Signal, which checked it. Only a link whose bot lookup failed needs
    * the network: a mention needs the bot's username, so a failure here makes the service try again.
+   * The transport holds the socket only after this, so the lookup holds it itself.
    */
   identify(): Effect.Effect<ConnectionIdentity, MessagingAdapterError> {
     return Effect.gen({ self: this }, function* () {
       if (!this.#state.botUsername) {
-        const me = yield* this.#call("getMe", {});
+        const me = yield* Effect.acquireUseRelease(
+          Effect.sync(() => this.#ingress.acquire("telegram")),
+          () => this.#call("getMe", {}),
+          (release) => Effect.sync(release),
+        );
         if (me.username) this.#state.botUsername = me.username;
       }
       return {
@@ -359,7 +366,7 @@ export function telegramDriver(options: TelegramDriverOptions = {}): MessagingDr
     createAdapter(credentials, driverOptions) {
       if (!options.ingress) throw new Error(sourceText("error.messaging.telegramUnsupported"));
       const chat = state(credentials);
-      return new TelegramAdapter(options.ingress.telegram, chat.values, chat.state, driverOptions);
+      return new TelegramAdapter(options.ingress, chat.values, chat.state, driverOptions);
     },
     createTransport(credentials, identity) {
       if (!options.ingress) throw new Error(sourceText("error.messaging.telegramUnsupported"));
