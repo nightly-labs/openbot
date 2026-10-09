@@ -114,8 +114,8 @@
 }
 
 .attachment-open-button svg {
-  width: 18px;
-  height: 18px;
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
