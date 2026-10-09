@@ -414,7 +414,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       conversation: this.#conversation,
       emit: (event) => this.#emit(event),
       emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
-      limit: options.agentMemoryLimit,
+      ...(options.agentMemoryLimit ? { limit: options.agentMemoryLimit } : {}),
     });
     // One timer for both routine owners. The sources are read lazily because `channels` and its
     // scheduler are built further down, and because an owner's earliest routine changes constantly.
