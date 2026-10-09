@@ -49,6 +49,14 @@ currency, the amount that Stripe reports, the server size, the start reason and 
 no email, name, Stripe ID or server ID. The desktop analytics setting does not stop these events,
 because the account service sends them and not your computer.
 
+The account service also records a return from Checkout without payment and later payment
+recovery. Verified paid invoices produce a revenue event in USD, with the original amount,
+currency, and dated exchange rate. Daily totals contain recurring revenue, overdue recurring
+revenue, paid accounts, paid servers, and scheduled cancellations. These totals have no account ID.
+The service stores payment facts and a delivery ledger in D1 to prevent duplicate revenue events.
+It does not send Stripe identifiers, server identifiers, or Checkout return tokens to OpenPanel.
+An account deletion clears its profile reference and stops pending account event delivery.
+
 ## Agent and host usage
 
 The Usage view stores numeric token counts, activity counts, provider and model identifiers,
