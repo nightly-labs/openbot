@@ -1030,6 +1030,7 @@ function ExpandedContent(props: {
               )}
             </For>
           </div>
+          <IslandActionError message={props.actionError} />
         </div>
       </Match>
       <Match when={props.presentation.mode === "message" ? props.presentation.message : undefined}>
@@ -1460,15 +1461,18 @@ function QuestionContent(props: {
               </For>
             </ul>
           </Show>
-          <Show when={typedAnswerAvailable()}>
-            <IslandReplyField
-              label={t(
-                directAnswerAvailable()
-                  ? "island.reply.answerPlaceholderWithOptions"
-                  : "island.reply.answerPlaceholder",
-              )}
-              onSend={answerWith}
-            />
+          {/* Each question gets a new field, so a draft for one question is not sent as the answer to the next. */}
+          <Show keyed when={typedAnswerAvailable() ? currentQuestion()?.id : undefined}>
+            {(_questionId) => (
+              <IslandReplyField
+                label={t(
+                  directAnswerAvailable()
+                    ? "island.reply.answerPlaceholderWithOptions"
+                    : "island.reply.answerPlaceholder",
+                )}
+                onSend={answerWith}
+              />
+            )}
           </Show>
         </div>
       </div>
