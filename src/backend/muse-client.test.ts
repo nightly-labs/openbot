@@ -14,10 +14,13 @@ import {
   decodeRecordResponse,
   decodeThreadResponse,
   decodeTurnResponse,
+  getRecord,
+  getString,
 } from "./protocol";
 
 /* Failure modes: the host loses final items; a gap hides an item; a page crosses sessions;
  * a credential answer enters shared history; an inherited key reaches the wrong account; MCP refresh leaves an old process alive.
+ * live items, split deltas, and resumed history can expose provider credentials; redaction can damage IDs or usage.
  * These tests use the real SDK over a child-process boundary and a saved session fixture. */
 const HOST = String.raw`
 const fs = require("node:fs");
@@ -25,7 +28,15 @@ const readline = require("node:readline");
 const statePath = process.env.MUSE_TEST_STATE;
 const emit = (value) => process.stdout.write(JSON.stringify({jsonrpc:"2.0", ...value}) + "\n");
 const readState = () => fs.existsSync(statePath) ? JSON.parse(fs.readFileSync(statePath, "utf8")) : {};
-const item = (state) => ({itemId:"answer",kind:"agentMessage",revision:2,status:"completed",turnId:state.turnId,text:"Recovered answer"});
+const secretText = state => process.env.MUSE_TEST_ECHO_SECRETS === "1" ? "prefix " + state.apiKey + " " + state.mcp.example.headers["X-Test"] + " suffix f" : "Recovered answer";
+const item = (state) => ({itemId:"answer",kind:"agentMessage",revision:2,status:"completed",turnId:state.turnId,text:secretText(state)});
+const items = state => process.env.MUSE_TEST_ECHO_SECRETS === "1" ? [
+  item(state),
+  {...item(state),itemId:"user",kind:"userMessage"},
+  {...item(state),itemId:"tool",kind:"toolCall",tool:secretText(state),args:secretText(state),visibleOutput:secretText(state),failureReason:secretText(state)},
+  {...item(state),itemId:"reasoning",kind:"reasoning",summary:[secretText(state)]},
+  {...item(state),itemId:"shell",kind:"userShell",commandText:secretText(state),visibleOutput:secretText(state),exitCode:0},
+] : [item(state)];
 const event = (method, state, extra) => ({method,params:{sessionId:state.sessionId,...extra}});
 readline.createInterface({input:process.stdin}).on("line", line => {
  const frame = JSON.parse(line); const p = frame.params || {}; let result = {};
@@ -40,6 +51,17 @@ readline.createInterface({input:process.stdin}).on("line", line => {
  if(frame.method === "turn/start") {
    const state = {...readState(),turnId:p.commandId}; fs.writeFileSync(statePath, JSON.stringify(state));
    emit({id:frame.id,result:{turnId:p.commandId}});
+   if(process.env.MUSE_TEST_ECHO_SECRETS === "1") {
+     for(const entry of items(state)) emit(event("item/started",state,{item:{...entry,revision:1,status:"inProgress"}}));
+     for(const [itemId,field] of [["answer","text"],["reasoning","summary.0"],["tool","output"]]) {
+       for(const secret of [state.apiKey,state.mcp.example.headers["X-Test"]]) {
+         const split = Math.floor(secret.length/2);
+         emit(event("item/delta",state,{itemId,field,delta:secret.slice(0,split)}));
+         emit(event("item/delta",state,{itemId,field,delta:secret.slice(split)+" suffix"}));
+       }
+     }
+     emit(event("session/tokenUsage",state,{turnId:state.turnId,cumulative:{promptTokens:123,outputTokens:7,totalTokens:130,cacheReadTokens:2,cacheWriteTokens:3}}));
+   }
    if(process.env.MUSE_TEST_INPUT === "1") {
      emit(event("userInput/requested",state,{userInputId:"input-1",questions:[{id:"credential",header:"Account",question:"Enter your API key",options:[],selection:{mode:"single"}}]}));
      return;
@@ -59,11 +81,11 @@ readline.createInterface({input:process.stdin}).on("line", line => {
    return;
  }
  if(frame.method === "session/read") {
-   const state = readState(); result={session:{sessionId:state.sessionId},history:{mode:"inline",items:state.turnId ? [item(state)] : [],snapshot:null}};
+   const state = readState(); result={session:{sessionId:state.sessionId},history:{mode:"inline",items:state.turnId ? items(state) : [],snapshot:null}};
  }
  if(frame.method === "view/page") {
    const state=readState();
-   result={events:[event("item/completed",state,{sessionId:process.env.MUSE_TEST_WRONG_SESSION === "1" ? "wrong" : state.sessionId,item:item(state),viewCursor:"b"}),event("turn/completed",state,{turnId:state.turnId,terminal:"completed",viewCursor:"c"})],nextCursor:null};
+   result={events:[...items(state).map(entry=>event("item/completed",state,{sessionId:process.env.MUSE_TEST_WRONG_SESSION === "1" ? "wrong" : state.sessionId,item:entry,viewCursor:"b"})),event("turn/completed",state,{turnId:state.turnId,terminal:"completed",viewCursor:"c"})],nextCursor:null};
  }
  emit({id:frame.id,result});
 });
@@ -184,6 +206,75 @@ describe("Muse native MSP adapter", () => {
     );
     await failed;
     expect(notifications.some((event) => event.method === "turn/completed")).toBe(false);
+  });
+
+  it("redacts live items, split deltas, and resumed history without changing protocol metadata", async () => {
+    const apiKey = "fixture-muse-private-value";
+    const mcpKey = "fixture-mcp-private-value";
+    const { client, directory, notifications } = await fixture(
+      {
+        apiKey: () => apiKey,
+        mcpServers: () => [
+          {
+            id: "example",
+            name: "example",
+            transport: "http",
+            enabled: true,
+            command: "",
+            args: [],
+            env: [],
+            envPassthrough: [],
+            workingDirectory: "",
+            url: "https://example.test/mcp",
+            headers: [{ key: "X-Test", value: mcpKey }],
+          },
+        ],
+      },
+      { MUSE_TEST_ECHO_SECRETS: "1" },
+    );
+    const opened = await runCauseEffect(client.request("thread/start", { cwd: directory }, decodeThreadResponse));
+    const done = completion(client);
+    await runCauseEffect(
+      client.request(
+        "turn/start",
+        { threadId: opened.thread.id, input: [{ type: "text", text: "echo" }] },
+        decodeTurnResponse,
+      ),
+    );
+    await done;
+    for (const secret of [apiKey, mcpKey]) expect(JSON.stringify(notifications)).not.toContain(secret);
+    for (const method of [
+      "item/agentMessage/delta",
+      "item/reasoning/summaryTextDelta",
+      "item/commandExecution/outputDelta",
+    ]) {
+      const text = notifications
+        .filter((event) => event.method === method)
+        .map((event) => getString(event.params, "delta") ?? "")
+        .join("");
+      expect(text).toContain("suffix");
+      for (const secret of [apiKey, mcpKey]) expect(text).not.toContain(secret);
+    }
+    expect(notifications.find((event) => event.method === "openbot/usage")?.params).toMatchObject({
+      threadId: opened.thread.id,
+      usage: { inputTokens: 123, outputTokens: 7, cachedReadTokens: 2, cachedWriteTokens: 3 },
+    });
+    expect(
+      notifications.find(
+        (event) => event.method === "item/completed" && getString(getRecord(event.params, "item"), "id") === "shell",
+      )?.params,
+    ).toMatchObject({ item: { id: "shell", exitCode: 0 } });
+    await runCauseEffect(client.releaseThread(opened.thread.id));
+    await runCauseEffect(
+      client.request("thread/resume", { threadId: opened.thread.id, cwd: directory }, decodeThreadResponse),
+    );
+    const history = await runCauseEffect(
+      client.request("thread/read", { threadId: opened.thread.id, includeTurns: true }, decodeThreadResponse),
+    );
+    for (const secret of [apiKey, mcpKey]) expect(JSON.stringify(history)).not.toContain(secret);
+    expect(history.thread.turns?.[0]?.items).toHaveLength(5);
+    expect(JSON.stringify(history)).toContain("prefix");
+    expect(JSON.stringify(history)).toContain("suffix f");
   });
 
   it("keeps a credential answer out of the persisted prompt resolution", async () => {

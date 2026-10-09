@@ -1374,7 +1374,15 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         if (typeof value !== "boolean" && typeof value !== "string")
           return yield* providerFailure(new Error(sourceText("error.provider.sessionSettingInvalid")));
         const option = sessionSettingsSnapshot(thread.configOptions).options.find((entry) => entry.id === configId);
-        if (!option || option.currentValue !== value) yield* this.#configuration.set(thread, configId, value);
+        // A provider update can remove an option or choice. Keep the saved override in the
+        // store and report the effective value for correction, without blocking the prompt.
+        const available =
+          option?.type === "boolean"
+            ? typeof value === "boolean"
+            : option?.type === "select" &&
+              typeof value === "string" &&
+              option.options.some((choice) => choice.value === value);
+        if (available && option?.currentValue !== value) yield* this.#configuration.set(thread, configId, value);
       }
     }
     this.#publishSessionSettings(thread);

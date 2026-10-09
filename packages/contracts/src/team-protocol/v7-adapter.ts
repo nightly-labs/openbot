@@ -352,7 +352,18 @@ export function decodeTeamProtocolV7CurrentHttpResponse(
  * validator. They are not the app's lists: a value the app adds later is not part of this frozen
  * protocol, so a v7 request cannot name it.
  */
-const V7_AGENT_PROVIDERS = ["codex", "claude", "grok", "opencode", "antigravity", "acp", "cursor", "cline"] as const;
+const V7_AGENT_PROVIDERS = [
+  "codex",
+  "claude",
+  "grok",
+  "opencode",
+  "antigravity",
+  "acp",
+  "cursor",
+  "cline",
+  "pi",
+  "muse",
+] as const;
 export const V7_AGENT_MODEL = /^[A-Za-z0-9][A-Za-z0-9._:/[\],=-]{0,159}$/u;
 const V7_REASONING_EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
 

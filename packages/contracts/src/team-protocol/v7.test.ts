@@ -3,8 +3,8 @@ import { isCustomAgentId, isNewCustomAgentId } from "../agent-providers";
 import { PROVIDERS_V4_CODECS, PROVIDERS_V4_ROUTES } from "./providers-v4";
 import { PROVIDERS_V5_CODECS, PROVIDERS_V5_ROUTES } from "./providers-v5";
 import { decodeTeamProtocolV6CurrentHttpRequest } from "./v6-adapter";
-import { decodeTeamProtocolV7CurrentHttpRequest } from "./v7-adapter";
-import { encodeTeamProtocolV7WebRtcHttpRequest } from "./v7-webrtc-adapter";
+import { decodeTeamProtocolV7CurrentHttpRequest, encodeTeamProtocolV7CurrentHttpRequest } from "./v7-adapter";
+import { decodeTeamProtocolV7WebRtcHttpRequest, encodeTeamProtocolV7WebRtcHttpRequest } from "./v7-webrtc-adapter";
 
 // Failure modes: new provider values reach an old decoder; existing custom agent IDs become unreadable.
 describe("Team protocol v7 provider boundaries", () => {
@@ -17,6 +17,23 @@ describe("Team protocol v7 provider boundaries", () => {
     expect(() => PROVIDERS_V4_CODECS.get(PROVIDERS_V4_ROUTES.runtimesDownload)?.request({ provider })).toThrow();
     expect(isCustomAgentId(provider)).toBe(true);
     expect(isNewCustomAgentId(provider)).toBe(false);
+  });
+  it.each(["pi", "muse"])("preserves %s on agent creation over HTTP and WebRTC", (provider) => {
+    const input = {
+      name: "Helper",
+      description: "Helps out.",
+      avatarSeed: "setup:helper",
+      avatarHue: null,
+      initialMessage: "Greet me briefly.",
+      provider,
+      model: "provider/model",
+    };
+    const options = { agentCreateModel: true };
+    const wire = JSON.parse(encodeTeamProtocolV7CurrentHttpRequest("POST", "/v1/agents", input, options));
+    expect(decodeTeamProtocolV7CurrentHttpRequest("POST", "/v1/agents", wire, options)).toEqual(input);
+    const peerWire = encodeTeamProtocolV7WebRtcHttpRequest("POST", "/v1/agents", input, options);
+    expect(decodeTeamProtocolV7WebRtcHttpRequest("POST", "/v1/agents", peerWire, options)).toEqual(input);
+    expect(() => decodeTeamProtocolV6CurrentHttpRequest("POST", "/v1/agents", wire, options)).toThrow();
   });
   it("keeps Meta keys write-only in the new administration contract", () => {
     expect(PROVIDERS_V5_CODECS.get(PROVIDERS_V5_ROUTES.apiKeySet)?.response(200, { key: "secret" })).toEqual({});

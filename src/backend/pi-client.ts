@@ -228,12 +228,13 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       case "thread/read": {
         const id = yield* providerSync(() => requiredString(params, "threadId"));
         const turns: Array<{ id: string; status?: string; startedAt?: number; items: ThreadItem[] }> = [];
+        const cwd = getString(params, "cwd");
         if (isRecord(params) && params.includeTurns === true)
           yield* this.readHistory(
             {
               threadId: id,
               items: "full",
-              ...(getString(params, "cwd") ? { cwd: getString(params, "cwd") ?? undefined } : {}),
+              ...(cwd ? { cwd } : {}),
             },
             (fragment) =>
               Effect.sync(() => {

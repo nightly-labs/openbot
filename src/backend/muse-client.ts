@@ -91,6 +91,8 @@ interface MuseTurn {
   id: string;
   compact: boolean;
   items: Map<string, MuseItem>;
+  /** Holds a trailing credential prefix until the next delta or authoritative item. */
+  deltaPending: Map<string, string>;
 }
 interface MuseThread {
   id: string;
@@ -399,14 +401,17 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
     }
   }
 
-  #redact(value: string): string {
+  #redactionValues(): string[] {
     const key = this.#options.apiKey();
     if (key) this.#secrets.add(key);
     const secrets = [...this.#secrets, ...mcpSecretValues(this.#options.mcpServers?.() ?? [])];
-    return redactMcpValues(
-      redactText(value),
-      secrets.flatMap((secret) => [secret, JSON.stringify(secret).slice(1, -1)]),
-    );
+    return secrets
+      .flatMap((secret) => [secret, JSON.stringify(secret).slice(1, -1)])
+      .filter((secret) => secret.length >= 4);
+  }
+
+  #redact(value: string): string {
+    return redactMcpValues(redactText(value), this.#redactionValues());
   }
   #fail(_error: unknown): void {
     if (!this.#running) return;
@@ -577,7 +582,7 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
     const input = compact ? [] : yield* musePrompt(params);
     if (thread.instructions) input.unshift({ type: "text", text: thread.instructions });
     const id = host.connection.mintCommandId();
-    thread.turn = { id, compact, items: new Map() };
+    thread.turn = { id, compact, items: new Map(), deltaPending: new Map() };
     this.#emit("turn/started", { threadId: thread.id, turn: { id, status: "inProgress" } });
     const effort = getString(params, "effort");
     const result = yield* this.#command(
@@ -613,6 +618,44 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
     return { turn: { id, status: "inProgress" } };
   });
 
+  /** Only provider text is redacted. IDs, status, revisions, and numeric usage stay intact. */
+  #publicItem(item: MuseItem, turn?: MuseTurn): ThreadItem {
+    const redact = (text: string, field: string): string => {
+      if (!turn || item.status !== "inProgress") return this.#redact(text);
+      turn.deltaPending.delete(`${item.itemId}:${field}`);
+      return this.#streamDelta(turn, item.itemId, field, text);
+    };
+    return museThreadItem({
+      ...item,
+      tool: this.#redact(item.tool ?? item.kind),
+      ...(item.text !== undefined ? { text: redact(item.text, "text") } : {}),
+      ...(item.summary !== undefined
+        ? { summary: item.summary.map((text, index) => redact(text, `summary.${index}`)) }
+        : {}),
+      ...(item.args !== undefined ? { args: redact(item.args, "args") } : {}),
+      ...(item.visibleOutput !== undefined ? { visibleOutput: redact(item.visibleOutput, "output") } : {}),
+      ...(item.commandText !== undefined ? { commandText: redact(item.commandText, "commandText") } : {}),
+      ...(item.failureReason !== undefined ? { failureReason: redact(item.failureReason, "failureReason") } : {}),
+    });
+  }
+
+  #streamDelta(turn: MuseTurn, itemId: string, field: string, delta: string): string {
+    const key = `${itemId}:${field}`;
+    const text = this.#redact((turn.deltaPending.get(key) ?? "") + delta);
+    let held = 0;
+    for (const secret of this.#redactionValues()) {
+      for (let length = Math.min(secret.length - 1, text.length); length > held; length--) {
+        if (secret.startsWith(text.slice(-length))) {
+          held = length;
+          break;
+        }
+      }
+    }
+    if (held) turn.deltaPending.set(key, text.slice(-held));
+    else turn.deltaPending.delete(key);
+    return text.slice(0, text.length - held);
+  }
+
   #emit(method: string, params: unknown): void {
     this.emit("notification", { method, params });
   }
@@ -622,10 +665,14 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
     const old = turn.items.get(item.itemId);
     if (old && old.revision >= item.revision) return;
     turn.items.set(item.itemId, item);
+    if (item.status !== "inProgress") {
+      // The final item replaces streamed text, including any held ordinary suffix.
+      for (const key of turn.deltaPending.keys()) if (key.startsWith(`${item.itemId}:`)) turn.deltaPending.delete(key);
+    }
     this.#emit(item.status === "inProgress" ? "item/started" : "item/completed", {
       threadId: thread.id,
       turnId: turn.id,
-      item: museThreadItem(item),
+      item: this.#publicItem(item, turn),
     });
   }
   #finish(thread: MuseThread, status: string): void {
@@ -754,7 +801,14 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
           : item.kind === "reasoning"
             ? "item/reasoning/summaryTextDelta"
             : "item/commandExecution/outputDelta";
-      this.#emit(event, { threadId: thread.id, turnId: thread.turn.id, itemId, delta, summaryIndex: 0 });
+      const safeDelta = this.#streamDelta(
+        thread.turn,
+        item.itemId,
+        field === "visibleOutput" ? "output" : field,
+        delta,
+      );
+      if (safeDelta)
+        this.#emit(event, { threadId: thread.id, turnId: thread.turn.id, itemId, delta: safeDelta, summaryIndex: 0 });
       return;
     }
     if (method === "session/tokenUsage") {
@@ -943,7 +997,7 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
         !(yield* consume({
           turnId: id,
           ...(status ? { status } : {}),
-          items: request.items === "full" ? turn.map(museThreadItem) : [],
+          items: request.items === "full" ? turn.map((item) => this.#publicItem(item)) : [],
           complete: true,
         }))
       )

@@ -688,6 +688,35 @@ describe("OpenCode ACP environment", () => {
 });
 
 describe("ACP session settings", () => {
+  // Failure mode: a saved option removed by a provider update prevents all future prompts.
+  it("applies only available saved settings without blocking the next prompt", async () => {
+    const fake = await createFakeOpencodeAgent("system");
+    vi.stubEnv("OPENBOT_FAKE_ACP_CONFIG_MODELS", "1");
+    vi.stubEnv("OPENBOT_FAKE_ACP_SETTINGS", "1");
+    vi.stubEnv("OPENBOT_FAKE_ACP_CONFIG_LOG", fake.configLog);
+    vi.stubEnv("OPENBOT_FAKE_ACP_PROMPT_LOG", fake.promptLog);
+    const client = startOpencode(fake.cli, () => null, fake.envLog);
+    const { thread } = await runCauseEffect(
+      client.request("thread/start", { cwd: fake.directory }, decodeThreadResponse),
+    );
+    await runCauseEffect(
+      client.request(
+        "turn/start",
+        {
+          threadId: thread.id,
+          clientUserMessageId: "saved-options",
+          input: [{ type: "inputText", text: "Continue" }],
+          sessionSettings: { removed: true, tone: "removed-choice", compact: true },
+        },
+        decodeRecordResponse,
+      ),
+    );
+    await vi.waitFor(async () => expect(await fake.readPrompts()).toHaveLength(1));
+    const changes = await fake.readConfigCalls();
+    expect(changes).toContainEqual(expect.objectContaining({ configId: "compact", value: true }));
+    expect(changes.some((change) => change.configId === "removed" || change.configId === "tone")).toBe(false);
+  });
+
   // Failure modes: a setting bypasses approval, an invalid choice reaches the agent, or an idle
   // option update is lost. This test uses the real ACP process and stream for all three paths.
   it("keeps permission controls private and accepts configuration updates while idle", async () => {

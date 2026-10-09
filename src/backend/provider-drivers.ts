@@ -252,8 +252,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     id: "pi",
     signIn: { kind: "terminal", timeoutMs: CLI_LOGIN_TIMEOUT_MS },
     resolveCli: resolvePiCli,
-    createClient: (cli, timeout, context, confinement) =>
-      new PiAgentClient(cli, {
+    createClient: (cli, timeout, context, confinement) => {
+      const history = context.history?.("pi");
+      return new PiAgentClient(cli, {
         requestTimeoutMs: timeout,
         ...(confinement
           ? {
@@ -265,18 +266,19 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
             }
           : {}),
         extraEnv: () => ({ ...context.agentEnvironment?.() }),
-        providerStateDirectory: context.providerStateDirectory,
+        ...(context.providerStateDirectory ? { providerStateDirectory: context.providerStateDirectory } : {}),
         mcpServers: context.mcpServers,
-        reportMcpDrops: context.reportMcpDrops,
-        mcpToolRuntimes: context.mcpToolRuntimes,
-        mcpAuthorization: context.mcpAuthorization,
-        history: context.history?.("pi"),
-      }),
+        ...(context.reportMcpDrops ? { reportMcpDrops: context.reportMcpDrops } : {}),
+        ...(context.mcpToolRuntimes ? { mcpToolRuntimes: context.mcpToolRuntimes } : {}),
+        ...(context.mcpAuthorization ? { mcpAuthorization: context.mcpAuthorization } : {}),
+        ...(history ? { history } : {}),
+      });
+    },
     createProfileClient: (cli, timeout, context) =>
       new PiAgentClient(cli, {
         requestTimeoutMs: timeout,
         profileGeneration: true,
-        providerStateDirectory: context.providerStateDirectory,
+        ...(context.providerStateDirectory ? { providerStateDirectory: context.providerStateDirectory } : {}),
       }),
     authState: (account) => ({ kind: "pi", email: account?.email ?? null }),
     validateAccount: () => undefined,
@@ -307,9 +309,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
             }
           : {}),
         mcpServers: context.mcpServers,
-        reportMcpDrops: context.reportMcpDrops,
-        mcpToolRuntimes: context.mcpToolRuntimes,
-        mcpAuthorization: context.mcpAuthorization,
+        ...(context.reportMcpDrops ? { reportMcpDrops: context.reportMcpDrops } : {}),
+        ...(context.mcpToolRuntimes ? { mcpToolRuntimes: context.mcpToolRuntimes } : {}),
+        ...(context.mcpAuthorization ? { mcpAuthorization: context.mcpAuthorization } : {}),
       }),
     createProfileClient: (cli, timeout, context) =>
       new MuseAgentClient(cli, {
