@@ -73,7 +73,8 @@ export const messages = {
   "account.login.signInTitle": "OpenBot'a giriş yapın",
   "account.login.connectingDescription": "Hesap hizmeti başlatılıyor. Bu işlem genellikle biraz zaman alır.",
   "account.login.unavailableDescription": "OpenBot şu anda hesap hizmetine ulaşamıyor.",
-  "account.login.signInDescription": "Size tek kullanımlık bir kod e-posta ile göndereceğiz.",
+  "account.login.signInDescription":
+    "Oturum açmak veya hesap oluşturmak için e-postanızı kullanın. Size tek kullanımlık bir kod göndereceğiz.",
   "account.login.codeAccepted": "Kodunuz kabul edildi.",
   "account.login.codeSent": "{email} adresine bir kod gönderdik.",
   "account.login.connectingSecurely": "Güvenli bir şekilde bağlanılıyor…",
@@ -86,6 +87,7 @@ export const messages = {
   "account.login.tryAgainIn": "{time} sonra tekrar deneyin",
   "account.login.checkingDelivery": "Teslimat kontrol ediliyor…",
   "account.login.sendingCode": "Kod gönderiliyor…",
+  "account.login.localData": "Sohbetleriniz ve dosyalarınız OpenBot'u çalıştıran bilgisayarda kalır.",
   "account.login.sendFailed": "Kod gönderilirken bir sorun oluştu. Tekrar deneyin.",
   "account.login.codeIncomplete": "8 karakterlik kodun tamamını girin.",
   "account.login.verifyFailed": "Kod doğrulanırken bir sorun oluştu. Tekrar deneyin.",

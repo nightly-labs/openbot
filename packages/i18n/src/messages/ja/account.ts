@@ -73,7 +73,8 @@ export const messages = {
   "account.login.signInTitle": "OpenBot にサインイン",
   "account.login.connectingDescription": "アカウントサービスを起動しています。通常は少しで完了します。",
   "account.login.unavailableDescription": "OpenBot は現在アカウントサービスに接続できません。",
-  "account.login.signInDescription": "ワンタイムコードをメールでお送りします。",
+  "account.login.signInDescription":
+    "メールアドレスでサインイン、またはアカウントを作成できます。ワンタイムコードをお送りします。",
   "account.login.codeAccepted": "コードが承認されました。",
   "account.login.codeSent": "{email} にコードを送信しました。",
   "account.login.connectingSecurely": "安全に接続しています…",
@@ -86,6 +87,7 @@ export const messages = {
   "account.login.tryAgainIn": "{time} 後に再試行",
   "account.login.checkingDelivery": "配信を確認しています…",
   "account.login.sendingCode": "コードを送信しています…",
+  "account.login.localData": "チャットとファイルは、OpenBot を実行しているコンピューターに残ります。",
   "account.login.sendFailed": "コードの送信中に問題が発生しました。もう一度お試しください。",
   "account.login.codeIncomplete": "8 文字のコードをすべて入力してください。",
   "account.login.verifyFailed": "コードの確認中に問題が発生しました。もう一度お試しください。",

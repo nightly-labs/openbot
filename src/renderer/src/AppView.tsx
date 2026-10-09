@@ -6,10 +6,8 @@ import { useSetup } from "./features/onboarding/onboarding-context";
 import { useSetupProviderProps } from "./features/onboarding/setup-provider-props";
 import { useServerScope } from "./features/servers/server-scope";
 import { useServerSelection } from "./features/servers/server-selection";
-import { useSettings } from "./features/settings/settings-context";
-import type { SoundFeedbackChoice } from "./features/settings/sound-feedback";
 import { StartupSplash } from "./features/startup/StartupSplash";
-import { AccountLogin, InitialSetup, OnboardingFlow } from "./lazy-views";
+import { AccountLogin, FirstRunFlow, InitialSetup } from "./lazy-views";
 import { usePlatform } from "./platform";
 import { WorkspaceShell } from "./WorkspaceShell";
 
@@ -44,19 +42,6 @@ export function AppAccessGate() {
   const setupProviders = useSetupProviderProps();
   const detection = useProviderDetection();
   const { joinRemoteDuringSetup } = useServerSelection();
-  const { generalSettings, updateGeneralSettings } = useSettings();
-  const soundFeedback: SoundFeedbackChoice = {
-    get value() {
-      const settings = generalSettings();
-      return settings.soundFeedback ? settings.soundTheme : "off";
-    },
-    onChange: (value) =>
-      updateGeneralSettings({
-        ...generalSettings(),
-        soundFeedback: value !== "off",
-        ...(value === "off" ? {} : { soundTheme: value }),
-      }),
-  };
   const started = () => setup.setupLoaded() && platform.appInfo() !== null;
   const [splashShown, setSplashShown] = createSignal(true);
   // A startup mark for `dev:bench`: the first moment the app can leave the splash.
@@ -91,7 +76,7 @@ export function AppAccessGate() {
                     when={setup.pendingInviteUrl().trim()}
                     fallback={
                       <Loading fallback={<LoadingScreen />}>
-                        <OnboardingFlow
+                        <FirstRunFlow
                           {...setupProviders}
                           state={
                             setup.setupState() ?? { completed: false, preferredProvider: null, preferredModel: null }
@@ -99,7 +84,7 @@ export function AppAccessGate() {
                           platform={platform.appInfo()?.platform ?? "darwin"}
                           onSave={setup.saveSetup}
                           onProviderStepShown={detection.scanOnce}
-                          soundFeedback={soundFeedback}
+                          logoVariant={platform.appInfo()?.variant ?? "production"}
                         />
                       </Loading>
                     }

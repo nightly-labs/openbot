@@ -32,10 +32,14 @@ function userHasProvider(option: ProviderPickerOption): boolean {
  * stay in the list in their order: the rows the user saw when they first used the list, and each
  * provider that they chose from "More providers". Thus a row does not move or go away under the
  * pointer when a download finishes or a sign-in changes the state of a provider.
+ *
+ * Without `includeFree`, the list has plan rows only, and the free provider is the last provider in
+ * "More providers". The user chose to connect a plan, and can still find it there.
  */
 export function onboardingProviderRows(
   options: readonly ProviderPickerOption[],
   kept: readonly AgentProviderId[] = [],
+  includeFree = true,
 ): OnboardingProviderRows {
   const plans = options.filter((option) => option.id !== FREE_PROVIDER);
   const owned = plans.filter(userHasProvider);
@@ -48,8 +52,13 @@ export function onboardingProviderRows(
   const listedPlans = [...keptRows, ...ruled.filter((option) => !kept.includes(option.id))];
   const listedIds = new Set(listedPlans.map((option) => option.id));
   const hidden = plans.filter((option) => !listedIds.has(option.id));
+  const free = options.filter((option) => option.id === FREE_PROVIDER);
   return {
-    listed: [...listedPlans, ...options.filter((option) => option.id === FREE_PROVIDER)],
-    hidden: [...hidden.filter((option) => !option.freeModels), ...hidden.filter((option) => option.freeModels)],
+    listed: includeFree ? [...listedPlans, ...free] : listedPlans,
+    hidden: [
+      ...hidden.filter((option) => !option.freeModels),
+      ...hidden.filter((option) => option.freeModels),
+      ...(includeFree ? [] : free),
+    ],
   };
 }

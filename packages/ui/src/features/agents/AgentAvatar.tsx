@@ -20,6 +20,7 @@ import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, createUniqueId, For, onSettled, Show } from "solid-js";
 import { type AvatarMotion, bloubAvatarProfile, type SupportedAvatarSilhouetteId } from "../../bloub-avatar";
 import type { AgentProfile } from "../../data";
+import { createPointerGaze } from "./avatar-pointer-gaze";
 
 // Cap avatar animation at 30fps: uncapped bloub clocks measured 30% renderer / 24% GPU
 // for two visible avatars. The shape is 24-40px, so the eye cannot see the difference.
@@ -65,6 +66,11 @@ interface AgentAvatarProps {
   cycleOffset?: number;
   animationOffset?: number;
   shape?: SupportedAvatarSilhouetteId;
+  /**
+   * The eyes follow the pointer, and a press makes the agent nod. The avatar then moves without hover,
+   * so use it only where few avatars show. A photo avatar and reduced motion ignore it.
+   */
+  followPointer?: boolean;
   class?: string;
   style?: Record<string, string>;
 }
@@ -104,6 +110,7 @@ export function AgentAvatar(props: AgentAvatarProps) {
           cycleOffset={props.cycleOffset}
           animationOffset={props.animationOffset}
           shape={props.shape}
+          followPointer={props.followPointer === true}
           breathe={breathe()}
           class={className()}
           style={style()}
@@ -267,11 +274,13 @@ function GeneratedAvatar(props: {
   cycleOffset?: number;
   animationOffset?: number;
   shape?: SupportedAvatarSilhouetteId;
+  followPointer: boolean;
   breathe?: string;
   class: string;
   style?: Record<string, string>;
 }) {
   let element: HTMLSpanElement | undefined;
+  const gaze = createPointerGaze();
   const [interacting, setInteracting] = createSignal(false);
   const [reducedMotion, setReducedMotion] = createSignal(prefersReducedMotion());
   const presentation = createMemo(() => avatarMoodPresentation(props.mood));
@@ -285,10 +294,12 @@ function GeneratedAvatar(props: {
     state: presentation().state,
   }));
   const cycle = createMemo(() => offsetCycle(DEFAULT_CYCLE, props.cycleOffset ?? 0));
-  // A mood that carries its own motion has to be seen without being pointed at; the resting moods
-  // keep the hover gating that the perf note above is about.
+  // A mood that carries its own motion has to be seen without being pointed at, and so do eyes that
+  // follow the pointer; the resting moods keep the hover gating that the perf note above is about.
   const animated = () =>
-    !reducedMotion() && (avatarMoodIsBusy(props.mood) || !STATIC_MOTIONS.has(props.motion) || interacting());
+    !reducedMotion() &&
+    (props.followPointer || avatarMoodIsBusy(props.mood) || !STATIC_MOTIONS.has(props.motion) || interacting());
+  const gazeScript = createMemo(() => (props.followPointer ? gaze.script : null));
   const motionCycle = () => {
     if (props.mood !== "idle") return [slowerBlock(presentation().state)];
     return cycle();
@@ -326,6 +337,13 @@ function GeneratedAvatar(props: {
     };
   });
 
+  createEffect(
+    () => props.followPointer,
+    (follow) => {
+      if (follow && element) return gaze.attach(element);
+    },
+  );
+
   const avatar = () => (
     <BloubBot
       size={100}
@@ -336,6 +354,7 @@ function GeneratedAvatar(props: {
       playing={true}
       fps={AVATAR_FPS}
       initialPhase={props.animationOffset ?? avatarAnimationPhase(props.seed)}
+      gaze={gazeScript()}
       ariaLabel=""
       class="bloub-avatar-svg"
     />

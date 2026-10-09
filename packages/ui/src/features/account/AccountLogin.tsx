@@ -2,7 +2,7 @@ import { AppLogo } from "@openbot/brand";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AppVariant, CentralAuthIssue, CentralAuthState } from "@openbot/contracts/ipc";
 import { normalizeEmailAddress, normalizeOneTimeCode } from "@openbot/contracts/validation";
-import { ArrowLeft, Button, Input, RefreshCw } from "@openbot/ui";
+import { ArrowLeft, Button, Input, Lock, RefreshCw } from "@openbot/ui";
 import { createEffect, createMemo, createSignal, onCleanup, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import { OtpInput, type OtpInputStatus } from "./OtpInput";
@@ -501,6 +501,11 @@ export function AccountLogin(props: AccountLoginProps) {
                         : t("account.login.sendingCode")}
                     </Show>
                   </Button>
+                  {/* The account is for sign-in only. A new user asks what leaves the computer. */}
+                  <p class="account-login-local-data">
+                    <Lock size={13} aria-hidden="true" />
+                    {t("account.login.localData")}
+                  </p>
                 </form>
               }
             >

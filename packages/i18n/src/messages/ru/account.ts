@@ -78,7 +78,8 @@ export const messages = {
   "account.login.signInTitle": "Вход в OpenBot",
   "account.login.connectingDescription": "Запускаем сервис аккаунтов. Обычно это занимает немного времени.",
   "account.login.unavailableDescription": "OpenBot сейчас не может связаться с сервисом аккаунтов.",
-  "account.login.signInDescription": "Мы отправим вам одноразовый код на почту.",
+  "account.login.signInDescription":
+    "Войдите или создайте аккаунт по электронной почте. Мы отправим вам одноразовый код.",
   "account.login.codeAccepted": "Код принят.",
   "account.login.codeSent": "Мы отправили код на {email}.",
   "account.login.connectingSecurely": "Устанавливаем защищённое соединение…",
@@ -91,6 +92,7 @@ export const messages = {
   "account.login.tryAgainIn": "Повторить через {time}",
   "account.login.checkingDelivery": "Проверяем доставку…",
   "account.login.sendingCode": "Отправляем код…",
+  "account.login.localData": "Ваши чаты и файлы остаются на компьютере, где работает OpenBot.",
   "account.login.sendFailed": "Не удалось отправить код. Повторите попытку.",
   "account.login.codeIncomplete": "Введите все 8 символов кода.",
   "account.login.verifyFailed": "Не удалось проверить код. Повторите попытку.",

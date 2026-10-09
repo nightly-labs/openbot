@@ -146,6 +146,13 @@ export interface ProviderPickerProps {
   moreProviders?: readonly ProviderPickerOption[] | undefined;
   /** The custom provider row is in the "More providers" dialog, not in the list. */
   customInMore?: boolean;
+  /** The OpenCode option that runs the custom endpoints, when OpenCode is not a row of `options`. */
+  customEngine?: ProviderPickerOption | undefined;
+  /**
+   * The installed version goes on the line under the name when the row has no email and no
+   * description, so the badge has the row's last column alone.
+   */
+  versionInDetail?: boolean;
   /** A note beside the "More providers" button, drawn like a row's `callout`. */
   moreCallout?: { title: string; detail: string } | null;
   onChooseMoreProvider?: ((provider: AgentProviderId) => void) | undefined;
@@ -166,7 +173,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
   const pickerId = createUniqueId();
   const addCustomId = `${pickerId}-custom`;
   const customRadioId = `${pickerId}-custom-radio`;
-  const openCode = () => props.options.find((option) => option.id === "opencode");
+  const openCode = () => props.customEngine ?? props.options.find((option) => option.id === "opencode");
   const customReady = () => servesCustomProvider(openCode());
   const endpointCount = () => props.customProviders?.length ?? 0;
   const endpointCountLabel = () => t("provider.endpointCount", { count: endpointCount() });
@@ -505,7 +512,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
                     <ProviderLogo provider={option().id} class="provider-picker-logo" />
                     <span class="provider-picker-identity">
                       <span class="provider-picker-name">{option().name}</span>
-                      <Show when={option().email ?? option().description}>
+                      <Show when={option().email ?? option().description ?? (props.versionInDetail ? version() : null)}>
                         {(detail) => <small class="provider-picker-email">{detail()}</small>}
                       </Show>
                       <Show when={off() ? undefined : option().checkError}>
@@ -540,7 +547,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
                           </Badge>
                         }
                       >
-                        <Show when={version()}>
+                        <Show when={props.versionInDetail ? null : version()}>
                           {(installed) => <small class="provider-picker-version">{installed()}</small>}
                         </Show>
                         {/* Free-tier badge only beside runtime badge. */}

@@ -50,25 +50,6 @@
   width: 100%;
   display: flex;
   justify-content: center;
-  animation: onboarding-step-in var(--openbot-duration-overlay) var(--openbot-ease-out) both;
-}
-
-.onboarding-step[data-direction="back"] {
-  animation-name: onboarding-step-in-back;
-}
-
-@keyframes onboarding-step-in {
-  from {
-    opacity: 0;
-    transform: translateX(18px);
-  }
-}
-
-@keyframes onboarding-step-in-back {
-  from {
-    opacity: 0;
-    transform: translateX(-18px);
-  }
 }
 
 .onboarding-panel {
@@ -102,33 +83,6 @@
   width: 100%;
   height: auto;
   overflow: visible;
-}
-
-.onboarding-hero-avatar {
-  width: 86px;
-  height: 86px;
-  display: grid;
-  place-items: center;
-  margin: 0 0 26px;
-}
-
-.onboarding-hero-avatar .agent-avatar {
-  width: 86px;
-  height: 86px;
-}
-
-.onboarding-hero-avatar .agent-avatar > svg {
-  width: 128%;
-  height: 128%;
-}
-
-.onboarding-composer {
-  width: min(100%, 480px);
-  margin-top: 28px;
-}
-
-.onboarding-panel-meet .onboarding-composer {
-  margin-top: 28px;
 }
 
 .onboarding-provider {
@@ -388,61 +342,6 @@
   }
 }
 
-.onboarding-job-orbit {
-  position: relative;
-  width: min(100%, 440px);
-  height: 300px;
-  margin-top: 26px;
-}
-
-.onboarding-job-card {
-  position: absolute;
-  display: grid;
-  justify-items: center;
-  gap: 10px;
-}
-
-.onboarding-job-card > span:last-child {
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-bg-control);
-  padding: 9px 15px;
-  color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-lg);
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.onboarding-job-card-top {
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-}
-
-.onboarding-job-card-left {
-  top: 112px;
-  left: 3%;
-}
-
-.onboarding-job-card-right {
-  top: 112px;
-  right: 3%;
-}
-
-.onboarding-job-avatar.agent-avatar {
-  width: 76px;
-  height: 76px;
-}
-
-.onboarding-job-avatar.agent-avatar > svg {
-  width: 128%;
-  height: 128%;
-}
-
-.onboarding-sound-picker {
-  width: min(100%, 600px);
-  margin-top: 32px;
-}
-
 .onboarding-error {
   width: min(100%, 480px);
   margin: 12px 0 0;
@@ -508,23 +407,6 @@
     width: 30px;
     height: 30px;
   }
-
-  .onboarding-job-orbit {
-    height: 280px;
-  }
-
-  .onboarding-job-card-left {
-    left: -2%;
-  }
-
-  .onboarding-job-card-right {
-    right: -2%;
-  }
-
-  .onboarding-job-card > span:last-child {
-    padding-inline: 11px;
-    font-size: var(--openbot-text-md);
-  }
 }
 
 @media (max-width: 460px) {
@@ -541,17 +423,9 @@
     width: min(100%, 320px);
     margin-top: 14px;
   }
-
-  .onboarding-job-orbit {
-    height: 250px;
-    transform: scale(0.88);
-    transform-origin: top center;
-    margin-bottom: -28px;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .onboarding-step,
   .onboarding-progress span,
   .onboarding-computer-window,
   .onboarding-computer-cursor,
@@ -642,7 +516,6 @@
 @keyframes provider-picker-callout-in {
   from {
     opacity: 0;
-    transform: translateX(-8px);
   }
 }
 
@@ -653,19 +526,11 @@
   left: calc(100% + 10px);
   align-items: flex-end;
   text-align: right;
-  animation-name: provider-picker-callout-end-in;
 }
 
 .provider-picker-callout-end .provider-picker-callout-arrow {
   align-self: flex-start;
   transform: scaleX(-1);
-}
-
-@keyframes provider-picker-callout-end-in {
-  from {
-    opacity: 0;
-    transform: translateX(8px);
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -698,4 +563,541 @@
   top: 12px;
   right: 12px;
   -webkit-app-region: no-drag;
+}
+
+/* The first question of first run. The team rises in from the sides to the large agent in the
+   middle; the two answers are rows of one grouped list. */
+
+.first-run-screen[data-step="choose"] .onboarding-shell {
+  width: min(100%, 960px);
+}
+
+/* First run changes steps in a view transition (`first-run-transition.ts`). The old step blurs and
+   fades out while the next one comes into focus in the same place; the progress and the actions
+   move to their new place. Opening the app blurs the setup screen away into
+   the app. The motion stays small: blur and fade carry the change, not travel. */
+.first-run-screen .onboarding-shell > .onboarding-step {
+  view-transition-name: first-run-step;
+}
+
+.first-run-screen .onboarding-shell > .onboarding-progress {
+  view-transition-name: first-run-progress;
+}
+
+.first-run-screen .onboarding-shell > .onboarding-actions {
+  view-transition-name: first-run-actions;
+}
+
+::view-transition-group(first-run-step),
+::view-transition-group(first-run-progress),
+::view-transition-group(first-run-actions) {
+  animation-duration: 440ms;
+  animation-timing-function: var(--openbot-ease-out);
+}
+
+/* The steps are not the same width. Each image keeps its own size in the middle, so none stretches. */
+::view-transition-old(first-run-step),
+::view-transition-new(first-run-step) {
+  inset-inline-start: 50%;
+  inline-size: auto;
+  translate: -50% 0;
+}
+
+html:active-view-transition-type(step)::view-transition-old(first-run-step) {
+  animation: first-run-step-out 220ms var(--openbot-ease-out) both;
+}
+
+html:active-view-transition-type(step)::view-transition-new(first-run-step) {
+  animation: first-run-step-in 440ms var(--openbot-ease-out) 40ms both;
+}
+
+/* The live dots animate their own width, so the old picture of them is not needed. */
+::view-transition-old(first-run-progress):not(:only-child) {
+  animation: none;
+  opacity: 0;
+}
+
+::view-transition-new(first-run-progress):not(:only-child) {
+  animation: none;
+}
+
+::view-transition-new(first-run-progress):only-child,
+::view-transition-new(first-run-actions):only-child {
+  animation: first-run-step-rise 440ms var(--openbot-ease-out) 40ms both;
+}
+
+/* The buttons change their labels in place, so the old ones blur away under the new ones. */
+::view-transition-old(first-run-actions),
+::view-transition-old(first-run-progress):only-child {
+  animation: first-run-blur-out 220ms var(--openbot-ease-out) both;
+}
+
+::view-transition-new(first-run-actions):not(:only-child) {
+  animation: first-run-blur-in 440ms var(--openbot-ease-out) 40ms both;
+}
+
+html:active-view-transition-type(open)::view-transition-old(*) {
+  animation: first-run-open-out 320ms var(--openbot-ease-out) both;
+}
+
+html:active-view-transition-type(open)::view-transition-new(*) {
+  animation: first-run-open-in 520ms var(--openbot-ease-out) 60ms both;
+}
+
+@keyframes first-run-step-out {
+  to {
+    opacity: 0;
+    filter: blur(6px);
+  }
+}
+
+@keyframes first-run-step-in {
+  from {
+    opacity: 0;
+    filter: blur(6px);
+  }
+}
+
+@keyframes first-run-step-rise {
+  from {
+    opacity: 0;
+    filter: blur(4px);
+  }
+}
+
+@keyframes first-run-blur-out {
+  to {
+    opacity: 0;
+    filter: blur(8px);
+  }
+}
+
+@keyframes first-run-blur-in {
+  from {
+    opacity: 0;
+    filter: blur(8px);
+  }
+}
+
+@keyframes first-run-open-out {
+  to {
+    opacity: 0;
+    filter: blur(8px);
+  }
+}
+
+@keyframes first-run-open-in {
+  from {
+    opacity: 0;
+    filter: blur(6px);
+  }
+}
+
+.first-run-choice {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.first-run-choice-team {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--openbot-space-3);
+  margin-bottom: 40px;
+}
+
+.first-run-choice-avatar {
+  width: 52px;
+  height: 52px;
+  flex: none;
+  animation: first-run-rise var(--openbot-duration-overlay) var(--openbot-ease-out) both;
+}
+
+.first-run-choice-avatar:nth-child(1),
+.first-run-choice-avatar:nth-child(7) {
+  width: 40px;
+  height: 40px;
+  transform: translateY(24px);
+}
+
+.first-run-choice-avatar:nth-child(2),
+.first-run-choice-avatar:nth-child(6) {
+  transform: translateY(8px);
+}
+
+.first-run-choice-avatar:nth-child(3),
+.first-run-choice-avatar:nth-child(5) {
+  width: 68px;
+  height: 68px;
+}
+
+.first-run-choice-avatar:nth-child(4) {
+  width: 104px;
+  height: 104px;
+  transform: translateY(-12px);
+}
+
+.first-run-choice-avatar:nth-child(2) {
+  animation-delay: calc(var(--openbot-duration-fast) * 1);
+}
+
+.first-run-choice-avatar:nth-child(3) {
+  animation-delay: calc(var(--openbot-duration-fast) * 2);
+}
+
+.first-run-choice-avatar:nth-child(4) {
+  animation-delay: calc(var(--openbot-duration-fast) * 3);
+}
+
+.first-run-choice-avatar:nth-child(5) {
+  animation-delay: calc(var(--openbot-duration-fast) * 4);
+}
+
+.first-run-choice-avatar:nth-child(6) {
+  animation-delay: calc(var(--openbot-duration-fast) * 5);
+}
+
+.first-run-choice-avatar:nth-child(7) {
+  animation-delay: calc(var(--openbot-duration-fast) * 6);
+}
+
+.first-run-choice-title {
+  margin: 0;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-hero);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: -0.055em;
+  line-height: 1;
+  text-wrap: balance;
+}
+
+.first-run-choice .onboarding-description {
+  margin-top: var(--openbot-space-4);
+}
+
+.first-run-choice-rows {
+  width: min(100%, 440px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  margin-top: var(--openbot-space-8);
+  border: 1px solid var(--openbot-border-grouped);
+  border-radius: var(--openbot-radius-grouped);
+  background: var(--openbot-bg-grouped);
+}
+
+.first-run-choice-rows .first-run-choice-row {
+  height: auto;
+  min-height: 64px;
+  justify-content: flex-start;
+  gap: var(--openbot-space-3);
+  border-radius: 0;
+  padding: var(--openbot-space-3) var(--openbot-space-4);
+  text-align: left;
+  white-space: normal;
+}
+
+.first-run-choice-rows .first-run-choice-row + .first-run-choice-row {
+  border-top-color: var(--openbot-border-grouped);
+}
+
+.first-run-choice-row-text {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-regular);
+  line-height: var(--openbot-leading-sm);
+}
+
+.first-run-choice-row-text strong {
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.first-run-choice-logos {
+  display: flex;
+  gap: 6px;
+}
+
+.first-run-choice-logo {
+  width: 16px;
+  height: 16px;
+  overflow: visible;
+  fill: var(--openbot-provider-current);
+}
+
+.first-run-choice-row-chevron {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--openbot-text-dim);
+}
+
+.first-run-choice-reason {
+  margin-top: var(--openbot-space-3);
+}
+
+@keyframes first-run-rise {
+  from {
+    opacity: 0;
+    translate: 0 16px;
+  }
+}
+
+@media (max-width: 760px) {
+  .first-run-choice-team {
+    gap: var(--openbot-space-1-5);
+  }
+
+  .first-run-choice-avatar:nth-child(1),
+  .first-run-choice-avatar:nth-child(7) {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .first-run-choice-avatar {
+    animation: none;
+  }
+}
+
+/*
+ * The agents of the first screen and of the splash watch the pointer with their eyes (see
+ * `followPointer`). A hovered agent grows a little and a pressed one squeezes, then both spring back.
+ * The `scale` property leaves `transform` and `translate` to the arc and to the jumps. On the splash
+ * the hover is on the member, which stays still: a jump under a still pointer must not start it.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .first-run-choice-avatar,
+  .first-run-launch-avatar {
+    --first-run-spring: linear(
+      0,
+      0.035 2.1%,
+      0.281 6.7%,
+      0.723 12.9%,
+      0.938 16.7%,
+      1.077 21%,
+      1.149 24.3%,
+      1.163 27%,
+      1.154 29.9%,
+      1.129 32.8%,
+      1.051 39.6%,
+      1.017 43.1%,
+      0.977 51%,
+      0.974 53.8%,
+      0.975 57.1%,
+      0.997 69.8%,
+      1.003 76.9%,
+      1
+    );
+
+    transition: scale 560ms var(--first-run-spring);
+  }
+
+  .first-run-choice-avatar:hover,
+  .first-run-launch-member:hover .first-run-launch-avatar {
+    scale: 1.12;
+  }
+
+  .first-run-choice-avatar:active,
+  .first-run-launch-member:active .first-run-launch-avatar {
+    scale: 0.9;
+    transition-duration: var(--openbot-duration-fast);
+    transition-timing-function: var(--openbot-ease-out);
+  }
+}
+
+/*
+ * While first run waits to open the app, a splash covers it. The team from the first screen stands
+ * in the same arc and jumps in a slow wave, one agent after the other. The scribble under the team
+ * fills with the download; a wait with no percent draws and erases it.
+ */
+.first-run-launch {
+  --first-run-launch-accent: var(--openbot-logo-production);
+  position: absolute;
+  z-index: var(--openbot-layer-dialog);
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: var(--openbot-bg-canvas);
+  -webkit-app-region: drag;
+}
+
+.first-run-launch[data-variant="dev"] {
+  --first-run-launch-accent: var(--openbot-logo-dev);
+}
+
+.first-run-launch[data-variant="preview"] {
+  --first-run-launch-accent: var(--openbot-logo-preview);
+}
+
+.first-run-launch-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 40px;
+}
+
+.first-run-launch-team {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--openbot-space-3);
+}
+
+.first-run-launch-member {
+  display: grid;
+  flex: none;
+}
+
+.first-run-launch-avatar {
+  width: 52px;
+  height: 52px;
+}
+
+/* The same arc as the team on the first screen. */
+.first-run-launch-member:nth-child(1),
+.first-run-launch-member:nth-child(7) {
+  translate: 0 24px;
+}
+
+.first-run-launch-member:nth-child(1) .first-run-launch-avatar,
+.first-run-launch-member:nth-child(7) .first-run-launch-avatar {
+  width: 40px;
+  height: 40px;
+}
+
+.first-run-launch-member:nth-child(2),
+.first-run-launch-member:nth-child(6) {
+  translate: 0 8px;
+}
+
+.first-run-launch-member:nth-child(3) .first-run-launch-avatar,
+.first-run-launch-member:nth-child(5) .first-run-launch-avatar {
+  width: 68px;
+  height: 68px;
+}
+
+.first-run-launch-member:nth-child(4) {
+  translate: 0 -12px;
+}
+
+.first-run-launch-member:nth-child(4) .first-run-launch-avatar {
+  width: 104px;
+  height: 104px;
+}
+
+.first-run-launch-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.first-run-launch-scribble {
+  display: block;
+  width: 112px;
+  height: 14px;
+  overflow: visible;
+}
+
+.first-run-launch-scribble polyline {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.4px;
+}
+
+.first-run-launch-track {
+  stroke: color-mix(in srgb, var(--first-run-launch-accent) 18%, transparent);
+}
+
+.first-run-launch-fill {
+  stroke: var(--first-run-launch-accent);
+  stroke-dasharray: 1 1;
+  stroke-dashoffset: calc(1 - var(--first-run-launch-percent));
+  transition: stroke-dashoffset var(--openbot-duration-overlay) var(--openbot-ease-out);
+}
+
+.first-run-launch-label {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-md);
+}
+
+@media (max-width: 760px) {
+  .first-run-launch-team {
+    gap: var(--openbot-space-1-5);
+  }
+
+  .first-run-launch-member:nth-child(1),
+  .first-run-launch-member:nth-child(7) {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .first-run-launch-avatar {
+    animation: first-run-launch-hop 1.8s var(--openbot-ease-in-out) infinite;
+  }
+
+  .first-run-launch-member:nth-child(2) .first-run-launch-avatar {
+    animation-delay: 120ms;
+  }
+
+  .first-run-launch-member:nth-child(3) .first-run-launch-avatar {
+    animation-delay: 240ms;
+  }
+
+  .first-run-launch-member:nth-child(4) .first-run-launch-avatar {
+    animation-delay: 360ms;
+  }
+
+  .first-run-launch-member:nth-child(5) .first-run-launch-avatar {
+    animation-delay: 480ms;
+  }
+
+  .first-run-launch-member:nth-child(6) .first-run-launch-avatar {
+    animation-delay: 600ms;
+  }
+
+  .first-run-launch-member:nth-child(7) .first-run-launch-avatar {
+    animation-delay: 720ms;
+  }
+
+  .first-run-launch-progress[data-known="false"] .first-run-launch-fill {
+    stroke-dasharray: 0.35 1.2;
+    transition: none;
+    animation: first-run-launch-scribble 1.8s var(--openbot-ease-in-out) infinite;
+  }
+}
+
+/* A short jump, then a rest, so the wave reads as one team and not as noise. */
+@keyframes first-run-launch-hop {
+  0%,
+  36%,
+  100% {
+    transform: translateY(0);
+  }
+  16% {
+    transform: translateY(-12px);
+  }
+}
+
+@keyframes first-run-launch-scribble {
+  from {
+    stroke-dashoffset: 0.35;
+  }
+  to {
+    stroke-dashoffset: -1.2;
+  }
 }

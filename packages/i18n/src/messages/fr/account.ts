@@ -73,7 +73,8 @@ export const messages = {
   "account.login.signInTitle": "Se connecter à OpenBot",
   "account.login.connectingDescription": "Démarrage du service de compte. Cela prend en général un instant.",
   "account.login.unavailableDescription": "OpenBot ne peut pas joindre le service de compte pour le moment.",
-  "account.login.signInDescription": "Nous vous enverrons un code à usage unique par e-mail.",
+  "account.login.signInDescription":
+    "Utilisez votre e-mail pour vous connecter ou créer un compte. Nous vous enverrons un code à usage unique.",
   "account.login.codeAccepted": "Votre code a été accepté.",
   "account.login.codeSent": "Nous avons envoyé un code à {email}.",
   "account.login.connectingSecurely": "Connexion sécurisée…",
@@ -86,6 +87,7 @@ export const messages = {
   "account.login.tryAgainIn": "Réessayez dans {time}",
   "account.login.checkingDelivery": "Vérification de la livraison…",
   "account.login.sendingCode": "Envoi du code…",
+  "account.login.localData": "Vos discussions et fichiers restent sur l’ordinateur qui exécute OpenBot.",
   "account.login.sendFailed": "Un problème est survenu lors de l’envoi du code. Réessayez.",
   "account.login.codeIncomplete": "Saisissez le code complet de 8 caractères.",
   "account.login.verifyFailed": "Un problème est survenu lors de la vérification du code. Réessayez.",

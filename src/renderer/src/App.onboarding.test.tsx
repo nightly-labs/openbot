@@ -88,18 +88,17 @@ describe("OpenBot connected desktop shell", () => {
     });
     render(() => <App />);
 
-    expect(await screen.findByRole("heading", { name: "Meet OpenBot" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Build your AI team." })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Where will OpenBot run?" })).not.toBeInTheDocument();
     expect(screen.queryByText("Verified. Opening OpenBot…")).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Chief" })).not.toBeInTheDocument();
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
 
+    await fireEvent.click(await screen.findByRole("button", { name: "I have a subscription" }));
     const providers = screen.getByRole("radiogroup", { name: "Default provider" });
     const codex = within(providers).getByRole("radio", { name: /ChatGPT.*Connected/ });
     expect(codex).toBeChecked();
     await fireEvent.click(within(providers).getByRole("radio", { name: /Claude.*Connected/ }));
-    await fireEvent.click(screen.getByRole("button", { name: "Next" }));
-    await fireEvent.click(screen.getByRole("button", { name: "Next" }));
     await fireEvent.click(screen.getByRole("button", { name: "Next" }));
     await fireEvent.click(screen.getByRole("button", { name: "Open OpenBot" }));
     expect(window.openbot.saveSetup).toHaveBeenCalledWith({ preferredProvider: "claude", preferredModel: null });
@@ -155,6 +154,7 @@ describe("OpenBot connected desktop shell", () => {
     });
     render(() => <App />);
 
+    await fireEvent.click(await screen.findByRole("button", { name: "I have a subscription" }));
     await fireEvent.click(await screen.findByRole("button", { name: "Connect Grok" }));
     expect(window.openbot.connectProvider).toHaveBeenCalledWith("grok");
     expect(screen.getByRole("button", { name: "Restart Grok" })).toBeEnabled();
@@ -239,6 +239,7 @@ describe("OpenBot connected desktop shell", () => {
     );
     render(() => <App />);
 
+    await fireEvent.click(await screen.findByRole("button", { name: "I have a subscription" }));
     await fireEvent.click(await screen.findByRole("button", { name: "Refresh providers" }));
     expect(screen.getByRole("button", { name: "Checking providers" })).toBeDisabled();
     expect(screen.queryByRole("button", { name: /^Install / })).not.toBeInTheDocument();
@@ -296,6 +297,7 @@ describe("OpenBot connected desktop shell", () => {
     vi.mocked(window.openbot.connectProvider).mockRejectedValueOnce(new Error("Raw IPC failure"));
     render(() => <App />);
 
+    await fireEvent.click(await screen.findByRole("button", { name: "I have a subscription" }));
     await fireEvent.click(await screen.findByRole("button", { name: "Connect ChatGPT" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("OpenBot could not connect ChatGPT. Try again.");
@@ -333,6 +335,7 @@ describe("OpenBot connected desktop shell", () => {
     });
     render(() => <App />);
 
+    await fireEvent.click(await screen.findByRole("button", { name: "I have a subscription" }));
     await fireEvent.click(await screen.findByRole("button", { name: "Connect ChatGPT" }));
     expect(screen.getByRole("button", { name: "Restart ChatGPT" })).toBeEnabled();
 
@@ -437,7 +440,7 @@ describe("OpenBot connected desktop shell", () => {
     expect(trackAnalytics).toHaveBeenCalledWith("account_sign_in_completed", { result: "succeeded" });
     expect(await screen.findByText("Verified. Opening OpenBot…")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Where will OpenBot run?" })).not.toBeInTheDocument();
-    expect(await screen.findByRole("heading", { name: "Meet OpenBot" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Build your AI team." })).toBeInTheDocument();
   });
 
   it("shows a soft loader until the account API becomes available", async () => {

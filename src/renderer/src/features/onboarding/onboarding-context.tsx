@@ -2,6 +2,7 @@ import type { AgentModelId, AgentProviderId, AppSetupState } from "@openbot/cont
 import { createSignal, onSettled } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { createSimpleContext } from "../../simple-context";
+import { firstRunTransition } from "./first-run-transition";
 import { onboardingPort } from "./onboarding-port";
 
 /** The saved local default, first-run state, and pending server invitation. */
@@ -40,10 +41,15 @@ const Setup = createSimpleContext({
         preferredProvider,
         preferredModel: preferredModel === undefined ? keptModel(preferredProvider) : preferredModel,
       });
-      setSetupState(state);
-      // Only the first completion is onboarding; later saves are a review.
+      // Only the first completion is onboarding; later saves are a review. It opens the app, so the
+      // setup screen fades into it.
       if (!wasCompleted && state.completed) {
+        await firstRunTransition("open", () => {
+          setSetupState(state);
+        });
         analytics.track("onboarding_completed", { preferred_provider: preferredProvider });
+      } else {
+        setSetupState(state);
       }
     }
 

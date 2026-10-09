@@ -153,6 +153,22 @@
   margin-top: 24px;
 }
 
+.account-login-local-data {
+  margin: 4px 0 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: 17px;
+  text-align: center;
+  text-wrap: balance;
+}
+
+/* Inline, so the lock stays beside the first word when the sentence wraps. */
+.account-login-local-data svg {
+  display: inline-block;
+  margin-right: 6px;
+  vertical-align: -2px;
+}
+
 .account-login-email-field {
   display: grid;
   gap: 12px;
