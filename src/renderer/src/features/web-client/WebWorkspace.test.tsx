@@ -449,6 +449,48 @@ describe("web workspace state", () => {
     },
   );
 
+  it.each(["authentication_required", "access_ended"] as const)(
+    "clears private state when a conversation recovery read fails with %s",
+    async (code) => {
+      const app = harness();
+      const workspace = await connected(app);
+      const host = workspace.state.host;
+      assert(host);
+      workspace.setDraft("Private conversation draft");
+      vi.mocked(app.runtime.conversation).mockRejectedValueOnce(new WebHostConnectionError(code));
+
+      await workspace.connect(host);
+
+      expect(workspace.state.status).toBe("offline");
+      expect(workspace.state.workspaceLoaded).toBe(false);
+      expect(workspace.state.conversations).toEqual({});
+      expect(workspace.state.agents).toEqual([]);
+      expect(workspace.state.recovery?.phase).toBe("suspended");
+      await workspace.send("chief", "Do not send", [], null, "denied-send");
+      expect(app.runtime.send).not.toHaveBeenCalled();
+      window.dispatchEvent(new Event("online"));
+      expect(app.runtime.connect).toHaveBeenCalledTimes(2);
+
+      await workspace.reconnect();
+      expect(workspace.state.status).toBe("online");
+      expect(workspace.conversation()?.draft).toBe("");
+    },
+  );
+
+  it("clears private state on current-host request denial and ignores another host", async () => {
+    const app = harness();
+    const workspace = await connected(app);
+    workspace.setDraft("Private draft");
+    flush();
+    const error = new WebHostConnectionError("access_ended");
+    app.events().accessDenied?.("other-host", error);
+    expect(workspace.conversation()?.draft).toBe("Private draft");
+    app.events().accessDenied?.("host", error);
+    await waitFor(() => expect(workspace.state.status).toBe("offline"));
+    expect(workspace.state.conversations).toEqual({});
+    expect(workspace.state.recovery?.phase).toBe("suspended");
+  });
+
   it("waits for a revoked connection attempt before one authorized reconnect", async () => {
     const app = harness();
     const workspace = await connected(app);

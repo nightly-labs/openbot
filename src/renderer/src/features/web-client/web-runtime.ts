@@ -218,6 +218,7 @@ export interface WebWorkspaceRuntime {
 
 export interface WebRuntimeEvents {
   connection(update: RemoteTeamConnectionUpdate): void;
+  accessDenied?(hostId: string, error: WebHostConnectionError): void;
   event(hostId: string, event: AgentEvent | TeamRealtimeEvent): void;
   accountChanged(): Promise<void>;
   /** The state of a host this tab has not opened. */
@@ -408,6 +409,7 @@ export function createWebWorkspaceRuntime(
   async function request(method: string, path: string, body: TeamProtocolV2Json = {}, upload?: RemoteFileUpload) {
     if (disposed) throw new Error(currentText().t("webClient.error.connectionClosed"));
     const current = generation;
+    const requestHostId = lockedHostId;
     const result = await peer.execute({
       id: crypto.randomUUID(),
       type: "request",
@@ -418,8 +420,11 @@ export function createWebWorkspaceRuntime(
       timeoutMs: remoteWorkspaceReadTimeout(method, path),
     });
     if (disposed || generation !== current) throw new Error(currentText().t("webClient.error.hostChanged"));
-    if (result.status === 401 || result.status === 403)
-      throw new WebHostConnectionError(result.status === 401 ? "authentication_required" : "access_ended");
+    if (result.status === 401 || result.status === 403) {
+      const error = new WebHostConnectionError(result.status === 401 ? "authentication_required" : "access_ended");
+      if (requestHostId) events.accessDenied?.(requestHostId, error);
+      throw error;
+    }
     if (!result.ok || (result.status ?? 500) >= 400)
       throw new Error(hostRefusal(result.status, result.body) ?? currentText().t("webClient.error.requestIncomplete"));
     return result.body;

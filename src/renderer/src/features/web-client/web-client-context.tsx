@@ -253,6 +253,9 @@ export function createWebWorkspace(
     props.accountId,
     {
       accountChanged: props.onSessionCheck,
+      accessDenied(id, error) {
+        if (!disposed && id === hostId) blockAccess(error);
+      },
       hostNotice(id, event, agents) {
         if (disposed) return;
         for (const listener of hostNoticeListeners) listener(id, event, agents);
@@ -682,6 +685,22 @@ export function createWebWorkspace(
       draft.duplicatingAgentIds = [];
     });
   }
+  function blockAccess(error: unknown): boolean {
+    if (
+      !(error instanceof WebHostConnectionError) ||
+      (error.code !== "authentication_required" && error.code !== "access_ended")
+    )
+      return false;
+    clearRevokedWorkspace();
+    hostLifecycle.endSleep();
+    recoveryBlocked = true;
+    recovery.suspend();
+    setState((draft) => {
+      draft.status = "offline";
+      draft.connectionError = error.message;
+    });
+    return true;
+  }
   async function reconnect(): Promise<void> {
     const host = state.hosts.find((listed) => listed.hostId === hostId) ?? state.host;
     if (!host || connectionPromise) return;
@@ -833,11 +852,7 @@ export function createWebWorkspace(
             hostProtocol: { ...error.hostProtocol },
           };
       });
-      if (
-        error instanceof WebHostConnectionError &&
-        (error.code === "authentication_required" || error.code === "access_ended")
-      )
-        clearRevokedWorkspace();
+      if (blockAccess(error)) throw error;
       if (error instanceof WebHostIncompatibleError || error instanceof WebHostConnectionError) {
         hostLifecycle.endSleep();
         recoveryBlocked = true;
@@ -937,7 +952,7 @@ export function createWebWorkspace(
         item.error = null;
       });
     } catch (error) {
-      if (!disposed && current === generation)
+      if (!disposed && current === generation && !blockAccess(error))
         setState((draft) => {
           const item = draft.conversations[id];
           if (item) {

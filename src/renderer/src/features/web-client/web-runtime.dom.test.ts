@@ -75,6 +75,26 @@ describe("browser workspace runtime", () => {
     await runtime.dispose();
   });
 
+  it.each([401, 403, 503])("reports current-host request denial with status %s", async (status) => {
+    const accessDenied = vi.fn();
+    const runtime = createWebWorkspaceRuntime(
+      "one",
+      { connection: vi.fn(), accessDenied, event: vi.fn(), accountChanged: async () => {} },
+      vi.fn(),
+      { createPeer: () => peer, acquireHostLock: async () => () => {} },
+    );
+    await runtime.connect(host);
+    peer.execute.mockResolvedValueOnce({ ok: false, status, body: {} });
+    await expect(runtime.conversation("agent")).rejects.toThrow();
+    if (status === 503) expect(accessDenied).not.toHaveBeenCalled();
+    else
+      expect(accessDenied).toHaveBeenCalledWith(
+        host.hostId,
+        expect.objectContaining({ code: status === 401 ? "authentication_required" : "access_ended" }),
+      );
+    await runtime.dispose();
+  });
+
   it("reads the host sidebar layout and validates account usage", async () => {
     peer.execute.mockImplementation(async (command) => ({
       ok: true,
@@ -184,7 +204,7 @@ describe("browser workspace runtime", () => {
     await runtime.dispose();
   });
 
-  it("does not accept a sidebar layout response after the host changes", async () => {
+  it.each([200, 403])("ignores a sidebar response with status %s after the host changes", async (status) => {
     let resolveLayout: ((value: unknown) => void) | undefined;
     peer.execute.mockImplementation(async (command) => {
       if (command.path === "/v1/sidebar-layout") {
@@ -201,20 +221,31 @@ describe("browser workspace runtime", () => {
             : {},
       };
     });
-    const runtime = create();
+    const accessDenied = vi.fn();
+    const runtime = createWebWorkspaceRuntime(
+      "one",
+      { connection: vi.fn(), accessDenied, event: vi.fn(), accountChanged: async () => {} },
+      vi.fn(),
+      { createPeer: () => peer, acquireHostLock: async () => () => {} },
+    );
     await runtime.connect(host);
     if (!runtime.getSidebarLayout) throw new Error("Runtime sidebar layout is unavailable.");
     const pending = runtime.getSidebarLayout();
     await vi.waitFor(() => expect(resolveLayout).toBeDefined());
     await runtime.connect({ ...host, hostId: "other-host", devicePublicKey: "other-key" });
     resolveLayout?.({
-      revision: 1,
-      sections: [],
-      order: ["people", "unassigned"],
-      agentAssignments: {},
-      agentOrder: [],
+      ok: status === 200,
+      status,
+      body: {
+        revision: 1,
+        sections: [],
+        order: ["people", "unassigned"],
+        agentAssignments: {},
+        agentOrder: [],
+      },
     });
     await expect(pending).rejects.toThrow("selected host changed");
+    expect(accessDenied).not.toHaveBeenCalled();
     await runtime.dispose();
   });
 
