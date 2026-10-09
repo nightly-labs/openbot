@@ -161,6 +161,12 @@ export const messages = {
     "サーバーは応答する前に停止しました。ターミナルでコマンドを実行してエラーを確認してください。",
   "error.backend.mcpServerUnreachable":
     "OpenBot はサーバーに接続できませんでした。URL とネットワークを確認してください。",
+  "error.backend.mcpLocalServerOff":
+    "このコンピューターの {address} で応答するサーバーがありません。サーバーを起動するか、サーバーを実行するアプリでオンにしてから、もう一度お試しください。",
+  "error.backend.mcpServerBlocked":
+    "このコンピューターがサーバーへの接続をブロックしました。ファイアウォールまたはセキュリティソフトを確認してから、もう一度お試しください。",
+  "error.backend.mcpServerIncompatible":
+    "このアドレスで応答がありましたが、Streamable HTTP の MCP サーバーではありません。URL を確認し、サーバーを実行するアプリを更新してください。",
   "error.backend.mcpRemoteBridge":
     "{reason} このコマンドは mcp-remote ブリッジを実行します。代わりに URL {url} で Streamable HTTP を選ぶと、OpenBot がサインインします。",
   "error.backend.oauthNotHttps": "OAuth エンドポイント {origin} は https ではないため、認証情報を送信しませんでした。",

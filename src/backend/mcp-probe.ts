@@ -2,7 +2,7 @@ import { basename } from "node:path";
 import { type OAuthClientProvider, UnauthorizedError } from "@modelcontextprotocol/sdk/client/auth.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { getDefaultEnvironment, StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { StreamableHTTPClientTransport, StreamableHTTPError } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { AccessDeniedError, UnauthorizedClientError } from "@modelcontextprotocol/sdk/server/auth/errors.js";
 import type { FetchLike, Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
@@ -12,7 +12,13 @@ import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result, Schema } from "effect";
 import { causeHelpers } from "./effect-boundary";
-import { type McpOAuthAuthority, type McpSignIn, normalizeResource, secureOAuthFetch } from "./mcp-oauth-provider";
+import {
+  isLoopback,
+  type McpOAuthAuthority,
+  type McpSignIn,
+  normalizeResource,
+  secureOAuthFetch,
+} from "./mcp-oauth-provider";
 import {
   clearMcpCommandCache,
   type McpToolRuntimes,
@@ -383,6 +389,10 @@ function describeMcpErrorText(error: unknown, config: McpServerConfig, timeoutMs
   // The child exited before the handshake: the process failed to start, not the network.
   if (config.transport === "stdio" && isConnectionClosed(error)) return sourceText("error.backend.mcpServerExited");
   const status = httpStatus(error);
+  if (config.transport === "http") {
+    const described = describeConnectionFailure(error, status, config.url);
+    if (described) return described;
+  }
   if (status !== null) return httpStatusMessage(status);
   if (config.transport === "http" && isNetworkFailure(error)) return sourceText("error.backend.mcpServerUnreachable");
   const message = error instanceof Error ? error.message : String(error);
@@ -429,6 +439,36 @@ function isNetworkFailure(error: unknown): boolean {
     if (current instanceof TypeError && current.message === "fetch failed") return true;
   }
   return false;
+}
+
+/**
+ * What an http connection that failed below MCP says, or `null` for the general sentences.
+ *
+ * A local server, such as the one in the Figma desktop app, refuses the connection while it is
+ * turned off, and "check your network" sends the user the wrong way. Something that answers but
+ * not in MCP over Streamable HTTP - a web page, a closed socket, another protocol - is told apart
+ * from a server that is not there.
+ */
+function describeConnectionFailure(error: unknown, status: number | null, url: string): string | null {
+  if (status === 405) return sourceText("error.backend.mcpServerIncompatible");
+  for (let current = error, depth = 0; current instanceof Error && depth < 4; current = current.cause, depth++) {
+    const code = isDynamicRecord(current) ? current.code : undefined;
+    if (code === "ECONNREFUSED" && URL.canParse(url) && isLoopback(new URL(url).hostname))
+      return sourceText("error.backend.mcpLocalServerOff", { address: new URL(url).origin });
+    if (code === "EACCES" || code === "EPERM") return sourceText("error.backend.mcpServerBlocked");
+    if (isProtocolMismatch(current, code)) return sourceText("error.backend.mcpServerIncompatible");
+  }
+  return null;
+}
+
+/**
+ * An answer that is not MCP over Streamable HTTP: a content type the transport does not read, a body
+ * that is not JSON-RPC, a socket closed with no response, or bytes that are not HTTP/1.1.
+ */
+function isProtocolMismatch(error: Error, code: unknown): boolean {
+  if (error instanceof StreamableHTTPError) return error.code === -1;
+  if (error instanceof SyntaxError || error.name === "ZodError" || error.name === "HTTPParserError") return true;
+  return code === "UND_ERR_SOCKET" || (typeof code === "string" && code.startsWith("HPE_"));
 }
 
 /**
