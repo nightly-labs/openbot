@@ -496,13 +496,14 @@ export class TurnLifecycle {
           // The turn's completion runs it again or reports it in words the user can act on.
           if (isForeignReasoningError(message)) return;
         }
-        // The usage notice explains a limit only for a provider that reports usage. Gemini's 429
-        // reads as a spent quota, and without a usage reading it failed with nothing on screen.
+        // A spent quota or balance is explained by the usage notice, so only a provider that reports
+        // usage can leave it out of the banner. Gemini's 429 reads as a spent quota, and it failed
+        // with nothing on screen. A plan window holds the queue until its reset for every provider.
         if (
-          agentProviderDescriptor(source.provider).reportsUsage &&
-          (error?.codexErrorInfo === "usageLimitExceeded" ||
-            isUsageLimitDiagnostic(message) ||
-            (errorTurnId !== null && this.#limitedTurns.has(errorTurnId)))
+          error?.codexErrorInfo === "usageLimitExceeded" ||
+          (isUsageLimitDiagnostic(message) &&
+            (agentProviderDescriptor(source.provider).reportsUsage || isPlanLimitDiagnostic(message))) ||
+          (errorTurnId !== null && this.#limitedTurns.has(errorTurnId))
         ) {
           // Only a plan window resets by itself. A spent balance fails as before, with its reason.
           const planLimit =
@@ -544,8 +545,9 @@ export class TurnLifecycle {
     const running = this.#runningTurns.get(turnId);
     this.#runningTurns.delete(turnId);
     if (running) {
-      // `waitMs` is OpenBot's part of a slow reply: the queue, the provider start, the session and
-      // its settings. `firstOutputMs` is the provider's: the time to its first text or thinking.
+      // `waitMs` is OpenBot's part of a slow reply: the queue (a usage-limit hold included), the
+      // provider start, the session and its settings. `firstOutputMs` is the provider's: the time
+      // to its first text, thinking or tool step.
       logger.info("A turn finished.", {
         provider: running.client.provider,
         model: this.#hooks.turnModel(agentId, turnId),
@@ -759,7 +761,7 @@ export class TurnLifecycle {
     });
   }, Effect.uninterruptible);
 
-  /** `streamed`: text or thinking the model wrote, which marks when the provider first answered. */
+  /** `streamed`: text, thinking or a tool step, which marks when the provider first answered. */
   #markProduced(turnId: string, acted: boolean, streamed = acted): void {
     const running = this.#runningTurns.get(turnId);
     if (!running) return;

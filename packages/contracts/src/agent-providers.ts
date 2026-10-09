@@ -87,7 +87,9 @@ export interface AgentProviderDescriptor {
   readonly steer: "native" | "deferred";
   /**
    * Whether OpenBot can read the plan's remaining usage. `false`: the CLI exposes no usage reading,
-   * so the dock says the provider does not report usage instead of waiting for a reading.
+   * so the dock says the provider does not report usage instead of waiting for a reading. Declared
+   * here because the renderer cannot see the drivers; set it to `true` with a driver's usage read
+   * (Codex and Claude read it themselves, Grok and OpenCode through `readRateLimits`).
    */
   readonly reportsUsage: boolean;
 }

@@ -2292,9 +2292,10 @@ export class ProviderRuntime implements ProviderPort {
         stderrLogger.warn("A provider ignored settings in its configuration.", { provider: client.provider, message });
         return;
       }
-      if (isUsageLimitDiagnostic(message)) {
+      // The usage notice reports the limit only for a provider with a usage reading. Another
+      // provider's line goes on to the error below, or nothing on screen would name the limit.
+      if (isUsageLimitDiagnostic(message) && agentProviderDescriptor(client.provider).reportsUsage) {
         stderrLogger.warn("A provider reported an exhausted usage limit.", { provider: client.provider, message });
-        // A provider with no usage reading reports the limit in the failed turn's error instead.
         Effect.runFork(this.refreshUsageAfterLimit(client));
         return;
       }

@@ -41,7 +41,7 @@ export const messages = {
   "account.usage.value.unavailable": "表示できません",
   "account.usage.notReported": "上限の報告なし",
   "account.usage.value.notReported": "報告なし",
-  "account.usage.providerNotReported": "このプロバイダーは使用量を報告しません",
+  "account.usage.providerNotReported": "使用量データなし",
   "account.usage.row.unavailable": "{name}、表示できません",
   "account.usage.row.notReported": "{name}、使用量の報告なし",
   "account.usage.row.loading": "{name}、読み込み中",

@@ -1971,7 +1971,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           : this.provider === "opencode" && isOpenCodeServiceFailure(error)
             ? sourceText("error.provider.opencodeServiceFailure")
             : this.provider === "antigravity"
-              ? geminiRequestFailure(detail)
+              ? geminiRequestFailure(error, detail)
               : this.#openCodeRequestFailure(error, detail);
       this.emit("notification", {
         method: "error",
@@ -2514,27 +2514,33 @@ const OPENCODE_REQUEST_FAILURES = [
 /**
  * The kind of a Gemini request failure, first match wins. Gemini reports no usage, so a limit has
  * no usage notice to explain it, and the raw Google status left the user unsure whether waiting or
- * another model helps (#1676). The patterns follow Google's API status names; Antigravity does not
- * document its failure texts. The model comes before the service, so "model unavailable" names it.
+ * another model helps (#1676). The patterns follow Google's API status names, matched in capitals,
+ * and a status number only after `status`, `code` or `HTTP`: a bare 404 or "unavailable" can be an
+ * MCP server or a tool. Antigravity does not document its failure texts.
  */
 const GEMINI_REQUEST_FAILURES = [
+  ["error.provider.antigravityRateLimited", /\bRESOURCE_EXHAUSTED\b/u],
   [
     "error.provider.antigravityRateLimited",
-    /\b429\b|\bRESOURCE_EXHAUSTED\b|\bresource has been exhausted\b|\brate[ _-]?limit|\btoo many requests\b|\bquota\b/iu,
+    /\b(?:status|code|HTTP)\W{0,4}429\b|\bresource has been exhausted\b|\brate[ _-]?limit|\btoo many requests\b|\bquota\b.{0,40}\b(?:exceeded|exhausted)\b/iu,
   ],
   [
     "error.provider.antigravityModelUnavailable",
-    /\b404\b|\bNOT_FOUND\b|\bmodel\b.{0,60}\b(?:not found|not supported|unavailable|does not exist)\b/iu,
+    /\bmodel\b.{0,60}\b(?:not found|not supported|does not exist|is unavailable)\b/iu,
   ],
+  ["error.provider.antigravityServiceFailure", /\b(?:UNAVAILABLE|DEADLINE_EXCEEDED)\b/u],
   [
     "error.provider.antigravityServiceFailure",
-    /\b50[0-4]\b|\bUNAVAILABLE\b|\boverloaded\b|\bdeadline exceeded\b|\binternal server error\b/iu,
+    /\b(?:status|code|HTTP)\W{0,4}50[0-4]\b|\bservice unavailable\b|\boverloaded\b|\bdeadline exceeded\b|\binternal server error\b/iu,
   ],
 ] as const satisfies readonly (readonly [keyof SourceMessages, RegExp])[];
 
-function geminiRequestFailure(detail: string): string {
-  const key = GEMINI_REQUEST_FAILURES.find(([, pattern]) => pattern.test(detail))?.[0];
-  return key ? sourceText(key, { detail: shownFailureDetail(detail) }) : detail;
+/** Only a failure the server answered with: a local failure is not Google's to explain. */
+function geminiRequestFailure(error: unknown, detail: string): string {
+  if (!(error instanceof RequestError)) return detail;
+  const reason = detail.replace(/^(?:RequestError:\s*)?Internal error:\s*/u, "");
+  const key = GEMINI_REQUEST_FAILURES.find(([, pattern]) => pattern.test(reason))?.[0];
+  return key ? sourceText(key, { detail: shownFailureDetail(reason) }) : detail;
 }
 
 function isAuthenticationError(error: unknown): boolean {

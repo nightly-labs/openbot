@@ -41,7 +41,7 @@ export const messages = {
   "account.usage.value.unavailable": "Nicht verfügbar",
   "account.usage.notReported": "Kein Limit gemeldet",
   "account.usage.value.notReported": "Nicht gemeldet",
-  "account.usage.providerNotReported": "Der Anbieter meldet keine Nutzung",
+  "account.usage.providerNotReported": "Keine Nutzungsdaten",
   "account.usage.row.unavailable": "{name}, nicht verfügbar",
   "account.usage.row.notReported": "{name}, Nutzung nicht gemeldet",
   "account.usage.row.loading": "{name}, wird geladen",
