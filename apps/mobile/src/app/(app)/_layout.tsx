@@ -106,7 +106,7 @@ function AuthenticatedStack() {
           name="browser/[agentId]"
           options={{
             animation: pushAnimation,
-            contentStyle: { backgroundColor: "black" },
+            contentStyle: { backgroundColor: background },
             // Every finger on the page is the page's mouse, so only the screen edge goes back.
             fullScreenGestureEnabled: false,
             gestureEnabled: true,

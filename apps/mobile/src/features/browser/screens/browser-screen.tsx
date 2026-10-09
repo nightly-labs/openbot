@@ -3,7 +3,6 @@ import type { BrowserViewContextMenu, BrowserViewInput } from "@openbot/contract
 import * as Clipboard from "expo-clipboard";
 import { GlassView } from "expo-glass-effect";
 import { router, useLocalSearchParams } from "expo-router";
-import { StatusBar } from "expo-status-bar";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import {
@@ -28,7 +27,7 @@ import {
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import Animated, { type CSSTransitionProperties, cubicBezier, FadeIn, FadeOut } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ScopedTheme } from "uniwind";
+import { useUniwind } from "uniwind";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { ChatGlassButton, ChatGlassIconButton } from "@/features/chat/components/chat-glass-icon-button";
 import {
@@ -86,8 +85,7 @@ export function BrowserScreen() {
   const [attempt, setAttempt] = useState(0);
   const [chosenTabId, setChosenTabId] = useState(tabId);
   return (
-    <ScopedTheme theme="dark">
-      <StatusBar style="light" />
+    <>
       {agent ? (
         <BrowserView
           key={attempt}
@@ -97,9 +95,9 @@ export function BrowserScreen() {
           onReconnect={() => setAttempt((value) => value + 1)}
         />
       ) : (
-        <View className="flex-1 bg-black" />
+        <View className="flex-1 bg-background" />
       )}
-    </ScopedTheme>
+    </>
   );
 }
 
@@ -120,6 +118,8 @@ function BrowserView({
   const liquidGlass = useLiquidGlass();
   const reducedMotion = useReducedMotion();
   const [foreground, fieldBackground] = useThemeColor(["foreground", "default"]);
+  const { theme } = useUniwind();
+  const appearance = theme === "dark" ? "dark" : "light";
   const iconColor = String(foreground);
   const { servers, browserViewSupport, respondToBrowserTakeover, controlBrowserTab, conversationStore } =
     useMobileWorkspace();
@@ -322,7 +322,7 @@ function BrowserView({
         {
           options: [...choices.map((choice) => choice.title), t("common.cancel")],
           cancelButtonIndex: choices.length,
-          userInterfaceStyle: "dark",
+          userInterfaceStyle: appearance,
         },
         (index) => choices[index]?.run(),
       );
@@ -441,7 +441,7 @@ function BrowserView({
   const controlBottom = keyboardShown ? CONTROL_OFFSET : insets.bottom + CONTROL_OFFSET;
 
   return (
-    <View className="flex-1 bg-black">
+    <View className="flex-1 bg-background">
       <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
         <View style={{ flex: 1 }}>
           <BrowserLiveStage
@@ -468,7 +468,7 @@ function BrowserView({
           {status ? (
             <View
               pointerEvents="box-none"
-              className={`absolute inset-0 items-center justify-center gap-4 px-8 ${live.frame ? "bg-black/60" : ""}`}
+              className={`absolute inset-0 items-center justify-center gap-4 px-8 ${live.frame ? "bg-background/60" : ""}`}
             >
               <Typography.Paragraph align="center" className="text-muted">
                 {status.text}
@@ -699,7 +699,7 @@ function BrowserView({
         caretHidden
         contextMenuHidden
         importantForAutofill="no"
-        keyboardAppearance="dark"
+        keyboardAppearance={appearance}
         multiline
         smartInsertDelete={false}
         spellCheck={false}
