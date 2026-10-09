@@ -91,7 +91,7 @@ export interface OpenBotDynamicIslandProps {
   actionError?: string | undefined;
   onHaptic?: () => void;
   /** Lets the user reply to, answer and stop an agent on the island, so the main window stays where it is. */
-  inlineReply?: boolean;
+  inlineReply?: boolean | undefined;
 }
 
 const COMPACT_INDICES = [0, 1, 2] as const;
