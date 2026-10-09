@@ -340,6 +340,7 @@ export const messages = {
   "mobile.agent.home.noAgentsBody": "Ajoutez un agent pour travailler depuis votre téléphone.",
   "mobile.agent.home.searchAgents": "Rechercher",
   "mobile.agent.home.chatOptions": "Options de la discussion",
+  "mobile.agent.home.markAllRead": "Tout marquer comme lu",
   "mobile.agent.route.appearance": "Apparence",
   "mobile.agent.route.cropPhoto": "Déplacer et redimensionner",
 } as const satisfies PartialTranslation<typeof source>;

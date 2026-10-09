@@ -31,6 +31,8 @@ export const messages = {
     "Konuşmaları okunmadı olarak işaretlemek için bu masaüstü sunucusunu güncelleyin.",
   "mobile.workspace.alert.markUnreadTitle": "Okunmadı olarak işaretlenemedi",
   "mobile.workspace.alert.markUnreadBody": "Sunucuya yeniden bağlanıp tekrar deneyin.",
+  "mobile.workspace.alert.markAllReadTitle": "Tümü okundu olarak işaretlenemedi",
+  "mobile.workspace.alert.markAllReadBody": "Bazı sohbetler hâlâ okunmadı. Sunucuya yeniden bağlanıp tekrar deneyin.",
   "mobile.workspace.alert.serverOrderTitle": "Sunucu sırası kaydedilemedi",
   "mobile.workspace.alert.serverOrderBody": "Önceki sıranız korundu. Lütfen tekrar deneyin.",
   "mobile.workspace.error.connectFailed": "Sunucu bağlantısı başarısız oldu.",

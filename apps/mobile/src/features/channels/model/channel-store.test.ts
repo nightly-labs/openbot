@@ -375,6 +375,28 @@ describe("mobile channels", () => {
     expect(store.get("host-one").channels[0]?.unreadCount).toBe(1);
     close();
   });
+  it("marks every unread channel read through its newest message and keeps a refused one unread", async () => {
+    const other: ChannelSummary = { ...channel, id: "channel-two", unreadCount: 2 };
+    const host = new Map([
+      [channel.id, 1],
+      [other.id, 2],
+    ]);
+    const receipts: TeamProtocolV2Json[] = [];
+    const { store } = fixture(async (path, body) => {
+      if (path === CHANNEL_ROUTES.list)
+        return [channel, other].map((summary) => ({ ...summary, unreadCount: host.get(summary.id) }));
+      if (path === CHANNEL_ROUTES.read) return page(1, 3);
+      assert(body && typeof body === "object" && !Array.isArray(body) && typeof body.channelId === "string");
+      if (body.channelId === other.id) throw new Error("offline");
+      receipts.push(body);
+      host.set(body.channelId, 0);
+      return channel;
+    });
+    await store.refresh("host-one");
+    await expect(store.markAllRead("host-one", () => "operation")).rejects.toThrow("offline");
+    expect(receipts).toEqual([{ type: "read", operationId: "operation", channelId: channel.id, throughSequence: 3 }]);
+    expect(store.get("host-one").channels.map((summary) => summary.unreadCount)).toEqual([0, 2]);
+  });
   it("keeps unchanged bubbles during streaming and projects authors for the current member", () => {
     const current = page(1, 2);
     const update = page(1, 2);

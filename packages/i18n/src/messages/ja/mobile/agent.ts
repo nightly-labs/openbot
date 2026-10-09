@@ -331,6 +331,7 @@ export const messages = {
   "mobile.agent.home.noAgentsBody": "エージェントを追加すると、スマートフォンから作業を始められます。",
   "mobile.agent.home.searchAgents": "検索",
   "mobile.agent.home.chatOptions": "チャットのオプション",
+  "mobile.agent.home.markAllRead": "すべて既読にする",
   "mobile.agent.route.appearance": "外観",
   "mobile.agent.route.cropPhoto": "移動と拡大縮小",
 } as const satisfies PartialTranslation<typeof source>;

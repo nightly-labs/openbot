@@ -29,6 +29,8 @@ export const messages = defineMessages("mobile.workspace", {
   "mobile.workspace.alert.updateRequiredUnread": "Update this desktop server to mark conversations unread.",
   "mobile.workspace.alert.markUnreadTitle": "Could not mark unread",
   "mobile.workspace.alert.markUnreadBody": "Reconnect to the server and try again.",
+  "mobile.workspace.alert.markAllReadTitle": "Could not mark all as read",
+  "mobile.workspace.alert.markAllReadBody": "Some chats are still unread. Reconnect to the server and try again.",
   "mobile.workspace.alert.serverOrderTitle": "Could not save server order",
   "mobile.workspace.alert.serverOrderBody": "Your previous order has been kept. Please try again.",
   "mobile.workspace.error.connectFailed": "The server connection failed.",

@@ -344,6 +344,7 @@ export const messages = {
   "mobile.agent.home.noAgentsBody": "Telefonunuzdan çalışmaya başlamak için bir ajan ekleyin.",
   "mobile.agent.home.searchAgents": "Ara",
   "mobile.agent.home.chatOptions": "Sohbet seçenekleri",
+  "mobile.agent.home.markAllRead": "Tümünü okundu olarak işaretle",
   "mobile.agent.route.appearance": "Görünüm",
   "mobile.agent.route.cropPhoto": "Taşı ve Ölçeklendir",
 } as const satisfies PartialTranslation<typeof source>;

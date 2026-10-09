@@ -412,6 +412,7 @@ export const messages = {
   "mobile.agent.home.noAgentsBody": "Добавьте агента, чтобы начать работать с телефона.",
   "mobile.agent.home.searchAgents": "Поиск",
   "mobile.agent.home.chatOptions": "Параметры чата",
+  "mobile.agent.home.markAllRead": "Отметить все прочитанными",
   "mobile.agent.route.appearance": "Внешний вид",
   "mobile.agent.route.cropPhoto": "Перемещение и масштаб",
 } as const satisfies PartialTranslation<typeof source>;

@@ -31,6 +31,9 @@ export const messages = {
   "mobile.workspace.alert.updateRequiredUnread": "会話を未読にするには、このデスクトップサーバーを更新してください。",
   "mobile.workspace.alert.markUnreadTitle": "未読にできませんでした",
   "mobile.workspace.alert.markUnreadBody": "サーバーに再接続して、もう一度お試しください。",
+  "mobile.workspace.alert.markAllReadTitle": "すべてを既読にできませんでした",
+  "mobile.workspace.alert.markAllReadBody":
+    "未読のチャットが残っています。サーバーに再接続して、もう一度お試しください。",
   "mobile.workspace.alert.serverOrderTitle": "サーバーの順序を保存できませんでした",
   "mobile.workspace.alert.serverOrderBody": "以前の順序を保持しました。もう一度お試しください。",
   "mobile.workspace.error.connectFailed": "サーバーへの接続に失敗しました。",

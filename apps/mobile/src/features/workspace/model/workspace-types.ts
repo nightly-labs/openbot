@@ -263,5 +263,7 @@ export interface MobileWorkspaceContextValue {
   unhideAgent: (agentId: string) => void;
   markAgentRead: (agentId: string, throughMessageId?: string) => void;
   markAgentUnread: (agentId: string) => void;
+  /** Marks every unread chat of the active server read. It rejects when a chat stays unread. */
+  markAllRead: () => Promise<void>;
   toggleAgentPin: (agentId: string) => ToggleAgentPinResult;
 }

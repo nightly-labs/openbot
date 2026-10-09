@@ -375,6 +375,7 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.home.noAgentsBody": "Add an agent to start working from your phone.",
   "mobile.agent.home.searchAgents": "Search",
   "mobile.agent.home.chatOptions": "Chat options",
+  "mobile.agent.home.markAllRead": "Mark all as read",
   "mobile.agent.route.appearance": "Appearance",
   "mobile.agent.route.cropPhoto": "Move and Scale",
 });

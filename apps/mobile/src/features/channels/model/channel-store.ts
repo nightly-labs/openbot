@@ -405,6 +405,28 @@ export class MobileChannelStore {
     }
     return result;
   }
+  /** Reads each unread channel's latest page for its boundary, since a summary has no sequence. */
+  async markAllRead(serverId: string, operationId: () => string) {
+    const entry = this.entry(serverId);
+    if (!entry.state.supported) return;
+    const unread = entry.state.channels.filter((channel) => channel.unreadCount > 0).map((channel) => channel.id);
+    if (unread.length === 0) return;
+    const results = await Promise.allSettled(
+      unread.map(async (channelId) => {
+        const page = await this.request("POST", CHANNEL_ROUTES.read, decodeChannelPage, { channelId }, serverId);
+        await this.command(serverId, {
+          type: "read",
+          operationId: operationId(),
+          channelId,
+          throughSequence: page.throughSequence,
+        });
+      }),
+    );
+    // A receipt clears only a channel with loaded history, so the list gives the host's unread counts.
+    await this.refresh(serverId);
+    const failure = results.find((result) => result.status === "rejected");
+    if (failure) throw failure.reason;
+  }
   memories(serverId: string, channelId: string) {
     return this.request("POST", CHANNEL_ROUTES.memories, decodeChannelMemories, { channelId }, serverId);
   }

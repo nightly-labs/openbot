@@ -52,6 +52,7 @@ import {
 } from "@openbot/team-client/team-api-requests";
 import { replaceEqualDeep, useQueryClient } from "@tanstack/react-query";
 import { Effect } from "effect";
+import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
 import {
   createContext,
@@ -891,21 +892,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     ],
   );
 
-  const markAgentRead = useCallback(
-    (agentId: string, visibleMessageId?: string | null) => {
-      if (
-        visibleMessageId === null &&
-        (!activeServerId ||
-          !serverCapabilities.current.get(activeServerId)?.includes(TEAM_CONVERSATION_UNREAD_CAPABILITY))
-      ) {
-        showWarningAlert(
-          "team",
-          currentText().t("mobile.workspace.alert.updateRequiredTitle"),
-          currentText().t("mobile.workspace.alert.updateRequiredUnread"),
-        );
-        return;
-      }
-      if (!activeServerId) return;
+  /** Writes one agent's read cursor after its earlier writes. It rejects when the host refuses it. */
+  const writeAgentRead = useCallback(
+    (agentId: string, visibleMessageId?: string | null): Promise<void> => {
+      if (!activeServerId) return Promise.resolve();
       const isCurrentRead = readRefresh.invalidate(activeServerId);
       const generation = loadGeneration.current;
       liveState.update("unreadAgentIds", (current) =>
@@ -934,20 +924,17 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             applyConversationReads(reads);
           }
         })
-        .catch(() => {
+        .catch((error: unknown) => {
           if (generation === loadGeneration.current) void refreshConversationReads().catch(() => undefined);
-          if (visibleMessageId === null)
-            showFailureAlert(
-              undefined,
-              "settings",
-              currentText().t("mobile.workspace.alert.markUnreadTitle"),
-              currentText().t("mobile.workspace.alert.markUnreadBody"),
-            );
+          throw error;
         });
-      readWrites.current.set(agentId, write);
-      void write.finally(() => {
-        if (readWrites.current.get(agentId) === write) readWrites.current.delete(agentId);
+      // A failed write must not stop the next write for this agent.
+      const settled = write.catch(() => undefined);
+      readWrites.current.set(agentId, settled);
+      void settled.finally(() => {
+        if (readWrites.current.get(agentId) === settled) readWrites.current.delete(agentId);
       });
+      return write;
     },
     [
       liveState,
@@ -960,6 +947,48 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       applyConversationReads,
     ],
   );
+
+  const markAgentRead = useCallback(
+    (agentId: string, visibleMessageId?: string | null) => {
+      if (
+        visibleMessageId === null &&
+        (!activeServerId ||
+          !serverCapabilities.current.get(activeServerId)?.includes(TEAM_CONVERSATION_UNREAD_CAPABILITY))
+      ) {
+        showWarningAlert(
+          "team",
+          currentText().t("mobile.workspace.alert.updateRequiredTitle"),
+          currentText().t("mobile.workspace.alert.updateRequiredUnread"),
+        );
+        return;
+      }
+      void writeAgentRead(agentId, visibleMessageId).catch(() => {
+        if (visibleMessageId === null)
+          showFailureAlert(
+            undefined,
+            "settings",
+            currentText().t("mobile.workspace.alert.markUnreadTitle"),
+            currentText().t("mobile.workspace.alert.markUnreadBody"),
+          );
+      });
+    },
+    [activeServerId, writeAgentRead],
+  );
+
+  /** Marks every unread agent and channel of the active server read through its newest message. */
+  const markAllRead = useCallback(async () => {
+    const serverId = activeServerIdRef.current;
+    if (!serverId) return;
+    // Only listed agents: a read of an id the host no longer knows creates that agent again.
+    const listed = new Set(agents.filter((agent) => agent.serverId === serverId).map((agent) => agent.id));
+    const unread = liveState.get().unreadAgentIds.filter((agentId) => listed.has(agentId));
+    const results = await Promise.allSettled([
+      ...unread.map((agentId) => writeAgentRead(agentId)),
+      channelStore.markAllRead(serverId, Crypto.randomUUID),
+    ]);
+    const failure = results.find((result) => result.status === "rejected");
+    if (failure) throw failure.reason;
+  }, [agents, liveState, writeAgentRead, channelStore]);
 
   const updatePreferences = useCallback(
     (serverId: string, change: (current: RemoteWorkspacePreferences) => RemoteWorkspacePreferences) => {
@@ -1396,6 +1425,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         mobileAnalytics.track("conversation_action", { action: "unhide", result: saved ? "succeeded" : "failed" });
       },
       markAgentRead,
+      markAllRead,
       markAgentUnread: (agentId) => {
         markAgentRead(agentId, null);
       },
@@ -1445,6 +1475,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     loadConversation,
     loadOlderMessages,
     markAgentRead,
+    markAllRead,
     pinnedAgentIds,
     pinnedChannelIds,
     hiddenChannelIds,

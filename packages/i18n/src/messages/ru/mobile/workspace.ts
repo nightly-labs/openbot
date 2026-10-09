@@ -31,6 +31,9 @@ export const messages = {
     "Обновите этот настольный сервер, чтобы помечать диалоги непрочитанными.",
   "mobile.workspace.alert.markUnreadTitle": "Не удалось пометить непрочитанным",
   "mobile.workspace.alert.markUnreadBody": "Переподключитесь к серверу и повторите попытку.",
+  "mobile.workspace.alert.markAllReadTitle": "Не удалось отметить все прочитанными",
+  "mobile.workspace.alert.markAllReadBody":
+    "Некоторые чаты остались непрочитанными. Переподключитесь к серверу и повторите попытку.",
   "mobile.workspace.alert.serverOrderTitle": "Не удалось сохранить порядок серверов",
   "mobile.workspace.alert.serverOrderBody": "Прежний порядок сохранён. Повторите попытку.",
   "mobile.workspace.error.connectFailed": "Не удалось подключиться к серверу.",

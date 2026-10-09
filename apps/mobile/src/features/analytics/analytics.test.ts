@@ -458,6 +458,7 @@ it("instruments message commands without sending their contents or changing the 
     unhideAgent: () => {},
     markAgentRead: () => {},
     markAgentUnread: () => {},
+    markAllRead: async () => {},
     toggleAgentPin: () => "pinned",
   };
   mobileAnalytics.setUser({ id: "account", email: "person@example.com" });

@@ -4,7 +4,7 @@ import { type Href, router, Stack } from "expo-router";
 import { HeaderHeightContext } from "expo-router/react-navigation";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import { Layers3, Plus, Search, WifiOff } from "lucide-react-native";
+import { EllipsisVertical, Layers3, Search, WifiOff } from "lucide-react-native";
 import { useContext, useLayoutEffect, useMemo, useState } from "react";
 import { Pressable, View } from "react-native";
 import Animated, {
@@ -30,18 +30,20 @@ import { AgentWaitingGroupHeader } from "@/features/agents/components/agent-wait
 import { EmptyAgentsScene } from "@/features/agents/components/empty-agents-scene";
 import { PinnedAgentsGrid } from "@/features/agents/components/pinned-agents-grid";
 import { SidebarSectionHeader } from "@/features/agents/components/sidebar-section-header";
+import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { ChannelListRow } from "@/features/channels/components/channel-list";
 import { useChannels } from "@/features/channels/components/use-channels";
 import { useAppDrawer } from "@/features/servers/components/app-drawer-shell";
 import { ConnectionHeaderStatus } from "@/features/workspace/components/connection-header-status";
 import { useWaitingAgentIds } from "@/features/workspace/components/use-agent-activity";
+import { useUnreadAgentIds } from "@/features/workspace/components/use-live-workspace";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { mobileSidebarItems, mobileWaitingItems } from "@/features/workspace/model/sidebar-layout";
 import { useAppLoadingOverlay, useScreenLoadingLabel } from "@/shared/components/app-loading-overlay";
 import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
 import { haptics } from "@/shared/lib/haptics";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
-import { useText } from "@/shared/lib/text";
+import { currentText, useText } from "@/shared/lib/text";
 
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 const ROW_ENTER = FadeIn.duration(180).easing(EASE_OUT).reduceMotion(ReduceMotion.System);
@@ -178,6 +180,7 @@ export function ConnectedScreen() {
     activeServer,
     hiddenAgents,
     hiddenChannelIds,
+    markAllRead,
     pinnedAgentIds,
     pinnedChannelIds,
     refreshServers,
@@ -216,6 +219,27 @@ export function ConnectedScreen() {
     (channel) => !channel.archived && !hiddenChannelIds.includes(channel.id) && pinnedChannelIds.includes(channel.id),
   );
   const hasPins = pinnedAgents.length + pinnedChannels.length > 0;
+  const unreadAgentIds = useUnreadAgentIds();
+  const hasUnread =
+    channels.channels.some((channel) => channel.unreadCount > 0) ||
+    agents.some((agent) => agent.serverId === activeServer.id && unreadAgentIds.includes(agent.id));
+  const [markingAllRead, setMarkingAllRead] = useState(false);
+  const canMarkAllRead = hasUnread && !markingAllRead && activeServer.state === "online";
+  const markAllChatsRead = () => {
+    if (!canMarkAllRead) return;
+    void haptics.impact("soft");
+    setMarkingAllRead(true);
+    void markAllRead()
+      .catch((error: unknown) =>
+        showFailureAlert(
+          error,
+          "settings",
+          currentText().t("mobile.workspace.alert.markAllReadTitle"),
+          currentText().t("mobile.workspace.alert.markAllReadBody"),
+        ),
+      )
+      .finally(() => setMarkingAllRead(false));
+  };
   const unpinnedAgents = useMemo(
     () => activeAgents.filter((agent) => !pinnedAgentIds.includes(agent.id)),
     [activeAgents, pinnedAgentIds],
@@ -273,15 +297,34 @@ export function ConnectedScreen() {
     }
     return ids;
   }, [items, collapsedSectionIds]);
-  const optionsActions = useMemo<MenuAction[]>(
-    () => [
-      { id: "add-agent", title: t("mobile.agent.home.addAgent") },
-      ...(sidebar?.layout ? [{ id: "add-section", title: t("mobile.agent.sectionForm.newTitle") }] : []),
-      ...(channels.supported ? [{ id: "add-channel", title: t("mobile.agent.home.newChannel") }] : []),
+  // Add actions come first, then a divider and the actions on existing chats.
+  const optionsActions = useMemo<MenuAction[]>(() => {
+    const chatActions: MenuAction[] = [
+      ...(hasSelectedServer
+        ? [
+            {
+              id: "mark-all-read",
+              title: t("mobile.agent.home.markAllRead"),
+              attributes: { disabled: !canMarkAllRead },
+            },
+          ]
+        : []),
       ...(hasHiddenChats ? [{ id: "hidden-chats", title: t("mobile.agent.hidden.title") }] : []),
-    ],
-    [hasHiddenChats, channels.supported, sidebar?.layout, t],
-  );
+    ];
+    return [
+      {
+        id: "add",
+        title: "",
+        displayInline: true,
+        subactions: [
+          { id: "add-agent", title: t("mobile.agent.home.addAgent") },
+          ...(sidebar?.layout ? [{ id: "add-section", title: t("mobile.agent.sectionForm.newTitle") }] : []),
+          ...(channels.supported ? [{ id: "add-channel", title: t("mobile.agent.home.newChannel") }] : []),
+        ],
+      },
+      ...(chatActions.length > 0 ? [{ id: "chats", title: "", displayInline: true, subactions: chatActions }] : []),
+    ];
+  }, [hasHiddenChats, hasSelectedServer, canMarkAllRead, channels.supported, sidebar?.layout, t]);
 
   return (
     <View className="flex-1 bg-background">
@@ -464,6 +507,7 @@ export function ConnectedScreen() {
                       if (event.nativeEvent.event === "add-channel")
                         router.push({ pathname: "/add-channel", params: { serverId: activeServer.id } });
                       if (event.nativeEvent.event === "hidden-chats") router.push("/hidden-chats");
+                      if (event.nativeEvent.event === "mark-all-read") markAllChatsRead();
                     }}
                     style={{ height: 44, width: 44 }}
                   >
@@ -473,7 +517,7 @@ export function ConnectedScreen() {
                       accessible
                       className="size-11 items-center justify-center rounded-full"
                     >
-                      <Plus color={iconColor} size={24} strokeWidth={1.9} />
+                      <EllipsisVertical color={iconColor} size={24} strokeWidth={1.9} />
                     </View>
                   </MenuView>
                 </View>
@@ -504,30 +548,50 @@ export function ConnectedScreen() {
                 router.push("/search-agents");
               }}
             />
-            <Stack.Toolbar.Menu icon="plus" accessibilityLabel={t("mobile.agent.home.chatOptions")} separateBackground>
-              <Stack.Toolbar.MenuAction icon="plus.circle" onPress={() => openFromMenu("/add-agent")}>
-                {t("mobile.agent.home.addAgent")}
-              </Stack.Toolbar.MenuAction>
-              {sidebar?.layout ? (
-                <Stack.Toolbar.MenuAction
-                  icon="folder.badge.plus"
-                  onPress={() => openFromMenu({ pathname: "/section-form", params: { serverId: activeServer.id } })}
-                >
-                  {t("mobile.agent.sectionForm.newTitle")}
+            <Stack.Toolbar.Menu
+              icon="ellipsis"
+              accessibilityLabel={t("mobile.agent.home.chatOptions")}
+              separateBackground
+            >
+              {/* Add actions come first, then a divider and the actions on existing chats. */}
+              <Stack.Toolbar.Menu inline>
+                <Stack.Toolbar.MenuAction icon="plus.circle" onPress={() => openFromMenu("/add-agent")}>
+                  {t("mobile.agent.home.addAgent")}
                 </Stack.Toolbar.MenuAction>
-              ) : null}
-              {channels.supported ? (
-                <Stack.Toolbar.MenuAction
-                  icon="number"
-                  onPress={() => openFromMenu({ pathname: "/add-channel", params: { serverId: activeServer.id } })}
-                >
-                  {t("mobile.agent.home.newChannel")}
-                </Stack.Toolbar.MenuAction>
-              ) : null}
-              {hasHiddenChats ? (
-                <Stack.Toolbar.MenuAction icon="eye.slash" onPress={() => openFromMenu("/hidden-chats")}>
-                  {t("mobile.agent.hidden.title")}
-                </Stack.Toolbar.MenuAction>
+                {sidebar?.layout ? (
+                  <Stack.Toolbar.MenuAction
+                    icon="folder.badge.plus"
+                    onPress={() => openFromMenu({ pathname: "/section-form", params: { serverId: activeServer.id } })}
+                  >
+                    {t("mobile.agent.sectionForm.newTitle")}
+                  </Stack.Toolbar.MenuAction>
+                ) : null}
+                {channels.supported ? (
+                  <Stack.Toolbar.MenuAction
+                    icon="number"
+                    onPress={() => openFromMenu({ pathname: "/add-channel", params: { serverId: activeServer.id } })}
+                  >
+                    {t("mobile.agent.home.newChannel")}
+                  </Stack.Toolbar.MenuAction>
+                ) : null}
+              </Stack.Toolbar.Menu>
+              {hasSelectedServer || hasHiddenChats ? (
+                <Stack.Toolbar.Menu inline>
+                  {hasSelectedServer ? (
+                    <Stack.Toolbar.MenuAction
+                      icon="envelope.open"
+                      disabled={!canMarkAllRead}
+                      onPress={markAllChatsRead}
+                    >
+                      {t("mobile.agent.home.markAllRead")}
+                    </Stack.Toolbar.MenuAction>
+                  ) : null}
+                  {hasHiddenChats ? (
+                    <Stack.Toolbar.MenuAction icon="eye.slash" onPress={() => openFromMenu("/hidden-chats")}>
+                      {t("mobile.agent.hidden.title")}
+                    </Stack.Toolbar.MenuAction>
+                  ) : null}
+                </Stack.Toolbar.Menu>
               ) : null}
             </Stack.Toolbar.Menu>
           </Stack.Toolbar>

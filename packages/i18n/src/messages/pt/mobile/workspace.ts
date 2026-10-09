@@ -32,6 +32,9 @@ export const messages = {
     "Atualize o servidor no computador para marcar conversas como não lidas.",
   "mobile.workspace.alert.markUnreadTitle": "Não foi possível marcar como não lida",
   "mobile.workspace.alert.markUnreadBody": "Conecte-se novamente ao servidor e tente de novo.",
+  "mobile.workspace.alert.markAllReadTitle": "Não foi possível marcar tudo como lido",
+  "mobile.workspace.alert.markAllReadBody":
+    "Algumas conversas continuam não lidas. Conecte-se novamente ao servidor e tente de novo.",
   "mobile.workspace.alert.serverOrderTitle": "Não foi possível salvar a ordem dos servidores",
   "mobile.workspace.alert.serverOrderBody": "A ordem anterior foi mantida. Tente novamente.",
   "mobile.workspace.error.connectFailed": "A conexão com o servidor falhou.",
