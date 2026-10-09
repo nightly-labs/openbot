@@ -983,12 +983,23 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     const listed = new Set(agents.filter((agent) => agent.serverId === serverId).map((agent) => agent.id));
     const unread = liveState.get().unreadAgentIds.filter((agentId) => listed.has(agentId));
     const results = await Promise.allSettled([
-      ...unread.map((agentId) => writeAgentRead(agentId)),
+      // A cached chat can be older than the read state, so each receipt uses the host's newest message.
+      ...unread.map(async (agentId) => {
+        const page = await request(
+          "GET",
+          `${TEAM_API_ROUTES.agent.conversationPage(agentId)}?limit=1`,
+          decodeConversationPage,
+          undefined,
+          serverId,
+        );
+        const latestId = page.messages.at(-1)?.id;
+        if (latestId) await writeAgentRead(agentId, latestId);
+      }),
       channelStore.markAllRead(serverId, Crypto.randomUUID),
     ]);
     const failure = results.find((result) => result.status === "rejected");
     if (failure) throw failure.reason;
-  }, [agents, liveState, writeAgentRead, channelStore]);
+  }, [agents, liveState, request, writeAgentRead, channelStore]);
 
   const updatePreferences = useCallback(
     (serverId: string, change: (current: RemoteWorkspacePreferences) => RemoteWorkspacePreferences) => {
