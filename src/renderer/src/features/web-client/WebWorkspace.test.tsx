@@ -420,6 +420,33 @@ describe("web workspace state", () => {
     directoryRefresh.resolve([]);
     await waitFor(() => expect(workspace.state.host).toBeNull());
   });
+  it("waits for a revoked connection attempt before one authorized reconnect", async () => {
+    const app = harness();
+    const workspace = await connected(app);
+    const host = workspace.state.host;
+    assert(host);
+    const first = Promise.withResolvers<string[]>();
+    const second = Promise.withResolvers<string[]>();
+    const connect = vi.mocked(app.runtime.connect);
+    connect.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    const attempt = workspace.connect(host);
+    await waitFor(() => expect(connect).toHaveBeenCalledTimes(2));
+    const revoked = { hostId: host.hostId, state: "offline", message: null, code: "session_revoked" } as const;
+    app.events().connection(revoked);
+    await waitFor(() => expect(app.runtime.listHosts).toHaveBeenCalledTimes(2));
+    expect(workspace.state.recovery?.phase).toBe("suspended");
+    first.reject(new Error("Access denied"));
+    await attempt;
+    await waitFor(() => expect(connect).toHaveBeenCalledTimes(3));
+    app.events().connection(revoked);
+    second.reject(new Error("Access denied"));
+    await waitFor(() => expect(workspace.state.revocationRevision).toBe(2));
+    window.dispatchEvent(new Event("online"));
+    expect(workspace.state.recovery?.phase).toBe("suspended");
+    expect(workspace.state.conversations).toEqual({});
+    expect(connect).toHaveBeenCalledTimes(3);
+  });
+
   it("ignores a stale revocation refresh after switching hosts", async () => {
     const firstHost = {
       hostId: "host",

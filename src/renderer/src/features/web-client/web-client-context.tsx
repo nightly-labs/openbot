@@ -323,10 +323,12 @@ export function createWebWorkspace(
           });
           const revokedHostId = hostId;
           const revokedGeneration = generation;
+          const revokedConnection = connectionPromise?.promise;
           void props
             .onSessionCheck()
             .then(() => refreshHosts())
-            .then(() => {
+            .then(async () => {
+              await revokedConnection?.catch(() => undefined);
               // A member or role change anywhere on the host revokes every session, this one
               // too. The directory still lists the host, so this account can connect again.
               // Try once: a second revocation before the host is online waits for Reconnect.
