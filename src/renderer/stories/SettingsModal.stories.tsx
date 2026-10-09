@@ -70,6 +70,13 @@ function SettingsModalStory(props: {
       connectedAt: Date.now() - 86_400_000,
       lastActiveAt: Date.now() - 45_000,
     },
+    {
+      sessionId: "22222222-2222-4222-8222-222222222222",
+      name: "Pixel 9",
+      platform: "android",
+      connectedAt: Date.now() - 3_600_000,
+      lastActiveAt: Date.now() - 600_000,
+    },
   ]);
 
   async function updateAccountAvatar(image: AvatarImageInput | null): Promise<void> {
@@ -198,6 +205,11 @@ export const Narrow: Story = {
 
 export const Notifications: Story = {
   render: () => <SettingsModalStory initialOpen initialTab="notifications" />,
+};
+
+/** The install guide for each phone, the sign-in code and the connected phones. */
+export const MobileConnect: Story = {
+  render: () => <SettingsModalStory initialOpen initialTab="mobile-connect" />,
 };
 
 /** No plan yet. Choose a plan: the mock then shows it as active, as after a Stripe payment. */

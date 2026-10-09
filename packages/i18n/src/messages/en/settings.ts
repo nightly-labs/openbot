@@ -142,23 +142,31 @@ export const messages = defineMessages("settings", {
   "settings.disconnect.pending": "Disconnecting…",
   // The Mobile Connect tab.
   "settings.mobileConnect.title": "Connect your phone",
-  "settings.mobileConnect.iosApp.title": "iPhone app",
-  "settings.mobileConnect.iosApp.description":
-    "OpenBot for iPhone is in public beta on TestFlight. Install it, then sign in below.",
-  "settings.mobileConnect.iosApp.copyLink": "Copy link",
-  "settings.mobileConnect.iosApp.linkCopied": "Link copied",
+  "settings.mobileConnect.install.title": "Install the app",
+  "settings.mobileConnect.install.description": "Choose your phone and scan the code with its camera.",
+  "settings.mobileConnect.install.platformLabel": "Phone",
+  "settings.mobileConnect.app.copyLink": "Copy link",
+  "settings.mobileConnect.app.linkCopied": "Link copied",
+  "settings.mobileConnect.iosApp.title": "OpenBot for iPhone",
+  "settings.mobileConnect.iosApp.badge": "Beta",
+  "settings.mobileConnect.iosApp.description": "Public beta on TestFlight. For iOS 16.4 or later.",
   "settings.mobileConnect.iosApp.qrLabel": "TestFlight invite QR code",
   "settings.mobileConnect.iosApp.step.testFlight": "On your iPhone, install TestFlight from the App Store.",
   "settings.mobileConnect.iosApp.step.invite":
     "Scan this QR code with the iPhone camera, or copy the invite link and open it on your iPhone.",
   "settings.mobileConnect.iosApp.step.install": "In TestFlight, tap Accept, then Install.",
-  "settings.mobileConnect.iosApp.step.signIn":
-    "Open OpenBot on your iPhone. Generate a QR code below and scan it to sign in.",
+  "settings.mobileConnect.androidApp.title": "OpenBot for Android",
+  "settings.mobileConnect.androidApp.badge": "Available",
+  "settings.mobileConnect.androidApp.description": "On Google Play. For Android 7.0 or later.",
+  "settings.mobileConnect.androidApp.qrLabel": "Google Play QR code",
+  "settings.mobileConnect.androidApp.step.scan":
+    "Scan this QR code with the phone camera, or copy the link and open it on your phone.",
+  "settings.mobileConnect.androidApp.step.install": "On Google Play, tap Install.",
   "settings.mobileConnect.description":
     "Scan a one-time code with the OpenBot mobile app to use this account on your phone.",
-  "settings.mobileConnect.signIn.title": "Mobile sign-in",
+  "settings.mobileConnect.signIn.title": "Sign in on your phone",
   "settings.mobileConnect.signIn.description":
-    "The code expires after two minutes and stops working after the first successful scan.",
+    "Open OpenBot on your phone and scan a one-time code. The code expires after two minutes and works only once.",
   "settings.mobileConnect.generating": "Generating…",
   "settings.mobileConnect.generate": "Generate QR code",
   "settings.mobileConnect.generateNew": "Generate new code",

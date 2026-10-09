@@ -1,11 +1,13 @@
+import { type MobilePlatformLogoVariant, PlatformLogo } from "@openbot/brand";
 import type { MobileConnectedDevice } from "@openbot/contracts/ipc";
-import type { AppTranslate } from "@openbot/i18n";
+import type { AppTextKey, AppTranslate } from "@openbot/i18n";
 import {
   Alert,
   AlertContent,
   AlertDescription,
   AlertIcon,
   AlertTitle,
+  Badge,
   Button,
   CircleCheck,
   CopyButton,
@@ -15,14 +17,17 @@ import {
   ItemContent,
   ItemDescription,
   ItemGroup,
+  ItemMedia,
   ItemTitle,
   QrCode,
   SettingsSection,
+  SlidingTabs,
   Smartphone,
   Text,
 } from "@openbot/ui";
-import { For, Show } from "solid-js";
+import { createSignal, For, Show } from "solid-js";
 import { useText } from "../../text";
+import { ANDROID_PLAY_STORE_URL } from "../mobile-app/android-play-store";
 import { IOS_TESTFLIGHT_URL } from "../mobile-app/ios-testflight";
 import type { SettingsMobileConnectStore } from "./stores/mobile-connect-store";
 
@@ -33,7 +38,51 @@ interface SettingsMobileConnectTabProps {
 }
 
 const IOS_PLATFORM_LABEL = "iOS";
+const IPHONE_LABEL = "iPhone";
 const ANDROID_PLATFORM_LABEL = "Android";
+
+interface MobileAppGuide {
+  platform: MobilePlatformLogoVariant;
+  tab: string;
+  url: string;
+  title: AppTextKey;
+  badge: AppTextKey;
+  description: AppTextKey;
+  qrLabel: AppTextKey;
+  steps: readonly AppTextKey[];
+}
+
+/** The phone apps in the order of the download pages. The QR code opens the store page on the phone. */
+const MOBILE_APPS: readonly MobileAppGuide[] = [
+  {
+    platform: "ios",
+    tab: IPHONE_LABEL,
+    url: IOS_TESTFLIGHT_URL,
+    title: "settings.mobileConnect.iosApp.title",
+    badge: "settings.mobileConnect.iosApp.badge",
+    description: "settings.mobileConnect.iosApp.description",
+    qrLabel: "settings.mobileConnect.iosApp.qrLabel",
+    steps: [
+      "settings.mobileConnect.iosApp.step.testFlight",
+      "settings.mobileConnect.iosApp.step.invite",
+      "settings.mobileConnect.iosApp.step.install",
+    ],
+  },
+  {
+    platform: "android",
+    tab: ANDROID_PLATFORM_LABEL,
+    url: ANDROID_PLAY_STORE_URL,
+    title: "settings.mobileConnect.androidApp.title",
+    badge: "settings.mobileConnect.androidApp.badge",
+    description: "settings.mobileConnect.androidApp.description",
+    qrLabel: "settings.mobileConnect.androidApp.qrLabel",
+    steps: ["settings.mobileConnect.androidApp.step.scan", "settings.mobileConnect.androidApp.step.install"],
+  },
+];
+
+function deviceLogo(platform: MobileConnectedDevice["platform"]): MobilePlatformLogoVariant | undefined {
+  return platform === "unknown" ? undefined : platform;
+}
 
 function devicePlatformLabel(platform: MobileConnectedDevice["platform"], t: AppTranslate): string {
   if (platform === "ios") return IOS_PLATFORM_LABEL;
@@ -43,37 +92,78 @@ function devicePlatformLabel(platform: MobileConnectedDevice["platform"], t: App
 
 export function SettingsMobileConnectTab(props: SettingsMobileConnectTabProps) {
   const { t } = useText();
+  const [platform, setPlatform] = createSignal<MobilePlatformLogoVariant>("ios");
   return (
     <SettingsSection title={t("settings.mobileConnect.title")} description={t("settings.mobileConnect.description")}>
       {/* Always here, so the install steps stay available after the sidebar announcement is closed. */}
       <ItemGroup class="settings-modal-card settings-mobile-connect-card">
-        <Item class="settings-modal-row settings-mobile-connect-action-row">
-          <ItemContent>
-            <ItemTitle>{t("settings.mobileConnect.iosApp.title")}</ItemTitle>
-            <ItemDescription>{t("settings.mobileConnect.iosApp.description")}</ItemDescription>
-          </ItemContent>
-          <ItemActions>
-            <CopyButton
-              variant="outline"
-              value={IOS_TESTFLIGHT_URL}
-              label={t("settings.mobileConnect.iosApp.copyLink")}
-              copiedLabel={t("settings.mobileConnect.iosApp.linkCopied")}
-            />
-          </ItemActions>
-        </Item>
-        <div class="settings-mobile-app-install">
-          <QrCode value={IOS_TESTFLIGHT_URL} size={132} label={t("settings.mobileConnect.iosApp.qrLabel")} />
-          <ol class="settings-mobile-app-steps">
-            <li>{t("settings.mobileConnect.iosApp.step.testFlight")}</li>
-            <li>{t("settings.mobileConnect.iosApp.step.invite")}</li>
-            <li>{t("settings.mobileConnect.iosApp.step.install")}</li>
-            <li>{t("settings.mobileConnect.iosApp.step.signIn")}</li>
-          </ol>
-        </div>
+        <SlidingTabs.Root
+          class="settings-mobile-app-install"
+          value={platform()}
+          onChange={(value) => {
+            if (value === "ios" || value === "android") setPlatform(value);
+          }}
+        >
+          <Item class="settings-modal-row settings-mobile-connect-action-row">
+            <ItemMedia class="settings-mobile-connect-step" aria-hidden="true">
+              1
+            </ItemMedia>
+            <ItemContent>
+              <ItemTitle>{t("settings.mobileConnect.install.title")}</ItemTitle>
+              <ItemDescription>{t("settings.mobileConnect.install.description")}</ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <SlidingTabs.List aria-label={t("settings.mobileConnect.install.platformLabel")}>
+                <For each={MOBILE_APPS}>
+                  {(app) => (
+                    <SlidingTabs.Trigger class="settings-mobile-app-tab" value={app.platform}>
+                      <PlatformLogo platform={app.platform} />
+                      {app.tab}
+                    </SlidingTabs.Trigger>
+                  )}
+                </For>
+              </SlidingTabs.List>
+            </ItemActions>
+          </Item>
+          <SlidingTabs.ContentSlot class="settings-mobile-app-panels">
+            <For each={MOBILE_APPS}>
+              {(app) => (
+                <SlidingTabs.Content class="settings-mobile-app-panel" value={app.platform}>
+                  <QrCode class="settings-mobile-app-qr" value={app.url} size={132} label={t(app.qrLabel)} />
+                  <div class="settings-mobile-app-details">
+                    <div class="settings-mobile-app-heading">
+                      <Text class="settings-mobile-app-title" variant="body">
+                        {t(app.title)}
+                      </Text>
+                      <Badge variant={app.platform === "ios" ? "info-light" : "success-light"}>{t(app.badge)}</Badge>
+                    </div>
+                    <Text variant="caption" tone="muted">
+                      {t(app.description)}
+                    </Text>
+                    <ol class="settings-mobile-app-steps">
+                      <For each={app.steps}>{(step) => <li>{t(step)}</li>}</For>
+                    </ol>
+                    <CopyButton
+                      class="settings-mobile-app-copy"
+                      variant="outline"
+                      size="sm"
+                      value={app.url}
+                      label={t("settings.mobileConnect.app.copyLink")}
+                      copiedLabel={t("settings.mobileConnect.app.linkCopied")}
+                    />
+                  </div>
+                </SlidingTabs.Content>
+              )}
+            </For>
+          </SlidingTabs.ContentSlot>
+        </SlidingTabs.Root>
       </ItemGroup>
 
       <ItemGroup class="settings-modal-card settings-mobile-connect-card">
         <Item class="settings-modal-row settings-mobile-connect-action-row">
+          <ItemMedia class="settings-mobile-connect-step" aria-hidden="true">
+            2
+          </ItemMedia>
           <ItemContent>
             <ItemTitle>{t("settings.mobileConnect.signIn.title")}</ItemTitle>
             <ItemDescription>{t("settings.mobileConnect.signIn.description")}</ItemDescription>
@@ -184,15 +274,6 @@ export function SettingsMobileConnectTab(props: SettingsMobileConnectTabProps) {
             </Text>
           </Show>
         </div>
-        <Alert tone="neutral">
-          <AlertIcon>
-            <Info />
-          </AlertIcon>
-          <AlertContent>
-            <AlertTitle>{t("settings.mobileConnect.disconnectInfo.title")}</AlertTitle>
-            <AlertDescription>{t("settings.mobileConnect.disconnectInfo.description")}</AlertDescription>
-          </AlertContent>
-        </Alert>
         <div class="settings-mobile-devices-states">
           <div
             class="settings-mobile-devices-state"
@@ -218,7 +299,7 @@ export function SettingsMobileConnectTab(props: SettingsMobileConnectTabProps) {
             data-expanded={props.store.state.devices.devices.length > 0 ? "" : undefined}
             aria-hidden={props.store.state.devices.devices.length === 0 ? "true" : undefined}
           >
-            <div class="settings-mobile-devices-state-body">
+            <div class="settings-mobile-devices-state-body settings-mobile-devices-list">
               <div class="settings-mobile-devices-table-frame">
                 <table class="settings-mobile-devices-table">
                   <thead>
@@ -242,7 +323,14 @@ export function SettingsMobileConnectTab(props: SettingsMobileConnectTabProps) {
                               {device.name}
                             </span>
                           </td>
-                          <td>{devicePlatformLabel(device.platform, t)}</td>
+                          <td>
+                            <span class="settings-mobile-device-platform">
+                              <Show when={deviceLogo(device.platform)} fallback={<Smartphone aria-hidden="true" />}>
+                                {(platform) => <PlatformLogo platform={platform()} />}
+                              </Show>
+                              {devicePlatformLabel(device.platform, t)}
+                            </span>
+                          </td>
                           <td>{props.store.deviceTimeLabel(device.connectedAt)}</td>
                           <td>{props.store.deviceTimeLabel(device.lastActiveAt)}</td>
                           <td class="settings-mobile-device-action">
@@ -267,6 +355,16 @@ export function SettingsMobileConnectTab(props: SettingsMobileConnectTabProps) {
                   </tbody>
                 </table>
               </div>
+              {/* Only beside a device that can be disconnected. */}
+              <Alert tone="neutral">
+                <AlertIcon>
+                  <Info />
+                </AlertIcon>
+                <AlertContent>
+                  <AlertTitle>{t("settings.mobileConnect.disconnectInfo.title")}</AlertTitle>
+                  <AlertDescription>{t("settings.mobileConnect.disconnectInfo.description")}</AlertDescription>
+                </AlertContent>
+              </Alert>
             </div>
           </div>
         </div>

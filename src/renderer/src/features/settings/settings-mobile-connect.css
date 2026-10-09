@@ -318,21 +318,99 @@
   }
 }
 
-/* The iPhone app install guide: the TestFlight invite QR code beside the numbered steps. It stays
- * here for good, because the sidebar announcement of the beta can be closed. */
+/* The phone app install guide: a tab for each phone, with the store QR code beside the steps. It
+ * stays here for good, because the sidebar announcement of the beta can be closed. The tab root
+ * gives its children to the card, so the header row keeps the card row styles. */
 .settings-mobile-app-install {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--openbot-space-6);
-  border-top: 1px solid var(--openbot-border);
+  display: contents;
+}
+
+/* The numbers of the two cards: install the app, then sign in. */
+.settings-mobile-connect-step.ui-item-media {
+  width: 24px;
+  height: 24px;
+  display: inline-grid;
+  flex: 0 0 auto;
+  align-self: flex-start;
+  place-items: center;
+  margin-top: 1px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-accent-soft);
+  color: var(--openbot-accent-text);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--openbot-weight-medium);
+  line-height: 1;
+}
+
+.settings-mobile-app-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-1-5);
+}
+
+.settings-mobile-app-tab > svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex: 0 0 auto;
+}
+
+.settings-mobile-app-panels {
+  position: relative;
   padding: var(--openbot-space-4);
+}
+
+.settings-mobile-app-panels::before {
+  position: absolute;
+  top: 0;
+  right: var(--openbot-space-4);
+  left: var(--openbot-space-4);
+  height: 1px;
+  background: var(--openbot-border);
+  pointer-events: none;
+  content: "";
+}
+
+.settings-mobile-app-panel {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-6);
+}
+
+/* The code settles in after the panel fades in, so a change of phone reads as a new code. */
+.settings-mobile-app-qr {
+  transform: scale(0.96);
+  transition: transform var(--openbot-duration-overlay) var(--openbot-ease-out);
+}
+
+.settings-mobile-app-panel[data-selected] .settings-mobile-app-qr {
+  transform: scale(1);
+}
+
+.settings-mobile-app-details {
+  min-width: 0;
+  display: grid;
+  justify-items: start;
+  gap: var(--openbot-space-2);
+}
+
+.settings-mobile-app-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.settings-mobile-app-title {
+  color: var(--openbot-text-primary);
+  font-weight: var(--openbot-weight-semibold);
 }
 
 .settings-mobile-app-steps {
   display: grid;
   min-width: 0;
-  gap: var(--openbot-space-2);
-  margin: 0;
+  gap: var(--openbot-space-1-5);
+  margin: var(--openbot-space-1) 0;
   padding-left: var(--openbot-space-4);
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-sm);
@@ -342,4 +420,59 @@
 
 .settings-mobile-app-steps > li::marker {
   color: var(--openbot-text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-mobile-app-copy > svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex: 0 0 auto;
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.settings-mobile-device-platform {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.settings-mobile-device-platform > svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex: 0 0 auto;
+  color: var(--openbot-text-muted);
+}
+
+.settings-mobile-devices-list {
+  display: grid;
+  gap: var(--openbot-space-3);
+}
+
+/* A phone that signs in while the tab is open fades into the list. */
+.settings-mobile-devices-table tbody tr {
+  transition: opacity var(--openbot-duration-overlay) var(--openbot-ease-out);
+}
+
+@starting-style {
+  .settings-mobile-devices-table tbody tr {
+    opacity: 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .settings-mobile-app-panel {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-mobile-app-qr,
+  .settings-mobile-devices-table tbody tr {
+    transition: none;
+  }
+
+  .settings-mobile-app-qr {
+    transform: none;
+  }
 }
