@@ -58,7 +58,8 @@ export interface RoutineFlowsCanvasProps {
 export function RoutineFlowsCanvas(props: RoutineFlowsCanvasProps) {
   const { t, errorMessage } = useText();
   const host = () => props.host;
-  const agentId = () => props.agent?.id ?? null;
+  // The web gives a new agent object on each agent update; only a new id loads another canvas.
+  const agentId = createMemo(() => props.agent?.id ?? null);
   const [state, setState] = createStore<RoutineFlowState>({
     canvas: null,
     error: null,

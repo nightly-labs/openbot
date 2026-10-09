@@ -7,3 +7,7 @@
 ### Changed
 
 - Long chats in the web app and on joined servers show the "Earlier" part of the day rail for messages that are not loaded yet, as on this computer. The server must run this version of OpenBot.
+
+### Fixed
+
+- The chat over the Routines canvas shows the agent's answer once, not twice.

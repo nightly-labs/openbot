@@ -67,6 +67,8 @@ export function createRoutineFlowAssistant(host: () => RoutineFlowsHost, agentId
     // Without the turn, a queue change can come before the answer does: only an ended turn ends it.
     if (!reply && (status !== "completed" || !turnId)) return;
     setChat((draft) => {
+      // An ended turn and its queue change check at the same time; only the first answers.
+      if (draft.pending?.deliveryId !== pending.deliveryId) return;
       if (reply) draft.messages.push({ id: reply.id, author: "agent", text: reply.text, createdAt: reply.createdAt });
       draft.pending = null;
     });
