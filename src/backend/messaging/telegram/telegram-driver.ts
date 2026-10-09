@@ -74,14 +74,23 @@ class TelegramAdapter implements MessagingAdapter {
     this.#rateLimited = options.rateLimited;
   }
 
-  /** The chat was linked through Signal, which checked it. Nothing here needs the network. */
+  /**
+   * The chat was linked through Signal, which checked it. Only a link whose bot lookup failed needs
+   * the network: a mention needs the bot's username, so a failure here makes the service try again.
+   */
   identify(): Effect.Effect<ConnectionIdentity, MessagingAdapterError> {
-    return Effect.succeed({
-      workspaceId: this.#chatId,
-      workspaceName: this.#state.title || this.#chatId,
-      botUserId: this.#botId,
-      appId: this.#botId,
-      missingScopes: [],
+    return Effect.gen({ self: this }, function* () {
+      if (!this.#state.botUsername) {
+        const me = yield* this.#call("getMe", {});
+        if (me.username) this.#state.botUsername = me.username;
+      }
+      return {
+        workspaceId: this.#chatId,
+        workspaceName: this.#state.title || this.#chatId,
+        botUserId: this.#botId,
+        appId: this.#botId,
+        missingScopes: [],
+      };
     });
   }
 

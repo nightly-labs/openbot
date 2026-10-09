@@ -51,7 +51,7 @@ import { slackOrchestratorMemories, slackOrchestratorProfile } from "./slack/sla
 import { SlackWebApi } from "./slack/slack-web-api";
 import { type TelegramAppPort, telegramLinkUrl } from "./telegram/telegram-connect";
 import { telegramOrchestratorMemories, telegramOrchestratorProfile } from "./telegram/telegram-orchestrator";
-import { parseTelegramUpdate, telegramLink } from "./telegram/telegram-updates";
+import { parseTelegramUpdate, telegramLink, telegramRemoval } from "./telegram/telegram-updates";
 
 const logger = createOpenBotLogger("messaging");
 
@@ -634,9 +634,28 @@ export class MessagingService {
     if (link) return yield* this.#linkTelegramChat(botId, chatId, link.title);
     const record = this.#threads.store.connectionForWorkspace("telegram", chatId);
     // A chat that both the production and the development bot are in answers only its own bot.
-    if (!record?.enabled || (record.appId && record.appId !== botId)) return;
-    const transport = this.#live.get(record.connectionId)?.transport;
-    if (transport?.deliver) yield* transport.deliver(delivery);
+    if (!record || (record.appId && record.appId !== botId)) return;
+    const transport = record.enabled ? this.#live.get(record.connectionId)?.transport : undefined;
+    if (transport?.deliver) {
+      yield* transport.deliver(delivery);
+      return;
+    }
+    // A paused chat has no transport, and Telegram does not send a removal again. Without this, a
+    // resume shows the chat as connected, and Signal keeps routing it here. A disconnected chat has no
+    // credentials, and the removal is the echo of its `leaveChat`.
+    if (
+      record.lastErrorCode === "removed" ||
+      this.#credentials.status(record.connectionId) === "missing" ||
+      !telegramRemoval(update, botId, chatId)
+    )
+      return;
+    yield* this.#stopConnection(record.connectionId);
+    // As for a running chat: the summary shows `removed` rather than `paused`, with no Resume.
+    this.#threads.store.updateConnection(record.connectionId, { enabled: true, lastErrorCode: "removed" });
+    if (this.#telegramApp)
+      yield* this.#telegramApp
+        .unlink(chatId)
+        .pipe(Effect.catch((failure) => Effect.sync(() => this.#warn(failure.cause))));
   });
 
   readonly #linkTelegramChat = Effect.fn("MessagingService.linkTelegramChat")(function* (

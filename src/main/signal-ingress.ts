@@ -58,7 +58,8 @@ export interface SignalIngressOptions {
   issueWebhookRoute(hostId: string): Effect.Effect<string, RemoteWorkflowError>;
   /**
    * The Telegram route ticket: the chats that the account service links to this host. A failure, such
-   * as an account service without Telegram, leaves the socket without Telegram chats.
+   * as an account service without Telegram, leaves the socket without Telegram chats until it opens
+   * again later.
    */
   issueTelegramRoute?(hostId: string): Effect.Effect<string, RemoteWorkflowError>;
 }
@@ -83,7 +84,16 @@ class SignalIngressAccount extends Context.Service<
         webhookRoute: (hostId) => options.issueWebhookRoute(hostId),
         telegramRoute: (hostId) =>
           options.issueTelegramRoute
-            ? options.issueTelegramRoute(hostId).pipe(Effect.catch(() => Effect.succeed(null)))
+            ? options.issueTelegramRoute(hostId).pipe(
+                Effect.catch(() =>
+                  Effect.sync(() => {
+                    logger.warn(
+                      "The Telegram route ticket is not available. The socket opens again later for Telegram.",
+                    );
+                    return null;
+                  }),
+                ),
+              )
             : Effect.succeed(null),
       }),
     );
@@ -142,6 +152,9 @@ export class SignalIngress implements MessagingIngress {
   /** The open socket serves Slack or Discord without the webhook route, because its ticket failed. */
   #webhookMissing = false;
   #webhookBackoffMs = BACKOFF_START_MS;
+  /** The open socket has no Telegram route, because its ticket failed. */
+  #telegramMissing = false;
+  #telegramBackoffMs = BACKOFF_START_MS;
   readonly #sessionListeners = new Set<(session: DiscordSession | null) => void>();
   readonly #routeListeners = new Set<(guildIds: ReadonlySet<string>) => void>();
   /** What the Signal of the open socket can do, from its `ready`. */
@@ -383,6 +396,8 @@ export class SignalIngress implements MessagingIngress {
     };
     if (generation !== this.#generation || (this.#held() === 0 && this.#webhookHolders === 0)) return;
     this.#webhookMissing = webhooks && webhookRoute === null;
+    this.#telegramMissing = telegram && telegramRoute === null;
+    if (telegram && telegramRoute !== null) this.#telegramBackoffMs = BACKOFF_START_MS;
     const socket = new WebSocket(bootstrap.signalUrl);
     this.#socket = socket;
     this.#apiUrl = discordApiUrl(bootstrap.signalUrl);
@@ -431,7 +446,7 @@ export class SignalIngress implements MessagingIngress {
       this.#backoffMs = BACKOFF_START_MS;
       this.#startPing(socket);
       this.#setState("online");
-      if (this.#webhookMissing) this.#retryWebhooks();
+      if (this.#webhookMissing || this.#telegramMissing) this.#retryRoutes();
       return;
     }
     if (message.type === "webhook-ready") {
@@ -543,11 +558,21 @@ export class SignalIngress implements MessagingIngress {
     }, delay);
   }
 
-  /** Opens the shared socket again later, with a longer delay each time, so webhooks come back. */
-  #retryWebhooks(): void {
+  /**
+   * Opens the shared socket again later, with a longer delay each time, so a missing webhook or
+   * Telegram route comes back. Each route has its own delay: a confirmed webhook route does not
+   * shorten the delay of a Telegram route that still fails.
+   */
+  #retryRoutes(): void {
     if (this.#retry) return;
-    const delay = this.#webhookBackoffMs * (0.5 + Math.random() / 2);
-    this.#webhookBackoffMs = Math.min(this.#webhookBackoffMs * 2, BACKOFF_LIMIT_MS);
+    let delay: number;
+    if (this.#webhookMissing) {
+      delay = this.#webhookBackoffMs * (0.5 + Math.random() / 2);
+      this.#webhookBackoffMs = Math.min(this.#webhookBackoffMs * 2, BACKOFF_LIMIT_MS);
+    } else {
+      delay = this.#telegramBackoffMs * (0.5 + Math.random() / 2);
+      this.#telegramBackoffMs = Math.min(this.#telegramBackoffMs * 2, BACKOFF_LIMIT_MS);
+    }
     this.#retry = setTimeout(() => {
       this.#retry = null;
       this.reconnect();

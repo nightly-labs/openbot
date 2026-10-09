@@ -53,9 +53,9 @@ export function telegramLink(update: DynamicRecord): TelegramLink | null {
  * One update as an event for OpenBot, or null when it does not address OpenBot.
  *
  * - A private chat is one conversation. Every message in it addresses OpenBot.
- * - In a group, a message that mentions the bot starts or continues the conversation of its reply
- *   chain. A reply to the bot, or another message in a chain, counts only in a conversation that an
- *   agent already answers (`requiresLink`). With privacy mode on, Telegram sends the bot only
+ * - In a group, a message that mentions the bot, or a reply to the bot, starts or continues the
+ *   conversation of its reply chain. Another message in a chain counts only in a conversation that
+ *   an agent already answers (`requiresLink`). With privacy mode on, Telegram sends the bot only
  *   mentions, replies to it and commands.
  * - The conversation key: a supergroup gives each reply chain a `message_thread_id`, the ID of its
  *   first message. A forum topic is one conversation. A basic group has no thread IDs, so the chain
@@ -68,26 +68,33 @@ export function telegramUpdateEvent(
   chatId: string,
   state: TelegramChatState,
 ): TelegramUpdateEvent | null {
-  const member = update.my_chat_member;
-  if (isDynamicRecord(member)) {
-    const user = isDynamicRecord(member.new_chat_member) ? member.new_chat_member.user : undefined;
-    const status = isDynamicRecord(member.new_chat_member) ? member.new_chat_member.status : undefined;
-    return isDynamicRecord(user) && String(user.id) === botId && (status === "left" || status === "kicked")
-      ? { type: "removed" }
-      : null;
-  }
+  if (telegramRemoval(update, botId, chatId)) return { type: "removed" };
+  if (isDynamicRecord(update.my_chat_member)) return null;
   const query = update.callback_query;
   if (isDynamicRecord(query)) return callbackEvent(query, chatId, state);
   const message = update.message;
   if (!isDynamicRecord(message) || !isDynamicRecord(message.chat) || String(message.chat.id) !== chatId) return null;
-  if (message.migrate_to_chat_id !== undefined) return { type: "removed" };
-  if (isDynamicRecord(message.left_chat_member) && String(message.left_chat_member.id) === botId)
-    return { type: "removed" };
   if (isString(message.new_chat_title) && message.new_chat_title.trim()) {
     state.title = message.new_chat_title.trim();
     return { type: "renamed", title: state.title };
   }
   return messageEvent(message, botId, chatId, state);
+}
+
+/** True when the bot left the chat, was removed, or the group became a supergroup with a new ID. */
+export function telegramRemoval(update: DynamicRecord, botId: string, chatId: string): boolean {
+  const member = update.my_chat_member;
+  if (isDynamicRecord(member)) {
+    const user = isDynamicRecord(member.new_chat_member) ? member.new_chat_member.user : undefined;
+    const status = isDynamicRecord(member.new_chat_member) ? member.new_chat_member.status : undefined;
+    return isDynamicRecord(user) && String(user.id) === botId && (status === "left" || status === "kicked");
+  }
+  const message = update.message;
+  if (!isDynamicRecord(message) || !isDynamicRecord(message.chat) || String(message.chat.id) !== chatId) return false;
+  return (
+    message.migrate_to_chat_id !== undefined ||
+    (isDynamicRecord(message.left_chat_member) && String(message.left_chat_member.id) === botId)
+  );
 }
 
 function messageEvent(
@@ -146,7 +153,8 @@ function messageEvent(
       target: { platformChannelId: chatId, replyThreadId: `${threadKey}:${messageId}` },
       platformMessageId: String(messageId),
       isDirect,
-      requiresLink: !isDirect && !mentioned,
+      // A reply to the bot, such as to its welcome message, can start a conversation.
+      requiresLink: !isDirect && !mentioned && !replyToBot,
       authorId,
       text,
       files: inboundFiles(message),
