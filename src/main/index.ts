@@ -41,6 +41,7 @@ import { hostAllowsTenantLaunch } from "./host-update-coordinator";
 import { takeHostedServerEnvironment } from "./hosted-server-bootstrap";
 import { takeHostingDeveloperKey } from "./hosted-server-service";
 import { accountIpcHandlers } from "./ipc/account-handlers";
+import { acpRegistryIpcHandlers } from "./ipc/acp-registry-handlers";
 import { agentAdminIpcHandlers } from "./ipc/agent-admin-handlers";
 import { agentIpcHandlers } from "./ipc/agent-handlers";
 import { agentImportIpcHandlers } from "./ipc/agent-import-handlers";
@@ -440,6 +441,7 @@ function registerIpcHandlers({
   idleRestart,
   approvalAutomation,
   agentAdminSettings,
+  agentHostSettings,
   language,
   logoColor,
   notificationPreference,
@@ -464,6 +466,7 @@ function registerIpcHandlers({
   events,
   customProviderChanges,
   customAgentChanges,
+  acpRegistry,
   providerDetection,
   providerDetectionSettings,
   marketplaceAgents,
@@ -526,6 +529,7 @@ function registerIpcHandlers({
     ...hostedServerIpcHandlers({ hostedServers }),
     ...customProviderIpcHandlers(customProviderChanges),
     ...customAgentIpcHandlers(customAgentChanges),
+    ...acpRegistryIpcHandlers(acpRegistry, remoteServers),
     ...providerDetectionIpcHandlers({ detection: providerDetection, settings: providerDetectionSettings }),
     ...marketplaceAgentIpcHandlers({ marketplaceAgents }),
     ...agentTemplateIpcHandlers({
@@ -565,6 +569,7 @@ function registerIpcHandlers({
     ...channelRoutineIpcHandlers({ service, remoteServers }),
     ...agentAdminIpcHandlers({
       settings: agentAdminSettings,
+      hostSettings: agentHostSettings,
       skills,
       marketplaceAgents,
       agentTemplates,

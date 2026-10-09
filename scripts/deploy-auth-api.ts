@@ -16,6 +16,11 @@ const cloudflareEnvironment = readCloudflareEnvironment(process.argv.slice(2));
 const environmentArgs = cloudflareEnvironment ? ["--env", cloudflareEnvironment] : [];
 
 async function main(): Promise<void> {
+  // Check both values before any remote change. Test Workers do not send account analytics.
+  if (!cloudflareEnvironment) {
+    requiredSecret("OPENPANEL_CLIENT_ID");
+    requiredSecret("OPENPANEL_CLIENT_SECRET");
+  }
   await putRequiredSecret("EMAIL_SMTP_PASSWORD");
   await putRequiredSecret("SKILLS_ADMIN_TOKEN");
   await putRequiredSecret("SITE_REPORT_HASH_SECRET");
@@ -45,7 +50,10 @@ async function main(): Promise<void> {
     await putOptionalSecret("HOSTED_SERVERS_DEVELOPER_KEY");
   }
   // Only production sends account events, so a test Worker does not add events to the production project.
-  if (!cloudflareEnvironment) await putOptionalSecretSet("OPENPANEL_CLIENT_ID", "OPENPANEL_CLIENT_SECRET");
+  if (!cloudflareEnvironment) {
+    await putRequiredSecret("OPENPANEL_CLIENT_ID");
+    await putRequiredSecret("OPENPANEL_CLIENT_SECRET");
+  }
   // The Live Activity relay stays off until the Apple key is in the environment.
   await putOptionalSecretSet("APNS_PRIVATE_KEY", "APNS_KEY_ID");
   await run(wranglerExecutable, ["d1", "migrations", "apply", "DB", "--remote", ...environmentArgs], {
@@ -60,12 +68,17 @@ async function main(): Promise<void> {
   });
 }
 
-async function putRequiredSecret(name: string): Promise<void> {
+function requiredSecret(name: string): string {
   const value = process.env[name];
   if (!value?.trim()) throw new Error(`${name} is missing from the decrypted production environment.`);
   // dotenvx keeps the ciphertext when .env.keys has no matching private key.
   if (value.startsWith("encrypted:"))
     throw new Error(`${name} is not decrypted. Check the environment decryption key.`);
+  return value;
+}
+
+async function putRequiredSecret(name: string): Promise<void> {
+  const value = requiredSecret(name);
   await run(wranglerExecutable, ["secret", "put", name, ...environmentArgs], {
     input: `${value}\n`,
     label: `${name} secret`,
@@ -111,7 +124,7 @@ async function putOptionalSecret(name: string): Promise<void> {
 }
 
 /**
- * Billing, hosting and account events are optional: the Worker turns each off without its secrets.
+ * Billing and hosting are optional: the Worker turns each off without its secrets.
  * Set all or none of a set. A Stripe or boat key without its webhook secret takes payments or makes
  * sandboxes that the Worker never sees.
  */

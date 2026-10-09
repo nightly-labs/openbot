@@ -1,5 +1,13 @@
+import {
+  type AgentSessionSettings,
+  isAgentSessionSettings,
+  type ResetAgentSessionSettingInput,
+  type SetAgentSessionSettingInput,
+} from "@openbot/contracts/ipc";
+import { AGENT_SESSION_SETTINGS_ROUTES } from "@openbot/contracts/team-protocol/agent-session-settings-v1";
 import { HOST_MEMBER_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-member-update-v1";
 import { HOST_RELEASE_ROUTES } from "@openbot/contracts/team-protocol/host-release-v1";
+import type { PROVIDERS_V5_ROUTES } from "@openbot/contracts/team-protocol/providers-v5";
 // Admin requests to one host: agent settings and skills, shared tables, agent share links, the server name and logo,
 // the app update, MCP servers, storage, hosted sites and providers.
 //
@@ -543,28 +551,31 @@ export function cancelProviderCodeLogin(
 ): Effect.Effect<AgentStatus, TeamAdminRequestError> {
   return providerChange(request, routes.codeLoginCancel, { provider });
 }
+export type ProviderKeyRoutes = typeof PROVIDERS_ADMIN_ROUTES | typeof PROVIDERS_V5_ROUTES;
+
 export const getProviderApiKeyState = Effect.fn("TeamAdmin.getProviderApiKeyState")(function* (
   request: TeamApiRequest,
   provider: AgentProviderId,
+  routes: ProviderKeyRoutes = PROVIDERS_ADMIN_ROUTES,
 ) {
-  const status = yield* adminCall(() =>
-    request("POST", PROVIDERS_ADMIN_ROUTES.apiKeyState, decodeProviderApiKeyStatus, { provider }),
-  );
+  const status = yield* adminCall(() => request("POST", routes.apiKeyState, decodeProviderApiKeyStatus, { provider }));
   return { provider, status };
 });
 
 export function setProviderApiKey(
   request: TeamApiRequest,
   input: SetProviderApiKeyInput,
+  routes: ProviderKeyRoutes = PROVIDERS_ADMIN_ROUTES,
 ): Effect.Effect<AgentStatus, TeamAdminRequestError> {
-  return providerChange(request, PROVIDERS_ADMIN_ROUTES.apiKeySet, { provider: input.provider, key: input.key });
+  return providerChange(request, routes.apiKeySet, { provider: input.provider, key: input.key });
 }
 
 export function clearProviderApiKey(
   request: TeamApiRequest,
   provider: AgentProviderId,
+  routes: ProviderKeyRoutes = PROVIDERS_ADMIN_ROUTES,
 ): Effect.Effect<AgentStatus, TeamAdminRequestError> {
-  return providerChange(request, PROVIDERS_ADMIN_ROUTES.apiKeyClear, { provider });
+  return providerChange(request, routes.apiKeyClear, { provider });
 }
 
 /**
@@ -572,6 +583,7 @@ export function clearProviderApiKey(
  * and `providers-v1` none of them. The caller picks by the host's capabilities.
  */
 export type ProviderRuntimeRoutes =
+  | typeof PROVIDERS_V5_ROUTES
   | typeof PROVIDERS_V4_ROUTES
   | typeof PROVIDERS_RUNTIMES_V2_ROUTES
   | typeof PROVIDERS_ADMIN_ROUTES;
@@ -640,4 +652,27 @@ export function getHostReleaseStatus(request: TeamApiRequest): Effect.Effect<Hos
 
 export function checkHostRelease(request: TeamApiRequest): Effect.Effect<HostReleaseStatus, TeamAdminRequestError> {
   return adminCall(() => request("POST", HOST_RELEASE_ROUTES.check, decodeHostReleaseStatus, {}));
+}
+
+function decodeSessionSettings(value: unknown): AgentSessionSettings {
+  if (!isAgentSessionSettings(value)) throw new Error("Invalid session settings response.");
+  return value;
+}
+export function readAgentSessionSettings(
+  request: TeamApiRequest,
+  agentId: string,
+): Effect.Effect<AgentSessionSettings, TeamAdminRequestError> {
+  return adminCall(() => request("POST", AGENT_SESSION_SETTINGS_ROUTES.read, decodeSessionSettings, { agentId }));
+}
+export function setAgentSessionSetting(
+  request: TeamApiRequest,
+  input: SetAgentSessionSettingInput,
+): Effect.Effect<AgentSessionSettings, TeamAdminRequestError> {
+  return adminCall(() => request("POST", AGENT_SESSION_SETTINGS_ROUTES.set, decodeSessionSettings, { ...input }));
+}
+export function resetAgentSessionSetting(
+  request: TeamApiRequest,
+  input: ResetAgentSessionSettingInput,
+): Effect.Effect<AgentSessionSettings, TeamAdminRequestError> {
+  return adminCall(() => request("POST", AGENT_SESSION_SETTINGS_ROUTES.reset, decodeSessionSettings, { ...input }));
 }

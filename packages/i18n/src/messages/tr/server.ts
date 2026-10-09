@@ -138,6 +138,7 @@ export const messages = {
   "server.rail.usage": "Kullanım",
   "server.rail.schedule": "Zamanlama",
   "server.rail.settings": "Sunucu ayarları",
+  "server.rail.remove": "Sunucuyu kaldır",
   "server.rail.leave": "Sunucudan ayrıl",
   "server.rail.delete": "Sunucuyu sil",
   "server.select.failedTitle": "Sunucu seçilemedi",
@@ -231,6 +232,14 @@ export const messages = {
   "server.settings.saveIdentityFirst": "Yayımlamadan önce sunucu kimliğini kaydedin.",
   "server.settings.reachable": "Çevrim içi erişilebilir. Yalnızca davet edilen kişiler giriş yapabilir.",
   "server.settings.notReachable": "Çevrim içi erişilemez. Mevcut üyeler ve davetler kalır.",
+  "server.settings.removeTitle": "Sunucuyu kaldır",
+  "server.settings.removeDescription":
+    "Bu sunucuyu tüm üyeler için hesap hizmetinden kaldırın. Bilgisayarı artık kullanılamadığında bunu kullanın.",
+  "server.settings.removeConfirmTitle": "{name} kaldırılsın mı?",
+  "server.settings.removeConfirmDescription":
+    "Bu işlem sunucuyu tüm üyeler için hesap hizmetinden kaldırır ve uzaktan erişimi sonlandırır. Bilgisayarındaki dosyalar ve sohbetler olduğu gibi kalır. Yeniden kullanmak için o bilgisayardan kaydedin.",
+  "server.settings.removing": "Kaldırılıyor…",
+  "server.settings.removedTitle": "{name} kaldırıldı",
   "server.settings.leaveTitle": "Sunucudan ayrıl",
   "server.settings.leaveDescription": "Bu sunucuyu sunucu listenizden kaldırın. Sunucu ve diğer üyeleri kalır.",
   "server.settings.leaveConfirmTitle": "{name} sunucusundan ayrılmak istiyor musunuz?",

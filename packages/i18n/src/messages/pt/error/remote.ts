@@ -79,6 +79,7 @@ export const messages = {
   "error.remote.bridgeCommandFailed": "O comando do Team WebRTC falhou.",
   "error.remote.webRtcFailed": "O WebRTC falhou.",
   "error.remote.ownerCannotLeave": "O proprietário não pode sair deste computador anfitrião.",
+  "error.remote.ownerOnlyRemove": "Somente o proprietário pode remover este servidor.",
   "error.remote.requestTimeout": "O tempo da solicitação remota esgotou.",
   "error.remote.requestFailed": "A solicitação remota falhou.",
   "error.remote.pinnedKeyMissing": "O computador anfitrião remoto não tem uma chave de dispositivo fixada.",

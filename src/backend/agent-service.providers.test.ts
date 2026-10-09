@@ -21,6 +21,7 @@ import { type AgentProvider, RequestTimeoutError } from "./agent-client";
 import { AgentLifecycleFailed, type AgentService } from "./agent-service";
 import {
   CREATE_AGENT_INPUT,
+  codexConfigRead,
   createTestService,
   FakeAgentClient,
   fakeBrowser,
@@ -423,7 +424,12 @@ describe.sequential("AgentService: providers", () => {
     expect(paramsRecord(starts[1]?.params)?.config).toEqual({
       tools: CODEX_TOOLS,
       mcp_servers: {
-        Filesystem: { command: "/bin/echo", args: ["ready"], env: await launchEnvironment({ TOKEN: "secret" }) },
+        Filesystem: {
+          enabled: true,
+          command: "/bin/echo",
+          args: ["ready"],
+          env: await launchEnvironment({ TOKEN: "secret" }),
+        },
       },
     });
   });
@@ -456,6 +462,25 @@ describe.sequential("AgentService: providers", () => {
       }),
     );
 
+    // The unsupported entry must not choose the transport for the usable normalized name.
+    await runCauseEffect(
+      service.saveMcpServer({
+        config: {
+          id: "",
+          name: "Local_SQLite",
+          transport: "http",
+          enabled: true,
+          command: "",
+          args: [],
+          env: [],
+          envPassthrough: [],
+          workingDirectory: "",
+          url: "https://example.com/mcp",
+          headers: [],
+        },
+      }),
+    );
+
     await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Start." }));
     await waitForQueue(service, "chief", (queue) =>
       queue.deliveries.every((delivery) => delivery.status === "completed"),
@@ -467,9 +492,36 @@ describe.sequential("AgentService: providers", () => {
       message: expect.stringContaining('did not get the MCP server "Local SQLite"'),
     });
 
-    // Reported, and still not sent: the point of the report is that the server is missing.
+    // The HTTP server wins the normalized name in both registration and the runtime.
     const starts = client.requests.filter((request) => request.method === "thread/start");
-    expect(paramsRecord(starts.at(-1)?.params)?.config).toEqual({ tools: CODEX_TOOLS });
+    expect(paramsRecord(starts.at(-1)?.params)?.config).toEqual({
+      tools: CODEX_TOOLS,
+      mcp_servers: { Local_SQLite: { enabled: true, url: "https://example.com/mcp", http_headers: {} } },
+    });
+
+    expect(client.configRead).toMatchObject({
+      config: {
+        mcp_servers: {
+          Local_SQLite: { url: "http://127.0.0.1:1", enabled: false },
+        },
+      },
+    });
+    expect(client.requests.filter((request) => request.method === "config/batchWrite")).toEqual([
+      {
+        method: "config/batchWrite",
+        params: {
+          edits: [
+            {
+              keyPath: "mcp_servers.Local_SQLite",
+              value: { url: "http://127.0.0.1:1", enabled: false },
+              mergeStrategy: "replace",
+            },
+          ],
+          filePath: "/test/.codex/config.toml",
+          expectedVersion: "config-version",
+        },
+      },
+    ]);
 
     await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Again." }));
     await waitForQueue(service, "chief", (queue) =>
@@ -534,7 +586,11 @@ describe.sequential("AgentService: providers", () => {
     expect(paramsRecord(starts.at(-1)?.params)?.config).toEqual({
       tools: CODEX_TOOLS,
       mcp_servers: {
-        Signed_in: { url: "https://mcp.example.com/mcp", http_headers: { Authorization: `Bearer ${token}` } },
+        Signed_in: {
+          enabled: true,
+          url: "https://mcp.example.com/mcp",
+          http_headers: { Authorization: `Bearer ${token}` },
+        },
       },
     });
     const reported = events.filter((event) => event.type === "error");
@@ -848,7 +904,91 @@ describe.sequential("AgentService: providers", () => {
     // and a server told to open `./data.db` from the wrong place creates a second database.
     expect(paramsRecord(starts[1]?.params)?.config).toEqual({
       tools: CODEX_TOOLS,
-      mcp_servers: { Filesystem: { command: "/bin/echo", args: ["ready"], env: await launchEnvironment() } },
+      mcp_servers: {
+        Filesystem: { enabled: true, command: "/bin/echo", args: ["ready"], env: await launchEnvironment() },
+      },
+    });
+  });
+
+  it("loads custom MCP approvals and revocations, and keeps a disabled server off", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex");
+    const saved = {
+      url: "http://127.0.0.1:1",
+      enabled: false,
+      tools: { t3_thread_read: { approval_mode: "approve" } },
+    };
+    client.configRead = codexConfigRead({ T3_MCP: saved });
+    service = createTestService({ store, mailbox, preferredProvider: "codex", clientFactory: () => client });
+    await runCauseEffect(service.initialize());
+    const config: McpServerConfig = {
+      id: "",
+      name: "T3 MCP",
+      transport: "http",
+      enabled: true,
+      command: "",
+      args: [],
+      env: [],
+      envPassthrough: [],
+      workingDirectory: "",
+      url: "https://example.com/mcp",
+      headers: [],
+    };
+    const [server] = await runCauseEffect(service.saveMcpServer({ config }));
+    assert.isDefined(server);
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Read the thread." }));
+    await waitForQueue(service, "chief", (queue) =>
+      queue.deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    const firstSession = store.activeProviderSession("chief")?.externalSessionId;
+    const starts = () => client.requests.filter((request) => request.method === "thread/start");
+    expect(paramsRecord(starts().at(-1)?.params)?.config).toMatchObject({
+      mcp_servers: {
+        T3_MCP: {
+          enabled: true,
+          url: config.url,
+          tools: { t3_thread_read: { approval_mode: "approve" } },
+        },
+      },
+    });
+
+    saved.tools.t3_thread_read.approval_mode = "prompt";
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Read the thread again." }));
+    await waitForQueue(service, "chief", (queue) =>
+      queue.deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    expect(store.activeProviderSession("chief")?.externalSessionId).not.toBe(firstSession);
+    expect(client.releasedThreads).toContain(firstSession);
+    expect(paramsRecord(starts().at(-1)?.params)?.config).toMatchObject({
+      mcp_servers: {
+        T3_MCP: {
+          enabled: true,
+          tools: { t3_thread_read: { approval_mode: "prompt" } },
+        },
+      },
+    });
+
+    await runCauseEffect(service.saveMcpServer({ config: { ...config, id: server.id, enabled: false } }));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Continue with the server off." }));
+    await waitForQueue(service, "chief", (queue) =>
+      queue.deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    expect(paramsRecord(starts().at(-1)?.params)?.config).toMatchObject({
+      mcp_servers: { T3_MCP: { enabled: false } },
+    });
+
+    await runCauseEffect(service.saveMcpServer({ config: { ...config, id: server.id, enabled: true } }));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Continue with the server on." }));
+    await waitForQueue(service, "chief", (queue) =>
+      queue.deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    expect(paramsRecord(starts().at(-1)?.params)?.config).toMatchObject({
+      mcp_servers: {
+        T3_MCP: {
+          enabled: true,
+          tools: { t3_thread_read: { approval_mode: "prompt" } },
+        },
+      },
     });
   });
 
@@ -974,11 +1114,10 @@ describe.sequential("AgentService: providers", () => {
     const client = new FakeAgentClient("codex", "CODEX_DONE", true, true);
     // `Filesystem` is in both places, and the panel's entry is the one that wins: a name the user
     // can see and edit must not resolve to a command from a file OpenBot does not show.
-    client.configRead = {
-      config: {
-        mcp_servers: { "Local notes": { command: "/usr/bin/notes" }, Filesystem: { command: "/usr/bin/other" } },
-      },
-    };
+    client.configRead = codexConfigRead({
+      "Local notes": { command: "/usr/bin/notes" },
+      Filesystem: { command: "/usr/bin/other" },
+    });
     service = createTestService({
       store,
       mailbox,
@@ -1016,15 +1155,14 @@ describe.sequential("AgentService: providers", () => {
       tools: CODEX_TOOLS,
       mcp_servers: {
         "Local notes": { enabled: false },
-        Filesystem: { command: "/bin/echo", args: ["ready"], env: await launchEnvironment() },
+        Filesystem: { enabled: true, command: "/bin/echo", args: ["ready"], env: await launchEnvironment() },
       },
     });
 
-    client.configRead = {
-      config: {
-        mcp_servers: { "Local notes": { command: "/usr/bin/notes" }, Scratch: { command: "/usr/bin/scratch" } },
-      },
-    };
+    client.configRead = codexConfigRead({
+      "Local notes": { command: "/usr/bin/notes" },
+      Scratch: { command: "/usr/bin/scratch" },
+    });
     await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Continue." }));
     await waitFor(() =>
       service?.listQueue("chief").deliveries.every((delivery) => ["completed", "failed"].includes(delivery.status)),
@@ -1130,7 +1268,9 @@ describe.sequential("AgentService: providers", () => {
     expect(starts).toHaveLength(2);
     expect(paramsRecord(starts[1]?.params)?.config).toEqual({
       tools: CODEX_TOOLS,
-      mcp_servers: { Filesystem: { command: "/bin/echo", args: ["ready"], env: await launchEnvironment() } },
+      mcp_servers: {
+        Filesystem: { enabled: true, command: "/bin/echo", args: ["ready"], env: await launchEnvironment() },
+      },
     });
   });
 
@@ -1307,7 +1447,9 @@ describe.sequential("AgentService: providers", () => {
     expect(starts).toHaveLength(2);
     expect(paramsRecord(starts[1]?.params)?.config).toEqual({
       tools: CODEX_TOOLS,
-      mcp_servers: { Filesystem: { command: "/bin/echo", args: ["ready"], env: await launchEnvironment() } },
+      mcp_servers: {
+        Filesystem: { enabled: true, command: "/bin/echo", args: ["ready"], env: await launchEnvironment() },
+      },
     });
   });
 
@@ -2873,6 +3015,8 @@ describe.sequential("AgentService: providers", () => {
         { id: "cursor", state: "not-installed", version: null },
         { id: "cline", state: "not-installed", version: null },
         { id: "acp", state: "not-installed", version: null },
+        { id: "pi", state: "not-installed", version: null },
+        { id: "muse", state: "not-installed", version: null },
       ],
       // Unavailable because no Computer Use driver was given to this service. It no longer follows
       // from Codex being connected.

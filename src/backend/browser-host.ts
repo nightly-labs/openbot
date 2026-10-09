@@ -1780,8 +1780,10 @@ export class BrowserHost {
   }
 
   #configureSession(target: Session): void {
-    // One identity for pages, frames and workers. It keeps the build token that Google needs
-    // and drops the product token that Framer refuses; the languages come from the system.
+    // Use the installed Chromium identity for pages, frames and workers.
+    // The request policy keeps the Google account compatibility exception.
+    // Service workers read the process fallback instead of the session, so it changes too.
+    app.userAgentFallback = sessionBrowserUserAgent(app.userAgentFallback);
     target.setUserAgent(sessionBrowserUserAgent(target.getUserAgent()), preferredBrowserLanguageCodes());
     target.webRequest.onBeforeSendHeaders((details, callback) => {
       callback({
@@ -2327,15 +2329,7 @@ export class BrowserHost {
     onOperationStarted?: (completion: Fiber.Fiber<void, BrowserOperationError>) => void,
   ): Effect.fn.Return<BrowserSnapshot | { tabId: string; closed: true; openerTabId?: string }, BrowserOperationError> {
     const tab = yield* this.#requireTab(tabId);
-    return yield* runTabAction(
-      tab,
-      () => this.#focusedContentsOutsideTabs(),
-      action,
-      target,
-      operation,
-      timeoutMs,
-      onOperationStarted,
-    );
+    return yield* runTabAction(tab, action, target, operation, timeoutMs, onOperationStarted);
   });
 
   readonly #runEvaluation = Effect.fn("BrowserHost.runEvaluation")(function* (

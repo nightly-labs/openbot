@@ -281,14 +281,15 @@ servers, their webhooks and the cron continue.
    billing and server events in [ANALYTICS.md](../ANALYTICS.md). Only production gets them.
 6. **Secrets.** The `Deploy Cloudflare production` job in `.github/workflows/ci.yml` sends these
    from the `cloudflare-production` GitHub Environment. It refuses a set with only some values and a
-   Stripe key that is not live. A value that is not set keeps the value that the Worker has; to turn
+   Stripe key that is not live. OpenPanel credentials are required before any remote change.
+   An optional value that is not set keeps the value that the Worker has; to turn
    a feature off, run `wrangler secret delete <name>`.
 
    | Name | Kind | Value |
    | --- | --- | --- |
    | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | secrets, a pair | Step 3 writes them |
    | `BOAT_API_KEY`, `BOAT_WEBHOOK_SECRET` | secrets, a pair | Step 3 writes them |
-   | `OPENPANEL_CLIENT_ID`, `OPENPANEL_CLIENT_SECRET` | secrets, a pair | The client from step 5 |
+   | `OPENPANEL_CLIENT_ID`, `OPENPANEL_CLIENT_SECRET` | required secrets, a pair | The client from step 5 |
 
    The release job sets `HOSTED_SERVER_TEMPLATE` directly on the production Worker. Normal
    deployments preserve it. A GitHub variable with that name is no longer used.

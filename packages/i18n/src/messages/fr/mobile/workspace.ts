@@ -17,6 +17,7 @@ export const messages = {
   "mobile.workspace.error.sectionsUnsupported": "Cet hôte ne prend pas en charge la modification des sections.",
   "mobile.workspace.error.leaveOwnServer":
     "Vous pouvez quitter uniquement les serveurs distants que vous avez rejoints.",
+  "mobile.workspace.error.removeOwnedServerOnly": "Seul le propriétaire peut supprimer ce serveur.",
   "mobile.workspace.error.agentNotOnHost": "L’agent n’est pas sur cet hôte.",
   "mobile.workspace.error.filesUnsupported":
     "Cet hôte ne prend pas en charge la gestion des fichiers. Mettez à jour OpenBot sur l’hôte.",

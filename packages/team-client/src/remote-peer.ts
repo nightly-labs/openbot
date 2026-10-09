@@ -12,14 +12,14 @@ import {
   decodeTeamProtocolV2AuthFrame,
   decodeTeamProtocolV2EventFrame,
   decodeTeamProtocolV2RpcFrame,
-  decodeTeamProtocolV6CurrentEvent,
-  decodeTeamProtocolV6WebRtcHttpResponse,
+  decodeTeamProtocolV7CurrentEvent,
+  decodeTeamProtocolV7WebRtcHttpResponse,
   encodeTeamProtocolV2Frame,
-  encodeTeamProtocolV6WebRtcHttpRequest,
-  TEAM_CURRENT_CAPABILITIES,
+  encodeTeamProtocolV7WebRtcHttpRequest,
   TEAM_PROTOCOL_V2_CHANNELS,
   type TeamProtocolV2AuthFrame,
   type TeamProtocolV2Json,
+  teamCapabilitiesForProtocol,
   teamProtocolV2AuthenticationTranscript,
 } from "@openbot/contracts/team-protocol";
 import { optionalTeamEvent, optionalTeamEventToCurrent } from "@openbot/contracts/team-protocol/optional-events";
@@ -28,6 +28,7 @@ import {
   type TeamProtocolV1CurrentEventControl,
   toWireTeamProtocolV1ClientEvent,
 } from "@openbot/contracts/team-protocol/v1-adapter";
+import { decodeTeamProtocolSupportV7Base } from "@openbot/contracts/team-protocol/v7-base";
 import { sourceText } from "@openbot/i18n/source";
 import { Context, Deferred, Effect, Exit, Layer, ManagedRuntime, Result, Schema, Scope, Semaphore } from "effect";
 import { base64UrlToBytes, bytesToBase64Url } from "./base64";
@@ -230,6 +231,7 @@ interface PeerState {
   signalReady: boolean;
   /** The host answered a request on this peer, so its channels worked after authentication. */
   answeredRequest: boolean;
+  hostProtocol?: number;
 }
 
 const CHANNELS: ChannelKind[] = ["rpc", "events", "files", "desktop"];
@@ -973,12 +975,15 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
           const sideRoute = teamSideRouteCodec(pending.path);
           const status = frame.result.status;
           const body = frame.result.body;
+          if (pending.method === "GET" && pending.path === TEAM_API_ROUTES.compatibility && status === 200) {
+            state.hostProtocol = (yield* peerDecode(() => decodeTeamProtocolSupportV7Base(body))).protocol.maximum;
+          }
           pending.resolve({
             status: frame.result.status,
             body: sideRoute
               ? yield* peerDecode(() => sideRoute.response(pending.path, status, body))
               : yield* peerDecode(() =>
-                  decodeTeamProtocolV6WebRtcHttpResponse(pending.method, pending.path, status, body),
+                  decodeTeamProtocolV7WebRtcHttpResponse(pending.method, pending.path, status, body),
                 ),
           });
         }
@@ -1014,7 +1019,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       const channel = yield* peerDecode(() => optionalTeamEvent(frame.payload));
       const decoded = channel
         ? { status: "known" as const, event: optionalTeamEventToCurrent(channel) }
-        : yield* peerDecode(() => decodeTeamProtocolV6CurrentEvent(frame));
+        : yield* peerDecode(() => decodeTeamProtocolV7CurrentEvent(frame));
       if (decoded.status === "invalid")
         return yield* new RemotePeerError({ message: sourceText("error.remote.malformedEvent") });
       state.lastEventSequence = frame.sequence;
@@ -1108,7 +1113,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
             : // A caller names a provider and model on agent creation only when the host advertises
               // `agent-create-model`, so the pair is kept whenever it is present.
               yield* peerDecode(() =>
-                encodeTeamProtocolV6WebRtcHttpRequest(method, path, body, {
+                encodeTeamProtocolV7WebRtcHttpRequest(method, path, body, {
                   preserveSemanticTags: true,
                   agentCreateModel: true,
                 }),
@@ -1129,7 +1134,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
               path,
               body: payloadBody,
               ...(bodyTransferId ? { bodyTransferId, contentType: upload?.mimeType } : {}),
-              capabilities: [...TEAM_CURRENT_CAPABILITIES],
+              capabilities: [...teamCapabilitiesForProtocol(checksConnection ? undefined : state.hostProtocol)],
             },
           }),
         );

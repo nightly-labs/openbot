@@ -127,6 +127,8 @@ const server = createServer((request, response) => {
         requestHeaders: ${requestHeaders},
         navigatorUserAgent: navigator.userAgent,
         navigatorBrands: navigator.userAgentData?.brands ?? [],
+        navigatorPlatform: navigator.userAgentData?.platform,
+        navigatorMobile: navigator.userAgentData?.mobile,
         navigatorWebdriver: navigator.webdriver,
       });
     </script>`);
@@ -377,7 +379,9 @@ const server = createServer((request, response) => {
 });
 
 const SCENARIOS = [
+  "identity",
   "background",
+  "focus",
   "controls",
   "tool-boundary",
   "evaluation",
@@ -453,6 +457,15 @@ async function main(): Promise<void> {
       try {
         if (scenario === "background") {
           // The scenario runs before the browser panel is first shown.
+        } else if (scenario === "focus") {
+          await runFocusScenario(browser, origin);
+        } else if (scenario === "identity") {
+          await runIdentityScenario(browser, origin);
+          if (googleLive) await runGoogleLiveProbe(browser);
+          if (xLive) await runXLiveProbe(browser);
+          if (whatsappLive) await runWhatsAppLiveProbe(browser);
+          if (canvaLive) await runCanvaLiveProbe(browser);
+          if (framerLive) await runFramerLiveProbe(browser, { x: 0, y: 0, width: 800, height: 600 });
         } else if (scenario === "popups") {
           await runPopupScenario(browser, origin);
         } else if (scenario === "secret-handoff") {
@@ -1617,71 +1630,10 @@ async function main(): Promise<void> {
     await boundedContents.executeJavaScript("window.releaseHeldEvaluation(true); true");
     if (!(await heldEvaluation).success) throw new Error("The held evaluation failed.");
     await runCauseEffect(browser.close(boundedTab.id));
-    const focusSentinel = new BrowserWindow({
-      show: false,
-      opacity: 0,
-      width: 64,
-      height: 64,
-    });
-    await focusSentinel.loadURL("data:text/html,<input autofocus>");
-    focusSentinel.show();
-    focusSentinel.focus();
-    focusSentinel.webContents.focus();
-    await waitFor(async () => webContents.getFocusedWebContents() === focusSentinel.webContents);
-    const backgroundTab = await runCauseEffect(browser.open(origin, "smoke-thread", "smoke-bot"));
-    if (webContents.getFocusedWebContents() !== focusSentinel.webContents) {
-      throw new Error("A background browser open stole focus from an unrelated application renderer.");
-    }
-    const backgroundSnapshot = await runCauseEffect(browser.snapshot(backgroundTab.id));
-    if (webContents.getFocusedWebContents() !== focusSentinel.webContents) {
-      throw new Error("A background CDP operation stole focus from an unrelated application renderer.");
-    }
-    const backgroundSave = backgroundSnapshot.elements.find((element) => element.name === "Save");
-    if (!backgroundSave) throw new Error("The background focus fixture did not expose its action.");
-    const backgroundAction = await callBrowserTool(browser, "click", {
-      tabId: backgroundTab.id,
-      target: {
-        kind: "ref",
-        ref: backgroundSave.ref,
-        revision: backgroundSnapshot.revision,
-      },
-    });
-    if (!backgroundAction.success || webContents.getFocusedWebContents() !== focusSentinel.webContents) {
-      throw new Error("A background browser action did not restore focus to the unrelated application renderer.");
-    }
-    await runCauseEffect(browser.close(backgroundTab.id));
-    focusSentinel.destroy();
+    await runFocusScenario(browser, origin);
     process.stdout.write("BrowserHost: V2 semantics, adaptive image, iframe, upload, waits, and emulation passed.\n");
 
-    const headerTab = await runCauseEffect(browser.open(`${origin}/headers`, "smoke-thread"));
-    const headerSnapshot = await runCauseEffect(browser.snapshot(headerTab.id));
-    const identity = JSON.parse(headerSnapshot.text);
-    if (!isDynamicRecord(identity) || !isDynamicRecord(identity.requestHeaders)) {
-      throw new Error("Browser identity payload is invalid.");
-    }
-    const navigatorUserAgent = getString(identity, "navigatorUserAgent");
-    const navigatorBrands = Array.isArray(identity.navigatorBrands)
-      ? identity.navigatorBrands.filter(isDynamicRecord)
-      : [];
-    const clientHintBrands = getString(identity.requestHeaders, "sec-ch-ua") ?? "";
-    const chromiumMajorVersion = process.versions.chrome.split(".")[0];
-    // The page and its requests share one identity: Google refuses sign-in without the build
-    // token, and Framer refuses it with the product token (`--google-live`, `--framer-live`).
-    if (
-      !navigatorUserAgent?.includes(`Chrome/${chromiumMajorVersion}`) ||
-      !navigatorUserAgent.includes(`Electron/${process.versions.electron}`) ||
-      navigatorUserAgent.includes("OpenBot/") ||
-      getString(identity.requestHeaders, "user-agent") !== navigatorUserAgent ||
-      identity.navigatorWebdriver !== false ||
-      (clientHintBrands.length > 0 &&
-        navigatorBrands.some(
-          (brand) => !clientHintBrands.includes(`"${getString(brand, "brand")}";v="${getString(brand, "version")}"`),
-        ))
-    ) {
-      throw new Error(`Browser identity headers are invalid: ${headerSnapshot.text}`);
-    }
-    process.stdout.write("BrowserHost: matching page and request identity passed.\n");
-    await runIdentityFrameProbe(browser, origin);
+    await runIdentityScenario(browser, origin);
     if (googleLive) await runGoogleLiveProbe(browser);
     if (xLive) await runXLiveProbe(browser);
     if (whatsappLive) await runWhatsAppLiveProbe(browser);
@@ -1892,6 +1844,53 @@ async function main(): Promise<void> {
     if (!configuredRoot) await rm(temporaryRoot, { recursive: true, force: true });
     app.quit();
   }
+}
+
+async function runFocusScenario(browser: BrowserHost, origin: string): Promise<void> {
+  const focusSentinel = new BrowserWindow({
+    show: false,
+    opacity: 0,
+    width: 64,
+    height: 64,
+  });
+  await focusSentinel.loadURL("data:text/html,<input autofocus>");
+  focusSentinel.show();
+  focusSentinel.focus();
+  focusSentinel.webContents.focus();
+  await waitFor(async () => webContents.getFocusedWebContents() === focusSentinel.webContents);
+  let focusLosses = 0;
+  focusSentinel.webContents.on("blur", () => {
+    focusLosses += 1;
+  });
+  const backgroundTab = await runCauseEffect(browser.open(origin, "smoke-thread", "smoke-bot"));
+  if (webContents.getFocusedWebContents() !== focusSentinel.webContents) {
+    throw new Error("A background browser open stole focus from an unrelated application renderer.");
+  }
+  const backgroundSnapshot = await runCauseEffect(browser.snapshot(backgroundTab.id));
+  if (webContents.getFocusedWebContents() !== focusSentinel.webContents) {
+    throw new Error("A background CDP operation stole focus from an unrelated application renderer.");
+  }
+  const backgroundSave = backgroundSnapshot.elements.find((element) => element.name === "Save");
+  if (!backgroundSave) throw new Error("The background focus fixture did not expose its action.");
+  const backgroundAction = await callBrowserTool(browser, "click", {
+    tabId: backgroundTab.id,
+    target: {
+      kind: "ref",
+      ref: backgroundSave.ref,
+      revision: backgroundSnapshot.revision,
+    },
+  });
+  if (!backgroundAction.success || webContents.getFocusedWebContents() !== focusSentinel.webContents) {
+    throw new Error("A background browser action did not restore focus to the unrelated application renderer.");
+  }
+  await mkdir(".openbot-build", { recursive: true });
+  await writeFile(
+    ".openbot-build/browser-focus-report.json",
+    JSON.stringify({ focusLosses, success: backgroundAction.success }, null, 2),
+  );
+  if (focusLosses !== 0) throw new Error(`Background browser actions interrupted typing ${focusLosses} times.`);
+  await runCauseEffect(browser.close(backgroundTab.id));
+  focusSentinel.destroy();
 }
 
 async function runBackgroundScenario(browser: BrowserHost, origin: string): Promise<void> {
@@ -3136,6 +3135,55 @@ function toolError(result: DynamicToolResult): string {
   return item?.type === "inputText" ? item.text : "unknown browser tool error";
 }
 
+async function runIdentityScenario(browser: BrowserHost, origin: string): Promise<void> {
+  const headerTab = await runCauseEffect(browser.open(`${origin}/headers`, "smoke-thread"));
+  const initial = await checkBrowserIdentity(browser, headerTab.id);
+  await runCauseEffect(browser.reload(headerTab.id));
+  const reloaded = await checkBrowserIdentity(browser, headerTab.id);
+  await runCauseEffect(browser.loadUrl(headerTab.id, `${origin}/headers?source=navigation`));
+  const navigated = await checkBrowserIdentity(browser, headerTab.id);
+  const secondTab = await runCauseEffect(browser.open(`${origin}/headers?source=second-tab`, "smoke-thread"));
+  const second = await checkBrowserIdentity(browser, secondTab.id);
+  await runIdentityFrameProbe(browser, origin);
+  await mkdir(".openbot-build", { recursive: true });
+  await writeFile(
+    ".openbot-build/browser-identity.json",
+    JSON.stringify({ initial, reloaded, navigated, second, requests: recordedIdentityAgents }, null, 2),
+  );
+  process.stdout.write("BrowserHost: matching page, reload, navigation, and second-tab identity passed.\n");
+}
+
+async function checkBrowserIdentity(browser: BrowserHost, tabId: string): Promise<DynamicRecord> {
+  const headerSnapshot = await runCauseEffect(browser.snapshot(tabId));
+  const identity = JSON.parse(headerSnapshot.text);
+  if (!isDynamicRecord(identity) || !isDynamicRecord(identity.requestHeaders)) {
+    throw new Error("Browser identity payload is invalid.");
+  }
+  const navigatorUserAgent = getString(identity, "navigatorUserAgent");
+  const navigatorBrands = Array.isArray(identity.navigatorBrands)
+    ? identity.navigatorBrands.filter(isDynamicRecord)
+    : [];
+  const clientHintBrands = getString(identity.requestHeaders, "sec-ch-ua") ?? "";
+  const chromiumMajorVersion = process.versions.chrome.split(".")[0];
+  if (
+    !navigatorUserAgent?.includes(`Chrome/${chromiumMajorVersion}`) ||
+    navigatorUserAgent.includes("Electron/") ||
+    navigatorUserAgent.includes("OpenBot/") ||
+    getString(identity.requestHeaders, "user-agent") !== navigatorUserAgent ||
+    identity.navigatorWebdriver !== false ||
+    getString(identity.requestHeaders, "sec-ch-ua-platform") !== `"${getString(identity, "navigatorPlatform")}"` ||
+    getString(identity.requestHeaders, "sec-ch-ua-mobile") !== (identity.navigatorMobile ? "?1" : "?0") ||
+    !navigatorBrands.some(
+      (brand) => getString(brand, "brand") === "Chromium" && getString(brand, "version") === chromiumMajorVersion,
+    ) ||
+    /Electron|OpenBot/u.test(clientHintBrands) ||
+    !clientHintBrands.includes(`"Chromium";v="${chromiumMajorVersion}"`)
+  ) {
+    throw new Error(`Browser identity headers are invalid: ${headerSnapshot.text}`);
+  }
+  return identity;
+}
+
 async function runIdentityFrameProbe(browser: BrowserHost, origin: string): Promise<void> {
   // Every source must present the same identity the session carries: a subframe or worker that
   // falls back to a different string reads as a second, unknown client next to the page.
@@ -3206,7 +3254,7 @@ async function runGoogleLiveProbe(browser: BrowserHost): Promise<void> {
   });
   const normalized = outcome.text.toLowerCase();
   if (outcome.url.includes("/signin/rejected") || normalized.includes("browser or app may not be secure")) {
-    throw new Error(`Google rejected the embedded browser: ${outcome.url}`);
+    throw new Error("Google rejected the embedded browser at the account identifier step.");
   }
   if (
     !normalized.includes("couldn’t find your google account") &&
@@ -3409,11 +3457,14 @@ async function waitForGoogleSnapshot(
   const deadline = Date.now() + 20_000;
   let snapshot = await runCauseEffect(browser.snapshot(tabId));
   while (Date.now() < deadline) {
+    if (snapshot.text.toLowerCase().includes("type the text you hear or see")) {
+      throw new Error("Google requested a CAPTCHA. Complete the sign-in check manually.");
+    }
     if (predicate(snapshot)) return snapshot;
     await new Promise((resolve) => setTimeout(resolve, 250));
     snapshot = await runCauseEffect(browser.snapshot(tabId));
   }
-  throw new Error(`Timed out waiting for Google: ${snapshot.url} ${snapshot.text.slice(0, 500)}`);
+  throw new Error("Timed out waiting for the Google sign-in step.");
 }
 
 async function expectFailure(operation: () => Promise<unknown>): Promise<void> {

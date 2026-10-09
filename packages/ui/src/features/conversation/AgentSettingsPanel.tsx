@@ -90,7 +90,7 @@ export interface AgentSettingsPanelProps {
   accessEditable?: boolean;
   /** Computer Use is local-only too, and no remote host administers it yet. */
   computerUseEditable?: boolean;
-  /** Local scripts reach only the computer that runs the agent, so a remote server hides the control. */
+  /** Local scripts can be changed locally or through the host's administrator route. */
   automationEditable?: boolean;
   /** The busy-message setting is local-only too: the Team API does not carry it. */
   busyMessageModeEditable?: boolean;

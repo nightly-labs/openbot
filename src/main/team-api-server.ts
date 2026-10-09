@@ -23,6 +23,8 @@ import {
   type TeamRealtimeEvent,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { ACP_REGISTRY_CAPABILITY } from "@openbot/contracts/team-protocol/acp-registry-v1";
+import { AGENT_SESSION_SETTINGS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-session-settings-v1";
 import {
   AGENT_ADMIN_CAPABILITY,
   AGENT_HOST_SETTINGS_CAPABILITY,
@@ -39,12 +41,14 @@ import {
   HOSTED_SITES_CAPABILITY,
   isTeamCurrentCapability,
   LIVE_ACTIVITY_PUSH_CAPABILITY,
+  legacyTeamCapabilities,
   MCP_SERVERS_CAPABILITY,
   MCP_SIGN_IN_CAPABILITY,
   PROVIDERS_ADMIN_CAPABILITY,
   PROVIDERS_RUNTIMES_V2_CAPABILITY,
   PROVIDERS_SIGN_IN_V3_CAPABILITY,
   PROVIDERS_V4_CAPABILITY,
+  PROVIDERS_V5_CAPABILITY,
   QUIET_TURN_CAPABILITY,
   SHARED_TABLES_CAPABILITY,
   SKILLS_ADMIN_CAPABILITY,
@@ -78,8 +82,10 @@ import {
 import { encodeTeamProtocolV4BaseCurrentEvent } from "@openbot/contracts/team-protocol/v4-base-adapter";
 import { TEAM_LOCAL_PROVIDERS_CAPABILITY } from "@openbot/contracts/team-protocol/v5";
 import { encodeTeamProtocolV5BaseCurrentEvent } from "@openbot/contracts/team-protocol/v5-base-adapter";
-import { TEAM_CURSOR_CLINE_CAPABILITY, TEAM_PROTOCOL_V6 } from "@openbot/contracts/team-protocol/v6";
+import { TEAM_CURSOR_CLINE_CAPABILITY } from "@openbot/contracts/team-protocol/v6";
 import { encodeTeamProtocolV6BaseCurrentEvent } from "@openbot/contracts/team-protocol/v6-base-adapter";
+import { TEAM_PI_MUSE_CAPABILITY, TEAM_PROTOCOL_V7 } from "@openbot/contracts/team-protocol/v7";
+import { encodeTeamProtocolV7BaseCurrentEvent } from "@openbot/contracts/team-protocol/v7-base-adapter";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Deferred, Effect, Exit, Scope } from "effect";
@@ -114,10 +120,12 @@ import {
   requestProtocol,
   stringField,
 } from "./team-api/request-helpers";
+import { routeAcpRegistry } from "./team-api/route-acp-registry";
 import { routeAgentAdmin, routeAgentHostSettings } from "./team-api/route-agent-admin";
 import { routeAgentImport } from "./team-api/route-agent-import";
 import { routeAgentInstall } from "./team-api/route-agent-install";
 import { routeAgentPublish } from "./team-api/route-agent-publish";
+import { routeAgentSessionSettings } from "./team-api/route-agent-session-settings";
 import { routeAgents } from "./team-api/route-agents";
 import { routeBrowser } from "./team-api/route-browser";
 import { routeChannels } from "./team-api/route-channels";
@@ -545,7 +553,7 @@ export class TeamApiServer {
       // a browser fetching the viewer sends neither protocol headers nor a bearer token. It is not a
       // route in the table; the gateway decides for itself which paths are its own.
       if (method === "GET" && url.pathname === TEAM_API_ROUTES.compatibility) {
-        return this.#json(response, 200, this.#protocolSupport());
+        return this.#json(response, 200, this.#protocolSupport(requestProtocol(request) >= 7));
       }
 
       if (this.#options.remoteScreen?.handlesHttp(url)) {
@@ -696,10 +704,12 @@ export class TeamApiServer {
       if ((await routeHostedSites(context, this.#options.hostedSites)) === "handled") return;
       if ((await routeAgentAdmin(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentHostSettings(context, this.#options.admin, hidden)) === "handled") return;
+      if ((await routeAgentSessionSettings(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeSkillsAdmin(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeSharedTables(context, this.#options.admin)) === "handled") return;
       if ((await routeAgentInstall(context, this.#options.admin, hidden, newAgentHidden)) === "handled") return;
       if ((await routeAgentPublish(context, this.#options.admin, hidden)) === "handled") return;
+      if ((await routeAcpRegistry(context, this.#options.admin)) === "handled") return;
       if ((await routeProviders(context, this.#options.admin)) === "handled") return;
       if ((await routeHostAdmin(context, this.#options.admin)) === "handled") return;
       if ((await routeHostUpdate(context, this.#options.admin)) === "handled") return;
@@ -831,11 +841,13 @@ export class TeamApiServer {
     if (!isAgentEvent(visible) && !isTeamRealtimeEvent(visible)) return null;
     if (protocol !== 1)
       return (
-        protocol === 6
-          ? encodeTeamProtocolV6BaseCurrentEvent
-          : protocol === 5
-            ? encodeTeamProtocolV5BaseCurrentEvent
-            : encodeTeamProtocolV4BaseCurrentEvent
+        protocol === 7
+          ? encodeTeamProtocolV7BaseCurrentEvent
+          : protocol === 6
+            ? encodeTeamProtocolV6BaseCurrentEvent
+            : protocol === 5
+              ? encodeTeamProtocolV5BaseCurrentEvent
+              : encodeTeamProtocolV4BaseCurrentEvent
       )(visible, {
         ...options,
         preserveBrowserSecrets: capabilities.has("browser-secret-handoff"),
@@ -1385,7 +1397,11 @@ export class TeamApiServer {
       status < 400 && route.hiddenAgentIds
         ? route.protocol < 4
           ? legacyProviderView(value, route.hiddenAgentIds)
-          : hiddenAgentView(value, route.hiddenAgentIds, route.protocol < 5 ? 4 : route.protocol < 6 ? 5 : 6)
+          : hiddenAgentView(
+              value,
+              route.hiddenAgentIds,
+              route.protocol < 5 ? 4 : route.protocol < 6 ? 5 : route.protocol < 7 ? 6 : 7,
+            )
         : value;
     const sideRoute = teamSideRouteCodec(route.path);
     const body = sideRoute
@@ -1438,11 +1454,12 @@ export class TeamApiServer {
     return hidden;
   }
 
-  #protocolSupport(): TeamProtocolSupportV1 {
+  #protocolSupport(expanded = false): TeamProtocolSupportV1 {
     return {
       appVersion: this.#options.appVersion ?? "0.0.0",
-      protocol: { minimum: TEAM_PROTOCOL_V1, maximum: TEAM_PROTOCOL_V6 },
+      protocol: { minimum: TEAM_PROTOCOL_V1, maximum: TEAM_PROTOCOL_V7 },
       capabilities: TEAM_CURRENT_CAPABILITIES.filter((capability) => {
+        if (!expanded && !legacyTeamCapabilities([capability]).length) return false;
         if (capability === "channel-chats-v1" || capability === CHANNEL_DELETE_CAPABILITY)
           return this.#options.channels !== undefined;
         // Advertised only when this host can serve it: a client that negotiated it gets a route,
@@ -1455,6 +1472,8 @@ export class TeamApiServer {
         if (capability === STORAGE_CAPABILITY) return this.#options.storage !== undefined;
         if (capability === HOSTED_SITES_CAPABILITY) return this.#options.hostedSites !== undefined;
         if (capability === AGENT_ADMIN_CAPABILITY) return this.#options.admin?.agents !== undefined;
+        if (capability === ACP_REGISTRY_CAPABILITY) return this.#options.admin?.acpRegistry !== undefined;
+        if (capability === AGENT_SESSION_SETTINGS_CAPABILITY) return this.#options.admin?.sessionSettings !== undefined;
         if (capability === AGENT_HOST_SETTINGS_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
         if (capability === SKILLS_ADMIN_CAPABILITY) return this.#options.admin?.skills !== undefined;
         if (capability === SKILLS_EVENTS_CAPABILITY) return this.#options.skills !== undefined;
@@ -1468,7 +1487,8 @@ export class TeamApiServer {
         if (
           capability === PROVIDERS_ADMIN_CAPABILITY ||
           capability === PROVIDERS_RUNTIMES_V2_CAPABILITY ||
-          capability === PROVIDERS_V4_CAPABILITY
+          capability === PROVIDERS_V4_CAPABILITY ||
+          capability === PROVIDERS_V5_CAPABILITY
         )
           return this.#options.admin?.providers !== undefined;
         if (capability === PROVIDERS_SIGN_IN_V3_CAPABILITY) return this.#options.admin?.providers?.pasteSignIn === true;
@@ -1512,7 +1532,7 @@ export class TeamApiServer {
         body: { error: "Invalid Team API protocol headers.", code: "protocol_error", host },
       };
     }
-    if (protocol >= TEAM_PROTOCOL_V1 && protocol <= TEAM_PROTOCOL_V6) return null;
+    if (protocol >= TEAM_PROTOCOL_V1 && protocol <= TEAM_PROTOCOL_V7) return null;
     const clientIsOlder = protocol < TEAM_PROTOCOL_V1;
     return {
       status: 426,
@@ -1592,7 +1612,8 @@ function unavailableSidebarLayout(): TeamApiSidebarLayout {
 }
 
 /** The protocol that an event connection's capabilities describe, as `#encodeProviderEvent` encodes it. */
-function eventProtocol(capabilities: ReadonlySet<string>): 1 | 4 | 5 | 6 {
+function eventProtocol(capabilities: ReadonlySet<string>): 1 | 4 | 5 | 6 | 7 {
+  if (capabilities.has(TEAM_PI_MUSE_CAPABILITY)) return 7;
   if (capabilities.has(TEAM_CURSOR_CLINE_CAPABILITY)) return 6;
   return capabilities.has(TEAM_LOCAL_PROVIDERS_CAPABILITY) ? 5 : capabilities.has("opencode") ? 4 : 1;
 }
@@ -1608,6 +1629,7 @@ function eventCapability(event: AgentEvent): TeamCurrentCapability | null {
     event.type === "channel-routines-changed"
   )
     return "channel-chats-v1";
+  if (event.type === "agent-session-settings-changed") return AGENT_SESSION_SETTINGS_CAPABILITY;
   if (event.type === "skills-changed") return SKILLS_EVENTS_CAPABILITY;
   if (event.type === "turn-progress") return TEAM_AGENT_ACTIVITY_CAPABILITY;
   if (event.type === "runtime-snapshot") return "agent-runtime-snapshots";

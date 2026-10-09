@@ -74,6 +74,7 @@ export const messages = {
   "error.remote.bridgeCommandFailed": "Команда Team WebRTC не выполнена.",
   "error.remote.webRtcFailed": "Сбой WebRTC.",
   "error.remote.ownerCannotLeave": "Владелец не может покинуть этот хост.",
+  "error.remote.ownerOnlyRemove": "Удалить этот сервер может только владелец.",
   "error.remote.requestTimeout": "Время удалённого запроса истекло.",
   "error.remote.requestFailed": "Удалённый запрос не удался.",
   "error.remote.pinnedKeyMissing": "У удалённого хоста нет закреплённого ключа устройства.",

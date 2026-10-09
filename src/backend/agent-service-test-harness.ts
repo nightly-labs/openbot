@@ -24,6 +24,7 @@ import {
   type DynamicToolResult,
   decodeThreadResponse,
   getArray,
+  getRecord,
   getString,
   isRecord,
   type RequestId,
@@ -32,6 +33,19 @@ import {
 } from "./protocol";
 import type { ProviderHistoryConsumer, ProviderHistoryRequest } from "./provider-history";
 import { HARNESS_WAIT_TIMEOUT_MS } from "./test-deadlines";
+
+export function codexConfigRead(servers: DynamicRecord = {}) {
+  return {
+    config: { mcp_servers: servers },
+    layers: [
+      {
+        name: { type: "user", file: "/test/.codex/config.toml", profile: null },
+        version: "config-version",
+        config: { mcp_servers: servers },
+      },
+    ],
+  };
+}
 
 export const CREATE_AGENT_INPUT = {
   name: "Planning Agent",
@@ -72,6 +86,8 @@ const PROVIDER_PATH_ENV_VARS = [
   "OPENBOT_OPENCODE_PATH",
   "OPENBOT_CURSOR_PATH",
   "OPENBOT_CLINE_PATH",
+  "OPENBOT_PI_PATH",
+  "OPENBOT_MUSE_PATH",
 ] as const;
 
 /** Provider paths as they were before any shard touched them. */
@@ -92,6 +108,8 @@ export async function startAgentTestFixture(): Promise<{ root: string; logPath: 
   process.env.OPENBOT_OPENCODE_PATH = join(root, "missing-opencode");
   process.env.OPENBOT_CURSOR_PATH = join(root, "missing-cursor");
   process.env.OPENBOT_CLINE_PATH = join(root, "missing-cline");
+  process.env.OPENBOT_PI_PATH = join(root, "missing-pi");
+  process.env.OPENBOT_MUSE_PATH = join(root, "missing-muse");
   return { root, logPath };
 }
 
@@ -159,12 +177,8 @@ export class FakeAgentClient extends EventEmitter implements AgentClient {
   modelList: ((params: unknown) => unknown) | undefined;
   threadRead: ((params: unknown) => unknown) | undefined;
   accountRateLimits: unknown = { rateLimits: null, rateLimitsByLimitId: null };
-  /**
-   * What `config/read` answers, for the Codex sweep that turns off the servers of
-   * `~/.codex/config.toml`. Left unset it answers nothing, which is the failed read the sweep
-   * treats as "no entry of its own".
-   */
-  configRead: unknown;
+  /** The file-backed Codex configuration. Tests can replace it with an invalid response. */
+  configRead: unknown = codexConfigRead();
 
   constructor(
     readonly provider: AgentProvider,
@@ -265,6 +279,31 @@ export class FakeAgentClient extends EventEmitter implements AgentClient {
       if (method === "model/list" && this.modelList) result = this.modelList(params);
       if (method === "plugin/list") result = { marketplaces: [] };
       if (method === "config/read") result = this.configRead;
+      if (method === "config/batchWrite") {
+        for (const edit of getArray(params, "edits")) {
+          const config = getRecord(this.configRead, "config");
+          const layers = getArray(this.configRead, "layers");
+          const userLayer = layers.find((layer) => getString(getRecord(layer, "name"), "type") === "user");
+          const saved = getRecord(userLayer, "config");
+          const name = getString(edit, "keyPath")?.replace(/^mcp_servers\./u, "");
+          const value = getRecord(edit, "value");
+          if (name && value && config && saved && isRecord(this.configRead) && isRecord(userLayer)) {
+            this.configRead = {
+              ...this.configRead,
+              config: { ...config, mcp_servers: { ...getRecord(config, "mcp_servers"), [name]: value } },
+              layers: layers.map((layer) =>
+                layer === userLayer
+                  ? {
+                      ...userLayer,
+                      config: { ...saved, mcp_servers: { ...getRecord(saved, "mcp_servers"), [name]: value } },
+                    }
+                  : layer,
+              ),
+            };
+          }
+        }
+        result = {};
+      }
       if (method === "config/value/write") result = {};
       if (method === "thread/start") {
         this.#threadCounter += 1;
@@ -662,6 +701,9 @@ if (process.argv.includes("--version")) {
   process.exit(0);
 }
 const log = process.env.OPENBOT_FAKE_CODEX_LOG;
+const configRead = process.env.OPENBOT_FAKE_CODEX_CONFIG
+  ? JSON.parse(process.env.OPENBOT_FAKE_CODEX_CONFIG)
+  : ${JSON.stringify(codexConfigRead())};
 let buffer = "";
 let threadCounter = 0;
 let turnCounter = 0;
@@ -699,7 +741,16 @@ process.stdin.on("data", (chunk) => {
       // The sweep that turns off the servers of the user's own Codex file reads this before every
       // thread starts. An unanswered request holds that start open until the request times out,
       // which is the failure this fake exists to make visible rather than hide.
-      if (message.method === "config/read") write({ id: message.id, result: JSON.parse(process.env.OPENBOT_FAKE_CODEX_CONFIG || '{"config":{}}') });
+      if (message.method === "config/read") write({ id: message.id, result: configRead });
+      if (message.method === "config/batchWrite") {
+        for (const edit of message.params.edits) {
+          const name = edit.keyPath.replace(/^mcp_servers\\./u, "");
+          configRead.config.mcp_servers[name] = edit.value;
+          const userLayer = configRead.layers.find((layer) => layer.name.type === "user");
+          userLayer.config.mcp_servers[name] = edit.value;
+        }
+        write({ id: message.id, result: {} });
+      }
       if (message.method === "thread/start") {
         const threadId = "thread-" + (++threadCounter);
         write({ id: message.id, result: { thread: { id: threadId, turns: [] } } });

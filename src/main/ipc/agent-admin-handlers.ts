@@ -12,8 +12,13 @@ import {
   decodeInstalledSkills,
   type InstalledSkill,
   parseUpdateAgentAdminSettingsInput,
+  parseUpdateAgentHostSettingsInput,
 } from "@openbot/contracts/ipc";
 import { AGENT_ADMIN_CAPABILITY, AGENT_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/agent-admin-v1";
+import {
+  AGENT_HOST_SETTINGS_CAPABILITY,
+  AGENT_HOST_SETTINGS_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-host-settings-v1";
 import { AGENT_INSTALL_CAPABILITY, AGENT_INSTALL_ROUTES } from "@openbot/contracts/team-protocol/agent-install-v1";
 import { AGENT_UPDATE_CAPABILITY, AGENT_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/agent-update-v1";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
@@ -21,8 +26,10 @@ import { SKILLS_ADMIN_CAPABILITY, SKILLS_ADMIN_ROUTES } from "@openbot/contracts
 import { sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { AgentAdminSettingsService } from "../agent-admin-settings";
+import type { AgentHostSettingsService } from "../agent-host-settings";
 import type { AgentMarketplaceService } from "../agent-marketplace-service";
 import type { AgentTemplateService } from "../agent-template-service";
+import { decodeAgentHostSettingsFromHost } from "../remote-agent-decoding";
 import { acceptEmpty, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
 import type { SkillMarketplaceService } from "../skill-marketplace-service";
@@ -49,6 +56,7 @@ interface AgentAdminRemoteServers {
 
 interface AgentAdminIpcDependencies {
   settings: AgentAdminSettingsService;
+  hostSettings: AgentHostSettingsService;
   skills: Pick<SkillMarketplaceService, "listInstalled" | "install" | "uninstall" | "setEnabled">;
   marketplaceAgents: Pick<AgentMarketplaceService, "install">;
   agentTemplates: Pick<AgentTemplateService, "install">;
@@ -63,6 +71,7 @@ function decodeRemoteInstalledSkill(value: unknown): InstalledSkill {
 
 export function agentAdminIpcHandlers({
   settings,
+  hostSettings,
   skills,
   marketplaceAgents,
   agentTemplates,
@@ -99,6 +108,14 @@ export function agentAdminIpcHandlers({
 
   return {
     agentAdmin: {
+      getAgentHostSettings: scopedHandler((value) => requireString(value, "agentId"), {
+        local: (agentId) => hostSettings.read(agentId),
+        remote: (agentId, serverId) => remoteHostSettings(serverId, AGENT_HOST_SETTINGS_ROUTES.settings, { agentId }),
+      }),
+      updateAgentHostSettings: scopedHandler(parseUpdateAgentHostSettingsInput, {
+        local: (input) => runCauseEffect(hostSettings.update(input)),
+        remote: (input, serverId) => remoteHostSettings(serverId, AGENT_HOST_SETTINGS_ROUTES.update, input),
+      }),
       getAgentAdminSettings: scopedHandler((value) => requireString(value, "agentId"), {
         local: (agentId) => settings.read(agentId),
         remote: (agentId, serverId) => remote(serverId, AGENT_ADMIN_ROUTES.settings, { agentId }),
@@ -141,6 +158,14 @@ export function agentAdminIpcHandlers({
       }),
     },
   };
+
+  function remoteHostSettings(serverId: string, path: string, body: unknown) {
+    if (!remoteServers.supportsCapability(serverId, AGENT_HOST_SETTINGS_CAPABILITY))
+      throw new Error(sourceText("error.team.agentSettingsUnsupported"));
+    return runCauseEffect(
+      remoteServers.request(serverId, path, decodeAgentHostSettingsFromHost, { method: "POST", body }),
+    );
+  }
 }
 
 function addedAgent({ agent }: { agent: { id: string; name: string } }): AddedAgent {

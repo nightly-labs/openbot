@@ -168,6 +168,10 @@ export const messages = {
   "mobile.server.settings.leaveTitle": "{name} sunucusundan ayrılmak istiyor musunuz?",
   "mobile.server.settings.leaveBody": "Tekrar katılmak için başka bir davete ihtiyacınız olacak.",
   "mobile.server.settings.leave": "Sunucudan ayrıl",
+  "mobile.server.settings.removeTitle": "{name} kaldırılsın mı?",
+  "mobile.server.settings.removeBody":
+    "Bu işlem sunucuyu tüm üyeler için hesap hizmetinden kaldırır. Bilgisayarındaki dosyalar ve sohbetler kalır. Yeniden kullanmak için o bilgisayardan kaydedin.",
+  "mobile.server.settings.remove": "Sunucuyu kaldır",
   "mobile.server.settings.name": "Sunucu adı",
   "mobile.server.settings.nameLength": "{min} ile {max} karakter kullanın.",
   "mobile.server.settings.logo": "Sunucu logosu",

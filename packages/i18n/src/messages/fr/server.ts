@@ -73,6 +73,7 @@ export const messages = {
   "server.rail.notificationSettings": "Réglages des notifications",
   "server.rail.usage": "Utilisation",
   "server.rail.settings": "Réglages du serveur",
+  "server.rail.remove": "Supprimer le serveur",
   "server.rail.leave": "Quitter le serveur",
   "server.rail.delete": "Supprimer le serveur",
   "server.select.failedTitle": "Impossible de sélectionner le serveur",
@@ -166,6 +167,14 @@ export const messages = {
   "server.settings.saveIdentityFirst": "Enregistrez l’identité du serveur avant de publier.",
   "server.settings.reachable": "Accessible en ligne. Seules les personnes invitées peuvent se connecter.",
   "server.settings.notReachable": "Inaccessible en ligne. Les membres et les invitations existants restent.",
+  "server.settings.removeTitle": "Supprimer le serveur",
+  "server.settings.removeDescription":
+    "Supprimez ce serveur du service de comptes pour tous les membres. Utilisez cette action quand son ordinateur n'est plus disponible.",
+  "server.settings.removeConfirmTitle": "Supprimer {name} ?",
+  "server.settings.removeConfirmDescription":
+    "Le serveur est supprimé du service de comptes pour tous les membres et l'accès à distance prend fin. Les fichiers et les discussions sur son ordinateur restent intacts. Pour le réutiliser, enregistrez-le depuis cet ordinateur.",
+  "server.settings.removing": "Suppression…",
+  "server.settings.removedTitle": "{name} supprimé",
   "server.settings.leaveTitle": "Quitter le serveur",
   "server.settings.leaveDescription":
     "Retirez ce serveur de votre liste de serveurs. Le serveur et ses autres membres restent.",

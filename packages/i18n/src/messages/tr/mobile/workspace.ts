@@ -16,6 +16,7 @@ export const messages = {
   "mobile.workspace.error.transportNotReady": "Mobil aktarım hazır değil.",
   "mobile.workspace.error.sectionsUnsupported": "Bu ana makine bölüm değişikliklerini desteklemiyor.",
   "mobile.workspace.error.leaveOwnServer": "Yalnızca katılınan uzak sunuculardan ayrılınabilir.",
+  "mobile.workspace.error.removeOwnedServerOnly": "Bu sunucuyu yalnızca sahibi kaldırabilir.",
   "mobile.workspace.error.agentNotOnHost": "Ajan bu ana makinede değil.",
   "mobile.workspace.error.filesUnsupported":
     "Bu ana makine dosya yönetimini desteklemiyor. Ana makinedeki OpenBot'u güncelleyin.",

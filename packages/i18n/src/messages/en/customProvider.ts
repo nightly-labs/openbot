@@ -1,6 +1,16 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("customProvider", {
+  "customProvider.registry.title": "ACP registry",
+  "customProvider.registry.description":
+    "Install agents on this host. Remove runtime keeps agent settings, credentials, and conversations.",
+  "customProvider.registry.search": "Search registry",
+  "customProvider.registry.empty": "No agents match this search.",
+  "customProvider.registry.agentId": "Custom agent ID",
+  "customProvider.registry.install": "Install",
+  "customProvider.registry.update": "Update",
+  "customProvider.registry.remove": "Remove runtime",
+  "customProvider.registry.failed": "The registry operation failed.",
   // Form validation. Each message names one field of the custom provider form.
   "customProvider.error.providerIdRequired": "Enter a provider ID.",
   "customProvider.error.providerIdPattern":

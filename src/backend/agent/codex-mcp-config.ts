@@ -1,24 +1,23 @@
-import { COMPUTER_USE_MCP_SERVER_NAME, type McpServerConfig } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Semaphore } from "effect";
 import type { AgentClient } from "../agent-client";
+import type { CodexMcpServer } from "../mcp-provider-shapes";
 import { decodeRecordResponse, getArray, getRecord, getString, isRecord } from "../protocol";
 import { ProviderClientOperationError } from "../provider-client-effects";
 
 // Agents share the Codex user file. Serialize registration so their first turns do not race.
 const registrationLock = Semaphore.makeUnsafe(1);
+const placeholderCommand = "openbot-mcp";
+const placeholderUrl = "http://127.0.0.1:1";
 
 /** Codex can save tool approvals only for servers present in a file-backed config layer. */
 export const readCodexMcpConfig = Effect.fn("Agent.readCodexMcpConfig")(function* (
   client: AgentClient,
-  computerUse: McpServerConfig | undefined,
+  servers: Readonly<Record<string, CodexMcpServer>>,
 ) {
-  const response = yield* client.request(
-    "config/read",
-    { includeLayers: computerUse !== undefined },
-    decodeRecordResponse,
-  );
-  if (!computerUse) return response;
+  const entries = Object.entries(servers);
+  const response = yield* client.request("config/read", { includeLayers: entries.length > 0 }, decodeRecordResponse);
+  if (entries.length === 0) return response;
 
   const userLayer = getArray(response, "layers")
     .filter(isRecord)
@@ -30,21 +29,36 @@ export const readCodexMcpConfig = Effect.fn("Agent.readCodexMcpConfig")(function
   const filePath = getString(getRecord(userLayer, "name"), "file");
   if (!version || !filePath) {
     return yield* new ProviderClientOperationError({
-      cause: new Error(sourceText("error.provider.computerUseConfig")),
+      cause: new Error(sourceText("error.provider.mcpConfig")),
     });
   }
   const saved = getRecord(getRecord(userLayer, "config"), "mcp_servers");
-  if (saved && Object.hasOwn(saved, COMPUTER_USE_MCP_SERVER_NAME)) return response;
-
-  // No environment or credentials are saved. Other Codex clients must not start OpenBot's driver.
-  // The thread supplies the current executable and socket, including after an app update.
-  const registration = { command: computerUse.command, enabled: false };
-  yield* client.request(
-    "config/value/write",
-    {
-      keyPath: `mcp_servers.${COMPUTER_USE_MCP_SERVER_NAME}`,
-      value: registration,
+  const edits = [];
+  for (const [name, server] of entries) {
+    const registration =
+      "command" in server ? { command: placeholderCommand, enabled: false } : { url: placeholderUrl, enabled: false };
+    const existing = getRecord(saved, name);
+    // Codex merges file and thread transport fields. Update only our own placeholder when
+    // the user changes transport, and keep the saved policies. Leave user entries unchanged.
+    const changedTransport =
+      existing?.enabled === false &&
+      ("command" in registration ? existing.url === placeholderUrl : existing.command === placeholderCommand);
+    if (saved && Object.hasOwn(saved, name) && !changedTransport) continue;
+    const { command: _command, url: _url, ...settings } = existing ?? {};
+    edits.push({
+      keyPath: `mcp_servers.${name}`,
+      value: { ...settings, ...registration },
       mergeStrategy: "replace",
+    });
+  }
+  if (edits.length === 0) return response;
+
+  // Save only a disabled placeholder. URLs, arguments, and credentials stay in the thread.
+  // Other Codex clients must not start servers that OpenBot owns.
+  yield* client.request(
+    "config/batchWrite",
+    {
+      edits,
       filePath,
       expectedVersion: version,
     },

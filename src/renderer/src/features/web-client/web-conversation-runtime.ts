@@ -9,6 +9,9 @@ import {
   listSharedTables,
   previewAgentTemplate,
   publishAgentTemplate,
+  readAgentSessionSettings,
+  resetAgentSessionSetting,
+  setAgentSessionSetting,
   setAgentSkillEnabled,
   uninstallAgentSkill,
   unpublishAgentTemplate,
@@ -30,10 +33,30 @@ function webHostAdmin(
   request: () => TeamApiRequest,
   onHostEvent?: HostEvents,
   eventsEnabled?: () => boolean,
+  sessionSettingsEnabled?: () => boolean,
 ): NonNullable<ConversationRuntime["admin"]> {
   // `request()` names the connected host at call time, so a host switch reaches the new host.
   const eventRoutines = webEventRoutinesApi((...args) => request()(...args));
   return {
+    get sessionSettings() {
+      if (sessionSettingsEnabled?.() !== true) return undefined;
+      return {
+        read: (agentId: string) =>
+          runTeamEffect(readAgentSessionSettings(request(), agentId).pipe(Effect.mapError((error) => error.cause))),
+        set: (input: import("@openbot/contracts/ipc").SetAgentSessionSettingInput) =>
+          runTeamEffect(setAgentSessionSetting(request(), input).pipe(Effect.mapError((error) => error.cause))),
+        reset: (input: import("@openbot/contracts/ipc").ResetAgentSessionSettingInput) =>
+          runTeamEffect(resetAgentSessionSetting(request(), input).pipe(Effect.mapError((error) => error.cause))),
+        ...(onHostEvent
+          ? {
+              subscribe: (agentId: string, listener: () => void) =>
+                onHostEvent((event) => {
+                  if (event.type === "agent-session-settings-changed" && event.agentId === agentId) listener();
+                }),
+            }
+          : {}),
+      };
+    },
     skills: {
       listInstalled: (agentId) =>
         runTeamEffect(listAgentSkills(request(), agentId).pipe(Effect.mapError((error) => error.cause))),
@@ -77,6 +100,7 @@ export function createWebConversationRuntime(
   adminRequest?: () => TeamApiRequest,
   onHostEvent?: HostEvents,
   eventsEnabled?: () => boolean,
+  sessionSettingsEnabled?: () => boolean,
 ): ConversationRuntime {
   const listeners = new Set<(event: AttachmentImportEvent) => void>();
   const files = createWebAttachmentFiles(remote);
@@ -192,6 +216,6 @@ export function createWebConversationRuntime(
       }
     },
     cancelImportFiles,
-    admin: adminRequest ? webHostAdmin(adminRequest, onHostEvent, eventsEnabled) : undefined,
+    admin: adminRequest ? webHostAdmin(adminRequest, onHostEvent, eventsEnabled, sessionSettingsEnabled) : undefined,
   };
 }

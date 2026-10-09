@@ -1,4 +1,4 @@
-// The local Whisper model and dictation.
+// The local speech recognition model (Parakeet) and dictation.
 
 import type { VoiceModelStatus, VoiceTranscriptionResult } from "@openbot/contracts/ipc";
 import { runCauseEffect } from "../../backend/effect-boundary";

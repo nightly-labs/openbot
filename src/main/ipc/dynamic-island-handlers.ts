@@ -56,7 +56,7 @@ export function dynamicIslandIpcHandlers({
         dynamicIsland.performHaptic();
       }),
       setInteractive: authorizedHandler(fromOverlayRenderer, parseDynamicIslandInteractive, (event, state) =>
-        dynamicIsland.setInteractive(event.sender.id, state.interactive),
+        dynamicIsland.setInteractive(event.sender.id, state.interactive, state.keyboard),
       ),
     },
   };

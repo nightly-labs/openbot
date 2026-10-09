@@ -515,6 +515,30 @@ body:has(.dynamic-island-surface),
     0 0 0 3px var(--openbot-accent-soft);
 }
 
+.dynamic-island-surface-row-group {
+  position: relative;
+  min-width: 0;
+}
+
+/* The stop button sits over the end of the row, so the row keeps the place the avatars move to. */
+.dynamic-island-surface-row-group:has(.dynamic-island-surface-row-stop) .dynamic-island-surface-row {
+  padding-right: calc(var(--openbot-control-sm) + var(--openbot-space-2));
+}
+
+.dynamic-island-surface-row-stop {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  color: var(--openbot-text-muted);
+  transform: translateY(-50%);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .dynamic-island-surface-row-stop:hover {
+    color: var(--openbot-danger-text);
+  }
+}
+
 .dynamic-island-surface-row-copy {
   min-width: 0;
   width: 100%;
@@ -581,6 +605,46 @@ body:has(.dynamic-island-surface),
 
 .dynamic-island-surface-attention-panel {
   gap: var(--openbot-space-3);
+}
+
+.dynamic-island-reply {
+  position: relative;
+  min-width: 0;
+  display: grid;
+  gap: var(--openbot-space-1-5);
+  margin: 0;
+}
+
+.dynamic-island-reply .dynamic-island-reply-input {
+  height: var(--openbot-control-md);
+  border-color: var(--openbot-border);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-hover);
+  padding-right: calc(var(--openbot-control-md) + var(--openbot-space-1));
+  padding-left: var(--openbot-space-3);
+  font-size: var(--openbot-text-sm);
+  user-select: text;
+}
+
+.dynamic-island-reply .dynamic-island-reply-input:focus-visible {
+  border-color: var(--openbot-border-focus);
+}
+
+.dynamic-island-reply-send {
+  position: absolute;
+  top: calc((var(--openbot-control-md) - var(--openbot-control-xs)) / 2);
+  right: calc((var(--openbot-control-md) - var(--openbot-control-xs)) / 2);
+  border-radius: var(--openbot-radius-pill);
+}
+
+.dynamic-island-reply-send svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.dynamic-island-surface-question-step .dynamic-island-reply {
+  margin-top: 6px;
 }
 
 .dynamic-island-surface-request-copy {
@@ -837,11 +901,11 @@ div.dynamic-island-surface-context-line span {
   animation: dynamic-island-surface-row-in var(--openbot-duration-slow) var(--openbot-ease-out) both;
 }
 
-.dynamic-island-surface-animated-row:nth-child(2) {
+.dynamic-island-surface-row-group:nth-child(2) .dynamic-island-surface-animated-row {
   animation-delay: 40ms;
 }
 
-.dynamic-island-surface-animated-row:nth-child(3) {
+.dynamic-island-surface-row-group:nth-child(3) .dynamic-island-surface-animated-row {
   animation-delay: 80ms;
 }
 

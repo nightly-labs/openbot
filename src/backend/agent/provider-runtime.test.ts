@@ -193,6 +193,8 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
       antigravity: 0,
       cursor: 0,
       cline: 0,
+      pi: 0,
+      muse: 0,
       acp: 0,
     };
     const availableOrder: AgentProvider[] = [];
@@ -338,6 +340,37 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
       "opencode/big-pickle",
       "openai/gpt-5.3-codex-spark",
     ]);
+  });
+
+  it("does not report an unverified Muse account as connected", async () => {
+    process.env.OPENBOT_MUSE_PATH = await fakeCodexCli();
+    let muse: FakeAgentClient | undefined;
+    const result = await startService(root, {
+      preferredProvider: "muse",
+      client: (provider) => {
+        const client = new FakeAgentClient(provider, "DONE", false);
+        if (provider === "muse") {
+          muse = client;
+          const request = client.request.bind(client);
+          client.request = (method, params, decoder) =>
+            method === "account/read"
+              ? Effect.sync(() =>
+                  decoder({ account: { type: "muse-unverified", email: null }, requiresOpenaiAuth: false }),
+                )
+              : request(method, params, decoder);
+        }
+        return client;
+      },
+    });
+    service = result.service;
+    expect(service.getStatus().providers).toContainEqual(
+      expect.objectContaining({
+        id: "muse",
+        state: "sign-in-required",
+        message: expect.stringContaining("not verified"),
+      }),
+    );
+    expect(muse?.running).toBe(true);
   });
 
   it("keeps the CLI version with sign-in-required and no models when OpenCode reports no account", async () => {

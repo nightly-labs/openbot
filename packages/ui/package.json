@@ -97,6 +97,7 @@
     "./features/conversation/ComparisonTable": "./src/features/conversation/ComparisonTable.tsx",
     "./features/conversation/ComposerEditor": "./src/features/conversation/ComposerEditor.tsx",
     "./features/conversation/ComposerErrorBanner": "./src/features/conversation/ComposerErrorBanner.tsx",
+    "./features/conversation/VoiceRecordingMorph": "./src/features/conversation/VoiceRecordingMorph.tsx",
     "./features/conversation/send-shortcut": "./src/features/conversation/send-shortcut.ts",
     "./features/conversation/ComposerNotice": "./src/features/conversation/ComposerNotice.tsx",
     "./features/conversation/ConversationIcons": "./src/features/conversation/ConversationIcons.tsx",
@@ -133,6 +134,7 @@
     "./features/custom-providers/CustomProviderListDialog": "./src/features/custom-providers/CustomProviderListDialog.tsx",
     "./features/custom-providers/custom-provider-form": "./src/features/custom-providers/custom-provider-form.ts",
     "./features/custom-providers/CustomAcpAgentDialog": "./src/features/custom-providers/CustomAcpAgentDialog.tsx",
+    "./features/custom-providers/AcpRegistrySettings": "./src/features/custom-providers/AcpRegistrySettings.tsx",
     "./features/custom-providers/CustomAgentSettings": "./src/features/custom-providers/CustomAgentSettings.tsx",
     "./features/custom-providers/CustomProviderPresetDialog": "./src/features/custom-providers/CustomProviderPresetDialog.tsx",
     "./features/custom-providers/DetectedProviderSetup": "./src/features/custom-providers/DetectedProviderSetup.tsx",
@@ -314,6 +316,7 @@
     "./features/conversation/conversation.css": "./src/features/conversation/conversation.css",
     "./features/files/files.css": "./src/features/files/files.css",
     "./features/import/agent-import.css": "./src/features/import/agent-import.css",
+    "./features/conversation/AgentSessionSettings": "./src/features/conversation/AgentSessionSettings.tsx",
     "./features/conversation/AgentSettingsPanel": "./src/features/conversation/AgentSettingsPanel.tsx",
     "./features/conversation/ConversationHeader": "./src/features/conversation/ConversationHeader.tsx"
   },

@@ -356,8 +356,9 @@ const ServerSettings = createSimpleContext({
     }
 
     /**
-     * Ends this account's membership of a joined server. Main removes the server from the list and
-     * sends the new list, which removes the dialog's target, so the dialog closes here first.
+     * Ends this account's membership of a joined server, or removes a server that it owns from the
+     * account service. Main removes the server from the list and sends the new list, which removes
+     * the dialog's target, so the dialog closes here first.
      */
     async function leaveServer(): Promise<void> {
       const server = serverSettingsTarget();
@@ -376,18 +377,19 @@ const ServerSettings = createSimpleContext({
 
     async function removeMembership(server: ServerSummary): Promise<void> {
       const analytics = desktopAnalytics.scope();
+      const action = server.role === "owner" ? "server_removed" : "server_left";
       try {
         await serversPort().servers.remove(server.id);
       } catch (error) {
         analytics.track("team_action", {
-          action: "server_left",
+          action,
           result: "failed",
           server_kind: server.kind,
           failure_code: "server_leave_failed",
         });
         throw error;
       }
-      analytics.track("team_action", { action: "server_left", result: "succeeded", server_kind: server.kind });
+      analytics.track("team_action", { action, result: "succeeded", server_kind: server.kind });
     }
 
     /**

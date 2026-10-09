@@ -1,3 +1,14 @@
+import type {
+  AcpRegistryEntry,
+  AcpRegistryInstallation,
+  AcpRegistryInstallInput,
+  AcpRegistryOperation,
+} from "./ipc-acp-registry";
+import type {
+  AgentSessionSettings,
+  ResetAgentSessionSettingInput,
+  SetAgentSessionSettingInput,
+} from "./ipc-agent-session-settings";
 // The one channel list. Each endpoint holds its wire value, the group it belongs to, and whether it
 // is a request the renderer invokes or an event the main process sends. That is what lets a
 // registrar bind its handlers as an object keyed by endpoint, so a channel with no handler, and a
@@ -26,7 +37,13 @@ import type {
   HostedServerList,
   HostedServerSummary,
 } from "./hosted-servers";
-import type { AddedAgent, AgentAdminSettings, UpdateAgentAdminSettingsInput } from "./ipc-agent-admin";
+import type {
+  AddedAgent,
+  AgentAdminSettings,
+  AgentHostSettings,
+  UpdateAgentAdminSettingsInput,
+  UpdateAgentHostSettingsInput,
+} from "./ipc-agent-admin";
 import type { AgentAnalytics, AgentAnalyticsInput } from "./ipc-agent-analytics";
 import type { AgentIpcRequest, ScopedAgentEvent } from "./ipc-agent-events";
 import type { AgentModelOption } from "./ipc-agent-identity";
@@ -599,6 +616,14 @@ export const IPC_ENDPOINTS = {
   },
   // The user's own ACP agents, on this computer only: no Team API route and no `providerAdmin` entry.
   // Environment values travel only towards main.
+  acpRegistry: {
+    search: scopedRequest<string, AcpRegistryEntry[]>()("acp-registry:search"),
+    installed: scopedQuery<AcpRegistryInstallation[]>()("acp-registry:installed"),
+    status: scopedQuery<AcpRegistryOperation[]>()("acp-registry:status"),
+    install: scopedRequest<AcpRegistryInstallInput, CustomAgentResult>()("acp-registry:install"),
+    cancel: scopedRequest<string, void>()("acp-registry:cancel"),
+    remove: scopedRequest<string, void>()("acp-registry:remove"),
+  },
   customAgents: {
     list: request<undefined, CustomAgentSummary[]>()("custom-agents:list"),
     save: request<SaveCustomAgentInput, CustomAgentResult>()("custom-agents:save"),
@@ -818,6 +843,13 @@ export const IPC_ENDPOINTS = {
     getUsage: scopedRequest<string | undefined, AccountUsage>()("agent:get-usage"),
     listModels: scopedQuery<AgentModelOption[]>()("agent:list-models"),
     listAgents: scopedQuery<AgentSummary[]>()("agent:list"),
+    readAgentSessionSettings: scopedRequest<string, AgentSessionSettings>()("agent:session-settings:read"),
+    setAgentSessionSetting: scopedRequest<SetAgentSessionSettingInput, AgentSessionSettings>()(
+      "agent:session-settings:set",
+    ),
+    resetAgentSessionSetting: scopedRequest<ResetAgentSessionSettingInput, AgentSessionSettings>()(
+      "agent:session-settings:reset",
+    ),
     listInstalledSkills: scopedRequest<string, InstalledSkill[]>()("agent:list-installed-skills"),
     listChannels: scopedQuery<ChannelSummary[]>()("agent:channels:list"),
     readChannel: scopedRequest<ChannelReadInput, ChannelPage>()("agent:channels:read"),
@@ -1002,6 +1034,10 @@ export const IPC_ENDPOINTS = {
   // Access and auto-approve of one agent, read and written on the computer that runs it. A joined
   // server answers only an owner or admin, and only when it advertises `agent-admin-v1`.
   agentAdmin: {
+    getAgentHostSettings: scopedRequest<string, AgentHostSettings>()("agent:admin:get-host-settings"),
+    updateAgentHostSettings: scopedRequest<UpdateAgentHostSettingsInput, AgentHostSettings>()(
+      "agent:admin:update-host-settings",
+    ),
     getAgentAdminSettings: scopedRequest<string, AgentAdminSettings>()("agent:admin:get-settings"),
     updateAgentAdminSettings: scopedRequest<UpdateAgentAdminSettingsInput, AgentAdminSettings>()(
       "agent:admin:update-settings",
@@ -1140,6 +1176,7 @@ export const IPC_GROUP_PATHS = {
   customProviders: "customProviders",
   providerDetection: "providerDetection",
   customAgents: "customAgents",
+  acpRegistry: "acpRegistry",
   providerAdmin: "providerAdmin",
   messaging: "messaging",
   hostAdmin: "hostAdmin",

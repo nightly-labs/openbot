@@ -31,6 +31,7 @@ export function serverSupportsCapability(
       capability === "storage-v1" ||
       capability === "hosted-sites-v1" ||
       capability === "agent-admin-v1" ||
+      capability === "agent-host-settings-v1" ||
       capability === "skills-admin-v1" ||
       capability === "shared-tables-v1" ||
       capability === "agent-install-v1" ||
@@ -39,6 +40,9 @@ export function serverSupportsCapability(
       capability === "providers-v2" ||
       capability === "providers-v3" ||
       capability === "providers-v4" ||
+      capability === "providers-v5" ||
+      capability === "agent-session-settings-v1" ||
+      capability === "acp-registry-v1" ||
       capability === "host-admin-v1" ||
       capability === "host-update-v1" ||
       capability === "host-member-update-v1" ||

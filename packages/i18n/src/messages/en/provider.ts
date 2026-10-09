@@ -123,6 +123,10 @@ export const messages = defineMessages("provider", {
   "provider.effort.xhigh": "Extra high",
   "provider.effort.max": "Max",
 
+  "provider.museKey.title": "Meta API key for Muse",
+  "provider.museKey.description": "Save a Meta API key on the host, or use the Muse CLI to sign in.",
+  "provider.museKey.label": "Meta API key",
+
   // The optional OpenCode Go key dialog.
   "provider.openCodeKey.title": "Sign in to OpenCode Go",
   "provider.openCodeKey.description": "Free models need no account. A key unlocks the paid Go models.",

@@ -117,7 +117,7 @@ export const messages = {
   "agentSettings.computerUse.description": "Diesem Agenten erlauben, Apps auf diesem Computer zu steuern",
   "agentSettings.automation.title": "Lokale Skripte",
   "agentSettings.automation.description":
-    "Skripten auf diesem Computer erlauben, die Routinen dieses Agenten auszuführen",
+    "Skripten auf dem Host erlauben, Nachrichten zu senden, Routinen auszuführen, Fragen zu beantworten und Anfragen zu genehmigen oder abzulehnen",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "Der gesamte Prozess von {provider} läuft in einer Sandbox, daher schlagen Schreibzugriffe außerhalb fehl. Nur unter macOS verfügbar.",
 } as const satisfies PartialTranslation<typeof source>;

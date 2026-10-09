@@ -1,8 +1,9 @@
 import { type AgentEvent, type AgentSummary, isAgentSummary } from "@openbot/contracts/ipc";
 import { guardedListDecoder } from "@openbot/contracts/ipc-decoding";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
-import { decodeTeamProtocolSupportV1, teamProtocolUpdateDirection } from "@openbot/contracts/team-protocol/v1";
+import { teamProtocolUpdateDirection } from "@openbot/contracts/team-protocol/v1";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
+import { decodeTeamProtocolSupportV7Base } from "@openbot/contracts/team-protocol/v7-base";
 import type { RemoteTeamHost } from "@openbot/team-client/remote-directory";
 import type { createRemoteTeamPeer, RemoteTeamPeerActions } from "@openbot/team-client/remote-peer";
 import { createRemoteConnectionRecovery } from "@openbot/team-client/remote-recovery";
@@ -188,7 +189,7 @@ export function createWebHostConnections(options: {
           body: {},
         });
         if (!response.ok || (response.status ?? 500) >= 400) throw failed(response.error);
-        const support = decodeTeamProtocolSupportV1(response.body);
+        const support = decodeTeamProtocolSupportV7Base(response.body);
         // The same rule as opening the host, so the rail and the open agree.
         if (teamProtocolUpdateDirection({ minimum: TEAM_PROTOCOL_V3, maximum: TEAM_PROTOCOL_V3 }, support.protocol)) {
           entry.incompatible = true;

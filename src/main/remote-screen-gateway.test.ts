@@ -200,6 +200,45 @@ describe("RemoteScreenGateway", () => {
     await close();
   });
 
+  it("writes a viewer's paste to the host clipboard only for that session's viewer", async () => {
+    const upstreamServer = createServer((_request, response) => {
+      response.writeHead(200, { "Content-Type": "text/html" });
+      response.end("<!DOCTYPE html><html><head><title>Stream</title></head></html>");
+    });
+    await new Promise<void>((resolve) => upstreamServer.listen(0, "127.0.0.1", resolve));
+    const upstreamAddress = z.object({ port: z.number().int() }).parse(upstreamServer.address());
+    const writeClipboard = vi.fn();
+    const gateway = createGateway({ runtimeBaseUrl: `http://127.0.0.1:${upstreamAddress.port}`, writeClipboard });
+    const { origin, close } = await serveGateway(gateway);
+    const session = await createSession(gateway, origin);
+    const clipboard = `${origin}/v1/remote-screen/sessions/${session.id}/moonlight/openbot-clipboard`;
+
+    const refused = await fetch(clipboard, { method: "POST", body: "from another page" });
+    expect(refused.status).toBe(401);
+    expect(writeClipboard).not.toHaveBeenCalled();
+
+    const viewer = { "X-OpenBot-WebRTC-Session": "team-member-a" };
+    const crossSite = await fetch(clipboard, {
+      method: "POST",
+      headers: { ...viewer, "Sec-Fetch-Site": "cross-site" },
+      body: "from another site",
+    });
+    expect(crossSite.status).toBe(403);
+    expect(writeClipboard).not.toHaveBeenCalled();
+
+    const pasted = await fetch(clipboard, { method: "POST", headers: viewer, body: "zażółć ✓" });
+    expect(pasted.status).toBe(204);
+    expect(writeClipboard).toHaveBeenCalledWith("zażółć ✓");
+    const page = await fetch(`${origin}/v1/remote-screen/sessions/${session.id}/moonlight/stream.html`, {
+      headers: viewer,
+    });
+    expect(await page.text()).toContain('<head><script type="module" src="openbot-paste.js"></script>');
+
+    await runCauseEffect(gateway.stop());
+    await close();
+    await new Promise<void>((resolve) => upstreamServer.close(() => resolve()));
+  });
+
   it("refuses a session the host may not record, instead of opening one that never shows a frame", async () => {
     // The refused member cannot grant anything on this computer, so the host owner is told as well.
     const onScreenRecordingDenied = vi.fn();
@@ -671,6 +710,7 @@ function createGateway(
     selectDisplay?: (displayId: string) => Promise<void>;
     screenCaptureDenied?: () => boolean;
     onScreenRecordingDenied?: (denied: boolean) => void;
+    writeClipboard?: (text: string) => void;
   } = {},
 ): RemoteScreenGateway {
   return new RemoteScreenGateway({
@@ -687,6 +727,7 @@ function createGateway(
     getIceServers: () => remoteCall(options.getIceServers ?? (async () => [{ urls: "stun:127.0.0.1:3478" }])),
     ...(options.onScreenRecordingDenied ? { onScreenRecordingDenied: options.onScreenRecordingDenied } : {}),
     ...(options.now ? { now: options.now } : {}),
+    ...(options.writeClipboard ? { writeClipboard: options.writeClipboard } : {}),
     createRuntime: ({ getIceServers }) => {
       const runtime = new FakeRuntime(options.runtimeBaseUrl, options.selectDisplay, options.screenCaptureDenied?.());
       runtime.getIceServers = getIceServers;

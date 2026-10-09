@@ -23,6 +23,7 @@ import { recordRestartActivity } from "../backend/restart-activity";
 import { readBodyWithin } from "./http-body";
 import { listenLoopback } from "./listen-loopback";
 import { RemoteDesktopOperationError } from "./remote-desktop-effects";
+import { remoteDesktopPasteScript } from "./remote-desktop-paste";
 import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifact";
 import { RemoteWorkflowError, remoteCall } from "./remote-service-effects";
 import {
@@ -40,6 +41,11 @@ const VIEWER_COOKIE = "openbotRemoteViewer";
 const MAX_PENDING_STREAM_FRAMES = 32;
 const MAX_PENDING_STREAM_BYTES = 1_048_576;
 const MAX_TIMER_DELAY_MS = 2_147_000_000;
+const MAX_CLIPBOARD_BYTES = 1_048_576;
+// Served here, not by Moonlight. They sit under `moonlight/` because the released Team API adapters
+// forward only the viewer routes of that family.
+const PASTE_SCRIPT_PATH = "/openbot-paste.js";
+const CLIPBOARD_PATH = "/openbot-clipboard";
 const RUNTIME_START_FAILURE = {
   sunshine: "error.remote.sunshineStartFailed",
   moonlight: "error.remote.moonlightStartFailed",
@@ -75,6 +81,9 @@ interface RemoteScreenGatewayOptions {
   audit?: (event: RemoteScreenAuditEvent) => void;
   now?: () => number;
   onDiagnostic?: (source: "sunshine" | "moonlight", message: string) => void;
+  // Puts a member's pasted text on the host's clipboard. Without it, a paste in the viewer pastes
+  // the host's own clipboard.
+  writeClipboard?: (text: string) => void;
   // Called only when the answer changes, so the host owner's screen can show the one refusal a
   // member cannot act on themselves -- and stop showing it once a member gets through.
   onScreenRecordingDenied?: (denied: boolean) => void;
@@ -1110,6 +1119,26 @@ export class RemoteScreenGateway {
       );
       return;
     }
+    const writeClipboard = this.#options.writeClipboard;
+    if (writeClipboard && upstreamPath === CLIPBOARD_PATH && request.method === "POST") {
+      // The viewer cookie can be SameSite=None, and a text POST needs no preflight. Only the viewer
+      // page itself may write the host's clipboard.
+      const site = request.headers["sec-fetch-site"];
+      if (site !== undefined && site !== "same-origin") return sendText(response, 403, "Paste is not allowed.");
+      const body = yield* remoteCall(() => readBodyWithin(request, MAX_CLIPBOARD_BYTES));
+      if (body === null) return sendText(response, 413, "Pasted text is too large.");
+      writeClipboard(body.toString("utf8"));
+      response.writeHead(204, { "Cache-Control": "no-store" });
+      response.end();
+      return;
+    }
+    if (writeClipboard && upstreamPath === PASTE_SCRIPT_PATH) {
+      response.writeHead(200, { "Content-Type": "text/javascript", "Cache-Control": "no-store" });
+      response.end(remoteDesktopPasteScript(this.#options.platform));
+      return;
+    }
+    // The viewer page loads the paste script before Moonlight's own, so its listeners run first.
+    const addPasteScript = writeClipboard !== undefined && upstreamPath === "/stream.html" && request.method === "GET";
     const target = new URL(`${upstreamPath}${search}`, this.#runtimeState.baseUrl);
     const authHeader = this.#runtimeState.authHeader;
     yield* Effect.callback<void>((resume) => {
@@ -1127,9 +1156,26 @@ export class RemoteScreenGateway {
         (upstreamResponse) => {
           const headers = { ...upstreamResponse.headers };
           delete headers["set-cookie"];
-          response.writeHead(upstreamResponse.statusCode ?? 502, headers);
-          upstreamResponse.pipe(response);
-          upstreamResponse.once("end", resolve);
+          if (addPasteScript && upstreamResponse.statusCode === 200 && !headers["content-encoding"]) {
+            const chunks: Buffer[] = [];
+            upstreamResponse.on("data", (chunk: Buffer) => chunks.push(chunk));
+            upstreamResponse.once("end", () => {
+              const page = Buffer.from(
+                Buffer.concat(chunks)
+                  .toString("utf8")
+                  .replace("<head>", `<head><script type="module" src="${PASTE_SCRIPT_PATH.slice(1)}"></script>`),
+              );
+              delete headers["content-length"];
+              delete headers["transfer-encoding"];
+              response.writeHead(200, { ...headers, "content-length": String(page.byteLength) });
+              response.end(page);
+              resolve();
+            });
+          } else {
+            response.writeHead(upstreamResponse.statusCode ?? 502, headers);
+            upstreamResponse.pipe(response);
+            upstreamResponse.once("end", resolve);
+          }
           upstreamResponse.once("error", () => {
             response.destroy();
             resolve();

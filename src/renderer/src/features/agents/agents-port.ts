@@ -11,6 +11,8 @@ export interface AgentsPort {
     | "deleteAgent"
     | "duplicateAgent"
     | "getAgentAdminSettings"
+    | "getAgentHostSettings"
+    | "updateAgentHostSettings"
     | "listConversationReads"
     | "listModels"
     | "onEvent"

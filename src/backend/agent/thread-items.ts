@@ -1,3 +1,4 @@
+import { RequestError } from "@agentclientprotocol/sdk";
 import { agentProviderName, COMPUTER_USE_MCP_SERVER_NAME } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
@@ -24,6 +25,9 @@ export function isForeignReasoningError(message: string): boolean {
 }
 
 export function isMissingProviderSessionError(error: unknown, provider: AgentProvider): boolean {
+  // ACP clients convert confirmed missing-session responses before this boundary.
+  // Provider diagnostics can mention missing resources without proving that this session is gone.
+  if (error instanceof RequestError) return false;
   if (
     (provider !== "grok" &&
       provider !== "opencode" &&
