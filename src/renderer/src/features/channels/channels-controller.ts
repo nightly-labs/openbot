@@ -290,45 +290,49 @@ export function createChannelsController(env: ChannelsEnvironment) {
         });
     }
   }
-  createEffect(env.scopeKey, (scope) => {
-    // Read once for this scope; a later capability change does not reset the open channel.
-    const channelsSupported = untrack(supported);
-    const selected = channelsSupported ? env.readSelection(scope) : null;
-    refreshId += 1;
-    readThrough.clear();
-    failedCommand = null;
-    pendingCommands = 0;
-    flush(() =>
-      setState((state) => {
-        Object.assign(state, {
-          channels: [],
-          selectedId: selected,
-          page: null,
-          pending: false,
-          error: null,
-          editing: null,
-        });
-      }),
-    );
-    if (channelsSupported) void untrack(() => refresh(selected));
-  });
-  // Support can arrive after the scope starts: a remote host reports its capabilities after it connects,
-  // and again after each reconnect. Support that is there from the start is the scope's read. As there,
-  // the read gets the saved channel as an argument: a store write in an effect shows only after the flush.
-  createEffect(supported, (isSupported, wasSupported) => {
-    if (!isSupported || wasSupported !== false) return;
-    const saved = state.selectedId === null ? env.readSelection(env.scopeKey()) : null;
-    if (saved === null) {
-      void refresh();
-      return;
-    }
-    flush(() =>
-      setState((state) => {
-        state.selectedId = saved;
-      }),
-    );
-    void refresh(saved);
-  });
+  createEffect(
+    () => ({ scope: env.scopeKey(), supported: supported() }),
+    (next, previous) => {
+      if (next.scope !== previous?.scope) {
+        const selected = next.supported ? env.readSelection(next.scope) : null;
+        refreshId += 1;
+        readThrough.clear();
+        failedCommand = null;
+        pendingCommands = 0;
+        flush(() =>
+          setState((state) => {
+            Object.assign(state, {
+              channels: [],
+              selectedId: selected,
+              page: null,
+              pending: false,
+              error: null,
+              editing: null,
+            });
+          }),
+        );
+        if (next.supported) void untrack(() => refresh(selected));
+        return;
+      }
+      // A capability change does not reset the open channel. Support can arrive after the scope starts:
+      // a remote host reports its capabilities after it connects, and again after each reconnect.
+      if (!next.supported || previous.supported) return;
+      const saved = state.selectedId === null ? env.readSelection(next.scope) : null;
+      if (saved === null) {
+        void refresh();
+        return;
+      }
+      // As `open`, but the read gets the channel as an argument: a store write in an effect shows only
+      // after the flush, so a read that takes the selection from the store reads the old one.
+      env.beforeOpen();
+      flush(() =>
+        setState((state) => {
+          Object.assign(state, { selectedId: saved, page: null, editing: null, loading: true });
+        }),
+      );
+      void refresh(saved);
+    },
+  );
   onSettled(() => {
     const focus = () => {
       void refresh();
