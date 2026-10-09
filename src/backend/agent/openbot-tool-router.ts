@@ -21,6 +21,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { isPluginSlug } from "@openbot/contracts/plugin-links";
 import { isString } from "@openbot/contracts/runtime-values";
+import { isUiBlockId, normalizeUiBlockSpec } from "@openbot/contracts/ui-blocks";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { Effect, Result } from "effect";
@@ -32,7 +33,12 @@ import { OPENBOT_BROWSER_NAMESPACE } from "../browser-tools";
 import type { ChannelService } from "../channel-service";
 import type { MailboxStore } from "../mailbox-store";
 import { agentMcpServers } from "../mcp-provider-shapes";
-import { CHAT_VISUAL_PREVIEW_DEFAULT_WIDTH, htmlPreviewToolSchema, htmlRenderToolSchema } from "../openbot-tools";
+import {
+  askUiToolSchema,
+  CHAT_VISUAL_PREVIEW_DEFAULT_WIDTH,
+  htmlPreviewToolSchema,
+  htmlRenderToolSchema,
+} from "../openbot-tools";
 import { type AppServerRequest, type DynamicToolCallParams, type DynamicToolResult, isRecord } from "../protocol";
 import { handleRoutineFlowTool, type RoutineFlowTools } from "../routine-flows/routine-flow-tools";
 import type { StoredStateFailure } from "../stored-state-effects";
@@ -275,6 +281,11 @@ export class OpenBotToolRouter {
               this.#attention.surfaceDynamicPrompt(client, request);
               return;
             }
+            // Every provider gets ask_ui, Claude too: its call arrives here through the SDK MCP server.
+            if (request.params.tool === "ask_ui") {
+              this.#askUi(client, request, request.params);
+              return;
+            }
             if (isHostedSiteMutationTool(request.params.tool)) {
               yield* this.#attention.surfaceHostedSiteApproval(client, request, request.params, request.params.tool);
               return;
@@ -321,6 +332,34 @@ export class OpenBotToolRouter {
       Effect.catchDefect(reportFailure),
     );
   }).bind(this);
+
+  /**
+   * Checks an `ask_ui` call and shows its block. Like `ask_user`, it answers the call only when the
+   * person answers or the turn ends. The agent can correct a refused block, so it gets the reason.
+   */
+  #askUi(client: AgentClient, request: AppServerRequest, params: DynamicToolCallParams): void {
+    const refuse = (message: string) => client.respond(request.id, openBotToolFailure(message));
+    const parsed = askUiToolSchema.safeParse(params.arguments);
+    if (!parsed.success) {
+      refuse(`${z.prettifyError(parsed.error)}\nCorrect the arguments and retry.`);
+      return;
+    }
+    const spec = normalizeUiBlockSpec(parsed.data.block);
+    // The stored block must read back, so its id passes the same check as the read.
+    const blockId = parsed.data.blockId ?? randomUUID();
+    if (!spec || !isUiBlockId(blockId)) {
+      refuse(
+        "The block breaks a rule: ids and option labels must be unique, an id must not be botId or a similar name, a value must be one of its options, a single choice selects at most one option, and a secret field is a text field with no value. Correct the block and retry.",
+      );
+      return;
+    }
+    const agentId = this.#conversation.agentForThread(params.threadId);
+    if (agentId && this.#channels.store.channelForThread(this.#conversation.publicThreadId(agentId, params.threadId))) {
+      refuse("A channel cannot show an ask_ui block. Ask in plain text instead.");
+      return;
+    }
+    this.#attention.surfaceUiBlock(client, request, { blockId, spec });
+  }
 
   #requireAgent(agentId: string): AgentSummary {
     const agent = this.#hooks.listAgents().find((candidate) => candidate.id === agentId);

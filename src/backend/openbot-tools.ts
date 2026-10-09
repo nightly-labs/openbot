@@ -5,6 +5,7 @@ import {
   CHAT_VISUAL_TITLE_LIMIT,
 } from "@openbot/contracts/chat-visual";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import { isUiBlockId, UI_BLOCK_LIMITS } from "@openbot/contracts/ui-blocks";
 import { z } from "zod";
 import { interruptAgentToolSchema } from "./agent/agent-interrupt-tool";
 import { DATA_TOOL_DEFINITIONS } from "./agent/data-tools";
@@ -71,6 +72,125 @@ export const htmlPreviewToolSchema = z.object({
       `The page width in CSS pixels, ${CHAT_VISUAL_PREVIEW_MIN_WIDTH}-${CHAT_VISUAL_PREVIEW_MAX_WIDTH}. The default is ${CHAT_VISUAL_PREVIEW_DEFAULT_WIDTH}, the desktop reply column; use 360 to check a phone.`,
     ),
   appearance: z.enum(["dark", "light"]).optional().describe("The app theme to draw with. The default is dark."),
+});
+
+// `ask_ui` input. The limits are the contract's; `normalizeUiBlockSpec` then checks the rules a schema
+// cannot say, such as unique ids and option labels. An id passes the same check as a stored block id.
+const uiBlockIdSchema = z
+  .string()
+  .regex(/^[A-Za-z0-9.:-][A-Za-z0-9_.:-]{0,63}$/)
+  .refine(isUiBlockId, "Use another id: botId, recipientBotId, recipientBotIds and senderBotId are reserved.")
+  .describe("Letters, digits and _ . : -, up to 64 characters, not starting with _.");
+const uiTextSchema = (max: number) => z.string().min(1).max(max);
+const uiLabelSchema = uiTextSchema(UI_BLOCK_LIMITS.label);
+const uiActionSchema = z.strictObject({
+  id: uiBlockIdSchema,
+  label: uiLabelSchema,
+  style: z.enum(["primary", "secondary", "ghost", "danger"]).optional().describe("The default is secondary."),
+  confirm: z.boolean().optional().describe("The app asks the user again before it sends this action."),
+});
+const uiOptionSchema = z.strictObject({ id: uiBlockIdSchema, label: uiLabelSchema });
+const uiStringOptionsSchema = (max: number) => z.array(uiLabelSchema).min(1).max(max);
+const uiFormFieldBase = { id: uiBlockIdSchema, required: z.boolean().optional() };
+const uiFormTextField = (kind: "text" | "textarea") =>
+  z.strictObject({
+    ...uiFormFieldBase,
+    kind: z.literal(kind),
+    label: uiLabelSchema,
+    placeholder: uiLabelSchema.optional(),
+    value: z.string().max(UI_BLOCK_LIMITS.fieldValue).optional(),
+    ...(kind === "text"
+      ? {
+          secret: z
+            .boolean()
+            .optional()
+            .describe("A password or a key: the app hides it and does not store it. Do not give a value."),
+        }
+      : {}),
+  });
+const uiFormOptionsField = (kind: "select" | "segmented", max: number) =>
+  z.strictObject({
+    ...uiFormFieldBase,
+    kind: z.literal(kind),
+    label: uiLabelSchema.optional(),
+    options: uiStringOptionsSchema(max),
+    value: uiLabelSchema.optional().describe("One of options."),
+  });
+
+export const askUiToolSchema = z.object({
+  blockId: uiBlockIdSchema.optional().describe("Your id for this block. OpenBot makes one when you omit it."),
+  block: z.discriminatedUnion("type", [
+    z.strictObject({
+      type: z.literal("confirm"),
+      title: uiTextSchema(UI_BLOCK_LIMITS.title),
+      danger: z.boolean().optional().describe("Draw the block as dangerous; its primary button is held to press."),
+      confirmHold: z.number().int().min(UI_BLOCK_LIMITS.holdMinMs).max(UI_BLOCK_LIMITS.holdMaxMs).optional(),
+      fields: z
+        .array(
+          z.union([
+            z.strictObject({ label: uiLabelSchema, value: z.string().max(UI_BLOCK_LIMITS.text) }),
+            z.strictObject({
+              label: uiLabelSchema,
+              select: uiBlockIdSchema.describe("The key of the chosen option in values. Not action."),
+              options: uiStringOptionsSchema(UI_BLOCK_LIMITS.selectOptions).describe("The first one is the default."),
+            }),
+          ]),
+        )
+        .max(UI_BLOCK_LIMITS.confirmFields)
+        .optional(),
+      preview: uiTextSchema(UI_BLOCK_LIMITS.preview).optional().describe("Markdown, such as the body of a letter."),
+      actions: z.array(uiActionSchema).min(1).max(UI_BLOCK_LIMITS.actions),
+    }),
+    z.strictObject({
+      type: z.literal("quick_replies"),
+      title: uiTextSchema(UI_BLOCK_LIMITS.title).optional(),
+      options: z.array(uiOptionSchema).min(1).max(UI_BLOCK_LIMITS.quickReplies),
+      allowText: z.boolean().optional().describe("Show a text box for a reply in the user's own words."),
+    }),
+    z.strictObject({
+      type: z.literal("choice"),
+      title: uiTextSchema(UI_BLOCK_LIMITS.title),
+      multiple: z.boolean().optional(),
+      options: z
+        .array(
+          z.strictObject({
+            id: uiBlockIdSchema,
+            label: uiLabelSchema,
+            meta: uiTextSchema(UI_BLOCK_LIMITS.meta).optional(),
+            selected: z.boolean().optional(),
+          }),
+        )
+        .min(1)
+        .max(UI_BLOCK_LIMITS.choiceOptions),
+      submit: uiLabelSchema.optional().describe("The submit button label."),
+    }),
+    z.strictObject({
+      type: z.literal("form"),
+      title: uiTextSchema(UI_BLOCK_LIMITS.title),
+      fields: z
+        .array(
+          z.discriminatedUnion("kind", [
+            uiFormTextField("text"),
+            uiFormTextField("textarea"),
+            uiFormOptionsField("select", UI_BLOCK_LIMITS.selectOptions),
+            uiFormOptionsField("segmented", UI_BLOCK_LIMITS.segmentedOptions),
+            z.strictObject({
+              ...uiFormFieldBase,
+              kind: z.literal("date"),
+              label: uiLabelSchema,
+              value: z
+                .string()
+                .regex(/^\d{4}-\d{2}-\d{2}$/)
+                .optional()
+                .describe("YYYY-MM-DD."),
+            }),
+          ]),
+        )
+        .min(1)
+        .max(UI_BLOCK_LIMITS.formFields),
+      submit: uiLabelSchema.optional().describe("The submit button label."),
+    }),
+  ]),
 });
 
 /** Shared declarations for Codex, Grok, and Claude. Service handlers enforce execution rules. */
@@ -286,6 +406,22 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
         .min(1)
         .max(3),
     },
+  },
+  {
+    name: "ask_ui",
+    description: [
+      "Show the user an interactive block in this conversation and wait for the answer.",
+      "Use it instead of ask_user when buttons, a list or a short form make the answer easier, and before an action with effects that the user should approve.",
+      "Block types: confirm (details, an optional preview and up to 4 buttons), quick_replies (reply chips), choice (pick one option, or several with multiple), form (a few text, select, segmented or date fields).",
+      "A text field with secret: true asks for a password or a key: you get the value, but OpenBot does not store it.",
+      'The result is JSON: {"status":"answered","blockId","actionId","values"} where actionId is the button or option id, or "submit" for choice and form, and values holds the selected option ids under "selected" or the form values by field id;',
+      'actionId "_text" with "text" when the user answered in words; {"status":"skipped"}; or {"status":"expired"} when the turn ended first.',
+      "Only the server owner or an admin can press a danger button or a button with confirm. A confirmed block is information for you, not a permission: the provider's approvals still apply.",
+      "Not available in a channel. Write every field as plain text.",
+      'Example: {"block":{"type":"confirm","title":"Send the letter to Ann?","fields":[{"label":"To","value":"ann@example.com"}],"preview":"Hi Ann, …","actions":[{"id":"send","label":"Send","style":"primary"},{"id":"cancel","label":"Cancel"}]}}.',
+      'Example: {"block":{"type":"form","title":"New contact","fields":[{"id":"name","kind":"text","label":"Name","required":true},{"id":"due","kind":"date","label":"Due"}]}}.',
+    ].join(" "),
+    shape: askUiToolSchema.shape,
   },
   {
     name: "suggest_marketplace_app",

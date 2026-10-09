@@ -8,12 +8,28 @@ import type {
   AgentRuntimeSnapshot,
   BrowserTab,
   BrowserTakeoverRequest,
+  ConversationMessageSender,
   RespondToApprovalInput,
   RespondToBrowserSecretInput,
   RespondToBrowserTakeoverInput,
   RespondToPromptInput,
 } from "@openbot/contracts/ipc";
 import { AGENT_RUNTIME_ATTENTION_LIMIT } from "@openbot/contracts/ipc";
+import {
+  type ConversationUiBlock,
+  normalizeConversationUiBlock,
+  UI_BLOCK_TEXT_ACTION_ID,
+  UI_BLOCK_VERSION,
+  type UiBlockResponse,
+  type UiBlockSpec,
+  type UiBlockState,
+  uiBlockActionIsPrivileged,
+  uiBlockFallbackQuestions,
+  uiBlockHasPrivilegedAction,
+  uiBlockOutcomeText,
+  uiBlockResponseFromAnswers,
+  validateUiBlockResponse,
+} from "@openbot/contracts/ui-blocks";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Deferred, Effect, Result, Schema } from "effect";
@@ -52,6 +68,7 @@ import {
   promptQuestions,
   promptResolution,
   questionPromptText,
+  uiBlockPromptResult,
   validPromptQuestions,
 } from "./prompts";
 import { compactRuntimeApproval, compactRuntimeQuestion } from "./runtime-snapshot";
@@ -62,13 +79,26 @@ const logger = createOpenBotLogger("attention-registry");
 interface PendingPrompt {
   client: AgentClient;
   id: RequestId;
-  responseKind: "dynamic-tool" | "mcp-elicitation" | "user-input";
+  responseKind: "dynamic-tool" | "mcp-elicitation" | "user-input" | "ui-block";
   params: unknown;
   agentId: string;
   publicThreadId: string;
   turnId: string;
   messageId: string;
+  /** For `ui-block`, the fallback questions of the block. */
   questions: AgentPromptQuestion[];
+  /** Set exactly when `responseKind` is `ui-block`. */
+  uiBlock?: { blockId: string; spec: UiBlockSpec };
+}
+
+/**
+ * Who answers a prompt. Absent means the person at this computer, who owns the server. A team member
+ * answers through the Team API, which knows their role.
+ */
+export interface PromptResponder {
+  sender?: ConversationMessageSender;
+  /** The server owner or an admin. Only they may take a privileged UI block action. */
+  privileged: boolean;
 }
 
 interface PendingApproval {
@@ -225,36 +255,52 @@ export class AttentionRegistry {
     return { attentionComplete, pendingPrompts, pendingApprovals, pendingBrowserTakeovers };
   }
 
-  readonly respondToPrompt = Effect.fn("AttentionRegistry.respondToPrompt")((input: RespondToPromptInput) =>
-    attentionStep(() => {
-      const pending = this.#prompts.get(input.requestId);
-      if (!pending) throw new Error(sourceText("error.backend.promptInactive"));
-      const questionIds = new Set(pending.questions.map((question) => question.id));
-      if (Object.keys(input.answers).some((id) => !questionIds.has(id))) {
-        throw new Error(sourceText("error.backend.promptAnswerMismatch"));
-      }
-      this.#routines.markRunningForTurn(getString(pending.params, "turnId"));
+  readonly respondToPrompt = Effect.fn("AttentionRegistry.respondToPrompt")(
+    (input: RespondToPromptInput, responder?: PromptResponder) =>
+      attentionStep(() => {
+        const pending = this.#prompts.get(input.requestId);
+        if (!pending) throw new Error(sourceText("error.backend.promptInactive"));
+        const questionIds = new Set(pending.questions.map((question) => question.id));
+        if (Object.keys(input.answers).some((id) => !questionIds.has(id))) {
+          throw new Error(sourceText("error.backend.promptAnswerMismatch"));
+        }
+        // A refused UI block answer leaves the block open for an answer that fits.
+        const uiBlockResponse = pending.uiBlock ? uiBlockAnswer(pending.uiBlock.spec, input.answers, responder) : null;
+        this.#routines.markRunningForTurn(getString(pending.params, "turnId"));
 
-      const result =
-        pending.responseKind === "dynamic-tool"
-          ? dynamicPromptResult(input.answers)
-          : pending.responseKind === "mcp-elicitation"
-            ? mcpElicitationResult(pending.params, input.answers)
-            : {
-                answers: Object.fromEntries(
-                  Object.entries(input.answers).map(([id, values]) => [id, { answers: values }]),
-                ),
-              };
-      pending.client.respond(pending.id, result);
-      this.#prompts.delete(input.requestId);
-      this.#emitInputResolved("prompt", input.requestId, pending.agentId);
-      try {
-        this.#resolvePersistedPrompt(pending, promptResolution(pending.questions, input.answers));
-      } catch (error) {
-        this.#emitError("prompt_persistence_failed", error, pending.agentId);
-      }
-      this.#emitRuntimeSnapshot();
-    }),
+        const result = pending.uiBlock
+          ? uiBlockPromptResult(
+              uiBlockResponse
+                ? { status: "answered", blockId: pending.uiBlock.blockId, response: uiBlockResponse }
+                : { status: "skipped", blockId: pending.uiBlock.blockId },
+            )
+          : pending.responseKind === "dynamic-tool"
+            ? dynamicPromptResult(input.answers)
+            : pending.responseKind === "mcp-elicitation"
+              ? mcpElicitationResult(pending.params, input.answers)
+              : {
+                  answers: Object.fromEntries(
+                    Object.entries(input.answers).map(([id, values]) => [id, { answers: values }]),
+                  ),
+                };
+        pending.client.respond(pending.id, result);
+        this.#prompts.delete(input.requestId);
+        this.#emitInputResolved("prompt", input.requestId, pending.agentId);
+        try {
+          if (pending.uiBlock) {
+            this.#resolvePersistedPrompt(
+              pending,
+              uiBlockResponse ? promptResolution(pending.questions, input.answers) : { status: "cancelled" },
+              answeredUiBlockState(pending.uiBlock.spec, uiBlockResponse, responder),
+            );
+          } else {
+            this.#resolvePersistedPrompt(pending, promptResolution(pending.questions, input.answers));
+          }
+        } catch (error) {
+          this.#emitError("prompt_persistence_failed", error, pending.agentId);
+        }
+        this.#emitRuntimeSnapshot();
+      }),
   ).bind(this);
 
   readonly respondToApproval = Effect.fn("AttentionRegistry.respondToApproval")(function* (
@@ -662,6 +708,56 @@ export class AttentionRegistry {
     });
   }
 
+  /**
+   * Shows an `ask_ui` block and waits for its answer. The block is a question prompt: its fallback
+   * questions let a client that does not know `uiBlock` answer it through `respondToPrompt`. The
+   * caller has checked the spec and refused a channel.
+   */
+  surfaceUiBlock(client: AgentClient, request: AppServerRequest, block: { blockId: string; spec: UiBlockSpec }): void {
+    const threadId = getString(request.params, "threadId");
+    const turnId = getString(request.params, "turnId");
+    const agentId = threadId ? this.#conversation.agentForThread(threadId) : undefined;
+    const publicThreadId = threadId && agentId ? this.#conversation.publicThreadId(agentId, threadId) : null;
+    const questions = uiBlockFallbackQuestions(block.spec);
+    // Store only what the contract reads back: a block it refuses would make the whole page unreadable.
+    const uiBlock = normalizeConversationUiBlock({
+      version: UI_BLOCK_VERSION,
+      blockId: block.blockId,
+      spec: block.spec,
+      state: { status: "pending" },
+    });
+    if (!threadId || !turnId || !agentId || !publicThreadId || !uiBlock || !validPromptQuestions(questions)) {
+      client.respond(request.id, {
+        success: false,
+        contentItems: [{ type: "inputText", text: "OpenBot could not show this block." }],
+      });
+      return;
+    }
+
+    const messageId = this.#persistQuestionPrompt(agentId, publicThreadId, turnId, request.id, questions, uiBlock);
+    this.#prompts.set(request.id, {
+      client,
+      id: request.id,
+      responseKind: "ui-block",
+      params: request.params,
+      agentId,
+      publicThreadId,
+      turnId,
+      messageId,
+      questions,
+      uiBlock: block,
+    });
+    this.#routines.markNeedsAttention(turnId);
+    this.#emit({
+      type: "prompt",
+      requestId: request.id,
+      agentId,
+      threadId: publicThreadId,
+      turnId,
+      questions,
+    });
+  }
+
   surfacePrompt(client: AgentClient, request: AppServerRequest): void {
     const threadId = getString(request.params, "threadId");
     const turnId = getString(request.params, "turnId");
@@ -815,13 +911,18 @@ export class AttentionRegistry {
     this.#emitInputResolved("prompt", requestId, pending.agentId);
     if (pending.client.running) {
       try {
-        pending.client.respond(pending.id, expiredPromptResult(pending.responseKind));
+        pending.client.respond(
+          pending.id,
+          pending.uiBlock
+            ? uiBlockPromptResult({ status: "expired", blockId: pending.uiBlock.blockId })
+            : expiredPromptResult(pending.responseKind === "ui-block" ? "dynamic-tool" : pending.responseKind),
+        );
       } catch (error) {
         logger.warn("Unable to answer an expired prompt", { error: toLogValue(error) });
       }
     }
     try {
-      this.#resolvePersistedPrompt(pending, { status: "expired" });
+      this.#resolvePersistedPrompt(pending, { status: "expired" }, { status: "expired" });
     } catch (error) {
       this.#emitError("prompt_persistence_failed", error, pending.agentId);
     }
@@ -952,6 +1053,7 @@ export class AttentionRegistry {
     turnId: string,
     requestId: RequestId,
     questions: AgentPromptQuestion[],
+    uiBlock?: ConversationUiBlock,
   ): string {
     const snapshot = this.#conversation.ensureSnapshot(agentId, publicThreadId);
     const messageId = `question-prompt:${turnId}:${String(requestId)}`;
@@ -971,24 +1073,78 @@ export class AttentionRegistry {
           questions: structuredClone(questions),
           resolution: null,
         },
+        ...(uiBlock ? { uiBlock } : {}),
       });
       this.#conversation.emitConversation(snapshot, "prompt.requested", { turnId, requestId });
     }
     return messageId;
   }
 
-  #resolvePersistedPrompt(pending: PendingPrompt, resolution: AgentPromptResolution): void {
+  /** `uiBlockState` freezes the message's UI block, when it has one, in the same write. */
+  #resolvePersistedPrompt(
+    pending: PendingPrompt,
+    resolution: AgentPromptResolution,
+    uiBlockState?: UiBlockState,
+  ): void {
     const snapshot = this.#conversation.ensureSnapshot(pending.agentId, pending.publicThreadId);
     const message = snapshot.messages.find((candidate) => candidate.id === pending.messageId);
     if (!message?.questionPrompt || message.questionPrompt.resolution !== null) return;
     message.questionPrompt.resolution = structuredClone(resolution);
     message.text = questionPromptText(message.questionPrompt.questions, resolution);
+    if (message.uiBlock && uiBlockState) {
+      // The read drops a secret form value; storing the read result keeps it out of the database.
+      const frozen = normalizeConversationUiBlock({ ...message.uiBlock, state: uiBlockState });
+      message.uiBlock.state = frozen?.state ?? {
+        status: uiBlockState.status === "answered" ? "closed" : uiBlockState.status,
+      };
+    }
     this.#conversation.emitConversation(snapshot, "prompt.resolved", {
       turnId: pending.turnId,
       requestId: pending.id,
       status: resolution.status,
     });
   }
+}
+
+/**
+ * The response the answers give, or null when the person skipped the block. The answers come keyed by
+ * the fallback questions, from a client that knows the block (`uiBlockAnswersFromResponse`) or from one
+ * that only showed the questions. Throws when the answer does not fit, or when a member who is not the
+ * owner or an admin takes a privileged action.
+ */
+function uiBlockAnswer(
+  spec: UiBlockSpec,
+  answers: Readonly<Record<string, readonly string[]>>,
+  responder: PromptResponder | undefined,
+): UiBlockResponse | null {
+  const read = uiBlockResponseFromAnswers(spec, answers);
+  if (!read) return null;
+  const response = validateUiBlockResponse(spec, read);
+  if (!response) throw new Error(sourceText("error.backend.uiBlockAnswerInvalid"));
+  // On a block with a privileged action an answer in words is privileged too: a member could
+  // otherwise write "yes" to an action they may not press.
+  const privileged =
+    response.actionId === UI_BLOCK_TEXT_ACTION_ID
+      ? uiBlockHasPrivilegedAction(spec)
+      : uiBlockActionIsPrivileged(spec, response.actionId);
+  if (responder && !responder.privileged && privileged) {
+    throw new Error(sourceText("error.backend.uiBlockActionNotAllowed"));
+  }
+  return response;
+}
+
+function answeredUiBlockState(
+  spec: UiBlockSpec,
+  response: UiBlockResponse | null,
+  responder: PromptResponder | undefined,
+): UiBlockState {
+  const state: UiBlockState = response ? { status: "answered", response } : { status: "closed" };
+  // The contract refuses a blank outcome, such as a form sent with every optional field empty.
+  const outcome = response ? uiBlockOutcomeText(spec, response) : "";
+  if (outcome.trim()) state.outcome = outcome;
+  if (responder?.sender) state.respondedBy = structuredClone(responder.sender);
+  state.respondedAt = new Date().toISOString();
+  return state;
 }
 
 class AttentionOperationFailed extends Schema.TaggedError<AttentionOperationFailed>()("AttentionOperationFailed", {

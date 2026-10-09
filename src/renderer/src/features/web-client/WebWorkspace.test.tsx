@@ -1,11 +1,21 @@
-import type { AttachmentImportEvent, AttachmentSummary, ConversationPage } from "@openbot/contracts/ipc";
+import type {
+  AttachmentImportEvent,
+  AttachmentSummary,
+  ConversationMessage,
+  ConversationPage,
+} from "@openbot/contracts/ipc";
+import {
+  decodeTeamProtocolV6WebRtcHttpResponse,
+  encodeTeamProtocolV6WebRtcHttpResponse,
+} from "@openbot/contracts/team-protocol/v6-webrtc-adapter";
 import { render, waitFor } from "@solidjs/testing-library";
-import { flush } from "solid-js";
+import { createRoot, flush } from "solid-js";
 import { assert, beforeEach, describe, expect, it, vi } from "vitest";
 import { STORY_AGENT_SUMMARIES } from "../../preview/fixtures";
 import { createWebWorkspace } from "./web-client-context";
 import { createWebConversationRuntime } from "./web-conversation-runtime";
-import type { WebRuntimeEvents, WebWorkspaceRuntime } from "./web-runtime";
+import { createWebConversationView } from "./web-conversation-view";
+import { decodeWebConversationPage, type WebRuntimeEvents, type WebWorkspaceRuntime } from "./web-runtime";
 
 const page: ConversationPage = {
   agentId: "chief",
@@ -343,6 +353,128 @@ describe("web workspace state", () => {
     expect(app.runtime.send).toHaveBeenCalledWith("chief", "Hello teammate", [], null, "client-1");
     app.unmount();
     expect(app.runtime.dispose).toHaveBeenCalledOnce();
+  });
+  it("keeps the ui block a host sends on the message model, over the WebRTC codec", async () => {
+    const uiBlock = {
+      version: 1 as const,
+      blockId: "letter",
+      spec: {
+        type: "confirm" as const,
+        title: "Send the letter?",
+        actions: [{ id: "send", label: "Send", style: "primary" as const }],
+      },
+      state: { status: "pending" as const },
+    };
+    const question: ConversationMessage = {
+      id: "question-prompt:turn:request",
+      turnId: "turn",
+      author: "assistant",
+      text: "Send the letter?",
+      createdAt: "2026-10-08T10:00:00.000Z",
+      status: "completed",
+      itemType: "question_prompt",
+      questionPrompt: {
+        requestId: "request",
+        questions: [
+          {
+            id: "action",
+            header: "Send the letter?",
+            question: "Send the letter?",
+            isSecret: false,
+            options: [{ label: "Send", description: "" }],
+          },
+        ],
+        resolution: null,
+      },
+      uiBlock,
+    };
+    const reference: ConversationMessage = {
+      id: "question-prompt:turn-0:request-0",
+      author: "assistant",
+      text: "Which report?",
+      createdAt: "2026-10-01T10:00:00.000Z",
+      status: "completed",
+      itemType: "question_prompt",
+      questionPrompt: {
+        requestId: "request-0",
+        questions: [
+          {
+            id: "reply",
+            header: "Which report?",
+            question: "Which report?",
+            isSecret: false,
+            options: [{ label: "Weekly", description: "" }],
+          },
+        ],
+        resolution: { status: "cancelled" },
+      },
+      uiBlock: {
+        version: 1,
+        blockId: "report",
+        spec: { type: "quick_replies", title: "Which report?", options: [{ id: "weekly", label: "Weekly" }] },
+        state: { status: "closed" },
+      },
+    };
+    const reply: ConversationMessage = {
+      id: "reply",
+      author: "user",
+      text: "And the report?",
+      createdAt: "2026-10-08T10:01:00.000Z",
+      status: "completed",
+      replyToMessageId: reference.id,
+    };
+    const hostPage = {
+      ...page,
+      messages: [question, reply],
+      references: { [reference.id]: reference },
+      readState: { unreadCount: 0, firstUnreadMessageId: null, throughMessageId: null },
+    };
+    // What the browser receives: the host's page through the v6 WebRTC codec and the web decoder.
+    const path = "/v1/agents/chief/conversation-page?limit=50";
+    const received = decodeWebConversationPage(
+      decodeTeamProtocolV6WebRtcHttpResponse(
+        "GET",
+        path,
+        200,
+        encodeTeamProtocolV6WebRtcHttpResponse("GET", path, 200, hostPage),
+      ),
+    );
+    const app = harness({ conversation: vi.fn().mockResolvedValue(received) });
+    await waitFor(() => expect(app.workspace().conversation()?.page?.messages).toHaveLength(2));
+    const workspace = app.workspace();
+    const { view, dispose } = createRoot((dispose) => ({
+      view: createWebConversationView({
+        workspace,
+        remoteAgentAdmin: { settings: () => null, update: vi.fn() },
+        hidden: () => false,
+      }),
+      dispose,
+    }));
+    expect(view.messages().find((message) => message.id === question.id)?.uiBlock).toEqual(uiBlock);
+    expect(view.messages().find((message) => message.id === reply.id)).not.toHaveProperty("uiBlock");
+    expect(view.messageReferences()[reference.id]?.uiBlock).toEqual(reference.uiBlock);
+    expect(view.promptUiBlock()).toBeUndefined();
+
+    // The waiting prompt finds its block, so the conversation draws it as a card.
+    app.events().event("host", {
+      type: "prompt",
+      agentId: "chief",
+      threadId: "thread-chief",
+      turnId: "turn",
+      requestId: "request",
+      questions: question.questionPrompt?.questions ?? [],
+    });
+    await waitFor(() => expect(view.promptUiBlock()).toEqual(uiBlock));
+
+    // A card that shows a refused answer itself gets the error instead of a throw.
+    const refusal = new Error("Only the server owner or an admin can choose this action.");
+    vi.mocked(app.runtime.answer).mockRejectedValueOnce(refusal);
+    const onError = vi.fn();
+    expect(await view.answerPrompt({ action: ["Send"] }, { onError })).toBe(false);
+    expect(onError).toHaveBeenCalledWith(refusal);
+    expect(app.runtime.answer).toHaveBeenCalledWith({ requestId: "request", answers: { action: ["Send"] } });
+    expect(view.prompt()?.requestId).toBe("request");
+    dispose();
   });
   it("removes questions expired in authoritative history without an input-resolved event", async () => {
     const app = harness();

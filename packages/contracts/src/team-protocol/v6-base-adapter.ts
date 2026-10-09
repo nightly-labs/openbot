@@ -5,6 +5,7 @@ import { isBoolean, isDynamicRecord, isNumber, isString } from "../runtime-value
 import { restoreBrowserSecretMetadata } from "./browser-secret-v1";
 import { eventConversationKey, withConversationPlans } from "./conversation-plan-v4";
 import { withConversationSenders } from "./conversation-sender-v5";
+import { withConversationUiBlocks } from "./conversation-ui-block-v6";
 import {
   toCurrentAgentKeys,
   toCurrentAgentKeysObjectForPath,
@@ -72,8 +73,8 @@ export function encodeTeamProtocolV6BaseCurrentEvent(
 }
 
 /**
- * Puts the plans and the senders of a conversation event beside its frozen projection. See
- * `withConversationPlans` and `withConversationSenders`.
+ * Puts the plans, the senders and the ui blocks of a conversation event beside its frozen
+ * projection. See `withConversationPlans`, `withConversationSenders` and `withConversationUiBlocks`.
  */
 function withEventConversationPlans(
   projected: TeamProtocolV6BaseJsonValue,
@@ -86,7 +87,10 @@ function withEventConversationPlans(
   if (!key || conversation === undefined) return projected;
   return {
     ...projected,
-    [key]: withConversationSenders(withConversationPlans(conversation, source[key]), source[key]),
+    [key]: withConversationUiBlocks(
+      withConversationSenders(withConversationPlans(conversation, source[key]), source[key]),
+      source[key],
+    ),
   };
 }
 

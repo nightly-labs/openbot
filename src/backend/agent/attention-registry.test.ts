@@ -704,6 +704,64 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     );
     persistenceFailure.mockRestore();
   });
+  it("closes a skipped ask_ui block and keeps it open for an answer to another question", async () => {
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    const { store, mailbox } = stores(root);
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        clients.set(provider, client);
+        return client;
+      },
+    });
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Show me a block" }));
+    await waitFor(() => events.some((event) => event.type === "turn-started"));
+
+    const client = clients.get("codex");
+    const threadId = store.activeProviderSession("chief")?.externalSessionId;
+    const turnId = events.find((event) => event.type === "turn-started")?.turnId;
+    if (!client || !threadId || !turnId) throw new Error("Turn did not start.");
+    client.emit("request", {
+      method: "item/tool/call",
+      id: "block-call",
+      params: {
+        threadId,
+        turnId,
+        callId: "block-call",
+        namespace: "openbot",
+        tool: "ask_ui",
+        arguments: {
+          blockId: "pick",
+          block: { type: "choice", title: "Pick one", options: [{ id: "a", label: "Alpha" }] },
+        },
+      },
+    });
+    await waitFor(() => events.some((event) => event.type === "prompt"));
+    expect(service.getRuntimeSnapshot().pendingPrompts).toEqual([
+      expect.objectContaining({ requestId: "block-call", questions: [expect.objectContaining({ id: "choice" })] }),
+    ]);
+
+    await expect(
+      runCauseEffect(service.respondToPrompt({ requestId: "block-call", answers: { other: ["Alpha"] } })),
+    ).rejects.toThrow("A prompt answer does not match an active question.");
+    expect(client.responses).toHaveLength(0);
+
+    await runCauseEffect(service.respondToPrompt({ requestId: "block-call", answers: {} }));
+    expect(client.responses).toHaveLength(1);
+    expect(openBotToolPayload(client.responses[0]?.result)).toEqual({ status: "skipped", blockId: "pick" });
+    const message = (await runCauseEffect(service.readConversation("chief"))).messages.find(
+      (candidate) => candidate.questionPrompt?.requestId === "block-call",
+    );
+    expect(message?.questionPrompt?.resolution).toEqual({ status: "cancelled" });
+    expect(message?.uiBlock?.state).toEqual({ status: "closed", respondedAt: expect.any(String) });
+  });
+
   it("pauses a browser tool call until the user resolves the takeover", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const tabs: BrowserTab[] = [];

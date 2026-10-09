@@ -28,5 +28,6 @@
 @import "./styles/notices.css";
 @import "./styles/interaction-cards.css";
 @import "./styles/browser-takeover.css";
+@import "./styles/ui-blocks.css";
 @import "./styles/surface-overrides.css";
 @import "./styles/browser-previews.css";

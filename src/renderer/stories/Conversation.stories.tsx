@@ -1,5 +1,11 @@
 import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
 import type { AgentEvent, AttachmentSummary, DraftAttachment, QueueSnapshot } from "@openbot/contracts/ipc";
+import {
+  type ConversationUiBlock,
+  type UiChoiceBlock,
+  type UiConfirmBlock,
+  uiBlockFallbackQuestions,
+} from "@openbot/contracts/ui-blocks";
 import type { AgentMessage as RendererAgentMessage, RoutineRunMarkerModel } from "@openbot/ui/data";
 import { BrowserTakeoverCard } from "@openbot/ui/features/conversation/ConversationPrompts";
 import { Portal } from "@solidjs/web";
@@ -745,6 +751,87 @@ const promptChatMessages: RendererAgentMessage[] = [
   },
 ];
 
+const uiBlockLetter: UiConfirmBlock = {
+  type: "confirm",
+  title: "Send the letter to the board?",
+  danger: true,
+  fields: [
+    { label: "To", value: "board@example.com" },
+    { label: "From", select: "from", options: ["me@example.com", "team@example.com"] },
+  ],
+  preview: "Hello,\n\nThe **heating** is off in block B since Monday. Could you send someone?",
+  actions: [
+    { id: "send", label: "Send", style: "primary" },
+    { id: "cancel", label: "Do not send", style: "ghost" },
+  ],
+};
+
+const uiBlockAudience: UiChoiceBlock = {
+  type: "choice",
+  title: "Who gets the offer?",
+  options: [
+    { id: "active", label: "Active customers", meta: "1 284" },
+    { id: "sleeping", label: "Sleeping customers", meta: "3 102" },
+  ],
+};
+
+const uiBlockPendingLetter: ConversationUiBlock = {
+  version: 1,
+  blockId: "letter",
+  spec: uiBlockLetter,
+  state: { status: "pending" },
+};
+
+const uiBlockPrompt: Extract<AgentEvent, { type: "prompt" }> = {
+  type: "prompt",
+  requestId: "ui-block-letter",
+  agentId: "chief",
+  threadId: "thread-chief",
+  turnId: "turn-ui-block",
+  questions: uiBlockFallbackQuestions(uiBlockLetter),
+};
+
+const uiBlockChatMessages: RendererAgentMessage[] = [
+  {
+    id: "ui-block-chat-user",
+    author: "you",
+    body: "Write to the board about the heating, and pick who gets the spring offer.",
+    time: "10:00",
+    kind: "text",
+  },
+  {
+    id: "question-prompt:turn-ui-block-earlier:ui-block-audience",
+    turnId: "turn-ui-block-earlier",
+    author: "agent",
+    body: "",
+    time: "10:01",
+    kind: "question",
+    itemType: "question_prompt",
+    questionPrompt: {
+      requestId: "ui-block-audience",
+      questions: uiBlockFallbackQuestions(uiBlockAudience),
+      resolution: { status: "answered", responses: {} },
+    },
+    uiBlock: {
+      version: 1,
+      blockId: "audience",
+      spec: uiBlockAudience,
+      state: {
+        status: "answered",
+        response: { actionId: "submit", values: { selected: ["sleeping"] } },
+        outcome: "Sleeping customers",
+      },
+    },
+  },
+  {
+    id: "ui-block-chat-agent",
+    author: "agent",
+    body: "The offer goes to sleeping customers. Here is the letter for the board.",
+    time: "10:02",
+    kind: "text",
+  },
+];
+
 type QueueDeliveryFixture = QueueSnapshot["deliveries"][number];
 
 const queuedDelivery: QueueDeliveryFixture = {
@@ -1342,6 +1429,15 @@ export const PromptQuestionsInChat: Story = {
   args: {
     messages: promptChatMessages,
     prompt: promptQuestions,
+  },
+};
+
+export const UiBlocksInChat: Story = {
+  name: "Agent UI blocks in chat",
+  args: {
+    messages: uiBlockChatMessages,
+    prompt: uiBlockPrompt,
+    promptUiBlock: uiBlockPendingLetter,
   },
 };
 

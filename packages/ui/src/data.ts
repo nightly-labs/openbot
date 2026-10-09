@@ -20,6 +20,7 @@ import type {
   RoutineRunConversationEvent,
   SkillConversationEvent,
 } from "@openbot/contracts/ipc";
+import type { ConversationUiBlock } from "@openbot/contracts/ui-blocks";
 
 /**
  * `error` is a message the renderer wrote itself, not one the provider sent: an action of the
@@ -162,6 +163,8 @@ export interface AgentMessage {
   attachments?: AttachmentSummary[];
   imageGeneration?: ImageGenerationInfo;
   questionPrompt?: ConversationQuestionPrompt;
+  /** The interactive block an agent drew. A blocking block sits beside `questionPrompt`. */
+  uiBlock?: ConversationUiBlock;
   citations?: MessageCitation[];
   exchange?: AgentExchangeSummary;
   reaction?: MessageReaction | null;

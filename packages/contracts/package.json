@@ -49,6 +49,7 @@
     "./slack-app": "./src/slack-app.ts",
     "./slack-workspace-grant": "./src/slack-workspace-grant.ts",
     "./team-api-routes": "./src/team-api-routes.ts",
+    "./ui-blocks": "./src/ui-blocks.ts",
     "./team-protocol": "./src/team-protocol/index.ts",
     "./team-protocol/queue-edit-v1": "./src/team-protocol/queue-edit-v1.ts",
     "./team-protocol/browser-view-v1": "./src/team-protocol/browser-view-v1.ts",

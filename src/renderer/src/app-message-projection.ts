@@ -72,6 +72,7 @@ export function toAgentMessage(message: ConversationMessage, ownerAgentId?: stri
     attachments: message.attachments,
     imageGeneration: message.imageGeneration,
     questionPrompt: message.questionPrompt,
+    ...(message.uiBlock ? { uiBlock: message.uiBlock } : {}),
     exchange: message.exchange,
     reaction: message.reaction,
     reactions:

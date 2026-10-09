@@ -1,14 +1,28 @@
 import { describe, expect, it } from "vitest";
 import { isAgentEvent } from "../ipc-agent-events";
 import { isAgentSummary } from "../ipc-agents";
+import { type ConversationMessage, isConversationMessage } from "../ipc-conversation-messages";
+import {
+  type ConversationPage,
+  type ConversationWithReadState,
+  isConversationWithReadState,
+} from "../ipc-conversations";
+import { isDynamicRecord } from "../runtime-values";
+import { withConversationPlans } from "./conversation-plan-v4";
+import { withConversationSenders } from "./conversation-sender-v5";
 import request from "./fixtures/v6/client-http-request.json";
+import conversationPageWire from "./fixtures/v6/host-conversation-page-response.json";
 import response from "./fixtures/v6/host-http-response.json";
 import models from "./fixtures/v6/host-models-response.json";
 import quietTurnWire from "./fixtures/v6/host-quiet-turn-completed-event.json";
 import status from "./fixtures/v6/host-status-response.json";
-import { encodeTeamProtocolV1CurrentEvent } from "./v1-adapter";
+import { encodeTeamProtocolV1CurrentEvent, encodeTeamProtocolV1CurrentHttpResponse } from "./v1-adapter";
 import { encodeTeamProtocolV4BaseCurrentEvent } from "./v4-base-adapter";
-import { decodeTeamProtocolV5CurrentHttpRequest, decodeTeamProtocolV5CurrentHttpResponse } from "./v5-adapter";
+import {
+  decodeTeamProtocolV5CurrentHttpRequest,
+  decodeTeamProtocolV5CurrentHttpResponse,
+  encodeTeamProtocolV5CurrentHttpResponse,
+} from "./v5-adapter";
 import { encodeTeamProtocolV5BaseCurrentEvent } from "./v5-base-adapter";
 import {
   decodeTeamProtocolV6CurrentHttpRequest,
@@ -17,7 +31,11 @@ import {
   encodeTeamProtocolV6CurrentHttpResponse,
 } from "./v6-adapter";
 import { decodeTeamProtocolV6BaseEvent } from "./v6-base";
-import { decodeTeamProtocolV6BaseCurrentEvent, encodeTeamProtocolV6BaseCurrentEvent } from "./v6-base-adapter";
+import {
+  decodeTeamProtocolV6BaseCurrentEvent,
+  decodeTeamProtocolV6BaseCurrentHttpResponse,
+  encodeTeamProtocolV6BaseCurrentEvent,
+} from "./v6-base-adapter";
 import {
   createTeamProtocolV6Event,
   decodeTeamProtocolV6CurrentEvent,
@@ -87,6 +105,167 @@ describe("Team protocol v6", () => {
     });
   });
 
+  describe("conversation ui blocks", () => {
+    const pagePath = "/v1/agents/chief/conversation-page?limit=50";
+    const snapshotPath = "/v1/agents/chief/conversation";
+    // The fixture is what a host writes: the wire names an agent `botId`.
+    const page = readPage(decodeTeamProtocolV6CurrentHttpResponse("GET", pagePath, 200, conversationPageWire));
+    const { references: _references, pageInfo: _pageInfo, ...snapshot } = page;
+    const blockOf = (value: unknown, id: string) => {
+      if (!isDynamicRecord(value) || !Array.isArray(value.messages)) return undefined;
+      const message = value.messages.find((item) => isDynamicRecord(item) && item.id === id);
+      return isDynamicRecord(message) ? message.uiBlock : undefined;
+    };
+
+    it("carries a block over HTTP, WebRTC and conversation events", () => {
+      expect(page.messages.map((message) => message.uiBlock?.blockId)).toEqual(["letter", "week", undefined]);
+      expect(page.references["question-prompt:turn-0:request-0"]?.uiBlock?.blockId).toBe("weekly");
+      const wire = JSON.parse(encodeTeamProtocolV6CurrentHttpResponse("GET", pagePath, 200, page));
+      expect(wire).toEqual(conversationPageWire);
+      expect(decodeTeamProtocolV6CurrentHttpResponse("GET", pagePath, 200, wire)).toEqual(page);
+      const snapshotWire = JSON.parse(encodeTeamProtocolV6CurrentHttpResponse("GET", snapshotPath, 200, snapshot));
+      expect(decodeTeamProtocolV6CurrentHttpResponse("GET", snapshotPath, 200, snapshotWire)).toEqual(snapshot);
+      const overWebRtc = encodeTeamProtocolV6WebRtcHttpResponse("GET", pagePath, 200, page);
+      expect(decodeTeamProtocolV6WebRtcHttpResponse("GET", pagePath, 200, overWebRtc)).toEqual(page);
+
+      // A block that changes, such as an answered block, reaches a client as a conversation event.
+      // Events carry no read state.
+      const { readState: _readState, ...eventSnapshot } = snapshot;
+      const { readState: _pageReadState, ...eventPage } = page;
+      for (const event of [
+        { type: "conversation" as const, snapshot: eventSnapshot },
+        { type: "conversation-page" as const, page: eventPage },
+      ]) {
+        const eventWire = JSON.parse(encodeTeamProtocolV6BaseCurrentEvent(event) ?? "null");
+        expect(decodeTeamProtocolV6BaseCurrentEvent(eventWire)).toEqual({ kind: "known", event });
+        expect(decodeTeamProtocolV6CurrentEvent(createTeamProtocolV6Event(1, eventWire))).toEqual({
+          status: "known",
+          event,
+        });
+      }
+    });
+
+    it("leaves the block out for a client that does not know it, without an error", () => {
+      const wire = conversationPageWire;
+      // The v6 decoder 0.33.0 shipped: the frozen projection with plans and senders beside it.
+      const shipped = withConversationSenders(
+        withConversationPlans(decodeTeamProtocolV6BaseCurrentHttpResponse("GET", pagePath, 200, wire), wire),
+        wire,
+      );
+      expect(JSON.stringify(shipped)).not.toContain("uiBlock");
+      // It still reads the fallback: a question it can answer, and its answer.
+      expect(shipped).toMatchObject({
+        messages: [
+          { itemType: "question_prompt", questionPrompt: page.messages[0]?.questionPrompt },
+          { itemType: "question_prompt", questionPrompt: page.messages[1]?.questionPrompt },
+          { text: page.messages[2]?.text },
+        ],
+      });
+      // A host serving an older protocol keeps its frozen key lists.
+      expect(encodeTeamProtocolV5CurrentHttpResponse("GET", pagePath, 200, page)).not.toContain("uiBlock");
+      expect(JSON.stringify(decodeTeamProtocolV5CurrentHttpResponse("GET", pagePath, 200, wire))).not.toContain(
+        "uiBlock",
+      );
+      expect(encodeTeamProtocolV1CurrentHttpResponse("GET", snapshotPath, 200, snapshot)).not.toContain("uiBlock");
+    });
+
+    it("fails closed on a malformed block, in both directions and on the event stream", () => {
+      const [prompt, ...rest] = page.messages;
+      if (!prompt) throw new Error("Invalid v6 conversation fixture.");
+      const malformed = {
+        ...page,
+        messages: [{ ...prompt, uiBlock: { ...prompt.uiBlock, spec: { type: "confirm" } } }, ...rest],
+      };
+      expect(() => encodeTeamProtocolV6CurrentHttpResponse("GET", pagePath, 200, malformed)).toThrow(
+        "Invalid conversation UI block.",
+      );
+
+      const [wirePrompt, ...wireRest] = conversationPageWire.messages;
+      const malformedWire = {
+        ...conversationPageWire,
+        messages: [{ ...wirePrompt, uiBlock: { ...wirePrompt?.uiBlock, spec: { type: "confirm" } } }, ...wireRest],
+      };
+      expect(() => decodeTeamProtocolV6CurrentHttpResponse("GET", pagePath, 200, malformedWire)).toThrow(
+        "Invalid conversation UI block.",
+      );
+      expect(() => decodeTeamProtocolV6WebRtcHttpResponse("GET", pagePath, 200, malformedWire)).toThrow(
+        "Invalid conversation UI block.",
+      );
+      // A block id that the legacy read renames is malformed too.
+      const legacyId = {
+        ...conversationPageWire,
+        messages: [{ ...wirePrompt, uiBlock: { ...wirePrompt?.uiBlock, blockId: "botId" } }, ...wireRest],
+      };
+      expect(() => decodeTeamProtocolV6CurrentHttpResponse("GET", pagePath, 200, legacyId)).toThrow(
+        "Invalid conversation UI block.",
+      );
+
+      const badReference = {
+        ...conversationPageWire,
+        references: {
+          "question-prompt:turn-0:request-0": {
+            ...conversationPageWire.references["question-prompt:turn-0:request-0"],
+            uiBlock: { version: 2 },
+          },
+        },
+      };
+      expect(() => decodeTeamProtocolV6CurrentHttpResponse("GET", pagePath, 200, badReference)).toThrow(
+        "Invalid conversation UI block.",
+      );
+
+      const { readState: _readState, ...eventSnapshot } = snapshot;
+      const eventWire = JSON.parse(
+        encodeTeamProtocolV6BaseCurrentEvent({ type: "conversation", snapshot: eventSnapshot }) ?? "null",
+      );
+      const malformedEvent = { ...eventWire, snapshot: { ...eventWire.snapshot, messages: malformedWire.messages } };
+      expect(decodeTeamProtocolV6BaseCurrentEvent(malformedEvent)).toEqual({ kind: "invalid", type: "conversation" });
+      expect(() => createTeamProtocolV6Event(1, malformedEvent)).toThrow("Invalid Team protocol v6 event.");
+    });
+
+    it("sends a block with only known keys", () => {
+      const [prompt, ...rest] = page.messages;
+      if (!prompt?.uiBlock) throw new Error("Invalid v6 conversation fixture.");
+      const extra = { ...page, messages: [{ ...prompt, uiBlock: { ...prompt.uiBlock, notify: "push" } }, ...rest] };
+      const wire = JSON.parse(encodeTeamProtocolV6CurrentHttpResponse("GET", pagePath, 200, extra));
+      expect(blockOf(wire, prompt.id)).toEqual(prompt.uiBlock);
+    });
+
+    it("keeps the newest blocks within the size budget and leaves the older ones to their fallback", () => {
+      const fields = Array.from({ length: 8 }, (_, field) => ({ label: `Field ${field}`, value: "x".repeat(2_000) }));
+      const messages = Array.from({ length: 50 }, (_, index) => ({
+        id: `question-prompt:turn-1:request-${index}`,
+        author: "assistant" as const,
+        text: `Letter ${index}`,
+        createdAt: `2026-10-08T10:${String(index).padStart(2, "0")}:00.000Z`,
+        status: "completed" as const,
+        uiBlock: {
+          version: 1,
+          blockId: `letter-${index}`,
+          spec: {
+            type: "confirm",
+            title: `Letter ${index}`,
+            fields,
+            preview: "y".repeat(8_000),
+            actions: [{ id: "send", label: "Send" }],
+          },
+          state: { status: "closed" },
+        },
+      }));
+      const large = { ...snapshot, messages };
+      const wire = JSON.parse(encodeTeamProtocolV6CurrentHttpResponse("GET", snapshotPath, 200, large));
+      const kept = messages.filter((message) => blockOf(wire, message.id) !== undefined);
+      expect(kept.length).toBeGreaterThan(0);
+      expect(kept.length).toBeLessThan(messages.length);
+      // The kept blocks are the newest ones, and every message still arrives with its text.
+      expect(kept.map((message) => message.id)).toEqual(messages.slice(-kept.length).map((message) => message.id));
+      expect(JSON.stringify(kept.map((message) => message.uiBlock)).length).toBeLessThanOrEqual(1_000_000);
+      expect(wire.messages).toHaveLength(messages.length);
+      const decoded = decodeTeamProtocolV6CurrentHttpResponse("GET", snapshotPath, 200, wire);
+      expect(kept.every((message) => blockOf(decoded, message.id) !== undefined)).toBe(true);
+      expect(JSON.parse(encodeTeamProtocolV6CurrentHttpResponse("GET", snapshotPath, 200, decoded))).toEqual(wire);
+    });
+  });
+
   describe("quiet routine runs", () => {
     // The fixture is what a host writes: the wire names an agent `botId`.
     const { botId, ...rest } = quietTurnWire;
@@ -131,3 +310,22 @@ describe("Team protocol v6", () => {
     });
   });
 });
+
+function readPage(value: unknown): ConversationPage & ConversationWithReadState {
+  const rawReferences = isDynamicRecord(value) ? value.references : undefined;
+  const rawPageInfo = isDynamicRecord(value) ? value.pageInfo : undefined;
+  if (
+    !isConversationWithReadState(value) ||
+    !isDynamicRecord(rawReferences) ||
+    !isDynamicRecord(rawPageInfo) ||
+    typeof rawPageInfo.hasOlder !== "boolean" ||
+    rawPageInfo.olderCursor !== null
+  )
+    throw new Error("Invalid v6 conversation fixture.");
+  const references: Record<string, ConversationMessage> = {};
+  for (const [id, message] of Object.entries(rawReferences)) {
+    if (!isConversationMessage(message)) throw new Error("Invalid v6 conversation fixture.");
+    references[id] = message;
+  }
+  return { ...value, references, pageInfo: { hasOlder: rawPageInfo.hasOlder, olderCursor: null } };
+}
