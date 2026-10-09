@@ -97,6 +97,7 @@
     "./features/conversation/ComparisonTable": "./src/features/conversation/ComparisonTable.tsx",
     "./features/conversation/ComposerEditor": "./src/features/conversation/ComposerEditor.tsx",
     "./features/conversation/ComposerErrorBanner": "./src/features/conversation/ComposerErrorBanner.tsx",
+    "./features/conversation/VoiceRecordingMorph": "./src/features/conversation/VoiceRecordingMorph.tsx",
     "./features/conversation/send-shortcut": "./src/features/conversation/send-shortcut.ts",
     "./features/conversation/ComposerNotice": "./src/features/conversation/ComposerNotice.tsx",
     "./features/conversation/ConversationIcons": "./src/features/conversation/ConversationIcons.tsx",

@@ -235,9 +235,10 @@ jobs:
         run: az account clear
 
   # Each architecture builds on a runner of its own kind. The install scripts run every provider
-  # runtime they download, and Whisper and the remote desktop runtime are built or verified for the
-  # runner's architecture, so one runner cannot produce both. The ARM64 job keeps the asset names
-  # every earlier release used, and it alone builds the Host PKG, which is Apple silicon only.
+  # runtime they download, and the voice runtime and the remote desktop runtime are downloaded or
+  # verified for the runner's architecture, so one runner cannot produce both. The ARM64 job keeps
+  # the asset names every earlier release used, and it alone builds the Host PKG, which is Apple
+  # silicon only.
   macos:
     name: Build signed macOS ${{ matrix.label }} release
     needs: validate

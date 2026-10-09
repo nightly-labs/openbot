@@ -159,10 +159,6 @@
   cursor: default;
 }
 
-.composer-recording {
-  border-color: var(--openbot-warning);
-}
-
 .composer-button,
 .dictation-button,
 .voice-button {
@@ -201,58 +197,240 @@
   white-space: nowrap;
 }
 
+/* The microphone melts into the recording bar and Finish buds off Send; VoiceRecordingMorph.tsx
+   explains the goo filter. Opening uses a spring (stiffness 320, damping 17, sampled). Closing
+   does not bounce: an undershoot would squeeze the microphone below its own size. */
+.voice-morph {
+  --voice-morph-duration: 600ms;
+  --voice-morph-exit-duration: 360ms;
+  --voice-morph-ease: linear(
+    0,
+    0.057 3.3%,
+    0.199 6.7%,
+    0.386 10%,
+    0.587 13.3%,
+    0.773 16.7%,
+    0.93 20%,
+    1.049 23.3%,
+    1.128 26.7%,
+    1.171 30%,
+    1.183 33.3%,
+    1.172 36.7%,
+    1.146 40%,
+    1.111 43.3%,
+    1.075 46.7%,
+    1.041 50%,
+    1.012 53.3%,
+    0.991 56.7%,
+    0.976 60%,
+    0.967 66.7%,
+    0.974 73.3%,
+    0.987 80%,
+    0.998 86.7%,
+    1.004 93.3%,
+    1
+  );
+  --voice-bar-width: 216px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.voice-morph-filter {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
+/* Inset past the controls so the blur is not cut off at the layer edge. */
+.voice-morph-goo {
+  position: absolute;
+  inset: -12px;
+  pointer-events: none;
+}
+
+/* The goo threshold needs opaque shapes, so the layer, not the shape, carries the
+   --openbot-hover transparency of the microphone button. */
+.voice-morph-goo-bar {
+  opacity: 0.06;
+}
+
+.voice-morph-bar,
+.voice-morph-send-blob,
+.voice-morph-finish-blob {
+  position: absolute;
+  top: 12px;
+  height: 28px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-text-primary);
+}
+
+.voice-morph-bar {
+  right: 46px;
+  width: 28px;
+  transition: width var(--voice-morph-exit-duration) var(--openbot-ease-out);
+}
+
+.voice-morph-send-blob,
+.voice-morph-finish-blob {
+  right: 12px;
+  width: 28px;
+  opacity: 0;
+  transition: opacity 0s linear var(--voice-morph-exit-duration);
+}
+
+.voice-morph-finish-blob {
+  transform: scale(0.5);
+  transition:
+    transform var(--voice-morph-exit-duration) var(--openbot-ease-out),
+    opacity 0s linear var(--voice-morph-exit-duration);
+}
+
+.voice-morph[data-recording] .voice-morph-bar {
+  width: var(--voice-bar-width);
+  transition: width var(--voice-morph-duration) var(--voice-morph-ease);
+}
+
+.voice-morph[data-recording] .voice-morph-send-blob {
+  opacity: 1;
+  transition: none;
+}
+
+.voice-morph[data-recording] .voice-morph-finish-blob {
+  opacity: 1;
+  transform: translateX(-34px) scale(0.8);
+  transition: transform var(--voice-morph-duration) var(--voice-morph-ease);
+}
+
+/* Positioned, so the controls paint over the goo layers before them. */
+.voice-morph-send {
+  position: relative;
+  display: flex;
+}
+
+.voice-morph-slot {
+  position: relative;
+  display: flex;
+  width: 28px;
+  height: 28px;
+  justify-content: flex-end;
+  transition: width var(--voice-morph-exit-duration) var(--openbot-ease-out);
+}
+
+.voice-morph[data-recording] .voice-morph-slot {
+  width: var(--voice-bar-width);
+  transition: width var(--voice-morph-duration) var(--voice-morph-ease);
+}
+
+.voice-morph .dictation-button {
+  background: transparent;
+}
+
 .voice-recording-status {
   display: flex;
+  width: 100%;
+  min-width: 0;
   height: 28px;
   align-items: center;
   gap: 4px;
   margin: 0;
   border: 0;
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-hover);
-  padding: 0 7px 0 4px;
+  overflow: hidden;
+  padding: 0 3px 0 12px;
   color: var(--openbot-text-secondary);
+  animation: voice-morph-content-in var(--openbot-duration-slow) var(--openbot-ease-out) var(--openbot-duration-fast)
+    both;
 }
 
-.voice-recording-stop {
-  display: grid;
-  width: 20px;
+.voice-waveform {
+  display: flex;
+  min-width: 0;
   height: 20px;
+  flex: 1;
+  align-items: center;
+  justify-content: flex-end;
+  overflow: hidden;
+  mask-image: linear-gradient(to right, transparent, currentColor 24px);
+}
+
+.voice-waveform-track {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 3px;
+}
+
+/* Quiet dots stay round; speech stretches them into bars. */
+.voice-waveform-dot {
+  width: 3px;
+  height: calc(3px + var(--voice-level, 0) * 15px);
+  flex: 0 0 auto;
+  border-radius: var(--openbot-radius-pill);
+  background: currentColor;
+}
+
+.voice-recording-cancel,
+.voice-recording-finish {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
   place-items: center;
   border: 0;
   border-radius: var(--openbot-radius-pill);
   padding: 0;
   background: transparent;
+  transition:
+    background-color var(--openbot-duration-hover) var(--openbot-ease-out),
+    color var(--openbot-duration-hover) var(--openbot-ease-out),
+    transform var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+.voice-recording-cancel {
+  color: var(--openbot-text-secondary);
+}
+
+.voice-recording-finish {
+  color: var(--openbot-bg-sidebar);
+  animation: voice-morph-content-in var(--openbot-duration-slow) var(--openbot-ease-out) var(--openbot-duration-overlay)
+    both;
+}
+
+/* Cancel sits on the bar itself; a hover disc there would look like a second drop. */
+.voice-morph .voice-recording-cancel:hover:not(:disabled) {
+  background: transparent;
   color: var(--openbot-text-primary);
-  transition: transform var(--openbot-duration-fast) var(--openbot-ease-out);
 }
 
-.voice-recording-stop:hover {
-  background: var(--openbot-border);
+.voice-recording-cancel:active,
+.voice-recording-finish:active {
+  transform: scale(0.94);
 }
 
-.voice-recording-stop:active {
-  transform: scale(0.96);
-}
-
-.voice-recording-stop svg {
+.voice-recording-cancel svg,
+.voice-recording-finish svg {
   width: 14px;
   height: 14px;
 }
 
-.voice-recording-duration {
-  min-width: 2.5em;
-  font-size: var(--openbot-text-sm);
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-  text-align: center;
+.voice-recording-finish svg {
+  stroke-width: 3;
 }
 
-.voice-recording-status > .conversation-more-icon {
-  width: 14px;
-  height: 14px;
-  fill: currentColor;
-  color: var(--openbot-text-muted);
+@keyframes voice-morph-content-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voice-morph *,
+  .voice-recording-status,
+  .voice-recording-finish {
+    transition: none;
+    animation: none;
+  }
 }
 
 .dictation-button:hover:not(:disabled) {
@@ -281,10 +459,12 @@
   color: var(--openbot-bg-sidebar);
 }
 
-.voice-button:hover,
-.voice-button-active:hover {
-  background: var(--openbot-text-primary);
-  color: var(--openbot-bg-canvas);
+/* Light circles only dim on hover. The ghost button hover is more specific and would turn them dark. */
+.voice-button:hover:not(:disabled),
+.voice-button.ui-button:hover:not(:disabled),
+.voice-morph .voice-recording-finish:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--openbot-text-primary) 84%, var(--openbot-bg-sidebar));
+  color: var(--openbot-bg-sidebar);
 }
 
 .composer-input-label,
@@ -299,6 +479,34 @@
   max-height: var(--composer-editor-max-height);
   align-items: flex-end;
   cursor: text;
+}
+
+/* Live dictation: the text said so far takes the empty editor's place, or follows the draft. */
+.composer-input-label[data-live-transcript] {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.composer-input-label[data-live-transcript="replace"] .composer-editor-root {
+  display: none;
+}
+
+.voice-live-transcript {
+  min-height: 28px;
+  margin: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 2px 0 8px;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-lg);
+  line-height: 20px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  transition: color var(--openbot-duration-hover) var(--openbot-ease-out);
+}
+
+.voice-live-transcript[data-final] {
+  color: var(--openbot-text-primary);
 }
 
 .composer-toolbar {

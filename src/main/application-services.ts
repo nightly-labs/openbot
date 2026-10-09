@@ -205,7 +205,8 @@ import {
   UpdateService,
 } from "./update-service";
 import { listSiblingOpenBotInstances } from "./update-sibling-instances";
-import { WHISPER_MODEL_NAME, WHISPER_MODEL_URL } from "./voice-model-service";
+import { PARAKEET_MODEL_DIRECTORY, removeLegacyWhisperCache } from "./voice-model-service";
+import { spawnVoiceTranscriptionHost } from "./voice-transcription-host-process";
 import { VoiceTranscriptionService } from "./voice-transcription-service";
 import { WebhookRelay } from "./webhook-relay";
 
@@ -1874,12 +1875,18 @@ export async function createApplicationServices({
   });
   teardown.push(TEARDOWN_ORDER.remoteDesktop, "remote desktop", () => Effect.runPromise(remoteDesktop.stop()));
   const voice = new VoiceTranscriptionService({
-    resourcesRoot: app.isPackaged ? join(process.resourcesPath, "whisper") : resolve(".openbot-build/whisper"),
-    modelPath: app.isPackaged
-      ? join(app.getPath("userData"), "runtimes", "whisper", WHISPER_MODEL_NAME)
-      : resolve(".openbot-build/whisper/model", WHISPER_MODEL_NAME),
-    modelDownloadUrl: WHISPER_MODEL_URL,
+    resourcesRoot: app.isPackaged ? join(process.resourcesPath, "voice") : resolve(".openbot-build/voice"),
+    modelDirectory: app.isPackaged
+      ? join(app.getPath("userData"), "runtimes", PARAKEET_MODEL_DIRECTORY)
+      : resolve(".openbot-build/voice/model"),
+    spawnHost: spawnVoiceTranscriptionHost,
   });
+  if (app.isPackaged) {
+    // Parakeet replaced Whisper. The Whisper model is an application download, not user data.
+    void Effect.runPromise(removeLegacyWhisperCache(join(app.getPath("userData"), "runtimes", "whisper"))).catch(
+      (error) => logger.warn("Could not remove the old Whisper model cache.", toLogValue(error)),
+    );
+  }
   teardown.push(TEARDOWN_ORDER.voice, "voice transcription", () => Effect.runPromise(voice.shutdown()));
   voice.on("modelStatus", forwardVoiceModelStatus);
   const currentVersion = app.getVersion();

@@ -13,18 +13,12 @@ export function voiceButtonLabel(phase: VoicePhase): AppTextKey {
 }
 
 /**
- * Whether this build can transcribe at all. The whisper binary is prepared for macOS and Windows
+ * Whether this build can transcribe at all. The voice runtime is prepared for macOS and Windows
  * only, so the Linux package ships without one and the composer offers no microphone rather than a
  * control that always fails.
  */
 export function voiceSupported(platform: AppInfo["platform"] | undefined): boolean {
   return platform !== "linux";
-}
-
-export function formatVoiceDuration(totalSeconds: number): string {
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = String(totalSeconds % 60).padStart(2, "0");
-  return `${minutes}:${seconds}`;
 }
 
 export function voiceCaptureError(error: unknown) {

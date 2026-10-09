@@ -64,6 +64,7 @@ export function Conversation(props: ConversationProps) {
       resources.voiceRecorder.stop();
     }
     for (const track of resources.voiceStream?.getTracks() ?? []) track.stop();
+    resources.voiceMeterStop?.();
   });
 
   return <ConversationView {...props} />;
