@@ -56,6 +56,16 @@ export const messages = {
   "mobile.chat.exchange.updateFrom": "Aktualisierung von",
   "mobile.chat.exchange.messaged": "Nachricht gesendet an",
   "mobile.chat.exchange.messageFrom": "Nachricht von",
+  "mobile.chat.exchange.agentCount": { one: "{count} Agent", other: "{count} Agenten" },
+  "mobile.chat.exchange.group": { one: "{count} Nachricht mit", other: "{count} Nachrichten mit" },
+  "mobile.chat.exchange.showMessages": {
+    one: "{count} Nachricht mit {agents} anzeigen",
+    other: "{count} Nachrichten mit {agents} anzeigen",
+  },
+  "mobile.chat.exchange.hideMessages": {
+    one: "{count} Nachricht mit {agents} ausblenden",
+    other: "{count} Nachrichten mit {agents} ausblenden",
+  },
   "mobile.chat.exchange.assignedTo": "Zugewiesen an",
   "mobile.chat.speaker.memberFallback": "Teammitglied",
   "mobile.chat.exchange.continuingWith": "Weiter mit",

@@ -186,6 +186,16 @@ export const messages = {
   "mobile.chat.exchange.updateFrom": "Güncelleme kaynağı:",
   "mobile.chat.exchange.messaged": "Mesaj gönderildi",
   "mobile.chat.exchange.messageFrom": "Mesaj kaynağı:",
+  "mobile.chat.exchange.agentCount": { one: "{count} ajan", other: "{count} ajan" },
+  "mobile.chat.exchange.group": { one: "{count} mesaj:", other: "{count} mesaj:" },
+  "mobile.chat.exchange.showMessages": {
+    one: "{agents} ile {count} mesajı göster",
+    other: "{agents} ile {count} mesajı göster",
+  },
+  "mobile.chat.exchange.hideMessages": {
+    one: "{agents} ile {count} mesajı gizle",
+    other: "{agents} ile {count} mesajı gizle",
+  },
   "mobile.chat.exchange.assignedTo": "Atandı:",
   "mobile.chat.speaker.superseded": "{name} · Geçersiz kılındı",
   "mobile.chat.speaker.memberFallback": "Ekip üyesi",

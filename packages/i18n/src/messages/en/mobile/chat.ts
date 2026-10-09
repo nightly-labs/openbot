@@ -184,6 +184,16 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.exchange.updateFrom": "Update from",
   "mobile.chat.exchange.messaged": "Messaged",
   "mobile.chat.exchange.messageFrom": "Message from",
+  "mobile.chat.exchange.agentCount": { one: "{count} agent", other: "{count} agents" },
+  "mobile.chat.exchange.group": { one: "{count} message with", other: "{count} messages with" },
+  "mobile.chat.exchange.showMessages": {
+    one: "Show {count} message with {agents}",
+    other: "Show {count} messages with {agents}",
+  },
+  "mobile.chat.exchange.hideMessages": {
+    one: "Hide {count} message with {agents}",
+    other: "Hide {count} messages with {agents}",
+  },
   "mobile.chat.exchange.assignedTo": "Assigned to",
   "mobile.chat.speaker.superseded": "{name} · Superseded",
   "mobile.chat.speaker.memberFallback": "Team member",
