@@ -73,6 +73,7 @@ export const messages = {
   "error.provider.unexpectedVersion": "El entorno de ejecución del proveedor devolvió una versión inesperada.",
   "error.provider.metadataNoData": "La descarga de metadatos del entorno de ejecución no devolvió datos.",
   "error.provider.metadataTooLarge": "Los metadatos del entorno de ejecución son demasiado grandes.",
+  "error.provider.requestFailed": "OpenBot no pudo descargar {url}. {reason}",
   "error.provider.installRecordMismatch": "El registro de instalación del entorno de ejecución no coincide.",
   "error.provider.runtimeChecksum": "La suma de comprobación del entorno de ejecución del proveedor no coincide.",
   "error.provider.codexReleaseShape": "La versión de Codex tiene una estructura inesperada.",

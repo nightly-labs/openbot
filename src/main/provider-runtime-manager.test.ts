@@ -1003,8 +1003,8 @@ describe("ProviderRuntimeManager", () => {
 
   /*
    * OpenCode ships as an npm platform tarball holding exactly `package/package.json` and
-   * `package/bin/opencode`, and no licence at all. Staging has to pick those two files out, fetch
-   * the licence from the tagged source, and refuse anything else -- this is the whole path a user
+   * `package/bin/opencode`, and no licence at all. Staging has to pick those two files out, take
+   * the licence from the `opencode-ai` tarball, and refuse anything else -- this is the whole path a user
    * gets by pressing Download, with no terminal step behind it.
    */
   it("stages the OpenCode binary, its license and its layout file", async () => {
@@ -1026,6 +1026,41 @@ describe("ProviderRuntimeManager", () => {
       target: "darwin-arm64",
       executable: "bin/opencode",
     });
+  });
+
+  // #1632: the archive arrived and verified, then the licence request failed with a bare "fetch failed",
+  // and every Retry downloaded the archive again only to fail at the same step.
+  it("names a failed request, and a Retry installs the archive it already has", async () => {
+    const root = await temporaryRoot();
+    const fixture = await opencodeFixture();
+    const umbrellaUrl = `${fixture.lock.opencode.registry}/opencode-ai/-/opencode-ai-${fixture.lock.opencode.version}.tgz`;
+    const requested: string[] = [];
+    let reachable = false;
+    const manager = new ProviderRuntimeManager({
+      root,
+      platform: "darwin",
+      architecture: "arm64",
+      lock: fixture.lock,
+      fetchImpl: async (input) => {
+        const url = String(input);
+        requested.push(url);
+        if (url !== umbrellaUrl) return chunkedResponse(fixture.archive, 4_096);
+        if (!reachable)
+          throw new TypeError("fetch failed", { cause: new Error("getaddrinfo ENOTFOUND registry.npmjs.org") });
+        return new Response(fixture.umbrella);
+      },
+    });
+    await runCauseEffect(manager.initialize());
+
+    await expect(runCauseEffect(manager.downloadAndWait("opencode"))).rejects.toThrow(
+      `OpenBot could not download ${umbrellaUrl}. getaddrinfo ENOTFOUND registry.npmjs.org`,
+    );
+    reachable = true;
+    await runCauseEffect(manager.downloadAndWait("opencode"));
+
+    expect(manager.getStatus().providers.opencode.phase).toBe("ready");
+    expect(requested.filter((url) => url !== umbrellaUrl)).toHaveLength(1);
+    expect(await readdir(join(root, ".downloads"))).toEqual([]);
   });
 
   it("refuses a package that is not the pinned OpenCode release", async () => {
@@ -1222,11 +1257,11 @@ interface OpencodeFixture {
   lock: ReturnType<typeof parseAgentRuntimeLock>;
 }
 
-/** A served `opencode-darwin-arm64` tarball with the lock rewritten to match it. */
+/** A served `opencode-darwin-arm64` tarball and `opencode-ai` licence tarball, with the lock rewritten to match. */
 async function opencodeFixture(options?: {
   manifestVersion?: string;
   reportedVersion?: string;
-}): Promise<OpencodeFixture> {
+}): Promise<OpencodeFixture & { umbrella: Uint8Array<ArrayBuffer> }> {
   const lock = parseAgentRuntimeLock(structuredClone(lockValue));
   const artifact = lock.opencode.artifacts["darwin-arm64"];
   const binaryText = `#!/bin/sh\necho ${options?.reportedVersion ?? lock.opencode.version}\n`;
@@ -1242,12 +1277,23 @@ async function opencodeFixture(options?: {
   execFileSync("tar", ["-czf", archivePath, "-C", source, "package"]);
   const archive = await readFile(archivePath);
 
+  const umbrellaSource = await temporaryRoot();
+  await mkdir(join(umbrellaSource, "package"), { recursive: true });
+  await writeFile(
+    join(umbrellaSource, "package", "package.json"),
+    JSON.stringify({ name: "opencode-ai", version: lock.opencode.version }),
+  );
+  await writeFile(join(umbrellaSource, "package", "LICENSE"), licenseText);
+  const umbrellaPath = join(umbrellaSource, "opencode-ai.tgz");
+  execFileSync("tar", ["-czf", umbrellaPath, "-C", umbrellaSource, "package"]);
+  const umbrella = new Uint8Array(await readFile(umbrellaPath));
+
   artifact.assetSha256 = digest(archive);
   artifact.binarySha256 = digest(new TextEncoder().encode(binaryText));
   artifact.downloadBytes = archive.byteLength;
   artifact.installedBytes = archive.byteLength + 1_024;
   lock.opencode.licenseSha256 = digest(new TextEncoder().encode(licenseText));
-  return { archive, binaryText, licenseText, lock };
+  return { archive, binaryText, licenseText, lock, umbrella };
 }
 
 /** A served `@oven/bun-darwin-aarch64` tarball with the lock rewritten to match it. */
@@ -1390,15 +1436,18 @@ function bunManager(root: string, fixture: OpencodeFixture): ProviderRuntimeMana
   });
 }
 
-function opencodeManager(root: string, fixture: OpencodeFixture): ProviderRuntimeManager {
+function opencodeManager(
+  root: string,
+  fixture: OpencodeFixture & { umbrella: Uint8Array<ArrayBuffer> },
+): ProviderRuntimeManager {
   return new ProviderRuntimeManager({
     root,
     platform: "darwin",
     architecture: "arm64",
     lock: fixture.lock,
     fetchImpl: async (input) =>
-      String(input).endsWith("/LICENSE")
-        ? new Response(new TextEncoder().encode(fixture.licenseText))
+      String(input).endsWith(`/opencode-ai-${fixture.lock.opencode.version}.tgz`)
+        ? new Response(fixture.umbrella)
         : chunkedResponse(fixture.archive, 4_096),
   });
 }
