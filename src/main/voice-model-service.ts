@@ -277,7 +277,7 @@ export class VoiceOperationError extends Schema.TaggedError<VoiceOperationError>
   cause: Schema.Defect(),
 }) {}
 
-export const { io: voiceIO } = causeHelpers(VoiceOperationError);
+const { io: voiceIO } = causeHelpers(VoiceOperationError);
 
 /**
  * Deletes the Whisper model cache that earlier versions downloaded (`<userData>/runtimes/whisper`).
