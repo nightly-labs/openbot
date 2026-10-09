@@ -21,8 +21,7 @@ import {
   pluginStructuredData,
   pluginsIndexHead,
 } from "../src/lib/content-metadata";
-import { downloadPageUrl } from "../src/lib/download-pages";
-import { DOWNLOAD_PLATFORM_ORDER } from "../src/lib/download-platforms";
+import { DOWNLOAD_PAGE_ORDER, downloadPageUrl } from "../src/lib/download-pages";
 import { pluginIndexUrl, pluginUrl, SITE_PLUGINS } from "../src/lib/plugins";
 import { OPENBOT_SITE_URL } from "../src/lib/site-metadata";
 import { contentRssXml, contentSitemapXml } from "../src/server/content-feed";
@@ -155,7 +154,7 @@ describe("sitemap", () => {
       ...SITE_PLUGINS.map((plugin) => pluginUrl(plugin.slug)),
       changelogUrl(),
       downloadPageUrl("hub"),
-      ...DOWNLOAD_PLATFORM_ORDER.map((platform) => downloadPageUrl(platform)),
+      ...DOWNLOAD_PAGE_ORDER.map((platform) => downloadPageUrl(platform)),
     ];
 
     for (const url of urls) {
