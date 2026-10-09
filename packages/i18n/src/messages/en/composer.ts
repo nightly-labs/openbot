@@ -37,6 +37,7 @@ export const messages = defineMessages("composer", {
   "composer.token.unavailableSkill": "Unavailable skill {name}",
   "composer.token.unavailableMcp": "Unavailable MCP server {name}",
   "composer.voice.stop": "Stop voice recording",
+  "composer.voice.cancel": "Cancel voice recording",
   "composer.voice.preparing": "Downloading voice model",
   "composer.voice.requesting": "Requesting microphone access",
   "composer.voice.transcribing": "Transcribing voice prompt",

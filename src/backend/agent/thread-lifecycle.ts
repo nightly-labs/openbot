@@ -47,6 +47,7 @@ import { agentNamesById, estimateTokens, HANDOFF_END, HANDOFF_START, renderHando
 import { developerInstructions } from "./developer-instructions";
 import { readHandoffHistory } from "./handoff-history";
 import { decodeCapturedSteps, readCapturedSteps } from "./handoff-tool-steps";
+import { sessionSettingsIdentity } from "./session-settings";
 import { isArchivedThreadError, isMissingProviderSessionError } from "./thread-items";
 import { codexSandboxConfig, codexSandboxMode, workspaceWritableRoots } from "./workspace-sandbox";
 
@@ -177,6 +178,10 @@ export class ThreadLifecycle {
    */
   #toolRuntimes(): McpToolRuntimes {
     return this.#mcpToolRuntimes?.() ?? NO_MCP_TOOL_RUNTIMES;
+  }
+
+  runtimeRefreshPending(agentId: string): boolean {
+    return this.#pendingRuntimeRefreshes.has(agentId);
   }
 
   readonly refreshAgentRuntime = Effect.fn("ThreadLifecycle.refreshAgentRuntime")(function* (
@@ -813,6 +818,9 @@ export class ThreadLifecycle {
     agent: AgentSummary,
     startingDeliveryIds: ReadonlySet<string> = new Set(),
   ) {
+    const settingsIdentity = sessionSettingsIdentity(agent);
+    const resets = this.#store.list().find((candidate) => candidate.id === agent.id)?.sessionSettingResets;
+    if (resets?.includes(settingsIdentity)) this.#pendingRuntimeRefreshes.add(agent.id);
     if (!this.#pendingRuntimeRefreshes.has(agent.id)) return;
     // A compaction is a provider turn that deliberately keeps no conversation turn id, so the busy
     // check below reads its thread as idle. Its completion arrives on the routing this refresh
@@ -841,7 +849,10 @@ export class ThreadLifecycle {
       if (this.#activeTurnOf(agent.id, threadId)) deferred = true;
       else yield* this.#refreshThreadRuntime(threadId);
     }
-    if (!deferred) this.#pendingRuntimeRefreshes.delete(agent.id);
+    if (!deferred) {
+      this.#pendingRuntimeRefreshes.delete(agent.id);
+      this.#store.clearSessionSettingReset(agent.id, settingsIdentity);
+    }
   }, Effect.uninterruptible).bind(this);
 
   /**

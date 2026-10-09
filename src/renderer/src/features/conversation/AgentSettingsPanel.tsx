@@ -2,6 +2,10 @@ import { agentAutomationAllowed, type MarketplaceSkillDetail } from "@openbot/co
 import { BookMarked, CalendarClock, Folder, Gauge, Puzzle, Table2, Upload } from "@openbot/ui";
 import { SettingsLinkGroup, SettingsLinkRow } from "@openbot/ui/components/SettingsPanel";
 import type { AgentProfile } from "@openbot/ui/data";
+import {
+  AgentSessionSettings,
+  type AgentSessionSettingsApi,
+} from "@openbot/ui/features/conversation/AgentSessionSettings";
 import SharedAgentSettingsPanel, {
   type AgentSettingsPanelProps as SharedAgentSettingsPanelProps,
 } from "@openbot/ui/features/conversation/AgentSettingsPanel";
@@ -28,6 +32,7 @@ interface AgentSettingsPanelProps
     "width" | "onResize" | "onResizeEnd" | "links" | "detailOpen" | "children"
   > {
   remoteClient?: boolean;
+  sessionSettingsEditable?: boolean;
   /** The memory cap of an agent on this computer. Absent for a remote agent: its host enforces its own. */
   memoryLimit?: number;
   /** The web client's host calls for the settings that its server supports. */
@@ -60,6 +65,26 @@ export type { AgentSkillsMode };
 
 export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   const { t } = useText();
+  const sessionSettings = createMemo((): AgentSessionSettingsApi | undefined => {
+    if (!props.sessionSettingsEditable) return undefined;
+    if (props.remoteClient) return props.adminCalls?.sessionSettings;
+    const serverId = props.skillsServerId;
+    const api = conversationPort().agent;
+    return {
+      read: (agentId) => api.readAgentSessionSettings(agentId, serverId),
+      set: (input) => api.setAgentSessionSetting(input, serverId),
+      reset: (input) => api.resetAgentSessionSetting(input, serverId),
+      subscribe: (agentId, listener) =>
+        api.onScopedEvent((scoped) => {
+          if (
+            scoped.serverId === serverId &&
+            scoped.event.type === "agent-session-settings-changed" &&
+            scoped.event.agentId === agentId
+          )
+            listener();
+        }),
+    };
+  });
   const [panelWidth, setPanelWidth] = createSettingsPanelWidth();
   const [draft, setDraft] = createStore({
     tables: { count: 0, open: false },
@@ -218,6 +243,15 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       detailOpen={draft.routines.open || draft.files.open}
       links={
         <>
+          <Show when={sessionSettings()}>
+            {(api) => (
+              <AgentSessionSettings
+                agentId={props.agent.id}
+                providerIdentity={`${props.runtimeSettings.provider}:${props.runtimeSettings.model}`}
+                api={api()}
+              />
+            )}
+          </Show>
           <Show when={!props.remoteClient || skillsMode() !== "hidden" || props.tablesVisible !== false || props.files}>
             <SettingsLinkGroup inset title={t("agentSettings.groups.knows")}>
               <Show when={!props.remoteClient}>

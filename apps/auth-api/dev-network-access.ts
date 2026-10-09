@@ -57,6 +57,16 @@ export function developmentNetworkRequestAllowed(remoteAddress: string | undefin
     segments[4] === "logo"
   )
     return true;
+  // The owner removes a host from the account. `register` is for a desktop host only.
+  if (
+    segments.length === 4 &&
+    segments[0] === "v2" &&
+    segments[1] === "remote" &&
+    segments[2] === "hosts" &&
+    segments[3] &&
+    segments[3] !== "register"
+  )
+    return true;
   if (
     segments.length === 6 &&
     segments[0] === "v2" &&

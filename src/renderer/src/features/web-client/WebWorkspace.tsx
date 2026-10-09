@@ -524,6 +524,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     workspace.runtime.admin ? () => hostRequest() : undefined,
     workspace.onHostEvent,
     eventsEnabled,
+    () =>
+      workspace.state.capabilities.includes("agent-session-settings-v1") &&
+      (workspace.state.host?.role === "owner" || workspace.state.host?.role === "admin"),
   );
   const remoteAgentAdmin = createRemoteAgentAdmin(
     () => {

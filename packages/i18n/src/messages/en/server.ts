@@ -264,6 +264,8 @@ export const messages = defineMessages("server", {
   "server.settings.reachable": "Reachable online. Only invited people can sign in.",
   "server.settings.notReachable": "Not reachable online. Existing members and invitations remain.",
   "server.settings.removeTitle": "Remove server",
+  "server.settings.removeDescription":
+    "Remove this server from the account service for all members. Use this when its computer is no longer available.",
   "server.settings.removeConfirmTitle": "Remove {name}?",
   "server.settings.removeConfirmDescription":
     "This removes the server from the account service for all members and ends remote access. Files and chats on its computer stay intact. To use it again, register it from that computer.",

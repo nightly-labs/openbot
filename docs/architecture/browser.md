@@ -86,6 +86,15 @@ the `media-attachments` capability; released protocol adapters keep their existi
 `browser-tools.ts` defines provider schemas and parses each call into a typed tool and its arguments.
 `browser-tool-actions.ts` maps input tools to CDP operations. It does not own tabs or import the host.
 `BrowserHost` owns tab access checks, operation queues, focus, deadlines, and persistent browser state.
+The browser session and service-worker fallback remove the `OpenBot/` and `Electron/` user-agent
+tokens. They keep the installed Chromium version and host platform. Requests to `accounts.google.com`
+keep the `Electron/` token because Google rejects the account identifier step without it. This
+exception does not change the page identity or the identity sent to other sites.
+Electron provides native `navigator.userAgentData` but no client-hint request headers. On HTTPS and
+loopback HTTP, the host supplies the basic Chromium brand/version, desktop flag, and platform hints.
+It preserves hints supplied by Chromium and does not add high-entropy hints. The focused check is
+`bun run test:browser --scenario=identity`; add `--google-live` for the Google identifier check.
+The local identity report is `.openbot-build/browser-identity.json`.
 Website popups are adopted into managed `WebContentsView` tabs through Electron's window creation
 hook. Native guests retain their opener, request body, and shared browser session. Local tab and
 agent tool results expose `openerTabId` while that relationship is live. Independent `noopener`

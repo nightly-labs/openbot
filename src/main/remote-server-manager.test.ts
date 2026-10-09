@@ -118,6 +118,7 @@ describe("remote server links", () => {
       listMembers: () => authCall(async () => []),
       updateMember: () => authCall(async () => undefined),
       removeMember: () => authCall(async () => undefined),
+      removeOwnedHost: () => authCall(async () => undefined),
       getPrincipalId: () => "person-1",
       controlPlaneUrl: "https://api.openbot.run",
       downloadHostLogo: () => authCall(async () => ({ bytes: new Uint8Array(), mimeType: "image/png" })),
@@ -239,6 +240,7 @@ describe("remote server links", () => {
       listMembers: () => authCall(async () => []),
       updateMember: () => authCall(async () => undefined),
       removeMember: () => authCall(async () => undefined),
+      removeOwnedHost: () => authCall(async () => undefined),
       getPrincipalId: () => "person-1",
       controlPlaneUrl: "https://api.openbot.run",
       downloadHostLogo: () => authCall(async () => ({ bytes: new Uint8Array(), mimeType: "image/png" })),
@@ -441,6 +443,11 @@ describe("remote server links", () => {
         hosts = hosts.filter((host) => host.hostId !== hostId);
       }),
     );
+    const removeOwnedHost = vi.fn((hostId: string) =>
+      authCall(async () => {
+        hosts = hosts.filter((host) => host.hostId !== hostId);
+      }),
+    );
     const revokeInvite = vi.fn(() => authCall(async () => undefined));
     const sendTeamInviteEmail = vi.fn(() => authCall(async () => undefined));
     const transport = new TeamWebRtcClientTransport({
@@ -472,6 +479,7 @@ describe("remote server links", () => {
       listMembers: () => authCall(async () => []),
       updateMember: () => authCall(async () => undefined),
       removeMember,
+      removeOwnedHost,
       getPrincipalId: () => "person-1",
       controlPlaneUrl: "https://api.openbot.run",
       downloadHostLogo: () => authCall(async () => ({ bytes: new Uint8Array(), mimeType: "image/png" })),
@@ -554,11 +562,16 @@ describe("remote server links", () => {
       expect(removeMember).toHaveBeenCalledWith(alphaId, `${alphaId}-member`);
       await runCauseEffect(manager.syncRemoteHosts());
       expect(manager.list().some((server) => server.id === alphaId)).toBe(false);
+      // The owner removes the host from the account, so no device lists it again. No local hide.
       await runCauseEffect(manager.remove(gammaId));
+      expect(removeOwnedHost).toHaveBeenCalledWith(gammaId);
       await runCauseEffect(manager.syncRemoteHosts());
       expect(manager.list().some((server) => server.id === gammaId)).toBe(false);
       expect(removeMember).not.toHaveBeenCalledWith(gammaId, `${gammaId}-member`);
-      expect(JSON.parse(await readFile(statePath, "utf8"))).toMatchObject({ hiddenHostIds: [gammaId] });
+      expect(JSON.parse(await readFile(statePath, "utf8"))).toMatchObject({ hiddenHostIds: [] });
+      // A retry after a lost answer finds no host and succeeds without a second request.
+      await runCauseEffect(manager.remove(gammaId));
+      expect(removeOwnedHost).toHaveBeenCalledOnce();
       const directoryChanged = vi.fn(() => runCauseEffect(manager.syncRemoteHosts()));
       manager.on("directoryInvalidated", directoryChanged);
       hosts = hosts.filter((host) => host.hostId !== betaId);
@@ -650,6 +663,7 @@ describe("remote server links", () => {
       listMembers: () => authCall(async () => []),
       updateMember: () => authCall(async () => undefined),
       removeMember: () => authCall(async () => undefined),
+      removeOwnedHost: () => authCall(async () => undefined),
       getPrincipalId: () => "person-1",
       controlPlaneUrl: "https://api.openbot.run",
       downloadHostLogo: () => authCall(async () => ({ bytes: new Uint8Array(), mimeType: "image/png" })),

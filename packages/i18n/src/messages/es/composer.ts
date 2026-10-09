@@ -38,6 +38,7 @@ export const messages = {
   "composer.token.unavailableSkill": "Habilidad no disponible {name}",
   "composer.token.unavailableMcp": "Servidor MCP no disponible {name}",
   "composer.voice.stop": "Detener grabación de voz",
+  "composer.voice.cancel": "Cancelar grabación de voz",
   "composer.voice.preparing": "Descargando modelo de voz",
   "composer.voice.requesting": "Solicitando acceso al micrófono",
   "composer.voice.transcribing": "Transcribiendo instrucción de voz",

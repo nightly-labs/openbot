@@ -23,6 +23,7 @@ import type { ProfileSave } from "./profile-save";
 import { isPlanLimitDiagnostic } from "./provider-diagnostics";
 import type { ProviderRuntime } from "./provider-runtime";
 import type { RoutineScheduler } from "./routine-scheduler";
+import { sessionSettingsOverrides } from "./session-settings";
 import { isMissingProviderSessionError, isRequestTimeout, providerForAgent } from "./thread-items";
 import type { ThreadLifecycle } from "./thread-lifecycle";
 import { TurnSlots } from "./turn-slots";
@@ -100,6 +101,7 @@ export class DrainScheduler {
   readonly #channels: ChannelService | undefined;
   readonly #messaging: MessagingThreads | undefined;
   readonly #drainingAgents = new Set<string>();
+  readonly #settingsHolds = new Map<string, number>();
   /**
    * The model each agent's running turn was started with, by turn id. The agent record can be moved
    * to another model while that turn runs, but the CLI keeps the session it opened, so this is the
@@ -151,6 +153,7 @@ export class DrainScheduler {
   /** The clauses of this agent's own state. `#heldByMachine` adds the memory and the turn slots. */
   mayDrain(agentId: string): boolean {
     return (
+      !this.#settingsHolds.has(agentId) &&
       !this.#conversation.workingSnapshot(agentId)?.activeTurnId &&
       (this.#channels?.mayDrain(agentId) ?? true) &&
       this.#profileSave.mayDrain(agentId) &&
@@ -207,6 +210,16 @@ export class DrainScheduler {
         }),
       );
     });
+  }
+
+  holdSessionSettings(agentId: string): () => void {
+    this.#settingsHolds.set(agentId, (this.#settingsHolds.get(agentId) ?? 0) + 1);
+    return () => {
+      const remaining = (this.#settingsHolds.get(agentId) ?? 1) - 1;
+      if (remaining > 0) this.#settingsHolds.set(agentId, remaining);
+      else this.#settingsHolds.delete(agentId);
+      this.scheduleDrain(agentId);
+    };
   }
 
   pendingTasks(): Effect.Effect<void, DeliveryStartFailed>[] {
@@ -464,6 +477,9 @@ export class DrainScheduler {
                 threadId: providerThreadId,
                 model: agent.model,
                 effort: agent.reasoningEffort,
+                sessionSettings: sessionSettingsOverrides(
+                  this.#store.list().find((current) => current.id === agent.id) ?? agent,
+                ),
                 clientUserMessageId: delivery.id,
                 // A teammate message that wants no answer tells the model to write nothing, so an empty
                 // turn is the expected result and not a provider that swallowed its error.

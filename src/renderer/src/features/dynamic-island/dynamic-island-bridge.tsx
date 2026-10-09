@@ -123,7 +123,8 @@ export function DynamicIslandBridge() {
   });
 
   async function handleDynamicIslandAction(action: DynamicIslandAction): Promise<void> {
-    if (action.type === "open-app") return;
+    // Main runs a reply and a stop against the agent. They must not move the main window.
+    if (action.type === "open-app" || action.type === "send-message" || action.type === "stop-agent") return;
     if (action.type === "answer-prompt") {
       dynamicIslandCoordinator.resolveAction(action);
       const prompt = pendingPrompts()[action.agentId];

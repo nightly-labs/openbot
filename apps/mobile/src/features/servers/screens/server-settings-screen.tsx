@@ -4,8 +4,10 @@ import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { Camera } from "lucide-react-native";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Alert, Pressable, View } from "react-native";
+import { useMobileSession } from "@/features/auth/context/mobile-session-context";
+import { hostedServerCalls } from "@/features/servers/api/hosted-servers";
 import { ServerAvatar } from "@/features/servers/components/server-avatar";
 import { ServerStatusLabel } from "@/features/servers/components/server-status-label";
 import { SERVER_ROLE_KEYS } from "@/features/servers/model/server-role";
@@ -24,14 +26,33 @@ import { type AvatarPhoto, pickAvatarPhoto } from "@/shared/lib/pick-avatar-phot
 import { useText } from "@/shared/lib/text";
 
 export function ServerSettingsScreen() {
-  const { t, sourceText } = useText();
+  const { t, sourceText, errorMessage } = useText();
   const { serverId } = useLocalSearchParams<{ serverId: string }>();
-  const { servers, leaveServer, refreshServer } = useMobileWorkspace();
+  const { servers, leaveServer, removeServer, refreshServer } = useMobileWorkspace();
   const server = servers.find((item) => item.id === serverId);
   const locked = useRef(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  async function perform(operation: () => Promise<void>) {
+  const { session } = useMobileSession();
+  const owner = server?.role === "owner";
+  // Billing deletes a hosted server, so Remove shows only after the hosted servers are known.
+  const [hostedServerIds, setHostedServerIds] = useState<ReadonlySet<string> | null>(null);
+  useEffect(() => {
+    if (!session || !owner) return;
+    let current = true;
+    hostedServerCalls(session)
+      .list()
+      .then(
+        (list) => {
+          if (current) setHostedServerIds(new Set(list.servers.map((item) => item.serverId)));
+        },
+        () => undefined,
+      );
+    return () => {
+      current = false;
+    };
+  }, [session, owner]);
+  async function perform(operation: () => Promise<void>, failure?: (error: unknown) => string) {
     if (locked.current) return;
     locked.current = true;
     setBusy(true);
@@ -39,8 +60,8 @@ export function ServerSettingsScreen() {
     try {
       await operation();
       void haptics.notification("success");
-    } catch {
-      setError(t("mobile.server.settings.updateFailed"));
+    } catch (caught) {
+      setError(failure?.(caught) ?? t("mobile.server.settings.updateFailed"));
       void haptics.notification("error");
     } finally {
       locked.current = false;
@@ -97,6 +118,38 @@ export function ServerSettingsScreen() {
           >
             <Typography.Paragraph type="body-sm" className="text-danger-text">
               {t("mobile.server.settings.leave")}
+            </Typography.Paragraph>
+          </SettingsRow>
+        ) : hostedServerIds && !hostedServerIds.has(serverId) ? (
+          // The owner removes the server from the account. The host does not need to be online.
+          <SettingsRow
+            disclosure={false}
+            disabled={busy}
+            onPress={() =>
+              Alert.alert(
+                t("mobile.server.settings.removeTitle", { name: server.name }),
+                t("mobile.server.settings.removeBody"),
+                [
+                  { text: t("common.cancel"), style: "cancel" },
+                  {
+                    text: t("mobile.server.settings.remove"),
+                    style: "destructive",
+                    onPress: () =>
+                      void perform(
+                        async () => {
+                          await removeServer(serverId);
+                          router.dismiss();
+                        },
+                        // The account service explains a refusal, such as a hosted server that Billing deletes.
+                        (caught) => errorMessage(caught, t("mobile.server.settings.updateFailed")),
+                      ),
+                  },
+                ],
+              )
+            }
+          >
+            <Typography.Paragraph type="body-sm" className="text-danger-text">
+              {t("mobile.server.settings.remove")}
             </Typography.Paragraph>
           </SettingsRow>
         ) : null}

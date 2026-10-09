@@ -6,7 +6,12 @@ import { AGENT_INSTALL_ROUTES } from "./agent-install-v1";
 import { AGENT_PUBLISH_ROUTES } from "./agent-publish-v1";
 import { AGENT_UPDATE_ROUTES } from "./agent-update-v1";
 import { CONTEXT_RESET_ROUTES } from "./context-reset-v1";
-import { TEAM_CURRENT_CAPABILITIES } from "./current";
+import {
+  legacyTeamCapabilities,
+  TEAM_BOOTSTRAP_CAPABILITIES,
+  TEAM_CURRENT_CAPABILITIES,
+  teamCapabilitiesForProtocol,
+} from "./current";
 import { EVENTS_ROUTES } from "./events-v1";
 import { HOST_ADMIN_ROUTES } from "./host-admin-v1";
 import { HOST_RELEASE_ROUTES } from "./host-release-v1";
@@ -18,6 +23,9 @@ import { PROVIDERS_ADMIN_ROUTES } from "./providers-v1";
 import { PROVIDERS_SIGN_IN_V3_ROUTES } from "./providers-v3";
 import { SHARED_TABLES_ROUTES } from "./shared-tables-v1";
 import { SKILLS_ADMIN_ROUTES } from "./skills-admin-v1";
+import { decodeTeamProtocolSupportV1 } from "./v1";
+import { decodeTeamProtocolSupportV6Base } from "./v6-base";
+import { decodeTeamProtocolSupportV7Base } from "./v7-base";
 
 function codec(path: string) {
   const found = optionalRouteCodec(path);
@@ -94,9 +102,24 @@ describe("agent-host-settings-v1", () => {
 
   // A released host reads no capability from a header with more than 64, and a released client
   // refuses a host that advertises more than 64.
-  it("keeps the current capabilities within the 64 that a released peer accepts", () => {
+  it("keeps bootstrap and old-client advertisements within the released limit", () => {
     expect(TEAM_CURRENT_CAPABILITIES).toContain(AGENT_HOST_SETTINGS_CAPABILITY);
-    expect(TEAM_CURRENT_CAPABILITIES.length).toBeLessThanOrEqual(64);
+    expect(TEAM_BOOTSTRAP_CAPABILITIES.length).toBeLessThanOrEqual(64);
+    expect(legacyTeamCapabilities(TEAM_CURRENT_CAPABILITIES).length).toBeLessThanOrEqual(64);
+    expect(TEAM_CURRENT_CAPABILITIES.length).toBeLessThanOrEqual(128);
+    for (const released of legacyTeamCapabilities(TEAM_CURRENT_CAPABILITIES)) {
+      expect(TEAM_BOOTSTRAP_CAPABILITIES).toContain(released);
+    }
+    expect(teamCapabilitiesForProtocol(6)).toEqual(TEAM_BOOTSTRAP_CAPABILITIES);
+    expect(teamCapabilitiesForProtocol(7)).toEqual(TEAM_CURRENT_CAPABILITIES);
+    const support = {
+      appVersion: "1.0.0",
+      protocol: { minimum: 1, maximum: 7 },
+      capabilities: [...TEAM_CURRENT_CAPABILITIES],
+    };
+    expect(() => decodeTeamProtocolSupportV1(support)).toThrow();
+    expect(() => decodeTeamProtocolSupportV6Base(support)).toThrow();
+    expect(decodeTeamProtocolSupportV7Base(support).capabilities).toEqual(TEAM_CURRENT_CAPABILITIES);
   });
 });
 

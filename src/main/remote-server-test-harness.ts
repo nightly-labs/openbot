@@ -192,6 +192,7 @@ export function fakeWebRtcTransport(
     listMembers: () => Effect.sync(() => []),
     updateMember: () => Effect.sync(() => undefined),
     removeMember: () => Effect.sync(() => undefined),
+    removeOwnedHost: () => Effect.sync(() => undefined),
     getPrincipalId: () => "user-1",
     controlPlaneUrl: "https://api.example.test",
     downloadHostLogo: () => Effect.sync(() => ({ bytes: new Uint8Array(), mimeType: "image/png" })),

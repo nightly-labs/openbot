@@ -668,7 +668,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
                         when={
                           props.onSignInProvider &&
                           !connectOptional() &&
-                          (option().id === "opencode"
+                          (option().id === "opencode" || option().id === "muse"
                             ? runtimeAction() === undefined ||
                               runtimeAction() === "connect" ||
                               runtimeAction() === "restart"

@@ -141,6 +141,40 @@ const CONNECTING_STATUS: Record<AgentProviderId, AgentStatus> = {
     message: null,
     fullAccess: true,
   },
+  pi: {
+    phase: "blocked",
+    cliVersion: "1.1.0",
+    auth: { kind: "unknown" },
+    providers: [
+      {
+        id: "pi",
+        state: "sign-in-required",
+        connectionState: "connecting",
+        version: "1.1.0",
+        message: null,
+      },
+    ],
+    capabilities: { chat: "unavailable", browser: "ready", computerUse: "unavailable" },
+    message: null,
+    fullAccess: true,
+  },
+  muse: {
+    phase: "blocked",
+    cliVersion: "1.4.4-R5419.1",
+    auth: { kind: "unknown" },
+    providers: [
+      {
+        id: "muse",
+        state: "sign-in-required",
+        connectionState: "connecting",
+        version: "1.4.4-R5419.1",
+        message: null,
+      },
+    ],
+    capabilities: { chat: "unavailable", browser: "ready", computerUse: "unavailable" },
+    message: null,
+    fullAccess: true,
+  },
   acp: {
     phase: "blocked",
     cliVersion: null,
@@ -804,6 +838,15 @@ export function installOpenbotStub(): void {
         },
       ]),
       listAgents: vi.fn().mockResolvedValue(AGENTS),
+      readAgentSessionSettings: vi.fn(async (agentId: string) => ({
+        agentId,
+        providerIdentity: "codex",
+        options: [],
+        overrides: {},
+        pending: false,
+      })),
+      setAgentSessionSetting: notStubbed("agent.setAgentSessionSetting"),
+      resetAgentSessionSetting: notStubbed("agent.resetAgentSessionSetting"),
       listInstalledSkills: vi.fn().mockResolvedValue([]),
       listMcpServers: vi.fn().mockResolvedValue([]),
       listMemories: vi.fn().mockResolvedValue([]),
@@ -1206,6 +1249,11 @@ export function installOpenbotStub(): void {
       list: vi.fn().mockResolvedValue([]),
       save: vi.fn().mockResolvedValue({ providers: [], restart: "not-running" }),
       delete: vi.fn().mockResolvedValue({ providers: [], restart: "not-running" }),
+    }),
+    acpRegistry: stubGroup("acpRegistry", {
+      search: vi.fn().mockResolvedValue([]),
+      installed: vi.fn().mockResolvedValue([]),
+      status: vi.fn().mockResolvedValue([]),
     }),
     customAgents: stubGroup("customAgents", {
       list: vi.fn().mockResolvedValue([]),

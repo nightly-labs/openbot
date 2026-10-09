@@ -10,6 +10,7 @@ import type {
   AgentModelOption,
   AgentProviderId,
   AgentReasoningEffort,
+  AgentSessionSettings,
   AgentTemplatePreview,
   AgentTemplatePublication,
   AvatarHue,
@@ -24,12 +25,14 @@ import type {
   InstallAgentTemplateInput,
   InstalledSkill,
   QueueSnapshot,
+  ResetAgentSessionSettingInput,
   RespondToApprovalInput,
   RespondToBrowserSecretInput,
   RespondToPromptInput,
   Routine,
   RoutineCalendar,
   RoutineCalendarInput,
+  SetAgentSessionSettingInput,
   SetEnabledSkillInput,
   SharedTable,
   SidebarLayoutAction,
@@ -185,6 +188,8 @@ export interface MobileWorkspaceContextValue {
   liveState: LiveWorkspaceStore;
   selectServer: (serverId: string) => void;
   leaveServer: (serverId: string) => Promise<void>;
+  /** Removes a server that this account owns from the account service. The host can be offline. */
+  removeServer: (serverId: string) => Promise<void>;
   refreshServers: () => Promise<void>;
   refreshServer: (serverId: string) => Promise<void>;
   /** An owner or admin of an online host that serves `host-admin-v1`. The host checks the role again. */
@@ -255,6 +260,9 @@ export interface MobileWorkspaceContextValue {
   /** True when the host advertises `context-reset-v1`. Any member can start a new chat. */
   canStartNewChat: (serverId: string) => boolean;
   /** The agent forgets the messages before it. The host refuses while the agent works. */
+  loadAgentSessionSettings: (agentId: string, serverId: string) => Promise<AgentSessionSettings | null>;
+  setAgentSessionSetting: (input: SetAgentSessionSettingInput, serverId: string) => Promise<AgentSessionSettings>;
+  resetAgentSessionSetting: (input: ResetAgentSessionSettingInput, serverId: string) => Promise<AgentSessionSettings>;
   startNewChat: (agentId: string, serverId: string) => Promise<void>;
   /** An owner or admin of an online host that serves `shared-tables-v1`. The host checks the role again. */
   canManageSharedTables: (serverId: string) => boolean;

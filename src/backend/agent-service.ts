@@ -10,6 +10,7 @@ import type {
   AgentModelId,
   AgentModelOption,
   AgentRuntimeSnapshot,
+  AgentSessionSettings,
   AgentStatus,
   AgentSummary,
   AttachmentDataInput,
@@ -53,6 +54,7 @@ import type {
   QueueSnapshot,
   RemoveMcpServerInput,
   ReorderQueueInput,
+  ResetAgentSessionSettingInput,
   RespondToApprovalInput,
   RespondToBrowserSecretInput,
   RespondToBrowserTakeoverInput,
@@ -63,6 +65,7 @@ import type {
   SaveAgentProfileResult,
   SaveMcpServerInput,
   SendMessageInput,
+  SetAgentSessionSettingInput,
   SetMcpServerEnabledInput,
   SetMessageReactionInput,
   SharedTable,
@@ -140,6 +143,7 @@ import { type AgentClientFactory, ProviderRuntime, toProviderOperationFailed } f
 import { QueueControls } from "./agent/queue-controls";
 import { type RoutineMutationOptions, RoutineScheduler, toRoutineOperationFailed } from "./agent/routine-scheduler";
 import { buildRuntimeSnapshot } from "./agent/runtime-snapshot";
+import { SessionSettings } from "./agent/session-settings";
 import type { AgentSidebar } from "./agent/sidebar-tools";
 import type { LocalSkillTools } from "./agent/skill-tools";
 import { isRequestTimeout, providerForAgent, providerLabel, type ToolUsageSignal } from "./agent/thread-items";
@@ -163,7 +167,7 @@ import { toMcpOperationError } from "./mcp-effects";
 import { McpServerStore } from "./mcp-server-store";
 import { MessagingThreads, toMessagingThreadFailed } from "./messaging/messaging-threads";
 import type { PasswordVault } from "./password-vault";
-import { decodeRecordResponse } from "./protocol";
+import { decodeRecordResponse, getString } from "./protocol";
 import { NO_PROVIDER_CREDENTIALS, type ProviderClientContext } from "./provider-drivers";
 import { providerHistoryPersistence } from "./provider-history-persistence";
 import { recordAgentRestartActivity } from "./restart-activity";
@@ -312,6 +316,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #memoryHold: MemoryHold;
   readonly #usageLimits: UsageLimitGate;
   readonly #drain: DrainScheduler;
+  readonly #sessionSettings: SessionSettings;
   readonly #queue: QueueControls;
   readonly #attachments: AttachmentGateway;
   readonly #browserUploads: BrowserUploads;
@@ -456,13 +461,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       conversation: this.#conversation,
       hooks: {
         bindClient: (client) => {
-          client.on("notification", (notification) =>
+          client.on("notification", (notification) => {
+            if (notification.method === "openbot/sessionSettings/updated") {
+              const threadId = getString(notification.params, "threadId");
+              const agentId = threadId ? this.#conversation.agentForThread(threadId) : undefined;
+              if (agentId) this.#emit({ type: "agent-session-settings-changed", agentId });
+              return;
+            }
             Effect.runFork(
               this.#turn
                 .handleNotification(notification, client)
                 .pipe(Effect.forkIn(this.#scope, { startImmediately: true })),
-            ),
-          );
+            );
+          });
           client.on("request", (request) =>
             Effect.runFork(
               this.#tools.handle(client, request).pipe(Effect.forkIn(this.#scope, { startImmediately: true })),
@@ -919,6 +930,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         servesModel: (model) => this.#endpoints.serves(model),
         requeueChannelDelivery: (deliveryId) => this.#requeueChannelDelivery(deliveryId),
       },
+    });
+    this.#sessionSettings = new SessionSettings({
+      store,
+      providers: this.#providers,
+      threads: this.#threads,
+      drain: this.#drain,
+      busy: (agentId) => this.#runsTurn(agentId),
+      exclusive: (run) => this.#endpoints.runExclusive(run),
+      changed: (agentId) => this.#emit({ type: "agent-session-settings-changed", agentId }),
     });
     this.#browser.onControlChanged((state) => {
       this.#emit({ type: "browser-control-changed", state });
@@ -1762,6 +1782,40 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return agent;
   }
 
+  readAgentSessionSettings(agentId: string): Effect.Effect<AgentSessionSettings, AgentLifecycleFailed> {
+    return this.#sessionSettings
+      .read(agentId)
+      .pipe(
+        Effect.mapError(
+          (failure) => new AgentLifecycleFailed({ operation: "read session settings", cause: failure.cause }),
+        ),
+      );
+  }
+
+  setAgentSessionSetting(
+    input: SetAgentSessionSettingInput,
+  ): Effect.Effect<AgentSessionSettings, AgentLifecycleFailed> {
+    return this.#sessionSettings
+      .set(input)
+      .pipe(
+        Effect.mapError(
+          (failure) => new AgentLifecycleFailed({ operation: "set session setting", cause: failure.cause }),
+        ),
+      );
+  }
+
+  resetAgentSessionSetting(
+    input: ResetAgentSessionSettingInput,
+  ): Effect.Effect<AgentSessionSettings, AgentLifecycleFailed> {
+    return this.#sessionSettings
+      .reset(input)
+      .pipe(
+        Effect.mapError(
+          (failure) => new AgentLifecycleFailed({ operation: "reset session setting", cause: failure.cause }),
+        ),
+      );
+  }
+
   /** `initiatingAgentId` is set when an agent, not the user, asks for the change. */
   updateAgent(input: UpdateAgentInput, initiatingAgentId?: string): Effect.Effect<AgentSummary, AgentLifecycleFailed> {
     return this.#endpoints
@@ -2239,6 +2293,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       .pipe(
         Effect.mapError(
           (failure) => new AgentLifecycleFailed({ operation: "reloadCustomAgents", cause: failure.cause }),
+        ),
+      );
+  }
+
+  withCustomAgentRuntimeRemoval<T>(
+    _customAgentIds: readonly string[],
+    operation: () => Effect.Effect<T, AgentLifecycleFailed>,
+  ): Effect.Effect<T, AgentLifecycleFailed> {
+    return this.#providers
+      .withCustomAgentRuntimeRemoval(() => operation().pipe(toProviderOperationFailed))
+      .pipe(
+        Effect.mapError(
+          (failure) => new AgentLifecycleFailed({ operation: "removeCustomAgentRuntime", cause: failure.cause }),
         ),
       );
   }

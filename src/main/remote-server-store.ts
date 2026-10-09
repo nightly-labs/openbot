@@ -169,8 +169,8 @@ export class RemoteServerStore implements RemoteServerDirectory {
     return this.#state.servers.some((candidate) => candidate.id === serverId);
   }
 
-  // A host the user removed while owning it. The account service keeps listing it, so without this
-  // the next directory sync would put it straight back.
+  // A host that an earlier version hid when its owner removed it on this computer. The account
+  // service still lists it, so without this the next directory sync would put it straight back.
   isHiddenHost(hostId: string): boolean {
     return this.#state.hiddenHostIds.includes(hostId);
   }
@@ -253,9 +253,7 @@ export class RemoteServerStore implements RemoteServerDirectory {
   readonly remove = Effect.fn("RemoteStore.remove")(function* (
     this: RemoteServerStore,
     serverId: string,
-    options: { hideHost?: boolean } = {},
   ): Effect.fn.Return<void, RemoteWorkflowError> {
-    if (options.hideHost && !this.#state.hiddenHostIds.includes(serverId)) this.#state.hiddenHostIds.push(serverId);
     // The user asked for this server to be gone. That reaches an entry this build could not read as
     // well -- leaving it would put the server back the next time a build that understands it runs.
     this.#forgetUnreadable(serverId);

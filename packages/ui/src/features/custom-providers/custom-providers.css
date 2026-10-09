@@ -286,6 +286,10 @@
   gap: var(--openbot-space-2);
 }
 
+.custom-acp-code {
+  overflow-wrap: anywhere;
+}
+
 .custom-acp-code input,
 input.custom-acp-code {
   font-family: var(--openbot-font-mono);

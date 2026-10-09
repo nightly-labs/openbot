@@ -1721,8 +1721,8 @@ export class BrowserHost {
   }
 
   #configureSession(): void {
-    // One identity for pages, frames and workers. It keeps the build token that Google needs
-    // and drops the product token that Framer refuses; the languages come from the system.
+    // Use the installed Chromium identity for pages, frames and workers.
+    // The request policy keeps the Google account compatibility exception.
     // Service workers read the process fallback instead of the session, so it changes too.
     app.userAgentFallback = sessionBrowserUserAgent(app.userAgentFallback);
     this.#session.setUserAgent(sessionBrowserUserAgent(this.#session.getUserAgent()), preferredBrowserLanguageCodes());

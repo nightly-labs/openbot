@@ -38,6 +38,9 @@ export function serverSupportsCapability(
       capability === "providers-v2" ||
       capability === "providers-v3" ||
       capability === "providers-v4" ||
+      capability === "providers-v5" ||
+      capability === "agent-session-settings-v1" ||
+      capability === "acp-registry-v1" ||
       capability === "host-admin-v1" ||
       capability === "host-update-v1" ||
       capability === "host-member-update-v1" ||

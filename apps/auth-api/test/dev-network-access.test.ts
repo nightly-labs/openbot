@@ -25,6 +25,7 @@ describe("development Auth API LAN access", () => {
       "/v2/remote/sessions/session-1/end",
       "/v2/remote/invites/preview",
       "/v2/remote/invites/accept",
+      "/v2/remote/hosts/host-1/",
       "/v2/remote/hosts/host-1/members/member-1",
       "/v2/remote/hosts/host-1/logo?v=logo-version",
       "/v1/agent-templates/AbCdEfGhIjKlMnOpQrSt_-",

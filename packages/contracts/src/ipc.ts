@@ -1,7 +1,9 @@
 export * from "./acp-agent-presets";
+export * from "./acp-registry-boundary";
 export * from "./agent-providers";
 export * from "./app-language";
 export * from "./app-logo-color";
+export * from "./ipc-acp-registry";
 export * from "./ipc-agent-admin";
 export * from "./ipc-agent-analytics";
 export * from "./ipc-agent-events";
@@ -10,6 +12,7 @@ export * from "./ipc-agent-import";
 export * from "./ipc-agent-memories";
 export * from "./ipc-agent-profile";
 export * from "./ipc-agent-runtime";
+export * from "./ipc-agent-session-settings";
 export * from "./ipc-agent-status";
 export * from "./ipc-agent-templates";
 export * from "./ipc-agents";

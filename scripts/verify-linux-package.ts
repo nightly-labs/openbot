@@ -82,7 +82,7 @@ await Promise.all(
 // Voice is not built for Linux. This assertion is the regression guard for the platform split of
 // `extraResources`: if it ever returns to the shared list, the Linux build either fails outright
 // on a missing source or ships a runtime it cannot use.
-await assertAbsent(resolve(resourcesPath, "whisper"), "Voice transcription is not available on Linux");
+await assertAbsent(resolve(resourcesPath, "voice"), "Voice transcription is not available on Linux");
 // The remote desktop runtime is built for x64 only, and only for this platform.
 if (architecture === "x64") {
   await Promise.all(

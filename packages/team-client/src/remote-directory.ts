@@ -311,6 +311,27 @@ export class RemoteTeamDirectoryClient {
     });
   }
 
+  /**
+   * Removes a host that this account owns from the account service, for all of its members. The host
+   * can be offline. A refused retry for a host that the list no longer has is a removal that already
+   * happened, as when the first answer was lost.
+   */
+  removeOwnedHost(hostId: string): Effect.Effect<void, DirectoryFailure> {
+    return Effect.gen({ self: this }, function* (): Effect.fn.Return<void, DirectoryFailure> {
+      yield* this.#request(`/v2/remote/hosts/${encodeURIComponent(hostId)}/`, { method: "DELETE" }).pipe(
+        Effect.catch((error) =>
+          error instanceof RemoteDirectoryError && (error.status === 403 || error.status === 404)
+            ? this.listHosts().pipe(
+                Effect.flatMap((hosts) =>
+                  hosts.some((host) => host.hostId === hostId) ? Effect.fail(error) : Effect.void,
+                ),
+              )
+            : Effect.fail(error),
+        ),
+      );
+    });
+  }
+
   createBootstrap(
     hostId: string,
     clientPublicKey: string,

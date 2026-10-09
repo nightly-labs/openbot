@@ -168,6 +168,10 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.settings.leaveTitle": "Leave {name}?",
   "mobile.server.settings.leaveBody": "You will need another invitation to join again.",
   "mobile.server.settings.leave": "Leave server",
+  "mobile.server.settings.removeTitle": "Remove {name}?",
+  "mobile.server.settings.removeBody":
+    "This removes the server from the account service for all members. Files and chats on its computer stay. To use it again, register it from that computer.",
+  "mobile.server.settings.remove": "Remove server",
   "mobile.server.settings.name": "Server name",
   "mobile.server.settings.nameLength": "Use {min} to {max} characters.",
   "mobile.server.settings.logo": "Server logo",
