@@ -738,7 +738,15 @@ export async function createApplicationServices({
     mainWindow.removeListener("blur", stopProfileTimer);
     centralAuth.stopProfileRefresh();
   });
-  const store = new AgentStore(app.getPath("userData"), homedir());
+  // UI tests need separate workspaces as well as a separate SQLite profile. Never change
+  // the workspace root of an installed app, or a development profile without this opt-in.
+  const workspaceHome =
+    !app.isPackaged &&
+    process.env.OPENBOT_DEV_ISOLATED_WORKSPACES === "1" &&
+    app.commandLine.getSwitchValue("user-data-dir").trim()
+      ? join(app.getPath("userData"), "workspace-home")
+      : homedir();
+  const store = new AgentStore(app.getPath("userData"), workspaceHome);
   await runCauseEffect(store.initialize());
   const managedSkills = new ManagedSkillService(
     app.isPackaged

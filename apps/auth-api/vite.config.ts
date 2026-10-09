@@ -42,6 +42,9 @@ export default defineConfig(({ command }) => {
       developmentLanGuard(),
       developmentApnsProxy(),
       cloudflare({
+        ...(process.env.OPENBOT_DEV_PERSIST_PATH
+          ? { persistState: { path: process.env.OPENBOT_DEV_PERSIST_PATH } }
+          : {}),
         viteEnvironment: { name: "ssr" },
         config(config) {
           return { vars: { ...config.vars, ...localRuntimeVars } };
