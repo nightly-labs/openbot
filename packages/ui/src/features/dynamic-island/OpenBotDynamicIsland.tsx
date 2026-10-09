@@ -1045,18 +1045,23 @@ function ExpandedContent(props: {
               />
             </IslandContentSwap>
             <Show when={props.inlineReply}>
-              <IslandReplyField
-                label={t("island.reply.placeholder", { name: message().agent.name })}
-                onSend={(text, clientMessageId) =>
-                  props.onAction({
-                    type: "send-message",
-                    serverId: props.presentation.serverId,
-                    agentId: message().agent.id,
-                    text,
-                    clientMessageId,
-                  })
-                }
-              />
+              {/* Each recipient gets a new field, so a draft for one agent is not sent to another. */}
+              <Show keyed when={`${props.presentation.serverId}:${message().agent.id}`}>
+                {(_recipient) => (
+                  <IslandReplyField
+                    label={t("island.reply.placeholder", { name: message().agent.name })}
+                    onSend={(text, clientMessageId) =>
+                      props.onAction({
+                        type: "send-message",
+                        serverId: props.presentation.serverId,
+                        agentId: message().agent.id,
+                        text,
+                        clientMessageId,
+                      })
+                    }
+                  />
+                )}
+              </Show>
               <IslandActionError message={props.actionError} />
             </Show>
             <footer class="dynamic-island-message-first-footer" data-island-motion-content>
