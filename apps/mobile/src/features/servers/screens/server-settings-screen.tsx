@@ -4,8 +4,10 @@ import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { Camera } from "lucide-react-native";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Alert, Pressable, View } from "react-native";
+import { useMobileSession } from "@/features/auth/context/mobile-session-context";
+import { hostedServerCalls } from "@/features/servers/api/hosted-servers";
 import { ServerAvatar } from "@/features/servers/components/server-avatar";
 import { ServerStatusLabel } from "@/features/servers/components/server-status-label";
 import { SERVER_ROLE_KEYS } from "@/features/servers/model/server-role";
@@ -31,6 +33,25 @@ export function ServerSettingsScreen() {
   const locked = useRef(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { session } = useMobileSession();
+  const owner = server?.role === "owner";
+  // Billing deletes a hosted server, so Remove shows only after the hosted servers are known.
+  const [hostedServerIds, setHostedServerIds] = useState<ReadonlySet<string> | null>(null);
+  useEffect(() => {
+    if (!session || !owner) return;
+    let current = true;
+    hostedServerCalls(session)
+      .list()
+      .then(
+        (list) => {
+          if (current) setHostedServerIds(new Set(list.servers.map((item) => item.serverId)));
+        },
+        () => undefined,
+      );
+    return () => {
+      current = false;
+    };
+  }, [session, owner]);
   async function perform(operation: () => Promise<void>, failure?: (error: unknown) => string) {
     if (locked.current) return;
     locked.current = true;
@@ -99,7 +120,7 @@ export function ServerSettingsScreen() {
               {t("mobile.server.settings.leave")}
             </Typography.Paragraph>
           </SettingsRow>
-        ) : (
+        ) : hostedServerIds && !hostedServerIds.has(serverId) ? (
           // The owner removes the server from the account. The host does not need to be online.
           <SettingsRow
             disclosure={false}
@@ -131,7 +152,7 @@ export function ServerSettingsScreen() {
               {t("mobile.server.settings.remove")}
             </Typography.Paragraph>
           </SettingsRow>
-        )}
+        ) : null}
         {error ? <SettingsNote>{error}</SettingsNote> : null}
       </SettingsSection>
     </SettingsContent>

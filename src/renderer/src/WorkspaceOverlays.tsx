@@ -258,7 +258,8 @@ function ServerSettings(props: {
   bitwardenConnector: BitwardenConnectorPanelProps | undefined;
 }) {
   const platform = usePlatform();
-  const { hostStatus, setServerMuted, setServerNotificationLevel, activeServer, hostedServerIds } = useServers();
+  const { hostStatus, setServerMuted, setServerNotificationLevel, activeServer, hostedServerIds, hostedServersLoaded } =
+    useServers();
   const { selectAgent, selectGlobalSearchMessage } = useNavigation();
   const { selectServer } = useServerSelection();
   const { setPendingAgentSelection } = useServerSwitch();
@@ -524,7 +525,7 @@ function ServerSettings(props: {
           onRevokeInvite={revokeServerInvite}
           onLeaveServer={leaveServer}
           // Billing deletes a hosted server, so its owner does not remove it here.
-          onRemoveServer={hostedServerIds().has(server().id) ? undefined : leaveServer}
+          onRemoveServer={hostedServersLoaded() && !hostedServerIds().has(server().id) ? leaveServer : undefined}
           onOpenScreenRecordingSettings={() => appPort().openExternal("mac-screen-recording")}
           onRecheckScreenRecording={recheckScreenRecording}
           mcpServers={serverSettingsMcp()}
