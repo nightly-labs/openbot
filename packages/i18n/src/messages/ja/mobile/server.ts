@@ -164,6 +164,10 @@ export const messages = {
   "mobile.server.settings.leaveTitle": "{name} から退出しますか？",
   "mobile.server.settings.leaveBody": "再度参加するには新しい招待が必要です。",
   "mobile.server.settings.leave": "サーバーから退出",
+  "mobile.server.settings.removeTitle": "{name} を削除しますか？",
+  "mobile.server.settings.removeBody":
+    "すべてのメンバーについてサーバーをアカウントサービスから削除します。そのコンピューター上のファイルとチャットは残ります。再び使うには、そのコンピューターから登録してください。",
+  "mobile.server.settings.remove": "サーバーを削除",
   "mobile.server.settings.name": "サーバー名",
   "mobile.server.settings.nameLength": "{min}〜{max} 文字で入力してください。",
   "mobile.server.settings.logo": "サーバーのロゴ",

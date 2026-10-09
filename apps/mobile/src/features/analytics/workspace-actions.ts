@@ -74,6 +74,8 @@ export function trackWorkspaceActions(workspace: MobileWorkspaceContextValue): M
       run("team_action", { action: "server_joined", server_kind: "remote" }, () => workspace.addRemoteServer(input)),
     leaveServer: (id) =>
       run("team_action", { action: "server_left", server_kind: "remote" }, () => workspace.leaveServer(id)),
+    removeServer: (id) =>
+      run("team_action", { action: "server_removed", server_kind: "remote" }, () => workspace.removeServer(id)),
     selectServer: (id) => {
       workspace.selectServer(id);
       mobileAnalytics.track("team_action", { action: "server_selected", server_kind: "remote", result: "succeeded" });

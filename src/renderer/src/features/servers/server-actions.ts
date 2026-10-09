@@ -82,6 +82,9 @@ export function useServerActions() {
     },
     onOpenSettings: openServerSettings,
     onLeave: requestLeaveServer,
+    // The same confirmation: main removes an owned server from the account instead of leaving it.
+    onRemove: requestLeaveServer,
+    canRemove: (serverId) => !hostedServerIds().has(serverId),
     onDelete: openHostedServerDelete,
     canDelete: (serverId) => hostedServerIds().has(serverId),
   } satisfies ServerActionCallbacks;

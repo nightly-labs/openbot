@@ -16,6 +16,7 @@ export const messages = {
   "mobile.workspace.error.transportNotReady": "モバイル接続の準備ができていません。",
   "mobile.workspace.error.sectionsUnsupported": "このホストはセクションの変更に対応していません。",
   "mobile.workspace.error.leaveOwnServer": "退出できるのは参加したリモートサーバーのみです。",
+  "mobile.workspace.error.removeOwnedServerOnly": "このサーバーを削除できるのはオーナーだけです。",
   "mobile.workspace.error.agentNotOnHost": "エージェントはこのホストにありません。",
   "mobile.workspace.error.filesUnsupported":
     "このホストはファイル管理に対応していません。ホストの OpenBot を更新してください。",

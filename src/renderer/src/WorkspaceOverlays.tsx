@@ -234,12 +234,13 @@ function AddServer() {
   );
 }
 
-/** The leave confirmation that the server menu opens. */
+/** The leave or owner removal confirmation that the server menu opens. */
 function LeaveServer() {
   const { leaveConfirmServer, leaveRestoreTarget, cancelLeaveServer, leaveConfirmedServer } = useServerSettings();
   return (
     <LeaveServerDialog
       server={leaveConfirmServer()}
+      removeOwned={leaveConfirmServer()?.role === "owner"}
       onClose={cancelLeaveServer}
       onLeave={leaveConfirmedServer}
       restoreFocusTarget={leaveRestoreTarget()}
@@ -257,7 +258,7 @@ function ServerSettings(props: {
   bitwardenConnector: BitwardenConnectorPanelProps | undefined;
 }) {
   const platform = usePlatform();
-  const { hostStatus, setServerMuted, setServerNotificationLevel, activeServer } = useServers();
+  const { hostStatus, setServerMuted, setServerNotificationLevel, activeServer, hostedServerIds } = useServers();
   const { selectAgent, selectGlobalSearchMessage } = useNavigation();
   const { selectServer } = useServerSelection();
   const { setPendingAgentSelection } = useServerSwitch();
@@ -522,6 +523,8 @@ function ServerSettings(props: {
           onRemoveMember={removeServerMember}
           onRevokeInvite={revokeServerInvite}
           onLeaveServer={leaveServer}
+          // Billing deletes a hosted server, so its owner does not remove it here.
+          onRemoveServer={hostedServerIds().has(server().id) ? undefined : leaveServer}
           onOpenScreenRecordingSettings={() => appPort().openExternal("mac-screen-recording")}
           onRecheckScreenRecording={recheckScreenRecording}
           mcpServers={serverSettingsMcp()}

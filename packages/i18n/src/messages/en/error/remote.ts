@@ -72,6 +72,7 @@ export const messages = defineMessages("error.remote", {
   "error.remote.bridgeCommandFailed": "The Team WebRTC command failed.",
   "error.remote.webRtcFailed": "WebRTC failed.",
   "error.remote.ownerCannotLeave": "The owner cannot leave this host.",
+  "error.remote.ownerOnlyRemove": "Only the owner can remove this server.",
   "error.remote.requestTimeout": "The remote request timed out.",
   "error.remote.requestFailed": "The remote request failed.",
   "error.remote.pinnedKeyMissing": "The remote host does not have a pinned device key.",

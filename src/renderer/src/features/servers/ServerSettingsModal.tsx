@@ -93,6 +93,11 @@ export interface ServerSettingsModalProps {
    * caller supplies this: the browser client is attached to one host and cannot leave it.
    */
   onLeaveServer?: () => Promise<void>;
+  /**
+   * Removes a server that the user owns from the account service, also when its host is offline.
+   * The Remove section appears only when a caller supplies this.
+   */
+  onRemoveServer?: () => Promise<void>;
   /** Opens the macOS pane that grants OpenBot screen recording, for the host that was refused it. */
   onOpenScreenRecordingSettings: () => Promise<void>;
   /** Asks the host to read the grant again, so the owner who gave it sees the warning go. */

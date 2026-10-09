@@ -75,6 +75,7 @@ export const messages = {
   "error.remote.bridgeCommandFailed": "Der Team-WebRTC-Befehl ist fehlgeschlagen.",
   "error.remote.webRtcFailed": "WebRTC ist fehlgeschlagen.",
   "error.remote.ownerCannotLeave": "Der Eigentümer kann diesen Host nicht verlassen.",
+  "error.remote.ownerOnlyRemove": "Nur der Eigentümer kann diesen Server entfernen.",
   "error.remote.requestTimeout": "Die Zeit für die entfernte Anfrage ist abgelaufen.",
   "error.remote.requestFailed": "Die entfernte Anfrage ist fehlgeschlagen.",
   "error.remote.pinnedKeyMissing": "Der entfernte Host hat keinen fest hinterlegten Geräteschlüssel.",

@@ -1044,6 +1044,37 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           serverCapabilities.current.get(serverId)?.includes(capability),
       );
     };
+    /** Drops a server that this account left or removed, and its local state. */
+    const forgetServer = (serverId: string) => {
+      removedServers.current.add(serverId);
+      readRefresh.invalidate(serverId);
+      directoryGeneration.current += 1;
+      directoryRefresh.invalidate();
+      setServerDirectoryState("ready");
+      setServerDirectoryError(null);
+      const removedIds = serverAgentIds.current.get(serverId) ?? new Set<string>();
+      serverAgentIds.current.delete(serverId);
+      if (activeServerId === serverId) {
+        loadGeneration.current += 1;
+        setActiveServerId(session.host?.hostId ?? null);
+      }
+      setServers((current) => current.filter((candidate) => candidate.id !== serverId));
+      setSidebarByServer((current) => Object.fromEntries(Object.entries(current).filter(([id]) => id !== serverId)));
+      setAgents((current) => current.filter((agent) => agent.serverId !== serverId));
+      liveState.update("activityByServer", (current) => {
+        const next = { ...current };
+        delete next[serverId];
+        return next;
+      });
+      liveState.update("approvalRequests", (current) => {
+        const next = { ...current };
+        delete next[serverId];
+        return next;
+      });
+      for (const id of removedIds) conversationStore.remove(id);
+      updatePreferences(serverId, () => ({ hidden: [], pinned: [] }));
+      liveState.update("unreadAgentIds", (current) => current.filter((id) => !removedIds.has(id)));
+    };
     const workspace: MobileWorkspaceContextValue = {
       browserViewSupport: (serverId) => {
         const capabilities = serverCapabilities.current.get(serverId) ?? [];
@@ -1205,34 +1236,13 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         if (!server || server.role === "owner")
           throw new Error(currentText().t("mobile.workspace.error.leaveOwnServer"));
         await runTeamEffect(directory.leaveHost(server.id, server.membershipId));
-        removedServers.current.add(serverId);
-        readRefresh.invalidate(serverId);
-        directoryGeneration.current += 1;
-        directoryRefresh.invalidate();
-        setServerDirectoryState("ready");
-        setServerDirectoryError(null);
-        const removedIds = serverAgentIds.current.get(serverId) ?? new Set<string>();
-        serverAgentIds.current.delete(serverId);
-        if (activeServerId === serverId) {
-          loadGeneration.current += 1;
-          setActiveServerId(session.host?.hostId ?? null);
-        }
-        setServers((current) => current.filter((candidate) => candidate.id !== serverId));
-        setSidebarByServer((current) => Object.fromEntries(Object.entries(current).filter(([id]) => id !== serverId)));
-        setAgents((current) => current.filter((agent) => agent.serverId !== serverId));
-        liveState.update("activityByServer", (current) => {
-          const next = { ...current };
-          delete next[serverId];
-          return next;
-        });
-        liveState.update("approvalRequests", (current) => {
-          const next = { ...current };
-          delete next[serverId];
-          return next;
-        });
-        for (const id of removedIds) conversationStore.remove(id);
-        updatePreferences(serverId, () => ({ hidden: [], pinned: [] }));
-        liveState.update("unreadAgentIds", (current) => current.filter((id) => !removedIds.has(id)));
+        forgetServer(serverId);
+      },
+      removeServer: async (serverId) => {
+        const server = serversRef.current.find((candidate) => candidate.id === serverId);
+        if (server?.role !== "owner") throw new Error(currentText().t("mobile.workspace.error.removeOwnedServerOnly"));
+        await runTeamEffect(directory.removeOwnedHost(server.id));
+        forgetServer(serverId);
       },
       refreshServer: async (serverId) => {
         connections.current.get(serverId)?.refresh();

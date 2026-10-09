@@ -87,6 +87,7 @@ interface TeamWebRtcClientTransportOptions {
     reactivate?: boolean,
   ) => Effect.Effect<void, CentralAuthOperationError>;
   removeMember: (hostId: string, membershipId: string) => Effect.Effect<void, CentralAuthOperationError>;
+  removeOwnedHost: (hostId: string) => Effect.Effect<void, CentralAuthOperationError>;
   getPrincipalId: () => string;
   controlPlaneUrl: string;
   downloadHostLogo: (
@@ -283,6 +284,27 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         if (host.role === "owner")
           return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.ownerCannotLeave")) });
         yield* this.#options.removeMember(hostId, host.membershipId).pipe(toRemoteWorkflowError);
+      }),
+    );
+  }).bind(this);
+
+  /**
+   * Removes a host that this account owns from the account service. The host can be offline. A host
+   * that the list no longer has is already removed, so a retry after a lost answer succeeds.
+   */
+  readonly removeOwnedHost = Effect.fn("TeamWebRtcClient.removeOwnedHost")(function* (
+    this: TeamWebRtcClientTransport,
+    hostId: string,
+  ): Effect.fn.Return<void, RemoteWorkflowError> {
+    return yield* this.#owned(
+      Effect.gen({ self: this }, function* () {
+        const host = (yield* this.#options.listHosts().pipe(toRemoteWorkflowError)).find(
+          (candidate) => candidate.hostId === hostId,
+        );
+        if (!host) return;
+        if (host.role !== "owner")
+          return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.ownerOnlyRemove")) });
+        yield* this.#options.removeOwnedHost(hostId).pipe(toRemoteWorkflowError);
       }),
     );
   }).bind(this);

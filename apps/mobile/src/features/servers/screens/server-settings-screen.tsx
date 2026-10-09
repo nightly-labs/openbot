@@ -24,14 +24,14 @@ import { type AvatarPhoto, pickAvatarPhoto } from "@/shared/lib/pick-avatar-phot
 import { useText } from "@/shared/lib/text";
 
 export function ServerSettingsScreen() {
-  const { t, sourceText } = useText();
+  const { t, sourceText, errorMessage } = useText();
   const { serverId } = useLocalSearchParams<{ serverId: string }>();
-  const { servers, leaveServer, refreshServer } = useMobileWorkspace();
+  const { servers, leaveServer, removeServer, refreshServer } = useMobileWorkspace();
   const server = servers.find((item) => item.id === serverId);
   const locked = useRef(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  async function perform(operation: () => Promise<void>) {
+  async function perform(operation: () => Promise<void>, failure?: (error: unknown) => string) {
     if (locked.current) return;
     locked.current = true;
     setBusy(true);
@@ -39,8 +39,8 @@ export function ServerSettingsScreen() {
     try {
       await operation();
       void haptics.notification("success");
-    } catch {
-      setError(t("mobile.server.settings.updateFailed"));
+    } catch (caught) {
+      setError(failure?.(caught) ?? t("mobile.server.settings.updateFailed"));
       void haptics.notification("error");
     } finally {
       locked.current = false;
@@ -99,7 +99,39 @@ export function ServerSettingsScreen() {
               {t("mobile.server.settings.leave")}
             </Typography.Paragraph>
           </SettingsRow>
-        ) : null}
+        ) : (
+          // The owner removes the server from the account. The host does not need to be online.
+          <SettingsRow
+            disclosure={false}
+            disabled={busy}
+            onPress={() =>
+              Alert.alert(
+                t("mobile.server.settings.removeTitle", { name: server.name }),
+                t("mobile.server.settings.removeBody"),
+                [
+                  { text: t("common.cancel"), style: "cancel" },
+                  {
+                    text: t("mobile.server.settings.remove"),
+                    style: "destructive",
+                    onPress: () =>
+                      void perform(
+                        async () => {
+                          await removeServer(serverId);
+                          router.dismiss();
+                        },
+                        // The account service explains a refusal, such as a hosted server that Billing deletes.
+                        (caught) => errorMessage(caught, t("mobile.server.settings.updateFailed")),
+                      ),
+                  },
+                ],
+              )
+            }
+          >
+            <Typography.Paragraph type="body-sm" className="text-danger-text">
+              {t("mobile.server.settings.remove")}
+            </Typography.Paragraph>
+          </SettingsRow>
+        )}
         {error ? <SettingsNote>{error}</SettingsNote> : null}
       </SettingsSection>
     </SettingsContent>

@@ -185,6 +185,8 @@ export interface MobileWorkspaceContextValue {
   liveState: LiveWorkspaceStore;
   selectServer: (serverId: string) => void;
   leaveServer: (serverId: string) => Promise<void>;
+  /** Removes a server that this account owns from the account service. The host can be offline. */
+  removeServer: (serverId: string) => Promise<void>;
   refreshServers: () => Promise<void>;
   refreshServer: (serverId: string) => Promise<void>;
   /** An owner or admin of an online host that serves `host-admin-v1`. The host checks the role again. */

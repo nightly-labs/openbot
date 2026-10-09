@@ -15,6 +15,7 @@ export const messages = defineMessages("mobile.workspace", {
   "mobile.workspace.error.transportNotReady": "The mobile transport is not ready.",
   "mobile.workspace.error.sectionsUnsupported": "This host does not support section changes.",
   "mobile.workspace.error.leaveOwnServer": "Only joined remote servers can be left.",
+  "mobile.workspace.error.removeOwnedServerOnly": "Only the owner can remove this server.",
   "mobile.workspace.error.agentNotOnHost": "Agent is not on this host.",
   "mobile.workspace.error.filesUnsupported": "This host does not support file management. Update OpenBot on the host.",
   "mobile.workspace.error.agentUnavailableOnHost": "The agent is unavailable on this host.",
