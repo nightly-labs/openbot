@@ -7,17 +7,18 @@ import { completed, conversation, newAgent, openAgent, send, t } from "./support
 test("chat sends, streams, follows up, stops, and sends again", async ({ app, owner }) => {
   const agent = await newAgent(app);
   await openAgent(app, agent.name);
+  const view = app.page.getByRole("main", { name: t("conversation.view.label"), exact: true });
   await send(app, agent.name, prompt({ steps: [{ kind: "hold", key: "chat-stream" }], reply: "First answer" }));
   // The streaming renderer can retain an unfinished trailing word until the next chunk.
-  await expect(app.page.getByText(/^Working on the test/)).toBeVisible();
+  await expect(view.getByText(/^Working on the test/)).toBeVisible();
   expect((await conversation(app, agent.id)).activeTurnId).not.toBeNull();
-  await expect(app.page.getByText("First answer", { exact: true })).toHaveCount(0);
+  await expect(view.getByText("First answer", { exact: true })).toHaveCount(0);
   await owner.release("chat-stream");
   await completed(app, agent.id, "First answer");
   await send(app, agent.name, prompt({ reply: "Follow-up answer" }));
   await completed(app, agent.id, "Follow-up answer");
   await send(app, agent.name, prompt({ steps: [{ kind: "hold", key: "never-release" }], reply: "Must not appear" }));
-  await expect(app.page.getByText(/^Working on the test/)).toBeVisible();
+  await expect(view.getByText(/^Working on the test/)).toBeVisible();
   await app.page.getByRole("button", { name: t("composer.send.stop") }).click();
   await expect.poll(async () => (await conversation(app, agent.id)).activeTurnId).toBeNull();
   await send(app, agent.name, prompt({ reply: "After stop" }));
@@ -25,7 +26,7 @@ test("chat sends, streams, follows up, stops, and sends again", async ({ app, ow
   const messages = (await conversation(app, agent.id)).messages;
   for (const text of ["First answer", "Follow-up answer", "After stop"]) {
     expect(messages.filter((message) => message.text === text)).toHaveLength(1);
-    await expect(app.page.getByText(text, { exact: true })).toBeVisible();
+    await expect(view.getByText(text, { exact: true })).toBeVisible();
   }
   expect(messages.some((message) => message.text === "Must not appear")).toBe(false);
   expect(messages.findIndex((message) => message.text === "First answer")).toBeLessThan(
@@ -43,8 +44,9 @@ test("queue edits and removes pending input", async ({ app, owner }) => {
   const agent = await newAgent(app);
   const key = randomUUID();
   await openAgent(app, agent.name);
+  const view = app.page.getByRole("main", { name: t("conversation.view.label"), exact: true });
   await send(app, agent.name, prompt({ steps: [{ kind: "hold", key }], reply: "Blocker finished" }));
-  await expect(app.page.getByText(/^Working on the test/)).toBeVisible();
+  await expect(view.getByText(/^Working on the test/)).toBeVisible();
   await send(app, agent.name, prompt({ reply: "Old queued answer" }));
   await app.page.getByRole("button", { name: t("queue.item.editLabel", { position: 1 }) }).click();
   await app.page
@@ -73,7 +75,7 @@ test("queue edits and removes pending input", async ({ app, owner }) => {
   expect(
     snapshot.messages.some((message) => ["Old queued answer", "Deleted queued answer"].includes(message.text)),
   ).toBe(false);
-  await expect(app.page.getByText("Edited queued answer", { exact: true })).toBeVisible();
+  await expect(view.getByText("Edited queued answer", { exact: true })).toBeVisible();
 });
 
 test("restart preserves identity and conversation", async ({ app, owner, serverId }) => {

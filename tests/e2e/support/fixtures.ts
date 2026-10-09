@@ -1,8 +1,6 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { redactText } from "@openbot/logging";
 import { test as base, expect } from "@playwright/test";
-import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 import { assertHost, joinHost, TestApp, testEmail } from "./app";
 import { output, providers, settings } from "./settings";
 
@@ -78,9 +76,6 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
   },
   app: async ({ stack }, use, testInfo) => {
     if (stack.serverId) await assertHost(stack.client, stack.serverId);
-    const context = stack.client.page.context();
-    // Actions only. Network bodies, source files, and credential-screen snapshots are not recorded.
-    await context.tracing.start({ snapshots: false, screenshots: false, sources: false });
     try {
       await use(stack.client);
     } finally {
@@ -88,22 +83,7 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
         const artifactRoot = join(output, "report", testInfo.testId.replaceAll(/[^a-zA-Z0-9_-]/g, "_"));
         await mkdir(artifactRoot, { recursive: true });
         await stack.client.page.screenshot({ path: join(artifactRoot, "failure.png") }).catch(() => undefined);
-        const raw = join(stack.client.profile, "trace.zip");
-        await context.tracing.stop({ path: raw }).catch(() => undefined);
-        try {
-          const entries = unzipSync(await readFile(raw));
-          // Without snapshots there are no binary resources. Reject an unexpected trace format.
-          const safe = Object.fromEntries(
-            Object.entries(entries).map(([name, bytes]) => {
-              if (!/\.(trace|network|stacks)$/u.test(name)) throw new Error("Unexpected trace resource.");
-              return [name, strToU8(redactText(strFromU8(bytes)))];
-            }),
-          );
-          await writeFile(join(artifactRoot, "trace.zip"), zipSync(safe));
-        } catch {
-          /* Keep the UI screenshot and report when the trace cannot be safely exported. */
-        }
-      } else await context.tracing.stop().catch(() => undefined);
+      }
     }
   },
 });

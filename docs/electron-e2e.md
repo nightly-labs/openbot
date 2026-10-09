@@ -138,8 +138,8 @@ The suite writes `.openbot-build/e2e/report/coverage.json` and `index.html`. Eac
 When reviewing cases separately, copy each report before starting the next case. A sequence of
 focused passes does not verify the full parallel release time budget. The JSON includes
 commit, platform, runtime versions, provider/model annotations, duration, and required coverage.
-The report also retains the last 300 redacted log chunks. Failures save a UI screenshot and an action trace when it can be exported safely. Traces
-exclude network bodies, DOM snapshots, screenshots, and source files. Text passes through the
+The report also retains the last 300 redacted log chunks. Failures save a UI screenshot. Playwright traces are disabled because Electron launch metadata
+contains the inherited process environment. Text passes through the
 shared secret redactor. Only `report/` is uploaded, for 14 days. Never upload the private profiles,
 provider state, SQLite files, raw traces, or the entire `.openbot-build/e2e` directory.
 

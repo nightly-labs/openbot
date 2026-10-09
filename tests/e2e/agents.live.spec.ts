@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
 import { expect, test } from "./support/fixtures";
 import { modelFor, providers, settings } from "./support/settings";
 import { conversation, createGroup, openAgent, send, sendGroup, t } from "./support/ui";
@@ -90,8 +91,10 @@ for (const provider of providers) {
     // The frame moves when the preview closes. Wait for its actionability before targeting its content.
     await visual.click({ trial: true });
     const frame = visual.contentFrame();
-    await frame.getByRole("button", { name: "Count: 0" }).click();
-    await expect(frame.getByRole("button", { name: "Count: 1" })).toBeVisible();
+    const counter = frame.getByRole("button");
+    await expect(counter).toHaveAccessibleName("Count: 0");
+    await counter.click();
+    await expect(counter).toHaveAccessibleName("Count: 1");
     expect(await fetch(`${settings().siteUrl}/receipts?case=${id}`).then((response) => response.json())).toEqual([
       "42",
     ]);
@@ -115,7 +118,7 @@ test("live-group routes Codex to Claude to OpenCode within a group", async ({ ap
   await sendGroup(
     app.page,
     [
-      `Release test for ${codex.name}: use channel_assign to give ${claude.name} (${claude.id}) this task:`,
+      `${serializeChatTagReference("agent", codex.name, codex.id)} use channel_assign to give ${claude.name} (${claude.id}) this task:`,
       `"Use channel_assign to ask ${opencode.name} (${opencode.id}) to compute 6 * 7 and report '${marker}: 42' with channel_result.`,
       `End your turn while it works. When it answers, use channel_result to return '${marker}: 42'."`,
       `When Claude answers, publish '${marker}: 42' with channel_result. Do not use send_message in this group.`,
@@ -144,10 +147,19 @@ test("live-group routes Codex to Claude to OpenCode within a group", async ({ ap
   expect(claudeTask.parentTaskId).toBe(codexTask.id);
   expect(opencodeTask.parentTaskId).toBe(claudeTask.id);
   for (const member of members)
-    expect(
-      history.messages.some(
-        (message) => message.author.id === member.id && message.message.text.includes(`${marker}: 42`),
-      ),
-    ).toBe(true);
+    await expect
+      .poll(
+        async () => {
+          const current = await app.page.evaluate(
+            (channelId) => window.openbot.agent.readChannel({ channelId }),
+            group.id,
+          );
+          return current.messages.some(
+            (message) => message.author.id === member.id && message.message.text.includes(`${marker}: 42`),
+          );
+        },
+        { message: `${member.name} must publish its group result.` },
+      )
+      .toBe(true);
   await expect(app.page.getByText(`${marker}: 42`, { exact: true }).first()).toBeVisible();
 });
