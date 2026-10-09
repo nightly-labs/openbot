@@ -71,6 +71,8 @@ export const messages = {
   "error.backend.channelRoutineLimit": "Un canal peut avoir au maximum {limit} routines.",
   "error.backend.agentRoutineLimit": "Un agent peut avoir au maximum {limit} routines.",
   "error.backend.agentMemoryLimit": "Un agent peut avoir jusqu’à {limit} souvenirs.",
+  "error.backend.agentMemoryLimitReached":
+    "Vous avez {saved} souvenirs sur {limit}. Fusionnez un souvenir avec un autre avec remember et son memoryId, ou oubliez-en un obsolète, puis réessayez.",
   "error.backend.channelHistoryLeadRequired": "Choisissez un responsable de canal pour préparer l’historique partagé.",
   "error.backend.channelHistoryArriving":
     "Un message partagé est encore en cours de réception. Reprenez quand il sera complet.",

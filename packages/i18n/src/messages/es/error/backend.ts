@@ -75,6 +75,8 @@ export const messages = {
   "error.backend.channelRoutineLimit": "Un canal puede tener un máximo de {limit} rutinas.",
   "error.backend.agentRoutineLimit": "Un agente puede tener un máximo de {limit} rutinas.",
   "error.backend.agentMemoryLimit": "Un agente puede tener hasta {limit} recuerdos.",
+  "error.backend.agentMemoryLimitReached":
+    "Tienes {saved} de {limit} recuerdos. Combina un recuerdo con otro usando remember y su memoryId, u olvida uno obsoleto, y vuelve a intentarlo.",
   "error.backend.channelHistoryLeadRequired": "Elige un coordinador de canal para preparar el historial compartido.",
   "error.backend.channelHistoryArriving": "Aún se está recibiendo un mensaje compartido. Reanuda cuando esté completo.",
   "error.backend.channelHistoryInvalid": "El resumen del historial no es válido. Reanuda para intentarlo de nuevo.",

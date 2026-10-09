@@ -39,6 +39,8 @@ export interface AgentMemoriesOptions {
   conversation: ConversationRuntime;
   emit(event: AgentEvent): void;
   emitError(code: string, error: unknown, agentId?: string): void;
+  /** How many memories one agent can hold: the app setting. Omitted, the default cap. */
+  limit?: () => number;
 }
 
 /**
@@ -63,7 +65,11 @@ export class AgentMemories {
     this.#conversation = options.conversation;
     this.#emit = options.emit;
     this.#emitError = options.emitError;
-    this.#memories = new AgentMemoryStore(options.store.database);
+    this.#memories = new AgentMemoryStore(options.store.database, options.limit);
+  }
+
+  limit(): number {
+    return this.#memories.limit();
   }
 
   list(agentId: string): AgentMemory[] {
@@ -132,6 +138,14 @@ export class AgentMemories {
       }
       const current = memoryId ? this.#memories.get(senderAgentId, memoryId) : null;
       if (memoryId && !current) return openBotToolFailure("This memory does not belong to the current agent.");
+      // A full agent hears it now, while it can still merge or forget in this turn. Staged anyway,
+      // the save would fail at commit and the memory would be lost.
+      if (!memoryId && !this.#memories.findByText(senderAgentId, text)) {
+        const limit = this.#memories.limit();
+        const count = this.#projectedCount(params.turnId, params.callId, senderAgentId);
+        if (count >= limit)
+          return openBotToolFailure(sourceText("error.backend.agentMemoryLimitReached", { saved: count, limit }));
+      }
       this.#stage(params.turnId, {
         callId: params.callId,
         type: "remember",
@@ -205,6 +219,23 @@ export class AgentMemories {
     const agent = this.#conversation.requireKnownAgent(agentId);
     this.#conversation.unloadAgentThreads(agent.id);
     this.#emit({ type: "memories-changed", agentId });
+  }
+
+  /** The agent's memory count once this turn's other staged changes commit. */
+  #projectedCount(turnId: string, callId: string, agentId: string): number {
+    let count = this.#memories.count(agentId);
+    for (const mutation of this.#pending.get(turnId) ?? []) {
+      if (mutation.agentId !== agentId || mutation.callId === callId) continue;
+      if (mutation.epoch !== this.#epoch(agentId)) continue;
+      if (mutation.type === "forget") count -= 1;
+      else {
+        const same = this.#memories.findByText(agentId, mutation.text);
+        if (!mutation.memoryId && !same) count += 1;
+        // An update to the text of another memory folds the two into one.
+        else if (mutation.memoryId && same && same.id !== mutation.memoryId) count -= 1;
+      }
+    }
+    return count;
   }
 
   #stage(turnId: string, mutation: PendingMemoryMutation): void {

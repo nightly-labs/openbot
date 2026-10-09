@@ -73,6 +73,8 @@ export const messages = {
   "error.backend.channelRoutineLimit": "Um canal pode ter no máximo {limit} rotinas.",
   "error.backend.agentRoutineLimit": "Um agente pode ter no máximo {limit} rotinas.",
   "error.backend.agentMemoryLimit": "Um agente pode ter até {limit} memórias.",
+  "error.backend.agentMemoryLimitReached":
+    "Você tem {saved} de {limit} memórias. Junte uma memória a outra com remember e o memoryId dela, ou esqueça uma desatualizada, e tente de novo.",
   "error.backend.channelHistoryLeadRequired": "Escolha um líder de canal para preparar o histórico compartilhado.",
   "error.backend.channelHistoryArriving":
     "Uma mensagem compartilhada ainda está chegando. Retome quando ela estiver completa.",

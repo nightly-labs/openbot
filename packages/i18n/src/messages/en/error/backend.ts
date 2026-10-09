@@ -72,6 +72,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.channelRoutineLimit": "A channel can have at most {limit} routines.",
   "error.backend.agentRoutineLimit": "An agent can have at most {limit} routines.",
   "error.backend.agentMemoryLimit": "An agent can have up to {limit} memories.",
+  "error.backend.agentMemoryLimitReached":
+    "You have {saved} of {limit} memories. Merge a memory into another with remember and its memoryId, or forget a stale one, then try again.",
   "error.backend.channelHistoryLeadRequired": "Choose a channel lead to prepare the shared history.",
   "error.backend.channelHistoryArriving": "A shared message is still arriving. Resume when it is complete.",
   "error.backend.channelHistoryInvalid": "The history summary is invalid. Resume to try again.",

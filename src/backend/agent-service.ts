@@ -236,6 +236,11 @@ export interface AgentServiceOptions {
    * Omitted, such a message waits in the queue, as every one did before the setting existed.
    */
   busyMessageMode?: () => BusyMessageMode;
+  /**
+   * How many memories one agent can hold. The main process owns the preference. Omitted, the
+   * default cap, which was the only cap before the setting existed.
+   */
+  agentMemoryLimit?: () => number;
   deleteWithRevokedApproval?: (
     agentId: string,
     remove: () => Effect.Effect<void, AgentRemovalFailed>,
@@ -409,6 +414,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       conversation: this.#conversation,
       emit: (event) => this.#emit(event),
       emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
+      limit: options.agentMemoryLimit,
     });
     // One timer for both routine owners. The sources are read lazily because `channels` and its
     // scheduler are built further down, and because an owner's earliest routine changes constantly.
@@ -1131,6 +1137,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   listMemories(agentId: string): AgentMemory[] {
     return this.#memories.list(agentId);
+  }
+
+  /** How many memories one agent can hold now. */
+  memoryLimit(): number {
+    return this.#memories.limit();
   }
 
   createMemory(input: CreateAgentMemoryInput): AgentMemory {

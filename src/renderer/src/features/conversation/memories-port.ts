@@ -12,7 +12,8 @@ export interface MemoriesPort {
   ownerLabel: string;
   /** The word the modal reads in its sentences: "This agent has no saved memories yet." */
   ownerNoun: "agent" | "channel";
-  limit: number;
+  /** Null when another computer holds the cap: its host refuses a memory past it. */
+  limit: number | null;
   list: () => Promise<MemoryEntry[]>;
   create: (text: string) => Promise<void>;
   update: (memoryId: string, text: string) => Promise<void>;
@@ -22,12 +23,12 @@ export interface MemoriesPort {
   subscribe: (reload: () => void) => () => void;
 }
 
-export function agentMemoriesPort(agentId: string, agentName: string): MemoriesPort {
+export function agentMemoriesPort(agentId: string, agentName: string, limit: number | null): MemoriesPort {
   return {
     ownerId: agentId,
     ownerLabel: agentName,
     ownerNoun: "agent",
-    limit: INPUT_LIMITS.agentMemories,
+    limit,
     list: () => window.openbot.agent.listMemories(agentId),
     create: async (text) => {
       await window.openbot.agent.createMemory({ agentId, text });

@@ -60,6 +60,7 @@ export interface ImportManifest {
 
 export function decodeImportManifest(
   bytes: Uint8Array,
+  agentMemoryLimit: number,
   now: () => Date = () => new Date(),
 ): { manifest: ImportManifest; warnings: string[] } {
   let value: unknown;
@@ -82,7 +83,7 @@ export function decodeImportManifest(
   const warnings: string[] = [];
   const keys = new Set<string>();
   const agents = value.agents.map((item, index) => {
-    const agent = decodeAgent(item, index, warnings, now);
+    const agent = decodeAgent(item, index, warnings, now, agentMemoryLimit);
     if (keys.has(agent.key)) throw new Error(`Two agents use the key "${agent.key}".`);
     keys.add(agent.key);
     return agent;
@@ -153,7 +154,13 @@ function decodeChannel(
   };
 }
 
-function decodeAgent(value: unknown, index: number, warnings: string[], now: () => Date): ImportAgent {
+function decodeAgent(
+  value: unknown,
+  index: number,
+  warnings: string[],
+  now: () => Date,
+  memoryLimit: number,
+): ImportAgent {
   if (!isDynamicRecord(value)) throw new Error(`Agent ${index + 1} is invalid.`);
   if (!isAgentImportKey(value.key)) throw new Error(`Agent ${index + 1} has an invalid key.`);
   const key = value.key;
@@ -187,7 +194,7 @@ function decodeAgent(value: unknown, index: number, warnings: string[], now: () 
     skills: skills.map((skill: unknown) => path(skill, "skill path") ?? invalidField(key, "skill path")),
     files: path(value.files, "files path"),
     routines: decodeRoutines(routines, name, warnings, now),
-    memories: decodeMemories(memories, name, warnings, INPUT_LIMITS.agentMemories),
+    memories: decodeMemories(memories, name, warnings, memoryLimit),
   };
 }
 

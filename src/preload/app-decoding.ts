@@ -17,6 +17,7 @@ import {
 import { parseHostedSiteList, parseHostedSiteSummary } from "@openbot/contracts/hosted-sites";
 import {
   type AccountSession,
+  type AgentMemoryLimitPreference,
   type AnalyticsPreference,
   type AppInfo,
   type AppLanguagePreference,
@@ -44,6 +45,7 @@ import {
   type HostedSiteSummary,
   IDLE_RESTART_TARGETS,
   type IdleRestart,
+  isAgentMemoryLimit,
   isAgentModel,
   isAgentProvider,
   isAppLanguage,
@@ -122,6 +124,12 @@ export function decodeBusyMessageModePreference(value: unknown): BusyMessageMode
   const preference = decodeRecord(value, "busy message mode preference");
   if (!isBusyMessageMode(preference.mode)) throw new Error("Invalid busy message mode.");
   return { mode: preference.mode };
+}
+
+export function decodeAgentMemoryLimitPreference(value: unknown): AgentMemoryLimitPreference {
+  const preference = decodeRecord(value, "agent memory limit preference");
+  if (!isAgentMemoryLimit(preference.limit)) throw new Error("Invalid agent memory limit.");
+  return { limit: preference.limit };
 }
 
 export function decodeAppLanguagePreference(value: unknown): AppLanguagePreference {

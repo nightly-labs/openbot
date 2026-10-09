@@ -691,7 +691,7 @@ export class ThreadLifecycle {
       this.#store.sharedRoot,
       this.#memories.listFor(agent.id),
       this.#store.automationRoot,
-      { passwordVault: this.#passwordVaultConnected() },
+      { passwordVault: this.#passwordVaultConnected(), memoryLimit: this.#memories.limit() },
     );
   }
 

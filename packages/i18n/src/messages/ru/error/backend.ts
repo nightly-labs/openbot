@@ -75,6 +75,8 @@ export const messages = {
   "error.backend.channelRoutineLimit": "В канале может быть не более {limit} регулярных задач.",
   "error.backend.agentRoutineLimit": "У агента может быть не более {limit} регулярных задач.",
   "error.backend.agentMemoryLimit": "У агента может быть не более {limit} записей памяти.",
+  "error.backend.agentMemoryLimitReached":
+    "У вас {saved} из {limit} записей памяти. Объедините запись с другой через remember и её memoryId или забудьте устаревшую, затем повторите попытку.",
   "error.backend.channelHistoryLeadRequired": "Выберите ведущего канала, чтобы подготовить общую историю.",
   "error.backend.channelHistoryArriving": "Общее сообщение ещё приходит. Продолжите, когда оно придёт полностью.",
   "error.backend.channelHistoryInvalid": "Сводка истории некорректна. Продолжите, чтобы повторить попытку.",

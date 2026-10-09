@@ -1,4 +1,4 @@
-import type { AppVariant } from "@openbot/contracts/ipc";
+import { AGENT_MEMORY_LIMITS, type AgentMemoryLimit, type AppVariant } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
   ConfirmDialog,
@@ -102,6 +102,29 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
             label={i18n.t("settings.busyMessage.title")}
             description={i18n.t("settings.busyMessage.description")}
           />
+          <Item class="settings-modal-row">
+            <ItemContent>
+              <ItemTitle>{i18n.t("settings.agentMemoryLimit.title")}</ItemTitle>
+              <ItemDescription>{i18n.t("settings.agentMemoryLimit.description")}</ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Select<AgentMemoryLimit>
+                class="settings-modal-select"
+                options={[...AGENT_MEMORY_LIMITS]}
+                value={props.value.agentMemoryLimit}
+                onChange={(value) => value && props.onUpdateSetting("agentMemoryLimit", value)}
+                placement="bottom-end"
+                itemComponent={(selectProps) => (
+                  <SelectItem item={selectProps.item}>{String(selectProps.item.rawValue)}</SelectItem>
+                )}
+              >
+                <SelectTrigger size="sm" aria-label={i18n.t("settings.agentMemoryLimit.title")}>
+                  <SelectValue<AgentMemoryLimit>>{(state) => String(state.selectedOption() ?? "")}</SelectValue>
+                </SelectTrigger>
+                <SelectContent mount={props.selectMount} />
+              </Select>
+            </ItemActions>
+          </Item>
           <Item class="settings-modal-row">
             <ItemContent>
               <ItemTitle>{i18n.t("settings.externalLinks.title")}</ItemTitle>

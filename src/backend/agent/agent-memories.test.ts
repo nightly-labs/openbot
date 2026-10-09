@@ -4,9 +4,12 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { AgentProvider } from "../agent-client";
 import type { AgentService } from "../agent-service";
 import {
+  callOpenBotTool,
   createTestService,
   FakeAgentClient,
   notification,
+  openBotToolPayload,
+  paramsRecord,
   startAgentTestFixture,
   stopAgentTestFixture,
   stores,
@@ -230,5 +233,59 @@ describe.sequential("AgentMemories: staging, epochs and turn commitment", () => 
     await waitFor(() => events.filter((event) => event.type === "turn-completed").length === 4);
     expect(service.listMemories("chief")).toEqual([]);
     expect(events.filter((event) => event.type === "memories-changed")).toHaveLength(memoryEventCount + 1);
+  });
+
+  it("refuses a new memory at the cap while the turn runs, and keeps one added after a forget", async () => {
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    const { store, mailbox } = stores(root);
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      agentMemoryLimit: () => 2,
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider, "DONE", false);
+        clients.set(provider, client);
+        return client;
+      },
+    });
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(store.getOrCreate("chief"));
+    const stale = service.createMemory({ agentId: "chief", text: "The release is on Friday." });
+    service.createMemory({ agentId: "chief", text: "Use Bun for scripts." });
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "The release moved to Monday." }));
+    await waitFor(() => events.some((event) => event.type === "turn-started"));
+
+    const client = clients.get("codex");
+    const threadId = store.activeProviderSession("chief")?.externalSessionId;
+    const turnId = events.find((event) => event.type === "turn-started")?.turnId;
+    if (!client || !threadId || !turnId) throw new Error("The memory cap turn did not start.");
+    const startRequest = client.requests.find((request) => request.method === "thread/start");
+    expect(JSON.stringify(startRequest?.params)).toContain('<agent_memories count=\\"2\\" limit=\\"2\\">');
+
+    const refused = await callOpenBotTool(client, threadId, "remember", { text: "The release is on Monday." }, turnId);
+    expect(paramsRecord(refused.result)?.success).toBe(false);
+    expect(openBotToolPayload(refused.result).error).toBe(
+      "You have 2 of 2 memories. Merge a memory into another with remember and its memoryId, or forget a stale one, then try again.",
+    );
+
+    await callOpenBotTool(client, threadId, "forget_memory", { memoryId: stale.id }, turnId);
+    const staged = await callOpenBotTool(client, threadId, "remember", { text: "The release is on Monday." }, turnId);
+    expect(openBotToolPayload(staged.result).status).toBe("staged");
+
+    client.emit(
+      "notification",
+      notification("turn/completed", { threadId, turn: { id: turnId, status: "completed" } }),
+    );
+    await waitFor(() => events.some((event) => event.type === "turn-completed"));
+    expect(
+      service
+        .listMemories("chief")
+        .map((memory) => memory.text)
+        .sort(),
+    ).toEqual(["The release is on Monday.", "Use Bun for scripts."]);
+    expect(events.filter((event) => event.type === "error")).toEqual([]);
   });
 });

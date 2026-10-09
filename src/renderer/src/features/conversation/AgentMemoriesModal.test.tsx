@@ -95,7 +95,7 @@ describe("AgentMemoriesModal", () => {
     const onCountChange = vi.fn();
     render(() => (
       <AgentMemoriesModal
-        port={agentMemoriesPort("chief", "Chief")}
+        port={agentMemoriesPort("chief", "Chief", 64)}
         open
         onOpenChange={vi.fn()}
         onCountChange={onCountChange}
@@ -144,7 +144,7 @@ describe("AgentMemoriesModal", () => {
     memoryState = [{ ...firstMemory }];
     render(() => (
       <AgentMemoriesModal
-        port={agentMemoriesPort("chief", "Chief")}
+        port={agentMemoriesPort("chief", "Chief", 64)}
         open
         onOpenChange={vi.fn()}
         onCountChange={vi.fn()}
@@ -174,7 +174,7 @@ describe("AgentMemoriesModal", () => {
     memoryState = [{ ...firstMemory }, { ...firstMemory, id: "memory-2", text: "Prefers short status reports." }];
     render(() => (
       <AgentMemoriesModal
-        port={agentMemoriesPort("chief", "Chief")}
+        port={agentMemoriesPort("chief", "Chief", 64)}
         open
         onOpenChange={vi.fn()}
         onCountChange={vi.fn()}
@@ -230,7 +230,7 @@ describe("AgentMemoriesModal", () => {
     const onOpenChange = vi.fn();
     render(() => (
       <AgentMemoriesModal
-        port={agentMemoriesPort("chief", "Chief")}
+        port={agentMemoriesPort("chief", "Chief", 64)}
         open
         onOpenChange={onOpenChange}
         onCountChange={vi.fn()}

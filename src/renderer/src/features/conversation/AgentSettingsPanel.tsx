@@ -28,6 +28,8 @@ interface AgentSettingsPanelProps
     "width" | "onResize" | "onResizeEnd" | "links" | "detailOpen" | "children"
   > {
   remoteClient?: boolean;
+  /** The memory cap of an agent on this computer. Absent for a remote agent: its host enforces its own. */
+  memoryLimit?: number;
   /** The web client's host calls for the settings that its server supports. */
   adminCalls?: ConversationRuntime["admin"];
   onPublish?: () => void;
@@ -66,7 +68,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     files: { open: false },
     skills: { count: 0, open: false, reopenAfterMarketplace: false },
   });
-  const memoriesPort = createMemo(() => agentMemoriesPort(props.agent.id, props.agent.name));
+  const memoriesPort = createMemo(() => agentMemoriesPort(props.agent.id, props.agent.name, props.memoryLimit ?? null));
   const legacyRoutinesPort = createMemo(() =>
     agentRoutinesPort(
       props.agent.id,

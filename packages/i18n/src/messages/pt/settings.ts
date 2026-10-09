@@ -35,6 +35,9 @@ export const messages = {
   "settings.busyMessage.title": "Redirecionar agentes enquanto trabalham",
   "settings.busyMessage.description":
     "Novas mensagens entram no trabalho atual do agente, não na fila. Funciona com ChatGPT e Claude.",
+  "settings.agentMemoryLimit.title": "Memórias por agente",
+  "settings.agentMemoryLimit.description":
+    "Quantas memórias cada agente neste computador pode guardar. Um número maior deixa cada prompt mais longo.",
   "settings.permissions.title": "Permissões",
   "settings.turbo.title": "Modo Turbo",
   "settings.turbo.description":

@@ -45,6 +45,12 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
 
   onSettled(() => scrollFades.stop);
 
+  /** The cap the owner reached, or null. A remote host's cap is unknown here; it refuses on save. */
+  const reachedLimit = () => {
+    const limit = props.port.limit;
+    return limit !== null && memories().length >= limit ? limit : null;
+  };
+
   async function loadMemories(showLoading = true): Promise<void> {
     if (showLoading) setLoading(true);
     setError(null);
@@ -81,7 +87,7 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
 
   async function createMemory(): Promise<void> {
     const text = newText().trim();
-    if (!text || memories().length >= props.port.limit) return;
+    if (!text || reachedLimit() !== null) return;
     const analytics = desktopAnalytics.scope();
     let operationSucceeded = false;
     setSavingId("new");
@@ -227,7 +233,7 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
                   label={t("memory.add")}
                   class="agent-memories-add-button"
                   variant="ghost"
-                  disabled={loading() || memories().length >= props.port.limit}
+                  disabled={loading() || reachedLimit() !== null}
                   onClick={openAddComposer}
                 >
                   <Plus />
@@ -279,10 +285,12 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
                 </section>
               </Show>
 
-              <Show when={memories().length >= props.port.limit}>
-                <p class="agent-memory-limit" role="status">
-                  {t(LIMIT_TEXT[props.port.ownerNoun], { limit: props.port.limit })}
-                </p>
+              <Show when={reachedLimit()}>
+                {(limit) => (
+                  <p class="agent-memory-limit" role="status">
+                    {t(LIMIT_TEXT[props.port.ownerNoun], { limit: limit() })}
+                  </p>
+                )}
               </Show>
               <Show when={!clearConfirmation() ? error() : null}>
                 {(message) => (

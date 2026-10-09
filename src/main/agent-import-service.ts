@@ -64,6 +64,7 @@ export interface AgentImportAgents {
   }): ReturnType<AgentService["createAgentProfile"]>;
   createRoutine(input: CreateRoutineInput, options?: { recordConversationEvent?: boolean }): unknown;
   createMemory(input: { agentId: string; text: string }): unknown;
+  memoryLimit(): number;
   setAvatar(agentId: string, image: AvatarImageInput | null): ReturnType<AgentService["setAvatar"]>;
   deleteAgent(agentId: string): ReturnType<AgentService["deleteAgent"]>;
   channels: { command(command: ChannelCommand, actor: ChannelActor): ReturnType<ChannelService["command"]> };
@@ -230,7 +231,10 @@ export class AgentImportService {
         new Error(sourceText("error.import.manifestMissing", { manifest: AGENT_IMPORT_MANIFEST })),
       );
     const { manifest, warnings } = yield* archiveSync(() =>
-      decodeImportManifest(extract(bytes, (name) => name === manifestName)[manifestName] ?? new Uint8Array()),
+      decodeImportManifest(
+        extract(bytes, (name) => name === manifestName)[manifestName] ?? new Uint8Array(),
+        this.agents.memoryLimit(),
+      ),
     );
 
     const avatarPaths = new Set(manifest.agents.flatMap((agent) => (agent.avatar ? [wrapper + agent.avatar] : [])));

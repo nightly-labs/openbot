@@ -71,6 +71,8 @@ export const messages = {
   "error.backend.channelRoutineLimit": "1 つのチャンネルに置けるルーティンは {limit} 個までです。",
   "error.backend.agentRoutineLimit": "1 つのエージェントに置けるルーティンは {limit} 個までです。",
   "error.backend.agentMemoryLimit": "1 つのエージェントに置けるメモリーは {limit} 個までです。",
+  "error.backend.agentMemoryLimitReached":
+    "メモリーは {limit} 個中 {saved} 個です。remember とその memoryId でメモリーを別のメモリーにまとめるか、古いメモリーを削除してから、もう一度試してください。",
   "error.backend.channelHistoryLeadRequired": "共有履歴を準備するには、チャンネルリードを選択してください。",
   "error.backend.channelHistoryArriving": "共有メッセージをまだ受信中です。完了してから再開してください。",
   "error.backend.channelHistoryInvalid": "履歴の要約が無効です。再開してもう一度お試しください。",

@@ -69,6 +69,8 @@ export const messages = {
   "error.backend.channelRoutineLimit": "Bir kanal en fazla {limit} rutine sahip olabilir.",
   "error.backend.agentRoutineLimit": "Bir ajan en fazla {limit} rutine sahip olabilir.",
   "error.backend.agentMemoryLimit": "Bir ajan en fazla {limit} belleğe sahip olabilir.",
+  "error.backend.agentMemoryLimitReached":
+    "{limit} bellekten {saved} tanesi dolu. Bir belleği remember ve memoryId ile başka bir bellekle birleştirin ya da eski bir belleği silin, sonra tekrar deneyin.",
   "error.backend.channelHistoryLeadRequired": "Paylaşılan geçmişi hazırlamak için bir kanal lideri seçin.",
   "error.backend.channelHistoryArriving": "Paylaşılan bir mesaj hâlâ geliyor. Tamamlandığında devam edin.",
   "error.backend.channelHistoryInvalid": "Geçmiş özeti geçersiz. Tekrar denemek için devam edin.",

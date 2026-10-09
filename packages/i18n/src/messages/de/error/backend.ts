@@ -76,6 +76,8 @@ export const messages = {
   "error.backend.channelRoutineLimit": "Ein Kanal kann höchstens {limit} Routinen haben.",
   "error.backend.agentRoutineLimit": "Ein Agent kann höchstens {limit} Routinen haben.",
   "error.backend.agentMemoryLimit": "Ein Agent kann bis zu {limit} Erinnerungen haben.",
+  "error.backend.agentMemoryLimitReached":
+    "Du hast {saved} von {limit} Erinnerungen. Führe eine Erinnerung mit remember und ihrer memoryId mit einer anderen zusammen oder vergiss eine veraltete, und versuche es dann erneut.",
   "error.backend.channelHistoryLeadRequired": "Wähle eine Kanalleitung, um den geteilten Verlauf vorzubereiten.",
   "error.backend.channelHistoryArriving":
     "Eine geteilte Nachricht wird noch empfangen. Setze fort, wenn sie vollständig ist.",

@@ -42,6 +42,7 @@ beforeEach(async () => {
       createAgentProfile: vi.fn(),
       createRoutine: vi.fn(),
       createMemory: vi.fn(),
+      memoryLimit: () => 64,
       setAvatar: vi.fn(),
       deleteAgent: vi.fn(),
       channels: { command: vi.fn() },
