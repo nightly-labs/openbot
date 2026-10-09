@@ -1044,16 +1044,6 @@
   margin: 0;
 }
 
-/* A fixed height: long instructions scroll inside the field, so the list below does not move. */
-.agent-settings-page .agent-settings-instructions-input {
-  field-sizing: fixed;
-  height: 120px;
-  min-height: 120px;
-  max-height: 120px;
-  overflow-y: auto;
-  resize: none;
-}
-
 /* A switch row inside an inset group: as tall as a link row, the switch on the right. */
 .agent-settings-switch-row {
   display: flex;

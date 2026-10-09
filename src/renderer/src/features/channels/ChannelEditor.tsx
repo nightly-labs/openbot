@@ -305,6 +305,7 @@ export function ChannelEditor(props: ChannelEditorProps) {
       </SettingsField>
       <SettingsField label={t("channel.form.instructions")}>
         <Textarea
+          class="settings-instructions-input"
           rows="4"
           aria-label={t("channel.form.instructionsLabel")}
           placeholder={t("channel.form.instructionsPlaceholder")}

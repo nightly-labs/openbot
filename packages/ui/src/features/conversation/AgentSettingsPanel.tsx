@@ -935,7 +935,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
               </SettingsField>
               <SettingsField label={t("agentSettings.instructions")}>
                 <Textarea
-                  class="agent-settings-instructions-input"
+                  class="settings-instructions-input"
                   rows="5"
                   value={draft.fields.description}
                   aria-label={t("agentSettings.instructionsLabel")}
