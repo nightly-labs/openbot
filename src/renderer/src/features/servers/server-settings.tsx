@@ -36,6 +36,15 @@ import { serverAdminPort, serversPort } from "./servers-port";
  * latch in each is what keeps a failure *after* the write from being reported as
  * a failed write.
  */
+/** How often the panel asks which host tab shows a remote sign-in page. */
+const MCP_SIGN_IN_PAGE_POLL_MS = 1_000;
+
+function withMcpSignInPage(pages: Record<string, string>, url: string, tabId: string | null): Record<string, string> {
+  if (pages[url] === (tabId ?? undefined)) return pages;
+  const { [url]: _previous, ...rest } = pages;
+  return tabId ? { ...rest, [url]: tabId } : rest;
+}
+
 const ServerSettings = createSimpleContext({
   name: "Server settings",
   init: () => {
@@ -50,8 +59,10 @@ const ServerSettings = createSimpleContext({
     const [serverSettingsError, setServerSettingsError] = createSignal<string | null>(null);
     const [serverSettingsMcp, setServerSettingsMcp] = createSignal<McpServerConfig[]>([]);
     const [serverSettingsMcpError, setServerSettingsMcpError] = createSignal<string | null>(null);
-    /** Which http rows this computer holds a sign-in for, by id. Empty for a remote server. */
+    /** Which http rows the server holds a sign-in for, by id. Empty for a host without `mcp-sign-in-v1`. */
     const [serverSettingsMcpSignIns, setServerSettingsMcpSignIns] = createSignal<Record<string, boolean>>({});
+    /** The host tab of each remote sign-in page, by the address it signs in to, while the sign-in waits. */
+    const [serverSettingsMcpSignInPages, setServerSettingsMcpSignInPages] = createSignal<Record<string, string>>({});
     /** Bumped by every open and refresh, so a slower earlier load cannot paint over a newer one. */
     let serverSettingsRequest = 0;
     /**
@@ -430,12 +441,8 @@ const ServerSettings = createSimpleContext({
       return result;
     }
 
-    /**
-     * Which http rows this computer holds a sign-in for. Only the local server answers: a sign-in
-     * opens this computer's browser, and a remote host signs in for itself.
-     */
+    /** Which http rows the server holds a sign-in for. A host without `mcp-sign-in-v1` answers none. */
     async function listMcpSignIns(server: ServerSummary): Promise<Record<string, boolean>> {
-      if (server.kind !== "local") return {};
       // A badge beside the list, not the list: a failed read shows no badge rather than failing the
       // list read, or reporting a save that already landed as failed.
       return serversPort()
@@ -443,14 +450,38 @@ const ServerSettings = createSimpleContext({
         .then(mcpSignInRecord, () => ({}));
     }
 
-    /** Opens the browser when the server asks; the answer comes once the browser came back. */
+    /**
+     * Opens the browser when the server asks; the answer comes once the browser came back. A remote
+     * host opens the page in its own browser, and the panel shows that tab while the sign-in waits.
+     */
     async function signInMcpServer(config: McpServerConfig): Promise<McpTestResult> {
       const server = serverSettingsTarget();
       if (!server) throw new Error(currentText().t("server.settings.unavailable"));
-      const result = await serversPort().agent.signInMcpServer({ config }, server.id);
+      let waiting = true;
+      const signIn = serversPort().agent.signInMcpServer({ config }, server.id);
+      if (server.kind === "remote") void followMcpSignInPage(server.id, config.url, () => waiting);
+      const result = await signIn.finally(() => {
+        waiting = false;
+      });
       const signIns = await listMcpSignIns(server);
       if (serverSettingsTargetId() === server.id) setServerSettingsMcpSignIns(signIns);
       return result;
+    }
+
+    /** Reads which host tab shows the sign-in page until the sign-in ends; the host opens it a moment after start. */
+    async function followMcpSignInPage(serverId: string, url: string, waiting: () => boolean): Promise<void> {
+      try {
+        while (waiting()) {
+          const tabId = await serversPort()
+            .agent.mcpSignInPage({ url }, serverId)
+            .catch(() => null);
+          if (!waiting()) return;
+          setServerSettingsMcpSignInPages((pages) => withMcpSignInPage(pages, url, tabId));
+          await new Promise((resolve) => setTimeout(resolve, MCP_SIGN_IN_PAGE_POLL_MS));
+        }
+      } finally {
+        setServerSettingsMcpSignInPages((pages) => withMcpSignInPage(pages, url, null));
+      }
     }
 
     async function cancelMcpSignIn(url: string): Promise<void> {
@@ -555,6 +586,7 @@ const ServerSettings = createSimpleContext({
       serverSettingsMcp,
       serverSettingsMcpError,
       serverSettingsMcpSignIns,
+      serverSettingsMcpSignInPages,
       signInMcpServer,
       cancelMcpSignIn,
       signOutMcpServer,

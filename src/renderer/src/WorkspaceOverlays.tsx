@@ -22,6 +22,7 @@ import {
 } from "./features/connectors/onepassword-connector";
 import { createSlackConnector } from "./features/connectors/slack-connector";
 import { createTelegramConnector } from "./features/connectors/telegram-connector";
+import { conversationPort } from "./features/conversation/conversation-port";
 import { useCustomAgents } from "./features/custom-agents/custom-agents-context";
 import { useCustomProviders } from "./features/custom-providers/custom-providers-context";
 import { useProviderDetection } from "./features/custom-providers/provider-detection-context";
@@ -31,7 +32,7 @@ import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-conte
 import { AddServerOverlay } from "./features/servers/AddServerOverlay";
 import { mcpToolRuntimeNote } from "./features/servers/mcp-servers";
 import { useServerActions } from "./features/servers/server-actions";
-import { serverCanAdminister, serverSupportsCapability } from "./features/servers/server-capabilities";
+import { remoteMcpSignIn, serverCanAdminister, serverSupportsCapability } from "./features/servers/server-capabilities";
 import { useServerSelection } from "./features/servers/server-selection";
 import { useServerSettings } from "./features/servers/server-settings";
 import { useServerSwitch } from "./features/servers/server-switch";
@@ -335,6 +336,7 @@ function ServerSettings(props: {
     serverSettingsMcp,
     serverSettingsMcpError,
     serverSettingsMcpSignIns,
+    serverSettingsMcpSignInPages,
     signInMcpServer,
     cancelMcpSignIn,
     signOutMcpServer,
@@ -535,11 +537,21 @@ function ServerSettings(props: {
           onRemoveMcpServer={removeMcpServer}
           onSetMcpServerEnabled={setMcpServerEnabled}
           onTestMcpServer={testMcpServer}
-          // A sign-in opens this computer's browser, so only this computer's server offers one.
+          // A sign-in opens the browser of the computer that runs the server. A remote host's page
+          // shows here through the live view, which streams the active server only.
           mcpSignIn={
-            server().kind === "local"
+            server().kind === "local" || remoteMcpSignIn(server())
               ? {
                   signedIn: serverSettingsMcpSignIns(),
+                  remote:
+                    server().kind === "remote"
+                      ? {
+                          hostName: server().name,
+                          runtime: conversationPort().browser,
+                          clipboard: serverSupportsCapability(server(), "browser-view-clipboard"),
+                          pages: serverSettingsMcpSignInPages(),
+                        }
+                      : undefined,
                   start: signInMcpServer,
                   cancel: cancelMcpSignIn,
                   signOut: signOutMcpServer,

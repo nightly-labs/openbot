@@ -177,6 +177,7 @@
     "./features/settings/McpKeyDialog": "./src/features/settings/McpKeyDialog.tsx",
     "./features/settings/McpLocalDialog": "./src/features/settings/McpLocalDialog.tsx",
     "./features/settings/McpSignInDialog": "./src/features/settings/McpSignInDialog.tsx",
+    "./features/settings/McpSignInPage": "./src/features/settings/McpSignInPage.tsx",
     "./features/settings/OpenCodeKeyDialog": "./src/features/settings/OpenCodeKeyDialog.tsx",
     "./features/settings/PluginUninstallDialog": "./src/features/settings/PluginUninstallDialog.tsx",
     "./features/settings/ProfileNameSaveBar": "./src/features/settings/ProfileNameSaveBar.tsx",

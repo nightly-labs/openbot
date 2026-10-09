@@ -25,6 +25,7 @@ export const messages = {
     "Войдите в аккаунт {name}. OpenBot получит инструменты, доступные этому аккаунту, но не пароль.",
   "mcp.signIn.waiting": "Ожидание браузера…",
   "mcp.signIn.continue": "Перейти к {name}",
+  "mcp.signIn.pageDescription": "Эта страница открыта в браузере на {host}. Войдите здесь.",
   "mcp.server.loadFailed": "Не удалось загрузить серверы MCP.",
   "mcp.test.connected": {
     one: "Подключено · {count} инструмент",
@@ -118,5 +119,11 @@ export const messages = {
     few: "Завершите вход в браузере. OpenBot ждёт не дольше {count} минут.",
     many: "Завершите вход в браузере. OpenBot ждёт не дольше {count} минут.",
     other: "Завершите вход в браузере. OpenBot ждёт не дольше {count} минуты.",
+  },
+  "mcp.panel.signInWaitingOn": {
+    one: "Открываем страницу входа на {host}. OpenBot ждёт не дольше {count} минуты.",
+    few: "Открываем страницу входа на {host}. OpenBot ждёт не дольше {count} минут.",
+    many: "Открываем страницу входа на {host}. OpenBot ждёт не дольше {count} минут.",
+    other: "Открываем страницу входа на {host}. OpenBot ждёт не дольше {count} минуты.",
   },
 } as const satisfies PartialTranslation<typeof source>;

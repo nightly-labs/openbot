@@ -13,7 +13,7 @@ import { Effect, Schema } from "effect";
 import type { AgentProvider } from "../agent-client";
 import { causeHelpers } from "../effect-boundary";
 import { McpHandoffLog } from "../mcp-handoff-log";
-import { type McpOAuthAuthority, normalizeResource } from "../mcp-oauth-provider";
+import { type McpOAuthAuthority, type McpSignInOpener, normalizeResource } from "../mcp-oauth-provider";
 import { type McpSignInPlace, testMcpServer } from "../mcp-probe";
 import {
   type McpServerDrop,
@@ -40,6 +40,8 @@ export interface TestMcpServerOptions {
   storedCredentials?: boolean;
   /** Who can finish a sign-in this test cannot start, for the sentence a sign-in challenge gets. */
   signInPlace?: McpSignInPlace;
+  /** Where an interactive sign-in shows its page, when not in this computer's own browser. */
+  open?: McpSignInOpener;
 }
 
 export interface McpGatewayHooks {
@@ -256,7 +258,12 @@ export class McpGateway {
       !options.interactive && options.storedCredentials && stored
         ? { accessToken: (url) => stored.accessToken(url), signIn: () => null }
         : undefined;
-    const oauth = options.interactive ? (stored ?? undefined) : silent;
+    const open = options.open;
+    const opened: Pick<McpOAuthAuthority, "accessToken" | "signIn"> | undefined =
+      stored && open
+        ? { accessToken: (url) => stored.accessToken(url), signIn: (url) => stored.signIn(url, open) }
+        : (stored ?? undefined);
+    const oauth = options.interactive ? opened : silent;
     return yield* testMcpServer(config, undefined, this.#toolRuntimes(), oauth, options.signInPlace ?? null).pipe(
       toMcpGatewayFailed,
     );
@@ -268,8 +275,8 @@ export class McpGateway {
    * next turn is handed the new token rather than the tools staying absent until a restart. A draft
    * no agent uses yet refreshes nothing: its save does that.
    */
-  readonly signIn = Effect.fnUntraced(function* (this: McpGateway, input: TestMcpServerInput) {
-    const result = yield* this.test(input, { interactive: true, signInPlace: "here" });
+  readonly signIn = Effect.fnUntraced(function* (this: McpGateway, input: TestMcpServerInput, open?: McpSignInOpener) {
+    const result = yield* this.test(input, { interactive: true, signInPlace: "here", ...(open ? { open } : {}) });
     const resource = normalizeResource(input.config.url);
     const inUse =
       resource !== null &&

@@ -16,6 +16,7 @@ import { CONTEXT_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/conte
 import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
 import { HOST_RELEASE_CAPABILITY } from "@openbot/contracts/team-protocol/host-release-v1";
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
+import { MCP_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import {
   cancelHostUpdate,
@@ -871,6 +872,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       workspace.state.capabilities.includes("browser-control") &&
       workspace.state.capabilities.includes("browser-view"),
   );
+  /** The host opens an MCP sign-in page in its own browser, and the live view shows it here. */
+  const mcpSignInSupported = () =>
+    workspace.state.capabilities.includes(MCP_SIGN_IN_CAPABILITY) &&
+    workspace.state.capabilities.includes("browser-view");
   const browserTakeover = createMemo(() => {
     const agent = workspace.selected();
     if (!agent) return undefined;
@@ -1338,12 +1343,32 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                     onRecheckScreenRecording={unavailable}
                     mcpServers={serverSettings.state.mcp}
                     mcpLoadError={serverSettings.state.mcpError}
-                    onMcpSectionShown={() => void serverSettings.refreshMcp()}
+                    onMcpSectionShown={() => {
+                      void serverSettings.refreshMcp();
+                      if (mcpSignInSupported()) void serverSettings.refreshMcpSignIns().catch(() => undefined);
+                    }}
                     onRetryMcpServers={() => void serverSettings.refreshMcp()}
                     onSaveMcpServer={serverSettings.saveMcpServer}
                     onRemoveMcpServer={serverSettings.removeMcpServer}
                     onSetMcpServerEnabled={serverSettings.setMcpServerEnabled}
                     onTestMcpServer={serverSettings.testMcpServer}
+                    // The host opens the sign-in page in its own browser, and the live view shows it here.
+                    mcpSignIn={
+                      mcpSignInSupported()
+                        ? {
+                            signedIn: serverSettings.state.mcpSignIns,
+                            remote: {
+                              hostName: target().name,
+                              runtime: workspace.runtime.browser,
+                              clipboard: workspace.state.capabilities.includes("browser-view-clipboard"),
+                              pages: serverSettings.state.mcpSignInPages,
+                            },
+                            start: serverSettings.signInMcpServer,
+                            cancel: serverSettings.cancelMcpSignIn,
+                            signOut: serverSettings.signOutMcpServer,
+                          }
+                        : undefined
+                    }
                     storage={{
                       hostName: target().name,
                       calls: storageCalls,

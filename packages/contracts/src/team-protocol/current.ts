@@ -25,6 +25,7 @@ import { HOST_RELEASE_CAPABILITY } from "./host-release-v1";
 import { HOST_UPDATE_CAPABILITY } from "./host-update-v1";
 import { HOSTED_SITES_CAPABILITY } from "./hosted-sites-v1";
 import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "./live-activity-push-v1";
+import { MCP_SIGN_IN_CAPABILITY } from "./mcp-sign-in-v1";
 import { TEAM_MESSAGE_CLIENT_ID_CAPABILITY } from "./message-client-id-v1";
 import { PROVIDERS_ADMIN_CAPABILITY } from "./providers-v1";
 import { PROVIDERS_RUNTIMES_V2_CAPABILITY } from "./providers-v2";
@@ -75,6 +76,7 @@ export {
   HOSTED_SITES_CAPABILITY,
   LIVE_ACTIVITY_PUSH_CAPABILITY,
   MCP_SERVERS_CAPABILITY,
+  MCP_SIGN_IN_CAPABILITY,
   PROVIDERS_ADMIN_CAPABILITY,
   PROVIDERS_RUNTIMES_V2_CAPABILITY,
   PROVIDERS_SIGN_IN_V3_CAPABILITY,
@@ -146,6 +148,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   TEAM_MESSAGE_CLIENT_ID_CAPABILITY,
   WORKSPACE_DIRECTORY_CAPABILITY,
   AGENT_HOST_SETTINGS_CAPABILITY,
+  MCP_SIGN_IN_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];

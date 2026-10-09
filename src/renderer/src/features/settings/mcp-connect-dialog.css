@@ -249,3 +249,36 @@
     transform: scale(0.97);
   }
 }
+
+/* A joined server's sign-in page, drawn from the host's browser. The dialog widens so the page is
+   large enough to type in, and the page keeps the shape of the host's frame. */
+.mcp-connect-dialog.mcp-sign-in-page-dialog,
+.mcp-connect-dialog[data-page] {
+  width: min(720px, 100%);
+}
+
+.mcp-sign-in-page {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-surface);
+}
+
+.mcp-sign-in-page-dialog .mcp-sign-in-page {
+  margin-top: var(--openbot-space-4);
+}
+
+.mcp-sign-in-page-note {
+  min-width: 0;
+  margin: 0;
+}
+
+.mcp-sign-in-page-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--openbot-space-3);
+  margin-top: var(--openbot-space-4);
+}

@@ -42,6 +42,7 @@ import type { BrowserViewGateway } from "../browser-view-gateway";
 import type { HostedSiteDesktopService } from "../hosted-site-service";
 import type { McpToolRuntimePreparation } from "../ipc/mcp-server-handlers";
 import type { LiveActivityPushService } from "../live-activity-push";
+import type { McpHostSignIns } from "../mcp-host-sign-ins";
 import type { RemoteScreenGateway } from "../remote-screen-gateway";
 import type { TeamStore } from "../team-store";
 
@@ -131,6 +132,9 @@ export type TeamApiMcpServers = Pick<
   AgentService,
   "listMcpServers" | "saveMcpServer" | "removeMcpServer" | "setMcpServerEnabled" | "testMcpServer"
 >;
+
+/** Its presence, beside `mcpServers`, is what `#protocolSupport` advertises `mcp-sign-in-v1` on. */
+export type TeamApiMcpSignIns = Pick<McpHostSignIns, "start" | "status" | "cancel" | "signOut" | "list">;
 
 /** Its presence is what `#protocolSupport` advertises `storage-v1` on. */
 export type TeamApiStorage = Pick<StorageUsageService, "usage" | "deleteFile" | "clear">;
@@ -241,6 +245,7 @@ export interface TeamApiOptions {
   events?: HostEventsApi;
   channels?: ChannelService;
   mcpServers?: TeamApiMcpServers;
+  mcpSignIns?: TeamApiMcpSignIns;
   /** Starts and waits for the managed tool runtimes behind the MCP save, enable, and test routes. */
   mcpToolRuntimePreparation?: McpToolRuntimePreparation;
   storage?: TeamApiStorage;

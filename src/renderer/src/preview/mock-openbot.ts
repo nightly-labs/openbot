@@ -1094,6 +1094,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           cancelPendingMcpSignIn = () => settle(sourceText("error.backend.mcpSignInCancelled"));
           schedule(() => settle(null), 1500);
         }),
+      // The preview is this computer, which shows no host page.
+      mcpSignInPage: async () => null,
       cancelMcpSignIn: async () => {
         cancelPendingMcpSignIn?.();
       },

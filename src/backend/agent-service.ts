@@ -160,6 +160,7 @@ import type { ProviderSession } from "./database/provider-sessions";
 import type { HostMemory } from "./host-memory";
 import type { MailboxStore } from "./mailbox-store";
 import { toMcpOperationError } from "./mcp-effects";
+import type { McpSignInOpener } from "./mcp-oauth-provider";
 import { McpServerStore } from "./mcp-server-store";
 import { MessagingThreads, toMessagingThreadFailed } from "./messaging/messaging-threads";
 import type { PasswordVault } from "./password-vault";
@@ -1403,9 +1404,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
   }
 
-  signInMcpServer(input: TestMcpServerInput): Effect.Effect<McpTestResult, AgentLifecycleFailed> {
+  signInMcpServer(
+    input: TestMcpServerInput,
+    open?: McpSignInOpener,
+  ): Effect.Effect<McpTestResult, AgentLifecycleFailed> {
     return this.#mcp
-      .signIn(input)
+      .signIn(input, open)
       .pipe(
         Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "signInMcpServer", cause: failure.cause })),
       );

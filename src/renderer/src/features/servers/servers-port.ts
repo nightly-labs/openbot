@@ -18,6 +18,7 @@ export interface ServersPort {
     | "setMcpServerEnabled"
     | "testMcpServer"
     | "signInMcpServer"
+    | "mcpSignInPage"
     | "cancelMcpSignIn"
     | "signOutMcpServer"
     | "listMcpSignIns"

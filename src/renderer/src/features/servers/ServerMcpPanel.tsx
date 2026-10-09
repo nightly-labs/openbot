@@ -27,9 +27,11 @@ import {
   Text,
   Trash2,
 } from "@openbot/ui";
+import type { BrowserViewRuntime } from "@openbot/ui/features/browser/BrowserLiveView";
+import { McpSignInPageDialog } from "@openbot/ui/features/settings/McpSignInPage";
 import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
-import { createMemo, createStore, For, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createStore, For, onCleanup, Show } from "solid-js";
 import {
   emptyMcpConfig,
   isMcpSignInCancelled,
@@ -93,20 +95,34 @@ export interface ServerMcpPanelProps {
   /** Test an unsaved draft config. */
   onTest: (config: McpServerConfig) => Promise<McpTestResult>;
   /**
-   * Browser sign-in for http servers. Only the computer that runs OpenBot can open its browser, so
-   * the caller leaves this out for a remote server: that host signs in for itself.
+   * Browser sign-in for http servers. This computer signs in with its own browser; a joined server
+   * signs in with the host's browser, and this panel shows that page.
    */
   signIn?: McpPanelSignIn;
 }
 
 export interface McpPanelSignIn {
-  /** Whether this computer holds a sign-in, by row id. A yes or no only. */
+  /** Whether the host holds a sign-in, by row id. A yes or no only. */
   signedIn: Record<string, boolean>;
+  /**
+   * A joined server's host signs in with its own browser, and its page shows here: the grant comes
+   * back on an address only that host can reach. Absent when this computer signs in.
+   */
+  remote?: McpPanelRemoteSignIn | undefined;
   /** Opens the browser when the server asks, and answers once it came back and the server took the token. */
   start: (config: McpServerConfig) => Promise<McpTestResult>;
   /** Stops the wait for the browser; the pending `start` then answers that it was cancelled. */
   cancel: (url: string) => Promise<void>;
   signOut: (id: string) => Promise<void>;
+}
+
+export interface McpPanelRemoteSignIn {
+  hostName: string;
+  runtime: BrowserViewRuntime;
+  /** Whether the host pastes and copies for a live view. */
+  clipboard: boolean;
+  /** The host tab with the sign-in page, by the address it signs in to, once the host opened it. */
+  pages: Record<string, string>;
 }
 
 /** A test or a sign-in that has answered. */
@@ -242,8 +258,9 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
     }
   }
 
-  /** Sign in is offered for an http server, and only where this computer can open the browser. */
+  /** Sign in is offered for an http server, where this computer or the joined host can sign in. */
   const canSignIn = (config: McpServerConfig) => Boolean(props.signIn) && config.transport === "http";
+  const testMessage = (test: McpTestState) => mcpTestMessage(test, t, props.signIn?.remote?.hostName);
 
   /**
    * Counts each row's tests and sign-ins. A row can start a second one while the first still waits
@@ -324,6 +341,37 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
       });
     });
   }
+
+  /** A joined server's waiting sign-in whose page the host opened. The form's comes first. */
+  const remotePage = createMemo(() => {
+    const remote = props.signIn?.remote;
+    if (!remote) return null;
+    const form = formSignIn();
+    const waiting = form
+      ? { url: form.url, name: state.draft.name, rowId: null }
+      : Object.entries(state.tests)
+          .filter(([, entry]) => entry.test.status === "signing-in")
+          .map(([rowId, entry]) => ({ url: entry.config.url, name: entry.config.name, rowId }))[0];
+    const tabId = waiting ? remote.pages[waiting.url] : undefined;
+    return waiting && tabId ? { ...waiting, tabId, remote } : null;
+  });
+
+  // The dialog leaves with its sign-in, before it can give the focus back, and what opened it can be
+  // gone: a row's Sign in button leaves as the wait starts. The row's menu button, or the form's
+  // Test connection, gets the focus one frame after the dialog left.
+  const menuButtons: Record<string, HTMLElement> = {};
+  let formTestButton: HTMLButtonElement | undefined;
+  createEffect(
+    () => remotePage()?.rowId,
+    (rowId, previous) => {
+      if (previous === undefined || rowId === previous) return;
+      const target = previous === null ? formTestButton : menuButtons[previous];
+      requestAnimationFrame(() => {
+        if (target?.isConnected && !document.querySelector(".mcp-sign-in-page-dialog"))
+          target.focus({ preventScroll: true });
+      });
+    },
+  );
 
   function openForm(config: McpServerConfig | null): void {
     // The row's Cancel is not on the form, and an edit can change the address it signs in to: a
@@ -504,7 +552,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                       <Show when={test()?.status === "signing-in" && test()}>
                         {(waiting) => (
                           <>
-                            <ItemDescription>{mcpTestMessage(waiting(), t)}</ItemDescription>
+                            <ItemDescription>{testMessage(waiting())}</ItemDescription>
                             <div class="server-mcp-row-next">
                               <Button
                                 type="button"
@@ -523,7 +571,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                       <Show when={test()?.status === "failed" && test()}>
                         {(failed) => (
                           <>
-                            <ItemDescription>{mcpTestMessage(failed(), t)}</ItemDescription>
+                            <ItemDescription>{testMessage(failed())}</ItemDescription>
                             <Show when={asksForSignIn(failed()) && canSignIn(config())}>
                               <div class="server-mcp-row-next">
                                 <Button
@@ -566,6 +614,9 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                       <McpRowMenu
                         name={config().name}
                         mount={props.menuMount}
+                        triggerRef={(element) => {
+                          menuButtons[config().id] = element;
+                        }}
                         disabled={disabled()}
                         // A Test would replace the sign-in waiting on this row, and with it Cancel.
                         testDisabled={test()?.status === "signing-in"}
@@ -943,6 +994,9 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                 </Button>
               </Show>
               <Button
+                ref={(element: HTMLButtonElement) => {
+                  formTestButton = element;
+                }}
                 type="button"
                 size="sm"
                 variant="outline"
@@ -968,7 +1022,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
             {(test) => (
               <>
                 <Text class="server-mcp-test-result" variant="caption" tone={mcpTestTone(test())} role="status">
-                  {mcpTestMessage(test(), t)}
+                  {testMessage(test())}
                 </Text>
                 <Show when={formSignIn()}>
                   {(pending) => (
@@ -1012,6 +1066,18 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
       </Show>
 
       {/* The dialog unmounts with its target, so its title never shows an empty name while it closes. */}
+      {/* Keyed by the page, so each sign-in opens a dialog of its own and a Cancel does not carry over. */}
+      <Show when={remotePage()} keyed>
+        {(page) => (
+          <McpSignInPageDialog
+            name={page.name}
+            hostName={page.remote.hostName}
+            page={{ runtime: page.remote.runtime, tabId: page.tabId, clipboard: page.remote.clipboard }}
+            onCancel={() => cancelSignIn(page.url)}
+          />
+        )}
+      </Show>
+
       <Show when={removeTarget()}>
         {(config) => (
           <ConfirmDialog
@@ -1079,6 +1145,7 @@ function McpRowList(props: {
 function McpRowMenu(props: {
   name: string;
   mount?: HTMLElement;
+  triggerRef?: (element: HTMLElement) => void;
   disabled: boolean;
   testDisabled: boolean;
   onTest: () => void;
@@ -1089,10 +1156,27 @@ function McpRowMenu(props: {
 }) {
   const { t } = useText();
   let triggerElement: HTMLElement | undefined;
+  // A joined server's sign-in opens a dialog, so it starts once the menu is gone. The menu gives the
+  // focus back to its trigger two frames after it closes (focusRestoreHandler in @openbot/ui
+  // complex.tsx); a dialog that opened sooner would lose its focus to that. Keep the counts in step.
+  let afterClose: (() => void) | undefined;
   return (
-    <DropdownMenu.Root placement="bottom-end" gutter={4} modal={false}>
+    <DropdownMenu.Root
+      placement="bottom-end"
+      gutter={4}
+      modal={false}
+      onOpenChange={(open) => {
+        const next = afterClose;
+        afterClose = undefined;
+        if (open || !next) return;
+        requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(next)));
+      }}
+    >
       <DropdownMenu.Trigger
-        ref={(element) => (triggerElement = element)}
+        ref={(element) => {
+          triggerElement = element;
+          props.triggerRef?.(element);
+        }}
         class={`${buttonVariants({ variant: "ghost", size: "icon-sm" })} ui-icon-button`}
         aria-label={t("mcp.panel.actionsFor", { name: props.name })}
         disabled={props.disabled}
@@ -1110,7 +1194,7 @@ function McpRowMenu(props: {
               <Show
                 when={signIn().signedIn}
                 fallback={
-                  <DropdownMenu.Item disabled={signIn().busy} onSelect={() => signIn().onSignIn()}>
+                  <DropdownMenu.Item disabled={signIn().busy} onSelect={() => (afterClose = signIn().onSignIn)}>
                     <LogIn aria-hidden="true" />
                     {t("mcp.panel.signIn")}
                   </DropdownMenu.Item>

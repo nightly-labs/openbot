@@ -25,6 +25,7 @@ export const messages = {
     "Melde dich bei deinem {name}-Konto an. OpenBot erhält die Werkzeuge, auf die dieses Konto zugreifen kann, aber kein Passwort.",
   "mcp.signIn.waiting": "Warten auf den Browser…",
   "mcp.signIn.continue": "Weiter zu {name}",
+  "mcp.signIn.pageDescription": "Diese Seite ist im Browser auf {host} geöffnet. Melde dich hier an.",
   "mcp.server.loadFailed": "Die MCP-Server konnten nicht geladen werden.",
   "mcp.test.connected": {
     one: "Verbunden · {count} Werkzeug",
@@ -115,5 +116,9 @@ export const messages = {
   "mcp.panel.signInWaiting": {
     one: "Schließe die Anmeldung im Browser ab. OpenBot wartet höchstens {count} Minute.",
     other: "Schließe die Anmeldung im Browser ab. OpenBot wartet höchstens {count} Minuten.",
+  },
+  "mcp.panel.signInWaitingOn": {
+    one: "Die Anmeldeseite wird auf {host} geöffnet. OpenBot wartet höchstens {count} Minute.",
+    other: "Die Anmeldeseite wird auf {host} geöffnet. OpenBot wartet höchstens {count} Minuten.",
   },
 } as const satisfies PartialTranslation<typeof source>;
