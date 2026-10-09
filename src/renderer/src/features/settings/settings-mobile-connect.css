@@ -387,6 +387,54 @@
   transform: scale(1);
 }
 
+/* The phone's platform, a link and OpenBot in the middle of the store code. The mark lands just
+ * after the code, and the link draws in last, so the pair reads as one connection. */
+.settings-mobile-app-qr .ui-qr-code-mark {
+  gap: 3px;
+  opacity: 0;
+  transform: scale(0.7);
+  transition:
+    opacity var(--openbot-duration-normal) ease-out,
+    transform var(--openbot-duration-overlay) var(--openbot-ease-out);
+}
+
+.settings-mobile-app-panel[data-selected] .settings-mobile-app-qr .ui-qr-code-mark {
+  opacity: 1;
+  transform: scale(1);
+  transition-delay: var(--openbot-duration-fast);
+}
+
+.settings-mobile-app-qr-platform {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+}
+
+.settings-mobile-app-qr-link {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  color: var(--openbot-text-muted-on-light);
+  stroke-width: 2.5;
+  opacity: 0;
+  transform: rotate(-45deg) scale(0.6);
+  transition:
+    opacity var(--openbot-duration-normal) ease-out,
+    transform var(--openbot-duration-overlay) var(--openbot-ease-out);
+}
+
+.settings-mobile-app-panel[data-selected] .settings-mobile-app-qr-link {
+  opacity: 1;
+  transform: rotate(0) scale(1);
+  transition-delay: calc(var(--openbot-duration-fast) * 2);
+}
+
+.settings-mobile-app-qr-logo {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+}
+
 .settings-mobile-app-details {
   min-width: 0;
   display: grid;
@@ -468,11 +516,15 @@
 
 @media (prefers-reduced-motion: reduce) {
   .settings-mobile-app-qr,
+  .settings-mobile-app-qr .ui-qr-code-mark,
+  .settings-mobile-app-qr-link,
   .settings-mobile-devices-table tbody tr {
     transition: none;
   }
 
-  .settings-mobile-app-qr {
+  .settings-mobile-app-qr,
+  .settings-mobile-app-qr .ui-qr-code-mark,
+  .settings-mobile-app-qr-link {
     transform: none;
   }
 }

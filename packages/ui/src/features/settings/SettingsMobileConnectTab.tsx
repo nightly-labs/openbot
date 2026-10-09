@@ -1,4 +1,4 @@
-import { type MobilePlatformLogoVariant, PlatformLogo } from "@openbot/brand";
+import { AppLogo, type MobilePlatformLogoVariant, PlatformLogo } from "@openbot/brand";
 import type { MobileConnectedDevice } from "@openbot/contracts/ipc";
 import type { AppTextKey, AppTranslate } from "@openbot/i18n";
 import {
@@ -19,6 +19,7 @@ import {
   ItemGroup,
   ItemMedia,
   ItemTitle,
+  Link2,
   QrCode,
   SettingsSection,
   SlidingTabs,
@@ -129,7 +130,11 @@ export function SettingsMobileConnectTab(props: SettingsMobileConnectTabProps) {
             <For each={MOBILE_APPS}>
               {(app) => (
                 <SlidingTabs.Content class="settings-mobile-app-panel" value={app.platform}>
-                  <QrCode class="settings-mobile-app-qr" value={app.url} size={132} label={t(app.qrLabel)} />
+                  <QrCode class="settings-mobile-app-qr" value={app.url} size={132} label={t(app.qrLabel)}>
+                    <PlatformLogo platform={app.platform} class="settings-mobile-app-qr-platform" />
+                    <Link2 class="settings-mobile-app-qr-link" />
+                    <AppLogo variant="production" class="settings-mobile-app-qr-logo" />
+                  </QrCode>
                   <div class="settings-mobile-app-details">
                     <div class="settings-mobile-app-heading">
                       <Text class="settings-mobile-app-title" variant="body">

@@ -1352,10 +1352,28 @@
   background: var(--openbot-qr-background);
 }
 
+.ui-qr-code > * {
+  grid-area: 1 / 1;
+}
+
 .ui-qr-code > img {
   width: 100%;
   height: 100%;
   display: block;
+}
+
+/* The logos sit in a hole that the code leaves clear, so no module is cut at their edge. They show
+   once the code is drawn around them. */
+.ui-qr-code-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  color: var(--openbot-text-on-light);
+  visibility: hidden;
+}
+
+.ui-qr-code-mark[data-ready] {
+  visibility: visible;
 }
 
 .ui-alert {
