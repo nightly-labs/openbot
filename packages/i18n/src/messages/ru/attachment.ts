@@ -7,6 +7,7 @@ export const messages = {
   "attachment.notFound": "Файл не найден",
   "attachment.download": "Скачать {name}",
   "attachment.open": "Открыть {name}",
+  "attachment.loadMedia": "Воспроизвести {name}",
   "attachment.previewUnavailable": "Предпросмотр недоступен.",
   "attachment.error.preview": "Не удалось показать предпросмотр {name}. Повторите.",
   "attachment.error.download": "Не удалось скачать вложения. Повторите.",

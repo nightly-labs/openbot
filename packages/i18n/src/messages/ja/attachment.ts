@@ -7,6 +7,7 @@ export const messages = {
   "attachment.notFound": "ファイルが見つかりません",
   "attachment.download": "{name} をダウンロード",
   "attachment.open": "{name} を開く",
+  "attachment.loadMedia": "{name} を再生",
   "attachment.previewUnavailable": "プレビューを利用できません。",
   "attachment.error.preview": "{name} をプレビューできませんでした。もう一度お試しください。",
   "attachment.error.download": "添付ファイルをダウンロードできませんでした。もう一度お試しください。",

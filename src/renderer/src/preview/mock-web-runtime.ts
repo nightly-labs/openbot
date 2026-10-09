@@ -1,4 +1,5 @@
 import { CHANNEL_CHATS_CAPABILITY } from "@openbot/contracts/ipc";
+import { ROUTINE_FLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import type { WebRuntimeFactory } from "../features/web-client/web-client-context";
 import { createMockOpenBot } from "./mock-openbot";
 
@@ -50,6 +51,7 @@ export const createMockWebRuntime: WebRuntimeFactory = (_accountId, events) => {
         "agent-duplication",
         "sidebar-layout",
         CHANNEL_CHATS_CAPABILITY,
+        ROUTINE_FLOWS_CAPABILITY,
       ];
     },
     disconnect: async () => {
@@ -62,6 +64,8 @@ export const createMockWebRuntime: WebRuntimeFactory = (_accountId, events) => {
         limit: 50,
         anchor: before ? { type: "before", cursor: before } : { type: "latest" },
       }),
+    conversationAround: (agentId, messageId) =>
+      agent.readConversationPage({ agentId, limit: 50, anchor: { type: "around", messageId } }),
     markRead: (agentId, throughMessageId) => agent.markConversationRead({ agentId, throughMessageId }),
     conversationReads: () => agent.listConversationReads(),
     send: async (agentId, text, attachmentDraftIds, replyToMessageId, clientMessageId) => {
@@ -93,6 +97,9 @@ export const createMockWebRuntime: WebRuntimeFactory = (_accountId, events) => {
     sharedFile: async () => ({ name: "preview.txt", mimeType: "text/plain", base64: btoa("OpenBot file preview") }),
     workspaceFile: async () => ({ name: "preview.txt", mimeType: "text/plain", base64: btoa("OpenBot file preview") }),
     workspaceDirectory: (agentId, path) => agent.listWorkspaceDirectory({ agentId, path }),
+    routineFlows: mock.api.routineFlows,
+    updateRoutine: (input) => agent.updateRoutine(input),
+    testRoutine: (input) => agent.testRoutine(input),
     react: (input) => agent.setMessageReaction(input),
     setAvatar: async (agentId, image) => {
       await agent.setAvatar({ agentId, image });

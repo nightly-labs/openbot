@@ -97,7 +97,10 @@ export const messages = {
   "diagram.routine.recent": "Letzte Ausführungen",
   "diagram.routine.runLabel": "{status}, {time}",
   "diagram.routine.manual": "Manuell",
-  "diagram.flows.remoteOnly": "Routinenabläufe sind nur für Agenten auf diesem Computer verfügbar.",
+  "diagram.flows.unsupported":
+    "Dieser Server unterstützt keine Routinenabläufe. Aktualisiere OpenBot auf dem Computer, auf dem er läuft.",
+  "diagram.flows.webhookAdminOnly":
+    "Nur ein Besitzer oder Admin dieses Servers kann eine Webhook-Routine ändern oder ausführen.",
   "diagram.flows.loadFailed": "Die Routinen dieses Agenten konnten nicht geladen werden.",
   "diagram.flows.saveFailed": "Diese Änderung an den Routinen konnte nicht gespeichert werden.",
   "diagram.flows.runFailed": "Diese Routine konnte nicht gestartet werden.",

@@ -96,7 +96,9 @@ export const messages = defineMessages("diagram", {
   "diagram.routine.recent": "Recent runs",
   "diagram.routine.runLabel": "{status}, {time}",
   "diagram.routine.manual": "By hand",
-  "diagram.flows.remoteOnly": "Routine flows are only available for agents on this computer.",
+  "diagram.flows.unsupported":
+    "This server does not support routine flows. Update OpenBot on the computer that runs it.",
+  "diagram.flows.webhookAdminOnly": "Only an owner or admin of this server can change or run a webhook routine.",
   "diagram.flows.loadFailed": "Could not load the routines of this agent.",
   "diagram.flows.saveFailed": "Could not save this change to the routines.",
   "diagram.flows.runFailed": "Could not start this routine.",

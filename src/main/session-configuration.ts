@@ -12,18 +12,13 @@
 
 import { readFile, stat } from "node:fs/promises";
 import { extname, isAbsolute, relative, resolve } from "node:path";
-import { isChatVisualMimeType } from "@openbot/contracts/chat-visual";
+import { CHAT_VISUAL_PAGE_LIMIT, isChatVisualMimeType } from "@openbot/contracts/chat-visual";
 import { LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
 import { app, session } from "electron";
 import type { AgentService } from "../backend/agent-service";
 import { runCauseEffect } from "../backend/effect-boundary";
 import type { MailboxStore } from "../backend/mailbox-store";
-import {
-  attachmentCorsHeaders,
-  attachmentDocumentHeaders,
-  CHAT_VISUAL_PAGE_LIMIT,
-  chatVisualResponse,
-} from "./chat-visual-protocol";
+import { attachmentCorsHeaders, attachmentDocumentHeaders, chatVisualResponse } from "./chat-visual-protocol";
 import { buildContentSecurityPolicy, readSelfHostedSignalOrigin } from "./content-security-policy";
 import { fileResponse } from "./file-response";
 import type { RemoteServerManager } from "./remote-server-manager";

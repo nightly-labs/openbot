@@ -7,6 +7,7 @@ export const messages = {
   "attachment.notFound": "Datei nicht gefunden",
   "attachment.download": "{name} herunterladen",
   "attachment.open": "{name} öffnen",
+  "attachment.loadMedia": "{name} abspielen",
   "attachment.previewUnavailable": "Die Vorschau ist nicht verfügbar.",
   "attachment.error.preview": "Die Vorschau von {name} konnte nicht angezeigt werden. Versuche es erneut.",
   "attachment.error.download": "Die Anhänge konnten nicht heruntergeladen werden. Versuche es erneut.",

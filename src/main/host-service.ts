@@ -79,6 +79,7 @@ interface HostServiceOptions {
   hostedSites?: ForwardedApiOptions["hostedSites"];
   events?: ForwardedApiOptions["events"];
   agentImport?: ForwardedApiOptions["agentImport"];
+  routineFlows?: ForwardedApiOptions["routineFlows"];
   admin?: ForwardedApiOptions["admin"];
   appVersion: string;
   store: TeamStore;
@@ -295,6 +296,7 @@ export class HostService extends EventEmitter<HostEvents> {
       hostedSites: options.hostedSites,
       events: options.events,
       agentImport: options.agentImport,
+      routineFlows: options.routineFlows,
       // The identity route changes this host's name and logo through `updateIdentity`, so a change
       // from a joined admin runs every step a local one does.
       admin: {

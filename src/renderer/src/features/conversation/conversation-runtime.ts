@@ -1,4 +1,5 @@
 import type { AttachmentSummary, FilePreview, OpenBotDesktopApi } from "@openbot/contracts/ipc";
+import type { AttachmentMediaSource } from "@openbot/ui/features/conversation/AttachmentCards";
 import type { AgentSkillCalls } from "../../skills-port";
 import type { AgentTemplatePublishCalls } from "../agent-templates/agent-templates-port";
 import type { SharedTableCalls } from "./conversation-port";
@@ -37,6 +38,13 @@ export interface ConversationRuntime {
   voice: Pick<OpenBotDesktopApi["voice"], "onModelStatus" | "prepareModel" | "transcribe">;
   openUrl: OpenBotDesktopApi["openUrl"];
   previewAttachment?: (attachment: AttachmentSummary) => Promise<FilePreview>;
+  /** Loads attachment images and media for a client that gets no `previewUrl`. */
+  attachmentMedia?: AttachmentMediaSource;
+  /**
+   * The HTML of a visual reply page, for a client that has no page URL. Only the browser client
+   * has it: the frame shows the page as `srcdoc`, which the desktop renderer policy would block.
+   */
+  visualPage?: (attachment: AttachmentSummary) => Promise<string>;
   importFiles?: (files: File[]) => Promise<void>;
   cancelImportFiles?: () => Promise<void>;
   /** The host admin calls of a client without the desktop port. Absent, skills, tables and publishing are hidden. */

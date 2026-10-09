@@ -123,8 +123,23 @@ mock. The separate web preview implements the browser runtime with that same moc
   and host preview URLs are not used as browser attachment links. Blob URLs are released when the
   preview closes, the host changes, or the workspace unmounts. A shared or workspace file link
   reads the file through the host's `/v1/shared-files` or `/v1/workspace-files` route and opens the
-  same panel. "Open" on a file card opens the panel; "Download" saves the file. Images show as
-  file cards, not inline: the browser reads no image bytes until a card is opened.
+  same panel. "Open" on a file card opens the panel; "Download" saves the file.
+- Inline media (`web-attachment-media.ts`): an image card of 2 MB or less downloads its file when
+  the chat shows the card, and shows it as a thumbnail. An MP3 or MOV card of 10 MB or less gets a
+  play button; the click downloads the whole file, then the player starts. Larger files keep only
+  Download. Only PNG, JPEG, GIF, WebP, AVIF, MP3 and MOV get an object URL, typed from that list and
+  not from the host's file type: an object URL has the app origin, so HTML, SVG and XHTML never get
+  one. At most 2 files download at the same time. The URLs share a 64 MB cache, and the least
+  recently used URL is revoked first. A host change or an unmount revokes all of them. An image
+  thumbnail opens the preview panel, not the image viewer.
+- Visual replies and HTML files: the browser has no page URL, so `web-attachments.ts` downloads
+  the HTML file (8 MB or less, HTML type on the attachment and the file) and the frame shows it as
+  `srcdoc`, with the same `allow-scripts allow-forms` sandbox as desktop and never
+  `allow-same-origin`. The page has an opaque origin and cannot read the web client's storage or
+  host keys. The last 8 pages stay in memory. The frame inherits the `/app` CSP, so a `script-src`
+  or `default-src` there would stop every page. Differences from desktop: a relative URL in the
+  page resolves to the `/app` origin, and the browser blocks `http:` and private-network loads from
+  the page.
 - Pinned agents and channels and collapsed sections are kept in local storage for each account and
   host, with the same storage modules as desktop. Only ids are stored. Pins do not delete
   conversations. Notification changes use the host's existing settings and include
@@ -157,6 +172,11 @@ mock. The separate web preview implements the browser runtime with that same moc
   another origin through CDP (`DOM.describeNode` on the focused frame element gives its frame ID,
   and a frame in another process is a target of its own). An `email` or `number` input has no
   selection to read, so copy gets no text there; paste works.
+- The sidebar's Agents and Routines switch shows when the host serves `routine-flows-v1`. The Routines
+  view hides channels and shows the open agent's routine canvas, as on desktop: links, node positions,
+  task edits, Run now, a new agent from the right-click menu, and the chat panel that asks the agent
+  to edit the canvas. Webhook config and webhook routine changes need an owner or admin with
+  `events-v1`. On a phone the canvas takes the chat pane, and the pane button reads Routines.
 - No full remote desktop, push notifications, or offline operation is included. See
   [Remote desktop](#remote-desktop) for the reason.
 - These stay desktop only: the application Settings dialog (permissions, app updates),

@@ -13,7 +13,7 @@ import {
   routineRunConversationEventItemType,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
-import { TEAM_CURRENT_CAPABILITIES } from "@openbot/contracts/team-protocol/current";
+import { TEAM_CURRENT_CAPABILITIES, TEAM_HISTORY_EXTENT_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import {
   TEAM_CAPABILITIES_HEADER,
   TEAM_PROTOCOL_V1_CAPABILITIES,
@@ -21,6 +21,7 @@ import {
 } from "@openbot/contracts/team-protocol/v1";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
 import { TEAM_PROTOCOL_V5 } from "@openbot/contracts/team-protocol/v5";
+import { TEAM_PROTOCOL_V6 } from "@openbot/contracts/team-protocol/v6";
 import { afterEach, assert, describe, expect, it, vi } from "vitest";
 import {
   createAgents,
@@ -171,7 +172,7 @@ describe("TeamApiServer conversations", () => {
           ...localConversation,
           messages,
           references: {},
-          // The day rail's unloaded length is local IPC only; every released adapter drops it.
+          // The day rail's unloaded length: only history-extent-v1 carries it over the Team API.
           pageInfo: { hasOlder: false, olderCursor: null, olderCount: 40, oldestAt: "2026-09-01T00:00:00.000Z" },
           readState: {
             unreadCount: 0,
@@ -358,10 +359,29 @@ describe("TeamApiServer conversations", () => {
       excludeRoutineRunEvents: false,
       excludeHostedSiteEvents: false,
     });
-    for (const capabilities of [TEAM_CURRENT_CAPABILITIES, TEAM_PROTOCOL_V1_CAPABILITIES]) {
+    // The day rail's unloaded length crosses only under history-extent-v1.
+    await expect(
+      jsonRequest(base, "/v1/agents/chief/conversation-page?limit=10", {
+        token: token,
+        capabilities: [...TEAM_CURRENT_CAPABILITIES],
+        protocol: TEAM_PROTOCOL_V6,
+      }),
+    ).resolves.toMatchObject({
+      pageInfo: { hasOlder: false, olderCursor: null, olderCount: 40, oldestAt: "2026-09-01T00:00:00.000Z" },
+    });
+    for (const [capabilities, protocol] of [
+      [
+        TEAM_CURRENT_CAPABILITIES.filter((capability) => capability !== TEAM_HISTORY_EXTENT_CAPABILITY),
+        TEAM_PROTOCOL_V6,
+      ],
+      // A released adapter ignores the capability.
+      [TEAM_CURRENT_CAPABILITIES, undefined],
+      [TEAM_PROTOCOL_V1_CAPABILITIES, undefined],
+    ] as const) {
       const page = await jsonRequest(base, "/v1/agents/chief/conversation-page?limit=10", {
         token: token,
         capabilities: [...capabilities],
+        ...(protocol ? { protocol } : {}),
       });
       expect(page).toMatchObject({ pageInfo: { hasOlder: false, olderCursor: null } });
       expect(page).not.toHaveProperty("pageInfo.olderCount");

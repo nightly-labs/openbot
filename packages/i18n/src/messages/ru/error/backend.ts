@@ -147,8 +147,6 @@ export const messages = {
   "error.backend.routineFlowCycle": "Эта связь создаст цикл.",
   "error.backend.routineFlowLinkLimit": "У регулярной задачи может быть не больше {limit} связей.",
   "error.backend.routineFlowHandoffFailed": "Задаче не удалось передать работу этому агенту.",
-  "error.backend.routineFlowRemoteUnsupported":
-    "Цепочки регулярных задач доступны только для агентов на этом компьютере.",
   "error.backend.mcpServerLimit": "OpenBot хранит не более {limit} серверов MCP.",
   "error.backend.mcpServerNameTaken": "Сервер MCP с именем {name} уже существует.",
   "error.backend.mcpServerNoAnswer": "Сервер не ответил за {seconds} с.",

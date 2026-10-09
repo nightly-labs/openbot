@@ -16,6 +16,7 @@ export const messages = {
   "webClient.login.wait": "Warte, bevor du einen weiteren Code anforderst.",
   "webClient.pane.navigation": "Arbeitsbereich-Navigation",
   "webClient.pane.chat": "Chat",
+  "webClient.pane.routines": "Routinen",
   "webClient.pane.workspace": "Arbeitsbereich",
   "webClient.notice.connecting": "Verbindung mit deinem Computer wird hergestellt",
   "webClient.notice.disconnected": "Dein Computer ist nicht verbunden",

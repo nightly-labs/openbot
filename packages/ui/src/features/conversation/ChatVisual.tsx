@@ -1,5 +1,7 @@
 import {
+  CHAT_VISUAL_FRAME_SANDBOX,
   type ChatVisualTheme,
+  chatVisualDocument,
   chatVisualFrameHeight,
   chatVisualFrameUrl,
   chatVisualThemeMessage,
@@ -49,6 +51,11 @@ interface ChatVisualProps {
    * policy, as the frame does.
    */
   src?: string | undefined;
+  /**
+   * The page itself, for a client that has no page URL, such as a browser. The frame gets it as
+   * `srcdoc` with the same sandbox, so the page still has an opaque origin. It replaces `src`.
+   */
+  html?: string | undefined;
   title: string;
   /** The height that the agent asked for, and the maximum height of the frame. */
   height?: number | undefined;
@@ -68,7 +75,7 @@ export function ChatVisual(props: ChatVisualProps) {
   const { t } = useText();
   return (
     <Show
-      when={!props.failed && props.src}
+      when={!props.failed && (props.html !== undefined || props.src !== undefined)}
       fallback={
         <div
           class={{ "chat-visual-placeholder": true, "chat-visual-reply": props.fill !== true }}
@@ -78,7 +85,7 @@ export function ChatVisual(props: ChatVisualProps) {
         </div>
       }
     >
-      {(src) => <VisualFrame {...props} src={src()} />}
+      <VisualFrame {...props} />
     </Show>
   );
 }
@@ -88,14 +95,20 @@ export function ChatVisual(props: ChatVisualProps) {
  * read the app. The page can only post messages, and each one is checked. A link opens only after
  * a click that the user made in this frame.
  */
-function VisualFrame(props: ChatVisualProps & { src: string }) {
+function VisualFrame(props: ChatVisualProps) {
   const [theme, setTheme] = createSignal<ChatVisualTheme>();
   const [reported, setReported] = createSignal<number>();
   let frame: HTMLIFrameElement | undefined;
-  // The URL waits for the theme, which the frame reads at its place once it is mounted.
+  // The page waits for the theme, which the frame reads at its place once it is mounted.
   const url = () => {
     const current = theme();
-    return current ? chatVisualFrameUrl(props.src, current) : undefined;
+    return current && props.html === undefined && props.src !== undefined
+      ? chatVisualFrameUrl(props.src, current)
+      : undefined;
+  };
+  const pageDocument = () => {
+    const current = theme();
+    return current && props.html !== undefined ? chatVisualDocument(props.html, { theme: current }) : undefined;
   };
 
   const onMessage = (event: MessageEvent) => {
@@ -131,10 +144,11 @@ function VisualFrame(props: ChatVisualProps & { src: string }) {
         "chat-visual-reply": props.fill !== true,
       }}
       title={props.title}
-      sandbox="allow-scripts allow-forms"
+      sandbox={CHAT_VISUAL_FRAME_SANDBOX}
       referrerpolicy="no-referrer"
       loading={props.fill ? undefined : "lazy"}
       src={url()}
+      srcdoc={pageDocument()}
       style={props.fill ? undefined : `height: ${chatVisualFrameHeight(reported(), props.height)}px`}
       // The frame loads `about:blank` while it is inserted, which runs this handler inside a render.
       onLoad={() => {

@@ -63,6 +63,10 @@ export const messages = {
   "error.team.agentUpdateUnsupported": "この接続ではエージェントを更新できません。",
   "error.team.contextResetUnsupported": "この接続では新しいチャットを始められません。",
   "error.team.workspaceDirectoryUnsupported": "この接続ではフォルダを表示できません。",
+  "error.team.routineFlowsUnsupported":
+    "このサーバーはルーティンフローに対応していません。サーバーを実行しているコンピュータの OpenBot を更新してください。",
+  "error.team.routineCanvasTooLarge":
+    "このルーティンキャンバスは大きすぎるため、このデバイスに送信できません。サーバーを実行しているコンピュータでルーティンの指示を短くしてください。",
   "error.team.agentImportUnsupported": "この接続ではエージェントをインポートできません。",
   "error.team.liveActivityUnsupported": "このホストはスマートフォンのライブアクティビティを更新できません。",
   "error.team.agentUpdateTargetRequired": "更新するエージェントを指定してください。",

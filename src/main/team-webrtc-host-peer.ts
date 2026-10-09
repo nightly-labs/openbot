@@ -9,6 +9,7 @@ import {
   supportsTeamSemanticTags,
   TEAM_AGENT_CREATE_MODEL_CAPABILITY,
   TEAM_CURRENT_CAPABILITIES,
+  TEAM_HISTORY_EXTENT_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
 import { optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
@@ -665,19 +666,28 @@ export class TeamWebRtcHostPeer {
               file: { transferId, name, mimeType: contentType || "application/octet-stream", size },
             };
           }
+          // A variable, not a literal: only the V6 encoder declares `historyExtent`.
+          const responseOptions = {
+            preserveSemanticTags,
+            historyExtent: peerCapabilities.has(TEAM_HISTORY_EXTENT_CAPABILITY),
+          };
           return yield* remoteDecode(() => ({
             status: response.status,
             body: sideRoute
-              ? sideRoute.response(input.path, response.status, body)
+              ? sideRoute.response(input.path, response.status, body, responseOptions)
               : (peerCapabilities.has(TEAM_CURSOR_CLINE_CAPABILITY)
                   ? encodeTeamProtocolV6WebRtcHttpResponse
                   : peerCapabilities.has(TEAM_LOCAL_PROVIDERS_CAPABILITY)
                     ? encodeTeamProtocolV5WebRtcHttpResponse
                     : peerCapabilities.has("opencode")
                       ? encodeTeamProtocolV4WebRtcHttpResponse
-                      : encodeTeamProtocolV3WebRtcHttpResponse)(input.method, input.path, response.status, body, {
-                  preserveSemanticTags,
-                }),
+                      : encodeTeamProtocolV3WebRtcHttpResponse)(
+                  input.method,
+                  input.path,
+                  response.status,
+                  body,
+                  responseOptions,
+                ),
           }));
         }),
       (response) =>

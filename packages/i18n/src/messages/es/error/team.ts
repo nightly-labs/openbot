@@ -64,6 +64,10 @@ export const messages = {
   "error.team.agentUpdateUnsupported": "Esta conexión no permite actualizar agentes.",
   "error.team.contextResetUnsupported": "Esta conexión no permite iniciar un nuevo chat.",
   "error.team.workspaceDirectoryUnsupported": "Esta conexión no permite mostrar carpetas.",
+  "error.team.routineFlowsUnsupported":
+    "Este servidor no admite flujos de rutinas. Actualiza OpenBot en el equipo que lo ejecuta.",
+  "error.team.routineCanvasTooLarge":
+    "Este lienzo de rutinas es demasiado grande para enviarlo a este dispositivo. Acorta las instrucciones de las rutinas en el equipo que ejecuta el servidor.",
   "error.team.agentImportUnsupported": "Esta conexión no permite importar agentes.",
   "error.team.liveActivityUnsupported": "Este host no puede actualizar la Live Activity de un teléfono.",
   "error.team.agentUpdateTargetRequired": "Se requiere un agente para actualizar.",

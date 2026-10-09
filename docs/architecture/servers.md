@@ -95,6 +95,33 @@ gets the existing skill and the result warns. `POST /v1/agent-import/discard` re
 desktop, main opens the dialog, reads the file and sends it (`agent-import:choose` is server-scoped);
 the web client uses the browser chooser and ships the export skill in its bundle.
 
+### Routine flows
+
+`routine-flows-v1` serves the routine canvas (see [Routine flows](agents.md#routine-flows)) to a
+joined desktop and to the web client. Its routes are `POST /v1/routine-flows/canvas`,
+`/positions/save`, `/positions/remove`, `/links/connect`, `/links/disconnect` and `/links/update`,
+with the input in the body. Any member who can see the agents can read and change a canvas, as with
+the agent routine routes; it is not an admin capability. A member sees a routine only when every
+agent it touches is visible, and the host answers a hidden or unknown agent, routine or link with
+404. A webhook trigger's URL goes only to an owner or admin; a member reads it as null. Step input,
+output and error cross with at most 4,000 characters each, and the host empties the step texts of the
+routines with the oldest runs first when a canvas would pass three quarters of one WebRTC frame. The
+optional event `routine-flows-changed { agentId }` names the canvas that changed; the host sends it
+only to a connection with the capability and never for a hidden agent. Webhook config, secret
+rotation and webhook test runs stay on `events-v1`. A client without the capability shows a notice
+in the Routines view; the web client shows the view switch only when the host serves it.
+
+### History extent
+
+`history-extent-v1` lets the chat's day rail draw the history that is not loaded on a joined server.
+It adds `olderCount` and `oldestAt` (at most 64 characters) beside the frozen keys of `pageInfo` on
+`GET /v1/agents/:id/conversation-page` and `GET /v1/direct/conversations/:id/page`, and at the top
+level of the `POST /v1/channels/read` page. The host adds them only on protocol 6 and only when the
+request advertises the capability, so a released client reads the same bytes as before. A host
+without the capability never sends them, so a client keeps them whenever they are present, and a
+malformed value fails closed. The WebRTC host peer encodes the local response again with the same
+option, so the fields reach the web client and a joined desktop through the data channel too.
+
 ### Skill events
 
 `skills-events-v1` adds one optional event, `skills-changed { agentId }`. The host sends it after

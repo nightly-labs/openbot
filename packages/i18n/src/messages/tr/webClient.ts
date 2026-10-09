@@ -16,6 +16,7 @@ export const messages = {
   "webClient.login.wait": "Başka bir kod istemeden önce bekleyin.",
   "webClient.pane.navigation": "Çalışma alanı gezintisi",
   "webClient.pane.chat": "Sohbet",
+  "webClient.pane.routines": "Rutinler",
   "webClient.pane.workspace": "Çalışma alanı",
   "webClient.notice.connecting": "Bilgisayarınıza bağlanılıyor",
   "webClient.notice.disconnected": "Bilgisayarınızın bağlantısı kesildi",

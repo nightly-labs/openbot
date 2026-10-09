@@ -73,7 +73,7 @@ import { deviceSendShortcut, sendShortcutAriaKey, sendShortcutHintKey } from "..
 import { AgentMemoriesModal } from "../conversation/AgentMemoriesModal";
 import { AgentRoutinesSettings } from "../conversation/AgentRoutinesSettings";
 import { attachmentFilePreview } from "../conversation/attachment-preview";
-import { htmlAttachmentPageUrl } from "../conversation/chat-visual-url";
+import { htmlAttachmentPageHtml, htmlAttachmentPageUrl } from "../conversation/chat-visual-url";
 import { EMPTY_DRAFT } from "../conversation/composer-draft";
 import { useConversationController } from "../conversation/conversation-controller-context";
 import type { ComposerDraft } from "../conversation/conversation-types";
@@ -792,6 +792,7 @@ export function ChannelConversation(props: ChannelConversationProps) {
                               onPreview={(attachment) => void previewChannelAttachment(attachment)}
                               onAttachmentAction={channelAttachmentAction}
                               onDownload={(attachment) => channelAttachmentAction(attachment, "download")}
+                              mediaSource={runtime().attachmentMedia}
                               actions={
                                 <MessageActions
                                   message={entry()?.message ?? initialEntry.message}
@@ -1078,6 +1079,9 @@ export function ChannelConversation(props: ChannelConversationProps) {
                     onOpenWorkspaceFile={() => undefined}
                     sourceUrl={file().attachment.previewUrl}
                     pageUrl={htmlAttachmentPageUrl(file().attachment)}
+                    pageHtml={
+                      runtime().visualPage ? htmlAttachmentPageHtml(file().attachment, file().preview) : undefined
+                    }
                     onOpenExternally={() => channelAttachmentAction(file().attachment, "open")}
                     onDownload={() => channelAttachmentAction(file().attachment, "download")}
                     onReveal={

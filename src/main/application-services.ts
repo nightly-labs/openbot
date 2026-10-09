@@ -54,7 +54,6 @@ import type {
   CentralAuthState,
   ComputerUseState,
   ProviderRuntimeSnapshot,
-  RoutineFlowsChanged,
   VoiceModelStatus,
 } from "@openbot/contracts/ipc";
 import { IPC_ENDPOINTS, isManagedToolRuntime, isUpdateBusyPhase, latestTurnAnswer } from "@openbot/contracts/ipc";
@@ -337,14 +336,9 @@ export interface ApplicationServiceContext {
 }
 
 /** Everything the entry point wires up, registers IPC handlers against, and shuts down. */
-/** The routine flow runtime, and a way to hear which agents' canvases changed. */
-type RoutineFlowsService = RoutineFlowsHandle & {
-  onChanged(listener: (change: RoutineFlowsChanged) => void): void;
-};
-
 export interface ApplicationServices {
   service: AgentService;
-  routineFlows: RoutineFlowsService;
+  routineFlows: RoutineFlowsHandle;
   providerRuntimes: ProviderRuntimeManager;
   providerCredentials: ProviderCredentialStore;
   /** The Slack connections of the agents on this host. */
@@ -1232,7 +1226,6 @@ export async function createApplicationServices({
   });
   teardown.push(TEARDOWN_ORDER.automation, "the automation server", () => Effect.runPromise(automation.stop()));
   // An agent routine's answer handed on from agent to agent; see `routine-flows.ts`.
-  const routineFlowListeners = new Set<(change: RoutineFlowsChanged) => void>();
   const routineFlowRuntime = await Effect.runPromise(
     createRoutineFlows({
       store: new RoutineFlowStore({ database: store.database }),
@@ -1250,17 +1243,12 @@ export async function createApplicationServices({
       },
       agentName: (agentId) => store.list().find((agent) => agent.id === agentId)?.name ?? agentId,
       sendHandoff: (input) => service.enqueueRoutineHandoff(input),
+      // An agent event, so this window, joined clients and the web app hear it the same way.
       changed: (agentIds) => {
-        for (const listener of routineFlowListeners) listener({ agentIds });
+        for (const agentId of agentIds) service.notifyRoutineFlowsChanged(agentId);
       },
     }),
   );
-  const routineFlows: RoutineFlowsService = {
-    ...routineFlowRuntime,
-    onChanged: (listener) => {
-      routineFlowListeners.add(listener);
-    },
-  };
   service.on("event", (event) => Effect.runFork(routineFlowRuntime.notice(event)));
   teardown.push(TEARDOWN_ORDER.routineFlows, "the routine flows", () => Effect.runPromise(routineFlowRuntime.close()));
   // Listens only after the user turns the feed on in Server Settings > Routines.
@@ -1546,6 +1534,8 @@ export async function createApplicationServices({
     hostedSites,
     // Present, so the host advertises `agent-import-v1`. Any member can import.
     agentImport,
+    // Present, so the host advertises `routine-flows-v1`. Any member who can see the agents.
+    routineFlows: routineFlowRuntime,
     // Each member present advertises its admin capability. Every admin route requires an owner or admin.
     admin: {
       agents: agentAdminSettings,
@@ -2079,7 +2069,7 @@ export async function createApplicationServices({
 
   return {
     service,
-    routineFlows,
+    routineFlows: routineFlowRuntime,
     providerRuntimes,
     providerCredentials,
     messaging,

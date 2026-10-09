@@ -19,6 +19,7 @@ import { Effect } from "effect";
 import { onCleanup } from "solid-js";
 import type { ConversationRuntime } from "../conversation/conversation-runtime";
 import { webEventRoutinesApi } from "../conversation/routine-webhooks-api";
+import { createWebAttachmentMedia } from "./web-attachment-media";
 import { createWebAttachmentFiles, openWebLink } from "./web-attachments";
 import type { WebWorkspaceRuntime } from "./web-runtime";
 
@@ -79,7 +80,7 @@ export function createWebConversationRuntime(
   eventsEnabled?: () => boolean,
 ): ConversationRuntime {
   const listeners = new Set<(event: AttachmentImportEvent) => void>();
-  const files = createWebAttachmentFiles(remote);
+  const files = createWebAttachmentFiles(remote, hostId);
   let importing: { cancelled: boolean; serverId: string } | undefined;
   async function cancelImportFiles() {
     if (!importing) return;
@@ -96,8 +97,10 @@ export function createWebConversationRuntime(
   const emit = (event: AttachmentImportEvent) => {
     for (const listener of listeners) listener(event);
   };
+  const attachmentMedia = createWebAttachmentMedia(remote, hostId);
   onCleanup(() => {
     void cancelImportFiles();
+    attachmentMedia.dispose();
   });
   return {
     agent: {
@@ -152,6 +155,8 @@ export function createWebConversationRuntime(
     voice: { onModelStatus: () => () => {}, prepareModel: unavailable, transcribe: unavailable },
     openUrl: openWebLink,
     previewAttachment: files.preview,
+    attachmentMedia,
+    visualPage: files.visualPage,
     async importFiles(files) {
       if (importing || files.length === 0) return;
       const serverId = hostId();

@@ -13,9 +13,11 @@ import {
 } from "@openbot/contracts/ipc";
 import { AGENT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-import-v1";
 import { CONTEXT_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/context-reset-v1";
+import { TEAM_AGENT_CREATE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
 import { HOST_RELEASE_CAPABILITY } from "@openbot/contracts/team-protocol/host-release-v1";
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
+import { ROUTINE_FLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import {
   cancelHostUpdate,
@@ -42,6 +44,8 @@ import { computeAgentAvatarMoods } from "@openbot/ui/features/agents/agent-avata
 import { createFirstAgentDraft, type FirstAgentDraft } from "@openbot/ui/features/agents/FirstAgentSetup";
 import { BillingDialog } from "@openbot/ui/features/billing/BillingDialog";
 import { createBillingStore } from "@openbot/ui/features/billing/billing-store";
+import { unloadedHistory } from "@openbot/ui/features/conversation/ChatScrollRail";
+import type { DiagramModelChoice } from "@openbot/ui/features/diagrams/DiagramNewAgentCard";
 import { LeaveServerDialog } from "@openbot/ui/features/servers/LeaveServerDialog";
 import { ServerRail } from "@openbot/ui/features/servers/ServerRail";
 import { createSettingsHostedServersStore } from "@openbot/ui/features/settings/stores/hosted-servers-store";
@@ -65,7 +69,8 @@ import {
   ServerSettingsOverlay,
   SharedAgentInstallOverlay,
 } from "../../WorkspaceOverlayViews";
-import type { CreationPreference } from "../agents/agent-creation-model";
+import { type NewAgentDraft, newAgentInput } from "../agents/agent-create-input";
+import { type CreationPreference, resolveCreationModel } from "../agents/agent-creation-model";
 import { claimErrorToast, readableAgentError } from "../agents/agent-error-text";
 import { createRemoteAgentAdmin, updateRemoteAgent } from "../agents/remote-agent-admin";
 import { ChannelConversation } from "../channels/ChannelConversation";
@@ -77,9 +82,11 @@ import { Conversation, createConversationController } from "../conversation/Conv
 import { clearStoredQueueEdit } from "../conversation/composer-draft";
 import { ConversationControllerProvider } from "../conversation/conversation-controller-context";
 import { composerDraftKey } from "../conversation/conversation-keys";
+import { webEventRoutinesApi } from "../conversation/routine-webhooks-api";
 import type { FilesPort } from "../files/files-port";
 import { hostSetupProviderProps } from "../onboarding/host-setup-provider-props";
 import { ServerOnboarding } from "../onboarding/ServerOnboarding";
+import { RoutineFlowsCanvas } from "../routine-flows/RoutineFlowsCanvas";
 import { AddServerOverlay, type AddServerResume } from "../servers/AddServerOverlay";
 import { watchHostUpdate } from "../servers/host-update-toast";
 import type { ServerHostedSitesOptions, ServerSettingsSection } from "../servers/ServerSettingsModal";
@@ -106,6 +113,7 @@ import { createWebServerNotifications } from "./web-notification-preferences";
 import { createWebNotificationRouting } from "./web-notification-routing";
 import { requestWebNotificationPermission } from "./web-notifications";
 import { createWebProviderSettings, openWebDestination } from "./web-provider-admin";
+import { webRoutineFlowsHost } from "./web-routine-flows";
 import { createWebServerSettings } from "./web-server-settings";
 import { createWebUsagePort } from "./web-usage-port";
 
@@ -718,13 +726,18 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     workspace.state.status === "online" &&
     workspace.state.capabilities.includes(CHANNEL_CHATS_CAPABILITY) &&
     Boolean(workspace.runtime.channels);
+  /** As on desktop: the Routines view shows the open agent's canvas, on a host that serves it. */
+  const routinesSupported = () => workspace.state.capabilities.includes(ROUTINE_FLOWS_CAPABILITY);
+  const routinesView = () => routinesSupported() && layout.sidebarView() === "routines";
+  /** The Routines view lists only agents: a channel has no routine canvas. */
+  const channelsListed = () => channelsSupported() && !routinesView();
   const savedChannelId = () => {
     const hostId = workspace.state.host?.hostId;
     return hostId ? (readChannelSelection()[props.accountId]?.[hostId] ?? null) : null;
   };
   // On a small screen the sidebar pane covers the chat, and so does the usage report. A covered
   // message was not seen.
-  const canMarkRead = () => document.hasFocus() && mobilePane() === "conversation" && !usageOpen();
+  const canMarkRead = () => document.hasFocus() && mobilePane() === "conversation" && !usageOpen() && !routinesView();
   const channels = createChannelsController({
     port: () => channelsPort,
     agents: workspace.profiles,
@@ -804,6 +817,33 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   createEffect(firstAgent, (first) => {
     if (first && !untrack(channelOpen)) setCreating(true);
   });
+  const webhookRoutines = webEventRoutinesApi((...args) => hostRequest()(...args));
+  const routineFlowsHost = webRoutineFlowsHost(workspace.runtime, workspace.onHostEvent, () =>
+    eventsEnabled() ? webhookRoutines : undefined,
+  );
+  /** A new agent on the canvas starts on the model the agent form would pick. */
+  const newAgentModels = createMemo((): DiagramModelChoice | undefined => {
+    if (!workspace.state.capabilities.includes(TEAM_AGENT_CREATE_MODEL_CAPABILITY)) return undefined;
+    const initial = resolveCreationModel(serverSetupChoice(), models());
+    return initial
+      ? { options: models(), status: status(), initial, customProviders: providerSettings()?.customProviders }
+      : undefined;
+  });
+  async function createCanvasAgent(draft: NewAgentDraft): Promise<{ id: string }> {
+    const created = await workspace.runtime.createAgent(
+      newAgentInput(draft, workspace.state.capabilities.includes(TEAM_AGENT_CREATE_MODEL_CAPABILITY)),
+    );
+    await workspace.refresh();
+    return created;
+  }
+  /* A channel can open while the Routines view is on: from search or a restored selection. Its row
+   * must be in the list, so the list goes back to the agents view. */
+  createEffect(
+    () => routinesView() && channelOpen(),
+    (channelOpenInRoutines) => {
+      if (channelOpenInRoutines) layout.setSidebarView("agents");
+    },
+  );
   const readState = () => workspace.conversation()?.page?.readState;
   // Keyed on the newest loaded message, not on the read state: the host can count a message that
   // this page has not loaded yet, and marking the same message again would not clear it. Focus
@@ -1035,10 +1075,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 />
               </Show>
               <Sidebar
-                channels={channelsSupported() ? channels.state.channels.filter((channel) => !channel.archived) : []}
-                deletedChannels={
-                  channelsSupported() ? channels.state.channels.filter((channel) => channel.archived) : []
-                }
+                channels={channelsListed() ? channels.state.channels.filter((channel) => !channel.archived) : []}
+                deletedChannels={channelsListed() ? channels.state.channels.filter((channel) => channel.archived) : []}
                 activeChannelId={channels.state.selectedId}
                 onSelectChannel={(id) => {
                   setMobilePane("conversation");
@@ -1049,9 +1087,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   void channels.editChannel(id);
                 }}
                 onDeleteChannel={channels.deletionSupported() ? channels.remove : undefined}
-                showingArchivedChannels={channels.state.archived}
-                onToggleArchivedChannels={channelsSupported() ? channels.toggleArchived : undefined}
-                onCreateChannel={channelsSupported() ? channels.create : undefined}
+                showingArchivedChannels={channelsListed() && channels.state.archived}
+                onToggleArchivedChannels={channelsListed() ? channels.toggleArchived : undefined}
+                onCreateChannel={channelsListed() ? channels.create : undefined}
                 onMarkAllRead={
                   workspace.state.status === "online"
                     ? () => {
@@ -1066,6 +1104,16 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 }
                 // The browser client does not know the unread counts of agent chats it has not opened.
                 hasUnread
+                view={layout.sidebarView()}
+                onViewChange={
+                  routinesSupported()
+                    ? (view) => {
+                        // An open channel would stay in the middle with no row in the list.
+                        if (view === "routines") channels.close();
+                        layout.setSidebarView(view);
+                      }
+                    : undefined
+                }
                 serverName={workspace.state.host?.name ?? "OpenBot"}
                 serverMenu={{
                   servers: servers(),
@@ -1183,7 +1231,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 }
                 onOpenSkills={workspace.state.status === "online" ? () => setMarketplaceOpen(true) : undefined}
               />
-              <WebMobileNavigation activePane={mobilePane()} onChange={setMobilePane} />
+              <WebMobileNavigation activePane={mobilePane()} routines={routinesView()} onChange={setMobilePane} />
             </>
           }
           after={
@@ -1461,7 +1509,25 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               }
             />
           </Show>
-          <Show when={!agentFormOpen() && !channelOpen() && !noHost() && !hostOffline()}>
+          <Show when={!agentFormOpen() && !channelOpen() && !noHost() && !hostOffline() && routinesView()}>
+            {/* A host switch starts the canvas again, with that host's webhook relay status. */}
+            <Show when={routineFlowsHost ? workspace.state.host?.hostId : undefined} keyed>
+              {(_hostId) => (
+                <Show when={routineFlowsHost}>
+                  {(host) => (
+                    <RoutineFlowsCanvas
+                      host={host()}
+                      agent={conversationAgent()}
+                      agents={workspace.profiles()}
+                      newAgentModels={newAgentModels()}
+                      createAgent={createCanvasAgent}
+                    />
+                  )}
+                </Show>
+              )}
+            </Show>
+          </Show>
+          <Show when={!agentFormOpen() && !channelOpen() && !noHost() && !hostOffline() && !routinesView()}>
             <Conversation
               runtime={runtime}
               onOpenMarketplace={() => setMarketplaceOpen(true)}
@@ -1490,6 +1556,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               firstUnreadMessageId={readState()?.firstUnreadMessageId ?? null}
               loaded={Boolean(workspace.conversation()?.page)}
               hasOlder={workspace.conversation()?.page?.pageInfo.hasOlder}
+              unloadedHistory={unloadedHistory(workspace.conversation()?.page?.pageInfo)}
               loadingOlder={workspace.conversation()?.loading}
               activeTurnId={workspace.conversation()?.page?.activeTurnId}
               activityDetail={

@@ -7,6 +7,7 @@ export const messages = {
   "attachment.notFound": "Dosya bulunamadı",
   "attachment.download": "{name} indir",
   "attachment.open": "{name} aç",
+  "attachment.loadMedia": "{name} oynat",
   "attachment.previewUnavailable": "Önizleme kullanılamıyor.",
   "attachment.error.preview": "{name} önizlenemedi. Tekrar deneyin.",
   "attachment.error.download": "Ekler indirilemedi. Tekrar deneyin.",

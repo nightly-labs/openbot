@@ -65,8 +65,16 @@ iCloud, cannot read it.
 
 A routine flow hands the answer of an agent routine on to other agents. The Routines view of the
 sidebar shows one canvas for each agent: every routine whose run reaches it, the agents its links
-reach, and the last run of each routine. Only this computer's host keeps flows; the remote IPC
-branch refuses them, and no Team API protocol changes.
+reach, and the last run of each routine. The host keeps the flows. A joined desktop and the web
+client read and change them through the optional `routine-flows-v1` capability (see
+[Routine flows](servers.md#routine-flows)); a host without it shows a notice instead of the canvas.
+The agent event `routine-flows-changed` names the agent whose canvas changed, on this computer and
+on a joined host.
+
+- `src/renderer/src/features/routine-flows/RoutineFlowsCanvas.tsx` is the canvas. It reads no
+  application context: it takes a `RoutineFlowsHost` (`routine-flows-port.ts`), the open agent and
+  the agent list. `WorkspaceRoutineFlows.tsx` gives it the active server through main, and
+  `web-client/web-routine-flows.ts` gives it the connected host over the Team API.
 
 - `src/backend/routine-flows/` owns the three tables of migration 31: links, node positions and steps.
   The rows are written directly, not through `dispatch`, because a step holds the text that one agent
@@ -85,7 +93,9 @@ branch refuses them, and no Team API protocol changes.
   does not change.
 - A canvas shows routines of every trigger kind (`routine-flow-routines.ts`). A webhook routine
   carries its endpoint, event type and filters; the details panel saves them, rotates the secret and
-  runs a test through the `events` IPC group, as the routine settings do.
+  runs a test through the events API, as the routine settings do. On a joined host only an owner or
+  admin has that API (`events-v1`); a member sees no webhook config and cannot change or run a
+  webhook routine from the canvas.
 - Agents read and change flows with the `openbot` tools `list_routine_flows`, `connect_routine_agents`
   and `disconnect_routine_agents` (`routine-flow-tools.ts`). `RoutineFlows` is built after the agent
   service, so the tool router reads it through a getter. The canvas chat panel sends the user's request

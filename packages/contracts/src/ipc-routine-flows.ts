@@ -6,8 +6,8 @@ import { isBoolean, isDynamicRecord, isOneOf, isString } from "./runtime-values"
 
 /**
  * Routine flows: what happens after an agent routine's own agent answers. A link hands that answer
- * on to another agent, inside one routine; each agent's part of one run is a step. Only this
- * computer's host keeps flows, so these types never cross the Team API.
+ * on to another agent, inside one routine; each agent's part of one run is a step. These IPC types
+ * never cross the Team API: the frozen `routine-flows-v1` codec carries a canvas to a joined client.
  */
 
 export const ROUTINE_FLOW_STEP_STATUSES = ["running", "succeeded", "failed", "skipped", "cancelled"] as const;
@@ -97,11 +97,6 @@ export interface DisconnectRoutineFlowInput {
 export interface UpdateRoutineFlowLinkInput {
   linkId: string;
   instruction: string;
-}
-
-/** The agents whose canvases changed, so the views showing them reload. */
-export interface RoutineFlowsChanged {
-  agentIds: string[];
 }
 
 /** The largest coordinate a node may take; far beyond any canvas a person would build. */
@@ -201,10 +196,6 @@ export function isRoutineFlowCanvas(value: unknown): value is RoutineFlowCanvas 
     Array.isArray(value.placedAgentIds) &&
     value.placedAgentIds.every(isIdentifier)
   );
-}
-
-export function isRoutineFlowsChanged(value: unknown): value is RoutineFlowsChanged {
-  return isDynamicRecord(value) && Array.isArray(value.agentIds) && value.agentIds.every(isIdentifier);
 }
 
 export function isSaveRoutineFlowPositionInput(value: unknown): value is SaveRoutineFlowPositionInput {

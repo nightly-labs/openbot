@@ -15,6 +15,7 @@ export const messages = defineMessages("webClient", {
   "webClient.login.wait": "Wait before requesting another code.",
   "webClient.pane.navigation": "Workspace navigation",
   "webClient.pane.chat": "Chat",
+  "webClient.pane.routines": "Routines",
   "webClient.pane.workspace": "Workspace",
   "webClient.notice.connecting": "Connecting to your computer",
   "webClient.notice.disconnected": "Your computer is disconnected",

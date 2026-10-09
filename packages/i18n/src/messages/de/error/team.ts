@@ -66,6 +66,10 @@ export const messages = {
   "error.team.agentUpdateUnsupported": "Diese Verbindung unterstützt das Aktualisieren von Agenten nicht.",
   "error.team.contextResetUnsupported": "Diese Verbindung unterstützt das Starten eines neuen Chats nicht.",
   "error.team.workspaceDirectoryUnsupported": "Diese Verbindung unterstützt das Anzeigen von Ordnern nicht.",
+  "error.team.routineFlowsUnsupported":
+    "Dieser Server unterstützt keine Routinenabläufe. Aktualisiere OpenBot auf dem Computer, auf dem er läuft.",
+  "error.team.routineCanvasTooLarge":
+    "Diese Routinenansicht ist zu groß, um sie an dieses Gerät zu senden. Kürze die Routinenanweisungen auf dem Computer, auf dem der Server läuft.",
   "error.team.agentImportUnsupported": "Diese Verbindung unterstützt das Importieren von Agenten nicht.",
   "error.team.liveActivityUnsupported": "Dieser Host kann die Live Activity eines Telefons nicht aktualisieren.",
   "error.team.agentUpdateTargetRequired": "Ein Agent zum Aktualisieren ist erforderlich.",

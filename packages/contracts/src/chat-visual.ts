@@ -31,6 +31,14 @@ export const CHAT_VISUAL_OPEN_LINK = "ui/open-link";
 export const CHAT_VISUAL_ITEM_TYPE_PREFIX = "visual-reply:";
 /** The most characters of HTML that an agent can publish as one page. */
 export const CHAT_VISUAL_HTML_LIMIT = 512_000;
+/** A larger page file is not shown: the frame would hold all of it in memory. */
+export const CHAT_VISUAL_PAGE_LIMIT = 8 * 1_024 * 1_024;
+/**
+ * The sandbox of a visual reply page: scripts and forms, but never `allow-same-origin`, popups,
+ * downloads or top navigation. The page has an opaque origin, so it cannot read the app or its
+ * storage. The desktop scheme sends it as a header, and the frame sets it as an attribute.
+ */
+export const CHAT_VISUAL_FRAME_SANDBOX = "allow-scripts allow-forms";
 export const CHAT_VISUAL_TITLE_LIMIT = 200;
 
 export function chatVisualItemType(height?: number): string {
@@ -183,8 +191,9 @@ const BASE_STYLE = [
 
 /**
  * The script that runs first in the page. It applies the theme, reports the page height, scrolls
- * to links in the page (the sandbox blocks them as loads) and sends web links to the app. Keep it
- * plain ES2020 and without dependencies: it runs inside the page.
+ * to links in the page (the sandbox blocks them as loads) and sends web links to the app. A `#`
+ * link is read as written: a `srcdoc` page has the app address as its base, so a resolved one would
+ * look like an app link. Keep it plain ES2020 and without dependencies: it runs inside the page.
  */
 const BOOTSTRAP = `(()=>{
 const parentWindow=window.parent,root=document.documentElement,marker="#${CHAT_VISUAL_THEME_FRAGMENT}";
@@ -206,9 +215,17 @@ addEventListener("DOMContentLoaded",report);
 addEventListener("load",report);
 let nextId=1;
 document.addEventListener("click",(event)=>{
-if(!event.isTrusted||event.button!==0||!(event.target instanceof Element))return;
+if(event.button!==0||!(event.target instanceof Element))return;
 const link=event.target.closest("a[href],area[href]");
 if(!link)return;
+const href=link.getAttribute("href")||"";
+if(href.startsWith("#")){
+event.preventDefault();
+const target=document.getElementById(decodeURIComponent(href.slice(1)));
+if(target)target.scrollIntoView();
+return;
+}
+if(!event.isTrusted)return;
 let url;
 try{url=new URL(link.getAttribute("href"),document.baseURI);}catch{return;}
 if(url.hash&&url.href.split("#")[0]===location.href.split("#")[0]){

@@ -40,6 +40,8 @@ export type AgentEvent =
   | { type: "memories-changed"; agentId: string }
   | { type: "routines-changed"; agentId: string }
   | { type: "skills-changed"; agentId: string }
+  /** The routine canvas of this agent changed, so the views showing it read it again. */
+  | { type: "routine-flows-changed"; agentId: string }
   | { type: "channel-memories-changed"; channelId: string }
   | { type: "channel-routines-changed"; channelId: string }
   | { type: "sidebar-layout-changed"; layout: SidebarLayoutSnapshot }
@@ -130,6 +132,7 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
     case "routines-changed":
       return isString(value.agentId) && value.agentId.length > 0 && value.agentId.length <= INPUT_LIMITS.identifier;
     case "skills-changed":
+    case "routine-flows-changed":
       return isIdentifier(value.agentId);
     case "channel-memories-changed":
     case "channel-routines-changed":

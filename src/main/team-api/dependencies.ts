@@ -33,6 +33,7 @@ import type { Logger } from "@openbot/logging";
 import type { AgentService } from "../../backend/agent-service";
 import type { BrowserHost } from "../../backend/browser-host";
 import type { MailboxStore } from "../../backend/mailbox-store";
+import type { RoutineFlowsHandle } from "../../backend/routine-flows/routine-flows";
 import type { SidebarLayoutStore } from "../../backend/sidebar-layout-store";
 import type { StorageUsageService } from "../../backend/storage-usage";
 import type { TeamChatStore } from "../../backend/team-chat-store";
@@ -140,6 +141,15 @@ export type TeamApiHostedSites = Pick<HostedSiteDesktopService, "listServerSites
 export type TeamApiAgentImport = Pick<AgentImportService, "stageUpload" | "apply" | "discard">;
 
 /**
+ * Its presence is what `#protocolSupport` advertises `routine-flows-v1` on. Any member who can see
+ * every agent a flow touches can use it.
+ */
+export type TeamApiRoutineFlows = Pick<
+  RoutineFlowsHandle,
+  "canvas" | "savePosition" | "removePosition" | "connect" | "disconnect" | "updateLink" | "agentsOf"
+>;
+
+/**
  * The admin routes, one member per optional capability. A member's presence is what
  * `#protocolSupport` advertises its capability on; every route behind it requires an owner or admin.
  */
@@ -243,6 +253,7 @@ export interface TeamApiOptions {
   storage?: TeamApiStorage;
   hostedSites?: TeamApiHostedSites;
   agentImport?: TeamApiAgentImport;
+  routineFlows?: TeamApiRoutineFlows;
   admin?: TeamApiAdmin;
   appVersion?: string;
   store: TeamStore;
