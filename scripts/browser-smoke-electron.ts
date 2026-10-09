@@ -378,6 +378,7 @@ const server = createServer((request, response) => {
 
 const SCENARIOS = [
   "background",
+  "focus",
   "controls",
   "tool-boundary",
   "evaluation",
@@ -453,6 +454,8 @@ async function main(): Promise<void> {
       try {
         if (scenario === "background") {
           // The scenario runs before the browser panel is first shown.
+        } else if (scenario === "focus") {
+          await runFocusScenario(browser, origin);
         } else if (scenario === "popups") {
           await runPopupScenario(browser, origin);
         } else if (scenario === "secret-handoff") {
@@ -1617,40 +1620,7 @@ async function main(): Promise<void> {
     await boundedContents.executeJavaScript("window.releaseHeldEvaluation(true); true");
     if (!(await heldEvaluation).success) throw new Error("The held evaluation failed.");
     await runCauseEffect(browser.close(boundedTab.id));
-    const focusSentinel = new BrowserWindow({
-      show: false,
-      opacity: 0,
-      width: 64,
-      height: 64,
-    });
-    await focusSentinel.loadURL("data:text/html,<input autofocus>");
-    focusSentinel.show();
-    focusSentinel.focus();
-    focusSentinel.webContents.focus();
-    await waitFor(async () => webContents.getFocusedWebContents() === focusSentinel.webContents);
-    const backgroundTab = await runCauseEffect(browser.open(origin, "smoke-thread", "smoke-bot"));
-    if (webContents.getFocusedWebContents() !== focusSentinel.webContents) {
-      throw new Error("A background browser open stole focus from an unrelated application renderer.");
-    }
-    const backgroundSnapshot = await runCauseEffect(browser.snapshot(backgroundTab.id));
-    if (webContents.getFocusedWebContents() !== focusSentinel.webContents) {
-      throw new Error("A background CDP operation stole focus from an unrelated application renderer.");
-    }
-    const backgroundSave = backgroundSnapshot.elements.find((element) => element.name === "Save");
-    if (!backgroundSave) throw new Error("The background focus fixture did not expose its action.");
-    const backgroundAction = await callBrowserTool(browser, "click", {
-      tabId: backgroundTab.id,
-      target: {
-        kind: "ref",
-        ref: backgroundSave.ref,
-        revision: backgroundSnapshot.revision,
-      },
-    });
-    if (!backgroundAction.success || webContents.getFocusedWebContents() !== focusSentinel.webContents) {
-      throw new Error("A background browser action did not restore focus to the unrelated application renderer.");
-    }
-    await runCauseEffect(browser.close(backgroundTab.id));
-    focusSentinel.destroy();
+    await runFocusScenario(browser, origin);
     process.stdout.write("BrowserHost: V2 semantics, adaptive image, iframe, upload, waits, and emulation passed.\n");
 
     const headerTab = await runCauseEffect(browser.open(`${origin}/headers`, "smoke-thread"));
@@ -1892,6 +1862,53 @@ async function main(): Promise<void> {
     if (!configuredRoot) await rm(temporaryRoot, { recursive: true, force: true });
     app.quit();
   }
+}
+
+async function runFocusScenario(browser: BrowserHost, origin: string): Promise<void> {
+  const focusSentinel = new BrowserWindow({
+    show: false,
+    opacity: 0,
+    width: 64,
+    height: 64,
+  });
+  await focusSentinel.loadURL("data:text/html,<input autofocus>");
+  focusSentinel.show();
+  focusSentinel.focus();
+  focusSentinel.webContents.focus();
+  await waitFor(async () => webContents.getFocusedWebContents() === focusSentinel.webContents);
+  let focusLosses = 0;
+  focusSentinel.webContents.on("blur", () => {
+    focusLosses += 1;
+  });
+  const backgroundTab = await runCauseEffect(browser.open(origin, "smoke-thread", "smoke-bot"));
+  if (webContents.getFocusedWebContents() !== focusSentinel.webContents) {
+    throw new Error("A background browser open stole focus from an unrelated application renderer.");
+  }
+  const backgroundSnapshot = await runCauseEffect(browser.snapshot(backgroundTab.id));
+  if (webContents.getFocusedWebContents() !== focusSentinel.webContents) {
+    throw new Error("A background CDP operation stole focus from an unrelated application renderer.");
+  }
+  const backgroundSave = backgroundSnapshot.elements.find((element) => element.name === "Save");
+  if (!backgroundSave) throw new Error("The background focus fixture did not expose its action.");
+  const backgroundAction = await callBrowserTool(browser, "click", {
+    tabId: backgroundTab.id,
+    target: {
+      kind: "ref",
+      ref: backgroundSave.ref,
+      revision: backgroundSnapshot.revision,
+    },
+  });
+  if (!backgroundAction.success || webContents.getFocusedWebContents() !== focusSentinel.webContents) {
+    throw new Error("A background browser action did not restore focus to the unrelated application renderer.");
+  }
+  await mkdir(".openbot-build", { recursive: true });
+  await writeFile(
+    ".openbot-build/browser-focus-report.json",
+    JSON.stringify({ focusLosses, success: backgroundAction.success }, null, 2),
+  );
+  if (focusLosses !== 0) throw new Error(`Background browser actions interrupted typing ${focusLosses} times.`);
+  await runCauseEffect(browser.close(backgroundTab.id));
+  focusSentinel.destroy();
 }
 
 async function runBackgroundScenario(browser: BrowserHost, origin: string): Promise<void> {

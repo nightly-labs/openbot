@@ -2269,15 +2269,7 @@ export class BrowserHost {
     onOperationStarted?: (completion: Fiber.Fiber<void, BrowserOperationError>) => void,
   ): Effect.fn.Return<BrowserSnapshot | { tabId: string; closed: true; openerTabId?: string }, BrowserOperationError> {
     const tab = yield* this.#requireTab(tabId);
-    return yield* runTabAction(
-      tab,
-      () => this.#focusedContentsOutsideTabs(),
-      action,
-      target,
-      operation,
-      timeoutMs,
-      onOperationStarted,
-    );
+    return yield* runTabAction(tab, action, target, operation, timeoutMs, onOperationStarted);
   });
 
   readonly #runEvaluation = Effect.fn("BrowserHost.runEvaluation")(function* (

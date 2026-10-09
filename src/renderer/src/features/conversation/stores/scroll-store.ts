@@ -147,6 +147,7 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     getItemKey: (index) => timelineMessages()[index]?.id ?? index,
     keyVersion: () => `${timelineMessages()[0]?.id ?? ""}:${timelineMessages().at(-1)?.id ?? ""}`,
     scrollMargin: virtualScrollMargin,
+    stickToLatest: deps.sticky.getStickToLatest,
     onChange: (instance) => {
       const first = instance.getVirtualItems()[0];
       if (!first) return;

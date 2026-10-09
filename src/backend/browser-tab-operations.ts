@@ -1,8 +1,7 @@
 import type { BrowserTarget } from "@openbot/contracts/ipc";
 import { Deferred, Effect, Fiber } from "effect";
-import type { WebContents } from "electron";
 import { type BrowserOperationError, browserFailure, browserSync } from "./browser-effects";
-import { type BrowserHostTab, type KeepQueueBlocked, restoreWebContentsFocus } from "./browser-host-tab";
+import type { BrowserHostTab, KeepQueueBlocked } from "./browser-host-tab";
 import { describeBrowserTarget } from "./browser-navigation";
 import { TimeoutError, withTimeout } from "./with-timeout";
 
@@ -133,7 +132,6 @@ const unwindStalledOperation = Effect.fn("BrowserTab.unwind")(function* <A>(
 export const runTabAction = Effect.fn("BrowserTab.action")(
   (
     tab: BrowserHostTab,
-    focusedOutsideTabs: () => WebContents | null,
     action: string,
     target: BrowserTarget | undefined,
     operation: (
@@ -150,7 +148,6 @@ export const runTabAction = Effect.fn("BrowserTab.action")(
           return yield* browserFailure(
             new Error("Browser inspection is protected during authentication. Use takeover."),
           );
-        const previouslyFocused = focusedOutsideTabs();
         const deadline = Date.now() + timeoutMs;
         const timeoutMessage = `Browser ${action} timed out.`;
         let actionRecorded = false;
@@ -161,7 +158,7 @@ export const runTabAction = Effect.fn("BrowserTab.action")(
           Effect.gen(function* () {
             let highlighted = false;
             yield* Effect.gen(function* () {
-              tab.contents.focus();
+              // CDP emulates page focus. Native focus would interrupt typing in another chat.
               if (target && target.kind !== "point")
                 highlighted = yield* tab.engine.highlight(target).pipe(
                   Effect.as(true),
@@ -266,11 +263,6 @@ export const runTabAction = Effect.fn("BrowserTab.action")(
                   detail: String(error.cause),
                 });
               return yield* error;
-            }),
-          ),
-          Effect.ensuring(
-            Effect.sync(() => {
-              if (!tab.closing) restoreWebContentsFocus(previouslyFocused, tab.contents);
             }),
           ),
         );

@@ -14,6 +14,8 @@ interface ChatVirtualizerOptions<TScrollElement extends Element, TItemElement ex
   getItemKey: (index: number) => string | number;
   keyVersion: () => unknown;
   scrollMargin: () => number;
+  /** Whether the reader is following new messages instead of reading older ones. */
+  stickToLatest?: () => boolean;
   onChange?: (virtualizer: Virtualizer<TScrollElement, TItemElement>) => void;
 }
 
@@ -51,7 +53,21 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
     getItemKey: options.getItemKey,
     observeElementRect,
     observeElementOffset,
-    scrollToFn: elementScroll,
+    scrollToFn: (offset, scroll, instance) => {
+      const element = instance.scrollElement;
+      if (
+        element &&
+        scroll.adjustments !== undefined &&
+        options.count() <= STATIC_CHAT_LIMIT &&
+        options.stickToLatest?.()
+      ) {
+        // Static rows already occupy their measured space. An estimate correction can move
+        // the chat off the bottom after routine cards load. Follow the actual bottom instead.
+        elementScroll(element.scrollHeight - element.clientHeight, { behavior: scroll.behavior }, instance);
+        return;
+      }
+      elementScroll(offset, scroll, instance);
+    },
     overscan: 5,
     anchorTo: "end",
     followOnAppend: "auto",
