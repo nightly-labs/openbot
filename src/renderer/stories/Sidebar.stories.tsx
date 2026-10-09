@@ -280,7 +280,7 @@ export const Populated: Story = {
 
 export const MobileAppCard: Story = {
   args: { footer: <SidebarMobileAppCard onOpenInstall={fn()} onDismiss={fn()} /> },
-  decorators: Populated.decorators,
+  decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
 };
 
 export const PinnedOne: Story = {
