@@ -47,6 +47,7 @@ type HistoricalRate = {
 
 type CachedRate = {
   day: unknown;
+  source_day: unknown;
   usd_rate: unknown;
 };
 
@@ -102,16 +103,20 @@ export class BillingUsd {
     const row = yield* Effect.tryPromise({
       try: () =>
         this.#database
-          .prepare("SELECT day, usd_rate FROM billing_fx_rates WHERE currency = ?1 AND day = ?2 LIMIT 1")
+          .prepare(
+            "SELECT day, COALESCE(source_day, day) AS source_day, usd_rate " +
+              "FROM billing_fx_rates WHERE currency = ?1 AND day = ?2 LIMIT 1",
+          )
           .bind(currency, day)
           .first<CachedRate>(),
       catch: () => new BillingUsdError({ reason: "database" }),
     });
     if (row === null) return null;
-    if (!isDateString(row.day)) return yield* new BillingUsdError({ reason: "invalid_rate" });
+    if (!isDateString(row.day) || !isDateString(row.source_day))
+      return yield* new BillingUsdError({ reason: "invalid_rate" });
     const usdRate = numberRate(row.usd_rate);
     if (usdRate === null) return yield* new BillingUsdError({ reason: "invalid_rate" });
-    return { fxDate: row.day, usdRate };
+    return { fxDate: row.source_day, usdRate };
   }).bind(this);
 
   #loadRate = Effect.fn("BillingUsd.loadRate")(function* (
@@ -146,14 +151,15 @@ export class BillingUsd {
       try: () =>
         this.#database
           .prepare(
-            "INSERT INTO billing_fx_rates (day, currency, usd_rate) VALUES (?1, ?2, ?3) " +
-              "ON CONFLICT(day, currency) DO UPDATE SET usd_rate = excluded.usd_rate",
+            "INSERT OR IGNORE INTO billing_fx_rates (day, currency, source_day, usd_rate) VALUES (?1, ?2, ?3, ?4)",
           )
-          .bind(selected.day, currency, usdRate)
+          .bind(day, currency, selected.day, usdRate)
           .run(),
       catch: () => new BillingUsdError({ reason: "database" }),
     });
-    return { fxDate: selected.day, usdRate };
+    const cached = yield* this.#cachedRate(currency, day);
+    if (cached === null) return yield* new BillingUsdError({ reason: "database" });
+    return cached;
   }).bind(this);
 }
 

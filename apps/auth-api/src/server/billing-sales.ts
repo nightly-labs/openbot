@@ -333,7 +333,6 @@ export class BillingSales {
           .run(),
       );
     }
-    if (!userId) return;
     const attributes: FactAttributes = row
       ? { plan: row.plan, interval: row.interval, currency: row.currency, amount: row.amount }
       : {};
@@ -343,7 +342,7 @@ export class BillingSales {
           `INSERT OR IGNORE INTO billing_sales_facts(
                source_key, fact_type, source_id, invoice_id, session_id, user_id, server_id,
                event_timestamp, attributes_json, delivery_enqueued_at, created_at
-             ) VALUES (?, 'checkout_completed', ?, NULL, ?, ?, ?, ?, ?, NULL, ?)`,
+               ) VALUES (?, 'checkout_completed', ?, NULL, ?, (SELECT id FROM users WHERE id = ?), ?, ?, ?, NULL, ?)`,
         )
         .bind(
           `checkout:${sessionId}:completed`,
@@ -392,7 +391,6 @@ export class BillingSales {
           .run(),
       );
     }
-    if (!userId) return;
     const attributes: FactAttributes = row
       ? { plan: row.plan, interval: row.interval, currency: row.currency, amount: row.amount }
       : {};
@@ -402,7 +400,7 @@ export class BillingSales {
           `INSERT OR IGNORE INTO billing_sales_facts(
                source_key, fact_type, source_id, invoice_id, session_id, user_id, server_id,
                event_timestamp, attributes_json, delivery_enqueued_at, created_at
-             ) VALUES (?, 'checkout_expired', ?, NULL, ?, ?, ?, ?, ?, NULL, ?)`,
+             ) VALUES (?, 'checkout_expired', ?, NULL, ?, (SELECT id FROM users WHERE id = ?), ?, ?, ?, NULL, ?)`,
         )
         .bind(
           `checkout:${sessionId}:expired`,
@@ -479,7 +477,7 @@ export class BillingSales {
           `INSERT OR IGNORE INTO billing_sales_facts(
                source_key, fact_type, source_id, invoice_id, session_id, user_id, server_id,
                event_timestamp, attributes_json, delivery_enqueued_at, created_at
-             ) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, NULL, ?)`,
+             ) VALUES (?, ?, ?, ?, NULL, (SELECT id FROM users WHERE id = ?), ?, ?, ?, NULL, ?)`,
         )
         .bind(
           sourceKey,

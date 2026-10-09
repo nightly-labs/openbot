@@ -107,4 +107,52 @@ describe("billing sales", () => {
       { fact_type: "payment_succeeded", invoice_id: "in_sales" },
     ]);
   });
+
+  it("acknowledges late events after the account was deleted", async () => {
+    const database = migratedDatabase("0031_billing_sales.sql");
+    databases.push(database);
+    database.exec(
+      `INSERT INTO users(id, identity_key, email, created_at, updated_at)
+       VALUES ('deleted-user', 'email:deleted@example.test', 'deleted@example.test', 1, 1);
+       INSERT INTO billing_subscriptions(
+         stripe_subscription_id, user_id, stripe_customer_id, server_id, plan, interval, currency, amount,
+         status, current_period_end, cancel_at_period_end, updated_at
+       ) VALUES ('sub_deleted', 'deleted-user', 'cus_deleted', 'server-1', 'standard', 'month', 'eur', 1200,
+         'active', 1, 0, 1);`,
+    );
+    const sales = service(database);
+    await runApiEffect(sales.checkout({ ...checkout, userId: "deleted-user", sessionId: "cs_deleted" }));
+    database.exec("DELETE FROM users WHERE id = 'deleted-user'");
+
+    await expect(
+      runApiEffect(
+        sales.webhook(
+          event("checkout.session.expired", "evt_deleted_expired", 1_700_000_030, {
+            id: "cs_deleted",
+            metadata: { openbot_user_id: "deleted-user" },
+          }),
+          null,
+        ),
+      ),
+    ).resolves.toBeUndefined();
+    await expect(
+      runApiEffect(
+        sales.webhook(
+          event("invoice.paid", "evt_deleted_paid", 1_700_000_040, {
+            id: "in_deleted",
+            subscription: "sub_deleted",
+            amount_paid: 1200,
+            currency: "eur",
+            metadata: { openbot_user_id: "deleted-user" },
+          }),
+          { userId: "deleted-user", plan: "standard", interval: "month", currency: "eur" },
+        ),
+      ),
+    ).resolves.toBeUndefined();
+    await expect(runApiEffect(sales.processPending())).resolves.toBeUndefined();
+
+    expect(database.prepare("SELECT user_id, delivery_enqueued_at FROM billing_sales_facts").all()).toEqual(
+      expect.arrayContaining([{ user_id: null, delivery_enqueued_at: expect.any(Number) }]),
+    );
+  });
 });

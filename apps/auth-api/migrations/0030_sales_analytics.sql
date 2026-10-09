@@ -37,11 +37,12 @@ BEGIN
    WHERE profile_id = OLD.id AND status IN ('pending', 'sending', 'uncertain', 'rejected');
 END;
 
--- One immutable conversion rate per currency and calendar day. The payment code owns the rate
--- lookup; this table does not keep any provider credentials or payment identifiers.
+-- Resolve each requested UTC day once. source_day identifies the prior available ECB quote.
+-- Existing resolutions are immutable and contain no credentials or payment identifiers.
 CREATE TABLE IF NOT EXISTS billing_fx_rates (
   day TEXT NOT NULL,
   currency TEXT NOT NULL,
+  source_day TEXT,
   usd_rate REAL NOT NULL CHECK(usd_rate > 0),
   PRIMARY KEY (day, currency)
 );

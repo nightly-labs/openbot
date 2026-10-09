@@ -25,6 +25,7 @@ function database(): D1Database {
     CREATE TABLE billing_fx_rates (
       day TEXT NOT NULL,
       currency TEXT NOT NULL,
+      source_day TEXT,
       usd_rate REAL NOT NULL,
       PRIMARY KEY (day, currency)
     )
@@ -61,15 +62,17 @@ describe("BillingUsd", () => {
     expect(result).toEqual({ amountUsd: 1_095, fxDate: "2024-01-05", fxRate: 1.095 });
   });
 
-  it("converts PLN with the EUR-base cross rate and caches the source day", async () => {
+  it("caches a weekend resolution without reusing it on the next weekday", async () => {
     const fetch = ecbFetch();
     const service = new BillingUsd({ database: database(), fetch });
-    const result = await runApiEffect(service.convert(1_000, "pln", timestamp("2024-01-05")));
-    const cached = await runApiEffect(service.convert(1_000, "pln", timestamp("2024-01-05")));
+    const result = await runApiEffect(service.convert(1_000, "pln", timestamp("2024-01-07")));
+    const cached = await runApiEffect(service.convert(1_000, "pln", timestamp("2024-01-07")));
+    const weekday = await runApiEffect(service.convert(1_000, "pln", timestamp("2024-01-08")));
 
     expect(result).toEqual({ amountUsd: 251, fxDate: "2024-01-05", fxRate: 1.095 / 4.37 });
     expect(cached).toEqual(result);
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(weekday).toEqual({ amountUsd: 251, fxDate: "2024-01-08", fxRate: 1.096 / 4.36 });
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 
   it("uses a cached exact-date rate without calling ECB", async () => {
@@ -78,6 +81,7 @@ describe("BillingUsd", () => {
       CREATE TABLE billing_fx_rates (
         day TEXT NOT NULL,
         currency TEXT NOT NULL,
+        source_day TEXT,
         usd_rate REAL NOT NULL,
         PRIMARY KEY (day, currency)
       );
