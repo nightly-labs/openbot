@@ -15,7 +15,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import { AGENT_RUNTIME_ATTENTION_LIMIT } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
-import { createOpenBotLogger, toLogValue } from "@openbot/logging";
+import { createOpenBotLogger, redactText, toLogValue } from "@openbot/logging";
 import { Deferred, Effect, Result, Schema } from "effect";
 import type { AgentClient } from "../agent-client";
 import type { BrowserOperationError } from "../browser-effects";
@@ -217,7 +217,7 @@ export class AttentionRegistry {
         .map((pending) => ({
           requestId: this.#localHandle(pending),
           questions: structuredClone(pending.questions),
-          requiresOpenBot: pending.questions.some((question) => question.isSecret),
+          requiresOpenBot: pending.questions.some(localQuestionNeedsOpenBot),
         })),
       approvals: [...this.#approvals.values()]
         .filter((pending) => pending.approval.agentId === agentId)
@@ -237,7 +237,7 @@ export class AttentionRegistry {
       const pending = [...this.#prompts.values()].find(
         (entry) => entry.agentId === agentId && this.#localHandles.get(entry) === input.requestId,
       );
-      if (!pending || pending.questions.some((question) => question.isSecret)) {
+      if (!pending || pending.questions.some(localQuestionNeedsOpenBot)) {
         return yield* attentionStep(() => {
           throw new InactiveAttentionRequest(sourceText("error.backend.promptInactive"));
         });
@@ -1055,5 +1055,14 @@ export class AttentionRegistry {
 class AttentionOperationFailed extends Schema.TaggedError<AttentionOperationFailed>()("AttentionOperationFailed", {
   cause: Schema.Defect(),
 }) {}
+
+/** Redacted choice labels and IDs cannot be sent back as the provider's original values. */
+function localQuestionNeedsOpenBot(question: AgentPromptQuestion): boolean {
+  return (
+    question.isSecret ||
+    redactText(question.id) !== question.id ||
+    (question.options?.some((option) => redactText(option.label) !== option.label) ?? false)
+  );
+}
 
 const { sync: attentionStep, rewrap: toAttentionOperationFailed } = causeHelpers(AttentionOperationFailed);

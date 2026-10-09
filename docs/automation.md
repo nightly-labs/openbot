@@ -123,7 +123,8 @@ returned. The response has three arrays:
 An approval has `requestId`, `agentId`, `threadId`, `turnId`, `kind`, `command`, `cwd`, `reason`,
 `grantRoot`, and `permissions`. Show the full details to the person before accepting it. Text is
 secret-redacted. A browser takeover has only `requestId` and `requiresOpenBot: true`.
-A secret question has `requiresOpenBot: true` and an empty `questions` array.
+A secret question, or a question whose IDs or choice labels need redaction, has
+`requiresOpenBot: true` and an empty `questions` array.
 Direct the person to the agent in OpenBot for these requests.
 
 Request IDs are opaque. Keep them unchanged. They identify one pending request and expire when

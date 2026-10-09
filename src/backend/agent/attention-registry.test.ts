@@ -421,6 +421,46 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       id: "unsupported-elicitation",
       result: { action: "decline", content: null, _meta: null },
     });
+
+    for (const { id, label } of [
+      { id: "account", label: "person@example.com" },
+      { id: "person@example.com", label: "Team account" },
+    ]) {
+      client.emit("request", {
+        method: "mcpServer/elicitation/request",
+        id: "redacted-choice",
+        params: {
+          threadId,
+          turnId,
+          serverName: "accounts",
+          mode: "form",
+          message: "Choose an account.",
+          requestedSchema: { type: "object", properties: { [id]: { type: "string", enum: [label] } } },
+        },
+      });
+      await waitFor(
+        () => service?.getLocalAttention("chief").prompts.some((prompt) => prompt.requiresOpenBot) === true,
+      );
+      const prompt = service.getLocalAttention("chief").prompts[0];
+      if (!prompt) throw new Error("The account question is missing.");
+      const responseCount = client.responses.length;
+      await expect(
+        runCauseEffect(
+          service.respondToLocalAttention("chief", {
+            kind: "prompt",
+            requestId: prompt.requestId,
+            answers: { [id]: ["[redacted-email]"] },
+          }),
+        ),
+      ).rejects.toThrow("This prompt is no longer active.");
+      expect(client.responses).toHaveLength(responseCount);
+      // The person can still answer the original choice in OpenBot.
+      await runCauseEffect(service.respondToPrompt({ requestId: "redacted-choice", answers: { [id]: [label] } }));
+      expect(client.responses.at(-1)).toEqual({
+        id: "redacted-choice",
+        result: { action: "accept", content: { [id]: label }, _meta: null },
+      });
+    }
     expect(events).toContainEqual(
       expect.objectContaining({ type: "error", code: "mcp_safety_handoff", agentId: "chief" }),
     );
