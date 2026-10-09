@@ -4,6 +4,7 @@ import type { messages as source } from "../en/account";
 export const messages = {
   "account.dock.usageLoading": "Cargando datos de uso",
   "account.dock.usageUnavailable": "Uso no disponible",
+  "account.dock.usageNotReported": "Uso no informado",
   "account.dock.usageLabel": "Uso, queda el {percent}% de {name}",
   "account.dock.usageTooltip": "Uso de {name}",
   "account.dock.openMenu": "Abrir menú de la cuenta",
@@ -39,7 +40,10 @@ export const messages = {
   "account.usage.value.loading": "Cargando…",
   "account.usage.value.unavailable": "No disponible",
   "account.usage.notReported": "No se ha indicado ningún límite",
+  "account.usage.value.notReported": "No informado",
+  "account.usage.providerNotReported": "El proveedor no informa del uso",
   "account.usage.row.unavailable": "{name}, no disponible",
+  "account.usage.row.notReported": "{name}, uso no informado",
   "account.usage.row.loading": "{name}, cargando",
   "account.usage.row.left": "{name}, {percent}% restante",
   "account.usage.row.resets": "se restablece {time}",

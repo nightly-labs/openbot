@@ -723,6 +723,9 @@ export class ProviderRuntime implements ProviderPort {
                 ),
               );
             } else {
+              // Starting a provider that has no usage reading only to get nothing back cost a cold
+              // start on every dock poll.
+              if (!agentProviderDescriptor(provider).reportsUsage) return;
               const kept = this.#released.has(provider) ? this.#lastUsage.get(provider) : undefined;
               if (kept && !usageWindowHasReset(kept)) {
                 collected.set(provider, kept);
@@ -1504,6 +1507,7 @@ export class ProviderRuntime implements ProviderPort {
     this: ProviderRuntime,
     source: AgentClient,
   ) {
+    if (!agentProviderDescriptor(source.provider).reportsUsage) return;
     const client = this.#clients.get(source.provider);
     if (!client || this.#usageLimitRefreshes.has(client)) return;
     this.#usageLimitRefreshes.add(client);
@@ -2290,6 +2294,7 @@ export class ProviderRuntime implements ProviderPort {
       }
       if (isUsageLimitDiagnostic(message)) {
         stderrLogger.warn("A provider reported an exhausted usage limit.", { provider: client.provider, message });
+        // A provider with no usage reading reports the limit in the failed turn's error instead.
         Effect.runFork(this.refreshUsageAfterLimit(client));
         return;
       }

@@ -188,6 +188,12 @@ export const messages = {
   "error.provider.antigravityNotStarted": "Gemini sunucusu bulundu ancak sürümü okunamıyor.",
   "error.provider.antigravityVersionUnreadable": "Gemini sunucu sürümü okunamıyor.",
   "error.provider.antigravitySignIn": "Gemini'yi kullanmak için Google ile oturum açın.",
+  "error.provider.antigravityRateLimited":
+    "Bir hız sınırına veya planın kotasına ulaşıldığı için Gemini isteği reddetti. Birkaç dakika bekleyin ya da başka bir model seçin, sonra yeniden deneyin.\n{detail}",
+  "error.provider.antigravityModelUnavailable":
+    "Gemini şu anda bu modeli kullanamıyor. Başka bir model seçin, sonra yeniden deneyin.\n{detail}",
+  "error.provider.antigravityServiceFailure":
+    "Google'ın Gemini hizmeti isteği tamamlamadı. Birkaç dakika sonra yeniden deneyin.\n{detail}",
   "error.provider.cursorArchivePath": "Cursor arşivi beklenmeyen bir dosya içeriyor.",
   "error.provider.cursorChecksum": "Cursor çalışma zamanı sağlama toplamı (checksum) eşleşmiyor.",
   "error.provider.cursorReleaseShape": "Cursor sürümü beklenmeyen bir yapıya sahip.",

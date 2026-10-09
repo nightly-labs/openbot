@@ -144,6 +144,7 @@ export function AccountDock(props: AccountDockProps) {
   const usageTone = createMemo(() => usageSummary()?.tone ?? "neutral");
   const usageButtonLabel = createMemo(() => {
     const summary = usageSummary();
+    if (summary !== null && !summary.reportsUsage) return t("account.dock.usageNotReported");
     if (usageLoading() && summary === null) return t("account.dock.usageLoading");
     if (summary === null || summary.remainingPercent === null) return t("account.dock.usageUnavailable");
     return t("account.dock.usageLabel", { name: summary.name, percent: summary.remainingPercent });

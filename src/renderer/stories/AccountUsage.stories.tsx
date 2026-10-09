@@ -37,7 +37,10 @@ const unreportedRows = accountUsageProviderRows(
       },
     ],
   },
-  [{ id: "grok", state: "available" }],
+  [
+    { id: "grok", state: "available" },
+    { id: "antigravity", state: "available" },
+  ],
 );
 const warningRows: AccountUsageProviderRow[] = mixedRows.map((row) =>
   row.provider === "claude" ? { ...row, remainingPercent: 29, windowLabel: "Weekly", tone: "warning" } : row,
