@@ -417,10 +417,16 @@ export function createWebWorkspaceRuntime(
       path,
       body,
       upload,
-      timeoutMs: remoteWorkspaceReadTimeout(method, path),
+      timeoutMs: method === "GET" && path === TEAM_API_ROUTES.me ? 15_000 : remoteWorkspaceReadTimeout(method, path),
     });
     if (disposed || generation !== current) throw new Error(currentText().t("webClient.error.hostChanged"));
-    if (result.status === 401 || result.status === 403) {
+    const membershipRead = method === "GET" && path === TEAM_API_ROUTES.me;
+    // An action can be forbidden while membership remains valid. Confirm access before clearing drafts.
+    if (result.status === 403 && !membershipRead) {
+      await request("GET", TEAM_API_ROUTES.me);
+      if (disposed || generation !== current) throw new Error(currentText().t("webClient.error.hostChanged"));
+    }
+    if (result.status === 401 || (result.status === 403 && membershipRead)) {
       const error = new WebHostConnectionError(result.status === 401 ? "authentication_required" : "access_ended");
       if (requestHostId) events.accessDenied?.(requestHostId, error);
       throw error;

@@ -85,6 +85,7 @@ describe("browser workspace runtime", () => {
     );
     await runtime.connect(host);
     peer.execute.mockResolvedValueOnce({ ok: false, status, body: {} });
+    if (status === 403) peer.execute.mockResolvedValueOnce({ ok: false, status, body: {} });
     await expect(runtime.conversation("agent")).rejects.toThrow();
     if (status === 503) expect(accessDenied).not.toHaveBeenCalled();
     else
@@ -92,6 +93,30 @@ describe("browser workspace runtime", () => {
         host.hostId,
         expect.objectContaining({ code: status === 401 ? "authentication_required" : "access_ended" }),
       );
+    await runtime.dispose();
+  });
+
+  it.each([200, 503])("keeps host access when a refused action has membership status %s", async (status) => {
+    const accessDenied = vi.fn();
+    const runtime = createWebWorkspaceRuntime(
+      "one",
+      { connection: vi.fn(), accessDenied, event: vi.fn(), accountChanged: async () => {} },
+      vi.fn(),
+      { createPeer: () => peer, acquireHostLock: async () => () => {} },
+    );
+    await runtime.connect(host);
+    peer.execute.mockClear();
+    peer.execute.mockResolvedValueOnce({ ok: false, status: 403, body: { error: "Action refused" } });
+    peer.execute.mockResolvedValueOnce({ ok: status === 200, status, body: { id: "member" } });
+
+    const deletion = runtime.deleteAgent("agent");
+    if (status === 200) await expect(deletion).rejects.toThrow("Action refused");
+    else await expect(deletion).rejects.toThrow();
+    expect(accessDenied).not.toHaveBeenCalled();
+    expect(peer.execute).toHaveBeenCalledTimes(2);
+    expect(peer.execute).toHaveBeenLastCalledWith(
+      expect.objectContaining({ method: "GET", path: "/v1/me", timeoutMs: 15_000 }),
+    );
     await runtime.dispose();
   });
 
