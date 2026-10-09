@@ -23,7 +23,7 @@ interface DynamicIslandDemoProps {
   workingVariant?: WorkingVariant;
   defaultState?: DynamicIslandViewState;
   inlineReply?: boolean;
-  onAction: (action: DynamicIslandAction) => void;
+  onAction: (action: DynamicIslandAction) => Promise<boolean> | undefined;
 }
 
 const AGENT_IDENTITIES = storyIslandAgents();

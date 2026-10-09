@@ -377,6 +377,14 @@ describe("app IPC input parsing", () => {
     expect(parseDynamicIslandAction(reply)).toEqual(reply);
     expect(() => parseDynamicIslandAction({ ...reply, text: "   " })).toThrow();
     expect(() => parseDynamicIslandAction({ ...reply, clientMessageId: undefined })).toThrow();
+    const typedAnswer = {
+      type: "answer-prompt",
+      serverId: "local",
+      agentId: "chief",
+      requestId: "prompt-1",
+      answers: { source: ["Use the official data. ".repeat(20)] },
+    };
+    expect(parseDynamicIslandAction(typedAnswer)).toEqual(typedAnswer);
     const stop = { type: "stop-agent", serverId: "local", agentId: "chief", turnId: "turn-1" };
     expect(parseDynamicIslandAction(stop)).toEqual(stop);
     expect(() => parseDynamicIslandAction({ ...stop, turnId: "" })).toThrow();

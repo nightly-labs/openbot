@@ -401,15 +401,16 @@ function isShortStringList(value: unknown): value is string[] {
 function isDynamicIslandAnswers(value: unknown): value is Record<string, string[]> {
   if (!isDynamicRecord(value)) return false;
   const entries = Object.entries(value);
-  return (
-    entries.length > 0 &&
-    entries.length <= INPUT_LIMITS.promptQuestions &&
-    entries.every(
-      ([questionId, answers]) =>
-        isShortString(questionId, INPUT_LIMITS.identifier) &&
-        Array.isArray(answers) &&
-        answers.length === 1 &&
-        answers.every((answer) => isShortString(answer, INPUT_LIMITS.promptOptionLabel)),
-    )
-  );
+  if (entries.length === 0 || entries.length > INPUT_LIMITS.promptQuestions) return false;
+  let totalLength = 0;
+  for (const [questionId, answers] of entries) {
+    if (!isShortString(questionId, INPUT_LIMITS.identifier) || !Array.isArray(answers) || answers.length !== 1) {
+      return false;
+    }
+    // An answer is an option label or the text that the user typed in the island reply field.
+    const [answer] = answers;
+    if (!isShortString(answer, INPUT_LIMITS.directMessageText)) return false;
+    totalLength += answer.length;
+  }
+  return totalLength <= INPUT_LIMITS.promptAnswersTotalText;
 }

@@ -50,7 +50,12 @@ export function DynamicIslandSurface() {
 
   function applyPresentation(next: DynamicIslandPresentation): void {
     if (
-      interactionLocksPresentation(presentation(), next, pointerInside || focusInside || viewState() === "expanded")
+      interactionLocksPresentation(
+        presentation(),
+        next,
+        pointerInside || focusInside || viewState() === "expanded",
+        keyboardInside,
+      )
     ) {
       queuedPresentation = next;
       return;
@@ -160,14 +165,15 @@ export function DynamicIslandSurface() {
     return ++actionGeneration;
   }
 
-  async function perform(action: DynamicIslandAction): Promise<void> {
+  /** Resolves `false` when the action failed. */
+  async function perform(action: DynamicIslandAction): Promise<boolean> {
     performHaptic();
     const generation = clearActionError();
     try {
       await dynamicIslandPort().dynamicIsland.performAction(action);
     } catch {
       if (generation === actionGeneration) setActionError(t("island.action.failed"));
-      return;
+      return false;
     }
     pointerInside = false;
     focusInside = false;
@@ -175,6 +181,7 @@ export function DynamicIslandSurface() {
     setViewState("compact");
     applyQueuedPresentation();
     await dynamicIslandPort().dynamicIsland.setInteractive({ interactive: false });
+    return true;
   }
 
   function performHaptic(): void {
@@ -264,8 +271,10 @@ function interactionLocksPresentation(
   current: DynamicIslandPresentation,
   next: DynamicIslandPresentation,
   interacting: boolean,
+  typing: boolean,
 ): boolean {
-  if (!interacting || !isCriticalPresentation(current)) return false;
+  // While the user types a reply, a new card must not take the draft to another agent.
+  if (!interacting || !(typing || isCriticalPresentation(current))) return false;
   return presentationIdentity(current) !== presentationIdentity(next);
 }
 

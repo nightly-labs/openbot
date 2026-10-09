@@ -85,7 +85,8 @@ export interface OpenBotDynamicIslandProps {
   extendedHoverArea?: boolean;
   suppressInitialHover?: boolean;
   onStateChange: (state: DynamicIslandViewState, reason: DynamicIslandStateChangeReason) => void;
-  onAction: (action: DynamicIslandAction) => void | Promise<void>;
+  /** Resolves `false` when the action failed, so a reply field keeps its draft. */
+  onAction: (action: DynamicIslandAction) => Promise<boolean> | undefined;
   /** Shown next to the actions of an attention panel when the last action failed. */
   actionError?: string | undefined;
   onHaptic?: () => void;
@@ -965,7 +966,7 @@ function ExpandedContent(props: {
   presentation: DynamicIslandPresentation;
   displayMode?: "notch" | "island";
   inlineReply?: boolean | undefined;
-  onAction: (action: DynamicIslandAction) => void | Promise<void>;
+  onAction: (action: DynamicIslandAction) => Promise<boolean> | undefined;
   actionError?: string | undefined;
   onHaptic?: () => void;
   onClose: () => void;
@@ -1045,7 +1046,6 @@ function ExpandedContent(props: {
             <Show when={props.inlineReply}>
               <IslandReplyField
                 label={t("island.reply.placeholder", { name: message().agent.name })}
-                actionError={props.actionError}
                 onSend={(text, clientMessageId) =>
                   props.onAction({
                     type: "send-message",
@@ -1132,7 +1132,7 @@ function FailureContent(props: {
   item: DynamicIslandFailureItem;
   serverId: string;
   actionError?: string | undefined;
-  onAction: (action: DynamicIslandAction) => void | Promise<void>;
+  onAction: (action: DynamicIslandAction) => Promise<boolean> | undefined;
 }): JSX.Element {
   const { t } = useText();
   return (
@@ -1181,7 +1181,7 @@ function TakeoverContent(props: {
   item: DynamicIslandTakeoverItem;
   serverId: string;
   actionError?: string | undefined;
-  onAction: (action: DynamicIslandAction) => void | Promise<void>;
+  onAction: (action: DynamicIslandAction) => Promise<boolean> | undefined;
 }): JSX.Element {
   const { t } = useText();
   return (
@@ -1237,7 +1237,7 @@ export function ApprovalContent(props: {
   remainingCount: number;
   allowDesktopReview?: boolean;
   actionError?: string | undefined;
-  onAction: (action: DynamicIslandAction) => void | Promise<void>;
+  onAction: (action: DynamicIslandAction) => Promise<boolean> | undefined;
 }): JSX.Element {
   const { t, sourceText } = useText();
   const openInOpenBot = () =>
@@ -1302,7 +1302,7 @@ function QuestionContent(props: {
   remainingCount: number;
   inlineReply?: boolean | undefined;
   actionError?: string | undefined;
-  onAction: (action: DynamicIslandAction) => void | Promise<void>;
+  onAction: (action: DynamicIslandAction) => Promise<boolean> | undefined;
   onHaptic?: () => void;
   onClose: () => void;
 }): JSX.Element {
@@ -1350,9 +1350,10 @@ function QuestionContent(props: {
       requestId: props.item.requestId,
     });
 
-  function answerWith(label: string): void | Promise<void> {
+  function answerWith(label: string): boolean | Promise<boolean> | undefined {
     const question = currentQuestion();
-    if (!question || !(directAnswerAvailable() || typedAnswerAvailable()) || questionTransitioning()) return;
+    // The field keeps a typed answer that did not go anywhere.
+    if (!question || !(directAnswerAvailable() || typedAnswerAvailable()) || questionTransitioning()) return false;
     const nextAnswers = { ...answers(), [question.id]: [label] };
     if (questionIndex() < questions().length - 1) {
       props.onHaptic?.();
@@ -1466,7 +1467,6 @@ function QuestionContent(props: {
                   ? "island.reply.answerPlaceholderWithOptions"
                   : "island.reply.answerPlaceholder",
               )}
-              actionError={props.actionError}
               onSend={answerWith}
             />
           </Show>
@@ -1489,14 +1489,12 @@ function QuestionContent(props: {
 }
 
 /**
- * A one-line reply. Enter sends it. The draft stays when the send fails, so the user can try again,
- * and a retry of the same text keeps its `clientMessageId`, so the agent gets it once.
+ * A one-line reply. Enter sends it. The draft stays when `onSend` resolves `false`, so the user can
+ * try again, and a retry of the same text keeps its `clientMessageId`, so the agent gets it once.
  */
 function IslandReplyField(props: {
   label: string;
-  /** The failure of the last send. The card shows it; the field keeps its draft while it is set. */
-  actionError: string | undefined;
-  onSend: (text: string, clientMessageId: string) => void | Promise<void>;
+  onSend: (text: string, clientMessageId: string) => boolean | Promise<boolean> | undefined;
 }): JSX.Element {
   const { t } = useText();
   const [draft, setDraft] = createSignal("");
@@ -1509,12 +1507,13 @@ function IslandReplyField(props: {
     if (!body || sending()) return;
     const clientMessageId = failedSend?.text === body ? failedSend.clientMessageId : crypto.randomUUID();
     setSending(true);
+    let sent: boolean;
     try {
-      await props.onSend(body, clientMessageId);
+      sent = (await props.onSend(body, clientMessageId)) !== false;
     } finally {
       setSending(false);
     }
-    if (props.actionError) {
+    if (!sent) {
       failedSend = { text: body, clientMessageId };
       return;
     }
@@ -1539,7 +1538,8 @@ function IslandReplyField(props: {
         placeholder={props.label}
         aria-label={props.label}
         maxlength={INPUT_LIMITS.directMessageText}
-        disabled={sending()}
+        // Read-only, not disabled: a disabled field loses focus, and the panel collapses with it.
+        readonly={sending()}
         autocomplete="off"
       />
       <IconButton
