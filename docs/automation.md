@@ -1,7 +1,8 @@
-# Local script runs
+# Local scripts API
 
-A script on the computer that runs OpenBot can run a routine of an agent and give it a payload. Use
-this to wake an agent when work outside its turn ends: a build, a download, a long test run.
+A script on the computer that runs OpenBot can send an agent a message, run a routine, read pending
+questions and approvals, and submit responses. Enable **Local scripts** for each agent that the
+integration needs. Use this API for a local Slack bridge or to report a build result.
 
 ```sh
 long-job; curl -sS -X POST "$(cat "$OPENBOT_AUTOMATION/url")/v1/agents/<agentId>/routines/<routineId>/run" \
@@ -14,11 +15,20 @@ long-job; curl -sS -X POST "$(cat "$OPENBOT_AUTOMATION/url")/v1/agents/<agentId>
 
 ## Turn it on
 
-The setting is per agent and is off by default. Open the agent's settings and turn on
-**Local scripts**. The setting is only on the computer that runs the agent: a joined server does not
-show it, and an agent cannot turn it on for itself or for a teammate.
+The setting is per agent and is off by default. Open the agent's settings, select **Permissions**,
+and turn on **Local scripts**. An owner or administrator can also change this setting from a
+connected desktop, web, or iPhone client when the host supports `agent-host-settings-v1`.
+An agent cannot turn it on for itself or for a teammate.
 
-When the setting is on, each routine of the agent has **Copy run command**. It copies a `curl`
+For a headless host, connect as its owner or administrator and turn on the setting there. The
+listener and the files below are on the host. Run the script on that host, as the OS user that
+runs OpenBot. No local screen is necessary. Turn the same setting off to remove access for that agent.
+
+The setting also permits scripts to answer questions and accept or decline approvals. Browser
+takeovers and secret questions must be completed in OpenBot.
+
+In the host's local desktop window, each routine of the agent has **Copy run command** when the
+setting is on. It copies a `curl`
 command on macOS and Linux and a PowerShell command on Windows. The agent also learns the command,
 so it can start a long command in the background and ask to be woken when it ends.
 
@@ -81,6 +91,64 @@ set to skip at the limit drops the run instead, and its run history shows it as 
 | 415 | `Content-Type` is not `application/json`. |
 | 429 | The agent got 30 runs from local scripts in the last hour. |
 
+### `POST /v1/agents/:agentId/messages`
+
+Send `{ "text": "Ask me which build to run", "clientMessageId": "bridge-message-123" }` with
+`Content-Type: application/json`. The message uses the normal conversation queue. The response is
+`202 { "messageId": string, "deliveries": [{ "id": string, "recipientAgentId": string,
+"status": string, "position": number | null }] }`.
+
+Keep `clientMessageId` (1–128 characters) stable when you retry the same message. The normal queue
+returns the first receipt for that agent and key for 24 hours, including after a restart. Use a new
+key for new work. Attachments are not supported by this route.
+
+### `GET /v1/agents/:agentId/pending`
+
+Poll this route for requests that need a person. No conversation history or browser content is
+returned. The response has three arrays:
+
+```json
+{
+  "prompts": [{
+    "requestId": "opaque-request-id",
+    "requiresOpenBot": false,
+    "questions": [{ "id": "build", "header": "Build", "question": "Which build?",
+      "options": [{ "label": "Debug", "description": "Use debug settings" }] }]
+  }],
+  "approvals": [],
+  "browserTakeovers": []
+}
+```
+
+An approval has `requestId`, `agentId`, `threadId`, `turnId`, `kind`, `command`, `cwd`, `reason`,
+`grantRoot`, and `permissions`. Show the full details to the person before accepting it. Text is
+secret-redacted. A browser takeover has only `requestId` and `requiresOpenBot: true`.
+A secret question has `requiresOpenBot: true` and an empty `questions` array.
+Direct the person to the agent in OpenBot for these requests.
+
+Request IDs are opaque. Keep them unchanged. They identify one pending request and expire when
+it ends, even if the provider reuses its own ID. They do not survive a host restart.
+
+### `POST /v1/agents/:agentId/prompts/:requestId/answer`
+
+Send `{ "answers": { "build": ["Debug"] } }` with `Content-Type: application/json`.
+Use question IDs as keys and answer strings as array values. The normal question handler resumes
+the agent. A successful response is `200 { "ok": true }`.
+
+### `POST /v1/agents/:agentId/approvals/:requestId/respond`
+
+Send `{ "decision": "accept" }` or `{ "decision": "decline" }` with
+`Content-Type: application/json`. A successful response is `200 { "ok": true }`.
+Neither choice changes the agent's saved permission settings.
+
+The agent must still allow Local scripts for every read and response. A request for another
+agent, an expired request, or a secret question cannot be answered through this API. Expired
+requests return `409`; refresh the pending list instead of retrying the old response.
+
+All request bodies have a 32 KiB limit. Messages and routine runs share the limit of 30 accepted
+requests per agent per hour, including message retries. Reads and attention responses do not use
+that limit. Routine runs have no retry key; retrying a run can start it twice.
+
 ## Windows
 
 ```powershell
@@ -102,4 +170,4 @@ Invoke-RestMethod -Method Post `
   `-H @headers`.
 - OpenBot logs the agent and the routine of each run, never the payload.
 - A process that runs as the same OS user can read the token. Turn the setting on only for agents
-  that you want such processes to wake.
+  that you want such processes to message and control, including approval decisions.

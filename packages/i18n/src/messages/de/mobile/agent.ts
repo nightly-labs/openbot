@@ -12,7 +12,7 @@ export const messages = {
   "mobile.agent.host.computerUseFooter": "Diesem Agenten erlauben, Apps auf dem Host-Computer zu steuern.",
   "mobile.agent.host.automation": "Lokale Skripte",
   "mobile.agent.host.automationFooter":
-    "Skripten auf dem Host-Computer erlauben, die Routinen dieses Agenten auszuführen.",
+    "Skripten auf dem Host erlauben, Nachrichten zu senden, Routinen auszuführen, Fragen zu beantworten und Anfragen zu genehmigen oder abzulehnen",
   "mobile.agent.host.failed": "Diese Einstellung konnte nicht geändert werden.",
   "mobile.agent.host.unsupported": "Dieser Host kann diese Einstellungen nicht von einem Remote-Gerät aus ändern.",
   "mobile.agent.busyMessage.label": "Während der Arbeit",

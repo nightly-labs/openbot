@@ -157,6 +157,10 @@ export type RuntimeAttention = Pick<
   "attentionComplete" | "pendingPrompts" | "pendingApprovals" | "pendingBrowserTakeovers"
 >;
 
+export type LocalAttentionResponse =
+  | { kind: "prompt"; requestId: string; answers: Record<string, string[]> }
+  | { kind: "approval"; requestId: string; decision: "accept" | "decline" };
+
 /**
  * Everything an agent can be blocked on waiting for the user: a question, an approval, a request to
  * take over a browser tab.
@@ -168,6 +172,8 @@ export type RuntimeAttention = Pick<
  * an entry silently dropped is an agent stuck forever.
  */
 export class AttentionRegistry {
+  // A handle belongs to one pending object, even when a provider reuses its request ID.
+  readonly #localHandles = new WeakMap<PendingPrompt | PendingApproval | PendingBrowserTakeover, string>();
   readonly #conversation: ConversationRuntime;
   readonly #browser: AttentionBrowserHost;
   readonly #hostedSites: HostedSiteApprovals;
@@ -201,6 +207,60 @@ export class AttentionRegistry {
       [...this.#approvals.values()].some((pending) => pending.approval.agentId === agentId) ||
       [...this.#takeovers.values()].some((pending) => pending.request.agentId === agentId)
     );
+  }
+
+  /** Full details for one agent; the UI snapshot has a separate size budget. */
+  localAttention(agentId: string) {
+    return {
+      prompts: [...this.#prompts.values()]
+        .filter((pending) => pending.agentId === agentId)
+        .map((pending) => ({
+          requestId: this.#localHandle(pending),
+          questions: structuredClone(pending.questions),
+          requiresOpenBot: pending.questions.some((question) => question.isSecret),
+        })),
+      approvals: [...this.#approvals.values()]
+        .filter((pending) => pending.approval.agentId === agentId)
+        .map((pending) => ({ ...structuredClone(pending.approval), requestId: this.#localHandle(pending) })),
+      browserTakeovers: [...this.#takeovers.values()]
+        .filter((pending) => pending.request.agentId === agentId)
+        .map((pending) => ({ requestId: this.#localHandle(pending), requiresOpenBot: true })),
+    };
+  }
+
+  readonly respondToLocalAttention = Effect.fn("AttentionRegistry.respondToLocalAttention")(function* (
+    this: AttentionRegistry,
+    agentId: string,
+    input: LocalAttentionResponse,
+  ) {
+    if (input.kind === "prompt") {
+      const pending = [...this.#prompts.values()].find(
+        (entry) => entry.agentId === agentId && this.#localHandles.get(entry) === input.requestId,
+      );
+      if (!pending || pending.questions.some((question) => question.isSecret)) {
+        return yield* attentionStep(() => {
+          throw new InactiveAttentionRequest(sourceText("error.backend.promptInactive"));
+        });
+      }
+      return yield* this.respondToPrompt({ requestId: pending.id, answers: input.answers });
+    }
+    const pending = [...this.#approvals.values()].find(
+      (entry) => entry.approval.agentId === agentId && this.#localHandles.get(entry) === input.requestId,
+    );
+    if (!pending) {
+      return yield* attentionStep(() => {
+        throw new InactiveAttentionRequest(sourceText("error.backend.approvalInactive"));
+      });
+    }
+    return yield* this.respondToApproval({ requestId: pending.id, decision: input.decision });
+  }).bind(this);
+
+  #localHandle(pending: PendingPrompt | PendingApproval | PendingBrowserTakeover): string {
+    const existing = this.#localHandles.get(pending);
+    if (existing) return existing;
+    const handle = randomUUID();
+    this.#localHandles.set(pending, handle);
+    return handle;
   }
 
   /** The attention section of the runtime snapshot, budgeted prompts first and takeovers last. */

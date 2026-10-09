@@ -102,7 +102,7 @@ import { AgentMemories } from "./agent/agent-memories";
 import { AgentRemoval, type AgentRemovalFailed } from "./agent/agent-removal";
 import type { ApprovalAutomationPolicy } from "./agent/approval-automation";
 import { AttachmentGateway } from "./agent/attachment-gateway";
-import { AttentionRegistry } from "./agent/attention-registry";
+import { AttentionRegistry, type LocalAttentionResponse } from "./agent/attention-registry";
 import { BootRecovery } from "./agent/boot-recovery";
 import { BrowserUploads } from "./agent/browser-uploads";
 import type { ChatVisualPreviewHost } from "./agent/chat-visual-preview";
@@ -1114,6 +1114,20 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       attention: this.#attention,
       usageLimits: this.#usageLimits,
     });
+  }
+
+  getLocalAttention(agentId: string) {
+    return this.#attention.localAttention(agentId);
+  }
+
+  respondToLocalAttention(agentId: string, input: LocalAttentionResponse): Effect.Effect<void, AgentLifecycleFailed> {
+    return this.#attention
+      .respondToLocalAttention(agentId, input)
+      .pipe(
+        Effect.mapError(
+          (failure) => new AgentLifecycleFailed({ operation: "respondToLocalAttention", cause: failure.cause }),
+        ),
+      );
   }
 
   /**

@@ -96,7 +96,23 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     expect(service.getRuntimeSnapshot().pendingApprovals[0]?.reason).toHaveLength(AGENT_RUNTIME_TEXT_LIMIT);
     expect(service.getRuntimeSnapshot().pendingApprovals[0]?.truncated).toBe(true);
 
-    await runCauseEffect(service.respondToApproval({ requestId: "approval-command", decision: "accept" }));
+    const approval = service.getLocalAttention("chief").approvals[0];
+    if (!approval) throw new Error("The local approval is missing.");
+    expect(approval.reason).toHaveLength(1_000);
+    expect(service.getLocalAttention("other-agent").approvals).toEqual([]);
+    await expect(
+      runCauseEffect(
+        service.respondToLocalAttention("other-agent", {
+          kind: "approval",
+          requestId: approval.requestId,
+          decision: "accept",
+        }),
+      ),
+    ).rejects.toThrow("This approval is no longer active.");
+    expect(client.responses).toHaveLength(0);
+    await runCauseEffect(
+      service.respondToLocalAttention("chief", { kind: "approval", requestId: approval.requestId, decision: "accept" }),
+    );
     expect(client.responses).toEqual([{ id: "approval-command", result: { decision: "accept" } }]);
     expect(events).toContainEqual({
       type: "agent-input-resolved",
@@ -126,6 +142,32 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       id: "approval-permissions",
       result: { permissions: {}, scope: "turn" },
     });
+    client.emit("request", {
+      method: "item/commandExecution/requestApproval",
+      id: "approval-command",
+      params: { threadId: externalId, turnId, command: ["npm", "publish"] },
+    });
+    await waitFor(() => events.filter((event) => event.type === "approval").length === 3);
+    await expect(
+      runCauseEffect(
+        service.respondToLocalAttention("chief", {
+          kind: "approval",
+          requestId: approval.requestId,
+          decision: "accept",
+        }),
+      ),
+    ).rejects.toThrow("This approval is no longer active.");
+    expect(client.responses).toHaveLength(2);
+    const replacement = service.getLocalAttention("chief").approvals[0];
+    if (!replacement) throw new Error("The replacement approval is missing.");
+    await runCauseEffect(
+      service.respondToLocalAttention("chief", {
+        kind: "approval",
+        requestId: replacement.requestId,
+        decision: "decline",
+      }),
+    );
+    expect(client.responses.at(-1)).toEqual({ id: "approval-command", result: { decision: "decline" } });
   });
   it("surfaces Computer Use app access elicitations and returns the user's persistence choice", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
@@ -453,6 +495,20 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       questionPrompt: { resolution: null },
     });
     expect(runtimeSnapshot.latestMessages).not.toContainEqual(expect.objectContaining({ id: pendingMessage?.id }));
+
+    const localPrompt = service.getLocalAttention("chief").prompts[0];
+    if (!localPrompt) throw new Error("The local prompt is missing.");
+    expect(localPrompt.requiresOpenBot).toBe(true);
+    await expect(
+      runCauseEffect(
+        service.respondToLocalAttention("chief", {
+          kind: "prompt",
+          requestId: localPrompt.requestId,
+          answers: { token: ["private-value"] },
+        }),
+      ),
+    ).rejects.toThrow("This prompt is no longer active.");
+    expect(client.responses).toHaveLength(0);
 
     await runCauseEffect(
       service.respondToPrompt({

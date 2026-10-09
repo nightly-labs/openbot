@@ -441,6 +441,7 @@ function registerIpcHandlers({
   idleRestart,
   approvalAutomation,
   agentAdminSettings,
+  agentHostSettings,
   language,
   logoColor,
   notificationPreference,
@@ -568,6 +569,7 @@ function registerIpcHandlers({
     ...channelRoutineIpcHandlers({ service, remoteServers }),
     ...agentAdminIpcHandlers({
       settings: agentAdminSettings,
+      hostSettings: agentHostSettings,
       skills,
       marketplaceAgents,
       agentTemplates,
