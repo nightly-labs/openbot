@@ -68,6 +68,7 @@ export const messages = {
   "error.provider.unexpectedVersion": "プロバイダーのランタイムが予期しないバージョンを返しました。",
   "error.provider.metadataNoData": "ランタイムのメタデータのダウンロードでデータが返されませんでした。",
   "error.provider.metadataTooLarge": "ランタイムのメタデータが大きすぎます。",
+  "error.provider.requestFailed": "OpenBot は {url} をダウンロードできませんでした。{reason}",
   "error.provider.installRecordMismatch": "ランタイムのインストール記録が一致しません。",
   "error.provider.runtimeChecksum": "プロバイダーのランタイムのチェックサムが一致しません。",
   "error.provider.codexReleaseShape": "Codex のリリース情報の形式が予期しないものです。",

@@ -69,6 +69,7 @@ export const messages = {
   "error.provider.unexpectedVersion": "Среда выполнения провайдера вернула неожиданную версию.",
   "error.provider.metadataNoData": "Загрузка метаданных среды выполнения не вернула данных.",
   "error.provider.metadataTooLarge": "Метаданные среды выполнения слишком большие.",
+  "error.provider.requestFailed": "OpenBot не удалось загрузить {url}. {reason}",
   "error.provider.installRecordMismatch": "Запись об установке среды выполнения не совпадает.",
   "error.provider.runtimeChecksum": "Контрольная сумма среды выполнения провайдера не совпадает.",
   "error.provider.codexReleaseShape": "У релиза Codex неожиданная структура.",

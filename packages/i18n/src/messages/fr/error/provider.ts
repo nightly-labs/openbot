@@ -76,6 +76,7 @@ export const messages = {
   "error.provider.metadataNoData":
     "Le téléchargement des métadonnées de l’environnement d’exécution n’a renvoyé aucune donnée.",
   "error.provider.metadataTooLarge": "Les métadonnées de l’environnement d’exécution sont trop volumineuses.",
+  "error.provider.requestFailed": "OpenBot n’a pas pu télécharger {url}. {reason}",
   "error.provider.installRecordMismatch":
     "L’enregistrement d’installation de l’environnement d’exécution ne correspond pas.",
   "error.provider.runtimeChecksum":

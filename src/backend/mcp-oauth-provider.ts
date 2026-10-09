@@ -781,7 +781,7 @@ function issuersMatch(left: string, right: string): boolean {
 }
 
 /** The names that never leave this machine. `::1` arrives from `URL` inside brackets. */
-function isLoopback(hostname: string): boolean {
+export function isLoopback(hostname: string): boolean {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
 }
 

@@ -154,6 +154,12 @@ export const messages = {
   "error.backend.mcpServerExited":
     "Sunucu yanıt vermeden durdu. Hatasını görmek için komutu bir terminalde çalıştırın.",
   "error.backend.mcpServerUnreachable": "OpenBot sunucuya ulaşamadı. URL'yi ve ağınızı kontrol edin.",
+  "error.backend.mcpLocalServerOff":
+    "Bu bilgisayarda {address} adresinde yanıt veren bir sunucu yok. Sunucuyu başlatın veya onu çalıştıran uygulamada açın, ardından tekrar deneyin.",
+  "error.backend.mcpServerBlocked":
+    "Bu bilgisayar sunucu bağlantısını engelledi. Güvenlik duvarınızı veya güvenlik yazılımınızı kontrol edin, ardından tekrar deneyin.",
+  "error.backend.mcpServerIncompatible":
+    "Bu adreste bir şey yanıt verdi, ancak Streamable HTTP üzerinden bir MCP sunucusu olarak değil. URL'yi kontrol edin ve sunucuyu çalıştıran uygulamayı güncelleyin.",
   "error.backend.mcpRemoteBridge":
     "{reason} Bu komut mcp-remote köprüsünü çalıştırır. Bunun yerine {url} URL'siyle Streamable HTTP'yi seçin; OpenBot oturumunuzu açar.",
   "error.backend.oauthNotHttps": "OAuth uç noktası {origin} https değil, bu nedenle kimlik bilgileri gönderilmedi.",

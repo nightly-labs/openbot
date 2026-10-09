@@ -182,6 +182,12 @@ export const messages = {
   "error.backend.mcpServerExited":
     "Der Server wurde beendet, bevor er geantwortet hat. Führe den Befehl in einem Terminal aus, um seinen Fehler zu sehen.",
   "error.backend.mcpServerUnreachable": "OpenBot konnte den Server nicht erreichen. Prüfe die URL und dein Netzwerk.",
+  "error.backend.mcpLocalServerOff":
+    "Unter {address} antwortet auf diesem Computer kein Server. Starte den Server oder schalte ihn in der App ein, die ihn ausführt, und versuche es dann erneut.",
+  "error.backend.mcpServerBlocked":
+    "Dieser Computer hat die Verbindung zum Server blockiert. Prüfe deine Firewall oder Sicherheitssoftware und versuche es dann erneut.",
+  "error.backend.mcpServerIncompatible":
+    "Unter dieser Adresse hat etwas geantwortet, aber nicht als MCP-Server über Streamable HTTP. Prüfe die URL und aktualisiere die App, die den Server ausführt.",
   "error.backend.mcpRemoteBridge":
     "{reason} Dieser Befehl startet die mcp-remote-Brücke. Wähle stattdessen Streamable HTTP mit der URL {url}, dann meldet OpenBot dich an.",
   "error.backend.oauthNotHttps":

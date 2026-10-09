@@ -166,6 +166,12 @@ export const messages = defineMessages("error.backend", {
   "error.backend.mcpServerExited":
     "The server stopped before it answered. Run the command in a terminal to see its error.",
   "error.backend.mcpServerUnreachable": "OpenBot could not reach the server. Check the URL and your network.",
+  "error.backend.mcpLocalServerOff":
+    "No server answers at {address} on this computer. Start the server, or turn it on in the app that runs it, then try again.",
+  "error.backend.mcpServerBlocked":
+    "This computer blocked the connection to the server. Check your firewall or security software, then try again.",
+  "error.backend.mcpServerIncompatible":
+    "Something answered at this address, but not as an MCP server over Streamable HTTP. Check the URL, and update the app that runs the server.",
   "error.backend.mcpRemoteBridge":
     "{reason} This command runs the mcp-remote bridge. Choose Streamable HTTP with the URL {url} instead, and OpenBot signs you in.",
   "error.backend.oauthNotHttps": "The OAuth endpoint {origin} is not https, so the credentials were not sent.",

@@ -68,6 +68,7 @@ export const messages = {
   "error.provider.unexpectedVersion": "Sağlayıcı çalışma zamanı beklenmeyen bir sürüm döndürdü.",
   "error.provider.metadataNoData": "Çalışma zamanı meta veri indirmesi veri döndürmedi.",
   "error.provider.metadataTooLarge": "Çalışma zamanı meta verileri çok büyük.",
+  "error.provider.requestFailed": "OpenBot {url} adresini indiremedi. {reason}",
   "error.provider.installRecordMismatch": "Çalışma zamanı kurulum kaydı eşleşmiyor.",
   "error.provider.runtimeChecksum": "Sağlayıcı çalışma zamanı sağlama toplamı (checksum) eşleşmiyor.",
   "error.provider.codexReleaseShape": "Codex sürümü beklenmeyen bir yapıya sahip.",

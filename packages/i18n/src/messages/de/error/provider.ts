@@ -71,6 +71,7 @@ export const messages = {
   "error.provider.unexpectedVersion": "Die Anbieterlaufzeit hat eine unerwartete Version zurückgegeben.",
   "error.provider.metadataNoData": "Der Download der Laufzeitmetadaten hat keine Daten zurückgegeben.",
   "error.provider.metadataTooLarge": "Die Laufzeitmetadaten sind zu groß.",
+  "error.provider.requestFailed": "OpenBot konnte {url} nicht herunterladen. {reason}",
   "error.provider.installRecordMismatch": "Der Installationseintrag der Laufzeit stimmt nicht überein.",
   "error.provider.runtimeChecksum": "Die Prüfsumme der Anbieterlaufzeit stimmt nicht überein.",
   "error.provider.codexReleaseShape": "Die Codex-Version hat eine unerwartete Struktur.",

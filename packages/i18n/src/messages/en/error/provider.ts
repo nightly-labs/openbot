@@ -69,6 +69,7 @@ export const messages = defineMessages("error.provider", {
   "error.provider.unexpectedVersion": "Provider runtime returned an unexpected version.",
   "error.provider.metadataNoData": "Runtime metadata download returned no data.",
   "error.provider.metadataTooLarge": "Runtime metadata is too large.",
+  "error.provider.requestFailed": "OpenBot could not download {url}. {reason}",
   "error.provider.installRecordMismatch": "The runtime install record does not match.",
   "error.provider.runtimeChecksum": "Provider runtime checksum mismatch.",
   "error.provider.codexReleaseShape": "The Codex release has an unexpected shape.",

@@ -98,8 +98,7 @@ export async function pinOpencodeRuntime(
     "win32-x64": await pinTarget("win32-x64"),
   };
 
-  const licenseUrl = `${REPOSITORY}/raw/v${version}/LICENSE`;
-  const license = await fetchBytes(fetchImpl, licenseUrl);
+  const license = await umbrellaLicense(fetchImpl, version);
   return {
     registry: REGISTRY,
     repository: REPOSITORY,
@@ -162,6 +161,31 @@ async function pinArtifact(
       executable: descriptor.executable,
       platformDirectory: descriptor.platformDirectory,
     };
+  } finally {
+    await rm(temporaryRoot, { recursive: true, force: true });
+  }
+}
+
+/** The LICENSE inside the `opencode-ai` tarball: the copy the app installs, so its hash is the one it checks. */
+async function umbrellaLicense(fetchImpl: typeof fetch, version: string): Promise<Buffer> {
+  const asset = `opencode-ai-${version}.tgz`;
+  const archiveBytes = await fetchBytes(fetchImpl, `${REGISTRY}/opencode-ai/-/${asset}`);
+  const temporaryRoot = await mkdtemp(join(tmpdir(), "openbot-opencode-pin-"));
+  try {
+    const archive = join(temporaryRoot, asset);
+    await writeFile(archive, archiveBytes, { mode: 0o600 });
+    execFileSync(
+      "tar",
+      ["-xzf", archive, "-C", temporaryRoot, "--no-same-owner", "package/package.json", "package/LICENSE"],
+      { stdio: "inherit" },
+    );
+    const manifest = packageManifestSchema.parse(
+      JSON.parse(await readFile(join(temporaryRoot, "package", "package.json"), "utf8")),
+    );
+    if (manifest.name !== "opencode-ai" || manifest.version !== version) {
+      throw new Error(`The opencode-ai ${version} package manifest does not match the registry metadata.`);
+    }
+    return await readFile(join(temporaryRoot, "package", "LICENSE"));
   } finally {
     await rm(temporaryRoot, { recursive: true, force: true });
   }

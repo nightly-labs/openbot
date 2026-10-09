@@ -6,6 +6,7 @@ import type { AgentRuntimeLock } from "../../scripts/agent-runtime-lock";
 import {
   codexTag,
   cursorPackageUrl,
+  OPENCODE_UMBRELLA_PACKAGE,
   providerRuntimeDescriptor,
   type RuntimeSpec,
   type RuntimeTarget,
@@ -127,11 +128,19 @@ const LATEST_RELEASES: Record<
     fetch,
   }: LatestReleaseContext): Effect.fn.Return<RuntimeSpec, ProviderRuntimeFailure> {
     const pinned = providerRuntimeDescriptor("opencode").spec(target, lock);
+    // The umbrella package names the release. Staging takes the LICENSE from it, so a platform
+    // package published before it is not offered yet.
+    const umbrella = yield* fetchJsonEffect(fetch, `${lock.opencode.registry}/${OPENCODE_UMBRELLA_PACKAGE}/latest`);
+    const version = isString(umbrella.version) && VERSION.test(umbrella.version) ? umbrella.version : null;
+    if (!version)
+      return yield* new ProviderRuntimeFailure({
+        cause: new Error(sourceText("error.provider.releaseNoDownload", { name: OPENCODE_UMBRELLA_PACKAGE })),
+      });
     const artifact = yield* npmArtifactEffect(
       fetch,
       lock.opencode.registry,
       lock.opencode.artifacts[target].package,
-      "latest",
+      version,
     );
     return { ...pinned, ...artifact, version: artifact.packageVersion, source: "latest" };
   }),

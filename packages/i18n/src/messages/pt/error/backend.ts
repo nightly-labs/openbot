@@ -163,6 +163,12 @@ export const messages = {
   "error.backend.mcpServerExited":
     "O servidor parou antes de responder. Execute o comando em um terminal para ver o erro.",
   "error.backend.mcpServerUnreachable": "O OpenBot não conseguiu acessar o servidor. Verifique a URL e sua rede.",
+  "error.backend.mcpLocalServerOff":
+    "Nenhum servidor responde em {address} neste computador. Inicie o servidor ou ative-o no app que o executa e tente novamente.",
+  "error.backend.mcpServerBlocked":
+    "Este computador bloqueou a conexão com o servidor. Verifique seu firewall ou software de segurança e tente novamente.",
+  "error.backend.mcpServerIncompatible":
+    "Algo respondeu neste endereço, mas não como um servidor MCP por Streamable HTTP. Verifique a URL e atualize o app que executa o servidor.",
   "error.backend.mcpRemoteBridge":
     "{reason} Este comando executa a ponte mcp-remote. Escolha Streamable HTTP com a URL {url} e o OpenBot faz a autenticação para você.",
   "error.backend.oauthNotHttps": "O endpoint OAuth {origin} não usa https, por isso as credenciais não foram enviadas.",

@@ -2,7 +2,7 @@ import { basename } from "node:path";
 import { type OAuthClientProvider, UnauthorizedError } from "@modelcontextprotocol/sdk/client/auth.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { getDefaultEnvironment, StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { StreamableHTTPClientTransport, StreamableHTTPError } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { AccessDeniedError, UnauthorizedClientError } from "@modelcontextprotocol/sdk/server/auth/errors.js";
 import type { FetchLike, Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
@@ -12,7 +12,13 @@ import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result, Schema } from "effect";
 import { causeHelpers } from "./effect-boundary";
-import { type McpOAuthAuthority, type McpSignIn, normalizeResource, secureOAuthFetch } from "./mcp-oauth-provider";
+import {
+  isLoopback,
+  type McpOAuthAuthority,
+  type McpSignIn,
+  normalizeResource,
+  secureOAuthFetch,
+} from "./mcp-oauth-provider";
 import {
   clearMcpCommandCache,
   type McpToolRuntimes,
@@ -382,6 +388,10 @@ function describeMcpErrorText(error: unknown, config: McpServerConfig, timeoutMs
   if (error instanceof UnauthorizedError) return sourceText("error.backend.mcpSignInNotAccepted");
   // The child exited before the handshake: the process failed to start, not the network.
   if (config.transport === "stdio" && isConnectionClosed(error)) return sourceText("error.backend.mcpServerExited");
+  if (config.transport === "http") {
+    const described = describeConnectionFailure(error, config.url);
+    if (described) return described;
+  }
   const status = httpStatus(error);
   if (status !== null) return httpStatusMessage(status);
   if (config.transport === "http" && isNetworkFailure(error)) return sourceText("error.backend.mcpServerUnreachable");
@@ -421,14 +431,60 @@ const NETWORK_ERROR_CODES = new Set([
   "EHOSTUNREACH",
 ]);
 
+/** The error and the causes Node's fetch nests under it, such as `fetch failed` over `ECONNREFUSED`. */
+function causeChain(error: unknown): Error[] {
+  const chain: Error[] = [];
+  for (let current = error; current instanceof Error && chain.length < 4; current = current.cause) chain.push(current);
+  return chain;
+}
+
+/** A system or undici code such as `ECONNREFUSED`. A transport's numeric HTTP status is not one. */
+function systemCode(error: Error): string | null {
+  const code = isDynamicRecord(error) ? error.code : undefined;
+  return typeof code === "string" ? code : null;
+}
+
 /** A request that never reached a server: Node's fetch rejects with `fetch failed` and the system code as the cause. */
 function isNetworkFailure(error: unknown): boolean {
-  for (let current = error, depth = 0; current instanceof Error && depth < 4; current = current.cause, depth++) {
-    const code = isDynamicRecord(current) ? current.code : undefined;
-    if (typeof code === "string" && NETWORK_ERROR_CODES.has(code)) return true;
-    if (current instanceof TypeError && current.message === "fetch failed") return true;
+  return causeChain(error).some((current) => {
+    const code = systemCode(current);
+    if (code !== null && NETWORK_ERROR_CODES.has(code)) return true;
+    return current instanceof TypeError && current.message === "fetch failed";
+  });
+}
+
+/**
+ * What an http connection that failed below MCP says, or `null` for the general sentences.
+ *
+ * A local server, such as the one in the Figma desktop app, refuses the connection while it is
+ * turned off, and "check your network" sends the user the wrong way. Something that answers but
+ * not in MCP over Streamable HTTP is told apart from a server that is not there.
+ */
+function describeConnectionFailure(error: unknown, url: string): string | null {
+  for (const current of causeChain(error)) {
+    const code = systemCode(current);
+    if (code === "ECONNREFUSED" && URL.canParse(url)) {
+      const address = new URL(url);
+      if (isLoopback(address.hostname))
+        return sourceText("error.backend.mcpLocalServerOff", { address: address.origin });
+    }
+    if (code === "EACCES" || code === "EPERM") return sourceText("error.backend.mcpServerBlocked");
+    if (isProtocolMismatch(current, code)) return sourceText("error.backend.mcpServerIncompatible");
   }
-  return false;
+  return null;
+}
+
+/**
+ * An answer that is not MCP over Streamable HTTP: a 405 to the POST, a content type the transport
+ * does not read, or bytes that are not HTTP/1.1.
+ *
+ * Only the transport's own errors and the HTTP parser count. A `SyntaxError` or a schema error can
+ * also come from a sign-in server or from one bad result of a real MCP server, and a closed socket
+ * can be the network.
+ */
+function isProtocolMismatch(error: Error, code: string | null): boolean {
+  if (error instanceof StreamableHTTPError) return error.code === -1 || error.code === 405;
+  return error.name === "HTTPParserError" || (code?.startsWith("HPE_") ?? false);
 }
 
 /**
