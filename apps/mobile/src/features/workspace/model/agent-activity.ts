@@ -1,11 +1,16 @@
 import type { AvatarMood } from "@openbot/brand/bloub-avatar-motion";
 import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 
+/** What a waiting agent needs from the user, as the desktop sidebar names it. */
+export type MobileAgentWaitReason = "question" | "approval" | "takeover";
+
 export interface MobileAgentActivity {
   agentId?: string;
   turnId: string | null;
   phase: "working" | "responding" | "waiting";
   detail: string | null;
+  /** Set only while `phase` is `waiting`. */
+  reason?: MobileAgentWaitReason;
 }
 
 export type MobileAgentActivities = Record<string, MobileAgentActivity>;
@@ -20,13 +25,17 @@ export function agentActivityMood(activity: MobileAgentActivity | undefined): Av
   return activity.phase === "waiting" ? "waiting" : "working";
 }
 
+/** When two requests wait in one turn, the higher rank names the wait, as on the desktop. */
+const WAIT_RANK = { approval: 0, takeover: 1, question: 2 } as const satisfies Record<MobileAgentWaitReason, number>;
+
 function sameActivity(left: MobileAgentActivity | undefined, right: MobileAgentActivity) {
   return (
     left !== undefined &&
     left.agentId === right.agentId &&
     left.turnId === right.turnId &&
     left.phase === right.phase &&
-    left.detail === right.detail
+    left.detail === right.detail &&
+    left.reason === right.reason
   );
 }
 
@@ -63,12 +72,14 @@ export function reduceAgentActivity(
       if (work.status === "failed") continue;
       next[work.agentId] ??= { turnId: work.turnId, phase: "working", detail: null };
     }
-    for (const request of [
-      ...event.snapshot.pendingPrompts,
-      ...event.snapshot.pendingApprovals,
-      ...event.snapshot.pendingBrowserTakeovers,
-    ]) {
-      next[request.agentId] = { turnId: request.turnId, phase: "waiting", detail: null };
+    // The later list wins, so a question names the wait over a takeover, and both over an approval.
+    const waits = [
+      ...event.snapshot.pendingApprovals.map((request) => ({ request, reason: "approval" as const })),
+      ...event.snapshot.pendingBrowserTakeovers.map((request) => ({ request, reason: "takeover" as const })),
+      ...event.snapshot.pendingPrompts.map((request) => ({ request, reason: "question" as const })),
+    ];
+    for (const { request, reason } of waits) {
+      next[request.agentId] = { turnId: request.turnId, phase: "waiting", detail: null, reason };
     }
     return sameActivities(current, next) ? current : next;
   }
@@ -106,10 +117,12 @@ export function reduceAgentActivity(
         message.status === "streaming" &&
         message.text.trim().length > 0,
     );
+    const kept = previous?.turnId === activeTurnId ? previous : undefined;
     return withActivity(current, agentId, {
       turnId: activeTurnId,
-      phase: responding ? "responding" : previous?.turnId === activeTurnId ? previous.phase : "working",
-      detail: previous?.turnId === activeTurnId ? previous.detail : null,
+      phase: responding ? "responding" : (kept?.phase ?? "working"),
+      detail: kept?.detail ?? null,
+      ...(!responding && kept?.reason ? { reason: kept.reason } : {}),
     });
   }
   if (event.type === "turn-completed") {
@@ -120,11 +133,31 @@ export function reduceAgentActivity(
   }
   if (event.type === "prompt" || event.type === "approval" || event.type === "browser-takeover-requested") {
     const request = event.type === "approval" ? event.approval : event.type === "prompt" ? event : event.request;
-    return withActivity(current, request.agentId, { turnId: request.turnId, phase: "waiting", detail: null });
+    const reason = event.type === "approval" ? "approval" : event.type === "prompt" ? "question" : "takeover";
+    const previous = current[request.agentId];
+    const kept =
+      previous?.phase === "waiting" && previous.turnId === request.turnId && previous.reason
+        ? WAIT_RANK[previous.reason] > WAIT_RANK[reason]
+          ? previous.reason
+          : reason
+        : reason;
+    return withActivity(current, request.agentId, {
+      turnId: request.turnId,
+      phase: "waiting",
+      detail: null,
+      reason: kept,
+    });
   }
   if (event.type === "agent-input-resolved") {
     const activity = current[event.agentId];
-    if (activity) return withActivity(current, event.agentId, { ...activity, phase: "working", detail: null });
+    if (activity) {
+      return withActivity(current, event.agentId, {
+        ...(activity.agentId ? { agentId: activity.agentId } : {}),
+        turnId: activity.turnId,
+        phase: "working",
+        detail: null,
+      });
+    }
   }
   return current;
 }

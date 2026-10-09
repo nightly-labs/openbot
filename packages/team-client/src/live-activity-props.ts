@@ -25,9 +25,9 @@ export interface AgentLiveActivityProps {
   /** The short text in the compact island, beside the symbol. */
   compact: string;
   /**
-   * The color of the state line and the compact text. One agent's work or reply takes the agent
-   * color, and several agents are white, which the light Lock Screen shows dark. Other states keep
-   * their state color.
+   * The color of the compact text. One agent's work, reply or wait takes the agent color, and several
+   * agents are white, which the light Lock Screen shows dark. Other states keep their state color.
+   * The state line takes it too, except for a wait, whose line keeps the state color of `tint`.
    */
   compactTint: string;
   /** The line under the content, such as `+2 more requests`. Empty when there is none. */
@@ -268,7 +268,7 @@ function liveActivityContent(
           DETAIL_LIMIT,
         ),
         compact: limit(presentation.item.agent.name, ROW_NAME_LIMIT),
-        compactTint: "#0A84FF",
+        compactTint: agentColor(presentation.item.agent.avatarSeed, presentation.item.agent.avatarHue),
         footer: remaining(presentation.remainingCount, t),
         detailLines: 2,
         detailMarkdown: true,
@@ -290,7 +290,7 @@ function liveActivityContent(
               DETAIL_LIMIT,
             ),
         compact: limit(presentation.item.agent.name, ROW_NAME_LIMIT),
-        compactTint: "#FF9F0A",
+        compactTint: agentColor(presentation.item.agent.avatarSeed, presentation.item.agent.avatarHue),
         footer: remaining(presentation.remainingCount, t),
         detailLines: command ? 4 : 2,
         detailMarkdown: !command,
@@ -309,7 +309,7 @@ function liveActivityContent(
           DETAIL_LIMIT,
         ),
         compact: limit(presentation.item.agent.name, ROW_NAME_LIMIT),
-        compactTint: "#FF9F0A",
+        compactTint: agentColor(presentation.item.agent.avatarSeed, presentation.item.agent.avatarHue),
         footer: "",
         detailLines: 2,
         detailMarkdown: true,

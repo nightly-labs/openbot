@@ -15,9 +15,11 @@ import Animated, {
 import { useAgentChatPreview } from "@/features/agents/components/agent-chat-preview";
 import { AgentAndroidMenu, useAgentContextMenu } from "@/features/agents/components/agent-context-menu";
 import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
+import { AGENT_WAIT_STATE, AgentWaitBadge } from "@/features/agents/components/agent-wait-badge";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
 import { ChatZoomSource } from "@/features/agents/components/chat-zoom-source";
+import { useAgentWaitReason } from "@/features/workspace/components/use-agent-activity";
 import { useAgentUnread } from "@/features/workspace/components/use-live-workspace";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import { isAndroid } from "@/shared/lib/platform";
@@ -82,17 +84,21 @@ function PinnedAgentItem({ agent }: { agent: MobileAgent }) {
   const agentChatPreview = useAgentChatPreview(agent);
   const menu = useRef<MenuComponentRef>(null);
   const isUnread = useAgentUnread(agent.id);
+  const waitReason = useAgentWaitReason(agent.id);
   const itemWidth = usePinnedItemWidth();
 
+  const openLabel = agent.title.trim()
+    ? t("mobile.agent.list.openPinnedWithTitle", { name: agent.name, title: agent.title.trim() })
+    : t("mobile.agent.list.openPinned", { name: agent.name });
   const link = (
     <Link href={{ pathname: "/chat/[agentId]", params: { agentId: agent.id } }} asChild>
       <Link.Trigger>
         <ChatLinkPressable
           chatId={agent.id}
           accessibilityLabel={
-            agent.title.trim()
-              ? t("mobile.agent.list.openPinnedWithTitle", { name: agent.name, title: agent.title.trim() })
-              : t("mobile.agent.list.openPinned", { name: agent.name })
+            waitReason
+              ? t("mobile.agent.list.withState", { label: openLabel, state: t(AGENT_WAIT_STATE[waitReason]) })
+              : openLabel
           }
           accessibilityRole="button"
           className="w-full items-center gap-2 px-1"
@@ -116,6 +122,7 @@ function PinnedAgentItem({ agent }: { agent: MobileAgent }) {
                   style={{ borderColor: background, backgroundColor: accent }}
                 />
               ) : null}
+              {waitReason ? <AgentWaitBadge reason={waitReason} size={22} /> : null}
             </AgentPinAvatar>
           </ChatZoomSource>
           <View className="w-full gap-0.5">

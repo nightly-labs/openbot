@@ -1,6 +1,7 @@
-import { HStack, Image, Link, Spacer, Text, VStack } from "@expo/ui/swift-ui";
+import { HStack, Image, Link, Spacer, Text, VStack, ZStack } from "@expo/ui/swift-ui";
 import {
   background,
+  buttonStyle,
   clipShape,
   font,
   foregroundStyle,
@@ -9,6 +10,7 @@ import {
   padding,
   privacySensitive,
   resizable,
+  shapes,
   widgetURL,
 } from "@expo/ui/swift-ui/modifiers";
 import type { AgentLiveActivityProps } from "@openbot/team-client/live-activity-props";
@@ -42,9 +44,9 @@ function agentLiveActivityLayout(
   // The app cannot update the activity while iOS suspends it, so old content does not claim a state.
   const stale = environment.isStale === true;
   const tint = stale ? "#8E8E93" : props.tint;
-  // One agent's state takes the agent color, and several agents are white. The island is always
-  // black. The Lock Screen banner is light in the light appearance, so white is dark there. An
-  // older host sends no `compactTint`.
+  // One agent's state takes the agent color, and several agents are white. A wait keeps its state
+  // color on the state line. The island is always black. The Lock Screen banner is light in the
+  // light appearance, so white is dark there. An older host sends no `compactTint`.
   const islandTint = stale ? tint : (props.compactTint ?? tint);
   const bannerTint = islandTint === "#FFFFFF" && environment.colorScheme === "light" ? "#1C1C1E" : islandTint;
   const label = stale ? props.staleLabel : props.label;
@@ -65,6 +67,39 @@ function agentLiveActivityLayout(
       <Image key={key} systemName={props.symbol} color={tint} size={size * 0.7} />
     );
   const avatar = (size: number) => photo(props.avatar, size);
+  // An agent that waits for the user has the amber mark of the app list on its photo, with the same
+  // icon for each reason. The island is always black, so the mark has a black ring.
+  const waitSymbol =
+    props.mode === "question"
+      ? "questionmark"
+      : props.mode === "approval"
+        ? "checkmark.shield.fill"
+        : props.mode === "takeover"
+          ? "cursorarrow"
+          : "";
+  // The mark stays inside the frame of the photo: the compact island cuts what leaves its region.
+  const islandAvatar = (size: number) =>
+    waitSymbol && !stale ? (
+      <ZStack alignment="bottomTrailing" modifiers={[frame({ width: size + 4, height: size + 3 })]}>
+        <HStack modifiers={[frame({ width: size + 4, height: size + 3, alignment: "topLeading" })]}>
+          {avatar(size)}
+        </HStack>
+        {/* A background without a shape fills the safe area of the island too, so each one names its circle. */}
+        <Image
+          systemName={waitSymbol}
+          color="#000000"
+          size={5.5}
+          modifiers={[
+            frame({ width: 9, height: 9 }),
+            background("#FF9F0A", shapes.circle()),
+            padding({ all: 1.5 }),
+            background("#000000", shapes.circle()),
+          ]}
+        />
+      </ZStack>
+    ) : (
+      avatar(size)
+    );
   // Several agents with unread replies: overlapping photos, and a row for each chat.
   const agents = stale ? [] : props.agents;
   const photos = (size: number) => (
@@ -149,27 +184,38 @@ function agentLiveActivityLayout(
     props.footer && !stale ? (
       <Text modifiers={[font({ size: 13 }), foregroundStyle(secondary), lineLimit(1)]}>{props.footer}</Text>
     ) : null;
-  const actions =
+  // The answers share the row in equal parts, as the actions of a notification do. The plain style
+  // removes the shape iOS draws around a link. In a widget, `@expo/ui` applies the modifiers of a
+  // `Text` twice, so the capsule is on a stack around the label: on the label it drew a capsule in a
+  // capsule. The island is always black, so its main answer is white. The Lock Screen can be light or
+  // dark, so its answers are neutral and follow the appearance.
+  const actions = (island: boolean) =>
     buttons.length > 0 ? (
       <HStack spacing={8}>
-        {buttons.map((button) => (
-          <Link key={button.url} destination={button.url}>
-            <Text
-              modifiers={[
-                font({ size: 14, weight: "semibold" }),
-                foregroundStyle(button.prominent ? { type: "hierarchical", style: "primary" } : secondary),
-                lineLimit(1),
-                padding({ horizontal: 14, vertical: 7 }),
-                // Neutral buttons: the state color is for the label, not for the answers.
-                background(button.prominent ? "#7878805C" : "#7878803D"),
-                clipShape("capsule"),
-              ]}
-            >
-              {button.label}
-            </Text>
-          </Link>
-        ))}
-        <Spacer />
+        {buttons.map((button) => {
+          const solid = island && button.prominent;
+          return (
+            <Link key={button.url} destination={button.url} modifiers={[buttonStyle("plain")]}>
+              <HStack
+                modifiers={[
+                  frame({ maxWidth: 10_000 }),
+                  padding({ horizontal: 10, vertical: 8 }),
+                  background(solid ? "#FFFFFF" : button.prominent ? "#7878805C" : "#7878803D", shapes.capsule()),
+                ]}
+              >
+                <Text
+                  modifiers={[
+                    font({ size: 15, weight: "semibold" }),
+                    foregroundStyle(solid ? "#000000" : { type: "hierarchical", style: "primary" }),
+                    lineLimit(1),
+                  ]}
+                >
+                  {button.label}
+                </Text>
+              </HStack>
+            </Link>
+          );
+        })}
       </HStack>
     ) : null;
   return {
@@ -184,7 +230,7 @@ function agentLiveActivityLayout(
         modifiers={[padding({ horizontal: 16, vertical: 14 }), widgetURL(props.tapUrl)]}
       >
         <HStack>
-          {status(bannerTint)}
+          {status(waitSymbol ? tint : bannerTint)}
           <Spacer />
           <Text modifiers={[font({ size: 13, weight: "medium" }), foregroundStyle(secondary)]}>{props.appName}</Text>
         </HStack>
@@ -200,32 +246,30 @@ function agentLiveActivityLayout(
             <Spacer />
           </HStack>
         )}
-        {actions}
+        {actions(false)}
       </VStack>
     ),
     // The compact regions sit against the sides of the island. The padding keeps both off its rounded ends.
     compactLeading: (
       <HStack modifiers={[padding({ leading: 6 }), widgetURL(props.tapUrl)]}>
-        {agents.length > 0 ? photos(20) : avatar(22)}
+        {agents.length > 0 ? photos(20) : islandAvatar(22)}
       </HStack>
     ),
+    // A waiting agent's name takes the agent color, as its work does. The mark on the photo carries the state.
     compactTrailing: (
-      <Text
-        modifiers={[
-          font({ size: 15, weight: "semibold" }),
-          foregroundStyle(islandTint),
-          lineLimit(1),
-          padding({ trailing: 6 }),
-        ]}
-      >
-        {stale ? "…" : props.compact}
-      </Text>
+      <HStack modifiers={[padding({ trailing: 6 })]}>
+        <Text modifiers={[font({ size: 15, weight: "semibold" }), foregroundStyle(islandTint), lineLimit(1)]}>
+          {stale ? "…" : props.compact}
+        </Text>
+      </HStack>
     ),
     // The minimal view is one small circle, so it keeps one photo.
-    minimal: <HStack modifiers={[widgetURL(props.tapUrl)]}>{avatar(22)}</HStack>,
+    minimal: <HStack modifiers={[widgetURL(props.tapUrl)]}>{islandAvatar(22)}</HStack>,
     // Expanded island: the state and its count sit beside the camera. Below, the photo and text read
     // as a notification from the agent, and the answers use the full width.
-    expandedLeading: <HStack modifiers={[padding({ leading: 8, top: 6 })]}>{status(islandTint)}</HStack>,
+    expandedLeading: (
+      <HStack modifiers={[padding({ leading: 8, top: 6 })]}>{status(waitSymbol ? tint : islandTint)}</HStack>
+    ),
     expandedTrailing: <HStack modifiers={[padding({ trailing: 8, top: 6 })]}>{footer}</HStack>,
     expandedBottom: (
       <VStack
@@ -242,7 +286,7 @@ function agentLiveActivityLayout(
             <Spacer />
           </HStack>
         )}
-        {actions}
+        {actions(true)}
       </VStack>
     ),
   };

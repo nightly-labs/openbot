@@ -220,7 +220,7 @@ it.each(["foreground", "manual"])(
     } else await act(async () => current.refreshServer(host.hostId));
     expect(current.liveState.get().activityByServer[host.hostId]).toEqual({
       working: { turnId: "running-turn", phase: "working", detail: null },
-      waiting: { turnId: "waiting-turn", phase: "waiting", detail: null },
+      waiting: { turnId: "waiting-turn", phase: "waiting", detail: null, reason: "approval" },
     });
 
     // A real replacement receives an authoritative snapshot, which clears finished work.
