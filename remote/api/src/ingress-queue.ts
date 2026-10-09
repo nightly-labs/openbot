@@ -74,6 +74,8 @@ export interface QueuedFrame {
 }
 
 interface QueueEntry extends QueuedFrame {
+  /** The route as the account service knows it, to ask for the start again. */
+  ingressRoute: IngressRoute;
   /** The arrival order. The account service answers concurrent events in any order. */
   order: number;
   /** The socket that got it last. It goes again only to another socket of the host. */
@@ -100,10 +102,16 @@ export class IngressQueue {
   #order = 0;
   #expiry: ReturnType<typeof setInterval> | null = null;
 
-  constructor(waker: RouteWaker | null, limits = DEFAULT_INGRESS_QUEUE_LIMITS, now: () => number = Date.now) {
+  readonly #fork: (work: Effect.Effect<unknown>) => void;
+
+  constructor(
+    waker: RouteWaker | null,
+    options: { fork?: (work: Effect.Effect<unknown>) => void; now?: () => number } = {},
+  ) {
     this.#waker = waker;
-    this.#limits = limits;
-    this.#now = now;
+    this.#limits = DEFAULT_INGRESS_QUEUE_LIMITS;
+    this.#fork = options.fork ?? ((work) => void Effect.runFork(work));
+    this.#now = options.now ?? Date.now;
   }
 
   /** The key from the host's last `ingress` hello. A hello without one removes the earlier key. */
@@ -151,6 +159,7 @@ export class IngressQueue {
     // The place is taken before the seal, so the events of a route keep their order.
     const entry: QueueEntry = {
       id: crypto.randomUUID().replaceAll("-", ""),
+      ingressRoute: route,
       route: routeKey,
       sealed: "",
       telegramCallback,
@@ -256,11 +265,27 @@ export class IngressQueue {
     if (this.#expiry) return;
     this.#expiry = setInterval(() => {
       this.#pruneAll();
+      this.#wakeAgain();
       if (this.#queues.size > 0 || !this.#expiry) return;
       clearInterval(this.#expiry);
       this.#expiry = null;
     }, EXPIRY_INTERVAL_MILLISECONDS);
     this.#expiry.unref?.();
+  }
+
+  /**
+   * A start can fail after the account service answered `starting`. While a host has kept events, its
+   * start is asked for again once in each check interval, until the host acknowledges them or they expire.
+   */
+  #wakeAgain(): void {
+    const now = this.#now();
+    for (const queue of this.#queues.values()) {
+      const first = queue.find((entry) => entry.sealed);
+      if (!first || this.#pending.has(first.route)) continue;
+      const known = this.#routes.get(first.route);
+      if (known && now - known.at < this.#limits.routeCheckMilliseconds) continue;
+      this.#fork(this.#check(first.ingressRoute, first.route, true));
+    }
   }
 
   /** Drops the events of a host that waited too long. A place still being sealed stays. */

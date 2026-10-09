@@ -1,6 +1,6 @@
 import { createIngressQueueKeyPair } from "@openbot/contracts/signal-protocol/ingress-queue";
 import { Effect } from "effect";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { IngressQueue, type RouteWake, type RouteWaker } from "../src/ingress-queue";
 
 const route = { platform: "telegram", botId: "777000111", chatId: "-100" } as const;
@@ -45,5 +45,32 @@ describe("IngressQueue", () => {
     await expect(Effect.runPromise(queue.offline(route, "telegram:-100", true, message))).resolves.toBe("unavailable");
     await expect(Effect.runPromise(queue.offline(route, "telegram:-100", true, message))).resolves.toBe("queued");
     queue.close();
+  });
+
+  it("asks again for the start of a server that keeps events and does not connect", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    try {
+      let now = 1_000_000;
+      const asked: boolean[] = [];
+      const queue = new IngressQueue(
+        (_route, wake) => {
+          asked.push(wake);
+          return Effect.succeed({ hostId: "host-1", state: "starting" as const });
+        },
+        { now: () => now },
+      );
+      queue.rememberKey("host-1", (await createIngressQueueKeyPair()).publicKey);
+      await expect(Effect.runPromise(queue.offline(route, "telegram:-100", true, message))).resolves.toBe("queued");
+
+      // Within one check interval nothing is asked again.
+      vi.advanceTimersByTime(30_000);
+      expect(asked).toEqual([true]);
+      now += 61_000;
+      vi.advanceTimersByTime(30_000);
+      await vi.waitFor(() => expect(asked).toEqual([true, true]));
+      queue.close();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -354,8 +354,8 @@ export class SignalService {
     this.#deliveryLimits = deliveryLimits;
     this.#discordEnabled = options.discord === true;
     this.#telegram = options.telegram ?? null;
-    this.#queue = new IngressQueue(options.routeWaker ?? null);
     this.#fork = options.fork ?? ((work) => void Effect.runFork(work));
+    this.#queue = new IngressQueue(options.routeWaker ?? null, { fork: this.#fork });
   }
 
   /** The Bot API and the file tokens, or `null` when Telegram is off. */

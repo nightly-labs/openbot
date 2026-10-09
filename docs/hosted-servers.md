@@ -509,7 +509,9 @@ holds it:
    button press.
 3. For such an event and a server that starts, Signal keeps the delivery frame, sealed to the host's
    queue key (`@openbot/contracts/signal-protocol/ingress-queue`), in memory for at most 10 minutes
-   (64 events and 192 KB for each host). Slack gets 200, so it does not send the event again. Signal
+   (64 events and 192 KB for each host). Slack gets 200, so it does not send the event again. Because
+   the start runs after the answer and can fail, Signal asks for the start again once a minute while
+   the host has kept events. Signal
    cannot read a kept event, and a restart of Signal loses it.
 4. Another Slack event of a hosted server gets 200 and is dropped: the host keeps only messages that
    address OpenBot, and joins the public channels again when its connection starts.
