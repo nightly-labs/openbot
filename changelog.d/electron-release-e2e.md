@@ -13,3 +13,4 @@
 - Update restored streaming messages when the host sends their completed content.
 - Stop repeated agent settings requests while a host is offline, so reconnect can recover.
 - Block release when required Linux UI cases are missing or skipped.
+- Build the current app and include visual comparisons in the single release test command, with a final result and failure status.

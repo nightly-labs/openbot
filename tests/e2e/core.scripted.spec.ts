@@ -44,7 +44,8 @@ test("conversation-isolation keeps streaming results, drafts and attachments in 
   await expect.poll(async () => (await conversation(app, first.id)).activeTurnId).not.toBeNull();
   const filename = `draft-${key}.txt`;
   const path = join(app.profile, filename);
-  await writeFile(path, key);
+  const content = `Uploaded content ${randomUUID()}`;
+  await writeFile(path, content);
   await upload(app, path);
   const draft = prompt({ steps: [{ kind: "read-upload", name: filename, save: "file" }], reply: "$result:file" });
   await app.page.getByRole("textbox", { name: t("composer.placeholder.message", { name: first.name }) }).fill(draft);
@@ -70,10 +71,10 @@ test("conversation-isolation keeps streaming results, drafts and attachments in 
     app.page.getByRole("button", { name: t("composer.attachment.remove", { name: filename }) }),
   ).toBeVisible();
   await app.page.getByRole("button", { name: t("composer.send.message"), exact: true }).click();
-  await completed(app, first.id, key);
+  await completed(app, first.id, content);
   const a = await conversation(owner, first.id);
   const b = await conversation(owner, second.id);
-  expect(a.messages.filter((item) => item.author === "assistant" && item.text === key)).toHaveLength(1);
+  expect(a.messages.filter((item) => item.author === "assistant" && item.text === content)).toHaveLength(1);
   expect(
     a.messages
       .filter((item) => item.author === "user" && item.text === draft)

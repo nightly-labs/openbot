@@ -94,7 +94,16 @@ Electron binary. Visual tests use the Playwright Chromium version installed by t
 
 ## Commands and time budget
 
-With the current commit built on the test machine:
+The complete release command builds the current code, installs the pinned Chromium browser,
+runs all required Electron cases, then runs all six visual comparisons. It stops at the first
+failed step and prints a final result. It removes inherited Electron runtime flags automatically.
+It does not accept test filters or baseline-update options.
+
+```sh
+bun run test:e2e:release > run-logs.txt 2>&1
+```
+
+For focused functional runs, build the current commit first:
 
 ```sh
 # Scripted local and host tests; one worker outside CI.
@@ -109,11 +118,8 @@ env -u ELECTRON_RUN_AS_NODE bun run test:e2e --grep='delegate delivers' --worker
 # Required real-provider cases only; uses provider quota.
 env -u ELECTRON_RUN_AS_NODE bun run test:e2e:live
 
-# Complete release gate, including all required providers.
-env -u ELECTRON_RUN_AS_NODE bun run test:e2e:release
-
 # Discover tests without starting apps or services.
-bun run test:e2e:release --list --reporter=list
+OPENBOT_E2E_SUITE=release bun run test:e2e --list --reporter=list
 ```
 
 Keep broad builds and full suite runs in CI. For harness changes, run the focused
@@ -126,7 +132,7 @@ case IDs. Tests wait for state and events. Retries are disabled. The release rep
 any missing, skipped, failed, or interrupted required case, or a test phase over ten minutes.
 The Linux job sets `OPENBOT_E2E_SUITE=scripted-release` to require all 47 scripted cases without
 requiring live providers. Ordinary `test:e2e` runs still permit selection of individual cases.
-Dependency install, build, provider preflight, and shared service startup are outside that budget.
+Dependency install, build, Chromium install, visual comparisons, provider preflight, and shared service startup are outside that budget.
 Worker app startup and teardown are inside it. This budget still needs measurement on the Mac mini.
 
 Do not run two suites in the same checkout at the same time: they share the report directory.

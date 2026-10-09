@@ -52,14 +52,8 @@ jobs:
         run: |
           test "$(uname -s)" = Darwin
           node --version
-      - name: Build once
-        run: bun run build
-      - name: Run local and host release workflows
-        run: env -u ELECTRON_RUN_AS_NODE bun run test:e2e:release
-      - name: Install the pinned visual browser
-        run: bunx playwright install chromium
-      - name: Check core Storybook layouts
-        run: bun run test:visual
+      - name: Build and run functional and visual release checks
+        run: bun run test:e2e:release
       - name: Stop any remaining test processes
         if: always()
         run: bun tests/e2e/support/cleanup.ts

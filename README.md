@@ -338,7 +338,7 @@ See [web client delivery](docs/web-client.md) for the release gate and focused c
 | `bun run test:browser` | Run the complete local embedded-browser smoke test, including cross-process persistence. Use `--scenario=controls`, `--scenario=tool-boundary`, `--scenario=evaluation`, `--scenario=wait-deadlines`, or `--scenario=popups` for one isolated scenario. |
 | `bun run test:e2e` | Run scripted Electron UI tests in local and host modes against the current build. See [runner setup and coverage](docs/electron-e2e.md). |
 | `bun run test:e2e:live` | Run required Codex, Claude, and OpenCode UI workflows with dedicated provider accounts. |
-| `bun run test:e2e:release` | Run the complete Electron release gate with required coverage and a ten-minute test budget. |
+| `bun run test:e2e:release` | Build the app, install pinned Chromium, then run required Electron and visual tests. The functional test budget is ten minutes. |
 | `bun run test:visual` | Compare six core Storybook screens with reviewed macOS visual baselines. |
 | `bun run test:codex` | Probe the real CLI handshake and account without starting a paid turn. |
 | `bun run test:durations` | Re-record how long each desktop test file takes. CI splits its shards by this table, so run it when the two shards stop finishing together. |
