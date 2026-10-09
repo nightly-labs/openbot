@@ -426,7 +426,8 @@ deleted. All agents share the embedded browser profile, including cookies and we
 When the owner publishes OpenBot, the app starts an authenticated Team API on a localhost port. The
 client and host use a separate OpenBot Signal service to establish WebRTC. Signal carries only
 short-lived authentication, SDP, and ICE messages. Team API data uses WebRTC DataChannels. Remote
-Desktop media and input use a separate WebRTC connection. The live browser view sends compressed
+Desktop media and input use a separate WebRTC connection. A paste in the Remote Desktop viewer
+sends the member's clipboard text to the host, which puts it on the host's clipboard. The live browser view sends compressed
 images of the host's browser tab, and the watching member's pointer and key input, over that same
 media connection. ICE uses a direct peer-to-peer path when possible. If a direct path is not possible, encrypted WebRTC traffic uses an OpenBot coturn relay.
 

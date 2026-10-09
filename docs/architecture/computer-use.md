@@ -99,6 +99,17 @@ Local tests use a temporary HTTP listener bound to `127.0.0.1`, without publishi
 
 A local video-only test can run without native diagnostics. Its viewer iframe is inert and excluded from keyboard focus; it does not start a native input test or report input success. Local loopback test cookies use HttpOnly, Secure and SameSite=None so the embedded viewer works across the app origin.
 
+A paste in the viewer puts the member's text on the host's clipboard, and then presses the host's
+paste keys. Moonlight sends Cmd+V or Ctrl+V as keys and cancels them, so the browser fires no paste
+event and the host pastes its own clipboard. The gateway adds `openbot-paste.js` to Moonlight's
+`stream.html`. The script keeps the member's paste key from Moonlight, reads the paste event, and
+posts the text to `moonlight/openbot-clipboard`. Both routes are under `moonlight/` because the
+released Team API adapters forward only that family of viewer routes. The same viewer cookie or
+WebRTC session check protects them. Then the script presses Cmd+V for a macOS host or Ctrl+V for
+other hosts, and releases the member's other held modifiers for that time. Text that the host
+already has from an earlier paste is not sent again, so a copy made on the host stays on its
+clipboard. A host with no clipboard writer serves neither route.
+
 On Linux, the gateway accepts only an X11 session (`DISPLAY` set, no `WAYLAND_DISPLAY`, and
 `XDG_SESSION_TYPE` not `wayland`). Sunshine then runs with X11 capture and software encoding, and
 sends input through XTest, so a hosted server under Xvfb needs no uinput device and no extra
