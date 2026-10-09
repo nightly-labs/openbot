@@ -254,6 +254,7 @@ export const messages = {
   "mobile.chat.queue.replyState.failed": "Başarısız",
   "mobile.chat.queue.repliesReadNext": "Yanıtları bir sonraki adımda {name} okuyacak.",
   "mobile.chat.queue.repliesWaitForAll": "{name}, yanıtları her ekip arkadaşı bitirdiğinde okur.",
+  "mobile.chat.queue.repliesHide": "Bu listeyi gizle",
   "mobile.chat.queue.replyAgentFallback": "Ajan",
   "mobile.chat.queue.editing": "Düzenleniyor",
   "mobile.chat.queue.loading": "Kuyruk yükleniyor…",

@@ -5,6 +5,7 @@ import { waitFor } from "@testing-library/dom";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { QueuedMessagesProvider } from "../context/queued-messages-context";
 import { useChatQueue } from "./use-chat-queue";
 
 const boundary = vi.hoisted(() => ({
@@ -92,7 +93,9 @@ function mount(client = new QueryClient({ defaultOptions: { queries: { retry: fa
   act(() =>
     root.render(
       <QueryClientProvider client={client}>
-        <Harness />
+        <QueuedMessagesProvider>
+          <Harness />
+        </QueuedMessagesProvider>
       </QueryClientProvider>,
     ),
   );

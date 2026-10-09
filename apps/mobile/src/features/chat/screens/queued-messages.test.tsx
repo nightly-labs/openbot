@@ -253,6 +253,7 @@ function stubQueue(overrides: Partial<ChatQueueController> = {}): ChatQueueContr
     queued,
     replies: [],
     waiting: [],
+    hideWaiting: vi.fn(),
     deliveries: queued,
     edit: null,
     editUnavailable: false,

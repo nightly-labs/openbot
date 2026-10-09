@@ -254,6 +254,7 @@ export const messages = {
   "mobile.chat.queue.replyState.failed": "Falhou",
   "mobile.chat.queue.repliesReadNext": "{name} lerá as respostas em seguida.",
   "mobile.chat.queue.repliesWaitForAll": "{name} lerá as respostas quando todos os colegas terminarem.",
+  "mobile.chat.queue.repliesHide": "Ocultar esta lista",
   "mobile.chat.queue.replyAgentFallback": "Agente",
   "mobile.chat.queue.editing": "Editando",
   "mobile.chat.queue.loading": "Carregando a fila…",

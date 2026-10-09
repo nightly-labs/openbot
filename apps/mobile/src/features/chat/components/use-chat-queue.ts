@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { currentText, useText } from "@/shared/lib/text";
+import { useHiddenReplies } from "../context/queued-messages-context";
 import { awaitingReplies } from "../model/awaiting-replies";
 import {
   readQueueAttachment,
@@ -95,7 +96,16 @@ export function useChatQueue(
   const replies = useMemo(() => orderedQueue((query.data?.deliveries ?? []).filter(isQueuedAgentReply)), [query.data]);
   // The questions come from the conversation and the answers from the queue. A teammate that is
   // still asked or working has a row before any answer arrives.
-  const waiting = useMemo(() => awaitingReplies(messages, replies), [messages, replies]);
+  // The person can close the rows when every teammate is done, as on desktop. A closed row that
+  // works again shows.
+  const { hiddenReplyIds, hideReplies } = useHiddenReplies();
+  const waiting = useMemo(
+    () =>
+      awaitingReplies(messages, replies).filter(
+        (row) => !(hiddenReplyIds.has(row.id) && (row.state === "replied" || row.state === "failed")),
+      ),
+    [messages, replies, hiddenReplyIds],
+  );
   // Persist typing after a pause, without blocking each key event. The edit identity is
   // persisted synchronously BEFORE requesting the host hold, so a restart can recover it.
   useEffect(() => {
@@ -339,6 +349,8 @@ export function useChatQueue(
       queued,
       replies,
       waiting,
+      /** Closes the waiting rows. The sheet offers it only when no teammate still works. */
+      hideWaiting: () => hideReplies(waiting.map((row) => row.id)),
       deliveries: query.data?.deliveries ?? EMPTY_DELIVERIES,
       edit,
       confirmed,
@@ -413,6 +425,7 @@ export function useChatQueue(
       queued,
       replies,
       waiting,
+      hideReplies,
       editUnavailable,
       query.data,
       edit,

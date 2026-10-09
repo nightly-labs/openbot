@@ -70,6 +70,7 @@ function stubQueue(
     queued,
     replies: [],
     waiting: [],
+    hideWaiting: vi.fn(),
     deliveries: queued,
     edit,
     editUnavailable: false,

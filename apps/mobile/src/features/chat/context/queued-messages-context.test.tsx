@@ -23,6 +23,7 @@ function controller(chatId: string): ChatQueueController {
     queued: [],
     replies: [],
     waiting: [],
+    hideWaiting: () => {},
     deliveries: [],
     edit: null,
     editUnavailable: false,

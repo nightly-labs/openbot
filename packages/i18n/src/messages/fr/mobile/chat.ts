@@ -261,6 +261,7 @@ export const messages = {
   "mobile.chat.queue.replyState.failed": "Échec",
   "mobile.chat.queue.repliesReadNext": "{name} lira ensuite les réponses.",
   "mobile.chat.queue.repliesWaitForAll": "{name} lira les réponses quand chaque coéquipier aura terminé.",
+  "mobile.chat.queue.repliesHide": "Masquer cette liste",
   "mobile.chat.queue.replyAgentFallback": "Agent",
   "mobile.chat.queue.editing": "Modification en cours",
   "mobile.chat.queue.loading": "Chargement de la file d’attente…",

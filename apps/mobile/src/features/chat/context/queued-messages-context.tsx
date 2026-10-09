@@ -17,6 +17,9 @@ interface QueuedChat {
 interface QueuedMessages {
   chats: ReadonlyMap<string, QueuedChat>;
   publish: (chatId: string, chat: QueuedChat | null) => void;
+  /** The waiting rows that the person closed. They stay closed when the chat opens again. */
+  hiddenReplyIds: ReadonlySet<string>;
+  hideReplies: (ids: readonly string[]) => void;
 }
 
 const QueuedMessagesContext = createContext<QueuedMessages | null>(null);
@@ -40,7 +43,14 @@ export function QueuedMessagesProvider({ children }: PropsWithChildren) {
       return new Map(current).set(chatId, chat);
     });
   }, []);
-  const value = useMemo(() => ({ chats, publish }), [chats, publish]);
+  const [hiddenReplyIds, setHiddenReplyIds] = useState<ReadonlySet<string>>(() => new Set());
+  const hideReplies = useCallback((ids: readonly string[]) => {
+    setHiddenReplyIds((current) => new Set([...current, ...ids]));
+  }, []);
+  const value = useMemo(
+    () => ({ chats, publish, hiddenReplyIds, hideReplies }),
+    [chats, publish, hiddenReplyIds, hideReplies],
+  );
   return <QueuedMessagesContext value={value}>{children}</QueuedMessagesContext>;
 }
 
@@ -61,6 +71,12 @@ export function usePublishedQueuedChat(
     publish(chatId, queue ? { queue, pending } : null);
   }, [chatId, queue, pending, publish]);
   useEffect(() => () => publish(chatId, null), [chatId, publish]);
+}
+
+/** The waiting rows that the person closed, and the action that closes more. */
+export function useHiddenReplies(): Pick<QueuedMessages, "hiddenReplyIds" | "hideReplies"> {
+  const { hiddenReplyIds, hideReplies } = useQueuedMessagesContext();
+  return { hiddenReplyIds, hideReplies };
 }
 
 /** The queue of the chat that opened the sheet. The route carries its identity. */

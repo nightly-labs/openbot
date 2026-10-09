@@ -87,6 +87,11 @@ export function QueuedMessagesScreen() {
         rows={waiting}
         agents={serverAgents}
         self={serverAgents.find((agent) => agent.id === agentId)}
+        onHide={() => {
+          queue?.hideWaiting();
+          // With nothing else to show, the sheet would only say that the queue is empty.
+          if (count === 0 && !queue?.error) router.back();
+        }}
       />
       {count > 0 ? (
         <SettingsSection title={t("mobile.chat.queue.waitingTitle")}>

@@ -264,6 +264,7 @@ export const messages = {
   "mobile.chat.queue.replyState.failed": "Ошибка",
   "mobile.chat.queue.repliesReadNext": "{name} прочитает ответы следующим.",
   "mobile.chat.queue.repliesWaitForAll": "{name} прочитает ответы, когда закончат все участники команды.",
+  "mobile.chat.queue.repliesHide": "Скрыть этот список",
   "mobile.chat.queue.replyAgentFallback": "Агент",
   "mobile.chat.queue.editing": "Редактируется",
   "mobile.chat.queue.loading": "Загрузка очереди…",

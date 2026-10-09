@@ -252,6 +252,7 @@ export const messages = {
   "mobile.chat.queue.replyState.failed": "失敗",
   "mobile.chat.queue.repliesReadNext": "次に {name} が返信を読みます。",
   "mobile.chat.queue.repliesWaitForAll": "すべてのチームメイトが終わると、{name} が返信を読みます。",
+  "mobile.chat.queue.repliesHide": "この一覧を非表示",
   "mobile.chat.queue.replyAgentFallback": "エージェント",
   "mobile.chat.queue.editing": "編集中",
   "mobile.chat.queue.loading": "キューを読み込み中…",
