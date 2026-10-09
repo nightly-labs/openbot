@@ -206,12 +206,12 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
       return;
     }
     const child = yield* this.#child(agentId, request.cwd).pipe(toProviderClientOperationError);
-    const read = child.readHistory;
-    if (!read) return;
+    if (!child.readHistory) return;
     const sessionId = ownSessionId(request.threadId, agentId, request.cwd);
-    yield* read({ ...request, threadId: sessionId, ...(durableReplay ? { providerOnly: true } : {}) }, consume).pipe(
-      toProviderClientOperationError,
-    );
+    // Call it on the child: a client's reader uses its own instance state.
+    yield* child
+      .readHistory({ ...request, threadId: sessionId, ...(durableReplay ? { providerOnly: true } : {}) }, consume)
+      .pipe(toProviderClientOperationError);
   });
 
   start(): void {

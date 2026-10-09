@@ -19,6 +19,7 @@ import {
   type ResponseDecoder,
   type RpcError,
 } from "./protocol";
+import type { ProviderHistoryConsumer, ProviderHistoryRequest } from "./provider-history";
 
 interface ClientEvents {
   notification: [notification: AppServerNotification];
@@ -35,6 +36,14 @@ class FakeChild extends EventEmitter<ClientEvents> implements AgentClient {
   readonly responses: { id: RequestId; result: unknown }[] = [];
   readonly errors: { id: RequestId; error: RpcError }[] = [];
   answers: Record<string, () => unknown> = {};
+  readonly historyReads: ProviderHistoryRequest[] = [];
+
+  /** Uses its own instance, as the real ACP client does. */
+  readHistory(request: ProviderHistoryRequest, _consume: ProviderHistoryConsumer): Effect.Effect<void> {
+    return Effect.sync(() => {
+      this.historyReads.push(request);
+    });
+  }
 
   start(): void {
     this.running = true;
@@ -212,6 +221,15 @@ describe("CustomAcpAgentsClient", () => {
       client.request("turn/start", { threadId: goose, model: "qwen/default", input: [] }, record),
     ).catch((reason: unknown) => reason);
     expect(isMissingProviderSessionError(error, "acp")).toBe(true);
+  });
+
+  it("reads a routed session's history on its own process, with the agent's own id", async () => {
+    const { client, children } = router();
+    const goose = await startThread(client, "goose/default");
+    await runCauseEffect(
+      client.readHistory({ threadId: goose, cwd: FOLDER, items: "none" }, () => Effect.succeed(true)),
+    );
+    expect(children.get(`goose@${FOLDER}`)?.historyReads).toEqual([{ threadId: "s1", cwd: FOLDER, items: "none" }]);
   });
 
   it("refuses a model of an agent that is not saved", async () => {
