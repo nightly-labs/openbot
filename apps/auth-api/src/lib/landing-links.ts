@@ -19,6 +19,8 @@ export const OPENBOT_DOWNLOAD_PAGE_LINKS = {
   macos: "/download/macos",
   windows: "/download/windows",
   linux: "/download/linux",
+  ios: "/download/ios",
+  android: "/download/android",
 } as const;
 
 export const OPENBOT_LINKS = {

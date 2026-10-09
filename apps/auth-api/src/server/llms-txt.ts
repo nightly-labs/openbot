@@ -47,7 +47,7 @@ function llmsTxt(): string {
     "",
     "## Download",
     "",
-    `System requirements and install steps: [macOS](${absolute(OPENBOT_DOWNLOAD_PAGE_LINKS.macos)}), [Windows](${absolute(OPENBOT_DOWNLOAD_PAGE_LINKS.windows)}), [Linux](${absolute(OPENBOT_DOWNLOAD_PAGE_LINKS.linux)}).`,
+    `System requirements and install steps: [macOS](${absolute(OPENBOT_DOWNLOAD_PAGE_LINKS.macos)}), [Windows](${absolute(OPENBOT_DOWNLOAD_PAGE_LINKS.windows)}), [Linux](${absolute(OPENBOT_DOWNLOAD_PAGE_LINKS.linux)}), [iPhone](${absolute(OPENBOT_DOWNLOAD_PAGE_LINKS.ios)}), [Android](${absolute(OPENBOT_DOWNLOAD_PAGE_LINKS.android)}).`,
     "",
     `- [macOS](${absolute(OPENBOT_DOWNLOAD_LINKS.macos)}): macOS 13 or later, Apple silicon`,
     `- [macOS for Intel](${absolute(OPENBOT_ALTERNATE_DOWNLOAD_LINKS.macos)}): macOS 13 or later, Intel`,

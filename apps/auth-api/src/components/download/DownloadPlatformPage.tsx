@@ -2,8 +2,12 @@ import { PlatformLogo } from "@openbot/brand";
 import { Link } from "@tanstack/solid-router";
 import { createTrackedEffect, For, Show } from "solid-js";
 import { landingAnalytics } from "../../lib/analytics";
-import { type DownloadPageContent, type DownloadStep, downloadPagePath } from "../../lib/download-pages";
-import { DOWNLOAD_PLATFORM_ORDER } from "../../lib/download-platforms";
+import {
+  DOWNLOAD_PAGE_ORDER,
+  type DownloadPageContent,
+  type DownloadStep,
+  downloadPagePath,
+} from "../../lib/download-pages";
 import { LandingFooter } from "../landing/LandingFooter";
 import { LandingIcon } from "../landing/LandingIcon";
 import { SiteHeader } from "../landing/SiteHeader";
@@ -25,7 +29,7 @@ export function DownloadPlatformPage(props: DownloadPlatformPageProps) {
     return landingAnalytics.start(document, window.location.hostname, path);
   });
 
-  const otherPlatforms = () => DOWNLOAD_PLATFORM_ORDER.filter((platform) => platform !== props.page.platform);
+  const otherPlatforms = () => DOWNLOAD_PAGE_ORDER.filter((platform) => platform !== props.page.platform);
 
   return (
     <div class="landing-page download-page">

@@ -1,14 +1,16 @@
-import { PlatformLogo, type PlatformLogoVariant } from "@openbot/brand";
+import { type MobilePlatformLogoVariant, PlatformLogo, type PlatformLogoVariant } from "@openbot/brand";
 import { Link } from "@tanstack/solid-router";
 import { For, Show } from "solid-js";
 import { DOWNLOAD_PLATFORM_ORDER, DOWNLOAD_PLATFORMS } from "../../lib/download-platforms";
+import { EXTERNAL_LINK_REL } from "../../lib/landing-links";
+import { MOBILE_APP_ORDER, MOBILE_APPS } from "../../lib/mobile-apps";
 import { createLandingReveal } from "./createLandingReveal";
 import { LandingIcon } from "./LandingIcon";
 
 interface DownloadCardContentProps {
   action?: string;
   description: string;
-  platform: PlatformLogoVariant;
+  platform: PlatformLogoVariant | MobilePlatformLogoVariant;
   status: string;
   title: string;
 }
@@ -102,8 +104,36 @@ export function DownloadSection() {
           </a>
         </div>
 
+        <div class="landing-download-grid landing-download-grid-mobile">
+          <For each={MOBILE_APP_ORDER}>
+            {(platform) => {
+              const app = MOBILE_APPS[platform];
+              return (
+                <a
+                  class="landing-download-card"
+                  href={app.href}
+                  target="_blank"
+                  rel={EXTERNAL_LINK_REL}
+                  data-download-platform={platform}
+                  data-state="available"
+                  data-revealed={revealState()}
+                >
+                  <DownloadCardContent
+                    platform={platform}
+                    status={app.status}
+                    title={app.label}
+                    description={app.description}
+                    action={app.action}
+                  />
+                </a>
+              );
+            }}
+          </For>
+        </div>
+
         {/* The cards start the download, so the pages that explain each installer get their own
-            links. They are also how a crawler finds those pages from the home page. */}
+            links. They are also how a crawler finds those pages from the home page. The phone apps
+            are a separate group after a rule, as their cards are a separate row. */}
         <p class="landing-download-pages">
           System requirements and install steps:
           <For each={DOWNLOAD_PLATFORM_ORDER}>
@@ -113,6 +143,15 @@ export function DownloadSection() {
               </Link>
             )}
           </For>
+          <span class="landing-download-pages-mobile">
+            <For each={MOBILE_APP_ORDER}>
+              {(platform) => (
+                <Link to="/download/$platform" params={{ platform }}>
+                  {MOBILE_APPS[platform].label}
+                </Link>
+              )}
+            </For>
+          </span>
         </p>
       </div>
     </section>

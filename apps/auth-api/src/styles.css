@@ -1654,6 +1654,29 @@ a {
   background: var(--openbot-logo-dev);
 }
 
+/* The phone apps: a blue and a coral beside the three build colours. Dark text keeps over 7:1 on both. */
+.landing-page {
+  --download-ios-color: #74b9ff;
+  --download-android-color: #ee9a7d;
+}
+
+.landing-download-card[data-download-platform="ios"] {
+  background: var(--download-ios-color);
+}
+
+.landing-download-card[data-download-platform="android"] {
+  background: var(--download-android-color);
+}
+
+.landing-download-grid-mobile {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 18px;
+}
+
+.landing-download-grid-mobile .landing-download-card {
+  min-height: 320px;
+}
+
 .landing-download-card[data-state="available"] {
   transition:
     transform var(--openbot-duration-normal) var(--openbot-ease-out),
@@ -3855,11 +3878,19 @@ a {
     margin-top: 42px;
   }
 
+  .landing-download-grid-mobile {
+    margin-top: 14px;
+  }
+
   .landing-download-card,
   .landing-download-card[data-download-platform="linux"] {
     min-height: 360px;
     grid-column: auto;
     padding: 26px;
+  }
+
+  .landing-download-grid-mobile .landing-download-card {
+    min-height: 300px;
   }
 
   .landing-footer-inner {
@@ -8025,6 +8056,12 @@ a {
   gap: 12px 24px;
 }
 
+.changelog-latest-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .changelog-latest-text {
   display: flex;
   flex-wrap: wrap;
@@ -8767,6 +8804,16 @@ a {
   --download-color: var(--openbot-logo-dev);
 }
 
+.download-main[data-download-platform="ios"],
+.download-main [data-download-platform="ios"] {
+  --download-color: var(--download-ios-color);
+}
+
+.download-main[data-download-platform="android"],
+.download-main [data-download-platform="android"] {
+  --download-color: var(--download-android-color);
+}
+
 .download-panel,
 .download-hub-card,
 .download-system-card {
@@ -9216,6 +9263,15 @@ a {
   border-radius: 24px;
 }
 
+.download-hub-cards-mobile {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 18px;
+}
+
+.download-hub-cards-mobile .download-hub-card {
+  min-height: 460px;
+}
+
 .download-hub-card-logo {
   width: clamp(80px, 7.4vw, 104px);
   height: clamp(80px, 7.4vw, 104px);
@@ -9331,7 +9387,8 @@ a {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .download-hub-card {
+  .download-hub-card,
+  .download-hub-cards-mobile .download-hub-card {
     min-height: 0;
   }
 
@@ -9378,6 +9435,15 @@ a {
   margin-top: 28px;
   color: var(--openbot-text-muted);
   font-size: 14px;
+}
+
+.landing-download-pages-mobile {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-left: 4px;
+  padding-left: 20px;
+  border-left: 1px solid var(--openbot-border-strong);
 }
 
 .landing-download-pages a {

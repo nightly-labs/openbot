@@ -205,6 +205,7 @@
     "./features/diagrams/diagram-text": "./src/features/diagrams/diagram-text.ts",
     "./features/diagrams/diagrams.css": "./src/features/diagrams/diagrams.css",
     "./features/sidebar/Sidebar": "./src/features/sidebar/Sidebar.tsx",
+    "./features/mobile-app/android-play-store": "./src/features/mobile-app/android-play-store.ts",
     "./features/mobile-app/ios-testflight": "./src/features/mobile-app/ios-testflight.ts",
     "./features/sidebar/SidebarMobileAppCard": "./src/features/sidebar/SidebarMobileAppCard.tsx",
     "./features/sidebar/sidebar-mobile-app.css": "./src/features/sidebar/sidebar-mobile-app.css",
