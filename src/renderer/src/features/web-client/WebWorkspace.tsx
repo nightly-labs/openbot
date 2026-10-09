@@ -254,7 +254,12 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
           id: host.hostId,
           name: host.name,
           ready: workspace.state.status === "online",
-          quiet: Boolean(workspace.state.hostedSleep || workspace.state.hostRestart || workspace.state.incompatibility),
+          quiet: Boolean(
+            !workspace.state.workspaceLoaded ||
+              workspace.state.hostedSleep ||
+              workspace.state.hostRestart ||
+              workspace.state.incompatibility,
+          ),
         }
       : null;
   });

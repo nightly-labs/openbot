@@ -296,31 +296,7 @@ export function createWebWorkspace(
           recovery.suspend();
         }
         if (update.code === "session_revoked") {
-          // A revoked session must not leave private conversations visible while the directory
-          // decides whether this membership still exists. Keep the host shell for a possible
-          // authorized reconnect, but invalidate every private read and pending action now.
-          generation += 1;
-          selectedId = null;
-          setState((draft) => {
-            draft.revocationRevision += 1;
-            draft.workspaceLoaded = false;
-            draft.agents = [];
-            draft.agentsLoaded = false;
-            draft.conversations = {};
-            draft.queues = {};
-            draft.selectedId = null;
-            draft.approvals = [];
-            draft.prompts = [];
-            draft.progress = {};
-            draft.takeovers = [];
-            draft.browserTabs = [];
-            draft.activeBrowserTabId = null;
-            draft.browserControlState = { sessions: [] };
-            draft.sidebarLayout = defaultSidebarLayout();
-            draft.capabilities = [];
-            draft.presence = null;
-            draft.duplicatingAgentIds = [];
-          });
+          clearRevokedWorkspace();
           const revokedHostId = hostId;
           const revokedGeneration = generation;
           const revokedConnection = connectionPromise?.promise;
@@ -679,6 +655,33 @@ export function createWebWorkspace(
         draft.hostedSleep = hostedSleep;
       });
   }
+  function clearRevokedWorkspace(): void {
+    // A revoked session must not leave private conversations visible while the directory
+    // decides whether this membership still exists. Keep the host shell for a possible
+    // authorized reconnect, but invalidate every private read and pending action now.
+    generation += 1;
+    selectedId = null;
+    setState((draft) => {
+      draft.revocationRevision += 1;
+      draft.workspaceLoaded = false;
+      draft.agents = [];
+      draft.agentsLoaded = false;
+      draft.conversations = {};
+      draft.queues = {};
+      draft.selectedId = null;
+      draft.approvals = [];
+      draft.prompts = [];
+      draft.progress = {};
+      draft.takeovers = [];
+      draft.browserTabs = [];
+      draft.activeBrowserTabId = null;
+      draft.browserControlState = { sessions: [] };
+      draft.sidebarLayout = defaultSidebarLayout();
+      draft.capabilities = [];
+      draft.presence = null;
+      draft.duplicatingAgentIds = [];
+    });
+  }
   async function reconnect(): Promise<void> {
     const host = state.hosts.find((listed) => listed.hostId === hostId) ?? state.host;
     if (!host || connectionPromise) return;
@@ -830,6 +833,11 @@ export function createWebWorkspace(
             hostProtocol: { ...error.hostProtocol },
           };
       });
+      if (
+        error instanceof WebHostConnectionError &&
+        (error.code === "authentication_required" || error.code === "access_ended")
+      )
+        clearRevokedWorkspace();
       if (error instanceof WebHostIncompatibleError || error instanceof WebHostConnectionError) {
         hostLifecycle.endSleep();
         recoveryBlocked = true;

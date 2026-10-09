@@ -10,7 +10,7 @@ import { assert, beforeEach, describe, expect, it, vi } from "vitest";
 import { STORY_AGENT_SUMMARIES } from "../../preview/fixtures";
 import { createWebWorkspace } from "./web-client-context";
 import { createWebConversationRuntime } from "./web-conversation-runtime";
-import type { WebRuntimeEvents, WebWorkspaceRuntime } from "./web-runtime";
+import { WebHostConnectionError, type WebRuntimeEvents, type WebWorkspaceRuntime } from "./web-runtime";
 
 const page: ConversationPage = {
   agentId: "chief",
@@ -420,6 +420,35 @@ describe("web workspace state", () => {
     directoryRefresh.resolve([]);
     await waitFor(() => expect(workspace.state.host).toBeNull());
   });
+  it.each(["authentication_required", "access_ended"] as const)(
+    "clears private state when a required recovery read fails with %s",
+    async (code) => {
+      const app = harness();
+      const workspace = await connected(app);
+      const host = workspace.state.host;
+      assert(host);
+      workspace.setDraft("Private draft");
+      vi.mocked(app.runtime.models).mockRejectedValueOnce(new WebHostConnectionError(code));
+
+      await workspace.connect(host);
+
+      expect(workspace.state.workspaceLoaded).toBe(false);
+      expect(workspace.state.agents).toEqual([]);
+      expect(workspace.state.conversations).toEqual({});
+      expect(workspace.state.selectedId).toBeNull();
+      expect(workspace.state.revocationRevision).toBe(1);
+      expect(workspace.state.recovery?.phase).toBe("suspended");
+      window.dispatchEvent(new Event("online"));
+      expect(app.runtime.connect).toHaveBeenCalledTimes(2);
+
+      await workspace.reconnect();
+      expect(workspace.state.status).toBe("online");
+      expect(workspace.conversation()?.page).toEqual(page);
+      expect(workspace.conversation()?.draft).toBe("");
+      expect(app.runtime.connect).toHaveBeenCalledTimes(3);
+    },
+  );
+
   it("waits for a revoked connection attempt before one authorized reconnect", async () => {
     const app = harness();
     const workspace = await connected(app);
