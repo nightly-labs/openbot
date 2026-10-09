@@ -116,22 +116,8 @@ export const messages = {
   "sidebar.announce.movedPinned": "Se movió el chat fijado a la posición {position} de {total}.",
   "sidebar.announce.personFallback": "persona",
   "sidebar.announce.chatFallback": "chat",
-  "sidebar.mobileApp.title": "OpenBot para iPhone",
-  "sidebar.mobileApp.body": "La aplicación para iOS ya está en beta pública en TestFlight.",
+  "sidebar.mobileApp.title": "OpenBot para móviles",
+  "sidebar.mobileApp.body": "La aplicación ya está disponible para iPhone y Android.",
   "sidebar.mobileApp.howToInstall": "Cómo instalar",
-  "sidebar.mobileApp.dismiss": "Cerrar el anuncio de la aplicación para iPhone",
-  "sidebar.mobileApp.qrLabel": "Código QR de invitación a TestFlight",
-  "sidebar.mobileApp.dialog.title": "Instala OpenBot en tu iPhone",
-  "sidebar.mobileApp.dialog.description":
-    "La aplicación para iOS está en beta pública. Se instala con Apple TestFlight.",
-  "sidebar.mobileApp.dialog.copyLink": "Copiar enlace",
-  "sidebar.mobileApp.dialog.linkCopied": "Enlace copiado",
-  "sidebar.mobileApp.dialog.copyFailed": "No se pudo copiar el enlace.",
-  "sidebar.mobileApp.dialog.close": "Cerrar",
-  "sidebar.mobileApp.step.testFlight": "En tu iPhone, instala TestFlight desde el App Store.",
-  "sidebar.mobileApp.step.invite":
-    "Escanea este código QR con la cámara del iPhone, o copia el enlace de invitación y ábrelo en tu iPhone.",
-  "sidebar.mobileApp.step.install": "En TestFlight, toca Aceptar y luego Instalar.",
-  "sidebar.mobileApp.step.connect":
-    "Abre OpenBot en tu iPhone. En este equipo, ve a Ajustes > Conexión móvil y escanea el código de inicio de sesión.",
+  "sidebar.mobileApp.dismiss": "Cerrar el anuncio de la aplicación móvil",
 } as const satisfies PartialTranslation<typeof source>;

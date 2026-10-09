@@ -1,4 +1,4 @@
-/* The iOS beta announcement at the bottom of the sidebar, above the account dock. It is a quiet
+/* The mobile app announcement at the bottom of the sidebar, above the account dock. It is a quiet
  * surface card rather than an accent one: an announcement is not an action. The body text and the
  * button use the full card width, so a narrow sidebar wraps the text instead of making a thin
  * column beside the icon. */
@@ -52,10 +52,4 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* The dialog title's cap line sits half its leading plus the font's ascender gap below the line
- * top, so the QR code moves down by the same amount to start level with the title text. */
-.sidebar-mobile-app-qr {
-  margin-top: calc((var(--openbot-leading-xl) - var(--openbot-text-xl)) / 2 + var(--openbot-space-0-5));
 }

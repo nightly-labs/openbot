@@ -130,22 +130,8 @@ export const messages = {
   "sidebar.announce.movedPinned": "Закреплённый чат перемещён на позицию {position} из {total}.",
   "sidebar.announce.personFallback": "человек",
   "sidebar.announce.chatFallback": "чат",
-  "sidebar.mobileApp.title": "OpenBot для iPhone",
-  "sidebar.mobileApp.body": "Приложение для iOS теперь в публичной бета-версии в TestFlight.",
+  "sidebar.mobileApp.title": "OpenBot для телефона",
+  "sidebar.mobileApp.body": "Приложение теперь доступно для iPhone и Android.",
   "sidebar.mobileApp.howToInstall": "Как установить",
-  "sidebar.mobileApp.dismiss": "Закрыть объявление о приложении для iPhone",
-  "sidebar.mobileApp.qrLabel": "QR-код приглашения в TestFlight",
-  "sidebar.mobileApp.dialog.title": "Установите OpenBot на iPhone",
-  "sidebar.mobileApp.dialog.description":
-    "Приложение для iOS в публичной бета-версии. Устанавливается через Apple TestFlight.",
-  "sidebar.mobileApp.dialog.copyLink": "Скопировать ссылку",
-  "sidebar.mobileApp.dialog.linkCopied": "Ссылка скопирована",
-  "sidebar.mobileApp.dialog.copyFailed": "Не удалось скопировать ссылку.",
-  "sidebar.mobileApp.dialog.close": "Закрыть",
-  "sidebar.mobileApp.step.testFlight": "Установите на iPhone TestFlight из App Store.",
-  "sidebar.mobileApp.step.invite":
-    "Отсканируйте этот QR-код камерой iPhone или скопируйте ссылку-приглашение и откройте её на iPhone.",
-  "sidebar.mobileApp.step.install": "В TestFlight нажмите «Принять», затем «Установить».",
-  "sidebar.mobileApp.step.connect":
-    "Откройте OpenBot на iPhone. На этом компьютере перейдите в Настройки > Mobile Connect и отсканируйте код входа.",
+  "sidebar.mobileApp.dismiss": "Закрыть объявление о мобильном приложении",
 } as const satisfies PartialTranslation<typeof source>;
