@@ -931,10 +931,11 @@ export class TeamApiServer {
     Effect.runFork(materialize);
   }
 
-  #broadcastAgentEventToClients(event: AgentEvent, audience: ConversationEventAudience = "all"): void {
+  #broadcastAgentEventToClients(broadcast: AgentEvent, audience: ConversationEventAudience = "all"): void {
     const filteredConversationPayloads = new Map<string, string>();
 
     for (const [client, connection] of this.#eventClients) {
+      const event = this.#eventFor(connection, broadcast);
       if (event.type === "conversation") {
         const legacy = isLegacyConversationClient(connection);
         if ((audience === "legacy" && !legacy) || (audience === "modern" && legacy)) continue;
@@ -1043,6 +1044,17 @@ export class TeamApiServer {
       if (Buffer.byteLength(completionSnapshot) > AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT) continue;
       client.send(completionSnapshot);
     }
+  }
+
+  /** A member does not see an administrator's private MCP sign-in tab, the same as on the browser routes. */
+  #eventFor(connection: EventClientState, event: AgentEvent): AgentEvent {
+    if (event.type !== "browser-changed") return event;
+    const { browser, store } = this.#options;
+    if (!event.tabs.some((tab) => browser.isPrivate(tab.id))) return event;
+    const role = store.authenticate(connection.token)?.role;
+    if (role && role !== "member") return event;
+    const tabs = event.tabs.filter((tab) => !browser.isPrivate(tab.id));
+    return { ...event, tabs, activeTabId: tabs.some((tab) => tab.id === event.activeTabId) ? event.activeTabId : null };
   }
 
   #connectEvents(

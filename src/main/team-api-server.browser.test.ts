@@ -4,11 +4,19 @@ import { Effect } from "effect";
 
 // The embedded browser over the wire: `src/main/team-api/route-browser.ts`.
 
+import { EventEmitter } from "node:events";
 import type { BrowserTab } from "@openbot/contracts/ipc";
 import { TEAM_CURRENT_CAPABILITIES } from "@openbot/contracts/team-protocol/current";
 import { TEAM_PROTOCOL_V6 } from "@openbot/contracts/team-protocol/v6";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createBrowser, createTeamApiFixture, jsonRequest, stopTeamApiFixtures } from "./team-api-server-test-harness";
+import {
+  createAgents,
+  createBrowser,
+  createTeamApiFixture,
+  jsonRequest,
+  nextJsonEvent,
+  stopTeamApiFixtures,
+} from "./team-api-server-test-harness";
 
 afterEach(stopTeamApiFixtures);
 
@@ -38,6 +46,7 @@ describe("TeamApiServer browser", () => {
 
   it("hides an administrator's MCP sign-in tab from a member", async () => {
     const { store, start, signIn } = await createTeamApiFixture("browser-private", { configure: true });
+    const events = new EventEmitter();
     const tab = (id: string): BrowserTab => ({
       id,
       title: id,
@@ -48,7 +57,8 @@ describe("TeamApiServer browser", () => {
     });
     const tabs = [tab("tab-shared"), tab("tab-sign-in")];
     const activate = vi.fn(() => Effect.void);
-    const { base } = await start({
+    const { base, port } = await start({
+      agents: createAgents({}, events),
       browser: createBrowser({
         listTabs: () => tabs,
         getDisplayState: () => ({ tabs, activeTabId: "tab-sign-in" }),
@@ -86,6 +96,34 @@ describe("TeamApiServer browser", () => {
     });
     expect(refused.status).toBe(404);
     expect(activate).not.toHaveBeenCalled();
+
+    const socket = new WebSocket(`ws://127.0.0.1:${port}/v1/events`, [
+      "openbot-team-v1",
+      `openbot-token.${member.sessionToken}`,
+    ]);
+    const presence = nextJsonEvent(socket);
+    await new Promise<void>((resolve) => socket.addEventListener("open", () => resolve(), { once: true }));
+    await presence;
+    const initial = nextJsonEvent(socket);
+    socket.send(
+      JSON.stringify({
+        type: "agent-event-scope",
+        includeConversations: false,
+        capabilities: ["agent-runtime-snapshots", "browser-control"],
+      }),
+    );
+    await initial;
+    const changed = new Promise<{ type: string; activeTabId: string | null; tabs: { id: string }[] }>((resolve) =>
+      socket.addEventListener("message", (message) => resolve(JSON.parse(String(message.data))), { once: true }),
+    );
+    events.emit("event", { type: "browser-changed", tabs, activeTabId: "tab-sign-in" });
+    const event = await changed;
+    expect({ type: event.type, tabs: ids(event.tabs), activeTabId: event.activeTabId }).toEqual({
+      type: "browser-changed",
+      tabs: ["tab-shared"],
+      activeTabId: null,
+    });
+    socket.close();
 
     const owner = await signIn();
     expect(ids(await jsonRequest<{ id: string }[]>(base, "/v1/browser/tabs", { token: owner }))).toEqual([
