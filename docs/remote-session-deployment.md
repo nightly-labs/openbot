@@ -56,8 +56,10 @@ Run only these Signal commands; `remote:update` also updates coturn and is not a
 signal_previous_image=$(docker inspect openbot-remote-remote-api-1 --format '{{.Image}}')
 docker image tag "$signal_previous_image" openbot-remote-api:before-325
 # The release directory is named after the commit. `/health/live` shows it after the start.
-OPENBOT_SOURCE_COMMIT="$(basename "$PWD")" remote/bin/dotenvx run --overload -f remote/.env.production -fk remote/.env.keys -- \
-  docker compose -p openbot-remote -f remote/compose.yaml build remote-api
+source_commit=$(basename "$PWD")
+printf '%s\n' "$source_commit" | grep -Eqx '[0-9a-f]{40}' || { echo "Not in a release directory." >&2; exit 1; }
+remote/bin/dotenvx run --overload -f remote/.env.production -fk remote/.env.keys -- \
+  docker compose -p openbot-remote -f remote/compose.yaml build --build-arg "OPENBOT_SOURCE_COMMIT=$source_commit" remote-api
 remote/bin/dotenvx run --overload -f remote/.env.production -fk remote/.env.keys -- \
   docker compose -p openbot-remote -f remote/compose.yaml up -d --no-build --no-deps remote-api
 docker inspect openbot-remote-remote-api-1 --format '{{.Image}} {{.State.Health.Status}}'

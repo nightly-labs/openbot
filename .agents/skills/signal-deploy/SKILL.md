@@ -14,10 +14,12 @@ the staging, build and rollback commands. This skill adds the checks before and 
 
 ## When to deploy
 
-CI and the release workflow do not deploy Signal. When
-`git diff --quiet <previous tag> <tag> -- remote packages/contracts/src/signal-protocol` finds changes,
-deploy Signal from the local tag before the tag is pushed: the push starts the release workflow,
-which does not wait for Signal ([docs/RELEASING.md](../../../docs/RELEASING.md), preflight item 16). Example: #1661. The v0.33.0 clients sent `webhookRoute`, but production Signal
+CI and the release workflow do not deploy Signal. For each release, find the running commit (step 1).
+When `git diff --quiet <running> <tag> -- remote packages/contracts/src/signal-protocol` finds changes,
+deploy Signal from the local tag before the tag is pushed. Compare with the running commit, not with
+the previous tag: an earlier release can have left Signal behind. The push starts the release
+workflow, which does not wait for Signal ([docs/RELEASING.md](../../../docs/RELEASING.md), preflight
+item 16). Example: #1661. The v0.33.0 clients sent `webhookRoute`, but production Signal
 was older than #1520. It had no `/v1/webhooks` route and refused webhook-only ingress sockets with
 `authentication_required`.
 
@@ -110,9 +112,8 @@ Report the results of steps 1 to 3 and get approval. Then follow "Deployment pro
 - Use `git archive <tag>` and the release directory `/opt/openbot/releases/$(git rev-parse <tag>^{commit})`.
   If the directory exists, do not write into it again.
 - Tag the running image as `openbot-remote-api:before-<tag>` before the build.
-- Put `OPENBOT_SOURCE_COMMIT=$(basename "$PWD")` (the release directory name, which is the tag commit) in the
-  environment of the Compose `build remote-api` command. The env file does not have this name, so
-  `--overload` keeps it.
+- Build from the release directory. The document's build command passes its name, the tag commit,
+  as `--build-arg OPENBOT_SOURCE_COMMIT`, and stops when the name is not a full commit SHA.
 - Run the Compose commands with `-p openbot-remote`, and build and start only `remote-api`.
 
 ## 5. Verify

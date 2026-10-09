@@ -127,13 +127,14 @@ a gate can be selected without opening anything:
 - **G. Reverse states and the changelog** → [gate-g-reverse-states.md](references/gate-g-reverse-states.md)
   always triggered; no path exempts a release.
 - **H. Signal** — no reference file.
-  `remote/` and `packages/contracts/src/signal-protocol/`. Signal is not deployed by CI or by the
-  release workflow. Read `commit` from `curl -fsS https://signal.openbot.run/health/live`; if it is
-  missing or `unknown`, the running commit is not known, so the verdict is **needs a human**. Pass
-  only when `git merge-base --is-ancestor <release commit> <running commit>` succeeds. Otherwise the verdict is
-  **deploy Signal from the new tag** before the tag is pushed (`docs/RELEASING.md` preflight
-  item 16). #1661 is the failure this catches: v0.33.0 clients sent webhook routes to a Signal older
-  than #1520.
+  always triggered: an earlier release can have left Signal behind, so a range with no `remote/`
+  change does not prove that Signal is current. Signal is not deployed by CI or by the release
+  workflow. Read `commit` from `curl -fsS https://signal.openbot.run/health/live`; if it is missing,
+  `unknown`, or not a commit in this repository, the verdict is **needs a human**. Pass when
+  `git diff --quiet <running commit> HEAD -- remote packages/contracts/src/signal-protocol`
+  succeeds. Otherwise the verdict is **deploy Signal from the new tag** before the tag is pushed
+  (`docs/RELEASING.md` preflight item 16); this is not a stop for the version bump. #1661 is the
+  failure this catches: v0.33.0 clients sent webhook routes to a Signal older than #1520.
 
 `references/surfaces.md` holds the exhaustive path inventory. Load it when a gate fires and you
 need the exact file, not before.

@@ -558,8 +558,10 @@ Before creating the first tag or any later release:
     microphone control is absent;
 14. confirm `CHANGELOG.md` describes the version and the working tree is clean;
 15. create and push the version commit, and create the tag locally, only after CI passes on `main`;
-16. if `git diff --quiet <previous tag> <new tag> -- remote packages/contracts/src/signal-protocol` finds
-    changes, deploy Signal from the local tag before you push the tag. Pushing the tag starts the
+16. read the running Signal commit from `curl -fsS https://signal.openbot.run/health/live`. If it is
+    missing or `unknown`, or if `git diff --quiet <running commit> <new tag> -- remote packages/contracts/src/signal-protocol`
+    finds changes, deploy Signal from the local tag before you push the tag. Compare with the running
+    commit, not with the previous tag: an earlier release can have left Signal behind. Pushing the tag starts the
     release workflow, and nothing in it waits for Signal. Use the Signal-only procedure in
     [remote-session-deployment.md](remote-session-deployment.md#deployment-procedure--requires-separate-approval);
     the `.agents/skills/signal-deploy/` skill adds the checks before and after it.
