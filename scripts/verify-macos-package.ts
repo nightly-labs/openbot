@@ -38,13 +38,14 @@ const resourcesPath = resolve(contentsPath, "Resources");
 const packagedIconPath = resolve(resourcesPath, "icon.icns");
 const sourceIconPath = resolve("build/icon-production.icns");
 const plistPath = resolve(contentsPath, "Info.plist");
-const whisperExecutablePath = resolve(resourcesPath, "whisper/bin/whisper-cli");
-const whisperModelPath = resolve(resourcesPath, "whisper/model/ggml-medium-q5_0.bin");
+const voiceRuntimePath = resolve(resourcesPath, "voice/runtime");
+const voiceRuntimeFiles = ["sherpa-onnx.node", "libsherpa-onnx-c-api.dylib", "libonnxruntime.dylib"];
 const remoteRuntimePath = resolve(resourcesPath, "remote-desktop-runtime/darwin", architecture);
 const cuaDriverPath = resolve(resourcesPath, "cua-driver/darwin", architecture);
 // The database host is spawned by path as its own process, so it has to survive the asar unchanged.
 // Packed into app.asar it would still be readable, but `utilityProcess` cannot start it from there.
 const databaseHostPath = resolve(resourcesPath, "app.asar.unpacked/out/main/agent-database-host.js");
+const voiceHostPath = resolve(resourcesPath, "app.asar.unpacked/out/main/voice-transcription-host.js");
 
 await Promise.all([
   access(executablePath),
@@ -55,10 +56,12 @@ await Promise.all([
   access(sourceIconPath),
   access(resolve(resourcesPath, "licenses/Electron-LICENSE")),
   access(resolve(resourcesPath, "licenses/LICENSES.chromium.html")),
-  access(resolve(resourcesPath, "licenses/OpenAI-Whisper-LICENSE")),
-  access(resolve(resourcesPath, "licenses/whisper.cpp-LICENSE")),
-  access(whisperExecutablePath),
+  access(resolve(resourcesPath, "licenses/sherpa-onnx-LICENSE")),
+  access(resolve(resourcesPath, "licenses/onnxruntime-LICENSE")),
+  access(resolve(resourcesPath, "licenses/NVIDIA-Parakeet-TDT-0.6B-v3-LICENSE")),
+  ...voiceRuntimeFiles.map((name) => access(resolve(voiceRuntimePath, name))),
   access(databaseHostPath),
+  access(voiceHostPath),
   access(resolve(resourcesPath, "remote-desktop-runtime/licenses/Sunshine-GPL-3.0.txt")),
   access(resolve(resourcesPath, "remote-desktop-runtime/licenses/moonlight-web-stream-GPL-3.0.txt")),
   access(resolve(resourcesPath, "remote-desktop-runtime/source-manifest.json")),
@@ -123,16 +126,26 @@ const databaseHost = await readFile(databaseHostPath, "utf8");
 if (/from "(?!node:|effect["/])/.test(databaseHost)) {
   throw new Error("The database host must import nothing but node: builtins and effect.");
 }
+const voiceHost = await readFile(voiceHostPath, "utf8");
+if (/from "(?!node:)/.test(voiceHost)) {
+  throw new Error("The voice transcription host must import nothing but node: builtins.");
+}
 
 const executableArchitecture = run("file", [executablePath]);
 if (!executableArchitecture.includes(machOArchitecture)) {
   throw new Error(`Expected a ${machOArchitecture} executable: ${executableArchitecture}`);
 }
-const whisperArchitecture = run("file", [whisperExecutablePath]);
-if (!whisperArchitecture.includes(machOArchitecture)) {
-  throw new Error(`Expected a ${machOArchitecture} Whisper executable: ${whisperArchitecture}`);
+for (const name of voiceRuntimeFiles) {
+  const path = resolve(voiceRuntimePath, name);
+  const voiceArchitecture = run("file", [path]);
+  if (!voiceArchitecture.includes(machOArchitecture)) {
+    throw new Error(`Expected a ${machOArchitecture} voice runtime library: ${voiceArchitecture}`);
+  }
 }
-if (existsSync(whisperModelPath)) throw new Error("The on-demand Whisper model must not be in the application.");
+// The Parakeet model is downloaded on first voice use.
+if (existsSync(resolve(resourcesPath, "voice/model")) || existsSync(resolve(voiceRuntimePath, "encoder.int8.onnx"))) {
+  throw new Error("The on-demand voice model must not be in the application.");
+}
 
 for (const name of ["Sunshine.app", "web-server", "streamer"]) {
   run("codesign", ["--verify", "--strict", "--verbose=2", resolve(remoteRuntimePath, name)]);

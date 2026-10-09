@@ -14,6 +14,10 @@ import { Text } from "@openbot/ui";
 import { ProviderCodeLoginDialog } from "@openbot/ui/components/ProviderCodeLoginDialog";
 import { ProviderPicker } from "@openbot/ui/components/ProviderPicker";
 import {
+  AcpRegistrySettings,
+  type AcpRegistrySettingsApi,
+} from "@openbot/ui/features/custom-providers/AcpRegistrySettings";
+import {
   CustomAgentSettings,
   type CustomAgentSettingsApi,
 } from "@openbot/ui/features/custom-providers/CustomAgentSettings";
@@ -78,6 +82,7 @@ interface ProviderSettingsSectionProps {
   takenAgentIds?: readonly string[] | undefined;
   /** The user's own ACP agents. This computer only, so a joined server's section never has it. */
   customAgents?: CustomAgentSettingsApi | undefined;
+  acpRegistry?: AcpRegistrySettingsApi | undefined;
 }
 
 /** The provider list of the computer the agents run on, with its custom endpoint dialogs. */
@@ -275,6 +280,9 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
           </>
         )}
       </Show>
+      <Show when={props.acpRegistry} keyed>
+        {(api) => <AcpRegistrySettings api={api} />}
+      </Show>
       <Show when={props.customAgents}>{(api) => <CustomAgentSettings api={api()} />}</Show>
     </div>
   );
@@ -289,6 +297,7 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
  */
 function createProviderKeyState(props: { readonly open: boolean; readonly providerKeys?: ProviderKeyApi | undefined }) {
   const [keyDialogOpen, setKeyDialogOpen] = createSignal(false);
+  const [keyProvider, setKeyProvider] = createSignal<"opencode" | "muse">("opencode");
   const [openCodeKeyStatus, setOpenCodeKeyStatus] = createSignal<ProviderApiKeyStatus | undefined>(undefined);
   async function refreshOpenCodeKeyStatus(): Promise<void> {
     const keys = props.providerKeys;
@@ -315,10 +324,14 @@ function createProviderKeyState(props: { readonly open: boolean; readonly provid
   );
   return {
     keyDialogOpen,
+    keyProvider,
     openCodeKeyStatus,
     /** OpenCode is the only provider whose sign-in is a pasted key, so it is the only row served. */
     openKeyDialog(provider: AgentProviderId): void {
-      if (provider === "opencode") setKeyDialogOpen(true);
+      if (provider === "opencode" || provider === "muse") {
+        setKeyProvider(provider);
+        setKeyDialogOpen(true);
+      }
     },
     closeKeyDialog(): void {
       setKeyDialogOpen(false);
@@ -342,8 +355,11 @@ function ProviderSettingsDialogs(props: {
         {(api) => (
           <OpenCodeKeyDialog
             api={api()}
+            provider={props.keys.keyProvider()}
             onClose={props.keys.closeKeyDialog}
-            onReconnect={props.onConnectProvider ? () => props.onConnectProvider?.("opencode") : undefined}
+            onReconnect={
+              props.onConnectProvider ? () => props.onConnectProvider?.(props.keys.keyProvider()) : undefined
+            }
           />
         )}
       </Show>
@@ -396,6 +412,7 @@ export interface HostProviderSettings {
   detectedProviderApi?: DetectedProviderApi | undefined;
   takenAgentIds?: readonly string[] | undefined;
   customAgents?: CustomAgentSettingsApi | undefined;
+  acpRegistry?: AcpRegistrySettingsApi | undefined;
   detectionSettings?: ProviderDetectionSettingsValue | undefined;
   onDetectionSettingsChange?: ((value: ProviderDetectionSettingsValue) => void) | undefined;
   detectionSettingsError?: string | null | undefined;
@@ -459,6 +476,7 @@ export function HostProviderSettingsPanel(
         detectedProviderApi={props.detectedProviderApi}
         takenAgentIds={props.takenAgentIds}
         customAgents={props.customAgents}
+        acpRegistry={props.acpRegistry}
         onSignInProvider={props.providerKeys ? keys.openKeyDialog : undefined}
         onSignInWithCodeProvider={props.codeLogin?.start}
         codeSignInProviders={props.codeLogin?.providers()}

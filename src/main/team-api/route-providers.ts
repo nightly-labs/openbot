@@ -21,6 +21,11 @@ import {
   PROVIDERS_V4_RUNTIME_PROVIDERS,
   PROVIDERS_V4_SIGN_IN_PROVIDERS,
 } from "@openbot/contracts/team-protocol/providers-v4";
+import {
+  PROVIDERS_V5_CAPABILITY,
+  PROVIDERS_V5_ROUTES,
+  PROVIDERS_V5_RUNTIME_PROVIDERS,
+} from "@openbot/contracts/team-protocol/providers-v5";
 import { sourceText } from "@openbot/i18n/source";
 import { redactText, registerSecretValue } from "@openbot/logging";
 import { Effect } from "effect";
@@ -55,13 +60,15 @@ export async function routeProviders(
   const { method, url, capabilities, member, request, json } = context;
   if (method !== "POST" || !isProvidersRoute(url.pathname)) return "unmatched";
   const providers = admin?.providers;
-  const capability = V4_ROUTES.has(url.pathname)
-    ? PROVIDERS_V4_CAPABILITY
-    : V3_ROUTES.has(url.pathname)
-      ? PROVIDERS_SIGN_IN_V3_CAPABILITY
-      : V2_ROUTES.has(url.pathname)
-        ? PROVIDERS_RUNTIMES_V2_CAPABILITY
-        : PROVIDERS_ADMIN_CAPABILITY;
+  const capability = V5_ROUTES.has(url.pathname)
+    ? PROVIDERS_V5_CAPABILITY
+    : V4_ROUTES.has(url.pathname)
+      ? PROVIDERS_V4_CAPABILITY
+      : V3_ROUTES.has(url.pathname)
+        ? PROVIDERS_SIGN_IN_V3_CAPABILITY
+        : V2_ROUTES.has(url.pathname)
+          ? PROVIDERS_RUNTIMES_V2_CAPABILITY
+          : PROVIDERS_ADMIN_CAPABILITY;
   if (!providers || !capabilities.has(capability))
     throw new HttpError(400, sourceText("error.team.providersUnsupported"));
   requireAdmin(member);
@@ -94,17 +101,28 @@ export async function routeProviders(
       case PROVIDERS_SIGN_IN_V3_ROUTES.codeLoginCancel:
         await runCauseEffect(service.cancelProviderCodeLogin(parsed(signInProvider, body)));
         return json(200, {});
+      case PROVIDERS_V5_ROUTES.codeLoginStart:
       case PROVIDERS_V4_ROUTES.codeLoginStart:
         return json(200, await runCauseEffect(service.startProviderCodeLogin(parsed(signInProviderV4, body))));
+      case PROVIDERS_V5_ROUTES.codeLoginSubmit:
       case PROVIDERS_V4_ROUTES.codeLoginSubmit: {
         // The code is a credential: it goes to the CLI's stdin, and no error quotes it.
         const input = parsed(codeSubmitInputV4, body);
         service.submitProviderCodeLogin(input.provider, input.code);
         return json(200, {});
       }
+      case PROVIDERS_V5_ROUTES.codeLoginCancel:
       case PROVIDERS_V4_ROUTES.codeLoginCancel:
         await runCauseEffect(service.cancelProviderCodeLogin(parsed(signInProviderV4, body)));
         return json(200, {});
+      case PROVIDERS_V5_ROUTES.runtimesStatus:
+        return json(200, wireSnapshotV5(runtimes.getStatus()));
+      case PROVIDERS_V5_ROUTES.runtimesDownload:
+        return json(200, wireSnapshotV5(await runCauseEffect(runtimes.download(parsed(managedProviderV5, body)))));
+      case PROVIDERS_V5_ROUTES.runtimesCancel:
+        return json(200, wireSnapshotV5(await runCauseEffect(runtimes.cancel(parsed(managedProviderV5, body)))));
+      case PROVIDERS_V5_ROUTES.runtimesCheck:
+        return json(200, wireSnapshotV5(await runCauseEffect(runtimes.checkForUpdates())));
       case PROVIDERS_V4_ROUTES.runtimesStatus:
         return json(200, wireSnapshotV4(runtimes.getStatus()));
       case PROVIDERS_V4_ROUTES.runtimesDownload:
@@ -113,10 +131,14 @@ export async function routeProviders(
         return json(200, wireSnapshotV4(await runCauseEffect(runtimes.cancel(parsed(managedProviderV4, body)))));
       case PROVIDERS_V4_ROUTES.runtimesCheck:
         return json(200, wireSnapshotV4(await runCauseEffect(runtimes.checkForUpdates())));
+      case PROVIDERS_V5_ROUTES.apiKeyState:
       case PROVIDERS_ADMIN_ROUTES.apiKeyState:
-        return json(200, { status: credentials.status(parsed(provider, body)) });
+        return json(200, {
+          status: credentials.status(parsed(V5_ROUTES.has(url.pathname) ? managedProviderV5 : provider, body)),
+        });
+      case PROVIDERS_V5_ROUTES.apiKeySet:
       case PROVIDERS_ADMIN_ROUTES.apiKeySet: {
-        const input = parsed(wireApiKeyInput, body);
+        const input = parsed(V5_ROUTES.has(url.pathname) ? parseProviderApiKeyInput : wireApiKeyInput, body);
         // The same step as the local handler: the key and the process that uses it change together.
         await runCauseEffect(
           service.changeProviderCredential(input.provider, () =>
@@ -131,8 +153,9 @@ export async function routeProviders(
         );
         return json(200, {});
       }
+      case PROVIDERS_V5_ROUTES.apiKeyClear:
       case PROVIDERS_ADMIN_ROUTES.apiKeyClear: {
-        const id = parsed(provider, body);
+        const id = parsed(V5_ROUTES.has(url.pathname) ? managedProviderV5 : provider, body);
         await runCauseEffect(
           service.changeProviderCredential(id, () =>
             credentials
@@ -180,8 +203,15 @@ export async function routeProviders(
 
 const V2_ROUTES = new Set<string>(Object.values(PROVIDERS_RUNTIMES_V2_ROUTES));
 const V3_ROUTES = new Set<string>(Object.values(PROVIDERS_SIGN_IN_V3_ROUTES));
+const V5_ROUTES = new Set<string>(Object.values(PROVIDERS_V5_ROUTES));
 const V4_ROUTES = new Set<string>(Object.values(PROVIDERS_V4_ROUTES));
-const ROUTES = new Set<string>([...Object.values(PROVIDERS_ADMIN_ROUTES), ...V2_ROUTES, ...V3_ROUTES, ...V4_ROUTES]);
+const ROUTES = new Set<string>([
+  ...Object.values(PROVIDERS_ADMIN_ROUTES),
+  ...V2_ROUTES,
+  ...V3_ROUTES,
+  ...V4_ROUTES,
+  ...V5_ROUTES,
+]);
 
 function isProvidersRoute(pathname: string): boolean {
   return ROUTES.has(pathname);
@@ -327,4 +357,17 @@ function wireSnapshotV4(snapshot: ProviderRuntimeSnapshot): WireProviderRuntimeS
 
 function wireStatus(status: ProviderRuntimeStatus): ProviderRuntimeStatus {
   return { ...status, message: status.message?.slice(0, RUNTIME_MESSAGE_LIMIT) ?? null };
+}
+
+function managedProviderV5(body: DynamicRecord): ManagedProviderId {
+  const id = parseProviderId(body.provider);
+  if (!isOneOf(PROVIDERS_V5_RUNTIME_PROVIDERS, id)) throw new Error("Unknown provider.");
+  return id;
+}
+function wireSnapshotV5(snapshot: ProviderRuntimeSnapshot): ProviderRuntimeSnapshot {
+  const wire = wireSnapshotV4(snapshot);
+  return {
+    ...wire,
+    providers: { ...wire.providers, pi: wireStatus(snapshot.providers.pi), muse: wireStatus(snapshot.providers.muse) },
+  };
 }

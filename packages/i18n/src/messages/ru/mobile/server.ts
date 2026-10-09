@@ -192,6 +192,10 @@ export const messages = {
   "mobile.server.settings.leaveTitle": "Покинуть «{name}»?",
   "mobile.server.settings.leaveBody": "Чтобы присоединиться снова, понадобится новое приглашение.",
   "mobile.server.settings.leave": "Покинуть сервер",
+  "mobile.server.settings.removeTitle": "Удалить «{name}»?",
+  "mobile.server.settings.removeBody":
+    "Сервер будет удалён из сервиса аккаунтов для всех участников. Файлы и чаты на его компьютере останутся. Чтобы снова использовать сервер, зарегистрируйте его с того компьютера.",
+  "mobile.server.settings.remove": "Удалить сервер",
   "mobile.server.settings.name": "Название сервера",
   "mobile.server.settings.nameLength": "Длина — от {min} до {max} символов.",
   "mobile.server.settings.logo": "Логотип сервера",

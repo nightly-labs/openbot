@@ -566,6 +566,60 @@ function isMinimumVersion(version: string, minimum: readonly number[]): boolean 
   return true;
 }
 
+/** Resolves native RPC providers through the same explicit/managed/system precedence. */
+const resolveNativeCli = Effect.fn("Cli.resolveNativeCli")(function* (
+  provider: "pi" | "muse",
+  input: { systemCandidates?: string[]; bundledExecutable?: string | null } = {},
+): Effect.fn.Return<AgentCliInfo, ProviderClientOperationError> {
+  const candidates = yield* cliCandidates(provider, input.systemCandidates, input.bundledExecutable ?? null);
+  let found = false;
+  let outdated: CodexCliError | undefined;
+  for (const candidate of candidates) {
+    if (!(yield* isExecutable(candidate.executable))) continue;
+    found = true;
+    const attempt = yield* Effect.result(
+      Effect.gen(function* () {
+        const output = yield* readCliVersion(candidate.executable, provider);
+        const version = provider === "pi" ? parsePiVersion(output) : parseMuseVersion(output);
+        if (provider === "pi" && !isMinimumVersion(version, [1, 1, 0]))
+          throw new CodexCliError(sourceText("error.provider.piOutdated", { version }), "outdated");
+        return { executable: candidate.executable, version, source: candidate.source };
+      }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause)))),
+    );
+    if (Result.isSuccess(attempt)) return attempt.success;
+    if (attempt.failure.cause instanceof CodexCliError && attempt.failure.cause.code === "outdated")
+      outdated = attempt.failure.cause;
+    if (isCliTimeout(attempt.failure.cause)) return yield* Effect.fail(attempt.failure);
+  }
+  if (outdated) return yield* Effect.fail(providerFailure(outdated));
+  return yield* Effect.fail(
+    providerFailure(
+      new CodexCliError(
+        sourceText(found ? "error.provider.nativeNotStarted" : "error.provider.nativeMissing", { provider }),
+        found ? "invalid" : "missing",
+      ),
+    ),
+  );
+});
+
+export const resolvePiCli = (input?: { systemCandidates?: string[]; bundledExecutable?: string | null }) =>
+  resolveNativeCli("pi", input);
+export const resolveMuseCli = (input?: { systemCandidates?: string[]; bundledExecutable?: string | null }) =>
+  resolveNativeCli("muse", input);
+
+export function parsePiVersion(output: string): string {
+  const match = output.trim().match(/(?:^|\s)v?(\d+\.\d+\.\d+)(?:[-+][\w.-]+)?(?:\s|$)/u);
+  if (!match?.[1])
+    throw new CodexCliError(sourceText("error.provider.nativeVersionUnreadable", { provider: "Pi" }), "invalid");
+  return match[1];
+}
+export function parseMuseVersion(output: string): string {
+  const match = output.match(/\b\d+\.\d+\.\d+-R\d+(?:\.\d+)?\b/u) ?? output.match(/\b\d+\.\d+\.\d+\b/u);
+  if (!match)
+    throw new CodexCliError(sourceText("error.provider.nativeVersionUnreadable", { provider: "Muse" }), "invalid");
+  return match[0];
+}
+
 /** The command name of a provider's CLI on `PATH`. */
 function cliCommandName(provider: AgentProviderId): string {
   return provider === "cursor" ? "cursor-agent" : provider;

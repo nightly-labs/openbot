@@ -1,4 +1,11 @@
-import type { AttachmentSummary, FilePreview, OpenBotDesktopApi } from "@openbot/contracts/ipc";
+import type {
+  AgentSessionSettings,
+  AttachmentSummary,
+  FilePreview,
+  OpenBotDesktopApi,
+  ResetAgentSessionSettingInput,
+  SetAgentSessionSettingInput,
+} from "@openbot/contracts/ipc";
 import type { AgentSkillCalls } from "../../skills-port";
 import type { AgentTemplatePublishCalls } from "../agent-templates/agent-templates-port";
 import type { SharedTableCalls } from "./conversation-port";
@@ -46,6 +53,14 @@ export interface ConversationRuntime {
         sharedTables: SharedTableCalls;
         agentTemplates: AgentTemplatePublishCalls;
         eventRoutines?: EventRoutinesApi | undefined;
+        sessionSettings?:
+          | {
+              read(agentId: string): Promise<AgentSessionSettings>;
+              set(input: SetAgentSessionSettingInput): Promise<AgentSessionSettings>;
+              reset(input: ResetAgentSessionSettingInput): Promise<AgentSessionSettings>;
+              subscribe?(agentId: string, listener: () => void): () => void;
+            }
+          | undefined;
       }
     | undefined;
 }

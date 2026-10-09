@@ -8,6 +8,11 @@ import {
   isAvatarSeed,
   isReasoningEffort,
 } from "./ipc-agent-identity";
+import {
+  type AgentSessionSettingOverrides,
+  isAgentSessionSettingOverrides,
+  isAgentSessionSettingResets,
+} from "./ipc-agent-session-settings";
 import { type AgentProviderId, isAgentProvider } from "./ipc-agent-status";
 import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
 import { type BusyMessageMode, isBusyMessageMode } from "./ipc-queue";
@@ -70,6 +75,10 @@ export interface AgentSummary {
   provider: AgentProviderId;
   model: AgentModelId;
   reasoningEffort: AgentReasoningEffort;
+  /** Local saved provider settings; released Team API agent payloads omit this field. */
+  sessionSettingOverrides?: AgentSessionSettingOverrides;
+  /** Provider sessions that must restart to restore defaults after a reset. Local-only. */
+  sessionSettingResets?: string[];
   /**
    * Local-only, like Auto approve: the Team API does not carry it, so an agent read from a remote host
    * has none. Absent means `DEFAULT_AGENT_ACCESS`.
@@ -117,6 +126,8 @@ export function isAgentSummary(value: unknown): value is AgentSummary {
     isAgentProvider(value.provider) &&
     isAgentModel(value.model) &&
     isReasoningEffort(value.reasoningEffort) &&
+    (value.sessionSettingOverrides === undefined || isAgentSessionSettingOverrides(value.sessionSettingOverrides)) &&
+    (value.sessionSettingResets === undefined || isAgentSessionSettingResets(value.sessionSettingResets)) &&
     (value.access === undefined || isAgentAccess(value.access)) &&
     (value.computerUse === undefined || isBoolean(value.computerUse)) &&
     (value.allowAutomation === undefined || isBoolean(value.allowAutomation)) &&

@@ -78,6 +78,7 @@ export const messages = {
   "error.remote.bridgeCommandFailed": "Team WebRTC のコマンドに失敗しました。",
   "error.remote.webRtcFailed": "WebRTC に失敗しました。",
   "error.remote.ownerCannotLeave": "オーナーはこのホストから退出できません。",
+  "error.remote.ownerOnlyRemove": "このサーバーを削除できるのはオーナーだけです。",
   "error.remote.requestTimeout": "リモートリクエストがタイムアウトしました。",
   "error.remote.requestFailed": "リモートリクエストに失敗しました。",
   "error.remote.pinnedKeyMissing": "リモートホストに固定されたデバイスキーがありません。",

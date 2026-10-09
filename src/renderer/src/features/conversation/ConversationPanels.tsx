@@ -276,6 +276,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
           <Loading>
             <AgentSettingsPanel
               remoteClient={Boolean(props.runtime)}
+              sessionSettingsEditable={serverCanAdminister(props.server, "agent-session-settings-v1")}
               adminCalls={props.runtime?.admin}
               skillsMarketplaceOpen={props.skillsMarketplaceOpen}
               onAddFromMarketplace={

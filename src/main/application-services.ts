@@ -12,6 +12,7 @@ import { SlackConnectFailed, toSlackConnectFailed } from "../backend/messaging/s
 import { routineFlowRoutines } from "../backend/routine-flows/routine-flow-routines";
 import { RoutineFlowStore } from "../backend/routine-flows/routine-flow-store";
 import { createRoutineFlows, type RoutineFlowsHandle } from "../backend/routine-flows/routine-flows";
+import { type AcpRegistry, createAcpRegistry } from "./acp-registry";
 import { type AgentAdminSettingsService, createAgentAdminSettings } from "./agent-admin-settings";
 import { spawnAgentDatabaseHost } from "./agent-database-host-process";
 import { createAgentHostSettings } from "./agent-host-settings";
@@ -169,6 +170,7 @@ import { startProviderLog } from "./provider-log";
 import { toProviderRuntimeFailure } from "./provider-runtime-effects";
 import { ProviderRuntimeManager, providerRuntimeRoot, runtimeTarget } from "./provider-runtime-manager";
 import { ProviderUseSettingsStore } from "./provider-use-settings-store";
+import { decodeQueuedMessageReceipt } from "./remote-agent-decoding";
 import { RemoteConnectTrace } from "./remote-connect-trace";
 import { RemoteDesktopManager } from "./remote-desktop-manager";
 import { resolveRemoteDesktopRuntime } from "./remote-desktop-runtime-artifact";
@@ -207,7 +209,8 @@ import {
   UpdateService,
 } from "./update-service";
 import { listSiblingOpenBotInstances } from "./update-sibling-instances";
-import { WHISPER_MODEL_NAME, WHISPER_MODEL_URL } from "./voice-model-service";
+import { PARAKEET_MODEL_DIRECTORY, removeLegacyWhisperCache } from "./voice-model-service";
+import { spawnVoiceTranscriptionHost } from "./voice-transcription-host-process";
 import { VoiceTranscriptionService } from "./voice-transcription-service";
 import { WebhookRelay } from "./webhook-relay";
 
@@ -401,6 +404,7 @@ export interface ApplicationServices {
   customProviders: CustomProviderStore;
   customProviderChanges: CustomProviderChanges;
   customAgentChanges: CustomAgentChanges;
+  acpRegistry: AcpRegistry;
   providerDetection: ProviderDetection;
   providerDetectionSettings: ProviderDetectionSettingsStore;
   marketplaceAgents: AgentMarketplaceService;
@@ -658,7 +662,8 @@ export async function createApplicationServices({
   // startup because its window must be able to appear immediately, but the two services its
   // critical actions drive are built hundreds of lines below. A single named local rather than
   // two lazy getters, so the gap is visible and bounded.
-  let criticalActionTargets: { agents: AgentService; remoteServers: RemoteServerManager } | null = null;
+  let criticalActionTargets: { agents: AgentService; host: HostService; remoteServers: RemoteServerManager } | null =
+    null;
   const dynamicIsland = new DynamicIslandWindowController({
     platform: process.platform,
     preferencePath: join(app.getPath("userData"), DYNAMIC_ISLAND_PREFERENCE_FILE),
@@ -674,10 +679,14 @@ export async function createApplicationServices({
         if (!criticalActionTargets) {
           return Effect.fail(new DynamicIslandFailed({ cause: new Error(sourceText("error.app.notReady")) }));
         }
-        const { agents, remoteServers } = criticalActionTargets;
-        return performDynamicIslandCriticalAction(action, agents, remoteServers, decodeVoid).pipe(
-          toDynamicIslandFailed,
-        );
+        const { agents, host, remoteServers } = criticalActionTargets;
+        return performDynamicIslandCriticalAction(
+          action,
+          agents,
+          remoteServers,
+          { decodeVoid, decodeQueuedMessageReceipt },
+          () => host.conversationSender(),
+        ).pipe(toDynamicIslandFailed);
       }),
   });
   teardown.push(TEARDOWN_ORDER.dynamicIsland, "the Dynamic Island", () => dynamicIsland.destroy());
@@ -1532,6 +1541,23 @@ export async function createApplicationServices({
   const agentAdminSettings = createAgentAdminSettings({ agents: service, approvalAutomation });
   const customProviderChanges = createCustomProviderChanges({ service, customProviders });
   const customAgentChanges = createCustomAgentChanges({ service, customAgents });
+  const acpRegistry = createAcpRegistry({
+    directory: app.getPath("userData"),
+    customAgentChanges,
+    withRuntimeRemoval: (ids, operation) =>
+      service
+        .withCustomAgentRuntimeRemoval(ids, () =>
+          operation.pipe(
+            Effect.mapError(
+              (failure) => new AgentLifecycleFailed({ operation: "removeCustomAgentRuntime", cause: failure.cause }),
+            ),
+          ),
+        )
+        .pipe(toProviderRuntimeFailure),
+  });
+  teardown.push(TEARDOWN_ORDER.providerRuntimes - 1, "ACP registry installations", () =>
+    runCauseEffect(acpRegistry.close()),
+  );
   // The host comes before the updater, and the restart readiness reads the host. The routes reach
   // the schedule through this, and a request that arrives before it exists is refused.
   let requestedUpdate: RequestedUpdate | undefined;
@@ -1590,6 +1616,8 @@ export async function createApplicationServices({
     admin: {
       agents: agentAdminSettings,
       agentHost: createAgentHostSettings({ agents: service, busyMessageMode }),
+      sessionSettings: service,
+      acpRegistry,
       skills,
       sharedTables: service,
       marketplaceAgents,
@@ -1827,6 +1855,7 @@ export async function createApplicationServices({
         updateMember: (hostId, membershipId, role, reactivate) =>
           centralAuth.updateRemoteMember(hostId, membershipId, role, reactivate),
         removeMember: (hostId, membershipId) => centralAuth.removeRemoteMember(hostId, membershipId),
+        removeOwnedHost: (hostId) => centralAuth.removeOwnedRemoteHost(hostId),
         getPrincipalId: () => centralAuth.getSignedInUser().id,
         controlPlaneUrl: centralAuth.resolveApiUrl("/"),
         downloadHostLogo: (hostId, version) => centralAuth.downloadRemoteHostLogo(hostId, version),
@@ -1843,7 +1872,7 @@ export async function createApplicationServices({
   teamWebRtcBridge.on("accountServersChanged", () => void Effect.runPromise(remoteServers.invalidateDirectory()));
   teardown.push(TEARDOWN_ORDER.remoteServers, "the remote servers", () => runCauseEffect(remoteServers.stop()));
   await runCauseEffect(remoteServers.initialize());
-  criticalActionTargets = { agents: service, remoteServers };
+  criticalActionTargets = { agents: service, host, remoteServers };
   // After `remoteServers.initialize()`. The client half polls for the host's connection file and
   // throws when it never appears, before any window is shown - see the module it lives in. It reads
   // the joined servers to choose between WebRTC and HTTP, so it waits for the account's host list.
@@ -1887,12 +1916,18 @@ export async function createApplicationServices({
   });
   teardown.push(TEARDOWN_ORDER.remoteDesktop, "remote desktop", () => Effect.runPromise(remoteDesktop.stop()));
   const voice = new VoiceTranscriptionService({
-    resourcesRoot: app.isPackaged ? join(process.resourcesPath, "whisper") : resolve(".openbot-build/whisper"),
-    modelPath: app.isPackaged
-      ? join(app.getPath("userData"), "runtimes", "whisper", WHISPER_MODEL_NAME)
-      : resolve(".openbot-build/whisper/model", WHISPER_MODEL_NAME),
-    modelDownloadUrl: WHISPER_MODEL_URL,
+    resourcesRoot: app.isPackaged ? join(process.resourcesPath, "voice") : resolve(".openbot-build/voice"),
+    modelDirectory: app.isPackaged
+      ? join(app.getPath("userData"), "runtimes", PARAKEET_MODEL_DIRECTORY)
+      : resolve(".openbot-build/voice/model"),
+    spawnHost: spawnVoiceTranscriptionHost,
   });
+  if (app.isPackaged) {
+    // Parakeet replaced Whisper. The Whisper model is an application download, not user data.
+    void Effect.runPromise(removeLegacyWhisperCache(join(app.getPath("userData"), "runtimes", "whisper"))).catch(
+      (error) => logger.warn("Could not remove the old Whisper model cache.", toLogValue(error)),
+    );
+  }
   teardown.push(TEARDOWN_ORDER.voice, "voice transcription", () => Effect.runPromise(voice.shutdown()));
   voice.on("modelStatus", forwardVoiceModelStatus);
   const currentVersion = app.getVersion();
@@ -2170,6 +2205,7 @@ export async function createApplicationServices({
     customProviders,
     customProviderChanges,
     customAgentChanges,
+    acpRegistry,
     providerDetection,
     providerDetectionSettings,
     marketplaceAgents,

@@ -2,11 +2,13 @@ import { BROWSER_SECRET_CAPABILITY } from "../ipc-browser-secret";
 import { CHANNEL_DELETE_CAPABILITY } from "../ipc-chat-channels";
 import { MCP_SERVERS_CAPABILITY } from "../ipc-mcp-servers";
 import { STORAGE_CAPABILITY } from "../ipc-storage";
+import { ACP_REGISTRY_CAPABILITY } from "./acp-registry-v1";
 import { AGENT_ADMIN_CAPABILITY } from "./agent-admin-v1";
 import { AGENT_HOST_SETTINGS_CAPABILITY } from "./agent-host-settings-v1";
 import { AGENT_IMPORT_CAPABILITY } from "./agent-import-v1";
 import { AGENT_INSTALL_CAPABILITY } from "./agent-install-v1";
 import { AGENT_PUBLISH_CAPABILITY } from "./agent-publish-v1";
+import { AGENT_SESSION_SETTINGS_CAPABILITY } from "./agent-session-settings-v1";
 import { AGENT_UPDATE_CAPABILITY } from "./agent-update-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "./browser-navigation-v1";
 import {
@@ -30,12 +32,13 @@ import { PROVIDERS_ADMIN_CAPABILITY } from "./providers-v1";
 import { PROVIDERS_RUNTIMES_V2_CAPABILITY } from "./providers-v2";
 import { PROVIDERS_SIGN_IN_V3_CAPABILITY } from "./providers-v3";
 import { PROVIDERS_V4_CAPABILITY } from "./providers-v4";
+import { PROVIDERS_V5_CAPABILITY } from "./providers-v5";
 import { TEAM_QUEUE_EDIT_CAPABILITY } from "./queue-edit-v1";
 import { QUIET_TURN_CAPABILITY } from "./quiet-turn-v1";
 import { SHARED_TABLES_CAPABILITY } from "./shared-tables-v1";
 import { SKILLS_ADMIN_CAPABILITY } from "./skills-admin-v1";
 import { SKILLS_EVENTS_CAPABILITY } from "./skills-events-v1";
-import { TEAM_PROTOCOL_V6_CAPABILITIES } from "./v6";
+import { TEAM_PROTOCOL_V7_CAPABILITIES } from "./v7";
 import { WORKSPACE_DIRECTORY_CAPABILITY } from "./workspace-directory-v1";
 
 export const TEAM_SEMANTIC_TAGS_CAPABILITY = "installed-skills";
@@ -59,11 +62,13 @@ export const TEAM_EML_ATTACHMENTS_CAPABILITY = "eml-attachments";
  */
 export const TEAM_MEMBER_LEAVE_CAPABILITY = "member-leave-v1";
 export {
+  ACP_REGISTRY_CAPABILITY,
   AGENT_ADMIN_CAPABILITY,
   AGENT_HOST_SETTINGS_CAPABILITY,
   AGENT_IMPORT_CAPABILITY,
   AGENT_INSTALL_CAPABILITY,
   AGENT_PUBLISH_CAPABILITY,
+  AGENT_SESSION_SETTINGS_CAPABILITY,
   AGENT_UPDATE_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
   CONTEXT_RESET_CAPABILITY,
@@ -79,6 +84,7 @@ export {
   PROVIDERS_RUNTIMES_V2_CAPABILITY,
   PROVIDERS_SIGN_IN_V3_CAPABILITY,
   PROVIDERS_V4_CAPABILITY,
+  PROVIDERS_V5_CAPABILITY,
   QUIET_TURN_CAPABILITY,
   SHARED_TABLES_CAPABILITY,
   SKILLS_ADMIN_CAPABILITY,
@@ -97,7 +103,7 @@ export {
 
 export const TEAM_CURRENT_CAPABILITIES = [
   BROWSER_SECRET_CAPABILITY,
-  ...TEAM_PROTOCOL_V6_CAPABILITIES,
+  ...TEAM_PROTOCOL_V7_CAPABILITIES,
   "remote-desktop-setup",
   TEAM_QUEUE_EDIT_CAPABILITY,
   TEAM_BROWSER_NAVIGATION_CAPABILITY,
@@ -122,6 +128,8 @@ export const TEAM_CURRENT_CAPABILITIES = [
   MCP_SERVERS_CAPABILITY,
   STORAGE_CAPABILITY,
   AGENT_ADMIN_CAPABILITY,
+  AGENT_SESSION_SETTINGS_CAPABILITY,
+  ACP_REGISTRY_CAPABILITY,
   SKILLS_ADMIN_CAPABILITY,
   SKILLS_EVENTS_CAPABILITY,
   SHARED_TABLES_CAPABILITY,
@@ -130,6 +138,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   PROVIDERS_RUNTIMES_V2_CAPABILITY,
   PROVIDERS_SIGN_IN_V3_CAPABILITY,
   PROVIDERS_V4_CAPABILITY,
+  PROVIDERS_V5_CAPABILITY,
   HOST_ADMIN_CAPABILITY,
   AGENT_UPDATE_CAPABILITY,
   TEAM_MEMBER_LEAVE_CAPABILITY,
@@ -208,4 +217,27 @@ export function isAgentCreateRoute(method: string, path: string): boolean {
  */
 export function isAgentMessageRoute(method: string, path: string): boolean {
   return method === "POST" && /^\/v1\/agents\/[^/]+\/messages$/u.test(new URL(path, "http://openbot.invalid").pathname);
+}
+
+// Keep the first request readable by every released peer. The v7 marker lets a current
+// host return the expanded list; older hosts ignore the marker and retain all old features.
+export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
+  (capability) =>
+    capability !== AGENT_SESSION_SETTINGS_CAPABILITY &&
+    capability !== ACP_REGISTRY_CAPABILITY &&
+    capability !== PROVIDERS_V5_CAPABILITY,
+);
+export function teamCapabilitiesForProtocol(protocol: number | null | undefined): readonly TeamCurrentCapability[] {
+  return protocol !== null && protocol !== undefined && protocol >= 7
+    ? TEAM_CURRENT_CAPABILITIES
+    : TEAM_BOOTSTRAP_CAPABILITIES;
+}
+export function legacyTeamCapabilities(capabilities: readonly string[]): string[] {
+  return capabilities.filter(
+    (capability) =>
+      capability !== "local-providers-v3" &&
+      capability !== AGENT_SESSION_SETTINGS_CAPABILITY &&
+      capability !== ACP_REGISTRY_CAPABILITY &&
+      capability !== PROVIDERS_V5_CAPABILITY,
+  );
 }

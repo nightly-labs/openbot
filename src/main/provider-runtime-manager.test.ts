@@ -1,3 +1,5 @@
+import { Effect } from "effect";
+import { nativeProviderRuntime } from "./native-provider-runtime";
 import { runtimeIO } from "./provider-runtime-effects";
 // @vitest-environment node
 
@@ -1167,6 +1169,50 @@ describe("ProviderRuntimeManager", () => {
       "The Cursor archive has an unexpected file.",
     );
     await expect(access(join(otherRoot, "outside"))).rejects.toThrow();
+  });
+
+  // Failure modes: a flat native zip escapes staging, or a changed binary passes pinned verification.
+  it("stages Pi flat Windows archives and rejects traversal and corrupt binaries", async () => {
+    const root = await temporaryRoot();
+    const lock = parseAgentRuntimeLock(structuredClone(lockValue));
+    const descriptor = nativeProviderRuntime("pi");
+    const spec = descriptor.spec("win32-x64", lock);
+    const content = "native-test-binary";
+    lock.pi.artifacts["win32-x64"].files = { "bin/pi.exe": digest(new TextEncoder().encode(content)) };
+    const archive = join(root, "pi.zip");
+    const staging = join(root, "stage");
+    await writeFile(
+      archive,
+      zipArchive([
+        ["pi.exe", content],
+        ["resources/example", "resource"],
+      ]),
+    );
+    await runCauseEffect(
+      descriptor.stage({
+        spec,
+        lock,
+        staging,
+        downloadedPath: archive,
+        downloadSmallFile: () => Effect.succeed(new Uint8Array()),
+      }),
+    );
+    await runCauseEffect(descriptor.verify(staging, spec, lock));
+    await writeFile(join(staging, "bin/pi.exe"), "changed");
+    await expect(runCauseEffect(descriptor.verify(staging, spec, lock))).rejects.toThrow("integrity check");
+    await writeFile(archive, zipArchive([["../outside", "escape"]]));
+    await expect(
+      runCauseEffect(
+        descriptor.stage({
+          spec,
+          lock,
+          staging: join(root, "bad"),
+          downloadedPath: archive,
+          downloadSmallFile: () => Effect.succeed(new Uint8Array()),
+        }),
+      ),
+    ).rejects.toThrow();
+    await expect(access(join(root, "outside"))).rejects.toThrow();
   });
 
   /*

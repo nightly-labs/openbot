@@ -2,8 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/voice";
 
 export const messages = {
-  "error.voice.assetsUnavailable":
-    "ローカル音声文字起こしのアセットを使用できません。`bun run voice:prepare` を実行し、OpenBot を再起動してください。",
   "error.voice.downloadFailed": "音声モデルをダウンロードできませんでした。もう一度お試しください。",
   "error.voice.downloadStopped": "音声モデルのダウンロードを停止しました。",
   "error.voice.runtimeUnavailable": "このプラットフォームではローカル音声文字起こしを使用できません。",

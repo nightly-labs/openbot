@@ -52,7 +52,7 @@ local access on the other side of it.
 
 ## Voice prompts or remote desktop are missing on Linux
 
-The Linux build has no Whisper transcription binary, so the microphone control is not drawn.
+The Linux build has no voice transcription runtime, so the microphone control is not drawn.
 
 Remote desktop on Linux needs the x64 AppImage and an X11 session. Sunshine captures the X11 screen
 and sends mouse and keyboard input through the XTest extension. Under Wayland, or with no `DISPLAY`,

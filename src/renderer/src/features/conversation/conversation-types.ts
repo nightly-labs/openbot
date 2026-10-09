@@ -49,6 +49,11 @@ export interface ConversationTarget {
   serverId: string;
 }
 
+/** What was said so far in a recording, and the conversation it is dictated into. */
+export interface VoiceLiveTranscript extends ConversationTarget {
+  text: string;
+}
+
 export interface ConversationProps {
   runtime?: ConversationRuntime;
   notice?: JSX.Element;

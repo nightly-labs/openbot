@@ -1,7 +1,7 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { sourceText } from "@openbot/i18n/source";
 import { app } from "electron";
-import { applySiteIdentity } from "./browser-identity";
+import { browserClientHints, browserRequestUserAgent } from "./browser-identity";
 import { isPersistableBrowserUrl } from "./browser-state";
 
 export function normalizeBrowserUrl(input: string): string {
@@ -21,7 +21,23 @@ export function browserLoadOptions(): { extraHeaders: string } {
 }
 
 export function browserRequestHeaders(url: string, requestHeaders: Record<string, string>): Record<string, string> {
-  const headers = applySiteIdentity(url, requestHeaders);
+  const headers = { ...requestHeaders };
+  const userAgent = Object.entries(headers).find(([name]) => name.toLowerCase() === "user-agent");
+  if (userAgent) {
+    setRequestHeader(headers, "User-Agent", browserRequestUserAgent(url, userAgent[1], process.versions.electron));
+  }
+  // Send only low-entropy hints, on secure origins. Keep any hints Chromium supplies.
+  const target = new URL(url);
+  if (
+    target.protocol === "https:" ||
+    (target.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(target.hostname))
+  ) {
+    for (const [name, value] of Object.entries(browserClientHints(process.versions.chrome, process.platform))) {
+      if (!Object.keys(headers).some((candidate) => candidate.toLowerCase() === name.toLowerCase())) {
+        headers[name] = value;
+      }
+    }
+  }
   setRequestHeader(headers, "Accept-Language", preferredBrowserLanguages());
   return headers;
 }

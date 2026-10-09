@@ -1,3 +1,4 @@
+import { type AgentSessionSettings, isAgentSessionSettings } from "@openbot/contracts/ipc";
 // What main answers for agents: provider status, models, the agents themselves, memories, routines,
 // shared tables and the sidebar layout.
 //
@@ -148,4 +149,9 @@ export function decodeAgentAnalyticsFromMain(value: unknown) {
 
 export function decodeHostAnalyticsFromMain(value: unknown) {
   return decodeOptionalHostAnalytics(value);
+}
+
+export function decodeAgentSessionSettingsFromMain(value: unknown): AgentSessionSettings {
+  if (!isAgentSessionSettings(value)) throw new Error("Invalid session settings response.");
+  return value;
 }

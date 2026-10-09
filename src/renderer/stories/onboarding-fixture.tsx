@@ -62,6 +62,8 @@ const initialRuntimeStatuses = (): Record<ManagedProviderId, ProviderRuntimeStat
   antigravity: { phase: "not-downloaded", progress: null, message: null, version: null },
   cursor: { phase: "not-downloaded", progress: null, message: null, version: null },
   cline: { phase: "not-downloaded", progress: null, message: null, version: null },
+  pi: { phase: "not-downloaded", progress: null, message: null, version: null },
+  muse: { phase: "not-downloaded", progress: null, message: null, version: null },
   opencode: { phase: "not-downloaded", progress: null, message: null, version: null },
 });
 

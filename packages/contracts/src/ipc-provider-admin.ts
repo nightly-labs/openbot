@@ -75,6 +75,14 @@ export function decodeProviderRuntimeSnapshot(value: unknown): ProviderRuntimeSn
   return {
     revision: value.revision,
     providers: {
+      pi:
+        providers.pi === undefined
+          ? { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null }
+          : decodeProviderRuntimeStatus(providers.pi),
+      muse:
+        providers.muse === undefined
+          ? { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null }
+          : decodeProviderRuntimeStatus(providers.muse),
       codex: decodeProviderRuntimeStatus(providers.codex),
       claude: decodeProviderRuntimeStatus(providers.claude),
       grok: decodeProviderRuntimeStatus(providers.grok),

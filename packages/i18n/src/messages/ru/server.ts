@@ -134,6 +134,7 @@ export const messages = {
   "server.rail.usage": "Использование",
   "server.rail.schedule": "Регулярные задачи",
   "server.rail.settings": "Настройки сервера",
+  "server.rail.remove": "Удалить сервер",
   "server.rail.leave": "Покинуть сервер",
   "server.rail.delete": "Удалить сервер",
   "server.select.failedTitle": "Не удалось выбрать сервер",
@@ -246,6 +247,14 @@ export const messages = {
   "server.settings.saveIdentityFirst": "Сохраните данные сервера перед публикацией.",
   "server.settings.reachable": "Доступен из интернета. Войти могут только приглашённые.",
   "server.settings.notReachable": "Недоступен из интернета. Существующие участники и приглашения сохраняются.",
+  "server.settings.removeTitle": "Удалить сервер",
+  "server.settings.removeDescription":
+    "Удалить этот сервер из сервиса аккаунтов для всех участников. Используйте, когда его компьютер больше недоступен.",
+  "server.settings.removeConfirmTitle": "Удалить {name}?",
+  "server.settings.removeConfirmDescription":
+    "Сервер будет удалён из сервиса аккаунтов для всех участников, удалённый доступ прекратится. Файлы и чаты на его компьютере останутся. Чтобы снова использовать сервер, зарегистрируйте его с того компьютера.",
+  "server.settings.removing": "Удаление…",
+  "server.settings.removedTitle": "{name} удалён",
   "server.settings.leaveTitle": "Покинуть сервер",
   "server.settings.leaveDescription":
     "Убрать этот сервер из вашего списка серверов. Сам сервер и другие его участники останутся.",

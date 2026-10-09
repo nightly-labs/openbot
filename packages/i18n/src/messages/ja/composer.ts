@@ -39,6 +39,7 @@ export const messages = {
   "composer.token.unavailableSkill": "利用できないスキル {name}",
   "composer.token.unavailableMcp": "利用できない MCP サーバー {name}",
   "composer.voice.stop": "音声の録音を停止",
+  "composer.voice.cancel": "音声の録音をキャンセル",
   "composer.voice.preparing": "音声モデルをダウンロードしています",
   "composer.voice.requesting": "マイクへのアクセスを要求しています",
   "composer.voice.transcribing": "音声プロンプトを文字起こししています",

@@ -8,6 +8,7 @@ import type { TeamProtocolV1JsonObject, TeamProtocolV1JsonValue } from "@openbot
  */
 export function isPeerHiddenProvider(value: unknown, protocol: number): boolean {
   return (
+    (protocol < 7 && (value === "pi" || value === "muse")) ||
     (protocol < 6 && (value === "cursor" || value === "cline")) ||
     (protocol < 5 && (value === "antigravity" || value === "acp")) ||
     (protocol < 4 && value === "opencode")
@@ -22,6 +23,7 @@ export function isPeerHiddenProvider(value: unknown, protocol: number): boolean 
  */
 function isPeerHiddenId(value: TeamProtocolV1JsonObject, protocol: number, listKey: string): boolean {
   const statusRow = listKey === "providers" && typeof value.state === "string";
+  if (value.id === "pi" || value.id === "muse") return protocol < 7 && statusRow;
   if (value.id === "acp") return protocol < 5 && statusRow;
   if (value.id === "cursor" || value.id === "cline") return protocol < 6 && statusRow;
   return isPeerHiddenProvider(value.id, protocol);
@@ -44,7 +46,7 @@ export function legacyProviderView(value: unknown, hiddenIds: ReadonlySet<string
 export function hiddenAgentView(
   value: unknown,
   hiddenIds: ReadonlySet<string>,
-  protocol: 4 | 5 | 6,
+  protocol: 4 | 5 | 6 | 7,
 ): TeamProtocolV1JsonValue {
   const json: TeamProtocolV1JsonValue = JSON.parse(JSON.stringify(value));
   return project(json, hiddenIds, protocol);

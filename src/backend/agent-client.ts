@@ -1,4 +1,4 @@
-import type { AgentProviderId } from "@openbot/contracts/ipc";
+import type { AgentProviderId, AgentSessionSettingsSnapshot, AgentSessionSettingValue } from "@openbot/contracts/ipc";
 import type { Effect } from "effect";
 import type { AppServerNotification, AppServerRequest, RequestId, ResponseDecoder, RpcError } from "./protocol";
 import type { ProviderClientOperationError } from "./provider-client-effects";
@@ -34,6 +34,15 @@ export interface AgentClient {
    * threads in one process frees nothing this way.
    */
   releaseIdleThreads?(): Effect.Effect<void, ProviderClientOperationError>;
+  /** Effective provider options. Saved overrides belong to the agent store. */
+  readSessionSettings?(
+    externalThreadId: string,
+  ): Effect.Effect<AgentSessionSettingsSnapshot, ProviderClientOperationError>;
+  setSessionSetting?(
+    externalThreadId: string,
+    configId: string,
+    value: AgentSessionSettingValue,
+  ): Effect.Effect<AgentSessionSettingsSnapshot, ProviderClientOperationError>;
   request<T>(
     method: string,
     params: unknown,
