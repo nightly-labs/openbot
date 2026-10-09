@@ -132,7 +132,9 @@ minute for each route. An event that addresses OpenBot starts a hosted server th
 then keeps the event's delivery frame, sealed with the host's queue key (`queueKey` in the `ingress`
 hello) and the host ID, for at most 10 minutes, 64 events and 4 MB for each host. When the host's
 socket holds the route again, Signal sends each kept event in order as `queued-delivery`. A host that
-sent no key gets nothing kept. A restart of Signal loses the queue and the keys.
+sent no key gets nothing kept. A restart of Signal loses the queue and the keys. With a route waker,
+`ready` names the `ingress-queue` capability: only then does a hosted server with a live connection
+sleep.
 
 ## Production requirements
 

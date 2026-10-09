@@ -1,7 +1,11 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { DiscordDelivery } from "@openbot/contracts/signal-protocol/discord-api";
 import { DISCORD_ROUTE_TTL_SECONDS, type DiscordRouteGuild } from "@openbot/contracts/signal-protocol/discord-route";
-import { isIngressQueueKey, type QueuedSignalMessage } from "@openbot/contracts/signal-protocol/ingress-queue";
+import {
+  INGRESS_QUEUE_CAPABILITY,
+  isIngressQueueKey,
+  type QueuedSignalMessage,
+} from "@openbot/contracts/signal-protocol/ingress-queue";
 import { SLACK_ROUTE_TTL_SECONDS, type SlackRouteTeam } from "@openbot/contracts/signal-protocol/slack-route";
 import {
   TELEGRAM_CAPABILITY,
@@ -360,6 +364,7 @@ export class SignalService {
     this.#connectionDropTimers.clear();
     this.#peerExpirationTimers.clear();
     for (const requestId of [...this.#pendingDeliveries.keys()]) this.#settleDelivery(requestId, null);
+    this.#queue.close();
   }
 
   connect(socket: SignalSocket): boolean {
@@ -604,7 +609,8 @@ export class SignalService {
     if (!ingress) {
       this.#metrics.discordDeliveriesUnavailable += 1;
       // The removal of the bot is the account service's work, not the host's.
-      Effect.runFork(this.#keep({ platform: "discord", guildId }, guildId, delivery.kind !== "removed", frame));
+      if (delivery.kind !== "removed")
+        Effect.runFork(this.#keep({ platform: "discord", guildId }, guildId, true, frame));
       return false;
     }
     ingress.socket.send(message);
@@ -935,7 +941,12 @@ export class SignalService {
   );
 
   #capabilities(peer: AuthenticatedPeer["peer"]): { capabilities?: string[] } {
-    return peer === "ingress" && this.#telegram ? { capabilities: [TELEGRAM_CAPABILITY] } : {};
+    if (peer !== "ingress") return {};
+    const capabilities = [
+      ...(this.#telegram ? [TELEGRAM_CAPABILITY] : []),
+      ...(this.#queue.enabled ? [INGRESS_QUEUE_CAPABILITY] : []),
+    ];
+    return capabilities.length > 0 ? { capabilities } : {};
   }
 
   #settleDelivery(requestId: string, result: IngressDeliveryResult | null): void {
@@ -968,9 +979,8 @@ export class SignalService {
       message,
       telegramCallback,
     );
-    if (outcome !== "queued") return outcome;
-    this.#metrics.queuedDeliveries += 1;
-    // The host connected while Signal sealed the event.
+    if (outcome === "queued") this.#metrics.queuedDeliveries += 1;
+    // The host connected while Signal sealed this event, or an earlier event that the flush waited for.
     const socketId =
       route.platform === "slack"
         ? this.#slackTeams.get(key)
@@ -1202,10 +1212,9 @@ export class SignalService {
             this.#send(socket, { type: "discord-session", version: 1, token, guilds: heldGuilds });
           }
           // After `ready` and the Discord session, so the host can answer what it kept.
-          if (message.queueKey && isIngressQueueKey(message.queueKey)) {
-            this.#queue.rememberKey(claims.hostId, message.queueKey);
-            this.#flushQueue(peer);
-          }
+          const queueKey = message.queueKey && isIngressQueueKey(message.queueKey) ? message.queueKey : null;
+          this.#queue.rememberKey(claims.hostId, queueKey);
+          if (queueKey) this.#flushQueue(peer);
           return;
         }
         if (message.peer === "host") {

@@ -2,7 +2,7 @@ import type { MessagingPlatform } from "@openbot/contracts/ipc";
 import { decodeSignalServerMessage } from "@openbot/contracts/signal-protocol/decode";
 import { type DiscordApiRequest, decodeDiscordApiError } from "@openbot/contracts/signal-protocol/discord-api";
 import { DISCORD_API_PATH } from "@openbot/contracts/signal-protocol/discord-route";
-import { openQueuedDelivery } from "@openbot/contracts/signal-protocol/ingress-queue";
+import { INGRESS_QUEUE_CAPABILITY, openQueuedDelivery } from "@openbot/contracts/signal-protocol/ingress-queue";
 import {
   SIGNAL_PROTOCOL_VERSION,
   type SignalClientMessage,
@@ -179,6 +179,14 @@ export class SignalIngress implements MessagingIngress {
   constructor(options: SignalIngressOptions) {
     this.#options = options;
     this.#runtime = ManagedRuntime.make(SignalIngressAccount.layer(options));
+  }
+
+  /**
+   * Whether the last Signal said that it starts this host for a connector event and keeps the event,
+   * and this host sent it a queue key. Only then may a hosted server with a live connection sleep.
+   */
+  queueReady(): boolean {
+    return Boolean(this.#queueKey) && this.#capabilities.has(INGRESS_QUEUE_CAPABILITY);
   }
 
   acquire(platform: MessagingPlatform): () => void {
@@ -519,7 +527,7 @@ export class SignalIngress implements MessagingIngress {
       // Discord gets no answer: Signal already acknowledged a button press.
       const handler = this.#handler;
       if (handler)
-        yield* handler(message.guildId, { platform: "discord", delivery: message.delivery }).pipe(
+        yield* handler(message.guildId, { platform: "discord", delivery: message.delivery, queued }).pipe(
           Effect.catch(() => Effect.void),
         );
       return;
@@ -537,6 +545,7 @@ export class SignalIngress implements MessagingIngress {
           botId: message.botId,
           body: Buffer.from(message.bodyBase64, "base64"),
           linked: message.linked === true,
+          queued,
         }).pipe(Effect.catch(() => Effect.void));
       return;
     }
@@ -569,6 +578,7 @@ export class SignalIngress implements MessagingIngress {
           kind: message.kind,
           retryNum: message.retryNum,
           body: Buffer.from(message.bodyBase64, "base64"),
+          queued,
         }).pipe(Effect.catch(() => Effect.succeed<IngressAnswer>({ status: 503 })))
       : { status: 503 };
     if (queued || socket.readyState !== WebSocket.OPEN) return;

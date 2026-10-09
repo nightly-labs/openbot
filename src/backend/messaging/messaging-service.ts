@@ -139,7 +139,10 @@ interface PendingApproval {
 const FATAL_STATES = new Set<MessagingConnectionState>(["invalid_token", "removed"]);
 const APPROVAL_TEXT_LIMIT = 2_500;
 const CANCEL_TEXT = /^(cancel|stop)$/i;
+const LIVE_STATES = new Set<MessagingConnectionState>(["connecting", "connected", "reconnecting", "rate_limited"]);
 const RECENT_MESSAGES = 2_000;
+/** How long a delivery that Signal kept waits for its connection to start. */
+const QUEUED_TRANSPORT_WAIT_MS = 60_000;
 /** How long a Telegram link waits for the Signal socket. */
 const TELEGRAM_READY_TIMEOUT_MS = 15_000;
 /** How long a connection waits before it tries Slack again after Slack was unreachable. */
@@ -161,6 +164,8 @@ export class MessagingService {
   readonly #drivers: ReadonlyMap<MessagingPlatform, MessagingDriver>;
   readonly #downloadsRoot: string;
   readonly #live = new Map<string, LiveConnection>();
+  /** The deliveries that Signal kept, each waiting for the transport of its connection. */
+  readonly #transportWaiters = new Map<string, Set<() => void>>();
   /** Status posts by `linkId:platformMessageId`, until the turn that answers the message ends. */
   readonly #posts = new Map<string, StatusPost>();
   /** The reply target of each external message, by `linkId:platformMessageId`. */
@@ -237,6 +242,10 @@ export class MessagingService {
     this.#live.clear();
     yield* Scope.close(this.#scope, Exit.void);
   }, Effect.uninterruptible).bind(this);
+
+  hasLiveConnection(): boolean {
+    return [...this.#live.values()].some((live) => LIVE_STATES.has(live.state));
+  }
 
   /** After the computer wakes, every socket may be dead without knowing it. */
   resume(): void {
@@ -487,7 +496,7 @@ export class MessagingService {
     const record = this.#threads.store.connectionForWorkspace(delivery.platform, workspaceId);
     if (!record) return { status: 404 };
     if (!record.enabled) return { status: 200 };
-    const transport = this.#live.get(record.connectionId)?.transport;
+    const transport = yield* this.#transportFor(record, delivery.queued === true);
     if (!transport?.deliver) return { status: 503 };
     return yield* transport.deliver(delivery);
   }).bind(this);
@@ -554,6 +563,31 @@ export class MessagingService {
     );
     yield* messagingIo(() => app.openExternal(telegramLinkUrl(link.botUsername, link.code, place)));
   }).bind(this);
+
+  /**
+   * The transport of an enabled connection. A delivery that Signal kept while this hosted server
+   * started waits a short time for it: the socket can open before every connection has started.
+   */
+  #transportFor(
+    record: { connectionId: string; enabled: boolean },
+    queued: boolean,
+  ): Effect.Effect<LiveConnection["transport"] | undefined> {
+    const current = () => (record.enabled ? this.#live.get(record.connectionId)?.transport : undefined);
+    if (current() || !queued || !record.enabled) return Effect.sync(current);
+    return Effect.callback<void>((resume) => {
+      const waiters = this.#transportWaiters.get(record.connectionId) ?? new Set<() => void>();
+      const ready = () => resume(Effect.void);
+      waiters.add(ready);
+      this.#transportWaiters.set(record.connectionId, waiters);
+      return Effect.sync(() => {
+        waiters.delete(ready);
+        if (waiters.size === 0) this.#transportWaiters.delete(record.connectionId);
+      });
+    }).pipe(
+      Effect.timeoutOrElse({ duration: QUEUED_TRANSPORT_WAIT_MS, orElse: () => Effect.void }),
+      Effect.map(current),
+    );
+  }
 
   /** Waits a short time for the socket to be open with a Signal that has Telegram. */
   #telegramReady(ingress: MessagingIngress): Effect.Effect<void, MessagingOperationFailed> {
@@ -630,7 +664,7 @@ export class MessagingService {
     const record = this.#threads.store.connectionForWorkspace("telegram", chatId);
     // A chat that both the production and the development bot are in answers only its own bot.
     if (!record || (record.appId && record.appId !== botId)) return;
-    const transport = record.enabled ? this.#live.get(record.connectionId)?.transport : undefined;
+    const transport = yield* this.#transportFor(record, delivery.queued === true);
     if (transport?.deliver) {
       yield* transport.deliver(delivery);
       return;
@@ -785,6 +819,8 @@ export class MessagingService {
         if (join) this.#dispatch(join.pipe(toMessagingOperationFailed));
       },
     });
+    // After `start`: a transport takes deliveries only once it has its sink.
+    for (const ready of [...(this.#transportWaiters.get(record.connectionId) ?? [])]) ready();
     // So people can mention OpenBot in any public channel without inviting it first. Channels made
     // while the host was off are joined here too.
     const join = live.adapter.joinPublicPlaces?.();

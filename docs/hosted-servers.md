@@ -95,7 +95,9 @@ when a server is idle or boat stops a sandbox; and `error` and `deleted`. The Wo
    at once. The Worker cron (each minute on `test`) resumes a server that stays `stopped` for 2
    minutes.
 
-   A live Slack, Discord or Telegram connection is not use: the server sleeps with its connectors.
+   A live Slack, Discord or Telegram connection is not use when the last Signal said
+   `ingress-queue` in `ready` and the host sent it a queue key: the server sleeps with its connectors.
+   Otherwise (an older Signal, or no key) the connection counts as use, so no message is lost.
 
    **Idle.** The cron stops a running server with no activity and no state change for 15 minutes:
    `desired_state = 'idle'`, and boat saves the disk. It does not stop a server whose next routine
@@ -516,7 +518,10 @@ holds it:
 
 The host makes its queue key once (`src/main/ingress-queue-key.ts`, `openbot-ingress-queue-key-v1.json`
 in the user data folder), encrypted by the operating system, and sends the public half in each
-`ingress` hello. An older host sends no key, so Signal keeps nothing for it. Generic webhooks do not
+`ingress` hello. An older host sends no key, so Signal keeps nothing for it; a hello with no key
+removes the key that Signal had. A kept delivery that arrives before its connection has started waits
+up to 60 seconds for it. When the account service does not answer, Signal keeps nothing and does not
+remember the failure. A start that fails at once keeps nothing either. Generic webhooks do not
 start a server: their sender sends again after a 503.
 
 ## Tested on boat

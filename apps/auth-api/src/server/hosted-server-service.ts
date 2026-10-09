@@ -786,10 +786,15 @@ export class HostedServerService {
           .first<HostedServerRow>(),
       );
       if (!row) return "not_hosted";
-      if (row.desired_state === "stopped") return "ended";
+      // A plan that ended, or a server that was never paid, does not start.
+      if (row.desired_state === "stopped" || row.observed_state === "awaiting_payment") return "ended";
       if (!wake) return row.desired_state === "idle" ? "sleeping" : "starting";
       yield* this.#startForUse(row);
-      return "starting";
+      const current = yield* this.#requireRow(hostId);
+      // As for a client: the host has no socket, and a lost provider event can hide a stop.
+      if (current.observed_state === "running" && current.provider_sandbox_id) yield* this.#refresh(current);
+      // A start that failed keeps nothing in Signal: the platform's retry or the next event asks again.
+      return (yield* this.#requireRow(hostId)).observed_state === "error" ? "sleeping" : "starting";
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);

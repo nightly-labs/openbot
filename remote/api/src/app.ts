@@ -64,6 +64,7 @@ const slackRequestSchema = z.object({
       channel_type: z.string().optional(),
       thread_ts: z.string().optional(),
       bot_id: z.string().optional(),
+      subtype: z.string().optional(),
     })
     .optional()
     .catch(undefined),
@@ -441,7 +442,11 @@ function slackRequest(
   const wakes =
     kind === "interactivity" ||
     event?.type === "app_mention" ||
-    (event?.type === "message" && !event.bot_id && (event.channel_type === "im" || event.thread_ts !== undefined));
+    (event?.type === "message" &&
+      !event.bot_id &&
+      event.subtype !== "message_changed" &&
+      event.subtype !== "message_deleted" &&
+      (event.channel_type === "im" || event.thread_ts !== undefined));
   return teamId && appId && SLACK_ID_PATTERN.test(teamId) && SLACK_ID_PATTERN.test(appId)
     ? { appId, teamId, wakes }
     : null;

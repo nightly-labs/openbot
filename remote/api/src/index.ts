@@ -298,9 +298,7 @@ const signal = new SignalService(
       : null,
     // A failure keeps nothing: the platform gets the answer of an offline host, as before.
     routeWaker: (route, wake) =>
-      controlPlaneService
-        .routeWake(route, wake)
-        .pipe(Effect.catch(() => Effect.succeed({ hostId: null, state: "not_hosted" as const }))),
+      controlPlaneService.routeWake(route, wake).pipe(Effect.catch(() => Effect.succeed(null))),
   },
 );
 const tlsPaths =

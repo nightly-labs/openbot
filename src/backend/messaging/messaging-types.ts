@@ -176,11 +176,16 @@ export interface MessagingTransport {
  * Telegram, one update of a chat, whose secret header Signal has checked. Discord and Telegram get no
  * answer.
  */
-export type IngressDelivery =
+export type IngressDelivery = (
   | { platform: "slack"; kind: "events" | "interactivity"; retryNum: number | null; body: Uint8Array }
   | { platform: "discord"; delivery: DiscordDelivery }
   // `linked` marks the `/start <code>` update that the account service just linked to this host.
-  | { platform: "telegram"; botId: string; body: Uint8Array; linked: boolean };
+  | { platform: "telegram"; botId: string; body: Uint8Array; linked: boolean }
+) & {
+  // Signal kept it while this hosted server started (`queued-delivery`). It can come before its
+  // connection has a transport, and nothing sends it again.
+  queued?: boolean;
+};
 
 /** The HTTP answer the platform gets. A body only for a URL check or a button reply. */
 export interface IngressAnswer {

@@ -2048,11 +2048,13 @@ export async function createApplicationServices({
     );
     const hostedServerActivity = new HostedServerActivity({
       hostId: hostedServer.hostId,
-      // A live Slack, Discord or Telegram connection does not count: Signal starts the server for the
-      // next message and keeps it until the server connects. An open browser view does not count either:
-      // a view that the user forgot would keep the server running. Input in the view counts as client use.
+      // A live Slack, Discord or Telegram connection counts only when Signal cannot start the server for
+      // the next message and keep it (an older Signal, or no queue key): stopped, the server could not
+      // hear it. An open browser view does not count: a view that the user forgot would keep the server
+      // running. Input in the view counts as client use.
       inUse: () =>
         service.hasActiveWork().length > 0 ||
+        (messaging.hasLiveConnection() && !signalIngress.queueReady()) ||
         host.describeRestartBlockers().some((reason) => reason !== "browser-view") ||
         (host.connectedClientCount() > 0 && Date.now() - (host.lastClientUseAt() ?? 0) < CLIENT_USE_WINDOW_MS),
       nextRunAt: () => {

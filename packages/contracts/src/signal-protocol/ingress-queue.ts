@@ -29,6 +29,12 @@ export type QueuedSignalMessage = Extract<
 
 const KIND: HostGrantKind = { version: 1, info: "openbot-ingress-queue-v1" };
 
+/**
+ * The `ready` capability of a Signal that starts a hosted server for a connector event and keeps the
+ * event. Without it, a hosted server with a live connection does not sleep.
+ */
+export const INGRESS_QUEUE_CAPABILITY = "ingress-queue";
+
 export const createIngressQueueKeyPair = createStoredHostGrantKeyPair;
 export const importIngressQueuePrivateKey = importHostGrantPrivateKey;
 export const isIngressQueueKey = isRawP256PublicKey;

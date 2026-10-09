@@ -3,11 +3,15 @@
 The Remote API is the Signal service. It verifies remote tickets, issues resume tokens and TURN
 credentials, and relays WebRTC signalling between peers. It does not carry team chats, files, or
 commands. The exceptions are Slack, Discord and Telegram. `POST /v1/slack/events` checks the OpenBot Slack
-app's signature, reads only the app ID (`api_app_id`), the workspace ID (`team_id`) and the
-`url_verification` challenge, and passes the body to the `ingress` socket of the workspace's host in
-transit. `POST /v1/telegram/updates/<bot ID>` checks the bot's secret header, reads only the chat ID,
+app's signature, reads only the app ID (`api_app_id`), the workspace ID (`team_id`), the
+`url_verification` challenge, and the event's `type`, `channel_type`, `thread_ts`, `bot_id` and
+`subtype` (to know whether it addresses OpenBot, never the text), and passes the body to the `ingress`
+socket of the workspace's host in transit. `POST /v1/telegram/updates/<bot ID>` checks the bot's secret header, reads only the chat ID,
 the callback query ID and a `/start <code>` link code, and passes the body to the `ingress` socket of
-the chat's host in the same way. Do not store or log these bodies, and do not read more of them. Hosts
+the chat's host in the same way. Do not log these bodies, and do not read more of them. The one store
+is `src/ingress-queue.ts`: for a hosted server that sleeps, it keeps an event in memory only, sealed to
+the host's queue key before it is queued, for at most 10 minutes. Never keep a body that is not
+sealed, and never write the queue to disk. Hosts
 trust a delivery because Signal checked the signature or the secret; never remove those checks.
 
 Signal holds the Telegram bot tokens: a host that had one could read and post in every chat. Never

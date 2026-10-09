@@ -24,8 +24,11 @@ export interface RouteWake {
   state: RouteHostState;
 }
 
-/** Asks the account service for the host of a route, and starts it with `wake`. Never fails. */
-export type RouteWaker = (route: IngressRoute, wake: boolean) => Effect.Effect<RouteWake>;
+/**
+ * Asks the account service for the host of a route, and starts it with `wake`. Null when the account
+ * service did not answer: that is not remembered, so the next event asks again.
+ */
+export type RouteWaker = (route: IngressRoute, wake: boolean) => Effect.Effect<RouteWake | null>;
 
 /**
  * `queued`: kept for the host. `hosted`: a hosted server has the route, but the event is not kept.
@@ -53,6 +56,9 @@ const DEFAULT_INGRESS_QUEUE_LIMITS: IngressQueueLimits = {
   maximumBytesPerHost: 4 * 1024 * 1024,
   maximumBytes: 256 * 1024 * 1024,
 };
+
+/** How often expired events go when no other event or flush comes. */
+const EXPIRY_INTERVAL_MILLISECONDS = 30_000;
 
 /** Bounds the remembered routes. Past it, the entries older than the longest check interval go. */
 const MAXIMUM_ROUTES = 100_000;
@@ -84,10 +90,11 @@ export class IngressQueue {
   readonly #keys = new Map<string, string>();
   readonly #routes = new Map<string, { wake: RouteWake; at: number; woke: boolean }>();
   /** A route that asks the account service now. Concurrent events share the answer. */
-  readonly #pending = new Map<string, Deferred.Deferred<RouteWake>>();
+  readonly #pending = new Map<string, { answer: Deferred.Deferred<RouteWake>; wake: boolean }>();
   readonly #queues = new Map<string, QueueEntry[]>();
   #bytes = 0;
   #order = 0;
+  #expiry: ReturnType<typeof setInterval> | null = null;
 
   constructor(waker: RouteWaker | null, limits = DEFAULT_INGRESS_QUEUE_LIMITS, now: () => number = Date.now) {
     this.#waker = waker;
@@ -95,13 +102,29 @@ export class IngressQueue {
     this.#now = now;
   }
 
-  rememberKey(hostId: string, queueKey: string): void {
-    this.#keys.set(hostId, queueKey);
+  /** The key from the host's last `ingress` hello. A hello without one removes the earlier key. */
+  rememberKey(hostId: string, queueKey: string | null): void {
+    if (queueKey) this.#keys.set(hostId, queueKey);
+    else this.#keys.delete(hostId);
+  }
+
+  /** Whether Signal can start hosts and keep their events. */
+  get enabled(): boolean {
+    return this.#waker !== null;
+  }
+
+  /** Drops every kept event and stops the expiry timer. */
+  close(): void {
+    if (this.#expiry) clearInterval(this.#expiry);
+    this.#expiry = null;
+    this.#queues.clear();
+    this.#bytes = 0;
   }
 
   /**
    * One event for a route that no socket holds. `message` is the frame the host would get; it is kept
-   * only when `wakes` is true and the host starts.
+   * only when `wakes` is true and the host starts. It cannot be interrupted: a place it took in the
+   * queue is always sealed or given back.
    */
   readonly offline = Effect.fn("IngressQueue.offline")(function* (
     this: IngressQueue,
@@ -143,18 +166,24 @@ export class IngressQueue {
     entry.bytes = sealed.length;
     entry.expiresAt = this.#now() + this.#limits.ttlMilliseconds;
     this.#bytes += entry.bytes;
+    this.#startExpiry();
     return "queued";
-  });
+  }, Effect.uninterruptible);
 
-  /** The kept events of a host whose new socket holds their routes, in order. Others wait. */
+  /**
+   * The kept events of a host whose new socket holds their routes, in order. Others wait, and so do the
+   * later events of a route whose earlier event is still being sealed.
+   */
   take(hostId: string, holds: (route: string) => boolean): QueuedFrame[] {
     this.#prune(hostId);
     const queue = this.#queues.get(hostId);
     if (!queue) return [];
     const ready: QueuedFrame[] = [];
     const waiting: QueueEntry[] = [];
+    const sealing = new Set<string>();
     for (const entry of queue) {
-      if (entry.sealed && holds(entry.route)) {
+      if (!entry.sealed) sealing.add(entry.route);
+      if (entry.sealed && !sealing.has(entry.route) && holds(entry.route)) {
         ready.push({ route: entry.route, sealed: entry.sealed, telegramCallback: entry.telegramCallback });
         this.#bytes -= entry.bytes;
       } else waiting.push(entry);
@@ -169,7 +198,7 @@ export class IngressQueue {
     route: IngressRoute,
     routeKey: string,
     wake: boolean,
-  ) {
+  ): Effect.fn.Return<RouteWake> {
     const now = this.#now();
     const known = this.#routes.get(routeKey);
     const hosted = known?.wake.state === "sleeping" || known?.wake.state === "starting";
@@ -179,13 +208,19 @@ export class IngressQueue {
     // A route that was only looked up asks again to start a server that sleeps.
     if (fresh && (known.woke || !wake || known.wake.state !== "sleeping")) return known.wake;
     const current = this.#pending.get(routeKey);
-    if (current) return yield* Deferred.await(current);
+    if (current) {
+      const shared = yield* Deferred.await(current.answer);
+      // A lookup did not start the server: this event asks again, with a wake.
+      if (!wake || current.wake || shared.state !== "sleeping") return shared;
+      return yield* this.#check(route, routeKey, wake);
+    }
     const result = Deferred.makeUnsafe<RouteWake>();
-    this.#pending.set(routeKey, result);
+    this.#pending.set(routeKey, { answer: result, wake });
     const waker = this.#waker;
-    const answer = waker ? yield* waker(route, wake) : { hostId: null, state: "not_hosted" as const };
+    const asked = waker ? yield* waker(route, wake) : null;
+    const answer: RouteWake = asked ?? { hostId: null, state: "not_hosted" };
     if (this.#routes.size >= MAXIMUM_ROUTES) this.#pruneRoutes(now);
-    this.#routes.set(routeKey, { wake: answer, at: now, woke: wake });
+    if (asked) this.#routes.set(routeKey, { wake: asked, at: now, woke: wake });
     this.#pending.delete(routeKey);
     yield* Deferred.succeed(result, answer);
     return answer;
@@ -197,6 +232,18 @@ export class IngressQueue {
     const index = queue.indexOf(entry);
     if (index >= 0) queue.splice(index, 1);
     if (queue.length === 0) this.#queues.delete(hostId);
+  }
+
+  /** Expired events go on time also when no other event or flush comes for their host. */
+  #startExpiry(): void {
+    if (this.#expiry) return;
+    this.#expiry = setInterval(() => {
+      this.#pruneAll();
+      if (this.#queues.size > 0 || !this.#expiry) return;
+      clearInterval(this.#expiry);
+      this.#expiry = null;
+    }, EXPIRY_INTERVAL_MILLISECONDS);
+    this.#expiry.unref?.();
   }
 
   /** Drops the events of a host that waited too long. A place still being sealed stays. */
