@@ -892,11 +892,13 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     ],
   );
 
-  /** Writes one agent's read cursor after its earlier writes. It rejects when the host refuses it. */
+  /**
+   * Writes one agent's read cursor on `serverId` after its earlier writes. It rejects when the host refuses it.
+   */
   const writeAgentRead = useCallback(
-    (agentId: string, visibleMessageId?: string | null): Promise<void> => {
-      if (!activeServerId) return Promise.resolve();
-      const isCurrentRead = readRefresh.invalidate(activeServerId);
+    (agentId: string, visibleMessageId?: string | null, serverId = activeServerId): Promise<void> => {
+      if (!serverId) return Promise.resolve();
+      const isCurrentRead = readRefresh.invalidate(serverId);
       const generation = loadGeneration.current;
       liveState.update("unreadAgentIds", (current) =>
         visibleMessageId === null ? [...new Set([...current, agentId])] : current.filter((id) => id !== agentId),
@@ -907,7 +909,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           const snapshot =
             visibleMessageId !== undefined
               ? null
-              : (conversationStore.get(agentId) ?? (await loadConversation(agentId)));
+              : (conversationStore.get(agentId) ?? (await loadConversation(agentId, serverId)));
           if (generation !== loadGeneration.current) return;
           const throughMessageId = visibleMessageId !== undefined ? visibleMessageId : snapshot?.messages.at(-1)?.id;
           if (throughMessageId === undefined) return;
@@ -918,14 +920,15 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
               : TEAM_API_ROUTES.agent.conversationRead(agentId),
             (value) => decodeConversationReads({ [agentId]: value }),
             visibleMessageId === null ? {} : { throughMessageId },
+            serverId,
           );
           if (generation === loadGeneration.current && isCurrentRead()) {
-            readRefresh.invalidate(activeServerId);
+            readRefresh.invalidate(serverId);
             applyConversationReads(reads);
           }
         })
         .catch((error: unknown) => {
-          if (generation === loadGeneration.current) void refreshConversationReads().catch(() => undefined);
+          if (generation === loadGeneration.current) void refreshConversationReads(serverId).catch(() => undefined);
           throw error;
         });
       // A failed write must not stop the next write for this agent.
@@ -993,7 +996,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           serverId,
         );
         const latestId = page.messages.at(-1)?.id;
-        if (latestId) await writeAgentRead(agentId, latestId);
+        if (latestId) await writeAgentRead(agentId, latestId, serverId);
       }),
       channelStore.markAllRead(serverId, Crypto.randomUUID),
     ]);
