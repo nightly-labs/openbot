@@ -2,8 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/voice";
 
 export const messages = {
-  "error.voice.assetsUnavailable":
-    "Los recursos de transcripción de voz local no están disponibles. Ejecuta `bun run voice:prepare` y reinicia OpenBot.",
   "error.voice.downloadFailed": "No se pudo descargar el modelo de voz. Inténtalo de nuevo.",
   "error.voice.downloadStopped": "Se detuvo la descarga del modelo de voz.",
   "error.voice.runtimeUnavailable": "La transcripción de voz local no está disponible en esta plataforma.",

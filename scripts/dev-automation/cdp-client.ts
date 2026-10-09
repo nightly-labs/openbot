@@ -7,7 +7,7 @@ import { promisify } from "node:util";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import type { Logger } from "@openbot/logging";
 import { type Browser, chromium, type Page } from "playwright-core";
-import { parseProcessTable } from "./cpu-sampling";
+import { PROCESS_TABLE_PS_ARGS, parseProcessTable } from "./cpu-sampling";
 import { describeTarget, findMainPages } from "./page-url";
 
 export const DEFAULT_DEV_AUTOMATION_PORT = 9_333;
@@ -140,7 +140,7 @@ async function readParentProcessTable(): Promise<ReadonlyMap<number, number>> {
     }
     return table;
   }
-  const { stdout } = await runCommand("ps", ["-o", "pid=,ppid=,cputime=,command=", "-ax"], {
+  const { stdout } = await runCommand("ps", [...PROCESS_TABLE_PS_ARGS], {
     timeout: 10_000,
     maxBuffer: 16 * 1_024 * 1_024,
   });
@@ -156,7 +156,14 @@ async function readParentProcessTable(): Promise<ReadonlyMap<number, number>> {
  * lifetime check while answering for someone else. Anything unverifiable
  * answers false -- refusing a command is always safer than driving it blind.
  */
-export async function verifyBrowserOwnership(browser: Browser, ownerPid: number): Promise<boolean> {
+interface BrowserOwnershipProbe {
+  newBrowserCDPSession(): Promise<{
+    send(method: "SystemInfo.getProcessInfo"): Promise<{ processInfo: Array<{ type: string; id: number }> }>;
+    detach(): Promise<void>;
+  }>;
+}
+
+export async function verifyBrowserOwnership(browser: BrowserOwnershipProbe, ownerPid: number): Promise<boolean> {
   let browserPid: number | null = null;
   try {
     const session = await browser.newBrowserCDPSession();
@@ -309,8 +316,8 @@ export interface OpenDevBrowserOptions {
   // browser with an app window that has the preload bridge proves itself without
   // further checks; a page in another Chromium can define `window.openbot`, but
   // that browser does not report `Electron/`. The `OpenBot/` token cannot prove
-  // it: the embedded browser removes that token because Framer refuses sign-in
-  // with it. Any other browser must prove the listening process descends from
+  // it: the embedded browser removes both product tokens for site compatibility.
+  // A browser without the Electron token must prove its process descends from
   // this pid, because liveness alone cannot tell a restarted instance from a
   // squatter.
   ownerPid?: number | null;
@@ -343,7 +350,7 @@ export async function openDevBrowser(
         `Port ${port} does not belong to OpenBot. Pass --port=<OPENBOT_DEV_REMOTE_DEBUGGING_PORT> of the instance you mean to drive.`,
       );
     }
-    logger.info(`Port :${port} answers without an OpenBot app window; the listener belongs to the recorded instance.`);
+    logger.info(`Port :${port} belongs to the recorded instance process.`);
   }
   const targets = described.targets;
   logger.info(`CDP targets on :${port}`, targets || "(no pages yet)");

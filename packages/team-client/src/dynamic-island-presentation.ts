@@ -130,7 +130,11 @@ export function createDynamicIslandPresentation(
   const working = visibleAgents
     .filter((agent) => isAgentWorking(agent.id, input))
     .slice(0, 3)
-    .map((agent) => ({ agent: agentIdentity(agent), task: currentTask(agent.id, input.queues, text) }));
+    .map((agent) => ({
+      agent: agentIdentity(agent),
+      task: currentTask(agent.id, input.queues, text),
+      turnId: input.activeTurns[agent.id] ?? null,
+    }));
   if (working.length > 0) return { serverId: input.serverId, mode: "working", working };
 
   const message = latestUnreadMessage(input, visibleAgents);

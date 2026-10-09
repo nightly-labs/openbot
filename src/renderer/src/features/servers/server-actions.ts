@@ -27,6 +27,7 @@ export function useServerActions() {
     setAddServerOpen,
     hostedServersAvailable,
     hostedServerIds,
+    hostedServersLoaded,
     refreshHostedServersAvailable,
   } = useServers();
   const { selectServer } = useServerSelection();
@@ -82,6 +83,9 @@ export function useServerActions() {
     },
     onOpenSettings: openServerSettings,
     onLeave: requestLeaveServer,
+    // The same confirmation: main removes an owned server from the account instead of leaving it.
+    onRemove: requestLeaveServer,
+    canRemove: (serverId) => hostedServersLoaded() && !hostedServerIds().has(serverId),
     onDelete: openHostedServerDelete,
     canDelete: (serverId) => hostedServerIds().has(serverId),
   } satisfies ServerActionCallbacks;

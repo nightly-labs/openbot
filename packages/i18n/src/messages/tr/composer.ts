@@ -39,6 +39,7 @@ export const messages = {
   "composer.token.unavailableSkill": "Kullanılamayan beceri {name}",
   "composer.token.unavailableMcp": "Kullanılamayan MCP sunucusu {name}",
   "composer.voice.stop": "Ses kaydını durdur",
+  "composer.voice.cancel": "Ses kaydını iptal et",
   "composer.voice.preparing": "Ses modeli indiriliyor",
   "composer.voice.requesting": "Mikrofon erişimi isteniyor",
   "composer.voice.transcribing": "Sesli istem metne dönüştürülüyor",

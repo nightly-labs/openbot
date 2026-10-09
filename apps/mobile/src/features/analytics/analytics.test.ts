@@ -405,6 +405,7 @@ it("instruments message commands without sending their contents or changing the 
     conversationStore: new MobileConversationStore(() => () => {}),
     selectServer: () => {},
     leaveServer: unexpected,
+    removeServer: unexpected,
     refreshServers: unexpected,
     reorderServers: () => false,
     refreshServer: unexpected,

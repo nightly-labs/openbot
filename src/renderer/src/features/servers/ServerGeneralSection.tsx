@@ -120,6 +120,8 @@ export function createServerGeneralSection(
   const visibleNameError = () => (panels.identity.nameTouched ? nameError() : null);
   /** The owner cannot leave the host they own, and the local server is this computer. */
   const canLeave = () => Boolean(props.onLeaveServer) && !local() && props.server.role !== "owner";
+  /** The owner removes the server from the account instead. The host does not need to be online. */
+  const canRemove = () => Boolean(props.onRemoveServer) && !local() && props.server.role === "owner";
   const identityDirty = () =>
     canEditIdentity() &&
     (trimmedName() !== panels.identity.savedName ||
@@ -546,22 +548,50 @@ export function createServerGeneralSection(
             </ItemGroup>
           </SettingsSection>
         </Show>
+        <Show when={canRemove()}>
+          <SettingsSection title={t("server.settings.removeTitle")}>
+            <ItemGroup class="settings-modal-card">
+              <Item>
+                <ItemContent>
+                  <ItemTitle>{t("server.settings.removeTitle")}</ItemTitle>
+                  <ItemDescription>{t("server.settings.removeDescription")}</ItemDescription>
+                </ItemContent>
+                <ItemActions>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="destructive"
+                    disabled={Boolean(busy())}
+                    onClick={() =>
+                      setPanels((state) => {
+                        state.confirmLeave = true;
+                      })
+                    }
+                  >
+                    {t("server.settings.removeTitle")}
+                  </Button>
+                </ItemActions>
+              </Item>
+            </ItemGroup>
+          </SettingsSection>
+        </Show>
       </>
     );
   }
 
   function LeaveDialog() {
     return (
-      <Show when={panels.confirmLeave && canLeave()}>
+      <Show when={panels.confirmLeave && (canLeave() || canRemove())}>
         <LeaveServerDialog
           server={props.server}
+          removeOwned={canRemove()}
           onClose={() =>
             setPanels((state) => {
               state.confirmLeave = false;
             })
           }
           onLeave={async () => {
-            await props.onLeaveServer?.();
+            await (canRemove() ? props.onRemoveServer?.() : props.onLeaveServer?.());
           }}
         />
       </Show>

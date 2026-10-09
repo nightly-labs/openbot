@@ -13,6 +13,7 @@ import {
   matchPages,
   processBelongsToInstance,
   resolveAutomationPort,
+  verifyBrowserOwnership,
 } from "./cdp-client";
 import { describeTarget, findMainPages, isMainAppUrl } from "./page-url";
 import {
@@ -376,5 +377,17 @@ describe("processBelongsToInstance", () => {
         ]),
       ),
     ).toBe(false);
+  });
+});
+
+describe("verifyBrowserOwnership", () => {
+  it("accepts a browser under the recorded parent and refuses an unrelated process", async () => {
+    // Read the real parent table to check that ps and its parser use the same columns.
+    const send = async () => ({ processInfo: [{ type: "browser", id: process.pid }] });
+    const browser = {
+      newBrowserCDPSession: async () => ({ send, detach: async () => undefined }),
+    };
+    await expect(verifyBrowserOwnership(browser, process.ppid)).resolves.toBe(true);
+    await expect(verifyBrowserOwnership(browser, 2_147_483_647)).resolves.toBe(false);
   });
 });

@@ -79,6 +79,7 @@ export const messages = {
   "error.remote.bridgeCommandFailed": "La commande Team WebRTC a échoué.",
   "error.remote.webRtcFailed": "WebRTC a échoué.",
   "error.remote.ownerCannotLeave": "Le propriétaire ne peut pas quitter cet hôte.",
+  "error.remote.ownerOnlyRemove": "Seul le propriétaire peut supprimer ce serveur.",
   "error.remote.requestTimeout": "La requête distante a expiré.",
   "error.remote.requestFailed": "La requête distante a échoué.",
   "error.remote.pinnedKeyMissing": "L’hôte distant n’a pas de clé d’appareil épinglée.",

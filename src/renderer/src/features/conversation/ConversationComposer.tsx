@@ -27,14 +27,15 @@ import {
   ComposerUpdateNotice,
   ComposerUsageLimitNotice,
 } from "@openbot/ui/features/conversation/ComposerNotice";
-import { CloseIcon, MoreIcon, StopIcon } from "@openbot/ui/features/conversation/ConversationIcons";
+import { CloseIcon, StopIcon } from "@openbot/ui/features/conversation/ConversationIcons";
 import { RichMessageText } from "@openbot/ui/features/conversation/RichMessageText";
+import { VoiceRecordingMorph } from "@openbot/ui/features/conversation/VoiceRecordingMorph";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, For, Loading, lazy, onCleanup, Show } from "solid-js";
 import { reportErrorBanner, reportNotification } from "../../error-reports";
 import { deviceSendShortcut, sendShortcutAriaKey, sendShortcutHintKey } from "../../send-shortcut-preference";
 import { useConversationViewScope } from "./conversation-scope";
-import { formatVoiceDuration, voiceButtonLabel, voiceSupported } from "./voice-status";
+import { voiceButtonLabel, voiceSupported } from "./voice-status";
 
 /** @internal Stable HMR boundary for conversation composer. */
 export function ConversationComposer() {
@@ -73,12 +74,15 @@ export function ConversationComposer() {
     showComposerActions,
     startVoiceRecording,
     stopVoiceRecording,
+    cancelVoiceRecording,
     submitComposer,
     submitting,
     unreferencedDraftAttachments,
     updateCurrentDraft,
     updateTeamTyping,
     voiceElapsedSeconds,
+    voiceLevels,
+    voiceLiveText,
     voicePhase,
     voiceModelProgress,
   } = useConversationViewScope();
@@ -154,6 +158,60 @@ export function ConversationComposer() {
       .map((extension) => `.${extension}`)
       .join(",");
   };
+  /** Send, or Stop while the agent works and the message box is empty. */
+  const SendControl = () => (
+    <Show
+      when={props.activeTurnId && !editingDeliveryId() && !composerHasContent() && voicePhase() !== "recording"}
+      fallback={
+        <Button
+          variant="ghost"
+          type="button"
+          class="voice-button"
+          aria-label={
+            editingDeliveryId()
+              ? t("composer.send.saveQueued")
+              : voicePhase() === "recording"
+                ? t("composer.send.voice")
+                : t("composer.send.message")
+          }
+          aria-keyshortcuts={
+            voicePhase() === "recording" ? undefined : sendShortcutAriaKey(deviceSendShortcut(props.platform))
+          }
+          title={
+            voicePhase() === "recording"
+              ? undefined
+              : t(sendShortcutHintKey(deviceSendShortcut(props.platform), editingDeliveryId() ? "save" : "send"))
+          }
+          data-cuelume-emphasis="normal"
+          disabled={
+            attachmentBusy() ||
+            submitting() ||
+            !agentReady() ||
+            Boolean(providerUpdateRequired()) ||
+            voicePhase() === "preparing" ||
+            voicePhase() === "requesting" ||
+            voicePhase() === "transcribing"
+          }
+          onClick={submitComposer}
+        >
+          <Show when={submitting()} fallback={<ArrowUp aria-hidden="true" />}>
+            <LoaderCircle class="composer-spinner" aria-hidden="true" />
+          </Show>
+        </Button>
+      }
+    >
+      <Button
+        variant="ghost"
+        type="button"
+        class="voice-button voice-button-active"
+        aria-label={t("composer.send.stop")}
+        data-cuelume-tap="close"
+        onClick={props.onStop}
+      >
+        <StopIcon />
+      </Button>
+    </Show>
+  );
   return (
     <Show when={!props.approval && !props.browserTakeover}>
       <div class="composer-wrap">
@@ -286,7 +344,7 @@ export function ConversationComposer() {
           )}
         </Show>
         <div
-          class={`composer${voicePhase() === "recording" ? " composer-recording" : ""}`}
+          class="composer"
           data-compact={
             currentDraft().text.includes("\n") || unreferencedDraftAttachments().length > 0 ? undefined : ""
           }
@@ -331,7 +389,10 @@ export function ConversationComposer() {
               </For>
             </div>
           </Show>
-          <div class="composer-input-label">
+          <div
+            class="composer-input-label"
+            data-live-transcript={voiceLiveText() ? (currentDraft().text.trim() ? "append" : "replace") : undefined}
+          >
             <ComposerEditor
               agentId={props.agent?.id}
               agents={props.agents}
@@ -377,6 +438,17 @@ export function ConversationComposer() {
                   : attachmentAction(attachment, "open")
               }
             />
+            <Show when={voiceLiveText()}>
+              {(text) => (
+                <p
+                  class="voice-live-transcript"
+                  aria-live="polite"
+                  data-final={voicePhase() === "transcribing" ? "" : undefined}
+                >
+                  {text()}
+                </p>
+              )}
+            </Show>
           </div>
           <div class="composer-toolbar">
             <Input
@@ -463,115 +535,43 @@ export function ConversationComposer() {
                   </Button>
                 )}
               </Show>
-              <Show when={voiceAvailable()}>
-                <Show when={voicePhase() === "preparing"}>
-                  <span class="voice-model-progress" role="status">
-                    {t("composer.voice.progress", { progress: voiceModelProgress() ?? 0 })}
-                  </span>
-                </Show>
-                <Show
-                  when={voicePhase() === "recording"}
-                  fallback={
-                    <Button
-                      variant="ghost"
-                      type="button"
-                      class="dictation-button"
-                      aria-label={t(voiceButtonLabel(voicePhase()))}
-                      disabled={
-                        voicePhase() === "requesting" ||
-                        voicePhase() === "preparing" ||
-                        voicePhase() === "transcribing" ||
-                        (voicePhase() === "idle" && (!props.agent || !agentReady()))
-                      }
-                      onClick={() => void startVoiceRecording()}
-                    >
-                      <Show
-                        when={
-                          voicePhase() === "preparing" ||
-                          voicePhase() === "requesting" ||
-                          voicePhase() === "transcribing"
-                        }
-                        fallback={<Mic aria-hidden="true" />}
-                      >
-                        <LoaderCircle class="composer-spinner" aria-hidden="true" />
-                      </Show>
-                    </Button>
-                  }
-                >
-                  <fieldset class="voice-recording-status" aria-label={t("composer.voice.recording")}>
-                    <Button
-                      variant="ghost"
-                      type="button"
-                      class="voice-recording-stop"
-                      aria-label={t("composer.voice.stop")}
-                      onClick={stopVoiceRecording}
-                    >
-                      <StopIcon />
-                    </Button>
-                    <time class="voice-recording-duration" datetime={`PT${voiceElapsedSeconds()}S`}>
-                      {formatVoiceDuration(voiceElapsedSeconds())}
-                    </time>
-                    <MoreIcon />
-                  </fieldset>
-                </Show>
+              <Show when={voiceAvailable() && voicePhase() === "preparing"}>
+                <span class="voice-model-progress" role="status">
+                  {t("composer.voice.progress", { progress: voiceModelProgress() ?? 0 })}
+                </span>
               </Show>
-              <Show
-                when={
-                  props.activeTurnId && !editingDeliveryId() && !composerHasContent() && voicePhase() !== "recording"
-                }
-                fallback={
+              <Show when={voiceAvailable()} fallback={<SendControl />}>
+                <VoiceRecordingMorph
+                  recording={voicePhase() === "recording"}
+                  levels={voiceLevels()}
+                  elapsedSeconds={voiceElapsedSeconds()}
+                  onCancel={cancelVoiceRecording}
+                  onFinish={stopVoiceRecording}
+                  send={<SendControl />}
+                >
                   <Button
                     variant="ghost"
                     type="button"
-                    class="voice-button"
-                    aria-label={
-                      editingDeliveryId()
-                        ? t("composer.send.saveQueued")
-                        : voicePhase() === "recording"
-                          ? t("composer.send.voice")
-                          : t("composer.send.message")
-                    }
-                    aria-keyshortcuts={
-                      voicePhase() === "recording" ? undefined : sendShortcutAriaKey(deviceSendShortcut(props.platform))
-                    }
-                    title={
-                      voicePhase() === "recording"
-                        ? undefined
-                        : t(
-                            sendShortcutHintKey(
-                              deviceSendShortcut(props.platform),
-                              editingDeliveryId() ? "save" : "send",
-                            ),
-                          )
-                    }
-                    data-cuelume-emphasis="normal"
+                    class="dictation-button"
+                    aria-label={t(voiceButtonLabel(voicePhase()))}
                     disabled={
-                      attachmentBusy() ||
-                      submitting() ||
-                      !agentReady() ||
-                      Boolean(providerUpdateRequired()) ||
-                      voicePhase() === "preparing" ||
                       voicePhase() === "requesting" ||
-                      voicePhase() === "transcribing"
+                      voicePhase() === "preparing" ||
+                      voicePhase() === "transcribing" ||
+                      (voicePhase() === "idle" && (!props.agent || !agentReady()))
                     }
-                    onClick={submitComposer}
+                    onClick={() => void startVoiceRecording()}
                   >
-                    <Show when={submitting()} fallback={<ArrowUp aria-hidden="true" />}>
+                    <Show
+                      when={
+                        voicePhase() === "preparing" || voicePhase() === "requesting" || voicePhase() === "transcribing"
+                      }
+                      fallback={<Mic aria-hidden="true" />}
+                    >
                       <LoaderCircle class="composer-spinner" aria-hidden="true" />
                     </Show>
                   </Button>
-                }
-              >
-                <Button
-                  variant="ghost"
-                  type="button"
-                  class="voice-button voice-button-active"
-                  aria-label={t("composer.send.stop")}
-                  data-cuelume-tap="close"
-                  onClick={props.onStop}
-                >
-                  <StopIcon />
-                </Button>
+                </VoiceRecordingMorph>
               </Show>
             </div>
           </div>
