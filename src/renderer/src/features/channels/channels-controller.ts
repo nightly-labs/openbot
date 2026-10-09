@@ -312,6 +312,23 @@ export function createChannelsController(env: ChannelsEnvironment) {
     );
     if (channelsSupported) void untrack(() => refresh(selected));
   });
+  // Support can arrive after the scope starts: a remote host reports its capabilities after it connects,
+  // and again after each reconnect. Support that is there from the start is the scope's read. As there,
+  // the read gets the saved channel as an argument: a store write in an effect shows only after the flush.
+  createEffect(supported, (isSupported, wasSupported) => {
+    if (!isSupported || wasSupported !== false) return;
+    const saved = state.selectedId === null ? env.readSelection(env.scopeKey()) : null;
+    if (saved === null) {
+      void refresh();
+      return;
+    }
+    flush(() =>
+      setState((state) => {
+        state.selectedId = saved;
+      }),
+    );
+    void refresh(saved);
+  });
   onSettled(() => {
     const focus = () => {
       void refresh();

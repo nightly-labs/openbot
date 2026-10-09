@@ -737,7 +737,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     port: () => channelsPort,
     agents: workspace.profiles,
     // A host switch and a revoked session start the list again. A dropped connection does not: the
-    // open channel and its draft stay, and the effect below reads the list again when the host is back.
+    // open channel and its draft stay, and the controller reads the list again when the host is back.
     scopeKey: () => `${workspace.state.host?.hostId ?? ""}:${workspace.state.revocationRevision}`,
     readSelection: savedChannelId,
     writeSelection: (channelId) => {
@@ -778,13 +778,6 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         });
     }),
   );
-  // The scope starts before the host is online, so the first connection opens the saved channel here.
-  createEffect(channelsSupported, (supported) => {
-    if (!supported) return;
-    const saved = savedChannelId();
-    if (channels.state.selectedId === null && saved !== null) void channels.open(saved);
-    else void channels.refresh();
-  });
   const channelOpen = () => channels.state.selectedId !== null;
   const createSupported = () => workspace.state.status === "online" && workspace.state.host !== null;
   /** A host with no agents. The first-agent form opens there by itself, as in the desktop app. */
