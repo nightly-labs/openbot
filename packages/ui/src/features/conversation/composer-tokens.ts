@@ -81,6 +81,19 @@ export function createAttachmentToken(attachment: DraftAttachment, actions: Atta
   return token;
 }
 
+export function syncAttachmentTokens(
+  editor: HTMLDivElement,
+  attachments: DraftAttachment[],
+  actions: AttachmentTokenActions,
+): void {
+  for (const token of editor.querySelectorAll<HTMLElement>("[data-attachment-reference-id]")) {
+    const attachment = attachments.find((candidate) => candidate.id === token.dataset.attachmentReferenceId);
+    if (!attachment) token.replaceWith(document.createTextNode(token.dataset.attachmentReferenceName ?? ""));
+    else if (attachment.name !== token.dataset.attachmentReferenceName)
+      token.replaceWith(createAttachmentToken(attachment, actions));
+  }
+}
+
 export function createMentionToken(agent: AgentProfile): HTMLSpanElement {
   const token = document.createElement("span");
   token.className = `composer-mention-token ${referenceChipClasses.root}`;
@@ -315,6 +328,7 @@ export function renderEditorValue(
     cursor = index + match[0].length;
   }
   if (cursor < value.length) editor.append(document.createTextNode(value.slice(cursor)));
+  if (value.endsWith("\n")) editor.append(document.createElement("br"));
 }
 
 function scheduleStaticMentionAvatar(avatar: HTMLElement, agent: AgentProfile): void {

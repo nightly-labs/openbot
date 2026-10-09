@@ -3,18 +3,13 @@ import { serializeChatTagReference } from "@openbot/contracts/chat-tag-reference
 import { markdownListLineBreak } from "@openbot/contracts/markdown-lists";
 
 export function serializeEditor(editor: HTMLDivElement): string {
-  if (
-    editor.textContent === "" &&
-    !editor.querySelector("[data-mention-id], [data-skill-id], [data-mcp-id], [data-attachment-reference-id]")
-  )
-    return "";
   return Array.from(editor.childNodes).map(serializeNode).join("");
 }
 
 function serializeNode(node: Node): string {
   if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? "";
   if (!(node instanceof HTMLElement)) return "";
-  if (node.dataset.composerTrailingLine !== undefined) return "";
+  if (isTrailingPlaceholder(node)) return "";
   const attachmentId = node.dataset.attachmentReferenceId;
   const attachmentName = node.dataset.attachmentReferenceName;
   if (attachmentId && attachmentName) {
@@ -34,49 +29,48 @@ function serializeNode(node: Node): string {
   return node.tagName === "DIV" || node.tagName === "P" ? `${content}\n` : content;
 }
 
-/*
- * Writes through the browser's own editing command, so the change joins the undo stack: Ctrl+Z
- * still takes typing back, and still restores text a keystroke replaced. A range edit writes
- * nothing there. The command needs the caret inside this editor, and jsdom has no such command,
- * so it reports what it did and `insertPlainText` keeps a range edit for both cases.
- */
+/* Use native edits for typing, paste, and line breaks so they share the undo history.
+ * insertText splits multiline text into blocks. Escaped insertHTML keeps literal newlines. */
 function insertTextThroughBrowser(editor: HTMLDivElement, text: string): boolean {
-  // The command answers a newline with a block split, which serializes as two line breaks.
-  if (text.includes("\n") || typeof document.execCommand !== "function") return false;
+  if (typeof document.execCommand !== "function") return false;
   const selection = window.getSelection();
   const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
   if (!range || !editor.contains(range.commonAncestorContainer)) return false;
-  return document.execCommand("insertText", false, text);
+  if (!text) return document.execCommand("delete", false);
+  if (!text.includes("\n")) return document.execCommand("insertText", false, text);
+  const escaped = document.createElement("div");
+  escaped.textContent = text;
+  const atEnd = editorTextOffset(editor, range.endContainer, range.endOffset) === editorText(editor).length;
+  if (atEnd && editor.lastChild instanceof HTMLBRElement) range.setEndAfter(editor.lastChild);
+  // Include the final line box in the undoable edit, not in a later DOM mutation.
+  const trailingLine = atEnd && text.endsWith("\n") ? "<br>" : "";
+  return document.execCommand("insertHTML", false, escaped.innerHTML + trailingLine);
 }
 
 export function insertPlainText(editor: HTMLDivElement, text: string): void {
-  if (insertTextThroughBrowser(editor, text)) return;
-  /*
-   * The browser leaves a placeholder `<br>` behind when it empties the editable, and drops it only
-   * when it writes text itself. The range edit below writes the text instead, so it drops the
-   * placeholder: left in place beside the new text, it would serialize as a line break the user
-   * never typed.
-   */
-  if (!editor.textContent) editor.querySelector(":scope > br:last-child")?.remove();
   const selection = window.getSelection();
-  let range: Range;
   const selectedRange = selection?.rangeCount ? selection.getRangeAt(0) : null;
-  if (selectedRange && editor.contains(selectedRange.commonAncestorContainer)) {
-    range = selectedRange.cloneRange();
-  } else {
-    range = document.createRange();
+  const range =
+    selectedRange && editor.contains(selectedRange.commonAncestorContainer)
+      ? selectedRange.cloneRange()
+      : document.createRange();
+  if (!selectedRange || !editor.contains(selectedRange.commonAncestorContainer)) {
     range.selectNodeContents(editor);
     range.collapse(false);
+    selection?.removeAllRanges();
+    selection?.addRange(range);
   }
-
-  const prefix = range.cloneRange();
-  prefix.selectNodeContents(editor);
-  prefix.setEnd(range.startContainer, range.startOffset);
-  const caretOffset = prefix.toString().length + text.length;
-  range.deleteContents();
-  range.insertNode(document.createTextNode(text));
-  editor.normalize();
-  syncTrailingLineSentinel(editor);
+  const caretOffset = editorTextOffset(editor, range.startContainer, range.startOffset) + text.length;
+  if (!insertTextThroughBrowser(editor, text)) {
+    // jsdom has no editing commands. Keep the range path for that environment.
+    if (!editor.textContent) editor.querySelector(":scope > br:last-child")?.remove();
+    range.deleteContents();
+    range.insertNode(document.createTextNode(text));
+    if (editor.textContent?.endsWith("\n") && !(editor.lastChild instanceof HTMLBRElement)) {
+      editor.append(document.createElement("br"));
+    }
+  }
+  // Native deletion can put the caret before the previous newline. Restore the edit's endpoint.
   const caretRange = rangeFromTextOffsets(editor, caretOffset, caretOffset);
   if (!caretRange) return;
   selection?.removeAllRanges();
@@ -85,7 +79,7 @@ export function insertPlainText(editor: HTMLDivElement, text: string): void {
 
 /*
  * Continues or ends a Markdown list, as `markdownListLineBreak` describes. The edit works in the
- * editor's text offsets, where a chip counts as its visible text, and it changes only the current
+ * editor's text offsets, where a chip counts as one position, and it changes only the current
  * line, so chips stay in place.
  */
 export function insertLineBreak(editor: HTMLDivElement): void {
@@ -95,14 +89,8 @@ export function insertLineBreak(editor: HTMLDivElement): void {
     insertPlainText(editor, "\n");
     return;
   }
-  const before = range.cloneRange();
-  before.selectNodeContents(editor);
-  before.setEnd(range.startContainer, range.startOffset);
-  const after = range.cloneRange();
-  after.selectNodeContents(editor);
-  after.setStart(range.endContainer, range.endOffset);
-  const text = before.toString() + after.toString();
-  const caret = before.toString().length;
+  const text = editorText(editor);
+  const caret = editorTextOffset(editor, range.startContainer, range.startOffset);
   const edit = markdownListLineBreak(text, caret);
   if (!edit) {
     insertPlainText(editor, "\n");
@@ -119,23 +107,14 @@ export function insertLineBreak(editor: HTMLDivElement): void {
   insertPlainText(editor, "");
 }
 
-export function syncTrailingLineSentinel(editor: HTMLDivElement, value = serializeEditor(editor)): void {
-  const existing = editor.querySelector<HTMLElement>("[data-composer-trailing-line]");
-  existing?.remove();
-  if (!value.endsWith("\n")) return;
-
-  const sentinel = document.createElement("span");
-  sentinel.className = "composer-trailing-line";
-  sentinel.dataset.composerTrailingLine = "";
-  sentinel.contentEditable = "false";
-  sentinel.setAttribute("aria-hidden", "true");
-  editor.append(sentinel);
+function isTrailingPlaceholder(node: HTMLElement): boolean {
+  return node.tagName === "BR" && !node.nextSibling;
 }
 
 export function placeCaretAtEnd(editor: HTMLDivElement): void {
-  const range = document.createRange();
-  range.selectNodeContents(editor);
-  range.collapse(false);
+  const end = editorText(editor).length;
+  const range = rangeFromTextOffsets(editor, end, end);
+  if (!range) return;
   const selection = window.getSelection();
   selection?.removeAllRanges();
   selection?.addRange(range);
@@ -232,26 +211,88 @@ function previousNonemptySibling(node: Node | null): Node | null {
   return candidate;
 }
 
-export function rangeFromTextOffsets(root: HTMLElement, start: number, end: number): Range | null {
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  const range = document.createRange();
-  let offset = 0;
-  let startSet = false;
-  let node = walker.nextNode();
-  while (node) {
-    const length = node.textContent?.length ?? 0;
-    if (!startSet && start <= offset + length) {
-      range.setStart(node, Math.max(0, start - offset));
-      startSet = true;
-    }
-    if (startSet && end <= offset + length) {
-      range.setEnd(node, Math.max(0, end - offset));
-      return range;
-    }
-    offset += length;
-    node = walker.nextNode();
+// Each tag occupies one position. Renaming a tag must not move a selection after it.
+function editorSegments(root: Node): Node[] {
+  return Array.from(root.childNodes).flatMap((node) => {
+    if (node.nodeType === Node.TEXT_NODE) return [node];
+    if (!(node instanceof HTMLElement) || isTrailingPlaceholder(node)) return [];
+    if (node.contentEditable === "false" || node.tagName === "BR") return [node];
+    return editorSegments(node);
+  });
+}
+
+export function editorText(root: Node): string {
+  return editorSegments(root)
+    .map((node) =>
+      node.nodeType === Node.TEXT_NODE ? (node.textContent ?? "") : node.nodeName === "BR" ? "\n" : "\uFFFC",
+    )
+    .join("");
+}
+
+export function editorTextOffset(editor: HTMLElement, node: Node, offset: number): number {
+  const prefix = document.createRange();
+  prefix.selectNodeContents(editor);
+  prefix.setEnd(node, offset);
+  let length = 0;
+  for (const segment of editorSegments(editor)) {
+    if (prefix.comparePoint(segment, 0) > 0) break;
+    const size = segment.nodeType === Node.TEXT_NODE ? (segment.textContent?.length ?? 0) : 1;
+    if (segment === node) return length + Math.min(offset, size);
+    length += size;
   }
-  if (!startSet) range.setStart(root, root.childNodes.length);
-  range.setEnd(root, root.childNodes.length);
+  return length;
+}
+
+export interface EditorSelection {
+  anchor: number;
+  focus: number;
+}
+
+export function readEditorSelection(editor: HTMLElement): EditorSelection | null {
+  const selection = editor.ownerDocument.getSelection();
+  if (
+    !selection?.anchorNode ||
+    !selection.focusNode ||
+    !editor.contains(selection.anchorNode) ||
+    !editor.contains(selection.focusNode)
+  )
+    return null;
+  return {
+    anchor: editorTextOffset(editor, selection.anchorNode, selection.anchorOffset),
+    focus: editorTextOffset(editor, selection.focusNode, selection.focusOffset),
+  };
+}
+
+export function restoreEditorSelection(editor: HTMLElement, saved: EditorSelection): void {
+  const anchor = rangeFromTextOffsets(editor, saved.anchor, saved.anchor);
+  const focus = rangeFromTextOffsets(editor, saved.focus, saved.focus);
+  if (!anchor || !focus) return;
+  editor.ownerDocument
+    .getSelection()
+    ?.setBaseAndExtent(anchor.startContainer, anchor.startOffset, focus.startContainer, focus.startOffset);
+}
+
+export function rangeFromTextOffsets(root: HTMLElement, start: number, end: number): Range | null {
+  const range = document.createRange();
+  const segments = editorSegments(root);
+  function pointAt(position: number): { node: Node; offset: number } {
+    let remaining = Math.max(0, position);
+    for (const node of segments) {
+      const text = node.nodeType === Node.TEXT_NODE;
+      const length = text ? (node.textContent?.length ?? 0) : 1;
+      if (remaining <= length) {
+        if (text) return { node, offset: remaining };
+        const parent = node.parentNode ?? root;
+        const index = Array.from<Node>(parent.childNodes).indexOf(node);
+        return { node: parent, offset: index + (remaining > 0 ? 1 : 0) };
+      }
+      remaining -= length;
+    }
+    return { node: root, offset: root.childNodes.length };
+  }
+  const from = pointAt(start);
+  const to = pointAt(end);
+  range.setStart(from.node, from.offset);
+  range.setEnd(to.node, to.offset);
   return range;
 }

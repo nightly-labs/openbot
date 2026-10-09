@@ -113,7 +113,10 @@ function composerFrame(storyArgs: Parameters<typeof ComposerEditor>[0], options:
   const [value, setValue] = createSignal(storyArgs.value);
   // The picker hangs off the composer inside `.composer-wrap`, the way the conversation renders it.
   return (
-    <div class="composer-wrap" style={{ width: options.width, "margin-top": "260px" }}>
+    <div
+      class="composer-wrap"
+      style={{ width: options.width, "max-width": "calc(100vw - 32px)", "margin-top": "260px" }}
+    >
       <div class="composer" data-compact={options.compact ? "" : undefined}>
         <div class="composer-input-label">
           <ComposerEditor {...storyArgs} value={value()} onValueChange={setValue} onSubmit={storyArgs.onSubmit} />
@@ -144,6 +147,11 @@ export const LongMultilineDraft: Story = {
     value: Array.from({ length: 30 }, (_, index) => `Line ${index + 1}: Edit this part of the draft.`).join("\n"),
   },
   render: (storyArgs) => composerFrame(storyArgs, { width: "480px" }),
+};
+
+export const WrappedDraft: Story = {
+  args: { value: "Edit this long draft without adding a line break. ".repeat(30) },
+  render: (storyArgs) => composerFrame(storyArgs, { width: "480px", compact: true }),
 };
 
 export const WithAgentAndSkillTags: Story = {

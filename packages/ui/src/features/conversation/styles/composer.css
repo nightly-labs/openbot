@@ -287,11 +287,16 @@
   color: var(--openbot-bg-canvas);
 }
 
+.composer-input-label,
+.composer-editor-root {
+  --composer-editor-max-height: max(48px, 33dvh);
+}
+
 .composer-input-label {
   display: flex;
   min-width: 0;
   min-height: 48px;
-  max-height: 117px;
+  max-height: var(--composer-editor-max-height);
   align-items: flex-end;
   cursor: text;
 }
@@ -358,7 +363,7 @@
   width: 100%;
   min-width: 0;
   min-height: 48px;
-  max-height: 117px;
+  max-height: var(--composer-editor-max-height);
   cursor: text;
 }
 
@@ -368,7 +373,7 @@
   width: 100%;
   height: auto;
   min-height: 48px;
-  max-height: 117px;
+  max-height: var(--composer-editor-max-height);
   margin: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -400,14 +405,6 @@
   line-height: 20px;
   pointer-events: none;
   user-select: none;
-}
-
-.composer-trailing-line {
-  display: inline-block;
-  width: 0;
-  height: 1em;
-  overflow: hidden;
-  pointer-events: none;
 }
 
 /* The box comes from `.reference-chip`; this token only loses the chip fill and gains the outline. */

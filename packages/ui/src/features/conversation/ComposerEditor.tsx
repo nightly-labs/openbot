@@ -14,14 +14,17 @@ import { AnchoredTooltip } from "./AnchoredTooltip";
 import { AttachmentReferenceVisual } from "./AttachmentReference";
 import {
   automaticMentionSpaceAtCaretBoundary,
+  editorText,
+  editorTextOffset,
   insertLineBreak,
   insertPlainText,
   mentionTokenAtCaretBoundary,
   placeCaretAtChildOffset,
   placeCaretAtEnd,
   rangeFromTextOffsets,
+  readEditorSelection,
+  restoreEditorSelection,
   serializeEditor,
-  syncTrailingLineSentinel,
 } from "./composer-dom";
 import { shouldRestoreComposerFocus } from "./composer-focus";
 import {
@@ -43,6 +46,7 @@ import {
   createSkillToken,
   MENTION_PATTERN,
   renderEditorValue,
+  syncAttachmentTokens,
   syncMcpTokens,
   syncSkillTokens,
   truncateComposerValue,
@@ -213,6 +217,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
   let lastFocusRequest = 0;
   let lastSkillPickerRequest = 0;
   let isComposing = false;
+  const [compositionRevision, setCompositionRevision] = createSignal(0);
   const attachmentTokenActions: AttachmentTokenActions = {
     tooltipId: attachmentTooltipId,
     open: (attachment, keepTooltip = false) => {
@@ -240,6 +245,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
 
   createEffect(
     () => ({
+      compositionRevision: compositionRevision(),
       agentId: props.agentId,
       value: props.value,
       agents: props.agents,
@@ -250,35 +256,56 @@ export function ComposerEditor(props: ComposerEditorProps) {
       skillPickerRequest: props.skillPickerRequest ?? 0,
     }),
     ({ agentId, value, agents, skills, mcpServers, attachments, focusRequest, skillPickerRequest }) => {
-      if (!editor) return;
+      if (!editor || (isComposing && agentId === lastAgentId)) return;
       const attachmentKey = attachments.map((attachment) => `${attachment.id}:${attachment.name}`).join("|");
       const skillKey = skills
-        .map((skill) => `${skill.skillId}:${skill.name}:${skill.state}:${skill.description ?? ""}`)
+        .map((skill) => `${skill.skillId}:${skill.name}:${skill.state}:${skill.enabled}:${skill.description ?? ""}`)
         .join("|");
       const mcpKey = mcpServers.map((server) => `${server.id}:${server.name}:${server.enabled}`).join("|");
-      const contentChanged =
-        agentId !== lastAgentId || value !== lastEmittedValue || attachmentKey !== lastAttachmentKey;
+      const draftChanged = agentId !== lastAgentId;
+      const attachmentsChanged = attachmentKey !== lastAttachmentKey;
+      const renderedAttachments = new Set(
+        Array.from(
+          editor.querySelectorAll<HTMLElement>("[data-attachment-reference-id]"),
+          (token) => token.dataset.attachmentReferenceId,
+        ),
+      );
+      const attachmentResolved =
+        attachmentsChanged &&
+        [...attachmentReferenceIds(value)].some(
+          (id) => attachments.some((attachment) => attachment.id === id) && !renderedAttachments.has(id),
+        );
+      const contentChanged = draftChanged || value !== lastEmittedValue || attachmentResolved;
+      const selection =
+        !draftChanged && editor.ownerDocument.activeElement === editor ? readEditorSelection(editor) : null;
+      const scrollTop = draftChanged ? 0 : editor.scrollTop;
       const skillsChanged = skillKey !== lastSkillKey;
       const mcpChanged = mcpKey !== lastMcpKey;
       const focusRequested = focusRequest > lastFocusRequest;
       if (contentChanged) {
         lastAgentId = agentId;
-        lastAttachmentKey = attachmentKey;
         lastEmittedValue = value;
         setAttachmentTooltip(null);
         renderEditorValue(editor, value, agents, skills, mcpServers, attachments, attachmentTokenActions);
-        syncTrailingLineSentinel(editor, value);
         setMention(null);
       } else {
+        if (attachmentsChanged) syncAttachmentTokens(editor, attachments, attachmentTokenActions);
         if (skillsChanged) syncSkillTokens(editor, skills);
         if (mcpChanged) syncMcpTokens(editor, mcpServers);
       }
+      if (selection && (contentChanged || attachmentsChanged || skillsChanged || mcpChanged)) {
+        restoreEditorSelection(editor, selection);
+        scheduleCaretScroll();
+      }
+      editor.scrollTop = scrollTop;
+      lastAttachmentKey = attachmentKey;
       lastSkillKey = skillKey;
       lastMcpKey = mcpKey;
       if (focusRequested) {
         lastFocusRequest = focusRequest;
-        editor.focus();
+        editor.focus({ preventScroll: true });
         placeCaretAtEnd(editor);
+        scheduleCaretScroll();
       }
       if (skillPickerRequest > lastSkillPickerRequest) {
         lastSkillPickerRequest = skillPickerRequest;
@@ -299,13 +326,59 @@ export function ComposerEditor(props: ComposerEditorProps) {
     };
     const restoreFocus = () => {
       if (focusInFrame || usesTouchLayout()) return;
-      if (editor && shouldRestoreComposerFocus(editor)) editor.focus();
+      if (editor && shouldRestoreComposerFocus(editor)) {
+        editor.focus({ preventScroll: true });
+        scheduleCaretScroll();
+      }
     };
     view.addEventListener("blur", noteFrameFocus);
     view.addEventListener("focus", restoreFocus);
     return () => {
       view.removeEventListener("blur", noteFrameFocus);
       view.removeEventListener("focus", restoreFocus);
+    };
+  });
+
+  let caretFrame: number | undefined;
+  function scheduleCaretScroll() {
+    const view = editor?.ownerDocument.defaultView;
+    if (!view || caretFrame !== undefined) return;
+    caretFrame = view.requestAnimationFrame(() => {
+      caretFrame = undefined;
+      if (!editor || editor.ownerDocument.activeElement !== editor) return;
+      const selection = readEditorSelection(editor);
+      if (!selection) return;
+      const range = rangeFromTextOffsets(editor, selection.focus, selection.focus);
+      if (!range) return;
+      const text = editorText(editor);
+      const trailingLine =
+        selection.focus === text.length && text.endsWith("\n") && editor.lastChild instanceof HTMLBRElement
+          ? editor.lastChild
+          : null;
+      const rect = trailingLine?.getBoundingClientRect() ?? range.getClientRects?.()[0];
+      if (!rect?.height || !editor.offsetHeight) return;
+      const box = editor.getBoundingClientRect();
+      const scale = box.height / editor.offsetHeight;
+      if (rect.top < box.top) editor.scrollTop += Math.floor((rect.top - box.top) / scale);
+      else if (rect.bottom > box.bottom) editor.scrollTop += Math.ceil((rect.bottom - box.bottom) / scale);
+    });
+  }
+
+  onSettled(() => {
+    if (!editor) return;
+    const document = editor.ownerDocument;
+    const view = document.defaultView;
+    const selectionChanged = () => {
+      // A dismissed picker stays closed until the user types or clicks again.
+      if (mention()) updateMention();
+    };
+    document.addEventListener("selectionchange", selectionChanged);
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(scheduleCaretScroll);
+    observer?.observe(editor);
+    return () => {
+      document.removeEventListener("selectionchange", selectionChanged);
+      observer?.disconnect();
+      if (caretFrame !== undefined) view?.cancelAnimationFrame(caretFrame);
     };
   });
 
@@ -326,9 +399,9 @@ export function ComposerEditor(props: ComposerEditorProps) {
       );
       placeCaretAtEnd(editor);
     }
-    syncTrailingLineSentinel(editor, value);
     lastEmittedValue = value;
     props.onValueChange(value);
+    scheduleCaretScroll();
   }
 
   /*
@@ -341,46 +414,39 @@ export function ComposerEditor(props: ComposerEditorProps) {
    */
   function handleBeforeInput(event: InputEvent) {
     if (!editor || props.disabled || isComposing || event.isComposing) return;
-    if (event.inputType !== "insertText" || !event.data) return;
+    const lineBreak = event.inputType === "insertLineBreak" || event.inputType === "insertParagraph";
+    if (!lineBreak && (event.inputType !== "insertText" || !event.data)) return;
     event.preventDefault();
-    insertPlainText(editor, event.data);
+    if (lineBreak) insertLineBreak(editor);
+    else if (event.data) insertPlainText(editor, event.data);
     emitValue();
     updateMention();
-    scrollToEndIfCaretAtEnd();
   }
 
-  function scrollToEndIfCaretAtEnd() {
-    if (!editor) return;
-    const selection = window.getSelection();
-    const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
-    if (!range?.collapsed || !editor.contains(range.commonAncestorContainer)) return;
-    const afterCaret = range.cloneRange();
-    afterCaret.selectNodeContents(editor);
-    afterCaret.setStart(range.endContainer, range.endOffset);
-    // Keep earlier edits in view; only follow the bottom when appending to the draft.
-    if (!afterCaret.toString()) editor.scrollTop = editor.scrollHeight;
+  function mentionAtSelection(): MentionContext | null {
+    if (!editor) return null;
+    const selection = readEditorSelection(editor);
+    if (!selection || selection.anchor !== selection.focus) return null;
+    const beforeCaret = editorText(editor).slice(0, selection.focus);
+    const match = beforeCaret.match(/(?:^|\s)([@$])([^@$\n\uFFFC]{0,60})$/u);
+    if (!match) return null;
+    const trigger = match[1] === "$" ? "$" : "@";
+    const query = match[2] ?? "";
+    return { query, start: beforeCaret.length - query.length - 1, end: beforeCaret.length, trigger };
   }
 
   function updateMention() {
-    if (!editor) return;
-    const selection = window.getSelection();
-    if (!selection?.rangeCount || !editor.contains(selection.anchorNode)) {
-      setMention(null);
+    const next = mentionAtSelection();
+    const current = mention();
+    if (next && editor) setPickerFrame(measurePickerFrame(editor));
+    if (
+      current?.start === next?.start &&
+      current?.end === next?.end &&
+      current?.query === next?.query &&
+      current?.trigger === next?.trigger
+    )
       return;
-    }
-    const range = selection.getRangeAt(0).cloneRange();
-    range.selectNodeContents(editor);
-    range.setEnd(selection.anchorNode ?? editor, selection.anchorOffset);
-    const beforeCaret = range.toString();
-    const match = beforeCaret.match(/(?:^|\s)([@$])([^@$\n]{0,60})$/u);
-    if (!match) {
-      setMention(null);
-      return;
-    }
-    const trigger = match[1] === "$" ? "$" : "@";
-    const query = match[2] ?? "";
-    setPickerFrame(measurePickerFrame(editor));
-    setMention({ query, start: beforeCaret.length - query.length - 1, end: beforeCaret.length, trigger });
+    setMention(next);
     setActiveOption(0);
   }
 
@@ -393,10 +459,10 @@ export function ComposerEditor(props: ComposerEditorProps) {
     if (!selection?.rangeCount) return;
     // Keep selected text: put the `$` after it.
     if (!selection.isCollapsed) selection.collapseToEnd();
-    const range = selection.getRangeAt(0).cloneRange();
-    range.selectNodeContents(editor);
-    range.setEnd(selection.anchorNode ?? editor, selection.anchorOffset);
-    const beforeCaret = range.toString();
+    const beforeCaret = editorText(editor).slice(
+      0,
+      editorTextOffset(editor, selection.anchorNode ?? editor, selection.anchorOffset),
+    );
     const separator = beforeCaret && !/\s$/u.test(beforeCaret) ? " " : "";
     insertPlainText(editor, `${separator}$`);
     setRequestedMentionStart(beforeCaret.length + separator.length);
@@ -431,29 +497,9 @@ export function ComposerEditor(props: ComposerEditorProps) {
     editor.focus();
   }
 
-  function ensureEditorSelection(normalize = false) {
+  function ensureEditorSelection() {
     if (!editor) return;
-    const selection = window.getSelection();
-    const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
-    if (!range || !editor.contains(range.commonAncestorContainer)) {
-      if (normalize) editor.normalize();
-      placeCaretAtEnd(editor);
-      return;
-    }
-    if (!normalize) return;
-    const startPrefix = range.cloneRange();
-    startPrefix.selectNodeContents(editor);
-    startPrefix.setEnd(range.startContainer, range.startOffset);
-    const endPrefix = range.cloneRange();
-    endPrefix.selectNodeContents(editor);
-    endPrefix.setEnd(range.endContainer, range.endOffset);
-    const start = startPrefix.toString().length;
-    const end = endPrefix.toString().length;
-    editor.normalize();
-    const normalizedRange = rangeFromTextOffsets(editor, start, end);
-    if (!normalizedRange) return;
-    selection?.removeAllRanges();
-    selection?.addRange(normalizedRange);
+    if (!readEditorSelection(editor)) placeCaretAtEnd(editor);
   }
 
   function moveActiveOption(delta: number, optionCount: number) {
@@ -467,8 +513,15 @@ export function ComposerEditor(props: ComposerEditorProps) {
     });
   }
 
-  function handleMentionPickerKeyDown(event: KeyboardEvent, sendShortcut: SendShortcut): boolean {
-    if (!mention()) return false;
+  function handleMentionPickerKeyDown(event: KeyboardEvent): boolean {
+    const context = mention();
+    if (!context) return false;
+    const current = mentionAtSelection();
+    if (!current || current.start !== context.start || current.end !== context.end || current.query !== context.query) {
+      setMention(null);
+      return false;
+    }
+    if (event.shiftKey || event.altKey || event.metaKey || event.ctrlKey) return false;
     const options = matchingOptions();
     if (event.key === "Escape") {
       event.preventDefault();
@@ -486,9 +539,6 @@ export function ComposerEditor(props: ComposerEditorProps) {
       moveActiveOption(-1, options.length);
       return true;
     }
-    // The modifier send chord submits instead of picking a suggestion. In the Enter mode the
-    // chord is plain Enter, which keeps selecting the suggestion as before.
-    if (sendShortcut !== "enter" && isSendShortcutKey(event, sendShortcut)) return false;
     if ((event.key === "Enter" && !event.shiftKey) || event.key === "Tab") {
       event.preventDefault();
       const option = options[activeOption()];
@@ -545,7 +595,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
      * `compositionstart` and without `isComposing`; Chromium marks it with keyCode 229 ("Process").
      */
     if (isComposing || event.isComposing || event.keyCode === 229 || event.key === "Process") return;
-    if (handleMentionPickerKeyDown(event, sendShortcut)) return;
+    if (handleMentionPickerKeyDown(event)) return;
     if (event.key === "Backspace" && removeAutomaticMentionSpace()) {
       event.preventDefault();
       return;
@@ -578,7 +628,6 @@ export function ComposerEditor(props: ComposerEditorProps) {
       insertLineBreak(editor);
       emitValue();
       updateMention();
-      scrollToEndIfCaretAtEnd();
       return;
     }
     if (event.key === "Enter") {
@@ -588,7 +637,6 @@ export function ComposerEditor(props: ComposerEditorProps) {
         insertLineBreak(editor);
         emitValue();
         updateMention();
-        scrollToEndIfCaretAtEnd();
         return;
       }
       event.preventDefault();
@@ -598,27 +646,16 @@ export function ComposerEditor(props: ComposerEditorProps) {
 
   function removeTrailingLineBreak(): boolean {
     if (!editor) return false;
-    const value = serializeEditor(editor);
-    if (!value.endsWith("\n")) return false;
-    const selection = window.getSelection();
-    const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
-    if (!range?.collapsed || !editor.contains(range.commonAncestorContainer)) return false;
-    const afterCaret = range.cloneRange();
-    afterCaret.setEndAfter(editor.lastChild ?? editor);
-    if (afterCaret.toString()) return false;
-
-    const nextValue = value.slice(0, -1);
-    renderEditorValue(
-      editor,
-      nextValue,
-      props.agents,
-      props.skills ?? [],
-      props.mcpServers ?? [],
-      props.attachments ?? [],
-      attachmentTokenActions,
-    );
-    syncTrailingLineSentinel(editor, nextValue);
-    placeCaretAtEnd(editor);
+    const value = editorText(editor);
+    const selection = readEditorSelection(editor);
+    if (!value.endsWith("\n") || !selection || selection.anchor !== value.length || selection.focus !== value.length)
+      return false;
+    const range = rangeFromTextOffsets(editor, value.length - 1, value.length);
+    if (!range) return false;
+    const nativeSelection = window.getSelection();
+    nativeSelection?.removeAllRanges();
+    nativeSelection?.addRange(range);
+    insertPlainText(editor, "");
     emitValue();
     updateMention();
     return true;
@@ -670,7 +707,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
         aria-multiline="true"
         spellcheck="true"
         data-cuelume-type=""
-        onFocus={() => ensureEditorSelection(true)}
+        onFocus={ensureEditorSelection}
         onInput={() => {
           emitValue();
           updateMention();
@@ -683,6 +720,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
         }}
         onCompositionEnd={() => {
           isComposing = false;
+          setCompositionRevision((revision) => revision + 1);
         }}
         onPaste={handlePaste}
         onBlur={() => {
