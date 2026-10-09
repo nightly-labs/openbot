@@ -555,7 +555,14 @@ Before creating the first tag or any later release:
     running application, that a provider downloads in-app, that the server rail is drawn, and that the
     microphone control is absent;
 14. confirm `CHANGELOG.md` describes the version and the working tree is clean;
-15. create and push the version commit and tag only after CI passes on `main`.
+15. create and push the version commit and tag only after CI passes on `main`;
+16. if `git diff --quiet <previous tag> <new tag> -- remote packages/contracts/src/signal-protocol` finds
+    changes, deploy Signal from the new tag as soon as the tag exists, before the release workflow
+    publishes the clients. Use the Signal-only procedure in
+    [remote-session-deployment.md](remote-session-deployment.md#deployment-procedure--requires-separate-approval).
+    Confirm that `curl -fsS https://signal.openbot.run/health/live` shows the tag commit. A client
+    that needs a newer Signal fails until then: v0.33.0 shipped webhook routines while Signal was older
+    than #1520, so every webhook route answered 404 (#1661).
 
 The macOS ZIP must be smaller than 800,000,000 bytes and smaller than the official `0.1.21` ZIP.
 Do not publish when either size gate fails, the `0.1.21` canary update crashes, or Windows starts NSIS

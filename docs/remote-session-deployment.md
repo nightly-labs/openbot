@@ -55,13 +55,18 @@ Run only these Signal commands; `remote:update` also updates coturn and is not a
 ```sh
 signal_previous_image=$(docker inspect openbot-remote-remote-api-1 --format '{{.Image}}')
 docker image tag "$signal_previous_image" openbot-remote-api:before-325
-remote/bin/dotenvx run --overload -f remote/.env.production -fk remote/.env.keys -- \
+# The release directory is named after the commit. `/health/live` shows it after the start.
+OPENBOT_SOURCE_COMMIT="$(basename "$PWD")" remote/bin/dotenvx run --overload -f remote/.env.production -fk remote/.env.keys -- \
   docker compose -p openbot-remote -f remote/compose.yaml build remote-api
 remote/bin/dotenvx run --overload -f remote/.env.production -fk remote/.env.keys -- \
   docker compose -p openbot-remote -f remote/compose.yaml up -d --no-build --no-deps remote-api
 docker inspect openbot-remote-remote-api-1 --format '{{.Image}} {{.State.Health.Status}}'
 curl --fail --silent --show-error https://signal.openbot.run/health/ready
+curl --fail --silent --show-error https://signal.openbot.run/health/live
 ```
+
+`/health/live` must show the release commit. Builds made before this field existed show no `commit`;
+builds made without `OPENBOT_SOURCE_COMMIT` show `unknown`.
 
 Wait for Docker health to become `healthy`. Check the running source for `multiplex` and record its
 checksum. Keep the previous image until the device checks below pass. Do not print container environment

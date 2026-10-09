@@ -11,7 +11,7 @@ opens them last, a released Team API adapter is spoken by peers you will never u
 account Worker's D1 migrations are applied before the Worker that needs them. A build that ships
 past one of these does not fail on your machine; it fails on someone else's, once, permanently.
 
-Audit the diff since the last released tag against the seven gates below, then report a verdict.
+Audit the diff since the last released tag against the eight gates below, then report a verdict.
 This runs *before* `docs/RELEASING.md`, which stays authoritative for the publish itself.
 
 ## What this skill does and does not do
@@ -89,9 +89,9 @@ audit delegates a check to can be dismissed by the bucket its file lives in.**
 The rest of `docs/**`, `tools/**` and `src/renderer/stories/**` are not in the shipped app at all,
 which is a reason that covers every file in them. "Nothing looked interesting" is not.
 
-## Step 2 — the seven gates
+## Step 2 — the eight gates
 
-Work through all seven. A gate no path triggered is reported as **not triggered** — never dropped
+Work through all eight. A gate no path triggered is reported as **not triggered** — never dropped
 silently, because "I did not look" and "I looked and it was clean" are different verdicts and only
 one of them is a release gate.
 
@@ -126,6 +126,14 @@ a gate can be selected without opening anything:
   two, so omitting them makes the weakening read as "not triggered".
 - **G. Reverse states and the changelog** → [gate-g-reverse-states.md](references/gate-g-reverse-states.md)
   always triggered; no path exempts a release.
+- **H. Signal** — no reference file.
+  `remote/` and `packages/contracts/src/signal-protocol/`. Signal is not deployed by CI or by the
+  release workflow. Read `commit` from `curl -fsS https://signal.openbot.run/health/live`; if it is
+  missing or `unknown`, the running commit is not known, so the verdict is **needs a human**. Pass
+  only when `git merge-base --is-ancestor <release commit> <running commit>` succeeds. Otherwise the verdict is
+  **deploy Signal from the new tag** before the clients are published (`docs/RELEASING.md` preflight
+  item 16). #1661 is the failure this catches: v0.33.0 clients sent webhook routes to a Signal older
+  than #1520.
 
 `references/surfaces.md` holds the exhaustive path inventory. Load it when a gate fires and you
 need the exact file, not before.

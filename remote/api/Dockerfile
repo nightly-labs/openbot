@@ -17,6 +17,9 @@ RUN bun install --production --ignore-scripts --frozen-lockfile --filter @openbo
 FROM oven/bun:1.4.2-alpine
 WORKDIR /app
 ENV NODE_ENV=production
+# The release commit. `/health/live` shows it; the deploy sets it through Compose.
+ARG OPENBOT_SOURCE_COMMIT=unknown
+ENV OPENBOT_SOURCE_COMMIT=$OPENBOT_SOURCE_COMMIT
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY --from=dependencies /app/remote/api/node_modules ./remote/api/node_modules
 # Source, not just the manifest: workspace packages here ship as raw TypeScript, so the symlink

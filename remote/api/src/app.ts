@@ -118,7 +118,7 @@ export function createRemoteApiApp(
   discord: DiscordApi | null = null,
 ) {
   const app = new Elysia()
-    .get("/health/live", () => ({ service: "openbot-remote-api", status: "live" }))
+    .get("/health/live", () => ({ service: "openbot-remote-api", status: "live", commit: config.sourceCommit }))
     .get("/health/ready", () => ({ service: "openbot-remote-api", status: "ready" }))
     .post("/internal/auth-events", async ({ request, set }) => {
       const timestamp = request.headers.get("OpenBot-Timestamp") ?? "";

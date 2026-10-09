@@ -24,6 +24,8 @@ services:
     build:
       context: ..
       dockerfile: remote/api/Dockerfile
+      args:
+        OPENBOT_SOURCE_COMMIT: ${OPENBOT_SOURCE_COMMIT:-unknown}
     restart: unless-stopped
     depends_on:
       acme:
