@@ -47,6 +47,34 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("browser workspace runtime", () => {
+  it.each([401, 403, 503])("classifies account bootstrap denial with status %s", async (status) => {
+    let bootstrap: RemoteTeamPeerActions["getBootstrap"] | undefined;
+    const connection = vi.fn();
+    const runtime = createWebWorkspaceRuntime(
+      "one",
+      { connection, event: vi.fn(), accountChanged: async () => {} },
+      vi.fn(async () => Response.json({ error: "Unavailable" }, { status })),
+      {
+        createPeer: (actions) => {
+          bootstrap = actions.current.getBootstrap;
+          return peer;
+        },
+        acquireHostLock: async () => () => {},
+      },
+    );
+    if (!bootstrap) throw new Error("Peer actions are unavailable.");
+    await expect(bootstrap(host.hostId, "client-key", null)).rejects.toMatchObject({ status });
+    if (status === 503) expect(connection).not.toHaveBeenCalled();
+    else
+      expect(connection).toHaveBeenCalledWith({
+        hostId: host.hostId,
+        state: "offline",
+        message: null,
+        code: "session_revoked",
+      });
+    await runtime.dispose();
+  });
+
   it("reads the host sidebar layout and validates account usage", async () => {
     peer.execute.mockImplementation(async (command) => ({
       ok: true,

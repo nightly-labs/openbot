@@ -1195,7 +1195,7 @@ export function createWebWorkspace(
     const visibility = () => {
       if (document.hidden) {
         hostLifecycle.cancelPending();
-        if (hostId) generation += 1;
+        if (hostId && state.status !== "online") generation += 1;
         recovery.setActive(false);
       } else {
         hostLifecycle.resume();

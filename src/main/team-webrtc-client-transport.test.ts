@@ -167,6 +167,36 @@ function sentRequestId(send: { mock: { calls: unknown[][] } }): string | null {
 }
 
 describe("TeamWebRtcClientTransport", () => {
+  it("ends a required read at its deadline while the bridge send is blocked", async () => {
+    const bridge = new TeamWebRtcBridge();
+    vi.spyOn(bridge, "start").mockReturnValue(Effect.void);
+    vi.spyOn(bridge, "connect").mockImplementation(({ peerId }) =>
+      remoteCall(async () => {
+        queueMicrotask(() => bridge.emit("connected", peerId, channelBinding));
+      }),
+    );
+    vi.spyOn(bridge, "disconnect").mockReturnValue(Effect.void);
+    const { send } = mockAuthenticatedSend(bridge);
+    const transport = createTransport(bridge);
+    transport.pinHostKey("host-1", hostKeys.publicKey);
+    await runCauseEffect(transport.connect("host-1"));
+    const interrupted = vi.fn();
+    send.mockClear().mockReturnValue(Effect.never.pipe(Effect.ensuring(Effect.sync(interrupted))));
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const request = runCauseEffect(transport.request("host-1", "/v1/agents"));
+      const rejected = expect(request).rejects.toMatchObject({ code: "remote_timeout" });
+      await vi.waitFor(() => expect(send).toHaveBeenCalledOnce());
+      await vi.advanceTimersByTimeAsync(15_000);
+      await rejected;
+      expect(interrupted).toHaveBeenCalledOnce();
+      expect(send).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+      await runCauseEffect(transport.stop());
+    }
+  });
+
   it("waits for the host directory only for a host without a pinned key, and still refuses one it does not pin", async () => {
     const bridge = new TeamWebRtcBridge();
     vi.spyOn(bridge, "start").mockReturnValue(Effect.void);

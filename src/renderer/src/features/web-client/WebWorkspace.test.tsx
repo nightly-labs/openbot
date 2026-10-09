@@ -227,8 +227,17 @@ describe("web workspace state", () => {
     await vi.waitFor(() => expect(workspace.state.duplicatingAgentIds).toEqual(["chief"]));
     await workspace.duplicateAgent("chief");
     expect(app.runtime.duplicateAgent).toHaveBeenCalledOnce();
+    const hidden = vi.spyOn(document, "hidden", "get").mockReturnValue(true);
+    document.dispatchEvent(new Event("visibilitychange"));
     pending.resolve({ agent: copy, layout });
-    await first;
+    try {
+      await first;
+      expect(workspace.state.selectedId).toBe("chief-copy");
+      expect(workspace.state.duplicatingAgentIds).toEqual([]);
+    } finally {
+      hidden.mockRestore();
+      document.dispatchEvent(new Event("visibilitychange"));
+    }
   });
 
   it("cleans deleted agent state from the authoritative roster", async () => {

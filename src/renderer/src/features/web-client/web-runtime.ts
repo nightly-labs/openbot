@@ -78,6 +78,7 @@ import {
 import { runTeamEffect } from "@openbot/team-client";
 import { createRemoteBrowserView, type RemoteBrowserView } from "@openbot/team-client/browser-view";
 import {
+  RemoteDirectoryError,
   RemoteTeamDirectoryClient,
   type RemoteTeamHost,
   type RemoteTeamInvite,
@@ -287,8 +288,15 @@ export function createWebWorkspaceRuntime(
   });
   let sessionsEnded = false;
   const sessionActions = {
-    getBootstrap: (id: string, key: string, sessionId: string | null) =>
-      runTeamEffect(directory.createBootstrap(id, key, sessionId)),
+    getBootstrap: async (id: string, key: string, sessionId: string | null) => {
+      try {
+        return await runTeamEffect(directory.createBootstrap(id, key, sessionId));
+      } catch (error) {
+        if (error instanceof RemoteDirectoryError && (error.status === 401 || error.status === 403))
+          events.connection({ hostId: id, state: "offline", message: null, code: "session_revoked" });
+        throw error;
+      }
+    },
     endSession: async (id: string) => {
       if (!sessionsEnded) await runTeamEffect(directory.endSession(id));
     },

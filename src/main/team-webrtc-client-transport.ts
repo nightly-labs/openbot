@@ -503,17 +503,22 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     }
     // The cleanup covers the send too: an interrupted send must not leave the entry and its timer.
     return yield* Effect.gen({ self: this }, function* () {
-      const sent = yield* TeamClientBridge.use((bridge) => bridge.send(hostId, "rpc", frame)).pipe(Effect.result);
-      if (Result.isFailure(sent)) {
-        const error = sent.failure.cause;
-        const pending = this.#pending.get(requestId);
-        if (pending) {
-          clearTimeout(pending.timer);
-          this.#pending.delete(requestId);
-          pending.reject(error instanceof Error ? error : new Error(sourceText("error.remote.requestFailed")));
-        }
-      }
-      return yield* Deferred.await(result);
+      const sending = yield* Effect.forkChild(
+        Effect.gen({ self: this }, function* () {
+          const sent = yield* TeamClientBridge.use((bridge) => bridge.send(hostId, "rpc", frame)).pipe(Effect.result);
+          if (Result.isFailure(sent)) {
+            const error = sent.failure.cause;
+            const pending = this.#pending.get(requestId);
+            if (pending) {
+              clearTimeout(pending.timer);
+              this.#pending.delete(requestId);
+              pending.reject(error instanceof Error ? error : new Error(sourceText("error.remote.requestFailed")));
+            }
+          }
+        }),
+        { startImmediately: true },
+      );
+      return yield* Deferred.await(result).pipe(Effect.ensuring(Fiber.interrupt(sending)));
     }).pipe(
       Effect.ensuring(
         Effect.sync(() => {
