@@ -130,11 +130,13 @@ All messaging platforms share one path (`src/ingress-queue.ts`). For an event wh
 `ingress` socket, Signal asks the account service (`/v2/remote/route-wake`, signed), at most once a
 minute for each route. An event that addresses OpenBot starts a hosted server that sleeps. Signal
 then keeps the event's delivery frame, sealed with the host's queue key (`queueKey` in the `ingress`
-hello) and the host ID, for at most 10 minutes, 64 events and 4 MB for each host. When the host's
-socket holds the route again, Signal sends each kept event in order as `queued-delivery`. A host that
-sent no key gets nothing kept. A restart of Signal loses the queue and the keys. With a route waker,
-`ready` names the `ingress-queue` capability: only then does a hosted server with a live connection
-sleep.
+hello) and the host ID, for at most 10 minutes, 64 events and 192 KB for each host. When the host's
+socket holds the route again, Signal sends each kept event in order as `queued-delivery`, and keeps it
+until the host sends `queued-delivery-ack`. A host that
+sent no key gets nothing kept. A restart of Signal loses the queue and the keys. Signal names the
+`ingress-queue` capability in `ready` only when the account service answered `/v2/remote/route-wake`
+when Signal started: only then does a hosted server with a live connection sleep. Deploy the account
+service before Signal.
 
 ## Production requirements
 

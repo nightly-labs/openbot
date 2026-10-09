@@ -1,4 +1,9 @@
-import { type QueuedSignalMessage, sealQueuedDelivery } from "@openbot/contracts/signal-protocol/ingress-queue";
+import {
+  type IngressRoute,
+  type QueuedSignalMessage,
+  type RouteHostState,
+  sealQueuedDelivery,
+} from "@openbot/contracts/signal-protocol/ingress-queue";
 import { Deferred, Effect } from "effect";
 
 /**
@@ -7,17 +12,10 @@ import { Deferred, Effect } from "effect";
  *
  * Signal asks the account service for the route's host. A hosted server that sleeps starts for an event
  * that addresses OpenBot, and Signal keeps that event, sealed to the host's queue key, until the host's
- * socket holds the route again. Everything here is in memory: a restart of Signal loses it. Signal never
- * keeps an event that it cannot seal.
+ * socket holds the route again, and keeps it until the host acknowledges it, so a socket that closes
+ * after the flush loses nothing. Everything here is in memory: a restart of Signal loses it. Signal
+ * never keeps an event that it cannot seal.
  */
-
-export type IngressRoute =
-  | { platform: "slack"; appId: string; teamId: string }
-  | { platform: "discord"; guildId: string }
-  | { platform: "telegram"; botId: string; chatId: string };
-
-/** What the account service says of a route's host: `starting` is a hosted server that comes online. */
-type RouteHostState = "not_hosted" | "ended" | "sleeping" | "starting";
 
 export interface RouteWake {
   hostId: string | null;
@@ -53,7 +51,9 @@ const DEFAULT_INGRESS_QUEUE_LIMITS: IngressQueueLimits = {
   routeCheckMilliseconds: 60_000,
   otherRouteCheckMilliseconds: 10 * 60_000,
   maximumPerHost: 64,
-  maximumBytesPerHost: 4 * 1024 * 1024,
+  // A flush sends them all at once, and the socket closes at 256 KB of backpressure. One largest
+  // delivery, sealed, is about 160 KB.
+  maximumBytesPerHost: 192 * 1024,
   maximumBytes: 256 * 1024 * 1024,
 };
 
@@ -64,6 +64,8 @@ const EXPIRY_INTERVAL_MILLISECONDS = 30_000;
 const MAXIMUM_ROUTES = 100_000;
 
 export interface QueuedFrame {
+  /** Sent with the frame; the host acknowledges it with `queued-delivery-ack`. */
+  id: string;
   /** `<platform>:<route key>`, as `queueRouteKey` makes it. */
   route: string;
   sealed: string;
@@ -74,6 +76,8 @@ export interface QueuedFrame {
 interface QueueEntry extends QueuedFrame {
   /** The arrival order. The account service answers concurrent events in any order. */
   order: number;
+  /** The socket that got it last. It goes again only to another socket of the host. */
+  sentTo: string | null;
   bytes: number;
   expiresAt: number;
 }
@@ -145,7 +149,16 @@ export class IngressQueue {
     const queue = this.#queues.get(hostId) ?? [];
     if (queue.length >= this.#limits.maximumPerHost) return "unavailable";
     // The place is taken before the seal, so the events of a route keep their order.
-    const entry: QueueEntry = { route: routeKey, sealed: "", telegramCallback, order, bytes: 0, expiresAt: 0 };
+    const entry: QueueEntry = {
+      id: crypto.randomUUID().replaceAll("-", ""),
+      route: routeKey,
+      sealed: "",
+      telegramCallback,
+      order,
+      sentTo: null,
+      bytes: 0,
+      expiresAt: 0,
+    };
     const later = queue.findIndex((item) => item.order > order);
     queue.splice(later < 0 ? queue.length : later, 0, entry);
     this.#queues.set(hostId, queue);
@@ -171,26 +184,30 @@ export class IngressQueue {
   }, Effect.uninterruptible);
 
   /**
-   * The kept events of a host whose new socket holds their routes, in order. Others wait, and so do the
-   * later events of a route whose earlier event is still being sealed.
+   * The kept events, in order, that this socket of the host has not had yet and whose routes it holds.
+   * They stay until the host acknowledges them. The later events of a route whose earlier event is
+   * still being sealed wait for it.
    */
-  take(hostId: string, holds: (route: string) => boolean): QueuedFrame[] {
+  take(hostId: string, socketId: string, holds: (route: string) => boolean): QueuedFrame[] {
     this.#prune(hostId);
-    const queue = this.#queues.get(hostId);
-    if (!queue) return [];
     const ready: QueuedFrame[] = [];
-    const waiting: QueueEntry[] = [];
     const sealing = new Set<string>();
-    for (const entry of queue) {
+    for (const entry of this.#queues.get(hostId) ?? []) {
       if (!entry.sealed) sealing.add(entry.route);
-      if (entry.sealed && !sealing.has(entry.route) && holds(entry.route)) {
-        ready.push({ route: entry.route, sealed: entry.sealed, telegramCallback: entry.telegramCallback });
-        this.#bytes -= entry.bytes;
-      } else waiting.push(entry);
+      if (!entry.sealed || sealing.has(entry.route) || entry.sentTo === socketId || !holds(entry.route)) continue;
+      entry.sentTo = socketId;
+      ready.push({ id: entry.id, route: entry.route, sealed: entry.sealed, telegramCallback: entry.telegramCallback });
     }
-    if (waiting.length > 0) this.#queues.set(hostId, waiting);
-    else this.#queues.delete(hostId);
     return ready;
+  }
+
+  /** The host handled a kept event. Only the host that it was kept for can remove it. */
+  acknowledge(hostId: string, id: string): void {
+    const queue = this.#queues.get(hostId);
+    const entry = queue?.find((item) => item.id === id && item.sealed);
+    if (!entry) return;
+    this.#bytes -= entry.bytes;
+    this.#remove(hostId, entry);
   }
 
   readonly #check = Effect.fn("IngressQueue.check")(function* (

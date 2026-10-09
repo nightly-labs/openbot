@@ -142,7 +142,7 @@ export function decodeSignalServerMessage(value: unknown): SignalServerMessage |
       const sealed = text(value.sealed);
       if (sealed.length === 0 || sealed.length > QUEUED_DELIVERY_SEALED_LIMIT || !/^[A-Za-z0-9_-]+$/u.test(sealed))
         invalid();
-      return { type: kind, version, sealed };
+      return { type: kind, version, id: identifier(value.id), sealed };
     }
     case "telegram-delivery":
       if (value.linked !== undefined && value.linked !== true) invalid();

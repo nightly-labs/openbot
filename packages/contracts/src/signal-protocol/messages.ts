@@ -171,6 +171,9 @@ export type SignalClientMessage =
       contentType?: "application/json" | "text/plain";
       body?: string;
     }
+  // An `ingress` socket handled one `queued-delivery`. Signal keeps a kept event until this comes, and
+  // sends it again on the host's next hello. Sent only to a Signal whose `ready` named `ingress-queue`.
+  | { type: "queued-delivery-ack"; version: SignalProtocolVersion; id: string }
   // An ingress socket's answer to one generic webhook delivery. Signal returns this status to the
   // public webhook caller only after the host has committed the event.
   | {
@@ -260,7 +263,8 @@ export type SignalServerMessage =
   | { type: "discord-delivery"; version: SignalProtocolVersion; guildId: string; delivery: DiscordDelivery }
   // One Slack, Discord or Telegram delivery that Signal kept while this host started, sealed to the
   // host's queue key (`./ingress-queue.ts`). It needs no answer: Signal already answered the platform.
-  | { type: "queued-delivery"; version: SignalProtocolVersion; sealed: string }
+  // `id` is the event's own: the host sends it back in `queued-delivery-ack`.
+  | { type: "queued-delivery"; version: SignalProtocolVersion; id: string; sealed: string }
   // One generic webhook request for a route linked to this host. The HMAC is checked by the host:
   // Signal forwards the exact body and the three signed header values without reading the body.
   | {

@@ -170,14 +170,15 @@ export class SignalIngress implements MessagingIngress {
   /** The HTTPS origin of the Signal of the open socket, for Telegram files. */
   #signalOrigin: string | null = null;
   readonly #telegramCalls = new Map<string, (answer: TelegramCallAnswer) => void>();
-  /** Loaded once; `null` when this host has none. */
-  #queueKey: IngressQueueKey | null | undefined;
-  /** The host ID that the open socket said hello with: the queued events are sealed for it. */
-  #socketHostId: string | null = null;
+  /** `null` until it is loaded, and when this host has none. */
+  #queueKey: IngressQueueKey | null = null;
   readonly #queuedOrder = Semaphore.makeUnsafe(1);
+
+  readonly #loadQueueKey: Effect.Effect<IngressQueueKey | null>;
 
   constructor(options: SignalIngressOptions) {
     this.#options = options;
+    this.#loadQueueKey = Effect.runSync(Effect.cached(options.queueKey?.() ?? Effect.succeed(null)));
     this.#runtime = ManagedRuntime.make(SignalIngressAccount.layer(options));
   }
 
@@ -415,15 +416,15 @@ export class SignalIngress implements MessagingIngress {
       ...(webhookRoute === null ? {} : { webhookRoute }),
       ...(telegramRoute === null ? {} : { telegramRoute }),
     };
-    if (this.#queueKey === undefined) this.#queueKey = this.#options.queueKey ? yield* this.#options.queueKey() : null;
-    const queueKey = this.#queueKey;
+    // Loaded once: two opens at the same time must not make two keys.
+    const queueKey = yield* this.#loadQueueKey;
+    this.#queueKey = queueKey;
     if (generation !== this.#generation || (this.#held() === 0 && this.#webhookHolders === 0)) return;
     this.#webhookMissing = webhooks && webhookRoute === null;
     this.#telegramMissing = telegram && telegramRoute === null;
     if (telegram && telegramRoute !== null) this.#telegramBackoffMs = BACKOFF_START_MS;
     const socket = new WebSocket(bootstrap.signalUrl);
     this.#socket = socket;
-    this.#socketHostId = hostId;
     this.#apiUrl = discordApiUrl(bootstrap.signalUrl);
     this.#signalOrigin = signalHttpOrigin(bootstrap.signalUrl);
     socket.on("open", () => {
@@ -437,7 +438,7 @@ export class SignalIngress implements MessagingIngress {
       };
       socket.send(JSON.stringify(hello));
     });
-    socket.on("message", (data) => this.#run(this.#receive(socket, data.toString())));
+    socket.on("message", (data) => this.#run(this.#receive(socket, hostId, data.toString())));
     socket.on("pong", () => pongs.set(socket, true));
     socket.on("close", () => {
       if (socket !== this.#socket) return;
@@ -456,35 +457,41 @@ export class SignalIngress implements MessagingIngress {
   readonly #receive = Effect.fn("SignalIngress.receive")(function* (
     this: SignalIngress,
     socket: WebSocket,
+    hostId: string,
     text: string,
   ) {
-    if (this.#disposing || socket !== this.#socket) return;
+    if (this.#disposing) return;
     const decoded = yield* remoteDecode(() => decodeSignalServerMessage(JSON.parse(text))).pipe(Effect.result);
     if (Result.isFailure(decoded)) {
-      socket.close(1002);
+      if (socket === this.#socket) socket.close(1002);
       return;
     }
     const message = decoded.success;
-    if (!message || socket !== this.#socket) return;
-    if (message.type !== "queued-delivery") return yield* this.#dispatch(socket, message, false);
-    // A delivery that Signal kept while this host started. Signal already answered the platform. The
-    // kept deliveries are handled one at a time, in the order that Signal sent them.
-    const sealed = message.sealed;
+    if (!message) return;
+    if (message.type !== "queued-delivery") {
+      if (socket === this.#socket) yield* this.#dispatch(socket, message, false);
+      return;
+    }
+    // A delivery that Signal kept while this host started. Signal already answered the platform, so it
+    // is handled also when this socket closed meanwhile. The kept deliveries are handled one at a time,
+    // in the order that Signal sent them, and each is acknowledged so that Signal stops keeping it.
+    const { id, sealed } = message;
     yield* this.#queuedOrder.withPermit(
       Effect.gen({ self: this }, function* () {
         const key = this.#queueKey;
-        const hostId = this.#socketHostId;
-        const opened =
-          key && hostId
-            ? yield* Effect.tryPromise(() => openQueuedDelivery(key.privateKey, hostId, sealed)).pipe(
-                Effect.catch(() => Effect.succeed(null)),
-              )
-            : null;
-        if (!opened) {
-          logger.warn("A kept delivery from Signal could not be opened, and is dropped.");
-          return;
-        }
-        if (socket === this.#socket) yield* this.#dispatch(socket, opened, true);
+        const opened = key
+          ? yield* Effect.tryPromise(() => openQueuedDelivery(key.privateKey, hostId, sealed)).pipe(
+              Effect.catch(() => Effect.succeed(null)),
+            )
+          : null;
+        if (opened) yield* this.#dispatch(socket, opened, true);
+        else logger.warn("A kept delivery from Signal could not be opened, and is dropped.");
+        // An acknowledgement that cannot be sent now is not needed: Signal sends the delivery again on
+        // the next hello, and the transports drop an event that they already handled.
+        const current = this.#socket;
+        if (current?.readyState !== WebSocket.OPEN || !this.#capabilities.has(INGRESS_QUEUE_CAPABILITY)) return;
+        const ack: SignalClientMessage = { type: "queued-delivery-ack", version: SIGNAL_PROTOCOL_VERSION, id };
+        current.send(JSON.stringify(ack));
       }),
     );
   });

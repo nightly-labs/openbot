@@ -10,6 +10,7 @@ import {
   json,
   requestHostedServerService,
   requestRemoteControlPlane,
+  schedule,
   verifyRemoteServiceRequest,
 } from "../../../server/request-auth";
 
@@ -50,8 +51,12 @@ export const Route = createFileRoute("/v2/remote/route-wake")({
             if (!parsed.success) return apiError(400, "invalid_route", "The route is invalid.");
             const hostId = yield* requestRemoteControlPlane().routeHost(parsed.data.route);
             if (!hostId) return json({ hostId: null, state: "not_hosted" });
-            const state = yield* requestHostedServerService().routeWake(hostId, parsed.data.wake);
-            return json({ hostId, state });
+            const hosting = requestHostedServerService();
+            const state = yield* hosting.routeState(hostId);
+            if (!parsed.data.wake || (state !== "sleeping" && state !== "starting")) return json({ hostId, state });
+            // Slack waits at most 3 seconds, and a resume can take longer: the start runs after the answer.
+            schedule(hosting.startForRoute(hostId));
+            return json({ hostId, state: "starting" });
           }),
           hostedServerErrorResponse,
         ),

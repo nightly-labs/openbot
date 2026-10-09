@@ -140,6 +140,8 @@ const FATAL_STATES = new Set<MessagingConnectionState>(["invalid_token", "remove
 const APPROVAL_TEXT_LIMIT = 2_500;
 const CANCEL_TEXT = /^(cancel|stop)$/i;
 const LIVE_STATES = new Set<MessagingConnectionState>(["connecting", "connected", "reconnecting", "rate_limited"]);
+/** The states in which a connection can still get a transport that takes deliveries. */
+const STARTING_STATES = new Set<MessagingConnectionState>(["connecting", "reconnecting", "rate_limited"]);
 const RECENT_MESSAGES = 2_000;
 /** How long a delivery that Signal kept waits for its connection to start. */
 const QUEUED_TRANSPORT_WAIT_MS = 60_000;
@@ -228,6 +230,8 @@ export class MessagingService {
   ): Effect.fn.Return<void, MessagingOperationFailed> {
     this.#started = false;
     for (const unsubscribe of this.#unsubscribe.splice(0)) unsubscribe();
+    // The kept deliveries that wait for a connection go now: nothing will start it.
+    for (const waiters of [...this.#transportWaiters.values()]) for (const ready of [...waiters]) ready();
     this.#threads.setContextSource(null);
     this.#ingress?.handle(null);
     this.#endTelegramLinkLease();
@@ -573,7 +577,11 @@ export class MessagingService {
     queued: boolean,
   ): Effect.Effect<LiveConnection["transport"] | undefined> {
     const current = () => (record.enabled ? this.#live.get(record.connectionId)?.transport : undefined);
-    if (current() || !queued || !record.enabled) return Effect.sync(current);
+    // Not started yet, or starting again after an identify that failed (its transport takes no delivery).
+    // A connection that stopped on an error does not start by itself, so nothing waits for it.
+    const live = this.#live.get(record.connectionId);
+    const starting = !live || STARTING_STATES.has(live.state);
+    if (current()?.deliver || !queued || !record.enabled || !starting) return Effect.sync(current);
     return Effect.callback<void>((resume) => {
       const waiters = this.#transportWaiters.get(record.connectionId) ?? new Set<() => void>();
       const ready = () => resume(Effect.void);

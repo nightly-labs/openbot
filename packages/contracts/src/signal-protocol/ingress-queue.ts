@@ -21,6 +21,16 @@ import {
 import { decodeSignalServerMessage } from "./decode";
 import type { SignalServerMessage } from "./messages";
 
+/** A messaging route that Signal asks the account service about (`/v2/remote/route-wake`). */
+export type IngressRoute =
+  | { platform: "slack"; appId: string; teamId: string }
+  | { platform: "discord"; guildId: string }
+  | { platform: "telegram"; botId: string; chatId: string };
+
+/** What the account service says of a route's host: `starting` is a hosted server that comes online. */
+export const ROUTE_HOST_STATES = ["not_hosted", "ended", "sleeping", "starting"] as const;
+export type RouteHostState = (typeof ROUTE_HOST_STATES)[number];
+
 /** The frames that Signal can queue. Each one needs no answer from the host. */
 export type QueuedSignalMessage = Extract<
   SignalServerMessage,

@@ -57,6 +57,7 @@ const signalMessageTypeSchema = z.enum([
   "slack-delivery-result",
   "webhook-delivery-result",
   "telegram-call",
+  "queued-delivery-ack",
 ]);
 
 // The Bot API calls an `ingress` socket can make (`TelegramCallParams`). Every object is strict: an
@@ -199,6 +200,11 @@ const signalClientMessageSchema = z.discriminatedUnion("type", [
     status: z.union([z.literal(200), z.literal(400), z.literal(401), z.literal(404), z.literal(503)]),
     contentType: z.enum(["application/json", "text/plain"]).optional(),
     body: z.string().max(SLACK_DELIVERY_RESPONSE_BYTES_LIMIT).optional(),
+  }),
+  z.object({
+    type: z.literal("queued-delivery-ack"),
+    version: z.literal(1),
+    id: identifierSchema,
   }),
   z.object({
     type: z.literal("webhook-delivery-result"),

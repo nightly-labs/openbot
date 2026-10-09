@@ -934,7 +934,7 @@ describe("hosted servers", () => {
     expect(context.state(server.serverId)).toMatchObject({ desired_state: "running", last_wake_reason: "message" });
   });
 
-  it("starts a sleeping server for a connector event only when Signal asks for a wake", async () => {
+  it("looks up a sleeping server for a connector event without starting it, and starts it on request", async () => {
     const context = await setup();
     const server = await createRunningServer(context);
     await runApiEffect(context.service.redeemClaim(context.claims[0]));
@@ -944,12 +944,12 @@ describe("hosted servers", () => {
     const resumes = () => context.boatCalls.filter((call) => call.path === "/sandboxes/bx_1/resume");
     expect(context.state(server.serverId)).toMatchObject({ desired_state: "idle", observed_state: "stopped" });
 
-    await expect(runApiEffect(context.service.routeWake("not-a-hosted-server", true))).resolves.toBe("not_hosted");
-    await expect(runApiEffect(context.service.routeWake(server.serverId, false))).resolves.toBe("sleeping");
+    await expect(runApiEffect(context.service.routeState("not-a-hosted-server"))).resolves.toBe("not_hosted");
+    await expect(runApiEffect(context.service.routeState(server.serverId))).resolves.toBe("sleeping");
     expect(resumes()).toHaveLength(0);
     expect(context.state(server.serverId)).toMatchObject({ desired_state: "idle" });
 
-    await expect(runApiEffect(context.service.routeWake(server.serverId, true))).resolves.toBe("starting");
+    await runApiEffect(context.service.startForRoute(server.serverId));
     expect(resumes()).toHaveLength(1);
     expect(context.state(server.serverId)).toMatchObject({
       desired_state: "running",

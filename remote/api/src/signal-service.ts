@@ -3,6 +3,7 @@ import type { DiscordDelivery } from "@openbot/contracts/signal-protocol/discord
 import { DISCORD_ROUTE_TTL_SECONDS, type DiscordRouteGuild } from "@openbot/contracts/signal-protocol/discord-route";
 import {
   INGRESS_QUEUE_CAPABILITY,
+  type IngressRoute,
   isIngressQueueKey,
   type QueuedSignalMessage,
 } from "@openbot/contracts/signal-protocol/ingress-queue";
@@ -16,7 +17,7 @@ import {
 } from "@openbot/contracts/signal-protocol/telegram-route";
 import { WEBHOOK_ROUTE_TTL_SECONDS, type WebhookRoute } from "@openbot/contracts/signal-protocol/webhook-route";
 import { Context, Effect, Fiber, Layer, Result } from "effect";
-import { IngressQueue, type IngressRoute, queueRouteKey, type RouteWaker } from "./ingress-queue";
+import { IngressQueue, queueRouteKey, type RouteWaker } from "./ingress-queue";
 import {
   type DecodedSignalClientMessage,
   decodeSignalClientMessage,
@@ -163,6 +164,8 @@ export interface SignalServiceOptions {
   telegram?: SignalTelegram | null;
   /** Finds and starts the host of a route with no socket. Without it, Signal keeps no event. */
   routeWaker?: RouteWaker | null;
+  /** Runs the work that an event for an offline route starts, in the process's runtime. */
+  fork?: (work: Effect.Effect<unknown>) => void;
 }
 
 /** What the Discord Gateway knows of the bot's guilds. */
@@ -293,6 +296,7 @@ export class SignalService {
   #discordMembership: DiscordMembership | null = null;
   readonly #pendingDeliveries = new Map<string, PendingDelivery>();
   readonly #queue: IngressQueue;
+  readonly #fork: (work: Effect.Effect<unknown>) => void;
   readonly #deliveryLimits: IngressDeliveryLimits;
   readonly #connections = new Map<string, ActiveConnection>();
   readonly #connectionDropTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -351,6 +355,7 @@ export class SignalService {
     this.#discordEnabled = options.discord === true;
     this.#telegram = options.telegram ?? null;
     this.#queue = new IngressQueue(options.routeWaker ?? null);
+    this.#fork = options.fork ?? ((work) => void Effect.runFork(work));
   }
 
   /** The Bot API and the file tokens, or `null` when Telegram is off. */
@@ -428,6 +433,10 @@ export class SignalService {
       }
       if (message.type === "disconnect") {
         if (this.#ownsConnection(peer, message.connectionId)) this.#dropConnection(message.connectionId, socket.id);
+        return;
+      }
+      if (message.type === "queued-delivery-ack") {
+        if (peer.peer === "ingress") this.#queue.acknowledge(peer.claims.hostId, message.id);
         return;
       }
       if (message.type === "slack-delivery-result" || message.type === "webhook-delivery-result") {
@@ -609,8 +618,7 @@ export class SignalService {
     if (!ingress) {
       this.#metrics.discordDeliveriesUnavailable += 1;
       // The removal of the bot is the account service's work, not the host's.
-      if (delivery.kind !== "removed")
-        Effect.runFork(this.#keep({ platform: "discord", guildId }, guildId, true, frame));
+      if (delivery.kind !== "removed") this.#fork(this.#keep({ platform: "discord", guildId }, guildId, true, frame));
       return false;
     }
     ingress.socket.send(message);
@@ -826,7 +834,7 @@ export class SignalService {
     const ingress = socketId ? this.#peers.get(socketId) : undefined;
     if (!ingress) {
       this.#metrics.telegramDeliveriesUnrouted += 1;
-      Effect.runFork(
+      this.#fork(
         this.#keep(
           { platform: "telegram", botId, chatId },
           route,
@@ -998,17 +1006,18 @@ export class SignalService {
     const held = new Set<string>();
     for (const key of peer.slackTeams)
       if (this.#slackTeams.get(key) === socketId) held.add(queueRouteKey("slack", key));
-    for (const key of peer.telegramChats) held.add(queueRouteKey("telegram", key));
+    for (const key of peer.telegramChats)
+      if (this.#telegramChats.get(key) === socketId) held.add(queueRouteKey("telegram", key));
     for (const key of peer.discordGuilds)
       if (this.#discordGuilds.get(key) === socketId) held.add(queueRouteKey("discord", key));
-    for (const frame of this.#queue.take(peer.claims.hostId, (route) => held.has(route))) {
+    for (const frame of this.#queue.take(peer.claims.hostId, socketId, (route) => held.has(route))) {
       if (frame.telegramCallback)
         this.#rememberCallback(
           telegramRouteKey(frame.telegramCallback.botId, frame.telegramCallback.queryId),
           peer.socket.id,
         );
       this.#metrics.queuedDeliveriesFlushed += 1;
-      this.#send(peer.socket, { type: "queued-delivery", version: 1, sealed: frame.sealed });
+      this.#send(peer.socket, { type: "queued-delivery", version: 1, id: frame.id, sealed: frame.sealed });
     }
   }
 

@@ -500,28 +500,33 @@ holds it:
 
 1. Signal asks the Worker, signed, `POST /v2/remote/route-wake` with the route and `wake`. The Worker
    finds the host in `slack_workspace_routes`, `discord_guild_routes` or `telegram_chat_routes`, and
-   answers `not_hosted`, `ended`, `sleeping` or `starting`. With `wake`, an idle server starts as for
+   answers `not_hosted`, `ended`, `sleeping` or `starting` before it starts anything, because Slack
+   waits at most 3 seconds. With `wake`, the server then starts in the background (`waitUntil`) as for
    a client (`last_wake_reason = 'message'`). A plan that ended starts nothing. Signal asks at most
-   once a minute for each route.
+   once a minute for each hosted route, and once in 10 minutes for another route.
 2. `wake` is true only for an event that addresses OpenBot: a Slack button press, mention, direct
    message or thread reply from a person; a Discord mention or button press; a Telegram message or
    button press.
 3. For such an event and a server that starts, Signal keeps the delivery frame, sealed to the host's
    queue key (`@openbot/contracts/signal-protocol/ingress-queue`), in memory for at most 10 minutes
-   (64 events and 4 MB for each host). Slack gets 200, so it does not send the event again. Signal
+   (64 events and 192 KB for each host). Slack gets 200, so it does not send the event again. Signal
    cannot read a kept event, and a restart of Signal loses it.
 4. Another Slack event of a hosted server gets 200 and is dropped: the host keeps only messages that
    address OpenBot, and joins the public channels again when its connection starts.
 5. When the host's socket connects again, Signal sends each kept event of the routes that the socket
-   holds, in order, as `queued-delivery`. The host opens it with its private key and handles it as a
-   normal delivery, with no answer.
+   holds, in order, as `queued-delivery` with an `id`. The host opens it with its private key, handles
+   it as a normal delivery, and sends `queued-delivery-ack`. Signal keeps the event until that ack, and
+   sends it again on the host's next hello: the first socket can close before the host handled it. The
+   transports drop an event that they already handled.
 
 The host makes its queue key once (`src/main/ingress-queue-key.ts`, `openbot-ingress-queue-key-v1.json`
 in the user data folder), encrypted by the operating system, and sends the public half in each
 `ingress` hello. An older host sends no key, so Signal keeps nothing for it; a hello with no key
 removes the key that Signal had. A kept delivery that arrives before its connection has started waits
-up to 60 seconds for it. When the account service does not answer, Signal keeps nothing and does not
-remember the failure. A start that fails at once keeps nothing either. Generic webhooks do not
+up to 60 seconds for it, only while the connection can still start. When the account service does
+not answer, Signal keeps nothing and does not remember the failure. Signal says `ingress-queue` only
+when the account service had `/v2/remote/route-wake` when Signal started, so deploy the account
+service first. Generic webhooks do not
 start a server: their sender sends again after a 503.
 
 ## Tested on boat

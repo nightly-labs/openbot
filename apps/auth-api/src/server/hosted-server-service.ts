@@ -23,6 +23,7 @@ import {
   parseHostedServerName,
 } from "@openbot/contracts/hosted-servers";
 import { isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
+import type { RouteHostState } from "@openbot/contracts/signal-protocol/ingress-queue";
 import { sourceText } from "@openbot/i18n/source";
 import { Context, Effect, Layer, Result, Schema } from "effect";
 import { type AccountAnalytics, type AccountAnalyticsEvent, NO_ACCOUNT_ANALYTICS } from "./account-analytics";
@@ -148,9 +149,6 @@ function hostedValidate<A>(operation: () => A): Effect.Effect<A, HostedFailure> 
  */
 type DesiredState = "running" | "idle" | "stopped" | "deleted";
 type WakeReason = "create" | "message" | "restart" | "schedule";
-
-/** What Signal does with an event for a host that has no socket: keep it (`starting`), or not. */
-export type RouteHostState = "not_hosted" | "ended" | "sleeping" | "starting";
 
 interface HostedServerRow {
   server_id: string;
@@ -768,15 +766,14 @@ export class HostedServerService {
   ).bind(this);
 
   /**
-   * Signal has a Slack, Discord or Telegram event for a host with no `ingress` socket. With `wake`, an idle
-   * server starts as it does for a client. `starting` tells Signal to keep the event until the host connects.
-   * Only signed Signal requests reach this, for the host of a linked route; no user is signed in.
+   * What Signal does with a Slack, Discord or Telegram event for a host with no `ingress` socket. Only
+   * signed Signal requests reach this, for the host of a linked route; no user is signed in. It changes
+   * nothing, so it answers before the platform's deadline; `startForRoute` starts the server.
    */
-  readonly routeWake = Effect.fn("HostedServerService.routeWake")(
+  readonly routeState = Effect.fn("HostedServerService.routeState")(
     function* (
       this: HostedServerService,
       hostId: string,
-      wake: boolean,
     ): Effect.fn.Return<RouteHostState, HostedFailure, HostedServerDependencies> {
       const dependencies = yield* HostedServerDependencies;
       const row = yield* hostedCall(() =>
@@ -788,13 +785,23 @@ export class HostedServerService {
       if (!row) return "not_hosted";
       // A plan that ended, or a server that was never paid, does not start.
       if (row.desired_state === "stopped" || row.observed_state === "awaiting_payment") return "ended";
-      if (!wake) return row.desired_state === "idle" ? "sleeping" : "starting";
+      return row.desired_state === "idle" ? "sleeping" : "starting";
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
+  /** Starts a hosted server for a connector event, as for a client. Signal does not wait for it. */
+  readonly startForRoute = Effect.fn("HostedServerService.startForRoute")(
+    function* (
+      this: HostedServerService,
+      hostId: string,
+    ): Effect.fn.Return<void, HostedFailure, HostedServerDependencies> {
+      const row = yield* this.#requireRow(hostId);
+      if (row.desired_state === "stopped" || row.desired_state === "deleted") return;
       yield* this.#startForUse(row);
       const current = yield* this.#requireRow(hostId);
       // As for a client: the host has no socket, and a lost provider event can hide a stop.
       if (current.observed_state === "running" && current.provider_sandbox_id) yield* this.#refresh(current);
-      // A start that failed keeps nothing in Signal: the platform's retry or the next event asks again.
-      return (yield* this.#requireRow(hostId)).observed_state === "error" ? "sleeping" : "starting";
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);

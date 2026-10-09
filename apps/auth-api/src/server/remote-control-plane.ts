@@ -8,6 +8,7 @@ import {
   DISCORD_ROUTE_TTL_SECONDS,
   type DiscordRouteGuild,
 } from "@openbot/contracts/signal-protocol/discord-route";
+import type { IngressRoute } from "@openbot/contracts/signal-protocol/ingress-queue";
 import {
   SLACK_ROUTE_AUDIENCE,
   SLACK_ROUTE_TEAMS_LIMIT,
@@ -123,12 +124,6 @@ export type RemoteResumeClaims = Pick<
   RemoteTicketClaims,
   "sessionId" | "hostId" | "userId" | "membershipId" | "role" | "authEpoch" | "sessionExpiresAt"
 >;
-
-/** One messaging route that Signal passes events on for, as the account service links it to a host. */
-export type RemoteRoute =
-  | { platform: "slack"; appId: string; teamId: string }
-  | { platform: "discord"; guildId: string }
-  | { platform: "telegram"; botId: string; chatId: string };
 
 interface RemoteInviteRow {
   invite_id: string;
@@ -1694,7 +1689,7 @@ export class RemoteControlPlane {
   readonly routeHost = Effect.fn("RemoteControlPlane.routeHost")(
     function* (
       this: RemoteControlPlane,
-      route: RemoteRoute,
+      route: IngressRoute,
     ): Effect.fn.Return<string | null, RemoteFailure, RemoteDependencies> {
       const dependencies = yield* RemoteDependencies;
       const statement =

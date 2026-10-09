@@ -162,9 +162,17 @@ describe("Telegram route", () => {
     ).toEqual([message, press]);
     // The new socket can answer the button press that came while the server slept.
     expect(await call(after, "answerCallbackQuery", { callback_query_id: "cb-9" })).toMatchObject({ ok: true });
-    // Sent once.
+    // Not acknowledged: the host's next socket gets them again, because the first may have closed first.
     const again = await connect("again", [{ id: "-100" }], key.publicKey);
-    expect(again.messages).toEqual([]);
+    expect(again.messages.map((frame) => JSON.parse(frame).id)).toEqual(queued.map((frame) => frame.id));
+    // Acknowledged: never again.
+    for (const frame of queued)
+      await runSignal(
+        signal,
+        signal.receive(again, JSON.stringify({ type: "queued-delivery-ack", version: 1, id: frame.id })),
+      );
+    const last = await connect("last", [{ id: "-100" }], key.publicKey);
+    expect(last.messages).toEqual([]);
   });
 
   it("links a chat with a /start code and routes it to the host at once", async () => {

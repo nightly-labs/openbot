@@ -1,9 +1,11 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
+import { type IngressRoute, ROUTE_HOST_STATES } from "@openbot/contracts/signal-protocol/ingress-queue";
 import { Context, Effect, Layer, ManagedRuntime, Schema } from "effect";
 import { createRemoteApiApp, prometheusMetrics } from "./app";
 import { readRemoteApiConfig } from "./config";
 import { DiscordGateway } from "./discord-gateway";
+import type { RouteWake } from "./ingress-queue";
 import { SignalService } from "./signal-service";
 import { TelegramBotApi } from "./telegram";
 import {
@@ -29,7 +31,7 @@ const DiscordValidation = Schema.Struct({ guilds: Schema.Array(Schema.String) })
 const WebhookValidation = Schema.Struct({ routes: Schema.Array(Schema.String) });
 const RouteWakeAnswer = Schema.Struct({
   hostId: Schema.NullOr(Schema.String),
-  state: Schema.Literals(["not_hosted", "ended", "sleeping", "starting"]),
+  state: Schema.Literals(ROUTE_HOST_STATES),
 });
 
 class ControlPlane extends Context.Service<
@@ -63,10 +65,9 @@ class ControlPlane extends Context.Service<
     ): Effect.Effect<string[], ControlPlaneError>;
     discordGuildRemoved(guildId: string): Effect.Effect<void, ControlPlaneError>;
     // An account service without the route answers 404: no host starts and nothing is kept.
-    routeWake(
-      route: import("./ingress-queue").IngressRoute,
-      wake: boolean,
-    ): Effect.Effect<import("./ingress-queue").RouteWake, ControlPlaneError>;
+    routeWake(route: IngressRoute, wake: boolean): Effect.Effect<RouteWake, ControlPlaneError>;
+    // False for an account service without `/v2/remote/route-wake`, or one that does not answer.
+    supportsRouteWake(): Effect.Effect<boolean>;
     reconcileDiscordGuilds(guildIds: string[], before: number): Effect.Effect<void, ControlPlaneError>;
   }
 >()("@openbot/remote-api/ControlPlane") {
@@ -199,6 +200,13 @@ class ControlPlane extends Context.Service<
           releaseResponse,
         ),
       ),
+      supportsRouteWake: Effect.fn("ControlPlane.supportsRouteWake")(() =>
+        Effect.acquireUseRelease(
+          ask("/v2/remote/route-wake", { route: { platform: "slack", appId: "A0", teamId: "T0" }, wake: false }),
+          (response) => Effect.succeed(response.ok),
+          releaseResponse,
+        ).pipe(Effect.catch(() => Effect.succeed(false))),
+      ),
       discordGuildRemoved: Effect.fn("ControlPlane.discordGuildRemoved")((guildId) =>
         Effect.acquireUseRelease(
           ask("/v2/remote/discord-route/removed", { guildId }),
@@ -296,9 +304,13 @@ const signal = new SignalService(
     telegram: config.telegram
       ? { bot: new TelegramBotApi(config.telegram), files: new TelegramFileTokens(config.sessionSecret) }
       : null,
-    // A failure keeps nothing: the platform gets the answer of an offline host, as before.
-    routeWaker: (route, wake) =>
-      controlPlaneService.routeWake(route, wake).pipe(Effect.catch(() => Effect.succeed(null))),
+    // Only with an account service that has the route: else Signal does not say `ingress-queue`, and
+    // a hosted server with a live connection stays on. A failure keeps nothing: the platform gets the
+    // answer of an offline host, as before.
+    routeWaker: (await controlPlane.runPromise(controlPlaneService.supportsRouteWake()))
+      ? (route, wake) => controlPlaneService.routeWake(route, wake).pipe(Effect.catch(() => Effect.succeed(null)))
+      : null,
+    fork: (work) => void signalRuntime.runFork(work),
   },
 );
 const tlsPaths =

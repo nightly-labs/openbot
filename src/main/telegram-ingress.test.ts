@@ -179,10 +179,10 @@ describe.sequential("Telegram on the ingress socket", () => {
     expect(received).toEqual(['700:-100:{"update_id":1}']);
   });
 
-  it("opens a delivery that Signal kept for this host, and answers nothing for it", async () => {
+  it("opens a delivery that Signal kept for this host, answers nothing for it, and acknowledges it", async () => {
     const pair = await createIngressQueueKeyPair();
     const key = { publicKey: pair.publicKey, privateKey: await importIngressQueuePrivateKey(pair.privateKey) };
-    const { signal, ingress } = await open(["telegram"], key);
+    const { signal, ingress } = await open(["telegram", "ingress-queue"], key);
     expect(signal.frames[0]).toMatchObject({ type: "hello", queueKey: pair.publicKey });
     const received: string[] = [];
     ingress.handle((teamId, delivery) =>
@@ -207,14 +207,22 @@ describe.sequential("Telegram on the ingress socket", () => {
     signal.send({
       type: "queued-delivery",
       version: 1,
+      id: "kept-other",
       sealed: await sealQueuedDelivery(pair.publicKey, "host-2", slack("other")),
     });
     signal.send({
       type: "queued-delivery",
       version: 1,
+      id: "kept-mine",
       sealed: await sealQueuedDelivery(pair.publicKey, "host-1", slack("mine")),
     });
     await waitFor(() => received.length === 1);
+    // Both are acknowledged, so Signal does not send them again: one that cannot open never will.
+    await waitFor(() => signal.frames.filter((frame) => frame.type === "queued-delivery-ack").length === 2);
+    expect(signal.frames.filter((frame) => frame.type === "queued-delivery-ack").map((frame) => frame.id)).toEqual([
+      "kept-other",
+      "kept-mine",
+    ]);
     expect(received).toEqual(["T1:mine"]);
     expect(ingress.state()).toBe("online");
     // Signal already answered Slack, and refuses an answer to a request it did not send.
