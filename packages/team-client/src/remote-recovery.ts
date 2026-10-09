@@ -1,4 +1,5 @@
 import type { ConversationSnapshot } from "@openbot/contracts/ipc";
+import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
 import { Effect, Result, Schema } from "effect";
 import { runTeamEffect } from "./effect-boundary";
@@ -390,3 +391,19 @@ export const resyncRemoteConversations = Effect.fn("RemoteRecovery.resyncConvers
     input.apply(snapshot);
   }
 });
+
+/** Bound the reads that make a workspace usable; file transfers and writes retain their own limits. */
+export function remoteWorkspaceReadTimeout(method: string, path: string): number | undefined {
+  if (method !== "GET") return undefined;
+  const route = path.split("?")[0];
+  return route === TEAM_API_ROUTES.compatibility ||
+    route === TEAM_API_ROUTES.agents.all ||
+    route === TEAM_API_ROUTES.agents.status ||
+    route === TEAM_API_ROUTES.agents.models ||
+    route === TEAM_API_ROUTES.sidebarLayout.state ||
+    route === TEAM_API_ROUTES.browser.tabs ||
+    route === TEAM_API_ROUTES.agents.conversationReads ||
+    /^\/v1\/agents\/[^/]+\/conversation(?:-page)?$/.test(route ?? "")
+    ? 15_000
+    : undefined;
+}

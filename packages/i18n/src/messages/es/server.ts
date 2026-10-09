@@ -134,8 +134,6 @@ export const messages = {
   "server.select.failedTitle": "No se pudo seleccionar el servidor",
   "server.select.failedDescription": "No se pudo cambiar de servidor. Inténtalo de nuevo.",
   "server.select.openAgentFailed": "No se pudo abrir {name}. Búscalo en la barra lateral.",
-  "server.scope.agentsLoadFailed":
-    "No se pudieron cargar los agentes. Comprueba la conexión del servidor e inténtalo de nuevo.",
   "server.settings.unavailable": "Este servidor no está disponible.",
   "server.settings.identityRefreshFailed": "No se pudo actualizar la identidad del servidor.",
   "server.settings.loadFailed": "No se pudieron cargar los ajustes del servidor.",

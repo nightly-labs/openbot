@@ -138,7 +138,6 @@ export const messages = {
   "server.select.failedTitle": "Не удалось выбрать сервер",
   "server.select.failedDescription": "Не удалось переключить сервер. Повторите.",
   "server.select.openAgentFailed": "Не удалось открыть {name}. Найдите его на боковой панели.",
-  "server.scope.agentsLoadFailed": "Не удалось загрузить агентов. Проверьте подключение к серверу и повторите.",
   "server.settings.unavailable": "Этот сервер недоступен.",
   "server.settings.identityRefreshFailed": "Не удалось обновить данные сервера.",
   "server.settings.loadFailed": "Не удалось загрузить настройки сервера.",

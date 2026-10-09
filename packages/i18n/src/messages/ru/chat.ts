@@ -284,7 +284,6 @@ export const messages = {
   "chat.scrollRail.earlierSince": "Раньше, с {date}",
   "chat.day.now": "сейчас",
   "chat.errorStatus.readState": "Не удалось обновить статус прочтения",
-  "chat.errorStatus.load": "Не удалось загрузить",
   "chat.errorStatus.send": "Не удалось отправить",
   "chat.send.sending": "Отправка…",
   "chat.send.waiting": "Ожидает отправки",

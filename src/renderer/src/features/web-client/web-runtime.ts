@@ -89,6 +89,7 @@ import {
   type RemoteFileUpload,
   type RemoteTeamConnectionUpdate,
 } from "@openbot/team-client/remote-peer";
+import { remoteWorkspaceReadTimeout } from "@openbot/team-client/remote-recovery";
 import {
   cancelQueuedMessage,
   deleteAgent,
@@ -240,6 +241,14 @@ export class WebHostIncompatibleError extends Error {
   }
 }
 
+export class WebHostConnectionError extends Error {
+  constructor(readonly code: "identity_changed" | "authentication_required" | "access_ended") {
+    super(
+      currentText().t(code === "identity_changed" ? "webClient.error.identityChanged" : "webClient.error.accessEnded"),
+    );
+  }
+}
+
 interface WebConnectionDependencies {
   createPeer: typeof createRemoteTeamPeer;
   acquireHostLock: typeof acquireWebHostLock;
@@ -251,7 +260,7 @@ interface WebConnectionDependencies {
 function pinWebHostKey(accountId: string, host: RemoteTeamHost): void {
   const key = `openbot.web.host-key:${accountId}:${host.hostId}`;
   const pinned = localStorage.getItem(key);
-  if (pinned && pinned !== host.devicePublicKey) throw new Error(currentText().t("webClient.error.identityChanged"));
+  if (pinned && pinned !== host.devicePublicKey) throw new WebHostConnectionError("identity_changed");
   localStorage.setItem(key, host.devicePublicKey);
 }
 
@@ -391,8 +400,18 @@ export function createWebWorkspaceRuntime(
   async function request(method: string, path: string, body: TeamProtocolV2Json = {}, upload?: RemoteFileUpload) {
     if (disposed) throw new Error(currentText().t("webClient.error.connectionClosed"));
     const current = generation;
-    const result = await peer.execute({ id: crypto.randomUUID(), type: "request", method, path, body, upload });
+    const result = await peer.execute({
+      id: crypto.randomUUID(),
+      type: "request",
+      method,
+      path,
+      body,
+      upload,
+      timeoutMs: remoteWorkspaceReadTimeout(method, path),
+    });
     if (disposed || generation !== current) throw new Error(currentText().t("webClient.error.hostChanged"));
+    if (result.status === 401 || result.status === 403)
+      throw new WebHostConnectionError(result.status === 401 ? "authentication_required" : "access_ended");
     if (!result.ok || (result.status ?? 500) >= 400)
       throw new Error(hostRefusal(result.status, result.body) ?? currentText().t("webClient.error.requestIncomplete"));
     return result.body;

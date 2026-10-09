@@ -31,6 +31,7 @@ export interface RemoteServerConnectionStatus {
   hostRestart: ServerSummary["hostRestart"];
   /** A hosted server that the account service stopped for no use, or that it starts now. */
   hostedSleep: ServerSummary["hostedSleep"];
+  hostedIssue: ServerSummary["hostedIssue"];
 }
 
 export interface RemoteConnectionOutcome {

@@ -592,6 +592,7 @@ export const STORY_SERVERS: ServerSummary[] = [
     role: "owner",
     active: false,
     hostedSleep: "sleeping",
+    hostedIssue: null,
   },
 ];
 

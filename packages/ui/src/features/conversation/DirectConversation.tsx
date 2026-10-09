@@ -39,6 +39,7 @@ interface DirectConversationProps {
   loadingOlder?: boolean;
   olderError?: string | null;
   typing: boolean;
+  connectionReady?: boolean;
   onSend: (text: string, clientMessageId: string) => Promise<{ message: DirectMessage; readError?: string }>;
   onMarkRead: () => Promise<void>;
   onLoadOlder?: () => void;
@@ -211,7 +212,7 @@ export function DirectConversation(props: DirectConversationProps) {
 
   async function send(): Promise<void> {
     const body = text().trim();
-    if (!body || sending()) return;
+    if (!body || sending() || props.connectionReady === false) return;
     if (typingIdleTimer) clearTimeout(typingIdleTimer);
     props.onTypingChange(false);
     setSending(true);
@@ -463,7 +464,7 @@ export function DirectConversation(props: DirectConversationProps) {
             aria-label={t("conversation.direct.send")}
             aria-keyshortcuts={sendShortcutAriaKey(props.sendShortcut ?? "enter")}
             title={t(sendShortcutHintKey(props.sendShortcut ?? "enter", "send"))}
-            disabled={!text().trim() || sending()}
+            disabled={!text().trim() || sending() || props.connectionReady === false}
             onClick={() => void send()}
           >
             {sending() ? "…" : "↑"}

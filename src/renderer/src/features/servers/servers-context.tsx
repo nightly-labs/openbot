@@ -8,7 +8,6 @@ import { createEffect, createMemo, createSignal, flush, onSettled } from "solid-
 import { actionToast } from "../../action-toast";
 import { FALLBACK_HOST_STATUS } from "../../app-defaults";
 import { createSimpleContext } from "../../simple-context";
-import { createHostRestartToasts } from "../updates/host-restart-toast";
 import { watchHostUpdate } from "./host-update-toast";
 import { olderAppSide, remoteUpdateServer, serverSupportsCapability } from "./server-capabilities";
 import { serversPort } from "./servers-port";
@@ -46,6 +45,8 @@ import { serversPort } from "./servers-port";
 const Servers = createSimpleContext({
   name: "Servers",
   init: () => {
+    const [serversLoaded, setServersLoaded] = createSignal(false);
+    const [serversLoadFailed, setServersLoadFailed] = createSignal(false);
     const [servers, setServers] = createSignal<ServerSummary[]>([]);
     const [hostStatus, setHostStatus] = createSignal<HostStatus>(FALLBACK_HOST_STATUS);
     const [joinServerOpen, setJoinServerOpen] = createSignal(false);
@@ -143,6 +144,8 @@ const Servers = createSimpleContext({
     const mismatchOffers = new Set<string>();
 
     function applyServerSummaries(value: ServerSummary[]): void {
+      setServersLoaded(true);
+      setServersLoadFailed(false);
       const previous = new Map(servers().map((server) => [server.id, server]));
       for (const server of value) {
         const sequence = server.connectionSequence ?? 0;
@@ -230,6 +233,15 @@ const Servers = createSimpleContext({
       }
     }
 
+    async function refreshServers(): Promise<void> {
+      setServersLoadFailed(false);
+      try {
+        applyServerSummaries(await serversPort().servers.list());
+      } catch {
+        setServersLoadFailed(true);
+      }
+    }
+
     let markServersLoaded: () => void = () => undefined;
     const initialServersReady = new Promise<void>((resolve) => {
       markServersLoaded = resolve;
@@ -242,15 +254,7 @@ const Servers = createSimpleContext({
       // is another microtask between the summaries arriving and the per-server
       // bootstrap that waits on this promise, and that gap is long enough for the
       // view to paint a first pass from stale state.
-      void serversPort()
-        .servers.list()
-        .then(
-          (value) => {
-            applyServerSummaries(value);
-            markServersLoaded();
-          },
-          () => markServersLoaded(),
-        );
+      void refreshServers().finally(markServersLoaded);
       void serversPort()
         .host.getStatus()
         .then(setHostStatus)
@@ -373,24 +377,11 @@ const Servers = createSimpleContext({
       }
     }
 
-    createHostRestartToasts(() =>
-      servers().flatMap((server) =>
-        server.kind === "remote"
-          ? [
-              {
-                id: server.id,
-                name: server.name,
-                online: server.state === "online",
-                restart: server.hostRestart?.state ?? null,
-                version: server.hostRestart?.version ?? null,
-              },
-            ]
-          : [],
-      ),
-    );
-
     return {
       servers,
+      serversLoaded,
+      serversLoadFailed,
+      refreshServers,
       setServers,
       setHostUpdateOpener,
       activeServer,

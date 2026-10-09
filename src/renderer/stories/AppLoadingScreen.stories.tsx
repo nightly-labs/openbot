@@ -1,4 +1,5 @@
 import { APP_LOADING_FPS, APP_LOADING_LOOP_S, AppLoadingScreen } from "@openbot/ui/features/account/AppLoadingScreen";
+import { ServerConnectionNotice } from "@openbot/ui/features/servers/ServerConnectionNotice";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { SplashPlayground } from "./splash-concept";
 
@@ -45,4 +46,18 @@ export const Scrub: StoryObj<{ at: number }> = {
     at: { control: { type: "range", min: 0, max: APP_LOADING_LOOP_S * 3, step: 1 / APP_LOADING_FPS } },
   },
   render: (args) => <AppLoadingScreen at={args.at} />,
+};
+
+export const StartingServer: Story = {
+  render: () => <ServerConnectionNotice name="My server" phase="waking" initial onRetry={() => {}} />,
+};
+export const StartFailed: Story = {
+  render: () => (
+    <ServerConnectionNotice name="My server" phase="blocked" issue="start_timeout" initial onRetry={() => {}} />
+  ),
+};
+export const Reconnecting: Story = {
+  render: () => (
+    <ServerConnectionNotice name="My server" phase="waiting" remainingSeconds={12} initial={false} onRetry={() => {}} />
+  ),
 };

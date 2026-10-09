@@ -2,6 +2,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentApproval,
   AgentEvent,
+  AgentModelOption,
   AgentRuntimeApproval,
   AgentStatus,
   AgentSummary,
@@ -10,6 +11,7 @@ import type {
   BrowserTab,
   BrowserTakeoverRequest,
   ConversationPage,
+  HostedServerIssue,
   HostedServerSleep,
   QueueSnapshot,
   RespondToApprovalInput,
@@ -21,6 +23,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
 import type { RemoteTeamHost } from "@openbot/team-client/remote-directory";
+import { createRemoteConnectionRecovery, type RemoteRecoveryStatus } from "@openbot/team-client/remote-recovery";
 import { reconcilePendingRequests } from "@openbot/team-client/runtime-attention";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, createStore, onSettled } from "solid-js";
@@ -34,6 +37,7 @@ import { createWebHostLifecycle } from "./web-host-lifecycle";
 import type { WebHostState } from "./web-host-lock";
 import {
   createWebWorkspaceRuntime,
+  WebHostConnectionError,
   WebHostIncompatibleError,
   type WebRuntimeEvents,
   type WebWorkspaceRuntime,
@@ -46,6 +50,7 @@ interface WebConversation {
   draft: string;
   attachments: AttachmentSummary[];
   loading: boolean;
+  error?: string | null;
 }
 interface WebWorkspaceState {
   hosts: RemoteTeamHost[];
@@ -74,6 +79,14 @@ interface WebWorkspaceState {
    * starts after the user's input (`waking`). Cleared when it is online again.
    */
   hostedSleep: HostedServerSleep | null;
+  hostedIssue: HostedServerIssue | null;
+  connectionError: string | null;
+  recovery: RemoteRecoveryStatus | null;
+  workspaceLoaded: boolean;
+  panelsFailed: boolean;
+  panelsLoading: boolean;
+  agentStatus: AgentStatus | null;
+  models: AgentModelOption[];
   /** The opened host said it restarts into an update (`host-update-v1`). Cleared when it is online again. */
   hostRestart: { state: "waiting" | "restarting"; version: string | null } | null;
   /** The state of each host that this tab has not opened, from its status connection. */
@@ -141,6 +154,14 @@ export function createWebWorkspace(
     capabilities: [],
     status: "offline",
     hostedSleep: null,
+    hostedIssue: null,
+    connectionError: null,
+    recovery: null,
+    workspaceLoaded: false,
+    panelsFailed: false,
+    panelsLoading: false,
+    agentStatus: null,
+    models: [],
     hostRestart: null,
     hostStates: {},
     incompatibility: null,
@@ -181,6 +202,31 @@ export function createWebWorkspace(
   const conversationReads = new Map<string, number>();
   const heldDeltas = new Map<string, Array<Extract<AgentEvent, { type: "conversation-delta" }>>>();
   const hostEventListeners = new Set<(event: AgentEvent | TeamRealtimeEvent) => void>();
+  let connectionPromise: { hostId: string; opened: boolean; promise: Promise<void> } | null = null;
+  let recoveryBlocked = false;
+  let recovery = makeRecovery();
+  function makeRecovery() {
+    return createRemoteConnectionRecovery(
+      async () => {
+        const host = state.host;
+        if (!host || document.hidden) return;
+        await attemptConnection(host);
+        if (state.status !== "online") throw new Error(currentText().t("webClient.notice.connecting"));
+      },
+      () => {},
+      (status) => {
+        if (!disposed)
+          setState((draft) => {
+            draft.recovery = status;
+          });
+      },
+    );
+  }
+  function recover() {
+    if (disposed || !hostId || recoveryBlocked) return;
+    recovery.offline();
+    recovery.setActive(!document.hidden);
+  }
   const hostLifecycle = createWebHostLifecycle({
     accountFetch: props.accountFetch,
     hostId: () => hostId,
@@ -188,8 +234,19 @@ export function createWebWorkspace(
     status: () => state.status,
     hostedSleep: () => state.hostedSleep,
     setHostedSleep,
-    reconnect,
-    report,
+    setIssue: (issue) =>
+      setState((draft) => {
+        draft.hostedIssue = issue;
+      }),
+    suspend: () => {
+      recoveryBlocked = true;
+      recovery.suspend();
+    },
+    recover: () => {
+      recoveryBlocked = false;
+      recovery.refresh();
+      recover();
+    },
   });
   const hostNoticeListeners = new Set<(hostId: string, event: WebHostNotice, agents: AgentSummary[]) => void>();
   const runtime = (props.createRuntime ?? createWebWorkspaceRuntime)(
@@ -209,27 +266,35 @@ export function createWebWorkspace(
       hostSessionRevoked: () => void retryHosts(),
       connection(update) {
         if (disposed || update.hostId !== hostId) return;
+        if (recoveryBlocked && update.state === "offline" && !update.code) return;
         // A host that announced a restart comes back by itself; a wake is only for a stopped server.
         const unavailable = update.state === "offline" && !update.code && !state.hostRestart;
         setState((draft) => {
-          draft.status = update.state;
+          if (update.state !== "online") draft.status = update.state;
+          if (update.state !== "online")
+            draft.connectionError = currentText().t("server.connection.reconnecting", { name: draft.host?.name ?? "" });
           // The lifecycle shows the message of an unavailable host only when the host does not sleep or wake.
-          draft.error =
-            unavailable || (update.code === "session_revoked" && leftHostIds.has(update.hostId))
-              ? null
-              : update.message;
+          if (update.code)
+            draft.connectionError = currentText().t(
+              update.code === "session_revoked"
+                ? "webClient.error.accessEnded"
+                : "server.compatibility.unsafeDataDescription",
+            );
           if (update.state !== "online") {
             draft.approvals = [];
             draft.prompts = [];
             draft.progress = {};
             draft.takeovers = [];
-            draft.browserTabs = [];
-            draft.activeBrowserTabId = null;
             draft.browserControlState = { sessions: [] };
-            draft.sidebarLayout = defaultSidebarLayout();
             draft.duplicatingAgentIds = [];
           }
         });
+        if (update.state === "offline") generation += 1;
+        if (update.code) {
+          hostLifecycle.endSleep();
+          recoveryBlocked = true;
+          recovery.suspend();
+        }
         if (update.code === "session_revoked") {
           // A revoked session must not leave private conversations visible while the directory
           // decides whether this membership still exists. Keep the host shell for a possible
@@ -238,6 +303,7 @@ export function createWebWorkspace(
           selectedId = null;
           setState((draft) => {
             draft.revocationRevision += 1;
+            draft.workspaceLoaded = false;
             draft.agents = [];
             draft.agentsLoaded = false;
             draft.conversations = {};
@@ -274,19 +340,13 @@ export function createWebWorkspace(
             .catch(report);
           return;
         }
-        if (unavailable)
-          hostLifecycle.hostUnavailable(update.hostId, update.message ? new Error(update.message) : undefined);
-        if (update.state === "online") {
-          revokedReconnect = false;
-          hostLifecycle.endSleep();
-        } else if (state.hostRestart) hostLifecycle.retryAfterRestart();
-        if (update.state === "online" && update.resync) {
-          // A host that still waits to restart says so again when the connection declares capabilities.
-          setState((draft) => {
-            draft.hostRestart = null;
+        if (unavailable) {
+          const current = generation;
+          void hostLifecycle.hostUnavailable(update.hostId, connectionPromise?.opened ?? false).then((retry) => {
+            if (retry && !disposed && current === generation) recover();
           });
-          void resync();
-        }
+        } else if (state.hostRestart && update.state === "offline") recover();
+        if (update.state === "online" && update.resync && !connectionPromise) recover();
       },
       event(id, event) {
         if (disposed || id !== hostId) return;
@@ -507,9 +567,13 @@ export function createWebWorkspace(
         if (refreshHostId && !hosts.some((host) => host.hostId === refreshHostId)) {
           generation += 1;
           hostId = null;
+          recovery.dispose();
+          recovery = makeRecovery();
+          hostLifecycle.endSleep();
           selectedId = null;
           setState((draft) => {
             draft.host = null;
+            draft.workspaceLoaded = false;
             draft.memberId = null;
             draft.selectedId = null;
             draft.agents = [];
@@ -614,9 +678,14 @@ export function createWebWorkspace(
       });
   }
   async function reconnect(): Promise<void> {
-    const host = state.hosts.find((listed) => listed.hostId === state.host?.hostId) ?? state.host;
-    if (!host || state.status === "connecting") return;
-    await connect({ ...host });
+    const host = state.hosts.find((listed) => listed.hostId === hostId) ?? state.host;
+    if (!host || connectionPromise) return;
+    if (state.hostedSleep === "sleeping" || state.hostedIssue) await hostLifecycle.retry();
+    else {
+      await props.onSessionCheck();
+      recoveryBlocked = false;
+      await connect(host);
+    }
   }
   async function joinInvite(inviteUrl: string): Promise<void> {
     const normalizedInviteUrl = inviteUrl.trim();
@@ -632,11 +701,29 @@ export function createWebWorkspace(
     acceptedInvite = null;
   }
   async function connect(host: RemoteTeamHost) {
-    if (state.status === "connecting") return;
+    recoveryBlocked = false;
+    recovery.dispose();
+    recovery = makeRecovery();
+    if (!connectionPromise || connectionPromise.hostId !== host.hostId) hostLifecycle.endSleep();
+    try {
+      await attemptConnection(host, true);
+    } catch {
+      if (!disposed && hostId === host.hostId && state.recovery?.phase !== "suspended") recover();
+    }
+  }
+  function attemptConnection(host: RemoteTeamHost, opened = false): Promise<void> {
+    if (connectionPromise?.hostId === host.hostId) return connectionPromise.promise;
+    const promise = connectWorkspace(host, opened).finally(() => {
+      if (connectionPromise?.promise === promise) connectionPromise = null;
+    });
+    connectionPromise = { hostId: host.hostId, opened, promise };
+    return promise;
+  }
+  async function connectWorkspace(host: RemoteTeamHost, opened: boolean) {
     const current = ++generation;
     const sameHost = hostId === host.hostId;
     // A hosted server that sleeps or wakes keeps the workspace visible, so each retry keeps its agents and the selection.
-    const keepWorkspace = sameHost && state.hostedSleep !== null;
+    const keepWorkspace = sameHost && state.workspaceLoaded;
     const previousSelected = sameHost ? selectedId : null;
     hostId = host.hostId;
     writeWebServerSelection(props.accountId, host.hostId);
@@ -644,6 +731,13 @@ export function createWebWorkspace(
     if (!sameHost) hostLifecycle.endSleep();
     setState((draft) => {
       draft.host = host;
+      draft.recovery = null;
+      draft.connectionError = null;
+      if (!sameHost) {
+        draft.workspaceLoaded = false;
+        draft.agentStatus = null;
+        draft.models = [];
+      }
       draft.status = "connecting";
       draft.hostRestart = null;
       draft.memberId = sameHost ? draft.memberId : null;
@@ -659,27 +753,26 @@ export function createWebWorkspace(
       }
       draft.approvals = [];
       draft.prompts = [];
-      draft.progress = {};
       draft.takeovers = [];
-      draft.browserTabs = [];
-      draft.activeBrowserTabId = null;
       draft.browserControlState = { sessions: [] };
-      draft.sidebarLayout = defaultSidebarLayout();
-      draft.duplicatingAgentIds = [];
-      draft.capabilities = [];
-      draft.presence = null;
+      if (!keepWorkspace) {
+        draft.progress = {};
+        draft.browserTabs = [];
+        draft.activeBrowserTabId = null;
+        draft.sidebarLayout = defaultSidebarLayout();
+        draft.duplicatingAgentIds = [];
+        draft.capabilities = [];
+        draft.presence = null;
+      }
       draft.error = null;
       draft.incompatibility = null;
     });
     try {
       const capabilities = await runtime.connect(host);
-      const agents = await runtime.listAgents();
-      const [browserTabs, sidebarLayout] = await Promise.all([
-        capabilities.includes("browser-control") ? runtime.browserTabs() : Promise.resolve([]),
-        readSidebarLayout(
-          capabilities,
-          agents.map((agent) => agent.id),
-        ),
+      const [agents, agentStatus, models] = await Promise.all([
+        runtime.listAgents(),
+        runtime.status(),
+        runtime.models(),
       ]);
       if (disposed || current !== generation) return;
       revokedReconnect = false;
@@ -688,11 +781,16 @@ export function createWebWorkspace(
         draft.capabilities = capabilities;
         draft.agents = agents;
         draft.agentsLoaded = true;
+        draft.workspaceLoaded = true;
+        draft.agentStatus = agentStatus;
+        draft.models = models;
+        draft.connectionError = null;
         draft.status = "online";
-        draft.browserTabs = browserTabs;
-        draft.activeBrowserTabId = browserTabs[0]?.id ?? null;
-        if (sidebarLayout.revision >= draft.sidebarLayout.revision) draft.sidebarLayout = sidebarLayout;
       });
+      void loadPanels(
+        capabilities,
+        agents.map((agent) => agent.id),
+      );
       preferences.reconcileActiveServerPins(agents.map((agent) => agent.id));
       for (const agent of agents) loadQueue(agent.id);
       void runtime
@@ -730,9 +828,62 @@ export function createWebWorkspace(
             hostProtocol: { ...error.hostProtocol },
           };
       });
-      if (!(error instanceof WebHostIncompatibleError)) hostLifecycle.hostUnavailable(host.hostId, error);
+      if (error instanceof WebHostIncompatibleError || error instanceof WebHostConnectionError) {
+        hostLifecycle.endSleep();
+        recoveryBlocked = true;
+        recovery.suspend();
+        setState((draft) => {
+          draft.connectionError = error.message;
+        });
+      } else {
+        setState((draft) => {
+          draft.connectionError = currentText().t("server.connection.reconnecting", { name: host.name });
+        });
+        await hostLifecycle.hostUnavailable(host.hostId, opened);
+      }
+      throw error;
     }
   }
+  async function loadPanels(capabilities = state.capabilities, agentIds = state.agents.map((agent) => agent.id)) {
+    const current = generation;
+    const isCurrent = () => !disposed && current === generation;
+    setState((draft) => {
+      draft.panelsFailed = false;
+      draft.panelsLoading = true;
+    });
+    const failed = () => {
+      if (isCurrent())
+        setState((draft) => {
+          draft.panelsFailed = true;
+        });
+    };
+    await Promise.all([
+      (capabilities.includes("browser-control") ? runtime.browserTabs() : Promise.resolve([]))
+        .then((browserTabs) => {
+          if (!isCurrent()) return;
+          setState((draft) => {
+            draft.browserTabs = browserTabs;
+            draft.activeBrowserTabId = browserTabs.some((tab) => tab.id === draft.activeBrowserTabId)
+              ? draft.activeBrowserTabId
+              : (browserTabs[0]?.id ?? null);
+          });
+        })
+        .catch(failed),
+      readSidebarLayout(capabilities, agentIds)
+        .then((layout) => {
+          if (isCurrent())
+            setState((draft) => {
+              if (layout.revision >= draft.sidebarLayout.revision) draft.sidebarLayout = layout;
+            });
+        })
+        .catch(failed),
+    ]);
+    if (isCurrent())
+      setState((draft) => {
+        draft.panelsLoading = false;
+      });
+  }
+
   async function load(id: string, older = false) {
     const current = generation;
     const previous = state.conversations[id];
@@ -773,7 +924,18 @@ export function createWebWorkspace(
           revision: older && old ? old.revision : page.revision,
         };
         item.loading = false;
+        item.error = null;
       });
+    } catch (error) {
+      if (!disposed && current === generation)
+        setState((draft) => {
+          const item = draft.conversations[id];
+          if (item) {
+            item.loading = false;
+            item.error = currentText().t("webClient.error.requestFailed");
+          }
+        });
+      throw error;
     } finally {
       const reads = (conversationReads.get(id) ?? 1) - 1;
       if (reads > 0) conversationReads.set(id, reads);
@@ -872,15 +1034,14 @@ export function createWebWorkspace(
         attachments: [],
         loading: true,
       };
+      draft.conversations[id].loading = true;
+      draft.conversations[id].error = undefined;
     });
     try {
       await load(id);
     } catch (error) {
       if (disposed || current !== generation) return;
       report(error);
-      setState((draft) => {
-        if (draft.conversations[id]) draft.conversations[id].loading = false;
-      });
     }
   }
   async function resync() {
@@ -1025,14 +1186,35 @@ export function createWebWorkspace(
       void props
         .onSessionCheck()
         .then(() => refreshHosts())
-        .then(() => refresh())
+        .then(() => {
+          if (state.status === "online") return resync();
+          if (state.recovery?.phase !== "suspended") recover();
+        })
         .catch(report);
     };
+    const visibility = () => {
+      if (document.hidden) {
+        hostLifecycle.cancelPending();
+        if (hostId) generation += 1;
+        recovery.setActive(false);
+      } else {
+        hostLifecycle.resume();
+        if (state.status !== "online" && state.recovery?.phase !== "suspended") recover();
+      }
+    };
+    const network = () => {
+      if (!document.hidden) recovery.networkRestored();
+    };
+    document.addEventListener("visibilitychange", visibility);
+    window.addEventListener("online", network);
     window.addEventListener("focus", focus);
     return () => {
       disposed = true;
       generation += 1;
+      recovery.dispose();
       hostLifecycle.dispose();
+      document.removeEventListener("visibilitychange", visibility);
+      window.removeEventListener("online", network);
       acceptedInvite = null;
       window.removeEventListener("focus", focus);
       void runtime.dispose({ sessionsEnded: props.accountSessionEnded?.() ?? false }).catch(() => undefined);
@@ -1041,6 +1223,7 @@ export function createWebWorkspace(
   return {
     state,
     profiles,
+    retryPanels: loadPanels,
     selected,
     conversation,
     runtime,

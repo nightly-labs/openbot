@@ -5,6 +5,7 @@ import { Loading } from "solid-js";
 import { DirectConversation } from "../../lazy-views";
 import { usePlatform } from "../../platform";
 import { deviceSendShortcut } from "../../send-shortcut-preference";
+import { useServerScope } from "../servers/server-scope";
 import { useServers } from "../servers/servers-context";
 import { usePresence } from "../team/team-context";
 import { useDirectMessages } from "./direct-messages-context";
@@ -18,6 +19,7 @@ import { useDirectMessages } from "./direct-messages-context";
  */
 export function WorkspaceDirectConversation(props: { member: TeamPresenceMember }) {
   const platform = usePlatform();
+  const scope = useServerScope();
   const { activeServerSupportsCapability } = useServers();
   const { currentTeamMember } = usePresence();
   const {
@@ -47,6 +49,7 @@ export function WorkspaceDirectConversation(props: { member: TeamPresenceMember 
       }
     >
       <DirectConversation
+        connectionReady={scope.loaded()}
         member={props.member}
         currentMemberId={currentTeamMember()?.id ?? ""}
         snapshot={directConversations()[props.member.id]}

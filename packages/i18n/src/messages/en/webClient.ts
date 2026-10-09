@@ -2,7 +2,6 @@ import { defineMessages } from "../../message";
 
 export const messages = defineMessages("webClient", {
   "webClient.loading": "Loading OpenBot…",
-  "webClient.hostWaking": "Waking the server…",
   "webClient.loadingLine.wake": "Waking up the agents…",
   "webClient.loadingLine.coffee": "Pouring coffee for the agents…",
   "webClient.loadingLine.tokens": "Counting tokens on fingers…",
@@ -17,11 +16,9 @@ export const messages = defineMessages("webClient", {
   "webClient.pane.chat": "Chat",
   "webClient.pane.workspace": "Workspace",
   "webClient.notice.connecting": "Connecting to your computer",
-  "webClient.notice.disconnected": "Your computer is disconnected",
   "webClient.notice.findingHosts": "Finding your computers",
   "webClient.notice.hostsFailed": "Could not load your computers",
   "webClient.notice.connectComputer": "Connect your computer",
-  "webClient.notice.keepOpen": "Keep OpenBot open on your computer. Your draft stays here while you reconnect.",
   "webClient.connect.description":
     "Run OpenBot on your computer to chat with your agents from this browser. You can also join a computer with an invitation.",
   "webClient.connect.stepInstall": "Install and open OpenBot on your computer.",
@@ -35,7 +32,6 @@ export const messages = defineMessages("webClient", {
   "webClient.agent.refreshFailed":
     "The agent was created, but the workspace could not refresh. Reload before trying again.",
   "webClient.agent.unconfirmed": "The result is not confirmed. Close this form and check the host before trying again.",
-  "webClient.error.hostStatus": "The host status could not be read.",
   "webClient.error.usageOffline": "Connect to your host to view usage.",
   "webClient.error.desktopOnly": "This action is available in the desktop app.",
   "webClient.settings.preferences.title": "Preferences",

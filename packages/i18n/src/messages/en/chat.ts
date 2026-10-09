@@ -236,7 +236,6 @@ export const messages = defineMessages("chat", {
   "chat.scrollRail.earlierSince": "Earlier, since {date}",
   "chat.day.now": "now",
   "chat.errorStatus.readState": "Read state failed",
-  "chat.errorStatus.load": "Load failed",
   "chat.errorStatus.send": "Send failed",
   "chat.send.sending": "Sending…",
   "chat.send.waiting": "Waiting to send",

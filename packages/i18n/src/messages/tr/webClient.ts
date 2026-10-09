@@ -3,7 +3,6 @@ import type { messages as source } from "../en/webClient";
 
 export const messages = {
   "webClient.loading": "OpenBot yükleniyor…",
-  "webClient.hostWaking": "Sunucu uyandırılıyor…",
   "webClient.loadingLine.wake": "Ajanlar uyandırılıyor…",
   "webClient.loadingLine.coffee": "Ajanlara kahve dolduruluyor…",
   "webClient.loadingLine.tokens": "Token'lar parmakla sayılıyor…",
@@ -18,11 +17,9 @@ export const messages = {
   "webClient.pane.chat": "Sohbet",
   "webClient.pane.workspace": "Çalışma alanı",
   "webClient.notice.connecting": "Bilgisayarınıza bağlanılıyor",
-  "webClient.notice.disconnected": "Bilgisayarınızın bağlantısı kesildi",
   "webClient.notice.findingHosts": "Bilgisayarlarınız aranıyor",
   "webClient.notice.hostsFailed": "Bilgisayarlarınız yüklenemedi",
   "webClient.notice.connectComputer": "Bilgisayarınızı bağlayın",
-  "webClient.notice.keepOpen": "Bilgisayarınızda OpenBot'u açık tutun. Yeniden bağlanırken taslağınız burada kalır.",
   "webClient.connect.description":
     "Bu tarayıcıdan ajanlarınızla sohbet etmek için bilgisayarınızda OpenBot'u çalıştırın. Ayrıca bir davetle bir bilgisayara da katılabilirsiniz.",
   "webClient.connect.stepInstall": "Bilgisayarınıza OpenBot'u yükleyin ve açın.",
@@ -37,7 +34,6 @@ export const messages = {
     "Ajan oluşturuldu, ancak çalışma alanı yenilenemedi. Tekrar denemeden önce sayfayı yeniden yükleyin.",
   "webClient.agent.unconfirmed":
     "Sonuç doğrulanmadı. Bu formu kapatın ve tekrar denemeden önce ana makineyi kontrol edin.",
-  "webClient.error.hostStatus": "Ana makine durumu okunamadı.",
   "webClient.error.usageOffline": "Kullanımı görüntülemek için ana makinenize bağlanın.",
   "webClient.error.desktopOnly": "Bu eylem masaüstü uygulamasında kullanılabilir.",
   "webClient.settings.preferences.title": "Tercihler",

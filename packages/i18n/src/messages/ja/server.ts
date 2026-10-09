@@ -78,8 +78,6 @@ export const messages = {
   "server.select.failedTitle": "サーバーを選択できませんでした",
   "server.select.failedDescription": "サーバーを切り替えられませんでした。もう一度お試しください。",
   "server.select.openAgentFailed": "{name} を開けませんでした。サイドバーで探してください。",
-  "server.scope.agentsLoadFailed":
-    "エージェントを読み込めませんでした。サーバーの接続を確認して、もう一度お試しください。",
   "server.settings.unavailable": "このサーバーは利用できません。",
   "server.settings.identityRefreshFailed": "サーバーの ID を更新できませんでした。",
   "server.settings.loadFailed": "サーバーの設定を読み込めませんでした。",

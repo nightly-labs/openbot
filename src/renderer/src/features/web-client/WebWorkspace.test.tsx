@@ -1,4 +1,9 @@
-import type { AttachmentImportEvent, AttachmentSummary, ConversationPage } from "@openbot/contracts/ipc";
+import type {
+  AgentModelOption,
+  AttachmentImportEvent,
+  AttachmentSummary,
+  ConversationPage,
+} from "@openbot/contracts/ipc";
 import { render, waitFor } from "@solidjs/testing-library";
 import { flush } from "solid-js";
 import { assert, beforeEach, describe, expect, it, vi } from "vitest";
@@ -605,7 +610,19 @@ describe("web workspace state", () => {
     app.events().connection({ hostId: "host", state: "offline", message: "Offline" });
     const host = workspace.state.host;
     if (!host) throw new Error("Missing host");
-    await workspace.connect(host);
+    const models = Promise.withResolvers<AgentModelOption[]>();
+    vi.mocked(app.runtime.models).mockReturnValueOnce(models.promise);
+    const reconnect = workspace.connect(host);
+    await waitFor(() => expect(app.runtime.models).toHaveBeenCalledTimes(2));
+    app.events().connection({ hostId: "host", state: "online", message: null });
+    flush();
+    expect(workspace.state.status).toBe("connecting");
+    expect(workspace.state.selectedId).toBe("chief");
+    expect(workspace.conversation()?.page).toEqual(page);
+    expect(workspace.conversation()?.draft).toBe("Unsent text");
+    models.resolve([]);
+    await reconnect;
+    expect(workspace.state.status).toBe("online");
     expect(workspace.conversation()?.draft).toBe("Unsent text");
     expect(app.runtime.send).not.toHaveBeenCalled();
   });

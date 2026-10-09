@@ -3,7 +3,6 @@ import type { messages as source } from "../en/webClient";
 
 export const messages = {
   "webClient.loading": "OpenBot wird geladen…",
-  "webClient.hostWaking": "Server wird gestartet…",
   "webClient.loadingLine.wake": "Agenten werden geweckt…",
   "webClient.loadingLine.coffee": "Kaffee für die Agenten wird eingeschenkt…",
   "webClient.loadingLine.tokens": "Tokens werden an den Fingern abgezählt…",
@@ -18,12 +17,9 @@ export const messages = {
   "webClient.pane.chat": "Chat",
   "webClient.pane.workspace": "Arbeitsbereich",
   "webClient.notice.connecting": "Verbindung mit deinem Computer wird hergestellt",
-  "webClient.notice.disconnected": "Dein Computer ist nicht verbunden",
   "webClient.notice.findingHosts": "Deine Computer werden gesucht",
   "webClient.notice.hostsFailed": "Deine Computer konnten nicht geladen werden",
   "webClient.notice.connectComputer": "Verbinde deinen Computer",
-  "webClient.notice.keepOpen":
-    "Lass OpenBot auf deinem Computer geöffnet. Dein Entwurf bleibt hier, während du dich erneut verbindest.",
   "webClient.connect.description":
     "Starte OpenBot auf deinem Computer, um über diesen Browser mit deinen Agenten zu chatten. Du kannst auch mit einer Einladung einem Computer beitreten.",
   "webClient.connect.stepInstall": "Installiere und öffne OpenBot auf deinem Computer.",
@@ -38,7 +34,6 @@ export const messages = {
     "Der Agent wurde erstellt, aber der Arbeitsbereich konnte nicht aktualisiert werden. Lade ihn neu, bevor du es erneut versuchst.",
   "webClient.agent.unconfirmed":
     "Das Ergebnis ist nicht bestätigt. Schließe dieses Formular und prüfe den Host, bevor du es erneut versuchst.",
-  "webClient.error.hostStatus": "Der Host-Status konnte nicht gelesen werden.",
   "webClient.error.usageOffline": "Verbinde dich mit deinem Host, um die Nutzung anzuzeigen.",
   "webClient.error.desktopOnly": "Diese Aktion ist in der Desktop-App verfügbar.",
   "webClient.settings.preferences.title": "Einstellungen",

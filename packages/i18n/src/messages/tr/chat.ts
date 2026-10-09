@@ -237,7 +237,6 @@ export const messages = {
   "chat.scrollRail.earlierSince": "{date} tarihinden beri daha eski",
   "chat.day.now": "şimdi",
   "chat.errorStatus.readState": "Okuma durumu başarısız",
-  "chat.errorStatus.load": "Yükleme başarısız",
   "chat.errorStatus.send": "Gönderme başarısız",
   "chat.send.sending": "Gönderiliyor…",
   "chat.send.waiting": "Gönderilmeyi bekliyor",

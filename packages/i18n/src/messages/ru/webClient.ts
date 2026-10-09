@@ -3,7 +3,6 @@ import type { messages as source } from "../en/webClient";
 
 export const messages = {
   "webClient.loading": "Загрузка OpenBot…",
-  "webClient.hostWaking": "Пробуждение сервера…",
   "webClient.loadingLine.wake": "Будим агентов…",
   "webClient.loadingLine.coffee": "Наливаем агентам кофе…",
   "webClient.loadingLine.tokens": "Считаем токены на пальцах…",
@@ -18,12 +17,9 @@ export const messages = {
   "webClient.pane.chat": "Чат",
   "webClient.pane.workspace": "Рабочее пространство",
   "webClient.notice.connecting": "Подключение к вашему компьютеру",
-  "webClient.notice.disconnected": "Ваш компьютер отключён",
   "webClient.notice.findingHosts": "Поиск ваших компьютеров",
   "webClient.notice.hostsFailed": "Не удалось загрузить ваши компьютеры",
   "webClient.notice.connectComputer": "Подключите свой компьютер",
-  "webClient.notice.keepOpen":
-    "Не закрывайте OpenBot на своём компьютере. Черновик останется здесь, пока вы переподключаетесь.",
   "webClient.connect.description":
     "Запустите OpenBot на своём компьютере, чтобы общаться с агентами из этого браузера. Также можно присоединиться к компьютеру по приглашению.",
   "webClient.connect.stepInstall": "Установите и откройте OpenBot на своём компьютере.",
@@ -37,7 +33,6 @@ export const messages = {
   "webClient.agent.refreshFailed":
     "Агент создан, но рабочее пространство обновить не удалось. Перезагрузите страницу, прежде чем повторять.",
   "webClient.agent.unconfirmed": "Результат не подтверждён. Закройте эту форму и проверьте хост, прежде чем повторять.",
-  "webClient.error.hostStatus": "Не удалось прочитать состояние хоста.",
   "webClient.error.usageOffline": "Подключитесь к хосту, чтобы посмотреть использование.",
   "webClient.error.desktopOnly": "Это действие доступно в приложении для компьютера.",
   "webClient.settings.preferences.title": "Настройки",

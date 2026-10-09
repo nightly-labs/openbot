@@ -37,6 +37,7 @@ interface MutableStatus {
   connectionSequence: number;
   hostRestart: ServerSummary["hostRestart"];
   hostedSleep: HostedSleep;
+  hostedIssue: ServerSummary["hostedIssue"];
 }
 
 type HostedSleep = NonNullable<ServerSummary["hostedSleep"]> | null;
@@ -64,7 +65,12 @@ export class RemoteServerConnections {
       connectionSequence: status?.connectionSequence ?? 0,
       hostRestart: status?.hostRestart ?? null,
       hostedSleep: status?.hostedSleep ?? null,
+      hostedIssue: status?.hostedIssue ?? null,
     };
+  }
+
+  setHostedIssue(serverId: string, issue: ServerSummary["hostedIssue"]): void {
+    this.#mutable(serverId).hostedIssue = issue;
   }
 
   hostedSleepFor(serverId: string): HostedSleep {
@@ -150,6 +156,7 @@ export class RemoteServerConnections {
     status.issue = null;
     status.hostRestart = null;
     status.hostedSleep = null;
+    status.hostedIssue = null;
     status.connectionSequence += 1;
   }
 
@@ -223,6 +230,7 @@ export class RemoteServerConnections {
       connectionSequence: 0,
       hostRestart: null,
       hostedSleep: null,
+      hostedIssue: null,
     };
     this.#statuses.set(serverId, status);
     return status;

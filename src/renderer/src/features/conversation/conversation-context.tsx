@@ -68,6 +68,8 @@ function trimToLatestPage(conversation: ConversationState): void {
 interface ConversationState {
   messages: AgentMessage[];
   loaded?: boolean;
+  loading?: boolean;
+  loadError?: string | null;
   revision?: number;
   page?: ConversationPageInfo;
   windowMode?: "latest" | "around";
@@ -95,7 +97,7 @@ const Conversation = createSimpleContext({
   init: () => {
     const usage = useUsage();
     const { appFocused } = usePlatform();
-    const { activeServerId } = useServers();
+    const { activeServerId, activeServer } = useServers();
     const { agentChatsToMarkRead, agentChatsToRetryRead, autoReadAgentMessages } = useAgentReadTracking();
     const scopeIsCurrent = createScopeGuard();
     const { activeDirectMemberId } = useDirectMessages();
@@ -169,17 +171,32 @@ const Conversation = createSimpleContext({
     });
 
     createEffect(
-      () => ({ agentId: activeAgentId(), agentPhase: agentStatus().phase, openRevision: agentChatOpenRevision() }),
+      () => ({
+        agentId: activeAgentId(),
+        agentPhase: agentStatus().phase,
+        openRevision: agentChatOpenRevision(),
+        serverState: activeServer()?.state,
+        sequence: activeServer()?.connectionSequence,
+      }),
       ({ agentId }) => {
         if (!agentId) return;
         const serverId = untrack(activeServerId);
         const trackingKey = agentConversationKey(serverId, agentId);
         const pageRequest = (conversationPageRequests.get(agentId) ?? 0) + 1;
         conversationPageRequests.set(agentId, pageRequest);
+        const server = untrack(activeServer);
+        if (server?.kind === "remote" && server.state !== "online") return;
+        updateConversation(agentId, (conversation) => {
+          conversation.loading = true;
+          conversation.loadError = null;
+        });
         void conversationPort()
           .agent.readConversationPage({ agentId, anchor: { type: "latest" }, limit: 50 }, serverId)
           .then((page) => {
             if (!scopeIsCurrent() || conversationPageRequests.get(agentId) !== pageRequest) return;
+            updateConversation(agentId, (conversation) => {
+              conversation.loading = false;
+            });
             const pageApplied = applyConversationPage(page, "replace", "latest");
             if (!pageApplied) {
               if (agentChatsToMarkRead.has(trackingKey)) {
@@ -204,9 +221,12 @@ const Conversation = createSimpleContext({
               if (latestIncomingMessage) autoMarkAgentMessageRead(agentId, latestIncomingMessage.id);
             }
           })
-          .catch((error) => {
+          .catch(() => {
             if (!scopeIsCurrent() || conversationPageRequests.get(agentId) !== pageRequest) return;
-            appendUiError(agentId, error, currentText().t("chat.errorStatus.load"), serverId);
+            updateConversation(agentId, (conversation) => {
+              conversation.loading = false;
+              conversation.loadError = currentText().t("server.connection.conversationFailed");
+            });
             if (agentChatsToMarkRead.delete(trackingKey)) markLatestVisibleAgentMessageRead(agentId, serverId);
           });
       },
@@ -916,6 +936,7 @@ const Conversation = createSimpleContext({
 
     return {
       conversations,
+      retryConversation: () => setAgentChatOpenRevision((current) => current + 1),
       unreadReplies,
       recentReplies,
       activeMessages,

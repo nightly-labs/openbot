@@ -25,6 +25,7 @@ import {
   encodeTeamProtocolV6WebRtcHttpRequest,
 } from "@openbot/contracts/team-protocol/v6-webrtc-adapter";
 import { sourceText } from "@openbot/i18n/source";
+import { remoteWorkspaceReadTimeout } from "@openbot/team-client/remote-recovery";
 import { Context, Deferred, Effect, Fiber, Layer, Result, Schema } from "effect";
 import type { CentralAuthOperationError } from "./central-auth-effects";
 import type { RemoteConnectionBootstrap } from "./central-auth-manager";
@@ -343,7 +344,13 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     this: TeamWebRtcClientTransport,
     hostId: string,
     path: string,
-    init: { method?: string; body?: unknown; preserveSemanticTags?: boolean; agentCreateModel?: boolean } = {},
+    init: {
+      method?: string;
+      body?: unknown;
+      preserveSemanticTags?: boolean;
+      agentCreateModel?: boolean;
+      timeoutMs?: number;
+    } = {},
   ): Effect.fn.Return<TeamProtocolV2Json | undefined, RemoteWorkflowError> {
     return yield* this.#owned(
       this.requestResponse(hostId, path, init).pipe(
@@ -362,6 +369,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       contentType?: string;
       preserveSemanticTags?: boolean;
       agentCreateModel?: boolean;
+      timeoutMs?: number;
     } = {},
   ): Effect.fn.Return<
     {
@@ -414,14 +422,24 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         // connection that carried its body. Only the connection that refused the frame is marked
         // lost: a request that fails late must not drop the connection another request just made.
         const refusedBy = this.#active.get(hostId);
-        const envelope = yield* this.#exchange(hostId, requestId, frame).pipe(
+        const envelope = yield* this.#exchange(
+          hostId,
+          requestId,
+          frame,
+          init.timeoutMs ?? remoteWorkspaceReadTimeout(method, path),
+        ).pipe(
           Effect.catchIf(
             (error) => !bodyTransferId && isClosedChannelError(error.cause),
             () =>
               Effect.gen({ self: this }, function* () {
                 if (refusedBy?.connected && this.#active.get(hostId) === refusedBy) this.#onDisconnected(hostId);
                 yield* this.#ensureConnected(hostId);
-                return yield* this.#exchange(hostId, requestId, frame);
+                return yield* this.#exchange(
+                  hostId,
+                  requestId,
+                  frame,
+                  init.timeoutMs ?? remoteWorkspaceReadTimeout(method, path),
+                );
               }),
           ),
         );
@@ -467,6 +485,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     hostId: string,
     requestId: string,
     frame: string,
+    timeoutMs = TEAM_WEBRTC_REMOTE_REQUEST_TIMEOUT_MILLISECONDS,
   ): Effect.fn.Return<TeamProtocolV2Json, RemoteWorkflowError, TeamClientBridge> {
     const result = Deferred.makeUnsafe<TeamProtocolV2Json, RemoteWorkflowError>();
     {
@@ -479,7 +498,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       const timer = setTimeout(() => {
         this.#pending.delete(requestId);
         reject(new TeamWebRtcRequestError(504, "remote_timeout", sourceText("error.remote.requestTimeout")));
-      }, TEAM_WEBRTC_REMOTE_REQUEST_TIMEOUT_MILLISECONDS);
+      }, timeoutMs);
       this.#pending.set(requestId, { hostId, resolve, reject, timer });
     }
     // The cleanup covers the send too: an interrupted send must not leave the entry and its timer.

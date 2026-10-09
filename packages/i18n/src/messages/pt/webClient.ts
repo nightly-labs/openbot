@@ -3,7 +3,6 @@ import type { messages as source } from "../en/webClient";
 
 export const messages = {
   "webClient.loading": "Carregando o OpenBot…",
-  "webClient.hostWaking": "Acordando o servidor…",
   "webClient.loadingLine.wake": "Acordando os agentes…",
   "webClient.loadingLine.coffee": "Servindo café para os agentes…",
   "webClient.loadingLine.tokens": "Contando tokens nos dedos…",
@@ -18,12 +17,9 @@ export const messages = {
   "webClient.pane.chat": "Chat",
   "webClient.pane.workspace": "Espaço de trabalho",
   "webClient.notice.connecting": "Conectando ao seu computador",
-  "webClient.notice.disconnected": "Seu computador está desconectado",
   "webClient.notice.findingHosts": "Buscando seus computadores",
   "webClient.notice.hostsFailed": "Não foi possível carregar seus computadores",
   "webClient.notice.connectComputer": "Conecte seu computador",
-  "webClient.notice.keepOpen":
-    "Mantenha o OpenBot aberto no seu computador. Seu rascunho fica aqui enquanto você se reconecta.",
   "webClient.connect.description":
     "Execute o OpenBot no seu computador para conversar com seus agentes neste navegador. Você também pode entrar em um computador com um convite.",
   "webClient.connect.stepInstall": "Instale e abra o OpenBot no seu computador.",
@@ -38,7 +34,6 @@ export const messages = {
     "O agente foi criado, mas não foi possível atualizar o espaço de trabalho. Recarregue antes de tentar novamente.",
   "webClient.agent.unconfirmed":
     "O resultado não foi confirmado. Feche este formulário e verifique o computador anfitrião antes de tentar novamente.",
-  "webClient.error.hostStatus": "Não foi possível ler o status do computador anfitrião.",
   "webClient.error.usageOffline": "Conecte-se ao seu computador anfitrião para ver o uso.",
   "webClient.error.desktopOnly": "Esta ação está disponível no app para computador.",
   "webClient.settings.preferences.title": "Preferências",

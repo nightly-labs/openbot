@@ -21,6 +21,8 @@ type WorkspaceFrameProps = ParentProps<
     /** Whether the usage report is open. While it is, the middle panes are inert. */
     usageOpen: boolean;
     usage?: JSX.Element;
+    connection?: JSX.Element;
+    initialLoading?: boolean;
     /** Dialogs and overlays after the panes. */
     after?: JSX.Element;
   } & Omit<JSX.HTMLAttributes<HTMLDivElement>, "children">
@@ -47,6 +49,8 @@ export function WorkspaceFrame(props: WorkspaceFrameProps) {
     "usage",
     "after",
     "children",
+    "connection",
+    "initialLoading",
     "class",
   );
 
@@ -70,10 +74,17 @@ export function WorkspaceFrame(props: WorkspaceFrameProps) {
     >
       {props.left}
       <WorkspaceLeftPanelResizer />
-      <div class="usage-workspace-content" inert={props.usageOpen} aria-hidden={props.usageOpen ? "true" : undefined}>
-        <Show when={props.blockedServer} keyed fallback={props.children}>
-          {(server) => <RemoteCompatibilityScreen server={server} onRetry={() => props.onRetryServer(server.id)} />}
-        </Show>
+      <div
+        class="usage-workspace-content server-connection-workspace"
+        inert={props.usageOpen}
+        aria-hidden={props.usageOpen ? "true" : undefined}
+      >
+        {props.connection}
+        <div class="server-connection-content">
+          <Show when={props.blockedServer} keyed fallback={<Show when={!props.initialLoading}>{props.children}</Show>}>
+            {(server) => <RemoteCompatibilityScreen server={server} onRetry={() => props.onRetryServer(server.id)} />}
+          </Show>
+        </div>
       </div>
       <Show when={props.usageOpen}>
         <div class="conversation-panel agent-usage-workspace">{props.usage}</div>

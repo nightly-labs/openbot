@@ -62,12 +62,24 @@ export interface RemoteHostRequestTransport {
   request: (
     hostId: string,
     path: string,
-    init?: { method?: string; body?: unknown; preserveSemanticTags?: boolean; agentCreateModel?: boolean },
+    init?: {
+      method?: string;
+      body?: unknown;
+      preserveSemanticTags?: boolean;
+      agentCreateModel?: boolean;
+      timeoutMs?: number;
+    },
   ) => Effect.Effect<unknown, RemoteWorkflowError>;
   requestResponse: (
     hostId: string,
     path: string,
-    init?: { method?: string; body?: unknown; contentType?: string; preserveSemanticTags?: boolean },
+    init?: {
+      method?: string;
+      body?: unknown;
+      contentType?: string;
+      preserveSemanticTags?: boolean;
+      timeoutMs?: number;
+    },
   ) => Effect.Effect<
     {
       status: number;
@@ -191,7 +203,7 @@ export class RemoteServerClient {
    * `affectsConnection` is false for the remote viewer, whose requests are triggered by page loads
    * rather than by the user and so must not mark a healthy server offline.
    *
-   * `timeoutMs` applies to HTTP only. A WebRTC request has the transport's own limit.
+   * `timeoutMs` applies to both HTTP and WebRTC requests.
    */
 
   readonly fetch = Effect.fn("RemoteClient.fetch")(function* (
@@ -214,6 +226,7 @@ export class RemoteServerClient {
             method: init.method,
             body: requestBody,
             contentType,
+            timeoutMs,
             preserveSemanticTags: supportsTeamSemanticTags(compatibility.capabilities),
           });
           const headers = new Headers();

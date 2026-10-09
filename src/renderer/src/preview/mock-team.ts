@@ -67,6 +67,7 @@ export function createMockTeam(
   let sessions = clone(options.sessions ?? STORY_SESSIONS);
   let remoteDesktopSessions = clone(options.remoteDesktopSessions ?? [STORY_REMOTE_DESKTOP_SESSION]);
   let directMessageCounter = 10;
+  const serverListeners = new Set<Listener<ServerSummary[]>>();
   const presenceListeners = new Set<Listener<TeamPresenceSnapshot>>();
   const directMessageListeners = new Set<Listener<DirectMessageRealtimeEvent>>();
   const directTypingListeners = new Set<Listener<DirectTypingRealtimeEvent>>();
@@ -194,7 +195,16 @@ export function createMockTeam(
     retryConnection: async (serverId) => {
       const server = servers.find((candidate) => candidate.id === serverId);
       if (!server) throw new Error("Server not found");
-      return clone(server);
+      const connected = {
+        ...server,
+        state: "online" as const,
+        hostedSleep: null,
+        hostedIssue: null,
+        connectionSequence: (server.connectionSequence ?? 0) + 1,
+      };
+      servers = servers.map((item) => (item.id === serverId ? connected : item));
+      emit(serverListeners, servers);
+      return clone(connected);
     },
     remove: async (serverId) => {
       servers = servers.filter((server) => server.id !== serverId);
@@ -321,8 +331,8 @@ export function createMockTeam(
     onScopedDirectMessage: () => () => undefined,
     onScopedDirectTyping: () => () => undefined,
     onEvent: (listener) => {
-      void listener;
-      return () => undefined;
+      serverListeners.add(listener);
+      return () => serverListeners.delete(listener);
     },
     onInvite: (listener) => {
       inviteListeners.add(listener);

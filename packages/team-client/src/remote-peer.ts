@@ -51,7 +51,15 @@ import { encodeTeamWebRtcPayload, TeamWebRtcPayloadDecoder } from "./webrtc-fram
 export type RemoteTeamCommand =
   | { id: string; type: "connect"; hostId: string; hostPublicKey: string }
   | { id: string; type: "disconnect" }
-  | { id: string; type: "request"; method: string; path: string; body: TeamProtocolV2Json; upload?: RemoteFileUpload };
+  | {
+      id: string;
+      type: "request";
+      method: string;
+      path: string;
+      body: TeamProtocolV2Json;
+      upload?: RemoteFileUpload;
+      timeoutMs?: number;
+    };
 
 export interface RemoteTeamBootstrapPayload {
   sessionId: string;
@@ -536,6 +544,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
               peerCall(() => actions.current.onUploadProgress?.({ commandId: command.id, sent, total })),
             ).catch(() => undefined);
           },
+          command.timeoutMs,
         );
         return { commandId: command.id, ok: true, status: response.status, body: response.body };
       }).pipe(Effect.result);
@@ -1076,6 +1085,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     body: TeamProtocolV2Json,
     upload?: RemoteFileUpload,
     onUploadProgress?: (sent: number, total: number) => void,
+    timeoutMs = REQUEST_TIMEOUT_MS,
   ) {
     return Effect.fn("RemotePeer.request")(function* () {
       const state = peer;
@@ -1135,7 +1145,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
                 reject(error);
                 if (checksConnection) failPeer(state, error, actions);
               },
-              checksConnection ? compatibilityTimeout : REQUEST_TIMEOUT_MS,
+              checksConnection ? Math.min(compatibilityTimeout, timeoutMs) : timeoutMs,
             );
             const resolve = (value: { status: number; body: TeamProtocolV2Json }) =>
               Deferred.doneUnsafe(answer, Effect.succeed(value));

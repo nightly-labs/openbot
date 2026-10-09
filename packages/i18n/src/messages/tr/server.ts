@@ -142,7 +142,6 @@ export const messages = {
   "server.select.failedTitle": "Sunucu seçilemedi",
   "server.select.failedDescription": "Sunucular arasında geçiş yapılamadı. Tekrar deneyin.",
   "server.select.openAgentFailed": "{name} açılamadı. Onu kenar çubuğunda bulun.",
-  "server.scope.agentsLoadFailed": "Ajanlar yüklenemedi. Sunucu bağlantısını kontrol edip tekrar deneyin.",
   "server.settings.unavailable": "Bu sunucu kullanılamıyor.",
   "server.settings.identityRefreshFailed": "Sunucu kimliği yenilenemedi.",
   "server.settings.loadFailed": "Sunucu ayarları yüklenemedi.",

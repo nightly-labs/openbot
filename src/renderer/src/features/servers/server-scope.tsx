@@ -1,5 +1,5 @@
-import { currentText } from "@openbot/ui/text";
-import { createEffect, createSignal, flush, getOwner, isDisposed, onSettled, untrack } from "solid-js";
+import { createRemoteConnectionRecovery, type RemoteRecoveryStatus } from "@openbot/team-client/remote-recovery";
+import { createEffect, createSignal, createStore, flush, getOwner, isDisposed, onSettled, untrack } from "solid-js";
 import { isGlobalSearchShortcut } from "../../global-search-shortcut";
 import { useNavigation } from "../../navigation";
 import { createSimpleContext } from "../../simple-context";
@@ -21,14 +21,9 @@ import { serversPort } from "./servers-port";
  * teardown `selectServer` used to run and the `resetForServer` slice every
  * per-server domain exported for it.
  *
- * It also collapses the load that existed twice. The startup bootstrap and
- * `selectServer` ran the same per-server sequence behind the same
- * incompatible-remote cutoff, and had already drifted - a `catch` per promise in
- * one, a single `Promise.all` without one in the other, and a different subset of
- * loads - which is the "works at startup, not after a switch" class of bug in the
- * shape it actually takes. First mount and server switch are now the same mount,
- * so the sequence exists once. The shape kept is the bootstrap's: a `catch` per
- * load, so one failure cannot take the other seven with it.
+ * First mount and server switches use the same required reads. Status, models
+ * and agents must all succeed before the workspace is ready. Optional reads
+ * do not block the workspace. Same-server recovery keeps loaded data.
  *
  * `loaded` replaces `dynamicIslandLoadedServerId`. The old flag had to name a
  * server because one global signal described whichever server was current; here
@@ -46,7 +41,7 @@ const ServerScope = createSimpleContext({
   init: () => {
     const { centralAuth } = useAuth();
     const { setupState } = useSetup();
-    const { servers, activeServerId, initialServersReady, serverLoadRequest } = useServers();
+    const { servers, activeServerId, initialServersReady, serverLoadRequest, serversLoaded } = useServers();
     const { pendingAgentSelection, setPendingAgentSelection } = useServerSwitch();
     const { setTeamPresence } = usePresence();
     const {
@@ -57,7 +52,7 @@ const ServerScope = createSimpleContext({
       markDirectMessagesRead,
       conversationVisible,
     } = useDirectMessages();
-    const { setModelOptions, activeAgent, setAgentStatus, applyStoredAgents, setAgentListSettled } = useAgents();
+    const { setModelOptions, activeAgent, setAgentStatus, applyStoredAgents } = useAgents();
     const {
       setBrowserControlState,
       supportsBrowser,
@@ -70,77 +65,84 @@ const ServerScope = createSimpleContext({
     const { conversations, clearRecentReplies, requestConversationRead, applyConversationReads, isAgentChatOpen } =
       useConversation();
 
-    const [loaded, setLoaded] = createSignal(false);
+    const [bootstrapReady, setBootstrapReady] = createSignal(false);
+    const [connection, setConnection] = createStore<{
+      hasContent: boolean;
+      loading: boolean;
+      sequence: number | undefined;
+      failed: boolean;
+      panelsFailed: boolean;
+      panelsLoading: boolean;
+      recovery: RemoteRecoveryStatus;
+    }>({
+      hasContent: false,
+      loading: true,
+      sequence: undefined,
+      failed: false,
+      panelsFailed: false,
+      panelsLoading: false,
+      recovery: { phase: "connecting", attempt: 0, remainingSeconds: 0 },
+    });
+    const selectedServer = () => servers().find((candidate) => candidate.id === activeServerId());
+    const transportReady = () => selectedServer()?.kind !== "remote" || selectedServer()?.state === "online";
+    const loaded = () =>
+      connection.hasContent &&
+      !connection.loading &&
+      connection.sequence === selectedServer()?.connectionSequence &&
+      connection.recovery.phase === "online" &&
+      transportReady();
+    const recovery = createRemoteConnectionRecovery(
+      loadWorkspace,
+      () => {
+        if (scopeIsCurrent())
+          setConnection((draft) => {
+            draft.failed = true;
+            draft.loading = false;
+          });
+      },
+      (status) => {
+        if (scopeIsCurrent())
+          setConnection((draft) => {
+            draft.recovery = status;
+          });
+      },
+    );
     const owner = getOwner();
     /** This scope still owns the screen - the successor to `activeServerId() !== serverId`. */
     const scopeIsCurrent = (): boolean => !(owner && isDisposed(owner));
 
     let loadGeneration = 0;
-    function loadWorkspace(): void {
+    async function loadWorkspace(): Promise<void> {
       const generation = ++loadGeneration;
       const isCurrent = () => scopeIsCurrent() && generation === loadGeneration;
-      if (!isCurrent()) return;
       const serverId = activeServerId();
-      const server = servers().find((candidate) => candidate.id === serverId);
-      if (server?.kind === "remote" && (server.state === "incompatible" || server.issue != null)) {
-        return;
-      }
-      void Promise.all([
-        serversPort()
-          .agent.getStatus()
-          .then((value) => {
-            if (isCurrent()) setAgentStatus(value);
-          })
-          .catch(() => undefined),
-        serversPort()
-          .agent.listModels()
-          .then((value) => {
-            if (isCurrent()) setModelOptions(value);
-          })
-          .catch(() => undefined),
-        serversPort()
-          .agent.listAgents()
-          .then((storedAgents) => {
-            if (!isCurrent()) return;
-            applyStoredAgents(storedAgents);
-            reconcileActiveServerPins(storedAgents.map((agent) => agent.id));
-          })
-          .catch((error) => {
-            if (!isCurrent()) return;
-            setAgentListSettled(true);
-            const text = currentText();
-            setAgentStatus((current) => ({
-              ...current,
-              message: text.errorMessage(error, text.t("server.scope.agentsLoadFailed")),
-            }));
-          }),
-        loadSidebarLayout(server)
-          .then((value) => {
-            if (isCurrent()) setSidebarLayout(value);
-          })
-          .catch(() => undefined),
-        serversPort()
-          .agent.listConversationReads()
-          .then((value) => {
-            if (isCurrent()) applyConversationReads(value);
-          })
-          .catch(() => undefined),
-      ]).finally(() => {
-        if (isCurrent()) setLoaded(true);
+      const server = selectedServer();
+      const sequence = server?.connectionSequence;
+      if (!isCurrent() || !transportReady()) return;
+      setConnection((draft) => {
+        draft.failed = false;
+        draft.loading = true;
       });
-      if (supportsBrowser(server)) {
-        const applyDisplayState = beginBrowserLoad();
-        void loadBrowserDisplayState(server)
-          .then((value) => {
-            if (isCurrent()) applyDisplayState(value);
-          })
-          .catch(() => undefined);
-        void loadBrowserControlState(server)
-          .then((value) => {
-            if (isCurrent()) setBrowserControlState(value);
-          })
-          .catch(() => undefined);
-      }
+      const [status, models, agents, reads] = await Promise.all([
+        serversPort().agent.getStatus(serverId),
+        serversPort().agent.listModels(serverId),
+        serversPort().agent.listAgents(serverId),
+        serversPort()
+          .agent.listConversationReads(serverId)
+          .catch(() => null),
+      ]);
+      if (!isCurrent()) return;
+      setAgentStatus(status);
+      setModelOptions(models);
+      if (reads) applyConversationReads(reads);
+      applyStoredAgents(agents);
+      reconcileActiveServerPins(agents.map((agent) => agent.id));
+      setConnection((draft) => {
+        draft.hasContent = true;
+        draft.loading = false;
+        draft.sequence = sequence;
+      });
+      void loadPanels();
       void serversPort()
         .servers.getPresence()
         .then((value) => {
@@ -149,6 +151,51 @@ const ServerScope = createSimpleContext({
         .catch(() => undefined);
       void refreshDirectThreads();
       void refreshDirectConversation();
+    }
+
+    async function loadPanels() {
+      const generation = loadGeneration;
+      const isCurrent = () => scopeIsCurrent() && generation === loadGeneration;
+      const server = selectedServer();
+      setConnection((draft) => {
+        draft.panelsFailed = false;
+        draft.panelsLoading = true;
+      });
+      const failed = () => {
+        if (isCurrent())
+          setConnection((draft) => {
+            draft.panelsFailed = true;
+          });
+      };
+      const reads = [
+        loadSidebarLayout(server)
+          .then((value) => {
+            if (isCurrent()) setSidebarLayout(value);
+          })
+          .catch(failed),
+      ];
+      if (supportsBrowser(server)) {
+        const applyDisplayState = beginBrowserLoad();
+        reads.push(
+          loadBrowserDisplayState(server)
+            .then((value) => {
+              if (isCurrent()) applyDisplayState(value);
+            })
+            .catch(failed),
+        );
+        reads.push(
+          loadBrowserControlState(server)
+            .then((value) => {
+              if (isCurrent()) setBrowserControlState(value);
+            })
+            .catch(failed),
+        );
+      }
+      await Promise.all(reads);
+      if (isCurrent())
+        setConnection((draft) => {
+          draft.panelsLoading = false;
+        });
     }
 
     onSettled(() => {
@@ -185,9 +232,13 @@ const ServerScope = createSimpleContext({
       };
       window.addEventListener("focus", handleWindowFocus);
 
-      void initialServersReady.then(loadWorkspace);
+      void initialServersReady.then(() => {
+        if (scopeIsCurrent()) setBootstrapReady(true);
+      });
 
       return () => {
+        loadGeneration += 1;
+        recovery.dispose();
         window.removeEventListener("keydown", handleGlobalSearchShortcut);
         window.removeEventListener("focus", handleWindowFocus);
       };
@@ -197,8 +248,16 @@ const ServerScope = createSimpleContext({
       () => serverLoadRequest(),
       (request) =>
         untrack(() => {
-          if (request?.serverId === activeServerId()) loadWorkspace();
+          if (request?.serverId === activeServerId()) recovery.refresh();
         }),
+    );
+
+    createEffect(
+      () => ({ ready: bootstrapReady() && serversLoaded() && transportReady(), id: activeServerId() }),
+      ({ ready }) => {
+        if (!ready) loadGeneration += 1;
+        recovery.setActive(ready);
+      },
     );
 
     // "Select this agent once you are on its server" - written before the switch
@@ -214,7 +273,7 @@ const ServerScope = createSimpleContext({
       },
     );
 
-    return { loaded };
+    return { loaded, connection, retryPanels: loadPanels, retry: () => recovery.refresh() };
   },
 });
 

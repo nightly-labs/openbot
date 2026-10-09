@@ -6,13 +6,14 @@ import { Effect } from "effect";
  * server sleeps, and starts it when it does not. A sleeping server starts with `wakeForInput`.
  */
 export function createWebHostedServerWake(accountFetch: typeof fetch, now: () => number = Date.now) {
+  const controller = new AbortController();
   const accountRequest = (hostId: string, action: "status" | "wake") =>
     Effect.tryPromise((signal) =>
       accountFetch(
         new URL(`/api/browser/v2/hosting/servers/${encodeURIComponent(hostId)}/${action}`, window.location.origin),
         action === "wake"
           ? {
-              signal,
+              signal: AbortSignal.any([signal, controller.signal, AbortSignal.timeout(15_000)]),
               method: "POST",
               credentials: "same-origin",
               cache: "no-store",
@@ -20,7 +21,7 @@ export function createWebHostedServerWake(accountFetch: typeof fetch, now: () =>
               body: "{}",
             }
           : {
-              signal,
+              signal: AbortSignal.any([signal, controller.signal, AbortSignal.timeout(15_000)]),
               method: "GET",
               credentials: "same-origin",
               cache: "no-store",
@@ -29,5 +30,9 @@ export function createWebHostedServerWake(accountFetch: typeof fetch, now: () =>
       ),
     );
   const wake = createHostedServerWake((hostId) => accountRequest(hostId, "wake"), now);
-  return { wake, ...createHostedServerStatusCheck((hostId) => accountRequest(hostId, "status"), wake, now) };
+  return {
+    wake,
+    dispose: () => controller.abort(),
+    ...createHostedServerStatusCheck((hostId) => accountRequest(hostId, "status"), wake, now),
+  };
 }

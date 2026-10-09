@@ -16,6 +16,7 @@ import { useCustomAgents } from "../custom-agents/custom-agents-context";
 import { useCustomProviders } from "../custom-providers/custom-providers-context";
 import { useRemoteDesktop } from "../remote-desktop/remote-desktop-context";
 import { serverSupportsCapability } from "../servers/server-capabilities";
+import { useServerScope } from "../servers/server-scope";
 import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
 import { useSettings } from "../settings/settings-context";
@@ -39,6 +40,7 @@ import { useConversation } from "./conversation-context";
  */
 export function WorkspaceConversation(props: { account: () => CentralAuthUser }) {
   const scopeIsCurrent = createScopeGuard();
+  const serverScope = useServerScope();
   const platform = usePlatform();
   const { activeServer, activeServerSupportsCapability, joinServerOpen } = useServers();
   const { serverSettingsOpen, openServerSettings } = useServerSettings();
@@ -238,7 +240,11 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         setSkillsMarketplaceOpen(true);
       }}
       onOpenUsage={(trigger) => usage.openUsage(activeServer()?.id ?? "local", trigger, activeAgent()?.id)}
-      agentStatus={agentStatus()}
+      agentStatus={
+        activeServer()?.kind === "remote" && (!serverScope.loaded() || !conversations[activeAgent()?.id ?? ""]?.loaded)
+          ? { ...agentStatus(), phase: "starting" }
+          : agentStatus()
+      }
       agentsConnecting={agentListConnecting()}
       accountUsage={auth.accountUsage()}
       providerRuntimeStatuses={providerDownloads() ? providerRuntimeStatuses() : undefined}

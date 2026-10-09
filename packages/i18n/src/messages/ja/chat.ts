@@ -221,7 +221,6 @@ export const messages = {
   "chat.scrollRail.earlierSince": "{date}からの以前のメッセージ",
   "chat.day.now": "今",
   "chat.errorStatus.readState": "既読状態の更新に失敗しました",
-  "chat.errorStatus.load": "読み込みに失敗しました",
   "chat.errorStatus.send": "送信に失敗しました",
   "chat.send.sending": "送信中…",
   "chat.send.waiting": "送信待ち",

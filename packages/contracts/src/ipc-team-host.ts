@@ -84,7 +84,11 @@ export interface ServerSummary {
    * user's input (`waking`). Cleared when the connection comes back.
    */
   hostedSleep?: HostedServerSleep | null;
+  /** A hosted start needs user action. This is local IPC metadata, not a Team API field. */
+  hostedIssue?: HostedServerIssue | null;
 }
+
+export type HostedServerIssue = "plan_ended" | "wake_failed" | "start_timeout";
 
 export type HostedServerSleep = "sleeping" | "waking";
 

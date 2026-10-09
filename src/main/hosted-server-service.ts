@@ -93,6 +93,7 @@ export class HostedServerDesktopService {
             `/v2/hosting/servers/${encodeURIComponent(serverId)}/status`,
             { method: "GET" },
             (value) => value,
+            15_000,
           ),
         ),
       wake,
@@ -226,6 +227,7 @@ export class HostedServerDesktopService {
       `/v2/hosting/servers/${encodeURIComponent(serverId)}/wake`,
       { method: "POST" },
       decodeSummary,
+      15_000,
     );
     if (WAKE_RECONNECT_STATES.has(server.state)) this.onWake(serverId);
     return server;
