@@ -1347,6 +1347,12 @@ function QuestionContent(props: {
     () => Boolean(props.inlineReply) && questions().length > 0 && questions().every((question) => !question.isSecret),
   );
   const currentQuestion = () => questions()[questionIndex()];
+  const answerFieldKey = () => {
+    const question = currentQuestion();
+    return question
+      ? `${props.serverId}:${props.item.agent.id}:${String(props.item.requestId)}:${question.id}`
+      : undefined;
+  };
   const questionText = () => currentQuestion()?.question ?? props.item.detail ?? props.item.title;
   const openInOpenBot = () =>
     props.onAction({
@@ -1466,8 +1472,8 @@ function QuestionContent(props: {
               </For>
             </ul>
           </Show>
-          {/* Each question gets a new field, so a draft for one question is not sent as the answer to the next. */}
-          <Show keyed when={typedAnswerAvailable() ? currentQuestion()?.id : undefined}>
+          {/* Each question gets a new field, so a draft for one question is not sent as the answer to another. */}
+          <Show keyed when={typedAnswerAvailable() ? answerFieldKey() : undefined}>
             {(_questionId) => (
               <IslandReplyField
                 label={t(
