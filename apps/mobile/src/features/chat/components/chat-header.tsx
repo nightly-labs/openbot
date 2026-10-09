@@ -2,11 +2,12 @@ import { GlassView } from "expo-glass-effect";
 import { Link, router } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import { ArrowLeft, TriangleAlert } from "lucide-react-native";
+import { ArrowLeft, Globe, TriangleAlert } from "lucide-react-native";
 import { useMemo } from "react";
 import { Pressable, View, type ViewStyle } from "react-native";
 import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
+import { useBrowserFeature } from "@/features/browser/components/use-browser-feature";
 import { ChannelAvatar } from "@/features/channels/components/channel-avatar";
 import { ChatGlassIconButton } from "@/features/chat/components/chat-glass-icon-button";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
@@ -42,8 +43,16 @@ export function ChatHeader({
 }: ChatHeaderProps) {
   const warning = useThemeColor("warning");
   const { t } = useText();
-  const { servers } = useMobileWorkspace();
+  const { servers, browserViewSupport } = useMobileWorkspace();
   const disconnected = !servers.some((server) => server.id === target.serverId && server.state === "online");
+  const browserAllowed = useBrowserFeature();
+  // The agent's browser on the host, live. The button shows when the agent has no tab yet too: the
+  // browser screen opens a new one. A host that cannot stream a tab, or an app version the account
+  // server has the browser off for, shows no button.
+  const browserTarget =
+    target.kind === "agent" && browserAllowed && !disconnected && !readOnly && browserViewSupport(target.serverId).view
+      ? target
+      : null;
   const members = useMemo(
     () => new Map(target.kind === "channel" ? target.members.map((member) => [member.id, member]) : []),
     [target],
@@ -163,7 +172,28 @@ export function ChatHeader({
               )}
             </BlurReveal>
           </View>
-        ) : null}
+        ) : (
+          <View style={{ width: 48, height: 48 }} collapsable={false} pointerEvents={browserTarget ? "auto" : "none"}>
+            <BlurReveal value={browserTarget} interactive collapseOnHide enterDuration={320} exitDuration={240}>
+              {(agent) => (
+                <ChatGlassIconButton
+                  accessibilityLabel={t("mobile.browser.open")}
+                  fallbackBackground={fallbackBackground}
+                  liquidGlassAvailable={liquidGlassAvailable}
+                  onPress={() => {
+                    void haptics.impact("soft");
+                    router.push({
+                      pathname: "/browser/[agentId]",
+                      params: { agentId: agent.id, serverId: agent.serverId },
+                    });
+                  }}
+                >
+                  <Globe color={iconColor} size={24} strokeWidth={2} />
+                </ChatGlassIconButton>
+              )}
+            </BlurReveal>
+          </View>
+        )}
       </View>
       <SheetScrollEdgeEffect
         style={{ height: topInset + 82, left: 0, position: "absolute", right: 0, top: 0, zIndex: 10 }}

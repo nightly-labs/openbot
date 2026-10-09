@@ -78,6 +78,45 @@ describe("remote browser view", () => {
       runTeamEffect(view.input({ type: "key", action: "down", key: "a", code: "KeyA", text: "", modifiers: 0 })),
     ).rejects.toThrow("not connected");
   });
+  it("asks for the cursor, the menus and a page size only of a host that advertises them", async () => {
+    for (const advertised of [true, false]) {
+      const send = vi.fn().mockResolvedValue(undefined);
+      const request = vi.fn().mockResolvedValue({ id: sessionId, tabId, streamPath: browserViewStreamPath(sessionId) });
+      const client = createRemoteBrowserView(
+        send,
+        request,
+        () => false,
+        () => false,
+        () => ({
+          cursor: advertised,
+          contextMenu: advertised,
+          viewport: advertised ? { width: 1280, height: 800 } : null,
+        }),
+      );
+      const message = vi.fn();
+      const copied = vi.fn();
+      const ended = vi.fn();
+      const view = await runTeamEffect(client.open(tabId, vi.fn(), ended, copied, message));
+      const control = decodeRemoteDesktopSignalControl(send.mock.calls[0]?.[0]);
+      assert(control.type === "open");
+      const query = new URL(control.path, "http://host").searchParams;
+      expect([query.get("cursor"), query.get("menu"), query.get("viewport")]).toEqual(
+        advertised ? ["1", "1", "1280x800"] : [null, null, null],
+      );
+      client.receive(encodeRemoteDesktopSignalControl({ type: "opened", streamId: control.streamId }));
+      const text = (data: string) =>
+        client.receive(encodeRemoteDesktopSignalControl({ type: "text", streamId: control.streamId, data }));
+      // A message of a newer host leaves the view open, and a copy answer still goes to its own listener.
+      text(JSON.stringify({ type: "something-newer" }));
+      text(JSON.stringify({ type: "cursor", cursor: "pointer" }));
+      text(encodeBrowserViewCopied({ type: "copyTooLarge" }));
+      expect(message).toHaveBeenCalledExactlyOnceWith({ type: "cursor", cursor: "pointer" });
+      expect(copied).toHaveBeenCalledExactlyOnceWith({ type: "copyTooLarge" });
+      expect(ended).not.toHaveBeenCalled();
+      await runTeamEffect(view.close());
+    }
+  });
+
   it("does not attach a view that finishes opening after disconnect", async () => {
     let finish: ((value: { id: string; tabId: string; streamPath: string }) => void) | undefined;
     const request = vi

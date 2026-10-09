@@ -8,10 +8,16 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import type { Duplex } from "node:stream";
 import {
+  BROWSER_VIEW_CONTEXT_MENU_QUERY,
+  BROWSER_VIEW_CURSOR_QUERY,
   BROWSER_VIEW_FRAME_ACK_QUERY,
   BROWSER_VIEW_MAX_CLIPBOARD_TEXT,
+  BROWSER_VIEW_VIEWPORT_QUERY,
+  type BrowserViewContextMenu,
+  type BrowserViewCursor,
   decodeBrowserViewCopied,
   decodeBrowserViewFrame,
+  decodeBrowserViewHostMessage,
   encodeBrowserViewInput,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { afterEach, assert, describe, expect, it, vi } from "vitest";
@@ -76,7 +82,7 @@ describe("the live browser view on a host", () => {
         encodeBrowserViewInput({ type: "key", action: "down", key: "a", code: "KeyA", text: "", modifiers: 0 }),
       );
       await vi.waitFor(() => expect(dispatch).toHaveBeenCalledTimes(attempt));
-      expect(dispatch).toHaveBeenLastCalledWith("tab-1", expect.objectContaining({ type: "key", key: "a" }));
+      expect(dispatch).toHaveBeenLastCalledWith("tab-1", expect.objectContaining({ type: "key", key: "a" }), undefined);
       const closed = new Promise<void>((resolve) => socket.once("close", () => resolve()));
       await runCauseEffect(gateway.stop());
       await closed;
@@ -720,6 +726,105 @@ describe("the live browser view on a host", () => {
       gateway.createSession({ memberId: "member-1", teamSessionId: TEAM_SESSION, tabId: "tab-2" }),
     ).not.toThrow();
     await runCauseEffect(gateway.stop());
+  });
+});
+
+describe("the cursor, menus and page size of a live view", () => {
+  // Failure modes: a cursor or menu message reaches a desktop or web client that never asked for
+  // one, which reads every text message as a copy answer; a right-click of a phone opens the menu
+  // on the host's screen; the page size a phone asked for is not held.
+  async function openView(asks: { cursor?: boolean; menu?: boolean; viewport?: string } = {}) {
+    let reportCursor: ((cursor: BrowserViewCursor) => void) | undefined;
+    let heldViewport: unknown = null;
+    const dispatched: BrowserViewportInput[] = [];
+    const menus: Array<((menu: BrowserViewContextMenu) => void) | undefined> = [];
+    const gateway = new BrowserViewGateway({
+      browser: {
+        startView: (_tabId, onFrame, _onEnded, options) =>
+          Effect.sync(() => {
+            reportCursor = options?.onCursor;
+            heldViewport = options?.viewport ?? null;
+            onFrame({ sequence: 1, width: 1200, height: 800, image: new Uint8Array([0xff, 0xd8, 0xff]) });
+            return () => Effect.void;
+          }),
+        dispatchViewInput: (_tabId, input, onContextMenu) =>
+          Effect.sync(() => {
+            dispatched.push(input);
+            menus.push(onContextMenu);
+          }),
+        copyViewSelection: (tabId) => Effect.succeed(`selected in ${tabId}`),
+      },
+      authenticate: () => null,
+    });
+    const origin = await serve(gateway);
+    const session = gateway.createSession({ memberId: "member-1", teamSessionId: TEAM_SESSION, tabId: "tab-1" });
+    const url = new URL(`${origin}${session.streamPath}`);
+    if (asks.cursor) url.searchParams.set(BROWSER_VIEW_CURSOR_QUERY, "1");
+    if (asks.menu) url.searchParams.set(BROWSER_VIEW_CONTEXT_MENU_QUERY, "1");
+    if (asks.viewport) url.searchParams.set(BROWSER_VIEW_VIEWPORT_QUERY, asks.viewport);
+    const socket = new webSockets.WebSocket(url, { headers: { "X-OpenBot-WebRTC-Session": TEAM_SESSION } });
+    const messages: unknown[] = [];
+    socket.on("message", (data, binary) => {
+      if (!binary) messages.push(decodeBrowserViewHostMessage(String(data)));
+    });
+    const frames = collect(socket);
+    await new Promise((resolve) => socket.once("open", resolve));
+    await vi.waitFor(() => expect(frames).toHaveLength(1));
+    // The server waits for its sockets, so the gateway closes them first.
+    closers.unshift(() => runCauseEffect(gateway.stop()));
+    return {
+      socket,
+      messages,
+      dispatched,
+      menus,
+      heldViewport: () => heldViewport,
+      cursor: (cursor: BrowserViewCursor) => reportCursor?.(cursor),
+    };
+  }
+
+  const rightClick = encodeBrowserViewInput({
+    type: "pointer",
+    action: "down",
+    x: 0.5,
+    y: 0.5,
+    button: "right",
+    clickCount: 1,
+    deltaX: 0,
+    deltaY: 0,
+    modifiers: 0,
+  });
+
+  it("reports the page's cursor only to a client that asked for it", async () => {
+    const asked = await openView({ cursor: true });
+    asked.cursor("pointer");
+    await vi.waitFor(() => expect(asked.messages).toEqual([{ type: "cursor", cursor: "pointer" }]));
+
+    const silent = await openView();
+    silent.cursor("pointer");
+    silent.socket.send(encodeBrowserViewInput({ type: "copy" }));
+    // The copy answer is the barrier: a cursor message sent before it would arrive first.
+    await vi.waitFor(() => expect(silent.messages).toHaveLength(1));
+    expect(silent.messages).toEqual([{ type: "copied", text: "selected in tab-1" }]);
+  });
+
+  it("sends a right-click's menu to the client that asked, and holds the page size it asked for", async () => {
+    const asked = await openView({ menu: true, viewport: "1280x800" });
+    expect(asked.heldViewport()).toEqual({ width: 1280, height: 800 });
+    asked.socket.send(rightClick);
+    await vi.waitFor(() => expect(asked.dispatched).toMatchObject([{ type: "pointer", x: 600, y: 400 }]));
+    asked.menus[0]?.({ items: ["copy-link", "copy"], link: "https://a.example/" });
+    await vi.waitFor(() =>
+      expect(asked.messages).toEqual([
+        { type: "context-menu", items: ["copy-link", "copy"], link: "https://a.example/" },
+      ]),
+    );
+
+    // A client that did not ask leaves the menu to the host, and the page to the host's panel.
+    const silent = await openView({ viewport: "90x90" });
+    expect(silent.heldViewport()).toBeNull();
+    silent.socket.send(rightClick);
+    await vi.waitFor(() => expect(silent.dispatched).toHaveLength(1));
+    expect(silent.menus).toEqual([undefined]);
   });
 });
 

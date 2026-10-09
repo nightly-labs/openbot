@@ -7,4 +7,6 @@ import type { MobileFeatureConfig } from "@openbot/contracts/mobile-features";
  */
 export const MOBILE_FEATURE_CONFIG: MobileFeatureConfig = {
   cloudServers: { ios: "0", android: "1.2.0" },
+  // The browser is not checked on Android yet.
+  browser: { ios: "1.2.0", android: "1.2.0" },
 };

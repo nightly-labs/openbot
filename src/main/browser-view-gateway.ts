@@ -18,13 +18,20 @@ import { dirname, join } from "node:path";
 import type { Duplex } from "node:stream";
 import {
   BROWSER_VIEW_MAX_CLIPBOARD_TEXT,
+  type BrowserViewContextMenu,
+  type BrowserViewHostMessage,
   type BrowserViewSessionResponse,
+  type BrowserViewViewport,
   browserViewClientAcksFrames,
+  browserViewClientViewport,
+  browserViewClientWantsContextMenu,
+  browserViewClientWantsCursor,
   browserViewStreamPath,
   browserViewStreamSessionId,
   decodeBrowserViewInput,
   encodeBrowserViewCopied,
   encodeBrowserViewFrame,
+  encodeBrowserViewHostMessage,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import type * as Ws from "ws";
 import type { BrowserHost } from "../backend/browser-host";
@@ -112,6 +119,12 @@ interface ManagedViewSession {
    * key typed after it must not land first.
    */
   input: Semaphore.Semaphore;
+  /** The client draws the pointer itself and asked for the page's cursor. */
+  reportCursor: boolean;
+  /** The client shows the menu of its own right-clicks. */
+  reportContextMenu: boolean;
+  /** The page size the client asked the page to keep while it watches. */
+  viewport: BrowserViewViewport | null;
 }
 
 export class BrowserViewGateway {
@@ -144,6 +157,9 @@ export class BrowserViewGateway {
       frameSizes: new Map(),
       rememberFrames: false,
       input: Semaphore.makeUnsafe(1),
+      reportCursor: false,
+      reportContextMenu: false,
+      viewport: null,
     });
     return { id, tabId: input.tabId, streamPath: browserViewStreamPath(id) };
   }
@@ -224,6 +240,9 @@ export class BrowserViewGateway {
     session.frameHeight = 0;
     session.frameSizes.clear();
     session.rememberFrames = browserViewClientAcksFrames(url);
+    session.reportCursor = browserViewClientWantsCursor(url);
+    session.reportContextMenu = browserViewClientWantsContextMenu(url);
+    session.viewport = browserViewClientViewport(url);
     this.#webSockets.handleUpgrade(request, socket, head, (client) => this.#dispatch(this.#connect(session, client)));
   }
 
@@ -278,6 +297,14 @@ export class BrowserViewGateway {
         },
         (reason) => {
           this.#dispatch(this.#closeSession(session, reason));
+        },
+        {
+          // A cursor message is not dropped with frames: a lost frame is replaced by the next one,
+          // and a lost cursor stays wrong until the page changes it again.
+          ...(session.reportCursor
+            ? { onCursor: (cursor) => this.#send(session, client, { type: "cursor", cursor }) }
+            : {}),
+          ...(session.viewport ? { viewport: session.viewport } : {}),
         },
       );
       if (session.socket === client) session.stopView = stopView;
@@ -349,8 +376,18 @@ export class BrowserViewGateway {
         ? { ...input, sequence: undefined, x: input.x * frame.width, y: input.y * frame.height }
         : input;
     const browser = yield* BrowserViewPort;
-    yield* browser.input(session.tabId, dispatched).pipe(Effect.catch(() => Effect.void));
+    const client = session.socket;
+    const onContextMenu =
+      session.reportContextMenu && client
+        ? (menu: BrowserViewContextMenu) => this.#send(session, client, { type: "context-menu", ...menu })
+        : undefined;
+    yield* browser.input(session.tabId, dispatched, onContextMenu).pipe(Effect.catch(() => Effect.void));
   });
+
+  #send(session: ManagedViewSession, client: Ws.WebSocket, message: BrowserViewHostMessage): void {
+    if (session.socket !== client || client.readyState !== webSockets.WebSocket.OPEN) return;
+    client.send(encodeBrowserViewHostMessage(message));
+  }
 
   readonly #detach = Effect.fn("BrowserViewGateway.detach")(function* (
     this: BrowserViewGateway,

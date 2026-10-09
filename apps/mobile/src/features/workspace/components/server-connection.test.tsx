@@ -38,6 +38,7 @@ vi.mock("./remote-team-transport", () => ({
         },
         disconnect: async () => {},
         request: async (_method, _path, decode) => decode({ connected: true }),
+        openBrowserView: () => null,
       };
       return client;
     }, []);

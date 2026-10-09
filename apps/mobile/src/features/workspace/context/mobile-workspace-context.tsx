@@ -7,6 +7,14 @@ import {
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import {
+  TEAM_BROWSER_VIEW_CAPABILITY,
+  TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY,
+  TEAM_BROWSER_VIEW_CONTEXT_MENU_CAPABILITY,
+  TEAM_BROWSER_VIEW_CURSOR_CAPABILITY,
+  TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
+  TEAM_BROWSER_VIEW_VIEWPORT_CAPABILITY,
+} from "@openbot/contracts/team-protocol/browser-view-v1";
 import { TEAM_CONVERSATION_UNREAD_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
 import { HOST_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/host-admin-v1";
@@ -59,6 +67,13 @@ import { showFailureAlert, showWarningAlert } from "@/features/analytics/failure
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { trackWorkspaceActions } from "@/features/analytics/workspace-actions";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
+import {
+  decodeMobileBrowserTab,
+  decodeMobileBrowserTabs,
+  withBrowserTab,
+  withoutBrowserTab,
+} from "@/features/browser/model/browser-tabs";
+import { BROWSER_VIEW_PAGE_SIZE } from "@/features/browser/model/browser-view-bridge";
 import { MobileChannelStore } from "@/features/channels/model/channel-store";
 import { useLiveActivity } from "@/features/live-activity/use-live-activity";
 import { fetch } from "@/features/support/model/logged-fetch";
@@ -480,6 +495,19 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       serverCapabilities.current.set(serverId, compatibility.capabilities);
       channelStore.configure(serverId, compatibility.capabilities);
       void channelStore.refresh(serverId);
+      if (supportsBrowserView(compatibility.capabilities)) {
+        // The tabs only add the browser button. A host that cannot list them still loads.
+        void client
+          .request("GET", TEAM_API_ROUTES.browser.tabs, decodeMobileBrowserTabs)
+          .then((tabs) => {
+            if (!context.isCurrent()) return;
+            liveState.update("browserTabs", (current) => ({
+              ...current,
+              [serverId]: { tabs, activeTabId: current[serverId]?.activeTabId ?? null },
+            }));
+          })
+          .catch(() => undefined);
+      }
       if (compatibility.capabilities.includes("sidebar-layout")) {
         try {
           const layout = await client.request("GET", TEAM_API_ROUTES.sidebarLayout.state, decodeSidebarLayout);
@@ -546,6 +574,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       channelStore,
       applySidebarLayout,
       applyConversationReads,
+      liveState,
     ],
   );
 
@@ -701,6 +730,12 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         liveState.update("browserRequests", (current) => ({
           ...current,
           [serverId]: (current[serverId] ?? []).filter((item) => item.requestId !== event.requestId),
+        }));
+      } else if (event.type === "browser-changed") {
+        const tabs = decodeMobileBrowserTabs(event.tabs);
+        liveState.update("browserTabs", (current) => ({
+          ...current,
+          [serverId]: { tabs, activeTabId: event.activeTabId },
         }));
       }
       if (event.type === "sidebar-layout-changed") {
@@ -945,6 +980,76 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       );
     };
     const workspace: MobileWorkspaceContextValue = {
+      browserViewSupport: (serverId) => {
+        const capabilities = serverCapabilities.current.get(serverId) ?? [];
+        const view = supportsBrowserView(capabilities);
+        return {
+          view,
+          clipboard: view && capabilities.includes(TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY),
+          contextMenu: view && capabilities.includes(TEAM_BROWSER_VIEW_CONTEXT_MENU_CAPABILITY),
+          viewport: view && capabilities.includes(TEAM_BROWSER_VIEW_VIEWPORT_CAPABILITY),
+        };
+      },
+      openBrowserView: (serverId, tabId, listener) => {
+        const client = connections.current.get(serverId)?.client;
+        const capabilities = serverCapabilities.current.get(serverId) ?? [];
+        if (!client || !supportsBrowserView(capabilities)) return null;
+        return client.openBrowserView(
+          {
+            tabId,
+            namesFrames: capabilities.includes(TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY),
+            cursor: capabilities.includes(TEAM_BROWSER_VIEW_CURSOR_CAPABILITY),
+            clipboard: capabilities.includes(TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY),
+            contextMenu: capabilities.includes(TEAM_BROWSER_VIEW_CONTEXT_MENU_CAPABILITY),
+            viewport: capabilities.includes(TEAM_BROWSER_VIEW_VIEWPORT_CAPABILITY) ? BROWSER_VIEW_PAGE_SIZE : null,
+          },
+          listener,
+        );
+      },
+      controlBrowserTab: async (serverId, action) => {
+        // The host also sends `browser-changed` for an open or a close. The phone does not wait for
+        // it: the tab list changes at once, and is read again in case the event does not arrive.
+        const readTabs = () =>
+          void request("GET", TEAM_API_ROUTES.browser.tabs, decodeMobileBrowserTabs, undefined, serverId)
+            .then((tabs) =>
+              liveState.update("browserTabs", (current) => ({
+                ...current,
+                [serverId]: { tabs, activeTabId: current[serverId]?.activeTabId ?? null },
+              })),
+            )
+            .catch(() => undefined);
+        if (action.type === "open") {
+          // The desktop opens a new tab for the agent in the same way. `focus` stays false: the
+          // phone does not move the host's own browser to the tab.
+          const opened = await request(
+            "POST",
+            TEAM_API_ROUTES.browser.open,
+            decodeMobileBrowserTab,
+            { url: action.url, ownerThreadId: action.ownerThreadId, ownerAgentId: action.ownerAgentId, focus: false },
+            serverId,
+          );
+          liveState.update("browserTabs", (current) => ({
+            ...current,
+            [serverId]: withBrowserTab(current[serverId], opened),
+          }));
+          readTabs();
+          return opened;
+        }
+        if (action.type === "navigate") {
+          const body = { tabId: action.tabId, direction: action.direction };
+          await request("POST", TEAM_API_ROUTES.browser.navigate, ignoreResponse, body, serverId);
+        } else if (action.type === "reload") {
+          await request("POST", TEAM_API_ROUTES.browser.reload, ignoreResponse, { tabId: action.tabId }, serverId);
+        } else {
+          await request("POST", TEAM_API_ROUTES.browser.close, ignoreResponse, { tabId: action.tabId }, serverId);
+          liveState.update("browserTabs", (current) => ({
+            ...current,
+            [serverId]: withoutBrowserTab(current[serverId], action.tabId),
+          }));
+          readTabs();
+        }
+        return null;
+      },
       sidebarByServer,
       mutateSidebarLayout: async (serverId, action) => {
         if (!serverCapabilities.current.get(serverId)?.includes("sidebar-layout")) {
@@ -1350,4 +1455,9 @@ export function useMobileWorkspace(): MobileWorkspaceContextValue {
   const value = useContext(MobileWorkspaceContext);
   if (!value) throw new Error("useMobileWorkspace must be used within MobileWorkspaceProvider.");
   return value;
+}
+
+/** The host lists its tabs to a member (`browser-control`) and streams one of them (`browser-view`). */
+function supportsBrowserView(capabilities: readonly string[]): boolean {
+  return capabilities.includes("browser-control") && capabilities.includes(TEAM_BROWSER_VIEW_CAPABILITY);
 }

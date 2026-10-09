@@ -50,6 +50,7 @@ export const messages = {
   "mobile.chat.imageGeneration.wasInterrupted": "Se interrumpió la generación de la imagen.",
   "mobile.chat.imageGeneration.preview": "Vista previa de la imagen generada",
   "mobile.chat.message.reply": "Responder",
+  "mobile.chat.browserSecret.done": "He terminado",
   "mobile.chat.browserSecret.takeOver": "Tomar el control",
   "mobile.chat.exchange.informed": "Información enviada a",
   "mobile.chat.exchange.updateFrom": "Actualización de",

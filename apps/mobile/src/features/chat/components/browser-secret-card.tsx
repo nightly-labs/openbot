@@ -9,10 +9,13 @@ export function BrowserSecretCard({
   request,
   respond,
   respondToTakeover,
+  openBrowser,
 }: {
   request: BrowserTakeoverRequest;
   respondToTakeover: (decision: "complete" | "cancel") => Promise<void>;
   respond: (input: RespondToBrowserSecretInput) => Promise<void>;
+  /** Shows the tab live on the phone. Absent when the host cannot stream it. */
+  openBrowser?: () => void;
 }) {
   const { t } = useText();
   const [value, setValue] = useState("");
@@ -71,8 +74,23 @@ export function BrowserSecretCard({
             {t("mobile.chat.browserSecret.takeoverFailed")}
           </Typography.Paragraph>
         ) : null}
-        <View className="flex-row gap-2">
-          <Button isDisabled={pending} onPress={() => void finish("complete")}>
+        <View className="flex-row flex-wrap gap-2">
+          {openBrowser ? (
+            <Button
+              isDisabled={pending}
+              onPress={() => {
+                void haptics.impact("soft");
+                openBrowser();
+              }}
+            >
+              <Button.Label>{t("mobile.browser.open")}</Button.Label>
+            </Button>
+          ) : null}
+          <Button
+            variant={openBrowser ? "secondary" : "primary"}
+            isDisabled={pending}
+            onPress={() => void finish("complete")}
+          >
             <Button.Label>{t("mobile.chat.browserSecret.done")}</Button.Label>
           </Button>
           <Button variant="secondary" isDisabled={pending} onPress={() => void finish("cancel")}>

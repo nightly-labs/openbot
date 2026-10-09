@@ -4,12 +4,15 @@ import {
   BROWSER_VIEW_MAX_CLIPBOARD_TEXT,
   BROWSER_VIEW_MAX_FRAME_BYTES,
   type BrowserViewInput,
+  browserViewClientViewport,
   browserViewInputForHost,
   decodeBrowserViewCopied,
   decodeBrowserViewFrame,
+  decodeBrowserViewHostMessage,
   decodeBrowserViewInput,
   encodeBrowserViewCopied,
   encodeBrowserViewFrame,
+  encodeBrowserViewHostMessage,
   encodeBrowserViewInput,
   TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY,
   TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
@@ -159,5 +162,46 @@ describe("the browser view wire format", () => {
     ]) {
       expect(() => decodeBrowserViewInput(JSON.stringify(invalid))).toThrow("Invalid browser view input.");
     }
+  });
+
+  it("reads a host message it knows, and ignores one it does not", () => {
+    const cursor = { type: "cursor" as const, cursor: "text" as const };
+    expect(decodeBrowserViewHostMessage(encodeBrowserViewHostMessage(cursor))).toEqual(cursor);
+    // A newer host can name a cursor this client has no drawing for.
+    expect(decodeBrowserViewHostMessage(JSON.stringify({ type: "cursor", cursor: "alias-of-the-future" }))).toEqual({
+      type: "cursor",
+      cursor: "default",
+    });
+    expect(decodeBrowserViewHostMessage(JSON.stringify({ type: "something-newer" }))).toBeNull();
+    // The answer to a copy keeps the bounds of the released decoder.
+    expect(decodeBrowserViewHostMessage(encodeBrowserViewCopied({ type: "copied", text: "hi" }))).toEqual({
+      type: "copied",
+      text: "hi",
+    });
+    expect(() => decodeBrowserViewHostMessage(JSON.stringify({ type: "copied", text: 4 }))).toThrow(
+      "Invalid browser view message.",
+    );
+    // A menu keeps the items this client knows, and a copy item only with the address it copies.
+    expect(
+      decodeBrowserViewHostMessage(
+        JSON.stringify({
+          type: "context-menu",
+          items: ["copy-link", "copy-image-address", "copy", "print"],
+          link: "https://a.example/",
+        }),
+      ),
+    ).toEqual({ type: "context-menu", items: ["copy-link", "copy"], link: "https://a.example/" });
+    expect(() =>
+      decodeBrowserViewHostMessage(
+        JSON.stringify({ type: "context-menu", items: [], link: `https://a.example/${"a".repeat(2_048)}` }),
+      ),
+    ).toThrow("Invalid browser view message.");
+  });
+
+  it("reads the page size a client asks for only inside the bounds", () => {
+    const asked = (value: string) => browserViewClientViewport(new URL(`http://host/stream?viewport=${value}`));
+    expect(asked("1280x800")).toEqual({ width: 1280, height: 800 });
+    expect([asked("100x800"), asked("1280x9000"), asked("1280"), asked("1e3x800")]).toEqual([null, null, null, null]);
+    expect(browserViewClientViewport(new URL("http://host/stream"))).toBeNull();
   });
 });

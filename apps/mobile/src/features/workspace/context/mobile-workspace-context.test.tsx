@@ -146,6 +146,7 @@ vi.mock("../components/remote-team-transport", () => ({
           }
           throw new Error(`Unexpected request: ${path}`);
         },
+        openBrowserView: () => null,
       }),
       [],
     );

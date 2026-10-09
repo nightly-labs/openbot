@@ -1,4 +1,5 @@
 import type { BrowserTakeoverRequest } from "@openbot/contracts/ipc";
+import type { MobileBrowserTabs } from "@/features/browser/model/browser-tabs";
 import type { MobileAgentActivities } from "./agent-activity";
 
 /** Workspace state that host events change many times in one turn. */
@@ -8,6 +9,8 @@ export interface LiveWorkspaceState {
   /** The unread message count of each agent, from the host read state. `unreadAgentIds` decides which count. */
   unreadCounts: Record<string, number>;
   browserRequests: Record<string, BrowserTakeoverRequest[]>;
+  /** The host's browser tabs, by server. Absent for a host that serves no live view. */
+  browserTabs: Record<string, MobileBrowserTabs>;
 }
 
 /**
@@ -20,6 +23,7 @@ export class LiveWorkspaceStore {
     unreadAgentIds: [],
     unreadCounts: {},
     browserRequests: {},
+    browserTabs: {},
   };
   readonly #listeners = new Set<() => void>();
 

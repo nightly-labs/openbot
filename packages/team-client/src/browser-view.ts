@@ -1,12 +1,18 @@
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
+  BROWSER_VIEW_CONTEXT_MENU_QUERY,
+  BROWSER_VIEW_CURSOR_QUERY,
   BROWSER_VIEW_FRAME_ACK_QUERY,
+  BROWSER_VIEW_VIEWPORT_QUERY,
   type BrowserViewCopied,
   type BrowserViewFrame,
+  type BrowserViewHostMessage,
   type BrowserViewInput,
+  type BrowserViewViewport,
   browserViewInputForHost,
-  decodeBrowserViewCopied,
+  browserViewViewportQuery,
   decodeBrowserViewFrame,
+  decodeBrowserViewHostMessage,
   decodeBrowserViewSessionResponse,
   encodeBrowserViewInput,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
@@ -18,6 +24,7 @@ import {
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result, Schema } from "effect";
 import { runTeamEffect } from "./effect-boundary";
+import { createTeamRequestId } from "./request-id";
 
 class BrowserViewError extends Schema.TaggedError<BrowserViewError>()("BrowserViewError", { message: Schema.String }) {}
 
@@ -38,7 +45,19 @@ interface View {
   frame: (frame: BrowserViewFrame) => void;
   ended: (reason?: string) => void;
   copied: (message: BrowserViewCopied) => void;
+  /** Hears the cursor and the context menus, for a client that asked for them. */
+  message?: (message: Exclude<BrowserViewHostMessage, BrowserViewCopied>) => void;
 }
+/** What else the host advertises and this client asks of it. Each one is read when a view opens. */
+export interface RemoteBrowserViewFeatures {
+  /** `browser-view-cursor`: the client draws the pointer and asks for the page's cursor. */
+  cursor: boolean;
+  /** `browser-view-context-menu`: the client shows the menus of its own right-clicks. */
+  contextMenu: boolean;
+  /** `browser-view-viewport`: the page size the client asks the host to hold while the view is open. */
+  viewport: BrowserViewViewport | null;
+}
+const NO_FEATURES: RemoteBrowserViewFeatures = { cursor: false, contextMenu: false, viewport: null };
 /** One browser tab view per client. All paths still pass the host's stream allowlist. */
 export function createRemoteBrowserView(
   send: (data: string) => Promise<void>,
@@ -47,6 +66,7 @@ export function createRemoteBrowserView(
   namesFrames: () => boolean,
   /** Whether the host advertises `browser-view-clipboard`. The same holds for a paste and a copy. */
   clipboard: () => boolean,
+  features: () => RemoteBrowserViewFeatures = () => NO_FEATURES,
 ) {
   let view: View | null = null;
   let generation = 0;
@@ -87,6 +107,8 @@ export function createRemoteBrowserView(
     frame: (frame: BrowserViewFrame) => void,
     ended: (reason?: string) => void,
     copied: (message: BrowserViewCopied) => void,
+    /** Hears the cursor and the context menus. Without it, the client asks for neither. */
+    message?: (message: Exclude<BrowserViewHostMessage, BrowserViewCopied>) => void,
   ): Effect.fn.Return<RemoteBrowserView, BrowserViewError> {
     yield* close().pipe(Effect.catch(() => Effect.void));
     const current = ++generation;
@@ -98,17 +120,23 @@ export function createRemoteBrowserView(
     }
     const next: View = {
       sessionId: session.id,
-      streamId: crypto.randomUUID(),
+      // `crypto.randomUUID` needs a secure context. The phone's peer page in development is not one.
+      streamId: createTeamRequestId((size) => crypto.getRandomValues(new Uint8Array(size))),
       ready: false,
       released: false,
       frame,
       ended,
       copied,
+      ...(message ? { message } : {}),
     };
     view = next;
     const acksFrames = namesFrames();
+    const asked = features();
     const path = new URL(session.streamPath, "http://host");
     if (acksFrames) path.searchParams.set(BROWSER_VIEW_FRAME_ACK_QUERY, "1");
+    if (asked.cursor && message) path.searchParams.set(BROWSER_VIEW_CURSOR_QUERY, "1");
+    if (asked.contextMenu && message) path.searchParams.set(BROWSER_VIEW_CONTEXT_MENU_QUERY, "1");
+    if (asked.viewport) path.searchParams.set(BROWSER_VIEW_VIEWPORT_QUERY, browserViewViewportQuery(asked.viewport));
     yield* sendFrame(
       encodeRemoteDesktopSignalControl({
         type: "open",
@@ -151,8 +179,13 @@ export function createRemoteBrowserView(
           const control = decodeRemoteDesktopSignalControl(data);
           if (control.streamId !== current.streamId) return;
           if (control.type === "opened") current.ready = true;
-          // Text from the host is the answer to a copy.
-          if (control.type === "text" && current.ready) current.copied(decodeBrowserViewCopied(control.data));
+          // Text from the host is the answer to a copy, or a cursor or a menu this client asked for.
+          // A message of a newer host that this client cannot name is left alone.
+          if (control.type === "text" && current.ready) {
+            const hostMessage = decodeBrowserViewHostMessage(control.data);
+            if (hostMessage?.type === "copied" || hostMessage?.type === "copyTooLarge") current.copied(hostMessage);
+            else if (hostMessage) current.message?.(hostMessage);
+          }
           if (control.type === "close" || control.type === "error") {
             current.released = true;
             disconnect(

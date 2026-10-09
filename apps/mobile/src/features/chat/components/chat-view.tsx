@@ -16,6 +16,7 @@ import { getBloubAvatarColor } from "@/features/agents/model/bloub-activity";
 import { MobileConversationAnalytics } from "@/features/analytics/conversation";
 import { reportMobileNotification } from "@/features/analytics/failure-reports";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
+import { useBrowserFeature } from "@/features/browser/components/use-browser-feature";
 import { ChatComposer, VOICE_BUTTON_SIZE } from "@/features/chat/components/chat-composer";
 import { ChatGlassIconButton } from "@/features/chat/components/chat-glass-icon-button";
 import { ChatHeader } from "@/features/chat/components/chat-header";
@@ -126,8 +127,10 @@ export function ChatView({
   notice,
 }: ChatViewProps) {
   const { t, errorMessage } = useText();
-  const { respondToBrowserSecret, respondToBrowserTakeover, attachmentSupport } = useMobileWorkspace();
+  const { respondToBrowserSecret, respondToBrowserTakeover, attachmentSupport, browserViewSupport } =
+    useMobileWorkspace();
   const browserRequests = useBrowserRequests(target.serverId);
+  const browserAllowed = useBrowserFeature();
   const isFocused = useIsFocused();
   const foregroundVisit = useAppForeground();
   const [conversationAnalytics] = useState(() => new MobileConversationAnalytics(mobileAnalytics));
@@ -683,6 +686,19 @@ export function ChatView({
                         respond={(input) => respondToBrowserSecret(target.serverId, input)}
                         respondToTakeover={(decision) =>
                           respondToBrowserTakeover(target.serverId, { requestId: request.requestId, decision })
+                        }
+                        openBrowser={
+                          browserAllowed && browserViewSupport(target.serverId).view
+                            ? () =>
+                                router.push({
+                                  pathname: "/browser/[agentId]",
+                                  params: {
+                                    agentId: request.agentId,
+                                    serverId: target.serverId,
+                                    tabId: request.tabId,
+                                  },
+                                })
+                            : undefined
                         }
                       />
                     ))

@@ -103,6 +103,30 @@ function AuthenticatedStack() {
           }}
         />
         <Stack.Screen
+          name="browser/[agentId]"
+          options={{
+            animation: pushAnimation,
+            contentStyle: { backgroundColor: "black" },
+            // Every finger on the page is the page's mouse, so only the screen edge goes back.
+            fullScreenGestureEnabled: false,
+            gestureEnabled: true,
+            // The screen draws the app's glass header over the page, as the chat does.
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="browser-help"
+          // The header comes from the route's `_layout.tsx`: Android draws no header on a formSheet route.
+          options={{
+            contentStyle: { backgroundColor: sheetBackground },
+            headerShown: false,
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+            presentation: "formSheet",
+            sheetAllowedDetents: [0.85],
+            sheetGrabberVisible: true,
+          }}
+        />
+        <Stack.Screen
           name="channel/[channelId]"
           options={{
             animation: pushAnimation,

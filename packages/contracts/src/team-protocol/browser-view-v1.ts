@@ -38,6 +38,180 @@ export function browserViewClientAcksFrames(url: URL): boolean {
   return url.searchParams.get(BROWSER_VIEW_FRAME_ACK_QUERY) === "1";
 }
 
+/**
+ * A host that tells a client which mouse cursor the page shows, as a `cursor` message on the view
+ * socket. A frame is a screenshot of the page and has no pointer in it. A client that draws the
+ * pointer itself, such as a phone, needs the shape: a hand on a link, a bar in a text field.
+ */
+export const TEAM_BROWSER_VIEW_CURSOR_CAPABILITY = "browser-view-cursor";
+/**
+ * Present on the view socket when this client draws the cursor the host reports. A host sends no
+ * cursor message to a client that did not ask: the desktop and web clients show their own pointer.
+ */
+export const BROWSER_VIEW_CURSOR_QUERY = "cursor";
+
+export function browserViewClientWantsCursor(url: URL): boolean {
+  return url.searchParams.get(BROWSER_VIEW_CURSOR_QUERY) === "1";
+}
+
+/**
+ * A host that holds the page at the size a client asks for while that client's view is open. The
+ * page otherwise has the size of the host's browser panel, so a client sees the page change shape
+ * each time the host's window changes. A tab an agent gave a size of its own keeps that size.
+ */
+export const TEAM_BROWSER_VIEW_VIEWPORT_CAPABILITY = "browser-view-viewport";
+/** The page size a client asks for on the view socket, in CSS pixels, as `1280x800`. */
+export const BROWSER_VIEW_VIEWPORT_QUERY = "viewport";
+export const BROWSER_VIEW_VIEWPORT_LIMITS = {
+  minWidth: 320,
+  minHeight: 240,
+  maxWidth: 2_560,
+  maxHeight: 2_560,
+} as const;
+
+export interface BrowserViewViewport {
+  width: number;
+  height: number;
+}
+
+export function browserViewViewportQuery(viewport: BrowserViewViewport): string {
+  return `${Math.round(viewport.width)}x${Math.round(viewport.height)}`;
+}
+
+/** The page size this client asked for, or null when it asked for none or for a size out of bounds. */
+export function browserViewClientViewport(url: URL): BrowserViewViewport | null {
+  const match = /^(\d{3,4})x(\d{3,4})$/u.exec(url.searchParams.get(BROWSER_VIEW_VIEWPORT_QUERY) ?? "");
+  if (!match) return null;
+  const width = Number(match[1]);
+  const height = Number(match[2]);
+  const limits = BROWSER_VIEW_VIEWPORT_LIMITS;
+  if (width < limits.minWidth || width > limits.maxWidth || height < limits.minHeight || height > limits.maxHeight)
+    return null;
+  return { width, height };
+}
+
+/**
+ * A host that sends the menu of a right-click to the client that made it, as a `context-menu`
+ * message, and does not open its own menu. The host's menu opens on the host's screen, where a
+ * member on a phone never sees it. The menu's Select All is the client's Cmd+A or Ctrl+A.
+ */
+export const TEAM_BROWSER_VIEW_CONTEXT_MENU_CAPABILITY = "browser-view-context-menu";
+/** Present on the view socket when this client shows the menu of its own right-clicks. */
+export const BROWSER_VIEW_CONTEXT_MENU_QUERY = "menu";
+
+export function browserViewClientWantsContextMenu(url: URL): boolean {
+  return url.searchParams.get(BROWSER_VIEW_CONTEXT_MENU_QUERY) === "1";
+}
+
+/** The items of a page's context menu. A client leaves out an item it does not know. */
+export const BROWSER_VIEW_CONTEXT_MENU_ITEMS = [
+  "copy-link",
+  "copy-image-address",
+  "cut",
+  "copy",
+  "paste",
+  "select-all",
+] as const;
+export type BrowserViewContextMenuItem = (typeof BROWSER_VIEW_CONTEXT_MENU_ITEMS)[number];
+/** A link or an image address longer than this is not sent, and its copy item is left out. */
+export const BROWSER_VIEW_CONTEXT_MENU_URL_MAX_LENGTH = 2_048;
+
+/**
+ * The cursors a host reports, by their CSS names. A host reports a cursor it has no name for here
+ * as `default`, and a client draws a name it does not know as `default`.
+ */
+export const BROWSER_VIEW_CURSORS = [
+  "default",
+  "pointer",
+  "text",
+  "vertical-text",
+  "crosshair",
+  "cell",
+  "wait",
+  "progress",
+  "help",
+  "move",
+  "grab",
+  "grabbing",
+  "not-allowed",
+  "zoom-in",
+  "zoom-out",
+  "ew-resize",
+  "ns-resize",
+  "nesw-resize",
+  "nwse-resize",
+  "col-resize",
+  "row-resize",
+  "none",
+] as const;
+export type BrowserViewCursor = (typeof BROWSER_VIEW_CURSORS)[number];
+
+/** The menu of a right-click that a client made, for a client that asked for it. */
+export interface BrowserViewContextMenu {
+  items: BrowserViewContextMenuItem[];
+  /** The address of the link under the pointer, for `copy-link`. */
+  link?: string;
+  /** The address of the image under the pointer, for `copy-image-address`. */
+  image?: string;
+}
+
+/**
+ * What a host sends on the view socket as text, beside the binary frames: the answer to a copy, and
+ * the cursor and the menus for a client that asked for them.
+ */
+export type BrowserViewHostMessage =
+  | BrowserViewCopied
+  | { type: "cursor"; cursor: BrowserViewCursor }
+  | ({ type: "context-menu" } & BrowserViewContextMenu);
+
+export function encodeBrowserViewHostMessage(message: BrowserViewHostMessage): string {
+  return JSON.stringify(message);
+}
+
+/**
+ * Null for a message that this client does not know: a newer host can send more. A client that
+ * reads only `decodeBrowserViewCopied` asks for no cursor and no menu, so a host sends it neither.
+ */
+export function decodeBrowserViewHostMessage(value: string): BrowserViewHostMessage | null {
+  return decodeHostMessageValue(JSON.parse(value));
+}
+
+function decodeHostMessageValue(message: unknown): BrowserViewHostMessage | null {
+  if (!isDynamicRecord(message) || !isString(message.type)) throw new Error("Invalid browser view message.");
+  if (message.type === "copied" || message.type === "copyTooLarge") return decodeBrowserViewCopiedValue(message);
+  if (message.type === "cursor") {
+    if (!isString(message.cursor)) throw new Error("Invalid browser view message.");
+    const cursor = BROWSER_VIEW_CURSORS.find((name) => name === message.cursor) ?? "default";
+    return { type: "cursor", cursor };
+  }
+  if (message.type === "context-menu") {
+    const listed = message.items;
+    if (!Array.isArray(listed) || listed.length > 32) throw new Error("Invalid browser view message.");
+    const link = menuUrl(message.link);
+    const image = menuUrl(message.image);
+    const items = BROWSER_VIEW_CONTEXT_MENU_ITEMS.filter(
+      (item) =>
+        listed.includes(item) &&
+        (item !== "copy-link" || link !== undefined) &&
+        (item !== "copy-image-address" || image !== undefined),
+    );
+    return {
+      type: "context-menu",
+      items,
+      ...(link === undefined ? {} : { link }),
+      ...(image === undefined ? {} : { image }),
+    };
+  }
+  return null;
+}
+
+function menuUrl(value: unknown): string | undefined {
+  if (value === undefined) return undefined;
+  if (!isString(value) || value.length > BROWSER_VIEW_CONTEXT_MENU_URL_MAX_LENGTH)
+    throw new Error("Invalid browser view message.");
+  return value;
+}
+
 /** A frame is one JPEG. The cap is generous for a photograph and refuses a stream that is not one. */
 export const BROWSER_VIEW_MAX_FRAME_BYTES = 2 * 1024 * 1024;
 /**

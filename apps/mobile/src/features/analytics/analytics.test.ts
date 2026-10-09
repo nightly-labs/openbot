@@ -357,6 +357,9 @@ it("instruments message commands without sending their contents or changing the 
   };
   const sendMessage = vi.fn(async () => "message-receipt");
   const workspace: MobileWorkspaceContextValue = {
+    browserViewSupport: () => ({ view: false, clipboard: false, contextMenu: false, viewport: false }),
+    openBrowserView: () => null,
+    controlBrowserTab: unexpected,
     respondToBrowserTakeover: async () => undefined,
     respondToBrowserSecret: async () => undefined,
     sidebarByServer: {},

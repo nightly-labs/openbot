@@ -48,6 +48,8 @@ import type {
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import type { RemoteRecoveryStatus, RemoteTeamDirectoryClient } from "@openbot/team-client";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
+import type { MobileBrowserTab } from "@/features/browser/model/browser-tabs";
+import type { BrowserViewBridgeEvent, RemoteBrowserViewSession } from "@/features/browser/model/browser-view-bridge";
 import type { MobileChannelStore } from "@/features/channels/model/channel-store";
 import type { MobileConversationStore } from "./conversation-store";
 import type { LiveWorkspaceStore } from "./live-workspace-store";
@@ -97,7 +99,35 @@ interface AddRemoteServerInput {
   inviteUrl: string;
 }
 
+/** What a host serves of the live browser view. */
+export interface MobileBrowserViewSupport {
+  /** `browser-control` and `browser-view`: the phone can show the agent's tab and use it. */
+  view: boolean;
+  /** `browser-view-clipboard`: the host pastes text and answers the selected text. */
+  clipboard: boolean;
+  /** `browser-view-context-menu`: the host sends the phone the menu of its right-clicks. */
+  contextMenu: boolean;
+  /** `browser-view-viewport`: the host holds the page at the size the phone asks for. */
+  viewport: boolean;
+}
+
+/** What the phone does to a host browser tab, through the released `browser-control` routes. */
+export type MobileBrowserTabAction =
+  | { type: "navigate"; tabId: string; direction: "back" | "forward" }
+  | { type: "reload"; tabId: string }
+  | { type: "open"; url: string; ownerAgentId: string; ownerThreadId: string | null }
+  | { type: "close"; tabId: string };
+
 export interface MobileWorkspaceContextValue {
+  browserViewSupport: (serverId: string) => MobileBrowserViewSupport;
+  /** Null when the server is not connected, or its peer page is not ready yet. */
+  openBrowserView: (
+    serverId: string,
+    tabId: string,
+    listener: (event: BrowserViewBridgeEvent) => void,
+  ) => RemoteBrowserViewSession | null;
+  /** The new tab for `open`, and null for the other actions. */
+  controlBrowserTab: (serverId: string, action: MobileBrowserTabAction) => Promise<MobileBrowserTab | null>;
   respondToBrowserTakeover: (
     serverId: string,
     input: { requestId: string | number; decision: "complete" | "cancel" },

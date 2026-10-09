@@ -19,6 +19,12 @@ import type {
   BrowserVisibilityInput,
 } from "@openbot/contracts/ipc";
 import { isNumber, isString } from "@openbot/contracts/runtime-values";
+import {
+  BROWSER_VIEW_CONTEXT_MENU_URL_MAX_LENGTH,
+  type BrowserViewContextMenu,
+  type BrowserViewCursor,
+  type BrowserViewViewport,
+} from "@openbot/contracts/team-protocol/browser-view-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText, toLogValue } from "@openbot/logging";
 import { Deferred, Effect, Exit, Fiber, Scope, Semaphore } from "effect";
@@ -44,6 +50,7 @@ import {
   type SnapshotReadResult,
 } from "./browser-cdp";
 import { BrowserControlSessions } from "./browser-control-sessions";
+import { browserViewCursor } from "./browser-cursor";
 import { BrowserDiagnostics } from "./browser-diagnostics";
 import { type BrowserOperationError, browserCall, browserFailure, browserSync } from "./browser-effects";
 import {
@@ -68,6 +75,7 @@ import {
 } from "./browser-policy";
 import { BrowserRecorder } from "./browser-recorder";
 import {
+  type BrowserContextMenuItem,
   browserContextMenuItems,
   EDITABLE_FOCUS_SCRIPT,
   isCloseBrowserTabShortcut,
@@ -150,6 +158,40 @@ const PREVIEW_STALE_AFTER_MS = 1_000;
 const VIEW_FRAME_QUALITY = 60;
 const VIEW_FRAME_MAX_WIDTH = 1_280;
 const VIEW_FRAME_MAX_HEIGHT = 800;
+/** How long after a live view's right-click the page's menu still belongs to that view. */
+const VIEW_CONTEXT_MENU_MS = 1_500;
+
+export interface BrowserViewOptions {
+  /** Hears the page's mouse cursor when it changes. Not called while a secret is on the page. */
+  onCursor?: (cursor: BrowserViewCursor) => void;
+  /** The page size, in CSS pixels, that the page keeps while the view is open. */
+  viewport?: BrowserViewViewport;
+}
+
+/** A web address a member may copy from a menu. Other schemes and long addresses are left out. */
+function menuAddress(value: string): string | undefined {
+  if (!value || value.length > BROWSER_VIEW_CONTEXT_MENU_URL_MAX_LENGTH) return undefined;
+  return /^https?:\/\//iu.test(value) ? value : undefined;
+}
+
+function viewContextMenu(
+  items: readonly BrowserContextMenuItem[],
+  linkUrl: string,
+  srcUrl: string,
+): BrowserViewContextMenu {
+  const link = menuAddress(linkUrl);
+  const image = menuAddress(srcUrl);
+  return {
+    items: items.filter(
+      (item): item is BrowserViewContextMenu["items"][number] =>
+        item !== "separator" &&
+        (item !== "copy-link" || link !== undefined) &&
+        (item !== "copy-image-address" || image !== undefined),
+    ),
+    ...(link === undefined ? {} : { link }),
+    ...(image === undefined ? {} : { image }),
+  };
+}
 /**
  * An agent's tab that nobody used for this long unloads its page, and loads it again on its next use,
  * so a long run does not keep in memory the page of each tab an agent left open. The tab keeps a
@@ -1148,26 +1190,48 @@ export class BrowserHost {
     tabId: string,
     onFrame: (frame: BrowserScreencastFrame) => void,
     onEnded?: (reason: string) => void,
+    options: BrowserViewOptions = {},
   ): Effect.fn.Return<() => Effect.Effect<void>, BrowserOperationError> {
+    const { onCursor, viewport } = options;
     const tab = yield* this.#requireTab(tabId);
     if (tab.secret?.submitted)
       return yield* browserFailure(new Error(sourceText("error.backend.browserViewProtected")));
     const generation = tab.captureGeneration;
     let invalidated = false;
+    // Chromium reports the cursor of the input it dispatches, the live view's pointer included.
+    let lastCursor: BrowserViewCursor | null = null;
+    const cursorChanged = (_event: unknown, type: string) => {
+      if (tab.secret?.submitted || tab.captureGeneration !== generation) return;
+      const cursor = browserViewCursor(type);
+      if (cursor === lastCursor) return;
+      lastCursor = cursor;
+      onCursor?.(cursor);
+    };
+    const stopCursor = () => {
+      if (onCursor && !tab.contents.isDestroyed()) tab.contents.off("cursor-changed", cursorChanged);
+    };
     const invalidate = () => {
       invalidated = true;
       tab.viewInvalidations.delete(invalidate);
+      stopCursor();
       onEnded?.("Authentication changed the browser view. Open a new view to continue.");
     };
     tab.viewInvalidations.add(invalidate);
+    if (onCursor) tab.contents.on("cursor-changed", cursorChanged);
     return yield* Effect.gen({ self: this }, function* () {
       const stop = yield* tab.engine.startScreencast(
-        { quality: VIEW_FRAME_QUALITY, maxWidth: VIEW_FRAME_MAX_WIDTH, maxHeight: VIEW_FRAME_MAX_HEIGHT },
+        {
+          quality: VIEW_FRAME_QUALITY,
+          maxWidth: VIEW_FRAME_MAX_WIDTH,
+          maxHeight: VIEW_FRAME_MAX_HEIGHT,
+          ...(viewport ? { viewport } : {}),
+        },
         (frame) => {
           if (!tab.secret?.submitted && tab.captureGeneration === generation) onFrame(frame);
         },
         (error) => {
           tab.viewInvalidations.delete(invalidate);
+          stopCursor();
           logger.warn("The live browser view stopped.", { error: toLogValue(error) });
           onEnded?.("The live browser view stopped. Open a new view to continue.");
         },
@@ -1176,8 +1240,10 @@ export class BrowserHost {
       const stopOnce = () =>
         Effect.gen({ self: this }, function* () {
           tab.viewInvalidations.delete(invalidate);
+          stopCursor();
           if (stopped) return;
           stopped = true;
+          tab.engine.releaseViewButton();
           yield* stop();
         });
       if (invalidated) yield* stopOnce();
@@ -1187,6 +1253,7 @@ export class BrowserHost {
         Effect.gen({ self: this }, function* () {
           const error = operationFailure.cause;
           tab.viewInvalidations.delete(invalidate);
+          stopCursor();
           return yield* browserFailure(error);
         }),
       ),
@@ -1197,11 +1264,19 @@ export class BrowserHost {
     this: BrowserHost,
     tabId: string,
     input: BrowserViewportInput,
+    /** Hears the menu of this right-click, which then does not open on this screen. */
+    onContextMenu?: (menu: BrowserViewContextMenu) => void,
   ): Effect.fn.Return<void, BrowserOperationError> {
     const tab = yield* this.#requireTab(tabId);
     if (tab.secret?.submitted)
       return yield* browserFailure(new Error(sourceText("error.backend.browserInputProtected")));
     if (input.type !== "pointer" || input.action !== "move") tab.engine.invalidateReferences();
+    if (input.type === "pointer" && input.action === "down") {
+      tab.viewContextMenu =
+        input.button === "right" && onContextMenu
+          ? { deliver: onContextMenu, until: Date.now() + VIEW_CONTEXT_MENU_MS }
+          : null;
+    }
     yield* tab.engine.dispatchViewportInput(input);
   }).bind(this);
 
@@ -1625,6 +1700,7 @@ export class BrowserHost {
       captureGeneration: 0,
       documents: 0,
       viewInvalidations: new Set(),
+      viewContextMenu: null,
       lastUsedAt: Date.now(),
     };
   }
@@ -1784,6 +1860,14 @@ export class BrowserHost {
         srcURL: params.srcURL,
         mediaType: params.mediaType,
       });
+      const viewMenu = tab.viewContextMenu;
+      tab.viewContextMenu = null;
+      if (viewMenu && Date.now() <= viewMenu.until) {
+        // A member's right-click from a live view: their screen shows the menu, and this one does not.
+        event.preventDefault();
+        if (!tab.secret) viewMenu.deliver(viewContextMenu(items, params.linkURL, params.srcURL));
+        return;
+      }
       if (items.length === 0) return;
       event.preventDefault();
       const window = this.#mountedViews.get(tab.view);

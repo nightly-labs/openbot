@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { type MobileFeatureConfig, parseMobileFeatureFlags, resolveMobileFeatures } from "./mobile-features";
 
 function config(ios: string, android = "0"): MobileFeatureConfig {
-  return { cloudServers: { ios, android } };
+  return { cloudServers: { ios, android }, browser: { ios: "0", android: "0" } };
 }
 
 // A wrong answer turns a feature on for a version that must not have it.

@@ -84,6 +84,12 @@ export interface BrowserScreencastOptions {
   quality: number;
   maxWidth: number;
   maxHeight: number;
+  /**
+   * The page size, in CSS pixels, that the viewer asks the page to keep while it watches. A tab that
+   * fills the panel otherwise changes size with the host's window. A tab with a size of its own
+   * keeps that size.
+   */
+  viewport?: { width: number; height: number };
 }
 
 export interface BrowserScreencastFrame {
@@ -194,9 +200,16 @@ const COMMAND_MODIFIERS = 2 | 4;
 
 export class BrowserCdpEngine {
   readonly #contents: WebContents;
+  /**
+   * The button a live view holds down. Chromium ends a drag at a move that names no button, so a
+   * move between a press and a release names this one.
+   */
+  #viewButton: "left" | "middle" | "right" | null = null;
   #targets = new Map<string, TargetRecord>();
   #lastSnapshot: BrowserSnapshot | null = null;
   #environment: BrowserEnvironment | null = null;
+  /** The page sizes of the open views that asked for one. The newest one applies. */
+  readonly #viewViewports: Array<{ width: number; height: number }> = [];
   #navigationGeneration = 0;
 
   readonly prepareSecret = Effect.fn("BrowserCdp.prepareSecret")(function* (
@@ -1225,12 +1238,13 @@ export class BrowserCdpEngine {
         (send) =>
           Effect.gen({ self: this }, function* () {
             yield* Effect.gen({ self: this }, function* () {
-              yield* this.#applyEnvironmentEffect(send, environment);
+              yield* this.#applyEnvironmentEffect(send, this.#appliedEnvironment(environment) ?? environment);
             }).pipe(
               Effect.catch((operationFailure) =>
                 Effect.gen({ self: this }, function* () {
                   const error = operationFailure.cause;
-                  if (previousEnvironment) yield* this.#applyEnvironmentEffect(send, previousEnvironment);
+                  const previous = this.#appliedEnvironment(previousEnvironment);
+                  if (previous) yield* this.#applyEnvironmentEffect(send, previous);
                   else yield* this.#clearEnvironmentEffect(send);
                   return yield* browserFailure(error);
                 }),
@@ -1257,7 +1271,8 @@ export class BrowserCdpEngine {
   ): Effect.fn.Return<NativeImage, BrowserOperationError> {
     return yield* this.#leaseEffect((send) =>
       Effect.gen({ self: this }, function* () {
-        const fill = !this.#environment || this.#environment.viewport.mode === "fill";
+        const environment = this.#appliedEnvironment(this.#environment);
+        const fill = !environment || environment.viewport.mode === "fill";
         if (fill) {
           // Hidden views need a capture surface. Preserve the page's full viewport,
           // including scrollbars: layoutViewport.clientWidth would shrink it and
@@ -1304,6 +1319,16 @@ export class BrowserCdpEngine {
     };
     const ready = Deferred.makeUnsafe<void, BrowserOperationError>();
     const started = () => Deferred.doneUnsafe(ready, Effect.void);
+    // The size goes in before the first lease, which applies it with the rest of the environment.
+    const viewport = options.viewport ? { ...options.viewport } : null;
+    if (viewport) this.#viewViewports.push(viewport);
+    let viewportHeld = viewport !== null;
+    const releaseViewport = () => {
+      if (!viewportHeld || !viewport) return false;
+      viewportHeld = false;
+      this.#viewViewports.splice(this.#viewViewports.indexOf(viewport), 1);
+      return true;
+    };
     let sequence = 0;
     // The number counts the frames the client is given, not the ones the page drew.
     const pacer = createFramePacer<Omit<BrowserScreencastFrame, "sequence">>((frame) => {
@@ -1362,7 +1387,17 @@ export class BrowserCdpEngine {
                       Effect.gen({ self: this }, function* () {
                         this.#contents.debugger.off("message", listener);
                         this.#contents.debugger.off("detach", onDetach);
-                        if (stopRequested) yield* send("Page.stopScreencast").pipe(Effect.ignore);
+                        if (!stopRequested) return;
+                        yield* send("Page.stopScreencast").pipe(Effect.ignore);
+                        // The debugger can stay attached for an agent, and the page keeps an
+                        // emulated size until it is told otherwise.
+                        if (!releaseViewport()) return;
+                        const environment = this.#appliedEnvironment(this.#environment);
+                        yield* (
+                          environment
+                            ? this.#applyEnvironmentEffect(send, environment)
+                            : this.#clearEnvironmentEffect(send)
+                        ).pipe(Effect.ignore);
                       }).pipe(Effect.orDie),
                     ),
                   );
@@ -1374,6 +1409,8 @@ export class BrowserCdpEngine {
           Effect.ensuring(
             Effect.sync(() => {
               pacer.stop();
+              // After a failed stream, the next lease applies the environment without this size.
+              releaseViewport();
             }),
           ),
         );
@@ -1481,12 +1518,20 @@ export class BrowserCdpEngine {
             });
             return;
           }
+          const held = this.#viewButton;
+          if (input.action === "down") this.#viewButton = input.button;
+          if (input.action === "up") this.#viewButton = null;
           yield* send("Input.dispatchMouseEvent", {
             type: input.action === "move" ? "mouseMoved" : input.action === "down" ? "mousePressed" : "mouseReleased",
             x: input.x,
             y: input.y,
-            button: input.action === "move" ? "none" : input.button,
-            buttons: input.action === "down" ? buttonMask(input.button) : 0,
+            button: input.action === "move" ? (held ?? "none") : input.button,
+            buttons:
+              input.action === "down"
+                ? buttonMask(input.button)
+                : input.action === "move" && held
+                  ? buttonMask(held)
+                  : 0,
             clickCount: input.action === "move" ? 0 : input.clickCount,
             modifiers: input.modifiers,
           });
@@ -1551,6 +1596,14 @@ export class BrowserCdpEngine {
     }
     return { contextId, sessionId };
   });
+
+  /**
+   * Forgets the button a live view held. A view that closes during a drag sends no release, and the
+   * next view's first move would otherwise drag. That move names no button, so the page ends its drag.
+   */
+  releaseViewButton(): void {
+    this.#viewButton = null;
+  }
 
   readonly navigate = Effect.fn("BrowserCdp.navigate")(function* (
     this: BrowserCdpEngine,
@@ -2201,7 +2254,8 @@ export class BrowserCdpEngine {
           filter: [{ type: "iframe", exclude: false }],
         }).pipe(Effect.ignore);
       }
-      if (this.#environment) yield* this.#applyEnvironmentEffect(send, this.#environment);
+      const environment = this.#appliedEnvironment(this.#environment);
+      if (environment) yield* this.#applyEnvironmentEffect(send, environment);
       return yield* operation(send);
     }).pipe(
       Effect.ensuring(
@@ -2259,6 +2313,21 @@ export class BrowserCdpEngine {
     yield* send("Emulation.clearDeviceMetricsOverride");
     yield* send("Emulation.setEmulatedMedia", { features: [] });
   });
+
+  /**
+   * The environment the page gets: the tab's own, with the page size of the newest view that asked
+   * for one when the tab fills its panel. A size the agent set for the tab is not replaced.
+   */
+  #appliedEnvironment(environment: BrowserEnvironment | null): BrowserEnvironment | null {
+    const viewport = this.#viewViewports.at(-1);
+    if (!viewport || environment?.viewport.mode === "custom") return environment;
+    return {
+      colorScheme: environment?.colorScheme ?? "system",
+      reducedMotion: environment?.reducedMotion ?? false,
+      // A scale of 0 keeps the display's own, so the page stays sharp on the host's screen.
+      viewport: { mode: "custom", width: viewport.width, height: viewport.height, deviceScaleFactor: 0, preset: null },
+    };
+  }
 }
 
 function assertTypingProgressBeforeDeadline(deadline: number | undefined, sent: number, total: number): void {

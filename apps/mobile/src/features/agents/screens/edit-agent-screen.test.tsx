@@ -260,6 +260,11 @@ const workspace = {
   }),
 };
 vi.mock("@/features/workspace/context/mobile-workspace-context", () => ({ useMobileWorkspace: () => workspace }));
+// The account server's feature flags need the native app version.
+vi.mock("@/shared/lib/mobile-features", () => ({
+  refreshMobileFeatures: async () => undefined,
+  useMobileFeature: () => false,
+}));
 vi.mock("@/features/auth/context/mobile-session-context", () => ({
   useMobileSession: () => ({ session: { apiUrl: "test", user: { id: "user" } }, sessionScope: 1 }),
 }));

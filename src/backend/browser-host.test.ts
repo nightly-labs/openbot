@@ -172,6 +172,7 @@ vi.mock("./browser-cdp", () => ({
       return Effect.void;
     }
     invalidateReferences() {}
+    releaseViewButton() {}
     cancelPendingCommands() {
       return true;
     }

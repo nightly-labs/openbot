@@ -1,4 +1,5 @@
 import type { BrowserEnvironment, BrowserPreview, BrowserTab } from "@openbot/contracts/ipc";
+import type { BrowserViewContextMenu } from "@openbot/contracts/team-protocol/browser-view-v1";
 import type { Deferred, Effect, Scope } from "effect";
 import { BrowserWindow, type WebContents, type WebContentsView, webContents } from "electron";
 import type { BrowserCdpEngine } from "./browser-cdp";
@@ -73,6 +74,11 @@ export interface BrowserHostTab {
   recording: boolean;
   captureGeneration: number;
   viewInvalidations: Set<() => void>;
+  /**
+   * The live view that made the last right-click, until the menu of that click opens. The menu then
+   * goes to that view, and does not open on this screen.
+   */
+  viewContextMenu: { deliver: (menu: BrowserViewContextMenu) => void; until: number } | null;
   /** The host of the last page reported as a site visit, so a navigation inside one site is not reported again. */
   visitedHost?: string | undefined;
   // Pending consent permits human takeover; submission blocks captures until document replacement.
