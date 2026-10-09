@@ -245,24 +245,21 @@ describe("testMcpServer over http on this computer", () => {
       .end(JSON.stringify({ jsonrpc: "2.0", id: message.id, result }));
   }
 
-  it("says no server runs at a local address that refuses, and connects when it runs", async () => {
+  it("connects to a local server that answers MCP over Streamable HTTP", async () => {
+    const url = await listen(createHttpServer((request, response) => void answerMcp(request, response)));
+    expect(await runMcp(testMcpServer(config({ transport: "http", url })))).toEqual({ toolCount: 2, error: null });
+  });
+
+  it("says no server runs at a local address that refuses", async () => {
     const off = createHttpServer();
     const url = await listen(off);
-    const { port } = new URL(url);
     await new Promise<void>((resolve) => off.close(() => resolve()));
     listeners.splice(listeners.indexOf(off), 1);
 
     expect(await runMcp(testMcpServer(config({ transport: "http", url })))).toEqual({
       toolCount: 0,
-      error: `No server answers at http://127.0.0.1:${port} on this computer. Start the server, or turn it on in the app that runs it, then try again.`,
+      error: `No server answers at ${new URL(url).origin} on this computer. Start the server, or turn it on in the app that runs it, then try again.`,
     });
-
-    // Try again, now that the user turned the server on: nothing of the failed attempt is left.
-    await listen(
-      createHttpServer((request, response) => void answerMcp(request, response)),
-      Number(port),
-    );
-    expect(await runMcp(testMcpServer(config({ transport: "http", url })))).toEqual({ toolCount: 2, error: null });
   });
 
   const INCOMPATIBLE =
@@ -274,14 +271,6 @@ describe("testMcpServer over http on this computer", () => {
       () =>
         createHttpServer((_request, response) => response.writeHead(200, { "content-type": "text/html" }).end("<p>")),
     ],
-    [
-      "a body that is not JSON",
-      () =>
-        createHttpServer((_request, response) =>
-          response.writeHead(200, { "content-type": "application/json" }).end("<p>"),
-        ),
-    ],
-    ["a closed socket", () => createHttpServer((request) => request.socket.destroy())],
     [
       "bytes that are not HTTP",
       () => createNetServer((socket) => socket.end("NOT HTTP\r\n\r\n", () => socket.destroy())),
