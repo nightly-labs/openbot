@@ -1,5 +1,6 @@
 import type { ServerSummary } from "@openbot/contracts/ipc";
 import { classifyFailure } from "@openbot/telemetry";
+import { SETTINGS_PANEL_MAX, SETTINGS_PANEL_MIN } from "@openbot/ui/components/SettingsPanel";
 import { useText } from "@openbot/ui/text";
 import { actionToast } from "../../action-toast";
 import { createSettingsPanelWidth, saveSettingsPanelWidth } from "../../components/settings-panel-width";
@@ -14,8 +15,6 @@ import { useConversationController } from "./conversation-controller-context";
 import { useConversationViewScope } from "./conversation-scope";
 import { desktopEventRoutinesApi } from "./routine-webhooks-api";
 
-const SETTINGS_PANEL_MIN = 180;
-const SETTINGS_PANEL_MAX = 1600;
 const BROWSER_PANEL_DEFAULT_RATIO = 0.5;
 const BROWSER_PANEL_MIN = 220;
 const BROWSER_PANEL_MAX = 1600;

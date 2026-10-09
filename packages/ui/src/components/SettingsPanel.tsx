@@ -5,7 +5,8 @@ import { useText } from "../text";
 import { PanelResizer } from "./PanelResizer";
 
 export const SETTINGS_PANEL_DEFAULT = 296;
-export const SETTINGS_PANEL_MIN = 180;
+/** The default is also the minimum: a narrower panel breaks the avatar editor and the setting rows. */
+export const SETTINGS_PANEL_MIN = SETTINGS_PANEL_DEFAULT;
 export const SETTINGS_PANEL_MAX = 1600;
 /** What the chat under the panel keeps for itself, however far the panel is dragged. */
 const CONVERSATION_PANEL_MIN = 96;
