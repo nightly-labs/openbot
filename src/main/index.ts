@@ -6,6 +6,7 @@ import {
   type CentralAuthState,
   type HostStatus,
   IPC_ENDPOINTS,
+  type ServerSummary,
 } from "@openbot/contracts/ipc";
 import { createFormat, resolveLocale, translateFor } from "@openbot/i18n";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
@@ -72,6 +73,7 @@ import { pluginIpcHandlers } from "./ipc/plugin-handlers";
 import { providerAdminIpcHandlers } from "./ipc/provider-admin-handlers";
 import { providerDetectionIpcHandlers } from "./ipc/provider-detection-handlers";
 import { providerIpcHandlers } from "./ipc/provider-handlers";
+import { remoteWorkspaceCacheIpcHandlers } from "./ipc/remote-workspace-cache-handlers";
 import { routineFeedIpcHandlers } from "./ipc/routine-feed-handlers";
 import { routineFlowIpcHandlers } from "./ipc/routine-flow-handlers";
 import { routineIpcHandlers } from "./ipc/routine-handlers";
@@ -444,6 +446,7 @@ function registerIpcHandlers({
   logoColor,
   notificationPreference,
   busyMessageMode,
+  remoteWorkspaceCache,
   remoteSessionReuse,
   remoteSessionCache,
   agentInitialization,
@@ -520,6 +523,7 @@ function registerIpcHandlers({
     ...bitwardenConnectorIpcHandlers({ bitwardenConnector }),
     ...billingIpcHandlers({ billing }),
     ...routineFeedIpcHandlers({ routineFeed }),
+    ...remoteWorkspaceCacheIpcHandlers({ remoteWorkspaceCache }),
     ...eventsIpcHandlers({ events, remoteServers }),
     ...hostedServerIpcHandlers({ hostedServers }),
     ...customProviderIpcHandlers(customProviderChanges),
@@ -1013,6 +1017,27 @@ if (!hasSingleInstanceLock) {
       remoteServers.on("presence", forwardTeamPresence);
       remoteServers.on("directMessage", forwardDirectMessage);
       remoteServers.on("directTyping", forwardDirectTyping);
+      // The saved copy of joined servers belongs to the signed-in account and to the servers it still
+      // joins. A changed account or a sign-out deletes the other copies, and a server that leaves the
+      // list, or no longer accepts this account, loses its copy.
+      const savedCopyPrincipal = (state: CentralAuthState): void => {
+        if (state.status !== "signed_in" && state.status !== "signed_out") return;
+        void Effect.runPromise(built.remoteWorkspaceCache.setPrincipal(centralAuthPrincipalId(state)));
+      };
+      const savedCopyServers = (servers: ServerSummary[]): void => {
+        const serverIds = servers
+          .filter((server) => server.kind === "remote" && server.issue?.code !== "authentication_required")
+          .map((server) => server.id);
+        void Effect.runPromise(built.remoteWorkspaceCache.setServers(serverIds));
+      };
+      savedCopyPrincipal(built.centralAuth.getState());
+      savedCopyServers(remoteServers.list());
+      built.centralAuth.on("changed", savedCopyPrincipal);
+      remoteServers.on("changed", savedCopyServers);
+      teardown.push(0, "saved copy listeners", () => {
+        built.centralAuth.off("changed", savedCopyPrincipal);
+        remoteServers.off("changed", savedCopyServers);
+      });
       // The selected server connects while the window loads. Its WebRTC setup takes seconds, and
       // the first screen waits for it. The other servers start after the load, below. The connection
       // needs the signed-in account, so it starts only after the account loads. A failed account

@@ -29,10 +29,12 @@ export function SidebarAgentContextMenu(menuProps: { agent: AgentProfile; pinned
           <span>{menuProps.pinned ? t("sidebar.unpin") : t("sidebar.pin")}</span>
         </ContextMenu.Item>
         <SidebarMoveToSubmenu chatId={menuProps.agent.id} />
-        <ContextMenu.Item onSelect={() => props.onEditAgent(menuProps.agent.id)}>
-          <EditIcon />
-          <span>{t("sidebar.agentMenu.edit")}</span>
-        </ContextMenu.Item>
+        <Show when={props.editSupported !== false}>
+          <ContextMenu.Item onSelect={() => props.onEditAgent(menuProps.agent.id)}>
+            <EditIcon />
+            <span>{t("sidebar.agentMenu.edit")}</span>
+          </ContextMenu.Item>
+        </Show>
         <Show when={props.duplicateSupported !== false && props.onDuplicateAgent}>
           <ContextMenu.Item
             disabled={props.duplicatingAgentIds?.has(menuProps.agent.id)}

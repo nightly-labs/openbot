@@ -103,6 +103,9 @@ const Settings = createSimpleContext({
     let autoInstallUpdatesChanged = false;
     let desktopNotificationsChanged = false;
     let busyMessageModeChanged = false;
+    let remoteWorkspaceCacheChanged = false;
+    /** The saved copy setting as main last confirmed it, or null before main answers. */
+    const [savedCopyEnabled, setSavedCopyEnabled] = createSignal<boolean | null>(null);
     let keepRemoteSessionsChanged = false;
     let turboModeChanged = false;
     const [turboModePending, setTurboModePending] = createSignal(false);
@@ -232,6 +235,19 @@ const Settings = createSimpleContext({
           "desktopNotifications",
           settingsPort().notifications.setPreference({ desktopNotifications: value.desktopNotifications }),
           (preference) => preference.desktopNotifications,
+        );
+      }
+      if (previous.remoteWorkspaceCache !== value.remoteWorkspaceCache) {
+        remoteWorkspaceCacheChanged = true;
+        persistField(
+          "remoteWorkspaceCache",
+          settingsPort()
+            .remoteWorkspaceCache.setPreference({ enabled: value.remoteWorkspaceCache })
+            .then((preference) => {
+              setSavedCopyEnabled(preference.enabled);
+              return preference;
+            }),
+          (preference) => preference.enabled,
         );
       }
       if (previous.busyMessageMode !== value.busyMessageMode) {
@@ -395,6 +411,14 @@ const Settings = createSimpleContext({
         })
         .catch(() => undefined);
       void settingsPort()
+        .remoteWorkspaceCache.getPreference()
+        .then((preference) => {
+          if (remoteWorkspaceCacheChanged) return;
+          setSavedCopyEnabled(preference.enabled);
+          setGeneralSettings((current) => ({ ...current, remoteWorkspaceCache: preference.enabled }));
+        })
+        .catch(() => undefined);
+      void settingsPort()
         .getBusyMessageModePreference()
         .then((preference) => {
           if (busyMessageModeChanged) return;
@@ -441,6 +465,7 @@ const Settings = createSimpleContext({
     return {
       analyticsPreferenceLoaded,
       generalSettings,
+      savedCopyEnabled,
       builtInDisplayGeometry,
       turboModePending,
       updateGeneralSettings,

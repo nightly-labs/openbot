@@ -20,6 +20,7 @@ export interface SettingsPort {
     "getBuiltInDisplayGeometry" | "getPreference" | "setPreference"
   >;
   notifications: Pick<OpenBotDesktopApi["notifications"], "getPreference" | "openSettings" | "setPreference" | "test">;
+  remoteWorkspaceCache: Pick<OpenBotDesktopApi["remoteWorkspaceCache"], "getPreference" | "setPreference">;
   update: Pick<OpenBotDesktopApi["update"], "getPreference" | "onPreference" | "setPreference">;
 }
 

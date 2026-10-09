@@ -27,6 +27,7 @@
 @import "@openbot/ui/features/conversation/conversation.css";
 @import "@openbot/ui/features/channels/channel-avatar.css";
 @import "./features/channels/channels.css";
+@import "./features/saved-copy/saved-copy.css";
 @import "@openbot/ui/features/channels/channel-activity.css";
 @import "@openbot/ui/features/diagrams/diagrams.css";
 @import "@openbot/ui/features/usage/agent-usage-report.css";

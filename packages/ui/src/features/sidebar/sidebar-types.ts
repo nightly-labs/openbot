@@ -73,6 +73,8 @@ export interface SidebarProps {
   /** Whether this server currently accepts new agents. Desktop keeps the default enabled. */
   createSupported?: boolean;
   onCreateAgent: () => void;
+  /** Whether the agent menu offers Edit. Off while the list shows a saved copy. */
+  editSupported?: boolean;
   onEditAgent: (agentId: string) => void;
   duplicateSupported?: boolean;
   duplicatingAgentIds?: ReadonlySet<string>;
@@ -87,6 +89,8 @@ export interface SidebarProps {
   onOpenMarketplace: () => void;
   /** The agents are still on their way, so an empty list says that it connects rather than that it is empty. */
   agentsConnecting?: boolean;
+  /** The list shows a saved copy while the server connects, so it says that it can be out of date. */
+  savedCopy?: boolean;
   emptyAction?:
     | {
         label: string;

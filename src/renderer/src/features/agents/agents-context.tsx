@@ -72,6 +72,8 @@ const Agents = createSimpleContext({
     const [agentList, setAgentList] = createSignal<AgentProfile[]>([]);
     /** The first roster read of this scope came back, or failed. */
     const [agentListSettled, setAgentListSettled] = createSignal(false);
+    /** The roster as the server last sent it, for the saved copy of a joined server. Null until it does. */
+    const [storedAgents, setStoredAgents] = createSignal<AgentSummary[] | null>(null);
     const [duplicatingAgentIds, setDuplicatingAgentIds] = createSignal<Set<string>>(new Set());
     const [modelOptions, setModelOptions] = createSignal<AgentModelOption[]>([]);
     const selectionServerId = untrack(activeServerId);
@@ -136,6 +138,16 @@ const Agents = createSimpleContext({
       });
     }
 
+    /**
+     * The agent to open when the roster comes back. The saved copy of a joined server calls it when the
+     * user picks an agent there, before the server answers.
+     */
+    function rememberAgentSelection(agentId: string): void {
+      if (!scopeIsCurrent() || agentListSettled()) return;
+      savedAgentId = agentId;
+      writeAgentSelection(selectionServerId, agentId);
+    }
+
     function explicitlyOpenedAgentChatId(): string | null {
       return openedAgentChatId;
     }
@@ -165,6 +177,7 @@ const Agents = createSimpleContext({
         return existing;
       });
       setAgentList(profiles);
+      setStoredAgents(storedAgents);
       setAgentListSettled(true);
       setActiveAgentId((current) => {
         // Validate the saved choice before it can trigger conversation requests.
@@ -274,7 +287,10 @@ const Agents = createSimpleContext({
       agentList,
       setAgentList,
       agentListConnecting,
+      agentListSettled,
       setAgentListSettled,
+      storedAgents,
+      rememberAgentSelection,
       duplicatingAgentIds,
       setDuplicatingAgentIds,
       modelOptions,

@@ -1,0 +1,34 @@
+/* The read-only chat of a saved copy. It keeps the live chat's header and scroll area, and puts a
+ * status line where the composer stands. */
+.saved-copy-conversation {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.saved-copy-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.saved-copy-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.saved-copy-empty {
+  margin: var(--openbot-space-8) 0;
+  color: var(--openbot-text-readable);
+  font-size: var(--openbot-text-md);
+  text-align: center;
+}
+
+.saved-copy-status {
+  margin: 0;
+  padding: var(--openbot-space-3) var(--openbot-space-4);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  text-align: center;
+}

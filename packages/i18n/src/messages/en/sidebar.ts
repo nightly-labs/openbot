@@ -19,6 +19,7 @@ export const messages = defineMessages("sidebar", {
   "sidebar.topbar.marketplace": "Marketplace",
   "sidebar.empty.noAgents": "No agents yet",
   "sidebar.empty.firstAgent": "Create your first agent",
+  "sidebar.savedCopy.notice": "Connecting… This is a saved copy and can be out of date.",
   "sidebar.view.label": "Sidebar view",
   "sidebar.view.agents": "Agents",
   "sidebar.view.routines": "Routines",

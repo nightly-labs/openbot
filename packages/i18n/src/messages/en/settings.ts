@@ -103,6 +103,9 @@ export const messages = defineMessages("settings", {
   "settings.analytics.title": "Share product analytics",
   "settings.analytics.description":
     "Send usage and reliability metadata with your account ID and email to OpenBot’s self-hosted analytics.",
+  "settings.savedCopy.title": "Keep a copy of joined servers",
+  "settings.savedCopy.description":
+    "Show your agents, unread counts and the latest messages of recent chats at once while a joined server connects. An encrypted copy stays on this computer, without attachments. Turning this off deletes it.",
   "settings.analytics.webTitle": "Share error reports",
   "settings.analytics.webDescription":
     "Send error and warning codes with your account ID to OpenBot’s analytics. This setting applies to this browser.",

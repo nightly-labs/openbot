@@ -20,6 +20,7 @@ export const messages = {
   "sidebar.topbar.marketplace": "Каталог",
   "sidebar.empty.noAgents": "Агентов пока нет",
   "sidebar.empty.firstAgent": "Создайте первого агента",
+  "sidebar.savedCopy.notice": "Подключение… Это сохранённая копия, она может быть устаревшей.",
   "sidebar.view.label": "Вид боковой панели",
   "sidebar.view.agents": "Агенты",
   "sidebar.view.routines": "Задачи",

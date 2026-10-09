@@ -151,6 +151,7 @@ import {
 import { decodeHostReleaseStatusFromMain } from "./host-release-decoding";
 import { decodeAddOrchestratorReply, decodeMessagingOverviewReply } from "./messaging-decoding";
 import { decodeProviderRuntimeSnapshot } from "./provider-runtime";
+import { decodeRemoteWorkspaceCache, decodeRemoteWorkspaceCachePreference } from "./remote-workspace-cache-decoding";
 import { decodeRoutineFlowCanvas, decodeRoutineFlowLink, decodeRoutineFlowsChanged } from "./routine-flow-decoding";
 import {
   decodeAgentInstallation,
@@ -603,6 +604,13 @@ const openbotApi: OpenBotDesktopApi = {
     cancel: decodeOnePasswordConnectorStatus,
     disconnect: decodeOnePasswordConnectorStatus,
     changed: decodeOnePasswordConnectorStatus,
+  }),
+  remoteWorkspaceCache: bridgeGroup(IPC_ENDPOINTS.remoteWorkspaceCache, {
+    getPreference: decodeRemoteWorkspaceCachePreference,
+    setPreference: decodeRemoteWorkspaceCachePreference,
+    read: decodeRemoteWorkspaceCache,
+    saveWorkspace: decodeVoid,
+    saveConversation: decodeVoid,
   }),
   routineFeed: bridgeGroup(IPC_ENDPOINTS.routineFeed, {
     get: decodeRoutineFeed,
