@@ -30,7 +30,7 @@ export const MOBILE_EVENTS = {
     attachment_count: count,
     is_reply: isBoolean,
   },
-  agent_input_action: { ...outcome, kind: ["prompt"], decision: ["answered"] },
+  agent_input_action: { ...outcome, kind: ["prompt", "approval"], decision: ["answered", "accept", "decline"] },
   attachment_action: {
     ...outcome,
     action: ["select", "upload", "remove"],

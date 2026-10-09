@@ -20,6 +20,9 @@ export const messages = defineMessages("mobile.workspace", {
   "mobile.workspace.error.agentUnavailableOnHost": "The agent is unavailable on this host.",
   "mobile.workspace.error.agentUnavailable": "The agent is unavailable.",
   "mobile.workspace.error.formUnavailable": "This form is no longer available.",
+  "mobile.workspace.error.approvalInactive":
+    "This request is not waiting now. Another device answered it, or the task stopped.",
+  "mobile.workspace.error.approvalOffline": "Connect to the server to answer this request.",
   "mobile.workspace.alert.preferencesTitle": "Could not save chat preferences",
   "mobile.workspace.alert.preferencesBody": "Your previous preferences have been kept. Please try again.",
   "mobile.workspace.alert.updateRequiredTitle": "Update required",

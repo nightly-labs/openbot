@@ -28,6 +28,7 @@ import {
   type OpenBotDesktopApi,
   type RemoteAgentImportResult,
   type ReorderQueueInput,
+  type RespondToApprovalInput,
   type RespondToBrowserSecretInput,
   type RespondToBrowserTakeoverInput,
   type SteerQueuedMessageInput,
@@ -177,6 +178,13 @@ export const deleteAgent = Effect.fn("TeamClient.deleteAgent")(function* (
   agentId: string,
 ): Effect.fn.Return<void, TeamRequestError> {
   return yield* teamCall(() => request("DELETE", TEAM_API_ROUTES.agent.one(agentId), ignoreResponse));
+});
+
+export const respondToApproval = Effect.fn("TeamClient.respondToApproval")(function* (
+  request: TeamApiRequest,
+  input: RespondToApprovalInput,
+): Effect.fn.Return<void, TeamRequestError> {
+  return yield* teamCall(() => request("POST", TEAM_API_ROUTES.respond.approval, ignoreResponse, { ...input }));
 });
 
 export const respondToBrowserTakeover = Effect.fn("TeamClient.respondToBrowserTakeover")(function* (

@@ -468,7 +468,7 @@ where available, `duration_ms`. Failure codes are fixed categories, never raw er
 | `mobile_connection_action` | Initial connection attempt, reconnection attempt, or connection lost; result, duration and bounded loading stage |
 | `conversation_opened` | One visible-visit outcome and time to readable conversation, including cached/offline reads; failures when no readable conversation is available |
 | `message_send` | Host receipt or failure, attachment count, reply flag, provider/model/reasoning metadata when known |
-| `agent_input_action` | Submission of a structured prompt answer; no answer contents |
+| `agent_input_action` | Submission of a structured prompt answer or an approval decision (`accept` or `decline`); no answer contents, command or path |
 | `attachment_action` | Local file selection, upload, removal; result, count and coarse size bucket when known |
 | `agent_action` | Create, update, duplicate or delete |
 | `routine_action` | Create, update or delete, including enabling/disabling through update |

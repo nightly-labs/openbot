@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { useAgentActivity } from "@/features/workspace/components/use-agent-activity";
+import { useApprovalRequests } from "@/features/workspace/components/use-live-workspace";
 import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { latestReadableMessage, projectChatMessages, withFailureReasons } from "../model/chat-messages";
 import { uploadChatAttachments } from "../model/upload-chat-attachments";
@@ -48,6 +49,16 @@ export function MobileChatView({ agent }: { agent: MobileAgent }) {
     [conversation?.references, memberId, accountUserId],
   );
   const activity = useAgentActivity(agent.id);
+  const serverApprovals = useApprovalRequests(agent.serverId);
+  const threadId = conversation?.threadId ?? null;
+  // As on the desktop, only this chat's thread. A channel task of the same agent asks in the channel.
+  const approvals = useMemo(
+    () =>
+      serverApprovals.filter(
+        (approval) => approval.agentId === agent.id && (threadId === null || approval.threadId === threadId),
+      ),
+    [serverApprovals, agent.id, threadId],
+  );
   const online = servers.find((item) => item.id === agent.serverId)?.state === "online";
   const queue = useChatQueue(
     agent.id,
@@ -106,6 +117,7 @@ export function MobileChatView({ agent }: { agent: MobileAgent }) {
       activeTurnId={conversation?.activeTurnId ?? null}
       stopTurn={stopTurn}
       questionForm={questionForm}
+      approvals={approvals}
       readBoundary={latest ? `${latest.id}:${latest.status}` : null}
       markRead={markRead}
       fetchHistory={fetchHistory}

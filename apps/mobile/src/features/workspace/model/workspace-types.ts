@@ -21,6 +21,7 @@ import type {
   InstallAgentTemplateInput,
   InstalledSkill,
   QueueSnapshot,
+  RespondToApprovalInput,
   RespondToBrowserSecretInput,
   RespondToPromptInput,
   Routine,
@@ -128,6 +129,11 @@ export interface MobileWorkspaceContextValue {
   ) => RemoteBrowserViewSession | null;
   /** The new tab for `open`, and null for the other actions. */
   controlBrowserTab: (serverId: string, action: MobileBrowserTabAction) => Promise<MobileBrowserTab | null>;
+  /**
+   * Allows or denies an approval that the server's agent waits on. Rejects with
+   * `InactiveRequestError`, and drops the request, when it no longer waits on the host.
+   */
+  respondToApproval: (serverId: string, input: RespondToApprovalInput) => Promise<void>;
   respondToBrowserTakeover: (
     serverId: string,
     input: { requestId: string | number; decision: "complete" | "cancel" },

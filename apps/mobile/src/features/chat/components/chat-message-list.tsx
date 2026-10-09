@@ -44,6 +44,7 @@ import { BloubAvatarThumbnail } from "@/features/agents/components/bloub-avatar"
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
 import { getBloubAvatarColor } from "@/features/agents/model/bloub-activity";
 import { ChatActivityRow, type ChatActivitySpec } from "@/features/chat/components/chat-activity-row";
+import { type ApprovalDecision, approvalTitle, ChatApprovalCard } from "@/features/chat/components/chat-approval-card";
 import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
 import { ChatPlan } from "@/features/chat/components/chat-plan";
 import { ChatQuestionPrompt } from "@/features/chat/components/chat-question-prompt";
@@ -56,6 +57,7 @@ import { useAgentColorMessages } from "@/features/settings/model/message-color";
 import { useConnectionAppearance } from "@/features/workspace/components/use-connection-appearance";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import { agentActivityMood, type MobileAgentActivity } from "@/features/workspace/model/agent-activity";
+import type { PendingApproval } from "@/features/workspace/model/pending-approvals";
 import { haptics } from "@/shared/lib/haptics";
 import { useMotionPreference, useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
@@ -210,6 +212,10 @@ interface ChatMessageListProps {
   activeTurnId: string | null;
   questionForm?: QuestionPromptController;
   onSelectQuestion?: (messageId: string) => void;
+  /** The approvals that this chat's agents wait on, shown below the activity as on the desktop. */
+  approvals?: readonly PendingApproval[];
+  serverName?: string;
+  onRespondApproval?: (approval: PendingApproval, decision: ApprovalDecision) => Promise<void>;
   fieldBackground: ViewStyle["backgroundColor"];
   foreground: ViewStyle["backgroundColor"];
   historyState: "ready" | "connecting" | "waiting" | "loading" | "error";
@@ -653,6 +659,8 @@ function TurnFailure({ reason }: { reason: string | undefined }) {
   );
 }
 
+const NO_APPROVALS: readonly PendingApproval[] = [];
+
 export function ChatMessageList({
   upload,
   target,
@@ -669,6 +677,9 @@ export function ChatMessageList({
   activeTurnId,
   questionForm,
   onSelectQuestion,
+  approvals = NO_APPROVALS,
+  serverName = "",
+  onRespondApproval,
   fieldBackground,
   foreground,
   historyState,
@@ -717,6 +728,20 @@ export function ChatMessageList({
       t("mobile.chat.question.inputRequired", { question: questionForm.question.question }),
     );
   }, [questionForm?.messageId, questionForm?.question, t]);
+  const announcedApprovals = useRef(new Set<string>());
+  useEffect(() => {
+    for (const approval of approvals) {
+      const key = String(approval.requestId);
+      if (announcedApprovals.current.has(key)) continue;
+      announcedApprovals.current.add(key);
+      AccessibilityInfo.announceForAccessibility(
+        t("mobile.chat.approval.inputRequired", {
+          name: agentsById.get(approval.agentId)?.name ?? target.name,
+          title: approvalTitle(approval, t),
+        }),
+      );
+    }
+  }, [approvals, agentsById, target.name, t]);
   const [userForegroundColor, themeForegroundColor, themeMutedColor] = useCSSVariable([
     "--openbot-text-on-light",
     "--openbot-text-primary",
@@ -915,7 +940,9 @@ export function ChatMessageList({
               (message) => message.kind === "question" && !message.prompt.resolution && message.turnId === activeTurnId,
             )
             ? t("mobile.chat.activity.waitingForAnswer")
-            : t("mobile.chat.activity.waitingOnDesktop")
+            : approvals.some((approval) => approval.agentId === (activity?.agentId ?? target.id))
+              ? t("mobile.chat.activity.waitingForApproval")
+              : t("mobile.chat.activity.waitingOnDesktop")
           : thinkingDetail
             ? thinkingDetail
             : activity?.phase === "responding"
@@ -1073,6 +1100,21 @@ export function ChatMessageList({
                   />
                 ))}
               </Animated.View>
+              {onRespondApproval && approvals.length ? (
+                <View className="gap-3 pb-3">
+                  {approvals.map((approval) => (
+                    <ChatApprovalCard
+                      key={String(approval.requestId)}
+                      approval={approval}
+                      agentName={agentsById.get(approval.agentId)?.name ?? target.name}
+                      showAgentName={target.kind === "channel"}
+                      serverName={serverName}
+                      canAnswer={canSend}
+                      respond={(decision) => onRespondApproval(approval, decision)}
+                    />
+                  ))}
+                </View>
+              ) : null}
               {showStarter ? (
                 <View
                   className="gap-4 rounded-[26px] p-4"

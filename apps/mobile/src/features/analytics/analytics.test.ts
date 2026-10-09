@@ -360,6 +360,7 @@ it("instruments message commands without sending their contents or changing the 
     browserViewSupport: () => ({ view: false, clipboard: false, contextMenu: false, viewport: false }),
     openBrowserView: () => null,
     controlBrowserTab: unexpected,
+    respondToApproval: async () => undefined,
     respondToBrowserTakeover: async () => undefined,
     respondToBrowserSecret: async () => undefined,
     sidebarByServer: {},

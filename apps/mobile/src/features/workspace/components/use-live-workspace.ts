@@ -2,8 +2,10 @@ import type { BrowserTakeoverRequest } from "@openbot/contracts/ipc";
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { agentBrowserTab, agentBrowserTabs, type MobileBrowserTabs } from "@/features/browser/model/browser-tabs";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import type { PendingApproval } from "@/features/workspace/model/pending-approvals";
 
 const NO_REQUESTS: BrowserTakeoverRequest[] = [];
+const NO_APPROVALS: readonly PendingApproval[] = [];
 
 /** Re-renders only when this agent's unread state changes. */
 export function useAgentUnread(agentId: string) {
@@ -46,4 +48,10 @@ export function useAgentBrowserTabs(serverId: string, agentId: string, threadId:
   );
   const state = useSyncExternalStore(liveState.subscribe, select);
   return useMemo(() => agentBrowserTabs(state, agentId, threadId), [state, agentId, threadId]);
+}
+/** The approvals this server waits on, in the order they arrived. Re-renders only when that list changes. */
+export function useApprovalRequests(serverId: string) {
+  const { liveState } = useMobileWorkspace();
+  const select = useCallback(() => liveState.get().approvalRequests[serverId] ?? NO_APPROVALS, [liveState, serverId]);
+  return useSyncExternalStore(liveState.subscribe, select);
 }

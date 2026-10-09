@@ -1,6 +1,7 @@
 import type { BrowserTakeoverRequest } from "@openbot/contracts/ipc";
 import type { MobileBrowserTabs } from "@/features/browser/model/browser-tabs";
 import type { MobileAgentActivities } from "./agent-activity";
+import type { PendingApproval } from "./pending-approvals";
 
 /** Workspace state that host events change many times in one turn. */
 export interface LiveWorkspaceState {
@@ -11,6 +12,7 @@ export interface LiveWorkspaceState {
   browserRequests: Record<string, BrowserTakeoverRequest[]>;
   /** The host's browser tabs, by server. Absent for a host that serves no live view. */
   browserTabs: Record<string, MobileBrowserTabs>;
+  approvalRequests: Record<string, readonly PendingApproval[]>;
 }
 
 /**
@@ -24,6 +26,7 @@ export class LiveWorkspaceStore {
     unreadCounts: {},
     browserRequests: {},
     browserTabs: {},
+    approvalRequests: {},
   };
   readonly #listeners = new Set<() => void>();
 

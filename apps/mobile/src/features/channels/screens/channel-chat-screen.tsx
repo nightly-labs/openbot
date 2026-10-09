@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChatView } from "@/features/chat/components/chat-view";
 import { useQuestionPrompt } from "@/features/chat/components/use-question-prompt";
 import { projectChannelMessages } from "@/features/chat/model/chat-messages";
+import { useApprovalRequests } from "@/features/workspace/components/use-live-workspace";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { useText } from "@/shared/lib/text";
 import { useChannels } from "../components/use-channels";
@@ -44,6 +45,15 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
         : [],
     [online, channel?.archived, channel?.leadAgentId, page?.tasks, page?.messages],
   );
+  const serverApprovals = useApprovalRequests(serverId);
+  // As on the desktop: a member's approval belongs here while that member runs a task of this channel.
+  const approvals = useMemo(() => {
+    if (channel?.archived) return [];
+    const workers = new Set(
+      (page?.tasks ?? []).flatMap((task) => (task.state === "running" && task.ownerAgentId ? [task.ownerAgentId] : [])),
+    );
+    return serverApprovals.filter((approval) => workers.has(approval.agentId));
+  }, [serverApprovals, channel?.archived, page?.tasks]);
   const [sender] = useState(() => new ChannelSend(state.store, serverId, channelId, Crypto.randomUUID));
   useEffect(() => () => sender.dispose(), [sender]);
   const [olderLoading, setOlderLoading] = useState(false);
@@ -91,6 +101,7 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
       activeTurnId={null}
       questionForm={questionForm}
       onSelectQuestion={selectPrompt}
+      approvals={approvals}
       readBoundary={throughSequence ? String(throughSequence) : null}
       markRead={markRead}
       fetchHistory={() => {

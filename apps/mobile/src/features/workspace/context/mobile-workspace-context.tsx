@@ -44,6 +44,7 @@ import {
   deleteAgent,
   discardAttachmentDraft,
   interruptAgentTurn,
+  respondToApproval,
   respondToBrowserSecret,
   respondToBrowserTakeover,
   type TeamApiRequest,
@@ -95,6 +96,11 @@ import {
 import { conversationMessageId, decodeConversationPage } from "@/features/workspace/model/conversation";
 import { MobileConversationStore } from "@/features/workspace/model/conversation-store";
 import { LiveWorkspaceStore } from "@/features/workspace/model/live-workspace-store";
+import {
+  dropApproval,
+  InactiveRequestError,
+  reducePendingApprovals,
+} from "@/features/workspace/model/pending-approvals";
 import { applyMobileQueueEvent } from "@/features/workspace/model/queue-cache";
 import { decodeServerOrder, serverAccent, serverOrderKey, sortServers } from "@/features/workspace/model/server-order";
 import { applyServerRecovery, serverKind } from "@/features/workspace/model/server-status";
@@ -265,6 +271,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         for (const id of removedAgentIds) conversationStore.remove(id);
         liveState.update("unreadAgentIds", (current) => current.filter((id) => !removedAgentIds.has(id)));
         liveState.update("activityByServer", (current) =>
+          Object.fromEntries(Object.entries(current).filter(([id]) => available.has(id))),
+        );
+        liveState.update("approvalRequests", (current) =>
           Object.fromEntries(Object.entries(current).filter(([id]) => available.has(id))),
         );
       }
@@ -706,6 +715,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     (serverId: string, event: AgentEvent | TeamRealtimeEvent) => {
       if (removedServers.current.has(serverId)) return;
       applyLiveActivityEvent(serverId, event);
+      liveState.update("approvalRequests", (current) => {
+        const previous = current[serverId] ?? [];
+        const next = reducePendingApprovals(previous, event);
+        return next === previous ? current : { ...current, [serverId]: next };
+      });
       if (event.type === "runtime-snapshot") {
         liveState.update("browserRequests", (current) => {
           const next = replaceEqualDeep(
@@ -1101,6 +1115,27 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         Boolean(updatePreferences(serverId, (current) => setChannelHidden(current, id, false))),
       conversationStore,
       liveState,
+      respondToApproval: async (serverId, input) => {
+        const pending = liveState
+          .get()
+          .approvalRequests[serverId]?.some((item) => String(item.requestId) === String(input.requestId));
+        if (!pending) throw new InactiveRequestError(currentText().t("mobile.workspace.error.approvalInactive"));
+        if (serversRef.current.find((server) => server.id === serverId)?.state !== "online")
+          throw new Error(currentText().t("mobile.workspace.error.approvalOffline"));
+        try {
+          await Effect.runPromise(
+            respondToApproval(teamApi(serverId), input).pipe(Effect.mapError((error) => error.cause)),
+          );
+        } catch (error) {
+          // Another device answered first, or the turn ended. The request is gone on the host too.
+          if (error instanceof InactiveRequestError)
+            liveState.update("approvalRequests", (current) => dropApproval(current, serverId, input.requestId));
+          throw error;
+        }
+        // The host answered the agent. Its resolved event can arrive after this, or not at all on a
+        // connection that drops now, so the card goes at once.
+        liveState.update("approvalRequests", (current) => dropApproval(current, serverId, input.requestId));
+      },
       respondToBrowserTakeover: (serverId, input) =>
         Effect.runPromise(
           respondToBrowserTakeover(teamApi(serverId), input).pipe(Effect.mapError((error) => error.cause)),
@@ -1135,6 +1170,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         setSidebarByServer((current) => Object.fromEntries(Object.entries(current).filter(([id]) => id !== serverId)));
         setAgents((current) => current.filter((agent) => agent.serverId !== serverId));
         liveState.update("activityByServer", (current) => {
+          const next = { ...current };
+          delete next[serverId];
+          return next;
+        });
+        liveState.update("approvalRequests", (current) => {
           const next = { ...current };
           delete next[serverId];
           return next;

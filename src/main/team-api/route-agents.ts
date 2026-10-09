@@ -29,6 +29,7 @@ import { V6_AGENT_MODEL } from "@openbot/contracts/team-protocol/v6-adapter";
 import { sourceText } from "@openbot/i18n/source";
 import type { Effect } from "effect";
 import type { AgentDuplicationFailed } from "../../backend/agent/duplication-gate";
+import { InactiveAttentionRequest } from "../../backend/agent/inactive-attention-request";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { parseSidebarLayoutAction } from "../ipc/agent-inputs";
 import type { TeamApiAgents, TeamApiOptions, TeamApiSidebarLayout } from "./dependencies";
@@ -267,7 +268,7 @@ export async function routeAgents(
         requestId: promptRequestId(body.requestId),
         answers: promptAnswers(body.answers),
       }),
-    );
+    ).catch(inactiveAsConflict);
     return empty(204);
   }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.respond.approval) {
@@ -277,7 +278,7 @@ export async function routeAgents(
         requestId: promptRequestId(body.requestId),
         decision: approvalDecision(body.decision),
       }),
-    );
+    ).catch(inactiveAsConflict);
     return empty(204);
   }
   if (method === "POST" && url.pathname === BROWSER_SECRET_RESPONSE_PATH) {
@@ -298,4 +299,13 @@ export async function routeAgents(
   }
 
   return "unmatched";
+}
+
+/**
+ * Another client answered the request first, or its turn ended. A conflict, not a host failure: the
+ * client shows that the request is gone instead of offering a retry.
+ */
+function inactiveAsConflict(error: unknown): never {
+  if (error instanceof InactiveAttentionRequest) throw new HttpError(409, error.message);
+  throw error;
 }

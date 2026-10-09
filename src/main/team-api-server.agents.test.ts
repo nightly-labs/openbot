@@ -1,7 +1,9 @@
-import { isAgentSummary } from "@openbot/contracts/ipc";
+import { isAgentSummary, type RespondToApprovalInput } from "@openbot/contracts/ipc";
 import { QueueEditRejectedError } from "@openbot/contracts/team-protocol/queue-edit-v1";
+import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import opencodeFixture from "../../packages/contracts/src/team-protocol/fixtures/v4/host-http-response.json";
+import { InactiveAttentionRequest } from "../backend/agent/inactive-attention-request";
 import { AgentLifecycleFailed } from "../backend/agent-service";
 import { StoredStateFailure } from "../backend/stored-state-effects";
 // @vitest-environment node
@@ -963,7 +965,7 @@ describe("TeamApiServer agents", () => {
 
   it("responds to authenticated remote interactive requests", async () => {
     const { start, signIn } = await createTeamApiFixture("approval", { configure: true });
-    const approvals: unknown[] = [];
+    const approvals: RespondToApprovalInput[] = [];
     const failures: unknown[] = [];
     const takeovers: unknown[] = [];
     const prompts: unknown[] = [];
@@ -975,10 +977,18 @@ describe("TeamApiServer agents", () => {
         Effect.sync(() => {
           prompts.push(input);
         }),
-      respondToApproval: (input: unknown) =>
-        Effect.sync(() => {
-          approvals.push(input);
-        }),
+      // One answer per request, as the attention registry deletes a request when it answers it.
+      respondToApproval: (input) =>
+        approvals.some((answered) => answered.requestId === input.requestId)
+          ? Effect.fail(
+              new AgentLifecycleFailed({
+                operation: "respondToApproval",
+                cause: new InactiveAttentionRequest(sourceText("error.backend.approvalInactive")),
+              }),
+            )
+          : Effect.sync(() => {
+              approvals.push(input);
+            }),
       respondToBrowserTakeover: (input: unknown) =>
         Effect.sync(() => {
           takeovers.push(input);
@@ -991,6 +1001,15 @@ describe("TeamApiServer agents", () => {
       token: token,
       body: { requestId: 17, decision: "accept" },
     });
+    expect(approvals).toEqual([{ requestId: 17, decision: "accept" }]);
+    // A second answer, from another client or a replay, is a conflict that names the stale request.
+    const replay = await fetch(`${base}/v1/approvals/respond`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ requestId: 17, decision: "decline" }),
+    });
+    expect(replay.status).toBe(409);
+    await expect(replay.json()).resolves.toEqual({ error: sourceText("error.backend.approvalInactive") });
     expect(approvals).toEqual([{ requestId: 17, decision: "accept" }]);
     await emptyRequest(base, "/v1/browser-takeovers/respond", {
       token: token,

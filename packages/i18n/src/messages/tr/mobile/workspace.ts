@@ -22,6 +22,8 @@ export const messages = {
   "mobile.workspace.error.agentUnavailableOnHost": "Ajan bu ana makinede kullanılamıyor.",
   "mobile.workspace.error.agentUnavailable": "Ajan kullanılamıyor.",
   "mobile.workspace.error.formUnavailable": "Bu form artık kullanılamıyor.",
+  "mobile.workspace.error.approvalInactive": "Bu istek artık beklemiyor. Başka bir cihaz yanıtladı veya görev durdu.",
+  "mobile.workspace.error.approvalOffline": "Bu isteği yanıtlamak için sunucuya bağlanın.",
   "mobile.workspace.alert.preferencesTitle": "Sohbet tercihleri kaydedilemedi",
   "mobile.workspace.alert.preferencesBody": "Önceki tercihleriniz korundu. Lütfen tekrar deneyin.",
   "mobile.workspace.alert.updateRequiredTitle": "Güncelleme gerekli",

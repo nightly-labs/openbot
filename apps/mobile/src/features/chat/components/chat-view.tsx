@@ -32,6 +32,7 @@ import { useBrowserRequests } from "@/features/workspace/components/use-live-wor
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import type { MobileAgentActivity } from "@/features/workspace/model/agent-activity";
+import type { PendingApproval } from "@/features/workspace/model/pending-approvals";
 import { haptics } from "@/shared/lib/haptics";
 import { isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
@@ -69,6 +70,8 @@ export interface ChatViewProps {
   stopTurn?: (turnId: string) => Promise<void>;
   questionForm?: QuestionPromptController;
   onSelectQuestion?: (messageId: string) => void;
+  /** The approvals of this chat's agents, from the caller that knows which thread is this chat's. */
+  approvals?: readonly PendingApproval[];
   readBoundary: string | null;
   markRead: () => void;
   fetchHistory: () => void;
@@ -115,6 +118,7 @@ export function ChatView({
   stopTurn,
   questionForm,
   onSelectQuestion,
+  approvals,
   readBoundary,
   markRead,
   fetchHistory,
@@ -127,7 +131,7 @@ export function ChatView({
   notice,
 }: ChatViewProps) {
   const { t, errorMessage } = useText();
-  const { respondToBrowserSecret, respondToBrowserTakeover, attachmentSupport, browserViewSupport } =
+  const { respondToApproval, respondToBrowserSecret, respondToBrowserTakeover, attachmentSupport, browserViewSupport } =
     useMobileWorkspace();
   const browserRequests = useBrowserRequests(target.serverId);
   const browserAllowed = useBrowserFeature();
@@ -596,6 +600,11 @@ export function ChatView({
               activeTurnId={activeTurnId}
               questionForm={questionForm}
               onSelectQuestion={onSelectQuestion}
+              approvals={readOnly ? undefined : approvals}
+              serverName={server?.name ?? ""}
+              onRespondApproval={(approval, decision) =>
+                respondToApproval(target.serverId, { requestId: approval.requestId, decision })
+              }
               fieldBackground={fieldBackground}
               foreground={foreground}
               messages={messages}

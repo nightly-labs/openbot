@@ -40,6 +40,7 @@ import {
   type HostedSiteMutationContext,
 } from "./hosted-site-coordinator";
 import type { HostedSiteMutationTool } from "./hosted-site-events";
+import { InactiveAttentionRequest } from "./inactive-attention-request";
 import {
   approvalPermissions,
   browserTakeoverError,
@@ -228,7 +229,7 @@ export class AttentionRegistry {
   readonly respondToPrompt = Effect.fn("AttentionRegistry.respondToPrompt")((input: RespondToPromptInput) =>
     attentionStep(() => {
       const pending = this.#prompts.get(input.requestId);
-      if (!pending) throw new Error(sourceText("error.backend.promptInactive"));
+      if (!pending) throw new InactiveAttentionRequest(sourceText("error.backend.promptInactive"));
       const questionIds = new Set(pending.questions.map((question) => question.id));
       if (Object.keys(input.answers).some((id) => !questionIds.has(id))) {
         throw new Error(sourceText("error.backend.promptAnswerMismatch"));
@@ -263,7 +264,7 @@ export class AttentionRegistry {
   ) {
     const pending = yield* attentionStep(() => {
       const value = this.#approvals.get(input.requestId);
-      if (!value) throw new Error(sourceText("error.backend.approvalInactive"));
+      if (!value) throw new InactiveAttentionRequest(sourceText("error.backend.approvalInactive"));
       return value;
     });
     this.#routines.markRunningForTurn(getString(pending.params, "turnId"));

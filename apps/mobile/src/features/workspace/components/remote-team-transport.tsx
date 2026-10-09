@@ -1,4 +1,5 @@
 import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
+import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { isQueueEditRoute, QueueEditRejectedError } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { sourceText } from "@openbot/i18n/source";
@@ -23,6 +24,7 @@ import type {
   RemoteBrowserViewSession,
 } from "@/features/browser/model/browser-view-bridge";
 import { supportLog, supportLogUrl } from "@/features/support/model/support-log";
+import { InactiveRequestError } from "@/features/workspace/model/pending-approvals";
 import { expoGoDomOptions } from "@/shared/lib/expo-go-dom";
 import { currentText } from "@/shared/lib/text";
 
@@ -144,6 +146,11 @@ export const RemoteTeamTransport = forwardRef<RemoteTeamTransportRef, RemoteTeam
           if (!result.ok) throw new Error(result.error ?? sourceText("error.remote.serverRequestFailed"));
           if (result.status === 409 && isQueueEditRoute(method, path))
             throw new QueueEditRejectedError(currentText().t("mobile.workspace.error.queueEditRejected"));
+          // The host answers 409 when a form or an approval no longer waits: answered elsewhere, or ended.
+          if (result.status === 409 && method === "POST" && path === TEAM_API_ROUTES.respond.approval)
+            throw new InactiveRequestError(currentText().t("mobile.workspace.error.approvalInactive"));
+          if (result.status === 409 && method === "POST" && path === TEAM_API_ROUTES.respond.prompt)
+            throw new InactiveRequestError(currentText().t("mobile.workspace.error.formUnavailable"));
           if (result.status !== undefined && result.status >= 400)
             throw new Error(sourceText("error.remote.serverRequestFailed"));
           return decode(result.body);

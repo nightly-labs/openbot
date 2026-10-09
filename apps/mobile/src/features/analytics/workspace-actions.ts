@@ -34,6 +34,10 @@ export function trackWorkspaceActions(workspace: MobileWorkspaceContextValue): M
       ),
     respondToPrompt: (id, input) =>
       run("agent_input_action", { kind: "prompt", decision: "answered" }, () => workspace.respondToPrompt(id, input)),
+    respondToApproval: (server, input) =>
+      run("agent_input_action", { kind: "approval", decision: input.decision }, () =>
+        workspace.respondToApproval(server, input),
+      ),
     uploadAttachment: (id, input) =>
       run(
         "attachment_action",

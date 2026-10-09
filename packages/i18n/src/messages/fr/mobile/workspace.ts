@@ -23,6 +23,9 @@ export const messages = {
   "mobile.workspace.error.agentUnavailableOnHost": "L’agent est indisponible sur cet hôte.",
   "mobile.workspace.error.agentUnavailable": "L’agent est indisponible.",
   "mobile.workspace.error.formUnavailable": "Ce formulaire n’est plus disponible.",
+  "mobile.workspace.error.approvalInactive":
+    "Cette demande n’est plus en attente. Un autre appareil y a répondu, ou la tâche s’est arrêtée.",
+  "mobile.workspace.error.approvalOffline": "Connectez-vous au serveur pour répondre à cette demande.",
   "mobile.workspace.alert.preferencesTitle": "Impossible d’enregistrer les préférences de discussion",
   "mobile.workspace.alert.preferencesBody": "Vos préférences précédentes ont été conservées. Réessayez.",
   "mobile.workspace.alert.updateRequiredTitle": "Mise à jour requise",
