@@ -135,6 +135,11 @@ interface RemoteServerManagerOptions {
   hostedServers?: HostedServerWakeHooks;
   /** Times each WebRTC connection for the local trace. */
   connectTrace?: RemoteConnectTrace;
+  /**
+   * The account's first load. The host list needs only the saved token, so it can arrive before the
+   * account says who is signed in; the first read of it waits for this.
+   */
+  accountReady?: Effect.Effect<unknown, RemoteWorkflowError>;
 }
 
 export interface HostedServerWakeHooks {
@@ -204,6 +209,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   /** Done when the first read of the account's host list after `initialize` ends, either way. */
   readonly #initialDirectory = Deferred.makeUnsafe<void>();
   readonly #connectTrace: RemoteConnectTrace | null;
+  readonly #accountReady: Effect.Effect<unknown, RemoteWorkflowError>;
   #muteExpiryTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
@@ -232,6 +238,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     this.#getLocalHostId = options.getLocalHostId ?? (() => null);
     this.#hostedServers = options.hostedServers ?? null;
     this.#connectTrace = options.connectTrace ?? null;
+    this.#accountReady = options.accountReady ?? Effect.void;
     this.#client = new RemoteServerClient({
       appVersion: this.#appVersion,
       servers: this.#store,
@@ -438,7 +445,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       const startedAt = performance.now();
       this.#background(
         this.#owned(
-          this.#syncWebRtcHosts().pipe(
+          this.#accountReady.pipe(
+            Effect.andThen(this.#syncWebRtcHosts()),
             Effect.tap(() => Effect.sync(() => this.#initializeConnectionStates())),
             // A host the directory added after the event connections started has no connection yet.
             Effect.tap(() => (this.#events.enabled ? this.startEventConnections() : Effect.void)),
@@ -1680,6 +1688,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     transport: TeamWebRtcClientTransport,
   ): Effect.fn.Return<void, RemoteWorkflowError, RemoteRequest> {
     const hosts = yield* transport.listHosts();
+    // The account can be signed out or not loaded yet; that is a failed read, not a defect.
+    const email = yield* remoteDecode(() => this.#centralAccount.getEmail());
     const localHostId = this.#getLocalHostId();
     this.#localMemberLimit = hosts.find((host) => host.hostId === localHostId)?.memberLimit ?? null;
     const { servers, removedHostIds, staleTransportHostIds, pinnedKeys } = reconcileWebRtcHosts({
@@ -1689,7 +1699,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       preservedIdentities: this.#store.preservedIdentities,
       localHostId,
       isHiddenHost: (hostId) => this.#store.isHiddenHost(hostId),
-      username: this.#centralAccount.getEmail().trim().toLowerCase(),
+      username: email.trim().toLowerCase(),
       keepOtherTransports: this.#allowLocalDevelopmentInvites,
     });
     for (const { hostId, publicKey } of pinnedKeys) transport.pinHostKey(hostId, publicKey);

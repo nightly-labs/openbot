@@ -1762,6 +1762,7 @@ export async function createApplicationServices({
       selfHostedApiOrigin: selfHostedApiOrigin(centralAuthApiUrl),
       appVersion: app.getVersion(),
       connectTrace,
+      accountReady: centralAuthInitialization,
       getLocalHostId: () => teamStore.getIdentity()?.serverId ?? null,
       hostedServers: {
         unavailable: (serverId, wake) => hostedServers.unavailableHost(serverId, wake),
