@@ -7,6 +7,8 @@ import type {
   DirectThreadSummary,
   ServerSummary,
 } from "@openbot/contracts/ipc";
+import { TEAM_CURRENT_CAPABILITIES } from "@openbot/contracts/team-protocol/current";
+import { TEAM_PROTOCOL_V6 } from "@openbot/contracts/team-protocol/v6";
 import developmentLogoUrl from "../assets/openbot-logo-dev.png";
 import productionLogoUrl from "../assets/openbot-logo-production.png";
 import { STORY_PRESENCE } from "./fixtures";
@@ -219,6 +221,14 @@ const LANDING_PREVIEW_SERVERS: ServerSummary[] = [
     remoteDesktopAvailable: true,
     role: "owner",
     active: true,
+    compatibility: {
+      localAppVersion: "preview",
+      hostAppVersion: "preview",
+      localProtocol: { minimum: TEAM_PROTOCOL_V6, maximum: TEAM_PROTOCOL_V6 },
+      hostProtocol: { minimum: TEAM_PROTOCOL_V6, maximum: TEAM_PROTOCOL_V6 },
+      negotiatedProtocol: TEAM_PROTOCOL_V6,
+      capabilities: [...TEAM_CURRENT_CAPABILITIES],
+    },
   },
 ];
 
