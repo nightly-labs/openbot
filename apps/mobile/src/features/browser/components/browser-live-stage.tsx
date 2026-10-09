@@ -4,15 +4,18 @@ import { type Ref, useCallback, useEffect, useImperativeHandle, useMemo, useRef,
 import { type LayoutChangeEvent, StyleSheet, View } from "react-native";
 import { Gesture, GestureDetector, type TouchData } from "react-native-gesture-handler";
 import { type SharedValue, useDerivedValue, useSharedValue } from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
 import { haptics } from "@/shared/lib/haptics";
 import {
   clampZoom,
   fittedRect,
+  fromFraction,
   NO_ZOOM,
   type Point,
   type Rect,
   revealFraction,
   type Size,
+  shownRect,
   visibleCenter,
   type Zoom,
 } from "../model/live-view-geometry";
@@ -34,9 +37,12 @@ const SAMPLING = { filter: FilterMode.Linear, mipmap: MipmapMode.None };
 export interface BrowserLiveStageHandle {
   /** Puts the pointer in the middle of the part of the page that shows. */
   recenterPointer(): void;
+  /** Where the pointer is on the stage, in points. Null before a frame shows. */
+  pointerPosition(): Point | null;
 }
 
 function touch(data: TouchData) {
+  "worklet";
   return { id: data.id, x: data.x, y: data.y };
 }
 
@@ -164,28 +170,42 @@ export function BrowserLiveStage({
         setPointer(center);
         current.current.send(pointerMove(center, current.current.drawnSequence()));
       },
+      pointerPosition: () => {
+        const { stage: size, frame: page, zoom: shown, pointer: at } = current.current;
+        return page ? fromFraction(at, shownRect(size, page, shown)) : null;
+      },
     }),
     [setPointer],
   );
 
-  const touches = useMemo(
-    () =>
-      Gesture.Manual()
-        .runOnJS(true)
-        .onTouchesDown((event, manager) => {
-          manager.activate();
-          gestures.down(event.changedTouches.map(touch), Date.now());
-        })
-        .onTouchesMove((event) => gestures.move(event.allTouches.map(touch), Date.now()))
-        .onTouchesUp((event, manager) => {
-          if (gestures.up(event.changedTouches.map(touch), Date.now()) === 0) manager.end();
-        })
-        .onTouchesCancelled((_event, manager) => {
-          gestures.cancel();
-          manager.end();
-        }),
-    [gestures],
-  );
+  const touches = useMemo(() => {
+    // The callbacks run on the UI thread, where the gesture's state can change: a call to the state
+    // manager from the JS thread only logs a warning. The touches go to the gestures on the JS thread.
+    const { down, move, up, cancel } = gestures;
+    return Gesture.Manual()
+      .onTouchesDown((event, manager) => {
+        "worklet";
+        manager.activate();
+        scheduleOnRN(down, event.changedTouches.map(touch), Date.now());
+      })
+      .onTouchesMove((event) => {
+        "worklet";
+        scheduleOnRN(move, event.allTouches.map(touch), Date.now());
+      })
+      .onTouchesUp((event, manager) => {
+        "worklet";
+        const lifted = event.changedTouches.map(touch);
+        // The gesture ends with the last finger, which the UI thread knows without the JS thread.
+        const remaining = event.allTouches.filter((held) => !lifted.some((finger) => finger.id === held.id));
+        if (remaining.length === 0) manager.end();
+        scheduleOnRN(up, lifted, Date.now());
+      })
+      .onTouchesCancelled((_event, manager) => {
+        "worklet";
+        manager.end();
+        scheduleOnRN(cancel);
+      });
+  }, [gestures]);
 
   const transform = useDerivedValue(() => [
     { translateX: zoom.value.x },

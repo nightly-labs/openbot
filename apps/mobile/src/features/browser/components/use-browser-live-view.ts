@@ -1,14 +1,11 @@
-import type {
-  BrowserViewContextMenu,
-  BrowserViewCursor,
-  BrowserViewInput,
-} from "@openbot/contracts/team-protocol/browser-view-v1";
+import type { BrowserViewContextMenu, BrowserViewCursor } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { type SkImage, Skia } from "@shopify/react-native-skia";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSharedValue } from "react-native-reanimated";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import type { RemoteBrowserViewSession } from "../model/browser-view-bridge";
 import type { Size } from "../model/live-view-geometry";
+import { createLiveViewInputQueue } from "../model/live-view-input-queue";
 
 export type BrowserLiveViewStatus =
   | { kind: "connecting" }
@@ -48,6 +45,18 @@ export function useBrowserLiveView(
   const drawn = useRef<number | null>(null);
   const selections = useRef<((text: string | null) => void)[]>([]);
   const shownTab = useRef(tabId);
+  /** Input for the page. Moves and scroll steps wait for the next frame of the screen and go as one. */
+  const queue = useMemo(
+    () =>
+      createLiveViewInputQueue(
+        (inputs) => session.current?.input(inputs),
+        (callback) => {
+          const id = requestAnimationFrame(() => callback());
+          return () => cancelAnimationFrame(id);
+        },
+      ),
+    [],
+  );
 
   useEffect(() => {
     // A frame belongs to its tab. Another tab, or no tab, does not show it, as a closed tab does not.
@@ -88,6 +97,10 @@ export function useBrowserLiveView(
             setStatus({ kind: "live" });
           }
         }
+        // A queued move or scroll names the frame that was on screen when the finger made it. It goes
+        // before this frame is reported drawn: the host forgets older frames then, and drops input
+        // that names one.
+        queue.flush();
         view?.frameDone(event.sequence, decoded !== null);
       } else if (event.type === "message") {
         const message = event.message;
@@ -106,14 +119,13 @@ export function useBrowserLiveView(
     }
     session.current = view;
     return () => {
+      queue.clear();
       view.close();
       if (session.current === view) session.current = null;
       drawn.current = null;
       selections.current = [];
     };
-  }, [active, image, serverId, tabId]);
-
-  const send = useCallback((inputs: BrowserViewInput[]) => session.current?.input(inputs), []);
+  }, [active, image, queue, serverId, tabId]);
 
   /** The page's selected text, or null when it is longer than one copy carries. Rejects when the host does not answer. */
   const requestSelection = useCallback(
@@ -133,9 +145,10 @@ export function useBrowserLiveView(
           resolve(text);
         };
         selections.current.push(answer);
-        view.input([{ type: "copy" }]);
+        // After the input that waits, such as the end of a drag that selected the text.
+        queue.push({ type: "copy" });
       }),
-    [],
+    [queue],
   );
 
   return {
@@ -145,7 +158,8 @@ export function useBrowserLiveView(
     cursor,
     /** The frame on screen, which a point on the page belongs to. */
     drawnSequence: useCallback(() => drawn.current, []),
-    send,
+    /** Input for the page, in order. A move or a scroll step waits for the next frame of the screen. */
+    send: queue.push,
     requestSelection,
   };
 }

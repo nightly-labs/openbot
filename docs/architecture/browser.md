@@ -149,7 +149,7 @@ outside the per-tab operation queue, so watching never delays a tool call. `brow
 the client half, and it reuses the Remote Desktop websocket tunnel rather than adding a WebRTC channel.
 The `browser-view` capability says whether a host has both.
 
-The iPhone app draws the pointer itself, so it needs the page's cursor. A host with
+The mobile app (iOS and Android) draws the pointer itself, so it needs the page's cursor. A host with
 `browser-view-cursor` sends a `cursor` text message, from the tab's `cursor-changed` event, to a
 socket opened with `cursor=1`; desktop and web clients do not ask. The phone uses the
 `browser-view-clipboard` inputs of the desktop and web clients: `paste`, `copy` (answered with

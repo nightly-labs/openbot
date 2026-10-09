@@ -1,4 +1,4 @@
-import { type MenuAction, MenuView } from "@expo/ui/community/menu";
+import { type MenuAction, type MenuComponentRef, MenuView } from "@expo/ui/community/menu";
 import type { BrowserViewContextMenu, BrowserViewInput } from "@openbot/contracts/team-protocol/browser-view-v1";
 import * as Clipboard from "expo-clipboard";
 import { GlassView } from "expo-glass-effect";
@@ -16,10 +16,9 @@ import {
   Keyboard,
   Plus,
 } from "lucide-react-native";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import {
   ActionSheetIOS,
-  Alert,
   type NativeSyntheticEvent,
   TextInput,
   type TextInputKeyPressEventData,
@@ -51,7 +50,6 @@ import { useBrowserLiveView } from "../components/use-browser-live-view";
 import { namedKeyInputs, pasteInput, selectAllInputs, textChangeInputs, typedTextInputs } from "../model/browser-keys";
 import type { MobileBrowserTab } from "../model/browser-tabs";
 import type { LiveViewMode } from "../model/live-view-gestures";
-import { createLiveViewInputQueue } from "../model/live-view-input-queue";
 
 /** The floating controls are 48 points, 8 points from the safe area, as in the chat. */
 const CONTROL_SIZE = 48;
@@ -135,7 +133,7 @@ function BrowserView({
   const tab = useAgentBrowserTab(agent.serverId, agent.id, preferredTabId, threadId);
   // The view stays open under the help sheet, and closes while the app is in the background.
   const appForeground = useAppForeground();
-  // The menu needs the clipboard and the input queue, which need the view: it is read when a menu comes.
+  // The menu needs the clipboard and the input, which need the view: it is read when a menu comes.
   const contextMenu = useRef<(menu: BrowserViewContextMenu) => void>(() => undefined);
   const live = useBrowserLiveView(
     agent.serverId,
@@ -150,19 +148,16 @@ function BrowserView({
   const [keyboardShown, setKeyboardShown] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [openingTab, setOpeningTab] = useState(false);
+  // Android shows the page's menu as a dropdown that opens from code, at the pointer.
+  const [pageMenu, setPageMenu] = useState<{
+    actions: MenuAction[];
+    run: Map<string, () => void>;
+    at: { x: number; y: number };
+  } | null>(null);
+  const pageMenuView = useRef<MenuComponentRef>(null);
   const takeover = useBrowserRequests(agent.serverId).find(
     (request) => request.agentId === agent.id && (!request.secret || request.secret.requiresReload),
   );
-
-  const queue = useMemo(
-    () =>
-      createLiveViewInputQueue(live.send, (callback) => {
-        const id = requestAnimationFrame(() => callback());
-        return () => cancelAnimationFrame(id);
-      }),
-    [live.send],
-  );
-  useEffect(() => () => queue.clear(), [queue]);
 
   // The connection came back: a view that ended with it opens again.
   const wasOnline = useRef(online);
@@ -185,7 +180,7 @@ function BrowserView({
 
   const ready = live.status.kind === "live";
   const sendKeys = (inputs: readonly BrowserViewInput[]) => {
-    for (const input of inputs) queue.push(input);
+    for (const input of inputs) live.send(input);
   };
 
   const paste = async () => {
@@ -306,7 +301,7 @@ function BrowserView({
         choices.push({
           title: t("mobile.browser.menu.cut"),
           // The host deletes the selection only while it is still the text the phone has.
-          run: () => void copy().then((text) => text && queue.push({ type: "cut", text })),
+          run: () => void copy().then((text) => text && live.send({ type: "cut", text })),
         });
       else if (item === "copy") choices.push({ title: t("mobile.browser.menu.copy"), run: () => void copy() });
       else if (item === "paste") choices.push({ title: t("mobile.browser.menu.paste"), run: () => void paste() });
@@ -320,13 +315,12 @@ function BrowserView({
         { title: t("mobile.browser.reload"), run: reload },
       );
     }
-    const cancel = t("common.cancel");
     if (isIOS) {
       // A SwiftUI menu of `@expo/ui` opens only from a touch on its own button, and this menu opens
       // when the host answers a right-click. The system action sheet opens from code.
       ActionSheetIOS.showActionSheetWithOptions(
         {
-          options: [...choices.map((choice) => choice.title), cancel],
+          options: [...choices.map((choice) => choice.title), t("common.cancel")],
           cancelButtonIndex: choices.length,
           userInterfaceStyle: "dark",
         },
@@ -334,12 +328,20 @@ function BrowserView({
       );
       return;
     }
-    // An Android alert has room for three buttons.
-    Alert.alert("", undefined, [
-      ...choices.slice(0, 2).map((choice) => ({ text: choice.title, onPress: choice.run })),
-      { text: cancel, style: "cancel" as const },
-    ]);
+    // The Android menu of `@expo/ui` opens from code, under its trigger: a point at the pointer.
+    const actions: MenuAction[] = [];
+    const run = new Map<string, () => void>();
+    for (const [index, choice] of choices.entries()) {
+      const id = `page-menu-${index}`;
+      actions.push({ id, title: choice.title });
+      run.set(id, choice.run);
+    }
+    setPageMenu({ actions, run, at: stage.current?.pointerPosition() ?? { x: 0, y: 0 } });
   };
+
+  useEffect(() => {
+    if (pageMenu) pageMenuView.current?.show();
+  }, [pageMenu]);
 
   const handBack = async () => {
     if (!takeover) return;
@@ -449,9 +451,20 @@ function BrowserView({
             cursor={live.cursor}
             mode={mode}
             drawnSequence={live.drawnSequence}
-            send={ready ? queue.push : ignoreInput}
+            send={ready ? live.send : ignoreInput}
             accessibilityLabel={t("mobile.browser.liveView", { title: tab?.title || agent.name })}
           />
+          {pageMenu ? (
+            <MenuView
+              ref={pageMenuView}
+              actions={pageMenu.actions}
+              onPressAction={({ nativeEvent }) => pageMenu.run.get(nativeEvent.event)?.()}
+              onCloseMenu={() => setPageMenu(null)}
+              style={{ position: "absolute", left: pageMenu.at.x, top: pageMenu.at.y, width: 1, height: 1 }}
+            >
+              <View style={{ width: 1, height: 1 }} />
+            </MenuView>
+          ) : null}
           {status ? (
             <View
               pointerEvents="box-none"

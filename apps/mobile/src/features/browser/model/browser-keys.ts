@@ -11,7 +11,7 @@ import {
 type NamedKey = "Backspace" | "Enter" | "Tab";
 
 /** The longest paste a phone sends to a page: the most that one paste carries to a host. */
-export const PASTE_MAX_LENGTH = BROWSER_VIEW_MAX_CLIPBOARD_TEXT;
+const PASTE_MAX_LENGTH = BROWSER_VIEW_MAX_CLIPBOARD_TEXT;
 /** The Meta key in the modifiers of a key input. */
 const META_MODIFIER = 4;
 

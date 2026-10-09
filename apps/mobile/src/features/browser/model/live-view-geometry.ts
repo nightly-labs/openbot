@@ -100,7 +100,7 @@ export function clampZoom(stage: Size, frame: Size, zoom: Zoom): Zoom {
 }
 
 /** The part of the page the stage shows, as fractions of the page. */
-export function visibleFractions(stage: Size, frame: Size, zoom: Zoom): { start: Point; end: Point } {
+function visibleFractions(stage: Size, frame: Size, zoom: Zoom): { start: Point; end: Point } {
   const rect = shownRect(stage, frame, zoom);
   const start = clampFraction(toFraction({ x: 0, y: 0 }, rect));
   const end = clampFraction(toFraction({ x: stage.width, y: stage.height }, rect));

@@ -112,7 +112,7 @@ export interface MobileBrowserViewSupport {
 }
 
 /** What the phone does to a host browser tab, through the released `browser-control` routes. */
-export type MobileBrowserTabAction =
+type MobileBrowserTabAction =
   | { type: "navigate"; tabId: string; direction: "back" | "forward" }
   | { type: "reload"; tabId: string }
   | { type: "open"; url: string; ownerAgentId: string; ownerThreadId: string | null }
