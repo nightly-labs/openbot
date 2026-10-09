@@ -218,6 +218,14 @@ describe("RemoteScreenGateway", () => {
     expect(writeClipboard).not.toHaveBeenCalled();
 
     const viewer = { "X-OpenBot-WebRTC-Session": "team-member-a" };
+    const crossSite = await fetch(clipboard, {
+      method: "POST",
+      headers: { ...viewer, "Sec-Fetch-Site": "cross-site" },
+      body: "from another site",
+    });
+    expect(crossSite.status).toBe(403);
+    expect(writeClipboard).not.toHaveBeenCalled();
+
     const pasted = await fetch(clipboard, { method: "POST", headers: viewer, body: "zażółć ✓" });
     expect(pasted.status).toBe(204);
     expect(writeClipboard).toHaveBeenCalledWith("zażółć ✓");

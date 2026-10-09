@@ -1121,6 +1121,10 @@ export class RemoteScreenGateway {
     }
     const writeClipboard = this.#options.writeClipboard;
     if (writeClipboard && upstreamPath === CLIPBOARD_PATH && request.method === "POST") {
+      // The viewer cookie can be SameSite=None, and a text POST needs no preflight. Only the viewer
+      // page itself may write the host's clipboard.
+      const site = request.headers["sec-fetch-site"];
+      if (site !== undefined && site !== "same-origin") return sendText(response, 403, "Paste is not allowed.");
       const body = yield* remoteCall(() => readBodyWithin(request, MAX_CLIPBOARD_BYTES));
       if (body === null) return sendText(response, 413, "Pasted text is too large.");
       writeClipboard(body.toString("utf8"));
@@ -1152,7 +1156,7 @@ export class RemoteScreenGateway {
         (upstreamResponse) => {
           const headers = { ...upstreamResponse.headers };
           delete headers["set-cookie"];
-          if (addPasteScript && upstreamResponse.statusCode === 200) {
+          if (addPasteScript && upstreamResponse.statusCode === 200 && !headers["content-encoding"]) {
             const chunks: Buffer[] = [];
             upstreamResponse.on("data", (chunk: Buffer) => chunks.push(chunk));
             upstreamResponse.once("end", () => {

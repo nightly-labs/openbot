@@ -105,8 +105,11 @@ event and the host pastes its own clipboard. The gateway adds `openbot-paste.js`
 `stream.html`. The script keeps the member's paste key from Moonlight, reads the paste event, and
 posts the text to `moonlight/openbot-clipboard`. Both routes are under `moonlight/` because the
 released Team API adapters forward only that family of viewer routes. The same viewer cookie or
-WebRTC session check protects them. Then the script presses Cmd+V for a macOS host or Ctrl+V for
-other hosts, and releases the member's other held modifiers for that time. Text that the host
+WebRTC session check protects them, and the clipboard route refuses a request from another site.
+At the paste event, the script presses the host's paste modifier, Cmd for a macOS host or Ctrl for
+other hosts, and releases the member's other held modifiers except Shift. A Win or Super key
+released with no key between would open the host's Start menu or Activities. After the upload, the
+script presses V. Text that the host
 already has from an earlier paste is not sent again, so a copy made on the host stays on its
 clipboard. A host with no clipboard writer serves neither route.
 
