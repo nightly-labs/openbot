@@ -63,7 +63,7 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
       ) {
         // Static rows already occupy their measured space. An estimate correction can move
         // the chat off the bottom after routine cards load. Follow the actual bottom instead.
-        elementScroll(element.scrollHeight - element.clientHeight, { behavior: scroll.behavior }, instance);
+        elementScroll(element.scrollHeight - element.clientHeight, { ...scroll, adjustments: 0 }, instance);
         return;
       }
       elementScroll(offset, scroll, instance);
