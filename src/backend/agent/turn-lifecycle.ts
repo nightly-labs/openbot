@@ -1,6 +1,7 @@
 import {
   type AgentEvent,
   type AgentSummary,
+  agentProviderDescriptor,
   type BrowserControlState,
   type BrowserTab,
   CONVERSATION_PLAN_ITEM_TYPE,
@@ -11,6 +12,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger } from "@openbot/logging";
 import { classifyFailure } from "@openbot/telemetry";
 import { Deferred, Effect, Exit, Schema, Scope } from "effect";
 import type { AgentClient } from "../agent-client";
@@ -54,6 +56,8 @@ import {
 } from "./thread-items";
 import { collectProviderUsage } from "./usage-collection";
 import { USAGE_LIMIT_METHOD, type UsageLimitGate } from "./usage-limit-gate";
+
+const logger = createOpenBotLogger("turn-lifecycle");
 
 export interface AgentBrowserHost extends AttentionBrowserHost, BrowserUploadTarget {
   onChanged(listener: (tabs: BrowserTab[], activeTabId: string | null) => void): () => void;
@@ -154,11 +158,21 @@ export class TurnLifecycle {
    * The client, provider thread and start time of each running turn, from its `turn/started`.
    * `produced` is set by the first item or delta: a refused turn is run again only without one.
    * `acted` is narrower: a tool step or answer text, which a turn run again would repeat. Thinking
-   * and the echo of the user's message do not count.
+   * and the echo of the user's message do not count. `sentAt` (when the message that started the
+   * turn was sent) and `firstOutputAt` split a slow reply into OpenBot's wait and the provider's.
    */
   readonly #runningTurns = new Map<
     string,
-    { client: AgentClient; agentId: string; threadId: string; startedAt: number; produced: boolean; acted: boolean }
+    {
+      client: AgentClient;
+      agentId: string;
+      threadId: string;
+      startedAt: number;
+      sentAt: number | null;
+      firstOutputAt: number | null;
+      produced: boolean;
+      acted: boolean;
+    }
   >();
   /** Running turns a provider plan refused, with the reset in epoch seconds when the provider gave it. */
   readonly #limitedTurns = new Map<string, number | null>();
@@ -303,11 +317,15 @@ export class TurnLifecycle {
         const turnId = getString(turn, "id");
         if (!turnId) return;
         if (this.#compaction.claimTurn(agentId, threadId, turnId)) return;
+        const starting = this.#mailbox.startingDeliveryForAgent(agentId)?.delivery;
+        const sentAt = starting ? Date.parse(starting.createdAt) : Number.NaN;
         this.#runningTurns.set(turnId, {
           client: source,
           agentId,
           threadId,
           startedAt: Date.now(),
+          sentAt: Number.isFinite(sentAt) ? sentAt : null,
+          firstOutputAt: null,
           produced: false,
           acted: false,
         });
@@ -315,7 +333,7 @@ export class TurnLifecycle {
         const snapshot = this.#conversation.ensureSnapshot(agentId, publicThreadId);
         snapshot.activeTurnId = turnId;
         this.#failedTurns.delete(agentId);
-        const origin = this.#mailbox.startingDeliveryForAgent(agentId)?.delivery.sender.kind ?? "unknown";
+        const origin = starting?.sender.kind ?? "unknown";
         const association = Deferred.makeUnsafe<void, TurnOperationFailed>();
         this.#turnAssociations.set(turnId, association);
         yield* Effect.gen({ self: this }, function* () {
@@ -376,6 +394,7 @@ export class TurnLifecycle {
         this.#markProduced(
           turnId,
           notification.method === "item/agentMessage/delta" && delta.trim() !== "" && message.itemType !== "commentary",
+          delta.trim() !== "",
         );
         if (notification.method.startsWith("item/reasoning/")) {
           if (message.itemType !== "commentary") {
@@ -477,9 +496,13 @@ export class TurnLifecycle {
           // The turn's completion runs it again or reports it in words the user can act on.
           if (isForeignReasoningError(message)) return;
         }
+        // A spent quota or balance is explained by the usage notice, so only a provider that reports
+        // usage can leave it out of the banner. Gemini's 429 reads as a spent quota, and it failed
+        // with nothing on screen. A plan window holds the queue until its reset for every provider.
         if (
           error?.codexErrorInfo === "usageLimitExceeded" ||
-          isUsageLimitDiagnostic(message) ||
+          (isUsageLimitDiagnostic(message) &&
+            (agentProviderDescriptor(source.provider).reportsUsage || isPlanLimitDiagnostic(message))) ||
           (errorTurnId !== null && this.#limitedTurns.has(errorTurnId))
         ) {
           // Only a plan window resets by itself. A spent balance fails as before, with its reason.
@@ -521,6 +544,19 @@ export class TurnLifecycle {
   ) {
     const running = this.#runningTurns.get(turnId);
     this.#runningTurns.delete(turnId);
+    if (running) {
+      // `waitMs` is OpenBot's part of a slow reply: the queue (a usage-limit hold included), the
+      // provider start, the session and its settings. `firstOutputMs` is the provider's: the time
+      // to its first text, thinking or tool step.
+      logger.info("A turn finished.", {
+        provider: running.client.provider,
+        model: this.#hooks.turnModel(agentId, turnId),
+        status,
+        waitMs: running.sentAt === null ? null : Math.max(0, running.startedAt - running.sentAt),
+        firstOutputMs: running.firstOutputAt === null ? null : running.firstOutputAt - running.startedAt,
+        durationMs: Date.now() - running.startedAt,
+      });
+    }
     const reportedError = this.#turnErrors.get(turnId);
     this.#turnErrors.delete(turnId);
     // The error is kept only while the turn runs, so a refused turn always has its entry.
@@ -725,11 +761,13 @@ export class TurnLifecycle {
     });
   }, Effect.uninterruptible);
 
-  #markProduced(turnId: string, acted: boolean): void {
+  /** `streamed`: text, thinking or a tool step, which marks when the provider first answered. */
+  #markProduced(turnId: string, acted: boolean, streamed = acted): void {
     const running = this.#runningTurns.get(turnId);
     if (!running) return;
     running.produced = true;
     if (acted) running.acted = true;
+    if (streamed) running.firstOutputAt ??= Date.now();
   }
 
   readonly #associateStartedTurn = Effect.fn("TurnLifecycle.associateStartedTurn")(function* (

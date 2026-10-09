@@ -183,6 +183,12 @@ export const messages = defineMessages("error.provider", {
   "error.provider.antigravityNotStarted": "The Gemini server was found, but its version cannot be read.",
   "error.provider.antigravityVersionUnreadable": "Unable to read the Gemini server version.",
   "error.provider.antigravitySignIn": "Sign in with Google to use Gemini.",
+  "error.provider.antigravityRateLimited":
+    "Gemini refused the request because a rate limit or the plan's quota is reached. Wait a few minutes or choose another model, then try again.\n{detail}",
+  "error.provider.antigravityModelUnavailable":
+    "Gemini cannot use this model now. Choose another model, then try again.\n{detail}",
+  "error.provider.antigravityServiceFailure":
+    "Google's Gemini service did not complete the request. Try again in a few minutes.\n{detail}",
   "error.provider.cursorArchivePath": "The Cursor archive has an unexpected file.",
   "error.provider.cursorChecksum": "Cursor runtime checksum mismatch.",
   "error.provider.cursorReleaseShape": "The Cursor release has an unexpected shape.",

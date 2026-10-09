@@ -4,6 +4,7 @@ import type { messages as source } from "../en/account";
 export const messages = {
   "account.dock.usageLoading": "Kullanım yükleniyor",
   "account.dock.usageUnavailable": "Kullanım kullanılamıyor",
+  "account.dock.usageNotReported": "Kullanım bildirilmedi",
   "account.dock.usageLabel": "Kullanım, {name} %{percent} kaldı",
   "account.dock.usageTooltip": "{name} kullanımı",
   "account.dock.openMenu": "Hesap menüsünü aç",
@@ -39,7 +40,10 @@ export const messages = {
   "account.usage.value.loading": "Yükleniyor…",
   "account.usage.value.unavailable": "Kullanılamıyor",
   "account.usage.notReported": "Limit bildirilmedi",
+  "account.usage.value.notReported": "Bildirilmedi",
+  "account.usage.providerNotReported": "Kullanım verisi yok",
   "account.usage.row.unavailable": "{name}, kullanılamıyor",
+  "account.usage.row.notReported": "{name}, kullanım bildirilmedi",
   "account.usage.row.loading": "{name}, yükleniyor",
   "account.usage.row.left": "{name}, %{percent} kaldı",
   "account.usage.row.resets": "{time} tarihinde sıfırlanır",

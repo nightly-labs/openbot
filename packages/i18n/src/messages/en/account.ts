@@ -3,6 +3,7 @@ import { defineMessages } from "../../message";
 export const messages = defineMessages("account", {
   "account.dock.usageLoading": "Usage is loading",
   "account.dock.usageUnavailable": "Usage unavailable",
+  "account.dock.usageNotReported": "Usage not reported",
   "account.dock.usageLabel": "Usage, {name} {percent}% left",
   "account.dock.usageTooltip": "{name} usage",
   "account.dock.openMenu": "Open account menu",
@@ -38,7 +39,10 @@ export const messages = defineMessages("account", {
   "account.usage.value.loading": "Loading…",
   "account.usage.value.unavailable": "Unavailable",
   "account.usage.notReported": "No limit reported",
+  "account.usage.value.notReported": "Not reported",
+  "account.usage.providerNotReported": "No usage reading",
   "account.usage.row.unavailable": "{name}, unavailable",
+  "account.usage.row.notReported": "{name}, usage not reported",
   "account.usage.row.loading": "{name}, loading",
   "account.usage.row.left": "{name}, {percent}% left",
   "account.usage.row.resets": "resets {time}",

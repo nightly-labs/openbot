@@ -4,6 +4,7 @@ import type { messages as source } from "../en/account";
 export const messages = {
   "account.dock.usageLoading": "使用量を読み込んでいます",
   "account.dock.usageUnavailable": "使用量を表示できません",
+  "account.dock.usageNotReported": "使用量の報告なし",
   "account.dock.usageLabel": "使用量、{name} 残り {percent}%",
   "account.dock.usageTooltip": "{name} の使用量",
   "account.dock.openMenu": "アカウントメニューを開く",
@@ -39,7 +40,10 @@ export const messages = {
   "account.usage.value.loading": "読み込み中…",
   "account.usage.value.unavailable": "表示できません",
   "account.usage.notReported": "上限の報告なし",
+  "account.usage.value.notReported": "報告なし",
+  "account.usage.providerNotReported": "使用量データなし",
   "account.usage.row.unavailable": "{name}、表示できません",
+  "account.usage.row.notReported": "{name}、使用量の報告なし",
   "account.usage.row.loading": "{name}、読み込み中",
   "account.usage.row.left": "{name}、残り {percent}%",
   "account.usage.row.resets": "{time} にリセット",

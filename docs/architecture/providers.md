@@ -208,6 +208,12 @@ The server runs confined; `antigravityStatePaths` gives it `~/.gemini/antigravit
 `~/.gemini/artifacts` and protects its settings files. Migration 22 adds `antigravity` to
 `projection_provider_sessions`.
 
+The server has no usage reading, so the descriptor sets `reportsUsage: false`: the usage poll does
+not start Gemini, the dock says usage is not reported, and a limit failure is shown as a turn error
+instead of waiting for a usage notice. `GEMINI_REQUEST_FAILURES` in `src/backend/acp-client.ts`
+names a rate limit or quota, an unavailable model, and a service failure from Google's status
+text. Antigravity does not document these texts.
+
 Team API v1–v4 do not know `antigravity`. The host hides Gemini agents, models, status, and
 sign-in state from peers on those versions, and the `providers-v1` routes omit it. Team API v5
 carries Gemini, and the `providers-v2` runtime routes let an owner or admin download or cancel the

@@ -67,16 +67,22 @@ export function AccountUsageDetails(props: {
                   <strong class="account-usage-provider-name">{row.name}</strong>
                   <span class="account-usage-provider-meta">
                     {row.windowLabel ??
-                      (props.loading ? t("account.usage.window.limit") : t("account.usage.notReported"))}
+                      (!row.reportsUsage
+                        ? t("account.usage.providerNotReported")
+                        : props.loading
+                          ? t("account.usage.window.limit")
+                          : t("account.usage.notReported"))}
                     <Show when={row.resetsAtLabel}>{(label) => <> · {label()}</>}</Show>
                   </span>
                 </span>
                 <strong class="account-usage-provider-remaining">
                   {row.remainingPercent !== null
                     ? t("account.usage.percentLeft", { percent: row.remainingPercent })
-                    : props.loading
-                      ? t("account.usage.value.loading")
-                      : t("account.usage.value.unavailable")}
+                    : !row.reportsUsage
+                      ? t("account.usage.value.notReported")
+                      : props.loading
+                        ? t("account.usage.value.loading")
+                        : t("account.usage.value.unavailable")}
                 </strong>
               </li>
             )}

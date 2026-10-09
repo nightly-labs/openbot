@@ -196,6 +196,12 @@ export const messages = {
   "error.provider.antigravityNotStarted": "Se encontró el servidor de Gemini, pero no se puede leer su versión.",
   "error.provider.antigravityVersionUnreadable": "No se pudo leer la versión del servidor de Gemini.",
   "error.provider.antigravitySignIn": "Inicia sesión con Google para usar Gemini.",
+  "error.provider.antigravityRateLimited":
+    "Gemini rechazó la solicitud porque se alcanzó un límite de frecuencia o la cuota del plan. Espera unos minutos o elige otro modelo y vuelve a intentarlo.\n{detail}",
+  "error.provider.antigravityModelUnavailable":
+    "Gemini no puede usar este modelo ahora. Elige otro modelo y vuelve a intentarlo.\n{detail}",
+  "error.provider.antigravityServiceFailure":
+    "El servicio Gemini de Google no completó la solicitud. Vuelve a intentarlo en unos minutos.\n{detail}",
   "error.provider.cursorArchivePath": "El archivo de Cursor contiene un archivo inesperado.",
   "error.provider.cursorChecksum": "La suma de comprobación del entorno de ejecución de Cursor no coincide.",
   "error.provider.cursorReleaseShape": "La versión de Cursor tiene una estructura inesperada.",

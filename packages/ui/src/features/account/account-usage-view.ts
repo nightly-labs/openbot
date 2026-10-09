@@ -21,6 +21,8 @@ export interface AccountUsageProviderRow {
   windowLabel: string | null;
   resetsAtLabel: string | null;
   tone: AccountUsageTone;
+  /** `false` for a provider that has no usage reading, so a missing amount is not a failure. */
+  reportsUsage: boolean;
 }
 
 /** Remaining quota from a provider-reported used percentage. */
@@ -72,6 +74,7 @@ function usageRow(
     windowLabel: window ? usageWindowLabel(window.windowDurationMins, text) : null,
     resetsAtLabel: window ? formatUsageReset(window.resetsAt, text) : null,
     tone: usageTone(remainingPercent),
+    reportsUsage: agentProviderDescriptor(provider).reportsUsage,
   };
 }
 
@@ -129,6 +132,7 @@ export function accountUsageRowLabel(
   loading = false,
 ): string {
   const { t } = text;
+  if (!row.reportsUsage) return t("account.usage.row.notReported", { name: row.name });
   if (row.remainingPercent === null)
     return t(loading ? "account.usage.row.loading" : "account.usage.row.unavailable", { name: row.name });
   const parts = [t("account.usage.row.left", { name: row.name, percent: row.remainingPercent })];

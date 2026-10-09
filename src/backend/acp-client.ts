@@ -993,7 +993,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     return yield* Fiber.join(discovery).pipe(
       Effect.timeoutOrElse({
         duration: timeoutMs,
-        orElse: () => Effect.fail(providerFailure(new Error(`${this.#label} request timed out: model/list`))),
+        orElse: () => Effect.fail(providerFailure(new TimeoutError(`${this.#label} request timed out: model/list`))),
       }),
     );
   });
@@ -1970,7 +1970,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             })
           : this.provider === "opencode" && isOpenCodeServiceFailure(error)
             ? sourceText("error.provider.opencodeServiceFailure")
-            : this.#openCodeRequestFailure(error, detail);
+            : this.provider === "antigravity"
+              ? geminiRequestFailure(error, detail)
+              : this.#openCodeRequestFailure(error, detail);
       this.emit("notification", {
         method: "error",
         params: { threadId: thread.id, turnId: turn.id, message },
@@ -2508,6 +2510,38 @@ const OPENCODE_REQUEST_FAILURES = [
     /\b(?:cannot|unable to|could not) connect\b|\bfetch failed\b|\bfailed to fetch\b|\bgetaddrinfo\b|\b(?:ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|ETIMEDOUT)\b|\bsocket hang up\b/iu,
   ],
 ] as const satisfies readonly (readonly [keyof SourceMessages, RegExp])[];
+
+/**
+ * The kind of a Gemini request failure, first match wins. Gemini reports no usage, so a limit has
+ * no usage notice to explain it, and the raw Google status left the user unsure whether waiting or
+ * another model helps (#1676). The patterns follow Google's API status names, matched in capitals,
+ * and a status number only after `status`, `code` or `HTTP`: a bare 404 or "unavailable" can be an
+ * MCP server or a tool. Antigravity does not document its failure texts.
+ */
+const GEMINI_REQUEST_FAILURES = [
+  ["error.provider.antigravityRateLimited", /\bRESOURCE_EXHAUSTED\b/u],
+  [
+    "error.provider.antigravityRateLimited",
+    /\b(?:status|code|HTTP)\W{0,4}429\b|\bresource has been exhausted\b|\brate[ _-]?limit|\btoo many requests\b|\bquota\b.{0,40}\b(?:exceeded|exhausted)\b/iu,
+  ],
+  [
+    "error.provider.antigravityModelUnavailable",
+    /\bmodel\b.{0,60}\b(?:not found|not supported|does not exist|is unavailable)\b/iu,
+  ],
+  ["error.provider.antigravityServiceFailure", /\b(?:UNAVAILABLE|DEADLINE_EXCEEDED)\b/u],
+  [
+    "error.provider.antigravityServiceFailure",
+    /\b(?:status|code|HTTP)\W{0,4}50[0-4]\b|\bservice unavailable\b|\boverloaded\b|\bdeadline exceeded\b|\binternal server error\b/iu,
+  ],
+] as const satisfies readonly (readonly [keyof SourceMessages, RegExp])[];
+
+/** Only a failure the server answered with: a local failure is not Google's to explain. */
+function geminiRequestFailure(error: unknown, detail: string): string {
+  if (!(error instanceof RequestError)) return detail;
+  const reason = detail.replace(/^(?:RequestError:\s*)?Internal error:\s*/u, "");
+  const key = GEMINI_REQUEST_FAILURES.find(([, pattern]) => pattern.test(reason))?.[0];
+  return key ? sourceText(key, { detail: shownFailureDetail(reason) }) : detail;
+}
 
 function isAuthenticationError(error: unknown): boolean {
   return /auth|login|credential|token|unauthori[sz]ed|api key/i.test(

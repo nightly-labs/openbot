@@ -190,6 +190,12 @@ export const messages = {
   "error.provider.antigravityNotStarted": "Gemini サーバーは見つかりましたが、バージョンを読み取れません。",
   "error.provider.antigravityVersionUnreadable": "Gemini サーバーのバージョンを読み取れません。",
   "error.provider.antigravitySignIn": "Gemini を使うには Google でサインインしてください。",
+  "error.provider.antigravityRateLimited":
+    "レート制限またはプランの割り当てに達したため、Gemini がリクエストを拒否しました。数分待つか別のモデルを選んでから、もう一度お試しください。\n{detail}",
+  "error.provider.antigravityModelUnavailable":
+    "Gemini は現在このモデルを使用できません。別のモデルを選んでから、もう一度お試しください。\n{detail}",
+  "error.provider.antigravityServiceFailure":
+    "Google の Gemini サービスがリクエストを完了しませんでした。数分後にもう一度お試しください。\n{detail}",
   "error.provider.cursorArchivePath": "Cursor のアーカイブに予期しないファイルがあります。",
   "error.provider.cursorChecksum": "Cursor ランタイムのチェックサムが一致しません。",
   "error.provider.cursorReleaseShape": "Cursor のリリースの形式が予期しないものです。",

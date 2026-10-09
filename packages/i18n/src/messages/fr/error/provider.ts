@@ -202,6 +202,12 @@ export const messages = {
   "error.provider.antigravityNotStarted": "Le serveur Gemini a été trouvé, mais sa version est illisible.",
   "error.provider.antigravityVersionUnreadable": "Impossible de lire la version du serveur Gemini.",
   "error.provider.antigravitySignIn": "Connectez-vous avec Google pour utiliser Gemini.",
+  "error.provider.antigravityRateLimited":
+    "Gemini a refusé la requête, car une limite de débit ou le quota de l'abonnement est atteint. Attendez quelques minutes ou choisissez un autre modèle, puis réessayez.\n{detail}",
+  "error.provider.antigravityModelUnavailable":
+    "Gemini ne peut pas utiliser ce modèle pour le moment. Choisissez un autre modèle, puis réessayez.\n{detail}",
+  "error.provider.antigravityServiceFailure":
+    "Le service Gemini de Google n'a pas terminé la requête. Réessayez dans quelques minutes.\n{detail}",
   "error.provider.cursorArchivePath": "L’archive Cursor contient un fichier inattendu.",
   "error.provider.cursorChecksum": "La somme de contrôle de l’environnement d’exécution Cursor ne correspond pas.",
   "error.provider.cursorReleaseShape": "La version Cursor a une forme inattendue.",

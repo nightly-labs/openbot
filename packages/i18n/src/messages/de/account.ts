@@ -4,6 +4,7 @@ import type { messages as source } from "../en/account";
 export const messages = {
   "account.dock.usageLoading": "Nutzungsdaten werden geladen",
   "account.dock.usageUnavailable": "Nutzung nicht verfügbar",
+  "account.dock.usageNotReported": "Nutzung nicht gemeldet",
   "account.dock.usageLabel": "Nutzung, {name}: {percent}% übrig",
   "account.dock.usageTooltip": "Nutzung von {name}",
   "account.dock.openMenu": "Kontomenü öffnen",
@@ -39,7 +40,10 @@ export const messages = {
   "account.usage.value.loading": "Wird geladen…",
   "account.usage.value.unavailable": "Nicht verfügbar",
   "account.usage.notReported": "Kein Limit gemeldet",
+  "account.usage.value.notReported": "Nicht gemeldet",
+  "account.usage.providerNotReported": "Keine Nutzungsdaten",
   "account.usage.row.unavailable": "{name}, nicht verfügbar",
+  "account.usage.row.notReported": "{name}, Nutzung nicht gemeldet",
   "account.usage.row.loading": "{name}, wird geladen",
   "account.usage.row.left": "{name}, {percent}% übrig",
   "account.usage.row.resets": "wird {time} zurückgesetzt",
