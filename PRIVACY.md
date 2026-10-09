@@ -420,6 +420,9 @@ Billing is off, and Stripe receives nothing, when the account service has no Str
 
 Attachments copied into OpenBot remain in managed storage after their original file is moved or
 deleted. All agents share the embedded browser profile, including cookies and website sessions.
+Websites receive the browser's Chromium user agent. HTTPS sites and local loopback HTTP sites also
+receive basic client hints with the Chromium major version, operating-system name, and desktop flag.
+Google account requests retain the Electron version token for sign-in compatibility.
 
 ## Remote Team API
 
