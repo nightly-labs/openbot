@@ -303,6 +303,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
               automationEditable={props.server?.kind === "local"}
               busyMessageModeEditable={props.server?.kind === "local"}
               defaultBusyMessageMode={props.defaultBusyMessageMode}
+              memoryLimit={props.server?.kind === "local" ? props.agentMemoryLimit : undefined}
               agents={props.agents}
               onStartNewChat={props.onClearAgentContext}
               onCreateSkill={

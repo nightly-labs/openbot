@@ -82,6 +82,7 @@ import { TeamChatStore } from "../backend/team-chat-store";
 import { AgentImportService } from "./agent-import-service";
 import { AgentInitializationGate } from "./agent-initialization";
 import { AgentMarketplaceService } from "./agent-marketplace-service";
+import { AgentMemoryLimitPreferenceStore } from "./agent-memory-limit-preference-store";
 import { AgentTemplateService } from "./agent-template-service";
 import { HostAnalytics } from "./analytics";
 import { analyticsInventoryDayStore, collectAnalyticsInventory } from "./analytics-inventory";
@@ -221,6 +222,7 @@ const LOGO_COLOR_PREFERENCE_FILE = "openbot-logo-color-preference-v1.json";
 const UPDATE_PREFERENCE_FILE = "openbot-update-preference-v1.json";
 const NOTIFICATION_PREFERENCE_FILE = "openbot-notification-preference-v1.json";
 const BUSY_MESSAGE_MODE_PREFERENCE_FILE = "openbot-busy-message-mode-v1.json";
+const AGENT_MEMORY_LIMIT_PREFERENCE_FILE = "openbot-agent-memory-limit-v1.json";
 const REMOTE_SESSION_REUSE_PREFERENCE_FILE = "openbot-remote-session-reuse-preference-v1.json";
 const DYNAMIC_ISLAND_PREFERENCE_FILE = "openbot-dynamic-island-preference-v1.json";
 const BROWSER_STATE_FILE = "openbot-browser-state-v1.json";
@@ -377,6 +379,7 @@ export interface ApplicationServices {
   logoColor: LogoColorService;
   notificationPreference: NotificationPreferenceStore;
   busyMessageMode: BusyMessageModePreferenceStore;
+  agentMemoryLimit: AgentMemoryLimitPreferenceStore;
   remoteSessionReuse: RemoteSessionReusePreferenceStore;
   remoteSessionCache: RemoteSessionCache;
   agentInitialization: AgentInitializationGate<AgentLifecycleFailed>;
@@ -849,6 +852,10 @@ export async function createApplicationServices({
     join(app.getPath("userData"), BUSY_MESSAGE_MODE_PREFERENCE_FILE),
   );
   await runCauseEffect(busyMessageMode.load());
+  const agentMemoryLimit = new AgentMemoryLimitPreferenceStore(
+    join(app.getPath("userData"), AGENT_MEMORY_LIMIT_PREFERENCE_FILE),
+  );
+  await runCauseEffect(agentMemoryLimit.load());
   const remoteSessionReuse = new RemoteSessionReusePreferenceStore(
     join(app.getPath("userData"), REMOTE_SESSION_REUSE_PREFERENCE_FILE),
   );
@@ -1246,6 +1253,7 @@ export async function createApplicationServices({
     routineFlowTools: () => routineFlowRuntime,
     approvalAutomation,
     busyMessageMode: () => busyMessageMode.get().mode,
+    agentMemoryLimit: () => agentMemoryLimit.get().limit,
     deleteWithRevokedApproval: (agentId, remove) =>
       approvalAutomation.deleteAgent(agentId, remove).pipe(toAgentRemovalFailed),
     tables,
@@ -2133,6 +2141,7 @@ export async function createApplicationServices({
     logoColor,
     notificationPreference,
     busyMessageMode,
+    agentMemoryLimit,
     remoteSessionReuse,
     remoteSessionCache,
     agentInitialization,

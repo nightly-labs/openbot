@@ -65,3 +65,22 @@ export interface DeleteAgentMemoryInput {
   agentId: string;
   memoryId: string;
 }
+
+/**
+ * The choices for how many memories one agent can hold on this computer. The first is the default,
+ * which was the only cap before the setting existed. A lower cap never deletes memories: an agent
+ * over it keeps them and only cannot add another.
+ */
+// A full list must fit the released 2 MiB WebRTC frame, including JSON escaping.
+export const AGENT_MEMORY_LIMITS = [INPUT_LIMITS.agentMemories, 128, 256, 512] as const;
+export type AgentMemoryLimit = (typeof AGENT_MEMORY_LIMITS)[number];
+export const DEFAULT_AGENT_MEMORY_LIMIT: AgentMemoryLimit = INPUT_LIMITS.agentMemories;
+
+export function isAgentMemoryLimit(value: unknown): value is AgentMemoryLimit {
+  return isOneOf(AGENT_MEMORY_LIMITS, value);
+}
+
+/** The app setting, as it is stored and as it crosses IPC. */
+export interface AgentMemoryLimitPreference {
+  limit: AgentMemoryLimit;
+}

@@ -102,6 +102,22 @@ describe("AgentMemoryStore", () => {
     database.close();
   });
 
+  it("reads the limit at each save, and keeps memories past a lowered limit", async () => {
+    const { database } = await setup();
+    let limit = 3;
+    const memories = new AgentMemoryStore(database, () => limit);
+    for (const text of ["One.", "Two.", "Three."]) memories.createManual("chief", text);
+    expect(() => memories.createManual("chief", "Four.")).toThrow("An agent can have up to 3 memories.");
+
+    limit = 4;
+    memories.createManual("chief", "Four.");
+    limit = 2;
+    expect(memories.duplicate("chief", "copy")).toHaveLength(4);
+    expect(memories.list("chief")).toHaveLength(4);
+    expect(() => memories.createManual("chief", "Five.")).toThrow("An agent can have up to 2 memories.");
+    database.close();
+  });
+
   it("hard-deletes memory text from projections and the event log", async () => {
     const { database, memories } = await setup();
     const secretText = "A unique saved memory value";

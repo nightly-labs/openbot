@@ -16,6 +16,7 @@ import { app, type BrowserWindow, shell } from "electron";
 import type { AgentService } from "../../backend/agent-service";
 import type { BrowserHost } from "../../backend/browser-host";
 import type { MailboxStore } from "../../backend/mailbox-store";
+import type { AgentMemoryLimitPreferenceStore } from "../agent-memory-limit-preference-store";
 import { readAnalyticsPreference, writeAnalyticsPreference } from "../analytics-preference-store";
 import type { ApprovalAutomation } from "../approval-automation-store";
 import type { BusyMessageModePreferenceStore } from "../busy-message-mode-preference-store";
@@ -28,6 +29,7 @@ import type { RemoteSessionReusePreferenceStore } from "../remote-session-reuse-
 import { readSetupState, writeSetupState } from "../setup-store";
 import type { UpdateService } from "../update-service";
 import {
+  parseAgentMemoryLimitPreference,
   parseAnalyticsPreference,
   parseAppLanguagePreference,
   parseAppLogoColorPreference,
@@ -75,6 +77,7 @@ export interface AppIpcDependencies {
   analyticsPreferenceFile: string;
   approvalAutomation: ApprovalAutomation;
   busyMessageMode: BusyMessageModePreferenceStore;
+  agentMemoryLimit: AgentMemoryLimitPreferenceStore;
   remoteSessionReuse: RemoteSessionReusePreferenceStore;
   remoteSessionCache: RemoteSessionCache;
   language: LanguageService;
@@ -95,6 +98,7 @@ export function appIpcHandlers({
   analyticsPreferenceFile,
   approvalAutomation,
   busyMessageMode,
+  agentMemoryLimit,
   remoteSessionReuse,
   remoteSessionCache,
   language,
@@ -135,6 +139,12 @@ export function appIpcHandlers({
       getBusyMessageModePreference: handler(() => busyMessageMode.get()),
       setBusyMessageModePreference: payloadHandler(parseBusyMessageModePreference, (parsed) =>
         runCauseEffect(busyMessageMode.set(parsed)),
+      ),
+      getAgentMemoryLimitPreference: handler(() => agentMemoryLimit.get()),
+      setAgentMemoryLimitPreference: payloadHandler(parseAgentMemoryLimitPreference, (parsed) =>
+        runCauseEffect(
+          agentMemoryLimit.set(parsed).pipe(Effect.tap(() => Effect.sync(() => service.memoryLimitChanged()))),
+        ),
       ),
       getRemoteSessionReusePreference: handler(() => remoteSessionReuse.get()),
       // Off removes the kept sessions at once. The sessions of this run then end when the app quits.

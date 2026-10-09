@@ -47,6 +47,7 @@ All notable changes to OpenBot will be documented here. The project follows
 - A right-click from the mobile app opens the page's menu on the phone, not on the screen of the
   server. While the phone shows a tab, the page keeps one size, so it does not change shape when
   the OpenBot window changes size. A tab that an agent gave its own size keeps that size.
+- Choose how many memories each agent can keep, from 64 to 512, in Settings > General. A lower limit keeps all saved memories.
 
 ### Changed
 
@@ -263,6 +264,8 @@ All notable changes to OpenBot will be documented here. The project follows
   hidden lead. A lead the peer picks itself still wins.
 - Keep remote routine runs quiet through a new optional capability. Older clients still receive the released turn completion event.
 - Remove Telegram chat links and unused link codes when you remove a server from your account. Other servers keep their links.
+- An agent with a full memory now gets an error when it tries to save one more memory, and it can
+  merge or forget a memory in the same turn. Before, the new memory was lost when the turn ended.
 
 ### Security
 

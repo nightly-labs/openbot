@@ -33,6 +33,7 @@ import type { AgentModelOption } from "./ipc-agent-identity";
 import type { AgentImportPreview, AgentImportResult, ApplyAgentImportInput } from "./ipc-agent-import";
 import type {
   AgentMemory,
+  AgentMemoryLimitPreference,
   CreateAgentMemoryInput,
   DeleteAgentMemoryInput,
   UpdateAgentMemoryInput,
@@ -448,6 +449,10 @@ export const IPC_ENDPOINTS = {
     getBusyMessageModePreference: request<undefined, BusyMessageModePreference>()("app:get-busy-message-mode"),
     setBusyMessageModePreference: request<BusyMessageModePreference, BusyMessageModePreference>()(
       "app:set-busy-message-mode",
+    ),
+    getAgentMemoryLimitPreference: request<undefined, AgentMemoryLimitPreference>()("app:get-agent-memory-limit"),
+    setAgentMemoryLimitPreference: request<AgentMemoryLimitPreference, AgentMemoryLimitPreference>()(
+      "app:set-agent-memory-limit",
     ),
     getRemoteSessionReusePreference: request<undefined, RemoteSessionReusePreference>()("app:get-remote-session-reuse"),
     setRemoteSessionReusePreference: request<RemoteSessionReusePreference, RemoteSessionReusePreference>()(

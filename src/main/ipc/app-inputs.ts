@@ -1,5 +1,6 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
+  AgentMemoryLimitPreference,
   AgentProviderId,
   BusyMessageModePreference,
   DeleteHostedSiteInput,
@@ -33,6 +34,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   IDLE_RESTART_TARGETS,
+  isAgentMemoryLimit,
   isAgentModel,
   isAgentProvider,
   isAppLanguage,
@@ -92,6 +94,11 @@ export function parseApprovalAutomation(input: unknown): SetApprovalAutomationIn
 export function parseBusyMessageModePreference(input: unknown): BusyMessageModePreference {
   if (!isDynamicRecord(input) || !isBusyMessageMode(input.mode)) throw new Error("Busy message mode is required.");
   return { mode: input.mode };
+}
+
+export function parseAgentMemoryLimitPreference(input: unknown): AgentMemoryLimitPreference {
+  if (!isDynamicRecord(input) || !isAgentMemoryLimit(input.limit)) throw new Error("Agent memory limit is required.");
+  return { limit: input.limit };
 }
 
 export function parseRemoteSessionReusePreference(input: unknown): RemoteSessionReusePreference {

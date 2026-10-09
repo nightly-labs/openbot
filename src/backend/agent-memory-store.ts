@@ -12,21 +12,24 @@ export interface SaveAutomaticMemoryInput {
   expectedUpdatedAt?: string | null;
 }
 
-const AGENT_MEMORY_TABLES: MemoryTables = {
-  table: "projection_agent_memories",
-  ownerColumn: "agent_id",
-  aggregateType: "agent-memory",
-  limit: INPUT_LIMITS.agentMemories,
-  limitMessage: sourceText("error.backend.agentMemoryLimit", { limit: INPUT_LIMITS.agentMemories }),
-};
+function agentMemoryTables(limit: () => number): MemoryTables {
+  return {
+    table: "projection_agent_memories",
+    ownerColumn: "agent_id",
+    aggregateType: "agent-memory",
+    limit,
+    limitMessage: (current) => sourceText("error.backend.agentMemoryLimit", { limit: current }),
+  };
+}
 
 /**
  * All the SQL is in `MemoryStore`. This class only names the owner: it re-attaches `agentId` to
  * every row so `AgentMemory` keeps the exact shape its callers and IPC guards already expect.
  */
 export class AgentMemoryStore extends MemoryStore {
-  constructor(database: OpenBotDatabase) {
-    super(database, AGENT_MEMORY_TABLES);
+  /** `limit` is the app setting; omitted, it is the default cap. */
+  constructor(database: OpenBotDatabase, limit: () => number = () => INPUT_LIMITS.agentMemories) {
+    super(database, agentMemoryTables(limit));
   }
 
   override list(agentId: string): AgentMemory[] {

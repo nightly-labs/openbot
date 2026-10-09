@@ -20,8 +20,9 @@ export interface MemoryTables {
   table: string;
   ownerColumn: "agent_id" | "channel_id";
   aggregateType: "agent-memory" | "channel-memory";
-  limit: number;
-  limitMessage: string;
+  /** Read at each save, because the agent cap is an app setting the user can change. */
+  limit: () => number;
+  limitMessage: (limit: number) => string;
 }
 
 export interface SaveAutomaticMemory {
@@ -73,13 +74,30 @@ export class MemoryStore {
     return row ? memoryFromRow(row) : null;
   }
 
+  count(ownerId: string): number {
+    const row = databaseRow(
+      this.database.connection
+        .prepare(`SELECT COUNT(*) AS count FROM ${this.tables.table} WHERE ${this.tables.ownerColumn} = ?`)
+        .get(ownerId),
+    );
+    return Number(row?.count ?? 0);
+  }
+
+  limit(): number {
+    return this.tables.limit();
+  }
+
   createManual(ownerId: string, text: string): MemoryEntry {
     return this.save(ownerId, { text, origin: "manual", sourceTurnId: null });
   }
 
+  /**
+   * Copies every memory, even past the cap: the user can lower the cap below what the source holds,
+   * and a copy that stops partway would lose memories.
+   */
   duplicate(sourceOwnerId: string, targetOwnerId: string): MemoryEntry[] {
     return this.list(sourceOwnerId).map((memory) =>
-      this.save(targetOwnerId, { text: memory.text, origin: memory.origin, sourceTurnId: null }),
+      this.save(targetOwnerId, { text: memory.text, origin: memory.origin, sourceTurnId: null, uncapped: true }),
     );
   }
 
@@ -165,6 +183,7 @@ export class MemoryStore {
       origin: AgentMemoryOrigin;
       sourceTurnId: string | null;
       commandId?: string;
+      uncapped?: boolean;
     },
   ): MemoryEntry {
     const text = validateMemoryText(input.text);
@@ -177,7 +196,10 @@ export class MemoryStore {
 
     const previous = input.memoryId ? this.get(ownerId, input.memoryId) : null;
     if (input.memoryId && !previous) throw new Error(sourceText("error.backend.memoryGone"));
-    if (!previous && this.list(ownerId).length >= this.tables.limit) throw new Error(this.tables.limitMessage);
+    if (!previous && !input.uncapped) {
+      const limit = this.tables.limit();
+      if (this.count(ownerId) >= limit) throw new Error(this.tables.limitMessage(limit));
+    }
 
     const now = new Date().toISOString();
     const updatedAt =
@@ -271,7 +293,8 @@ function validateMemoryText(value: string): string {
   return text;
 }
 
-function normalizeMemoryText(value: string): string {
+/** Two memories with the same normalized text are one memory: `save` folds the second into the first. */
+export function normalizeMemoryText(value: string): string {
   return value;
 }
 

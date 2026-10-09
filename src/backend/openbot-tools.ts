@@ -257,7 +257,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "forget_memory",
     description:
-      "Stage deletion of one saved memory when the user asks you to forget it. The change commits only if the current turn completes.",
+      "Stage deletion of one saved memory when the user asks you to forget it, or when it is stale or merged into another memory and you need room under the memory limit. The change commits only if the current turn completes.",
     shape: { memoryId: z.string().min(1) },
   },
   {

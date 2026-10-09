@@ -347,6 +347,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
       }
       onSetAgentAutoApprove={setAgentAutoApproveForActiveAgent()}
       defaultBusyMessageMode={generalSettings().busyMessageMode}
+      agentMemoryLimit={generalSettings().agentMemoryLimit}
       onClearAgentContext={clearActiveAgentContext()}
       onRespondToBrowserTakeover={respondToBrowserTakeover}
       onCancelQueuedMessage={cancelQueuedMessage}

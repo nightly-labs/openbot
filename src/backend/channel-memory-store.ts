@@ -8,8 +8,8 @@ const CHANNEL_MEMORY_TABLES: MemoryTables = {
   table: "projection_channel_memories",
   ownerColumn: "channel_id",
   aggregateType: "channel-memory",
-  limit: INPUT_LIMITS.channelMemories,
-  limitMessage: sourceText("error.backend.channelMemoryLimit", { limit: INPUT_LIMITS.channelMemories }),
+  limit: () => INPUT_LIMITS.channelMemories,
+  limitMessage: (limit) => sourceText("error.backend.channelMemoryLimit", { limit }),
 };
 
 /** The channel twin of `AgentMemoryStore`: the same `MemoryStore`, with a channel for an owner. */

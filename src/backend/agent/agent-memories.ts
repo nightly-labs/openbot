@@ -10,6 +10,7 @@ import { isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { AgentMemoryStore } from "../agent-memory-store";
 import type { AgentStore } from "../agent-store";
+import { normalizeMemoryText } from "../memory-store";
 import { type DynamicToolCallParams, isRecord } from "../protocol";
 import type { ConversationRuntime } from "./conversation-runtime";
 import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from "./routine-tools";
@@ -39,6 +40,8 @@ export interface AgentMemoriesOptions {
   conversation: ConversationRuntime;
   emit(event: AgentEvent): void;
   emitError(code: string, error: unknown, agentId?: string): void;
+  /** How many memories one agent can hold: the app setting. Omitted, the default cap. */
+  limit?: () => number;
 }
 
 /**
@@ -63,7 +66,11 @@ export class AgentMemories {
     this.#conversation = options.conversation;
     this.#emit = options.emit;
     this.#emitError = options.emitError;
-    this.#memories = new AgentMemoryStore(options.store.database);
+    this.#memories = new AgentMemoryStore(options.store.database, options.limit);
+  }
+
+  limit(): number {
+    return this.#memories.limit();
   }
 
   list(agentId: string): AgentMemory[] {
@@ -132,6 +139,20 @@ export class AgentMemories {
       }
       const current = memoryId ? this.#memories.get(senderAgentId, memoryId) : null;
       if (memoryId && !current) return openBotToolFailure("This memory does not belong to the current agent.");
+      // A full agent hears it now, while it can still merge or forget in this turn. Staged anyway,
+      // the save would fail at commit and the memory would be lost.
+      if (!memoryId) {
+        const projected = this.#projectedMemories(senderAgentId, params.turnId, params.callId);
+        const normalized = normalizeMemoryText(text);
+        const limit = this.#memories.limit();
+        const saved = projected.size;
+        if (saved >= limit && ![...projected.values()].some((memory) => memory.text === normalized)) {
+          // Over the limit only when the user lowered it. The agent must not delete memories for that.
+          const key =
+            saved > limit ? "error.backend.agentMemoryLimitExceeded" : "error.backend.agentMemoryLimitReached";
+          return openBotToolFailure(sourceText(key, { saved, limit }));
+        }
+      }
       this.#stage(params.turnId, {
         callId: params.callId,
         type: "remember",
@@ -205,6 +226,64 @@ export class AgentMemories {
     const agent = this.#conversation.requireKnownAgent(agentId);
     this.#conversation.unloadAgentThreads(agent.id);
     this.#emit({ type: "memories-changed", agentId });
+  }
+
+  /**
+   * The agent's memories, by id, once this turn's staged changes commit, replayed in staging order
+   * as `finishTurn` applies them. A staged change that commit would skip, such as a forget of a
+   * memory the same turn already updated, is skipped here too.
+   *
+   * Another turn of the agent, such as a channel turn beside its chat, commits apart: before this
+   * one, after it, or never. So its new memories hold a place, and its forgets and updates free none.
+   * A memory that another turn changes counts, but this turn can neither fold into it nor remove it.
+   * A null text never matches.
+   */
+  #projectedMemories(
+    agentId: string,
+    turnId: string,
+    exceptCallId: string,
+  ): Map<string, { text: string | null; updatedAt: string | null }> {
+    const epoch = this.#epoch(agentId);
+    const counts = (mutation: PendingMemoryMutation) =>
+      mutation.agentId === agentId && mutation.epoch === epoch && mutation.callId !== exceptCallId;
+    const others = [...this.#pending]
+      .filter(([pendingTurnId]) => pendingTurnId !== turnId)
+      .flatMap(([, pending]) => pending.filter(counts));
+    const changedElsewhere = new Set(others.flatMap((mutation) => (mutation.memoryId ? [mutation.memoryId] : [])));
+    const memories = new Map<string, { text: string | null; updatedAt: string | null }>(
+      this.#memories
+        .list(agentId)
+        .map((memory) => [
+          memory.id,
+          changedElsewhere.has(memory.id)
+            ? { text: null, updatedAt: null }
+            : { text: normalizeMemoryText(memory.text), updatedAt: memory.updatedAt },
+        ]),
+    );
+    for (const mutation of (this.#pending.get(turnId) ?? []).filter(counts)) {
+      if (mutation.type === "forget") {
+        if (memories.get(mutation.memoryId)?.updatedAt === mutation.expectedUpdatedAt)
+          memories.delete(mutation.memoryId);
+        continue;
+      }
+      const text = normalizeMemoryText(mutation.text);
+      const same = [...memories].find(([, memory]) => memory.text === text)?.[0];
+      if (!mutation.memoryId) {
+        if (same === undefined) memories.set(`staged:${mutation.callId}`, { text, updatedAt: null });
+        continue;
+      }
+      const current = memories.get(mutation.memoryId);
+      if (!current || (mutation.expectedUpdatedAt !== undefined && current.updatedAt !== mutation.expectedUpdatedAt))
+        continue;
+      // An update to the text of another memory folds the two into one.
+      if (same !== undefined && same !== mutation.memoryId) memories.delete(mutation.memoryId);
+      else memories.set(mutation.memoryId, { text, updatedAt: null });
+    }
+    for (const mutation of others) {
+      if (mutation.type === "remember" && !mutation.memoryId)
+        memories.set(`reserved:${mutation.callId}`, { text: null, updatedAt: null });
+    }
+    return memories;
   }
 
   #stage(turnId: string, mutation: PendingMemoryMutation): void {

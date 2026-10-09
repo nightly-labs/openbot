@@ -70,6 +70,7 @@ import { decodeScopedAgentEvent } from "./agent-event-decoding";
 import {
   decodeAccountSessions,
   decodeAgentImportSkill,
+  decodeAgentMemoryLimitPreference,
   decodeAnalyticsPreference,
   decodeAppInfo,
   decodeAppLanguagePreference,
@@ -473,6 +474,8 @@ const openbotApi: OpenBotDesktopApi = {
     approvalAutomation: decodeApprovalAutomationPreference,
     getBusyMessageModePreference: decodeBusyMessageModePreference,
     setBusyMessageModePreference: decodeBusyMessageModePreference,
+    getAgentMemoryLimitPreference: decodeAgentMemoryLimitPreference,
+    setAgentMemoryLimitPreference: decodeAgentMemoryLimitPreference,
     getRemoteSessionReusePreference: decodeRemoteSessionReusePreference,
     setRemoteSessionReusePreference: decodeRemoteSessionReusePreference,
     getAppLanguagePreference: decodeAppLanguagePreference,

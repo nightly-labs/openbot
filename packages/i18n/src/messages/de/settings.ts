@@ -41,6 +41,9 @@ export const messages = {
   "settings.busyMessage.title": "Agenten während der Arbeit steuern",
   "settings.busyMessage.description":
     "Neue Nachrichten fließen in die aktuelle Arbeit des Agenten ein, nicht in die Warteschlange. Funktioniert mit ChatGPT und Claude.",
+  "settings.agentMemoryLimit.title": "Erinnerungen pro Agent",
+  "settings.agentMemoryLimit.description":
+    "Wie viele Erinnerungen jeder Agent auf diesem Computer behalten kann. Eine größere Zahl macht jeden Prompt länger.",
   "settings.keepRemoteSessions.title": "Schnelle Verbindung zu Servern",
   "settings.keepRemoteSessions.description":
     "Die Verbindung zu deinen beigetretenen Servern zwischen Starts beibehalten. OpenBot startet etwa eine Sekunde schneller. Wenn du OpenBot beendest, schließt der OpenBot-Dienst die Verbindung nicht.",
