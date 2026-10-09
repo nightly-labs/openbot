@@ -109,7 +109,8 @@ export class VoiceModelService extends EventEmitter<VoiceModelEvents> {
     const fiber = yield* Effect.forkIn(
       Effect.gen({ self: this }, function* () {
         if (yield* this.#isComplete()) {
-          this.#setStatus({ phase: "ready", progress: 100, message: null });
+          // Each transcription prepares the model, so a ready model does not announce itself again.
+          if (this.#status.phase !== "ready") this.#setStatus({ phase: "ready", progress: 100, message: null });
           return this.#copyStatus();
         }
         if (this.#stopping) {

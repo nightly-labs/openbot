@@ -197,7 +197,7 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
     resources.voiceMeterStop?.();
     let levels: number[] = new Array(VOICE_LEVEL_COUNT).fill(0);
     deps.setVoiceLevels(levels);
-    let context: AudioContext;
+    let context: AudioContext | undefined;
     let analyser: AnalyserNode;
     try {
       context = new AudioContext();
@@ -205,6 +205,7 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
       analyser.fftSize = 512;
       context.createMediaStreamSource(stream).connect(analyser);
     } catch {
+      void context?.close();
       return;
     }
     const samples = new Float32Array(analyser.fftSize);
@@ -234,9 +235,10 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
       levels = [...levels.slice(1), shown];
       deps.setVoiceLevels(levels);
     }, VOICE_LEVEL_INTERVAL_MS);
+    const meterContext = context;
     resources.voiceMeterStop = () => {
       clearInterval(timer);
-      void context.close();
+      void meterContext.close();
       resources.voiceMeterStop = undefined;
     };
   }
@@ -267,6 +269,9 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
     resources.voiceServerId = undefined;
     resources.voiceChunks = [];
     resources.voiceSubmitRequest = undefined;
+    // The recorder also stops by itself, for example when the microphone is disconnected.
+    stopVoiceElapsedTimer();
+    stopVoiceStream();
     if (!targetAgentId || !targetServerId || resources.voiceDisposed) return;
     const analytics = desktopAnalytics.scope();
     const audioDurationSeconds = deps.voiceElapsedSeconds();
