@@ -1275,6 +1275,24 @@
     color var(--openbot-duration-hover) ease;
 }
 
+/* Keep message references in inline flow. Flex/grid children make Chromium add line breaks to
+   copied selections, even when the child is an icon that cannot be selected. */
+.reference-chip.message-reference-chip,
+.message-file-reference {
+  --message-reference-icon-size: var(--openbot-space-4);
+
+  display: inline-block;
+  user-select: text;
+}
+
+.message-file-reference:has(> [data-badge-length="3"]) {
+  --message-reference-icon-size: var(--openbot-space-5);
+}
+
+.message-file-reference:has(> [data-badge-length="4"]) {
+  --message-reference-icon-size: var(--openbot-space-6);
+}
+
 /* A table measures its columns before it knows their widths, so the percentage cap above does not
    apply there, and a long path makes its column as wide as the path. A fixed cap keeps it short. */
 :is(.message-data-table, .message-markdown-table) .message-file-reference {
@@ -1548,4 +1566,35 @@
 
 .choice-input::placeholder {
   color: var(--openbot-text-muted);
+}
+
+.reference-chip.message-reference-chip .reference-chip-icon,
+.message-file-reference .attachment-reference-visual {
+  display: inline-block;
+  margin-right: var(--openbot-space-1);
+  text-align: center;
+  vertical-align: middle;
+  user-select: none;
+}
+
+.reference-chip.message-reference-chip .agent-avatar {
+  display: inline-block;
+}
+
+.message-file-reference .attachment-reference-visual > svg,
+.reference-chip.message-reference-chip .reference-chip-icon > svg,
+.reference-chip.message-reference-chip .agent-avatar > svg {
+  display: inline;
+  vertical-align: middle;
+}
+
+.reference-chip.message-reference-chip .reference-chip-name,
+.message-file-reference .inline-file-reference-name {
+  display: inline-block;
+  max-width: calc(100% - var(--message-reference-icon-size) - var(--openbot-space-1));
+  vertical-align: middle;
+}
+
+.reference-chip.message-reference-chip > .sr-only {
+  user-select: none;
 }

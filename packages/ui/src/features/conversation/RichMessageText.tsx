@@ -141,17 +141,19 @@ export function RichMessageText(props: RichMessageTextProps) {
               <ReferenceChip
                 kind="agent"
                 name={part.agent.name}
-                class="message-agent-tag"
+                class="message-reference-chip message-agent-tag"
                 icon={<AgentAvatar agent={part.agent} />}
                 onClick={() => props.onSelectAgent(part.agent?.id ?? "")}
               />
             );
           }
           if (part.skill) {
-            return <ReferenceChip kind="skill" name={part.skill.name} icon={<Puzzle />} />;
+            return (
+              <ReferenceChip class="message-reference-chip" kind="skill" name={part.skill.name} icon={<Puzzle />} />
+            );
           }
           if (part.mcpName) {
-            return <ReferenceChip kind="mcp" name={part.mcpName} icon={<Blocks />} />;
+            return <ReferenceChip class="message-reference-chip" kind="mcp" name={part.mcpName} icon={<Blocks />} />;
           }
           if (part.unavailableKind) {
             return (
