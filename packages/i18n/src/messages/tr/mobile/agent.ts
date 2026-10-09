@@ -242,7 +242,8 @@ export const messages = {
   "mobile.agent.host.computerUse": "Computer Use",
   "mobile.agent.host.computerUseFooter": "Bu ajanın ana makinedeki uygulamaları kontrol etmesine izin verin.",
   "mobile.agent.host.automation": "Yerel betikler",
-  "mobile.agent.host.automationFooter": "Ana makinedeki betiklerin bu ajanın rutinlerini çalıştırmasına izin verin.",
+  "mobile.agent.host.automationFooter":
+    "Ana bilgisayardaki betiklerin mesaj göndermesine, rutinleri çalıştırmasına, soruları yanıtlamasına ve onay isteklerini kabul etmesine veya reddetmesine izin ver",
   "mobile.agent.host.failed": "Bu ayar değiştirilemedi.",
   "mobile.agent.host.unsupported": "Bu ana makine bu ayarları uzak bir cihazdan değiştiremez.",
   "mobile.agent.busyMessage.label": "Çalışırken",

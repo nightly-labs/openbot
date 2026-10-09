@@ -133,7 +133,7 @@ export const messages = {
   "agentSettings.computerUse.description": "Разрешить этому агенту управлять приложениями на этом компьютере",
   "agentSettings.automation.title": "Локальные скрипты",
   "agentSettings.automation.description":
-    "Разрешить скриптам на этом компьютере запускать регулярные задачи этого агента",
+    "Разрешить скриптам на хосте отправлять сообщения, запускать процедуры, отвечать на вопросы и одобрять или отклонять запросы",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "Весь процесс {provider} работает в песочнице, поэтому запись за пределами не удастся. Доступно только в macOS.",
 } as const satisfies PartialTranslation<typeof source>;

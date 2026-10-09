@@ -51,6 +51,7 @@ import {
   decodeAccountUsageFromMain,
   decodeAgent,
   decodeAgentAnalyticsFromMain,
+  decodeAgentHostSettingsFromMain,
   decodeAgentModels,
   decodeAgentSessionSettingsFromMain,
   decodeAgentStatusFromMain,
@@ -784,6 +785,8 @@ const openbotApi: OpenBotDesktopApi = {
     }),
     ...bridgeGroup(IPC_ENDPOINTS.agentAdmin, {
       getAgentAdminSettings: decodeAgentAdminSettings,
+      getAgentHostSettings: decodeAgentHostSettingsFromMain,
+      updateAgentHostSettings: decodeAgentHostSettingsFromMain,
       updateAgentAdminSettings: decodeAgentAdminSettings,
       listAgentSkills: decodeInstalledSkillsFromMain,
       installAgentSkill: decodeInstalledSkill,

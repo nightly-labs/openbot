@@ -86,6 +86,9 @@ export const messages = {
   "error.agent.automationLocalOnly": "Los scripts locales solo se pueden permitir en el equipo que ejecuta el agente.",
   "error.agent.busyMessageModeLocalOnly":
     "El comportamiento de los mensajes mientras trabaja el agente solo se puede configurar en el equipo que lo ejecuta.",
+  "error.agent.localScriptsOff": "Este agente no permite scripts locales.",
+  "error.agent.localScriptsRateLimited":
+    "Los scripts locales enviaron {limit} solicitudes de mensajes o rutinas a este agente en la última hora. Inténtalo más tarde.",
   "error.agent.automationOff": "Este agente no permite que los scripts locales ejecuten sus rutinas.",
   "error.agent.automationPayloadTooLong": "El contenido supera los {limit} caracteres.",
   "error.agent.automationRateLimited":

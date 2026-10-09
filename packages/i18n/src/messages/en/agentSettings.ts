@@ -118,7 +118,8 @@ export const messages = defineMessages("agentSettings", {
   "agentSettings.computerUse.title": "Computer Use",
   "agentSettings.computerUse.description": "Let this agent control apps on this computer",
   "agentSettings.automation.title": "Local scripts",
-  "agentSettings.automation.description": "Let scripts on this computer run this agent's routines",
+  "agentSettings.automation.description":
+    "Let scripts on the host send messages, run routines, answer questions, and accept or decline approvals",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "The whole {provider} process runs in a sandbox, so a write outside fails. Available on macOS only.",
 });

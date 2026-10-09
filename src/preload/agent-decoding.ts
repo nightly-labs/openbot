@@ -15,6 +15,7 @@ import {
   decodeOptionalAgentAnalytics,
   decodeOptionalHostAnalytics,
   isAccountUsage,
+  isAgentHostSettings,
   isAgentMemory,
   isAgentModelOption,
   isAgentProvider,
@@ -35,6 +36,7 @@ import { decodeRecord, guardedDecoder, guardedListDecoder } from "@openbot/contr
 import { isDynamicRecord, isHttpsUrl, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 
 export const decodeRoutine = guardedDecoder(isRoutine, "routine response");
+export const decodeAgentHostSettingsFromMain = guardedDecoder(isAgentHostSettings, "agent host settings response");
 export const decodeRoutines = guardedListDecoder(isRoutine, "routine list response");
 export const decodeRoutineRun = guardedDecoder(isRoutineRun, "routine run response");
 export const decodeRoutineRuns = guardedListDecoder(isRoutineRun, "routine history response");

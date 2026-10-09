@@ -18,6 +18,8 @@ import {
   type AppSetupState,
   type AttachmentImportEvent,
   agentAutoApprovalEnabled,
+  agentAutomationAllowed,
+  agentComputerUseEnabled,
   type BusyMessageModePreference,
   type CentralAuthState,
   CONTEXT_RESET_ITEM_TYPE,
@@ -1121,6 +1123,20 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           autoApprove: agentAutoApprovalEnabled(approvalAutomation, agentId),
           autoApproveLocked: approvalAutomation.turbo,
         };
+      },
+      getAgentHostSettings: async (agentId) => {
+        const agent = agents.find((candidate) => candidate.id === agentId);
+        if (!agent) throw new Error("Agent not found");
+        return {
+          computerUse: agentComputerUseEnabled(agent),
+          allowAutomation: agentAutomationAllowed(agent),
+          busyMessageMode: agent.busyMessageMode ?? null,
+          defaultBusyMessageMode: busyMessageMode.mode,
+        };
+      },
+      updateAgentHostSettings: async (input) => {
+        await api.agent.updateAgent(input);
+        return api.agent.getAgentHostSettings(input.agentId);
       },
       updateAgentAdminSettings: async ({ agentId, access, autoApprove }) => {
         const agent = agents.find((candidate) => candidate.id === agentId);

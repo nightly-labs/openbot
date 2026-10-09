@@ -30,6 +30,7 @@ export function serverSupportsCapability(
       capability === "storage-v1" ||
       capability === "hosted-sites-v1" ||
       capability === "agent-admin-v1" ||
+      capability === "agent-host-settings-v1" ||
       capability === "skills-admin-v1" ||
       capability === "shared-tables-v1" ||
       capability === "agent-install-v1" ||

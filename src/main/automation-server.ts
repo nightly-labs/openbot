@@ -4,17 +4,20 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { join } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { type AgentSummary, agentAutomationAllowed, type Routine, type RoutineRun } from "@openbot/contracts/ipc";
-import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { createOpenBotLogger, registerSecretValue } from "@openbot/logging";
+import { createOpenBotLogger, registerSecretValue, toLogValue } from "@openbot/logging";
 import { RoutineInputError } from "@openbot/team-client/routine-schedule";
 import { Effect, Exit, Schema, Scope, Semaphore } from "effect";
-import type { AgentLifecycleFailed } from "../backend/agent-service";
+import { InactiveAttentionRequest } from "../backend/agent/inactive-attention-request";
+import type { AgentLifecycleFailed, AgentService } from "../backend/agent-service";
 import { writeFileAtomically } from "../backend/atomic-json-file";
 import { AUTOMATION_HEADERS_FILE, AUTOMATION_TOKEN_FILE, AUTOMATION_URL_FILE } from "../backend/automation-command";
 import { causeHelpers, runCauseEffect } from "../backend/effect-boundary";
 import { readBodyWithin } from "./http-body";
 import { listenLoopback } from "./listen-loopback";
+import { HttpError } from "./team-api/http-error";
+import { approvalDecision, promptAnswers } from "./team-api/request-helpers";
 
 const logger = createOpenBotLogger("automation");
 
@@ -24,6 +27,7 @@ const HOUR_MS = 60 * 60 * 1000;
 // A payload is at most 4,000 characters; four UTF-8 bytes each plus JSON escapes stay below this.
 const BODY_LIMIT_BYTES = 32 * 1024;
 const RUN_PATH = /^\/v1\/agents\/([^/]+)\/routines\/([^/]+)\/run$/;
+const AGENT_PATH = /^\/v1\/agents\/([^/]+)\/(messages|pending|prompts\/([^/]+)\/answer|approvals\/([^/]+)\/respond)$/;
 
 /** A start or close that failed. It is only logged; the next `sync` tries again. */
 class AutomationServerFailed extends Schema.TaggedError<AutomationServerFailed>()("AutomationServerFailed", {
@@ -43,10 +47,13 @@ export interface AutomationServerOptions {
     payload: string;
   }) => Effect.Effect<Pick<RoutineRun, "id" | "deliveryId">, AgentLifecycleFailed>;
   now?: () => number;
+  sendMessage: AgentService["sendMessage"];
+  getLocalAttention: AgentService["getLocalAttention"];
+  respondToLocalAttention: AgentService["respondToLocalAttention"];
 }
 
 /**
- * The loopback door through which a local script runs a routine of an agent that allows it.
+ * The loopback API for local scripts that work with an enabled agent.
  *
  * It listens only while at least one agent allows local scripts. A caller proves that it runs as
  * this OS user by reading the token file; the token changes at each start. A request with an
@@ -171,6 +178,13 @@ export class AutomationServer {
         if (request.method !== "GET") return send(response, 405, { error: "method not allowed" });
         return send(response, 200, this.#listAgents());
       }
+      const agentMatch = AGENT_PATH.exec(path);
+      if (agentMatch?.[1] && agentMatch[2]) {
+        const agentId = decodePathPart(agentMatch[1]);
+        if (agentId === null) return send(response, 404, { error: "not found" });
+        await this.#agentRequest(request, response, agentId, agentMatch[2], agentMatch[3] ?? agentMatch[4]);
+        return;
+      }
       const match = RUN_PATH.exec(path);
       if (!match?.[1] || !match[2]) return send(response, 404, { error: "not found" });
       if (request.method !== "POST") return send(response, 405, { error: "method not allowed" });
@@ -179,44 +193,85 @@ export class AutomationServer {
       if (agentId === null || routineId === null) return send(response, 404, { error: "not found" });
       await this.#run(request, response, agentId, routineId);
     } catch (error) {
+      if (error instanceof HttpError) return send(response, error.status, { error: error.message });
+      if (error instanceof InactiveAttentionRequest) return send(response, 409, { error: error.message });
       logger.warn("An automation request failed.", error);
       if (!response.headersSent) send(response, 500, { error: "internal error" });
     }
   }
 
+  async #agentRequest(
+    request: IncomingMessage,
+    response: ServerResponse,
+    agentId: string,
+    route: string,
+    encodedRequestId: string | undefined,
+  ): Promise<void> {
+    this.#requireAgent(agentId);
+    if (route === "pending") {
+      if (request.method !== "GET") return send(response, 405, { error: "method not allowed" });
+      const pending = this.#options.getLocalAttention(agentId);
+      return send(response, 200, {
+        ...pending,
+        prompts: pending.prompts.map((prompt) => ({
+          ...prompt,
+          questions: prompt.requiresOpenBot
+            ? []
+            : prompt.questions.map(({ id, header, question, options }) => ({ id, header, question, options })),
+        })),
+      });
+    }
+    if (request.method !== "POST") return send(response, 405, { error: "method not allowed" });
+    const value = await readJson(request);
+    // The setting can change while the script uploads its body.
+    this.#requireAgent(agentId);
+    if (route === "messages") {
+      const text = requiredString(value, "text", INPUT_LIMITS.messageText);
+      const clientMessageId = requiredString(value, "clientMessageId", INPUT_LIMITS.identifier);
+      const now = this.#takeSlot(agentId);
+      try {
+        // Separate script retry keys from local UI retry keys without inventing a team member.
+        const receipt = await runCauseEffect(
+          this.#options.sendMessage({ agentId, text, clientMessageId: `automation:${clientMessageId}` }),
+        );
+        return send(response, 202, receipt);
+      } catch (error) {
+        this.#releaseSlot(agentId, now);
+        throw error;
+      }
+    }
+    const requestId = encodedRequestId === undefined ? null : decodePathPart(encodedRequestId);
+    if (!requestId || requestId.length > INPUT_LIMITS.identifier) throw new HttpError(400, "requestId is invalid.");
+    const input = route.startsWith("prompts/")
+      ? { kind: "prompt" as const, requestId, answers: promptAnswers(value.answers) }
+      : { kind: "approval" as const, requestId, decision: approvalDecision(value.decision) };
+    await runCauseEffect(this.#options.respondToLocalAttention(agentId, input));
+    send(response, 200, { ok: true });
+  }
+
+  #requireAgent(agentId: string, routine = false): void {
+    const agent = this.#options.listAgents().find((candidate) => candidate.id === agentId);
+    if (!agent) throw new HttpError(404, "not found");
+    if (!agentAutomationAllowed(agent))
+      throw new HttpError(
+        403,
+        routine ? sourceText("error.agent.automationOff") : sourceText("error.agent.localScriptsOff"),
+      );
+  }
+
   async #run(request: IncomingMessage, response: ServerResponse, agentId: string, routineId: string): Promise<void> {
-    if (request.headers["content-type"]?.split(";", 1)[0]?.trim() !== "application/json") {
-      return send(response, 415, { error: "Content-Type must be application/json." });
-    }
-    const body = await readBody(request);
-    if (body === null) return send(response, 413, { error: "The request body is too large." });
-    let value: unknown;
-    try {
-      value = body.length === 0 ? {} : JSON.parse(body);
-    } catch {
-      return send(response, 400, { error: "The request body is not JSON." });
-    }
-    const payload = isDynamicRecord(value) ? (value.payload ?? "") : null;
+    const value = await readJson(request);
+    const payload = value.payload ?? "";
     if (!isString(payload)) return send(response, 400, { error: "payload must be a string." });
     if (payload.length > INPUT_LIMITS.automationPayload) {
       const error = sourceText("error.agent.automationPayloadTooLong", { limit: INPUT_LIMITS.automationPayload });
       return send(response, 413, { error });
     }
-    const agent = this.#options.listAgents().find((candidate) => candidate.id === agentId);
-    if (!agent) return send(response, 404, { error: "not found" });
-    if (!agentAutomationAllowed(agent)) return send(response, 403, { error: sourceText("error.agent.automationOff") });
+    this.#requireAgent(agentId, true);
     if (!this.#options.listRoutines(agentId).some((routine) => routine.id === routineId)) {
       return send(response, 404, { error: sourceText("error.backend.routineGone") });
     }
-    const now = this.#now();
-    const recent = (this.#runs.get(agentId) ?? []).filter((time) => now - time < HOUR_MS);
-    if (recent.length >= AUTOMATION_RUNS_PER_HOUR) {
-      this.#runs.set(agentId, recent);
-      const error = sourceText("error.agent.automationRateLimited", { limit: AUTOMATION_RUNS_PER_HOUR });
-      return send(response, 429, { error });
-    }
-    // The slot is taken before the run starts, so parallel requests cannot pass the limit together.
-    this.#runs.set(agentId, [...recent, now]);
+    const now = this.#takeSlot(agentId, true);
     let run: Pick<RoutineRun, "id" | "deliveryId">;
     try {
       run = await runCauseEffect(this.#options.runRoutine({ agentId, routineId, payload }));
@@ -228,6 +283,23 @@ export class AutomationServer {
     }
     logger.info(`A local script ran routine ${routineId} of agent ${agentId}.`);
     send(response, 202, { runId: run.id, deliveryId: run.deliveryId });
+  }
+
+  #takeSlot(agentId: string, routine = false): number {
+    const now = this.#now();
+    const recent = (this.#runs.get(agentId) ?? []).filter((time) => now - time < HOUR_MS);
+    this.#runs.set(agentId, recent);
+    if (recent.length >= AUTOMATION_RUNS_PER_HOUR) {
+      const params = { limit: AUTOMATION_RUNS_PER_HOUR };
+      throw new HttpError(
+        429,
+        routine
+          ? sourceText("error.agent.automationRateLimited", params)
+          : sourceText("error.agent.localScriptsRateLimited", params),
+      );
+    }
+    recent.push(now);
+    return now;
   }
 
   #listAgents() {
@@ -276,6 +348,28 @@ async function readBody(request: IncomingMessage): Promise<string | null> {
 }
 
 function send(response: ServerResponse, status: number, body: unknown): void {
-  response.writeHead(status, { "content-type": "application/json" });
-  response.end(JSON.stringify(body));
+  response.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" });
+  response.end(JSON.stringify(toLogValue(body)));
+}
+
+async function readJson(request: IncomingMessage): Promise<DynamicRecord> {
+  if (request.headers["content-type"]?.split(";", 1)[0]?.trim() !== "application/json") {
+    throw new HttpError(415, "Content-Type must be application/json.");
+  }
+  const body = await readBody(request);
+  if (body === null) throw new HttpError(413, "The request body is too large.");
+  let value: unknown;
+  try {
+    value = body.length === 0 ? {} : JSON.parse(body);
+  } catch {
+    throw new HttpError(400, "The request body is not JSON.");
+  }
+  if (!isDynamicRecord(value)) throw new HttpError(400, "The request body must be an object.");
+  return value;
+}
+
+function requiredString(value: DynamicRecord, key: string, limit: number): string {
+  const text = value[key];
+  if (!isString(text) || !text.trim() || text.length > limit) throw new HttpError(400, `${key} is invalid.`);
+  return text;
 }

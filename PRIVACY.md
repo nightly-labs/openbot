@@ -57,6 +57,15 @@ The service stores payment facts and a delivery ledger in D1 to prevent duplicat
 It does not send Stripe identifiers, server identifiers, or Checkout return tokens to OpenPanel.
 An account deletion clears its profile reference and stops pending account event delivery.
 
+## Local scripts
+
+Local scripts is off by default for each agent. When enabled, scripts that run as the same OS user
+on the host can read a local token and use the loopback API. They can send messages, run routines,
+read pending questions and approvals, and submit answers or approval decisions. OpenBot redacts
+secrets in API responses. Secret questions and browser takeovers return notices only and must be
+completed in OpenBot. OpenBot does not send these API responses to the account service or analytics.
+A script can send the data elsewhere under its own configuration.
+
 ## Agent and host usage
 
 The Usage view stores numeric token counts, activity counts, provider and model identifiers,

@@ -7,7 +7,6 @@ import {
   agentComputerUseEnabled,
   agentProviderDescriptor,
   COMPUTER_USE_MCP_SERVER_ID,
-  COMPUTER_USE_MCP_SERVER_NAME,
   type McpServerConfig,
   workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
@@ -25,6 +24,7 @@ import {
   type CodexDisabledMcpServer,
   type CodexMcpServer,
   codexDisabledServers,
+  codexMcpServerName,
   codexMcpServers,
   type McpAuthorizationSource,
   type McpServerDrop,
@@ -59,9 +59,9 @@ import { codexSandboxConfig, codexSandboxMode, workspaceWritableRoots } from "./
  * the payload, 3 is the sweep that turns off the servers `~/.codex/config.toml` declares, and 4 is
  * the managed tool runtimes joining the fingerprint, so a session started before Bun finished
  * downloading is replaced once its servers can actually start, 5 is the plan tool below, and 6 is
- * server names in the form Codex accepts.
+ * server names in the form Codex accepts. Version 7 keeps approvals for custom MCP servers.
  */
-const CODEX_MCP_ADAPTER_VERSION = 6;
+const CODEX_MCP_ADAPTER_VERSION = 7;
 
 /**
  * Codex offers `update_plan` only when this is on, and without it a turn sends no
@@ -395,7 +395,7 @@ export class ThreadLifecycle {
     const toolRuntimes = this.#toolRuntimes();
     // The same reading rule as above, and for the same reason: the manifest has to record the set
     // this session was started with, including the names swept out of the provider's own file.
-    const disabled = yield* this.codexOwnServersEffect(client, mcpServers);
+    const disabled = yield* this.codexOwnServersEffect(client, mcpServers, toolRuntimes);
     // The same single reading, so the manifest records the variables this session was started with.
     const environment = this.#agentEnvironment();
     const config = yield* this.codexConfigEffect(agent, client, mcpServers, disabled, toolRuntimes, environment);
@@ -538,13 +538,8 @@ export class ThreadLifecycle {
     const { servers, dropped } = yield* threadStep(() => codexMcpServers(usable));
     this.#hooks.reportMcpDrops(client.provider, dropped);
     const mcpServers = { ...disabled, ...servers };
-    const computerUse = servers[COMPUTER_USE_MCP_SERVER_NAME];
-    if (computerUse) {
-      mcpServers[COMPUTER_USE_MCP_SERVER_NAME] = {
-        ...disabled[COMPUTER_USE_MCP_SERVER_NAME],
-        ...computerUse,
-        enabled: true,
-      };
+    for (const [name, server] of Object.entries(servers)) {
+      mcpServers[name] = { ...disabled[name], ...server, enabled: true };
     }
     return {
       config: {
@@ -561,21 +556,34 @@ export class ThreadLifecycle {
   /**
    * The servers Codex would merge from its own file, each turned off.
    *
-   * Computer Use needs a saved registration for persistent tool approvals. A registration failure
-   * stops the thread with recovery guidance. Without Computer Use, retain the existing empty
+   * Each MCP server needs a saved registration for persistent tool approvals. A registration failure
+   * stops the thread with recovery guidance. Without MCP servers, retain the existing empty
    * result on a failed config read.
    */
   private readonly codexOwnServersEffect = Effect.fn("ThreadLifecycle.codexOwnServers")(function* (
     this: ThreadLifecycle,
     client: AgentClient,
     configs: readonly McpServerConfig[],
+    toolRuntimes: McpToolRuntimes,
   ): Effect.fn.Return<Record<string, CodexDisabledMcpServer>, ThreadOperationFailed> {
     if (client.provider !== "codex") return {};
-    const computerUse = configs.find((server) => server.id === COMPUTER_USE_MCP_SERVER_ID);
-    return yield* codexDisabledServers(() => readCodexMcpConfig(client, computerUse).pipe(toMcpShapeFailed)).pipe(
+    // Register only the servers selected by the runtime adapter, including name collisions.
+    const usable = yield* usableMcpServers(configs, toolRuntimes).pipe(toThreadOperationFailed);
+    const { servers } = codexMcpServers(usable);
+    return yield* codexDisabledServers(() => readCodexMcpConfig(client, servers).pipe(toMcpShapeFailed)).pipe(
       Effect.catch(() =>
-        computerUse
-          ? Effect.fail(new ThreadOperationFailed({ cause: new Error(sourceText("error.provider.computerUseConfig")) }))
+        Object.keys(servers).length > 0
+          ? Effect.fail(
+              new ThreadOperationFailed({
+                cause: new Error(
+                  sourceText(
+                    configs.every((server) => server.id === COMPUTER_USE_MCP_SERVER_ID)
+                      ? "error.provider.computerUseConfig"
+                      : "error.provider.mcpConfig",
+                  ),
+                ),
+              }),
+            )
           : Effect.succeed({}),
       ),
     );
@@ -624,9 +632,10 @@ export class ThreadLifecycle {
           mcpFingerprintValues(configs),
           Object.keys(disabled).sort(),
           // A revoked approval must also replace a loaded session with the old tool policy.
-          ...(configs.some((config) => config.id === COMPUTER_USE_MCP_SERVER_ID)
-            ? [disabled[COMPUTER_USE_MCP_SERVER_NAME]?.tools ?? {}]
-            : []),
+          configs.map((config) => [
+            codexMcpServerName(config.name),
+            disabled[codexMcpServerName(config.name)]?.tools ?? {},
+          ]),
           [toolRuntimes.binDirectories, toolRuntimes.commandAliases],
           CODEX_MCP_ADAPTER_VERSION,
           // Only a sandboxed agent, or one that allows local scripts, adds a value: Codex keeps the
@@ -676,15 +685,11 @@ export class ThreadLifecycle {
       if (missingSessionFile(stored.failure.cause)) return false;
       return yield* stored.failure;
     }
-    const disabled = yield* this.codexOwnServersEffect(client, this.#agentMcpServers(agent));
+    const configs = this.#agentMcpServers(agent);
+    const toolRuntimes = this.#toolRuntimes();
+    const disabled = yield* this.codexOwnServersEffect(client, configs, toolRuntimes);
     const fingerprint = yield* threadStep(() =>
-      this.toolFingerprint(
-        agent,
-        this.#agentMcpServers(agent),
-        disabled,
-        this.#toolRuntimes(),
-        this.#agentEnvironment(),
-      ),
+      this.toolFingerprint(agent, configs, disabled, toolRuntimes, this.#agentEnvironment()),
     );
     return stored.success === fingerprint;
   });
@@ -712,6 +717,8 @@ export class ThreadLifecycle {
     client: AgentClient,
     externalThreadId: string,
   ): Effect.fn.Return<DynamicRecord, ThreadOperationFailed> {
+    const configs = this.#agentMcpServers(agent);
+    const toolRuntimes = this.#toolRuntimes();
     return {
       threadId: externalThreadId,
       model: agent.model,
@@ -727,9 +734,9 @@ export class ThreadLifecycle {
       ...(yield* this.codexConfigEffect(
         agent,
         client,
-        this.#agentMcpServers(agent),
-        yield* this.codexOwnServersEffect(client, this.#agentMcpServers(agent)),
-        this.#toolRuntimes(),
+        configs,
+        yield* this.codexOwnServersEffect(client, configs, toolRuntimes),
+        toolRuntimes,
         this.#agentEnvironment(),
       )),
     };

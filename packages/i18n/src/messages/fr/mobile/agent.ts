@@ -239,7 +239,7 @@ export const messages = {
   "mobile.agent.host.computerUseFooter": "Autoriser cet agent à contrôler les apps de l’ordinateur hôte.",
   "mobile.agent.host.automation": "Scripts locaux",
   "mobile.agent.host.automationFooter":
-    "Autoriser les scripts de l’ordinateur hôte à exécuter les routines de cet agent.",
+    "Autoriser les scripts sur l’hôte à envoyer des messages, exécuter des routines, répondre aux questions et accepter ou refuser les demandes d’approbation",
   "mobile.agent.host.failed": "Impossible de modifier ce réglage.",
   "mobile.agent.host.unsupported": "Cet hôte ne permet pas de modifier ces réglages depuis un appareil distant.",
   "mobile.agent.busyMessage.label": "Pendant le travail",

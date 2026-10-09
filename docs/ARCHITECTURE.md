@@ -27,7 +27,7 @@ The architecture notes are in one file for each topic:
   - [Provider CLI updates](architecture/providers.md#provider-cli-updates)
   - [OpenCode and ACP](architecture/providers.md#opencode-and-acp)
 - [Agents](architecture/agents.md)
-  - [Local script runs](architecture/agents.md#local-script-runs)
+  - [Local scripts API](architecture/agents.md#local-scripts-api)
   - [Routine flows](architecture/agents.md#routine-flows)
   - [Agent communication policy](architecture/agents.md#agent-communication-policy)
   - [Prompt-driven agent profiles](architecture/agents.md#prompt-driven-agent-profiles)
