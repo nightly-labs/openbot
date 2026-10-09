@@ -136,10 +136,9 @@ export function useBrowserLiveView(
           reject(new Error("The live view is not connected."));
           return;
         }
-        const timer = setTimeout(() => {
-          selections.current = selections.current.filter((waiter) => waiter !== answer);
-          reject(new Error("The host did not answer."));
-        }, SELECTION_TIMEOUT_MS);
+        // The waiter keeps its place after a timeout: the host answers each copy in order, so a late
+        // answer is this one's, and the rejected promise ignores it. The next copy gets its own.
+        const timer = setTimeout(() => reject(new Error("The host did not answer.")), SELECTION_TIMEOUT_MS);
         const answer = (text: string | null) => {
           clearTimeout(timer);
           resolve(text);
