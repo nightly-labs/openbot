@@ -208,8 +208,12 @@ remove the `export` keyword, then delete the code if `tsc` or Biome reports it u
 `bunx knip --fix --fix-type exports,types` removes the keywords; check its diff, because it can
 break a destructured export.
 
-`setup-bun` restores the Bun package store before installing. The key falls back through
-`restore-keys`, so a lockfile change re-downloads only what moved. The Electron download is
+`setup-bun` installs with the frozen lockfile without a GitHub Actions cache for the Bun package
+store. In CI run 37915311865, restoring the 996 MB store took 23 seconds before installation.
+The action keeps Bun binary caching and Node tool-cache support. Its `frozen`, `ignore-scripts`,
+and `none` install modes do not change. Compare setup time and total job time when measuring this
+change; removing the restore also requires fresh package downloads on a new runner.
+The Electron download is
 deliberately not cached: `install-electron` takes 2.6s on a runner, and a measured cache hit
 restored 123 MB in 4.4s and left `bun install` at 29.9s against 29.0s with no cache at all.
 
