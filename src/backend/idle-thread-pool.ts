@@ -78,14 +78,19 @@ export class IdleThreadPool<Thread extends IdleThread, Released> {
     this.#released.delete(threadId);
   }
 
+  /** Removes a thread and its timer. The caller must release its resources. */
+  detach(thread: Thread): void {
+    this.#threads.delete(thread.id);
+    this.#disarm(thread);
+  }
+
   /** Stops holding the thread and ends it. No snapshot is kept. */
 
   readonly close = Effect.fn("IdleThreadPool.close")(function* (
     this: IdleThreadPool<Thread, Released>,
     thread: Thread,
   ) {
-    this.#threads.delete(thread.id);
-    this.#disarm(thread);
+    this.detach(thread);
     yield* this.#options.dispose(thread);
   }, Effect.uninterruptible);
 

@@ -149,7 +149,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   const remoteAgentAdmin = createRemoteAgentAdmin(() => {
     const server = activeServer();
     const agent = activeAgent();
-    return server && agent ? { server, agentId: agent.id } : null;
+    return server && agent ? { server, agentId: agent.id, updatedAt: agent.updatedAt ?? null } : null;
   });
   const remoteAgentSettings = remoteAgentAdmin.settings;
 
@@ -199,7 +199,14 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   const conversationAgent = createMemo(() => {
     const agent = activeAgent();
     const settings = remoteAgentSettings();
-    return agent && settings ? { ...agent, access: settings.access } : agent;
+    const automation = remoteAgentAdmin.automation();
+    return agent
+      ? {
+          ...agent,
+          ...(settings ? { access: settings.access } : {}),
+          ...(activeServer()?.kind === "remote" && automation !== undefined ? { allowAutomation: automation } : {}),
+        }
+      : agent;
   });
 
   /** Access of a joined server's agent goes to its host; every other field keeps the Team API route. */

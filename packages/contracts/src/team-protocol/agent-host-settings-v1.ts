@@ -3,11 +3,14 @@
 // What it grants, recorded here because freezing it makes it permanent: an owner or admin of a
 // server can read and change three settings of each agent that act only on the host: whether the
 // agent gets the Computer Use tools there (`computerUse`), whether a script on the host can run its
-// routines through the automation server (`allowAutomation`), and what a message sent while the
-// agent works does (`busyMessageMode`; null follows the host default). The host default stays a
+// routines, send messages, and answer questions and approvals (`allowAutomation`), and what a message
+// sent while the agent works does (`busyMessageMode`; null follows the host default). The host default stays a
 // local choice: the client reads it as `defaultBusyMessageMode` and cannot change it. A member
-// cannot use either route; `requireAdmin` on the host is the only gate. Widening any of it needs a
-// second capability string.
+// cannot use either route; `requireAdmin` on the host is the only gate.
+//
+// Developer-approved exception in #1720: Local scripts stays one grant. The added message and
+// attention operations also apply to existing enabled agents, without another opt-in or capability.
+// See docs/architecture/agents.md#local-scripts-api. Any other widening needs a second capability.
 import {
   type AdminDecoder,
   adminRoute,

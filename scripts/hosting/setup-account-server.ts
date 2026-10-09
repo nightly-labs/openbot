@@ -249,8 +249,10 @@ async function main(args: string[]): Promise<void> {
   );
   if (live) {
     next.push("The desktop release workflow selects HOSTED_SERVER_TEMPLATE directly on the production Worker.");
-    if (!(await store.has("OPENPANEL_CLIENT_ID"))) {
-      next.push("Optional: set OPENPANEL_CLIENT_ID and OPENPANEL_CLIENT_SECRET with gh secret set --env.");
+    if (!(await store.has("OPENPANEL_CLIENT_ID")) || !(await store.has("OPENPANEL_CLIENT_SECRET"))) {
+      next.push(
+        "Required before production deployment: set OPENPANEL_CLIENT_ID and OPENPANEL_CLIENT_SECRET with gh secret set --env cloudflare-production.",
+      );
     }
   }
   for (const line of next) logger.info(line);

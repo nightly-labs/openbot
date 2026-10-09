@@ -32,6 +32,8 @@ interface AgentSettingsPanelProps
     "width" | "onResize" | "onResizeEnd" | "links" | "detailOpen" | "children"
   > {
   remoteClient?: boolean;
+  /** Routines can copy local run commands only on the computer that runs the agent. */
+  localHost?: boolean;
   sessionSettingsEditable?: boolean;
   /** The memory cap of an agent on this computer. Absent for a remote agent: its host enforces its own. */
   memoryLimit?: number;
@@ -97,9 +99,9 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   const legacyRoutinesPort = createMemo(() =>
     agentRoutinesPort(
       props.agent.id,
-      props.automationEditable === true && agentAutomationAllowed(props.agent),
+      props.localHost === true && agentAutomationAllowed(props.agent),
       // Set only for the host on this computer, the one place the policy is kept.
-      props.automationEditable === true,
+      props.localHost === true,
     ),
   );
   const routinesPort = createMemo(() => {

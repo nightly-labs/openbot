@@ -233,7 +233,7 @@ export const messages = {
   "mobile.agent.host.computerUseFooter": "このエージェントに、ホストのコンピューター上のアプリの操作を許可します。",
   "mobile.agent.host.automation": "ローカルスクリプト",
   "mobile.agent.host.automationFooter":
-    "ホストのコンピューター上のスクリプトに、このエージェントのルーティンの実行を許可します。",
+    "ホスト上のスクリプトによるメッセージの送信、ルーティンの実行、質問への回答、承認リクエストの許可または拒否を許可する",
   "mobile.agent.host.failed": "この設定を変更できませんでした。",
   "mobile.agent.host.unsupported": "このホストでは、リモートデバイスからこれらの設定を変更できません。",
   "mobile.agent.busyMessage.label": "作業中",

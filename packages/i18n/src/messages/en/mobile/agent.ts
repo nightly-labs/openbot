@@ -284,7 +284,8 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.host.computerUse": "Computer Use",
   "mobile.agent.host.computerUseFooter": "Let this agent control apps on the host computer.",
   "mobile.agent.host.automation": "Local scripts",
-  "mobile.agent.host.automationFooter": "Let scripts on the host computer run this agent's routines.",
+  "mobile.agent.host.automationFooter":
+    "Let scripts on the host send messages, run routines, answer questions, and accept or decline approvals",
   "mobile.agent.host.failed": "Could not change this setting.",
   "mobile.agent.host.unsupported": "This host cannot change these settings from a remote device.",
   "mobile.agent.busyMessage.label": "While working",

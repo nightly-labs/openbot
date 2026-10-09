@@ -49,6 +49,15 @@ currency, the amount that Stripe reports, the server size, the start reason and 
 no email, name, Stripe ID or server ID. The desktop analytics setting does not stop these events,
 because the account service sends them and not your computer.
 
+## Local scripts
+
+Local scripts is off by default for each agent. When enabled, scripts that run as the same OS user
+on the host can read a local token and use the loopback API. They can send messages, run routines,
+read pending questions and approvals, and submit answers or approval decisions. OpenBot redacts
+secrets in API responses. Secret questions and browser takeovers return notices only and must be
+completed in OpenBot. OpenBot does not send these API responses to the account service or analytics.
+A script can send the data elsewhere under its own configuration.
+
 ## Agent and host usage
 
 The Usage view stores numeric token counts, activity counts, provider and model identifiers,

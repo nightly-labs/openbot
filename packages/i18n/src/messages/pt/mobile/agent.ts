@@ -236,7 +236,7 @@ export const messages = {
   "mobile.agent.host.computerUseFooter": "Permitir que este agente controle aplicativos no computador anfitrião.",
   "mobile.agent.host.automation": "Scripts locais",
   "mobile.agent.host.automationFooter":
-    "Permitir que scripts no computador anfitrião executem as rotinas deste agente.",
+    "Permitir que scripts no computador host enviem mensagens, executem rotinas, respondam a perguntas e aceitem ou recusem pedidos de aprovação",
   "mobile.agent.host.failed": "Não foi possível alterar esta configuração.",
   "mobile.agent.host.unsupported":
     "Este computador anfitrião não pode alterar estas configurações a partir de um dispositivo remoto.",

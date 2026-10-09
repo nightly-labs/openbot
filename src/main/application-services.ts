@@ -15,7 +15,7 @@ import { createRoutineFlows, type RoutineFlowsHandle } from "../backend/routine-
 import { type AcpRegistry, createAcpRegistry } from "./acp-registry";
 import { type AgentAdminSettingsService, createAgentAdminSettings } from "./agent-admin-settings";
 import { spawnAgentDatabaseHost } from "./agent-database-host-process";
-import { createAgentHostSettings } from "./agent-host-settings";
+import { type AgentHostSettingsService, createAgentHostSettings } from "./agent-host-settings";
 import { HostReleaseService, readInstallationMode } from "./host-release-service";
 import { HOSTED_UPDATE_TRIGGER, HostedUpdateAdapter } from "./hosted-update-adapter";
 import { LocalSkillLibrary } from "./local-skill-library";
@@ -379,6 +379,7 @@ export interface ApplicationServices {
   updatePreferenceFile: string;
   approvalAutomation: ApprovalAutomation;
   agentAdminSettings: AgentAdminSettingsService;
+  agentHostSettings: AgentHostSettingsService;
   language: LanguageService;
   logoColor: LogoColorService;
   notificationPreference: NotificationPreferenceStore;
@@ -1283,6 +1284,9 @@ export async function createApplicationServices({
     listAgents: () => service.listAgents(),
     listRoutines: (agentId) => service.listRoutines(agentId),
     runRoutine: (input) => service.runRoutineFromAutomation(input),
+    sendMessage: (input) => service.sendMessage(input),
+    getLocalAttention: (agentId) => service.getLocalAttention(agentId),
+    respondToLocalAttention: (agentId, input) => service.respondToLocalAttention(agentId, input),
   });
   service.on("event", (event) => {
     if (event.type === "agents-changed") Effect.runFork(automation.requestSync());
@@ -1547,6 +1551,7 @@ export async function createApplicationServices({
     }),
   );
   const agentAdminSettings = createAgentAdminSettings({ agents: service, approvalAutomation });
+  const agentHostSettings = createAgentHostSettings({ agents: service, busyMessageMode });
   const customProviderChanges = createCustomProviderChanges({ service, customProviders });
   const customAgentChanges = createCustomAgentChanges({ service, customAgents });
   const acpRegistry = createAcpRegistry({
@@ -1623,7 +1628,7 @@ export async function createApplicationServices({
     // Each member present advertises its admin capability. Every admin route requires an owner or admin.
     admin: {
       agents: agentAdminSettings,
-      agentHost: createAgentHostSettings({ agents: service, busyMessageMode }),
+      agentHost: agentHostSettings,
       sessionSettings: service,
       acpRegistry,
       skills,
@@ -2185,6 +2190,7 @@ export async function createApplicationServices({
     updatePreferenceFile,
     approvalAutomation,
     agentAdminSettings,
+    agentHostSettings,
     language,
     logoColor,
     notificationPreference,

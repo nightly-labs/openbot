@@ -11,7 +11,8 @@ export const messages = {
   "mobile.agent.host.computerUse": "Computer Use",
   "mobile.agent.host.computerUseFooter": "Permitir que este agente controle apps en el equipo host.",
   "mobile.agent.host.automation": "Scripts locales",
-  "mobile.agent.host.automationFooter": "Permitir que los scripts del equipo host ejecuten las rutinas de este agente.",
+  "mobile.agent.host.automationFooter":
+    "Permitir que los scripts del equipo host envíen mensajes, ejecuten rutinas, respondan preguntas y acepten o rechacen solicitudes de aprobación",
   "mobile.agent.host.failed": "No se pudo cambiar este ajuste.",
   "mobile.agent.host.unsupported": "Este host no puede cambiar estos ajustes desde un dispositivo remoto.",
   "mobile.agent.busyMessage.label": "Mientras trabaja",

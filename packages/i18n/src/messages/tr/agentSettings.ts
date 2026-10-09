@@ -103,7 +103,7 @@ export const messages = {
   "agentSettings.computerUse.description": "Bu ajanın bu bilgisayardaki uygulamaları kontrol etmesine izin verin",
   "agentSettings.automation.title": "Yerel betikler",
   "agentSettings.automation.description":
-    "Bu bilgisayardaki betiklerin bu ajanın rutinlerini çalıştırmasına izin verin",
+    "Ana bilgisayardaki betiklerin mesaj göndermesine, rutinleri çalıştırmasına, soruları yanıtlamasına ve onay isteklerini kabul etmesine veya reddetmesine izin ver",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "Tüm {provider} süreci bir korumalı alanda (sandbox) çalışır, bu nedenle dışarıya yazma işlemi başarısız olur. Yalnızca macOS'ta kullanılabilir.",
 } as const satisfies PartialTranslation<typeof source>;
