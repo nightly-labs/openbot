@@ -2,6 +2,7 @@ import {
   BROWSER_VIEW_MAX_CLIPBOARD_TEXT,
   type BrowserViewInput,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
+import { graphemes } from "../../../shared/lib/graphemes";
 
 // The phone keyboard as keystrokes on the host's page. A hidden text field takes the typing, and
 // the screen sends what changed in it: each new character as a key press, each removed one as
@@ -44,10 +45,14 @@ export function typedTextInputs(text: string): BrowserViewInput[] {
   });
 }
 
-/** What the page receives when the hidden field changes from `before` to `after`. */
+/**
+ * What the page receives when the hidden field changes from `before` to `after`. The texts are
+ * compared by the characters a reader sees: a Backspace on the page deletes a whole flag or joined
+ * emoji, so one Backspace goes for each, not one for each code point in it.
+ */
 export function textChangeInputs(before: string, after: string): BrowserViewInput[] {
-  const old = Array.from(before);
-  const next = Array.from(after);
+  const old = graphemes(before);
+  const next = graphemes(after);
   let common = 0;
   while (common < old.length && common < next.length && old[common] === next[common]) common += 1;
   const removed = old.length - common;
