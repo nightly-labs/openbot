@@ -1001,8 +1001,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       channelStore.markAllRead(serverId, Crypto.randomUUID),
     ]);
     const failure = results.find((result) => result.status === "rejected");
-    if (failure) throw failure.reason;
-  }, [agents, liveState, request, writeAgentRead, channelStore]);
+    if (!failure) return;
+    // A later successful write discards the refresh of a refused one, so read the host state once more.
+    await refreshConversationReads(serverId).catch(() => undefined);
+    throw failure.reason;
+  }, [agents, liveState, request, writeAgentRead, channelStore, refreshConversationReads]);
 
   const updatePreferences = useCallback(
     (serverId: string, change: (current: RemoteWorkspacePreferences) => RemoteWorkspacePreferences) => {
