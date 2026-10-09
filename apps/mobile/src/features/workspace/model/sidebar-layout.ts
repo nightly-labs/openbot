@@ -5,6 +5,7 @@ import { currentText } from "@/shared/lib/text";
 import type { MobileAgent } from "./workspace-types";
 
 export type MobileSidebarItem =
+  | { kind: "waiting"; id: string; count: number }
   | { kind: "section"; id: string; name: string; empty: boolean }
   | { kind: "agent"; id: string; agent: MobileAgent }
   | { kind: "channel"; id: string; channel: ChannelSummary };
@@ -41,4 +42,21 @@ export function mobileSidebarItems(
       ...(collapsedSectionIds.has(id) ? [] : group),
     ];
   });
+}
+
+/**
+ * "Needs you": the agents that wait for the user, above the sections, in layout order. As on the
+ * desktop, the group is not a section of the layout. The layout keeps each agent's place, so an
+ * agent returns to its section when the wait ends.
+ */
+export function mobileWaitingItems(layout: SidebarLayoutSnapshot | null, agents: MobileAgent[]): MobileSidebarItem[] {
+  if (agents.length === 0) return [];
+  const positions = new Map(layout?.agentOrder.map((id, index) => [id, index]));
+  const sorted = [...agents].sort(
+    (a, b) => (positions.get(a.id) ?? positions.size) - (positions.get(b.id) ?? positions.size),
+  );
+  return [
+    { kind: "waiting", id: "needs-you", count: sorted.length },
+    ...sorted.map((agent) => ({ kind: "agent" as const, id: agent.id, agent })),
+  ];
 }

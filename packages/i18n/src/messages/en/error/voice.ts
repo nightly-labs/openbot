@@ -2,8 +2,6 @@ import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.voice", {
   // Voice transcription errors.
-  "error.voice.assetsUnavailable":
-    "Local voice transcription assets are unavailable. Run `bun run voice:prepare` and restart OpenBot.",
   "error.voice.downloadFailed": "Could not download the voice model. Try again.",
   "error.voice.downloadStopped": "Voice model download was stopped.",
   "error.voice.runtimeUnavailable": "Local voice transcription is not available on this platform.",

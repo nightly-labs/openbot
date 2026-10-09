@@ -67,6 +67,7 @@ export const messages = {
   "error.remote.bridgeCommandFailed": "Ekip WebRTC komutu başarısız oldu.",
   "error.remote.webRtcFailed": "WebRTC başarısız oldu.",
   "error.remote.ownerCannotLeave": "Sahip bu ana makineden ayrılamaz.",
+  "error.remote.ownerOnlyRemove": "Bu sunucuyu yalnızca sahibi kaldırabilir.",
   "error.remote.requestTimeout": "Uzak istek zaman aşımına uğradı.",
   "error.remote.requestFailed": "Uzak istek başarısız oldu.",
   "error.remote.pinnedKeyMissing": "Uzak ana makinenin sabitlenmiş bir cihaz anahtarı yok.",

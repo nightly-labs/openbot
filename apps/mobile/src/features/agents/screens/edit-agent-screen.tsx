@@ -1,5 +1,6 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { AvatarHue, UpdateAgentInput } from "@openbot/contracts/ipc";
+import type { AgentAccess, AvatarHue, UpdateAgentInput } from "@openbot/contracts/ipc";
+import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
@@ -7,11 +8,16 @@ import { useThemeColor } from "heroui-native/hooks";
 import { Pencil } from "lucide-react-native";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { Alert, Pressable, View } from "react-native";
-import { AgentAccessFields } from "@/features/agents/components/agent-access-fields";
+import { AgentAccessFields, useAgentAdminSettings } from "@/features/agents/components/agent-access-fields";
 import { AgentAppearancePicker } from "@/features/agents/components/agent-appearance-picker";
+import { AgentNewChatSection, AgentNotificationsRow } from "@/features/agents/components/agent-chat-settings";
+import { AgentBusyMessageField, AgentHostPermissionFields } from "@/features/agents/components/agent-host-fields";
 import { AgentInformation } from "@/features/agents/components/agent-information";
 import { type AgentPhotoDraft, AgentPhotoPicker } from "@/features/agents/components/agent-photo-picker";
+import { AgentPublish } from "@/features/agents/components/agent-publish";
 import { AgentRuntimeFields } from "@/features/agents/components/agent-runtime-fields";
+import { AgentSessionSettingsSection } from "@/features/agents/components/agent-session-settings";
+import { AgentSharedTables } from "@/features/agents/components/agent-shared-tables";
 import { BloubAvatarPreview } from "@/features/agents/components/bloub-avatar";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import {
@@ -30,6 +36,11 @@ type AgentEdits = Pick<
   "name" | "title" | "description" | "avatarSeed" | "avatarHue" | "provider" | "model" | "reasoningEffort"
 >;
 
+const ACCESS_LABEL = {
+  workspace: "mobile.agent.access.workspace",
+  full: "mobile.agent.access.full",
+} as const satisfies Record<AgentAccess, MobileTextKey>;
+
 type AgentPage =
   | "info"
   | "appearance"
@@ -38,7 +49,11 @@ type AgentPage =
   | "skills"
   | "files"
   | "routines"
+  | "tables"
+  | "publish"
   | "runtime"
+  | "permissions"
+  | "advanced"
   | "memory"
   | "routine";
 
@@ -79,7 +94,21 @@ function AgentForm({
   page: AgentPage;
 }) {
   const { t, errorMessage } = useText();
-  const { updateAgent, setAgentAvatar } = useMobileWorkspace();
+  const {
+    updateAgent,
+    setAgentAvatar,
+    canManageSharedTables,
+    canPublishAgent,
+    canStartNewChat,
+    canManageAgentAccess,
+    canManageAgentHostSettings,
+  } = useMobileWorkspace();
+  // The Permissions row shows the access, as on desktop. Its page reads the same host answer.
+  const { settings: adminSettings } = useAgentAdminSettings(agent, host, available && page === "info");
+  const showPermissions = canManageAgentAccess(agent.serverId) || canManageAgentHostSettings(agent.serverId);
+  const showNotifications = agent.notifications !== undefined;
+  const showAdvanced =
+    Boolean(agent.workspacePath) || canStartNewChat(agent.serverId) || canManageAgentHostSettings(agent.serverId);
   const navigation = useNavigation();
   const [edits, setEdits] = useState<AgentEdits>({});
   const foreground = useThemeColor("foreground");
@@ -286,7 +315,29 @@ function AgentForm({
           onChange={change}
         />
       ) : null}
-      {page === "runtime" ? <AgentAccessFields agent={agent} server={host} available={available} /> : null}
+      {page === "permissions" ? (
+        <>
+          <AgentAccessFields agent={agent} server={host} available={available} />
+          <AgentHostPermissionFields agent={agent} server={host} available={available} />
+        </>
+      ) : null}
+      {page === "advanced" ? (
+        <>
+          <AgentBusyMessageField agent={agent} server={host} available={available} />
+          {agent.workspacePath ? (
+            <SettingsSection title={t("mobile.agent.workspace.title")} footer={t("mobile.agent.workspace.footer")}>
+              <SettingsRow>
+                <Typography.Paragraph selectable type="body-sm">
+                  {agent.workspacePath}
+                </Typography.Paragraph>
+              </SettingsRow>
+            </SettingsSection>
+          ) : null}
+          {canStartNewChat(agent.serverId) ? <AgentNewChatSection agent={agent} available={available} /> : null}
+        </>
+      ) : null}
+      {page === "tables" ? <AgentSharedTables agent={agent} available={available} /> : null}
+      {page === "publish" ? <AgentPublish agent={agent} available={available} /> : null}
       {page === "usage" ||
       page === "memories" ||
       page === "skills" ||
@@ -310,19 +361,23 @@ function AgentForm({
           onSave={() => void submit()}
         />
       ) : null}
+      {/* The groups and their order follow the desktop agent settings. */}
       {page === "info" ? (
         <>
-          <SettingsSection title={t("mobile.agent.menu.info")}>
+          <SettingsSection title={t("mobile.agent.groups.brain")}>
             <SettingsRow
+              supportingText={agent.model}
               onPress={() =>
                 router.push({
-                  pathname: "/agent-info/[agentId]/usage",
+                  pathname: "/agent-info/[agentId]/runtime",
                   params: { agentId: agent.id, serverId: agent.serverId },
                 })
               }
             >
-              <Typography.Paragraph>{t("mobile.agent.info.usage.title")}</Typography.Paragraph>
+              <Typography.Paragraph>{t("mobile.agent.runtime.model")}</Typography.Paragraph>
             </SettingsRow>
+          </SettingsSection>
+          <SettingsSection title={t("mobile.agent.groups.knows")}>
             <SettingsRow
               onPress={() =>
                 router.push({
@@ -353,6 +408,20 @@ function AgentForm({
             >
               <Typography.Paragraph>{t("mobile.agent.info.files.title")}</Typography.Paragraph>
             </SettingsRow>
+            {canManageSharedTables(agent.serverId) ? (
+              <SettingsRow
+                onPress={() =>
+                  router.push({
+                    pathname: "/agent-info/[agentId]/tables",
+                    params: { agentId: agent.id, serverId: agent.serverId },
+                  })
+                }
+              >
+                <Typography.Paragraph>{t("mobile.agent.tables.title")}</Typography.Paragraph>
+              </SettingsRow>
+            ) : null}
+          </SettingsSection>
+          <SettingsSection title={t("mobile.agent.groups.does")}>
             <SettingsRow
               onPress={() =>
                 router.push({
@@ -363,20 +432,65 @@ function AgentForm({
             >
               <Typography.Paragraph>{t("mobile.agent.info.routines.title")}</Typography.Paragraph>
             </SettingsRow>
-          </SettingsSection>
-          <SettingsSection>
             <SettingsRow
-              supportingText={agent.model}
               onPress={() =>
                 router.push({
-                  pathname: "/agent-info/[agentId]/runtime",
+                  pathname: "/agent-info/[agentId]/usage",
                   params: { agentId: agent.id, serverId: agent.serverId },
                 })
               }
             >
-              <Typography.Paragraph>{t("mobile.agent.runtime.title")}</Typography.Paragraph>
+              <Typography.Paragraph>{t("mobile.agent.info.usage.title")}</Typography.Paragraph>
             </SettingsRow>
+            {canPublishAgent(agent.serverId) ? (
+              <SettingsRow
+                onPress={() =>
+                  router.push({
+                    pathname: "/agent-info/[agentId]/publish",
+                    params: { agentId: agent.id, serverId: agent.serverId },
+                  })
+                }
+              >
+                <Typography.Paragraph>{t("mobile.agent.publish.title")}</Typography.Paragraph>
+              </SettingsRow>
+            ) : null}
           </SettingsSection>
+          {host && host.role !== "member" ? (
+            <AgentSessionSettingsSection key={`${agent.serverId}:${agent.id}`} agent={agent} available={available} />
+          ) : null}
+          {showPermissions || showNotifications || showAdvanced ? (
+            <SettingsSection
+              title={t("mobile.agent.groups.rules")}
+              footer={showNotifications ? t("mobile.agent.notifications.footer") : undefined}
+            >
+              {showPermissions ? (
+                <SettingsRow
+                  supportingText={adminSettings ? t(ACCESS_LABEL[adminSettings.access]) : undefined}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/agent-info/[agentId]/permissions",
+                      params: { agentId: agent.id, serverId: agent.serverId },
+                    })
+                  }
+                >
+                  <Typography.Paragraph>{t("mobile.agent.permissions.title")}</Typography.Paragraph>
+                </SettingsRow>
+              ) : null}
+              {showNotifications ? <AgentNotificationsRow agent={agent} available={available} /> : null}
+              {showAdvanced ? (
+                <SettingsRow
+                  onPress={() =>
+                    router.push({
+                      pathname: "/agent-info/[agentId]/advanced",
+                      params: { agentId: agent.id, serverId: agent.serverId },
+                    })
+                  }
+                >
+                  <Typography.Paragraph>{t("mobile.agent.advanced.title")}</Typography.Paragraph>
+                </SettingsRow>
+              ) : null}
+            </SettingsSection>
+          ) : null}
         </>
       ) : null}
     </SheetScrollView>

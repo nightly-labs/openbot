@@ -169,6 +169,10 @@ export const messages = {
   "mobile.server.settings.leaveTitle": "Quitter {name} ?",
   "mobile.server.settings.leaveBody": "Il vous faudra une nouvelle invitation pour revenir.",
   "mobile.server.settings.leave": "Quitter le serveur",
+  "mobile.server.settings.removeTitle": "Supprimer {name} ?",
+  "mobile.server.settings.removeBody":
+    "Le serveur est supprimé du service de comptes pour tous les membres. Les fichiers et les discussions sur son ordinateur restent. Pour le réutiliser, enregistrez-le depuis cet ordinateur.",
+  "mobile.server.settings.remove": "Supprimer le serveur",
   "mobile.server.settings.name": "Nom du serveur",
   "mobile.server.settings.nameLength": "Utilisez de {min} à {max} caractères.",
   "mobile.server.settings.logo": "Logo du serveur",

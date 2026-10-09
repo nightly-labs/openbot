@@ -47,6 +47,8 @@ function runtimeHarness(owners?: Parameters<typeof createProviderRuntimeStore>[1
       antigravity: { ...offer.runtime, availableVersion: null },
       cursor: { ...offer.runtime, availableVersion: null },
       cline: { ...offer.runtime, availableVersion: null },
+      pi: { ...offer.runtime, availableVersion: null },
+      muse: { ...offer.runtime, availableVersion: null },
     },
     toolRuntimes: { bun: { ...offer.runtime } },
   };

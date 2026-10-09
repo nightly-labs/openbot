@@ -8,7 +8,7 @@ import {
   type SidebarLayoutSnapshot,
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
-import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { formatUpdatedAt } from "@/shared/lib/format-updated-at";
@@ -17,7 +17,9 @@ export type RemoteAgent = Pick<
   AgentSummary,
   "id" | "name" | "title" | "description" | "preview" | "updatedAt" | "avatarSeed" | "avatarHue"
 > &
-  Partial<Pick<AgentSummary, "provider" | "model" | "reasoningEffort" | "avatarUrl">>;
+  Partial<
+    Pick<AgentSummary, "provider" | "model" | "reasoningEffort" | "avatarUrl" | "notifications" | "workspacePath">
+  >;
 
 export function projectAgent(serverId: string, agent: RemoteAgent): MobileAgent {
   return {
@@ -31,6 +33,8 @@ export function projectAgent(serverId: string, agent: RemoteAgent): MobileAgent 
     provider: agent.provider,
     model: agent.model,
     reasoningEffort: agent.reasoningEffort,
+    notifications: agent.notifications,
+    workspacePath: agent.workspacePath,
     avatarUrl: agent.avatarUrl ?? null,
     avatarSeed: agent.avatarSeed,
     avatarHue: agent.avatarHue,
@@ -61,6 +65,8 @@ export function decodeAgent(value: unknown): RemoteAgent {
     provider: isAgentProvider(value.provider) ? value.provider : undefined,
     model: isAgentModel(value.model) ? value.model : undefined,
     reasoningEffort: isReasoningEffort(value.reasoningEffort) ? value.reasoningEffort : undefined,
+    notifications: isBoolean(value.notifications) ? value.notifications : undefined,
+    workspacePath: isString(value.workspacePath) && value.workspacePath ? value.workspacePath : undefined,
     avatarUrl: isString(value.avatarUrl) ? value.avatarUrl : null,
     avatarSeed: value.avatarSeed,
     avatarHue: value.avatarHue,

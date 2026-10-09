@@ -984,6 +984,21 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     (operation) => this.#owned(operation),
   ).bind(this);
 
+  /** Removes a host that this account owns from the account service, for all of its members. */
+  readonly removeOwnedRemoteHost = Effect.fn("CentralAuth.removeOwnedRemoteHost")(
+    function* (
+      this: CentralAuthManager,
+      hostId: string,
+    ): Effect.fn.Return<void, CentralAuthOperationError, CentralAuthTransport> {
+      return yield* this.#authorizedRequestEffect(
+        `/v2/remote/hosts/${encodeURIComponent(hostId)}/`,
+        { method: "DELETE" },
+        decodeVoid,
+      );
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
   readonly updateRemoteHostLogo = Effect.fn("CentralAuth.updateRemoteHostLogo")(
     function* (
       this: CentralAuthManager,

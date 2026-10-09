@@ -1,3 +1,5 @@
+import { ACP_REGISTRY_ROUTES } from "@openbot/contracts/team-protocol/acp-registry-v1";
+import { legacyTeamCapabilities, TEAM_CURRENT_CAPABILITIES } from "@openbot/contracts/team-protocol/current";
 import { Effect } from "effect";
 import type { AgentLifecycleFailed } from "../backend/agent-service";
 import { RemoteWorkflowError } from "./remote-service-effects";
@@ -8,6 +10,7 @@ import { RemoteWorkflowError } from "./remote-service-effects";
 
 import type {
   AgentAccess,
+  AgentSessionSettings,
   AgentStatus,
   AgentSummary,
   AgentTemplatePreview,
@@ -27,8 +30,14 @@ import type {
 import { createOpenBotLogger, registerSecretValue } from "@openbot/logging";
 import { afterEach, describe, expect, it } from "vitest";
 import { createAgentAdminSettings } from "./agent-admin-settings";
+import { createAgentHostSettings } from "./agent-host-settings";
 import { RequestedUpdateRefusal } from "./requested-update";
-import { createTeamApiFixture, stopTeamApiFixtures, type TeamApiOptions } from "./team-api-server-test-harness";
+import {
+  createAgents,
+  createTeamApiFixture,
+  stopTeamApiFixtures,
+  type TeamApiOptions,
+} from "./team-api-server-test-harness";
 
 afterEach(stopTeamApiFixtures);
 
@@ -67,6 +76,73 @@ async function signedIn(name: string, options: Partial<TeamApiOptions>) {
     fetch(`${base}${path}`, { method: "POST", headers, body: JSON.stringify(body) });
   return { base, admin, asMember, post, fixture, member };
 }
+
+describe("Team API agent-session-settings-v1", () => {
+  // Failure modes: a member changes provider behavior, an old client reaches new routes, or
+  // an extra/invalid value reaches the service. Exercise the real authenticated HTTP boundary.
+  it("requires an admin and the capability for reading, saving and resetting settings", async () => {
+    let value: AgentSessionSettings = {
+      agentId: "chief",
+      providerIdentity: "opencode",
+      pending: false,
+      overrides: {},
+      options: [{ id: "compact", name: "Compact replies", type: "boolean", currentValue: false }],
+    };
+    let changes = 0;
+    const { admin, asMember, post } = await signedIn("agent-session-settings", {
+      admin: {
+        sessionSettings: {
+          readAgentSessionSettings: () => Effect.succeed(value),
+          setAgentSessionSetting: (input) =>
+            Effect.sync(() => {
+              changes += 1;
+              value = {
+                ...value,
+                overrides: { compact: input.value },
+                options: [
+                  { id: "compact", name: "Compact replies", type: "boolean", currentValue: input.value === true },
+                ],
+              };
+              return value;
+            }),
+          resetAgentSessionSetting: () =>
+            Effect.sync(() => {
+              changes += 1;
+              value = {
+                ...value,
+                overrides: {},
+                options: [{ id: "compact", name: "Compact replies", type: "boolean", currentValue: false }],
+              };
+              return value;
+            }),
+        },
+      },
+    });
+    const path = "/v1/admin/agents/session-settings";
+    const headers = { ...admin, "OpenBot-Capabilities": "agent-session-settings-v1" };
+    const memberHeaders = { ...asMember, "OpenBot-Capabilities": "agent-session-settings-v1" };
+    expect((await post(path, { agentId: "chief" })).status).toBe(400);
+    expect((await post(path, { agentId: "chief" }, memberHeaders)).status).toBe(403);
+    expect(
+      (await post(`${path}/set`, { agentId: "chief", settingId: "compact", value: true }, memberHeaders)).status,
+    ).toBe(403);
+    expect((await post(`${path}/reset`, { agentId: "chief", settingId: "compact" }, memberHeaders)).status).toBe(403);
+    expect((await post(`${path}/set`, { agentId: "chief", settingId: "compact", value: 1 }, headers)).status).toBe(400);
+    expect(
+      (await post(`${path}/set`, { agentId: "chief", settingId: "compact", value: true, access: "full" }, headers))
+        .status,
+    ).toBe(400);
+    expect(changes).toBe(0);
+    expect(await (await post(path, { agentId: "chief" }, headers)).json()).toEqual(value);
+    const saved = await post(`${path}/set`, { agentId: "chief", settingId: "compact", value: true }, headers);
+    expect(saved.status).toBe(200);
+    expect((await saved.json()).overrides).toEqual({ compact: true });
+    const reset = await post(`${path}/reset`, { agentId: "chief", settingId: "compact" }, headers);
+    expect(reset.status).toBe(200);
+    expect((await reset.json()).overrides).toEqual({});
+    expect(changes).toBe(2);
+  });
+});
 
 describe("Team API agent-admin-v1", () => {
   it("lets only an admin read and change agent access and auto-approve", async () => {
@@ -135,6 +211,79 @@ describe("Team API agent-admin-v1", () => {
     const { base } = await signedIn("agent-admin-absent", {});
     const compatibility = await (await fetch(`${base}/v1/compatibility`)).json();
     expect(compatibility.capabilities).not.toContain("agent-admin-v1");
+  });
+});
+
+describe("Team API agent-host-settings-v1", () => {
+  it("lets only an admin read and change Computer Use, local scripts and the busy-message mode", async () => {
+    let agent: AgentSummary = { ...CHIEF, busyMessageMode: "steer" };
+    const settings = createAgentHostSettings({
+      agents: {
+        listAgents: () => [agent],
+        updateAgent: ({ agentId: _agentId, busyMessageMode, ...changes }) =>
+          Effect.sync(() => {
+            agent = { ...agent, ...changes };
+            if (busyMessageMode === null) delete agent.busyMessageMode;
+            else if (busyMessageMode) agent.busyMessageMode = busyMessageMode;
+            return agent;
+          }),
+      },
+      busyMessageMode: { get: () => ({ mode: "queue" }) },
+    });
+    const { base, admin, asMember, post } = await signedIn("agent-host-settings", { admin: { agentHost: settings } });
+    const withCapability = { ...admin, "OpenBot-Capabilities": "agent-host-settings-v1" };
+    const memberWithCapability = { ...asMember, "OpenBot-Capabilities": "agent-host-settings-v1" };
+
+    expect((await post("/v1/admin/agents/host-settings", { agentId: "chief" })).status).toBe(400);
+    expect((await post("/v1/admin/agents/host-settings", { agentId: "chief" }, memberWithCapability)).status).toBe(403);
+    expect(
+      (
+        await post(
+          "/v1/admin/agents/host-settings/update",
+          { agentId: "chief", computerUse: false, allowAutomation: true },
+          memberWithCapability,
+        )
+      ).status,
+    ).toBe(403);
+    expect(agent.computerUse).toBeUndefined();
+    expect(agent.allowAutomation).toBeUndefined();
+
+    const read = await post("/v1/admin/agents/host-settings", { agentId: "chief" }, withCapability);
+    expect(await read.json()).toEqual({
+      computerUse: true,
+      allowAutomation: false,
+      busyMessageMode: "steer",
+      defaultBusyMessageMode: "queue",
+    });
+
+    const updated = await post(
+      "/v1/admin/agents/host-settings/update",
+      { agentId: "chief", computerUse: false, allowAutomation: true, busyMessageMode: null },
+      withCapability,
+    );
+    expect(await updated.json()).toEqual({
+      computerUse: false,
+      allowAutomation: true,
+      busyMessageMode: null,
+      defaultBusyMessageMode: "queue",
+    });
+    expect(agent).toMatchObject({ computerUse: false, allowAutomation: true });
+    expect(agent.busyMessageMode).toBeUndefined();
+
+    // An update must change something, and the host refuses an agent it does not have.
+    expect((await post("/v1/admin/agents/host-settings/update", { agentId: "chief" }, withCapability)).status).toBe(
+      400,
+    );
+    expect((await post("/v1/admin/agents/host-settings", { agentId: "missing" }, withCapability)).status).toBe(404);
+
+    const compatibility = await (await fetch(`${base}/v1/compatibility`)).json();
+    expect(compatibility.capabilities).toContain("agent-host-settings-v1");
+  });
+
+  it("does not advertise agent-host-settings-v1 without the service", async () => {
+    const { base } = await signedIn("agent-host-settings-absent", {});
+    const compatibility = await (await fetch(`${base}/v1/compatibility`)).json();
+    expect(compatibility.capabilities).not.toContain("agent-host-settings-v1");
   });
 });
 
@@ -525,6 +674,8 @@ describe("Team API providers-v1", () => {
         antigravity: idle,
         cursor: idle,
         cline: idle,
+        pi: idle,
+        muse: idle,
       },
       toolRuntimes: { bun: idle },
     };
@@ -896,5 +1047,126 @@ describe("Team API host-member-update-v1", () => {
     for (const path of paths) expect((await post(`/v1/host/update/${path}`, {}, asMember)).status).toBe(401);
     const compatibility = await (await fetch(`${base}/v1/compatibility`)).json();
     expect(compatibility.capabilities).toContain("host-member-update-v1");
+  });
+});
+
+describe("Team API protocol 7 negotiation", () => {
+  // Failure modes: an old peer rejects the expanded handshake, or a new provider reaches an old decoder.
+  it("keeps every available released capability in protocol 6 and expands protocol 7", async () => {
+    const settings: AgentSessionSettings = {
+      agentId: "chief",
+      providerIdentity: "codex",
+      pending: false,
+      overrides: {},
+      options: [],
+    };
+    const { base } = await signedIn("v7-capabilities", {
+      admin: {
+        sessionSettings: {
+          readAgentSessionSettings: () => Effect.succeed(settings),
+          setAgentSessionSetting: () => Effect.succeed(settings),
+          resetAgentSessionSetting: () => Effect.succeed(settings),
+        },
+      },
+    });
+    const read = async (protocol: string) => {
+      const response = await fetch(`${base}/v1/compatibility`, { headers: { "OpenBot-Protocol-Version": protocol } });
+      expect(response.status).toBe(200);
+      return response.json();
+    };
+    const old = await read("6");
+    const current = await read("7");
+    expect(TEAM_CURRENT_CAPABILITIES).toHaveLength(66);
+    expect(legacyTeamCapabilities(TEAM_CURRENT_CAPABILITIES)).toHaveLength(62);
+    // This fixture omits optional services. Their capabilities must not be advertised.
+    expect(old.capabilities).toEqual(legacyTeamCapabilities(current.capabilities));
+    expect(old.capabilities.length).toBeLessThanOrEqual(62);
+    expect(current.capabilities.length).toBeLessThanOrEqual(66);
+    expect(old.capabilities).not.toContain("local-providers-v3");
+    expect(old.capabilities).not.toContain("agent-session-settings-v1");
+    expect(current.capabilities).toContain("local-providers-v3");
+    expect(current.capabilities).toContain("agent-session-settings-v1");
+  });
+
+  it("refuses Pi and Muse changes from protocol 6 and accepts them from protocol 7", async () => {
+    let agent = { ...CHIEF };
+    let changes = 0;
+    const { base, admin } = await signedIn("v7-provider-patch", {
+      agents: createAgents({
+        listAgents: () => [agent],
+        updateAgent: (input) =>
+          Effect.sync(() => {
+            changes++;
+            agent = {
+              ...agent,
+              ...(input.provider ? { provider: input.provider } : {}),
+              ...(input.model ? { model: input.model } : {}),
+            };
+            return agent;
+          }),
+      }),
+    });
+    for (const provider of ["pi", "muse"] as const) {
+      agent = { ...CHIEF };
+      const patch = (protocol: string) =>
+        fetch(`${base}/v1/agents/chief`, {
+          method: "PATCH",
+          headers: { ...admin, "OpenBot-Protocol-Version": protocol, "OpenBot-Capabilities": "local-providers-v3" },
+          body: JSON.stringify({ provider, model: "default" }),
+        });
+      expect((await patch("6")).status).toBe(400);
+      const prior = changes;
+      const response = await patch("7");
+      expect(response.status).toBe(200);
+      expect((await response.json()).provider).toBe(provider);
+      expect(changes).toBe(prior + 1);
+    }
+    expect(changes).toBe(2);
+  });
+});
+
+describe("Team API acp-registry-v1 authorization", () => {
+  // Failure mode: a joined member installs or removes a host command through a new optional route.
+  it("requires an admin and negotiated capability before invoking registry operations", async () => {
+    const calls: string[] = [];
+    const record = (name: string) =>
+      Effect.sync(() => {
+        calls.push(name);
+      });
+    const { admin, asMember, post } = await signedIn("registry-authorization", {
+      admin: {
+        acpRegistry: {
+          search: () => record("search").pipe(Effect.as([])),
+          listInstalled: () => record("installed").pipe(Effect.as([])),
+          status: () => record("status").pipe(Effect.as([])),
+          install: () => record("install").pipe(Effect.as({ agents: [], restart: "not-running" as const })),
+          cancel: () => record("cancel"),
+          uninstall: () => record("remove").pipe(Effect.as(undefined)),
+        },
+      },
+    });
+    const payloads = {
+      search: { query: "" },
+      installed: {},
+      status: {},
+      install: { registryId: "example", customAgentId: "example" },
+      cancel: { registryId: "example" },
+      remove: { registryId: "example" },
+    };
+    for (const name of ["search", "installed", "status", "install", "cancel", "remove"] as const) {
+      const path = ACP_REGISTRY_ROUTES[name];
+      expect((await post(path, payloads[name], admin)).status).toBe(400);
+      expect(
+        (await post(path, payloads[name], { ...asMember, "OpenBot-Capabilities": "acp-registry-v1" })).status,
+      ).toBe(403);
+    }
+    expect(calls).toEqual([]);
+    for (const name of ["search", "installed", "status", "install", "cancel", "remove"] as const) {
+      expect(
+        (await post(ACP_REGISTRY_ROUTES[name], payloads[name], { ...admin, "OpenBot-Capabilities": "acp-registry-v1" }))
+          .status,
+      ).toBe(200);
+    }
+    expect(calls).toEqual(["search", "installed", "status", "install", "cancel", "remove"]);
   });
 });

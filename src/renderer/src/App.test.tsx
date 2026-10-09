@@ -240,10 +240,9 @@ describe("OpenBot connected desktop shell", () => {
     await fireEvent.input(composer);
     await fireEvent.click(screen.getByRole("button", { name: "View agent settings" }));
     const settings = await screen.findByRole("complementary", { name: "Agent settings" });
-    await fireEvent.click(within(settings).getByRole("button", { name: /^Edit profile of/u }));
     const name = await within(settings).findByRole("textbox", { name: "Agent name" });
     await fireEvent.input(name, { target: { value: "Draft agent name" } });
-    await fireEvent.click(within(settings).getByRole("button", { name: "Back to settings" }));
+    await fireEvent.blur(name);
     const usageTrigger = within(settings).getByRole("button", { name: "Usage" });
     await fireEvent.click(usageTrigger);
     const usage = await screen.findByRole("region", { name: "Agent usage" });
@@ -251,7 +250,7 @@ describe("OpenBot connected desktop shell", () => {
     expect(within(usage).getByRole("heading", { name: "Usage Local" })).toBeInTheDocument();
     await fireEvent.click(within(usage).getByRole("button", { name: "Back" }));
     expect(screen.getByRole("main", { name: "Conversation" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Edit profile of Draft agent name" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Agent name" })).toHaveValue("Draft agent name");
     expect(screen.getByRole("textbox", { name: "Message Draft agent name" })).toHaveTextContent(
       "Keep this conversation draft",
     );

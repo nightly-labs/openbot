@@ -25,6 +25,7 @@ import {
   type AgentModelId,
   type AgentProviderId,
   type AgentReasoningEffort,
+  type AgentSessionSettingOverrides,
   type AgentSummary,
   type AvatarImageInput,
   type BusyMessageMode,
@@ -36,6 +37,8 @@ import {
   defaultProviderModel,
   isAgentAccess,
   isAgentModel,
+  isAgentSessionSettingOverrides,
+  isAgentSessionSettingResets,
   isAvatarHue,
   isAvatarSeed,
   isBusyMessageMode,
@@ -346,6 +349,8 @@ export class AgentStore {
       record.provider = source.provider;
       record.model = source.model;
       record.reasoningEffort = source.reasoningEffort;
+      if (source.sessionSettingOverrides)
+        record.sessionSettingOverrides = structuredClone(source.sessionSettingOverrides);
       record.access = source.access;
       record.computerUse = source.computerUse;
       if (source.busyMessageMode) record.busyMessageMode = source.busyMessageMode;
@@ -561,6 +566,42 @@ export class AgentStore {
       return decodeSaveAgentProfileResult(result);
     } catch (error) {
       Object.assign(this.#requireAgent(agentId), previous);
+      throw error;
+    }
+  }
+
+  setSessionSettingOverrides(
+    agentId: string,
+    overrides: AgentSessionSettingOverrides,
+    resetIdentity?: string,
+  ): AgentSummary {
+    if (!isAgentSessionSettingOverrides(overrides)) throw new Error(sourceText("error.provider.sessionSettingInvalid"));
+    const agent = this.#requireAgent(agentId);
+    const previous = agent.sessionSettingOverrides;
+    const previousResets = agent.sessionSettingResets;
+    if (resetIdentity) agent.sessionSettingResets = [...new Set([...(previousResets ?? []), resetIdentity])];
+    agent.sessionSettingOverrides = structuredClone(overrides);
+    try {
+      this.#persist("agent.updated");
+    } catch (error) {
+      if (previous === undefined) delete agent.sessionSettingOverrides;
+      else agent.sessionSettingOverrides = previous;
+      if (previousResets === undefined) delete agent.sessionSettingResets;
+      else agent.sessionSettingResets = previousResets;
+      throw error;
+    }
+    return { ...agent };
+  }
+
+  clearSessionSettingReset(agentId: string, identity: string): void {
+    const agent = this.#requireAgent(agentId);
+    const previous = agent.sessionSettingResets;
+    if (!previous?.includes(identity)) return;
+    agent.sessionSettingResets = previous.filter((value) => value !== identity);
+    try {
+      this.#persist("agent.updated");
+    } catch (error) {
+      agent.sessionSettingResets = previous;
       throw error;
     }
   }
@@ -1606,6 +1647,8 @@ function isStoredAgent(value: unknown): value is PersistedStoredAgent {
   const record = value;
   return (
     (record.provider === undefined || isOneOf(AGENT_PROVIDERS, record.provider)) &&
+    (record.sessionSettingOverrides === undefined || isAgentSessionSettingOverrides(record.sessionSettingOverrides)) &&
+    (record.sessionSettingResets === undefined || isAgentSessionSettingResets(record.sessionSettingResets)) &&
     (record.access === undefined || isAgentAccess(record.access)) &&
     (record.computerUse === undefined || isBoolean(record.computerUse)) &&
     (record.allowAutomation === undefined || isBoolean(record.allowAutomation)) &&
@@ -1683,6 +1726,14 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
       reset("marketplaceSource", undefined);
     }
   }
+  const sessionSettingResets =
+    value.sessionSettingResets === undefined || isAgentSessionSettingResets(value.sessionSettingResets)
+      ? value.sessionSettingResets
+      : reset("sessionSettingResets", undefined);
+  const sessionSettingOverrides =
+    value.sessionSettingOverrides === undefined || isAgentSessionSettingOverrides(value.sessionSettingOverrides)
+      ? value.sessionSettingOverrides
+      : reset("sessionSettingOverrides", undefined);
   const agent: PersistedStoredAgent = {
     id,
     name: isString(value.name) ? value.name : reset("name", titleFromId(id)),
@@ -1705,6 +1756,8 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
     ...(computerUse === undefined ? {} : { computerUse }),
     ...(allowAutomation === undefined ? {} : { allowAutomation }),
     ...(busyMessageMode === undefined ? {} : { busyMessageMode }),
+    ...(sessionSettingOverrides === undefined ? {} : { sessionSettingOverrides }),
+    ...(sessionSettingResets === undefined ? {} : { sessionSettingResets }),
     ...(marketplaceSource === undefined ? {} : { marketplaceSource }),
   };
   return { agent, repaired };

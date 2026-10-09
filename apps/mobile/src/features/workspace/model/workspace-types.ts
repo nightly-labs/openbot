@@ -4,11 +4,15 @@ import type {
   AgentAdminSettings,
   AgentAnalytics,
   AgentAnalyticsInput,
+  AgentHostSettings,
   AgentMemory,
   AgentModelId,
   AgentModelOption,
   AgentProviderId,
   AgentReasoningEffort,
+  AgentSessionSettings,
+  AgentTemplatePreview,
+  AgentTemplatePublication,
   AvatarHue,
   AvatarImageInput,
   ConversationSearchPage,
@@ -21,18 +25,22 @@ import type {
   InstallAgentTemplateInput,
   InstalledSkill,
   QueueSnapshot,
+  ResetAgentSessionSettingInput,
   RespondToApprovalInput,
   RespondToBrowserSecretInput,
   RespondToPromptInput,
   Routine,
   RoutineCalendar,
   RoutineCalendarInput,
+  SetAgentSessionSettingInput,
   SetEnabledSkillInput,
+  SharedTable,
   SidebarLayoutAction,
   SidebarLayoutSnapshot,
   StorageUsage,
   UninstallSkillInput,
   UpdateAgentAdminSettingsInput,
+  UpdateAgentHostSettingsInput,
   UpdateAgentInput,
   UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
@@ -82,6 +90,10 @@ export interface MobileAgent {
   provider?: AgentProviderId;
   model?: AgentModelId;
   reasoningEffort?: AgentReasoningEffort;
+  /** One switch for every member: off stops the host's notifications and Live Activity for the agent. */
+  notifications?: boolean;
+  /** The agent workspace folder on the host. */
+  workspacePath?: string;
   id: string;
   serverId: string;
   name: string;
@@ -176,6 +188,8 @@ export interface MobileWorkspaceContextValue {
   liveState: LiveWorkspaceStore;
   selectServer: (serverId: string) => void;
   leaveServer: (serverId: string) => Promise<void>;
+  /** Removes a server that this account owns from the account service. The host can be offline. */
+  removeServer: (serverId: string) => Promise<void>;
   refreshServers: () => Promise<void>;
   refreshServer: (serverId: string) => Promise<void>;
   /** An owner or admin of an online host that serves `host-admin-v1`. The host checks the role again. */
@@ -232,6 +246,38 @@ export interface MobileWorkspaceContextValue {
   loadAgentAdminSettings: (agentId: string, serverId: string) => Promise<AgentAdminSettings | null>;
   /** Owners and admins only; the host refuses a member. Resolves with the settings the host saved. */
   updateAgentAdminSettings: (input: UpdateAgentAdminSettingsInput, serverId: string) => Promise<AgentAdminSettings>;
+  /** An owner or admin of an online host that serves `agent-admin-v1`. The host checks the role again. */
+  canManageAgentAccess: (serverId: string) => boolean;
+  /** An owner or admin of an online host that serves `agent-host-settings-v1`. The host checks the role again. */
+  canManageAgentHostSettings: (serverId: string) => boolean;
+  /**
+   * Computer Use, local scripts and the busy-message mode. Null when the host does not advertise
+   * `agent-host-settings-v1`. Owners and admins only; the host refuses a member.
+   */
+  loadAgentHostSettings: (agentId: string, serverId: string) => Promise<AgentHostSettings | null>;
+  /** Owners and admins only; the host refuses a member. Resolves with the settings the host saved. */
+  updateAgentHostSettings: (input: UpdateAgentHostSettingsInput, serverId: string) => Promise<AgentHostSettings>;
+  /** True when the host advertises `context-reset-v1`. Any member can start a new chat. */
+  canStartNewChat: (serverId: string) => boolean;
+  /** The agent forgets the messages before it. The host refuses while the agent works. */
+  loadAgentSessionSettings: (agentId: string, serverId: string) => Promise<AgentSessionSettings | null>;
+  setAgentSessionSetting: (input: SetAgentSessionSettingInput, serverId: string) => Promise<AgentSessionSettings>;
+  resetAgentSessionSetting: (input: ResetAgentSessionSettingInput, serverId: string) => Promise<AgentSessionSettings>;
+  startNewChat: (agentId: string, serverId: string) => Promise<void>;
+  /** An owner or admin of an online host that serves `shared-tables-v1`. The host checks the role again. */
+  canManageSharedTables: (serverId: string) => boolean;
+  /** Every table that the agents of the host share. Owners and admins only. */
+  listSharedTables: (serverId: string) => Promise<SharedTable[]>;
+  /** Owners and admins only. The table goes for every agent. */
+  deleteSharedTable: (name: string, serverId: string) => Promise<void>;
+  /** An owner or admin of an online host that serves `agent-publish-v1`. The host checks the role again. */
+  canPublishAgent: (serverId: string) => boolean;
+  /** What the host would publish for the agent, and its link when it is published. Owners and admins only. */
+  loadAgentTemplatePreview: (agentId: string, serverId: string) => Promise<AgentTemplatePreview>;
+  /** The host publishes with its own account, without a share card. Owners and admins only. */
+  publishAgentTemplate: (agentId: string, serverId: string) => Promise<AgentTemplatePublication>;
+  /** Owners and admins only. The link stops working. */
+  unpublishAgentTemplate: (agentId: string, serverId: string) => Promise<void>;
   /** True when the host advertises `agent-install-v1`. The host still refuses a member. */
   canInstallAgentTemplate: (serverId: string) => boolean;
   /** Owners and admins only. The host downloads the template with its own account. */
@@ -263,5 +309,7 @@ export interface MobileWorkspaceContextValue {
   unhideAgent: (agentId: string) => void;
   markAgentRead: (agentId: string, throughMessageId?: string) => void;
   markAgentUnread: (agentId: string) => void;
+  /** Marks every unread chat of the active server read. It rejects when a chat stays unread. */
+  markAllRead: () => Promise<void>;
   toggleAgentPin: (agentId: string) => ToggleAgentPinResult;
 }

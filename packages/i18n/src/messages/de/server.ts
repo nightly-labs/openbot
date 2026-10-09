@@ -133,6 +133,7 @@ export const messages = {
   "server.rail.usage": "Nutzung",
   "server.rail.schedule": "Routinen",
   "server.rail.settings": "Servereinstellungen",
+  "server.rail.remove": "Server entfernen",
   "server.rail.leave": "Server verlassen",
   "server.rail.delete": "Server löschen",
   "server.select.failedTitle": "Server konnte nicht ausgewählt werden",
@@ -245,6 +246,14 @@ export const messages = {
   "server.settings.saveIdentityFirst": "Speichere die Serveridentität vor der Veröffentlichung.",
   "server.settings.reachable": "Online erreichbar. Nur eingeladene Personen können sich anmelden.",
   "server.settings.notReachable": "Online nicht erreichbar. Bestehende Mitglieder und Einladungen bleiben erhalten.",
+  "server.settings.removeTitle": "Server entfernen",
+  "server.settings.removeDescription":
+    "Entferne diesen Server für alle Mitglieder aus dem Kontodienst. Nutze dies, wenn sein Computer nicht mehr verfügbar ist.",
+  "server.settings.removeConfirmTitle": "{name} entfernen?",
+  "server.settings.removeConfirmDescription":
+    "Dadurch wird der Server für alle Mitglieder aus dem Kontodienst entfernt und der Fernzugriff beendet. Dateien und Chats auf seinem Computer bleiben erhalten. Um ihn wieder zu nutzen, registriere ihn auf diesem Computer.",
+  "server.settings.removing": "Wird entfernt…",
+  "server.settings.removedTitle": "{name} entfernt",
   "server.settings.leaveTitle": "Server verlassen",
   "server.settings.leaveDescription":
     "Entferne diesen Server aus deiner Serverliste. Der Server und seine anderen Mitglieder bleiben erhalten.",

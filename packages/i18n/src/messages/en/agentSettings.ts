@@ -1,14 +1,18 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("agentSettings", {
+  "agentSettings.session.title": "Provider settings",
+  "agentSettings.session.readFailed": "Could not read provider settings.",
+  "agentSettings.session.pending": "Saved changes apply before the next turn.",
+  "agentSettings.session.unavailable": "Saved value {value} is not available. Select another value or reset it.",
+  "agentSettings.session.effective": "Current provider value: {value}",
+  "agentSettings.session.reset": "Reset setting",
+  "agentSettings.session.resetNamed": "Reset {name}",
   "agentSettings.label": "Agent settings",
   "agentSettings.title": "Settings",
   "agentSettings.backToDetails": "Back to details",
   "agentSettings.closeDetails": "Close details",
   "agentSettings.backToSettings": "Back to settings",
-  "agentSettings.profile.title": "Profile",
-  "agentSettings.profile.open": "Edit profile of {name}",
-  "agentSettings.instructionsEdit": "Edit instructions",
   "agentSettings.permissions.title": "Permissions",
   "agentSettings.advanced.title": "Advanced",
   "agentSettings.groups.brain": "Brain",

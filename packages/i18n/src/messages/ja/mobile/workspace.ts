@@ -16,6 +16,7 @@ export const messages = {
   "mobile.workspace.error.transportNotReady": "モバイル接続の準備ができていません。",
   "mobile.workspace.error.sectionsUnsupported": "このホストはセクションの変更に対応していません。",
   "mobile.workspace.error.leaveOwnServer": "退出できるのは参加したリモートサーバーのみです。",
+  "mobile.workspace.error.removeOwnedServerOnly": "このサーバーを削除できるのはオーナーだけです。",
   "mobile.workspace.error.agentNotOnHost": "エージェントはこのホストにありません。",
   "mobile.workspace.error.filesUnsupported":
     "このホストはファイル管理に対応していません。ホストの OpenBot を更新してください。",
@@ -31,6 +32,9 @@ export const messages = {
   "mobile.workspace.alert.updateRequiredUnread": "会話を未読にするには、このデスクトップサーバーを更新してください。",
   "mobile.workspace.alert.markUnreadTitle": "未読にできませんでした",
   "mobile.workspace.alert.markUnreadBody": "サーバーに再接続して、もう一度お試しください。",
+  "mobile.workspace.alert.markAllReadTitle": "すべてを既読にできませんでした",
+  "mobile.workspace.alert.markAllReadBody":
+    "未読のチャットが残っています。サーバーに再接続して、もう一度お試しください。",
   "mobile.workspace.alert.serverOrderTitle": "サーバーの順序を保存できませんでした",
   "mobile.workspace.alert.serverOrderBody": "以前の順序を保持しました。もう一度お試しください。",
   "mobile.workspace.error.connectFailed": "サーバーへの接続に失敗しました。",

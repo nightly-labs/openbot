@@ -116,22 +116,8 @@ export const messages = {
   "sidebar.announce.movedPinned": "Der angeheftete Chat wurde an Position {position} von {total} verschoben.",
   "sidebar.announce.personFallback": "Person",
   "sidebar.announce.chatFallback": "Chat",
-  "sidebar.mobileApp.title": "OpenBot für iPhone",
-  "sidebar.mobileApp.body": "Die iOS-App ist jetzt als öffentliche Beta in TestFlight verfügbar.",
+  "sidebar.mobileApp.title": "OpenBot für Mobilgeräte",
+  "sidebar.mobileApp.body": "Die App gibt es jetzt für iPhone und Android.",
   "sidebar.mobileApp.howToInstall": "Installationsanleitung",
-  "sidebar.mobileApp.dismiss": "Ankündigung der iPhone-App ausblenden",
-  "sidebar.mobileApp.qrLabel": "QR-Code der TestFlight-Einladung",
-  "sidebar.mobileApp.dialog.title": "OpenBot auf deinem iPhone installieren",
-  "sidebar.mobileApp.dialog.description":
-    "Die iOS-App ist als öffentliche Beta verfügbar. Die Installation erfolgt über Apple TestFlight.",
-  "sidebar.mobileApp.dialog.copyLink": "Link kopieren",
-  "sidebar.mobileApp.dialog.linkCopied": "Link kopiert",
-  "sidebar.mobileApp.dialog.copyFailed": "Der Link konnte nicht kopiert werden.",
-  "sidebar.mobileApp.dialog.close": "Schließen",
-  "sidebar.mobileApp.step.testFlight": "Installiere TestFlight aus dem App Store auf deinem iPhone.",
-  "sidebar.mobileApp.step.invite":
-    "Scanne diesen QR-Code mit der iPhone-Kamera oder kopiere den Einladungslink und öffne ihn auf deinem iPhone.",
-  "sidebar.mobileApp.step.install": "Tippe in TestFlight auf Annehmen und dann auf Installieren.",
-  "sidebar.mobileApp.step.connect":
-    "Öffne OpenBot auf deinem iPhone. Gehe auf diesem Computer zu Einstellungen > Mobilverbindung und scanne den Anmeldecode.",
+  "sidebar.mobileApp.dismiss": "Ankündigung der Mobile-App ausblenden",
 } as const satisfies PartialTranslation<typeof source>;

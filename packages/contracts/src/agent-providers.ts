@@ -27,6 +27,8 @@ export const AGENT_PROVIDERS = [
   "antigravity",
   "cursor",
   "cline",
+  "pi",
+  "muse",
   "acp",
 ] as const;
 export type AgentProviderId = (typeof AGENT_PROVIDERS)[number];
@@ -226,6 +228,40 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     steer: "deferred",
     reportsUsage: false,
   },
+  pi: {
+    id: "pi",
+    displayName: "Pi",
+    cliName: "Pi CLI",
+    onboardingDescription: "Included with OpenBot",
+    signInMessage: "Use /login in Pi on the host computer. Close Pi when sign-in is complete.",
+    installGuideLink: null,
+    defaultModel: "",
+    legacyModelPrefix: null,
+    authKind: "pi",
+    pickerOrder: 7,
+    codeSignIn: false,
+    skillFolders: [".agents/skills"],
+    workspaceEnforcement: "confined-process",
+    steer: "native",
+    reportsUsage: false,
+  },
+  muse: {
+    id: "muse",
+    displayName: "Muse",
+    cliName: "Muse CLI",
+    onboardingDescription: "Included with OpenBot",
+    signInMessage: "Sign in to Muse on the host computer to continue.",
+    installGuideLink: null,
+    defaultModel: "",
+    legacyModelPrefix: null,
+    authKind: "muse",
+    pickerOrder: 8,
+    codeSignIn: false,
+    skillFolders: [".agents/skills"],
+    workspaceEnforcement: "confined-process",
+    steer: "native",
+    reportsUsage: true,
+  },
   // One provider for every Agent Client Protocol agent the user adds by command. The model id names
   // the agent (`<customAgentId>/<agentModel>`), so one provider row serves them all and the shipped
   // provider CHECK lists grow by one word only once.
@@ -290,6 +326,8 @@ export const MANAGED_RUNTIME_PROVIDERS = [
   "antigravity",
   "cursor",
   "cline",
+  "pi",
+  "muse",
 ] as const satisfies readonly AgentProviderId[];
 export type ManagedProviderId = (typeof MANAGED_RUNTIME_PROVIDERS)[number];
 
@@ -306,6 +344,8 @@ export const LOCAL_ONLY_PROVIDERS = [
   "antigravity",
   "cursor",
   "cline",
+  "pi",
+  "muse",
   "acp",
 ] as const satisfies readonly AgentProviderId[];
 

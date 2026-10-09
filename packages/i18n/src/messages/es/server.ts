@@ -130,6 +130,7 @@ export const messages = {
   "server.rail.usage": "Uso",
   "server.rail.schedule": "Rutinas",
   "server.rail.settings": "Ajustes del servidor",
+  "server.rail.remove": "Eliminar servidor",
   "server.rail.leave": "Abandonar servidor",
   "server.rail.delete": "Eliminar servidor",
   "server.select.failedTitle": "No se pudo seleccionar el servidor",
@@ -240,6 +241,14 @@ export const messages = {
   "server.settings.saveIdentityFirst": "Guarda la identidad del servidor antes de publicarlo.",
   "server.settings.reachable": "Accesible en línea. Solo las personas invitadas pueden iniciar sesión.",
   "server.settings.notReachable": "No accesible en línea. Los miembros y las invitaciones existentes se conservan.",
+  "server.settings.removeTitle": "Eliminar servidor",
+  "server.settings.removeDescription":
+    "Elimina este servidor del servicio de cuentas para todos los miembros. Úsalo cuando su ordenador ya no esté disponible.",
+  "server.settings.removeConfirmTitle": "¿Eliminar {name}?",
+  "server.settings.removeConfirmDescription":
+    "Esto elimina el servidor del servicio de cuentas para todos los miembros y termina el acceso remoto. Los archivos y chats de su ordenador se conservan. Para volver a usarlo, regístralo desde ese ordenador.",
+  "server.settings.removing": "Eliminando…",
+  "server.settings.removedTitle": "{name} eliminado",
   "server.settings.leaveTitle": "Abandonar servidor",
   "server.settings.leaveDescription":
     "Elimina este servidor de tu lista de servidores. El servidor y sus otros miembros se conservan.",

@@ -5,6 +5,8 @@ import type {
   ProviderAdminDesktopApi,
   ServerSummary,
 } from "@openbot/contracts/ipc";
+import { decodeRegistryEntries, decodeRegistryInstallResult, decodeRegistryOperations } from "@openbot/contracts/ipc";
+import { ACP_REGISTRY_ROUTES } from "@openbot/contracts/team-protocol/acp-registry-v1";
 import { PROVIDERS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/providers-v1";
 import {
   PROVIDERS_RUNTIMES_V2_CAPABILITY,
@@ -15,6 +17,7 @@ import {
   PROVIDERS_SIGN_IN_V3_ROUTES,
 } from "@openbot/contracts/team-protocol/providers-v3";
 import { PROVIDERS_V4_CAPABILITY, PROVIDERS_V4_ROUTES } from "@openbot/contracts/team-protocol/providers-v4";
+import { PROVIDERS_V5_CAPABILITY, PROVIDERS_V5_ROUTES } from "@openbot/contracts/team-protocol/providers-v5";
 import { runTeamEffect } from "@openbot/team-client";
 import {
   cancelProviderCodeLogin,
@@ -34,6 +37,7 @@ import {
   submitProviderCodeLogin,
 } from "@openbot/team-client/team-admin-requests";
 import type { TeamApiRequest } from "@openbot/team-client/team-api-requests";
+import type { AcpRegistrySettingsApi } from "@openbot/ui/features/custom-providers/AcpRegistrySettings";
 import { currentText } from "@openbot/ui/text";
 import { Effect } from "effect";
 import { createEffect, createMemo } from "solid-js";
@@ -74,6 +78,7 @@ function webProviderAdmin(
   request: (serverId?: string) => TeamApiRequest,
   runtimeRoutes: () => ProviderRuntimeRoutes,
   signInRoutes: () => ProviderCodeLoginRoutes,
+  keyRoutes: () => typeof PROVIDERS_ADMIN_ROUTES | typeof PROVIDERS_V5_ROUTES,
 ): ProviderAdminDesktopApi {
   return {
     startCodeLogin: async (provider, serverId) =>
@@ -99,11 +104,17 @@ function webProviderAdmin(
         ),
       ),
     getApiKeyState: async (provider, serverId) =>
-      runTeamEffect(getProviderApiKeyState(request(serverId), provider).pipe(Effect.mapError((error) => error.cause))),
+      runTeamEffect(
+        getProviderApiKeyState(request(serverId), provider, keyRoutes()).pipe(Effect.mapError((error) => error.cause)),
+      ),
     setApiKey: async (input, serverId) =>
-      runTeamEffect(setProviderApiKey(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
+      runTeamEffect(
+        setProviderApiKey(request(serverId), input, keyRoutes()).pipe(Effect.mapError((error) => error.cause)),
+      ),
     clearApiKey: async (provider, serverId) =>
-      runTeamEffect(clearProviderApiKey(request(serverId), provider).pipe(Effect.mapError((error) => error.cause))),
+      runTeamEffect(
+        clearProviderApiKey(request(serverId), provider, keyRoutes()).pipe(Effect.mapError((error) => error.cause)),
+      ),
     getRuntimes: async (serverId) =>
       runTeamEffect(
         getProviderRuntimes(request(serverId), runtimeRoutes()).pipe(Effect.mapError((error) => error.cause)),
@@ -151,11 +162,13 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions): 
   const admin = webProviderAdmin(
     options.request,
     () =>
-      serverSupportsCapability(options.server(), PROVIDERS_V4_CAPABILITY)
-        ? PROVIDERS_V4_ROUTES
-        : serverSupportsCapability(options.server(), PROVIDERS_RUNTIMES_V2_CAPABILITY)
-          ? PROVIDERS_RUNTIMES_V2_ROUTES
-          : PROVIDERS_ADMIN_ROUTES,
+      serverSupportsCapability(options.server(), PROVIDERS_V5_CAPABILITY)
+        ? PROVIDERS_V5_ROUTES
+        : serverSupportsCapability(options.server(), PROVIDERS_V4_CAPABILITY)
+          ? PROVIDERS_V4_ROUTES
+          : serverSupportsCapability(options.server(), PROVIDERS_RUNTIMES_V2_CAPABILITY)
+            ? PROVIDERS_RUNTIMES_V2_ROUTES
+            : PROVIDERS_ADMIN_ROUTES,
     // `providers-v1` signs in Codex only; the picker offers no other provider on such a host.
     () =>
       serverSupportsCapability(options.server(), PROVIDERS_V4_CAPABILITY)
@@ -163,6 +176,10 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions): 
         : serverSupportsCapability(options.server(), PROVIDERS_SIGN_IN_V3_CAPABILITY)
           ? PROVIDERS_SIGN_IN_V3_ROUTES
           : PROVIDERS_ADMIN_ROUTES,
+    () =>
+      serverSupportsCapability(options.server(), PROVIDERS_V5_CAPABILITY)
+        ? PROVIDERS_V5_ROUTES
+        : PROVIDERS_ADMIN_ROUTES,
   );
   const serverId = createMemo(() => remoteAdminServer(options.server(), "providers-v1")?.id);
   const runtimes = createProviderRuntimeStore(
@@ -227,7 +244,23 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions): 
     },
   );
 
+  const registry = createMemo((): AcpRegistrySettingsApi | undefined => {
+    const id = serverId();
+    if (!id || !serverSupportsCapability(options.server(), "acp-registry-v1")) return undefined;
+    const send = options.request(id);
+    const empty = () => undefined;
+    return {
+      search: (query) => send("POST", ACP_REGISTRY_ROUTES.search, decodeRegistryEntries, { query }),
+      status: () => send("POST", ACP_REGISTRY_ROUTES.status, decodeRegistryOperations, {}),
+      install: (input) => send("POST", ACP_REGISTRY_ROUTES.install, decodeRegistryInstallResult, { ...input }),
+      cancel: (registryId) => send("POST", ACP_REGISTRY_ROUTES.cancel, empty, { registryId }),
+      remove: (registryId) => send("POST", ACP_REGISTRY_ROUTES.remove, empty, { registryId }),
+    };
+  });
   const settings: HostProviderSettings = {
+    get acpRegistry() {
+      return registry();
+    },
     get agentStatus() {
       return options.status();
     },

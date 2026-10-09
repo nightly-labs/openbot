@@ -23,9 +23,11 @@ import { AgentAndroidMenu, useAgentContextMenu } from "@/features/agents/compone
 import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
 import { AgentPinSwipeRow } from "@/features/agents/components/agent-pin-swipe-row";
 import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
+import { AGENT_WAIT_STATE, AgentWaitBadge, AgentWaitChip } from "@/features/agents/components/agent-wait-badge";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
 import { ChatZoomSource } from "@/features/agents/components/chat-zoom-source";
+import { useAgentWaitReason } from "@/features/workspace/components/use-agent-activity";
 import { useAgentUnread } from "@/features/workspace/components/use-live-workspace";
 import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
@@ -115,6 +117,7 @@ export function AgentListRow({
   const agentChatPreview = useAgentChatPreview(agent);
   const previewLine = useMemo(() => markdownPreviewText(agent.preview), [agent.preview]);
   const isUnread = useAgentUnread(agent.id);
+  const waitReason = useAgentWaitReason(agent.id);
   const isUnpinTarget = transition?.chatId === agent.id && transition.target === "row";
   const bloub = (
     <BloubAvatar
@@ -126,23 +129,31 @@ export function AgentListRow({
       animateIdle={false}
     />
   );
+  const waitBadge = waitReason ? <AgentWaitBadge reason={waitReason} /> : null;
   const avatar = onOpen ? (
-    bloub
+    <View>
+      {bloub}
+      {waitBadge}
+    </View>
   ) : (
     <ChatZoomSource>
       <AgentPinAvatar agentId={agent.id} location="row" size={54}>
         {bloub}
+        {waitBadge}
       </AgentPinAvatar>
     </ChatZoomSource>
   );
+  const openLabel = agent.title.trim()
+    ? t("mobile.agent.list.openWithTitle", { name: agent.name, title: agent.title.trim() })
+    : t("mobile.agent.list.open", { name: agent.name });
 
   const row = (
     <ChatLinkPressable
       chatId={onOpen ? undefined : agent.id}
       accessibilityLabel={
-        agent.title.trim()
-          ? t("mobile.agent.list.openWithTitle", { name: agent.name, title: agent.title.trim() })
-          : t("mobile.agent.list.open", { name: agent.name })
+        waitReason
+          ? t("mobile.agent.list.withState", { label: openLabel, state: t(AGENT_WAIT_STATE[waitReason]) })
+          : openLabel
       }
       accessibilityRole="button"
       accessibilityActions={
@@ -180,9 +191,13 @@ export function AgentListRow({
                   <Typography.Paragraph className="min-w-0 flex-1" weight="semibold" numberOfLines={2}>
                     {agent.name}
                   </Typography.Paragraph>
-                  <Typography.Paragraph type="body-xs" className="text-muted">
-                    {agent.updatedLabel}
-                  </Typography.Paragraph>
+                  {waitReason ? (
+                    <AgentWaitChip reason={waitReason} />
+                  ) : (
+                    <Typography.Paragraph type="body-xs" className="text-muted">
+                      {agent.updatedLabel}
+                    </Typography.Paragraph>
+                  )}
                 </View>
                 {agent.title.trim() ? (
                   <Typography.Paragraph type="body-xs" className="-mt-1.5 text-muted" numberOfLines={2}>

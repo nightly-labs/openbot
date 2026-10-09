@@ -535,6 +535,10 @@ export function useLiveActivity({
       void resetLiveActivitySecret().catch(() => undefined);
       if (!live) return;
       live.native.removeAvatars(new Set());
+      // The files are gone, so the next mount draws and loads them again. Fast Refresh keeps the refs.
+      avatars.current.clear();
+      keptAvatars.current = 0;
+      setPhotos({});
       void syncFor(live.native).show(null);
     };
   }, [live, syncFor, enqueueRegistration]);

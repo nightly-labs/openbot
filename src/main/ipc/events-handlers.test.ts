@@ -125,6 +125,7 @@ describe("events-v1 over a real host", () => {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
             "OpenBot-App-Version": APP_VERSION,
+            "OpenBot-Protocol-Version": "7",
             "OpenBot-Capabilities": TEAM_CURRENT_CAPABILITIES.join(","),
           },
           body:

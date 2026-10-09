@@ -25,11 +25,11 @@ import {
   Bell,
   Brain,
   Button,
-  ChevronRight,
   ConfirmDialog,
   Cpu,
   IconButton,
   Input,
+  Pencil,
   Popover,
   RefreshCw,
   RotateCcw,
@@ -63,7 +63,6 @@ import {
   createMemo,
   createSignal,
   createStore,
-  createUniqueId,
   For,
   onCleanup,
   onSettled,
@@ -131,12 +130,13 @@ export interface AgentSettingsPanelProps {
 
 const INSTRUCTIONS_SAVE_DELAY_MS = 400;
 
-/** The pages behind the root list. The root shows the agent and one row for each page. */
-type AgentSettingsPage = "profile" | "instructions" | "permissions" | "advanced";
+/**
+ * The pages behind the root list. The root edits the agent's face, name, title and instructions
+ * in place, as the mobile app does, and shows one row for each page.
+ */
+type AgentSettingsPage = "permissions" | "advanced";
 
 const PAGE_TITLE: Record<AgentSettingsPage, AppTextKey> = {
-  profile: "agentSettings.profile.title",
-  instructions: "agentSettings.instructions",
   permissions: "agentSettings.permissions.title",
   advanced: "agentSettings.advanced.title",
 };
@@ -232,7 +232,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   }
 
   let pageRoot: HTMLDivElement | undefined;
-  const instructionsPreviewId = createUniqueId();
 
   /**
    * The row that opened the page is gone, so the focus moves to the first control of the page.
@@ -248,11 +247,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     );
   }
 
-  /** A field removed with the page may not blur, so its edit is saved here. */
   function closePage(): void {
-    if (draft.dirty.name) saveName();
-    if (draft.dirty.title) saveTitle();
-    if (draft.dirty.description) saveDescription();
     returnFocusPage = page();
     setPage(null);
   }
@@ -728,152 +723,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
         <SettingsPanelContent>
           <div ref={(element) => (pageRoot = element)} class="agent-settings-page">
             <Show when={page() === null}>
-              <Button
-                ref={pageRowRef("profile")}
-                variant="ghost"
-                type="button"
-                class="agent-settings-profile-card"
-                aria-label={t("agentSettings.profile.open", { name: draft.fields.name })}
-                data-cuelume-tap="navigate"
-                onClick={() => openPage("profile")}
-              >
-                <AgentAvatar
-                  class="agent-settings-profile-avatar"
-                  seed={draft.avatar.seed}
-                  hue={draft.avatar.hue}
-                  url={avatarUrl()}
-                />
-                <span class="agent-settings-profile-text">
-                  <strong class="agent-settings-profile-name">{draft.fields.name}</strong>
-                  <Show when={draft.fields.title}>
-                    <small class="agent-settings-profile-subtitle">{draft.fields.title}</small>
-                  </Show>
-                </span>
-                <ChevronRight class="agent-settings-card-chevron" aria-hidden="true" />
-              </Button>
-              <Button
-                ref={pageRowRef("instructions")}
-                variant="ghost"
-                type="button"
-                class="agent-settings-instructions-card"
-                aria-label={t("agentSettings.instructionsEdit")}
-                aria-describedby={instructionsPreviewId}
-                data-cuelume-tap="navigate"
-                onClick={() => openPage("instructions")}
-              >
-                <span class="agent-settings-instructions-card-head">
-                  {t("agentSettings.instructions")}
-                  <ChevronRight class="agent-settings-card-chevron" aria-hidden="true" />
-                </span>
-                <span
-                  id={instructionsPreviewId}
-                  class={[
-                    "agent-settings-instructions-preview",
-                    { "agent-settings-instructions-preview-empty": !draft.fields.description.trim() },
-                  ]}
-                >
-                  {draft.fields.description.trim() || t("agentSettings.instructionsPlaceholder")}
-                </span>
-              </Button>
-              <SettingsLinkGroup inset class="agent-settings-runtime-rows" title={t("agentSettings.groups.brain")}>
-                <ProviderModelPicker
-                  variant="field"
-                  icon={
-                    <span class="settings-link-icon">
-                      <Cpu aria-hidden="true" />
-                    </span>
-                  }
-                  ariaLabel={t("agentSettings.runtime.model")}
-                  provider={draft.runtime.provider}
-                  value={draft.runtime.model}
-                  agentStatus={props.agentStatus}
-                  modelOptions={props.modelOptions}
-                  runtimeStatuses={props.providerRuntimeStatuses}
-                  customProviders={props.customProviders}
-                  customAgents={props.customAgents}
-                  onDownloadProvider={props.onDownloadProvider}
-                  onCancelProviderDownload={props.onCancelProviderDownload}
-                  onConnectProvider={props.onConnectProvider}
-                  onAddCustomProvider={props.onAddCustomProvider}
-                  disabled={props.working}
-                  disabledReason={
-                    props.working ? t("agentSettings.runtime.modelBusy") : t("agentSettings.runtime.modelUnavailable")
-                  }
-                  onChange={(nextModel, provider) => void selectModel(nextModel, provider)}
-                />
-                <Select<AgentReasoningEffort>
-                  class="agent-settings-runtime-select"
-                  options={reasoningOptions()}
-                  value={draft.runtime.reasoningEffort}
-                  disabled={reasoningSetByProvider()}
-                  onChange={(nextReasoning) => {
-                    if (!nextReasoning || nextReasoning === draft.runtime.reasoningEffort) return;
-                    void selectReasoning(nextReasoning);
-                  }}
-                  itemComponent={(item) => (
-                    <SelectItem item={item.item}>{reasoningLabel(item.item.rawValue)}</SelectItem>
-                  )}
-                >
-                  <SelectTrigger
-                    class="agent-settings-runtime-row"
-                    aria-label={t("agentSettings.runtime.reasoningLabel")}
-                  >
-                    <span class="settings-link-icon">
-                      <Brain aria-hidden="true" />
-                    </span>
-                    <span class="agent-settings-runtime-label">{t("agentSettings.runtime.reasoning")}</span>
-                    <SelectValue<AgentReasoningEffort>>
-                      {(state) => {
-                        if (reasoningSetByProvider()) {
-                          return t("agentSettings.runtime.reasoningSetByProvider", {
-                            provider: agentProviderName(draft.runtime.provider),
-                          });
-                        }
-                        const effort = state.selectedOption();
-                        return effort ? reasoningLabel(effort) : t("agentSettings.runtime.selectReasoning");
-                      }}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent />
-                </Select>
-              </SettingsLinkGroup>
-              {props.links}
-              <SettingsLinkGroup inset title={t("agentSettings.groups.rules")}>
-                <SettingsLinkRow
-                  ref={pageRowRef("permissions")}
-                  icon={<ShieldCheck aria-hidden="true" />}
-                  label={t("agentSettings.permissions.title")}
-                  value={t(ACCESS_LABEL[draft.access])}
-                  onClick={() => openPage("permissions")}
-                />
-                <div class="agent-settings-switch-row">
-                  <span class="settings-link-label">
-                    <span class="settings-link-icon">
-                      <Bell aria-hidden="true" />
-                    </span>
-                    {t("agentSettings.notifications.title")}
-                  </span>
-                  <Switch
-                    size="sm"
-                    aria-label={t("agentSettings.notifications.title")}
-                    checked={draft.notifications}
-                    onChange={(next) => {
-                      setDraft((state) => {
-                        state.notifications = next;
-                      });
-                      void saveAgentPatch({ notifications: next });
-                    }}
-                  />
-                </div>
-                <SettingsLinkRow
-                  ref={pageRowRef("advanced")}
-                  icon={<SlidersHorizontal aria-hidden="true" />}
-                  label={t("agentSettings.advanced.title")}
-                  onClick={() => openPage("advanced")}
-                />
-              </SettingsLinkGroup>
-            </Show>
-            <Show when={page() === "profile"}>
               <div ref={(element) => (avatarPickerRoot = element)} class="agent-settings-avatar-picker">
                 <Popover.Root
                   open={draft.avatar.pickerOpen}
@@ -891,6 +740,9 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                 >
                   <Popover.Trigger class="agent-settings-avatar" aria-label={t("agentSettings.avatar.edit")}>
                     <AgentAvatar seed={draft.avatar.seed} hue={draft.avatar.hue} url={avatarUrl()} motion="always" />
+                    <span class="agent-settings-avatar-badge" aria-hidden="true">
+                      <Pencil class="agent-settings-avatar-badge-icon" />
+                    </span>
                   </Popover.Trigger>
                   <Popover.Content class="avatar-editor" aria-hidden={draft.avatar.pickerOpen ? undefined : "true"}>
                     <Popover.Title class="sr-only">{t("agentSettings.avatar.editor")}</Popover.Title>
@@ -1081,24 +933,121 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   onBlur={saveTitle}
                 />
               </SettingsField>
-            </Show>
-            <Show when={page() === "instructions"}>
-              <Textarea
-                class="agent-settings-instructions-input"
-                rows="12"
-                value={draft.fields.description}
-                aria-label={t("agentSettings.instructionsLabel")}
-                placeholder={t("agentSettings.instructionsPlaceholder")}
-                maxlength={INPUT_LIMITS.agentDescription}
-                onValueChange={(value) => {
-                  setDraft((state) => {
-                    state.fields.description = value;
-                    state.dirty.description = true;
-                  });
-                  scheduleInstructionsSave(value);
-                }}
-                onBlur={saveDescription}
-              />
+              <SettingsField label={t("agentSettings.instructions")}>
+                <Textarea
+                  class="settings-instructions-input"
+                  rows="5"
+                  value={draft.fields.description}
+                  aria-label={t("agentSettings.instructionsLabel")}
+                  placeholder={t("agentSettings.instructionsPlaceholder")}
+                  maxlength={INPUT_LIMITS.agentDescription}
+                  onValueChange={(value) => {
+                    setDraft((state) => {
+                      state.fields.description = value;
+                      state.dirty.description = true;
+                    });
+                    scheduleInstructionsSave(value);
+                  }}
+                  onBlur={saveDescription}
+                />
+              </SettingsField>
+              <SettingsLinkGroup inset class="agent-settings-runtime-rows" title={t("agentSettings.groups.brain")}>
+                <ProviderModelPicker
+                  variant="field"
+                  icon={
+                    <span class="settings-link-icon">
+                      <Cpu aria-hidden="true" />
+                    </span>
+                  }
+                  ariaLabel={t("agentSettings.runtime.model")}
+                  provider={draft.runtime.provider}
+                  value={draft.runtime.model}
+                  agentStatus={props.agentStatus}
+                  modelOptions={props.modelOptions}
+                  runtimeStatuses={props.providerRuntimeStatuses}
+                  customProviders={props.customProviders}
+                  customAgents={props.customAgents}
+                  onDownloadProvider={props.onDownloadProvider}
+                  onCancelProviderDownload={props.onCancelProviderDownload}
+                  onConnectProvider={props.onConnectProvider}
+                  onAddCustomProvider={props.onAddCustomProvider}
+                  disabled={props.working}
+                  disabledReason={
+                    props.working ? t("agentSettings.runtime.modelBusy") : t("agentSettings.runtime.modelUnavailable")
+                  }
+                  onChange={(nextModel, provider) => void selectModel(nextModel, provider)}
+                />
+                <Select<AgentReasoningEffort>
+                  class="agent-settings-runtime-select"
+                  options={reasoningOptions()}
+                  value={draft.runtime.reasoningEffort}
+                  disabled={reasoningSetByProvider()}
+                  onChange={(nextReasoning) => {
+                    if (!nextReasoning || nextReasoning === draft.runtime.reasoningEffort) return;
+                    void selectReasoning(nextReasoning);
+                  }}
+                  itemComponent={(item) => (
+                    <SelectItem item={item.item}>{reasoningLabel(item.item.rawValue)}</SelectItem>
+                  )}
+                >
+                  <SelectTrigger
+                    class="agent-settings-runtime-row"
+                    aria-label={t("agentSettings.runtime.reasoningLabel")}
+                  >
+                    <span class="settings-link-icon">
+                      <Brain aria-hidden="true" />
+                    </span>
+                    <span class="agent-settings-runtime-label">{t("agentSettings.runtime.reasoning")}</span>
+                    <SelectValue<AgentReasoningEffort>>
+                      {(state) => {
+                        if (reasoningSetByProvider()) {
+                          return t("agentSettings.runtime.reasoningSetByProvider", {
+                            provider: agentProviderName(draft.runtime.provider),
+                          });
+                        }
+                        const effort = state.selectedOption();
+                        return effort ? reasoningLabel(effort) : t("agentSettings.runtime.selectReasoning");
+                      }}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent />
+                </Select>
+              </SettingsLinkGroup>
+              {props.links}
+              <SettingsLinkGroup inset title={t("agentSettings.groups.rules")}>
+                <SettingsLinkRow
+                  ref={pageRowRef("permissions")}
+                  icon={<ShieldCheck aria-hidden="true" />}
+                  label={t("agentSettings.permissions.title")}
+                  value={t(ACCESS_LABEL[draft.access])}
+                  onClick={() => openPage("permissions")}
+                />
+                <div class="agent-settings-switch-row">
+                  <span class="settings-link-label">
+                    <span class="settings-link-icon">
+                      <Bell aria-hidden="true" />
+                    </span>
+                    {t("agentSettings.notifications.title")}
+                  </span>
+                  <Switch
+                    size="sm"
+                    aria-label={t("agentSettings.notifications.title")}
+                    checked={draft.notifications}
+                    onChange={(next) => {
+                      setDraft((state) => {
+                        state.notifications = next;
+                      });
+                      void saveAgentPatch({ notifications: next });
+                    }}
+                  />
+                </div>
+                <SettingsLinkRow
+                  ref={pageRowRef("advanced")}
+                  icon={<SlidersHorizontal aria-hidden="true" />}
+                  label={t("agentSettings.advanced.title")}
+                  onClick={() => openPage("advanced")}
+                />
+              </SettingsLinkGroup>
             </Show>
             <Show when={page() === "permissions"}>
               <Show when={props.accessEditable}>

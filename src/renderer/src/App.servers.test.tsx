@@ -1088,7 +1088,6 @@ describe("OpenBot connected desktop shell", () => {
   it("persists settings and opens managed attachment actions", async () => {
     render(() => <App />);
     await fireEvent.click(await screen.findByRole("button", { name: "View agent settings" }));
-    await fireEvent.click(await screen.findByRole("button", { name: /^Edit profile of/u }));
     const name = await screen.findByRole("textbox", { name: "Agent name" });
     await fireEvent.input(name, { target: { value: "Coordinator" } });
     await fireEvent.blur(name);

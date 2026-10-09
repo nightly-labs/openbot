@@ -249,7 +249,9 @@
   transform-origin: right center;
 }
 
+/* The hidden badge moves onto the end of a panel row, so it must not take a press from a row button. */
 .dynamic-island[data-layout-state="expanded"] .dynamic-island-trailing-compact {
+  pointer-events: none;
   opacity: 0;
   filter: none;
   transform: scale(0.92);

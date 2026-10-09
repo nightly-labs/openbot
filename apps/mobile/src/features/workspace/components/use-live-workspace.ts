@@ -14,6 +14,13 @@ export function useAgentUnread(agentId: string) {
   return useSyncExternalStore(liveState.subscribe, select);
 }
 
+/** The agents with unread messages, on every server. Re-renders only when that list changes. */
+export function useUnreadAgentIds() {
+  const { liveState } = useMobileWorkspace();
+  const select = useCallback(() => liveState.get().unreadAgentIds, [liveState]);
+  return useSyncExternalStore(liveState.subscribe, select);
+}
+
 /** The browser takeovers this server waits on. Re-renders only when that list changes. */
 export function useBrowserRequests(serverId: string) {
   const { liveState } = useMobileWorkspace();

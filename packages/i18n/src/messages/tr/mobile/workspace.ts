@@ -16,6 +16,7 @@ export const messages = {
   "mobile.workspace.error.transportNotReady": "Mobil aktarım hazır değil.",
   "mobile.workspace.error.sectionsUnsupported": "Bu ana makine bölüm değişikliklerini desteklemiyor.",
   "mobile.workspace.error.leaveOwnServer": "Yalnızca katılınan uzak sunuculardan ayrılınabilir.",
+  "mobile.workspace.error.removeOwnedServerOnly": "Bu sunucuyu yalnızca sahibi kaldırabilir.",
   "mobile.workspace.error.agentNotOnHost": "Ajan bu ana makinede değil.",
   "mobile.workspace.error.filesUnsupported":
     "Bu ana makine dosya yönetimini desteklemiyor. Ana makinedeki OpenBot'u güncelleyin.",
@@ -31,6 +32,8 @@ export const messages = {
     "Konuşmaları okunmadı olarak işaretlemek için bu masaüstü sunucusunu güncelleyin.",
   "mobile.workspace.alert.markUnreadTitle": "Okunmadı olarak işaretlenemedi",
   "mobile.workspace.alert.markUnreadBody": "Sunucuya yeniden bağlanıp tekrar deneyin.",
+  "mobile.workspace.alert.markAllReadTitle": "Tümü okundu olarak işaretlenemedi",
+  "mobile.workspace.alert.markAllReadBody": "Bazı sohbetler hâlâ okunmadı. Sunucuya yeniden bağlanıp tekrar deneyin.",
   "mobile.workspace.alert.serverOrderTitle": "Sunucu sırası kaydedilemedi",
   "mobile.workspace.alert.serverOrderBody": "Önceki sıranız korundu. Lütfen tekrar deneyin.",
   "mobile.workspace.error.connectFailed": "Sunucu bağlantısı başarısız oldu.",

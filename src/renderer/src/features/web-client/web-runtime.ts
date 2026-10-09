@@ -64,13 +64,10 @@ import {
   TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
-import {
-  decodeTeamProtocolSupportV1,
-  type TeamProtocolSupportV1,
-  teamProtocolUpdateDirection,
-} from "@openbot/contracts/team-protocol/v1";
+import { type TeamProtocolSupportV1, teamProtocolUpdateDirection } from "@openbot/contracts/team-protocol/v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
+import { decodeTeamProtocolSupportV7Base } from "@openbot/contracts/team-protocol/v7-base";
 import {
   WORKSPACE_DIRECTORY_CAPABILITY,
   WORKSPACE_DIRECTORY_ROUTES,
@@ -699,7 +696,7 @@ export function createWebWorkspaceRuntime(
         });
         if (!result.ok || disposed || current !== generation)
           throw new Error(currentText().t("webClient.error.connectionUnavailable"));
-        const support = decodeTeamProtocolSupportV1(await request("GET", TEAM_API_ROUTES.compatibility));
+        const support = decodeTeamProtocolSupportV7Base(await request("GET", TEAM_API_ROUTES.compatibility));
         const updateDirection = teamProtocolUpdateDirection(
           { minimum: TEAM_PROTOCOL_V3, maximum: TEAM_PROTOCOL_V3 },
           support.protocol,

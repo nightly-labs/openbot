@@ -1,11 +1,14 @@
+import { ACP_REGISTRY_CODECS } from "./acp-registry-v1";
 // The optional admin routes, one table. `teamSideRouteCodec` in `side-routes.ts` asks here, so every
 // HTTP and WebRTC transport encodes an admin route with its frozen codec. A path that is not listed
 // goes to the protocol adapter.
 import type { OptionalRouteCodec } from "./admin-wire";
 import { AGENT_ADMIN_CODECS } from "./agent-admin-v1";
+import { AGENT_HOST_SETTINGS_CODECS } from "./agent-host-settings-v1";
 import { AGENT_IMPORT_CODECS } from "./agent-import-v1";
 import { AGENT_INSTALL_CODECS } from "./agent-install-v1";
 import { AGENT_PUBLISH_CODECS } from "./agent-publish-v1";
+import { AGENT_SESSION_SETTINGS_CODECS } from "./agent-session-settings-v1";
 import { AGENT_UPDATE_CODECS } from "./agent-update-v1";
 import { CONTEXT_RESET_CODECS } from "./context-reset-v1";
 import { EVENTS_CODECS } from "./events-v1";
@@ -19,6 +22,7 @@ import { PROVIDERS_ADMIN_CODECS } from "./providers-v1";
 import { PROVIDERS_RUNTIMES_V2_CODECS } from "./providers-v2";
 import { PROVIDERS_SIGN_IN_V3_CODECS } from "./providers-v3";
 import { PROVIDERS_V4_CODECS } from "./providers-v4";
+import { PROVIDERS_V5_CODECS } from "./providers-v5";
 import { SHARED_TABLES_CODECS } from "./shared-tables-v1";
 import { SKILLS_ADMIN_CODECS } from "./skills-admin-v1";
 import { WORKSPACE_DIRECTORY_CODECS } from "./workspace-directory-v1";
@@ -35,6 +39,9 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...PROVIDERS_RUNTIMES_V2_CODECS,
   ...PROVIDERS_SIGN_IN_V3_CODECS,
   ...PROVIDERS_V4_CODECS,
+  ...PROVIDERS_V5_CODECS,
+  ...AGENT_SESSION_SETTINGS_CODECS,
+  ...ACP_REGISTRY_CODECS,
   ...HOST_ADMIN_CODECS,
   ...HOST_UPDATE_CODECS,
   ...HOST_RELEASE_CODECS,
@@ -46,6 +53,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...LIVE_ACTIVITY_PUSH_CODECS,
   ...HOSTED_SITES_CODECS,
   ...WORKSPACE_DIRECTORY_CODECS,
+  ...AGENT_HOST_SETTINGS_CODECS,
 ]);
 
 export function optionalRouteCodec(path: string): OptionalRouteCodec | undefined {

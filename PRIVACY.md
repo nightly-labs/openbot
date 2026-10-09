@@ -420,13 +420,17 @@ Billing is off, and Stripe receives nothing, when the account service has no Str
 
 Attachments copied into OpenBot remain in managed storage after their original file is moved or
 deleted. All agents share the embedded browser profile, including cookies and website sessions.
+Websites receive the browser's Chromium user agent. HTTPS sites and local loopback HTTP sites also
+receive basic client hints with the Chromium major version, operating-system name, and desktop flag.
+Google account requests retain the Electron version token for sign-in compatibility.
 
 ## Remote Team API
 
 When the owner publishes OpenBot, the app starts an authenticated Team API on a localhost port. The
 client and host use a separate OpenBot Signal service to establish WebRTC. Signal carries only
 short-lived authentication, SDP, and ICE messages. Team API data uses WebRTC DataChannels. Remote
-Desktop media and input use a separate WebRTC connection. The live browser view sends compressed
+Desktop media and input use a separate WebRTC connection. A paste in the Remote Desktop viewer
+sends the member's clipboard text to the host, which puts it on the host's clipboard. The live browser view sends compressed
 images of the host's browser tab, and the watching member's pointer and key input, over that same
 media connection. ICE uses a direct peer-to-peer path when possible. If a direct path is not possible, encrypted WebRTC traffic uses an OpenBot coturn relay.
 
@@ -963,3 +967,22 @@ release manifest from GitHub for its operating system and architecture. The requ
 account data, chats, files, commands, or credentials. GitHub receives the host IP address as part
 of the connection. Connected administrators receive the installed version, release version,
 check status, and installation method.
+
+
+## Pi, Muse, and ACP registry setup
+
+Pi and Muse run on the host selected for the agent. They receive the conversation input, attached
+images, tool definitions, and enabled MCP server configuration needed for a turn. Provider account
+files remain under each provider's control. An explicit Meta API key is encrypted in OpenBot's
+existing provider credential store. Settings responses and settings-change events contain no
+provider credentials; the event carries only the agent ID.
+
+ACP registry search fetches the catalog from `cdn.agentclientprotocol.com`; search text is matched
+on the host. Installation downloads the selected distribution from its published source. Pi update
+checks use `api.github.com`. Muse update checks use `api.meta.ai`, and manifests and binaries come
+from `lookaside.facebook.com`. Download requests reveal the host IP address and requested artifact.
+Registry install records remain on the host, separate from conversations and credentials.
+
+An authorized remote administrator can install, update, cancel, or remove a registry runtime on
+the host through the encrypted Team connection. Removal does not delete agent configuration,
+credentials, or conversations. The existing cloud service does not store those files.

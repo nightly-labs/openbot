@@ -17,6 +17,7 @@ export const messages = {
   "mobile.workspace.error.sectionsUnsupported": "Cet hôte ne prend pas en charge la modification des sections.",
   "mobile.workspace.error.leaveOwnServer":
     "Vous pouvez quitter uniquement les serveurs distants que vous avez rejoints.",
+  "mobile.workspace.error.removeOwnedServerOnly": "Seul le propriétaire peut supprimer ce serveur.",
   "mobile.workspace.error.agentNotOnHost": "L’agent n’est pas sur cet hôte.",
   "mobile.workspace.error.filesUnsupported":
     "Cet hôte ne prend pas en charge la gestion des fichiers. Mettez à jour OpenBot sur l’hôte.",
@@ -33,6 +34,9 @@ export const messages = {
     "Mettez à jour ce serveur de bureau pour marquer les conversations comme non lues.",
   "mobile.workspace.alert.markUnreadTitle": "Impossible de marquer comme non lu",
   "mobile.workspace.alert.markUnreadBody": "Reconnectez-vous au serveur et réessayez.",
+  "mobile.workspace.alert.markAllReadTitle": "Impossible de tout marquer comme lu",
+  "mobile.workspace.alert.markAllReadBody":
+    "Certaines discussions sont encore non lues. Reconnectez-vous au serveur et réessayez.",
   "mobile.workspace.alert.serverOrderTitle": "Impossible d’enregistrer l’ordre des serveurs",
   "mobile.workspace.alert.serverOrderBody": "L’ordre précédent a été conservé. Réessayez.",
   "mobile.workspace.error.connectFailed": "La connexion au serveur a échoué.",

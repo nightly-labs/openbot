@@ -11,7 +11,9 @@ import {
   cursorConfinedEnv,
   cursorStatePaths,
   grokStatePaths,
+  museStatePaths,
   ProcessConfinementUnavailableError,
+  piStatePaths,
 } from "./process-confinement";
 
 // The test folder must not be under the temporary folders, which the sandbox allows. The test runner
@@ -73,6 +75,23 @@ describe.runIf(process.platform === "darwin")("confineSpawnTarget on macOS", () 
     expect(confinedWrite(join(grokHome, "hooks", "start.sh"))).toBe(false);
     expect(confinedWrite(join(grokHome, "trusted_folders.toml"))).toBe(false);
     expect(confinedWrite(join(workspace, ".grok", "config.toml"))).toBe(false);
+  });
+
+  it("permits native provider session state but denies credentials and executable settings", async () => {
+    const piRoot = join(root, "pi");
+    const museData = join(root, "muse-data");
+    const pi = piStatePaths({ PI_CODING_AGENT_DIR: piRoot }, root);
+    const muse = museStatePaths({ XDG_DATA_HOME: museData }, root);
+    for (const path of [join(piRoot, "sessions"), join(museData, "muse", "sessions"), join(museData, "muse", "logs")])
+      await mkdir(path, { recursive: true });
+    expect(confinedWrite(join(piRoot, "sessions", "saved.jsonl"), pi)).toBe(true);
+    expect(confinedWrite(join(piRoot, "auth.json"), pi)).toBe(false);
+    expect(confinedWrite(join(piRoot, "extensions", "plugin.ts"), pi)).toBe(false);
+    expect(confinedWrite(join(museData, "muse", "sessions", "saved.jsonl"), muse)).toBe(true);
+    expect(confinedWrite(join(museData, "muse", "session-index.db"), muse)).toBe(true);
+    expect(confinedWrite(join(museData, "muse", "plugins", "plugin.js"), muse)).toBe(false);
+    expect(confinedWrite(join(workspace, ".pi", "settings.json"), pi)).toBe(false);
+    expect(confinedWrite(join(workspace, ".muse", "settings.json"), muse)).toBe(false);
   });
 
   it("denies every provider's project settings in a root, also through a renamed folder", async () => {

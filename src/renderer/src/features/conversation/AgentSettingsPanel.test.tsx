@@ -41,7 +41,6 @@ describe("AgentSettingsPanel", () => {
           onSetAgentAvatar={vi.fn(async () => undefined)}
         />
       ));
-      await fireEvent.click(await screen.findByRole("button", { name: "Edit instructions" }));
       const instructions = await screen.findByRole("textbox", { name: "Agent instructions" });
       await fireEvent.input(instructions, { target: { value: "Keep the shared form independent." } });
       view.unmount();
@@ -76,7 +75,6 @@ describe("AgentSettingsPanel", () => {
         />
       ));
 
-      await fireEvent.click(await screen.findByRole("button", { name: "Edit instructions" }));
       const instructions = await screen.findByRole("textbox", { name: "Agent instructions" });
       instructions.focus();
       await fireEvent.input(instructions, { target: { value: "Use the reviewed release instructions." } });
@@ -112,7 +110,6 @@ describe("AgentSettingsPanel", () => {
       />
     ));
 
-    await fireEvent.click(await screen.findByRole("button", { name: "Edit instructions" }));
     const instructions = await screen.findByRole("textbox", { name: "Agent instructions" });
     await fireEvent.input(instructions, { target: { value: "Keep this instruction when the panel closes." } });
     view.unmount();
@@ -152,7 +149,6 @@ describe("AgentSettingsPanel", () => {
         />
       ));
 
-      await fireEvent.click(await screen.findByRole("button", { name: "Edit instructions" }));
       const instructions = await screen.findByRole("textbox", { name: "Agent instructions" });
       await fireEvent.input(instructions, { target: { value: "First instruction" } });
       await vi.advanceTimersByTimeAsync(500);

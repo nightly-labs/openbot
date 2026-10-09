@@ -1,4 +1,5 @@
 import { AppLogo } from "@openbot/brand";
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AppVariant,
   DynamicIslandAction,
@@ -17,6 +18,7 @@ import {
 } from "@openbot/contracts/ipc";
 import type { AppTextKey, AppTranslate } from "@openbot/i18n";
 import {
+  ArrowUp,
   Badge,
   Button,
   Check,
@@ -27,6 +29,8 @@ import {
   type DynamicIslandStateChangeReason,
   type DynamicIslandViewState,
   ExternalLink,
+  IconButton,
+  Input,
   MessageCircle,
   MessageCircleQuestionMark,
   Monitor,
@@ -50,6 +54,7 @@ import {
   untrack,
 } from "solid-js";
 import { AgentAvatar } from "../agents/AgentAvatar";
+import { StopIcon } from "../conversation/ConversationIcons";
 import { playIdleGreetingMotion } from "./idle-greeting-motion";
 import {
   animateModeLayers,
@@ -80,10 +85,13 @@ export interface OpenBotDynamicIslandProps {
   extendedHoverArea?: boolean;
   suppressInitialHover?: boolean;
   onStateChange: (state: DynamicIslandViewState, reason: DynamicIslandStateChangeReason) => void;
-  onAction: (action: DynamicIslandAction) => void | Promise<void>;
+  /** Resolves `false` when the action failed, so a reply field keeps its draft. */
+  onAction: (action: DynamicIslandAction) => Promise<boolean> | undefined;
   /** Shown next to the actions of an attention panel when the last action failed. */
   actionError?: string | undefined;
   onHaptic?: () => void;
+  /** Lets the user reply to, answer and stop an agent on the island, so the main window stays where it is. */
+  inlineReply?: boolean | undefined;
 }
 
 const COMPACT_INDICES = [0, 1, 2] as const;
@@ -683,6 +691,7 @@ export function OpenBotDynamicIsland(props: OpenBotDynamicIslandProps): JSX.Elem
               <ExpandedContent
                 presentation={presentation}
                 displayMode={props.displayMode}
+                inlineReply={props.inlineReply}
                 onAction={props.onAction}
                 onHaptic={props.onHaptic}
                 onClose={() => props.onStateChange("compact", "pointer")}
@@ -692,6 +701,7 @@ export function OpenBotDynamicIsland(props: OpenBotDynamicIslandProps): JSX.Elem
             <ExpandedContent
               presentation={visiblePresentation()}
               displayMode={props.displayMode}
+              inlineReply={props.inlineReply}
               onAction={props.onAction}
               actionError={props.actionError}
               onHaptic={props.onHaptic}
@@ -955,7 +965,8 @@ function IdleGreetingEmoji(): JSX.Element {
 function ExpandedContent(props: {
   presentation: DynamicIslandPresentation;
   displayMode?: "notch" | "island";
-  onAction: (action: DynamicIslandAction) => void | Promise<void>;
+  inlineReply?: boolean | undefined;
+  onAction: (action: DynamicIslandAction) => Promise<boolean> | undefined;
   actionError?: string | undefined;
   onHaptic?: () => void;
   onClose: () => void;
@@ -972,30 +983,54 @@ function ExpandedContent(props: {
               {(index) => (
                 <Show when={working()[index]}>
                   {(item) => (
-                    <Button
-                      variant="ghost"
-                      class="dynamic-island-surface-row dynamic-island-surface-animated-row"
-                      onClick={() =>
-                        props.onAction({
-                          type: "open-agent",
-                          serverId: props.presentation.serverId,
-                          agentId: item().agent.id,
-                        })
-                      }
-                    >
-                      <span class="dynamic-island-surface-working-avatar-slot" aria-hidden="true" />
-                      <IslandContentSwap contentKey={`${item().agent.id}:${item().task}`}>
-                        <span class="dynamic-island-surface-row-copy" data-island-motion-content>
-                          <strong>{item().agent.name}</strong>
-                          <small>{item().task}</small>
-                        </span>
-                      </IslandContentSwap>
-                    </Button>
+                    <div class="dynamic-island-surface-row-group">
+                      <Button
+                        variant="ghost"
+                        class="dynamic-island-surface-row dynamic-island-surface-animated-row"
+                        onClick={() =>
+                          props.onAction({
+                            type: "open-agent",
+                            serverId: props.presentation.serverId,
+                            agentId: item().agent.id,
+                          })
+                        }
+                      >
+                        <span class="dynamic-island-surface-working-avatar-slot" aria-hidden="true" />
+                        <IslandContentSwap contentKey={`${item().agent.id}:${item().task}`}>
+                          <span class="dynamic-island-surface-row-copy" data-island-motion-content>
+                            <strong>{item().agent.name}</strong>
+                            <small>{item().task}</small>
+                          </span>
+                        </IslandContentSwap>
+                      </Button>
+                      <Show when={props.inlineReply ? item().turnId : null}>
+                        {(turnId) => (
+                          <IconButton
+                            variant="ghost"
+                            class="dynamic-island-surface-row-stop"
+                            label={t("island.action.stopAgent", { name: item().agent.name })}
+                            data-cuelume-close=""
+                            data-island-motion-content
+                            onClick={() =>
+                              props.onAction({
+                                type: "stop-agent",
+                                serverId: props.presentation.serverId,
+                                agentId: item().agent.id,
+                                turnId: turnId(),
+                              })
+                            }
+                          >
+                            <StopIcon />
+                          </IconButton>
+                        )}
+                      </Show>
+                    </div>
                   )}
                 </Show>
               )}
             </For>
           </div>
+          <IslandActionError message={props.actionError} />
         </div>
       </Match>
       <Match when={props.presentation.mode === "message" ? props.presentation.message : undefined}>
@@ -1009,6 +1044,26 @@ function ExpandedContent(props: {
                 trailing={<time datetime={message().createdAt}>{t("chat.day.now")}</time>}
               />
             </IslandContentSwap>
+            <Show when={props.inlineReply}>
+              {/* Each recipient gets a new field, so a draft for one agent is not sent to another. */}
+              <Show keyed when={`${props.presentation.serverId}:${message().agent.id}`}>
+                {(_recipient) => (
+                  <IslandReplyField
+                    label={t("island.reply.placeholder", { name: message().agent.name })}
+                    onSend={(text, clientMessageId) =>
+                      props.onAction({
+                        type: "send-message",
+                        serverId: props.presentation.serverId,
+                        agentId: message().agent.id,
+                        text,
+                        clientMessageId,
+                      })
+                    }
+                  />
+                )}
+              </Show>
+              <IslandActionError message={props.actionError} />
+            </Show>
             <footer class="dynamic-island-message-first-footer" data-island-motion-content>
               <span class="dynamic-island-message-first-unread">
                 {t("island.message.unread", { count: unreadCount() })}
@@ -1056,6 +1111,7 @@ function ExpandedContent(props: {
             item={presentation().item}
             serverId={presentation().serverId}
             remainingCount={presentation().remainingCount}
+            inlineReply={props.inlineReply}
             actionError={props.actionError}
             onAction={props.onAction}
             onHaptic={props.onHaptic}
@@ -1082,7 +1138,7 @@ function FailureContent(props: {
   item: DynamicIslandFailureItem;
   serverId: string;
   actionError?: string | undefined;
-  onAction: (action: DynamicIslandAction) => void | Promise<void>;
+  onAction: (action: DynamicIslandAction) => Promise<boolean> | undefined;
 }): JSX.Element {
   const { t } = useText();
   return (
@@ -1131,7 +1187,7 @@ function TakeoverContent(props: {
   item: DynamicIslandTakeoverItem;
   serverId: string;
   actionError?: string | undefined;
-  onAction: (action: DynamicIslandAction) => void | Promise<void>;
+  onAction: (action: DynamicIslandAction) => Promise<boolean> | undefined;
 }): JSX.Element {
   const { t } = useText();
   return (
@@ -1187,7 +1243,7 @@ export function ApprovalContent(props: {
   remainingCount: number;
   allowDesktopReview?: boolean;
   actionError?: string | undefined;
-  onAction: (action: DynamicIslandAction) => void | Promise<void>;
+  onAction: (action: DynamicIslandAction) => Promise<boolean> | undefined;
 }): JSX.Element {
   const { t, sourceText } = useText();
   const openInOpenBot = () =>
@@ -1250,8 +1306,9 @@ function QuestionContent(props: {
   item: DynamicIslandPromptItem;
   serverId: string;
   remainingCount: number;
+  inlineReply?: boolean | undefined;
   actionError?: string | undefined;
-  onAction: (action: DynamicIslandAction) => void | Promise<void>;
+  onAction: (action: DynamicIslandAction) => Promise<boolean> | undefined;
   onHaptic?: () => void;
   onClose: () => void;
 }): JSX.Element {
@@ -1285,7 +1342,17 @@ function QuestionContent(props: {
           Boolean(question.options && question.options.length > 0 && question.options.length <= 3),
       ),
   );
+  // A typed answer works for every question that is not secret, with or without options.
+  const typedAnswerAvailable = createMemo(
+    () => Boolean(props.inlineReply) && questions().length > 0 && questions().every((question) => !question.isSecret),
+  );
   const currentQuestion = () => questions()[questionIndex()];
+  const answerFieldKey = () => {
+    const question = currentQuestion();
+    return question
+      ? `${props.serverId}:${props.item.agent.id}:${String(props.item.requestId)}:${question.id}`
+      : undefined;
+  };
   const questionText = () => currentQuestion()?.question ?? props.item.detail ?? props.item.title;
   const openInOpenBot = () =>
     props.onAction({
@@ -1295,16 +1362,17 @@ function QuestionContent(props: {
       requestId: props.item.requestId,
     });
 
-  function answerWith(label: string): void {
+  function answerWith(label: string): boolean | Promise<boolean> | undefined {
     const question = currentQuestion();
-    if (!question || !directAnswerAvailable() || questionTransitioning()) return;
+    // The field keeps a typed answer that did not go anywhere.
+    if (!question || !(directAnswerAvailable() || typedAnswerAvailable()) || questionTransitioning()) return false;
     const nextAnswers = { ...answers(), [question.id]: [label] };
     if (questionIndex() < questions().length - 1) {
       props.onHaptic?.();
       void showNextQuestion(nextAnswers);
       return;
     }
-    void props.onAction({
+    return props.onAction({
       type: "answer-prompt",
       serverId: props.serverId,
       agentId: props.item.agent.id,
@@ -1404,6 +1472,19 @@ function QuestionContent(props: {
               </For>
             </ul>
           </Show>
+          {/* Each question gets a new field, so a draft for one question is not sent as the answer to another. */}
+          <Show keyed when={typedAnswerAvailable() ? answerFieldKey() : undefined}>
+            {(_questionId) => (
+              <IslandReplyField
+                label={t(
+                  directAnswerAvailable()
+                    ? "island.reply.answerPlaceholderWithOptions"
+                    : "island.reply.answerPlaceholder",
+                )}
+                onSend={answerWith}
+              />
+            )}
+          </Show>
         </div>
       </div>
       <div class="dynamic-island-surface-actions dynamic-island-surface-question-actions" data-island-motion-content>
@@ -1419,6 +1500,74 @@ function QuestionContent(props: {
         </Button>
       </div>
     </div>
+  );
+}
+
+/**
+ * A one-line reply. Enter sends it. The draft stays when `onSend` resolves `false`, so the user can
+ * try again, and a retry of the same text keeps its `clientMessageId`, so the agent gets it once.
+ */
+function IslandReplyField(props: {
+  label: string;
+  onSend: (text: string, clientMessageId: string) => boolean | Promise<boolean> | undefined;
+}): JSX.Element {
+  const { t } = useText();
+  const [draft, setDraft] = createSignal("");
+  const [sending, setSending] = createSignal(false);
+  const text = () => draft().trim();
+  let failedSend: { text: string; clientMessageId: string } | undefined;
+
+  async function send(): Promise<void> {
+    const body = text();
+    if (!body || sending()) return;
+    const clientMessageId = failedSend?.text === body ? failedSend.clientMessageId : crypto.randomUUID();
+    setSending(true);
+    let sent: boolean;
+    try {
+      sent = (await props.onSend(body, clientMessageId)) !== false;
+    } finally {
+      setSending(false);
+    }
+    if (!sent) {
+      failedSend = { text: body, clientMessageId };
+      return;
+    }
+    failedSend = undefined;
+    setDraft("");
+  }
+
+  return (
+    <form
+      class="dynamic-island-reply"
+      data-island-motion-content
+      onSubmit={(event) => {
+        event.preventDefault();
+        void send();
+      }}
+    >
+      <Input
+        size="sm"
+        class="dynamic-island-reply-input"
+        value={draft()}
+        onValueChange={setDraft}
+        placeholder={props.label}
+        aria-label={props.label}
+        maxlength={INPUT_LIMITS.directMessageText}
+        // Read-only, not disabled: a disabled field loses focus, and the panel collapses with it.
+        readonly={sending()}
+        autocomplete="off"
+      />
+      <IconButton
+        type="submit"
+        size="icon-xs"
+        class="dynamic-island-reply-send"
+        label={t("island.reply.send")}
+        disabled={!text()}
+        loading={sending()}
+      >
+        <ArrowUp aria-hidden="true" />
+      </IconButton>
+    </form>
   );
 }
 

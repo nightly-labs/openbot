@@ -115,6 +115,8 @@ interface HostServiceOptions {
   getRemoteDesktopRuntimeCredentials?: () => Effect.Effect<{ username: string; password: string }, RemoteWorkflowError>;
   getRemoteDesktopDisplays?: () => RemoteDesktopDisplay[];
   getRemoteDesktopIceServers?: () => Effect.Effect<RemoteDesktopIceServer[], RemoteWorkflowError>;
+  /** Puts a remote desktop member's pasted text on this computer's clipboard. */
+  writeRemoteDesktopClipboard?: (text: string) => void;
   platform?: "darwin" | "win32" | "linux";
   unattended?: boolean;
   teamWebRtcBridge?: TeamWebRtcBridge;
@@ -219,6 +221,7 @@ export class HostService extends EventEmitter<HostEvents> {
         options.getRemoteDesktopIceServers ??
         (() => Effect.fail(new RemoteWorkflowError({ cause: new Error(sourceText("error.host.iceServersMissing")) }))),
       ...(options.createRemoteDesktopRuntime ? { createRuntime: options.createRemoteDesktopRuntime } : {}),
+      ...(options.writeRemoteDesktopClipboard ? { writeClipboard: options.writeRemoteDesktopClipboard } : {}),
       ...(logDirectory
         ? {
             onDiagnostic: (source: "sunshine" | "moonlight", message: string) => {

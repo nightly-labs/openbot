@@ -140,9 +140,10 @@ A tag build signs the Windows release with Azure Artifact Signing. It needs no s
   `bun run dist:win --config electron-builder.windows-signing.yml`, then runs `az account clear`, so
   the steps after the build have no Azure session. That overlay adds
   `win.azureSignOptions` and `forceCodeSigning`. electron-builder signs `OpenBot.exe`, every `.exe` from
-  `extraResources` (Whisper, the remote desktop runtime, and the Computer Use driver), the NSIS
-  installer, and its uninstaller. The provider CLIs are not packaged on Windows, so their vendor
-  signatures do not change.
+  `extraResources` (the remote desktop runtime and the Computer Use driver), the NSIS
+  installer, and its uninstaller. It does not sign the `.node` and `.dll` files of the voice runtime,
+  because the overlay sets no `win.signExts`. The provider CLIs are not packaged on Windows, so their
+  vendor signatures do not change.
 - `verify:package:win --require-signature` requires a valid signature with the `app-update.yml`
   publisher on each of those executables, and the next step requires the same signer on the
   installer. A dry run requires `NotSigned` instead.
@@ -434,6 +435,8 @@ git commit -m "release: prepare vX.Y.Z"
 git push origin main
 bun run release:preflight
 git tag -a vX.Y.Z -m "OpenBot vX.Y.Z"
+# When Signal changed since the previous tag, deploy and check Signal from
+# vX.Y.Z now (preflight item 16). Push the tag only after that.
 git push origin vX.Y.Z
 ```
 
@@ -449,8 +452,8 @@ The workflow:
 3. runs the complete offline repository check;
 4. builds signed and notarized ARM64 DMG and ZIP artifacts plus a separately signed/notarized Host PKG on a GitHub Apple silicon runner,
    and signed and notarized x64 DMG and ZIP artifacts on a GitHub Intel runner (`macos-15-intel`). Each
-   architecture builds on its own runner, because the Whisper and remote desktop builds run on the
-   build machine. The Host PKG is ARM64 only;
+   architecture builds on its own runner, because the voice runtime and the remote desktop runtime
+   are prepared for the architecture of the build machine. The Host PKG is ARM64 only;
    when `hdiutil create` fails with "Device not configured" or "Resource busy", it builds again,
    up to 3 attempts, because that runner error is not caused by the app;
 5. builds a signed Windows x64 NSIS installer on a GitHub Windows runner (unsigned in a dry run);
@@ -513,14 +516,18 @@ explicit action, because `autoInstallOnAppQuit` stays off so shutdown preparatio
 stage the user waits on is bounded by a timeout and recorded in `logs/update/update.log`, so a failed
 check, download, or restart reports an actionable error and can be retried in place.
 
-The Whisper executable is part of the macOS and Windows applications. Linux ships no Whisper binary
-and no remote desktop runtime, so voice prompts and remote desktop report themselves as unavailable
-there. The `ggml-medium-q5_0.bin` model is not part of an application or update artifact. OpenBot downloads the pinned model on first voice use, checks its size
-and SHA-256, and keeps the verified file in the user data directory for later offline use.
+The voice runtime (the sherpa-onnx N-API addon and ONNX Runtime, from the pinned `sherpa-onnx-*`
+npm packages) is part of the macOS and Windows applications, in `voice/runtime`. Linux ships no voice
+runtime and no remote desktop runtime, so voice prompts and remote desktop report themselves as
+unavailable there. The NVIDIA Parakeet TDT 0.6B v3 int8 model is not part of an application or update
+artifact. OpenBot downloads its four pinned files on first voice use, checks the size and SHA-256 of
+each, and keeps the verified files in `runtimes/parakeet-tdt-0.6b-v3-int8` in the user data directory
+for later offline use. At startup, a packaged application removes the old `runtimes/whisper`
+directory if it exists.
 
 The release workflow stops if the macOS update ZIP, the Windows NSIS installer, or the Linux AppImage
 is larger than 700 MiB, or if the DMG is larger than 750 MiB. It also stops if update metadata has a wrong size or SHA-512, if
-the Whisper model is present, or if the application contains a second native Claude runtime.
+the voice model is present, or if the application contains a second native Claude runtime.
 
 If a release is bad, publish a newer patch version. Do not replace an already published version with
 different binaries.
@@ -564,7 +571,18 @@ Before creating the first tag or any later release:
     running application, that a provider downloads in-app, that the server rail is drawn, and that the
     microphone control is absent;
 14. confirm `CHANGELOG.md` describes the version and the working tree is clean;
-15. create and push the version commit and tag only after CI passes on `main`.
+15. create and push the version commit, and create the tag locally, only after CI passes on `main`;
+16. read the running Signal commit from `curl -fsS https://signal.openbot.run/health/live`. If it is
+    missing or `unknown`, or if `git diff --quiet <running commit> <new tag> -- remote packages/contracts/src/signal-protocol`
+    finds changes, deploy Signal from the local tag before you push the tag. Compare with the running
+    commit, not with the previous tag: an earlier release can have left Signal behind. Pushing the tag starts the
+    release workflow, and nothing in it waits for Signal. Use the Signal-only procedure in
+    [remote-session-deployment.md](remote-session-deployment.md#deployment-procedure--requires-separate-approval);
+    the `.agents/skills/signal-deploy/` skill adds the checks before and after it.
+    Confirm that `curl -fsS https://signal.openbot.run/health/live` shows the tag commit. A client
+    that needs a newer Signal fails until then: v0.33.0 shipped webhook routines while Signal was older
+    than #1520, so every webhook route answered 404 (#1661);
+17. push the tag.
 
 The macOS ZIP must be smaller than 800,000,000 bytes and smaller than the official `0.1.21` ZIP.
 Do not publish when either size gate fails, the `0.1.21` canary update crashes, or Windows starts NSIS

@@ -1,6 +1,6 @@
-import type { ConversationMessage, QueueDelivery } from "@openbot/contracts/ipc";
+import type { AttachmentSummary, ConversationMessage, QueueDelivery } from "@openbot/contracts/ipc";
 import { describe, expect, it } from "vitest";
-import { latestReadableMessage, projectChatMessages, withFailureReasons } from "./chat-messages";
+import { groupExchangeMarkers, latestReadableMessage, projectChatMessages, withFailureReasons } from "./chat-messages";
 
 function planMessage(text: string, status: ConversationMessage["status"], plan?: ConversationMessage["plan"]) {
   return {
@@ -172,5 +172,59 @@ describe("mobile message senders", () => {
     expect(authors(projectChatMessages([host], "member-self", "account-other"))[0]?.sender).toEqual(host.senderMember);
     // A server that is still connecting names no reader, so no message is shown as another person's.
     expect(authors(projectChatMessages(messages, "")).every((message) => message.sender === undefined)).toBe(true);
+  });
+});
+
+describe("groupExchangeMarkers", () => {
+  function exchangeMessage(
+    id: string,
+    direction: "incoming" | "outgoing",
+    minute: number,
+    extra: Partial<ConversationMessage> = {},
+  ) {
+    return {
+      id,
+      turnId: `turn-${id}`,
+      author: direction === "outgoing" ? "assistant" : "user",
+      text: "",
+      createdAt: `2026-09-28T10:0${minute}:00.000Z`,
+      status: "completed",
+      exchange: {
+        direction,
+        messageId: id,
+        senderAgentId: direction === "outgoing" ? "self" : "research",
+        recipientAgentIds: direction === "outgoing" ? ["research", "builder"] : ["self"],
+        replyToMessageId: null,
+        deliveries: [],
+      },
+      ...extra,
+    } satisfies ConversationMessage;
+  }
+
+  it("joins consecutive agent messages across thinking steps, like desktop, and keeps files on their own row", () => {
+    const attachment = {
+      id: "file",
+      name: "report.pdf",
+      size: 1,
+      kind: "file",
+      mimeType: "application/pdf",
+      previewKind: "pdf",
+      previewUrl: null,
+    } satisfies AttachmentSummary;
+    const messages = [
+      exchangeMessage("a", "outgoing", 1),
+      { ...answer, id: "step", turnId: "turn-a", itemType: "commentary", createdAt: "2026-09-28T10:02:00.000Z" },
+      exchangeMessage("b", "incoming", 3),
+      exchangeMessage("c", "incoming", 4, { attachments: [attachment] }),
+      exchangeMessage("d", "outgoing", 5),
+    ] satisfies ConversationMessage[];
+    const rows = () =>
+      groupExchangeMarkers(projectChatMessages(messages).filter((message) => message.kind !== "thinking"));
+    const first = rows();
+    expect(first.map((row) => (row.kind === "exchange-group" ? row.exchanges.map((item) => item.id) : row.id))).toEqual(
+      [["exchange:a", "exchange:b"], "exchange:c", "c", "exchange:d"],
+    );
+    // A streamed chunk projects the rows again; the group row stays the same object for its memoized row.
+    expect(rows()[0]).toBe(first[0]);
   });
 });

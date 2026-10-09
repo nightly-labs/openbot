@@ -188,6 +188,9 @@
   min-width: 0;
   overflow: hidden;
 }
+/* The panes were grid items of the frame and stretched to its height. In this column they grow to
+ * fill it, so a short chat keeps its composer at the bottom. */
 .server-connection-content > * {
   min-height: 0;
+  flex: 1;
 }

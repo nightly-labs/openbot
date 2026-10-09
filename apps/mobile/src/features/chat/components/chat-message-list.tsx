@@ -1,6 +1,5 @@
-import type { AgentExchangeSummary } from "@openbot/contracts/ipc";
-import type { MobileTextKey, MobileTranslate } from "@openbot/i18n/mobile";
-import { Link, useIsFocused } from "expo-router";
+import type { MobileTextKey } from "@openbot/i18n/mobile";
+import { useIsFocused } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import {
   CalendarClock,
@@ -41,10 +40,10 @@ import Animated, {
 } from "react-native-reanimated";
 import { useCSSVariable } from "uniwind";
 import { BloubAvatarThumbnail } from "@/features/agents/components/bloub-avatar";
-import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
 import { getBloubAvatarColor } from "@/features/agents/model/bloub-activity";
 import { ChatActivityRow, type ChatActivitySpec } from "@/features/chat/components/chat-activity-row";
 import { type ApprovalDecision, approvalTitle, ChatApprovalCard } from "@/features/chat/components/chat-approval-card";
+import { ChatExchangeGroup, ChatExchangeMarker } from "@/features/chat/components/chat-exchange-marker";
 import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
 import { ChatPlan } from "@/features/chat/components/chat-plan";
 import { ChatQuestionPrompt } from "@/features/chat/components/chat-question-prompt";
@@ -52,7 +51,13 @@ import { useActivityPresence } from "@/features/chat/components/use-activity-pre
 import type { ChatMotion } from "@/features/chat/components/use-chat-motion";
 import { useMessageArrivals } from "@/features/chat/components/use-message-arrivals";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
-import { type ChatMessage, indexChatMessages, type RoutineMarkerEvent } from "@/features/chat/model/chat-messages";
+import {
+  type ChatMessage,
+  type ExchangeGroup,
+  groupExchangeMarkers,
+  indexChatMessages,
+  type RoutineMarkerEvent,
+} from "@/features/chat/model/chat-messages";
 import { useAgentColorMessages } from "@/features/settings/model/message-color";
 import { useConnectionAppearance } from "@/features/workspace/components/use-connection-appearance";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
@@ -72,7 +77,8 @@ import { ChatImageGeneration, imageGenerationStatus } from "./chat-image-generat
 import { ChatMessageGesture } from "./chat-message-gesture";
 import { useReplyHaptics } from "./use-reply-haptics";
 
-type VisibleMessage = Exclude<ChatMessage, { kind: "thinking" }>;
+/** A row of the list. Thinking steps show in the activity row instead. */
+type VisibleMessage = Exclude<ChatMessage, { kind: "thinking" }> | ExchangeGroup;
 const TailLayoutContext = createContext<{
   id: string | null;
   onTailStartLayout: ChatMotion["onTailStartLayout"];
@@ -182,18 +188,6 @@ function ChatBubble({
       {children}
     </Animated.View>
   );
-}
-
-/**
- * Matches the desktop marker. An absent mark means a request: that is what a host older than the
- * mark reports, and what every message stored before it meant.
- */
-function exchangeLabel(exchange: AgentExchangeSummary, t: MobileTranslate) {
-  if (exchange.expectsReply === false)
-    return exchange.direction === "outgoing"
-      ? t("mobile.chat.exchange.informed")
-      : t("mobile.chat.exchange.updateFrom");
-  return exchange.direction === "outgoing" ? t("mobile.chat.exchange.messaged") : t("mobile.chat.exchange.messageFrom");
 }
 
 interface ChatMessageListProps {
@@ -333,6 +327,20 @@ function RoutineMarkerRow({
   );
 }
 
+/** Where a new chat started, as the desktop divider shows it. The agent does not see the messages above. */
+function ContextResetMarkerRow({ muted }: { muted: ViewStyle["backgroundColor"] }) {
+  const { t } = useText();
+  return (
+    <View accessible className="flex-row items-center gap-3 py-2">
+      <View className="h-px flex-1" style={{ backgroundColor: muted, opacity: 0.35 }} />
+      <Typography.Paragraph type="body-sm" style={{ color: muted }}>
+        {t("mobile.chat.contextReset")}
+      </Typography.Paragraph>
+      <View className="h-px flex-1" style={{ backgroundColor: muted, opacity: 0.35 }} />
+    </View>
+  );
+}
+
 function playbackEligible(message: VisibleMessage) {
   return (
     message.kind === "message" &&
@@ -428,62 +436,12 @@ const MessageRow = memo(function MessageRow({
   const rendered =
     message.kind === "routine" ? (
       <RoutineMarkerRow key={message.id} message={message} muted={muted} />
+    ) : message.kind === "context-reset" ? (
+      <ContextResetMarkerRow key={message.id} muted={muted} />
+    ) : message.kind === "exchange-group" ? (
+      <ChatExchangeGroup key={message.id} group={message} agents={agents} agentsById={agentsById} muted={muted} />
     ) : message.kind === "exchange" || message.kind === "channel-routing" ? (
-      <View key={message.id} className="flex-row flex-wrap items-center justify-center gap-2 py-2">
-        <Typography.Paragraph type="body-sm" style={{ color: muted }}>
-          {message.kind === "channel-routing"
-            ? message.event.action === "assigned"
-              ? t("mobile.chat.exchange.assignedTo")
-              : t("mobile.chat.exchange.continuingWith")
-            : exchangeLabel(message.exchange, t)}
-        </Typography.Paragraph>
-        {(message.kind === "channel-routing"
-          ? [message.event.agentId]
-          : message.exchange.direction === "incoming"
-            ? [message.exchange.senderAgentId]
-            : message.exchange.recipientAgentIds
-        ).map((id) => {
-          const legacyName =
-            message.kind === "channel-routing" && message.event.agentId === null ? message.event.agentName : null;
-          const legacyMatches = legacyName ? agents.filter((agent) => agent.name === legacyName) : [];
-          const participant = id ? agentsById.get(id) : legacyMatches.length === 1 ? legacyMatches[0] : undefined;
-          const badge = (
-            <View key={id ?? legacyName} className="flex-row items-center gap-1">
-              {participant ? (
-                <BloubAvatarThumbnail
-                  agentId={participant.id}
-                  serverId={participant.serverId}
-                  hue={participant.avatarHue}
-                  seed={participant.avatarSeed}
-                  size={22}
-                />
-              ) : null}
-              <Typography.Paragraph type="body-sm" style={{ color: muted }}>
-                {participant?.name ??
-                  (message.kind === "channel-routing"
-                    ? (legacyName ?? t("mobile.chat.exchange.unavailableAgent"))
-                    : t("mobile.chat.exchange.unknownAgent"))}
-              </Typography.Paragraph>
-            </View>
-          );
-          return message.kind === "channel-routing" && participant ? (
-            <Link
-              key={participant.id}
-              href={{ pathname: "/chat/[agentId]", params: { agentId: participant.id } }}
-              asChild
-            >
-              <ChatLinkPressable
-                accessibilityRole="link"
-                accessibilityLabel={t("mobile.chat.exchange.openChat", { name: participant.name })}
-              >
-                {badge}
-              </ChatLinkPressable>
-            </Link>
-          ) : (
-            <View key={id ?? legacyName}>{badge}</View>
-          );
-        })}
-      </View>
+      <ChatExchangeMarker key={message.id} message={message} agents={agents} agentsById={agentsById} muted={muted} />
     ) : message.kind === "plan" ? (
       <ChatPlan key={message.id} message={message} />
     ) : message.kind === "question" ? (
@@ -788,7 +746,10 @@ export function ChatMessageList({
     return { backgroundColor: `rgb(${r}, ${g}, ${b})` };
   });
 
-  const visibleMessages = useMemo(() => messages.filter((message) => message.kind !== "thinking"), [messages]);
+  const visibleMessages = useMemo(
+    () => groupExchangeMarkers(messages.filter((message) => message.kind !== "thinking")),
+    [messages],
+  );
   const tailIndex = visibleMessages.findLastIndex((message) => message.kind === "message" && message.author === "user");
   const tailId = visibleMessages[tailIndex]?.id ?? null;
   const [boundary, setBoundary] = useState<ChatHistoryBoundary>({ firstId: null, headId: null });

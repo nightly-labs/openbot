@@ -17,6 +17,27 @@ import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
 /**
+ * The access and auto-approve of an agent, as its host answers them. Null for a member, for a host
+ * without `agent-admin-v1`, and until the host answers. The info page and this page share the read.
+ */
+export function useAgentAdminSettings(agent: MobileAgent, server: MobileServer | undefined, available: boolean) {
+  const workspace = useMobileWorkspace();
+  const { session, sessionScope } = useMobileSession();
+  const canAdminister = server?.role === "owner" || server?.role === "admin";
+  // Under "agent-info", so the host's agent events refresh it with the other agent records.
+  const queryKey = ["agent-info", session?.apiUrl, session?.user.id, sessionScope, agent.serverId, agent.id, "admin"];
+  const settings = useQuery({
+    queryKey,
+    queryFn: () => workspace.loadAgentAdminSettings(agent.id, agent.serverId),
+    enabled: available && canAdminister,
+    retry: false,
+    // Another device can change these at any time, so a reopened page reads the host again.
+    staleTime: 0,
+  });
+  return { queryKey, settings: canAdminister ? (settings.data ?? null) : null };
+}
+
+/**
  * Access and auto-approve of an agent, read from and saved on its host. Only an owner or admin sees
  * them, and only when the host serves `agent-admin-v1`. The host checks the role again on every call.
  * A change saves at once, as on desktop and web, and does not wait for the sheet's Save action.
@@ -32,25 +53,14 @@ export function AgentAccessFields({
 }) {
   const { t, errorMessage } = useText();
   const workspace = useMobileWorkspace();
-  const { session, sessionScope } = useMobileSession();
   const queryClient = useQueryClient();
   const { theme } = useUniwind();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const canAdminister = server?.role === "owner" || server?.role === "admin";
-  // Under "agent-info", so the host's agent events refresh it with the other agent records.
-  const queryKey = ["agent-info", session?.apiUrl, session?.user.id, sessionScope, agent.serverId, agent.id, "admin"];
-  const settings = useQuery({
-    queryKey,
-    queryFn: () => workspace.loadAgentAdminSettings(agent.id, agent.serverId),
-    enabled: available && canAdminister,
-    retry: false,
-    // Another device can change these at any time, so a reopened page reads the host again.
-    staleTime: 0,
-  });
+  const { queryKey, settings } = useAgentAdminSettings(agent, server, available);
   // A host without the capability answers null. A failed read keeps the controls hidden, as for a member.
-  if (!canAdminister || !settings.data) return null;
-  const current = settings.data;
+  if (!settings) return null;
+  const current = settings;
   const enabled = available && !saving;
 
   async function save(input: Omit<UpdateAgentAdminSettingsInput, "agentId">): Promise<void> {

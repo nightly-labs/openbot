@@ -1,5 +1,6 @@
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/agent-admin-v1";
+import { AGENT_HOST_SETTINGS_ROUTES } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
 import { AGENT_PUBLISH_ROUTES } from "@openbot/contracts/team-protocol/agent-publish-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { HOST_MEMBER_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-member-update-v1";
@@ -31,6 +32,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   LIVE_ACTIVITY_PUSH_ROUTES.remove,
   STORAGE_ROUTES.usage,
   AGENT_ADMIN_ROUTES.settings,
+  AGENT_HOST_SETTINGS_ROUTES.settings,
   SKILLS_ADMIN_ROUTES.list,
   AGENT_PUBLISH_ROUTES.preview,
   SHARED_TABLES_ROUTES.list,

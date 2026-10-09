@@ -45,7 +45,11 @@ export const MOBILE_EVENTS = {
   },
   memory_action: { ...outcome, action: ["create", "update", "delete"] },
   search_action: { ...outcome, scope: ["global"], result_count: count },
-  team_action: { ...outcome, action: ["server_selected", "server_joined", "server_left"], server_kind: ["remote"] },
+  team_action: {
+    ...outcome,
+    action: ["server_selected", "server_joined", "server_left", "server_removed"],
+    server_kind: ["remote"],
+  },
   conversation_action: { ...outcome, action: ["pin", "unpin", "hide", "unhide"] },
   usage_viewed: {},
   account_sign_out: outcome,

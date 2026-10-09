@@ -163,6 +163,15 @@
   overflow-y: auto;
 }
 
+/* Instructions keep a fixed height and scroll inside, so the rows below do not move. */
+.settings-field .settings-instructions-input {
+  field-sizing: fixed;
+  height: 120px;
+  min-height: 120px;
+  max-height: 120px;
+  resize: none;
+}
+
 .settings-field input::placeholder,
 .settings-field textarea::placeholder {
   color: var(--openbot-text-muted);
