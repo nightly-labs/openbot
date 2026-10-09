@@ -81,6 +81,8 @@ export function DynamicIslandSurface() {
   }
 
   function changeViewState(next: DynamicIslandViewState, reason: DynamicIslandStateChangeReason): void {
+    // The pointer can leave while the user types a reply. Escape, Close and a click outside still collapse.
+    if (reason === "hover-exit" && keyboardInside && isTextField(document.activeElement)) return;
     if (reason === "pointer" || reason === "keyboard" || reason === "escape") performHaptic();
     setViewState(next);
     if (next === "compact" && keyboardInside) {
