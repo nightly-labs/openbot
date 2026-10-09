@@ -103,6 +103,8 @@ jobs:
       - name: Build once
         run: bun run build
       - name: Run local and host scripted workflows
+        env:
+          OPENBOT_E2E_SUITE: scripted-release
         run: xvfb-run -a env -u ELECTRON_RUN_AS_NODE bun run test:e2e
       - name: Stop any remaining test processes
         if: always()

@@ -198,23 +198,31 @@ it("completes group delegation after the parent task resumes", async () => {
   ).toBe(true);
 });
 
-it("rejects missing, skipped, failed, and slow release coverage", () => {
+it.each(["release", "scripted"] as const)("rejects missing, skipped, failed, and slow %s coverage", (suite) => {
   const complete = ["local", "host"].flatMap((mode) =>
-    [...scriptedCases, ...liveCases, ...(mode === "host" ? hostCases : [])].map((id) => ({
+    [...scriptedCases, ...(suite === "release" ? liveCases : []), ...(mode === "host" ? hostCases : [])].map((id) => ({
       mode,
       id,
       status: "passed",
     })),
   );
-  expect(releaseCoverage(complete, 600_000).passed).toBe(true);
-  expect(releaseCoverage(complete.slice(1), 1).passed).toBe(false);
+  expect(releaseCoverage(complete, 600_000, suite).passed).toBe(true);
+  expect(releaseCoverage(complete.slice(1), 1, suite).passed).toBe(false);
+  expect(
+    releaseCoverage(
+      complete.filter((entry) => entry.id !== "host-revoke"),
+      1,
+      suite,
+    ).missing,
+  ).toContain("host/host-revoke");
   for (const status of ["skipped", "failed", "timedOut", "interrupted"]) {
     expect(
       releaseCoverage(
         complete.map((entry, index) => (index === 0 ? { ...entry, status } : entry)),
         1,
+        suite,
       ).passed,
     ).toBe(false);
   }
-  expect(releaseCoverage(complete, 600_001).passed).toBe(false);
+  expect(releaseCoverage(complete, 600_001, suite).passed).toBe(false);
 });

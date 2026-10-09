@@ -59,12 +59,13 @@ export default class ReleaseReporter implements Reporter {
     process.stdout.write(`${result.status}: ${test.parent.project()?.name} / ${test.title}\n`);
   }
   async onEnd(result: FullResult): Promise<{ status: FullResult["status"] }> {
-    const release = process.env.OPENBOT_E2E_SUITE === "release";
+    const suite = process.env.OPENBOT_E2E_SUITE;
+    const required = suite === "release" ? "release" : suite === "scripted-release" ? "scripted" : null;
     const started = Number(process.env.OPENBOT_E2E_STARTED_AT ?? this.started);
     const elapsedMs = Date.now() - started;
-    const coverage = releaseCoverage(this.results, elapsedMs);
-    const missing = release ? coverage.missing : [];
-    const status = result.status === "passed" && (!release || coverage.passed) ? "passed" : "failed";
+    const coverage = required ? releaseCoverage(this.results, elapsedMs, required) : null;
+    const missing = coverage?.missing ?? [];
+    const status = result.status === "passed" && (!coverage || coverage.passed) ? "passed" : "failed";
     const report = {
       status,
       commit: process.env.GITHUB_SHA ?? "local",

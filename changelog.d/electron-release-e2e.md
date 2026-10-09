@@ -12,3 +12,4 @@
 - Use the existing macOS process cleanup handling for release test services.
 - Update restored streaming messages when the host sends their completed content.
 - Stop repeated agent settings requests while a host is offline, so reconnect can recover.
+- Block release when required Linux UI cases are missing or skipped.

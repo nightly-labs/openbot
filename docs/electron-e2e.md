@@ -124,6 +124,8 @@ CI uses three Playwright workers on macOS and two on Linux. Each worker owns its
 workspaces. Tests reuse the worker's app and use separate agents, group IDs, files, and browser
 case IDs. Tests wait for state and events. Retries are disabled. The release reporter fails for
 any missing, skipped, failed, or interrupted required case, or a test phase over ten minutes.
+The Linux job sets `OPENBOT_E2E_SUITE=scripted-release` to require all 47 scripted cases without
+requiring live providers. Ordinary `test:e2e` runs still permit selection of individual cases.
 Dependency install, build, provider preflight, and shared service startup are outside that budget.
 Worker app startup and teardown are inside it. This budget still needs measurement on the Mac mini.
 
