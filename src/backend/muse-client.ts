@@ -10,6 +10,7 @@ import { isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
 import { Effect, Exit, Schema, Scope } from "effect";
+import { secretElicitationField } from "./agent/prompts";
 import { type AgentClient, type AgentProvider, type DiagnosticOrigin, RequestTimeoutError } from "./agent-client";
 import { type AgentCliInfo, cliSpawnTarget } from "./cli";
 import { runCauseEffect } from "./effect-boundary";
@@ -839,7 +840,11 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
       {
         threadId: thread.id,
         turnId: thread.turn?.id,
-        questions: input.questions.map((question) => ({ ...question, isOther: true, isSecret: false })),
+        questions: input.questions.map((question) => ({
+          ...question,
+          isOther: true,
+          isSecret: secretElicitationField(`${question.id} ${question.header} ${question.question}`, undefined),
+        })),
       },
       signal,
     );

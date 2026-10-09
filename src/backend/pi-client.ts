@@ -5,7 +5,7 @@ import { isAbsolute } from "node:path";
 import { type DynamicRecord, isBoolean, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
-import { Effect, Exit, Scope, Semaphore } from "effect";
+import { Effect, Exit, Schema, Scope, Semaphore } from "effect";
 import { secretElicitationField } from "./agent/prompts";
 import type { AgentClient, DiagnosticOrigin } from "./agent-client";
 import { type AgentCliInfo, cliSpawnTarget } from "./cli";
@@ -54,6 +54,15 @@ import type {
   ProviderHistoryRequest,
   ReadProviderHistory,
 } from "./provider-history";
+
+const PiSessionUsage = Schema.Struct({
+  tokens: Schema.Struct({
+    input: Schema.Number,
+    output: Schema.Number,
+    cacheRead: Schema.Number,
+    cacheWrite: Schema.Number,
+  }),
+});
 
 export interface PiProviderOptions {
   requestTimeoutMs?: number;
@@ -520,7 +529,8 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
   });
 
   #notify(method: string, thread: PiThread, params: DynamicRecord): void {
-    const safe = JSON.parse(this.#redact(JSON.stringify(params)));
+    // Usage contains only validated numeric counters. Generic secret-name matching masks `*Tokens`.
+    const safe = method === "openbot/usage" ? params : JSON.parse(this.#redact(JSON.stringify(params)));
     this.emit("notification", {
       method,
       params: {
@@ -585,16 +595,6 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       turn.failure =
         stop === "error" ? this.#redact(getString(message, "errorMessage") ?? "Pi model request failed.") : null;
       if (stop === "aborted") turn.stopped = true;
-      const usage = getRecord(message, "usage");
-      if (usage)
-        this.#notify("openbot/usage", thread, {
-          usage: {
-            inputTokens: usage.input,
-            outputTokens: usage.output,
-            cachedReadTokens: usage.cacheRead,
-            cachedWriteTokens: usage.cacheWrite,
-          },
-        });
     } else if (record.type === "tool_execution_start" || record.type === "tool_execution_end") {
       const id = getString(record, "toolCallId");
       if (!id) return;
@@ -623,6 +623,22 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     if (!turn || turn.finishing) return;
     turn.finishing = true;
     if (failure) this.#notify("error", thread, { error: { message: this.#redact(failure) }, willRetry: false });
+    // Native totals survive process release/resume. Per-message usage is not a cumulative counter.
+    yield* thread.rpc.request({ type: "get_session_stats" }, 2_000).pipe(
+      Effect.flatMap((stats) => providerSync(() => Schema.decodeUnknownSync(PiSessionUsage)(stats))),
+      Effect.map(({ tokens }) =>
+        this.#notify("openbot/usage", thread, {
+          usage: {
+            inputTokens: tokens.input + tokens.cacheRead + tokens.cacheWrite,
+            outputTokens: tokens.output,
+            cachedReadTokens: tokens.cacheRead,
+            cachedWriteTokens: tokens.cacheWrite,
+          },
+        }),
+      ),
+      // A crashed host cannot answer telemetry; it must not block durable completion.
+      Effect.catch(() => Effect.void),
+    );
     const append = this.options.history?.append;
     if (append) {
       const saved = yield* Effect.exit(

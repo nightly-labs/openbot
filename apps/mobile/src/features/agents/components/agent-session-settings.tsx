@@ -1,8 +1,10 @@
-import type { AgentSessionSettings, AgentSessionSettingValue } from "@openbot/contracts/ipc";
+import type { AgentSessionSettingValue } from "@openbot/contracts/ipc";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Typography } from "heroui-native";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useState } from "react";
 import { useUniwind } from "uniwind";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
+import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SettingsPicker, SettingsSwitch } from "@/features/settings/components/settings-controls";
 import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
@@ -12,36 +14,41 @@ export function AgentSessionSettingsSection({ agent, available }: { agent: Mobil
   const { t } = useText();
   const { theme } = useUniwind();
   const { loadAgentSessionSettings, setAgentSessionSetting, resetAgentSessionSetting } = useMobileWorkspace();
-  const [settings, setSettings] = useState<AgentSessionSettings | null>(null);
+  const { session, sessionScope } = useMobileSession();
+  const queryClient = useQueryClient();
+  const queryKey = [
+    "agent-info",
+    session?.apiUrl,
+    session?.user.id,
+    sessionScope,
+    agent.serverId,
+    agent.id,
+    agent.provider,
+    agent.model,
+    "session-settings",
+  ];
+  const query = useQuery({
+    queryKey,
+    queryFn: () => loadAgentSessionSettings(agent.id, agent.serverId),
+    enabled: available,
+    retry: false,
+    staleTime: 0,
+    gcTime: 0,
+  });
+  const settings = query.data;
   const [busy, setBusy] = useState(false);
-  const [failed, setFailed] = useState(false);
-  useEffect(() => {
-    let active = true;
-    setSettings(null);
-    setFailed(false);
-    if (available) {
-      loadAgentSessionSettings(agent.id, agent.serverId).then(
-        (value) => {
-          if (active) setSettings(value);
-        },
-        () => {
-          if (active) setFailed(true);
-        },
-      );
-    }
-    return () => {
-      active = false;
-    };
-  }, [agent.id, agent.serverId, available, loadAgentSessionSettings]);
+  const unavailable = Object.entries(settings?.overrides ?? {}).filter(
+    ([id]) => !settings?.options.some((option) => option.id === id),
+  );
 
   async function save(settingId: string, value?: AgentSessionSettingValue): Promise<void> {
     setBusy(true);
     try {
-      setSettings(
-        await (value === undefined
-          ? resetAgentSessionSetting({ agentId: agent.id, settingId }, agent.serverId)
-          : setAgentSessionSetting({ agentId: agent.id, settingId, value }, agent.serverId)),
-      );
+      const saved = await (value === undefined
+        ? resetAgentSessionSetting({ agentId: agent.id, settingId }, agent.serverId)
+        : setAgentSessionSetting({ agentId: agent.id, settingId, value }, agent.serverId));
+      await queryClient.cancelQueries({ queryKey, exact: true });
+      queryClient.setQueryData(queryKey, saved);
     } catch (cause) {
       const text = currentText();
       showFailureAlert(
@@ -55,13 +62,13 @@ export function AgentSessionSettingsSection({ agent, available }: { agent: Mobil
     }
   }
 
-  if (!failed && !settings?.options.length) return null;
+  if (!query.isError && !settings?.options.length && !unavailable.length) return null;
   return (
     <SettingsSection
       title={t("mobile.agent.session.title")}
       footer={settings?.pending ? t("mobile.agent.session.pending") : undefined}
     >
-      {failed ? (
+      {query.isError ? (
         <SettingsRow>
           <Typography.Paragraph>{t("mobile.agent.session.readFailed")}</Typography.Paragraph>
         </SettingsRow>
@@ -69,9 +76,10 @@ export function AgentSessionSettingsSection({ agent, available }: { agent: Mobil
       {settings?.options.map((option) => {
         const saved = settings.overrides[option.id];
         const invalid =
-          option.type === "select" &&
-          typeof saved === "string" &&
-          !option.options.some((choice) => choice.value === saved);
+          saved !== undefined &&
+          (option.type === "select"
+            ? typeof saved !== "string" || !option.options.some((choice) => choice.value === saved)
+            : typeof saved !== "boolean");
         return (
           <Fragment key={option.id}>
             <SettingsRow
@@ -111,6 +119,17 @@ export function AgentSessionSettingsSection({ agent, available }: { agent: Mobil
           </Fragment>
         );
       })}
+      {unavailable.map(([id, value]) => (
+        <SettingsRow
+          key={id}
+          disclosure={false}
+          disabled={!available || busy}
+          supportingText={t("mobile.agent.session.unavailable", { value: String(value) })}
+          onPress={() => void save(id)}
+        >
+          <Typography.Paragraph>{t("mobile.agent.session.reset", { name: id })}</Typography.Paragraph>
+        </SettingsRow>
+      ))}
     </SettingsSection>
   );
 }

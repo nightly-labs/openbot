@@ -134,11 +134,11 @@ export function AgentSessionSettings(props: {
                         value={typeof value() === "string" ? String(value()) : null}
                         disabled={state.busy || !option()}
                         onChange={(next) => {
-                          if (next !== null) void change(id, next);
+                          if (next !== null && next !== value()) void change(id, next);
                         }}
                         itemComponent={(item) => <SelectItem item={item.item}>{label(item.item.rawValue)}</SelectItem>}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger aria-label={option()?.name ?? id}>
                           <SelectValue<string>>{() => label(String(value() ?? ""))}</SelectValue>
                         </SelectTrigger>
                         <SelectContent />
@@ -146,6 +146,7 @@ export function AgentSessionSettings(props: {
                     }
                   >
                     <Switch
+                      aria-label={option()?.name ?? id}
                       checked={value() === true}
                       disabled={state.busy}
                       onChange={(next) => void change(id, next)}

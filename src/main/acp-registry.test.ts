@@ -1,6 +1,7 @@
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { isCustomAgentResult } from "@openbot/contracts/ipc";
 import { Deferred, Effect } from "effect";
 import { afterEach, expect, it } from "vitest";
 import { runCauseEffect } from "../backend/effect-boundary";
@@ -11,12 +12,13 @@ import { CustomAgentStore } from "./custom-agent-store";
 import { ProviderRuntimeFailure } from "./provider-runtime-effects";
 
 // Failure modes: failed/cancelled updates replace a working command; runtime removal deletes
-// saved credentials; concurrent settings edits lose secrets; fresh reserved IDs collide.
+// saved credentials; concurrent settings edits lose secrets; fresh reserved IDs collide; long
+// catalog names make the saved agent fail the custom-agent response contract.
 const folders: string[] = [];
 afterEach(async () => {
   for (const folder of folders.splice(0)) await rm(folder, { recursive: true, force: true });
 });
-async function setup() {
+async function setup(name = "Example") {
   const folder = await mkdtemp(join(tmpdir(), "openbot-registry-"));
   folders.push(folder);
   const store = new CustomAgentStore({
@@ -34,7 +36,7 @@ async function setup() {
   });
   const entry: RegistryAgent = {
     id: "example",
-    name: "Example",
+    name,
     description: "Test",
     version: "1.0.0",
     distribution: { npx: { package: "example@1.0.0" } },
@@ -139,4 +141,14 @@ it("keeps edits to saved name and credentials during an update and rejects a cha
   await runCauseEffect(a.store.save({ id: "pi", name: "Legacy", command: "/agent", args: [], env: [] }));
   await runCauseEffect(a.changes.save({ id: "pi", name: "Existing", command: "/agent", args: [], env: [] }));
   expect(a.store.configs().find((agent) => agent.id === "pi")?.name).toBe("Existing");
+});
+
+it("keeps the catalog display name while saving a bounded custom agent name", async () => {
+  const name = "Registry display name ".repeat(7);
+  const a = await setup(name);
+  expect((await runCauseEffect(a.registry.search()))[0]?.name).toBe(name);
+  const installed = await runCauseEffect(a.registry.install({ registryId: "example", customAgentId: "example" }));
+  expect(installed.agents[0]?.name).toBe(name.trim().slice(0, 80));
+  expect(isCustomAgentResult(installed)).toBe(true);
+  expect(a.store.configs()[0]?.name).toBe(name.trim().slice(0, 80));
 });

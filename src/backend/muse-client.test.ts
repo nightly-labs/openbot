@@ -4,10 +4,12 @@ import { join } from "node:path";
 import { EXPECTED_SCHEMA_FINGERPRINT, spawnMspConnection } from "@muse-code/sdk";
 import { Effect } from "effect";
 import { afterEach, describe, expect, it } from "vitest";
+import { promptQuestions, promptResolution } from "./agent/prompts";
 import { runCauseEffect } from "./effect-boundary";
 import { MuseAgentClient, type MuseProviderOptions } from "./muse-client";
 import {
   type AppServerNotification,
+  type AppServerRequest,
   decodeAccountReadResult,
   decodeRecordResponse,
   decodeThreadResponse,
@@ -15,7 +17,7 @@ import {
 } from "./protocol";
 
 /* Failure modes: the host loses final items; a gap hides an item; a page crosses sessions;
- * an inherited key reaches the wrong account; MCP refresh leaves an old process alive.
+ * a credential answer enters shared history; an inherited key reaches the wrong account; MCP refresh leaves an old process alive.
  * These tests use the real SDK over a child-process boundary and a saved session fixture. */
 const HOST = String.raw`
 const fs = require("node:fs");
@@ -38,12 +40,22 @@ readline.createInterface({input:process.stdin}).on("line", line => {
  if(frame.method === "turn/start") {
    const state = {...readState(),turnId:p.commandId}; fs.writeFileSync(statePath, JSON.stringify(state));
    emit({id:frame.id,result:{turnId:p.commandId}});
+   if(process.env.MUSE_TEST_INPUT === "1") {
+     emit(event("userInput/requested",state,{userInputId:"input-1",questions:[{id:"credential",header:"Account",question:"Enter your API key",options:[],selection:{mode:"single"}}]}));
+     return;
+   }
    if(process.env.MUSE_TEST_GAP === "1") {
      emit(event("view/gap",state,{after:"a",next:"c"}));
    } else {
      emit(event("item/started",state,{item:{...item(state),revision:1,status:"inProgress",text:"Partial"}}));
    }
    emit(event("turn/completed",state,{turnId:state.turnId,terminal: process.env.MUSE_TEST_ERROR === "1" ? "failed" : "completed", ...(process.env.MUSE_TEST_ERROR === "1" ? {error:{message:"Rejected key: " + process.env.META_API_KEY}} : {}), viewCursor:"c"}));
+   return;
+ }
+ if(frame.method === "userInput/answer") {
+   const state = readState(); fs.writeFileSync(statePath, JSON.stringify({...state,answers:p.answers}));
+   emit({id:frame.id,result:{}});
+   emit(event("turn/completed",state,{turnId:state.turnId,terminal:"completed"}));
    return;
  }
  if(frame.method === "session/read") {
@@ -172,6 +184,29 @@ describe("Muse native MSP adapter", () => {
     );
     await failed;
     expect(notifications.some((event) => event.method === "turn/completed")).toBe(false);
+  });
+
+  it("keeps a credential answer out of the persisted prompt resolution", async () => {
+    const { client, directory, statePath } = await fixture({}, { MUSE_TEST_INPUT: "1" });
+    const opened = await runCauseEffect(client.request("thread/start", { cwd: directory }, decodeThreadResponse));
+    const asked = new Promise<AppServerRequest>((resolve) => client.once("request", resolve));
+    const done = completion(client);
+    await runCauseEffect(
+      client.request(
+        "turn/start",
+        { threadId: opened.thread.id, input: [{ type: "text", text: "connect" }] },
+        decodeTurnResponse,
+      ),
+    );
+    const request = await asked;
+    const answers = { credential: ["fixture-private-answer"] };
+    const persisted = promptResolution(promptQuestions(request.params), answers);
+    expect(persisted).toMatchObject({ responses: { credential: { status: "answered" } } });
+    expect(JSON.stringify(persisted)).not.toContain("fixture-private-answer");
+    client.respond(request.id, { answers: { credential: { answers: answers.credential } } });
+    await done;
+    const state = decodeRecordResponse(JSON.parse(await readFile(statePath, "utf8")));
+    expect(state.answers).toEqual([{ questionId: "credential", freeText: "fixture-private-answer" }]);
   });
 
   it("does not launch a profile session that could inherit external tools", async () => {

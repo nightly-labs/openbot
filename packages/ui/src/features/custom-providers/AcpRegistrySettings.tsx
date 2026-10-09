@@ -112,7 +112,7 @@ export function AcpRegistrySettings(props: { api: AcpRegistrySettingsApi }) {
       s.error = null;
     });
     try {
-      await props.api.install({ registryId: entry.id, customAgentId, name: entry.name });
+      await props.api.install({ registryId: entry.id, customAgentId });
       setState((s) => {
         s.selected = null;
       });

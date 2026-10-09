@@ -843,13 +843,19 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           queryKey: ["agent-info", session.apiUrl, session.user.id, sessionScope, serverId, event.agentId],
         });
       }
+      if (event.type === "agent-session-settings-changed") {
+        void queryClient.invalidateQueries({
+          queryKey: ["agent-info", session.apiUrl, session.user.id, sessionScope, serverId, event.agentId],
+          predicate: (query) => query.queryKey.at(-1) === "session-settings",
+        });
+      }
       if (event.type === "agents-changed") {
         replaceServerAgents(serverId, event.agents);
         // The admin and host settings of an agent are not in the agent summary. The host sends this event
         // when one of them changes, so an open settings page reads them again.
         void queryClient.invalidateQueries({
           queryKey: ["agent-info", session.apiUrl, session.user.id, sessionScope, serverId],
-          predicate: (query) => query.queryKey.at(-1) === "admin" || query.queryKey.at(-1) === "host",
+          predicate: (query) => ["admin", "host", "session-settings"].includes(String(query.queryKey.at(-1))),
         });
       } else if (event.type === "conversation") {
         const knownIds = serverAgentIds.current.get(serverId) ?? new Set<string>();

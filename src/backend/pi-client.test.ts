@@ -11,6 +11,7 @@ import type { ProviderHistoryFragment } from "./provider-history";
 
 // Failure modes: agent_end can precede retries (settled test); cancellation can run queued work
 // (interrupt test); a restarted process can use a different session (resume test); credentials
+// per-message usage can reset cumulative counters (usage test); credentials
 // can enter a generated file or become a shell command (MCP test).
 const FAKE = `#!/usr/bin/env node
 const fs = require("node:fs");
@@ -18,6 +19,7 @@ const path = require("node:path");
 let session = path.join(process.cwd(), "pi-session.jsonl");
 const send = value => process.stdout.write(JSON.stringify(value) + "\\n");
 let buffer = "";
+let usageTurns = 0;
 process.stdin.on("data", chunk => {
   buffer += chunk;
   let line;
@@ -27,6 +29,7 @@ process.stdin.on("data", chunk => {
     let data = {};
     if (command.type === "get_state") { fs.writeFileSync(session, "{}"); data = { sessionFile: session }; }
     if (command.type === "switch_session") session = command.sessionPath;
+    if (command.type === "get_session_stats") data = {tokens: {input: usageTurns * 20, cacheRead: usageTurns * 30, cacheWrite: usageTurns * 10, output: usageTurns > 1 ? 180 : usageTurns * 100}};
     if (command.type === "get_messages") data = { messages: [{ role: "assistant", content: [{ type: "text", text: "Active branch" }], timestamp: 1000 }] };
     if (command.type === "get_available_models") data = { models: [{ id: "model", provider: "test", name: "Test", reasoning: false }] };
     if (command.type === "prompt") {
@@ -40,6 +43,11 @@ process.stdin.on("data", chunk => {
     if (command.type === "compact") {
       send({ type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "Final" }], stopReason: "stop" } });
       send({ type: "agent_settled" });
+    }
+    if (command.type === "prompt" && command.message === "usage") {
+      usageTurns++;
+      send({type:"message_end",message:{role:"assistant",content:[{type:"text",text:"Answer"}],stopReason:"stop",usage:{input:20,cacheRead:30,cacheWrite:10,output: usageTurns === 1 ? 100 : 80}}});
+      send({type:"agent_settled"});
     }
     if (command.type === "abort") send({ type: "agent_settled" });
   }
@@ -93,6 +101,28 @@ function completed(client: PiAgentClient) {
 }
 
 describe("Pi native sessions", () => {
+  it("reports cumulative usage and preserves the separate cache counts", async () => {
+    const test = await fixture();
+    for (let turn = 0; turn < 2; turn++) {
+      const done = completed(test.client);
+      await Effect.runPromise(
+        test.client.request(
+          "turn/start",
+          { threadId: test.id, input: [{ type: "text", text: "usage" }] },
+          decodeTurnResponse,
+        ),
+      );
+      await done;
+    }
+    const usage = test.events
+      .filter((event) => event.method === "openbot/usage")
+      .map((event) => getRecord(event.params, "usage"));
+    expect(usage).toEqual([
+      { inputTokens: 60, outputTokens: 100, cachedReadTokens: 30, cachedWriteTokens: 10 },
+      { inputTokens: 120, outputTokens: 180, cachedReadTokens: 60, cachedWriteTokens: 20 },
+    ]);
+  });
+
   it("keeps a turn open after agent_end and persists the authoritative reply before completion", async () => {
     const test = await fixture();
     await Effect.runPromise(

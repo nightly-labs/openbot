@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AcpRegistryEntry,
   AcpRegistryInstallation,
@@ -240,7 +241,7 @@ export class AcpRegistry {
       );
       const inputToSave: SaveCustomAgentInput = {
         id: input.customAgentId,
-        name: old?.name ?? input.name ?? entry.name,
+        name: old?.name ?? input.name ?? (entry.name.trim() || entry.id).slice(0, INPUT_LIMITS.agentName),
         command: prepared.command,
         args: prepared.args,
         env: Object.entries(prepared.env).map(([name, value]) => ({ name, value })),
