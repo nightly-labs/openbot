@@ -17,7 +17,7 @@ export type IngressRoute =
   | { platform: "telegram"; botId: string; chatId: string };
 
 /** What the account service says of a route's host: `starting` is a hosted server that comes online. */
-export type RouteHostState = "not_hosted" | "ended" | "sleeping" | "starting";
+type RouteHostState = "not_hosted" | "ended" | "sleeping" | "starting";
 
 export interface RouteWake {
   hostId: string | null;
@@ -31,7 +31,7 @@ export type RouteWaker = (route: IngressRoute, wake: boolean) => Effect.Effect<R
  * `queued`: kept for the host. `hosted`: a hosted server has the route, but the event is not kept.
  * `unavailable`: no host can take the event now.
  */
-export type OfflineOutcome = "queued" | "hosted" | "unavailable";
+type OfflineOutcome = "queued" | "hosted" | "unavailable";
 
 export interface IngressQueueLimits {
   /** How long an event waits for its host. A hosted server starts in a few minutes. */
@@ -45,7 +45,7 @@ export interface IngressQueueLimits {
   maximumBytes: number;
 }
 
-export const DEFAULT_INGRESS_QUEUE_LIMITS: IngressQueueLimits = {
+const DEFAULT_INGRESS_QUEUE_LIMITS: IngressQueueLimits = {
   ttlMilliseconds: 10 * 60_000,
   routeCheckMilliseconds: 60_000,
   otherRouteCheckMilliseconds: 10 * 60_000,
@@ -110,9 +110,9 @@ export class IngressQueue {
     wakes: boolean,
     message: QueuedSignalMessage,
     telegramCallback: QueuedFrame["telegramCallback"] = null,
-  ) {
+  ): Effect.fn.Return<OfflineOutcome> {
     const order = ++this.#order;
-    if (!this.#waker) return "unavailable" as const;
+    if (!this.#waker) return "unavailable";
     const wake = yield* this.#check(route, routeKey, wakes);
     if (!wakes) return wake.state === "sleeping" || wake.state === "starting" ? "hosted" : "unavailable";
     const queueKey = wake.hostId ? this.#keys.get(wake.hostId) : undefined;
