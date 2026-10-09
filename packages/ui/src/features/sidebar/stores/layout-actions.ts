@@ -31,7 +31,6 @@ export function createSidebarLayoutActions(deps: {
   chatName: (chatId: string) => string;
   draggedSidebarItem: () => SidebarPinnedItem | null;
   filteredChatsBySection: () => Map<string, SidebarChatItem[]>;
-  filteredPeople: () => TeamPresenceMember[];
   layoutMutable: () => boolean;
   orderedPeople: () => TeamPresenceMember[];
   personById: () => Map<string, TeamPresenceMember>;
@@ -49,7 +48,6 @@ export function createSidebarLayoutActions(deps: {
     chatPinnedItems,
     draggedSidebarItem,
     filteredChatsBySection,
-    filteredPeople,
     layoutMutable,
     orderedPeople,
     personById,
@@ -106,7 +104,7 @@ export function createSidebarLayoutActions(deps: {
   }
 
   function movePersonByKeyboard(memberId: string, direction: -1 | 1): void {
-    const visibleMemberIds = filteredPeople().map((member) => member.id);
+    const visibleMemberIds = orderedPeople().map((member) => member.id);
     const index = visibleMemberIds.indexOf(memberId);
     const targetMemberId = visibleMemberIds[index + direction];
     if (index < 0 || !targetMemberId) return;

@@ -51,6 +51,7 @@ class DataChannel {
   onopen: (() => void) | null = null;
   onmessage: ((event: { data: string }) => void) | null = null;
   onerror: (() => void) | null = null;
+  onclose: (() => void) | null = null;
   readonly send = vi.fn();
   constructor(readonly label: string) {}
 }
@@ -63,6 +64,7 @@ class PeerConnection {
   onicecandidate: ((event: { candidate: RTCIceCandidateInit | null }) => void) | null = null;
   onconnectionstatechange: (() => void) | null = null;
   connectionState = "new";
+  readonly channels: DataChannel[] = [];
   readonly close = vi.fn();
   readonly setConfiguration = vi.fn();
   readonly restartIce = vi.fn();
@@ -82,7 +84,9 @@ class PeerConnection {
     return { type: "offer", sdp: "a=fingerprint:sha-256 CLIENT" };
   }
   createDataChannel(label: string): DataChannel {
-    return new DataChannel(label);
+    const channel = new DataChannel(label);
+    this.channels.push(channel);
+    return channel;
   }
 }
 
@@ -319,6 +323,40 @@ it("renews Signal for a lost client path, and reports the peer when the path doe
   await vi.advanceTimersByTimeAsync(7_000);
   expect(posted("peer-disconnected")).toEqual([{ type: "peer-disconnected", peerId: "host-1" }]);
   expect(rtc.close).toHaveBeenCalled();
+});
+
+// The host can close the connection while the client computer sleeps. The path still read
+// `connected`, so main read the host as connected and each stop request failed on a closed channel.
+it("reports the client peer when the host closes a data channel on a connected path", async () => {
+  const { posted, command } = await startBridge();
+  await command({
+    type: "connect",
+    peerId: "host-1",
+    peer: "client",
+    signalUrl: "wss://signal.example.test",
+    token: "test",
+    iceTransportPolicy: "all",
+  });
+  const signal = SignalSocket.instances[0];
+  if (!signal) throw new Error("No Signal socket.");
+  signal.dispatchEvent(new Event("open"));
+  signal.message({ type: "ready", version: 1, connectionId: "connection-1", resumeToken: "resume", iceServers: [] });
+  await vi.waitFor(() => expect(PeerConnection.instances[0]?.channels).toHaveLength(4));
+  const rtc = PeerConnection.instances[0];
+  const rpc = rtc?.channels[0];
+  if (!rtc || !rpc) throw new Error("No RTC connection.");
+  rtc.connectionState = "connected";
+  rtc.onconnectionstatechange?.();
+
+  rpc.readyState = "closed";
+  rpc.onclose?.();
+
+  expect(posted("peer-disconnected")).toEqual([{ type: "peer-disconnected", peerId: "host-1" }]);
+  expect(rtc.close).toHaveBeenCalled();
+  expect(signal.send.mock.calls.map(([data]) => JSON.parse(data))).toContainEqual(
+    expect.objectContaining({ type: "disconnect", connectionId: "connection-1" }),
+  );
+  await command({ type: "close", peerId: "all" });
 });
 
 // Main opens the client's Signal socket while the account service makes the ticket, so the TLS and

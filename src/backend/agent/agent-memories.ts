@@ -12,7 +12,7 @@ import { AgentMemoryStore } from "../agent-memory-store";
 import type { AgentStore } from "../agent-store";
 import { type DynamicToolCallParams, isRecord } from "../protocol";
 import type { ConversationRuntime } from "./conversation-runtime";
-import { type OpenBotToolResponse, openBotToolResult } from "./routine-tools";
+import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from "./routine-tools";
 
 type PendingMemoryMutation =
   | {
@@ -108,23 +108,30 @@ export class AgentMemories {
     this.#memories.duplicate(sourceAgentId, targetAgentId);
   }
 
-  /** The two `openbot` memory tools. Returns null when `tool` is not one of them. */
+  /**
+   * The two `openbot` memory tools. Returns null when `tool` is not one of them.
+   *
+   * Invalid arguments are a failed tool result that the agent can correct. A throw reached the user
+   * as a "Provider error" toast, and the agent got only an opaque fault (#1524).
+   */
   handleTool(params: DynamicToolCallParams, senderAgentId: string): OpenBotToolResponse | null {
     if (params.tool === "remember") {
       const args = params.arguments;
-      if (!isRecord(args) || !isString(args.text)) throw new Error("Memory text is required.");
+      if (!isRecord(args) || !isString(args.text))
+        return openBotToolFailure(sourceText("error.backend.memoryTextRequired"));
       const text = args.text.trim();
-      if (!text) throw new Error("Memory text is required.");
-      if (text.length > INPUT_LIMITS.agentMemoryText) throw new Error("Memory text is too long.");
+      if (!text) return openBotToolFailure(sourceText("error.backend.memoryTextRequired"));
+      if (text.length > INPUT_LIMITS.agentMemoryText)
+        return openBotToolFailure(sourceText("error.backend.memoryTextTooLong"));
       const memoryId = args.memoryId;
       if (
         memoryId !== undefined &&
         (!isString(memoryId) || memoryId.length === 0 || memoryId.length > INPUT_LIMITS.identifier)
       ) {
-        throw new Error("memoryId is invalid.");
+        return openBotToolFailure("memoryId is invalid.");
       }
       const current = memoryId ? this.#memories.get(senderAgentId, memoryId) : null;
-      if (memoryId && !current) throw new Error("This memory does not belong to the current agent.");
+      if (memoryId && !current) return openBotToolFailure("This memory does not belong to the current agent.");
       this.#stage(params.turnId, {
         callId: params.callId,
         type: "remember",
@@ -146,10 +153,10 @@ export class AgentMemories {
         args.memoryId.length === 0 ||
         args.memoryId.length > INPUT_LIMITS.identifier
       ) {
-        throw new Error("memoryId is required.");
+        return openBotToolFailure("memoryId is required.");
       }
       const current = this.#memories.get(senderAgentId, args.memoryId);
-      if (!current) throw new Error("This memory does not belong to the current agent.");
+      if (!current) return openBotToolFailure("This memory does not belong to the current agent.");
       this.#stage(params.turnId, {
         callId: params.callId,
         type: "forget",

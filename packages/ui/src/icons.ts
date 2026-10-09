@@ -9,6 +9,7 @@ export { default as AudioLines } from "lucide-solid/icons/audio-lines";
 export { default as Bell } from "lucide-solid/icons/bell";
 export { default as BellOff } from "lucide-solid/icons/bell-off";
 export { default as Blocks } from "lucide-solid/icons/blocks";
+export { default as BookMarked } from "lucide-solid/icons/book-marked";
 export { default as Bot } from "lucide-solid/icons/bot";
 export { default as Brain } from "lucide-solid/icons/brain";
 export { default as CalendarClock } from "lucide-solid/icons/calendar-clock";
@@ -100,6 +101,7 @@ export { default as SlidersHorizontal } from "lucide-solid/icons/sliders-horizon
 export { default as Smartphone } from "lucide-solid/icons/smartphone";
 export { default as Sparkles } from "lucide-solid/icons/sparkles";
 export { default as Store } from "lucide-solid/icons/store";
+export { default as Table2 } from "lucide-solid/icons/table-2";
 export { default as Trash2 } from "lucide-solid/icons/trash-2";
 export { default as TriangleAlert } from "lucide-solid/icons/triangle-alert";
 export { default as Upload } from "lucide-solid/icons/upload";

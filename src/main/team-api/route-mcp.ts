@@ -55,8 +55,12 @@ export async function routeMcpServers(
     const parsed = parseTestMcpServer(body);
     if (toolRuntimes) await runCauseEffect(prepareToolRuntimeForTest(parsed.config, toolRuntimes));
     // The administrator tests the host's servers, so the host's stored sign-ins are spent - but no
-    // browser opens on a machine nobody is sitting at. Only the tool count and the error travel back.
-    return json(200, await runCauseEffect(mcpServers.testMcpServer(parsed, { storedCredentials: true })));
+    // browser opens on a machine nobody is sitting at. Only the tool count and the error travel back;
+    // a server that wants a sign-in is told to the administrator as one to finish on the host.
+    return json(
+      200,
+      await runCauseEffect(mcpServers.testMcpServer(parsed, { storedCredentials: true, signInPlace: "host" })),
+    );
   }
   const toggled = parseSetMcpServerEnabled(body);
   if (toggled.enabled) toolRuntimes?.startToolRuntimes();

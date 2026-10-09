@@ -4,6 +4,7 @@ import { Alert, AlertContent, AlertDescription, AlertIcon } from "./alert";
 import { Button } from "./button";
 import { AlertDialog } from "./complex";
 import { ShieldCheck, Trash2, TriangleAlert } from "./icons";
+import { useText } from "./text";
 
 export type ConfirmDialogTone = "destructive" | "default";
 
@@ -38,6 +39,7 @@ export interface ConfirmDialogProps {
 }
 
 export function ConfirmDialog(props: ConfirmDialogProps): JSX.Element {
+  const { t } = useText();
   const [running, setRunning] = createSignal(false);
   const pending = () => Boolean(props.pending) || running();
   const tone = () => props.tone ?? "destructive";
@@ -140,7 +142,7 @@ export function ConfirmDialog(props: ConfirmDialogProps): JSX.Element {
                 disabled={pending()}
                 onClick={() => props.onCancel()}
               >
-                {props.cancelLabel ?? "Cancel"}
+                {props.cancelLabel ?? t("common.cancel")}
               </Button>
               <Button
                 ref={(element: HTMLButtonElement) => {

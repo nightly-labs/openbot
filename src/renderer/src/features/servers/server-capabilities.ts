@@ -25,6 +25,7 @@ export function serverSupportsCapability(
       capability === "model-scoped-usage" ||
       capability === "browser-navigation" ||
       capability === "browser-view" ||
+      capability === "browser-view-clipboard" ||
       capability === "mcp-servers-v1" ||
       capability === "storage-v1" ||
       capability === "hosted-sites-v1" ||

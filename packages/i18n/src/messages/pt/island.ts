@@ -34,6 +34,7 @@ export const messages = {
   "island.action.later": "Mais tarde",
   "island.action.dismiss": "Dispensar",
   "island.action.answerInOpenBot": "Responder no OpenBot",
+  "island.action.failed": "Não funcionou. Tente novamente.",
   "island.failure.fallback": "A tarefa parou antes de terminar.",
   "island.failure.title": "A tarefa falhou",
   "island.failure.detail": "A tarefa parou antes de terminar. Abra a conversa para tentar novamente.",

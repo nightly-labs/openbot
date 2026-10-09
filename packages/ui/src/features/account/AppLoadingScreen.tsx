@@ -103,6 +103,8 @@ export interface AppLoadingScreenProps {
   onExited?: () => void;
   /** Stop the clock and show the frame at this time, in seconds. */
   at?: number;
+  /** What the screen waits for, for a screen reader. The default is the app load. */
+  label?: string;
 }
 
 export function AppLoadingScreen(props: AppLoadingScreenProps) {
@@ -197,7 +199,7 @@ export function AppLoadingScreen(props: AppLoadingScreenProps) {
       aria-busy={props.ready ? "false" : "true"}
       onAnimationEnd={handleAnimationEnd}
     >
-      <span class="sr-only">{t("webClient.loading")}</span>
+      <span class="sr-only">{props.label ?? t("webClient.loading")}</span>
       <div class="app-loading-stage" aria-hidden="true">
         <div class="app-loading-row">
           <For each={HOPPERS}>

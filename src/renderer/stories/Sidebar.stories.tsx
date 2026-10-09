@@ -147,6 +147,7 @@ const args: Parameters<typeof Sidebar>[0] = {
   onDeleteAgent: async () => undefined,
   compact: false,
   onExpand: fn(),
+  onOpenSearch: fn(),
   onOpenMarketplace: fn(),
 };
 

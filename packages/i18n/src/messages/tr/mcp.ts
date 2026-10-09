@@ -31,6 +31,14 @@ export const messages = {
   "mcp.status.failed": "Başarısız oldu",
   "mcp.status.enabled": "Etkin",
   "mcp.status.disabled": "Devre dışı",
+  "mcp.status.signedIn": "Oturum açık",
+  "mcp.status.signingIn": "Oturum açılıyor…",
+  "mcp.status.signInNeeded": "Oturum açılmalı",
+  "mcp.status.refused": "Reddedildi",
+  "mcp.status.checkUrl": "URL'yi kontrol edin",
+  "mcp.status.noAnswer": "Yanıt yok",
+  "mcp.status.didNotStart": "Başlamadı",
+  "mcp.status.unreachable": "Ulaşılamıyor",
   "mcp.server.providerLimitNote": "Yalnızca Claude: Çalışma dizini olan bir sunucu diğer sağlayıcılara verilmez.",
   "mcp.server.runtimeDownloading":
     "Bir STDIO sunucusunun başlatıldığı çalışma zamanı indiriliyor. Tamamlanana kadar başlatılamayabilir.",
@@ -94,4 +102,13 @@ export const messages = {
   "mcp.panel.removeConfirm": "MCP sunucusunu kaldır",
   "mcp.panel.actionsFor": "{name} için eylemler",
   "mcp.panel.testUnavailable": "Bu sunucu burada test edilemez.",
+  "mcp.panel.signIn": "Oturum aç",
+  "mcp.panel.signOut": "Oturumu kapat",
+  "mcp.panel.cancelSignIn": "Oturum açmayı iptal et",
+  "mcp.panel.signInTo": "Oturum aç: {name}",
+  "mcp.panel.cancelSignInTo": "Oturum açmayı iptal et: {name}",
+  "mcp.panel.signInWaiting": {
+    one: "Oturum açmayı tarayıcınızda tamamlayın. OpenBot {count} dakika sonra beklemeyi bırakır.",
+    other: "Oturum açmayı tarayıcınızda tamamlayın. OpenBot {count} dakika sonra beklemeyi bırakır.",
+  },
 } as const satisfies PartialTranslation<typeof source>;

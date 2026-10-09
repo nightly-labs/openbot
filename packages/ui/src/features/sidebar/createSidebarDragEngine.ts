@@ -46,7 +46,7 @@ export interface SidebarDragEngineDeps {
   canPinDraggedItem: () => boolean;
   dragState: SidebarDragWriters;
   filteredChatsBySection: () => Map<string, SidebarChatItem[]>;
-  filteredPeople: () => TeamPresenceMember[];
+  orderedPeople: () => TeamPresenceMember[];
   getAgentList: () => HTMLElement | undefined;
   /** Which kind of chat an id names, or null when it names none: only a known chat can be pinned. */
   chatKind: (chatId: string) => "agent" | "channel" | null;
@@ -66,7 +66,7 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
     commitSidebarDrop,
     dragState,
     filteredChatsBySection,
-    filteredPeople,
+    orderedPeople,
     scrollFades,
     sectionAcceptsChat,
     visiblePinnedKeys,
@@ -288,7 +288,7 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
       case "person": {
         if (source.kind !== "person") return {};
         return reorderOffsets(
-          filteredPeople().map((member) => member.id),
+          orderedPeople().map((member) => member.id),
           source.id,
           { id: target.target.memberId, placement: target.target.placement },
           (memberId) => personDragSlots.get(memberId),

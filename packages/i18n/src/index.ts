@@ -22,7 +22,7 @@ export {
   type Translate,
 } from "./message";
 export type { AppMessages } from "./messages/en/index";
-export { localizeSourceText, type SourceMessages, sourceText } from "./source-text";
+export { localizeSourceText, matchingSourceKeys, type SourceMessages, sourceText } from "./source-text";
 export { de, en, es, fr, ja, pt, ru, tr };
 
 const catalogs = { en, de, es, fr, ja, pt, ru, tr } as const;

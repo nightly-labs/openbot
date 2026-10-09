@@ -12,6 +12,7 @@ import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, flush, onCleanup } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { createSimpleContext } from "../../simple-context";
+import { mcpSignInRecord } from "./mcp-servers";
 import type { ServerSettingsSection } from "./ServerSettingsModal";
 import { serverCanAdminister, serverRoleCanAdminister } from "./server-capabilities";
 import { useServers } from "./servers-context";
@@ -49,6 +50,8 @@ const ServerSettings = createSimpleContext({
     const [serverSettingsError, setServerSettingsError] = createSignal<string | null>(null);
     const [serverSettingsMcp, setServerSettingsMcp] = createSignal<McpServerConfig[]>([]);
     const [serverSettingsMcpError, setServerSettingsMcpError] = createSignal<string | null>(null);
+    /** Which http rows this computer holds a sign-in for, by id. Empty for a remote server. */
+    const [serverSettingsMcpSignIns, setServerSettingsMcpSignIns] = createSignal<Record<string, boolean>>({});
     /** Bumped by every open and refresh, so a slower earlier load cannot paint over a newer one. */
     let serverSettingsRequest = 0;
     /**
@@ -157,6 +160,7 @@ const ServerSettings = createSimpleContext({
       setServerSettingsInvites([]);
       setServerSettingsMcp([]);
       setServerSettingsMcpError(null);
+      setServerSettingsMcpSignIns({});
       setServerSettingsError(null);
       void refreshServerSettings(serverId);
     }
@@ -388,9 +392,13 @@ const ServerSettings = createSimpleContext({
       const request = ++serverSettingsMcpRequest;
       const current = (): boolean => request === serverSettingsMcpRequest && serverSettingsTargetId() === server.id;
       try {
-        const configs = await serversPort().agent.listMcpServers(server.id);
+        const [configs, signIns] = await Promise.all([
+          serversPort().agent.listMcpServers(server.id),
+          listMcpSignIns(server),
+        ]);
         if (!current()) return;
         setServerSettingsMcp(configs);
+        setServerSettingsMcpSignIns(signIns);
         setServerSettingsMcpError(null);
       } catch (error) {
         // Reported in the panel rather than thrown: the callers ask for this list on a section
@@ -420,6 +428,42 @@ const ServerSettings = createSimpleContext({
         ...(result.error ? { failure_code: "mcp_server_test_failed" } : {}),
       });
       return result;
+    }
+
+    /**
+     * Which http rows this computer holds a sign-in for. Only the local server answers: a sign-in
+     * opens this computer's browser, and a remote host signs in for itself.
+     */
+    async function listMcpSignIns(server: ServerSummary): Promise<Record<string, boolean>> {
+      if (server.kind !== "local") return {};
+      // A badge beside the list, not the list: a failed read shows no badge rather than failing the
+      // list read, or reporting a save that already landed as failed.
+      return serversPort()
+        .agent.listMcpSignIns(server.id)
+        .then(mcpSignInRecord, () => ({}));
+    }
+
+    /** Opens the browser when the server asks; the answer comes once the browser came back. */
+    async function signInMcpServer(config: McpServerConfig): Promise<McpTestResult> {
+      const server = serverSettingsTarget();
+      if (!server) throw new Error(currentText().t("server.settings.unavailable"));
+      const result = await serversPort().agent.signInMcpServer({ config }, server.id);
+      const signIns = await listMcpSignIns(server);
+      if (serverSettingsTargetId() === server.id) setServerSettingsMcpSignIns(signIns);
+      return result;
+    }
+
+    async function cancelMcpSignIn(url: string): Promise<void> {
+      const server = serverSettingsTarget();
+      if (!server) throw new Error(currentText().t("server.settings.unavailable"));
+      await serversPort().agent.cancelMcpSignIn({ url }, server.id);
+    }
+
+    async function signOutMcpServer(mcpServerId: string): Promise<void> {
+      const server = serverSettingsTarget();
+      if (!server) throw new Error(currentText().t("server.settings.unavailable"));
+      const states = await serversPort().agent.signOutMcpServer({ mcpServerId }, server.id);
+      if (serverSettingsTargetId() === server.id) setServerSettingsMcpSignIns(mcpSignInRecord(states));
     }
 
     async function saveMcpServer(config: McpServerConfig): Promise<void> {
@@ -465,6 +509,9 @@ const ServerSettings = createSimpleContext({
         serverSettingsMcpRequest += 1;
         setServerSettingsMcp(configs);
         setServerSettingsMcpError(null);
+        // A saved row can name an address this computer is already signed in to.
+        const signIns = await listMcpSignIns(server);
+        if (serverSettingsTargetId() === server.id) setServerSettingsMcpSignIns(signIns);
       } catch (error) {
         if (!operationSucceeded) {
           analytics.track("team_action", {
@@ -507,6 +554,10 @@ const ServerSettings = createSimpleContext({
       leaveConfirmedServer,
       serverSettingsMcp,
       serverSettingsMcpError,
+      serverSettingsMcpSignIns,
+      signInMcpServer,
+      cancelMcpSignIn,
+      signOutMcpServer,
       refreshMcpServers,
       saveMcpServer,
       removeMcpServer,

@@ -24,6 +24,13 @@ export const TEAM_BROWSER_VIEW_CAPABILITY = "browser-view";
  * client sends the sequence and the drawn-frame acknowledgement only when the host advertises this.
  */
 export const TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY = "browser-view-frame-point";
+/**
+ * A host that pastes the client's text into the page and sends the page's selection back on copy.
+ * The clipboard is the user's, on the client: the host never reads or writes its own. Older hosts
+ * reject an unknown input, so a client sends `paste`, `copy` and `cut` only when the host advertises
+ * this.
+ */
+export const TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY = "browser-view-clipboard";
 /** Present on the view socket when this client will acknowledge the frame it has drawn. */
 export const BROWSER_VIEW_FRAME_ACK_QUERY = "frameAck";
 
@@ -33,6 +40,11 @@ export function browserViewClientAcksFrames(url: URL): boolean {
 
 /** A frame is one JPEG. The cap is generous for a photograph and refuses a stream that is not one. */
 export const BROWSER_VIEW_MAX_FRAME_BYTES = 2 * 1024 * 1024;
+/**
+ * The most text one paste or one copy carries. A long article selected whole still fits, and the
+ * message stays under the remote stream's 1 MiB text bound even when every character is escaped.
+ */
+export const BROWSER_VIEW_MAX_CLIPBOARD_TEXT = 100_000;
 const FRAME_MAGIC = new Uint8Array([0x4f, 0x42, 0x56, 0x31]);
 const FRAME_HEADER_BYTES = FRAME_MAGIC.byteLength + 8;
 
@@ -79,7 +91,22 @@ export type BrowserViewInput =
    * of a named key itself, such as the `\r` of Enter, so a client that also sends it types it twice.
    */
   | { type: "key"; action: "down" | "up" | "char"; key: string; code: string; text: string; modifiers: number }
-  | { type: "ack"; sequence: number };
+  | { type: "ack"; sequence: number }
+  /** Text from the client's clipboard, inserted where the page has focus. */
+  | { type: "paste"; text: string }
+  /** Asks for the page's selection, which comes back as `copied`. */
+  | { type: "copy" }
+  /**
+   * Deletes the selection after a cut, once its text is on the client's clipboard. The host deletes
+   * only when the selection is still `text` and in a field the user can edit.
+   */
+  | { type: "cut"; text: string };
+
+/**
+ * The text message a host sends on the view socket, only in answer to a `copy`: the selection, or
+ * word that it is longer than one message carries.
+ */
+export type BrowserViewCopied = { type: "copied"; text: string } | { type: "copyTooLarge" };
 
 export function isBrowserViewSessionsRoute(method: string, path: string): boolean {
   return method === "POST" && pathname(path) === "/v1/browser/view/sessions";
@@ -155,11 +182,17 @@ export function encodeBrowserViewInput(input: BrowserViewInput): string {
 
 /**
  * The input a host of this capability is sent. A host that does not name frames still accepts the
- * released payload, and it expands every point with its newest frame. An acknowledgement is not
- * part of that payload: an older host closes the view on an input it does not know.
+ * released payload, and it expands every point with its newest frame. An acknowledgement, a paste,
+ * a copy and a cut are not part of that payload: an older host closes the view on an input it does
+ * not know.
  */
-export function browserViewInputForHost(input: BrowserViewInput, namesFrames: boolean): BrowserViewInput | null {
+export function browserViewInputForHost(
+  input: BrowserViewInput,
+  namesFrames: boolean,
+  clipboard: boolean,
+): BrowserViewInput | null {
   if (!namesFrames && input.type === "ack") return null;
+  if (!clipboard && (input.type === "paste" || input.type === "copy" || input.type === "cut")) return null;
   if (input.type !== "pointer" || input.sequence === undefined || namesFrames) return input;
   const { sequence: _sequence, ...released } = input;
   return released;
@@ -178,6 +211,13 @@ export function decodeBrowserViewInputValue(message: unknown): BrowserViewInput 
   if (!isDynamicRecord(message)) throw new Error("Invalid browser view input.");
   // The client says which frame it has drawn. There is no page event in it.
   if (message.type === "ack") return { type: "ack", sequence: sequenceNumber(message.sequence) };
+  if (message.type === "paste" || message.type === "cut") {
+    if (!isBoundedString(message.text, BROWSER_VIEW_MAX_CLIPBOARD_TEXT) || message.text.length === 0) {
+      throw new Error("Invalid browser view input.");
+    }
+    return { type: message.type, text: message.text };
+  }
+  if (message.type === "copy") return { type: "copy" };
   const modifiers = isNumber(message.modifiers) ? message.modifiers : 0;
   if (!Number.isInteger(modifiers) || modifiers < 0 || modifiers > 15) throw new Error("Invalid browser view input.");
   if (message.type === "pointer") {
@@ -216,6 +256,24 @@ export function decodeBrowserViewInputValue(message: unknown): BrowserViewInput 
     return { type: "key", action, key: message.key, code: message.code, text, modifiers };
   }
   throw new Error("Invalid browser view input.");
+}
+
+export function encodeBrowserViewCopied(message: BrowserViewCopied): string {
+  return JSON.stringify(message);
+}
+
+/** The client decodes what the host sends, with the same bound as a paste going the other way. */
+export function decodeBrowserViewCopied(value: string): BrowserViewCopied {
+  return decodeBrowserViewCopiedValue(JSON.parse(value));
+}
+
+function decodeBrowserViewCopiedValue(message: unknown): BrowserViewCopied {
+  if (!isDynamicRecord(message)) throw new Error("Invalid browser view message.");
+  if (message.type === "copyTooLarge") return { type: "copyTooLarge" };
+  if (message.type !== "copied" || !isBoundedString(message.text, BROWSER_VIEW_MAX_CLIPBOARD_TEXT)) {
+    throw new Error("Invalid browser view message.");
+  }
+  return { type: "copied", text: message.text };
 }
 
 function fraction(value: unknown): number {

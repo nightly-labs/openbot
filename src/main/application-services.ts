@@ -137,6 +137,7 @@ import { localRoutineFeedDocument } from "./local-routine-calendar";
 import { LogoColorService } from "./logo-color-service";
 import type { MacHapticFeedback } from "./mac-haptic-feedback";
 import {
+  computerUseCoveringWindowIds,
   computerUseDesktopPoint,
   computerUseDesktopRect,
   computerUseDisplays,
@@ -1104,6 +1105,7 @@ export async function createApplicationServices({
           session,
           action,
           ownPid: process.pid,
+          ownCoveringWindowIds: computerUseCoveringWindowIds(),
           previous,
           toDesktop: computerUseDesktopRect,
         });

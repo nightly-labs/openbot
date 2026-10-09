@@ -39,7 +39,8 @@ export function shouldPlayCompletionSound(
   agents: NotificationAgent[],
   storage?: PreferenceStorage,
 ): boolean {
-  if (event.type !== "turn-completed" || event.status !== "completed") return false;
+  // A quiet routine run posted nothing, so it has no reply to announce.
+  if (event.type !== "turn-completed" || event.status !== "completed" || event.quiet) return false;
   if (!isCompletionSoundEnabled(storage)) return false;
   return agents.some((agent) => agent.id === event.agentId && agent.notifications);
 }

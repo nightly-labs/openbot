@@ -17,8 +17,8 @@ interface PublishState {
 }
 
 /**
- * The publish dialog of the conversation header, and the calls behind it. `open` is what the header
- * button runs; `dialog` is mounted once beside the header. `calls` is read on each call; by default
+ * The publish dialog for agent settings and the calls behind it. `open` is what the settings
+ * action runs; `dialog` is mounted once beside the conversation panels. `calls` is read on each call; by default
  * it is this computer's.
  */
 export function createPublishAgent(calls: () => AgentTemplatePublishCalls = () => agentTemplatesPort().agentTemplates) {

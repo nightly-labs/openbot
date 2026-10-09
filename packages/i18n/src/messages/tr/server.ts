@@ -261,6 +261,10 @@ export const messages = {
   "server.members.actionsFor": "{name} için eylemler",
   "server.members.makeMember": "Üye yap",
   "server.members.makeAdmin": "Yönetici yap",
+  "server.members.makeAdminTitle": "{name} yönetici yapılsın mı?",
+  "server.members.makeMemberTitle": "{name} üye yapılsın mı?",
+  "server.members.roleChangeDescription":
+    "{name} adlı kişinin bu sunucuyla bağlantısı kesilebilir ve yeniden bağlanması gerekebilir.",
   "server.invite.invalidEmail": "Geçerli bir e-posta adresi girin.",
   "server.invite.title": "Kişileri davet edin",
   "server.invite.description":
@@ -304,6 +308,8 @@ export const messages = {
   },
   "server.invite.expires": "Bitiş: {date}",
   "server.invite.revoke": "İptal et",
+  "server.invite.revokeTitle": "Bu davet iptal edilsin mi?",
+  "server.invite.revokeDescription": "Davet artık çalışmaz. Bu davetle katılanlar üye olarak kalır.",
   "server.desktop.accessTitle": "Uzak masaüstü erişimi",
   "server.desktop.gatewayDescription":
     "Her etkin sunucu üyesi bu ana makineyi kontrol edebilir. Ayrı bir uzak masaüstü şifresi yoktur.",

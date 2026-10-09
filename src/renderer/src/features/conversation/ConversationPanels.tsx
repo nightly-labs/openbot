@@ -3,6 +3,8 @@ import { classifyFailure } from "@openbot/telemetry";
 import { useText } from "@openbot/ui/text";
 import { actionToast } from "../../action-toast";
 import { createSettingsPanelWidth, saveSettingsPanelWidth } from "../../components/settings-panel-width";
+import { agentTemplatesPort } from "../agent-templates/agent-templates-port";
+import { createPublishAgent } from "../agent-templates/PublishAgent";
 import { serverCanAdministerAgents } from "../agents/remote-agent-admin";
 import type { AgentFilesOptions } from "../files/AgentFilesSettings";
 import { canManageStorage, serverHasStorage } from "../files/storage-usage";
@@ -80,6 +82,15 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
     updateRuntimeSettings,
   } = useConversationViewScope();
   const { t, errorMessage } = useText();
+  const publishAgent = createPublishAgent(
+    () => props.runtime?.admin?.agentTemplates ?? agentTemplatesPort().agentTemplates,
+  );
+  // This computer reads the skills of its own agents from the workspace. A joined host publishes its
+  // own agents, for an owner or admin, when it serves `agent-publish-v1`.
+  const canPublish = () =>
+    props.runtime
+      ? props.runtime.admin !== undefined && serverCanAdminister(props.server, "agent-publish-v1")
+      : props.server?.kind === "local";
   let browserPreviewTrigger: HTMLButtonElement | undefined;
   const settingsMaxWidth = () =>
     Math.min(
@@ -255,6 +266,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
                 : null
             }
             liveViewRuntime={props.browserRuntime ?? conversationPort().browser}
+            liveViewClipboard={serverSupportsCapability(props.server, "browser-view-clipboard")}
             onBack={() => setActiveRightPanel("browser")}
             onEnterPip={props.runtime ? () => undefined : showBrowserPip}
           />
@@ -321,6 +333,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
                   : undefined
               }
               onOpenUsage={panelProps.onOpenUsage}
+              onPublish={canPublish() ? () => publishAgent.open(agent().id) : undefined}
               agent={agent()}
               runtimeSettings={{
                 provider: settingsProvider(),
@@ -334,6 +347,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
               onDownloadProvider={props.onDownloadProvider}
               onCancelProviderDownload={props.onCancelProviderDownload}
               onConnectProvider={props.onConnectProvider}
+              onAddCustomProvider={props.onManageProviders}
               modelOptions={props.modelOptions}
               working={agentActivity() === "Working"}
               maxWidth={settingsMaxWidth}
@@ -385,6 +399,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
           );
         }}
       </Show>
+      {publishAgent.dialog()}
     </>
   );
 }

@@ -203,6 +203,13 @@ export function createMainWindowController({
               active.select();
               return;
             }
+            // A focused canvas is a remote browser page, which selects its own text when it gets the key.
+            // Only the key down is held here; the real key up still reaches it.
+            if (active instanceof HTMLCanvasElement) {
+              const key = { key: "a", code: "KeyA", ctrlKey: ${input.control}, metaKey: ${input.meta}, bubbles: true };
+              active.dispatchEvent(new KeyboardEvent("keydown", key));
+              return;
+            }
             if (!(active instanceof HTMLElement) || !active.isContentEditable) return;
             const range = document.createRange();
             range.selectNodeContents(active);
@@ -508,6 +515,23 @@ export function computerUseDisplays(): HighlightDisplay[] {
  */
 export function computerUseDesktopRect(rect: Rectangle): Rectangle {
   return process.platform === "win32" ? screen.screenToDipRect(null, rect) : rect;
+}
+
+/**
+ * The driver ids of OpenBot's windows that cover the rim, such as the conversation.
+ *
+ * The overlays - the rim's own and the dynamic island - can never take focus, and every window the
+ * user reads can. The id in a media source id is the one the driver lists a window by: the
+ * `CGWindowID` on macOS and the `HWND` on Windows.
+ */
+export function computerUseCoveringWindowIds(): Set<number> {
+  const ids = new Set<number>();
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (window.isDestroyed() || !window.isVisible() || window.isMinimized() || !window.isFocusable()) continue;
+    const id = Number(window.getMediaSourceId().split(":")[1]);
+    if (Number.isSafeInteger(id)) ids.add(id);
+  }
+  return ids;
 }
 
 /** One point the driver was asked for, in the same units as `computerUseDesktopRect`. */

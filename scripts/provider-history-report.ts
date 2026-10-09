@@ -189,6 +189,7 @@ export async function runProviderHistoryReport(options: Options): Promise<Report
         publicThreadId: threadId,
         findDelivery: () => null,
         findMessageDelivery: () => null,
+        quietRoutineDelivery: () => false,
       }),
     );
 
@@ -211,6 +212,7 @@ export async function runProviderHistoryReport(options: Options): Promise<Report
         publicThreadId: threadId,
         findDelivery: () => null,
         findMessageDelivery: () => null,
+        quietRoutineDelivery: () => false,
       }),
     );
     const afterDuplicate = rowCount(database, "provider_history_staging", "session_id", sessionId);

@@ -36,13 +36,17 @@ export function createWebHostLifecycle(options: {
   /**
    * The opened host is offline. A hosted server that the account service stopped for no use waits for the
    * user's input. Another stopped hosted server starts, and the tab connects again. A server that starts
-   * already is asked to start again, with no status read in between.
+   * already is asked to start again, with no status read in between. The `error` of a failed connection
+   * shows only for a host that does not sleep or wake: for those, the workspace shows why it waits.
    */
-  function hostUnavailable(id: string): void {
+  function hostUnavailable(id: string, error?: unknown): void {
     const starting = options.hostedSleep() === "waking";
     void (starting ? runTeamEffect(hostedServer.wake(id)) : Promise.resolve(false)).then(async (waking) => {
       const availability = waking ? "waking" : await runTeamEffect(hostedServer.unavailable(id));
       if (disposed() || hostId() !== id || status() === "online") return;
+      // A reconnect that started during the status read clears the error, so the old error does not show again.
+      if (error !== undefined && status() === "offline" && availability !== "sleeping" && availability !== "waking")
+        options.report(error);
       // The 5-minute recheck can find that the server does not sleep now, so input does not wake it.
       if (availability !== "sleeping") stopWaitingForInput?.();
       options.setHostedSleep(availability === "sleeping" ? "sleeping" : availability === "waking" ? "waking" : null);

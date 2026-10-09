@@ -501,6 +501,8 @@ describe.sequential("AgentService: providers", () => {
         mcpOAuth: {
           accessToken: (url) => Effect.succeed(url === "https://mcp.example.com/mcp" ? token : null),
           signIn: () => null,
+          cancelSignIn: () => false,
+          signedIn: () => false,
           forget: () => Effect.void,
         },
       },
@@ -745,6 +747,8 @@ describe.sequential("AgentService: providers", () => {
         mcpOAuth: {
           accessToken: () => Effect.succeed(null),
           signIn: () => null,
+          cancelSignIn: () => false,
+          signedIn: () => false,
           forget,
         },
       },

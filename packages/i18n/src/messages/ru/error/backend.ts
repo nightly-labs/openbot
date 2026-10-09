@@ -159,6 +159,18 @@ export const messages = {
   "error.backend.mcpSignInAbandoned": "Вход в MCP прерван.",
   "error.backend.mcpSignInNoBrowser": "Этот вход в MCP не может открыть браузер.",
   "error.backend.mcpSignInNotWebPage": "Адрес входа — не веб-страница.",
+  "error.backend.mcpSignInRequired": "Этот сервер просит войти. Нажмите «Войти», чтобы продолжить в браузере.",
+  "error.backend.mcpSignInOnHost": "Этот сервер просит войти. Войдите в него в OpenBot на компьютере-хосте.",
+  "error.backend.mcpSignInNeedsHttps":
+    "Этот сервер просит войти, а OpenBot входит только по https. Измените URL на {url}.",
+  "error.backend.mcpSignInCancelled": "Вход отменён.",
+  "error.backend.mcpSignInTimedOut": "Вход в браузере не был завершён.",
+  "error.backend.mcpSignInResponseTimedOut": "Ответ на вход не пришёл вовремя.",
+  "error.backend.mcpServerExited":
+    "Сервер остановился, не ответив. Запустите команду в терминале, чтобы увидеть ошибку.",
+  "error.backend.mcpServerUnreachable": "OpenBot не смог связаться с сервером. Проверьте URL и сеть.",
+  "error.backend.mcpRemoteBridge":
+    "{reason} Эта команда запускает мост mcp-remote. Выберите вместо него Streamable HTTP с URL {url}, и OpenBot выполнит вход.",
   "error.backend.oauthNotHttps": "Эндпоинт OAuth {origin} не использует https, поэтому учётные данные не отправлены.",
   "error.backend.oauthTooManyRedirects": "Эндпоинт OAuth слишком много раз перенаправлял.",
   "error.backend.oauthRedirectOrigin": "Эндпоинт OAuth перенаправил на {origin}, поэтому учётные данные не переданы.",

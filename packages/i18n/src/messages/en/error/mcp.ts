@@ -11,4 +11,5 @@ export const messages = defineMessages("error.mcp", {
   "error.mcp.signInFileUnreadable": "The MCP sign-in file is unreadable.",
   "error.mcp.signInFileTooLarge": "The MCP sign-in file is too large.",
   "error.mcp.unsupported": "MCP servers are not supported by this server.",
+  "error.mcp.signInOnHost": "Sign-in to an MCP server works only in OpenBot on the host computer.",
 });

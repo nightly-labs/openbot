@@ -10,7 +10,10 @@ export interface MarketplaceCalls {
   skills: Pick<SkillsPort["skills"], "get" | "list">;
   agents: Pick<SkillsPort["marketplaceAgents"], "get" | "list">;
   agentSkills: (hostServerId?: string) => AgentSkillCalls;
-  mcp: Pick<SkillsPort["agent"], "listMcpServers" | "removeMcpServer" | "saveMcpServer" | "testMcpServer">;
+  mcp: Pick<
+    SkillsPort["agent"],
+    "listMcpServers" | "removeMcpServer" | "saveMcpServer" | "signInMcpServer" | "testMcpServer"
+  >;
   /** `serverId` absent: this computer, which is also the only place an installed agent is updated. */
   addAgent: (input: InstallMarketplaceAgentInput, serverId: string | undefined) => Promise<AddedAgent>;
   openUrl: (url: string) => Promise<void>;

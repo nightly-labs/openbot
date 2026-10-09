@@ -761,6 +761,16 @@ div.dynamic-island-surface-context-line span {
   padding-top: var(--openbot-space-2);
 }
 
+.dynamic-island-surface-action-error {
+  min-width: 0;
+  margin: 0 auto 0 0;
+  flex: 1 1 auto;
+  align-self: center;
+  color: var(--openbot-danger-text);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
 .dynamic-island-surface-actions svg {
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);

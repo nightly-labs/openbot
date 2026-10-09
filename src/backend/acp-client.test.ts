@@ -177,6 +177,10 @@ function handle(message) {
   if (message.method === "session/load") {
     const loadLog = process.env.OPENBOT_FAKE_ACP_LOAD_LOG;
     if (loadLog) fs.appendFileSync(loadLog, JSON.stringify(message.params) + NL);
+    if (process.env.OPENBOT_FAKE_ACP_LOAD_ERROR) {
+      write({ jsonrpc: "2.0", id: message.id, error: JSON.parse(process.env.OPENBOT_FAKE_ACP_LOAD_ERROR) });
+      return;
+    }
     // OpenCode's answer when its internal server fails the lookup, a session missing from its
     // store included.
     loadCount += 1;
@@ -884,6 +888,47 @@ describe("OpenCode MCP sign-in", () => {
         headers: [{ name: "Authorization", value: "Bearer minted-access-token" }],
       },
     ]);
+  });
+});
+
+describe("ACP missing session errors", () => {
+  it.each([
+    { provider: "cursor", code: -32602, data: { message: 'Session "ses_stored" not found' }, missing: true },
+    { provider: "cursor", code: -32602, data: { message: 'Session "ses_other" not found' }, missing: false },
+    { provider: "cursor", code: -32602, data: { message: "Invalid model value: retired-model" }, missing: false },
+    { provider: "cursor", code: -32602, data: null, missing: false },
+    { provider: "cursor", code: -32603, data: { message: 'Session "ses_stored" not found' }, missing: false },
+    { provider: "opencode", code: -32602, data: { message: 'Session "ses_stored" not found' }, missing: false },
+    { provider: "cursor", code: -32002, data: { uri: "ses_stored" }, missing: true },
+  ] as const)("classifies $provider load error $code with $data", async ({ provider, code, data, missing }) => {
+    const fake = await createFakeOpencodeAgent();
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_SESSION", "1");
+    const responseError = { code, message: "Invalid params", data };
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_ERROR", JSON.stringify(responseError));
+    const client = requireProviderDriver(provider).createClient(fake.cli, 10_000, {
+      apiKey: () => null,
+      customProviders: () => [],
+      mcpServers: () => [],
+    });
+    started.push(client);
+    client.start();
+
+    const error = await runCauseEffect(
+      client.request("thread/resume", { threadId: "ses_stored", cwd: fake.directory }, decodeRecordResponse),
+    ).catch((reason: unknown) => reason);
+
+    expect(isMissingProviderSessionError(error, provider)).toBe(missing);
+    if (!missing) expect(error).toMatchObject(responseError);
+    else {
+      const read = await runCauseEffect(
+        client.request(
+          "thread/read",
+          { threadId: "ses_stored", cwd: fake.directory, includeTurns: true },
+          decodeThreadResponse,
+        ),
+      );
+      expect(read.thread.turns).toEqual([]);
+    }
   });
 });
 

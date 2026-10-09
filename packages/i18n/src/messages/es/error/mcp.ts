@@ -11,4 +11,5 @@ export const messages = {
   "error.mcp.signInFileUnreadable": "El archivo de inicio de sesión de MCP no se puede leer.",
   "error.mcp.signInFileTooLarge": "El archivo de inicio de sesión de MCP es demasiado grande.",
   "error.mcp.unsupported": "Este servidor no admite servidores MCP.",
+  "error.mcp.signInOnHost": "Solo puedes iniciar sesión en un servidor MCP desde OpenBot en el equipo anfitrión.",
 } as const satisfies PartialTranslation<typeof source>;

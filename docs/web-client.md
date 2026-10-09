@@ -160,6 +160,18 @@ mock. The separate web preview implements the browser runtime with that same moc
   Tabs, back, forward, reload, and the address bar use the same Team API routes as a desktop
   client of a remote host. Picture in Picture is desktop only. The expanded live view is a card
   with the shape of the host frame.
+- Copy and paste in the live view use the member's clipboard, not the host's, when the host
+  advertises `browser-view-clipboard`. The client sends pasted text as one `paste` input; the host
+  fires a `paste` event on the focused element and, when the page does not cancel it, inserts the
+  text with CDP `Input.insertText`. A copy starts in the key press with a `ClipboardItem` that waits
+  for the host's answer, the one text message on the view socket. The host answers every `copy`.
+  A cut is a copy, then a `cut` input once the text is on the clipboard; the host deletes only the
+  same selection. The host runs one input of a view at a time, in order. The host never reads or
+  writes its own clipboard. Password fields give no text. The host follows focus through open
+  shadow roots and frames: it walks into a frame of the page's own origin, and it finds a frame of
+  another origin through CDP (`DOM.describeNode` on the focused frame element gives its frame ID,
+  and a frame in another process is a target of its own). An `email` or `number` input has no
+  selection to read, so copy gets no text there; paste works.
 - The sidebar's Agents and Routines switch shows when the host serves `routine-flows-v1`. The Routines
   view hides channels and shows the open agent's routine canvas, as on desktop: links, node positions,
   task edits, Run now, a new agent from the right-click menu, and the chat panel that asks the agent

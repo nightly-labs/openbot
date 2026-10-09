@@ -1,4 +1,5 @@
 import { agentAutomationAllowed, type MarketplaceSkillDetail } from "@openbot/contracts/ipc";
+import { BookMarked, CalendarClock, Folder, Gauge, Puzzle, Table2, Upload } from "@openbot/ui";
 import { SettingsLinkGroup, SettingsLinkRow } from "@openbot/ui/components/SettingsPanel";
 import type { AgentProfile } from "@openbot/ui/data";
 import SharedAgentSettingsPanel, {
@@ -27,8 +28,9 @@ interface AgentSettingsPanelProps
     "width" | "onResize" | "onResizeEnd" | "links" | "detailOpen" | "children"
   > {
   remoteClient?: boolean;
-  /** The web client's host calls. A remote client shows only Skills and Tables, and only with these. */
+  /** The web client's host calls for the settings that its server supports. */
   adminCalls?: ConversationRuntime["admin"];
+  onPublish?: () => void;
   onOpenUsage?: (trigger: HTMLButtonElement) => void;
   onWidthChange: (width: number) => void;
   skillSelectionRequest?: { skillId: string } | null;
@@ -213,71 +215,90 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       onResizeEnd={saveSettingsPanelWidth}
       detailOpen={draft.routines.open || draft.files.open}
       links={
-        <Show when={!props.remoteClient || skillsMode() !== "hidden" || props.tablesVisible !== false}>
-          <SettingsLinkGroup>
-            <Show when={!props.remoteClient && props.onOpenUsage}>
-              <SettingsLinkRow
-                label={t("agentSettings.links.usage")}
-                onClick={(trigger) => props.onOpenUsage?.(trigger)}
-              />
-            </Show>
-            <Show when={!props.remoteClient}>
-              <SettingsLinkRow
-                label={t("agentSettings.links.memories")}
-                value={t("agentSettings.links.memoriesCount", { count: draft.memories.count })}
-                onClick={() =>
-                  setDraft((state) => {
-                    state.memories.open = true;
-                  })
-                }
-              />
-            </Show>
-            <Show when={skillsMode() !== "hidden"}>
-              <SettingsLinkRow
-                label={t("agentSettings.links.skills")}
-                value={t("agentSettings.links.skillsCount", { count: draft.skills.count })}
-                onClick={() =>
-                  setDraft((state) => {
-                    state.skills.open = true;
-                  })
-                }
-              />
-            </Show>
-            <Show when={props.tablesVisible !== false}>
-              <SettingsLinkRow
-                label={t("agentSettings.links.tables")}
-                value={t("agentSettings.links.tablesCount", { count: draft.tables.count })}
-                onClick={() =>
-                  setDraft((state) => {
-                    state.tables.open = true;
-                  })
-                }
-              />
-            </Show>
-            <Show when={props.files}>
-              <SettingsLinkRow
-                label={t("agentSettings.links.files")}
-                value={storage.state.usage ? agentFilesLinkValue(storage.state.usage.breakdown) : undefined}
-                onClick={() =>
-                  setDraft((state) => {
-                    state.files.open = true;
-                  })
-                }
-              />
-            </Show>
-            <Show when={!props.remoteClient}>
-              <SettingsLinkRow
-                label={t("agentSettings.links.routines")}
-                value={t("agentSettings.links.routinesCount", { count: draft.routines.count })}
-                onClick={() =>
-                  setDraft((state) => {
-                    state.routines.open = true;
-                  })
-                }
-              />
-            </Show>
-          </SettingsLinkGroup>
-        </Show>
+        <>
+          <Show when={!props.remoteClient || skillsMode() !== "hidden" || props.tablesVisible !== false || props.files}>
+            <SettingsLinkGroup inset title={t("agentSettings.groups.knows")}>
+              <Show when={!props.remoteClient}>
+                <SettingsLinkRow
+                  icon={<BookMarked aria-hidden="true" />}
+                  label={t("agentSettings.links.memories")}
+                  value={t("agentSettings.links.memoriesCount", { count: draft.memories.count })}
+                  onClick={() =>
+                    setDraft((state) => {
+                      state.memories.open = true;
+                    })
+                  }
+                />
+              </Show>
+              <Show when={skillsMode() !== "hidden"}>
+                <SettingsLinkRow
+                  icon={<Puzzle aria-hidden="true" />}
+                  label={t("agentSettings.links.skills")}
+                  value={t("agentSettings.links.skillsCount", { count: draft.skills.count })}
+                  onClick={() =>
+                    setDraft((state) => {
+                      state.skills.open = true;
+                    })
+                  }
+                />
+              </Show>
+              <Show when={props.files}>
+                <SettingsLinkRow
+                  icon={<Folder aria-hidden="true" />}
+                  label={t("agentSettings.links.files")}
+                  value={storage.state.usage ? agentFilesLinkValue(storage.state.usage.breakdown) : undefined}
+                  onClick={() =>
+                    setDraft((state) => {
+                      state.files.open = true;
+                    })
+                  }
+                />
+              </Show>
+              <Show when={props.tablesVisible !== false}>
+                <SettingsLinkRow
+                  icon={<Table2 aria-hidden="true" />}
+                  label={t("agentSettings.links.tables")}
+                  value={t("agentSettings.links.tablesCount", { count: draft.tables.count })}
+                  onClick={() =>
+                    setDraft((state) => {
+                      state.tables.open = true;
+                    })
+                  }
+                />
+              </Show>
+            </SettingsLinkGroup>
+          </Show>
+          <Show when={!props.remoteClient || props.onPublish}>
+            <SettingsLinkGroup inset title={t("agentSettings.groups.does")}>
+              <Show when={!props.remoteClient}>
+                <SettingsLinkRow
+                  icon={<CalendarClock aria-hidden="true" />}
+                  label={t("agentSettings.links.routines")}
+                  value={t("agentSettings.links.routinesCount", { count: draft.routines.count })}
+                  onClick={() =>
+                    setDraft((state) => {
+                      state.routines.open = true;
+                    })
+                  }
+                />
+              </Show>
+              <Show when={!props.remoteClient && props.onOpenUsage}>
+                <SettingsLinkRow
+                  icon={<Gauge aria-hidden="true" />}
+                  label={t("agentSettings.links.usage")}
+                  onClick={(trigger) => props.onOpenUsage?.(trigger)}
+                />
+              </Show>
+              <Show when={props.onPublish}>
+                <SettingsLinkRow
+                  icon={<Upload aria-hidden="true" />}
+                  label={t("conversation.header.publish")}
+                  onClick={() => props.onPublish?.()}
+                />
+              </Show>
+            </SettingsLinkGroup>
+          </Show>
+        </>
       }
     >
       <Show when={draft.files.open && props.files}>

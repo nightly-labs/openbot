@@ -39,6 +39,7 @@ import {
 } from "@openbot/ui";
 import { ContentExitMotion } from "@openbot/ui/menu-motion";
 import { cx } from "@openbot/ui/utils";
+import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, For, onCleanup, onSettled, Show, untrack } from "solid-js";
 import { currentText, type TextValue, useText } from "../text";
 import { createScrollFades } from "./createScrollFades";
@@ -61,6 +62,8 @@ interface ProviderModelPickerProps {
   variant?: "pill" | "field";
   ariaLabel?: string;
   label?: string;
+  /** A glyph before the field label. The `field` variant only. */
+  icon?: JSX.Element;
   reasoningEffort?: AgentReasoningEffort;
   onReasoningEffortChange?: (effort: AgentReasoningEffort) => void;
   disabled?: boolean;
@@ -75,7 +78,8 @@ interface ProviderModelPickerProps {
   customProviders?: readonly CustomProviderSummary[] | undefined;
   /** The user's own ACP agents; provider `acp`, drawn on the Custom tab with one group each. */
   customAgents?: readonly CustomAgentSummary[] | undefined;
-  onAddCustomProvider?: () => void;
+  /** Receives the picker trigger, so focus returns to it when the opened settings close. */
+  onAddCustomProvider?: (trigger: HTMLElement) => void;
   /**
    * This agent's standing approval, below Effort. Without the callback the row is absent, which is
    * how a remote agent and the setup screen show the picker they always showed: the grant belongs
@@ -323,6 +327,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
             setPickerOpen(true);
           }}
         >
+          <Show when={field() && props.icon}>{props.icon}</Show>
           <Show when={field()}>
             <span class="provider-model-field-label">{props.label ?? t("provider.picker.model")}</span>
           </Show>
@@ -533,7 +538,15 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                         <span>{railHeadingSummary(provider, status())}</span>
                       </div>
                       <Show when={provider === CUSTOM_RAIL && props.onAddCustomProvider}>
-                        <Button type="button" size="xs" variant="default" onClick={() => props.onAddCustomProvider?.()}>
+                        <Button
+                          type="button"
+                          size="xs"
+                          variant="default"
+                          onClick={() => {
+                            setOpen(false);
+                            if (trigger) props.onAddCustomProvider?.(trigger);
+                          }}
+                        >
                           <Plus />
                           {t("provider.picker.addProvider")}
                         </Button>

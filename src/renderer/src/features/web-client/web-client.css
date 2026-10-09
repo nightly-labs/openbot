@@ -162,7 +162,7 @@
     max-width: 132px;
   }
 
-  .web-app-frame[data-web-mobile-pane="conversation"] .agent-settings-runtime .provider-model-trigger-field {
+  .web-app-frame[data-web-mobile-pane="conversation"] .agent-settings-runtime-rows .provider-model-trigger-field {
     width: 100%;
     max-width: none;
   }

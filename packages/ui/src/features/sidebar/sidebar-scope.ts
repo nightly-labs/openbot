@@ -16,16 +16,12 @@ import { createSidebarDataStore } from "./stores/data-store";
 import { createSidebarDragStateStore } from "./stores/drag-state-store";
 import { createSidebarLayoutActions } from "./stores/layout-actions";
 import { createSidebarPendingStore } from "./stores/pending-store";
-import { createSidebarSearchStore } from "./stores/search-store";
 
 export function createSidebarScope(props: SidebarProps) {
   const layoutMutable = () => props.layoutMutable !== false;
   const scrollFades = createScrollFades();
 
   const { announce, announceError, reorderAnnouncement } = createSidebarAnnouncementStore();
-  const { expandToSearch, normalizedQuery, query, setQuery, setSearchInputElement } = createSidebarSearchStore({
-    props,
-  });
   // The drag state is built from the data store, so the data store reads it through this reference,
   // which is set once the drag state exists.
   let dragActive = () => false;
@@ -39,7 +35,6 @@ export function createSidebarScope(props: SidebarProps) {
     filteredAgents,
     filteredChats,
     filteredChatsBySection,
-    filteredPeople,
     orderedPeople,
     personById,
     resolvedPinnedItems,
@@ -50,7 +45,7 @@ export function createSidebarScope(props: SidebarProps) {
     visiblePinnedKeys,
     visibleSectionIds,
     waitingAgents,
-  } = createSidebarDataStore({ normalizedQuery, props, dragActive: () => dragActive() });
+  } = createSidebarDataStore({ props, dragActive: () => dragActive() });
   const {
     cancelSectionEditor,
     closeDelete,
@@ -84,7 +79,6 @@ export function createSidebarScope(props: SidebarProps) {
       chatPinnedItems,
       draggedSidebarItem: dragState.draggedSidebarItem,
       filteredChatsBySection,
-      filteredPeople,
       layoutMutable,
       orderedPeople,
       personById,
@@ -112,8 +106,8 @@ export function createSidebarScope(props: SidebarProps) {
     commitSidebarDrop,
     dragState,
     filteredChatsBySection,
-    filteredPeople,
     getAgentList: () => agentList,
+    orderedPeople,
     props,
     scrollFades,
     sectionAcceptsChat,
@@ -127,7 +121,7 @@ export function createSidebarScope(props: SidebarProps) {
   });
 
   createEffect(
-    () => [resolvedPinnedItems(), waitingAgents(), filteredChats(), filteredPeople()],
+    () => [resolvedPinnedItems(), waitingAgents(), filteredChats(), orderedPeople()],
     () => {
       scrollFades.remeasure();
     },
@@ -164,22 +158,19 @@ export function createSidebarScope(props: SidebarProps) {
     dropSidebarNativeDrag,
     emptyPinnedDropVisible: dragState.emptyPinnedDropVisible,
     endChatDragging,
-    expandToSearch,
     filteredAgents,
     filteredChats,
     filteredChatsBySection,
-    filteredPeople,
     handleListDragLeave,
     layoutMutable,
     movePersonByKeyboard,
     movePinnedItem,
     moveSection,
-    normalizedQuery,
     openDelete,
+    orderedPeople,
     pending,
     pinnedDropActive: dragState.pinnedDropActive,
     props,
-    query,
     releaseSectionNameInput,
     reorderAnnouncement,
     resolvedPinnedItems,
@@ -190,8 +181,6 @@ export function createSidebarScope(props: SidebarProps) {
     sectionIsCollapsed,
     sectionPosition,
     setAgentListElement,
-    setQuery,
-    setSearchInputElement,
     setSectionNameInput,
     sidebarClickIsSuppressed,
     startChatDragging,

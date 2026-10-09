@@ -2,6 +2,7 @@ import { defineMessages } from "../../message";
 
 export const messages = defineMessages("webClient", {
   "webClient.loading": "Loading OpenBot…",
+  "webClient.hostWaking": "Waking the server…",
   "webClient.loadingLine.wake": "Waking up the agents…",
   "webClient.loadingLine.coffee": "Pouring coffee for the agents…",
   "webClient.loadingLine.tokens": "Counting tokens on fingers…",

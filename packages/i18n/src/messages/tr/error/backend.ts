@@ -143,6 +143,19 @@ export const messages = {
   "error.backend.mcpSignInAbandoned": "MCP oturum açma işlemi iptal edildi.",
   "error.backend.mcpSignInNoBrowser": "Bu MCP oturum açma işlemi bir tarayıcı açamaz.",
   "error.backend.mcpSignInNotWebPage": "Oturum açma adresi bir web sayfası değil.",
+  "error.backend.mcpSignInRequired":
+    "Bu sunucu oturum açmanızı istiyor. Tarayıcınızda devam etmek için Oturum aç'ı seçin.",
+  "error.backend.mcpSignInOnHost": "Bu sunucu oturum açılmasını istiyor. Ana bilgisayardaki OpenBot'ta oturum açın.",
+  "error.backend.mcpSignInNeedsHttps":
+    "Bu sunucu oturum açılmasını istiyor ve OpenBot yalnızca https üzerinden oturum açar. URL'yi {url} olarak değiştirin.",
+  "error.backend.mcpSignInCancelled": "Oturum açma iptal edildi.",
+  "error.backend.mcpSignInTimedOut": "Oturum açma tarayıcıda tamamlanmadı.",
+  "error.backend.mcpSignInResponseTimedOut": "Oturum açma yanıtı zamanında gelmedi.",
+  "error.backend.mcpServerExited":
+    "Sunucu yanıt vermeden durdu. Hatasını görmek için komutu bir terminalde çalıştırın.",
+  "error.backend.mcpServerUnreachable": "OpenBot sunucuya ulaşamadı. URL'yi ve ağınızı kontrol edin.",
+  "error.backend.mcpRemoteBridge":
+    "{reason} Bu komut mcp-remote köprüsünü çalıştırır. Bunun yerine {url} URL'siyle Streamable HTTP'yi seçin; OpenBot oturumunuzu açar.",
   "error.backend.oauthNotHttps": "OAuth uç noktası {origin} https değil, bu nedenle kimlik bilgileri gönderilmedi.",
   "error.backend.oauthTooManyRedirects": "OAuth uç noktası çok fazla kez yönlendirdi.",
   "error.backend.oauthRedirectOrigin":

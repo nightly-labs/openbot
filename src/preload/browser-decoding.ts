@@ -105,6 +105,10 @@ export function decodeBrowserLiveViewEvent(value: unknown): BrowserLiveViewEvent
       };
     case "stopped":
       return { type: "stopped", tabId, reason: requiredString(event, "reason") };
+    case "copied":
+      return { type: "copied", tabId, text: requiredString(event, "text") };
+    case "copyTooLarge":
+      return { type: "copyTooLarge", tabId };
     default:
       throw new Error("Invalid browser live view event type.");
   }

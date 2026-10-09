@@ -31,6 +31,14 @@ export const messages = {
   "mcp.status.failed": "失敗",
   "mcp.status.enabled": "有効",
   "mcp.status.disabled": "無効",
+  "mcp.status.signedIn": "サインイン済み",
+  "mcp.status.signingIn": "サインインしています…",
+  "mcp.status.signInNeeded": "サインインが必要",
+  "mcp.status.refused": "拒否されました",
+  "mcp.status.checkUrl": "URL を確認",
+  "mcp.status.noAnswer": "応答なし",
+  "mcp.status.didNotStart": "起動しませんでした",
+  "mcp.status.unreachable": "接続できません",
   "mcp.server.providerLimitNote":
     "Claude のみ: 作業ディレクトリを指定したサーバーは、ほかのプロバイダーには渡されません。",
   "mcp.server.runtimeDownloading":
@@ -94,4 +102,12 @@ export const messages = {
   "mcp.panel.removeConfirm": "MCP サーバーを削除",
   "mcp.panel.actionsFor": "{name} の操作",
   "mcp.panel.testUnavailable": "このサーバーはここではテストできません。",
+  "mcp.panel.signIn": "サインイン",
+  "mcp.panel.signOut": "サインアウト",
+  "mcp.panel.cancelSignIn": "サインインをキャンセル",
+  "mcp.panel.signInTo": "{name} にサインイン",
+  "mcp.panel.cancelSignInTo": "{name} へのサインインをキャンセル",
+  "mcp.panel.signInWaiting": {
+    other: "ブラウザーでサインインを完了してください。OpenBot は {count} 分後に待機をやめます。",
+  },
 } as const satisfies PartialTranslation<typeof source>;

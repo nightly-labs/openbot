@@ -39,6 +39,7 @@ import { clearAgentContext, type TeamApiRequest } from "@openbot/team-client/tea
 import { classifyFailure } from "@openbot/telemetry";
 import { hasVisibleToasts, toast } from "@openbot/ui";
 import { AccountDock } from "@openbot/ui/features/account/AccountDock";
+import { AppLoadingScreen } from "@openbot/ui/features/account/AppLoadingScreen";
 import { computeAgentAvatarMoods } from "@openbot/ui/features/agents/agent-avatar-mood";
 import { createFirstAgentDraft, type FirstAgentDraft } from "@openbot/ui/features/agents/FirstAgentSetup";
 import { BillingDialog } from "@openbot/ui/features/billing/BillingDialog";
@@ -255,6 +256,14 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const noHost = () => !workspace.state.host && (workspace.state.hostsLoaded || Boolean(workspace.state.hostsError));
   // A hosted server that sleeps or wakes keeps the workspace on screen; the server name shows why it does not answer.
   const hostOffline = () => !noHost() && workspace.state.status !== "online" && !workspace.state.hostedSleep;
+  // The loading crew covers the chat while the opened hosted server wakes, and jumps out when it ends.
+  const hostWaking = () => workspace.state.hostedSleep === "waking" && workspace.state.status !== "online";
+  // Each screen has its own number. A wake that starts again during the exit shows a new screen.
+  const [wakeScreen, setWakeScreen] = createSignal<number | null>(null);
+  let wakeScreens = 0;
+  createEffect(hostWaking, (waking) => {
+    if (waking && untrack(wakeScreen) === null) setWakeScreen(++wakeScreens);
+  });
   let resetRevocation = workspace.state.revocationRevision;
   createEffect(
     () => ({ host: workspace.state.host?.hostId, revocation: workspace.state.revocationRevision }),
@@ -1169,6 +1178,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 onDeleteAgent={workspace.deleteAgent}
                 compact={compact()}
                 onExpand={layout.expandSidebar}
+                onOpenSearch={() => setSearchOpen(true)}
                 onOpenMarketplace={() => setMarketplaceOpen(true)}
                 emptyAction={
                   firstAgent()
@@ -1529,6 +1539,14 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               customProviders={providerSettings()?.customProviders}
               onDownloadProvider={providerSettings()?.onDownloadProvider}
               onCancelProviderDownload={providerSettings()?.onCancelProviderDownload}
+              onManageProviders={
+                providerSettings()
+                  ? (trigger: HTMLElement) => {
+                      const current = server();
+                      if (current) void openServerSettings(current.id, trigger, "providers");
+                    }
+                  : undefined
+              }
               agent={conversationAgent()}
               agents={workspace.profiles()}
               modelOptions={models()}
@@ -1564,7 +1582,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               browserTabs={workspace.state.browserTabs}
               activeBrowserTabId={workspace.state.activeBrowserTabId}
               browserVisibilitySuspended={workspace.state.status !== "online" || usageOpen()}
-              workspaceCovered={usageOpen()}
+              workspaceCovered={usageOpen() || wakeScreen() !== null}
               browserControlState={workspace.state.browserControlState}
               server={server()}
               presence={workspace.state.presence ?? { serverId: server()?.id ?? null, members: [], updatedAt: "" }}
@@ -1639,6 +1657,15 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   void workspace.run(() => workspace.runtime.stop(page.agentId, page.activeTurnId ?? ""));
               }}
             />
+          </Show>
+          <Show when={wakeScreen()} keyed>
+            <div class="conversation-panel">
+              <AppLoadingScreen
+                ready={!hostWaking()}
+                label={t("webClient.hostWaking")}
+                onExited={() => setWakeScreen(untrack(hostWaking) ? ++wakeScreens : null)}
+              />
+            </div>
           </Show>
         </WorkspaceFrame>
       </ChannelsControllerProvider>

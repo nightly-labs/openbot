@@ -408,42 +408,21 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
             },
           }),
         );
-        const result = Deferred.makeUnsafe<TeamProtocolV2Json, RemoteWorkflowError>();
-        {
-          const resolve = (value: TeamProtocolV2Json) => {
-            Deferred.doneUnsafe(result, Effect.succeed(value));
-          };
-          const reject = (cause: Error) => {
-            Deferred.doneUnsafe(result, Effect.fail(new RemoteWorkflowError({ cause })));
-          };
-          const timer = setTimeout(() => {
-            this.#pending.delete(requestId);
-            reject(new TeamWebRtcRequestError(504, "remote_timeout", sourceText("error.remote.requestTimeout")));
-          }, TEAM_WEBRTC_REMOTE_REQUEST_TIMEOUT_MILLISECONDS);
-          this.#pending.set(requestId, { hostId, resolve, reject, timer });
-        }
-        // The cleanup covers the send too: an interrupted send must not leave the entry and its timer.
-        const envelope = yield* Effect.gen({ self: this }, function* () {
-          const sent = yield* TeamClientBridge.use((bridge) => bridge.send(hostId, "rpc", frame)).pipe(Effect.result);
-          if (Result.isFailure(sent)) {
-            const error = sent.failure.cause;
-            const pending = this.#pending.get(requestId);
-            if (pending) {
-              clearTimeout(pending.timer);
-              this.#pending.delete(requestId);
-              pending.reject(error instanceof Error ? error : new Error(sourceText("error.remote.requestFailed")));
-            }
-          }
-          return yield* Deferred.await(result);
-        }).pipe(
-          Effect.ensuring(
-            Effect.sync(() => {
-              const pending = this.#pending.get(requestId);
-              if (pending) {
-                clearTimeout(pending.timer);
-                this.#pending.delete(requestId);
-              }
-            }),
+        // A closed channel refuses the frame before any byte leaves, so the host did not get the
+        // request. After the computer sleeps, main can read the host as connected on a connection
+        // that the host closed. Connect again and send the same frame once. An upload stays on the
+        // connection that carried its body. Only the connection that refused the frame is marked
+        // lost: a request that fails late must not drop the connection another request just made.
+        const refusedBy = this.#active.get(hostId);
+        const envelope = yield* this.#exchange(hostId, requestId, frame).pipe(
+          Effect.catchIf(
+            (error) => !bodyTransferId && isClosedChannelError(error.cause),
+            () =>
+              Effect.gen({ self: this }, function* () {
+                if (refusedBy?.connected && this.#active.get(hostId) === refusedBy) this.#onDisconnected(hostId);
+                yield* this.#ensureConnected(hostId);
+                return yield* this.#exchange(hostId, requestId, frame);
+              }),
           ),
         );
         if (!isDynamicRecord(envelope) || !isNumber(envelope.status) || !Object.hasOwn(envelope, "body")) {
@@ -481,6 +460,53 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       }),
     );
   }).bind(this);
+
+  /** Sends one request frame and waits for its response. */
+  readonly #exchange = Effect.fn("TeamWebRtcClient.exchange")(function* (
+    this: TeamWebRtcClientTransport,
+    hostId: string,
+    requestId: string,
+    frame: string,
+  ): Effect.fn.Return<TeamProtocolV2Json, RemoteWorkflowError, TeamClientBridge> {
+    const result = Deferred.makeUnsafe<TeamProtocolV2Json, RemoteWorkflowError>();
+    {
+      const resolve = (value: TeamProtocolV2Json) => {
+        Deferred.doneUnsafe(result, Effect.succeed(value));
+      };
+      const reject = (cause: Error) => {
+        Deferred.doneUnsafe(result, Effect.fail(new RemoteWorkflowError({ cause })));
+      };
+      const timer = setTimeout(() => {
+        this.#pending.delete(requestId);
+        reject(new TeamWebRtcRequestError(504, "remote_timeout", sourceText("error.remote.requestTimeout")));
+      }, TEAM_WEBRTC_REMOTE_REQUEST_TIMEOUT_MILLISECONDS);
+      this.#pending.set(requestId, { hostId, resolve, reject, timer });
+    }
+    // The cleanup covers the send too: an interrupted send must not leave the entry and its timer.
+    return yield* Effect.gen({ self: this }, function* () {
+      const sent = yield* TeamClientBridge.use((bridge) => bridge.send(hostId, "rpc", frame)).pipe(Effect.result);
+      if (Result.isFailure(sent)) {
+        const error = sent.failure.cause;
+        const pending = this.#pending.get(requestId);
+        if (pending) {
+          clearTimeout(pending.timer);
+          this.#pending.delete(requestId);
+          pending.reject(error instanceof Error ? error : new Error(sourceText("error.remote.requestFailed")));
+        }
+      }
+      return yield* Deferred.await(result);
+    }).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          const pending = this.#pending.get(requestId);
+          if (pending) {
+            clearTimeout(pending.timer);
+            this.#pending.delete(requestId);
+          }
+        }),
+      ),
+    );
+  });
 
   readonly disconnect = Effect.fn("TeamWebRtcClient.disconnect")(function* (
     this: TeamWebRtcClientTransport,
@@ -1257,6 +1283,18 @@ function binaryBody(value: unknown): Uint8Array | null {
   if (value instanceof Uint8Array) return value;
   if (value instanceof ArrayBuffer) return new Uint8Array(value);
   return null;
+}
+
+/**
+ * The bridge refused a frame because the data channel is closed. No byte of the frame left. A host
+ * error response is a `TeamWebRtcRequestError` with the host's message, so it never matches.
+ */
+function isClosedChannelError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    !(error instanceof TeamWebRtcRequestError) &&
+    error.message === sourceText("error.remote.channelNotOpen")
+  );
 }
 
 /** The account API answers 403 or 404 for a session that ended, expired, or does not exist. */

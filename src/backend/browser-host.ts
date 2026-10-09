@@ -1205,6 +1205,18 @@ export class BrowserHost {
     yield* tab.engine.dispatchViewportInput(input);
   }).bind(this);
 
+  /** A live view's copy. A protected tab refuses it as it refuses input: its fields hold a secret. */
+  readonly copyViewSelection = Effect.fn("BrowserHost.copyViewSelection")(function* (
+    this: BrowserHost,
+    tabId: string,
+    max: number,
+  ): Effect.fn.Return<string | null, BrowserOperationError> {
+    const tab = yield* this.#requireTab(tabId);
+    if (tab.secret?.submitted)
+      return yield* browserFailure(new Error(sourceText("error.backend.browserInputProtected")));
+    return yield* tab.engine.viewportSelectionText(max);
+  }).bind(this);
+
   readonly #toolHandlers: BrowserToolHandlers = {
     open: ({ args }, params) =>
       Effect.gen({ self: this }, function* () {

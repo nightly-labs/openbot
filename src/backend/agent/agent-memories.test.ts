@@ -122,7 +122,15 @@ describe.sequential("AgentMemories: staging, epochs and turn commitment", () => 
         arguments: { memoryId: otherMemory.id, text: "Changed by another agent." },
       },
     });
-    await waitFor(() => client.errors.some((response) => response.id === "foreign-memory-request"));
+    await waitFor(() => client.responses.some((response) => response.id === "foreign-memory-request"));
+    // The agent reads the refusal as the tool's result; the user gets no error toast (#1524).
+    expect(client.responses.find((response) => response.id === "foreign-memory-request")?.result).toEqual({
+      success: false,
+      contentItems: [
+        { type: "inputText", text: JSON.stringify({ error: "This memory does not belong to the current agent." }) },
+      ],
+    });
+    expect(events.filter((event) => event.type === "error")).toEqual([]);
     expect(service.listMemories("research").map((memory) => memory.text)).toEqual(["Research-only memory."]);
 
     client.emit("request", {

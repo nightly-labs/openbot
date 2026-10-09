@@ -1,4 +1,4 @@
-import { Button, Folder, Lock, Upload } from "@openbot/ui";
+import { Button, Folder, Lock } from "@openbot/ui";
 import { ProviderModelPicker } from "@openbot/ui/components/ProviderModelPicker";
 import type { AgentProfile } from "@openbot/ui/data";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
@@ -23,10 +23,6 @@ export interface ConversationHeaderProps {
   files?: {
     open: boolean;
     onToggle: () => void;
-  };
-  /** Publishes this agent as a shared template. Left out for an agent this computer does not host. */
-  publish?: {
-    onOpen: () => void;
   };
   browser?: {
     acting: boolean;
@@ -102,21 +98,6 @@ export function ConversationHeader(props: ConversationHeaderProps) {
               data-cuelume-tap={files().open ? "close" : "open"}
             >
               <Folder aria-hidden="true" class="size-[14px]" />
-            </Button>
-          )}
-        </Show>
-        <Show when={props.publish}>
-          {(publish) => (
-            <Button
-              variant="ghost"
-              type="button"
-              class="header-panel-toggle"
-              aria-label={t("conversation.header.publish")}
-              aria-haspopup="dialog"
-              onClick={() => publish().onOpen()}
-              data-cuelume-tap="open"
-            >
-              <Upload aria-hidden="true" class="size-[14px]" />
             </Button>
           )}
         </Show>

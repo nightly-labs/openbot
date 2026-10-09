@@ -107,6 +107,8 @@ const LEGACY_AVATAR_COLORS = [
 ] as const;
 
 const NEW_AGENT_PREVIEW = "No messages yet";
+/** The longest agent preview the store keeps; a longer text is cut to it. */
+export const AGENT_PREVIEW_MAX_LENGTH = 180;
 export const DEFAULT_AGENT_MODEL: AgentModelId = "gpt-6-luna";
 export const DEFAULT_AGENT_PROVIDER: AgentProviderId = "codex";
 // A provider CLI reports the effort its own configuration uses -- Codex says `medium` for every
@@ -1272,7 +1274,7 @@ export class AgentStore {
   ): Effect.fn.Return<void, StoredStateFailure> {
     try {
       const agent = this.#requireAgent(id);
-      agent.preview = preview.slice(0, 180);
+      agent.preview = preview.slice(0, AGENT_PREVIEW_MAX_LENGTH);
       agent.updatedAt = new Date().toISOString();
       this.#persist("agent.preview-updated");
     } catch (cause) {

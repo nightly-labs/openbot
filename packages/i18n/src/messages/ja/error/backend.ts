@@ -148,6 +148,21 @@ export const messages = {
   "error.backend.mcpSignInAbandoned": "MCP のサインインは中止されました。",
   "error.backend.mcpSignInNoBrowser": "この MCP のサインインではブラウザーを開けません。",
   "error.backend.mcpSignInNotWebPage": "サインインのアドレスは Web ページではありません。",
+  "error.backend.mcpSignInRequired":
+    "このサーバーはサインインを求めています。「サインイン」を選んでブラウザーで続けてください。",
+  "error.backend.mcpSignInOnHost":
+    "このサーバーはサインインを求めています。ホストコンピューターの OpenBot でサインインしてください。",
+  "error.backend.mcpSignInNeedsHttps":
+    "このサーバーはサインインを求めていますが、OpenBot は https でのみサインインします。URL を {url} に変更してください。",
+  "error.backend.mcpSignInCancelled": "サインインはキャンセルされました。",
+  "error.backend.mcpSignInTimedOut": "ブラウザーでサインインが完了しませんでした。",
+  "error.backend.mcpSignInResponseTimedOut": "サインインの応答が時間内に届きませんでした。",
+  "error.backend.mcpServerExited":
+    "サーバーは応答する前に停止しました。ターミナルでコマンドを実行してエラーを確認してください。",
+  "error.backend.mcpServerUnreachable":
+    "OpenBot はサーバーに接続できませんでした。URL とネットワークを確認してください。",
+  "error.backend.mcpRemoteBridge":
+    "{reason} このコマンドは mcp-remote ブリッジを実行します。代わりに URL {url} で Streamable HTTP を選ぶと、OpenBot がサインインします。",
   "error.backend.oauthNotHttps": "OAuth エンドポイント {origin} は https ではないため、認証情報を送信しませんでした。",
   "error.backend.oauthTooManyRedirects": "OAuth エンドポイントのリダイレクトが多すぎます。",
   "error.backend.oauthRedirectOrigin":

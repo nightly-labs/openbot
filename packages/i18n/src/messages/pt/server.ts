@@ -244,6 +244,10 @@ export const messages = {
   "server.members.actionsFor": "Ações para {name}",
   "server.members.makeMember": "Tornar membro",
   "server.members.makeAdmin": "Tornar administrador",
+  "server.members.makeAdminTitle": "Tornar {name} administrador?",
+  "server.members.makeMemberTitle": "Tornar {name} membro?",
+  "server.members.roleChangeDescription":
+    "{name} pode ser desconectado deste servidor e precisará se conectar de novo.",
   "server.invite.invalidEmail": "Digite um endereço de e-mail válido.",
   "server.invite.title": "Convidar pessoas",
   "server.invite.description":
@@ -284,6 +288,8 @@ export const messages = {
   "server.invite.neverExpires": { one: "Nunca expira · {count} entrada", other: "Nunca expira · {count} entradas" },
   "server.invite.expires": "Expira em {date}",
   "server.invite.revoke": "Revogar",
+  "server.invite.revokeTitle": "Revogar este convite?",
+  "server.invite.revokeDescription": "O convite deixa de funcionar. Quem entrou com ele continua como membro.",
   "server.desktop.accessTitle": "Acesso à área de trabalho remota",
   "server.desktop.gatewayDescription":
     "Todo membro ativo do servidor pode controlar este computador anfitrião. Não há senha separada para a área de trabalho remota.",

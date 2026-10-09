@@ -242,6 +242,8 @@ export const messages = defineMessages("routine", {
   "routine.settings.instruction": "Instruction",
   "routine.settings.instructionPlaceholderAgent": "Describe what this agent should do.",
   "routine.settings.instructionPlaceholderChannel": "Describe what this channel should do.",
+  "routine.settings.instructionNoUpdateHint":
+    "To stay silent when there is nothing to report, ask the agent to answer [[no-update]].",
   "routine.settings.limitPolicy": "If the account is at its limit",
   "routine.settings.limitPolicy.wait": "Wait and run after the reset",
   "routine.settings.limitPolicy.skip": "Skip this run",

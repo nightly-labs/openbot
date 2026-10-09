@@ -170,6 +170,20 @@ export const messages = {
   "error.backend.mcpSignInAbandoned": "Die MCP-Anmeldung wurde abgebrochen.",
   "error.backend.mcpSignInNoBrowser": "Diese MCP-Anmeldung kann keinen Browser öffnen.",
   "error.backend.mcpSignInNotWebPage": "Die Anmeldeadresse ist keine Webseite.",
+  "error.backend.mcpSignInRequired":
+    "Dieser Server verlangt eine Anmeldung. Wähle „Anmelden“, um im Browser fortzufahren.",
+  "error.backend.mcpSignInOnHost":
+    "Dieser Server verlangt eine Anmeldung. Melde dich in OpenBot auf dem Host-Computer bei ihm an.",
+  "error.backend.mcpSignInNeedsHttps":
+    "Dieser Server verlangt eine Anmeldung, und OpenBot meldet sich nur über https an. Ändere die URL in {url}.",
+  "error.backend.mcpSignInCancelled": "Die Anmeldung wurde abgebrochen.",
+  "error.backend.mcpSignInTimedOut": "Die Anmeldung wurde im Browser nicht abgeschlossen.",
+  "error.backend.mcpSignInResponseTimedOut": "Die Antwort auf die Anmeldung kam nicht rechtzeitig an.",
+  "error.backend.mcpServerExited":
+    "Der Server wurde beendet, bevor er geantwortet hat. Führe den Befehl in einem Terminal aus, um seinen Fehler zu sehen.",
+  "error.backend.mcpServerUnreachable": "OpenBot konnte den Server nicht erreichen. Prüfe die URL und dein Netzwerk.",
+  "error.backend.mcpRemoteBridge":
+    "{reason} Dieser Befehl startet die mcp-remote-Brücke. Wähle stattdessen Streamable HTTP mit der URL {url}, dann meldet OpenBot dich an.",
   "error.backend.oauthNotHttps":
     "Der OAuth-Endpunkt {origin} verwendet kein https. Die Zugangsdaten wurden daher nicht gesendet.",
   "error.backend.oauthTooManyRedirects": "Der OAuth-Endpunkt hat zu oft weitergeleitet.",

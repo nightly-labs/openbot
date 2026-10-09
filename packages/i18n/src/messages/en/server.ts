@@ -274,6 +274,9 @@ export const messages = defineMessages("server", {
   "server.members.actionsFor": "Actions for {name}",
   "server.members.makeMember": "Make member",
   "server.members.makeAdmin": "Make admin",
+  "server.members.makeAdminTitle": "Make {name} an admin?",
+  "server.members.makeMemberTitle": "Make {name} a member?",
+  "server.members.roleChangeDescription": "{name} can be disconnected from this server and must then connect again.",
   "server.invite.invalidEmail": "Enter a valid email address.",
   "server.invite.title": "Invite people",
   "server.invite.description":
@@ -313,6 +316,8 @@ export const messages = defineMessages("server", {
   "server.invite.neverExpires": { one: "Never expires · {count} join", other: "Never expires · {count} joins" },
   "server.invite.expires": "Expires {date}",
   "server.invite.revoke": "Revoke",
+  "server.invite.revokeTitle": "Revoke this invitation?",
+  "server.invite.revokeDescription": "The invitation stops working. People who joined with it stay members.",
   "server.desktop.accessTitle": "Remote desktop access",
   "server.desktop.gatewayDescription":
     "Every active server member can control this host. There is no separate remote desktop password.",

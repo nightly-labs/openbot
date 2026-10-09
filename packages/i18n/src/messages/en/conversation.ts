@@ -14,6 +14,7 @@ export const messages = defineMessages("conversation", {
   "conversation.globalSearch.appSettings": "App settings",
   "conversation.globalSearch.results": "Results",
   "conversation.globalSearch.empty": "No results",
+  "conversation.globalSearch.failed": "Search did not finish. Some results can be missing.",
   "conversation.globalSearch.countMore": "{shown}+",
   "conversation.globalSearch.searching": "Searching…",
   "conversation.globalSearch.you": "You",
