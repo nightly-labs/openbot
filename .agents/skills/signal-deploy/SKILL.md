@@ -16,8 +16,8 @@ the staging, build and rollback commands. This skill adds the checks before and 
 
 CI and the release workflow do not deploy Signal. When
 `git diff --quiet <previous tag> <tag> -- remote packages/contracts/src/signal-protocol` finds changes,
-deploy Signal from the tag before the release workflow publishes the clients ([docs/RELEASING.md](../../../docs/RELEASING.md),
-preflight item 16). Example: #1661. The v0.33.0 clients sent `webhookRoute`, but production Signal
+deploy Signal from the local tag before the tag is pushed: the push starts the release workflow,
+which does not wait for Signal ([docs/RELEASING.md](../../../docs/RELEASING.md), preflight item 16). Example: #1661. The v0.33.0 clients sent `webhookRoute`, but production Signal
 was older than #1520. It had no `/v1/webhooks` route and refused webhook-only ingress sockets with
 `authentication_required`.
 

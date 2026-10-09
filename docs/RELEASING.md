@@ -425,6 +425,8 @@ git commit -m "release: prepare vX.Y.Z"
 git push origin main
 bun run release:preflight
 git tag -a vX.Y.Z -m "OpenBot vX.Y.Z"
+# When Signal changed since the previous tag, deploy and check Signal from
+# vX.Y.Z now (preflight item 16). Push the tag only after that.
 git push origin vX.Y.Z
 ```
 
@@ -555,15 +557,16 @@ Before creating the first tag or any later release:
     running application, that a provider downloads in-app, that the server rail is drawn, and that the
     microphone control is absent;
 14. confirm `CHANGELOG.md` describes the version and the working tree is clean;
-15. create and push the version commit and tag only after CI passes on `main`;
+15. create and push the version commit, and create the tag locally, only after CI passes on `main`;
 16. if `git diff --quiet <previous tag> <new tag> -- remote packages/contracts/src/signal-protocol` finds
-    changes, deploy Signal from the new tag as soon as the tag exists, before the release workflow
-    publishes the clients. Use the Signal-only procedure in
+    changes, deploy Signal from the local tag before you push the tag. Pushing the tag starts the
+    release workflow, and nothing in it waits for Signal. Use the Signal-only procedure in
     [remote-session-deployment.md](remote-session-deployment.md#deployment-procedure--requires-separate-approval);
     the `.agents/skills/signal-deploy/` skill adds the checks before and after it.
     Confirm that `curl -fsS https://signal.openbot.run/health/live` shows the tag commit. A client
     that needs a newer Signal fails until then: v0.33.0 shipped webhook routines while Signal was older
-    than #1520, so every webhook route answered 404 (#1661).
+    than #1520, so every webhook route answered 404 (#1661);
+17. push the tag.
 
 The macOS ZIP must be smaller than 800,000,000 bytes and smaller than the official `0.1.21` ZIP.
 Do not publish when either size gate fails, the `0.1.21` canary update crashes, or Windows starts NSIS

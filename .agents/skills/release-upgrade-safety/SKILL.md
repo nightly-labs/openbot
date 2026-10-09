@@ -131,7 +131,7 @@ a gate can be selected without opening anything:
   release workflow. Read `commit` from `curl -fsS https://signal.openbot.run/health/live`; if it is
   missing or `unknown`, the running commit is not known, so the verdict is **needs a human**. Pass
   only when `git merge-base --is-ancestor <release commit> <running commit>` succeeds. Otherwise the verdict is
-  **deploy Signal from the new tag** before the clients are published (`docs/RELEASING.md` preflight
+  **deploy Signal from the new tag** before the tag is pushed (`docs/RELEASING.md` preflight
   item 16). #1661 is the failure this catches: v0.33.0 clients sent webhook routes to a Signal older
   than #1520.
 
