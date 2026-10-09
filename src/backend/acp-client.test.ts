@@ -22,7 +22,7 @@ import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
-import { ACP_IDLE_SESSION_LIMIT, type AcpHistoryPersistence } from "./acp-client";
+import { ACP_IDLE_SESSION_LIMIT, AcpAgentClient, type AcpHistoryPersistence } from "./acp-client";
 import { isMissingProviderSessionError } from "./agent/thread-items";
 import { type AgentClient, AgentProcessExitError } from "./agent-client";
 import type { OpencodeCliInfo } from "./cli";
@@ -219,6 +219,14 @@ function handle(message) {
     if (closeLog) fs.appendFileSync(closeLog, JSON.stringify(message.params) + NL);
     write({ jsonrpc: "2.0", id: message.id, result: {} });
     return;
+  }
+  const failureFile = process.env.OPENBOT_FAKE_ACP_FAILURE_FILE;
+  if (failureFile && fs.existsSync(failureFile)) {
+    const failure = JSON.parse(fs.readFileSync(failureFile, "utf8"));
+    if (message.method === failure.method) {
+      write({ jsonrpc: "2.0", id: message.id, error: failure.error });
+      return;
+    }
   }
   if (message.method === "session/prompt") {
     const promptLog = process.env.OPENBOT_FAKE_ACP_PROMPT_LOG;
@@ -892,6 +900,115 @@ describe("OpenCode MCP sign-in", () => {
 });
 
 describe("ACP missing session errors", () => {
+  it("does not replay a failed prompt and reloads for the next input", async () => {
+    const fake = await createFakeOpencodeAgent();
+    const failureFile = join(fake.directory, "failure.json");
+    vi.stubEnv("OPENBOT_FAKE_ACP_FAILURE_FILE", failureFile);
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_SESSION", "1");
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_LOG", fake.loadLog);
+    vi.stubEnv("OPENBOT_FAKE_ACP_PROMPT_LOG", fake.promptLog);
+    const client = new AcpAgentClient(fake.cli, 10_000, {
+      provider: "acp",
+      argv: [],
+      env: {},
+      signInMessage: "Sign in",
+    });
+    started.push(client);
+    client.start();
+    const response = await runCauseEffect(
+      client.request("thread/start", { cwd: fake.directory }, decodeThreadResponse),
+    );
+    const threadId = response.thread.id;
+    await writeFile(
+      failureFile,
+      JSON.stringify({
+        method: "session/prompt",
+        error: { code: -32603, message: "Internal error", data: { details: `Unsupported ACP session: ${threadId}` } },
+      }),
+    );
+    const completed: unknown[] = [];
+    client.on("notification", (notification) => {
+      if (notification.method === "turn/completed") completed.push(notification.params);
+    });
+    await runCauseEffect(
+      client.request("turn/start", { threadId, input: [{ type: "text", text: "Old input" }] }, decodeRecordResponse),
+    );
+    await vi.waitFor(() => expect(completed).toHaveLength(1));
+    expect(completed[0]).toMatchObject({ turn: { status: "failed" } });
+    await rm(failureFile);
+    await runCauseEffect(client.request("thread/resume", { threadId, cwd: fake.directory }, decodeRecordResponse));
+    expect(await fake.readLoadedSessions()).toHaveLength(1);
+    await runCauseEffect(
+      client.request("turn/start", { threadId, input: [{ type: "text", text: "New input" }] }, decodeRecordResponse),
+    );
+    await vi.waitFor(() => expect(completed).toHaveLength(2));
+    expect(completed[1]).toMatchObject({ turn: { status: "completed" } });
+    const prompts = await fake.readPrompts();
+    expect(prompts).toHaveLength(1);
+    expect(JSON.parse(prompts[0] ?? "{}")).toMatchObject({ prompt: [{ type: "text", text: "New input" }] });
+  });
+
+  it.each([
+    { code: -32002, data: { uri: "session-1" }, missing: true },
+    { code: -32603, data: { details: "Unsupported ACP session: session-1" }, missing: true },
+    { code: -32603, data: { details: "Unsupported ACP session: another-session" }, missing: false },
+    { code: -32603, data: { details: "Upstream session not found; credential=private-value" }, missing: false },
+  ])("recovers only confirmed startup session failures: $data", async ({ code, data, missing }) => {
+    const fake = await createFakeOpencodeAgent();
+    const failureFile = join(fake.directory, "failure.json");
+    vi.stubEnv("OPENBOT_FAKE_ACP_FAILURE_FILE", failureFile);
+    vi.stubEnv("OPENBOT_FAKE_ACP_CONFIG_MODELS", "1");
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_SESSION", "1");
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_LOG", fake.loadLog);
+    vi.stubEnv("OPENBOT_FAKE_ACP_PROMPT_LOG", fake.promptLog);
+    const client = new AcpAgentClient(fake.cli, 10_000, {
+      provider: "acp",
+      argv: [],
+      env: {},
+      signInMessage: "Sign in",
+      redactValues: () => ["private-value"],
+    });
+    started.push(client);
+    client.start();
+    const response = await runCauseEffect(
+      client.request("thread/start", { cwd: fake.directory }, decodeThreadResponse),
+    );
+    const threadId = response.thread.id;
+    await writeFile(
+      failureFile,
+      JSON.stringify({ method: "session/set_config_option", error: { code, message: "Internal error", data } }),
+    );
+    const notifications: string[] = [];
+    client.on("notification", (notification) => notifications.push(notification.method));
+    const error = await runCauseEffect(
+      client.request(
+        "turn/start",
+        { threadId, model: "agent/thinker", input: [{ type: "text", text: "Continue" }] },
+        decodeRecordResponse,
+      ),
+    ).catch((reason: unknown) => reason);
+    expect(isMissingProviderSessionError(error, "acp")).toBe(missing);
+    expect(notifications).not.toContain("turn/started");
+    expect(await fake.readPrompts()).toEqual([]);
+    if (!missing) {
+      expect(String(error)).toContain(data.details?.replace("private-value", "[redacted]"));
+      expect(String(error)).not.toContain("private-value");
+    }
+    await rm(failureFile);
+    await runCauseEffect(client.request("thread/resume", { threadId, cwd: fake.directory }, decodeRecordResponse));
+    expect(await fake.readLoadedSessions()).toHaveLength(missing ? 1 : 0);
+    await runCauseEffect(
+      client.request("turn/start", { threadId, input: [{ type: "text", text: "Continue" }] }, decodeRecordResponse),
+    );
+    await vi.waitFor(() => expect(notifications).toContain("turn/completed"));
+    const prompts = await fake.readPrompts();
+    expect(prompts).toHaveLength(1);
+    expect(JSON.parse(prompts[0] ?? "{}")).toMatchObject({
+      sessionId: threadId,
+      prompt: [{ type: "text", text: "Continue" }],
+    });
+  });
+
   it.each([
     { provider: "cursor", code: -32602, data: { message: 'Session "ses_stored" not found' }, missing: true },
     { provider: "cursor", code: -32602, data: { message: 'Session "ses_other" not found' }, missing: false },

@@ -703,6 +703,30 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     try {
       return providerResult(yield* Effect.result(this.#requestEffect(method, params, decoder, timeoutMs)));
     } catch (error) {
+      const sessionId = getString(params, "threadId");
+      if (
+        sessionId &&
+        (method === "turn/start" || method === "thread/resume") &&
+        !this.#threads.get(sessionId)?.activeTurn &&
+        isSessionNotFound(error, sessionId, this.provider)
+      ) {
+        // No prompt was sent. Drop the stale handle so the queue can load or replace the session.
+        yield* this.releaseThread(sessionId);
+        return yield* providerFailure(new MissingAcpSessionError(`ACP session not found: ${sessionId}`, error));
+      }
+      if (
+        error instanceof RequestError &&
+        (method === "turn/start" ||
+          method === "turn/steer" ||
+          ((method === "thread/start" || method === "thread/resume") &&
+            isRecord(error.data) &&
+            typeof error.data.details === "string"))
+      ) {
+        // Keep the protocol error type: details alone must never authorize session replacement.
+        return yield* providerFailure(
+          new RequestError(error.code, this.#redact(failureText(error).replace(/^RequestError:\s*/u, ""))),
+        );
+      }
       return yield* providerFailure(yield* this.#explainEndEffect(error, ended));
     }
   });
@@ -1955,6 +1979,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     error: unknown,
   ) {
     if (thread.activeTurn !== turn) return;
+    // A prompt can have run tools. Never replay it. Drop the handle before publishing completion
+    // so only new input can reload the session, including input already waiting in the queue.
+    if (status === "failed" && isSessionNotFound(error, thread.id, this.provider)) {
+      yield* this.releaseThread(thread.id);
+    }
     this.#completeThought(thread, turn);
     for (const item of turn.toolItems.values()) turn.messages.push(item);
     turn.toolItems.clear();
@@ -1998,7 +2027,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           params: { threadId: thread.id, turn: { id: turn.id, status: "failed" } },
         });
         thread.activeTurn = null;
-        yield* this.#threads.markIdle(thread);
+        if (this.#threads.get(thread.id) === thread) yield* this.#threads.markIdle(thread);
         return;
       }
     }
@@ -2007,7 +2036,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       params: { threadId: thread.id, turn: { id: turn.id, status } },
     });
     thread.activeTurn = null;
-    yield* this.#threads.markIdle(thread);
+    if (this.#threads.get(thread.id) === thread) yield* this.#threads.markIdle(thread);
   });
 
   /**
@@ -2444,6 +2473,11 @@ function isSessionNotFound(error: unknown, sessionId: string, provider: AgentPro
   // message. Other invalid parameters must not cause a provider session to be replaced.
   if (provider === "cursor" && error.code === -32602) {
     return isRecord(error.data) && error.data.message === `Session "${sessionId}" not found`;
+  }
+  // omp 18.8.4 wraps its exact missing-ID error in an internal error (#1690).
+  // Other internal failures, including an error for another session, are not lifecycle signals.
+  if (provider === "acp" && error.code === -32603) {
+    return isRecord(error.data) && error.data.details === `Unsupported ACP session: ${sessionId}`;
   }
   if (error.code !== -32002) return false;
   const uri = isRecord(error.data) ? error.data.uri : undefined;
