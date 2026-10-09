@@ -143,13 +143,14 @@ jobs:
         if: env.CODE == 'true'
         run: bun run check:desktop:static
 
-      - name: Check translation catalogs
-        if: env.CODE == 'true'
-        run: bun run i18n:check
+      - parallel:
+          - name: Check translation catalogs
+            if: env.CODE == 'true'
+            run: bun run i18n:check
 
-      - name: Check ratcheted TypeScript options
-        if: env.CODE == 'true'
-        run: bun run types:ratchet
+          - name: Check ratcheted TypeScript options
+            if: env.CODE == 'true'
+            run: bun run types:ratchet
 
   browser:
     # The smoke test starts the real Electron binary and opens windows, so it
@@ -167,14 +168,15 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Set up Bun
-        uses: ./.github/actions/setup-bun
+      - parallel:
+          - name: Set up Bun
+            uses: ./.github/actions/setup-bun
 
-      - name: Install a virtual display
-        shell: bash
-        run: |
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends --yes xvfb
+          - name: Install a virtual display
+            shell: bash
+            run: |
+              sudo apt-get update
+              sudo apt-get install --no-install-recommends --yes xvfb
 
       - name: Run the browser smoke test
         run: xvfb-run -a bun run test:browser
@@ -284,20 +286,32 @@ jobs:
         with:
           install: ignore-scripts
 
-      - name: Typecheck mobile
-        run: bun run mobile:typecheck
+      - parallel:
+          - name: Typecheck mobile
+            run: bun run mobile:typecheck
 
-      - name: Typecheck site router
-        run: bun run typecheck:sites
+          - name: Typecheck team client
+            run: bun run typecheck:team-client
 
-      - name: Typecheck team client
-        run: bun run typecheck:team-client
+      - parallel:
+          - name: Typecheck site router
+            run: bun run typecheck:sites
 
-      - name: Typecheck remote API
-        run: bun run typecheck:remote
+          - name: Typecheck remote API
+            run: bun run typecheck:remote
 
-      - name: Typecheck logging, telemetry, user errors and i18n
-        run: bun run --parallel typecheck:logging typecheck:telemetry typecheck:user-errors typecheck:i18n
+      - parallel:
+          - name: Typecheck logging
+            run: bun run typecheck:logging
+
+          - name: Typecheck telemetry
+            run: bun run typecheck:telemetry
+
+          - name: Typecheck user errors
+            run: bun run typecheck:user-errors
+
+          - name: Typecheck i18n
+            run: bun run typecheck:i18n
 
       - name: Validate the remote Compose files
         run: bun run remote:check:compose

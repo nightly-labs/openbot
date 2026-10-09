@@ -108,14 +108,32 @@ Its main jobs are:
 
 | Job | Runner | Commands |
 | --- | --- | --- |
-| Check | `ubuntu-latest` | `bun run knip:check`, `bun run check:assets`, `bun run check:doc-links`, `bun run check:desktop:static`, `bun run types:ratchet` |
+| Check | `ubuntu-latest` | `bun run knip:check`, `bun run check:assets`, `bun run check:doc-links`, `bun run check:desktop:static`, then `bun run i18n:check` and `bun run types:ratchet` in parallel |
 | Browser smoke | `ubuntu-latest` | `xvfb-run -a bun run test:browser` |
 | Tests (desktop 1/2, 2/2) | `ubuntu-latest` | `bun run test:desktop -- --shard=<n>/2` |
 | Tests (sites) | `ubuntu-latest` | `bun run test:sites` |
 | Tests (remote) | `ubuntu-latest` | `bun run test:remote` |
-| Surfaces | `ubuntu-latest` | `bun run mobile:typecheck`, `bun run typecheck:sites`, `bun run typecheck:team-client`, `bun run typecheck:remote`, `bun run --parallel typecheck:logging typecheck:user-errors typecheck:i18n`, `bun run remote:check:compose` |
+| Surfaces | `ubuntu-latest` | Parallel groups described below, then `bun run remote:check:compose` |
 | API | `ubuntu-latest` | `bun run check:api`, then, for a pull request from this repository, upload `apps/auth-api/dist` |
 | Storybook build | `ubuntu-latest` | `bun run build-storybook` |
+
+CI uses native GitHub Actions `parallel` groups. Each group waits for all its steps and fails
+if a step fails. The steps have separate logs. The groups run in this order:
+
+- `Check` completes `check:desktop:static` before it starts translation checks and the TypeScript
+  ratchet together. Both retain the `CODE` condition, so Markdown-only changes run only the link
+  check after setup. The desktop build still completes before `verify:preload`.
+- `Browser smoke` completes checkout, then runs `Set up Bun` and virtual-display installation
+  together. The smoke test starts only after both succeed.
+- `Surfaces` completes setup, then runs three groups: `mobile:typecheck` with
+  `typecheck:team-client`; `typecheck:sites` with `typecheck:remote`; and `typecheck:logging`,
+  `typecheck:telemetry`, `typecheck:user-errors`, and `typecheck:i18n`. Each command uses `bun run`
+  in its own step. Mobile generation stays inside `mobile:typecheck`. Compose validation starts
+  after all groups succeed.
+
+The desktop test shards keep separate runners. The API checks, artifact uploads, and production
+deployment dependencies keep their existing order. Local commands do not change. Compare job
+times on GitHub before claiming a time reduction; parallel steps share the runner's resources.
 
 `check:api` ends with `api:build:check`, which is the preview build of the Worker, so the API job
 uploads that build as the `cloudflare-preview` artifact. The job has no secrets. After the CI run completes, the trusted
