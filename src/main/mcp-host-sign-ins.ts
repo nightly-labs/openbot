@@ -27,7 +27,7 @@ type HostSignIn = McpSignInStatus;
 
 export interface McpHostSignInDependencies {
   service: Pick<AgentService, "signInMcpServer" | "cancelMcpSignIn" | "signOutMcpServer" | "listMcpSignIns">;
-  browser: Pick<BrowserHost, "openPrivate" | "closePrivate">;
+  browser: Pick<BrowserHost, "openPrivate" | "privateTab" | "close">;
 }
 
 /**
@@ -68,7 +68,8 @@ export class McpHostSignIns {
     const signIn = this.#signIns.get(signInKey(url));
     if (!signIn)
       return { tabId: null, result: { toolCount: 0, error: sourceText("error.backend.mcpSignInAbandonedGeneric") } };
-    return { tabId: signIn.tabId, result: signIn.result };
+    // A provider can sign in through a popup; the live view follows it and returns when it closes.
+    return { tabId: signIn.tabId && this.#dependencies.browser.privateTab(signIn.tabId), result: signIn.result };
   }
 
   cancel(url: string): void {
@@ -118,7 +119,7 @@ export class McpHostSignIns {
 
   #closeTab(tabId: string) {
     return this.#dependencies.browser
-      .closePrivate(tabId)
+      .close(tabId)
       .pipe(
         Effect.catch((error) =>
           Effect.sync(() => logger.warn("Unable to close an MCP sign-in tab", { error: toLogValue(error) })),

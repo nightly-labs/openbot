@@ -506,6 +506,15 @@ export class BrowserHost {
     return Boolean(this.#tabs.get(tabId)?.privateSession);
   }
 
+  /** The newest open tab of the private session that `openPrivate` opened as `tabId`: a sign-in popup while it is open. */
+  privateTab(tabId: string): string | null {
+    const privateSession = this.#tabs.get(tabId)?.privateSession;
+    if (!privateSession) return null;
+    return (
+      [...this.#tabs.values()].findLast((tab) => tab.privateSession === privateSession && !tab.closing)?.id ?? null
+    );
+  }
+
   listTabs(): BrowserTab[] {
     return [...this.#tabs.values()]
       .filter((tab) => !tab.closing && !tab.contents.isDestroyed())
@@ -702,20 +711,6 @@ export class BrowserHost {
     );
   }).bind(this);
 
-  /**
-   * Closes a tab that `openPrivate` opened, and every tab of its session with it. A popup the page
-   * opened without an opener is not its child, but it holds the same sign-in.
-   */
-  readonly closePrivate = Effect.fn("BrowserHost.closePrivate")(function* (
-    this: BrowserHost,
-    tabId: string,
-  ): Effect.fn.Return<void, BrowserOperationError> {
-    const privateSession = this.#tabs.get(tabId)?.privateSession;
-    if (!privateSession) return yield* this.close(tabId);
-    const tabIds = [...this.#tabs.values()].filter((tab) => tab.privateSession === privateSession).map((tab) => tab.id);
-    yield* Effect.forEach(tabIds, (id) => this.close(id), { discard: true });
-  }).bind(this);
-
   readonly close = Effect.fn("BrowserHost.close")(function* (
     this: BrowserHost,
     tabId: string,
@@ -726,8 +721,10 @@ export class BrowserHost {
     const closedIndex = tabIds.indexOf(tabId);
     this.#unmountView(tab.view);
     this.#tabs.delete(tabId);
+    // A popup that a private page opened without an opener is not its child, but it holds the same sign-in.
+    const signInSession = tab.popup ? undefined : tab.privateSession;
     const childDrains = [...this.#tabs.values()]
-      .filter((child) => child.openerTabId === tabId)
+      .filter((child) => child.openerTabId === tabId || (signInSession && child.privateSession === signInSession))
       .map((child) => this.close(child.id));
     this.#takeoverTabIds.delete(tabId);
 

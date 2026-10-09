@@ -542,6 +542,18 @@ describe("browser auth popups", () => {
     expect(host.activeTabId).toBe(opener.id);
   });
 
+  it("follows a private sign-in popup and closes it with the sign-in page", async () => {
+    const page = await runCauseEffect(host.openPrivate("https://auth.example.com/authorize"));
+    const outcome = windowOpenHandlers.at(-1)?.({ url: "https://accounts.example.com/auth" });
+    // The native popup has no opener, as Chromium gives for a noopener request.
+    outcome?.createWindow?.({ webContents: new WebContentsView().webContents });
+    const popup = host.listTabs().find((tab) => tab.id !== page.id);
+    expect(popup && host.isPrivate(popup.id)).toBe(true);
+    expect(host.privateTab(page.id)).toBe(popup?.id);
+    await runCauseEffect(host.close(page.id));
+    expect(host.listTabs()).toEqual([]);
+  });
+
   function prepareSecret(tabId: string) {
     return host.prepareSecret({
       namespace: "openbot_browser",
