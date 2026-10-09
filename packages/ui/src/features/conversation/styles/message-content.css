@@ -1286,7 +1286,7 @@
 }
 
 .message-file-reference:has(> [data-badge-length="3"]) {
-  --message-reference-icon-size: var(--openbot-space-5);
+  --message-reference-icon-size: var(--openbot-icon-lg);
 }
 
 .message-file-reference:has(> [data-badge-length="4"]) {
