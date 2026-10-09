@@ -13,6 +13,7 @@ const FENCE = "```";
 export function telegramHtml(markdown: string): string {
   const out: string[] = [];
   let fence: string[] | null = null;
+  let language = "";
   let quote: string[] = [];
   const flushQuote = () => {
     if (quote.length) out.push(`<blockquote>${quote.join("\n")}</blockquote>`);
@@ -21,11 +22,12 @@ export function telegramHtml(markdown: string): string {
   for (const line of markdown.split("\n")) {
     if (line.trimStart().startsWith(FENCE)) {
       if (fence) {
-        out.push(`<pre>${fence.join("\n")}</pre>`);
+        out.push(preHtml(fence, language));
         fence = null;
       } else {
         flushQuote();
         fence = [];
+        language = codeLanguage(line);
       }
       continue;
     }
@@ -42,7 +44,7 @@ export function telegramHtml(markdown: string): string {
     out.push(blockHtml(line));
   }
   flushQuote();
-  if (fence) out.push(`<pre>${fence.join("\n")}</pre>`);
+  if (fence) out.push(preHtml(fence, language));
   return out.join("\n");
 }
 
@@ -54,6 +56,17 @@ export function telegramChunks(markdown: string): string[] {
 /** An answer as plain text, for a post that Telegram refused as HTML. */
 export function telegramPlainText(markdown: string): string {
   return inertMentions(markdown);
+}
+
+/** The language after an opening fence, such as `python` in "```python". Other text gives none. */
+function codeLanguage(fenceLine: string): string {
+  return /^\s*```([\w+#.-]+)\s*$/u.exec(fenceLine)?.[1] ?? "";
+}
+
+/** A code block. Telegram colors the code when it gets a language. */
+function preHtml(lines: string[], language: string): string {
+  const code = lines.join("\n");
+  return language ? `<pre><code class="language-${language}">${code}</code></pre>` : `<pre>${code}</pre>`;
 }
 
 export function escapeHtml(text: string): string {
