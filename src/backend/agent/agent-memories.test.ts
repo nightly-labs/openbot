@@ -242,7 +242,7 @@ describe.sequential("AgentMemories: staging, epochs and turn commitment", () => 
       store,
       mailbox,
       preferredProvider: "codex",
-      agentMemoryLimit: () => 2,
+      agentMemoryLimit: () => 3,
       clientFactory: (provider) => {
         const client = new FakeAgentClient(provider, "DONE", false);
         clients.set(provider, client);
@@ -263,12 +263,23 @@ describe.sequential("AgentMemories: staging, epochs and turn commitment", () => 
     const turnId = events.find((event) => event.type === "turn-started")?.turnId;
     if (!client || !threadId || !turnId) throw new Error("The memory cap turn did not start.");
     const startRequest = client.requests.find((request) => request.method === "thread/start");
-    expect(JSON.stringify(startRequest?.params)).toContain('<agent_memories count=\\"2\\" limit=\\"2\\">');
+    expect(JSON.stringify(startRequest?.params)).toContain('<agent_memories count=\\"2\\" limit=\\"3\\">');
+    const owner = await callOpenBotTool(client, threadId, "remember", { text: "Builder owns the rollback." }, turnId);
+    expect(openBotToolPayload(owner.result).status).toBe("staged");
 
+    // Another turn of the same agent, such as a channel turn, commits apart. Its memory counts too.
+    const otherTurn = await callOpenBotTool(
+      client,
+      threadId,
+      "remember",
+      { text: "Use metric units." },
+      "channel-turn",
+    );
+    expect(paramsRecord(otherTurn.result)?.success).toBe(false);
     const refused = await callOpenBotTool(client, threadId, "remember", { text: "The release is on Monday." }, turnId);
     expect(paramsRecord(refused.result)?.success).toBe(false);
     expect(openBotToolPayload(refused.result).error).toBe(
-      "You have 2 of 2 memories. Merge a memory into another with remember and its memoryId, or forget a stale one, then try again.",
+      "You have 3 of 3 memories. To make room, update one memory by memoryId with the combined text of two related memories, then forget the other one, or forget a memory that is no longer true. Then try again.",
     );
 
     await callOpenBotTool(client, threadId, "forget_memory", { memoryId: stale.id }, turnId);
@@ -285,7 +296,7 @@ describe.sequential("AgentMemories: staging, epochs and turn commitment", () => 
         .listMemories("chief")
         .map((memory) => memory.text)
         .sort(),
-    ).toEqual(["The release is on Monday.", "Use Bun for scripts."]);
+    ).toEqual(["Builder owns the rollback.", "The release is on Monday.", "Use Bun for scripts."]);
     expect(events.filter((event) => event.type === "error")).toEqual([]);
   });
 });

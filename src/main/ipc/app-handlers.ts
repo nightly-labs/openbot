@@ -142,7 +142,9 @@ export function appIpcHandlers({
       ),
       getAgentMemoryLimitPreference: handler(() => agentMemoryLimit.get()),
       setAgentMemoryLimitPreference: payloadHandler(parseAgentMemoryLimitPreference, (parsed) =>
-        runCauseEffect(agentMemoryLimit.set(parsed)),
+        runCauseEffect(
+          agentMemoryLimit.set(parsed).pipe(Effect.tap(() => Effect.sync(() => service.memoryLimitChanged()))),
+        ),
       ),
       getRemoteSessionReusePreference: handler(() => remoteSessionReuse.get()),
       // Off removes the kept sessions at once. The sessions of this run then end when the app quits.

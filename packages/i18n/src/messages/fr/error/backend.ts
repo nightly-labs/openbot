@@ -72,7 +72,9 @@ export const messages = {
   "error.backend.agentRoutineLimit": "Un agent peut avoir au maximum {limit} routines.",
   "error.backend.agentMemoryLimit": "Un agent peut avoir jusqu’à {limit} souvenirs.",
   "error.backend.agentMemoryLimitReached":
-    "Vous avez {saved} souvenirs sur {limit}. Fusionnez un souvenir avec un autre avec remember et son memoryId, ou oubliez-en un obsolète, puis réessayez.",
+    "Vous avez {saved} souvenirs sur {limit}. Pour faire de la place, mettez à jour un souvenir par son memoryId avec le texte combiné de deux souvenirs liés, puis oubliez l’autre, ou oubliez un souvenir qui n’est plus vrai. Puis réessayez.",
+  "error.backend.agentMemoryLimitExceeded":
+    "Vous avez {saved} souvenirs, et la limite est de {limit}. L’utilisateur a fixé la limite sous le nombre de souvenirs enregistrés. N’oubliez pas de souvenirs pour faire de la place. Dites à l’utilisateur que ce souvenir n’a pas été enregistré.",
   "error.backend.channelHistoryLeadRequired": "Choisissez un responsable de canal pour préparer l’historique partagé.",
   "error.backend.channelHistoryArriving":
     "Un message partagé est encore en cours de réception. Reprenez quand il sera complet.",

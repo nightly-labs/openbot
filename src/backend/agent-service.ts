@@ -1144,6 +1144,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#memories.limit();
   }
 
+  /** The developer instructions state the limit, so a new limit reloads every agent's threads. */
+  memoryLimitChanged(): void {
+    for (const agent of this.listAgents()) this.#conversation.unloadAgentThreads(agent.id);
+  }
+
   createMemory(input: CreateAgentMemoryInput): AgentMemory {
     return this.#memories.create(input);
   }

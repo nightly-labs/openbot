@@ -586,7 +586,9 @@ export class AgentImportService {
                 );
               }
             }
-            for (const text of source.memories) this.agents.createMemory({ agentId: agent.id, text });
+            // The limit can be lower now than when the archive was read.
+            for (const text of source.memories.slice(0, this.agents.memoryLimit()))
+              this.agents.createMemory({ agentId: agent.id, text });
             const avatar = staged.avatars.get(source.key);
             if (avatar)
               agent = yield* this.agents

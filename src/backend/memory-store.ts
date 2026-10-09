@@ -87,11 +87,6 @@ export class MemoryStore {
     return this.tables.limit();
   }
 
-  /** The saved memory that `text` would fold into, as `save` finds it. */
-  findByText(ownerId: string, text: string): MemoryEntry | null {
-    return this.#findByNormalizedText(ownerId, normalizeMemoryText(text.trim()));
-  }
-
   createManual(ownerId: string, text: string): MemoryEntry {
     return this.save(ownerId, { text, origin: "manual", sourceTurnId: null });
   }
@@ -298,7 +293,8 @@ function validateMemoryText(value: string): string {
   return text;
 }
 
-function normalizeMemoryText(value: string): string {
+/** Two memories with the same normalized text are one memory: `save` folds the second into the first. */
+export function normalizeMemoryText(value: string): string {
   return value;
 }
 
