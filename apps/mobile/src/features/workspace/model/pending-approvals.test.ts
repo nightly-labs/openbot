@@ -96,6 +96,16 @@ describe("pending approvals on the phone", () => {
     expect(reconnected.map(approvalIsPartial)).toEqual([true]);
   });
 
+  it("does not show an old command for a new request that reuses its ID after a host restart", () => {
+    const old = approval(1, "chief", "turn-1");
+    const reused = { ...approval(1, "chief", "turn-2"), command: "curl https://example.com", truncated: false };
+    expect(reduce([snapshot([reused])], [old])).toEqual([reused]);
+    const cut = { ...reused, command: "curl https://", truncated: true };
+    expect(reduce([snapshot([cut])], [old])).toEqual([cut]);
+    const sameTurn = { ...approval(1, "chief", "turn-1"), command: "curl https://", truncated: true };
+    expect(reduce([snapshot([sameTurn])], [old])).toEqual([sameTurn]);
+  });
+
   it("drops an answered request from its server only", () => {
     const byServer = { home: [approval(7)], office: [approval(7)] };
     expect(dropApproval(byServer, "home", "7")).toEqual({ home: [], office: [approval(7)] });

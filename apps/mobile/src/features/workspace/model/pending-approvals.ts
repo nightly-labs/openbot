@@ -19,10 +19,33 @@ export function approvalIsPartial(approval: PendingApproval): boolean {
   return "truncated" in approval && approval.truncated;
 }
 
+function startsWith(whole: string | null, cut: string | null) {
+  return whole === null ? cut === null : cut !== null && whole.startsWith(cut);
+}
+
+/**
+ * True when `whole` is the full copy of the cut snapshot entry. A request ID alone is not enough: a
+ * provider can count its IDs from the start again after the host restarts.
+ */
+function isWholeCopyOf(whole: PendingApproval, cut: AgentRuntimeApproval) {
+  return (
+    !approvalIsPartial(whole) &&
+    sameRequest(whole.requestId, cut.requestId) &&
+    whole.agentId === cut.agentId &&
+    whole.threadId === cut.threadId &&
+    whole.turnId === cut.turnId &&
+    whole.kind === cut.kind &&
+    startsWith(whole.command, cut.command) &&
+    startsWith(whole.cwd, cut.cwd) &&
+    startsWith(whole.reason, cut.reason) &&
+    startsWith(whole.grantRoot, cut.grantRoot)
+  );
+}
+
 /**
  * Folds one host event into the approvals of one server, in the order they arrived. A snapshot is
- * the current state; it keeps the whole copy of a request that an earlier event delivered, because
- * the snapshot copy can be cut.
+ * the current state. For an entry that the snapshot cut, it keeps the whole copy that an earlier
+ * event delivered for the same request.
  */
 export function reducePendingApprovals(
   current: readonly PendingApproval[],
@@ -32,10 +55,8 @@ export function reducePendingApprovals(
     case "runtime-snapshot": {
       const next = reconcilePendingRequests<PendingApproval>(
         current,
-        event.snapshot.pendingApprovals.map(
-          (approval) =>
-            current.find((item) => sameRequest(item.requestId, approval.requestId) && !approvalIsPartial(item)) ??
-            approval,
+        event.snapshot.pendingApprovals.map((approval) =>
+          approval.truncated ? (current.find((item) => isWholeCopyOf(item, approval)) ?? approval) : approval,
         ),
         event.snapshot.attentionComplete,
       );
