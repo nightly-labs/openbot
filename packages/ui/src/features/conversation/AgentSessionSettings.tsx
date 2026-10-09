@@ -161,7 +161,12 @@ export function AgentSessionSettings(props: {
                   <Text tone="muted">
                     {t("agentSettings.session.effective", { value: String(option()?.currentValue ?? "") })}
                   </Text>
-                  <Button variant="ghost" disabled={state.busy} onClick={() => void change(id)}>
+                  <Button
+                    variant="ghost"
+                    aria-label={t("agentSettings.session.resetNamed", { name: option()?.name ?? id })}
+                    disabled={state.busy}
+                    onClick={() => void change(id)}
+                  >
                     {t("agentSettings.session.reset")}
                   </Button>
                 </Show>

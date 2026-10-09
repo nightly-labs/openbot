@@ -7,6 +7,7 @@ export const messages = defineMessages("agentSettings", {
   "agentSettings.session.unavailable": "Saved value {value} is not available. Select another value or reset it.",
   "agentSettings.session.effective": "Current provider value: {value}",
   "agentSettings.session.reset": "Reset setting",
+  "agentSettings.session.resetNamed": "Reset {name}",
   "agentSettings.label": "Agent settings",
   "agentSettings.title": "Settings",
   "agentSettings.backToDetails": "Back to details",
