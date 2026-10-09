@@ -93,6 +93,8 @@ describe("development environment loading", () => {
       REMOTE_AUTH_WEBHOOK_SECRET: "webhook",
       REMOTE_SESSION_SECRET: "session",
       TURN_SHARED_SECRET: "turn",
+      TELEGRAM_BOT_TOKENS: "telegram-token",
+      TELEGRAM_BOT_ID: "telegram-bot",
       PATH: "/bin",
     };
     const app = developmentChildEnvironment(source, "app");
@@ -103,6 +105,7 @@ describe("development environment loading", () => {
       REMOTE_AUTH_WEBHOOK_SECRET: "webhook",
       REMOTE_SESSION_SECRET: "session",
       TURN_SHARED_SECRET: "turn",
+      TELEGRAM_BOT_TOKENS: "telegram-token",
       PATH: "/bin",
     });
     expect(developmentChildEnvironment(source, "api").DOTENV_PRIVATE_KEY_PRODUCTION).toBeUndefined();
