@@ -169,7 +169,7 @@ const stageBunx = Effect.fn("ProviderRuntime.stageBunx")((binary: string, bunx: 
 );
 
 /** The npm package that lists OpenCode's platform packages and carries its LICENSE. */
-const OPENCODE_UMBRELLA_PACKAGE = "opencode-ai";
+export const OPENCODE_UMBRELLA_PACKAGE = "opencode-ai";
 
 interface NpmPackageCheck {
   name: string;
@@ -387,6 +387,13 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
       downloadSmallFile,
     }: ProviderStageContext): Effect.fn.Return<void, ProviderRuntimeFailure> {
       const artifact = lock.opencode.artifacts[spec.target];
+      // The platform tarball carries no licence. The umbrella package on the same registry does, so
+      // an install needs no host other than npm. `verify` checks its hash against the lock. It is
+      // fetched first because it is small: a failed request stops before the binary is unpacked.
+      const umbrella = yield* downloadSmallFile(
+        `${lock.opencode.registry}/${OPENCODE_UMBRELLA_PACKAGE}/-/${OPENCODE_UMBRELLA_PACKAGE}-${spec.version}.tgz`,
+        null,
+      );
       yield* withNpmPackage(
         downloadedPath,
         staging,
@@ -420,12 +427,6 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
             if (spec.target !== "win32-x64")
               yield* runtimeIO(() => chmod(join(staging, "bin", artifact.executable), 0o755));
           }),
-      );
-      // The platform tarball carries no licence. The umbrella package on the same registry does, so
-      // an install needs no host other than npm. `verify` checks its hash against the lock.
-      const umbrella = yield* downloadSmallFile(
-        `${lock.opencode.registry}/${OPENCODE_UMBRELLA_PACKAGE}/-/${OPENCODE_UMBRELLA_PACKAGE}-${spec.version}.tgz`,
-        null,
       );
       // A directory beside the staging one, so the sweep of abandoned staging removes it after a crash.
       const umbrellaRoot = `${staging}.umbrella`;

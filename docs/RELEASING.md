@@ -278,7 +278,7 @@ packages have no license file, so set `licenseSha256` to the SHA-256 of `LICENSE
 
 `native-runtime.lock.json` also pins the OpenCode CLI that OpenBot downloads for the OpenCode
 provider before its first update check answers, by npm platform package, asset SHA-256, extracted binary SHA-256, byte counts, and the
-MIT license file it fetches from `github.com/anomalyco/opencode`. Codex, Claude, and Grok are pinned
+MIT license file it takes from the `opencode-ai` npm package. Codex, Claude, and Grok are pinned
 in the same file by hand; OpenCode has a script, because the version, both platform packages, and
 the license have to agree:
 

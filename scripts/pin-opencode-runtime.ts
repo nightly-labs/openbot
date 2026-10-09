@@ -174,9 +174,17 @@ async function umbrellaLicense(fetchImpl: typeof fetch, version: string): Promis
   try {
     const archive = join(temporaryRoot, asset);
     await writeFile(archive, archiveBytes, { mode: 0o600 });
-    execFileSync("tar", ["-xzf", archive, "-C", temporaryRoot, "--no-same-owner", "package/LICENSE"], {
-      stdio: "inherit",
-    });
+    execFileSync(
+      "tar",
+      ["-xzf", archive, "-C", temporaryRoot, "--no-same-owner", "package/package.json", "package/LICENSE"],
+      { stdio: "inherit" },
+    );
+    const manifest = packageManifestSchema.parse(
+      JSON.parse(await readFile(join(temporaryRoot, "package", "package.json"), "utf8")),
+    );
+    if (manifest.name !== "opencode-ai" || manifest.version !== version) {
+      throw new Error(`The opencode-ai ${version} package manifest does not match the registry metadata.`);
+    }
     return await readFile(join(temporaryRoot, "package", "LICENSE"));
   } finally {
     await rm(temporaryRoot, { recursive: true, force: true });

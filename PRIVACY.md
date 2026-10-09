@@ -695,8 +695,8 @@ Marketplace submissions from the desktop app show the publisher’s current acco
 
 ### OpenCode
 
-OpenBot downloads the OpenCode CLI from `registry.npmjs.org` and its license from
-`github.com/anomalyco/opencode`, then starts it with `opencode acp`. Prompts, attachments, and tool
+OpenBot downloads the OpenCode CLI and its license (from the `opencode-ai` package) from
+`registry.npmjs.org`, then starts it with `opencode acp`. Prompts, attachments, and tool
 results go to that local process. OpenCode can send them to the model provider selected in its
 configuration. OpenCode's free models are the default, and they reach OpenCode Go with no account,
 so a first OpenCode turn leaves this computer without a sign-in.
