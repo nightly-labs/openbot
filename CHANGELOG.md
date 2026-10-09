@@ -6,6 +6,19 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.34.1] - 2026-10-09
+
+### Changed
+
+- The mobile app card at the bottom of the sidebar now says "OpenBot for mobile", because the app
+  is on iPhone and Android. "How to install" opens Settings > Mobile Connect, which shows the steps
+  for both phones. If you closed the old iPhone card, the new card shows one more time.
+
+### Fixed
+
+- The message box stays at the bottom of the chat again. In a short conversation it moved up to sit
+  directly below the last message.
+
 ## [0.34.0] - 2026-10-09
 
 ### Added
