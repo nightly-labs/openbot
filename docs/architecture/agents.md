@@ -21,6 +21,12 @@ routes. Desktop, web and mobile clients use these routes. The general agent upda
 refusing it, and hosts without this capability keep the remote control hidden. Remote clients read
 the flag from the host settings response because the released agent summary does not carry it.
 
+Permission decision for #1720: the developer explicitly approved extending the existing Local
+scripts grant to messages and question/approval responses, including agents that already have it
+enabled. There is no new opt-in or capability. This is a specific exception to the routine-only
+meaning first shipped in `agent-host-settings-v1`. Older clients can still change the same flag;
+their older text can describe routines only. The wire payloads and owner/admin checks stay unchanged.
+
 Messages use `AgentService.sendMessage` and its persisted retry keys. The attention registry gives
 each pending object an opaque local handle. Responses match that handle and agent together; an
 expired handle cannot answer a later provider request. Pending details are not trimmed to the UI

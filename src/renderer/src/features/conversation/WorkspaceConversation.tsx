@@ -149,7 +149,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   const remoteAgentAdmin = createRemoteAgentAdmin(() => {
     const server = activeServer();
     const agent = activeAgent();
-    return server && agent ? { server, agentId: agent.id, updatedAt: agent.updatedAt } : null;
+    return server && agent ? { server, agentId: agent.id, updatedAt: agent.updatedAt ?? null } : null;
   });
   const remoteAgentSettings = remoteAgentAdmin.settings;
 
@@ -199,11 +199,12 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   const conversationAgent = createMemo(() => {
     const agent = activeAgent();
     const settings = remoteAgentSettings();
+    const automation = remoteAgentAdmin.automation();
     return agent
       ? {
           ...agent,
           ...(settings ? { access: settings.access } : {}),
-          ...(activeServer()?.kind === "remote" ? { allowAutomation: remoteAgentAdmin.automation() } : {}),
+          ...(activeServer()?.kind === "remote" && automation !== undefined ? { allowAutomation: automation } : {}),
         }
       : agent;
   });

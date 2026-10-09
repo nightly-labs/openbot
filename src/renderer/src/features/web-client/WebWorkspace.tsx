@@ -534,7 +534,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     () => {
       const current = server();
       const agent = workspace.selected();
-      return current && agent ? { server: current, agentId: agent.id, updatedAt: agent.updatedAt } : null;
+      return current && agent ? { server: current, agentId: agent.id, updatedAt: agent.updatedAt ?? null } : null;
     },
     () => ({
       getAgentHostSettings: (agentId, serverId) =>
@@ -555,8 +555,13 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const conversationAgent = createMemo(() => {
     const agent = workspace.selected();
     const settings = remoteAgentAdmin.settings();
+    const automation = remoteAgentAdmin.automation();
     return agent
-      ? { ...agent, ...(settings ? { access: settings.access } : {}), allowAutomation: remoteAgentAdmin.automation() }
+      ? {
+          ...agent,
+          ...(settings ? { access: settings.access } : {}),
+          ...(automation === undefined ? {} : { allowAutomation: automation }),
+        }
       : agent;
   });
   const serverSettings = createWebServerSettings({

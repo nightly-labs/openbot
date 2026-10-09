@@ -26,6 +26,8 @@ runs OpenBot. No local screen is necessary. Turn the same setting off to remove 
 
 The setting also permits scripts to answer questions and accept or decline approvals. Browser
 takeovers and secret questions must be completed in OpenBot.
+Agents that already have Local scripts enabled get these operations after upgrade. No new opt-in
+is needed. Older clients can still change this setting, although their text can describe routines only.
 
 In the host's local desktop window, each routine of the agent has **Copy run command** when the
 setting is on. It copies a `curl`
