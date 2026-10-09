@@ -587,7 +587,10 @@ export class AgentImportService {
               }
             }
             // The limit can be lower now than when the archive was read.
-            for (const text of source.memories.slice(0, this.agents.memoryLimit()))
+            const memoryLimit = this.agents.memoryLimit();
+            if (source.memories.length > memoryLimit)
+              warnings.push(sourceText("error.import.memoryLimit", { name: source.name, limit: memoryLimit }));
+            for (const text of source.memories.slice(0, memoryLimit))
               this.agents.createMemory({ agentId: agent.id, text });
             const avatar = staged.avatars.get(source.key);
             if (avatar)

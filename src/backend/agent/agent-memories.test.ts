@@ -254,7 +254,7 @@ describe.sequential("AgentMemories: staging, epochs and turn commitment", () => 
     await runCauseEffect(service.initialize());
     await runCauseEffect(store.getOrCreate("chief"));
     const stale = service.createMemory({ agentId: "chief", text: "The release is on Friday." });
-    service.createMemory({ agentId: "chief", text: "Use Bun for scripts." });
+    const kept = service.createMemory({ agentId: "chief", text: "Use Bun for scripts." });
     await runCauseEffect(service.sendMessage({ agentId: "chief", text: "The release moved to Monday." }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
 
@@ -276,6 +276,8 @@ describe.sequential("AgentMemories: staging, epochs and turn commitment", () => 
       "channel-turn",
     );
     expect(paramsRecord(otherTurn.result)?.success).toBe(false);
+    // Its forget can commit after this turn, or never, so it frees no place here.
+    await callOpenBotTool(client, threadId, "forget_memory", { memoryId: kept.id }, "channel-turn");
     const refused = await callOpenBotTool(client, threadId, "remember", { text: "The release is on Monday." }, turnId);
     expect(paramsRecord(refused.result)?.success).toBe(false);
     expect(openBotToolPayload(refused.result).error).toBe(

@@ -142,7 +142,7 @@ export class AgentMemories {
       // A full agent hears it now, while it can still merge or forget in this turn. Staged anyway,
       // the save would fail at commit and the memory would be lost.
       if (!memoryId) {
-        const projected = this.#projectedMemories(senderAgentId, params.callId);
+        const projected = this.#projectedMemories(senderAgentId, params.turnId, params.callId);
         const normalized = normalizeMemoryText(text);
         const limit = this.#memories.limit();
         const saved = projected.size;
@@ -229,39 +229,59 @@ export class AgentMemories {
   }
 
   /**
-   * The agent's memories, by id, once every staged change commits, replayed in staging order as
-   * `finishTurn` applies them. Every turn of the agent counts: a channel turn can run beside its own
-   * chat, and each commits apart. A staged change that commit would skip, such as a forget of a
+   * The agent's memories, by id, once this turn's staged changes commit, replayed in staging order
+   * as `finishTurn` applies them. A staged change that commit would skip, such as a forget of a
    * memory the same turn already updated, is skipped here too.
+   *
+   * Another turn of the agent, such as a channel turn beside its chat, commits apart: before this
+   * one, after it, or never. So its new memories hold a place, and its forgets and updates free none.
+   * A memory that another turn changes counts, but this turn can neither fold into it nor remove it.
+   * A null text never matches.
    */
-  #projectedMemories(agentId: string, exceptCallId: string): Map<string, { text: string; updatedAt: string | null }> {
-    const memories = new Map<string, { text: string; updatedAt: string | null }>(
+  #projectedMemories(
+    agentId: string,
+    turnId: string,
+    exceptCallId: string,
+  ): Map<string, { text: string | null; updatedAt: string | null }> {
+    const epoch = this.#epoch(agentId);
+    const counts = (mutation: PendingMemoryMutation) =>
+      mutation.agentId === agentId && mutation.epoch === epoch && mutation.callId !== exceptCallId;
+    const others = [...this.#pending]
+      .filter(([pendingTurnId]) => pendingTurnId !== turnId)
+      .flatMap(([, pending]) => pending.filter(counts));
+    const changedElsewhere = new Set(others.flatMap((mutation) => (mutation.memoryId ? [mutation.memoryId] : [])));
+    const memories = new Map<string, { text: string | null; updatedAt: string | null }>(
       this.#memories
         .list(agentId)
-        .map((memory) => [memory.id, { text: normalizeMemoryText(memory.text), updatedAt: memory.updatedAt }]),
+        .map((memory) => [
+          memory.id,
+          changedElsewhere.has(memory.id)
+            ? { text: null, updatedAt: null }
+            : { text: normalizeMemoryText(memory.text), updatedAt: memory.updatedAt },
+        ]),
     );
-    const epoch = this.#epoch(agentId);
-    for (const pending of this.#pending.values()) {
-      for (const mutation of pending) {
-        if (mutation.agentId !== agentId || mutation.epoch !== epoch || mutation.callId === exceptCallId) continue;
-        if (mutation.type === "forget") {
-          if (memories.get(mutation.memoryId)?.updatedAt === mutation.expectedUpdatedAt)
-            memories.delete(mutation.memoryId);
-          continue;
-        }
-        const text = normalizeMemoryText(mutation.text);
-        const same = [...memories].find(([, memory]) => memory.text === text)?.[0];
-        if (!mutation.memoryId) {
-          if (same === undefined) memories.set(`staged:${mutation.callId}`, { text, updatedAt: null });
-          continue;
-        }
-        const current = memories.get(mutation.memoryId);
-        if (!current || (mutation.expectedUpdatedAt !== undefined && current.updatedAt !== mutation.expectedUpdatedAt))
-          continue;
-        // An update to the text of another memory folds the two into one.
-        if (same !== undefined && same !== mutation.memoryId) memories.delete(mutation.memoryId);
-        else memories.set(mutation.memoryId, { text, updatedAt: null });
+    for (const mutation of (this.#pending.get(turnId) ?? []).filter(counts)) {
+      if (mutation.type === "forget") {
+        if (memories.get(mutation.memoryId)?.updatedAt === mutation.expectedUpdatedAt)
+          memories.delete(mutation.memoryId);
+        continue;
       }
+      const text = normalizeMemoryText(mutation.text);
+      const same = [...memories].find(([, memory]) => memory.text === text)?.[0];
+      if (!mutation.memoryId) {
+        if (same === undefined) memories.set(`staged:${mutation.callId}`, { text, updatedAt: null });
+        continue;
+      }
+      const current = memories.get(mutation.memoryId);
+      if (!current || (mutation.expectedUpdatedAt !== undefined && current.updatedAt !== mutation.expectedUpdatedAt))
+        continue;
+      // An update to the text of another memory folds the two into one.
+      if (same !== undefined && same !== mutation.memoryId) memories.delete(mutation.memoryId);
+      else memories.set(mutation.memoryId, { text, updatedAt: null });
+    }
+    for (const mutation of others) {
+      if (mutation.type === "remember" && !mutation.memoryId)
+        memories.set(`reserved:${mutation.callId}`, { text: null, updatedAt: null });
     }
     return memories;
   }
