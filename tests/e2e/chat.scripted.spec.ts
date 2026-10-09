@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { assertHost } from "./support/app";
 import { expect, test } from "./support/fixtures";
 import { prompt } from "./support/scenario";
-import { completed, conversation, newAgent, openAgent, send, t } from "./support/ui";
+import { completed, conversation, newAgent, openAgent, resumeHost, send, t } from "./support/ui";
 
 test("chat sends, streams, follows up, stops, and sends again", async ({ app, owner }) => {
   const agent = await newAgent(app);
@@ -86,7 +86,7 @@ test("restart preserves identity and conversation", async ({ app, owner, serverI
   const before = await conversation(app, agent.id);
   expect(before.threadId).not.toBeNull();
   await owner.restart();
-  if (serverId) await assertHost(app, serverId);
+  if (serverId) await resumeHost(app, owner, serverId);
   await openAgent(app, agent.name);
   await expect(
     app.page

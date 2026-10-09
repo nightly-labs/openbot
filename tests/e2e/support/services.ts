@@ -13,7 +13,7 @@ import {
   removeDevStackRecord,
   writeDevStackRecord,
 } from "../../../scripts/dev-automation/stack-registry";
-import { findAvailablePort } from "../../../scripts/dev-services";
+import { findAvailablePort, stopOwnedProcesses } from "../../../scripts/dev-services";
 import { developmentChildEnvironment, loadDevelopmentEnvironment } from "../../../scripts/development-environment";
 import { createDevelopmentDefaults, ensureDevelopmentState } from "../../../scripts/development-secrets";
 import { withoutElectronRuntimeFlags } from "../../../scripts/electron-spawn-env";
@@ -26,24 +26,8 @@ const logger = createOpenBotLogger("e2e-services");
 
 async function stopChild(child: ChildProcess): Promise<void> {
   if (!child.pid) return;
-  const group = -child.pid;
-  const alive = () => {
-    try {
-      process.kill(group, 0);
-      return true;
-    } catch (error) {
-      if (error instanceof Error && "code" in error && error.code === "ESRCH") return false;
-      throw error;
-    }
-  };
-  if (!alive()) return;
-  process.kill(group, "SIGTERM");
-  try {
-    await expect.poll(alive, { timeout: 10_000 }).toBe(false);
-  } catch {
-    if (alive()) process.kill(group, "SIGKILL");
-    await expect.poll(alive, { timeout: 5_000 }).toBe(false);
-  }
+  await stopOwnedProcesses([child], "SIGTERM");
+  await expect.poll(() => child.exitCode !== null || child.signalCode !== null, { timeout: 5_000 }).toBe(true);
 }
 
 function start(args: string[], environment: NodeJS.ProcessEnv): ChildProcess {

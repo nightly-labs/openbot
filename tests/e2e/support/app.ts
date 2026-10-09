@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { createInterface } from "node:readline";
 import { promisify } from "node:util";
 import { createOpenBotLogger, registerSecretValue } from "@openbot/logging";
@@ -138,7 +138,11 @@ export class TestApp {
     }
     await this.page.evaluate(() => window.openbot.auth.updateName("Release test"));
     const host = await this.page.evaluate(() => window.openbot.host.getStatus());
-    if (!host.configured) await this.page.evaluate(() => window.openbot.host.configure({ serverName: "Release host" }));
+    if (!host.configured)
+      await this.page.evaluate(
+        (serverName) => window.openbot.host.configure({ serverName }),
+        `Release ${basename(this.profile)}`,
+      );
     await expect
       .poll(() => this.page.evaluate(() => window.openbot.agent.listAgents().then((agents) => agents.length)), {
         timeout: 60_000,

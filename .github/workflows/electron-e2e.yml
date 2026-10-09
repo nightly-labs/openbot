@@ -56,6 +56,10 @@ jobs:
         run: bun run build
       - name: Run local and host release workflows
         run: env -u ELECTRON_RUN_AS_NODE bun run test:e2e:release
+      - name: Install the pinned visual browser
+        run: bunx playwright install chromium
+      - name: Check core Storybook layouts
+        run: bun run test:visual
       - name: Stop any remaining test processes
         if: always()
         run: bun tests/e2e/support/cleanup.ts
@@ -64,7 +68,10 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: electron-e2e-macos
-          path: .openbot-build/e2e/report
+          path: |
+            .openbot-build/e2e/report
+            .openbot-build/visual/report
+            .openbot-build/visual/results.json
           if-no-files-found: warn
           retention-days: 14
 

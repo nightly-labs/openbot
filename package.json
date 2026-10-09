@@ -188,6 +188,7 @@
     "test:sites": "bun run --cwd apps/site-router test",
     "test:remote": "bun run --cwd remote/api test",
     "test:backend": "vitest run src/backend",
+    "test:visual": "playwright test --config tests/visual/playwright.config.ts",
     "test:e2e": "playwright test --config tests/e2e/playwright.config.ts",
     "test:e2e:live": "OPENBOT_E2E_SUITE=live playwright test --config tests/e2e/playwright.config.ts",
     "test:e2e:release": "OPENBOT_E2E_SUITE=release playwright test --config tests/e2e/playwright.config.ts",

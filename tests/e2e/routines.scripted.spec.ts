@@ -1,9 +1,8 @@
 import { randomUUID } from "node:crypto";
 import type { CreateRoutineInput } from "@openbot/contracts/ipc";
-import { assertHost } from "./support/app";
 import { expect, test } from "./support/fixtures";
 import { prompt } from "./support/scenario";
-import { completed, conversation, newAgent, openAgent, openRoutines, t } from "./support/ui";
+import { completed, conversation, newAgent, openAgent, openRoutines, resumeHost, t } from "./support/ui";
 
 test("routines creates, edits, runs, pauses, resumes, persists, and deletes", async ({ app, owner, serverId }) => {
   const agent = await newAgent(app);
@@ -59,7 +58,7 @@ test("routines creates, edits, runs, pauses, resumes, persists, and deletes", as
   await app.page.getByRole("button", { name: t("common.save"), exact: true }).click();
   await expect.poll(async () => (await routines()).find((entry) => entry.id === routine.id)?.active).toBe(false);
   await owner.restart();
-  if (serverId) await assertHost(app, serverId);
+  if (serverId) await resumeHost(app, owner, serverId);
   expect((await routines()).find((entry) => entry.id === routine.id)).toMatchObject({
     name: `${name} edited`,
     active: false,
@@ -92,7 +91,7 @@ test("schedule executes a due persisted schedule once", async ({ app, owner, ser
   };
   const routine = await app.page.evaluate((value) => window.openbot.agent.createRoutine(value), input);
   await owner.restart();
-  if (serverId) await assertHost(app, serverId);
+  if (serverId) await resumeHost(app, owner, serverId);
   await openAgent(app, agent.name);
   await completed(app, agent.id, "Scheduled result");
   const runs = await app.page.evaluate((input) => window.openbot.agent.listRoutineRuns(input), {

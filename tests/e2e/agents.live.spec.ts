@@ -2,11 +2,109 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
+import type { CreateAgentInput } from "@openbot/contracts/ipc";
 import { expect, test } from "./support/fixtures";
 import { modelFor, providers, settings } from "./support/settings";
-import { conversation, createGroup, openAgent, send, sendGroup, t } from "./support/ui";
+import { conversation, createGroup, openAgent, selectModel, send, sendGroup, t } from "./support/ui";
 
 test.use({ realProviders: true });
+
+test("live-switch preserves an agent and its files across provider changes", async ({ app, owner }, testInfo) => {
+  testInfo.annotations.push(
+    ...(["codex", "claude"] as const).map((provider) => ({
+      type: "model",
+      description: `${provider}:${modelFor(provider)}`,
+    })),
+  );
+  const marker = randomUUID();
+  const agent = await app.page.evaluate((input) => window.openbot.agent.createAgent(input), {
+    name: `Switch ${marker.slice(0, 8)}`,
+    description: "Provider switch release test",
+    initialMessage: "Reply READY without tools.",
+    provider: "codex",
+    model: modelFor("codex"),
+    reasoningEffort: "low",
+    avatarSeed: marker,
+    avatarHue: null,
+  } satisfies CreateAgentInput);
+  await expect
+    .poll(
+      async () => {
+        const snapshot = await conversation(app, agent.id);
+        return (
+          snapshot.activeTurnId === null &&
+          snapshot.messages.some((item) => item.author === "assistant" && item.text.includes("READY"))
+        );
+      },
+      { timeout: 120_000 },
+    )
+    .toBe(true);
+  await openAgent(app, agent.name);
+  const filename = `switch-${marker}.txt`;
+  const content = `Preserved ${marker}`;
+  await send(
+    app,
+    agent.name,
+    `Write ${filename} in your workspace with exact contents "${content}" and no newline. Attach it with openbot.attach_files_to_response. Reply FILE READY.`,
+  );
+  await expect
+    .poll(
+      async () =>
+        (await conversation(app, agent.id)).messages.some((item) =>
+          item.attachments?.some((file) => file.name === filename),
+        ),
+      { timeout: 120_000 },
+    )
+    .toBe(true);
+  await expect.poll(async () => (await conversation(app, agent.id)).activeTurnId).toBeNull();
+  const before = await conversation(app, agent.id);
+  expect(before.threadId).not.toBeNull();
+  const path = join(owner.profile, "workspace-home/OpenBot/Agents", agent.id, filename);
+  expect(await readFile(path, "utf8")).toBe(content);
+  for (const provider of ["claude", "codex"] as const) {
+    await selectModel(app, provider, modelFor(provider));
+    await expect
+      .poll(
+        async () =>
+          (await app.page.evaluate(() => window.openbot.agent.listAgents())).find((item) => item.id === agent.id)
+            ?.provider,
+      )
+      .toBe(provider);
+    const restored = (await app.page.evaluate(() => window.openbot.agent.listAgents())).find(
+      (item) => item.id === agent.id,
+    );
+    expect(restored).toMatchObject({ name: agent.name, workspacePath: agent.workspacePath, model: modelFor(provider) });
+    const history = await conversation(app, agent.id);
+    expect(history.threadId).toBe(before.threadId);
+    expect(history.messages.filter((item) => before.messages.some((previous) => previous.id === item.id))).toEqual(
+      before.messages,
+    );
+    await send(
+      app,
+      agent.name,
+      `Read ${filename} from your workspace. Reply with "${provider} confirmed: " followed by the exact file contents. Do not edit the file.`,
+    );
+    await expect
+      .poll(
+        async () => {
+          const snapshot = await conversation(app, agent.id);
+          return (
+            snapshot.activeTurnId === null &&
+            snapshot.messages.some(
+              (item) => item.author === "assistant" && item.text.includes(`${provider} confirmed: ${content}`),
+            )
+          );
+        },
+        { timeout: 120_000 },
+      )
+      .toBe(true);
+    expect(await readFile(path, "utf8")).toBe(content);
+    expect((await conversation(app, agent.id)).threadId).toBe(before.threadId);
+  }
+  await app.page.getByRole("button", { name: t("attachment.preview", { name: filename }), exact: true }).click();
+  await expect(app.page.getByRole("complementary", { name: t("preview.panel.label") })).toContainText(content);
+  await app.page.getByRole("button", { name: t("preview.panel.close") }).click();
+});
 
 for (const provider of providers) {
   test(`live-${provider} creates a child, delegates browser work, and generates files`, async ({

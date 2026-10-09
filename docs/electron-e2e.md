@@ -33,11 +33,11 @@ Assertions check saved messages, task owners and parent links, unique replies, e
 and HTTP form receipts. A provider's claim that it completed work is not sufficient. Live tasks
 use explicit browser targets and wait for completed output before preview interaction.
 Approval cases disable auto-approval for their test agent and check the exact provider decision;
-the fixture does not execute its example command. PDF coverage checks opening/reopening the
+the fixture performs a real workspace receipt write only after acceptance and checks that denial leaves no file. PDF coverage checks opening/reopening the
 viewer and exact downloaded bytes; it does not inspect Chromium's native PDF rendering.
 
-There are 16 scripted scenarios and four live scenarios per mode: 40 required macOS cases.
-Linux runs the 32 scripted cases. The scripted CLI implements the Codex subprocess protocol.
+There are 22 scripted scenarios and five live scenarios per mode, plus three host-only scenarios:
+57 required macOS cases. Linux runs the 47 scripted cases. The scripted CLI implements the Codex subprocess protocol.
 It scripts model decisions; the app still executes tools, stores messages, schedules routines,
 transfers files, and controls the embedded browser. Authentication and agent seed data use
 supported application APIs. Host setup creates and accepts its invitation directly through the
@@ -89,7 +89,8 @@ One workflow run owns the Mac mini at a time. Do not add a pull-request trigger 
 The workflow installs the repository's Bun and Node versions and builds the app once. Linux uses
 Xvfb and an AppArmor rule that permits Electron user namespaces. It keeps the Chromium sandbox.
 Linux uses Electron's basic password store only for the temporary synthetic account sessions;
-real-provider credentials are used only on the Mac mini. No extra Playwright browser download is needed: tests use the repository's Electron binary.
+real-provider credentials are used only on the Mac mini. Functional tests use the repository's
+Electron binary. Visual tests use the Playwright Chromium version installed by the macOS job.
 
 ## Commands and time budget
 
@@ -154,3 +155,29 @@ This command uses the existing development registry and PID identity checks. It 
 registries under this checkout's private E2E directories. If process identity cannot be confirmed,
 it fails and retains the registry and profile for inspection. Run it only after the suite stops.
 Do not use process-name kill commands. A failure must be fixed before the next release attempt.
+
+## Additional core coverage
+
+- Delegation survives a client disconnect with one routed reply. Owner restart preserves delivery
+  identity, marks uncertain work interrupted, and requires explicit recovery without replaying effects.
+- Provider switches use the UI and keep the public agent/thread, message history, workspace and files.
+- Concurrent conversations and local/host switches retain separate drafts, attachments and file effects.
+- Provider errors and a real scripted CLI crash preserve submitted input and allow a later request.
+- Uploaded content is read by the provider from the actual attachment path.
+- Removing host membership through settings blocks stale scoped message and file requests.
+- Agent creation selects a model through the UI; host recovery uses the connection retry control.
+- Restart cases use Retry after the host is ready, so the normal offline retry delay does not slow the suite.
+- Long history loads older messages and retains the reading position while another result arrives.
+
+## Visual regression checks
+
+`bun run test:visual` checks six fixed Storybook states: chat, streaming, approval, the delegation
+menu, Markdown preview, and narrow chat. It uses the installed Playwright Chromium version and
+starts or reuses only this worktree's registered Storybook instance. It stops an instance it starts.
+No live provider or external account is used. The macOS release job requires these checks.
+
+Expected screenshots are test fixtures under `src/renderer/stories/assets/visual-baselines/darwin`.
+Missing baselines fail ordinary runs. To review an intentional layout change, run
+`bun run test:visual --update-snapshots`, inspect every changed image, and commit the reviewed
+fixtures. Do not update baselines automatically in release CI. Actual images, diffs and the HTML
+report are under `.openbot-build/visual/`. Linux visual baselines are not included.

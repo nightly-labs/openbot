@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { generatedFiles, html } from "./support/files";
@@ -68,7 +69,8 @@ test("files generates, previews, downloads, and uploads files", async ({ app, ow
   await frame.getByRole("button", { name: "Count: 0" }).click();
   await expect(frame.getByRole("button", { name: "Count: 1" })).toBeVisible();
   const upload = join(app.profile, "upload.txt");
-  await writeFile(upload, "Uploaded release input 42");
+  const content = `Uploaded release input ${randomUUID()}`;
+  await writeFile(upload, content);
   await app.page.getByRole("button", { name: t("composer.add.label") }).click();
   const [chooser] = await Promise.all([
     app.page.waitForEvent("filechooser"),
@@ -78,15 +80,20 @@ test("files generates, previews, downloads, and uploads files", async ({ app, ow
   await expect(
     app.page.getByRole("button", { name: t("composer.attachment.remove", { name: "upload.txt" }) }),
   ).toBeVisible();
-  await send(app, agent.name, prompt({ reply: "Upload received" }));
-  await completed(app, agent.id, "Upload received");
+  await send(
+    app,
+    agent.name,
+    prompt({ steps: [{ kind: "read-upload", name: "upload.txt", save: "upload" }], reply: "$result:upload" }),
+  );
+  await completed(app, agent.id, content);
   const snapshot = await app.page.evaluate((id) => window.openbot.agent.readConversation(id), agent.id);
   expect(
     snapshot.messages.some((message) => message.attachments?.some((attachment) => attachment.name === "upload.txt")),
   ).toBe(true);
+  expect(
+    snapshot.messages.filter((message) => message.author === "assistant" && message.text === content),
+  ).toHaveLength(1);
   await app.page.getByRole("button", { name: t("attachment.preview", { name: "upload.txt" }), exact: true }).click();
-  await expect(app.page.getByRole("complementary", { name: t("preview.panel.label") })).toContainText(
-    "Uploaded release input 42",
-  );
+  await expect(app.page.getByRole("complementary", { name: t("preview.panel.label") })).toContainText(content);
   await app.page.getByRole("button", { name: t("preview.panel.close") }).click();
 });

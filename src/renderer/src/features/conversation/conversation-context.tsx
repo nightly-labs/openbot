@@ -259,7 +259,11 @@ const Conversation = createSimpleContext({
         const next = appendLatestRuntimeMessages(currentMessages, messages);
         for (const agentId of agentIds) {
           current[agentId] ??= { messages: [] };
-          current[agentId].messages = next[agentId] ?? [];
+          const existingIds = new Set(current[agentId].messages.map((message) => message.id));
+          // Runtime tails can arrive before the first page. New rows must accept later page updates.
+          current[agentId].messages = (next[agentId] ?? []).map((message) =>
+            existingIds.has(message.id) ? message : createStoredMessage(message),
+          );
           if (agentId !== activeAgentId()) trimToLatestPage(current[agentId]);
         }
       });

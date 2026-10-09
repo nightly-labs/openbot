@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
 import type { AgentSummary, CreateAgentInput } from "@openbot/contracts/ipc";
+import { agentProviderName } from "@openbot/contracts/ipc";
 import { translateFor } from "@openbot/i18n";
 import { expect, type Page } from "@playwright/test";
-import type { TestApp } from "./app";
+import { assertHost, type TestApp } from "./app";
 import { prompt } from "./scenario";
 import { scriptedModel } from "./settings";
 
@@ -27,6 +28,59 @@ export async function openAgent(app: TestApp, name: string) {
   const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   await app.page.getByRole("button", { name: new RegExp(`^${escaped}(?:[,.]|$)`) }).click();
   await expect(app.page.getByRole("textbox", { name: t("composer.placeholder.message", { name }) })).toBeVisible();
+}
+
+export async function upload(app: TestApp, path: string) {
+  await app.page.getByRole("button", { name: t("composer.add.label") }).click();
+  const [chooser] = await Promise.all([
+    app.page.waitForEvent("filechooser"),
+    app.page.getByRole("menuitem", { name: t("composer.add.context"), exact: true }).click(),
+  ]);
+  await chooser.setFiles(path);
+}
+
+export async function selectServer(app: TestApp, id: string) {
+  const server = (await app.page.evaluate(() => window.openbot.servers.list())).find((item) => item.id === id);
+  if (!server) throw new Error(`Missing test server ${id}.`);
+  const name = t("server.rail.buttonLabel", { name: server.name });
+  await app.page
+    .getByRole("complementary", { name: t("server.rail.label") })
+    .getByRole("button", { name, exact: true })
+    .click();
+  await expect
+    .poll(async () => (await app.page.evaluate(() => window.openbot.servers.list())).find((item) => item.active)?.id)
+    .toBe(id);
+}
+
+export async function resumeHost(app: TestApp, owner: TestApp, id: string) {
+  await expect
+    .poll(() => owner.page.evaluate(() => window.openbot.host.getStatus().then((status) => status.apiOnline)))
+    .toBe(true);
+  const server = (await app.page.evaluate(() => window.openbot.servers.list())).find((entry) => entry.id === id);
+  if (server?.state !== "online") {
+    const retry = app.page.getByRole("button", { name: t("server.connection.retry"), exact: true });
+    await retry.focus();
+    await expect(retry).toBeFocused();
+    await retry.press("Enter");
+  }
+  await assertHost(app, id);
+}
+
+export async function selectModel(app: TestApp, provider: "codex" | "claude", modelId: string, setup = false) {
+  const model = (await app.page.evaluate(() => window.openbot.agent.listModels())).find(
+    (item) => item.provider === provider && item.id === modelId,
+  );
+  if (!model) throw new Error(`Missing test model ${modelId}.`);
+  const label = t(setup ? "agent.setup.model" : "provider.picker.agentModel");
+  await app.page.getByRole("button", { name: new RegExp(`^${label}:`) }).click();
+  const providerName = agentProviderName(provider);
+  await app.page.getByRole("tab", { name: new RegExp(`^${providerName}:`) }).click();
+  await app.page
+    .getByRole("listbox", { name: t("provider.picker.models", { name: providerName }) })
+    .getByRole("option", { name: new RegExp(model.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")) })
+    .click();
+  if (await app.page.getByRole("listbox", { name: t("provider.picker.models", { name: providerName }) }).isVisible())
+    await app.page.getByRole("button", { name: new RegExp(`^${label}:`) }).click();
 }
 
 export async function send(app: TestApp, name: string, text: string) {

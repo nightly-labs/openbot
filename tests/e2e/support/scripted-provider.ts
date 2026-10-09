@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 // A real provider subprocess. Only model decisions are scripted; OpenBot owns every tool effect.
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { watch } from "node:fs/promises";
 import { basename, join, resolve, sep } from "node:path";
 import { createInterface } from "node:readline";
@@ -75,7 +75,7 @@ function toolValue(value: Json, name: string): Json {
     return text;
   }
 }
-async function run(threadId: string, turnId: string, text: string) {
+async function run(threadId: string, turnId: string, text: string, uploads: { name: string; path: string }[]) {
   const current = thread(threadId);
   const base = { threadId, turnId };
   const itemId = randomUUID();
@@ -131,7 +131,12 @@ async function run(threadId: string, turnId: string, text: string) {
       } else if (step.kind === "write") {
         const path = resolve(current.cwd, step.name);
         if (!path.startsWith(`${resolve(current.cwd)}${sep}`)) throw new Error("Fixture file leaves the workspace.");
-        writeFileSync(path, Buffer.from(step.base64, "base64"));
+        if (step.append) appendFileSync(path, Buffer.from(step.base64, "base64"));
+        else writeFileSync(path, Buffer.from(step.base64, "base64"));
+      } else if (step.kind === "read-upload") {
+        const upload = uploads.find((item) => item.name === step.name);
+        if (!upload) throw new Error(`The provider did not receive attachment ${step.name}.`);
+        saved.set(step.save, readFileSync(upload.path, "utf8"));
       } else if (step.kind === "hold") {
         const path = join(stateRoot, basename(step.key));
         const abort = new AbortController();
@@ -150,11 +155,16 @@ async function run(threadId: string, turnId: string, text: string) {
         const value = await call("item/commandExecution/requestApproval", {
           ...base,
           itemId: randomUUID(),
-          command: "printf release-test",
+          command: step.receipt ? `Write the test receipt ${step.receipt}` : "printf release-test",
           cwd: current.cwd,
           reason: "Run the release test command.",
         });
         saved.set("decision", value);
+        const decision = z.object({ decision: z.string() }).parse(value);
+        if (step.receipt && decision.decision === "accept") {
+          // The fixture is the CLI executor. This real file effect happens only after the app's decision.
+          appendFileSync(join(current.cwd, basename(step.receipt)), "approved\n");
+        }
       } else if (step.kind === "question") {
         saved.set(
           "answer",
@@ -175,9 +185,10 @@ async function run(threadId: string, turnId: string, text: string) {
           }),
         );
       } else if (step.kind === "fail") throw new Error(step.message);
+      else if (step.kind === "crash") process.exit(73);
     }
     if (interrupted.has(turnId)) return;
-    const reply = `${scenario.reply}${saved.has("decision") ? ` ${JSON.stringify(saved.get("decision"))}` : ""}${saved.has("answer") ? ` ${JSON.stringify(saved.get("answer"))}` : ""}`;
+    const reply = `${resolveArgs(scenario.reply, saved)}${saved.has("decision") ? ` ${JSON.stringify(saved.get("decision"))}` : ""}${saved.has("answer") ? ` ${JSON.stringify(saved.get("answer"))}` : ""}`;
     // Replies use the exact routing instructions supplied by the application.
     const recipient = /Use recipientAgentIds \["([^"]+)"\], replyToMessageId "([^"]+)"/u.exec(text);
     if (recipient?.[1] && recipient[2]) {
@@ -302,8 +313,20 @@ async function handle(raw: string) {
       save(threadId);
       send({ id: message.id, result: { turn } });
       send({ method: "turn/started", params: { threadId, turn } });
-      const input = z.array(z.object({ text: z.string().optional() })).parse(p.input);
-      await run(threadId, id, input.map((item) => item.text ?? "").join("\n"));
+      const input = z
+        .array(
+          z.object({
+            type: z.string(),
+            text: z.string().optional(),
+            name: z.string().optional(),
+            path: z.string().optional(),
+          }),
+        )
+        .parse(p.input);
+      const uploads = input.flatMap((item) =>
+        item.type === "mention" && item.name && item.path ? [{ name: item.name, path: item.path }] : [],
+      );
+      await run(threadId, id, input.map((item) => item.text ?? "").join("\n"), uploads);
       return;
     }
     case "turn/interrupt": {

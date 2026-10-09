@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { expect, test } from "./support/fixtures";
 import { prompt, type Scenario } from "./support/scenario";
 import { settings } from "./support/settings";
@@ -93,13 +95,16 @@ for (const accepted of [true, false]) {
       agent.id,
     );
     await openAgent(app, agent.name);
-    await send(app, agent.name, prompt({ steps: [{ kind: "approval" }], reply: "Approval result" }));
+    const receipt = `approval-${randomUUID()}.txt`;
+    const path = join(owner.profile, "workspace-home/OpenBot/Agents", agent.id, receipt);
+    await send(app, agent.name, prompt({ steps: [{ kind: "approval", receipt }], reply: "Approval result" }));
     const allow = app.page.getByRole("button", { name: t("prompt.approval.allow"), exact: true });
     const deny = app.page.getByRole("button", { name: t("prompt.approval.deny"), exact: true });
     await expect(allow).toBeVisible();
     await expect(deny).toBeVisible();
     const pending = await conversation(app, agent.id);
     expect(pending.activeTurnId).not.toBeNull();
+    await expect(readFile(path)).rejects.toMatchObject({ code: "ENOENT" });
     expect(pending.messages.some((message) => message.text.startsWith("Approval result"))).toBe(false);
     await (accepted ? allow : deny).click();
     await completed(app, agent.id, "Approval result");
@@ -112,6 +117,8 @@ for (const accepted of [true, false]) {
     ]);
     await expect(allow).not.toBeVisible();
     await expect(deny).not.toBeVisible();
+    if (accepted) expect(await readFile(path, "utf8")).toBe("approved\n");
+    else await expect(readFile(path)).rejects.toMatchObject({ code: "ENOENT" });
   });
 }
 

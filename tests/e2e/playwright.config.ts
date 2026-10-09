@@ -17,5 +17,5 @@ export default defineConfig({
   // Service startup is measured separately by globalSetup.
   globalTimeout: 900_000,
   reporter: [["./support/reporter.ts"]],
-  projects: [{ name: "local" }, { name: "host" }],
+  projects: [{ name: "local", testIgnore: "**/*.host.scripted.spec.ts" }, { name: "host" }],
 });

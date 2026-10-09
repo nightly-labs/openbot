@@ -339,6 +339,7 @@ See [web client delivery](docs/web-client.md) for the release gate and focused c
 | `bun run test:e2e` | Run scripted Electron UI tests in local and host modes against the current build. See [runner setup and coverage](docs/electron-e2e.md). |
 | `bun run test:e2e:live` | Run required Codex, Claude, and OpenCode UI workflows with dedicated provider accounts. |
 | `bun run test:e2e:release` | Run the complete Electron release gate with required coverage and a ten-minute test budget. |
+| `bun run test:visual` | Compare six core Storybook screens with reviewed macOS visual baselines. |
 | `bun run test:codex` | Probe the real CLI handshake and account without starting a paid turn. |
 | `bun run test:durations` | Re-record how long each desktop test file takes. CI splits its shards by this table, so run it when the two shards stop finishing together. |
 | `bun run cua-driver:doctor` | Print, as JSON, which `cua-driver` binary OpenBot would use for Computer Use, and the driver's own `doctor` report. Read-only, and it starts no daemon. `OPENBOT_CUA_DRIVER_PATH` selects a different binary in a checkout; an installed application runs only the driver it was released with. |

@@ -15,12 +15,19 @@ export const scriptedCases = [
   "approval-decline",
   "question",
   "reconnect",
+  "delegation-reconnect",
+  "delegation-restart",
+  "provider-failure",
+  "ui-create",
+  "conversation-isolation",
+  "history",
 ] as const;
-export const liveCases = ["live-codex", "live-claude", "live-opencode", "live-group"] as const;
+export const hostCases = ["host-isolation", "host-reconnect", "host-revoke"] as const;
+export const liveCases = ["live-codex", "live-claude", "live-opencode", "live-group", "live-switch"] as const;
 
 export function releaseCoverage(results: readonly { id: string; mode: string; status: string }[], elapsedMs: number) {
   const missing = ["local", "host"].flatMap((mode) =>
-    [...scriptedCases, ...liveCases]
+    [...scriptedCases, ...liveCases, ...(mode === "host" ? hostCases : [])]
       .filter((id) => !results.some((entry) => entry.mode === mode && entry.id === id && entry.status === "passed"))
       .map((id) => `${mode}/${id}`),
   );

@@ -11,7 +11,7 @@ import {
   waitFor,
 } from "../src/backend/agent-service-test-harness";
 import { runCauseEffect } from "../src/backend/effect-boundary";
-import { liveCases, releaseCoverage, scriptedCases } from "../tests/e2e/support/coverage";
+import { hostCases, liveCases, releaseCoverage, scriptedCases } from "../tests/e2e/support/coverage";
 import { prompt } from "../tests/e2e/support/scenario";
 
 let fixtureRoot = "";
@@ -200,7 +200,11 @@ it("completes group delegation after the parent task resumes", async () => {
 
 it("rejects missing, skipped, failed, and slow release coverage", () => {
   const complete = ["local", "host"].flatMap((mode) =>
-    [...scriptedCases, ...liveCases].map((id) => ({ mode, id, status: "passed" })),
+    [...scriptedCases, ...liveCases, ...(mode === "host" ? hostCases : [])].map((id) => ({
+      mode,
+      id,
+      status: "passed",
+    })),
   );
   expect(releaseCoverage(complete, 600_000).passed).toBe(true);
   expect(releaseCoverage(complete.slice(1), 1).passed).toBe(false);
