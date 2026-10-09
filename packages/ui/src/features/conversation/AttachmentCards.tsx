@@ -1,6 +1,6 @@
 import { attachmentMimeTypeForName, playableMediaKind } from "@openbot/contracts/attachment-files";
 import { type AttachmentSummary, canPreviewAttachment } from "@openbot/contracts/ipc";
-import { AudioLines, Button, Download, Film } from "@openbot/ui";
+import { AudioLines, Button, Download, ExternalLink, Film } from "@openbot/ui";
 import { createSignal, createUniqueId, For, Show } from "solid-js";
 import { useText } from "../../text";
 import { AnchoredTooltip } from "./AnchoredTooltip";
@@ -119,7 +119,7 @@ export function AttachmentCards(props: {
                     props.onAction(attachment, "open");
                   }}
                 >
-                  <AttachmentOpenIcon />
+                  <ExternalLink />
                 </Button>
               </Show>
               <Show when={attachment.previewUrl && !isMissing(attachment)}>
@@ -153,15 +153,6 @@ function AttachmentFileIcon() {
     <svg aria-hidden="true" viewBox="0 0 20 20">
       <path d="M5.5 2.75h5.75l3.25 3.5v11H5.5z" />
       <path d="M11.25 2.75v3.5h3.25M7.75 10h4.5M7.75 13h4.5" />
-    </svg>
-  );
-}
-
-function AttachmentOpenIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 20 20">
-      <path d="M8.25 5.25H5.5v9.25h9.25v-2.75" />
-      <path d="M10.25 5.25h4.5v4.5M14.5 5.5l-6 6" />
     </svg>
   );
 }
