@@ -68,7 +68,7 @@ const initialRuntimeStatuses = (): Record<ManagedProviderId, ProviderRuntimeStat
 /** ChatGPT, Claude and Grok downloaded and waiting to connect; OpenCode still to download. */
 const downloadedAgentStatus: AgentStatus = {
   ...lazyProviderAgentStatus,
-  providers: lazyProviderAgentStatus.providers?.map((provider) =>
+  providers: lazyProviders.map((provider) =>
     provider.id === "opencode" || provider.id === "antigravity" || provider.id === "cursor" || provider.id === "cline"
       ? provider
       : { ...provider, state: "sign-in-required" },
@@ -132,10 +132,10 @@ type FakeProviderArgs = Pick<
  */
 export function FakeProviderDownloads(props: {
   render: (fake: FakeProviderArgs) => JSX.Element;
-  failGrokOnce?: boolean;
-  downloaded?: boolean;
-  initialAgentStatus?: AgentStatus;
-  tickMs?: number;
+  failGrokOnce?: boolean | undefined;
+  downloaded?: boolean | undefined;
+  initialAgentStatus?: AgentStatus | undefined;
+  tickMs?: number | undefined;
 }) {
   // The story chooses the start state once; later changes come from the fake actions below.
   const [agentStatus, setAgentStatus] = createSignal(
@@ -171,15 +171,15 @@ export function FakeProviderDownloads(props: {
     setRuntimeStatuses((current) => ({ ...current, [provider]: { ...current[provider], ...status } }));
   }
 
-  function updateProvider(
-    provider: AgentProviderId,
-    update: Partial<NonNullable<AgentStatus["providers"]>[number]>,
-  ): void {
+  /** Sets `update` on one provider. A connection state that `update` does not set is removed. */
+  function updateProvider(provider: AgentProviderId, update: Partial<AgentProviderStatus>): void {
     setAgentStatus((current) => ({
       ...current,
-      providers: current.providers?.map((candidate) =>
-        candidate.id === provider ? { ...candidate, ...update } : candidate,
-      ),
+      providers: (current.providers ?? []).map((candidate) => {
+        if (candidate.id !== provider) return candidate;
+        const { connectionState: _connectionState, ...rest } = candidate;
+        return { ...rest, ...update };
+      }),
     }));
   }
 
@@ -197,7 +197,7 @@ export function FakeProviderDownloads(props: {
 
   function downloadProvider(provider: AgentProviderId): void {
     clearProviderTimers(provider);
-    updateProvider(provider, { state: "not-installed", connectionState: undefined, message: null });
+    updateProvider(provider, { state: "not-installed", message: null });
     updateRuntime(provider, { phase: "downloading", progress: 0 });
     let progress = 0;
     const interval = window.setInterval(() => {
@@ -253,7 +253,7 @@ export function FakeProviderDownloads(props: {
       provider,
       window.setTimeout(() => {
         providerTimers.delete(provider);
-        updateProvider(provider, { state: "available", connectionState: undefined, message: null });
+        updateProvider(provider, { state: "available", message: null });
       }, 1_200),
     );
   }

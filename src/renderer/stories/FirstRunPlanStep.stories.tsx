@@ -28,7 +28,7 @@ const openCodeInstalledAgentStatus: AgentStatus = {
 const checkingProvidersAgentStatus: AgentStatus = {
   ...noProvidersConnectedAgentStatus,
   phase: "starting",
-  providers: noProvidersConnectedAgentStatus.providers?.map((provider) => ({
+  providers: (noProvidersConnectedAgentStatus.providers ?? []).map((provider) => ({
     ...provider,
     state: "checking",
     message: null,
@@ -38,7 +38,7 @@ const checkingProvidersAgentStatus: AgentStatus = {
 
 const bothConnectingAgentStatus: AgentStatus = {
   ...noProvidersConnectedAgentStatus,
-  providers: noProvidersConnectedAgentStatus.providers?.map((provider) => ({
+  providers: (noProvidersConnectedAgentStatus.providers ?? []).map((provider) => ({
     ...provider,
     connectionState: "connecting" as const,
     message: null,

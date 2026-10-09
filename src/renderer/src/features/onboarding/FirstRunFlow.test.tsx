@@ -291,10 +291,9 @@ describe("FirstRunFlow", () => {
     window.openbot = activeMock.api;
     const initialAgentStatus: AgentStatus = {
       ...STORY_AGENT_STATUS,
-      providers: STORY_AGENT_STATUS.providers?.map((provider) => ({
+      providers: (STORY_AGENT_STATUS.providers ?? []).map(({ connectionState: _connectionState, ...provider }) => ({
         ...provider,
         state: "not-installed",
-        connectionState: undefined,
         message: null,
       })),
     };
@@ -324,9 +323,11 @@ describe("FirstRunFlow", () => {
     const onConnectProvider = vi.fn((provider: AgentProviderId) => {
       setAgentStatus((current) => ({
         ...current,
-        providers: current.providers?.map((candidate) =>
-          candidate.id === provider ? { ...candidate, state: "available", connectionState: undefined } : candidate,
-        ),
+        providers: (current.providers ?? []).map((candidate) => {
+          if (candidate.id !== provider) return candidate;
+          const { connectionState: _connectionState, ...rest } = candidate;
+          return { ...rest, state: "available" as const };
+        }),
       }));
     });
     const view = render(() => (
@@ -515,7 +516,7 @@ describe("FirstRunFlow", () => {
     }));
     setAgentStatus((current) => ({
       ...current,
-      providers: current.providers?.map((provider) =>
+      providers: (current.providers ?? []).map((provider) =>
         provider.id === "opencode" ? { ...provider, state: "sign-in-required" as const, version: "1.18.27" } : provider,
       ),
     }));

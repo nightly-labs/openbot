@@ -4,8 +4,8 @@
   (ChatGPT, Claude or Grok). "Start free" needs no subscription and no sign-in: your agents use the
   free models of OpenCode, which starts to download when first run opens. Before, you had to find
   OpenCode at the end of the provider list.
-- First run has fewer steps. On macOS, the only other step asks for the Computer Use permissions.
-  The sound and example-job steps are gone. You can still choose sounds in Settings.
+- First run has fewer steps. With "Start free", the only other step on macOS asks for the Computer Use
+  permissions. The sound and example-job steps are gone. You can still choose sounds in Settings.
 - First run changes steps calmly: the old step blurs and fades out, and the next one comes into
   focus. When setup is done, the setup screen blurs away into the app. With reduced motion, the steps
   change at once.
