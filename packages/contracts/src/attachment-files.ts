@@ -185,9 +185,6 @@ export function attachmentMimeTypeForName(name: string) {
     case "md":
     case "markdown":
       return "text/markdown";
-    case "htm":
-    case "html":
-      return "text/html";
     case "json":
     case "jsonl":
     case "ipynb":

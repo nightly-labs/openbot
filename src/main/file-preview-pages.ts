@@ -9,16 +9,27 @@ const FILE_PREVIEW_PAGE_CAPACITY = 8;
  * HTML bytes that the app has already read through an authorized file preview. An opaque address
  * lets the existing visual-page protocol serve them without accepting a filesystem path from a
  * frame. Nothing is written to disk. The server-owned preview state releases its page when
- * replaced, closed or disposed.
- * At most eight pages (64 MB) can be held; an accepted page stays available until its release.
+ * replaced, closed or disposed. Main clears all pages when the renderer is replaced or lost.
+ * At most eight pages (64 MB) can be held; an accepted page stays available until release or clear.
  */
 export class FilePreviewPages {
   readonly #pages = new Map<string, Uint8Array>();
+  #generation = 0;
 
   constructor(private readonly capacity = FILE_PREVIEW_PAGE_CAPACITY) {}
 
-  add(mimeType: string, bytes: Uint8Array): string | undefined {
+  get generation(): number {
+    return this.#generation;
+  }
+
+  clear(): void {
+    this.#generation += 1;
+    this.#pages.clear();
+  }
+
+  add(mimeType: string, bytes: Uint8Array, generation: number): string | undefined {
     if (
+      generation !== this.#generation ||
       !isChatVisualMimeType(mimeType) ||
       bytes.byteLength > CHAT_VISUAL_PAGE_LIMIT ||
       this.#pages.size >= this.capacity

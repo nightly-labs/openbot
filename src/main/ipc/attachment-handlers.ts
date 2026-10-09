@@ -241,8 +241,9 @@ export function attachmentIpcHandlers({
       }),
       previewSharedFile: scopedHandler(parseOpenSharedFile, {
         local: async (parsed) => {
+          const generation = filePreviewPages.generation;
           const sharedFile = await runCauseEffect(service.resolveSharedFile(parsed.path));
-          return runCauseEffect(localFilePreview(sharedFile.path, sharedFile.name, sharedFile.size));
+          return runCauseEffect(localFilePreview(sharedFile.path, sharedFile.name, sharedFile.size, generation));
         },
         remote: async (parsed, serverId) => {
           const downloaded = await runCauseEffect(remoteServers.downloadSharedFile(parsed.path, serverId));
@@ -251,8 +252,11 @@ export function attachmentIpcHandlers({
       }),
       previewWorkspaceFile: scopedHandler(parseOpenWorkspaceFile, {
         local: async (parsed) => {
+          const generation = filePreviewPages.generation;
           const workspaceFile = await runCauseEffect(service.resolveLocalWorkspaceFile(parsed.agentId, parsed.path));
-          return runCauseEffect(localFilePreview(workspaceFile.path, workspaceFile.name, workspaceFile.size));
+          return runCauseEffect(
+            localFilePreview(workspaceFile.path, workspaceFile.name, workspaceFile.size, generation),
+          );
         },
         remote: async (parsed, serverId) => {
           const downloaded = await runCauseEffect(

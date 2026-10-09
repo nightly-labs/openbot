@@ -82,6 +82,8 @@ export interface MainWindowContext {
   forwardAgentEvent: (serverId: string, event: AgentEvent) => void;
   /** The renderer is about to be replaced, so a queued invitation has nobody to receive it. */
   onRendererLoadStarted: () => void;
+  /** Main must release resources when a renderer can no longer run its own cleanup. */
+  onRendererGone: () => void;
   /** Where the entry point attaches the Windows session-end handlers, which read its own flags. */
   onMainWindowCreated: (window: BrowserWindow) => void;
   reportError: (message: string, error: unknown) => void;
@@ -108,6 +110,7 @@ export function createMainWindowController({
   getTranslate,
   forwardAgentEvent,
   onRendererLoadStarted,
+  onRendererGone,
   onMainWindowCreated,
   reportError,
 }: MainWindowContext): MainWindowController {
@@ -185,6 +188,11 @@ export function createMainWindowController({
     window.on("resize", () => rememberMainWindowBounds(window.getNormalBounds()));
 
     window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+    window.webContents.on("did-start-navigation", (details) => {
+      if (details.isMainFrame && !details.isSameDocument) onRendererLoadStarted();
+    });
+    window.webContents.on("render-process-gone", onRendererGone);
+    window.webContents.once("destroyed", onRendererGone);
     window.webContents.on("before-input-event", (event, input) => {
       if (input.key.toLowerCase() === "shift") {
         inspectElementModifierPressed = input.type === "keyDown";
@@ -287,7 +295,6 @@ export function createMainWindowController({
   }
 
   function loadRenderer(window: BrowserWindow): Promise<void> {
-    onRendererLoadStarted();
     const developmentUrl = process.env.ELECTRON_RENDERER_URL;
     return developmentUrl ? window.loadURL(developmentUrl) : window.loadURL("openbot-app://app/index.html");
   }

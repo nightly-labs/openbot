@@ -185,7 +185,7 @@ export const XLSX_PREVIEW: FilePreview = {
   bytes: buildXlsx(),
 };
 
-export const HTML_PREVIEW = filePreview("weekly-signups.html", "text/html", "text", INLINE_SVG_CHART);
+const HTML_PREVIEW = filePreview("weekly-signups.html", "text/html", "text", INLINE_SVG_CHART);
 
 /** A kind that the panel cannot show. The user opens the file externally. */
 export const UNSUPPORTED_PREVIEW: FilePreview = {

@@ -255,10 +255,13 @@ the same frame. On desktop, a shared or workspace HTML file preview gives the cl
 that already passed the existing file-access checks, in a bounded in-memory registry. The page
 protocol accepts only an opaque token, never a file path, and uses the same sandbox response as
 HTML attachments. The server-owned preview state releases its page on replacement, close or
-disposal; stale preview responses release their unused pages. Accepted
-addresses remain valid until release, including when the user switches to source and back. At
+disposal; stale preview responses release their unused pages. Main clears the registry when the
+main document reloads, the renderer exits, or its web contents are destroyed. A generation captured
+before file resolution prevents old requests from registering pages after a clear. Accepted
+addresses remain valid until release or clear, including when the user switches to source and back. At
 most eight pages can be held. A full registry or a page above the existing 8 MB limit falls back
-to source. Downloaded remote files keep their existing preview path and are not registered here.
+to source. Only local file previews use this HTML MIME override; attachment imports keep their
+existing MIME types. Downloaded remote files keep their existing preview path and are not registered here.
 `FilePreview` is local IPC data; this optional field does not cross the Team API or change its frozen adapters.
 
 Codex fixes dynamic tools at provider-session creation; resume does not update them. A local

@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
+import { attachmentFileExtension, attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
 import { ATTACHMENT_LIMITS } from "@openbot/contracts/input-limits";
 import { type FilePreview, filePreviewKindForFile } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
@@ -18,13 +18,19 @@ export function filePreviewFromBytes(name: string, bytes: Uint8Array): FilePrevi
   return { name, size: bytes.byteLength, mimeType, previewKind: kind, bytes: kind === "none" ? null : bytes };
 }
 
-export const localFilePreview = Effect.fn("FilePreview.local")(function* (path: string, name: string, size: number) {
+export const localFilePreview = Effect.fn("FilePreview.local")(function* (
+  path: string,
+  name: string,
+  size: number,
+  generation: number,
+) {
   if (size > ATTACHMENT_LIMITS.fileBytes)
     return yield* Effect.fail(attachmentFailure(new Error(sourceText("error.attachment.previewTooLarge"))));
-  const mimeType = mimeTypeForName(name);
+  const extension = attachmentFileExtension(name);
+  const mimeType = extension === "html" || extension === "htm" ? "text/html" : mimeTypeForName(name);
   const kind = filePreviewKindForFile(name, mimeType);
   const bytes = kind === "none" ? null : new Uint8Array(yield* attachmentCall(() => readFile(path)));
-  const pageUrl = bytes ? filePreviewPages.add(mimeType, bytes) : undefined;
+  const pageUrl = bytes ? filePreviewPages.add(mimeType, bytes, generation) : undefined;
   return {
     name,
     size,

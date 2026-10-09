@@ -37,6 +37,7 @@ import {
   readDevelopmentRemoteDebuggingPort,
   shouldAutoStartHost,
 } from "./development-profile";
+import { filePreviewPages } from "./file-preview-pages";
 import { hostAllowsTenantLaunch } from "./host-update-coordinator";
 import { takeHostedServerEnvironment } from "./hosted-server-bootstrap";
 import { takeHostingDeveloperKey } from "./hosted-server-service";
@@ -323,6 +324,11 @@ const windows = createMainWindowController({
   forwardAgentEvent,
   onRendererLoadStarted: () => {
     deepLinkReceiverReady = false;
+    filePreviewPages.clear();
+  },
+  onRendererGone: () => {
+    deepLinkReceiverReady = false;
+    filePreviewPages.clear();
   },
   onMainWindowCreated: (window) => {
     attachWindowsSessionEndHandlers(window);

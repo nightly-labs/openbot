@@ -58,8 +58,8 @@ describe("attachment file whitelist", () => {
 
   it("assigns stable MIME types to supported formats", () => {
     expect(attachmentMimeTypeForName("README.md")).toBe("text/markdown");
-    expect(attachmentMimeTypeForName("report.html")).toBe("text/html");
-    expect(attachmentMimeTypeForName("REPORT.HTM")).toBe("text/html");
+    expect(attachmentMimeTypeForName("report.html")).toBe("text/plain");
+    expect(attachmentMimeTypeForName("REPORT.HTM")).toBe("text/plain");
     expect(attachmentMimeTypeForName("report.pdf")).toBe("application/pdf");
     expect(attachmentMimeTypeForName("report.docx")).toBe(
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
