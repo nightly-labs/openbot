@@ -2,6 +2,7 @@
 // fail the command; filters must not weaken the release gate; Electron flags must not leak.
 import { spawnSync } from "node:child_process";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { requiredVisualCases, visualCoverage } from "../tests/visual/reporter";
 import { runReleaseChecks } from "./electron-e2e-release";
 
 vi.mock("node:child_process", () => ({ spawnSync: vi.fn() }));
@@ -48,4 +49,17 @@ it("fails when a child cannot start", () => {
 it("rejects filters and baseline updates before building", () => {
   for (const option of ["--grep=chat", "--update-snapshots", "--list"]) expect(runReleaseChecks([option])).toBe(1);
   expect(spawn).not.toHaveBeenCalled();
+});
+
+it("requires every visual case even when the remaining cases pass", () => {
+  const complete = requiredVisualCases.map((id) => ({ id, status: "passed" }));
+  expect(visualCoverage(complete).passed).toBe(true);
+  for (const id of requiredVisualCases) {
+    const coverage = visualCoverage(complete.filter((entry) => entry.id !== id));
+    expect(coverage).toEqual({ passed: false, missing: [id] });
+  }
+  for (const status of ["skipped", "failed", "timedOut", "interrupted"])
+    expect(visualCoverage(complete.map((entry, index) => (index === 0 ? { ...entry, status } : entry))).passed).toBe(
+      false,
+    );
 });

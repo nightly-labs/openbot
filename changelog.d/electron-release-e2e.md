@@ -14,3 +14,4 @@
 - Stop repeated agent settings requests while a host is offline, so reconnect can recover.
 - Block release when required Linux UI cases are missing or skipped.
 - Build the current app and include visual comparisons in the single release test command, with a final result and failure status.
+- Require all six visual cases to pass; missing or skipped cases block the release command.

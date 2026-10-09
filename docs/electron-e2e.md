@@ -98,6 +98,8 @@ The complete release command builds the current code, installs the pinned Chromi
 runs all required Electron cases, then runs all six visual comparisons. It stops at the first
 failed step and prints a final result. It removes inherited Electron runtime flags automatically.
 It does not accept test filters or baseline-update options.
+Release runs also require each of the six named visual cases to pass. A missing or skipped case
+fails the command; `.openbot-build/visual/coverage.json` records the required-case result.
 
 ```sh
 bun run test:e2e:release > run-logs.txt 2>&1

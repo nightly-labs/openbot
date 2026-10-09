@@ -66,6 +66,7 @@ jobs:
             .openbot-build/e2e/report
             .openbot-build/visual/report
             .openbot-build/visual/results.json
+            .openbot-build/visual/coverage.json
           if-no-files-found: warn
           retention-days: 14
 

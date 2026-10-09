@@ -12,6 +12,7 @@ export default defineConfig({
   updateSnapshots: "none",
   timeout: 90_000,
   reporter: [
+    ["./reporter.ts"],
     ["list"],
     ["html", { outputFolder: "../../.openbot-build/visual/report", open: "never" }],
     ["json", { outputFile: "../../.openbot-build/visual/results.json" }],
