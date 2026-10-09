@@ -6,7 +6,6 @@ import { promisify } from "node:util";
 import {
   type AgentProviderId,
   COMPUTER_USE_MCP_SERVER_ID,
-  COMPUTER_USE_MCP_SERVER_NAME,
   isReservedMcpServerName,
   type McpServerConfig,
 } from "@openbot/contracts/ipc";
@@ -555,7 +554,7 @@ export const codexDisabledServers = Effect.fn("McpShape.codexDisabledServers")(f
   const configured = getRecord(getRecord(config, "config"), "mcp_servers");
   return Object.fromEntries(
     Object.keys(configured ?? {}).map((name) => {
-      const tools = name === COMPUTER_USE_MCP_SERVER_NAME ? getRecord(getRecord(configured, name), "tools") : null;
+      const tools = getRecord(getRecord(configured, name), "tools");
       return [name, { enabled: false, ...(tools ? { tools } : {}) } satisfies CodexDisabledMcpServer];
     }),
   );
@@ -568,7 +567,7 @@ export interface CodexDisabledMcpServer {
 }
 
 /** A server name in the form Codex accepts. Claude makes the same change by itself. */
-function codexMcpServerName(name: string): string {
+export function codexMcpServerName(name: string): string {
   return name.replace(/[^A-Za-z0-9_-]/gu, "_");
 }
 

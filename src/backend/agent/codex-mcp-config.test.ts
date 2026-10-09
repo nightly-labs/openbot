@@ -39,27 +39,31 @@ function configResponse(
   };
 }
 
-describe("Codex Computer Use registration", () => {
+describe("Codex MCP registration", () => {
   it("registers a disabled Windows server without credentials and reads the saved config", async () => {
-    const saved = configResponse({ computer_use: { command: server.command, enabled: false } });
+    const saved = configResponse({ computer_use: { command: "openbot-mcp", enabled: false } });
     const client = new FakeAgentClient("codex", "DONE", true, true, {}, async (method) => {
-      if (method === "config/value/write") client.configRead = saved;
+      if (method === "config/batchWrite") client.configRead = saved;
     });
     client.configRead = configResponse();
     expect(
       await Promise.all([
-        runCauseEffect(readCodexMcpConfig(client, server)),
-        runCauseEffect(readCodexMcpConfig(client, server)),
+        runCauseEffect(readCodexMcpConfig(client, [server])),
+        runCauseEffect(readCodexMcpConfig(client, [server])),
       ]),
     ).toEqual([saved, saved]);
     expect(client.requests).toEqual([
       { method: "config/read", params: { includeLayers: true } },
       {
-        method: "config/value/write",
+        method: "config/batchWrite",
         params: {
-          keyPath: "mcp_servers.computer_use",
-          value: { command: server.command, enabled: false },
-          mergeStrategy: "replace",
+          edits: [
+            {
+              keyPath: "mcp_servers.computer_use",
+              value: { command: "openbot-mcp", enabled: false },
+              mergeStrategy: "replace",
+            },
+          ],
           filePath: "C:\\Users\\Test\\.codex\\config.toml",
           expectedVersion: "config-version",
         },
@@ -80,7 +84,7 @@ describe("Codex Computer Use registration", () => {
     for (const client of [new FakeAgentClient("codex"), new FakeAgentClient("codex")]) {
       client.configRead = saved;
       const disabled = await runCauseEffect(
-        codexDisabledServers(() => readCodexMcpConfig(client, server).pipe(toMcpShapeFailed)),
+        codexDisabledServers(() => readCodexMcpConfig(client, [server]).pipe(toMcpShapeFailed)),
       );
       expect(disabled.computer_use).toEqual({
         enabled: false,
@@ -94,26 +98,107 @@ describe("Codex Computer Use registration", () => {
     }
   });
 
-  it("does not register a server when Computer Use is off or unavailable", async () => {
+  it("registers custom HTTP and stdio servers without URLs, arguments, or secrets", async () => {
     const client = new FakeAgentClient("codex");
     client.configRead = configResponse();
-    await runCauseEffect(readCodexMcpConfig(client, undefined));
+    const configs: McpServerConfig[] = [
+      {
+        ...server,
+        id: "http",
+        name: "T3 MCP",
+        transport: "http",
+        url: "https://example.com/mcp?secret=private-url",
+        headers: [{ key: "Authorization", value: "private-header" }],
+      },
+      { ...server, id: "stdio", name: "Local MCP", args: ["private-argument"] },
+      { ...server, id: "duplicate", name: "T3_MCP" },
+      { ...server, id: "disabled", name: "Disabled", enabled: false },
+    ];
+    const response = await runCauseEffect(readCodexMcpConfig(client, configs));
+    expect(response).toMatchObject({
+      config: {
+        mcp_servers: {
+          T3_MCP: { url: "http://127.0.0.1:1", enabled: false },
+          Local_MCP: { command: "openbot-mcp", enabled: false },
+        },
+      },
+    });
+    expect(client.requests.filter((request) => request.method === "config/batchWrite")).toEqual([
+      {
+        method: "config/batchWrite",
+        params: {
+          edits: ["T3_MCP", "Local_MCP"].map((name) => ({
+            keyPath: `mcp_servers.${name}`,
+            value:
+              name === "T3_MCP"
+                ? { url: "http://127.0.0.1:1", enabled: false }
+                : { command: "openbot-mcp", enabled: false },
+            mergeStrategy: "replace",
+          })),
+          filePath: "C:\\Users\\Test\\.codex\\config.toml",
+          expectedVersion: "config-version",
+        },
+      },
+    ]);
+  });
+
+  it("keeps custom tool approvals and revocations across client restarts without changing user entries", async () => {
+    const custom = { ...server, id: "custom", name: "T3 MCP", transport: "http" as const };
+    for (const mode of ["approve", "prompt"]) {
+      const tools = { t3_thread_read: { approval_mode: mode } };
+      const saved = configResponse({ T3_MCP: { command: "user-command", enabled: true, tools } });
+      const client = new FakeAgentClient("codex");
+      client.configRead = saved;
+      expect(
+        await runCauseEffect(codexDisabledServers(() => readCodexMcpConfig(client, [custom]).pipe(toMcpShapeFailed))),
+      ).toEqual({ T3_MCP: { enabled: false, tools } });
+      expect(client.requests.map((request) => request.method)).toEqual(["config/read"]);
+      expect(client.configRead).toEqual(saved);
+    }
+  });
+
+  it("keeps tool policies when a managed server changes transport in either direction", async () => {
+    const client = new FakeAgentClient("codex");
+    const tools = { t3_thread_read: { approval_mode: "prompt" } };
+    client.configRead = configResponse({ T3_MCP: { command: "openbot-mcp", enabled: false, tools } });
+    const custom = { ...server, id: "custom", name: "T3 MCP" };
+    for (const transport of ["http", "stdio"] as const) {
+      const response = await runCauseEffect(readCodexMcpConfig(client, [{ ...custom, transport }]));
+      expect(response).toMatchObject({
+        config: {
+          mcp_servers: {
+            T3_MCP: {
+              ...(transport === "http" ? { url: "http://127.0.0.1:1" } : { command: "openbot-mcp" }),
+              enabled: false,
+              tools,
+            },
+          },
+        },
+      });
+    }
+    expect(client.requests.filter((request) => request.method === "config/batchWrite")).toHaveLength(2);
+  });
+
+  it("does not register a server when no MCP servers are enabled", async () => {
+    const client = new FakeAgentClient("codex");
+    client.configRead = configResponse();
+    await runCauseEffect(readCodexMcpConfig(client, []));
     expect(client.requests).toEqual([{ method: "config/read", params: { includeLayers: false } }]);
   });
 
   it("does not write without a user config version", async () => {
     const client = new FakeAgentClient("codex");
     client.configRead = { config: {} };
-    await expect(runCauseEffect(readCodexMcpConfig(client, server))).rejects.toThrow("valid and writable");
+    await expect(runCauseEffect(readCodexMcpConfig(client, [server]))).rejects.toThrow("valid and writable");
     expect(client.requests.map((request) => request.method)).toEqual(["config/read"]);
   });
 
   it("stops when the provider rejects a stale version or a write", async () => {
     const client = new FakeAgentClient("codex", "DONE", true, true, {}, async (method) => {
-      if (method === "config/value/write") throw new Error("Config version changed");
+      if (method === "config/batchWrite") throw new Error("Config version changed");
     });
     client.configRead = configResponse();
-    await expect(runCauseEffect(readCodexMcpConfig(client, server))).rejects.toThrow("Config version changed");
-    expect(client.requests.map((request) => request.method)).toEqual(["config/read", "config/value/write"]);
+    await expect(runCauseEffect(readCodexMcpConfig(client, [server]))).rejects.toThrow("Config version changed");
+    expect(client.requests.map((request) => request.method)).toEqual(["config/read", "config/batchWrite"]);
   });
 });
