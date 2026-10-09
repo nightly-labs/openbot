@@ -28,7 +28,6 @@ const isPaste = (event) =>
   (MAC_CLIENT ? event.metaKey && !event.ctrlKey && !event.shiftKey : event.ctrlKey && !event.metaKey) &&
   !event.altKey &&
   (/^[a-z]$/i.test(event.key) ? event.key.toLowerCase() === "v" : event.code === "KeyV");
-const flags = () => ({ [COMMAND_FLAG]: true, shiftKey: [...held].some((code) => code.startsWith("Shift")) });
 const press = (type, code, extra = {}) =>
   document.dispatchEvent(new KeyboardEvent(type, { code, key: code === "KeyV" ? "v" : code.replace(/(Left|Right)$/, ""), bubbles: true, cancelable: true, ...extra }));
 addEventListener("keydown", (event) => {
@@ -46,10 +45,13 @@ addEventListener("paste", (event) => {
   const text = event.clipboardData?.getData("text/plain") ?? "";
   // The host's paste key goes down now, before the member releases a key during the upload: a Win
   // or Super key released with no key since its press opens the Start menu or Activities. The
-  // member's own paste key, when the host uses another one, is released for good. Shift stays held,
-  // so Ctrl+Shift+V still pastes in a Linux terminal.
-  press("keydown", COMMAND, flags());
-  for (const code of held) if (code !== COMMAND && !code.startsWith("Shift")) press("keyup", code, flags());
+  // member's own paste key, when the host uses another one, is released for good. Shift stays in the
+  // paste, also when the member releases it during the upload, so Ctrl+Shift+V still pastes in a
+  // Linux terminal.
+  const shift = [...held].find((code) => code.startsWith("Shift"));
+  const flags = { [COMMAND_FLAG]: true, shiftKey: shift !== undefined };
+  press("keydown", COMMAND, flags);
+  for (const code of held) if (code !== COMMAND && !code.startsWith("Shift")) press("keyup", code, flags);
   queue = queue.then(async () => {
     let paste = true;
     if (text && text !== sent) {
@@ -58,9 +60,12 @@ addEventListener("paste", (event) => {
       if (paste) sent = text;
     }
     if (paste) {
-      press("keydown", COMMAND, flags());
-      press("keydown", "KeyV", flags());
-      press("keyup", "KeyV", flags());
+      const pressShift = shift !== undefined && !held.has(shift);
+      press("keydown", COMMAND, flags);
+      if (pressShift) press("keydown", shift, flags);
+      press("keydown", "KeyV", flags);
+      press("keyup", "KeyV", flags);
+      if (pressShift) press("keyup", shift, { [COMMAND_FLAG]: true });
     }
     if (!held.has(COMMAND)) press("keyup", COMMAND);
   });
