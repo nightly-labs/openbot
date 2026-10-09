@@ -3,6 +3,26 @@ import { resolve } from "node:path";
 import { z } from "zod";
 
 const sha256Schema = z.string().regex(/^[0-9a-f]{64}$/u, "Must use a complete SHA-256 value.");
+const nativeProviderArtifactSchema = z.object({
+  url: z.url(),
+  assetSha256: sha256Schema,
+  downloadBytes: z.number().int().positive(),
+  installedBytes: z.number().int().positive(),
+  executable: z.enum(["pi", "pi.exe", "muse", "muse.exe"]),
+  files: z.record(z.string().min(1), sha256Schema),
+});
+const nativeProviderLockSchema = z.object({
+  version: z.string().min(1),
+  license: z.string().min(1),
+  licenseUrl: z.url(),
+  artifacts: z.object({
+    "darwin-arm64": nativeProviderArtifactSchema,
+    "darwin-x64": nativeProviderArtifactSchema,
+    "linux-x64": nativeProviderArtifactSchema,
+    "linux-arm64": nativeProviderArtifactSchema,
+    "win32-x64": nativeProviderArtifactSchema,
+  }),
+});
 const codexArtifactSchema = z.object({
   asset: z.string().min(1),
   assetSha256: sha256Schema,
@@ -257,6 +277,8 @@ const agentRuntimeLockSchema = z.object({
    * The Cline CLI. Its version is the npm version, and its source tag is `cli-v<version>`, which the
    * licence is read from.
    */
+  pi: nativeProviderLockSchema,
+  muse: nativeProviderLockSchema,
   cline: z.object({
     registry: z.literal("https://registry.npmjs.org"),
     repository: z.literal("https://github.com/cline/cline"),

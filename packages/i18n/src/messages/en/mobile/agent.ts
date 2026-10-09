@@ -1,6 +1,13 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("mobile.agent", {
+  "mobile.agent.session.title": "Provider settings",
+  "mobile.agent.session.failed": "Could not change provider settings.",
+  "mobile.agent.session.readFailed": "Could not read provider settings.",
+  "mobile.agent.session.unsupported": "This host does not support provider settings.",
+  "mobile.agent.session.reset": "Reset {name}",
+  "mobile.agent.session.unavailable": "Saved value {value} is not available. Select another value or reset it.",
+  "mobile.agent.session.pending": "Changes apply on the next turn.",
   "mobile.agent.pin.pin": "Pin",
   "mobile.agent.pin.unpin": "Unpin",
   "mobile.agent.pin.pinNamed": "Pin {name}",

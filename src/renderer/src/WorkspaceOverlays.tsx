@@ -1,5 +1,6 @@
 import type { CentralAuthUser, ServerSummary } from "@openbot/contracts/ipc";
 import { classifyFailure } from "@openbot/telemetry";
+import type { AcpRegistrySettingsApi } from "@openbot/ui/features/custom-providers/AcpRegistrySettings";
 import type { CustomAgentSettingsApi } from "@openbot/ui/features/custom-providers/CustomAgentSettings";
 import { providerDiagnosticsText } from "@openbot/ui/features/provider-diagnostics/provider-diagnostics";
 import { LeaveServerDialog } from "@openbot/ui/features/servers/LeaveServerDialog";
@@ -382,6 +383,24 @@ function ServerSettings(props: {
    * server that the account administers over `providers-v1`. The provider state belongs to the
    * selected server only, so it is read only while `server` is the selected one.
    */
+  const registryApis = new Map<string, AcpRegistrySettingsApi>();
+  function registryFor(server: ServerSummary): AcpRegistrySettingsApi {
+    const existing = registryApis.get(server.id);
+    if (existing) return existing;
+    const api: AcpRegistrySettingsApi = {
+      search: (query) => appPort().acpRegistry.search(query, server.id),
+      status: () => appPort().acpRegistry.status(server.id),
+      install: async (input) => {
+        const result = await appPort().acpRegistry.install(input, server.id);
+        if (server.kind === "local") await localAgents.refreshCustomAgents();
+        return result;
+      },
+      cancel: (id) => appPort().acpRegistry.cancel(id, server.id),
+      remove: (id) => appPort().acpRegistry.remove(id, server.id),
+    };
+    registryApis.set(server.id, api);
+    return api;
+  }
   const providerSettings = (server: ServerSummary): HostProviderSettings | undefined => {
     const local = server.kind === "local";
     if (!server.active || (!local && server.id !== providerAdminServerId())) return undefined;
@@ -452,6 +471,7 @@ function ServerSettings(props: {
         return detection.takenAgentIds();
       },
       customAgents: local ? customAgents : undefined,
+      acpRegistry: serverCanAdminister(server, "acp-registry-v1") ? registryFor(server) : undefined,
       get detectionSettings() {
         return local ? (detection.settingsValue() ?? undefined) : undefined;
       },

@@ -1,6 +1,6 @@
 import type { HostRestartEvent } from "@openbot/contracts/team-protocol/host-update-v1";
 import { optionalTeamEvent, optionalTeamEventToCurrent } from "@openbot/contracts/team-protocol/optional-events";
-import { decodeTeamProtocolV6BaseCurrentEvent } from "@openbot/contracts/team-protocol/v6-base-adapter";
+import { decodeTeamProtocolV7BaseCurrentEvent } from "@openbot/contracts/team-protocol/v7-base-adapter";
 import { Effect, Exit, Result, Scope } from "effect";
 import { RemoteWorkflowError, remoteDecode } from "./remote-service-effects";
 // The live event channel for HTTPS servers, and the reconnect policy both transports share.
@@ -35,7 +35,7 @@ import type {
 import { decodeRecord } from "@openbot/contracts/ipc-decoding";
 import { isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
-import { TEAM_CURRENT_CAPABILITIES, type TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
+import { type TeamCurrentCapability, teamCapabilitiesForProtocol } from "@openbot/contracts/team-protocol/current";
 import { TEAM_PROTOCOL_V1_WEBSOCKET } from "@openbot/contracts/team-protocol/v1";
 import {
   encodeTeamProtocolV1CurrentClientEvent,
@@ -513,7 +513,7 @@ export class RemoteEventStream {
             const optional = optionalTeamEvent(value);
             const decoded = optional
               ? { kind: "known" as const, event: optionalTeamEventToCurrent(optional) }
-              : decodeTeamProtocolV6BaseCurrentEvent(value);
+              : decodeTeamProtocolV7BaseCurrentEvent(value);
             if (decoded.kind === "unknown") return;
             if (decoded.kind === "invalid") {
               protocolFailed = true;
@@ -627,7 +627,13 @@ export class RemoteEventStream {
       encodeTeamProtocolV1CurrentClientEvent({
         type: "agent-event-scope",
         includeConversations: this.#servers.activeServerId === serverId,
-        ...(this.#appVersion ? { capabilities: TEAM_CURRENT_CAPABILITIES } : {}),
+        ...(this.#appVersion
+          ? {
+              capabilities: teamCapabilitiesForProtocol(
+                this.#connections.compatibilityFor(serverId)?.negotiatedProtocol,
+              ),
+            }
+          : {}),
       }),
     );
   }

@@ -82,12 +82,26 @@ let selected = CONFIG_MODELS[0];
 let sessionCount = 0;
 let discoveryCount = 0;
 let loadCount = 0;
+let compact = false;
+const additionalOptions = () => process.env.OPENBOT_FAKE_ACP_SETTINGS === "1" ? [
+  { id: "compact", name: "Compact replies", type: "boolean", currentValue: compact },
+  { id: "tone", name: "Tone", category: "model_config", type: "select", currentValue: "short", options: [
+    { group: "style", name: "Style", options: [{ value: "short", name: "Short" }, { value: "full", name: "Full" }] },
+  ] },
+  { id: "approval", name: "Approval policy", type: "boolean", currentValue: false },
+  { id: "session_mode", name: "Mode", type: "select", currentValue: "default", options: [{ value: "default", name: "Default" }] },
+  { id: "autoApprove", name: "Auto approve", type: "boolean", currentValue: false },
+  { id: "behavior", name: "Behavior", type: "select", currentValue: "normal", options: [{ value: "normal", name: "Normal" }, { value: "bypassPermissions", name: "Fast" }] },
+  { id: "execution", name: "Execution", type: "select", currentValue: "ask", options: [{ group: "execution", name: "Execution", options: [{ value: "ask", name: "Ask" }, { value: "yolo", name: "Automatic" }] }] },
+  { id: "operating", name: "Operating mode", category: "mode", type: "select", currentValue: "ask", options: [{value: "ask", name: "Ask"}, {value: "auto", name: "Auto"}] },
+] : [];
 const SERVICE_FAILURE = {
   code: -32603,
   message: "Internal error: OpenCode service failure",
   data: { service: "session" },
 };
 const configOptions = () => [
+  ...additionalOptions(),
   {
     id: "model",
     name: "Model",
@@ -283,7 +297,13 @@ function handle(message) {
       return;
     }
     if (message.params.configId === "model") selected = message.params.value;
+    if (message.params.configId === "compact") compact = message.params.value;
     write({ jsonrpc: "2.0", id: message.id, result: { configOptions: configOptions() } });
+    if (message.params.configId === "compact") {
+      compact = false;
+      write({ jsonrpc: "2.0", method: "session/update", params: { sessionId: message.params.sessionId,
+        update: { sessionUpdate: "config_option_update", configOptions: configOptions() } } });
+    }
     return;
   }
   if (message.method === "session/new") {
@@ -664,6 +684,89 @@ describe("OpenCode ACP environment", () => {
 
     // Nothing reached the process, which still holds the session it opened on that endpoint.
     expect(await fake.readPrompts()).toEqual([]);
+  });
+});
+
+describe("ACP session settings", () => {
+  // Failure modes: a setting bypasses approval, an invalid choice reaches the agent, or an idle
+  // option update is lost. This test uses the real ACP process and stream for all three paths.
+  it("keeps permission controls private and accepts configuration updates while idle", async () => {
+    const fake = await createFakeOpencodeAgent("system");
+    vi.stubEnv("OPENBOT_FAKE_ACP_CONFIG_MODELS", "1");
+    vi.stubEnv("OPENBOT_FAKE_ACP_SETTINGS", "1");
+    vi.stubEnv("OPENBOT_FAKE_ACP_CONFIG_LOG", fake.configLog);
+    const client = startOpencode(fake.cli, () => null, fake.envLog);
+    const { thread } = await runCauseEffect(
+      client.request("thread/start", { cwd: fake.directory }, decodeThreadResponse),
+    );
+    if (!client.readSessionSettings || !client.setSessionSetting) throw new Error("ACP settings are unavailable.");
+    const snapshot = await runCauseEffect(client.readSessionSettings(thread.id));
+    expect(snapshot.options).toEqual([
+      { id: "compact", name: "Compact replies", type: "boolean", currentValue: false },
+      {
+        id: "tone",
+        name: "Tone",
+        category: "model_config",
+        type: "select",
+        currentValue: "short",
+        options: [
+          { value: "short", name: "Short", group: "Style" },
+          { value: "full", name: "Full", group: "Style" },
+        ],
+      },
+    ]);
+    await expect(runCauseEffect(client.setSessionSetting(thread.id, "approval", true))).rejects.toThrow(
+      sourceText("error.provider.sessionSettingUnavailable"),
+    );
+    await expect(runCauseEffect(client.setSessionSetting(thread.id, "operating", "auto"))).rejects.toThrow(
+      sourceText("error.provider.sessionSettingUnavailable"),
+    );
+    for (const [id, value] of [
+      ["session_mode", "default"],
+      ["autoApprove", true],
+      ["behavior", "bypassPermissions"],
+      ["execution", "yolo"],
+    ] as const) {
+      await expect(runCauseEffect(client.setSessionSetting(thread.id, id, value))).rejects.toThrow(
+        sourceText("error.provider.sessionSettingUnavailable"),
+      );
+    }
+    await expect(runCauseEffect(client.setSessionSetting(thread.id, "tone", "invalid"))).rejects.toThrow(
+      sourceText("error.provider.sessionSettingInvalid"),
+    );
+    await expect(runCauseEffect(client.setSessionSetting(thread.id, "compact", "true"))).rejects.toThrow(
+      sourceText("error.provider.sessionSettingInvalid"),
+    );
+    const idleUpdate = new Promise<void>((resolve) => {
+      const onNotification = (notification: import("./protocol").AppServerNotification) => {
+        if (notification.method !== "openbot/sessionSettings/updated") return;
+        const params = notification.params;
+        if (!isDynamicRecord(params) || !Array.isArray(params.options)) return;
+        if (
+          params.options.some(
+            (option) => isDynamicRecord(option) && option.id === "compact" && option.currentValue === false,
+          )
+        ) {
+          client.off("notification", onNotification);
+          resolve();
+        }
+      };
+      client.on("notification", onNotification);
+    });
+    await runCauseEffect(client.setSessionSetting(thread.id, "compact", true));
+    await idleUpdate;
+    expect(
+      (await runCauseEffect(client.readSessionSettings(thread.id))).options.find((option) => option.id === "compact")
+        ?.currentValue,
+    ).toBe(false);
+    const calls = await fake.readConfigCalls();
+    expect(
+      calls.filter((call) =>
+        ["approval", "operating", "tone", "session_mode", "autoApprove", "behavior", "execution"].includes(
+          call.configId,
+        ),
+      ),
+    ).toEqual([]);
   });
 });
 

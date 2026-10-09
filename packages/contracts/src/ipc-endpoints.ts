@@ -1,3 +1,14 @@
+import type {
+  AcpRegistryEntry,
+  AcpRegistryInstallation,
+  AcpRegistryInstallInput,
+  AcpRegistryOperation,
+} from "./ipc-acp-registry";
+import type {
+  AgentSessionSettings,
+  ResetAgentSessionSettingInput,
+  SetAgentSessionSettingInput,
+} from "./ipc-agent-session-settings";
 // The one channel list. Each endpoint holds its wire value, the group it belongs to, and whether it
 // is a request the renderer invokes or an event the main process sends. That is what lets a
 // registrar bind its handlers as an object keyed by endpoint, so a channel with no handler, and a
@@ -599,6 +610,14 @@ export const IPC_ENDPOINTS = {
   },
   // The user's own ACP agents, on this computer only: no Team API route and no `providerAdmin` entry.
   // Environment values travel only towards main.
+  acpRegistry: {
+    search: scopedRequest<string, AcpRegistryEntry[]>()("acp-registry:search"),
+    installed: scopedQuery<AcpRegistryInstallation[]>()("acp-registry:installed"),
+    status: scopedQuery<AcpRegistryOperation[]>()("acp-registry:status"),
+    install: scopedRequest<AcpRegistryInstallInput, CustomAgentResult>()("acp-registry:install"),
+    cancel: scopedRequest<string, void>()("acp-registry:cancel"),
+    remove: scopedRequest<string, void>()("acp-registry:remove"),
+  },
   customAgents: {
     list: request<undefined, CustomAgentSummary[]>()("custom-agents:list"),
     save: request<SaveCustomAgentInput, CustomAgentResult>()("custom-agents:save"),
@@ -818,6 +837,13 @@ export const IPC_ENDPOINTS = {
     getUsage: scopedRequest<string | undefined, AccountUsage>()("agent:get-usage"),
     listModels: scopedQuery<AgentModelOption[]>()("agent:list-models"),
     listAgents: scopedQuery<AgentSummary[]>()("agent:list"),
+    readAgentSessionSettings: scopedRequest<string, AgentSessionSettings>()("agent:session-settings:read"),
+    setAgentSessionSetting: scopedRequest<SetAgentSessionSettingInput, AgentSessionSettings>()(
+      "agent:session-settings:set",
+    ),
+    resetAgentSessionSetting: scopedRequest<ResetAgentSessionSettingInput, AgentSessionSettings>()(
+      "agent:session-settings:reset",
+    ),
     listInstalledSkills: scopedRequest<string, InstalledSkill[]>()("agent:list-installed-skills"),
     listChannels: scopedQuery<ChannelSummary[]>()("agent:channels:list"),
     readChannel: scopedRequest<ChannelReadInput, ChannelPage>()("agent:channels:read"),
@@ -1139,6 +1165,7 @@ export const IPC_GROUP_PATHS = {
   customProviders: "customProviders",
   providerDetection: "providerDetection",
   customAgents: "customAgents",
+  acpRegistry: "acpRegistry",
   providerAdmin: "providerAdmin",
   messaging: "messaging",
   hostAdmin: "hostAdmin",

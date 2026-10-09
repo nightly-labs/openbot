@@ -12,6 +12,7 @@ import { SlackConnectFailed, toSlackConnectFailed } from "../backend/messaging/s
 import { routineFlowRoutines } from "../backend/routine-flows/routine-flow-routines";
 import { RoutineFlowStore } from "../backend/routine-flows/routine-flow-store";
 import { createRoutineFlows, type RoutineFlowsHandle } from "../backend/routine-flows/routine-flows";
+import { type AcpRegistry, createAcpRegistry } from "./acp-registry";
 import { type AgentAdminSettingsService, createAgentAdminSettings } from "./agent-admin-settings";
 import { spawnAgentDatabaseHost } from "./agent-database-host-process";
 import { createAgentHostSettings } from "./agent-host-settings";
@@ -401,6 +402,7 @@ export interface ApplicationServices {
   customProviders: CustomProviderStore;
   customProviderChanges: CustomProviderChanges;
   customAgentChanges: CustomAgentChanges;
+  acpRegistry: AcpRegistry;
   providerDetection: ProviderDetection;
   providerDetectionSettings: ProviderDetectionSettingsStore;
   marketplaceAgents: AgentMarketplaceService;
@@ -1532,6 +1534,23 @@ export async function createApplicationServices({
   const agentAdminSettings = createAgentAdminSettings({ agents: service, approvalAutomation });
   const customProviderChanges = createCustomProviderChanges({ service, customProviders });
   const customAgentChanges = createCustomAgentChanges({ service, customAgents });
+  const acpRegistry = createAcpRegistry({
+    directory: app.getPath("userData"),
+    customAgentChanges,
+    withRuntimeRemoval: (ids, operation) =>
+      service
+        .withCustomAgentRuntimeRemoval(ids, () =>
+          operation.pipe(
+            Effect.mapError(
+              (failure) => new AgentLifecycleFailed({ operation: "removeCustomAgentRuntime", cause: failure.cause }),
+            ),
+          ),
+        )
+        .pipe(toProviderRuntimeFailure),
+  });
+  teardown.push(TEARDOWN_ORDER.providerRuntimes - 1, "ACP registry installations", () =>
+    runCauseEffect(acpRegistry.close()),
+  );
   // The host comes before the updater, and the restart readiness reads the host. The routes reach
   // the schedule through this, and a request that arrives before it exists is refused.
   let requestedUpdate: RequestedUpdate | undefined;
@@ -1590,6 +1609,8 @@ export async function createApplicationServices({
     admin: {
       agents: agentAdminSettings,
       agentHost: createAgentHostSettings({ agents: service, busyMessageMode }),
+      sessionSettings: service,
+      acpRegistry,
       skills,
       sharedTables: service,
       marketplaceAgents,
@@ -2170,6 +2191,7 @@ export async function createApplicationServices({
     customProviders,
     customProviderChanges,
     customAgentChanges,
+    acpRegistry,
     providerDetection,
     providerDetectionSettings,
     marketplaceAgents,

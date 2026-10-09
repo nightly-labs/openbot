@@ -1,3 +1,4 @@
+import type { AcpRegistryEntry, AgentSessionSettings } from "@openbot/contracts/ipc";
 import {
   type AccountUsage,
   type AgentEvent,
@@ -255,6 +256,35 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let dynamicIslandPresentation: DynamicIslandPresentation = { serverId: "local", mode: "idle" };
   let agentStatus = clone(options.agentStatus ?? STORY_AGENT_STATUS);
   let agents = clone(options.agents ?? STORY_AGENT_SUMMARIES);
+  const sessionSettings = new Map<string, AgentSessionSettings>();
+  function previewSessionSettings(agentId: string): AgentSessionSettings {
+    const agent = agents.find((candidate) => candidate.id === agentId);
+    if (!agent) throw new Error("Agent not found");
+    let value = sessionSettings.get(agentId);
+    if (!value || value.providerIdentity !== agent.provider) {
+      value = {
+        agentId,
+        providerIdentity: agent.provider,
+        pending: false,
+        overrides: {},
+        options: [
+          { id: "compact", name: "Compact replies", type: "boolean", currentValue: false },
+          {
+            id: "format",
+            name: "Reply format",
+            type: "select",
+            currentValue: "auto",
+            options: [
+              { value: "auto", name: "Automatic" },
+              { value: "brief", name: "Brief" },
+            ],
+          },
+        ],
+      };
+      sessionSettings.set(agentId, value);
+    }
+    return value;
+  }
   let mcpServers = clone(STORY_MCP_SERVERS);
   let mcpSignedIn = new Set<string>();
   let cancelPendingMcpSignIn: (() => void) | null = null;
@@ -278,6 +308,17 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let hostedSites = clone(STORY_HOSTED_SITES);
   let detectionSettings: ProviderDetectionSettings = clone(DEFAULT_PROVIDER_DETECTION_SETTINGS);
   let customAgents: CustomAgentSummary[] = [];
+  const registryEntry: AcpRegistryEntry = {
+    id: "example-acp",
+    name: "Example ACP",
+    version: "1.0.0",
+    description: "Preview agent",
+    website: null,
+    license: "MIT",
+    distributions: ["binary"],
+    installedVersion: null,
+    customAgentId: null,
+  };
   // The same two endpoints the model-picker stories invent, so preview shows one list everywhere.
   let customProviders = clone(
     options.customProviders ?? [
@@ -721,6 +762,40 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     },
     // Preview starts no process: the names are kept, the values are dropped, and a check answers
     // for the command without running it.
+    acpRegistry: {
+      search: async (query) =>
+        clone(!query || registryEntry.name.toLowerCase().includes(query.toLowerCase()) ? [registryEntry] : []),
+      installed: async () =>
+        registryEntry.installedVersion && registryEntry.customAgentId
+          ? [
+              {
+                registryId: registryEntry.id,
+                customAgentId: registryEntry.customAgentId,
+                version: registryEntry.installedVersion,
+                distribution: "binary",
+              },
+            ]
+          : [],
+      status: async () => [],
+      install: async (input) => {
+        registryEntry.installedVersion = registryEntry.version;
+        registryEntry.customAgentId = input.customAgentId;
+        if (!customAgents.some((agent) => agent.id === input.customAgentId))
+          customAgents.push({
+            id: input.customAgentId,
+            name: input.name ?? registryEntry.name,
+            command: "/preview/example-acp",
+            args: [],
+            envNames: [],
+            resolvedCommand: "/preview/example-acp",
+          });
+        return { agents: clone(customAgents), restart: "not-running" };
+      },
+      cancel: async () => undefined,
+      remove: async () => {
+        registryEntry.installedVersion = null;
+      },
+    },
     customAgents: {
       list: async () => clone(customAgents),
       save: async (input) => {
@@ -1010,6 +1085,32 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           ),
         ),
       listAgents: async () => clone(agents),
+      readAgentSessionSettings: async (agentId) => clone(previewSessionSettings(agentId)),
+      setAgentSessionSetting: async ({ agentId, settingId, value }) => {
+        const settings = previewSessionSettings(agentId);
+        const option = settings.options.find((entry) => entry.id === settingId);
+        if (!option) throw new Error("Unknown setting");
+        if (option.type === "boolean" && typeof value === "boolean") option.currentValue = value;
+        else if (
+          option.type === "select" &&
+          typeof value === "string" &&
+          option.options.some((choice) => choice.value === value)
+        )
+          option.currentValue = value;
+        else throw new Error("Invalid setting value");
+        settings.overrides[settingId] = value;
+        emitAgentEvent({ type: "agent-session-settings-changed", agentId });
+        return clone(settings);
+      },
+      resetAgentSessionSetting: async ({ agentId, settingId }) => {
+        const settings = previewSessionSettings(agentId);
+        delete settings.overrides[settingId];
+        const option = settings.options.find((entry) => entry.id === settingId);
+        if (option?.type === "boolean") option.currentValue = false;
+        else if (option?.type === "select") option.currentValue = "auto";
+        emitAgentEvent({ type: "agent-session-settings-changed", agentId });
+        return clone(settings);
+      },
       listInstalledSkills: async (agentId) => clone(readInstalledSkills(agentId)),
       ...mockChannels,
       getAgentAdminSettings: async (agentId) => {

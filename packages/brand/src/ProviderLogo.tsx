@@ -1,7 +1,17 @@
 import type { JSX } from "@solidjs/web";
 import { CLAUDE_PATH, CODEX_PATH, CURSOR_PATH } from "./provider-logo-shape";
 
-export type ProviderLogoVariant = "codex" | "claude" | "grok" | "opencode" | "antigravity" | "cursor" | "cline" | "acp";
+export type ProviderLogoVariant =
+  | "codex"
+  | "claude"
+  | "grok"
+  | "opencode"
+  | "antigravity"
+  | "cursor"
+  | "cline"
+  | "acp"
+  | "pi"
+  | "muse";
 
 export interface ProviderLogoProps {
   provider: ProviderLogoVariant;
@@ -28,7 +38,8 @@ export function ProviderLogo(props: ProviderLogoProps) {
   const isGemini = () => props.provider === "antigravity";
   const isCursor = () => props.provider === "cursor";
   const isCline = () => props.provider === "cline";
-  const isAcp = () => props.provider === "acp";
+  // Native CLI providers use the existing neutral terminal mark.
+  const isAcp = () => props.provider === "acp" || props.provider === "pi" || props.provider === "muse";
 
   return (
     <svg

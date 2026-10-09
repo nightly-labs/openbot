@@ -1,3 +1,4 @@
+import { PROVIDERS_V5_CAPABILITY, PROVIDERS_V5_ROUTES } from "@openbot/contracts/team-protocol/providers-v5";
 import { Effect } from "effect";
 import type { RemoteWorkflowError } from "../remote-service-effects";
 // The providers of one server's host: code sign-in, API keys, managed CLI runtimes and custom
@@ -88,7 +89,13 @@ export function providerAdminIpcHandlers({
    * The runtime routes of the host: `providers-v4` includes Cursor and Cline, `providers-v2` Gemini,
    * and `providers-v1` none of them.
    */
+  function keyRoutes(serverId: string) {
+    return remoteServers.supportsCapability(serverId, PROVIDERS_V5_CAPABILITY)
+      ? PROVIDERS_V5_ROUTES
+      : PROVIDERS_ADMIN_ROUTES;
+  }
   function runtimeRoutes(serverId: string) {
+    if (remoteServers.supportsCapability(serverId, PROVIDERS_V5_CAPABILITY)) return PROVIDERS_V5_ROUTES;
     if (remoteServers.supportsCapability(serverId, PROVIDERS_V4_CAPABILITY)) return PROVIDERS_V4_ROUTES;
     return remoteServers.supportsCapability(serverId, PROVIDERS_RUNTIMES_V2_CAPABILITY)
       ? PROVIDERS_RUNTIMES_V2_ROUTES
@@ -136,7 +143,7 @@ export function providerAdminIpcHandlers({
         local: (provider) => ({ provider, status: credentials.status(provider) }),
         remote: async (provider, serverId) => ({
           provider,
-          status: await remote(serverId, PROVIDERS_ADMIN_ROUTES.apiKeyState, { provider }, decodeProviderApiKeyStatus),
+          status: await remote(serverId, keyRoutes(serverId).apiKeyState, { provider }, decodeProviderApiKeyStatus),
         }),
       }),
       setApiKey: scopedHandler(parseProviderApiKeyInput, {
@@ -152,7 +159,7 @@ export function providerAdminIpcHandlers({
                 ),
             ),
           ),
-        remote: (input, serverId) => remoteChange(serverId, PROVIDERS_ADMIN_ROUTES.apiKeySet, input),
+        remote: (input, serverId) => remoteChange(serverId, keyRoutes(serverId).apiKeySet, input),
       }),
       clearApiKey: scopedHandler(parseProviderId, {
         local: (provider) =>
@@ -167,7 +174,7 @@ export function providerAdminIpcHandlers({
                 ),
             ),
           ),
-        remote: (provider, serverId) => remoteChange(serverId, PROVIDERS_ADMIN_ROUTES.apiKeyClear, { provider }),
+        remote: (provider, serverId) => remoteChange(serverId, keyRoutes(serverId).apiKeyClear, { provider }),
       }),
       getRuntimes: scopedQueryHandler({
         local: () => runtimes.getStatus(),

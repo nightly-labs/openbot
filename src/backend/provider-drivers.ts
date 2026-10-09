@@ -1,6 +1,6 @@
 import { mkdirSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import type { AgentAuthState, AgentProviderId } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
@@ -16,7 +16,9 @@ import {
   resolveCodexCli,
   resolveCursorCli,
   resolveGrokCli,
+  resolveMuseCli,
   resolveOpencodeCli,
+  resolvePiCli,
 } from "./cli";
 import { CustomAcpAgentsClient, type CustomAgentConfig, type CustomAgentSource } from "./custom-acp-agents-client";
 import { GrokAgentClient } from "./grok-client";
@@ -27,6 +29,7 @@ import type {
   McpServerSource,
   McpToolRuntimeSource,
 } from "./mcp-provider-shapes";
+import { MuseAgentClient } from "./muse-client";
 import {
   type CustomProviderSource,
   OPENCODE_PROFILE_CONFIG,
@@ -34,6 +37,7 @@ import {
   openCodeSignInMessage,
 } from "./opencode-config";
 import { readOpenCodeGoUsage } from "./opencode-usage";
+import { PiAgentClient } from "./pi-client";
 import {
   antigravityStatePaths,
   clineStatePaths,
@@ -41,9 +45,11 @@ import {
   cursorConfinedEnv,
   cursorStatePaths,
   customAgentStatePaths,
+  museStatePaths,
   OPENCODE_CONFINED_ENV,
   openCodeStatePaths,
   type ProcessConfinement,
+  piStatePaths,
   type SpawnTarget,
 } from "./process-confinement";
 import type { AccountReadResult } from "./protocol";
@@ -87,6 +93,8 @@ type ProviderSignIn =
   | { kind: "cli-command"; command: ProviderCliCommand }
   /** The user signs in with the CLI themselves; OpenBot only re-probes the provider afterwards. */
   | { kind: "external" }
+  /** The host opens an interactive terminal and refreshes the account when it closes. */
+  | { kind: "terminal"; timeoutMs: number }
   /**
    * OpenBot starts the ACP server and calls `authenticate` with this method, which opens a browser
    * from the server. Only the sign-in process calls it: in a status probe it would open a browser.
@@ -240,6 +248,79 @@ export interface BuiltInProviderDriver {
 }
 
 export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
+  {
+    id: "pi",
+    signIn: { kind: "terminal", timeoutMs: CLI_LOGIN_TIMEOUT_MS },
+    resolveCli: resolvePiCli,
+    createClient: (cli, timeout, context, confinement) =>
+      new PiAgentClient(cli, {
+        requestTimeoutMs: timeout,
+        ...(confinement
+          ? {
+              confine: (target) => {
+                const paths = piStatePaths();
+                for (const path of paths.writable) mkdirSync(path, { recursive: true, mode: 0o700 });
+                return confineSpawnTarget(target, confinement, paths);
+              },
+            }
+          : {}),
+        extraEnv: () => ({ ...context.agentEnvironment?.() }),
+        providerStateDirectory: context.providerStateDirectory,
+        mcpServers: context.mcpServers,
+        reportMcpDrops: context.reportMcpDrops,
+        mcpToolRuntimes: context.mcpToolRuntimes,
+        mcpAuthorization: context.mcpAuthorization,
+        history: context.history?.("pi"),
+      }),
+    createProfileClient: (cli, timeout, context) =>
+      new PiAgentClient(cli, {
+        requestTimeoutMs: timeout,
+        profileGeneration: true,
+        providerStateDirectory: context.providerStateDirectory,
+      }),
+    authState: (account) => ({ kind: "pi", email: account?.email ?? null }),
+    validateAccount: () => undefined,
+  },
+  {
+    id: "muse",
+    signIn: {
+      kind: "cli-command",
+      command: { argv: ["login"], env: () => ({ MUSE_NO_AUTO_UPDATE: "1" }), timeoutMs: CLI_LOGIN_TIMEOUT_MS },
+    },
+    resolveCli: resolveMuseCli,
+    createClient: (cli, timeout, context, confinement) =>
+      new MuseAgentClient(cli, {
+        requestTimeoutMs: timeout,
+        apiKey: () => context.apiKey("muse"),
+        extraEnv: () => ({ ...context.agentEnvironment?.() }),
+        ...(confinement
+          ? {
+              confine: (target) => {
+                const paths = museStatePaths();
+                for (const path of paths.writable)
+                  mkdirSync(basename(path).startsWith("session-index.db") ? dirname(path) : path, {
+                    recursive: true,
+                    mode: 0o700,
+                  });
+                return confineSpawnTarget(target, confinement, paths);
+              },
+            }
+          : {}),
+        mcpServers: context.mcpServers,
+        reportMcpDrops: context.reportMcpDrops,
+        mcpToolRuntimes: context.mcpToolRuntimes,
+        mcpAuthorization: context.mcpAuthorization,
+      }),
+    createProfileClient: (cli, timeout, context) =>
+      new MuseAgentClient(cli, {
+        requestTimeoutMs: timeout,
+        apiKey: () => context.apiKey("muse"),
+        profileGeneration: true,
+      }),
+    authState: (account) =>
+      account?.type === "muse" ? { kind: "muse", email: account.email ?? null } : { kind: "unknown" },
+    validateAccount: () => undefined,
+  },
   {
     id: "codex",
     signIn: { kind: "browser" },

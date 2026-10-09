@@ -16,6 +16,7 @@ import { AgentInformation } from "@/features/agents/components/agent-information
 import { type AgentPhotoDraft, AgentPhotoPicker } from "@/features/agents/components/agent-photo-picker";
 import { AgentPublish } from "@/features/agents/components/agent-publish";
 import { AgentRuntimeFields } from "@/features/agents/components/agent-runtime-fields";
+import { AgentSessionSettingsSection } from "@/features/agents/components/agent-session-settings";
 import { AgentSharedTables } from "@/features/agents/components/agent-shared-tables";
 import { BloubAvatarPreview } from "@/features/agents/components/bloub-avatar";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
@@ -454,6 +455,9 @@ function AgentForm({
               </SettingsRow>
             ) : null}
           </SettingsSection>
+          {host && host.role !== "member" ? (
+            <AgentSessionSettingsSection key={`${agent.serverId}:${agent.id}`} agent={agent} available={available} />
+          ) : null}
           {showPermissions || showNotifications || showAdvanced ? (
             <SettingsSection
               title={t("mobile.agent.groups.rules")}

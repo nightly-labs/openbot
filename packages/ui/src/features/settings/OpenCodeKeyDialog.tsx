@@ -40,6 +40,7 @@ export interface ProviderKeyApi {
 
 export interface OpenCodeKeyDialogProps {
   api: ProviderKeyApi;
+  provider?: "opencode" | "muse";
   onClose: () => void;
   /**
    * Retries the connection without touching credentials. Without it a failed free provider with
@@ -53,6 +54,7 @@ type DialogPhase = "idle" | "loading" | "saving" | "removing";
 
 export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
   const { t, errorMessage } = useText();
+  const provider = () => props.provider ?? "opencode";
   const [key, setKey] = createSignal("");
   const [stored, setStored] = createSignal<ProviderApiKeyStatus>("missing");
   const [phase, setPhase] = createSignal<DialogPhase>("loading");
@@ -66,7 +68,7 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
   async function readState(): Promise<void> {
     setPhase("loading");
     try {
-      setStored((await props.api.getProviderApiKeyState("opencode")).status);
+      setStored((await props.api.getProviderApiKeyState(provider())).status);
     } catch (cause) {
       setError(errorMessage(cause, t("provider.openCodeKey.readFailed")));
     } finally {
@@ -80,7 +82,7 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
     setPhase("saving");
     setError(null);
     try {
-      await props.api.setProviderApiKey({ provider: "opencode", key: value });
+      await props.api.setProviderApiKey({ provider: provider(), key: value });
       // The typed key is dropped rather than kept as a draft: OpenCode has restarted with it, and
       // the dialog keeps no copy of a secret it no longer needs.
       setKey("");
@@ -96,7 +98,7 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
     setPhase("removing");
     setError(null);
     try {
-      await props.api.clearProviderApiKey("opencode");
+      await props.api.clearProviderApiKey(provider());
       setKey("");
       props.onClose();
     } catch (cause) {
@@ -124,14 +126,21 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
         <Dialog.Overlay class="opencode-key-backdrop">
           <Dialog.Content class="opencode-key-dialog" as="section">
             <header class="opencode-key-header">
-              <Dialog.Title class="opencode-key-title">{t("provider.openCodeKey.title")}</Dialog.Title>
+              <Dialog.Title class="opencode-key-title">
+                {t(provider() === "muse" ? "provider.museKey.title" : "provider.openCodeKey.title")}
+              </Dialog.Title>
               {/* One line that is always the dialog's whole message: the default pitch, the saved
                   fact, or the unreadable warning. A second text block would repeat it. */}
               <Dialog.Description class="opencode-key-description">
                 <Show
                   when={stored() === "saved"}
                   fallback={
-                    <Show when={stored() === "unreadable"} fallback={t("provider.openCodeKey.description")}>
+                    <Show
+                      when={stored() === "unreadable"}
+                      fallback={t(
+                        provider() === "muse" ? "provider.museKey.description" : "provider.openCodeKey.description",
+                      )}
+                    >
                       {t("provider.openCodeKey.unreadable")}
                     </Show>
                   }
@@ -149,7 +158,7 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
                 void save();
               }}
             >
-              <Field label={t("provider.openCodeKey.label")}>
+              <Field label={t(provider() === "muse" ? "provider.museKey.label" : "provider.openCodeKey.label")}>
                 <Input
                   type="password"
                   autocomplete="off"
@@ -168,7 +177,7 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
                       <OctagonX />
                     </AlertIcon>
                     <AlertContent>
-                      <AlertTitle>{OPENCODE_GO}</AlertTitle>
+                      <AlertTitle>{provider() === "muse" ? "Muse" : OPENCODE_GO}</AlertTitle>
                       <AlertDescription>{message()}</AlertDescription>
                     </AlertContent>
                   </Alert>
