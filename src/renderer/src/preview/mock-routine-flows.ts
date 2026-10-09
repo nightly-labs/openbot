@@ -6,8 +6,8 @@ import type { OpenBotDesktopApi, Routine, RoutineFlowLink, RoutineFlowStep, Rout
 interface MockRoutineFlowsSource {
   routines: Map<string, Routine[]>;
   routineRuns: Map<string, RoutineRun[]>;
-  links?: RoutineFlowLink[];
-  steps?: RoutineFlowStep[];
+  links?: RoutineFlowLink[] | undefined;
+  steps?: RoutineFlowStep[] | undefined;
 }
 
 /** `emit` sends the agent event `routine-flows-changed` for one agent whose canvas changed. */
