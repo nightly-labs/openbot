@@ -15,7 +15,7 @@ import { assertSafeArchive, extractArchive, extractZipTree, rejectNonRegularFile
 import { ProviderRuntimeFailure, runtimeIO, runtimeSync, toProviderRuntimeFailure } from "./provider-runtime-effects";
 
 const execFileAsync = promisify(execFile);
-export function registryTarget(platform = process.platform, arch = process.arch): string {
+function registryTarget(platform = process.platform, arch = process.arch): string {
   return `${platform === "win32" ? "windows" : platform}-${arch === "arm64" ? "aarch64" : arch === "x64" ? "x86_64" : arch}`;
 }
 export function registryDistributions(agent: RegistryAgent): AcpRegistryDistribution[] {
@@ -32,7 +32,7 @@ export interface RegistryPrepared {
 }
 
 /** Rejects paths before archive or package metadata can select an executable. */
-export function registryRelativePath(value: string): string {
+function registryRelativePath(value: string): string {
   const path = value.replace(/^\.\//u, "");
   if (
     !path ||

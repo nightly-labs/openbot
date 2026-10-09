@@ -46,7 +46,7 @@ const CLOSE_MAC = `on run argv
 end run`;
 
 /** The path comes from the CLI resolver. Quote it as one shell word, including embedded apostrophes. */
-export function terminalLoginCommand(executable: string): string {
+function terminalLoginCommand(executable: string): string {
   return `'${executable.replaceAll("'", "'\\''")}'`;
 }
 

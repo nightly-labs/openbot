@@ -21,6 +21,8 @@ const config: KnipConfig = {
   },
   // Host tools that scripts and tests call. They are not npm packages.
   ignoreBinaries: [
+    // Opens the interactive provider sign-in CLI on Linux.
+    "xterm",
     // Builds whisper.cpp and the remote desktop runtime.
     "cmake",
     // Rewrite and inspect macOS dylib load paths.

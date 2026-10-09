@@ -2,7 +2,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { Effect, Schema } from "effect";
 import { ProviderRuntimeFailure, runtimeIO } from "./provider-runtime-effects";
 
-export const ACP_REGISTRY_URL = "https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json";
+const ACP_REGISTRY_URL = "https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json";
 const text = (limit: number) => Schema.String.check(Schema.isMaxLength(limit));
 const id = text(128).check(Schema.isPattern(/^[a-z0-9][a-z0-9._-]*$/u));
 const argument = text(1024).check(Schema.isPattern(/^[^\0\r\n]*$/u));
@@ -51,8 +51,6 @@ export const RegistryAgent = Schema.Struct({
   }),
 });
 export type RegistryAgent = typeof RegistryAgent.Type;
-export type RegistryBinary = typeof binary.Type;
-export type RegistryPackage = typeof npm.Type;
 const Catalog = Schema.Struct({ agents: Schema.Array(Schema.Unknown).check(Schema.isMaxLength(1000)) });
 const decodeCatalog = Schema.decodeUnknownEffect(Catalog);
 const decodeAgent = Schema.decodeUnknownOption(RegistryAgent);
