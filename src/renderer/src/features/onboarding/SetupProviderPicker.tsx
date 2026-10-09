@@ -451,8 +451,9 @@ export function createSetupProviders(
     void openProviderGuide(provider, props.onSignInProvider, "sign-in");
   }
 
-  async function connectProvider(provider: AgentProviderId): Promise<void> {
-    if (!props.onConnectProvider || props.refreshingProviders) return;
+  /** Resolves `false` when the request failed; the error then says why. */
+  async function connectProvider(provider: AgentProviderId): Promise<boolean> {
+    if (!props.onConnectProvider || props.refreshingProviders) return true;
     keepProviderRows();
     setError("");
     setProviderErrors((current) => ({ ...current, [provider]: undefined }));
@@ -464,14 +465,17 @@ export function createSetupProviders(
     );
     try {
       await props.onConnectProvider(provider);
+      return true;
     } catch {
       providersAwaitingFocusRefresh.delete(provider);
       setError(t("onboarding.error.connect", { provider: providerName(provider) }));
+      return false;
     }
   }
 
-  async function downloadProvider(provider: AgentProviderId): Promise<void> {
-    if (!props.onDownloadProvider) return;
+  /** Resolves `false` when the request failed; the error then says why. */
+  async function downloadProvider(provider: AgentProviderId): Promise<boolean> {
+    if (!props.onDownloadProvider) return true;
     keepProviderRows();
     setError("");
     setProviderErrors((current) => ({ ...current, [provider]: undefined }));
@@ -479,8 +483,10 @@ export function createSetupProviders(
     setSelectedProvider(provider);
     try {
       await props.onDownloadProvider(provider);
+      return true;
     } catch {
       setError(t("onboarding.error.download", { provider: providerName(provider) }));
+      return false;
     }
   }
 
@@ -581,8 +587,20 @@ export function SetupProviderPicker(props: SetupProviderPickerProps) {
         focusFirst
         disabled={props.disabled}
         refreshingProviders={source().refreshingProviders}
-        onConnectProvider={source().onConnectProvider ? props.providers.connectProvider : undefined}
-        onDownloadProvider={source().onDownloadProvider ? props.providers.downloadProvider : undefined}
+        onConnectProvider={
+          source().onConnectProvider
+            ? async (provider) => {
+                await props.providers.connectProvider(provider);
+              }
+            : undefined
+        }
+        onDownloadProvider={
+          source().onDownloadProvider
+            ? async (provider) => {
+                await props.providers.downloadProvider(provider);
+              }
+            : undefined
+        }
         onCancelProviderDownload={
           source().onCancelProviderDownload ? props.providers.cancelProviderDownload : undefined
         }
@@ -670,7 +688,13 @@ export function SetupProviderPicker(props: SetupProviderPickerProps) {
           <OpenCodeKeyDialog
             api={api()}
             onClose={props.providers.closeOpenCodeKey}
-            onReconnect={source().onConnectProvider ? () => props.providers.connectProvider("opencode") : undefined}
+            onReconnect={
+              source().onConnectProvider
+                ? async () => {
+                    await props.providers.connectProvider("opencode");
+                  }
+                : undefined
+            }
           />
         )}
       </Show>

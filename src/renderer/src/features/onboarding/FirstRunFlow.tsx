@@ -106,12 +106,14 @@ export function FirstRunFlow(props: FirstRunFlowProps) {
   );
 
   // The free provider starts when its runtime is on disk. The first connection only asks the CLI
-  // for its models, and the permission step gives it time to answer.
+  // for its models, and the permission step gives it time to answer. A provider refresh ignores a
+  // connection, so the start waits for it to end.
   createEffect(
     () => {
       const free = state.path === "free" ? option(FREE_PROVIDER) : undefined;
       return Boolean(
         free &&
+          !props.refreshingProviders &&
           (free.runtimeStatus?.phase ?? "ready") === "ready" &&
           free.state !== "available" &&
           free.connectionState !== "connecting",
@@ -120,11 +122,12 @@ export function FirstRunFlow(props: FirstRunFlowProps) {
     (startable) => {
       if (!startable || freeStartRequested) return;
       freeStartRequested = true;
-      untrack(() => void providers.connectProvider(FREE_PROVIDER));
+      untrack(() => void providers.connectProvider(FREE_PROVIDER).then(stopWaitUnlessSent));
     },
   );
 
   // Open waits for the provider; a failed download or start stops the wait, and the reason says why.
+  // A request that fails before either begins stops it in `stopWaitUnlessSent`.
   createEffect(
     () => ({
       waiting: state.finishWhenReady,
@@ -210,13 +213,21 @@ export function FirstRunFlow(props: FirstRunFlowProps) {
     const phase = free?.runtimeStatus?.phase;
     if (phase === "not-downloaded" || phase === "download-error") {
       freeDownloadRequested = true;
-      void providers.downloadProvider(FREE_PROVIDER);
+      void providers.downloadProvider(FREE_PROVIDER).then(stopWaitUnlessSent);
       return;
     }
     if (free?.state === "error") {
       freeStartRequested = true;
-      void providers.connectProvider(FREE_PROVIDER);
+      void providers.connectProvider(FREE_PROVIDER).then(stopWaitUnlessSent);
     }
+  }
+
+  /** A rejected request changes no provider status, so the wait for the provider stops here. */
+  function stopWaitUnlessSent(sent: boolean): void {
+    if (sent) return;
+    setState((current) => {
+      current.finishWhenReady = false;
+    });
   }
 
   function previousStep(): void {
@@ -248,8 +259,9 @@ export function FirstRunFlow(props: FirstRunFlowProps) {
   const [launchShown, setLaunchShown] = createSignal(false);
   createEffect(busy, (waiting) => {
     if (waiting === launchShown()) return;
+    // The update runs a frame later. Saving can fail before it, so it reads the state it applies then.
     void firstRunTransition("open", () => {
-      setLaunchShown(waiting);
+      setLaunchShown(busy());
     });
   });
   const stepsShown = () => !launchShown();
