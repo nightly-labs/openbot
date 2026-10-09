@@ -186,8 +186,8 @@ The workspace row says what is wrong.
 
 These limits are for Slack. Discord's are in [apps/discord-app/README.md](../apps/discord-app/README.md#limits-of-discord),
 and these also apply to Discord: the host must run, the queue limits, who can give work, and that a
-hosted server stays awake while a connection is live. Discord sends an event once: an event that
-arrives while this computer has no Signal connection is lost.
+hosted server that sleeps starts for a message. Discord sends an event once: an event that arrives
+while this computer has no Signal connection is lost, except for a hosted server that starts.
 
 - The host must run. Slack sends an event again after about 1 and 5 minutes when this computer does
   not answer, then drops it.
@@ -202,13 +202,17 @@ arrives while this computer has no Signal connection is lost.
 - Anyone who can post in the workspace, guests and Slack Connect members included, can give the
   agents work. They run with the access you gave them. With Turbo or **Always allow**, they run
   commands without asking.
-- A hosted server stays awake while a Slack connection is live.
+- A hosted server sleeps after 15 minutes with no use, also with a live connection. A mention, a
+  direct message, a thread reply or a button press starts it. Signal keeps that message, encrypted,
+  for up to 10 minutes and gives it to the server when it connects, so the answer comes after the
+  server starts (a few minutes). A restart of Signal in that time loses it.
 - When an agent asks another OpenBot agent for something in a Slack conversation, the reply comes
   back to that conversation. The agent then posts its answer in the same thread, and the original
   message keeps its reactions.
 - A question the agent asks is answered on the host. Slack shows nothing for it.
 - Telegram does not send an update again. An update that arrives while this computer is off, or
-  while it cannot reach Signal, is lost.
+  while it cannot reach Signal, is lost. A hosted server that sleeps starts for a message or a button
+  press, and gets it when it connects.
 - In a basic Telegram group (not a supergroup), OpenBot finds the reply chain in memory. After a
   restart, a reply to an older message starts a new conversation.
 - When a Telegram group becomes a supergroup, it gets a new ID. OpenBot shows the chat as removed:

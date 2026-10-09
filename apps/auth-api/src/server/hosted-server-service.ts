@@ -149,6 +149,9 @@ function hostedValidate<A>(operation: () => A): Effect.Effect<A, HostedFailure> 
 type DesiredState = "running" | "idle" | "stopped" | "deleted";
 type WakeReason = "create" | "message" | "restart" | "schedule";
 
+/** What Signal does with an event for a host that has no socket: keep it (`starting`), or not. */
+export type RouteHostState = "not_hosted" | "ended" | "sleeping" | "starting";
+
 interface HostedServerRow {
   server_id: string;
   owner_user_id: string;
@@ -746,7 +749,6 @@ export class HostedServerService {
       user: AuthUser,
       serverId: string,
     ): Effect.fn.Return<HostedServerSummary, HostedFailure, HostedServerDependencies> {
-      const dependencies = yield* HostedServerDependencies;
       const row = yield* this.#requireUsableRow(user, serverId);
       if (row.desired_state === "stopped") {
         return yield* new HostedServerServiceError(
@@ -755,28 +757,39 @@ export class HostedServerService {
           "The plan of this server ended. Renew it to start the server.",
         );
       }
-      if (row.desired_state === "idle") {
-        const now = dependencies.now();
-        // The start counts as use, so the server does not stop again before its first client connects.
-        yield* hostedCall(() =>
-          dependencies.database
-            .prepare(
-              `UPDATE hosted_servers SET desired_state = 'running', last_active_at = ?, updated_at = ?
-           WHERE server_id = ? AND desired_state = 'idle'`,
-            )
-            .bind(now, now, row.server_id)
-            .run(),
-        );
-        // A server that still stops starts again when the provider reports that it stopped.
-        yield* this.#wakeForClient(yield* this.#requireRow(serverId));
-      } else if (!(yield* this.#retrySetup(row))) {
-        yield* this.#wakeForClient(row);
-      }
+      yield* this.#startForUse(row);
       const current = yield* this.#requireRow(serverId);
       // A client asks for a start because it cannot reach the server. When the row says it runs, a lost
       // provider event can hide a stop, so the provider is asked.
       if (current.observed_state === "running" && current.provider_sandbox_id) yield* this.#refresh(current);
       return summary(yield* this.#requireRow(serverId));
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
+  /**
+   * Signal has a Slack, Discord or Telegram event for a host with no `ingress` socket. With `wake`, an idle
+   * server starts as it does for a client. `starting` tells Signal to keep the event until the host connects.
+   * Only signed Signal requests reach this, for the host of a linked route; no user is signed in.
+   */
+  readonly routeWake = Effect.fn("HostedServerService.routeWake")(
+    function* (
+      this: HostedServerService,
+      hostId: string,
+      wake: boolean,
+    ): Effect.fn.Return<RouteHostState, HostedFailure, HostedServerDependencies> {
+      const dependencies = yield* HostedServerDependencies;
+      const row = yield* hostedCall(() =>
+        dependencies.database
+          .prepare(`SELECT ${ROW_COLUMNS} FROM hosted_servers WHERE server_id = ? AND desired_state != 'deleted'`)
+          .bind(hostId)
+          .first<HostedServerRow>(),
+      );
+      if (!row) return "not_hosted";
+      if (row.desired_state === "stopped") return "ended";
+      if (!wake) return row.desired_state === "idle" ? "sleeping" : "starting";
+      yield* this.#startForUse(row);
+      return "starting";
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
@@ -1862,6 +1875,31 @@ export class HostedServerService {
         }),
       ),
     );
+  });
+
+  /** Starts a server that a client or a connector event needs. Its plan did not end. */
+  readonly #startForUse = Effect.fn("HostedServerService.startForUse")(function* (
+    this: HostedServerService,
+    row: HostedServerRow,
+  ): Effect.fn.Return<void, HostedFailure, HostedServerDependencies> {
+    const dependencies = yield* HostedServerDependencies;
+    if (row.desired_state === "idle") {
+      const now = dependencies.now();
+      // The start counts as use, so the server does not stop again before its first client connects.
+      yield* hostedCall(() =>
+        dependencies.database
+          .prepare(
+            `UPDATE hosted_servers SET desired_state = 'running', last_active_at = ?, updated_at = ?
+           WHERE server_id = ? AND desired_state = 'idle'`,
+          )
+          .bind(now, now, row.server_id)
+          .run(),
+      );
+      // A server that still stops starts again when the provider reports that it stopped.
+      yield* this.#wakeForClient(yield* this.#requireRow(row.server_id));
+    } else if (!(yield* this.#retrySetup(row))) {
+      yield* this.#wakeForClient(row);
+    }
   });
 
   /** The row keeps the reason of a failed resume, so the client gets it in the summary, not as a 500. */

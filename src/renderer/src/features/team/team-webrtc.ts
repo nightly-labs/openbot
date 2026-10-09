@@ -315,7 +315,8 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
     message.type === "webhook-ready" ||
     message.type === "webhook-delivery" ||
     message.type === "telegram-delivery" ||
-    message.type === "telegram-call-result"
+    message.type === "telegram-call-result" ||
+    message.type === "queued-delivery"
   )
     return;
   if (message.type === "account-profile-changed") {

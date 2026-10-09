@@ -137,7 +137,6 @@ interface PendingApproval {
 }
 
 const FATAL_STATES = new Set<MessagingConnectionState>(["invalid_token", "removed"]);
-const LIVE_STATES = new Set<MessagingConnectionState>(["connecting", "connected", "reconnecting", "rate_limited"]);
 const APPROVAL_TEXT_LIMIT = 2_500;
 const CANCEL_TEXT = /^(cancel|stop)$/i;
 const RECENT_MESSAGES = 2_000;
@@ -243,10 +242,6 @@ export class MessagingService {
   resume(): void {
     this.#ingress?.reconnect();
     for (const live of this.#live.values()) live.transport?.reconnect();
-  }
-
-  hasLiveConnection(): boolean {
-    return [...this.#live.values()].some((live) => LIVE_STATES.has(live.state));
   }
 
   /** The Slack workspaces of this computer, for Server settings > Connectors. A disconnected one is left out. */

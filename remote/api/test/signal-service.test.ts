@@ -1,3 +1,8 @@
+import {
+  createIngressQueueKeyPair,
+  importIngressQueuePrivateKey,
+  openQueuedDelivery,
+} from "@openbot/contracts/signal-protocol/ingress-queue";
 import { Effect } from "effect";
 import { describe, expect, it, vi } from "vitest";
 import type { RemoteTicketClaims } from "../src/protocol";
@@ -38,6 +43,7 @@ describe("SignalService", () => {
         body: new TextEncoder().encode("private request"),
         retryNum: null,
         retryReason: null,
+        wakes: false,
       }),
       controller.signal,
     );
@@ -64,6 +70,69 @@ describe("SignalService", () => {
       controller.abort();
       await service.close();
     }
+  });
+
+  it("answers Slack for a hosted server that sleeps, and keeps only a request that addresses OpenBot", async () => {
+    const service = new SignalService(
+      {
+        ...fakeTokens(),
+        verifySlackRoute: () => Effect.succeed({ teams: [{ id: "T1", appId: "A1", linkedAt: 1 }] }),
+        validateSlackRoute: () => Effect.succeed(["T1"]),
+      },
+      8,
+      undefined,
+      undefined,
+      undefined,
+      {
+        routeWaker: (route) =>
+          Effect.succeed(
+            route.platform === "slack" && route.teamId === "T1"
+              ? { hostId: "host-1", state: "starting" as const }
+              : { hostId: "host-2", state: "ended" as const },
+          ),
+      },
+    );
+    const key = await createIngressQueueKeyPair();
+    const ingress = async (id: string, token: string) => {
+      const target = socket(id);
+      service.connect(target);
+      const frame = { type: "hello", version: 1, peer: "ingress", token, slackRoute: "route" };
+      await runSignal(service, service.receive(target, JSON.stringify({ ...frame, queueKey: key.publicKey })));
+      return target;
+    };
+    await runSignal(service, service.disconnect(await ingress("before", "host-ticket")));
+    const slack = (teamId: string, wakes: boolean, text: string) =>
+      runSignal(
+        service,
+        service.deliverSlack("A1", teamId, {
+          kind: "events",
+          body: new TextEncoder().encode(text),
+          retryNum: null,
+          retryReason: null,
+          wakes,
+        }),
+      );
+
+    // 200 so that Slack does not count a failure; only the mention waits for the host.
+    await expect(slack("T1", false, "channel chatter")).resolves.toEqual({ status: 200 });
+    await expect(slack("T1", true, "private mention")).resolves.toEqual({ status: 200 });
+    // A server whose plan ended does not start: Slack sends the request again, as for any offline host.
+    await expect(slack("T2", true, "other mention")).resolves.toEqual({ status: 503 });
+
+    const after = await ingress("after", "current-host-ticket");
+    const kept = after.messages
+      .map((message) => JSON.parse(message))
+      .filter((frame) => frame.type === "queued-delivery");
+    expect(kept).toHaveLength(1);
+    const opened = await openQueuedDelivery(
+      await importIngressQueuePrivateKey(key.privateKey),
+      "host-1",
+      kept[0].sealed,
+    );
+    expect(opened).toMatchObject({ type: "slack-delivery", teamId: "T1" });
+    expect(opened.type === "slack-delivery" && Buffer.from(opened.bodyBase64, "base64").toString()).toBe(
+      "private mention",
+    );
   });
 
   it("notifies only authenticated devices of the changed account without disconnecting them", async () => {

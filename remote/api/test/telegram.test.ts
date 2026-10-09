@@ -1,10 +1,16 @@
 import { generateKeyPairSync } from "node:crypto";
+import {
+  createIngressQueueKeyPair,
+  importIngressQueuePrivateKey,
+  openQueuedDelivery,
+} from "@openbot/contracts/signal-protocol/ingress-queue";
 import type { TelegramCallMethod, TelegramCallParams } from "@openbot/contracts/signal-protocol/telegram-route";
 import { Effect } from "effect";
 import { exportJWK, SignJWT } from "jose";
 import { describe, expect, it, vi } from "vitest";
 import { createRemoteApiApp } from "../src/app";
 import { readRemoteApiConfig } from "../src/config";
+import type { RouteWaker } from "../src/ingress-queue";
 import type { RemoteTicketClaims } from "../src/protocol";
 import { type RemoteTokenProvider, SignalService } from "../src/signal-service";
 import { TelegramBotApi, type TelegramFetch } from "../src/telegram";
@@ -117,6 +123,48 @@ describe("Telegram route", () => {
     const relinked = await connect("relinked", [{ id: "-100", linkedAt: 3_000 }]);
     await revoke("-100", 2_999);
     expect(await delivered(relinked)).toBe(true);
+  });
+
+  it("starts a sleeping hosted server and gives it the kept updates sealed, in order", async () => {
+    const wakes: boolean[] = [];
+    const { connect, postUpdate, call, signal } = await telegramRoute({}, (route, wake) => {
+      wakes.push(wake);
+      return Effect.succeed(
+        route.platform === "telegram" && route.chatId === "-100"
+          ? { hostId: "host-1", state: "starting" as const }
+          : { hostId: null, state: "not_hosted" as const },
+      );
+    });
+    const key = await createIngressQueueKeyPair();
+    // The host said hello with its queue key, then its server stopped.
+    const before = await connect("before", [{ id: "-100" }], key.publicKey);
+    await runSignal(signal, signal.disconnect(before));
+
+    const message = JSON.stringify({ message: { chat: { id: -100 }, text: "private text" } });
+    const press = JSON.stringify({ callback_query: { id: "cb-9", message: { chat: { id: -100 } } } });
+    const member = JSON.stringify({ my_chat_member: { chat: { id: -100 } } });
+    for (const body of [message, press, member]) expect((await postUpdate(body)).status).toBe(200);
+    await vi.waitFor(() => expect(signal.metrics().queuedDeliveries).toBe(2));
+    // One wake for the route: the next updates use the answer of the first.
+    expect(wakes).toEqual([true]);
+    await postUpdate(JSON.stringify({ message: { chat: { id: -200 }, text: "other host" } }));
+
+    const after = await connect("after", [{ id: "-100" }], key.publicKey);
+    const queued = after.messages.map((frame) => JSON.parse(frame));
+    expect(queued.map((frame) => frame.type)).toEqual(["queued-delivery", "queued-delivery"]);
+    expect(after.messages.join("")).not.toContain("private text");
+    const privateKey = await importIngressQueuePrivateKey(key.privateKey);
+    const opened = await Promise.all(queued.map((frame) => openQueuedDelivery(privateKey, "host-1", frame.sealed)));
+    expect(
+      opened.map((frame) =>
+        frame.type === "telegram-delivery" ? Buffer.from(frame.bodyBase64, "base64").toString() : null,
+      ),
+    ).toEqual([message, press]);
+    // The new socket can answer the button press that came while the server slept.
+    expect(await call(after, "answerCallbackQuery", { callback_query_id: "cb-9" })).toMatchObject({ ok: true });
+    // Sent once.
+    const again = await connect("again", [{ id: "-100" }], key.publicKey);
+    expect(again.messages).toEqual([]);
   });
 
   it("links a chat with a /start code and routes it to the host at once", async () => {
@@ -235,7 +283,7 @@ interface TestSocket {
   close(): void;
 }
 
-async function telegramRoute(provider: Partial<RemoteTokenProvider> = {}) {
+async function telegramRoute(provider: Partial<RemoteTokenProvider> = {}, routeWaker: RouteWaker | null = null) {
   const { privateKey, publicKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
   const jwk = await exportJWK(publicKey);
   jwk.kid = "route-1";
@@ -289,13 +337,14 @@ async function telegramRoute(provider: Partial<RemoteTokenProvider> = {}) {
         bot: new TelegramBotApi(config.telegram, { fetch, apiOrigin: "https://telegram.test" }),
         files: new TelegramFileTokens(config.sessionSecret),
       },
+      routeWaker,
     },
   );
   const app = createRemoteApiApp(config, signal, signalRuntime(signal));
   const sockets = new Map<string, TestSocket>();
   const now = Math.floor(Date.now() / 1_000);
 
-  const connect = async (id: string, chats: Array<{ id: string; linkedAt?: number }> | null) => {
+  const connect = async (id: string, chats: Array<{ id: string; linkedAt?: number }> | null, queueKey?: string) => {
     const messages: string[] = [];
     const socket: TestSocket = {
       id,
@@ -330,11 +379,13 @@ async function telegramRoute(provider: Partial<RemoteTokenProvider> = {}) {
           token: "host-ticket",
           slackRoute: "route",
           telegramRoute,
+          queueKey,
         }),
       ),
     );
-    expect(messages.at(-1)).toContain('"type":"ready"');
-    socket.ready = messages.pop() ?? "";
+    socket.ready = messages.find((message) => message.includes('"type":"ready"')) ?? "";
+    expect(socket.ready).not.toBe("");
+    messages.splice(messages.indexOf(socket.ready), 1);
     return socket;
   };
 
@@ -387,7 +438,7 @@ async function telegramRoute(provider: Partial<RemoteTokenProvider> = {}) {
     expect(response.status).toBe(204);
   };
 
-  return { app, connect, postUpdate, call, revoke, requests, sockets };
+  return { app, connect, postUpdate, call, revoke, requests, sockets, signal };
 }
 
 function hostTickets(): RemoteTokenProvider {

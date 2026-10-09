@@ -158,6 +158,7 @@ const signalClientMessageSchema = z.discriminatedUnion("type", [
     discordRoute: z.string().min(1).max(8_192).optional(),
     webhookRoute: z.string().min(1).max(8_192).optional(),
     telegramRoute: z.string().min(1).max(16_384).optional(),
+    queueKey: z.string().max(128).optional(),
   }),
   z.object({
     type: z.enum(["offer", "answer"]),

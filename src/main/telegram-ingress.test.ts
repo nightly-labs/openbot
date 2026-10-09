@@ -6,11 +6,18 @@
 // Signal's own checks are in `remote/api/test`.
 
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
+import {
+  createIngressQueueKeyPair,
+  importIngressQueuePrivateKey,
+  sealQueuedDelivery,
+} from "@openbot/contracts/signal-protocol/ingress-queue";
+import type { SignalServerMessage } from "@openbot/contracts/signal-protocol/messages";
 import { Effect, Result } from "effect";
 import { afterEach, describe, expect, it } from "vitest";
 import { type WebSocket, WebSocketServer } from "ws";
 import { waitFor } from "../backend/agent-service-test-harness";
 import { TelegramCallError } from "../backend/messaging/messaging-types";
+import type { IngressQueueKey } from "./ingress-queue-key";
 import { SignalIngress } from "./signal-ingress";
 
 class FakeSignal {
@@ -71,6 +78,10 @@ class FakeSignal {
     this.url = `ws://127.0.0.1:${address.port}`;
   }
 
+  send(frame: SignalServerMessage): void {
+    this.#socket?.send(JSON.stringify(frame));
+  }
+
   deliver(body: string): void {
     this.#socket?.send(
       JSON.stringify({
@@ -99,7 +110,10 @@ afterEach(async () => {
   signal = null;
 });
 
-async function open(capabilities: string[] | undefined): Promise<{ signal: FakeSignal; ingress: SignalIngress }> {
+async function open(
+  capabilities: string[] | undefined,
+  queueKey: IngressQueueKey | null = null,
+): Promise<{ signal: FakeSignal; ingress: SignalIngress }> {
   const fake = new FakeSignal(capabilities);
   await fake.start();
   signal = fake;
@@ -111,6 +125,7 @@ async function open(capabilities: string[] | undefined): Promise<{ signal: FakeS
     issueDiscordRoute: () => Effect.succeed("discord-route"),
     issueWebhookRoute: () => Effect.succeed("webhook-route"),
     issueTelegramRoute: () => Effect.succeed("telegram-route"),
+    queueKey: () => Effect.succeed(queueKey),
   });
   ingress = created;
   created.acquire("slack");
@@ -162,5 +177,47 @@ describe.sequential("Telegram on the ingress socket", () => {
     signal.deliver('{"update_id":1}');
     await waitFor(() => received.length === 1);
     expect(received).toEqual(['700:-100:{"update_id":1}']);
+  });
+
+  it("opens a delivery that Signal kept for this host, and answers nothing for it", async () => {
+    const pair = await createIngressQueueKeyPair();
+    const key = { publicKey: pair.publicKey, privateKey: await importIngressQueuePrivateKey(pair.privateKey) };
+    const { signal, ingress } = await open(["telegram"], key);
+    expect(signal.frames[0]).toMatchObject({ type: "hello", queueKey: pair.publicKey });
+    const received: string[] = [];
+    ingress.handle((teamId, delivery) =>
+      Effect.sync(() => {
+        if (delivery.platform === "slack") received.push(`${teamId}:${Buffer.from(delivery.body).toString()}`);
+        return { status: 200 as const };
+      }),
+    );
+    const slack = (body: string) =>
+      ({
+        type: "slack-delivery",
+        version: 1,
+        requestId: "kept-1",
+        teamId: "T1",
+        kind: "events",
+        retryNum: null,
+        retryReason: null,
+        bodyBase64: Buffer.from(body).toString("base64"),
+      }) as const;
+
+    // A delivery sealed for another host does not open, and does not close the socket.
+    signal.send({
+      type: "queued-delivery",
+      version: 1,
+      sealed: await sealQueuedDelivery(pair.publicKey, "host-2", slack("other")),
+    });
+    signal.send({
+      type: "queued-delivery",
+      version: 1,
+      sealed: await sealQueuedDelivery(pair.publicKey, "host-1", slack("mine")),
+    });
+    await waitFor(() => received.length === 1);
+    expect(received).toEqual(["T1:mine"]);
+    expect(ingress.state()).toBe("online");
+    // Signal already answered Slack, and refuses an answer to a request it did not send.
+    expect(signal.frames.some((frame) => frame.type === "slack-delivery-result")).toBe(false);
   });
 });

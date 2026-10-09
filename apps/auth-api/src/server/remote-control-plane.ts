@@ -124,6 +124,12 @@ export type RemoteResumeClaims = Pick<
   "sessionId" | "hostId" | "userId" | "membershipId" | "role" | "authEpoch" | "sessionExpiresAt"
 >;
 
+/** One messaging route that Signal passes events on for, as the account service links it to a host. */
+export type RemoteRoute =
+  | { platform: "slack"; appId: string; teamId: string }
+  | { platform: "discord"; guildId: string }
+  | { platform: "telegram"; botId: string; chatId: string };
+
 interface RemoteInviteRow {
   invite_id: string;
   host_id: string;
@@ -1680,6 +1686,31 @@ export class RemoteControlPlane {
           return row?.app_id === team.appId && row.connected_at === team.linkedAt;
         })
         .map((team) => team.id);
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
+  /** The host that a Slack workspace, Discord guild or Telegram chat is linked to, or null. */
+  readonly routeHost = Effect.fn("RemoteControlPlane.routeHost")(
+    function* (
+      this: RemoteControlPlane,
+      route: RemoteRoute,
+    ): Effect.fn.Return<string | null, RemoteFailure, RemoteDependencies> {
+      const dependencies = yield* RemoteDependencies;
+      const statement =
+        route.platform === "slack"
+          ? dependencies.database
+              .prepare("SELECT host_id FROM slack_workspace_routes WHERE team_id = ? AND app_id = ?")
+              .bind(route.teamId, route.appId)
+          : route.platform === "discord"
+            ? dependencies.database
+                .prepare("SELECT host_id FROM discord_guild_routes WHERE guild_id = ?")
+                .bind(route.guildId)
+            : dependencies.database
+                .prepare("SELECT host_id FROM telegram_chat_routes WHERE bot_id = ? AND chat_id = ?")
+                .bind(route.botId, route.chatId);
+      const row = yield* remoteCall(() => statement.first<{ host_id: string }>());
+      return row?.host_id ?? null;
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);

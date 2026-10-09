@@ -27,6 +27,10 @@ const TelegramValidation = Schema.Struct({
 const TelegramLink = Schema.Struct({ hostId: Schema.String, linkedAt: Schema.Int });
 const DiscordValidation = Schema.Struct({ guilds: Schema.Array(Schema.String) });
 const WebhookValidation = Schema.Struct({ routes: Schema.Array(Schema.String) });
+const RouteWakeAnswer = Schema.Struct({
+  hostId: Schema.NullOr(Schema.String),
+  state: Schema.Literals(["not_hosted", "ended", "sleeping", "starting"]),
+});
 
 class ControlPlane extends Context.Service<
   ControlPlane,
@@ -58,6 +62,11 @@ class ControlPlane extends Context.Service<
       routes: import("@openbot/contracts/signal-protocol/webhook-route").WebhookRoute[],
     ): Effect.Effect<string[], ControlPlaneError>;
     discordGuildRemoved(guildId: string): Effect.Effect<void, ControlPlaneError>;
+    // An account service without the route answers 404: no host starts and nothing is kept.
+    routeWake(
+      route: import("./ingress-queue").IngressRoute,
+      wake: boolean,
+    ): Effect.Effect<import("./ingress-queue").RouteWake, ControlPlaneError>;
     reconcileDiscordGuilds(guildIds: string[], before: number): Effect.Effect<void, ControlPlaneError>;
   }
 >()("@openbot/remote-api/ControlPlane") {
@@ -174,6 +183,22 @@ class ControlPlane extends Context.Service<
           releaseResponse,
         ),
       ),
+      routeWake: Effect.fn("ControlPlane.routeWake")((route, wake) =>
+        Effect.acquireUseRelease(
+          ask("/v2/remote/route-wake", { route, wake }),
+          (response) =>
+            Effect.gen(function* () {
+              if (response.status === 404) return { hostId: null, state: "not_hosted" as const };
+              if (!response.ok)
+                return yield* new ControlPlaneError({ message: "The account service did not answer the route wake." });
+              return yield* readJson(response).pipe(
+                Effect.flatMap(Schema.decodeUnknownEffect(RouteWakeAnswer)),
+                Effect.mapError(() => new ControlPlaneError({ message: "The account service response is invalid." })),
+              );
+            }),
+          releaseResponse,
+        ),
+      ),
       discordGuildRemoved: Effect.fn("ControlPlane.discordGuildRemoved")((guildId) =>
         Effect.acquireUseRelease(
           ask("/v2/remote/discord-route/removed", { guildId }),
@@ -271,6 +296,11 @@ const signal = new SignalService(
     telegram: config.telegram
       ? { bot: new TelegramBotApi(config.telegram), files: new TelegramFileTokens(config.sessionSecret) }
       : null,
+    // A failure keeps nothing: the platform gets the answer of an offline host, as before.
+    routeWaker: (route, wake) =>
+      controlPlaneService
+        .routeWake(route, wake)
+        .pipe(Effect.catch(() => Effect.succeed({ hostId: null, state: "not_hosted" as const }))),
   },
 );
 const tlsPaths =

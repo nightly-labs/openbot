@@ -2,9 +2,11 @@ import type { MessagingPlatform } from "@openbot/contracts/ipc";
 import { decodeSignalServerMessage } from "@openbot/contracts/signal-protocol/decode";
 import { type DiscordApiRequest, decodeDiscordApiError } from "@openbot/contracts/signal-protocol/discord-api";
 import { DISCORD_API_PATH } from "@openbot/contracts/signal-protocol/discord-route";
+import { openQueuedDelivery } from "@openbot/contracts/signal-protocol/ingress-queue";
 import {
   SIGNAL_PROTOCOL_VERSION,
   type SignalClientMessage,
+  type SignalServerMessage,
   SLACK_DELIVERY_RESPONSE_BYTES_LIMIT,
   type WebhookDeliveryStatus,
 } from "@openbot/contracts/signal-protocol/messages";
@@ -15,7 +17,7 @@ import {
   type TelegramCallResult,
 } from "@openbot/contracts/signal-protocol/telegram-route";
 import { createOpenBotLogger } from "@openbot/logging";
-import { Context, Effect, Exit, Layer, ManagedRuntime, Option, Result, Scope } from "effect";
+import { Context, Effect, Exit, Layer, ManagedRuntime, Option, Result, Scope, Semaphore } from "effect";
 import WebSocket from "ws";
 import {
   DiscordApiError,
@@ -28,6 +30,7 @@ import {
   TelegramCallError,
   type TelegramGateway,
 } from "../backend/messaging/messaging-types";
+import type { IngressQueueKey } from "./ingress-queue-key";
 import { type RemoteWorkflowError, remoteDecode } from "./remote-service-effects";
 import { downloadTelegramFile, signalHttpOrigin, uploadTelegramFile } from "./telegram-files";
 
@@ -62,6 +65,11 @@ export interface SignalIngressOptions {
    * again later.
    */
   issueTelegramRoute?(hostId: string): Effect.Effect<string, RemoteWorkflowError>;
+  /**
+   * The lasting queue key of this host, or null. With it, Signal keeps the events of a hosted server
+   * that sleeps, sealed, and sends them when the socket connects.
+   */
+  queueKey?(): Effect.Effect<IngressQueueKey | null>;
 }
 
 class SignalIngressAccount extends Context.Service<
@@ -162,6 +170,11 @@ export class SignalIngress implements MessagingIngress {
   /** The HTTPS origin of the Signal of the open socket, for Telegram files. */
   #signalOrigin: string | null = null;
   readonly #telegramCalls = new Map<string, (answer: TelegramCallAnswer) => void>();
+  /** Loaded once; `null` when this host has none. */
+  #queueKey: IngressQueueKey | null | undefined;
+  /** The host ID that the open socket said hello with: the queued events are sealed for it. */
+  #socketHostId: string | null = null;
+  readonly #queuedOrder = Semaphore.makeUnsafe(1);
 
   constructor(options: SignalIngressOptions) {
     this.#options = options;
@@ -394,12 +407,15 @@ export class SignalIngress implements MessagingIngress {
       ...(webhookRoute === null ? {} : { webhookRoute }),
       ...(telegramRoute === null ? {} : { telegramRoute }),
     };
+    if (this.#queueKey === undefined) this.#queueKey = this.#options.queueKey ? yield* this.#options.queueKey() : null;
+    const queueKey = this.#queueKey;
     if (generation !== this.#generation || (this.#held() === 0 && this.#webhookHolders === 0)) return;
     this.#webhookMissing = webhooks && webhookRoute === null;
     this.#telegramMissing = telegram && telegramRoute === null;
     if (telegram && telegramRoute !== null) this.#telegramBackoffMs = BACKOFF_START_MS;
     const socket = new WebSocket(bootstrap.signalUrl);
     this.#socket = socket;
+    this.#socketHostId = hostId;
     this.#apiUrl = discordApiUrl(bootstrap.signalUrl);
     this.#signalOrigin = signalHttpOrigin(bootstrap.signalUrl);
     socket.on("open", () => {
@@ -409,6 +425,7 @@ export class SignalIngress implements MessagingIngress {
         peer: "ingress",
         token: bootstrap.ticket,
         ...routes,
+        ...(queueKey ? { queueKey: queueKey.publicKey } : {}),
       };
       socket.send(JSON.stringify(hello));
     });
@@ -441,6 +458,35 @@ export class SignalIngress implements MessagingIngress {
     }
     const message = decoded.success;
     if (!message || socket !== this.#socket) return;
+    if (message.type !== "queued-delivery") return yield* this.#dispatch(socket, message, false);
+    // A delivery that Signal kept while this host started. Signal already answered the platform. The
+    // kept deliveries are handled one at a time, in the order that Signal sent them.
+    const sealed = message.sealed;
+    yield* this.#queuedOrder.withPermit(
+      Effect.gen({ self: this }, function* () {
+        const key = this.#queueKey;
+        const hostId = this.#socketHostId;
+        const opened =
+          key && hostId
+            ? yield* Effect.tryPromise(() => openQueuedDelivery(key.privateKey, hostId, sealed)).pipe(
+                Effect.catch(() => Effect.succeed(null)),
+              )
+            : null;
+        if (!opened) {
+          logger.warn("A kept delivery from Signal could not be opened, and is dropped.");
+          return;
+        }
+        if (socket === this.#socket) yield* this.#dispatch(socket, opened, true);
+      }),
+    );
+  });
+
+  readonly #dispatch = Effect.fn("SignalIngress.dispatch")(function* (
+    this: SignalIngress,
+    socket: WebSocket,
+    message: Exclude<SignalServerMessage, { type: "queued-delivery" }>,
+    queued: boolean,
+  ) {
     if (message.type === "ready") {
       this.#capabilities = new Set(message.capabilities ?? []);
       this.#backoffMs = BACKOFF_START_MS;
@@ -525,7 +571,7 @@ export class SignalIngress implements MessagingIngress {
           body: Buffer.from(message.bodyBase64, "base64"),
         }).pipe(Effect.catch(() => Effect.succeed<IngressAnswer>({ status: 503 })))
       : { status: 503 };
-    if (socket.readyState !== WebSocket.OPEN) return;
+    if (queued || socket.readyState !== WebSocket.OPEN) return;
     const body =
       answer.contentType && answer.body !== undefined && answer.body.length <= SLACK_DELIVERY_RESPONSE_BYTES_LIMIT
         ? { contentType: answer.contentType, body: answer.body }

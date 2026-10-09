@@ -3,8 +3,9 @@
 A hosted server is an OpenBot server that runs in a [boat](https://boat.dev) sandbox, so it works
 when the user's computer is off. Each server is one boat sandbox for one account. The sandbox runs
 the Linux build of OpenBot on the boat desktop. The server runs while it is in use. After 15 minutes with no
-use, the Worker stops it and keeps its data. The next client starts it again, and the Worker cron
-starts it before its next routine run. A connected client counts as use for 5 minutes after its
+use, the Worker stops it and keeps its data. The next client starts it again, the Worker cron
+starts it before its next routine run, and Signal starts it for a Slack, Discord or Telegram message
+that addresses OpenBot (see [Connector events](#connector-events)). A connected client counts as use for 5 minutes after its
 last user action (`CLIENT_USE_WINDOW_MS`): a request that changes data, or a typing event. Reads and
 the requests that a client sends with no user action (polls, previews, mark-read) do not count
 (`src/main/team-api/client-use.ts`). So an app that is open but not used does not keep the server on:
@@ -93,6 +94,8 @@ when a server is idle or boat stops a sandbox; and `error` and `deleted`. The Wo
    `archived` for a server in use (for example, after maintenance), the webhook resumes the sandbox
    at once. The Worker cron (each minute on `test`) resumes a server that stays `stopped` for 2
    minutes.
+
+   A live Slack, Discord or Telegram connection is not use: the server sleeps with its connectors.
 
    **Idle.** The cron stops a running server with no activity and no state change for 15 minutes:
    `desired_state = 'idle'`, and boat saves the disk. It does not stop a server whose next routine
@@ -486,6 +489,35 @@ a person loads the page again, without its history and page state. When memory i
 unloads after 5 minutes. The active tab, a popup and its opener, and a tab with a
 takeover, a secret, a recording, a live view, staged uploads or sound do not unload. This also
 applies to the desktop app.
+
+## Connector events
+
+All messaging platforms use one path in Signal (`remote/api/src/ingress-queue.ts`). When an event
+comes for a route (a Slack workspace, a Discord guild or a Telegram chat) and no `ingress` socket
+holds it:
+
+1. Signal asks the Worker, signed, `POST /v2/remote/route-wake` with the route and `wake`. The Worker
+   finds the host in `slack_workspace_routes`, `discord_guild_routes` or `telegram_chat_routes`, and
+   answers `not_hosted`, `ended`, `sleeping` or `starting`. With `wake`, an idle server starts as for
+   a client (`last_wake_reason = 'message'`). A plan that ended starts nothing. Signal asks at most
+   once a minute for each route.
+2. `wake` is true only for an event that addresses OpenBot: a Slack button press, mention, direct
+   message or thread reply from a person; a Discord mention or button press; a Telegram message or
+   button press.
+3. For such an event and a server that starts, Signal keeps the delivery frame, sealed to the host's
+   queue key (`@openbot/contracts/signal-protocol/ingress-queue`), in memory for at most 10 minutes
+   (64 events and 4 MB for each host). Slack gets 200, so it does not send the event again. Signal
+   cannot read a kept event, and a restart of Signal loses it.
+4. Another Slack event of a hosted server gets 200 and is dropped: the host keeps only messages that
+   address OpenBot, and joins the public channels again when its connection starts.
+5. When the host's socket connects again, Signal sends each kept event of the routes that the socket
+   holds, in order, as `queued-delivery`. The host opens it with its private key and handles it as a
+   normal delivery, with no answer.
+
+The host makes its queue key once (`src/main/ingress-queue-key.ts`, `openbot-ingress-queue-key-v1.json`
+in the user data folder), encrypted by the operating system, and sends the public half in each
+`ingress` hello. An older host sends no key, so Signal keeps nothing for it. Generic webhooks do not
+start a server: their sender sends again after a 503.
 
 ## Tested on boat
 
