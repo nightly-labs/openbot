@@ -30,6 +30,7 @@ export function AgentSessionSettings(props: {
   });
   let generation = 0;
   let request = 0;
+  let reload: (() => void) | undefined;
   createEffect(
     () => [props.agentId, props.providerIdentity, props.api] as const,
     ([agentId, , api]) => {
@@ -51,9 +52,11 @@ export function AgentSessionSettings(props: {
             });
         }
       };
+      reload = () => void read();
       void read();
       const stop = api.subscribe?.(agentId, () => void read());
       return () => {
+        reload = undefined;
         generation++;
         stop?.();
       };
@@ -97,7 +100,16 @@ export function AgentSessionSettings(props: {
   return (
     <Show when={ids().length > 0 || state.error}>
       <SettingsLinkGroup title={t("agentSettings.session.title")}>
-        <Show when={state.error}>{(message) => <Text role="alert">{message()}</Text>}</Show>
+        <Show when={state.error}>
+          {(message) => (
+            <>
+              <Text role="alert">{message()}</Text>
+              <Button variant="ghost" onClick={() => reload?.()}>
+                {t("common.retry")}
+              </Button>
+            </>
+          )}
+        </Show>
         <Show when={state.data?.pending}>
           <Text tone="muted">{t("agentSettings.session.pending")}</Text>
         </Show>
