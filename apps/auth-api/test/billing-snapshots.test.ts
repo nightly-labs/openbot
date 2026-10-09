@@ -23,7 +23,8 @@ describe("billing snapshots", () => {
         status, current_period_end, cancel_at_period_end, updated_at
       ) VALUES
         ('sub_month', 'user-1', 'cus-1', 'server-1', 'starter', 'month', 'eur', 1000, 'active', 2, 0, 1),
-        ('sub_year', 'user-2', 'cus-2', 'server-2', 'pro', 'year', 'usd', 12000, 'past_due', 2, 1, 1);
+        ('sub_year', 'user-2', 'cus-2', 'server-2', 'pro', 'year', 'usd', 12000, 'past_due', 2, 1, 1),
+        ('sub_free', 'user-3', 'cus-3', 'server-3', 'starter', 'month', 'eur', 1000, 'active', 2, 0, 1);
     `);
     const subscriptions = new Map([
       [
@@ -67,6 +68,28 @@ describe("billing snapshots", () => {
               },
             ],
           },
+        },
+      ],
+      [
+        "sub_free",
+        {
+          id: "sub_free",
+          status: "active",
+          currency: "eur",
+          cancel_at_period_end: false,
+          items: {
+            data: [
+              {
+                quantity: 1,
+                price: {
+                  currency: "eur",
+                  unit_amount: 1000,
+                  recurring: { interval: "month", interval_count: 1 },
+                },
+              },
+            ],
+          },
+          discounts: [{ id: "discount_free", coupon: { percent_off: 100 } }],
         },
       ],
     ]);
@@ -209,8 +232,11 @@ function seedOwners(database: DatabaseSync): void {
   database.exec(`
     INSERT INTO users(id, identity_key, email, name, avatar_url, created_at, updated_at)
     VALUES ('user-1', 'email:user-1@example.test', 'user-1@example.test', 'User One', NULL, 1, 1),
-           ('user-2', 'email:user-2@example.test', 'user-2@example.test', 'User Two', NULL, 1, 1);
+           ('user-2', 'email:user-2@example.test', 'user-2@example.test', 'User Two', NULL, 1, 1),
+           ('user-3', 'email:user-3@example.test', 'user-3@example.test', 'User Three', NULL, 1, 1);
     INSERT INTO remote_hosts(host_id, owner_user_id, name, created_at, updated_at)
-    VALUES ('server-1', 'user-1', 'Server One', 1, 1), ('server-2', 'user-2', 'Server Two', 1, 1);
+    VALUES ('server-1', 'user-1', 'Server One', 1, 1),
+           ('server-2', 'user-2', 'Server Two', 1, 1),
+           ('server-3', 'user-3', 'Server Three', 1, 1);
   `);
 }

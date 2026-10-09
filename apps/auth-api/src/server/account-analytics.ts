@@ -19,7 +19,7 @@ import { Effect, Schema } from "effect";
 /** The same OpenPanel project as the desktop app and the website. ANALYTICS.md is the contract. */
 const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
 /** The current generation. The `account_api` events are new and change no older event. */
-const ANALYTICS_SCHEMA_VERSION = 8;
+export const ACCOUNT_ANALYTICS_SCHEMA_VERSION = 9;
 const SEND_TIMEOUT_MS = 5_000;
 const ACCOUNT_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
 
@@ -140,7 +140,7 @@ export function accountEventProperties(event: AccountAnalyticsEvent): Record<str
   const properties: Record<string, string | number> = {
     surface: "account_api",
     environment: "production",
-    event_schema_version: ANALYTICS_SCHEMA_VERSION,
+    event_schema_version: ACCOUNT_ANALYTICS_SCHEMA_VERSION,
   };
   if (event.name === "billing_action") {
     if (!isOneOf(BILLING_ACTIONS, event.action)) return null;

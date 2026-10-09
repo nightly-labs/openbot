@@ -61,7 +61,7 @@ const StripeSubscription = Schema.Struct({
 type StripeDiscount = typeof StripeDiscount.Type;
 type StripePrice = typeof StripePrice.Type;
 
-export const BILLING_SNAPSHOT_EVENT = "billing_snapshot" as const;
+const BILLING_SNAPSHOT_EVENT = "billing_snapshot" as const;
 
 export class BillingSnapshotError extends Schema.TaggedError<BillingSnapshotError>()("BillingSnapshotError", {
   code: Schema.Literals(["database", "stripe", "invalid_subscription", "currency", "delivery", "invalid_input"]),
@@ -76,7 +76,7 @@ export interface BillingSnapshotBindings {
 
 export type BillingSnapshotFetch = (input: string, init: RequestInit) => Promise<Response>;
 
-export interface BillingSnapshotMetrics {
+interface BillingSnapshotMetrics {
   mrr: number;
   arr: number;
   overdueMrr: number;
@@ -206,8 +206,10 @@ export const captureBillingSnapshot = Effect.fn("captureBillingSnapshot")(functi
     } catch (error) {
       return yield* error instanceof BillingSnapshotError ? error : snapshotError("invalid_subscription");
     }
-    users.add(sample.userId);
-    if (sample.serverId) servers.add(sample.serverId);
+    if (sample.amountMinor > 0) {
+      users.add(sample.userId);
+      if (sample.serverId) servers.add(sample.serverId);
+    }
   }
   try {
     metrics = { ...metrics, arr: multiplySafe(metrics.mrr, 12), payingAccounts: users.size, paidServers: servers.size };
@@ -257,12 +259,12 @@ export const captureBillingSnapshot = Effect.fn("captureBillingSnapshot")(functi
 });
 
 /** Returns the UTC day used for the durable source key and the report's date dimension. */
-export function utcDay(timestamp: number): string {
+function utcDay(timestamp: number): string {
   return new Date(timestamp).toISOString().slice(0, 10);
 }
 
 /** The stable key that makes the five-minute cron idempotent for one UTC day. */
-export function billingSnapshotSourceKey(timestamp: number): string {
+function billingSnapshotSourceKey(timestamp: number): string {
   return `${BILLING_SNAPSHOT_EVENT}:${utcDay(timestamp)}`;
 }
 

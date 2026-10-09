@@ -19,7 +19,7 @@ Every event has these low-cardinality properties:
 - `surface`: `desktop`, `desktop_host`, `landing`, `web`, `mobile`, or `account_api`;
 - `environment`: currently `production` only;
 - `event_schema_version`: the integer schema generation of that surface: currently `7` on `desktop`
-  and `desktop_host`, `8` on `landing` and `account_api`, `2` on `mobile`, and `1` on `web`;
+  and `desktop_host`, `8` on `landing`, `9` on `account_api`, `2` on `mobile`, and `1` on `web`;
 - `app_version` and `platform` on desktop surfaces;
 - `acquisition_source` on landing surfaces: `direct`, `search`, `social`, `github`, or `other`;
 - `source_platform` on landing surfaces: an allowlisted platform name, or `unknown`.

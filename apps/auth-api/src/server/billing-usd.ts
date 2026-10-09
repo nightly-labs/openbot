@@ -18,15 +18,6 @@ export type BillingUsdResult = {
   fxRate: number;
 };
 
-export type BillingUsdFailureReason =
-  | "invalid_input"
-  | "database"
-  | "network"
-  | "response"
-  | "document"
-  | "missing_rate"
-  | "invalid_rate";
-
 /** A safe conversion failure. It never contains a database, network, or document payload. */
 export class BillingUsdError extends Schema.TaggedError<BillingUsdError>()("BillingUsdError", {
   reason: Schema.Literals([

@@ -1,5 +1,6 @@
 import { isDynamicRecord, isOneOf } from "@openbot/contracts/runtime-values";
 import { Effect, Schema } from "effect";
+import { ACCOUNT_ANALYTICS_SCHEMA_VERSION } from "./account-analytics";
 
 const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
 const SEND_TIMEOUT_MS = 5_000;
@@ -7,7 +8,7 @@ const CLAIM_TIMEOUT_MS = 5 * 60_000;
 const MAX_BATCH_SIZE = 50;
 const MAX_RATE_LIMIT_RETRIES = 3;
 const RATE_LIMIT_RETRY_DELAY_MS = 60_000;
-const ANALYTICS_SCHEMA_VERSION = 9;
+
 const PROFILE_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
 const SOURCE_KEY_PATTERN = /^[A-Za-z0-9_.:-]{1,512}$/u;
 const SAFE_VALUE_PATTERN = /^[A-Za-z0-9_.:/+-]{1,128}$/u;
@@ -46,11 +47,11 @@ const BILLING_SUBSCRIPTION_STATUSES = [
   "paused",
 ] as const;
 
-export const SALES_ANALYTICS_EVENT_NAMES = ["billing_action", "revenue", "billing_snapshot"] as const;
-export type SalesAnalyticsEventName = (typeof SALES_ANALYTICS_EVENT_NAMES)[number];
+const SALES_ANALYTICS_EVENT_NAMES = ["billing_action", "revenue", "billing_snapshot"] as const;
+type SalesAnalyticsEventName = (typeof SALES_ANALYTICS_EVENT_NAMES)[number];
 
 /** The only event properties that the account Worker may send to OpenPanel. */
-export const SALES_ANALYTICS_EVENT_PROPERTIES = {
+const SALES_ANALYTICS_EVENT_PROPERTIES = {
   billing_action: [
     "action",
     "plan",
@@ -107,8 +108,6 @@ export interface SalesAnalyticsDrainSummary {
   uncertain: number;
   pending: number;
 }
-
-export type SalesAnalyticsDeliveryErrorCode = "invalid_event" | "database" | "delivery";
 
 export class SalesAnalyticsDeliveryError extends Schema.TaggedError<SalesAnalyticsDeliveryError>()(
   "SalesAnalyticsDeliveryError",
@@ -375,7 +374,7 @@ function validateEvent(
   const output: SalesAnalyticsProperties = {
     surface: "account_api",
     environment: "production",
-    event_schema_version: ANALYTICS_SCHEMA_VERSION,
+    event_schema_version: ACCOUNT_ANALYTICS_SCHEMA_VERSION,
     ...properties,
   };
   if (name === "billing_action" && typeof output.action !== "string") {
