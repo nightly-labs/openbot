@@ -3,7 +3,7 @@ import { EventEmitter } from "node:events";
 import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_CURRENT_CAPABILITIES } from "@openbot/contracts/team-protocol/current";
-import { optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
+import { optionalTeamEvent, optionalTeamEventToCurrent } from "@openbot/contracts/team-protocol/optional-events";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import {
   type TeamProtocolV1CurrentEventControl,
@@ -1236,7 +1236,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       }
       const optional = frame.type === "event" ? optionalTeamEvent(frame.payload) : null;
       const decoded = optional
-        ? { status: "known" as const, event: optional }
+        ? { status: "known" as const, event: optionalTeamEventToCurrent(optional) }
         : decodeTeamProtocolV6CurrentEvent(frame);
       if (decoded.status === "invalid") {
         this.#failProtocol(hostId, sourceText("error.remote.malformedKnownEvent"));

@@ -22,7 +22,7 @@ import {
   type TeamProtocolV2Json,
   teamProtocolV2AuthenticationTranscript,
 } from "@openbot/contracts/team-protocol";
-import { optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
+import { optionalTeamEvent, optionalTeamEventToCurrent } from "@openbot/contracts/team-protocol/optional-events";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import {
   type TeamProtocolV1CurrentEventControl,
@@ -1011,9 +1011,9 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       }
       if (frame.sequence !== state.lastEventSequence + 1)
         return yield* new RemotePeerError({ message: sourceText("error.remote.eventStreamGap") });
-      const channel = optionalTeamEvent(frame.payload);
+      const channel = yield* peerDecode(() => optionalTeamEvent(frame.payload));
       const decoded = channel
-        ? { status: "known" as const, event: channel }
+        ? { status: "known" as const, event: optionalTeamEventToCurrent(channel) }
         : yield* peerDecode(() => decodeTeamProtocolV6CurrentEvent(frame));
       if (decoded.status === "invalid")
         return yield* new RemotePeerError({ message: sourceText("error.remote.malformedEvent") });

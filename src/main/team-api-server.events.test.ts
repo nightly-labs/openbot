@@ -129,6 +129,53 @@ describe("TeamApiServer events", () => {
     }
   });
 
+  it.each([
+    { capabilities: ["quiet-turn-v1", "local-providers-v2", "agent-runtime-snapshots"], quiet: true },
+    { capabilities: ["local-providers-v2", "agent-runtime-snapshots"], quiet: false },
+    { capabilities: ["agent-runtime-snapshots"], quiet: false },
+  ])("keeps completion delivery for event capabilities $capabilities", async ({ capabilities, quiet }) => {
+    const events = new EventEmitter();
+    const { store, start } = await createTeamApiFixture("quiet-turn-events", { configure: true });
+    const { port } = await start({ agents: createAgents({}, events) });
+    const login = await Effect.runPromise(store.login("owner", "correct horse battery"));
+    const socket = new WebSocket(`ws://127.0.0.1:${port}/v1/events`, [
+      "openbot-team-v1",
+      `openbot-token.${login.sessionToken}`,
+    ]);
+    const presence = nextJsonEvent(socket);
+    await new Promise<void>((resolve) => socket.addEventListener("open", () => resolve(), { once: true }));
+    await presence;
+    const initial = nextJsonEvent(socket);
+    socket.send(JSON.stringify({ type: "agent-event-scope", includeConversations: true, capabilities }));
+    await initial;
+    const completion = {
+      type: "turn-completed" as const,
+      agentId: "agent-1",
+      threadId: "thread-1",
+      turnId: "turn-1".repeat(30),
+      status: "completed",
+      origin: "routine" as const,
+    };
+    // The shared event helper projects only fields used by older tests. Check the complete wire value here.
+    const nextCompletion = () =>
+      new Promise<unknown>((resolve, reject) => {
+        socket.addEventListener("message", (message) => resolve(JSON.parse(String(message.data))), { once: true });
+        socket.addEventListener("error", () => reject(new Error("WebSocket event failed.")), { once: true });
+      });
+    const quietReceived = nextCompletion();
+    events.emit("event", { ...completion, quiet: true });
+    const { agentId, ...wire } = completion;
+    await expect(quietReceived).resolves.toEqual(
+      quiet ? { ...completion, type: "quiet-turn-completed" } : { ...wire, botId: agentId },
+    );
+    const normalReceived = nextCompletion();
+    events.emit("event", completion);
+    await expect(normalReceived).resolves.toEqual({ ...wire, botId: agentId });
+    const closed = new Promise<void>((resolve) => socket.addEventListener("close", () => resolve(), { once: true }));
+    socket.close();
+    await closed;
+  });
+
   it("sends a skills change only to clients that negotiated skills-events-v1", async () => {
     const events = new EventEmitter();
     const { store, start } = await createTeamApiFixture("skills-events", { configure: true });

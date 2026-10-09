@@ -69,8 +69,8 @@ export type AgentEvent =
       origin?: AgentTurnOrigin;
       /**
        * A routine run that had nothing to report and posted no message. It is not news, so it shows
-       * no notification. The Team API carries it on protocol 6 beside the frozen projection; see
-       * `team-protocol/turn-quiet-v6.ts`.
+       * no notification. The Team API carries it through the optional `quiet-turn-v1` capability.
+       * Peers without that capability receive the released completion event.
        */
       quiet?: true;
     }

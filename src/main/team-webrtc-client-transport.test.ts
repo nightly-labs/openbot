@@ -828,6 +828,53 @@ describe("TeamWebRtcClientTransport", () => {
       );
       expect(event).toHaveBeenCalledWith("host-1", payload);
     }
+    const completion = {
+      type: "quiet-turn-completed",
+      agentId: "agent-1",
+      threadId: "thread-1",
+      turnId: "turn-1",
+      status: "completed",
+      origin: "routine",
+    };
+    bridge.emit(
+      "data",
+      "host-1",
+      "events",
+      JSON.stringify({
+        version: 2,
+        type: "event",
+        sequence: 5,
+        payload: completion,
+      }),
+    );
+    expect(event).toHaveBeenCalledWith("host-1", { ...completion, type: "turn-completed", quiet: true });
+    const { agentId, ...wire } = completion;
+    bridge.emit(
+      "data",
+      "host-1",
+      "events",
+      JSON.stringify({
+        version: 2,
+        type: "event",
+        sequence: 6,
+        payload: { ...wire, type: "turn-completed", botId: agentId },
+      }),
+    );
+    expect(event).toHaveBeenCalledWith("host-1", { ...completion, type: "turn-completed" });
+    const error = vi.fn();
+    transport.on("error", error);
+    bridge.emit(
+      "data",
+      "host-1",
+      "events",
+      JSON.stringify({
+        version: 2,
+        type: "event",
+        sequence: 7,
+        payload: { ...completion, turnId: null },
+      }),
+    );
+    expect(error).toHaveBeenCalledWith("host-1", "protocol_error", expect.any(String));
     await runCauseEffect(transport.stop());
   });
 

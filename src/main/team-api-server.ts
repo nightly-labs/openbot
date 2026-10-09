@@ -43,6 +43,7 @@ import {
   PROVIDERS_RUNTIMES_V2_CAPABILITY,
   PROVIDERS_SIGN_IN_V3_CAPABILITY,
   PROVIDERS_V4_CAPABILITY,
+  QUIET_TURN_CAPABILITY,
   SHARED_TABLES_CAPABILITY,
   SKILLS_ADMIN_CAPABILITY,
   SKILLS_EVENTS_CAPABILITY,
@@ -955,7 +956,18 @@ export class TeamApiServer {
       let queueInvalidation: string | undefined;
       let outgoing: string;
       // `eventCapability` above has already kept an optional event from a client without its capability.
-      const optional = optionalTeamEvent(event);
+      // Completion must still reach a peer without quiet-turn-v1 through its frozen adapter.
+      const optional =
+        event.type === "turn-completed" && event.quiet && connection.capabilities.has(QUIET_TURN_CAPABILITY)
+          ? {
+              type: "quiet-turn-completed" as const,
+              agentId: event.agentId,
+              threadId: event.threadId,
+              turnId: event.turnId,
+              status: event.status,
+              ...(event.origin === undefined ? {} : { origin: event.origin }),
+            }
+          : optionalTeamEvent(event);
       if (optional) {
         // The base events go through the provider view; an optional event that names a hidden agent is left out.
         if (

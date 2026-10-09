@@ -17,7 +17,7 @@ import {
 } from "../src/server/remote-control-plane";
 import { sqliteD1 } from "./sqlite-d1";
 
-/** The account server reads the plan of a host for its member limit, and its Slack and Discord links. */
+/** The account server reads the plan of a host for its member limit and its connector links. */
 function applyPlanMigrations(database: DatabaseSync): void {
   for (const name of [
     "0022_billing.sql",
@@ -25,6 +25,7 @@ function applyPlanMigrations(database: DatabaseSync): void {
     "0025_slack_workspace_routes.sql",
     "0026_discord_guild_routes.sql",
     "0027_webhook_routes.sql",
+    "0029_telegram_chat_routes.sql",
   ]) {
     database.exec(readFileSync(new URL(`../migrations/${name}`, import.meta.url), "utf8"));
   }

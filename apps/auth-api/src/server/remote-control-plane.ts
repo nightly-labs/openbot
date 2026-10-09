@@ -1588,6 +1588,8 @@ export class RemoteControlPlane {
                 dependencies.database.prepare("DELETE FROM remote_invites WHERE host_id = ?").bind(hostId),
                 dependencies.database.prepare("DELETE FROM slack_workspace_routes WHERE host_id = ?").bind(hostId),
                 dependencies.database.prepare("DELETE FROM discord_guild_routes WHERE host_id = ?").bind(hostId),
+                dependencies.database.prepare("DELETE FROM telegram_chat_routes WHERE host_id = ?").bind(hostId),
+                dependencies.database.prepare("DELETE FROM telegram_link_codes WHERE host_id = ?").bind(hostId),
               ]
             : [
                 dependencies.database

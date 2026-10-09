@@ -182,6 +182,67 @@ describe("browser remote peer recovery", () => {
     expect(network.updates.at(-1)).toMatchObject({ state: "online" });
     await network.runtime.dispose();
   });
+  it("translates optional quiet completion and still accepts a released completion", async () => {
+    const onTeamEvent = vi.fn(async () => {});
+    const network = await setupNetwork({ onTeamEvent });
+    await network.connect();
+    const event = {
+      type: "quiet-turn-completed",
+      agentId: "agent-1",
+      threadId: "thread-1",
+      turnId: "turn-1",
+      status: "completed",
+      origin: "routine",
+    };
+    const channel = network.connection().channel(TEAM_PROTOCOL_V2_CHANNELS.events);
+    channel.receive(encodeTeamProtocolV2Frame({ version: 2, type: "event", sequence: 1, payload: event }));
+    await vi.waitFor(() =>
+      expect(onTeamEvent).toHaveBeenCalledWith("host", {
+        ...event,
+        type: "turn-completed",
+        quiet: true,
+      }),
+    );
+    const { agentId, ...wire } = event;
+    channel.receive(
+      encodeTeamProtocolV2Frame({
+        version: 2,
+        type: "event",
+        sequence: 2,
+        payload: { ...wire, type: "turn-completed", botId: agentId },
+      }),
+    );
+    await vi.waitFor(() => expect(onTeamEvent).toHaveBeenCalledWith("host", { ...event, type: "turn-completed" }));
+    expect(network.updates.at(-1)).toMatchObject({ state: "online" });
+    await network.runtime.dispose();
+  });
+
+  it("ignores an unknown event and rejects a malformed quiet completion", async () => {
+    const onTeamEvent = vi.fn(async () => {});
+    const network = await setupNetwork({ onTeamEvent });
+    await network.connect();
+    const channel = network.connection().channel(TEAM_PROTOCOL_V2_CHANNELS.events);
+    channel.receive(
+      encodeTeamProtocolV2Frame({
+        version: 2,
+        type: "event",
+        sequence: 1,
+        payload: { type: "future-optional-event" },
+      }),
+    );
+    channel.receive(
+      encodeTeamProtocolV2Frame({
+        version: 2,
+        type: "event",
+        sequence: 2,
+        payload: { type: "quiet-turn-completed", agentId: "agent-1" },
+      }),
+    );
+    await vi.waitFor(() => expect(network.updates.at(-1)).toMatchObject({ state: "offline" }));
+    expect(onTeamEvent).not.toHaveBeenCalled();
+    await network.runtime.dispose();
+  });
+
   it("rejects an invalid outgoing request without leaving a promise to fail on disconnect", async () => {
     const network = await setupNetwork();
     await network.connect();

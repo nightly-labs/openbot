@@ -1,5 +1,5 @@
 import type { HostRestartEvent } from "@openbot/contracts/team-protocol/host-update-v1";
-import { optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
+import { optionalTeamEvent, optionalTeamEventToCurrent } from "@openbot/contracts/team-protocol/optional-events";
 import { decodeTeamProtocolV6BaseCurrentEvent } from "@openbot/contracts/team-protocol/v6-base-adapter";
 import { Effect, Exit, Result, Scope } from "effect";
 import { RemoteWorkflowError, remoteDecode } from "./remote-service-effects";
@@ -512,7 +512,7 @@ export class RemoteEventStream {
             const value = JSON.parse(message.data);
             const optional = optionalTeamEvent(value);
             const decoded = optional
-              ? { kind: "known" as const, event: optional }
+              ? { kind: "known" as const, event: optionalTeamEventToCurrent(optional) }
               : decodeTeamProtocolV6BaseCurrentEvent(value);
             if (decoded.kind === "unknown") return;
             if (decoded.kind === "invalid") {

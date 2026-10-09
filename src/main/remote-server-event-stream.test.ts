@@ -339,6 +339,39 @@ describe("remote event connections", () => {
     });
   });
 
+  it("translates quiet completion, accepts the old host event, and rejects malformed optional completion", async () => {
+    stubTeamFetch({ compatibility: { appVersion: "0.3.0", capabilities: ["agent-runtime-snapshots"] } });
+    const { sockets } = stubEventSockets();
+    const fixture = await createRemoteManager({ servers: [storedHttpsServer("quiet-events")] });
+    const agentEvent = vi.fn();
+    fixture.manager.on("agent", agentEvent);
+    void runCauseEffect(fixture.manager.startEventConnections());
+    await waitForServer(fixture, { state: "online", connectionSequence: 1 });
+    const event = {
+      type: "quiet-turn-completed",
+      agentId: "agent-1",
+      threadId: "thread-1",
+      turnId: "turn-1",
+      status: "completed",
+      origin: "routine",
+    };
+    sockets[0]?.emit(event);
+    await vi.waitFor(() =>
+      expect(agentEvent).toHaveBeenCalledWith("quiet-events", {
+        ...event,
+        type: "turn-completed",
+        quiet: true,
+      }),
+    );
+    const { agentId, ...wire } = event;
+    sockets[0]?.emit({ ...wire, type: "turn-completed", botId: agentId });
+    await vi.waitFor(() =>
+      expect(agentEvent).toHaveBeenCalledWith("quiet-events", { ...event, type: "turn-completed" }),
+    );
+    sockets[0]?.emit({ ...event, turnId: null });
+    await waitForServer(fixture, { issue: { code: "protocol_error" } });
+  });
+
   it("ignores an unknown event and stops reconnecting after a malformed known one", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"] });
     stubTeamFetch({ compatibility: { appVersion: "0.3.0", capabilities: ["agent-runtime-snapshots"] } });

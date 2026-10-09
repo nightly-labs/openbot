@@ -126,6 +126,50 @@ describe("Telegram chat routes", () => {
     ).resolves.toMatchObject({ hostId: "host-3" });
   });
 
+  it("removes Telegram routes and unused codes with a host, without changing another host", async () => {
+    const { controlPlane, hosts, clock } = await setup();
+    const first = await runApiEffect(controlPlane.issueTelegramLinkCode("host-1", hosts["host-1"]));
+    await runApiEffect(controlPlane.linkTelegramChat({ botId: BOT_ID, chatId: "-1001", code: first.code }));
+    const unused = await runApiEffect(controlPlane.issueTelegramLinkCode("host-1", hosts["host-1"]));
+    const otherLink = await runApiEffect(controlPlane.issueTelegramLinkCode("host-2", hosts["host-2"]));
+    await runApiEffect(controlPlane.linkTelegramChat({ botId: BOT_ID, chatId: "-1002", code: otherLink.code }));
+    const otherUnused = await runApiEffect(controlPlane.issueTelegramLinkCode("host-2", hosts["host-2"]));
+
+    await runApiEffect(controlPlane.removeOwnedHost(owner.id, "host-1"));
+    await expect(
+      runApiEffect(
+        controlPlane.validateTelegramRoute({
+          hostId: "host-1",
+          chats: [{ id: "-1001", botId: BOT_ID, linkedAt: clock.now }],
+        }),
+      ),
+    ).resolves.toEqual([]);
+    await expect(
+      runApiEffect(controlPlane.linkTelegramChat({ botId: BOT_ID, chatId: "-1003", code: unused.code })),
+    ).rejects.toMatchObject({ code: "telegram_link_invalid" });
+    const replacement = await runApiEffect(controlPlane.issueTelegramLinkCode("host-3", hosts["host-3"]));
+    await expect(
+      runApiEffect(controlPlane.linkTelegramChat({ botId: BOT_ID, chatId: "-1001", code: replacement.code })),
+    ).resolves.toMatchObject({ hostId: "host-3" });
+
+    const restored = await runApiEffect(
+      controlPlane.registerHost(owner, { hostId: "host-1", name: "Restored host", ownerMembershipId: "host-1:owner" }),
+    );
+    if (!restored.machineToken) throw new Error("The host credential is missing.");
+    await expect(runApiEffect(controlPlane.issueTelegramRoute("host-1", restored.machineToken))).resolves.toMatchObject(
+      { chats: [] },
+    );
+    await expect(
+      runApiEffect(controlPlane.linkTelegramChat({ botId: BOT_ID, chatId: "-1003", code: unused.code })),
+    ).rejects.toMatchObject({ code: "telegram_link_invalid" });
+    await expect(runApiEffect(controlPlane.issueTelegramRoute("host-2", hosts["host-2"]))).resolves.toMatchObject({
+      chats: ["-1002"],
+    });
+    await expect(
+      runApiEffect(controlPlane.linkTelegramChat({ botId: BOT_ID, chatId: "-1004", code: otherUnused.code })),
+    ).resolves.toMatchObject({ hostId: "host-2" });
+  });
+
   it("limits the chats and the open link codes of a host", async () => {
     const { controlPlane, database, hosts, clock } = await setup();
     const insert = database.prepare(

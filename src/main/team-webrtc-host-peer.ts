@@ -707,7 +707,7 @@ export class TeamWebRtcHostPeer {
         // rejects it and the catch below would drop it without a trace: a remote client would
         // stop seeing incoming messages and task updates until its next refresh. The optional
         // protocol validates and envelopes its own event, exactly as the request path does. The
-        // `host-update-v1` restart notice and the `skills-events-v1` event take the same path.
+        // `host-update-v1`, `skills-events-v1`, and `quiet-turn-v1` events take the same path.
         const event = JSON.parse(data.toString());
         const channel = optionalTeamEvent(event);
         frame = encodeTeamProtocolV2Frame(
