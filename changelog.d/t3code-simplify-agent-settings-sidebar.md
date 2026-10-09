@@ -5,3 +5,5 @@
   change the image, the generated face or the color.
 - The right panel cannot be narrower than its default width, because a narrower panel breaks its
   layout. A panel that you made narrower before opens at the default width.
+- The instructions field of an agent and of a channel has a fixed height. Long instructions scroll
+  inside the field. Before, the field grew and had a resize handle that did not match the field.
