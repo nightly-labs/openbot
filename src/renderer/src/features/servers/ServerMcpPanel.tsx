@@ -117,7 +117,7 @@ export interface McpPanelSignIn {
   signOut: (id: string) => Promise<void>;
 }
 
-export interface McpPanelRemoteSignIn {
+interface McpPanelRemoteSignIn {
   hostName: string;
   runtime: BrowserViewRuntime;
   /** Whether the host pastes and copies for a live view. */
