@@ -24,6 +24,7 @@ export const messages = {
   "mobile.chat.routine.created": "Создана регулярная задача",
   "mobile.chat.routine.updated": "Регулярная задача обновлена",
   "mobile.chat.routine.deleted": "Регулярная задача удалена",
+  "mobile.chat.contextReset": "Начат новый чат",
   "mobile.chat.plan.title": "Задачи",
   "mobile.chat.plan.stopped": "Остановлено",
   "mobile.chat.plan.count": "{done}/{total}",

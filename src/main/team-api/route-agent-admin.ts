@@ -1,5 +1,9 @@
-import { parseUpdateAgentAdminSettingsInput } from "@openbot/contracts/ipc";
+import { parseUpdateAgentAdminSettingsInput, parseUpdateAgentHostSettingsInput } from "@openbot/contracts/ipc";
 import { AGENT_ADMIN_CAPABILITY, AGENT_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/agent-admin-v1";
+import {
+  AGENT_HOST_SETTINGS_CAPABILITY,
+  AGENT_HOST_SETTINGS_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-host-settings-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { AgentNotFoundError } from "../agent-admin-settings";
@@ -34,6 +38,43 @@ export async function routeAgentAdmin(
     let input: ReturnType<typeof parseUpdateAgentAdminSettingsInput>;
     try {
       input = parseUpdateAgentAdminSettingsInput(body);
+    } catch (error) {
+      throw new HttpError(400, error instanceof Error ? error.message : "Invalid agent settings update.");
+    }
+    return json(200, await runCauseEffect(settings.update(input)));
+  } catch (error) {
+    if (error instanceof AgentNotFoundError) throw new HttpError(404, error.message);
+    throw error;
+  }
+}
+
+/**
+ * Computer Use, local scripts and the busy-message mode of one agent, changed from a joined server.
+ * Each one acts only on this computer, so only an owner or admin can read or change them. The app
+ * default for a busy message stays a local choice: the route reports it and cannot change it.
+ * Frozen by `agent-host-settings-v1`.
+ */
+export async function routeAgentHostSettings(
+  context: TeamApiRequestContext,
+  admin: TeamApiAdmin | undefined,
+  hiddenAgentIds: ReadonlySet<string>,
+): Promise<RouteOutcome> {
+  const { method, url, capabilities, member, request, json } = context;
+  const read = method === "POST" && url.pathname === AGENT_HOST_SETTINGS_ROUTES.settings;
+  const update = method === "POST" && url.pathname === AGENT_HOST_SETTINGS_ROUTES.update;
+  if (!read && !update) return "unmatched";
+  const settings = admin?.agentHost;
+  if (!settings || !capabilities.has(AGENT_HOST_SETTINGS_CAPABILITY))
+    throw new HttpError(400, sourceText("error.team.agentSettingsUnsupported"));
+  requireAdmin(member);
+  // `readJson` has already run the body through the agent-host-settings wire codec.
+  const body = await readJson(request);
+  requireVisibleBodyAgent(body, hiddenAgentIds);
+  try {
+    if (read) return json(200, settings.read(stringField(body, "agentId")));
+    let input: ReturnType<typeof parseUpdateAgentHostSettingsInput>;
+    try {
+      input = parseUpdateAgentHostSettingsInput(body);
     } catch (error) {
       throw new HttpError(400, error instanceof Error ? error.message : "Invalid agent settings update.");
     }

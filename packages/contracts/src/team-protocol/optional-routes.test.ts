@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { AGENT_ADMIN_ROUTES } from "./agent-admin-v1";
+import { AGENT_HOST_SETTINGS_CAPABILITY, AGENT_HOST_SETTINGS_ROUTES } from "./agent-host-settings-v1";
 import { AGENT_IMPORT_ROUTES } from "./agent-import-v1";
 import { AGENT_INSTALL_ROUTES } from "./agent-install-v1";
 import { AGENT_PUBLISH_ROUTES } from "./agent-publish-v1";
 import { AGENT_UPDATE_ROUTES } from "./agent-update-v1";
 import { CONTEXT_RESET_ROUTES } from "./context-reset-v1";
+import { TEAM_CURRENT_CAPABILITIES } from "./current";
 import { EVENTS_ROUTES } from "./events-v1";
 import { HOST_ADMIN_ROUTES } from "./host-admin-v1";
 import { HOST_RELEASE_ROUTES } from "./host-release-v1";
@@ -60,6 +62,41 @@ describe("agent-admin-v1", () => {
     expect(() => codec(AGENT_ADMIN_ROUTES.update).request({ agentId: "chief", access: "root" })).toThrow();
     expect(() => codec(AGENT_ADMIN_ROUTES.update).response(200, { ...settings, access: "root" })).toThrow();
     expect(() => codec(AGENT_ADMIN_ROUTES.update).response(200, { access: "full" })).toThrow();
+  });
+});
+
+describe("agent-host-settings-v1", () => {
+  const settings = {
+    computerUse: true,
+    allowAutomation: false,
+    busyMessageMode: null,
+    defaultBusyMessageMode: "queue",
+  };
+
+  it("carries a null mode to the host and drops an absent optional field", () => {
+    expect(codec(AGENT_HOST_SETTINGS_ROUTES.settings).request({ agentId: "chief" })).toEqual({ agentId: "chief" });
+    expect(codec(AGENT_HOST_SETTINGS_ROUTES.update).request({ agentId: "chief", busyMessageMode: null })).toEqual({
+      agentId: "chief",
+      busyMessageMode: null,
+    });
+    expect(codec(AGENT_HOST_SETTINGS_ROUTES.update).response(200, { ...settings, access: "full" })).toEqual(settings);
+  });
+
+  it("rejects malformed payloads", () => {
+    expect(() => codec(AGENT_HOST_SETTINGS_ROUTES.update).request({ agentId: "chief", computerUse: "yes" })).toThrow();
+    expect(() =>
+      codec(AGENT_HOST_SETTINGS_ROUTES.update).request({ agentId: "chief", busyMessageMode: "interrupt" }),
+    ).toThrow();
+    expect(() =>
+      codec(AGENT_HOST_SETTINGS_ROUTES.settings).response(200, { ...settings, defaultBusyMessageMode: null }),
+    ).toThrow();
+  });
+
+  // A released host reads no capability from a header with more than 64, and a released client
+  // refuses a host that advertises more than 64.
+  it("keeps the current capabilities within the 64 that a released peer accepts", () => {
+    expect(TEAM_CURRENT_CAPABILITIES).toContain(AGENT_HOST_SETTINGS_CAPABILITY);
+    expect(TEAM_CURRENT_CAPABILITIES.length).toBeLessThanOrEqual(64);
   });
 });
 

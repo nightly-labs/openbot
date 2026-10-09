@@ -1,6 +1,7 @@
 import type { Effect } from "effect";
 import type { ChannelService } from "../../backend/channel-service";
 import type { AgentAdminSettingsService } from "../agent-admin-settings";
+import type { AgentHostSettingsService } from "../agent-host-settings";
 import type { AgentMarketplaceService } from "../agent-marketplace-service";
 import type { AgentTemplateService } from "../agent-template-service";
 import type { PeerCustomProviderChanges } from "../custom-provider-changes";
@@ -148,6 +149,8 @@ export interface TeamApiAdmin {
   release?: Pick<HostReleaseService, "snapshot" | "check">;
   /** `agent-admin-v1`: access and auto-approve of one agent. */
   agents?: AgentAdminSettingsService;
+  /** `agent-host-settings-v1`: Computer Use, local scripts and the busy-message mode of one agent. */
+  agentHost?: AgentHostSettingsService;
   /** `skills-admin-v1`: list, install, remove and enable the skills of one agent. */
   skills?: Pick<SkillMarketplaceService, "listInstalled" | "install" | "uninstall" | "setEnabled">;
   /** `shared-tables-v1`: list and delete the tables the agents share. */

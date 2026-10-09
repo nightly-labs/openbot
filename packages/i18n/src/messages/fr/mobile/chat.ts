@@ -25,6 +25,7 @@ export const messages = {
   "mobile.chat.routine.created": "Routine créée",
   "mobile.chat.routine.updated": "Routine mise à jour",
   "mobile.chat.routine.deleted": "Routine supprimée",
+  "mobile.chat.contextReset": "Nouvelle discussion commencée",
   "mobile.chat.plan.title": "Tâches",
   "mobile.chat.plan.stopped": "Arrêtée",
   "mobile.chat.plan.count": "{done}/{total}",

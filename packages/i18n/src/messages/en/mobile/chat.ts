@@ -23,6 +23,7 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.routine.created": "Created routine",
   "mobile.chat.routine.updated": "Updated routine",
   "mobile.chat.routine.deleted": "Deleted routine",
+  "mobile.chat.contextReset": "New chat started",
   "mobile.chat.plan.title": "Tasks",
   "mobile.chat.plan.stopped": "Stopped",
   "mobile.chat.plan.count": "{done}/{total}",

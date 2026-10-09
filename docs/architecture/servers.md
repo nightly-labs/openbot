@@ -115,6 +115,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | Capability | Grants | IPC group |
 | --- | --- | --- |
 | `agent-admin-v1` | Agent access and auto-approve | `agentAdmin` |
+| `agent-host-settings-v1` | Agent Computer Use, local scripts, and messages while it works; reads the host default | none: only the iPhone app uses it |
 | `skills-admin-v1` | List, install, remove, enable skills by marketplace id | `agentAdmin` |
 | `shared-tables-v1` | List and delete shared tables | `agentAdmin` |
 | `agent-install-v1` | Add an agent from a listing or a shared template, by id | `agentAdmin` |

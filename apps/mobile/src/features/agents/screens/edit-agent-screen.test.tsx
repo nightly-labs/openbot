@@ -258,6 +258,12 @@ const workspace = {
   >(async () => {
     throw new Error("unexpected");
   }),
+  loadAgentHostSettings: vi.fn(async (_agentId: string, _serverId: string) => null),
+  canStartNewChat: vi.fn((_serverId: string) => false),
+  canManageSharedTables: vi.fn((_serverId: string) => false),
+  canPublishAgent: vi.fn((_serverId: string) => false),
+  canManageAgentAccess: vi.fn((_serverId: string) => false),
+  canManageAgentHostSettings: vi.fn((_serverId: string) => false),
 };
 vi.mock("@/features/workspace/context/mobile-workspace-context", () => ({ useMobileWorkspace: () => workspace }));
 // The account server's feature flags need the native app version.
@@ -649,6 +655,8 @@ async function renderSheet(
     | "files"
     | "routines"
     | "runtime"
+    | "permissions"
+    | "advanced"
     | "memory"
     | "routine" = "info",
 ) {
@@ -1235,7 +1243,7 @@ it("edits appearance separately from the main form", async () => {
 it("opens each detail page on the same host without sending or losing main form edits", async () => {
   await renderSheet();
   await edit("Name", "Draft name");
-  for (const label of ["Edit appearance", "Usage", "Memories", "Routines", "Runtime"]) await click(label);
+  for (const label of ["Edit appearance", "Usage", "Memories", "Routines", "Model"]) await click(label);
   expect(mocks.push.mock.calls.map((call) => call[0])).toEqual(
     ["appearance", "usage", "memories", "routines", "runtime"].map((page) => ({
       pathname: `/agent-info/[agentId]/${page}`,
@@ -1278,9 +1286,7 @@ it.each([
 ] as const)("hides access controls for %s", async (_case, role, settings) => {
   workspace.servers = [{ ...host, role }];
   workspace.loadAgentAdminSettings.mockResolvedValue(settings);
-  workspace.loadAgentModels.mockClear();
-  await renderSheet("runtime");
-  await waitFor(() => expect(workspace.loadAgentModels).toHaveBeenCalled());
+  await renderSheet("permissions");
   if (role === "member") expect(workspace.loadAgentAdminSettings).not.toHaveBeenCalled();
   else await waitFor(() => expect(workspace.loadAgentAdminSettings).toHaveBeenCalledWith(original.id, host.id));
   await act(async () => {});
@@ -1296,7 +1302,7 @@ it("saves access and auto-approve on the host for an admin", async () => {
     saved = { ...saved, ...input };
     return saved;
   });
-  await renderSheet("runtime");
+  await renderSheet("permissions");
   await waitFor(() => expect(screen.getByRole("switch", { name: "Auto approve" })).toHaveProperty("disabled", false));
   await click("Auto approve", "switch");
   await waitFor(() => expect(screen.getByRole("switch", { name: "Auto approve" })).toHaveProperty("checked", true));
@@ -1318,7 +1324,7 @@ it("saves access and auto-approve on the host for an admin", async () => {
   await act(() => root.unmount());
   root = createRoot(container);
   client.clear();
-  await renderSheet("runtime");
+  await renderSheet("permissions");
   await waitFor(() => expect(screen.getByDisplayValue("Full access")).toBeTruthy());
   expect(screen.getByRole("switch", { name: "Auto approve" })).toHaveProperty("checked", true);
 });
@@ -1327,7 +1333,7 @@ it("keeps the host value and shows the reason when an access update fails", asyn
   workspace.servers = [{ ...host, role: "owner" }];
   workspace.loadAgentAdminSettings.mockResolvedValue({ access: "full", autoApprove: true, autoApproveLocked: false });
   workspace.updateAgentAdminSettings.mockRejectedValue(new Error("Host refused the change."));
-  await renderSheet("runtime");
+  await renderSheet("permissions");
   await waitFor(() => expect(screen.getByDisplayValue("Full access")).toHaveProperty("disabled", false));
   await act(() => fireEvent.change(screen.getByDisplayValue("Full access"), { target: { value: "workspace" } }));
   expect(await screen.findByText("Host refused the change.")).toBeTruthy();
@@ -1342,7 +1348,7 @@ it("shows auto-approve as read-only when Turbo mode is on", async () => {
     autoApprove: false,
     autoApproveLocked: true,
   });
-  await renderSheet("runtime");
+  await renderSheet("permissions");
   await waitFor(() => expect(screen.getByRole("switch", { name: "Auto approve" })).toHaveProperty("checked", true));
   expect(screen.getByRole("switch", { name: "Auto approve" })).toHaveProperty("disabled", true);
 });

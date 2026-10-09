@@ -27,6 +27,7 @@ import type {
 import { createOpenBotLogger, registerSecretValue } from "@openbot/logging";
 import { afterEach, describe, expect, it } from "vitest";
 import { createAgentAdminSettings } from "./agent-admin-settings";
+import { createAgentHostSettings } from "./agent-host-settings";
 import { RequestedUpdateRefusal } from "./requested-update";
 import { createTeamApiFixture, stopTeamApiFixtures, type TeamApiOptions } from "./team-api-server-test-harness";
 
@@ -135,6 +136,79 @@ describe("Team API agent-admin-v1", () => {
     const { base } = await signedIn("agent-admin-absent", {});
     const compatibility = await (await fetch(`${base}/v1/compatibility`)).json();
     expect(compatibility.capabilities).not.toContain("agent-admin-v1");
+  });
+});
+
+describe("Team API agent-host-settings-v1", () => {
+  it("lets only an admin read and change Computer Use, local scripts and the busy-message mode", async () => {
+    let agent: AgentSummary = { ...CHIEF, busyMessageMode: "steer" };
+    const settings = createAgentHostSettings({
+      agents: {
+        listAgents: () => [agent],
+        updateAgent: ({ agentId: _agentId, busyMessageMode, ...changes }) =>
+          Effect.sync(() => {
+            agent = { ...agent, ...changes };
+            if (busyMessageMode === null) delete agent.busyMessageMode;
+            else if (busyMessageMode) agent.busyMessageMode = busyMessageMode;
+            return agent;
+          }),
+      },
+      busyMessageMode: { get: () => ({ mode: "queue" }) },
+    });
+    const { base, admin, asMember, post } = await signedIn("agent-host-settings", { admin: { agentHost: settings } });
+    const withCapability = { ...admin, "OpenBot-Capabilities": "agent-host-settings-v1" };
+    const memberWithCapability = { ...asMember, "OpenBot-Capabilities": "agent-host-settings-v1" };
+
+    expect((await post("/v1/admin/agents/host-settings", { agentId: "chief" })).status).toBe(400);
+    expect((await post("/v1/admin/agents/host-settings", { agentId: "chief" }, memberWithCapability)).status).toBe(403);
+    expect(
+      (
+        await post(
+          "/v1/admin/agents/host-settings/update",
+          { agentId: "chief", computerUse: false, allowAutomation: true },
+          memberWithCapability,
+        )
+      ).status,
+    ).toBe(403);
+    expect(agent.computerUse).toBeUndefined();
+    expect(agent.allowAutomation).toBeUndefined();
+
+    const read = await post("/v1/admin/agents/host-settings", { agentId: "chief" }, withCapability);
+    expect(await read.json()).toEqual({
+      computerUse: true,
+      allowAutomation: false,
+      busyMessageMode: "steer",
+      defaultBusyMessageMode: "queue",
+    });
+
+    const updated = await post(
+      "/v1/admin/agents/host-settings/update",
+      { agentId: "chief", computerUse: false, allowAutomation: true, busyMessageMode: null },
+      withCapability,
+    );
+    expect(await updated.json()).toEqual({
+      computerUse: false,
+      allowAutomation: true,
+      busyMessageMode: null,
+      defaultBusyMessageMode: "queue",
+    });
+    expect(agent).toMatchObject({ computerUse: false, allowAutomation: true });
+    expect(agent.busyMessageMode).toBeUndefined();
+
+    // An update must change something, and the host refuses an agent it does not have.
+    expect((await post("/v1/admin/agents/host-settings/update", { agentId: "chief" }, withCapability)).status).toBe(
+      400,
+    );
+    expect((await post("/v1/admin/agents/host-settings", { agentId: "missing" }, withCapability)).status).toBe(404);
+
+    const compatibility = await (await fetch(`${base}/v1/compatibility`)).json();
+    expect(compatibility.capabilities).toContain("agent-host-settings-v1");
+  });
+
+  it("does not advertise agent-host-settings-v1 without the service", async () => {
+    const { base } = await signedIn("agent-host-settings-absent", {});
+    const compatibility = await (await fetch(`${base}/v1/compatibility`)).json();
+    expect(compatibility.capabilities).not.toContain("agent-host-settings-v1");
   });
 });
 

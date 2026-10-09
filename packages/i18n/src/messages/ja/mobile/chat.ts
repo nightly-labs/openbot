@@ -24,6 +24,7 @@ export const messages = {
   "mobile.chat.routine.created": "ルーティンを作成しました",
   "mobile.chat.routine.updated": "ルーティンを更新しました",
   "mobile.chat.routine.deleted": "ルーティンを削除しました",
+  "mobile.chat.contextReset": "新しいチャットを開始しました",
   "mobile.chat.plan.title": "タスク",
   "mobile.chat.plan.stopped": "停止",
   "mobile.chat.plan.count": "{done}/{total}",

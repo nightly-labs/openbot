@@ -24,6 +24,7 @@ export const messages = {
   "mobile.chat.routine.created": "Oluşturulan rutin",
   "mobile.chat.routine.updated": "Güncellenen rutin",
   "mobile.chat.routine.deleted": "Silinen rutin",
+  "mobile.chat.contextReset": "Yeni sohbet başlatıldı",
   "mobile.chat.plan.title": "Görevler",
   "mobile.chat.plan.stopped": "Durduruldu",
   "mobile.chat.plan.count": "{done}/{total}",

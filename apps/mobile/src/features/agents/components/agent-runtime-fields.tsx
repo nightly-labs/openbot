@@ -66,7 +66,7 @@ export function AgentRuntimeFields({
   const enabled = available && !saving && options.length > 0;
   return (
     <>
-      <SettingsSection title={t("mobile.agent.runtime.title")}>
+      <SettingsSection>
         <SettingsRow
           trailing={
             <SettingsPicker<string>
