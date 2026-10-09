@@ -4,9 +4,8 @@ import { createUniqueId, Show } from "solid-js";
 import { useText } from "../text";
 import { PanelResizer } from "./PanelResizer";
 
-export const SETTINGS_PANEL_DEFAULT = 296;
 /** The default is also the minimum: a narrower panel breaks the avatar editor and the setting rows. */
-export const SETTINGS_PANEL_MIN = SETTINGS_PANEL_DEFAULT;
+export const SETTINGS_PANEL_DEFAULT = 296;
 export const SETTINGS_PANEL_MAX = 1600;
 /** What the chat under the panel keeps for itself, however far the panel is dragged. */
 const CONVERSATION_PANEL_MIN = 96;
@@ -16,7 +15,7 @@ const CONVERSATION_PANEL_MIN = 96;
 /** How wide the panel may be drawn before the chat beside it is squeezed out of readability. */
 export function settingsPanelMaxWidth(host: HTMLElement | undefined): number {
   const available = (host?.clientWidth || window.innerWidth) - CONVERSATION_PANEL_MIN;
-  return Math.min(SETTINGS_PANEL_MAX, Math.max(SETTINGS_PANEL_MIN, available));
+  return Math.min(SETTINGS_PANEL_MAX, Math.max(SETTINGS_PANEL_DEFAULT, available));
 }
 
 export interface SettingsPanelProps {
@@ -40,7 +39,7 @@ export function SettingsPanel(props: SettingsPanelProps): JSX.Element {
         direction="right"
         value={props.width}
         defaultValue={SETTINGS_PANEL_DEFAULT}
-        min={SETTINGS_PANEL_MIN}
+        min={SETTINGS_PANEL_DEFAULT}
         max={props.maxWidth}
         onResize={props.onResize}
         onResizeEnd={props.onResizeEnd}

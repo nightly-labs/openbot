@@ -1,6 +1,6 @@
 import type { ServerSummary } from "@openbot/contracts/ipc";
 import { classifyFailure } from "@openbot/telemetry";
-import { SETTINGS_PANEL_MAX, SETTINGS_PANEL_MIN } from "@openbot/ui/components/SettingsPanel";
+import { SETTINGS_PANEL_DEFAULT, SETTINGS_PANEL_MAX } from "@openbot/ui/components/SettingsPanel";
 import { useText } from "@openbot/ui/text";
 import { actionToast } from "../../action-toast";
 import { createSettingsPanelWidth, saveSettingsPanelWidth } from "../../components/settings-panel-width";
@@ -95,7 +95,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
     Math.min(
       SETTINGS_PANEL_MAX,
       Math.max(
-        SETTINGS_PANEL_MIN,
+        SETTINGS_PANEL_DEFAULT,
         (conversationPanelElement()?.clientWidth || window.innerWidth) - CONVERSATION_PANEL_MIN,
       ),
     );
