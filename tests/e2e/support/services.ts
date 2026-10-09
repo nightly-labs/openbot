@@ -1,10 +1,9 @@
-import { type ChildProcess, execFile, spawn } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
-import { promisify } from "node:util";
 import { createOpenBotLogger, registerSecretValue } from "@openbot/logging";
 import { expect } from "@playwright/test";
 import { loadAgentRuntimeLock } from "../../../scripts/agent-runtime-lock";
@@ -18,7 +17,9 @@ import { findAvailablePort } from "../../../scripts/dev-services";
 import { developmentChildEnvironment, loadDevelopmentEnvironment } from "../../../scripts/development-environment";
 import { createDevelopmentDefaults, ensureDevelopmentState } from "../../../scripts/development-secrets";
 import { withoutElectronRuntimeFlags } from "../../../scripts/electron-spawn-env";
-import { modelFor, output, providers, root } from "./settings";
+import { resolveClaudeCli, resolveCodexCli, resolveOpencodeCli } from "../../../src/backend/cli";
+import { runCauseEffect } from "../../../src/backend/effect-boundary";
+import { output, providers, root } from "./settings";
 import { startSite } from "./site";
 
 const logger = createOpenBotLogger("e2e-services");
@@ -64,18 +65,15 @@ export default async function setup() {
   if (process.env.OPENBOT_E2E_SUITE === "release" || process.env.OPENBOT_E2E_SUITE === "live") {
     const lock = await loadAgentRuntimeLock(root);
     const versions: Record<string, string> = {};
+    const resolvers = { codex: resolveCodexCli, claude: resolveClaudeCli, opencode: resolveOpencodeCli };
     for (const provider of providers) {
-      modelFor(provider);
-      const path = process.env[`OPENBOT_${provider.toUpperCase()}_PATH`];
-      if (!path) throw new Error(`Set OPENBOT_${provider.toUpperCase()}_PATH to the pinned CI runtime.`);
-      const { stdout } = await promisify(execFile)(path, ["--version"], { timeout: 15_000 });
-      const version = /\b\d+\.\d+\.\d+\b/u.exec(stdout)?.[0];
-      if (version !== lock[provider].version)
+      const runtime = await runCauseEffect(resolvers[provider]({ bundledExecutable: null }));
+      if (process.env.CI && runtime.version !== lock[provider].version)
         throw new Error(`${provider} must use pinned runtime ${lock[provider].version}.`);
-      versions[provider] = version;
+      process.env[`OPENBOT_${provider.toUpperCase()}_PATH`] = runtime.executable;
+      versions[provider] = runtime.version;
     }
     process.env.OPENBOT_E2E_RUNTIME_VERSIONS = JSON.stringify(versions);
-    if (!process.env.OPENCODE_API_KEY) throw new Error("Set OPENCODE_API_KEY for the dedicated CI account.");
   }
   await mkdir(output, { recursive: true, mode: 0o700 });
   await rm(join(output, "report"), { recursive: true, force: true });

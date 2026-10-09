@@ -6,13 +6,14 @@ export const output = resolve(root, ".openbot-build/e2e");
 export const providers = ["codex", "claude", "opencode"] as const;
 type LiveProvider = (typeof providers)[number];
 export const scriptedModel = "gpt-6-luna";
+const defaultModels: Record<LiveProvider, string> = {
+  codex: "gpt-6-luna",
+  claude: "claude-haiku-5-5",
+  opencode: "opencode/muse-spark-1.3-contributor-free",
+};
 
 export function modelFor(provider: LiveProvider): string {
-  return z
-    .string()
-    .trim()
-    .min(1, `Set OPENBOT_E2E_${provider.toUpperCase()}_MODEL on the CI runner.`)
-    .parse(process.env[`OPENBOT_E2E_${provider.toUpperCase()}_MODEL`] ?? "");
+  return process.env[`OPENBOT_E2E_${provider.toUpperCase()}_MODEL`]?.trim() || defaultModels[provider];
 }
 
 const serviceSettings = z.object({

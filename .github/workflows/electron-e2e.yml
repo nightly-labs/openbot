@@ -51,10 +51,6 @@ jobs:
       - name: Check runner prerequisites
         run: |
           test "$(uname -s)" = Darwin
-          test -n "$OPENBOT_E2E_CODEX_MODEL"
-          test -n "$OPENBOT_E2E_CLAUDE_MODEL"
-          test -n "$OPENBOT_E2E_OPENCODE_MODEL"
-          test -n "$OPENCODE_API_KEY"
           node --version
       - name: Build once
         run: bun run build

@@ -99,7 +99,17 @@ export class TestApp {
       processes: [{ name: "app", pid: child.pid, startedAt: Date.now() }],
     });
     try {
-      const page = await application.firstWindow();
+      await expect
+        .poll(() => application.windows().some((window) => window.url() === "openbot-app://app/index.html"), {
+          timeout: 60_000,
+        })
+        .toBe(true);
+      const page = application.windows().find((window) => window.url() === "openbot-app://app/index.html");
+      if (!page) throw new Error("The main application window did not open.");
+      page.on("console", (message) => {
+        if (message.type() === "error" || message.type() === "warning") logger.warn(message.text());
+      });
+      page.on("pageerror", (error) => logger.warn(error.message));
       await page.waitForFunction(() => typeof window.openbot?.agent === "object");
       return { application, page };
     } catch (error) {
@@ -172,16 +182,9 @@ export class TestApp {
     if (pid) removeDevStackRecord({ supervisorPid: pid });
   }
 
-  async chooseFile(path: string) {
-    await this.application.evaluate(({ dialog }, selected) => {
-      dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [selected] });
-    }, path);
-  }
-
   async downloadTo(path: string) {
     await this.application.evaluate(({ dialog }, selected) => {
       dialog.showSaveDialog = async () => ({ canceled: false, filePath: selected });
-      dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [selected] });
     }, path);
   }
 
@@ -214,6 +217,8 @@ export async function joinHost(host: TestApp, client: TestApp): Promise<string> 
     .object({ hostId: z.string() })
     .parse(await client.accountRequest("/v2/remote/invites/accept", { token: invite.token }));
   expect(accepted.hostId).toBe(status.serverId);
+  // The setup request bypasses the client's join handler. Reload its account directory on startup.
+  await client.restart();
   await expect
     .poll(
       () =>
@@ -235,12 +240,15 @@ export async function assertHost(client: TestApp, id: string) {
       () =>
         client.page.evaluate(
           (serverId) =>
-            window.openbot.servers.list().then((servers) => servers.find((server) => server.id === serverId)?.state),
+            window.openbot.servers.list().then((servers) => {
+              const server = servers.find((entry) => entry.id === serverId);
+              return { state: server?.state, active: server?.active };
+            }),
           id,
         ),
       { timeout: 60_000 },
     )
-    .toBe("online");
+    .toEqual({ state: "online", active: true });
   const stored = z
     .object({ servers: z.array(z.object({ id: z.string(), transport: z.string().optional() })) })
     .parse(JSON.parse(await readFile(join(client.profile, "openbot-remote-servers-v1.json"), "utf8")));

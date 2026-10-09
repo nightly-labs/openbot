@@ -29,6 +29,13 @@ not measure a network between two physical computers, TURN relay operation, or h
 | Real providers | Codex, Claude, and OpenCode each create a child, delegate browser work, receive its reply, and generate an attached file and interactive HTML |
 | Mixed providers | Codex assigns Claude, Claude assigns OpenCode, and results return through the group task chain |
 
+Assertions check saved messages, task owners and parent links, unique replies, exact file bytes,
+and HTTP form receipts. A provider's claim that it completed work is not sufficient. Live tasks
+use explicit browser targets and wait for completed output before preview interaction.
+Approval cases disable auto-approval for their test agent and check the exact provider decision;
+the fixture does not execute its example command. PDF coverage checks opening/reopening the
+viewer and exact downloaded bytes; it does not inspect Chromium's native PDF rendering.
+
 There are 16 scripted scenarios and four live scenarios per mode: 40 required macOS cases.
 Linux runs the 32 scripted cases. The scripted CLI implements the Codex subprocess protocol.
 It scripts model decisions; the app still executes tools, stores messages, schedules routines,
@@ -53,20 +60,22 @@ Set these repository variables:
 | Variable | Value |
 | --- | --- |
 | `OPENBOT_E2E_RUNNER` | JSON array of the Mac mini's actual runner labels, for example `["self-hosted", "macOS", "ARM64", "openbot-e2e"]` |
-| `OPENBOT_E2E_CODEX_MODEL` | Exact Codex model ID available to the CI account |
-| `OPENBOT_E2E_CLAUDE_MODEL` | Exact Claude model ID available to the CI account |
-| `OPENBOT_E2E_OPENCODE_MODEL` | Exact OpenCode model ID available to the CI account |
+| `OPENBOT_E2E_CODEX_MODEL` | Optional override; defaults to `gpt-6-luna` |
+| `OPENBOT_E2E_CLAUDE_MODEL` | Optional override; defaults to `claude-haiku-5-5` |
+| `OPENBOT_E2E_OPENCODE_MODEL` | Optional override; defaults to `opencode/muse-spark-1.3-contributor-free` |
 
 Set these in the runner service environment:
 
-- `OPENBOT_CODEX_PATH`, `OPENBOT_CLAUDE_PATH`, and `OPENBOT_OPENCODE_PATH`: absolute paths to
-  executable provider runtimes. Their versions must match `native-runtime.lock.json` at the
-  tested commit. Update this provisioned runtime cache when the lock changes.
+- `OPENBOT_CODEX_PATH`, `OPENBOT_CLAUDE_PATH`, and `OPENBOT_OPENCODE_PATH`: optional absolute
+  paths to executable provider runtimes. The suite uses the app's installed CLI discovery by
+  default. In CI, versions must match `native-runtime.lock.json` at the tested commit. Update
+  this provisioned runtime cache when the lock changes. Local runs use the installed versions.
 - Dedicated Codex and Claude login state, accessible to the runner account. `CODEX_HOME` and
   `CLAUDE_CONFIG_DIR` can point to the dedicated credential directories where supported by the
   provider. Complete login before starting the suite.
-- `OPENCODE_API_KEY`: the dedicated OpenCode account key. The suite saves it through the app's
-  provider settings API in each private profile.
+- `OPENCODE_API_KEY`: optional for a model that requires an OpenCode account key. The default
+  free model needs no key. When set, the suite saves it through the app's provider settings API
+  in each private profile.
 
 The suite checks runtime versions and model availability. A missing model, expired login, or
 failed provider turn fails the release; it does not substitute another provider or skip a case.
@@ -91,7 +100,10 @@ With the current commit built on the test machine:
 env -u ELECTRON_RUN_AS_NODE bun run test:e2e
 
 # One focused test during development.
-env -u ELECTRON_RUN_AS_NODE bun run test:e2e --project=local --grep='^delegate ' --workers=1
+env -u ELECTRON_RUN_AS_NODE bun run test:e2e --project=local --grep='delegate delivers' --workers=1
+
+# One case in both modes, in sequence.
+env -u ELECTRON_RUN_AS_NODE bun run test:e2e --grep='delegate delivers' --workers=1
 
 # Required real-provider cases only; uses provider quota.
 env -u ELECTRON_RUN_AS_NODE bun run test:e2e:live
@@ -122,7 +134,9 @@ unpackaged app with an explicit `--user-data-dir`.
 
 ## Evidence and cleanup
 
-The suite writes `.openbot-build/e2e/report/coverage.json` and `index.html`. The JSON includes
+The suite writes `.openbot-build/e2e/report/coverage.json` and `index.html`. Each run replaces this report directory.
+When reviewing cases separately, copy each report before starting the next case. A sequence of
+focused passes does not verify the full parallel release time budget. The JSON includes
 commit, platform, runtime versions, provider/model annotations, duration, and required coverage.
 The report also retains the last 300 redacted log chunks. Failures save a UI screenshot and an action trace when it can be exported safely. Traces
 exclude network bodies, DOM snapshots, screenshots, and source files. Text passes through the

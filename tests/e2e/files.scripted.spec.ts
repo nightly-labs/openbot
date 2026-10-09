@@ -1,6 +1,5 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { unzipSync } from "fflate";
 import { generatedFiles, html } from "./support/files";
 import { expect, test } from "./support/fixtures";
 import { prompt } from "./support/scenario";
@@ -30,7 +29,13 @@ test("files generates, previews, downloads, and uploads files", async ({ app, ow
       file.bytes,
     );
     await app.page.getByRole("button", { name: t("attachment.preview", { name: file.name }), exact: true }).click();
-    const preview = app.page.getByRole("complementary", { name: t("preview.panel.label") });
+    const image = file.name.endsWith(".png");
+    const preview = image
+      ? app.page.getByRole("dialog", { name: file.name, exact: true })
+      : app.page.getByRole("complementary", { name: t("preview.panel.label") });
+    const close = app.page.getByRole("button", {
+      name: t(image ? "chat.image.lightbox.close" : "preview.panel.close"),
+    });
     await expect(preview).toBeVisible();
     if (file.name.endsWith(".md")) await expect(preview.getByRole("heading", { name: "Release report" })).toBeVisible();
     if (file.name.endsWith(".xlsx")) await expect(preview.getByRole("cell", { name: "42", exact: true })).toBeVisible();
@@ -42,20 +47,19 @@ test("files generates, previews, downloads, and uploads files", async ({ app, ow
             .evaluate((element) => element instanceof HTMLImageElement && element.complete && element.naturalWidth > 0),
         )
         .toBe(true);
-    await app.page.getByRole("button", { name: t("preview.panel.close") }).click();
+    await close.click();
+    await expect(preview).not.toBeVisible();
     await app.page.getByRole("button", { name: t("attachment.preview", { name: file.name }), exact: true }).click();
     await expect(preview).toBeVisible();
-    await app.page.getByRole("button", { name: t("preview.panel.close") }).click();
-    const destination = join(downloads, `${file.name}.zip`);
+    await close.click();
+    await expect(preview).not.toBeVisible();
+    const destination = join(downloads, file.name);
     await app.downloadTo(destination);
     await app.page.getByRole("button", { name: t("attachment.download", { name: file.name }), exact: true }).click();
     await expect
       .poll(async () =>
         readFile(destination)
-          .then((bytes) => {
-            const archive = unzipSync(bytes);
-            return Object.values(archive).some((entry) => Buffer.from(entry).equals(file.bytes));
-          })
+          .then((bytes) => bytes.equals(file.bytes))
           .catch(() => false),
       )
       .toBe(true);
@@ -65,9 +69,12 @@ test("files generates, previews, downloads, and uploads files", async ({ app, ow
   await expect(frame.getByRole("button", { name: "Count: 1" })).toBeVisible();
   const upload = join(app.profile, "upload.txt");
   await writeFile(upload, "Uploaded release input 42");
-  await app.chooseFile(upload);
   await app.page.getByRole("button", { name: t("composer.add.label") }).click();
-  await app.page.getByRole("menuitem", { name: t("composer.add.image") }).click();
+  const [chooser] = await Promise.all([
+    app.page.waitForEvent("filechooser"),
+    app.page.getByRole("menuitem", { name: t("composer.add.context"), exact: true }).click(),
+  ]);
+  await chooser.setFiles(upload);
   await expect(
     app.page.getByRole("button", { name: t("composer.attachment.remove", { name: "upload.txt" }) }),
   ).toBeVisible();
@@ -77,4 +84,9 @@ test("files generates, previews, downloads, and uploads files", async ({ app, ow
   expect(
     snapshot.messages.some((message) => message.attachments?.some((attachment) => attachment.name === "upload.txt")),
   ).toBe(true);
+  await app.page.getByRole("button", { name: t("attachment.preview", { name: "upload.txt" }), exact: true }).click();
+  await expect(app.page.getByRole("complementary", { name: t("preview.panel.label") })).toContainText(
+    "Uploaded release input 42",
+  );
+  await app.page.getByRole("button", { name: t("preview.panel.close") }).click();
 });

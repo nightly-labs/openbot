@@ -63,12 +63,12 @@ function resolveArgs(value: Json, saved: Map<string, Json>): Json {
   }
   return value;
 }
-function toolValue(value: Json): Json {
+function toolValue(value: Json, name: string): Json {
   const result = z
     .object({ success: z.boolean(), contentItems: z.array(z.object({ text: z.string().optional() })) })
     .parse(value);
   const text = result.contentItems.flatMap((item) => (item.text ? [item.text] : [])).join("\n");
-  if (!result.success) throw new Error(`Tool failed: ${text}`);
+  if (!result.success) throw new Error(`Tool ${name} failed: ${text}`);
   try {
     return z.json().parse(JSON.parse(text));
   } catch {
@@ -125,6 +125,7 @@ async function run(threadId: string, turnId: string, text: string) {
             tool: step.name,
             arguments: resolveArgs(step.args, saved),
           }),
+          step.name,
         );
         if (step.save) saved.set(step.save, value);
       } else if (step.kind === "write") {
@@ -193,6 +194,7 @@ async function run(threadId: string, turnId: string, text: string) {
             text: `Status: done\nResult: ${reply}\nEvidence: release test`,
           },
         }),
+        "send_message",
       );
     }
     const item = { type: "agentMessage", id: itemId, text: reply, phase: "final_answer" };
@@ -208,6 +210,10 @@ async function run(threadId: string, turnId: string, text: string) {
     });
     turn.status = "failed";
     save(threadId);
+    send({
+      method: "error",
+      params: { ...base, message: error instanceof Error ? error.message : "Scripted provider failed." },
+    });
     send({
       method: "turn/completed",
       params: {

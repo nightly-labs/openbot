@@ -3,7 +3,7 @@ import type { CreateRoutineInput } from "@openbot/contracts/ipc";
 import { assertHost } from "./support/app";
 import { expect, test } from "./support/fixtures";
 import { prompt } from "./support/scenario";
-import { completed, newAgent, openAgent, openRoutines, t } from "./support/ui";
+import { completed, conversation, newAgent, openAgent, openRoutines, t } from "./support/ui";
 
 test("routines creates, edits, runs, pauses, resumes, persists, and deletes", async ({ app, owner, serverId }) => {
   const agent = await newAgent(app);
@@ -36,20 +36,42 @@ test("routines creates, edits, runs, pauses, resumes, persists, and deletes", as
     .poll(() =>
       app.page
         .evaluate((input) => window.openbot.agent.listRoutineRuns(input), { agentId: agent.id, routineId: routine.id })
-        .then((runs) => runs.some((run) => run.kind === "manual" && run.status === "succeeded")),
+        .then((runs) => runs.filter((run) => run.kind === "manual").map((run) => run.status)),
     )
-    .toBe(true);
+    .toEqual(["succeeded"]);
+  expect(
+    (await conversation(app, agent.id)).messages.filter(
+      (message) =>
+        message.senderAgentId === child.id && message.text.includes("Status: done\nResult: Routine child result"),
+    ),
+  ).toHaveLength(1);
+  // Open the saved routine again: a remote run can return the panel to its settings page.
+  await app.page.getByRole("button", { name: t("routine.settings.closeDetails"), exact: true }).click();
+  await openRoutines(app);
+  await app.page.getByRole("button", { name: new RegExp(`^${name}`) }).click();
   await app.page.getByPlaceholder(t("routine.settings.namePlaceholder")).fill(`${name} edited`);
-  await app.page.getByRole("switch", { name: t("routine.settings.activeToggle") }).uncheck();
+  const active = app.page.getByRole("switch", { name: t("routine.settings.activeToggle") });
+  await expect(active).toBeChecked();
+  await active.focus();
+  await expect(active).toBeFocused();
+  await active.press("Space");
+  await expect(active).not.toBeChecked();
   await app.page.getByRole("button", { name: t("common.save"), exact: true }).click();
   await expect.poll(async () => (await routines()).find((entry) => entry.id === routine.id)?.active).toBe(false);
   await owner.restart();
   if (serverId) await assertHost(app, serverId);
+  expect((await routines()).find((entry) => entry.id === routine.id)).toMatchObject({
+    name: `${name} edited`,
+    active: false,
+    instruction: routine.instruction,
+    trigger: { schedule: routine.trigger.schedule },
+  });
   await openAgent(app, agent.name);
   await openRoutines(app);
-  await app.page.getByRole("button", { name: new RegExp(`${name} edited`) }).click();
+  await app.page.getByRole("button", { name: new RegExp(`^${name} edited`) }).click();
   await expect(app.page.getByRole("switch", { name: t("routine.settings.activeToggle") })).not.toBeChecked();
-  await app.page.getByRole("switch", { name: t("routine.settings.activeToggle") }).check();
+  await app.page.getByRole("switch", { name: t("routine.settings.activeToggle") }).press("Space");
+  await expect(app.page.getByRole("switch", { name: t("routine.settings.activeToggle") })).toBeChecked();
   await app.page.getByRole("button", { name: t("common.save"), exact: true }).click();
   await expect.poll(async () => (await routines()).find((entry) => entry.id === routine.id)?.active).toBe(true);
   await app.page.getByRole("button", { name: t("common.delete"), exact: true }).click();
@@ -57,7 +79,7 @@ test("routines creates, edits, runs, pauses, resumes, persists, and deletes", as
   await expect.poll(async () => (await routines()).some((entry) => entry.id === routine.id)).toBe(false);
 });
 
-test("schedule executes a due persisted schedule once", async ({ app }) => {
+test("schedule executes a due persisted schedule once", async ({ app, owner, serverId }) => {
   const agent = await newAgent(app);
   const input: CreateRoutineInput = {
     agentId: agent.id,
@@ -69,6 +91,8 @@ test("schedule executes a due persisted schedule once", async ({ app }) => {
     schedule: { kind: "interval", amount: 3, unit: "minutes", anchorAt: new Date(Date.now() + 5_000).toISOString() },
   };
   const routine = await app.page.evaluate((value) => window.openbot.agent.createRoutine(value), input);
+  await owner.restart();
+  if (serverId) await assertHost(app, serverId);
   await openAgent(app, agent.name);
   await completed(app, agent.id, "Scheduled result");
   const runs = await app.page.evaluate((input) => window.openbot.agent.listRoutineRuns(input), {
@@ -76,7 +100,19 @@ test("schedule executes a due persisted schedule once", async ({ app }) => {
     routineId: routine.id,
   });
   expect(runs.filter((run) => run.kind === "scheduled" && run.status === "succeeded")).toHaveLength(1);
-  await expect(app.page.getByText("Scheduled result", { exact: true })).toBeVisible();
+  expect(runs[0]?.scheduledFor).toBe(routine.trigger.nextRunAt);
+  const saved = (await app.page.evaluate((agentId) => window.openbot.agent.listRoutines(agentId), agent.id)).find(
+    (entry) => entry.id === routine.id,
+  );
+  expect(saved?.trigger.schedule).toEqual(input.schedule);
+  expect(Date.parse(saved?.trigger.nextRunAt ?? "")).toBeGreaterThan(Date.parse(routine.trigger.nextRunAt));
+  const messages = (await conversation(app, agent.id)).messages;
+  expect(messages.filter((message) => message.text === "Scheduled result")).toHaveLength(1);
+  await expect(
+    app.page
+      .getByRole("main", { name: t("conversation.view.label"), exact: true })
+      .getByText("Scheduled result", { exact: true }),
+  ).toBeVisible();
   await app.page.evaluate((value) => window.openbot.agent.deleteRoutine(value), {
     agentId: agent.id,
     routineId: routine.id,

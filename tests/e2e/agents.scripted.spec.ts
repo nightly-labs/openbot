@@ -32,20 +32,31 @@ test("create-agent creates a child, runs its task, and returns a reply", async (
     }),
   );
   await completed(app, parent.id, "Child delegated result 42");
-  const child = (await app.page.evaluate(() => window.openbot.agent.listAgents())).find((agent) => agent.name === name);
+  const children = (await app.page.evaluate(() => window.openbot.agent.listAgents())).filter(
+    (agent) => agent.name === name,
+  );
+  expect(children).toHaveLength(1);
+  const child = children[0];
   expect(child?.provider).toBe(parent.provider);
   if (!child) throw new Error("The child was not created.");
   expect(child.model).toBe(parent.model);
   await openAgent(app, child.name);
-  await expect(app.page.getByText("Child initial task complete", { exact: true })).toBeVisible();
-  await expect(app.page.getByText("Child delegated result 42", { exact: true })).toBeVisible();
+  const view = app.page.getByRole("main", { name: t("conversation.view.label"), exact: true });
+  const childMessages = (await conversation(app, child.id)).messages;
+  for (const text of ["Child initial task complete", "Child delegated result 42"]) {
+    await expect(view.getByText(text, { exact: true })).toBeVisible();
+    expect(childMessages.filter((message) => message.author === "assistant" && message.text === text)).toHaveLength(1);
+  }
   const parentMessages = (await conversation(app, parent.id)).messages;
   expect(
-    parentMessages.filter((message) => message.text.includes("Status: done\nResult: Child delegated result 42")),
+    parentMessages.filter(
+      (message) =>
+        message.senderAgentId === child.id && message.text.includes("Status: done\nResult: Child delegated result 42"),
+    ),
   ).toHaveLength(1);
 });
 
-test("delegate delivers two parallel requests and routes replies once", async ({ app, owner }) => {
+test("delegate delivers two parallel requests and routes replies once", async ({ app, owner }, testInfo) => {
   const parent = await newAgent(app);
   const first = await newAgent(app);
   const second = await newAgent(app);
@@ -75,16 +86,28 @@ test("delegate delivers two parallel requests and routes replies once", async ({
       return Boolean(a.activeTurnId && b.activeTurnId);
     })
     .toBe(true);
-  await expect(app.page.getByText(first.name, { exact: true }).last()).toBeVisible();
+  await app.page.getByRole("button", { name: t("chat.marker.agentCount", { count: 2 }), exact: true }).click();
+  await expect(app.page.getByRole("menuitem", { name: new RegExp(first.name) })).toBeVisible();
+  await app.page.screenshot({ path: testInfo.outputPath("recipient-menu.png") });
+  await app.page.getByRole("menuitem", { name: new RegExp(first.name) }).click();
+  await expect(
+    app.page.getByRole("textbox", { name: t("composer.placeholder.message", { name: first.name }) }),
+  ).toBeVisible();
   await owner.release(key);
   await expect
-    .poll(
-      async () =>
-        (await conversation(app, parent.id)).messages.filter((message) =>
-          message.text.includes("Status: done\nResult: Parallel result"),
-        ).length,
+    .poll(async () =>
+      (await conversation(app, parent.id)).messages
+        .filter((message) => message.text.includes("Status: done\nResult: Parallel result"))
+        .map((message) => message.senderAgentId)
+        .sort(),
     )
-    .toBe(2);
+    .toEqual([first.id, second.id].sort());
+  for (const child of [first, second]) {
+    await completed(app, child.id, "Parallel result");
+    expect(
+      (await conversation(app, child.id)).messages.filter((message) => message.text === "Parallel result"),
+    ).toHaveLength(1);
+  }
 });
 
 test("child-failure exposes failed work, cancels delegated work, and recovers", async ({ app }) => {
@@ -115,6 +138,16 @@ test("child-failure exposes failed work, cancels delegated work, and recovers", 
         .then((queue) => queue.deliveries.some((delivery) => delivery.status === "failed")),
     )
     .toBe(true);
+  await expect(
+    app.page.getByLabel(
+      t("chat.marker.accessible.message", {
+        label: t("chat.marker.messaged"),
+        agent: child.name,
+        status: t("chat.marker.status.failed"),
+      }),
+      { exact: true },
+    ),
+  ).toBeVisible();
   await openAgent(app, child.name);
   await expect(app.page.getByText(/Fixture child failure/).first()).toBeVisible();
   await send(app, child.name, prompt({ reply: "Child recovered" }));
@@ -178,6 +211,15 @@ test("child-failure exposes failed work, cancels delegated work, and recovers", 
     }),
   );
   await completed(app, parent.id, "Status: done\nResult: Delegation recovered");
+  const replies = (await conversation(app, parent.id)).messages.filter((message) => message.senderAgentId === child.id);
+  expect(replies.filter((message) => message.text.includes("Status: done\nResult: Delegation recovered"))).toHaveLength(
+    1,
+  );
+  expect(
+    replies.some(
+      (message) => message.text.includes("Cancelled child result") || message.text.includes("Must not finish"),
+    ),
+  ).toBe(false);
 });
 
 test("group delegates inside a group and supports member removal", async ({ app }) => {
@@ -208,8 +250,21 @@ test("group delegates inside a group and supports member removal", async ({ app 
     }),
   );
   await expect(app.page.getByText("Group result 42", { exact: true })).toBeVisible();
+  await expect
+    .poll(() =>
+      app.page
+        .evaluate((channelId) => window.openbot.agent.readChannel({ channelId }), group.id)
+        .then((page) =>
+          page.tasks
+            .filter((task) => task.state === "completed")
+            .map((task) => task.ownerAgentId)
+            .sort(),
+        ),
+    )
+    .toEqual([lead.id, worker.id].sort());
   const page = await app.page.evaluate((channelId) => window.openbot.agent.readChannel({ channelId }), group.id);
-  expect(page.tasks.some((task) => task.ownerAgentId === worker.id && task.state === "completed")).toBe(true);
+  const leadTask = page.tasks.find((task) => task.ownerAgentId === lead.id);
+  expect(page.tasks.find((task) => task.ownerAgentId === worker.id)?.parentTaskId).toBe(leadTask?.id);
   await app.page.getByRole("button", { name: t("channel.settings.title"), exact: true }).click();
   await app.page.getByRole("button", { name: t("channel.members.remove", { name: worker.name }) }).click();
   await expect
@@ -230,4 +285,15 @@ test("group delegates inside a group and supports member removal", async ({ app 
     }),
   );
   await expect(app.page.getByText("Remaining member result", { exact: true })).toBeVisible();
+  await expect
+    .poll(() =>
+      app.page
+        .evaluate((channelId) => window.openbot.agent.readChannel({ channelId }), group.id)
+        .then((snapshot) =>
+          snapshot.tasks
+            .filter((task) => !page.tasks.some((previous) => previous.id === task.id))
+            .map((task) => ({ owner: task.ownerAgentId, state: task.state })),
+        ),
+    )
+    .toEqual([{ owner: lead.id, state: "completed" }]);
 });
