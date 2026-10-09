@@ -62,9 +62,20 @@ export function QrCode(props: QrCodeProps): JSX.Element {
   let markElement: HTMLSpanElement | undefined;
   let disposed = false;
 
-  // The hole is cut to the size of the logos, so they are measured before the code is drawn.
+  // The hole is cut to the size of the logos, so the code waits until they have a size. A code in a
+  // hidden panel has none yet, and is drawn when the panel shows.
   onSettled(() => {
-    if (markElement) setMarkBox({ width: markElement.offsetWidth, height: markElement.offsetHeight });
+    const element = markElement;
+    if (!element) return;
+    const observer = new ResizeObserver(() => {
+      const width = element.offsetWidth;
+      const height = element.offsetHeight;
+      if (width === 0 || height === 0) return;
+      const current = markBox();
+      if (current?.width !== width || current.height !== height) setMarkBox({ width, height });
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
   });
 
   createEffect(
