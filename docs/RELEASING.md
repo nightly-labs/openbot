@@ -559,7 +559,8 @@ Before creating the first tag or any later release:
 16. if `git diff --quiet <previous tag> <new tag> -- remote packages/contracts/src/signal-protocol` finds
     changes, deploy Signal from the new tag as soon as the tag exists, before the release workflow
     publishes the clients. Use the Signal-only procedure in
-    [remote-session-deployment.md](remote-session-deployment.md#deployment-procedure--requires-separate-approval).
+    [remote-session-deployment.md](remote-session-deployment.md#deployment-procedure--requires-separate-approval);
+    the `.agents/skills/signal-deploy/` skill adds the checks before and after it.
     Confirm that `curl -fsS https://signal.openbot.run/health/live` shows the tag commit. A client
     that needs a newer Signal fails until then: v0.33.0 shipped webhook routines while Signal was older
     than #1520, so every webhook route answered 404 (#1661).
