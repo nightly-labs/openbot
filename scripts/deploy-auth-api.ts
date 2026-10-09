@@ -36,6 +36,9 @@ async function main(): Promise<void> {
   // Discord is optional too: without these, the Discord routes answer 503 discord_not_configured.
   await putOptionalSecretSet("DISCORD_CLIENT_ID", "DISCORD_CLIENT_SECRET", "DISCORD_STATE_SECRET");
   await putOptionalSecretSet("DISCORD_ROUTE_PRIVATE_JWK", "DISCORD_ROUTE_KEY_ID");
+  // Telegram too: without these, the Telegram routes answer 503. Neither is the bot token, which only
+  // Signal has; the route ticket uses the SLACK_ROUTE_* key.
+  await putOptionalSecretSet("TELEGRAM_BOT_ID", "TELEGRAM_BOT_USERNAME");
   if (cloudflareEnvironment === "test") {
     await putTestAllowList();
     // The key is in the encrypted .env.dev file. Each developer who can decrypt it can create servers.
