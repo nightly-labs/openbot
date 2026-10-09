@@ -449,6 +449,8 @@ export function createMockTeam(
 
   return {
     servers: serversApi,
+    /** The server the preview shows, which its agent events belong to. */
+    activeServerId: () => servers.find((server) => server.active)?.id ?? "local",
     host,
     remoteDesktop,
     emitPresence,

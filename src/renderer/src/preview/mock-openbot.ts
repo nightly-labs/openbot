@@ -1668,7 +1668,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         return () => agentListeners.delete(listener);
       },
       onScopedEvent: (listener) => {
-        const scopedListener = (event: AgentEvent) => listener({ serverId: "local", event });
+        const scopedListener = (event: AgentEvent) => listener({ serverId: mockTeam.activeServerId(), event });
         agentListeners.add(scopedListener);
         return () => agentListeners.delete(scopedListener);
       },
