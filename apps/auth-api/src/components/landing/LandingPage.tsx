@@ -11,7 +11,6 @@ import { LandingAppPreview } from "./LandingAppPreview";
 import { LandingFooter } from "./LandingFooter";
 import { LandingGlow } from "./LandingGlow";
 import { PricingSection } from "./PricingSection";
-import { ProductHuntPill } from "./ProductHuntLaunch";
 import { SiteHeader } from "./SiteHeader";
 
 export function LandingPage() {
@@ -25,31 +24,28 @@ export function LandingPage() {
         <section class="landing-hero" aria-labelledby="landing-title">
           <div class="landing-hero-grid" data-slot="hero-grid" aria-hidden="true" />
           <div class="landing-hero-copy">
-            <div class="landing-hero-pills landing-hero-line" style={{ "--landing-hero-line": 0 }}>
-              <ProductHuntPill />
-              <p class="landing-availability">
-                <span class="landing-availability-new">NEW</span>
-                <span class="landing-availability-copy">Available on</span>
-                <span class="landing-availability-platform">
-                  <PlatformLogo platform="macos" />
-                  macOS
-                </span>
-                <span class="landing-availability-separator" aria-hidden="true">
-                  ·
-                </span>
-                <span class="landing-availability-platform">
-                  <PlatformLogo platform="windows" />
-                  Windows
-                </span>
-                <span class="landing-availability-separator" aria-hidden="true">
-                  ·
-                </span>
-                <span class="landing-availability-platform">
-                  <PlatformLogo platform="linux" solid />
-                  Linux
-                </span>
-              </p>
-            </div>
+            <p class="landing-availability landing-hero-line" style={{ "--landing-hero-line": 0 }}>
+              <span class="landing-availability-new">NEW</span>
+              <span class="landing-availability-copy">Available on</span>
+              <span class="landing-availability-platform">
+                <PlatformLogo platform="macos" />
+                macOS
+              </span>
+              <span class="landing-availability-separator" aria-hidden="true">
+                ·
+              </span>
+              <span class="landing-availability-platform">
+                <PlatformLogo platform="windows" />
+                Windows
+              </span>
+              <span class="landing-availability-separator" aria-hidden="true">
+                ·
+              </span>
+              <span class="landing-availability-platform">
+                <PlatformLogo platform="linux" solid />
+                Linux
+              </span>
+            </p>
 
             <h1 id="landing-title" class="landing-title landing-hero-line" style={{ "--landing-hero-line": 1 }}>
               {/* The spaces do not render in the flex row. They keep the words apart in

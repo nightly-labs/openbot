@@ -77,8 +77,7 @@ type LandingDestination =
   | "architecture"
   | "contributing"
   | "codex"
-  | "claude"
-  | "product_hunt";
+  | "claude";
 
 type CollectionIndexRoute = ContentCollection["indexRoute"];
 type DownloadPagePath = (typeof OPENBOT_DOWNLOAD_PAGE_LINKS)[keyof typeof OPENBOT_DOWNLOAD_PAGE_LINKS];
@@ -183,7 +182,6 @@ const LINK_DESTINATIONS = new Map<string, LandingDestination>([
   [OPENBOT_LINKS.contributing, "contributing"],
   [OPENBOT_LINKS.codex, "codex"],
   [OPENBOT_LINKS.claude, "claude"],
-  [OPENBOT_LINKS.productHunt, "product_hunt"],
 ]);
 
 const EVENT_PROPERTY_ALLOWLIST = {
