@@ -170,6 +170,8 @@ class RoutineFlows extends Context.Service<RoutineFlows, RoutineFlowsShape>()("o
 
         const savePosition = Effect.fn("RoutineFlows.savePosition")(function* (input: SaveRoutineFlowPositionInput) {
           yield* attempt(() => store.savePosition(input.agentId, input.nodeKey, input.x, input.y));
+          // Another client with this canvas open shows a placed or moved agent without a reload.
+          dependencies.changed([input.agentId]);
         });
 
         const removePosition = Effect.fn("RoutineFlows.removePosition")(function* (

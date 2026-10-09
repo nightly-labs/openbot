@@ -66,6 +66,8 @@ export const messages = {
   "error.team.workspaceDirectoryUnsupported": "Это подключение не поддерживает показ папок.",
   "error.team.routineFlowsUnsupported":
     "Этот сервер не поддерживает цепочки регулярных задач. Обновите OpenBot на компьютере, где он работает.",
+  "error.team.routineCanvasTooLarge":
+    "Эта схема регулярных задач слишком велика для отправки на это устройство. Сократите инструкции регулярных задач на компьютере, где работает сервер.",
   "error.team.agentImportUnsupported": "Это подключение не поддерживает импорт агентов.",
   "error.team.liveActivityUnsupported": "Этот хост не может обновлять Live Activity на телефоне.",
   "error.team.agentUpdateTargetRequired": "Нужно указать агента для обновления.",

@@ -238,6 +238,57 @@ describe("Team API routine-flows-v1", () => {
     expect(canvas.routines[0]?.steps[0]).toMatchObject({ input: "", output: null });
   });
 
+  it("empties the older runs' texts next, and refuses a canvas that still does not fit", async () => {
+    const run = (routineId: string, index: number) => ({
+      id: `${routineId}-run-${index}`,
+      routineId,
+      triggerId: null,
+      kind: "scheduled" as const,
+      scheduledFor: TIME,
+      routineName: routineId,
+      instruction: "r".repeat(100_000),
+      status: "failed" as const,
+      error: "e".repeat(10_000),
+      createdAt: TIME,
+      updatedAt: TIME,
+      agentId: "chief",
+      deliveryId: null,
+    });
+    const flows = (count: number, instruction: string) =>
+      Array.from({ length: count }, (_, index) => {
+        const entry = routine(`routine-${index}`, "chief", {
+          kind: "schedule",
+          schedule: { kind: "daily", time: "09:00" },
+        });
+        return {
+          ...entry,
+          routine: { ...entry.routine, instruction },
+          recentRuns: Array.from({ length: 10 }, (_, runIndex) => run(entry.routine.id, runIndex)),
+        };
+      });
+    let routines = flows(2, "Do it.");
+    const { send, memberToken } = await startHost(
+      routineFlows({
+        canvas: () => Effect.succeed({ ...CANVAS, routines, links: [], positions: [], placedAgentIds: [] }),
+      }),
+    );
+    const response = await send(memberToken, ROUTINE_FLOWS_ROUTES.canvas, { agentId: "chief" });
+    expect(response.status).toBe(200);
+    const text = await response.text();
+    expect(Buffer.byteLength(text)).toBeLessThan(TEAM_PROTOCOL_V2_MAX_JSON_FRAME_BYTES);
+    const canvas: RoutineFlowCanvas = JSON.parse(text);
+    for (const flow of canvas.routines) {
+      expect(flow.recentRuns).toHaveLength(10);
+      expect(flow.recentRuns[0]?.instruction).toHaveLength(100_000);
+    }
+    // The first routine is cut first, and that is enough for the canvas to fit.
+    expect(canvas.routines[0]?.recentRuns[1]).toMatchObject({ instruction: "", error: null });
+
+    routines = flows(20, "i".repeat(100_000));
+    const refused = await send(memberToken, ROUTINE_FLOWS_ROUTES.canvas, { agentId: "chief" });
+    expect(refused.status).toBe(413);
+  });
+
   it("sends a canvas change only to clients with the capability and never for a hidden agent", async () => {
     const events = new EventEmitter();
     const { port, ownerToken } = await startHost(routineFlows(), events);

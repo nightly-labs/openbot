@@ -67,6 +67,8 @@ export const messages = {
   "error.team.workspaceDirectoryUnsupported": "Esta conexão não oferece suporte à exibição de pastas.",
   "error.team.routineFlowsUnsupported":
     "Este servidor não oferece suporte a fluxos de rotinas. Atualize o OpenBot no computador que o executa.",
+  "error.team.routineCanvasTooLarge":
+    "Este quadro de rotinas é grande demais para ser enviado a este dispositivo. Encurte as instruções das rotinas no computador que executa o servidor.",
   "error.team.agentImportUnsupported": "Esta conexão não oferece suporte à importação de agentes.",
   "error.team.liveActivityUnsupported":
     "Este computador anfitrião não pode atualizar a Atividade ao Vivo de um celular.",

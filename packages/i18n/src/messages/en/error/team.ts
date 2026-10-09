@@ -64,6 +64,8 @@ export const messages = defineMessages("error.team", {
   "error.team.workspaceDirectoryUnsupported": "Showing folders is not supported by this connection.",
   "error.team.routineFlowsUnsupported":
     "This server does not support routine flows. Update OpenBot on the computer that runs it.",
+  "error.team.routineCanvasTooLarge":
+    "This routine canvas is too large to send to this device. Shorten the routine instructions on the computer that runs the server.",
   "error.team.agentImportUnsupported": "Importing agents is not supported by this connection.",
   "error.team.liveActivityUnsupported": "This host cannot update the Live Activity of a phone.",
   "error.team.agentUpdateTargetRequired": "An agent to update is required.",

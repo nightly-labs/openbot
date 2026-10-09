@@ -64,7 +64,7 @@ function clipStep(step: RoutineFlowStep): RoutineFlowStep {
 /**
  * The canvas a member may read: no routine that touches a hidden agent, and no webhook URL unless
  * the member administers the server. Step texts are clipped, and emptied from the routines with the
- * oldest runs first while the canvas would not fit one WebRTC frame.
+ * oldest runs first while the canvas would not fit one WebRTC frame; then the older runs' texts.
  */
 function memberCanvas(canvas: RoutineFlowCanvas, hidden: ReadonlySet<string>, admin: boolean): RoutineFlowCanvas {
   const visibleRoutineIds = new Set(
@@ -104,6 +104,18 @@ function memberCanvas(canvas: RoutineFlowCanvas, hidden: ReadonlySet<string>, ad
     flow.steps = flow.steps.map((step) => ({ ...step, input: "", output: null, error: null }));
     bytes -= before - Buffer.byteLength(JSON.stringify(flow.steps));
   }
+  // The run history shows only a run's status and times, and only the newest run shows its
+  // instruction, so the older runs give up their texts next.
+  for (const flow of oldestFirst) {
+    if (bytes <= CANVAS_BYTE_BUDGET) break;
+    const before = Buffer.byteLength(JSON.stringify(flow.recentRuns));
+    flow.recentRuns = flow.recentRuns.map((run, index) =>
+      index === 0 ? run : { ...run, instruction: "", error: null },
+    );
+    bytes -= before - Buffer.byteLength(JSON.stringify(flow.recentRuns));
+  }
+  // The routines and links themselves cannot be cut: a canvas that still does not fit is refused.
+  if (bytes > CANVAS_BYTE_BUDGET) throw new HttpError(413, sourceText("error.team.routineCanvasTooLarge"));
   return result;
 }
 
