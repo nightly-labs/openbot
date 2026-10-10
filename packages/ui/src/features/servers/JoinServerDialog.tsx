@@ -215,6 +215,7 @@ export function JoinServerDialog(props: JoinServerDialogProps) {
                 data-page={page()}
                 data-preview-error={previewError() ? "" : undefined}
                 data-error={joinError() ? "" : undefined}
+                data-reference={error()?.reference ? "" : undefined}
               >
                 <form
                   class="join-server-page t-page"
