@@ -80,7 +80,7 @@ export interface MainWindowContext {
   /** A function, not a value: the saved language is read after the first window opens. */
   getTranslate: () => AppTranslate;
   forwardAgentEvent: (serverId: string, event: AgentEvent) => void;
-  /** The renderer is about to be replaced, so a queued invitation has nobody to receive it. */
+  /** A renderer load or committed document navigation resets delivery of queued links. */
   onRendererLoadStarted: () => void;
   /** Main must release resources when a renderer can no longer run its own cleanup. */
   onRendererGone: () => void;
@@ -188,9 +188,8 @@ export function createMainWindowController({
     window.on("resize", () => rememberMainWindowBounds(window.getNormalBounds()));
 
     window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
-    window.webContents.on("did-start-navigation", (details) => {
-      if (details.isMainFrame && !details.isSameDocument) onRendererLoadStarted();
-    });
+    // A started navigation can still be cancelled without replacing the live renderer.
+    window.webContents.on("did-navigate", onRendererLoadStarted);
     window.webContents.on("render-process-gone", onRendererGone);
     window.webContents.once("destroyed", onRendererGone);
     window.webContents.on("before-input-event", (event, input) => {
@@ -295,6 +294,7 @@ export function createMainWindowController({
   }
 
   function loadRenderer(window: BrowserWindow): Promise<void> {
+    onRendererLoadStarted();
     const developmentUrl = process.env.ELECTRON_RENDERER_URL;
     return developmentUrl ? window.loadURL(developmentUrl) : window.loadURL("openbot-app://app/index.html");
   }

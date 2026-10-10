@@ -255,9 +255,11 @@ the same frame. On desktop, a shared or workspace HTML file preview gives the cl
 that already passed the existing file-access checks, in a bounded in-memory registry. The page
 protocol accepts only an opaque token, never a file path, and uses the same sandbox response as
 HTML attachments. The server-owned preview state releases its page on replacement, close or
-disposal; stale preview responses release their unused pages. Main clears the registry when the
-main document reloads, the renderer exits, or its web contents are destroyed. A generation captured
-before file resolution prevents old requests from registering pages after a clear. Accepted
+disposal; stale preview responses release their unused pages. Main clears the registry before an
+application-controlled renderer load, after a main-frame document navigation commits, when the renderer
+exits, or when its web contents are destroyed. Cancelled navigations retain the live renderer's pages and
+deep-link readiness. A generation captured before file resolution prevents old requests from registering
+pages after a clear. Accepted
 addresses remain valid until release or clear, including when the user switches to source and back. At
 most eight pages can be held. A full registry or a page above the existing 8 MB limit falls back
 to source. Only local file previews use this HTML MIME override; attachment imports keep their
