@@ -100,21 +100,23 @@ export class ContextCompaction {
           : null
         : display.compaction;
     const startedAt = previous ? previous.startedAt : Date.now();
-    display.compaction = {
+    const expectedMs = this.#durations.get(threadId);
+    const compaction: NonNullable<typeof display.compaction> = {
       id: previous ? previous.id : randomUUID(),
       startedAt,
       status,
-      ...(this.#durations.has(threadId) ? { expectedMs: this.#durations.get(threadId) } : {}),
+      ...(expectedMs === undefined ? {} : { expectedMs }),
       ...(previous ?? {}),
     };
-    display.compaction.status = status;
+    compaction.status = status;
+    display.compaction = compaction;
     const before = previous ? previous.beforeTokens : display.usage?.usedTokens;
     if (tokenComparison === "none") {
-      delete display.compaction.beforeTokens;
-      delete display.compaction.afterTokens;
-    } else if (before !== undefined) display.compaction.beforeTokens = before;
+      delete compaction.beforeTokens;
+      delete compaction.afterTokens;
+    } else if (before !== undefined) compaction.beforeTokens = before;
     this.#awaitingPostCompaction.delete(threadId);
-    if (tokenComparison === "context" && status === "completed" && display.compaction.afterTokens === undefined)
+    if (tokenComparison === "context" && status === "completed" && compaction.afterTokens === undefined)
       this.#awaitingPostCompaction.add(threadId);
     if (status === "completed" && previous?.status === "running")
       this.#durations.set(threadId, Math.max(1, Date.now() - startedAt));

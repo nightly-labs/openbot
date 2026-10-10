@@ -39,7 +39,7 @@ export function readHandoffHistory(
   let size = 0;
   let hasOlder = false;
   while (size < RECENT_CHARACTERS + OLDER_CHARACTERS) {
-    const page = database.readAgentHistory(agentId, threadId, { before, limit: 20 });
+    const page = database.readAgentHistory(agentId, threadId, { ...(before ? { before } : {}), limit: 20 });
     if (!page.messages.length) break;
     for (const row of page.messages) {
       recent.push(row);
