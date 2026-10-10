@@ -2,6 +2,7 @@ import { type InviteLinkOptions, parseInviteUrl, selfHostedApiOrigin } from "@op
 import type { AppFormat, MobileTranslate } from "@openbot/i18n/mobile";
 import { runTeamEffect } from "@openbot/team-client";
 import type { RemoteInvitePreview } from "@openbot/team-client/remote-directory";
+import type { UserErrorDetails } from "@openbot/user-errors";
 import * as Clipboard from "expo-clipboard";
 import { type Href, router } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
@@ -14,6 +15,7 @@ import { AppState, Keyboard, Pressable, View } from "react-native";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { SERVER_ROLE_KEYS } from "@/features/servers/model/server-role";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import { ErrorReference } from "@/shared/components/error-reference";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { haptics } from "@/shared/lib/haptics";
@@ -56,7 +58,7 @@ export function AddServerScreen({
   /** An inner page under a native header: its back button replaces Cancel. */
   underHeader?: boolean;
 } = {}) {
-  const { t, format, errorMessage, sourceText } = useText();
+  const { t, format, errorDetails, sourceText } = useText();
   const [foreground, accentForeground, success] = useThemeColor(["foreground", "accent-foreground", "success"]);
   const { addRemoteServer, servers, teamDirectory } = useMobileWorkspace();
   const { session } = useMobileSession();
@@ -72,7 +74,7 @@ export function AddServerScreen({
   const reviewedInvite = request?.url ?? null;
   const [preview, setPreview] = useState<RemoteInvitePreview | null>(null);
   const [previewing, setPreviewing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<UserErrorDetails | null>(null);
   const [joining, setJoining] = useState(false);
   const joinInFlight = useRef(false);
   usePreventRemove(joining, () => {
@@ -97,7 +99,7 @@ export function AddServerScreen({
       (cause) => {
         if (!active) return;
         const text = currentText();
-        setError(text.errorMessage(cause, text.t("mobile.server.invite.loadFailed")));
+        setError(text.errorDetails(cause, text.t("mobile.server.invite.loadFailed")));
         setPreviewing(false);
       },
     );
@@ -126,7 +128,7 @@ export function AddServerScreen({
       setJoinedId(serverId);
       void haptics.notification("success");
     } catch (cause) {
-      setError(errorMessage(cause, t("mobile.server.invite.joinFailed")));
+      setError(errorDetails(cause, t("mobile.server.invite.joinFailed")));
       void haptics.notification("error");
       joinInFlight.current = false;
     }
@@ -172,6 +174,9 @@ export function AddServerScreen({
               : joinedStatus(joinedServer?.name, joinStatus)
             : t("mobile.server.join.description")}
         </Typography.Paragraph>
+        {joinedId && !connected ? (
+          <ErrorReference reference={joinedServer?.connectionFailure?.reference} align="center" />
+        ) : null}
       </View>
 
       {joinedId ? (
@@ -240,9 +245,12 @@ export function AddServerScreen({
           ) : null}
 
           {error ? (
-            <Typography.Paragraph accessibilityRole="alert" align="center" className="text-danger-text">
-              {error}
-            </Typography.Paragraph>
+            <View className="items-center gap-1">
+              <Typography.Paragraph accessibilityRole="alert" align="center" className="text-danger-text">
+                {error.message}
+              </Typography.Paragraph>
+              <ErrorReference reference={error.reference} align="center" />
+            </View>
           ) : null}
 
           {/* The join button shows once the field has text, so an empty sheet has no dimmed button. */}

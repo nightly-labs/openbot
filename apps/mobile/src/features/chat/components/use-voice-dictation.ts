@@ -1,3 +1,4 @@
+import { referenceFrom } from "@openbot/user-errors";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Linking } from "react-native";
 import { type SharedValue, useSharedValue, withTiming } from "react-native-reanimated";
@@ -91,11 +92,11 @@ async function recognitionOptions(module: Recognizer, supported: Promise<Support
   return { lang, requiresOnDeviceRecognition };
 }
 
-function showNotice(notice: DictationNotice): void {
+function showNotice(notice: DictationNotice, error?: unknown): void {
   void haptics.notification("error");
   const { t } = currentText();
   showFailureAlert(
-    undefined,
+    error,
     "voice",
     t(notice.title),
     t(notice.message),
@@ -204,7 +205,8 @@ export function useVoiceDictation({
         // and with nothing said any error there loses nothing. No message.
         if (phaseRef.current === "stopping" && (!current.heard || event.error === "client")) return;
         const notice = dictationNotice(event.error);
-        if (notice) showNotice(notice);
+        // The recognizer's error name is a fixed identifier, so it can be the code of the failure.
+        if (notice) showNotice(notice, { reference: referenceFrom("speech", event.error) });
       }),
       speechRecognition.addListener("end", () => {
         const current = session.current;
@@ -268,10 +270,10 @@ export function useVoiceDictation({
           };
           current.native = true;
           module.start(current.options);
-        } catch {
+        } catch (error) {
           if (session.current !== current) return;
           settle();
-          showNotice(dictationFailedNotice);
+          showNotice(dictationFailedNotice, error);
         }
       })();
       return true;

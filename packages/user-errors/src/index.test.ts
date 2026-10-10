@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyUserError, userErrorMessage } from "./index";
+import { classifyUserError, errorReference, referenceCarrierName, userErrorDetails, userErrorMessage } from "./index";
 
 const fallback = "Could not save your changes. Try again.";
 
@@ -161,5 +161,53 @@ describe("provider authentication failures", () => {
   it("strips an error class prefix from a product message", () => {
     const error = new Error("Error invoking remote method 'test:action': RemoteRequestError: Choose another name.");
     expect(userErrorMessage(error, fallback)).toBe("Choose another name.");
+  });
+});
+
+describe("error references", () => {
+  it.each([
+    [new Error("ECONNREFUSED 127.0.0.1:1234"), "errno/ECONNREFUSED"],
+    [new Error("SQLITE_BUSY: database is locked"), "sqlite/SQLITE_BUSY"],
+    [new Error("HTTP 503: upstream failed"), "http/503"],
+    [new TypeError("Failed to fetch"), "network/fetch"],
+    [Object.assign(new Error("Refused."), { status: 403, code: "session_inactive" }), "http/403/session_inactive"],
+    [Object.assign(new Error("Busy."), { reference: "signal/host_busy" }), "signal/host_busy"],
+  ])("names the cause of %s", (error, reference) => {
+    expect(errorReference(error)).toBe(reference);
+  });
+
+  it("reads the reference the main process puts in the IPC error name and keeps the message", () => {
+    const error = new Error(
+      `Error invoking remote method 'servers:retry': ${referenceCarrierName("signal/host_busy")}: The host is offline.`,
+    );
+    expect(userErrorDetails(error, fallback)).toEqual({
+      message: "The host is offline.",
+      reference: "signal/host_busy",
+    });
+  });
+
+  it("keeps the fallback sentence for technical output but still names the cause", () => {
+    expect(userErrorDetails(new Error("SQLITE_BUSY: database is locked"), fallback)).toEqual({
+      message: fallback,
+      reference: "sqlite/SQLITE_BUSY",
+    });
+  });
+
+  // A reference is shown and copied, so it must never carry what a message can: a secret, a path,
+  // a URL or a sentence from a server.
+  it.each([
+    Object.assign(new Error("x"), { reference: "Bearer sk-live-secret-token value" }),
+    Object.assign(new Error("x"), { reference: "https://user:pass@example.com/a" }),
+    Object.assign(new Error("x"), { status: 401, code: "apiKey=example secret" }),
+    Object.assign(new Error("x"), { code: "/Users/person/private.txt" }),
+    new Error("Error invoking remote method 'x': Error[ref:token=abc def]: Failed."),
+    new Error('{"error":"private server response with sk-secret"}'),
+    "plain text with apiKey=example-secret-value",
+  ])("never builds a reference from unsafe text: %s", (error) => {
+    const reference = errorReference(error);
+    expect(reference === null || /^[a-z][a-z0-9_-]*(?:\/[A-Za-z0-9_.-]+)+$/u.test(reference)).toBe(true);
+    for (const leaked of ["secret", "Users", "https", "pass", "apiKey", "private"]) {
+      expect(reference ?? "").not.toContain(leaked);
+    }
   });
 });

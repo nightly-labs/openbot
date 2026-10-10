@@ -834,7 +834,8 @@ describe("CentralAuthManager", () => {
       status: "error",
       issue: {
         code: "auth_api_unavailable",
-        message: expect.stringContaining("Check that the API is running"),
+        // The last failure is either the rejected fetch or the end of the retry window.
+        message: expect.stringContaining("could not reach the account service"),
       },
     });
 

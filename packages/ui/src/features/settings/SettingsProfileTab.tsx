@@ -2,6 +2,7 @@ import type { CentralAuthUser } from "@openbot/contracts/ipc";
 import {
   Badge,
   Button,
+  ErrorReference,
   ImageRemoveButton,
   Input,
   Item,
@@ -157,7 +158,8 @@ export function SettingsProfileTab(props: SettingsProfileTabProps) {
           <Show when={props.store.state.sessions.error}>
             {(error) => (
               <Text role="alert" class="settings-modal-error">
-                {error()}
+                {error().message}
+                <ErrorReference reference={error().reference} />
               </Text>
             )}
           </Show>

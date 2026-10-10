@@ -1,5 +1,16 @@
 import type { MarketplaceSkillSummary } from "@openbot/contracts/ipc";
-import { ArrowRight, Button, Check, Heading, IconButton, Plug, Puzzle, Sparkles, Text } from "@openbot/ui";
+import {
+  ArrowRight,
+  Button,
+  Check,
+  ErrorReference,
+  Heading,
+  IconButton,
+  Plug,
+  Puzzle,
+  Sparkles,
+  Text,
+} from "@openbot/ui";
 import { ReferenceChip } from "@openbot/ui/reference-chip";
 import { SkillGradient } from "@openbot/ui/skill-gradient";
 import { useText } from "@openbot/ui/text";
@@ -29,6 +40,8 @@ export function PageHead(props: { media: JSX.Element; title: string; description
 /** The part of a page that waits for the full listing: a status line, or the failure with Retry. */
 export function DetailState(props: {
   status: "loading" | "loaded" | "failed";
+  /** The code of the failed read, when it has one. */
+  reference?: string | null | undefined;
   loadingLabel: string;
   onRetry: () => void;
   children: JSX.Element;
@@ -46,6 +59,7 @@ export function DetailState(props: {
           <Text as="p" variant="body-sm" tone="muted">
             {t("marketplace.loadFailed")}
           </Text>
+          <ErrorReference reference={props.reference} />
           <Button type="button" variant="outline" size="sm" onClick={props.onRetry}>
             {t("common.retry")}
           </Button>

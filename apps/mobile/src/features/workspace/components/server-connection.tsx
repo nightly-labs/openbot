@@ -2,15 +2,17 @@ import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import {
   createRemoteConnectionRecovery,
+  type RemoteConnectionFailure,
   type RemoteConnectionStage,
   type RemoteRecoveryStatus,
   type RemoteTeamDirectoryClient,
-  remoteConnectionFailure,
+  remoteConnectionFailureDetails,
 } from "@openbot/team-client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MobileConnectionAnalytics } from "@/features/analytics/connection";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { supportLog, supportLogValue } from "@/features/support/model/support-log";
+import { referencedError } from "@/features/workspace/model/referenced-error";
 import { RemoteTeamTransport, type RemoteTeamTransportRef } from "./remote-team-transport";
 
 export interface ServerConnectionHandle {
@@ -30,7 +32,7 @@ interface Props {
   directory: RemoteTeamDirectoryClient;
   register(hostId: string, handle: ServerConnectionHandle | null): void;
   load(hostId: string, publicKey: string, client: RemoteTeamTransportRef, context: ServerLoadContext): Promise<void>;
-  onStatus(hostId: string, status: RemoteRecoveryStatus, failure: string | null): void;
+  onStatus(hostId: string, status: RemoteRecoveryStatus, failure: RemoteConnectionFailure | null): void;
   onMembershipChanged?(): Promise<void>;
   onTeamEvent(hostId: string, event: AgentEvent | TeamRealtimeEvent): void;
 }
@@ -59,7 +61,7 @@ export function ServerConnection({
   useEffect(() => {
     if (!client) return;
     let disposed = false;
-    let failure: string | null = null;
+    let failure: RemoteConnectionFailure | null = null;
     let loggedStatus = "";
     let context: ServerLoadContext = { stage: "connection", isCurrent: () => false };
     const recovery = createRemoteConnectionRecovery(
@@ -90,7 +92,7 @@ export function ServerConnection({
         );
       },
       (error) => {
-        failure = remoteConnectionFailure(context.stage, error);
+        failure = remoteConnectionFailureDetails(context.stage, error);
       },
       (status) => {
         if (disposed) return;
@@ -156,7 +158,7 @@ export function ServerConnection({
             if (activeRef.current) void onMembershipChanged?.().catch(() => undefined);
             else membershipRefreshPending.current = true;
           }
-          const error = new Error(update.message ?? sourceText("error.remote.desktopOffline"));
+          const error = referencedError(update.message ?? sourceText("error.remote.desktopOffline"), update.reference);
           if (update.code === "protocol_error") controller.current?.suspend(error);
           else controller.current?.offline(error);
         }

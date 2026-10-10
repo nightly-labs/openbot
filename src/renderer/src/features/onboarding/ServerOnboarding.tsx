@@ -1,5 +1,5 @@
 import type { AgentModelId, AgentProviderId } from "@openbot/contracts/ipc";
-import { Button, IconButton, X } from "@openbot/ui";
+import { Button, ErrorReference, IconButton, X } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { createSignal, createUniqueId, onSettled, Show } from "solid-js";
 import { listenForEscape } from "./onboarding-escape";
@@ -84,6 +84,7 @@ export function ServerOnboarding(props: ServerOnboardingProps) {
         <Show when={providers.error()}>
           <p class="onboarding-error" role="alert">
             {providers.error()}
+            <ErrorReference reference={providers.errorReference()} />
           </p>
         </Show>
 

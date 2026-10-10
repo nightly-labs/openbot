@@ -66,7 +66,12 @@ export function MarketplaceSkillPage(props: { scope: MarketplaceScope; listing: 
         description={skill().description}
         actions={<SkillAction scope={props.scope} skill={skill()} />}
       />
-      <DetailState status={detail.status()} loadingLabel={t("marketplace.skill.loading")} onRetry={detail.retry}>
+      <DetailState
+        status={detail.status()}
+        reference={detail.reference()}
+        loadingLabel={t("marketplace.skill.loading")}
+        onRetry={detail.retry}
+      >
         <Show when={detail.value()}>
           {(full) => (
             <TryCard

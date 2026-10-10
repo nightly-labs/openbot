@@ -4,9 +4,19 @@ import {
   parseHostedServerSummary,
 } from "@openbot/contracts/hosted-servers";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { referenceFrom } from "@openbot/user-errors/reference";
 import { Deferred, Effect, Schema } from "effect";
 
-class HostedServerWakeError extends Schema.TaggedError<HostedServerWakeError>()("HostedServerWakeError", {}) {}
+/** The account server answered, but its body could not be read. */
+class HostedServerWakeError extends Schema.TaggedError<HostedServerWakeError>()("HostedServerWakeError", {
+  status: Schema.Number,
+  code: Schema.NullOr(Schema.String),
+  reference: Schema.NullOr(Schema.String),
+}) {
+  constructor(status: number, code: string | null = null) {
+    super({ status, code, reference: referenceFrom("boat", "wake", status, code) });
+  }
+}
 
 /**
  * A hosted server in one of these states comes online without a user action, so the client reconnects.
@@ -102,7 +112,7 @@ export function createHostedServerWake<E, R>(
       }
       const value = yield* Effect.tryPromise({
         try: () => response.json(),
-        catch: () => new HostedServerWakeError({}),
+        catch: () => new HostedServerWakeError(response.status),
       }).pipe(Effect.catch(() => Effect.succeed(null)));
       const server = parseHostedServerSummary(value);
       if (!server || !WAKE_RECONNECT_STATES.has(server.state)) {
@@ -159,16 +169,17 @@ export function createHostedServerStatusCheck<E, R>(
     if (response.status === 404) {
       const body = yield* Effect.tryPromise({
         try: () => response.json(),
-        catch: () => new HostedServerWakeError({}),
+        catch: () => new HostedServerWakeError(response.status),
       }).pipe(Effect.catch(() => Effect.succeed(null)));
       if (errorCode(body) === NOT_FOUND_CODE) return remember(hostId, "not_hosted", time);
       return startServer && (yield* wake(hostId)) ? "waking" : "offline";
     }
     if (!response.ok) return "offline";
     const status = parseHostedServerStatus(
-      yield* Effect.tryPromise({ try: () => response.json(), catch: () => new HostedServerWakeError({}) }).pipe(
-        Effect.catch(() => Effect.succeed(null)),
-      ),
+      yield* Effect.tryPromise({
+        try: () => response.json(),
+        catch: () => new HostedServerWakeError(response.status),
+      }).pipe(Effect.catch(() => Effect.succeed(null))),
     );
     if (!status) return "offline";
     if (status.sleeping) return remember(hostId, "sleeping", time);

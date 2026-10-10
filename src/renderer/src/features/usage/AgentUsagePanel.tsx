@@ -3,6 +3,7 @@ import type { AppTextKey } from "@openbot/i18n";
 import {
   ArrowLeft,
   Button,
+  ErrorReference,
   IconButton,
   RefreshCw,
   Select,
@@ -23,6 +24,7 @@ import {
   usagePeriods,
 } from "@openbot/ui/features/usage/usage-format";
 import { useText } from "@openbot/ui/text";
+import { errorReference } from "@openbot/user-errors";
 import { createEffect, createStore, onSettled, Show } from "solid-js";
 import { type UsagePort, usagePort } from "./usage-port";
 
@@ -39,6 +41,7 @@ interface UsageState {
   range: HostAnalyticsInput;
   result: HostAnalytics | null;
   phase: "loading" | "ready" | "unsupported" | "error";
+  errorReference: string | null;
   agents: AgentSummary[];
   metric: UsageMetric;
   period: UsagePeriod;
@@ -53,6 +56,7 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
     agents: [],
     result: null,
     phase: "loading",
+    errorReference: null,
     metric: "cost",
     period: "30d",
     serverId: props.serverId,
@@ -87,7 +91,7 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
           draft.result = result;
           draft.phase = result ? "ready" : "unsupported";
         });
-    } catch {
+    } catch (error) {
       // A background refresh that fails leaves the last good report where it is rather
       // than replacing it with an error the user cannot act on; the next turn retries.
       // Only while a report is on screen, though: a background request that overtakes the
@@ -98,6 +102,7 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
         setState((draft) => {
           draft.result = null;
           draft.phase = "error";
+          draft.errorReference = errorReference(error);
         });
     }
   }
@@ -245,7 +250,10 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
         </Show>
         <Show when={state.phase === "error"}>
           <div class="agent-usage-notice">
-            <p role="alert">{t("usage.panel.loadFailed")}</p>
+            <p role="alert">
+              {t("usage.panel.loadFailed")}
+              <ErrorReference reference={state.errorReference} />
+            </p>
             <Button variant="secondary" onClick={() => void load()}>
               {t("common.retry")}
             </Button>

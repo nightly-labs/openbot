@@ -62,9 +62,9 @@ export const ChatCodeBlock = memo(function ChatCodeBlock({
       await Clipboard.setStringAsync(text);
       setCopiedText(text);
       void haptics.notification("success");
-    } catch {
+    } catch (error) {
       void haptics.notification("error");
-      showFailureAlert(undefined, "turn", t("mobile.chat.code.copyFailed"), t("mobile.chat.copyFailedMessage"));
+      showFailureAlert(error, "turn", t("mobile.chat.code.copyFailed"), t("mobile.chat.copyFailedMessage"));
     }
   }
   return (

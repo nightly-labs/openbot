@@ -13,9 +13,9 @@ export function useCopyMessage(text: string) {
       setCopied(true);
       void haptics.notification("success");
       return true;
-    } catch {
+    } catch (error) {
       void haptics.notification("error");
-      showFailureAlert(undefined, "turn", t("mobile.chat.message.copyFailed"), t("mobile.chat.copyFailedMessage"));
+      showFailureAlert(error, "turn", t("mobile.chat.message.copyFailed"), t("mobile.chat.copyFailedMessage"));
       return false;
     }
   }

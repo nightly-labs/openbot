@@ -9,6 +9,7 @@ import {
   Button,
   Check,
   Dialog,
+  ErrorReference,
   Heading,
   IconButton,
   OctagonX,
@@ -17,6 +18,7 @@ import {
   X,
 } from "@openbot/ui";
 import { motionDuration, prefersReducedMotion } from "@openbot/ui/utils";
+import type { UserErrorDetails } from "@openbot/user-errors";
 import { createEffect, createSignal, For, Match, onCleanup, onSettled, Show, Switch, untrack } from "solid-js";
 import { useText } from "../../text";
 import {
@@ -135,15 +137,15 @@ const CONFETTI_PIECES = 56;
  * plan creates a hosted server, and the dialog then shows the setup.
  */
 export function AddServerDialog(props: AddServerDialogProps) {
-  const { t, errorMessage, format } = useText();
+  const { t, errorDetails, format } = useText();
   const [step, setStep] = createSignal<Step>(untrack(() => props.resume) ? "progress" : "pricing");
   const [billing, setBilling] = createSignal<HostedServerBilling>("yearly");
   const [currency, setCurrency] = createSignal<HostedCurrency>(untrack(() => props.currency) ?? guessHostedCurrency());
   const [pendingPlan, setPendingPlan] = createSignal<HostedServerPlanId | null>(null);
-  const [createError, setCreateError] = createSignal<string | null>(null);
+  const [createError, setCreateError] = createSignal<UserErrorDetails | null>(null);
   const [created, setCreated] = createSignal<CreatedHostedServer | null>(untrack(() => props.resume) ?? null);
   const [paymentPending, setPaymentPending] = createSignal(false);
-  const [paymentError, setPaymentError] = createSignal<string | null>(null);
+  const [paymentError, setPaymentError] = createSignal<UserErrorDetails | null>(null);
   const [rendered, setRendered] = createSignal(true);
   const [opened, setOpened] = createSignal(false);
   const [closing, setClosing] = createSignal(false);
@@ -212,7 +214,7 @@ export function AddServerDialog(props: AddServerDialogProps) {
       setStep("progress");
       focusHeading();
     } catch (cause) {
-      setCreateError(errorMessage(cause, t("settings.hostedServers.createFailed")));
+      setCreateError(errorDetails(cause, t("settings.hostedServers.createFailed")));
     } finally {
       setPendingPlan(null);
     }
@@ -225,7 +227,7 @@ export function AddServerDialog(props: AddServerDialogProps) {
     try {
       await props.onOpenPayment();
     } catch (cause) {
-      setPaymentError(errorMessage(cause, t("server.hosted.paymentFailed")));
+      setPaymentError(errorDetails(cause, t("server.hosted.paymentFailed")));
     } finally {
       setPaymentPending(false);
     }
@@ -379,14 +381,15 @@ export function AddServerDialog(props: AddServerDialogProps) {
 
                     {/* The limit notice above explains a create that failed at the limit. */}
                     <Show when={props.serverLimit == null && createError()}>
-                      {(message) => (
+                      {(failure) => (
                         <Alert class="join-server-alert" tone="danger" role="alert">
                           <AlertIcon>
                             <OctagonX />
                           </AlertIcon>
                           <AlertContent>
                             <AlertTitle>{t("settings.hostedServers.createFailed")}</AlertTitle>
-                            <AlertDescription>{message()}</AlertDescription>
+                            <AlertDescription>{failure().message}</AlertDescription>
+                            <ErrorReference reference={failure().reference} />
                           </AlertContent>
                         </Alert>
                       )}
@@ -474,14 +477,15 @@ export function AddServerDialog(props: AddServerDialogProps) {
                     <Show when={!running()}>
                       <footer class="join-server-actions">
                         <Show when={paymentError()}>
-                          {(message) => (
+                          {(failure) => (
                             <Alert class="join-server-alert" tone="danger" role="alert">
                               <AlertIcon>
                                 <OctagonX />
                               </AlertIcon>
                               <AlertContent>
                                 <AlertTitle>{t("server.hosted.paymentFailed")}</AlertTitle>
-                                <AlertDescription>{message()}</AlertDescription>
+                                <AlertDescription>{failure().message}</AlertDescription>
+                                <ErrorReference reference={failure().reference} />
                               </AlertContent>
                             </Alert>
                           )}

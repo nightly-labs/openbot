@@ -13,6 +13,7 @@ import type { MobileConnectHostBinding } from "@openbot/contracts/mobile-connect
 import { decodeRemoteSession, decodeRemoteSessionTicket } from "@openbot/contracts/remote-control-plane";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
+import { referenceFrom, safeReference } from "@openbot/user-errors/reference";
 import { Deferred, Effect, Schema, Semaphore } from "effect";
 import { bytesToBase64Url } from "./base64";
 import { runTeamEffect } from "./effect-boundary";
@@ -77,22 +78,41 @@ export function remoteHostFingerprint(publicKey: string): string {
   return bytesToBase64Url(digest);
 }
 
+/**
+ * A refusal from the account service. `code` is the service's error code, such as `invite_not_found`,
+ * or null when the service sent none. `reference` is the code a user can copy: the service's own
+ * reference when it sent one, otherwise `http/<status>[/<code>]`.
+ */
 export class RemoteDirectoryError extends Schema.TaggedError<RemoteDirectoryError>()("RemoteDirectoryError", {
   status: Schema.Number,
   message: Schema.String,
+  code: Schema.NullOr(Schema.String),
+  reference: Schema.NullOr(Schema.String),
 }) {
-  constructor(status: number, message: string) {
-    super({ status, message });
+  constructor(status: number, message: string, code: string | null = null, reference: string | null = null) {
+    super({ status, message, code, reference: reference ?? referenceFrom("http", status, code) });
   }
 }
 class RemoteDirectoryOperationError extends Schema.TaggedError<RemoteDirectoryOperationError>()(
   "RemoteDirectoryOperationError",
-  { message: Schema.String },
+  { message: Schema.String, reference: Schema.optional(Schema.NullOr(Schema.String)) },
 ) {}
 type DirectoryFailure = RemoteDirectoryError | RemoteDirectoryOperationError;
-function directoryFailure(message: string): RemoteDirectoryOperationError {
-  return new RemoteDirectoryOperationError({ message });
+function directoryFailure(message: string, reference: string | null = null): RemoteDirectoryOperationError {
+  return new RemoteDirectoryOperationError({ message, reference });
 }
+
+/** The account service codes that have their own sentence. Any other code keeps the service's text. */
+const DIRECTORY_ERROR_TEXT = new Map<string, string>([
+  ["invite_already_used", sourceText("error.remote.inviteAlreadyUsed")],
+  ["invite_not_found", sourceText("error.remote.inviteNotFound")],
+  ["member_limit_reached", sourceText("error.remote.memberLimitReached")],
+  ["host_not_found", sourceText("error.remote.hostNotRegistered")],
+  ["membership_not_found", sourceText("error.remote.membershipEnded")],
+  ["session_inactive", sourceText("error.remote.accountSessionInactive")],
+  ["host_owner_mismatch", sourceText("error.remote.hostOtherAccount")],
+  ["remote_not_configured", sourceText("error.remote.remoteNotConfigured")],
+]);
 function directoryIO<A>(operation: () => Promise<A>): Effect.Effect<A, RemoteDirectoryOperationError> {
   return Effect.tryPromise({
     try: operation,
@@ -491,10 +511,14 @@ export class RemoteTeamDirectoryClient {
                   : {}),
                 signal: controller.signal,
               }),
-            catch: (error) => directoryFailure(error instanceof Error ? error.message : String(error)),
+            // The request timer aborts the request, so an aborted signal is a timeout, not a lost network.
+            catch: () =>
+              controller.signal.aborted
+                ? directoryFailure(sourceText("error.remote.directoryTimeout"), "timeout/directory")
+                : directoryFailure(sourceText("error.remote.directoryUnreachable"), "network/directory"),
           });
           const value = yield* directoryIO(() => response.json()).pipe(Effect.catch(() => Effect.succeed(null)));
-          if (!response.ok) return yield* new RemoteDirectoryError(response.status, errorMessage(value));
+          if (!response.ok) return yield* directoryError(response.status, value);
           return value;
         }),
       ({ controller, timer }) =>
@@ -529,12 +553,23 @@ function decodeInvitePreview(value: unknown, expectedHostId: string): RemoteInvi
   };
 }
 
-function errorMessage(value: unknown): string {
-  if (isDynamicRecord(value)) {
-    if (isString(value.error)) return value.error;
-    if (isDynamicRecord(value.error) && isString(value.error.message)) return value.error.message;
-  }
-  return sourceText("error.remote.serviceRequestFailed");
+/**
+ * The refusal in an account service error body: `{ error: "text" }`, or
+ * `{ error: { code, message, reference? } }`. A code or reference that is not a fixed identifier is
+ * left out. A server from before references sends none.
+ */
+function directoryError(status: number, value: unknown): RemoteDirectoryError {
+  const body = isDynamicRecord(value) ? value.error : undefined;
+  if (isString(body)) return new RemoteDirectoryError(status, body);
+  if (!isDynamicRecord(body)) return new RemoteDirectoryError(status, sourceText("error.remote.serviceRequestFailed"));
+  const code = isString(body.code) && /^[a-z][a-z0-9_]{0,39}$/u.test(body.code) ? body.code : null;
+  const known = code === null ? undefined : DIRECTORY_ERROR_TEXT.get(code);
+  const message = known
+    ? known
+    : isString(body.message)
+      ? body.message
+      : sourceText("error.remote.serviceRequestFailed");
+  return new RemoteDirectoryError(status, message, code, safeReference(body.reference));
 }
 
 function decodeMember(value: unknown): RemoteTeamMember {

@@ -40,6 +40,7 @@
     "./button": "./src/button.tsx",
     "./marker": "./src/marker.tsx",
     "./toast": "./src/toast.tsx",
+    "./error-reference": "./src/error-reference.tsx",
     "./checkbox": "./src/checkbox.tsx",
     "./select": "./src/select.tsx",
     "./form": "./src/form.tsx",

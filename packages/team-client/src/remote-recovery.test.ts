@@ -1,4 +1,5 @@
 import type { ConversationSnapshot } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { runTeamEffect } from "./effect-boundary";
@@ -7,6 +8,7 @@ import {
   createRemoteReadRefresh,
   mergeRemoteUnreadIds,
   remoteConnectionFailure,
+  remoteConnectionFailureDetails,
   remoteRecoveryMessage,
   resyncRemoteConversations,
 } from "./remote-recovery";
@@ -170,6 +172,53 @@ describe("remote connection recovery", () => {
         remoteConnectionFailure("connection", new Error("The desktop did not connect.")),
       ),
     ).toContain("Connecting to the desktop: The desktop did not connect.");
+  });
+
+  it.each([
+    {
+      name: "a Signal refusal",
+      error: Object.assign(new Error(sourceText("error.remote.hostBusy")), { reference: "signal/host_busy" }),
+      reason: sourceText("error.remote.hostBusy"),
+      reference: "signal/host_busy",
+    },
+    {
+      name: "a rate limit with its wait",
+      error: Object.assign(new Error(sourceText("error.remote.signalRateLimited", { seconds: 60 })), {
+        reference: "signal/rate_limited",
+      }),
+      reason: sourceText("error.remote.signalRateLimited", { seconds: 60 }),
+      reference: "signal/rate_limited",
+    },
+    {
+      name: "a host refusal with server text",
+      error: Object.assign(new Error("Bearer private-token; conversation=private-message"), {
+        reference: "host/500/http.request",
+      }),
+      reason: sourceText("error.remote.connectionStepFailed"),
+      reference: "host/500/http.request",
+    },
+    {
+      name: "a number template that carries text",
+      error: new Error(sourceText("error.remote.signalRateLimited", { seconds: "private-message" })),
+      reason: sourceText("error.remote.connectionStepFailed"),
+      reference: null,
+    },
+    {
+      name: "an account service refusal",
+      error: Object.assign(new Error("Server text with private-message"), { status: 403, code: "session_inactive" }),
+      reason: sourceText("error.remote.connectionStepFailed"),
+      reference: "http/403/session_inactive",
+    },
+    {
+      name: "a named error with server text",
+      error: Object.assign(new Error("secret=private-value"), { name: "ProbeError" }),
+      reason: sourceText("error.remote.connectionStepFailed"),
+      reference: "error/ProbeError",
+    },
+  ])("keeps the reference of $name and passes no raw text", ({ error, reason, reference }) => {
+    const failure = remoteConnectionFailureDetails("connection", error);
+    expect(failure).toEqual({ message: `Connecting to the desktop: ${reason}`, reference });
+    expect(failure.message).not.toContain("private");
   });
 
   it("does not let an initial read overwrite a newer event refresh", async () => {

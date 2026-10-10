@@ -1,11 +1,13 @@
 import type { ConversationSnapshot } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
+import { errorReference } from "@openbot/user-errors/reference";
 import { Effect, Result, Schema } from "effect";
 import { runTeamEffect } from "./effect-boundary";
 
 class RemoteRecoveryError extends Schema.TaggedError<RemoteRecoveryError>()("RemoteRecoveryError", {
   message: Schema.String,
+  reference: Schema.optional(Schema.NullOr(Schema.String)),
 }) {}
 
 const recoveryCall = <A>(operation: () => Promise<A>) =>
@@ -14,6 +16,7 @@ const recoveryCall = <A>(operation: () => Promise<A>) =>
     catch: (error) =>
       new RemoteRecoveryError({
         message: error instanceof Error ? error.message : sourceText("error.remote.operationFailed"),
+        reference: errorReference(error),
       }),
   });
 
@@ -86,16 +89,63 @@ const SAFE_CONNECTION_ERRORS = new Set(
       "error.remote.channelNotOpen",
       "error.remote.signalOffline",
       "error.remote.mobileUpdateRequired",
+      "error.remote.hostBusy",
+      "error.remote.signalPermissionDenied",
+      "error.remote.signalProtocolError",
+      "error.remote.signalRefused",
+      "error.remote.signalClosed",
+      "error.remote.relayUnavailable",
+      "error.remote.iceFailed",
+      "error.remote.iceDisconnected",
+      "error.remote.directoryUnreachable",
+      "error.remote.directoryTimeout",
+      "error.remote.inviteAlreadyUsed",
+      "error.remote.inviteNotFound",
+      "error.remote.memberLimitReached",
+      "error.remote.hostNotRegistered",
+      "error.remote.membershipEnded",
+      "error.remote.accountSessionInactive",
+      "error.remote.hostOtherAccount",
+      "error.remote.remoteNotConfigured",
     ] as const satisfies readonly (keyof SourceMessages)[]
   ).map((key) => sourceText(key)),
 );
 
-export function remoteConnectionFailure(stage: RemoteConnectionStage, error: unknown): string {
+const NUMBER_MARK = "\u0000";
+/** A fixed message with a number in it. Only digits can fill the number, so no server text can pass. */
+function numberTemplate(text: string): RegExp {
+  const [before = "", after = ""] = text.split(NUMBER_MARK);
+  const literal = (part: string) => part.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  return new RegExp(`^${literal(before)}\\d{1,6}${literal(after)}$`, "u");
+}
+
+const SAFE_NUMBER_CONNECTION_ERRORS = [
+  numberTemplate(sourceText("error.remote.signalRateLimited", { seconds: NUMBER_MARK })),
+  numberTemplate(sourceText("error.remote.hostRefused", { status: NUMBER_MARK })),
+  numberTemplate(sourceText("error.remote.requestFailedStatus", { status: NUMBER_MARK })),
+];
+
+function isSafeConnectionError(message: string): boolean {
+  return SAFE_CONNECTION_ERRORS.has(message) || SAFE_NUMBER_CONNECTION_ERRORS.some((pattern) => pattern.test(message));
+}
+
+/** What a failed connection step shows: a fixed sentence, and the code that says where it failed. */
+export interface RemoteConnectionFailure {
+  message: string;
+  reference: string | null;
+}
+
+export function remoteConnectionFailureDetails(stage: RemoteConnectionStage, error: unknown): RemoteConnectionFailure {
   const reason =
-    error instanceof Error && SAFE_CONNECTION_ERRORS.has(error.message)
+    error instanceof Error && isSafeConnectionError(error.message)
       ? error.message
       : sourceText("error.remote.connectionStepFailed");
-  return sourceText(CONNECTION_STAGES[stage], { reason });
+  // The reference is built only from fixed identifiers, so it is safe when the text is not.
+  return { message: sourceText(CONNECTION_STAGES[stage], { reason }), reference: errorReference(error) };
+}
+
+export function remoteConnectionFailure(stage: RemoteConnectionStage, error: unknown): string {
+  return remoteConnectionFailureDetails(stage, error).message;
 }
 
 export function remoteRecoveryMessage(status: RemoteRecoveryStatus, failure?: string | null): string | null {

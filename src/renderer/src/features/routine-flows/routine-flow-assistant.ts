@@ -85,7 +85,9 @@ export function createRoutineFlowAssistant(port: () => RoutineFlowsPort, agentId
             ? { agentId: event.snapshot.agentId, turnId: null }
             : null;
       if (ended)
-        check(ended.agentId, ended.turnId).catch((error) => toast.error(errorMessage(error, t("diagram.chat.failed"))));
+        check(ended.agentId, ended.turnId).catch((error) =>
+          toast.error(errorMessage(error, t("diagram.chat.failed")), { error }),
+        );
     }),
   );
 
@@ -109,7 +111,7 @@ export function createRoutineFlowAssistant(port: () => RoutineFlowsPort, agentId
         });
       })
       .catch((error) => {
-        toast.error(errorMessage(error, t("diagram.chat.failed")));
+        toast.error(errorMessage(error, t("diagram.chat.failed")), { error });
         setChat((draft) => {
           draft.pending = null;
         });

@@ -1,6 +1,6 @@
 import { type AgentProviderId, agentProviderName } from "@openbot/contracts/agent-providers";
 import type { AppFormat } from "@openbot/i18n";
-import { Button, TriangleAlert } from "@openbot/ui";
+import { Button, ErrorReference, TriangleAlert } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, Show } from "solid-js";
 import { useText } from "../../text";
@@ -23,6 +23,8 @@ export function ComposerNotice(props: {
   tone?: "warning" | "danger";
   title?: string;
   body: string;
+  /** The code of the failure the body states. */
+  reference?: string | null | undefined;
   action?: JSX.Element;
   conversationKey?: string | null;
   onDismiss?: () => void;
@@ -38,7 +40,7 @@ export function ComposerNotice(props: {
           data-conversation-key={props.conversationKey ?? undefined}
           role="status"
         >
-          <NoticeContent title={props.title} body={props.body} action={props.action} />
+          <NoticeContent title={props.title} body={props.body} reference={props.reference} action={props.action} />
         </div>
       }
     >
@@ -54,7 +56,7 @@ export function ComposerNotice(props: {
             dismiss()();
           }}
         >
-          <NoticeContent title={props.title} body={props.body} action={props.action} />
+          <NoticeContent title={props.title} body={props.body} reference={props.reference} action={props.action} />
           <Button
             variant="ghost"
             type="button"
@@ -73,13 +75,19 @@ export function ComposerNotice(props: {
 }
 
 /** The icon, copy and optional action the card carries, whichever role announces it. */
-function NoticeContent(props: { title?: string; body: string; action?: JSX.Element }) {
+function NoticeContent(props: {
+  title?: string;
+  body: string;
+  reference?: string | null | undefined;
+  action?: JSX.Element;
+}) {
   return (
     <>
       <TriangleAlert class="composer-notice-icon" aria-hidden="true" />
       <div class="composer-notice-copy">
         <Show when={props.title}>{(title) => <strong>{title()}</strong>}</Show>
         <p>{props.body}</p>
+        <ErrorReference reference={props.reference} />
       </div>
       <Show when={props.action}>{props.action}</Show>
     </>

@@ -38,6 +38,7 @@
     "@noble/hashes": "catalog:",
     "@openbot/contracts": "workspace:*",
     "@openbot/i18n": "workspace:*",
+    "@openbot/user-errors": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {

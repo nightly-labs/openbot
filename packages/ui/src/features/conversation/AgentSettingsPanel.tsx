@@ -27,6 +27,7 @@ import {
   Button,
   ConfirmDialog,
   Cpu,
+  ErrorReference,
   IconButton,
   Input,
   Pencil,
@@ -57,6 +58,7 @@ import {
 } from "@openbot/ui/components/SettingsPanel";
 import type { AgentProfile } from "@openbot/ui/data";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
+import { errorReference, type UserErrorDetails } from "@openbot/user-errors";
 import type { JSX } from "@solidjs/web";
 import {
   createEffect,
@@ -176,6 +178,8 @@ interface AgentSettingsDraft {
   confirmingFullAccess: boolean;
   runtime: AgentRuntimeSettings;
   saveError: string | null;
+  /** The code of the failure behind `saveError`. */
+  saveErrorReference: string | null;
 }
 
 interface TextSaveRequest {
@@ -188,14 +192,17 @@ interface TextSaveRequest {
 export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   const { t, errorMessage } = useText();
   const [newChatOpen, setNewChatOpen] = createSignal(false);
-  const [newChatError, setNewChatError] = createSignal<string | null>(null);
+  const [newChatError, setNewChatError] = createSignal<UserErrorDetails | null>(null);
   async function startNewChat(start: () => Promise<void>): Promise<void> {
     setNewChatError(null);
     try {
       await start();
       setNewChatOpen(false);
     } catch (error) {
-      setNewChatError(errorMessage(error, t("agentSettings.newChat.failed")));
+      setNewChatError({
+        message: errorMessage(error, t("agentSettings.newChat.failed")),
+        reference: errorReference(error),
+      });
     }
   }
   const [draft, setDraft] = createStore<AgentSettingsDraft>({
@@ -217,6 +224,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     confirmingFullAccess: false,
     runtime: untrack(() => ({ ...props.runtimeSettings })),
     saveError: null,
+    saveErrorReference: null,
   });
   const avatarUrl = () => props.agent.avatarUrl ?? null;
   const [page, setPage] = createSignal<AgentSettingsPage | null>(null);
@@ -264,9 +272,10 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   }
 
   /** The message under the form: every save path clears it first and reports its failure through it. */
-  function setSaveError(message: string | null): void {
+  function setSaveError(message: string | null, cause?: unknown): void {
     setDraft((state) => {
       state.saveError = message;
+      state.saveErrorReference = message === null || cause === undefined ? null : errorReference(cause);
     });
   }
 
@@ -391,7 +400,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       return true;
     } catch (error) {
       if (!disposed && props.agent.id === agentId) {
-        setSaveError(errorMessage(error, t("agentSettings.saveFailed")));
+        setSaveError(errorMessage(error, t("agentSettings.saveFailed")), error);
       }
       return false;
     }
@@ -498,7 +507,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       return saved;
     } catch (error) {
       if (props.agent.id === agentId) {
-        setSaveError(errorMessage(error, t("agentSettings.saveFailed")));
+        setSaveError(errorMessage(error, t("agentSettings.saveFailed")), error);
       }
       return false;
     }
@@ -535,7 +544,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       await props.onSetAgentAvatar(props.agent.id, image);
       return true;
     } catch (error) {
-      setSaveError(errorMessage(error, t("agentSettings.avatar.saveFailed")));
+      setSaveError(errorMessage(error, t("agentSettings.avatar.saveFailed")), error);
       return false;
     } finally {
       setDraft((state) => {
@@ -554,7 +563,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       const image = await normalizeAvatarFile(file);
       await props.onSetAgentAvatar(props.agent.id, image);
     } catch (error) {
-      setSaveError(errorMessage(error, t("agentSettings.avatar.processFailed")));
+      setSaveError(errorMessage(error, t("agentSettings.avatar.processFailed")), error);
     } finally {
       setDraft((state) => {
         state.avatar.uploadBusy = false;
@@ -1197,6 +1206,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
               {(message) => (
                 <p class="agent-settings-save-error" role="alert">
                   {message()}
+                  <ErrorReference reference={draft.saveErrorReference} />
                 </p>
               )}
             </Show>
@@ -1212,7 +1222,14 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
               title={t("agentSettings.newChat.confirmTitle", { name: props.agent.name })}
               description={t("agentSettings.newChat.confirmDescription")}
               confirmLabel={t("agentSettings.newChat.confirm")}
-              error={newChatError() ?? undefined}
+              error={
+                newChatError() ? (
+                  <>
+                    {newChatError()?.message}
+                    <ErrorReference reference={newChatError()?.reference} />
+                  </>
+                ) : undefined
+              }
               onCancel={() => setNewChatOpen(false)}
               onConfirm={() => startNewChat(start())}
             />

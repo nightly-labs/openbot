@@ -69,6 +69,7 @@ export function MarketplaceAgentPage(props: { scope: MarketplaceScope; listing: 
         <div class="marketplace-stack">
           <DetailState
             status={detail.status()}
+            reference={detail.reference()}
             loadingLabel={t("marketplace.agents.loadingDetail")}
             onRetry={detail.retry}
           >

@@ -82,6 +82,8 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
   );
 
   const remote = () => activeServer()?.kind === "remote";
+  // The transport failure comes first: a workspace load fails when the transport fails.
+  const connectionFailure = () => activeServer()?.issue ?? (scope.connection.failed ? scope.connection.failure : null);
   const retry = () => {
     const server = activeServer();
     if (!serversLoaded()) {
@@ -136,7 +138,8 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
               name={activeServer()?.name ?? ""}
               initial={!scope.connection.hasContent}
               issue={activeServer()?.hostedIssue ?? null}
-              detail={activeServer()?.issue?.message ?? null}
+              detail={connectionFailure()?.message ?? null}
+              reference={connectionFailure()?.reference ?? null}
               phase={
                 activeServer()?.hostedSleep ??
                 (serversLoadFailed()

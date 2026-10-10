@@ -14,6 +14,7 @@ import {
   type RemoteTeamDiagnostic,
   type RemoteUploadProgress,
 } from "@openbot/team-client/remote-peer";
+import { referenceFrom } from "@openbot/user-errors";
 import * as Crypto from "expo-crypto";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
@@ -25,6 +26,7 @@ import type {
 } from "@/features/browser/model/browser-view-bridge";
 import { supportLog, supportLogUrl } from "@/features/support/model/support-log";
 import { InactiveRequestError } from "@/features/workspace/model/pending-approvals";
+import { referencedError } from "@/features/workspace/model/referenced-error";
 import { expoGoDomOptions } from "@/shared/lib/expo-go-dom";
 import { currentText } from "@/shared/lib/text";
 
@@ -116,11 +118,19 @@ export const RemoteTeamTransport = forwardRef<RemoteTeamTransportRef, RemoteTeam
         connect: async (hostId, hostPublicKey) => {
           hostIdRef.current = hostId;
           const result = await enqueue({ type: "connect", hostId, hostPublicKey });
-          if (!result.ok) throw new Error(result.error ?? currentText().t("mobile.workspace.error.connectFailed"));
+          if (!result.ok)
+            throw referencedError(
+              result.error ?? currentText().t("mobile.workspace.error.connectFailed"),
+              result.reference,
+            );
         },
         disconnect: async () => {
           const result = await enqueue({ type: "disconnect" });
-          if (!result.ok) throw new Error(result.error ?? currentText().t("mobile.workspace.error.disconnectFailed"));
+          if (!result.ok)
+            throw referencedError(
+              result.error ?? currentText().t("mobile.workspace.error.disconnectFailed"),
+              result.reference,
+            );
         },
         request: async <T,>(
           method: string,
@@ -143,7 +153,8 @@ export const RemoteTeamTransport = forwardRef<RemoteTeamTransportRef, RemoteTeam
               "connection",
               `${request} -> ${result.status ?? "no status"} ${time}`,
             );
-          if (!result.ok) throw new Error(result.error ?? sourceText("error.remote.serverRequestFailed"));
+          if (!result.ok)
+            throw referencedError(result.error ?? sourceText("error.remote.serverRequestFailed"), result.reference);
           if (result.status === 409 && isQueueEditRoute(method, path))
             throw new QueueEditRejectedError(currentText().t("mobile.workspace.error.queueEditRejected"));
           // The host answers 409 when a form or an approval no longer waits: answered elsewhere, or ended.
@@ -152,7 +163,7 @@ export const RemoteTeamTransport = forwardRef<RemoteTeamTransportRef, RemoteTeam
           if (result.status === 409 && method === "POST" && path === TEAM_API_ROUTES.respond.prompt)
             throw new InactiveRequestError(currentText().t("mobile.workspace.error.formUnavailable"));
           if (result.status !== undefined && result.status >= 400)
-            throw new Error(sourceText("error.remote.serverRequestFailed"));
+            throw referencedError(sourceText("error.remote.serverRequestFailed"), referenceFrom("http", result.status));
           return decode(result.body);
         },
         openBrowserView: (options, listener) => {

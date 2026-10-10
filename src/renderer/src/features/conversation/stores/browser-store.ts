@@ -66,7 +66,8 @@ export interface BrowserStoreDeps {
   browserAddress: () => string;
   setBrowserAddress: (address: string) => void;
   setBrowserAddressEditing: (editing: boolean) => void;
-  setComposerError: (error: string | null, targetOverride?: ConversationTarget) => void;
+  /** `cause` is the failure behind `error`. The banner shows its code. */
+  setComposerError: (error: string | null, targetOverride?: ConversationTarget, cause?: unknown) => void;
   panels: BrowserPanels;
 }
 
@@ -283,8 +284,8 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       if (closingBrowserTabIds.has(currentTab.id)) return;
       try {
         await conversationRuntime(deps.props).browser.navigate({ tabId: currentTab.id, url });
-      } catch {
-        deps.setComposerError(currentText().t("browser.error.openAddress"), target);
+      } catch (error) {
+        deps.setComposerError(currentText().t("browser.error.openAddress"), target, error);
       }
       return;
     }
@@ -343,8 +344,8 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     closingBrowserTabIds.add(tabId);
     try {
       await deps.props.onCloseBrowserTab(tabId);
-    } catch {
-      deps.setComposerError(currentText().t("browser.error.closeTab"), target);
+    } catch (error) {
+      deps.setComposerError(currentText().t("browser.error.closeTab"), target, error);
     } finally {
       closingBrowserTabIds.delete(tabId);
     }
@@ -375,8 +376,8 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     try {
       await conversationRuntime(deps.props).browser.reload(tabId);
       analytics.track("browser_action", { action: "reload", result: "succeeded" });
-    } catch {
-      deps.setComposerError(currentText().t("browser.error.reloadTab"), target);
+    } catch (error) {
+      deps.setComposerError(currentText().t("browser.error.reloadTab"), target, error);
       analytics.track("browser_action", {
         action: "reload",
         result: "failed",
@@ -397,10 +398,11 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     const target = agentId ? { agentId, serverId: deps.props.server?.id ?? "local" } : undefined;
     try {
       await conversationRuntime(deps.props).browser.navigate({ tabId, direction });
-    } catch {
+    } catch (error) {
       deps.setComposerError(
         currentText().t(direction === "back" ? "browser.error.navigateBack" : "browser.error.navigateForward"),
         target,
+        error,
       );
     }
   }

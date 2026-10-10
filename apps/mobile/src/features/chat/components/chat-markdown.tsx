@@ -321,11 +321,11 @@ function inline(tokens: Token[], parentPresentation: TextPresentation): ReactNod
           accessibilityHint={url}
           onPress={() => {
             void haptics.impact("soft");
-            void Linking.openURL(url).catch(() => {
+            void Linking.openURL(url).catch((error: unknown) => {
               void haptics.notification("error");
               const { t } = currentText();
               showFailureAlert(
-                undefined,
+                error,
                 "browser",
                 t("mobile.chat.markdown.linkFailedTitle"),
                 t("mobile.chat.markdown.linkFailedMessage"),

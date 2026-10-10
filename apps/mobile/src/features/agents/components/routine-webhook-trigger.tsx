@@ -11,6 +11,7 @@ import { Check, ChevronDown, ChevronRight, Copy, RefreshCw } from "lucide-react-
 import { type ReactNode, useState } from "react";
 import { Alert, View } from "react-native";
 import { useCSSVariable } from "uniwind";
+import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { haptics } from "@/shared/lib/haptics";
@@ -42,9 +43,9 @@ function useCopy() {
         setCopied(kind);
         void haptics.notification("success");
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         void haptics.notification("error");
-        Alert.alert(t("mobile.agent.webhook.copyFailed"));
+        showFailureAlert(error, "agent", t("mobile.agent.webhook.copyFailed"));
       });
   }
   return { copied, copy };

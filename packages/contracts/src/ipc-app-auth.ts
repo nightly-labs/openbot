@@ -207,6 +207,8 @@ export interface CentralAuthIssue {
   code: string;
   message: string;
   retryAfterSeconds?: number;
+  /** A short code a user can copy into a report, such as `auth/timeout`. */
+  reference?: string;
 }
 
 export type CentralAuthState =

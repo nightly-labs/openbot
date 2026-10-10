@@ -18,6 +18,7 @@ import { DetectedProviders } from "@openbot/ui/features/custom-providers/Detecte
 import type { DetectedProviderApi, ProviderDetection } from "@openbot/ui/features/custom-providers/detected-providers";
 import { OpenCodeKeyDialog, type ProviderKeyApi } from "@openbot/ui/features/settings/OpenCodeKeyDialog";
 import { useText } from "@openbot/ui/text";
+import { errorReference, type UserErrorDetails } from "@openbot/user-errors";
 import { createEffect, createMemo, createSignal, onCleanup, Show, untrack } from "solid-js";
 import type { ProviderCodeLoginApi } from "../../components/provider-code-login-api";
 import { createCustomProviderHostState } from "../custom-providers/custom-provider-host-state";
@@ -166,7 +167,14 @@ export function createSetupProviders(
   /** The user chose a row on this screen, so a late saved choice does not replace it. */
   let choiceChanged = false;
   const [openCodeKeyOpen, setOpenCodeKeyOpen] = createSignal(false);
-  const [error, setError] = createSignal("");
+  const [error, setErrorText] = createSignal("");
+  const [errorCode, setErrorCode] = createSignal<UserErrorDetails | null>(null);
+  /** Shows `message`, with the code of `cause` when a failure gave one. */
+  const setError = (message: string, cause?: unknown) => {
+    setErrorText(message);
+    const reference = cause === undefined ? null : errorReference(cause);
+    setErrorCode(reference ? { message, reference } : null);
+  };
   const [providerErrors, setProviderErrors] = createSignal<Partial<Record<AgentProviderId, string>>>({});
   const visibleError = createMemo(
     () => error() || SETUP_PROVIDERS.map((provider) => providerErrors()[provider.id]).find(Boolean) || "",
@@ -433,11 +441,12 @@ export function createSetupProviders(
     setError("");
     try {
       await action(provider);
-    } catch {
+    } catch (cause) {
       setError(
         kind === "install"
           ? t("onboarding.error.installGuide", { provider: providerName(provider) })
           : t("onboarding.error.signInGuide", { provider: providerName(provider) }),
+        cause,
       );
     }
   }
@@ -466,9 +475,9 @@ export function createSetupProviders(
     try {
       await props.onConnectProvider(provider);
       return true;
-    } catch {
+    } catch (cause) {
       providersAwaitingFocusRefresh.delete(provider);
-      setError(t("onboarding.error.connect", { provider: providerName(provider) }));
+      setError(t("onboarding.error.connect", { provider: providerName(provider) }), cause);
       return false;
     }
   }
@@ -484,8 +493,8 @@ export function createSetupProviders(
     try {
       await props.onDownloadProvider(provider);
       return true;
-    } catch {
-      setError(t("onboarding.error.download", { provider: providerName(provider) }));
+    } catch (cause) {
+      setError(t("onboarding.error.download", { provider: providerName(provider) }), cause);
       return false;
     }
   }
@@ -495,8 +504,8 @@ export function createSetupProviders(
     setError("");
     try {
       await props.onCancelProviderDownload(provider);
-    } catch {
-      setError(t("onboarding.error.cancelDownload", { provider: providerName(provider) }));
+    } catch (cause) {
+      setError(t("onboarding.error.cancelDownload", { provider: providerName(provider) }), cause);
     }
   }
 
@@ -511,8 +520,8 @@ export function createSetupProviders(
     }
     try {
       await props.onRefreshProviders();
-    } catch {
-      setError(t("onboarding.error.refresh"));
+    } catch (cause) {
+      setError(t("onboarding.error.refresh"), cause);
     }
   }
 
@@ -529,6 +538,11 @@ export function createSetupProviders(
     selectedProviderConnected,
     /** A provider action's error, or the message of a connection that ended without success. */
     error: visibleError,
+    /** The code of the shown error, when a failure gave one. */
+    errorReference: () => {
+      const code = errorCode();
+      return code && code.message === visibleError() ? code.reference : null;
+    },
     setError,
     clearErrors: () => {
       setError("");

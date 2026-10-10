@@ -92,6 +92,19 @@ export const Gallery: Story = {
         <Button
           variant="outline"
           onClick={() =>
+            toast.error("Could not connect to the server", {
+              error: Object.assign(new Error("The host is busy. Try again in a moment."), {
+                reference: "signal/host_busy",
+              }),
+              fallback: "The connection failed.",
+            })
+          }
+        >
+          Error with code
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() =>
             toast.loading("Connecting to server…", {
               description: "This can take a few seconds.",
             })

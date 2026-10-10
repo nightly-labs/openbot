@@ -1,6 +1,7 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AccountSession, AvatarImageInput, CentralAuthUser } from "@openbot/contracts/ipc";
 import { normalizeAccountName, validateProfileName } from "@openbot/contracts/validation";
+import { errorReference, type UserErrorDetails } from "@openbot/user-errors";
 import { createEffect, createMemo, createStore, untrack } from "solid-js";
 import { normalizeAvatarFile } from "../../../avatar-image";
 import { currentText } from "../../../text";
@@ -36,7 +37,13 @@ interface AvatarUpload {
 interface SettingsProfilePanels {
   avatar: AvatarUpload;
   profile: ProfileNameEdit;
-  sessions: { items: AccountSession[]; loading: boolean; error: string | null; revokingId: string | null };
+  sessions: {
+    items: AccountSession[];
+    loading: boolean;
+    /** The failed read or disconnect, with the code of its cause. */
+    error: UserErrorDetails | null;
+    revokingId: string | null;
+  };
 }
 
 /**
@@ -70,10 +77,13 @@ export function createSettingsProfileStore(props: ProfileStoreProps, isActive: (
       setPanels((state) => {
         state.sessions.items = items;
       });
-    } catch {
+    } catch (error) {
       if (revision !== sessionsRevision) return;
       setPanels((state) => {
-        state.sessions.error = currentText().t("settings.profile.sessions.loadFailed");
+        state.sessions.error = {
+          message: currentText().t("settings.profile.sessions.loadFailed"),
+          reference: errorReference(error),
+        };
       });
     } finally {
       if (revision === sessionsRevision)
@@ -94,10 +104,13 @@ export function createSettingsProfileStore(props: ProfileStoreProps, isActive: (
       await props.onRevokeAccountSession(sessionId);
       if (revision !== sessionsRevision) return;
       await refreshSessions();
-    } catch {
+    } catch (error) {
       if (revision !== sessionsRevision) return;
       setPanels((state) => {
-        state.sessions.error = currentText().t("settings.profile.sessions.disconnectFailed");
+        state.sessions.error = {
+          message: currentText().t("settings.profile.sessions.disconnectFailed"),
+          reference: errorReference(error),
+        };
       });
     } finally {
       setPanels((state) => {

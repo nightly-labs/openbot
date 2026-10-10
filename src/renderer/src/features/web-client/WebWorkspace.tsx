@@ -920,8 +920,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     () => workspace.state.error,
     (error) => {
       if (error)
-        toast.error(sourceText(error), {
-          report: { operation: "other", source: "system", cause_code: classifyFailure(error) },
+        toast.error(sourceText(error.message), {
+          // The toast shows the code of the failure that `report` kept.
+          error,
+          report: { operation: "other", source: "system", cause_code: classifyFailure(error.message) },
         });
     },
   );
@@ -1008,10 +1010,13 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   initial={!workspace.state.workspaceLoaded}
                   issue={workspace.state.hostedIssue}
                   detail={
-                    workspace.state.recovery?.phase === "suspended" &&
-                    !workspace.state.hostedSleep &&
-                    !workspace.state.hostedIssue
-                      ? workspace.state.connectionError
+                    !workspace.state.hostedSleep && !workspace.state.hostedIssue
+                      ? (workspace.state.connectionError?.message ?? null)
+                      : null
+                  }
+                  reference={
+                    !workspace.state.hostedSleep && !workspace.state.hostedIssue
+                      ? (workspace.state.connectionError?.reference ?? null)
                       : null
                   }
                   phase={
@@ -1525,6 +1530,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
             <WebConnectComputer
               loading={workspace.state.hostsLoading}
               failed={Boolean(workspace.state.hostsError)}
+              reference={workspace.state.hostsError?.reference ?? null}
               onJoin={() => setJoinOpen(true)}
               onRefresh={() => void workspace.run(workspace.refreshHosts)}
             />

@@ -1,6 +1,7 @@
 import type { HostedServerIssue } from "@openbot/contracts/ipc";
 import { Show } from "solid-js";
 import { Button } from "../../button";
+import { ErrorReference } from "../../error-reference";
 import { useText } from "../../text";
 import { AppLoadingScreen } from "../account/AppLoadingScreen";
 
@@ -21,6 +22,8 @@ export interface ServerConnectionNoticeProps {
   remainingSeconds?: number;
   busy?: boolean;
   detail?: string | null;
+  /** The code of the failure in `detail`, for a user to copy into a report. */
+  reference?: string | null;
   onRetry: () => void;
   onManage?: () => void;
 }
@@ -83,12 +86,19 @@ export function ServerConnectionNotice(props: ServerConnectionNoticeProps) {
           <div>
             <p>{title()}</p>
             <p class="server-connection-detail">{detail()}</p>
+            <ErrorReference reference={props.reference} />
           </div>
           <div class="server-connection-actions">{actions()}</div>
         </section>
       }
     >
-      <AppLoadingScreen label={title()} title={title()} detail={detail()} actions={actions()} />
+      <AppLoadingScreen
+        label={title()}
+        title={title()}
+        detail={detail()}
+        reference={props.reference}
+        actions={actions()}
+      />
     </Show>
   );
 }

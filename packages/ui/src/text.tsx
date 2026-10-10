@@ -6,7 +6,7 @@ import {
   type TranslatedLocale,
   translateFor,
 } from "@openbot/i18n";
-import { userErrorMessage } from "@openbot/user-errors";
+import { type UserErrorDetails, userErrorDetails, userErrorMessage } from "@openbot/user-errors";
 import type { JSX } from "@solidjs/web";
 import { createContext, createEffect, createSignal, type ParentProps, useContext } from "solid-js";
 
@@ -27,6 +27,8 @@ export interface TextValue {
   format: AppFormat;
   /** `userErrorMessage` in the interface language. `fallback` is already translated. */
   errorMessage: (error: unknown, fallback: string) => string;
+  /** `errorMessage` with the failure's code, for a screen that shows `ErrorReference` beside it. */
+  errorDetails: (error: unknown, fallback: string) => UserErrorDetails;
   /** Text a host or the main process sent as English source text, in the interface language. */
   sourceText: (text: string) => string;
 }
@@ -53,6 +55,7 @@ function createTextValue(locale: () => TranslatedLocale, formatLocale: () => str
       fileSize: (bytes) => current().fileSize(bytes),
     },
     errorMessage: (error, fallback) => userErrorMessage(error, fallback, locale()),
+    errorDetails: (error, fallback) => userErrorDetails(error, fallback, locale()),
     sourceText: (text) => localizeSourceText(text, locale()),
   };
 }

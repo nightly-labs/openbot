@@ -413,7 +413,9 @@ describe("RemoteTeamDirectoryClient", () => {
       logoKey: null,
       devicePublicKey: HOST_KEY,
     });
-    await expect(runTeamEffect(client.listHosts())).rejects.toThrow("Directory offline");
+    await expect(runTeamEffect(client.listHosts())).rejects.toThrow(
+      "OpenBot could not reach the OpenBot service. Check your connection.",
+    );
     directoryOffline = false;
     await expect(runTeamEffect(client.listHosts())).resolves.toMatchObject([{ devicePublicKey: HOST_KEY }]);
     advertisedKey = "substituted-key";

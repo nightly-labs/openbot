@@ -94,9 +94,9 @@ function PreviewContent({ entry }: { entry: CodePreviewEntry }) {
     try {
       await Clipboard.setStringAsync(entry.source);
       void haptics.notification("success");
-    } catch {
+    } catch (error) {
       void haptics.notification("error");
-      showFailureAlert(undefined, "turn", t("mobile.chat.code.copyFailed"), t("mobile.chat.copyFailedMessage"));
+      showFailureAlert(error, "turn", t("mobile.chat.code.copyFailed"), t("mobile.chat.copyFailedMessage"));
     }
   };
   const wrapAction: MenuAction = {

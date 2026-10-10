@@ -11,6 +11,7 @@ import {
 } from "@openbot/contracts/team-protocol";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
+import { type SourceMessages, sourceText } from "@openbot/i18n/source";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createEd25519Identity, signEd25519 } from "./ed25519";
 import { runTeamEffect } from "./effect-boundary";
@@ -1053,6 +1054,116 @@ describe("browser remote peer recovery", () => {
       .receive(encodeTeamProtocolV2Frame({ version: 2, type: "event-reset", nextSequence: 2001 }));
     await reset.promise;
     expect(network.updates.at(-1)).toMatchObject({ hostId: "host", resync: true });
+    await network.runtime.dispose();
+  });
+});
+
+describe("connection failure references", () => {
+  const SERVER_TEXT = "Signal server text.";
+  const signalError = (code: string): TeamProtocolV2Json => ({ type: "error", version: 1, code, message: SERVER_TEXT });
+  interface SignalFailure {
+    name: string;
+    frame: TeamProtocolV2Json;
+    state: RemoteTeamConnectionUpdate["state"];
+    message: string;
+    reference: string;
+  }
+  const SIGNAL_FAILURES: SignalFailure[] = [
+    ...(
+      [
+        ["authentication_required", "error.remote.ticketInvalidOrExpired"],
+        ["invalid_message", "error.remote.signalInvalidMessage"],
+        ["host_unavailable", "error.remote.hostOffline"],
+        ["host_busy", "error.remote.hostBusy"],
+        ["permission_denied", "error.remote.signalPermissionDenied"],
+        ["protocol_error", "error.remote.signalProtocolError"],
+        ["code_from_a_newer_signal", "error.remote.signalRefused"],
+      ] satisfies [string, keyof SourceMessages][]
+    ).map(
+      ([code, key]): SignalFailure => ({
+        name: `Signal ${code}`,
+        frame: signalError(code),
+        state: "offline",
+        message: sourceText(key),
+        reference: `signal/${code}`,
+      }),
+    ),
+    {
+      name: "Signal session_revoked",
+      frame: signalError("session_revoked"),
+      state: "offline",
+      message: SERVER_TEXT,
+      reference: "signal/session_revoked",
+    },
+    {
+      name: "Signal rate_limited",
+      frame: signalError("rate_limited"),
+      state: "connecting",
+      message: sourceText("error.remote.signalRateLimited", { seconds: 60 }),
+      reference: "signal/rate_limited",
+    },
+    {
+      name: "a Signal ready with no relay servers",
+      frame: { type: "ready", version: 1, connectionId: "connection-1", resumeToken: "resume", iceServers: [] },
+      state: "offline",
+      message: sourceText("error.remote.relayUnavailable"),
+      reference: "signal/no_ice_servers",
+    },
+  ];
+
+  it.each(SIGNAL_FAILURES)("names $name", async ({ frame, state, message, reference }) => {
+    const offered = deferred();
+    const answer = deferred();
+    const network = await setupNetwork({
+      beforeAnswer: () => {
+        offered.resolve();
+        return answer.promise;
+      },
+    });
+    void network.connect();
+    await offered.promise;
+    network.socket().receive(frame);
+    // The exact message also shows that no Signal text passes, except where a revoked session keeps it.
+    await vi.waitFor(() => expect(network.updates.at(-1)).toMatchObject({ state, message, reference }));
+    answer.resolve();
+    await network.runtime.dispose();
+  });
+
+  const PATH_ENDS: {
+    name: string;
+    drop: string | null;
+    key: "error.remote.iceFailed" | "error.remote.iceDisconnected" | "error.remote.desktopDidNotConnect";
+    reference: string;
+  }[] = [
+    { name: "a failed ICE path", drop: "failed", key: "error.remote.iceFailed", reference: "webrtc/ice/failed" },
+    {
+      name: "a disconnected ICE path after the grace period",
+      drop: "disconnected",
+      key: "error.remote.iceDisconnected",
+      reference: "webrtc/ice/disconnected",
+    },
+    { name: "a closed ICE path", drop: "closed", key: "error.remote.iceDisconnected", reference: "webrtc/ice/closed" },
+    {
+      name: "a connection whose ICE step does not finish",
+      drop: null,
+      key: "error.remote.desktopDidNotConnect",
+      reference: "timeout/connect/ice",
+    },
+  ];
+
+  it.each(PATH_ENDS)("names $name", async ({ drop, key, reference }) => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    const answer = deferred();
+    const network = await setupNetwork({ beforeAnswer: () => (drop ? Promise.resolve() : answer.promise) });
+    const connecting = network.connect();
+    if (drop) {
+      await expect(connecting).resolves.toMatchObject({ ok: true });
+      network.connection().drop(drop);
+    }
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(network.updates.at(-1)).toMatchObject({ state: "offline", message: sourceText(key), reference });
+    if (!drop) await expect(connecting).resolves.toMatchObject({ ok: false, reference });
+    answer.resolve();
     await network.runtime.dispose();
   });
 });

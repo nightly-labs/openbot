@@ -14,6 +14,7 @@ import type { ServerCompatibility, ServerConnectionIssue, ServerSummary } from "
 import { TEAM_PROTOCOL_V1, type TeamProtocolSupportV1 } from "@openbot/contracts/team-protocol/v1";
 import { TEAM_PROTOCOL_V3_CAPABILITIES } from "@openbot/contracts/team-protocol/v3";
 import { sourceText } from "@openbot/i18n/source";
+import { referenceFrom } from "@openbot/user-errors";
 import { RemoteProtocolError, RemoteRequestError } from "./remote-server-errors";
 
 // The protocol range this build speaks. Every compatibility record reports it as the local half.
@@ -50,10 +51,16 @@ const NO_OUTCOME: RemoteConnectionOutcome = { issue: null, state: null, suspendR
 // `fetch` rejects with a `TypeError` when it never reached the host, and a WebSocket that fails to
 // open says nothing useful at all. Both mean the same thing to the user, so they report it the same
 // way. A function rather than a constant: the issue ends up inside a status record, and one shared
-// object there would be one mutation away from being every server's issue.
-export function hostUnreachable(): RemoteConnectionOutcome {
+// object there would be one mutation away from being every server's issue. The caller can give a
+// more exact reference, such as the WebSocket close code.
+export function hostUnreachable(reference = "network/fetch"): RemoteConnectionOutcome {
   return {
-    issue: { code: "network_unavailable", message: sourceText("error.remote.hostUnreachable"), retryable: true },
+    issue: {
+      code: "network_unavailable",
+      message: sourceText("error.remote.hostUnreachable"),
+      retryable: true,
+      reference,
+    },
     state: "offline",
     suspendReconnect: false,
     hostSupport: null,
@@ -63,7 +70,10 @@ export function hostUnreachable(): RemoteConnectionOutcome {
 export function classifyRemoteConnectionError(error: unknown): RemoteConnectionOutcome {
   if (error instanceof RemoteProtocolError) {
     return {
-      issue: { code: error.code, message: error.message, retryable: true },
+      issue: withReference(
+        { code: error.code, message: error.message, retryable: true },
+        referenceFrom("protocol", error.code),
+      ),
       // A protocol error is this app and the host disagreeing about the bytes, which is not the same
       // as either being out of date -- only the two update codes say "incompatible".
       state: error.code === "protocol_error" ? "error" : "incompatible",
@@ -72,9 +82,21 @@ export function classifyRemoteConnectionError(error: unknown): RemoteConnectionO
     };
   }
   if (error instanceof RemoteRequestError) {
+    const reference = error.reference ?? referenceFrom("http", error.status, error.code);
+    // The host's own words are for a developer and are not translated, so the user gets ours.
     if (error.code === "client_update_required" || error.code === "host_update_required") {
       return {
-        issue: { code: error.code, message: error.message, retryable: true },
+        issue: withReference(
+          {
+            code: error.code,
+            message:
+              error.code === "client_update_required"
+                ? sourceText("error.remote.appUpdateRequired")
+                : sourceText("error.team.hostUpdateRequired"),
+            retryable: true,
+          },
+          reference,
+        ),
         state: "incompatible",
         suspendReconnect: true,
         hostSupport: null,
@@ -82,7 +104,18 @@ export function classifyRemoteConnectionError(error: unknown): RemoteConnectionO
     }
     if (error.code === "protocol_error") {
       return {
-        issue: { code: "protocol_error", message: error.message, retryable: true },
+        issue: withReference(
+          {
+            code: "protocol_error",
+            // A 5xx is this app refusing what the host sent; a 4xx is the host refusing this app.
+            message:
+              error.status >= 500
+                ? sourceText("error.remote.invalidData")
+                : sourceText("error.remote.hostRefused", { status: error.status }),
+            retryable: true,
+          },
+          reference,
+        ),
         state: "error",
         suspendReconnect: true,
         hostSupport: null,
@@ -92,23 +125,32 @@ export function classifyRemoteConnectionError(error: unknown): RemoteConnectionO
       // Deliberately not the host's own message: a 401 body is written for a developer, and the one
       // thing the user can do about it is sign in again.
       return {
-        issue: {
-          code: "authentication_required",
-          message: sourceText("error.remote.signInToHostAgain"),
-          retryable: true,
-        },
+        issue: withReference(
+          {
+            code: "authentication_required",
+            message: sourceText("error.remote.signInToHostAgain"),
+            retryable: true,
+          },
+          reference,
+        ),
         state: "error",
         suspendReconnect: true,
         hostSupport: null,
       };
     }
     // Any other refusal is the host answering normally. It is the caller's to report, not a
-    // connection problem.
+    // connection problem. The error keeps its status and code, so its reference is still
+    // `http/<status>/<code>` where the caller shows it.
     return NO_OUTCOME;
   }
   if (error instanceof SyntaxError) {
     return {
-      issue: { code: "protocol_error", message: sourceText("error.remote.invalidData"), retryable: true },
+      issue: {
+        code: "protocol_error",
+        message: sourceText("error.remote.invalidData"),
+        retryable: true,
+        reference: "protocol/invalid_json",
+      },
       state: "error",
       suspendReconnect: true,
       hostSupport: null,
@@ -123,21 +165,67 @@ export function classifyRemoteConnectionError(error: unknown): RemoteConnectionO
 export function classifyTransportError(code: string, message: string): RemoteConnectionOutcome {
   const authenticationEnded = code === "session_revoked";
   const suspendReconnect = code === "protocol_error" || authenticationEnded;
+  const failure = transportFailure(code, message);
   return {
-    issue: {
-      code:
-        code === "protocol_error"
-          ? "protocol_error"
-          : authenticationEnded
-            ? "authentication_required"
-            : "network_unavailable",
-      message,
-      retryable: !suspendReconnect,
-    },
+    issue: withReference(
+      {
+        code:
+          code === "protocol_error"
+            ? "protocol_error"
+            : authenticationEnded
+              ? "authentication_required"
+              : "network_unavailable",
+        message: failure.message,
+        retryable: !suspendReconnect,
+      },
+      failure.reference,
+    ),
     state: code === "protocol_error" ? "incompatible" : "error",
     suspendReconnect,
     hostSupport: null,
   };
+}
+
+/**
+ * The sentence and the reference for a transport failure. A Signal code (`SIGNAL_ERROR_CODES`) gets
+ * our own sentence, because the Signal text is for a developer and is not translated. Any other code
+ * is the bridge's own, and its message is already ours.
+ */
+export function transportFailure(code: string, message: string): { message: string; reference: string | null } {
+  const signal = signalIssueText(code);
+  if (signal !== null) return { message: signal, reference: referenceFrom("signal", code) };
+  // The Signal message says why the session ended.
+  if (code === "session_revoked") return { message, reference: "signal/session_revoked" };
+  return { message, reference: referenceFrom("transport", code) };
+}
+
+// The sentence for each Signal error code. Null for a code that is not Signal's, and for
+// `session_revoked`.
+function signalIssueText(code: string): string | null {
+  switch (code) {
+    case "host_unavailable":
+      return sourceText("error.remote.hostOffline");
+    case "host_busy":
+      return sourceText("error.remote.hostBusy");
+    case "permission_denied":
+      return sourceText("error.remote.signalPermissionDenied");
+    case "rate_limited":
+      // The Signal frame has no wait. The bridge waits 60 seconds before it opens Signal again.
+      return sourceText("error.remote.signalRateLimited", { seconds: 60 });
+    case "protocol_error":
+      return sourceText("error.remote.signalProtocolError");
+    case "invalid_message":
+      return sourceText("error.remote.signalInvalidMessage");
+    case "authentication_required":
+      // The next connection gets a new ticket, so the user does not need to sign in again.
+      return sourceText("error.remote.ticketInvalidOrExpired");
+    default:
+      return null;
+  }
+}
+
+function withReference(issue: ServerConnectionIssue, reference: string | null): ServerConnectionIssue {
+  return reference === null ? issue : { ...issue, reference };
 }
 
 // What the app reports before it has heard from the host. Every other compatibility record is this

@@ -656,7 +656,7 @@ describe("web workspace state", () => {
   it("reports a host directory failure and retries without losing the empty state", async () => {
     const listHosts = vi.fn().mockRejectedValueOnce(new Error("Directory unavailable")).mockResolvedValueOnce([]);
     const app = harness({ listHosts });
-    await waitFor(() => expect(app.workspace().state.hostsError).toBe("Directory unavailable"));
+    await waitFor(() => expect(app.workspace().state.hostsError?.message).toBe("Directory unavailable"));
     expect(app.workspace().state.hostsLoaded).toBe(false);
     expect(app.workspace().state.hostsLoading).toBe(false);
 

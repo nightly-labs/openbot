@@ -1,10 +1,11 @@
 import type { MarketplaceSkillDetail } from "@openbot/contracts/ipc";
 import type { AppTranslate } from "@openbot/i18n";
-import { ArrowRight, IconButton, Puzzle } from "@openbot/ui";
+import { ArrowRight, ErrorReference, IconButton, Puzzle } from "@openbot/ui";
 import { MarkdownMessageText } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { safeBrowserUrl } from "@openbot/ui/features/conversation/RichMessageText";
 import { ReferenceChip } from "@openbot/ui/reference-chip";
 import { SkillGradient } from "@openbot/ui/skill-gradient";
+import { errorReference, type UserErrorDetails } from "@openbot/user-errors";
 import type { JSX } from "@solidjs/web";
 import { createSignal, Show } from "solid-js";
 import { currentText, useText } from "../text";
@@ -34,7 +35,7 @@ export function SkillPreview(props: {
   action?: JSX.Element;
 }) {
   const { t } = useText();
-  const [linkError, setLinkError] = createSignal<string | null>(null);
+  const [linkError, setLinkError] = createSignal<UserErrorDetails | null>(null);
   const [iconTint, setIconTint] = createSignal<{ url: string; color: string } | null>(null);
   const [failedIcon, setFailedIcon] = createSignal<string | null>(null);
   const iconUrl = () => (props.skill.iconUrl && failedIcon() !== props.skill.iconUrl ? props.skill.iconUrl : null);
@@ -71,7 +72,12 @@ export function SkillPreview(props: {
   };
   const openLink = (url: string) => {
     const safe = safeBrowserUrl(url);
-    if (safe) void props.onOpenUrl(safe).catch(() => setLinkError(t("skill.preview.linkFailed")));
+    if (safe)
+      void props
+        .onOpenUrl(safe)
+        .catch((error: unknown) =>
+          setLinkError({ message: t("skill.preview.linkFailed"), reference: errorReference(error) }),
+        );
   };
   return (
     <section class="skill-preview t-stagger is-shown" aria-label={t("skill.preview.label", { name: props.skill.name })}>
@@ -139,7 +145,14 @@ export function SkillPreview(props: {
           onOpenLink={openLink}
         />
       </div>
-      <Show when={linkError()}>{(error) => <p role="alert">{error()}</p>}</Show>
+      <Show when={linkError()}>
+        {(error) => (
+          <p role="alert">
+            {error().message}
+            <ErrorReference reference={error().reference} />
+          </p>
+        )}
+      </Show>
     </section>
   );
 }

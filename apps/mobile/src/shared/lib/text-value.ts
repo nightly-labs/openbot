@@ -6,7 +6,7 @@ import {
   mobileTranslateFor,
   type TranslatedLocale,
 } from "@openbot/i18n/mobile";
-import { userErrorMessage } from "@openbot/user-errors";
+import { type UserErrorDetails, userErrorDetails, userErrorMessage } from "@openbot/user-errors";
 
 /**
  * The interface language on mobile. Screens call `useText()`; a store, an `Alert.alert` callback or
@@ -18,6 +18,8 @@ export interface MobileText {
   format: AppFormat;
   /** `userErrorMessage` in the interface language. `fallback` is already translated. */
   errorMessage: (error: unknown, fallback: string) => string;
+  /** `errorMessage` with the failure's code, for an alert or banner that shows the code. */
+  errorDetails: (error: unknown, fallback: string) => UserErrorDetails;
   /** Text a host sent as English source text, in the interface language. */
   sourceText: (text: string) => string;
 }
@@ -32,6 +34,7 @@ export function textFor(locale: TranslatedLocale, numbers: string = locale): Mob
     t: mobileTranslateFor(locale),
     format: createFormat(locale, numbers),
     errorMessage: (error, fallback) => userErrorMessage(error, fallback, locale),
+    errorDetails: (error, fallback) => userErrorDetails(error, fallback, locale),
     sourceText: (text) => localizeSourceText(text, locale),
   };
 }

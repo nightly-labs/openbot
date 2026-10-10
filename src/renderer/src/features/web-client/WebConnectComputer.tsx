@@ -1,11 +1,13 @@
 import { AppLogo } from "@openbot/brand";
-import { Button, buttonVariants, Download, Heading, Link2, RefreshCw, Text } from "@openbot/ui";
+import { Button, buttonVariants, Download, ErrorReference, Heading, Link2, RefreshCw, Text } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 
 /** The first screen of the web client when the account has no computer to connect to. */
 export function WebConnectComputer(props: {
   loading: boolean;
   failed: boolean;
+  /** The code of the failed host list read. */
+  reference?: string | null;
   onJoin: () => void;
   onRefresh: () => void;
 }) {
@@ -19,6 +21,7 @@ export function WebConnectComputer(props: {
             {props.failed ? t("webClient.notice.hostsFailed") : t("webClient.notice.connectComputer")}
           </Heading>
           <Text tone="muted">{t("webClient.connect.description")}</Text>
+          <ErrorReference reference={props.failed ? props.reference : null} />
         </header>
 
         <ol class="web-connect-steps">

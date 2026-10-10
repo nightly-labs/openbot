@@ -1,6 +1,6 @@
 import type { AppLogoVariant } from "@openbot/brand";
 import type { AgentModelId, AgentProviderId, AppSetupState, DesktopPlatform } from "@openbot/contracts/ipc";
-import { Button } from "@openbot/ui";
+import { Button, ErrorReference } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, createStore, createUniqueId, For, Match, Show, Switch, untrack } from "solid-js";
 import { ComputerUseSetup } from "../computer-use/ComputerUseSetup";
@@ -247,7 +247,7 @@ export function FirstRunFlow(props: FirstRunFlowProps) {
       // A built-in provider keeps its own default model, so only the custom row sends one.
       await props.onSave(provider, providers.customSelected() ? providers.customModel() : null);
     } catch (cause) {
-      providers.setError(errorMessage(cause, t("onboarding.error.finish")));
+      providers.setError(errorMessage(cause, t("onboarding.error.finish")), cause);
       setState((current) => {
         current.saving = false;
       });
@@ -348,6 +348,7 @@ export function FirstRunFlow(props: FirstRunFlowProps) {
           <Show when={providers.error()}>
             <p class="onboarding-error" role="alert">
               {providers.error()}
+              <ErrorReference reference={providers.errorReference()} />
             </p>
           </Show>
 

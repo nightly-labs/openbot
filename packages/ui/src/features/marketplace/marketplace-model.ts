@@ -98,6 +98,8 @@ export interface MarketplaceModel {
 
   /** The last failure, as a sentence. */
   error: () => string | null;
+  /** The code of the last failure, shown beside the sentence. */
+  errorReference?: (() => string | null) | undefined;
   clearError: () => void;
   /** The last result, for a screen reader. */
   notice: () => string;

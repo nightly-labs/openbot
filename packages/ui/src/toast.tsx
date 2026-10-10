@@ -1,4 +1,5 @@
 import { classifyFailure, type FailureProperties, type NotificationMetadata } from "@openbot/telemetry";
+import { errorReference } from "@openbot/user-errors";
 import type { ComponentProps, JSX } from "@solidjs/web";
 import { createEffect, createSignal, omit, onSettled } from "solid-js";
 import {
@@ -7,14 +8,24 @@ import {
   toast as sonnerToast,
   useSonner,
 } from "solid-sonner";
+import { ErrorReference } from "./error-reference";
 import { CircleCheck, Info, LoaderCircle, OctagonX, TriangleAlert } from "./icons";
-import { useText } from "./text";
+import { currentText, useText } from "./text";
 import { cx } from "./utils";
 
 export type ToasterProps = ComponentProps<typeof Sonner> & {
   onToastShown?: (metadata: FailureProperties) => void;
 };
-export type ExternalToast = SonnerExternalToast & { report?: NotificationMetadata };
+export type ExternalToast = SonnerExternalToast & {
+  report?: NotificationMetadata;
+  /**
+   * The failure the toast reports. The toast shows its code under the description, so a user can
+   * copy it. Without a `description`, the toast shows `errorMessage(error, fallback)`.
+   */
+  error?: unknown;
+  /** The translated sentence for an `error` with no readable message of its own. */
+  fallback?: string;
+};
 const reports = new Map<string | number, NotificationMetadata>();
 const shown = new Set<string | number>();
 let promiseId = 0;
@@ -28,12 +39,29 @@ function rememberReport(id: string | number, report: NotificationMetadata): void
 }
 function outcomeToast(kind: "error" | "warning") {
   return (message: Parameters<typeof sonnerToast>[0], options?: ExternalToast) => {
-    const { report, ...data } = options ?? {};
+    const { report, error, fallback, ...data } = options ?? {};
+    if (error !== undefined) data.description = withReference(error, data.description, fallback);
     const id = sonnerToast[kind](message, data);
     if (report) rememberReport(id, report);
     return id;
   };
 }
+function withReference(
+  error: unknown,
+  description: SonnerExternalToast["description"],
+  fallback: string | undefined,
+): SonnerExternalToast["description"] {
+  const reference = errorReference(error);
+  const text = description ?? (fallback === undefined ? undefined : currentText().errorMessage(error, fallback));
+  if (!reference) return text;
+  return () => (
+    <>
+      {typeof text === "function" ? text() : text}
+      <ErrorReference reference={reference} />
+    </>
+  );
+}
+
 function promiseToast<T>(
   promise: Parameters<typeof sonnerToast.promise<T>>[0],
   data?: Parameters<typeof sonnerToast.promise<T>>[1] & { report?: NotificationMetadata },

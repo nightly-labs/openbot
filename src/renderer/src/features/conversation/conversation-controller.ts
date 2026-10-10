@@ -7,6 +7,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import type { AgentActivityLabel } from "@openbot/ui/features/conversation/AgentActivity";
 import { currentText } from "@openbot/ui/text";
+import type { UserErrorDetails } from "@openbot/user-errors";
 import { createEffect, createSignal, onCleanup } from "solid-js";
 import type { ChatSearchMatch } from "./chat-search";
 import {
@@ -200,6 +201,8 @@ export function createStableConversationState(
       unsentTexts: pendingSends.unsentTexts,
     });
   const [composerErrors, setComposerErrors] = createSignal<Record<string, string>>({});
+  /** The code of each composer error that came from a failure, keyed like `composerErrors`. */
+  const [composerErrorReferences, setComposerErrorReferences] = createSignal<Record<string, UserErrorDetails>>({});
   const [voicePhase, setVoicePhase] = createSignal<"idle" | "preparing" | "requesting" | "recording" | "transcribing">(
     "idle",
   );
@@ -304,6 +307,8 @@ export function createStableConversationState(
     setConversationErrors,
     composerErrors,
     setComposerErrors,
+    composerErrorReferences,
+    setComposerErrorReferences,
     voicePhase,
     setVoicePhase,
     voiceModelProgress,

@@ -4,6 +4,7 @@ import type { AppTextKey } from "@openbot/i18n";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, For, onSettled, untrack } from "solid-js";
 import { bloubAvatarProfile } from "../../bloub-avatar";
+import { ErrorReference } from "../../error-reference";
 import { useText } from "../../text";
 import { prefersReducedMotion } from "../../utils";
 
@@ -108,6 +109,8 @@ export interface AppLoadingScreenProps {
   label?: string;
   title?: string;
   detail?: string;
+  /** The code of the failure in `detail`, for a user to copy into a report. */
+  reference?: string | null;
   actions?: JSX.Element;
 }
 
@@ -256,6 +259,7 @@ export function AppLoadingScreen(props: AppLoadingScreenProps) {
           {props.title ?? <For each={[status()]}>{(line) => <span class="app-loading-line">{t(line)}</span>}</For>}
         </p>
         {props.detail && <p class="server-connection-detail">{props.detail}</p>}
+        <ErrorReference reference={props.reference} />
         {props.actions && <div class="server-connection-actions">{props.actions}</div>}
       </div>
     </main>
