@@ -6,6 +6,16 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.35.2] - 2026-10-10
+
+### Fixed
+
+- Agents on Muse models, such as Muse Spark 1.3, reply again. In 0.35.0 and 0.35.1, each message
+  to these agents failed with "Recursive JSON schemas are not currently supported".
+- Keep the agent avatar inside the expanded Dynamic Island when the main window is zoomed in.
+  Before, the avatar moved to the left of the panel and was cut off. The Computer Use rim and the
+  permission help window also no longer change size with the main window zoom.
+
 ## [0.35.1] - 2026-10-10
 
 ### Changed
