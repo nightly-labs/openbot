@@ -439,8 +439,9 @@ export async function expectOpenBotToolFailure(
   tool: string,
   args: unknown,
   message: string,
+  turnId?: string,
 ): Promise<void> {
-  const result = await callOpenBotTool(client, threadId, tool, args);
+  const result = await callOpenBotTool(client, threadId, tool, args, turnId);
   expect(result.error).toBeUndefined();
   expect(paramsRecord(result.result)?.success).toBe(false);
   expect(openBotToolPayload(result.result).error).toContain(message);

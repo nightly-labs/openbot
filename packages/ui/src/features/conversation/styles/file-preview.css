@@ -45,6 +45,13 @@
   white-space: nowrap;
 }
 
+/* Copy is a shared icon button; its icon matches the other header icons. */
+.file-preview-copy svg {
+  width: 15px;
+  height: 15px;
+  stroke-width: 2;
+}
+
 .file-preview-file-icon {
   width: 15px;
   height: 15px;
