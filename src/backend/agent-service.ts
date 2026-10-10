@@ -872,6 +872,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     });
     this.messaging = new MessagingThreads(store.database, mailbox, {
       schedule: (agentId) => this.#drain.scheduleDrain(agentId),
+      queueChanged: (agentId) => this.#mailboxSync.emitQueue(agentId),
       busy: (agentId) =>
         Boolean(this.#conversation.workingSnapshot(agentId)?.activeTurnId || this.#mailbox.nextQueued(agentId)),
       interrupt: (agentId, turnId, threadId) => this.interrupt(agentId, turnId, threadId).pipe(toMessagingThreadFailed),
