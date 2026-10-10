@@ -1525,7 +1525,7 @@ describe.sequential("AgentService: providers", () => {
       expect(service.listQueue("chief").deliveries[0]).toMatchObject({
         id,
         text: "Start once.",
-        status: evidence === "missing" ? "starting" : evidence === "active" ? "running" : "completed",
+        status: evidence === "missing" ? "starting" : evidence === "active" ? "interrupted" : "completed",
       });
       expect(next.requests.filter((request) => request.method === "turn/start")).toHaveLength(0);
     },

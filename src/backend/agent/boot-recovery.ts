@@ -207,13 +207,14 @@ export class BootRecovery {
           if (turn && (!delivery.turnId || unconfirmedSteer)) {
             yield* this.#mailbox.markRunning(delivery.id, turn.id).pipe(toBootRecoveryFailed);
           }
-          if (unconfirmedInput && (!turn || !["completed", "failed", "interrupted"].includes(turn.status ?? "")))
-            return { terminal: null, reason: null };
+          if (unconfirmedInput && !turn) return { terminal: null, reason: null };
           if (turn?.status === "completed") {
             return { terminal: "completed" as const, reason: null };
           } else if (turn?.status === "failed") {
             return { terminal: "failed" as const, reason: "The recovered Codex turn failed." };
-          } else if (turn?.status === "interrupted") {
+          } else if (turn) {
+            // History proves acceptance, not a live owner in the replacement provider process.
+            // Apply the same restart interruption as other accepted work without replaying it.
             return interrupted;
           }
         }
@@ -247,7 +248,7 @@ export class BootRecovery {
             activeTurnId: null,
             changedMessages,
             eventType: "turn.reconciled-after-restart",
-            detail: { turnId: delivery.turnId, status: terminal },
+            detail: { turnId: recoveryTurnId, status: terminal },
           });
           const snapshot = structuredClone(this.#conversation.ensureSnapshot(agent.id, threadId));
           const changedById = new Map(changedMessages.map((message) => [message.id, message]));

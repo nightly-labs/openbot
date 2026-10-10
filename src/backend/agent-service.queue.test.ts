@@ -54,7 +54,7 @@ afterEach(async () => {
 describe.sequential("AgentService: queue", () => {
   describe("review recovery", () => {
     async function restartStartingInput(
-      history: "missing" | "interrupted",
+      history: "missing" | "interrupted" | "completed" | "failed" | "inProgress" | "omitted",
       identity?: "provider" | "thread" | "session",
     ) {
       const started = await startService(root, { provider: "codex" });
@@ -94,7 +94,7 @@ describe.sequential("AgentService: queue", () => {
               : [
                   {
                     id: "recovered-interrupted",
-                    status: "interrupted",
+                    ...(history === "omitted" ? {} : { status: history }),
                     items: [{ type: "userMessage", id: "receipt", clientId: id, content: [] }],
                   },
                 ],
@@ -151,6 +151,28 @@ describe.sequential("AgentService: queue", () => {
         queue.deliveries.some((item) => item.text === "Next input" && item.status === "running"),
       );
     });
+
+    it.each(["inProgress", "omitted", "completed", "failed"] as const)(
+      "review accepted restart input settles without replay or an orphan owner: %s",
+      async (history) => {
+        const recovered = await restartStartingInput(history);
+        assert(service);
+        const terminal = history === "completed" || history === "failed" ? history : "interrupted";
+        expect(recovered.mailbox.getDelivery(recovered.id)?.delivery).toMatchObject({
+          status: terminal,
+          turnId: "recovered-interrupted",
+        });
+        expect((await runCauseEffect(service.readConversation("chief"))).activeTurnId).toBeNull();
+        expect(service.getRuntimeSnapshot().activeTurns).toHaveLength(0);
+        expect(recovered.client.requests.filter((item) => item.method === "turn/start")).toHaveLength(0);
+        await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Next input" }));
+        await waitForQueue(service, "chief", (queue) =>
+          queue.deliveries.some((item) => item.text === "Next input" && item.status === "running"),
+        );
+        expect(recovered.client.requests.filter((item) => item.method === "turn/start")).toHaveLength(1);
+        expect(recovered.mailbox.getDelivery(recovered.id)?.delivery.status).toBe(terminal);
+      },
+    );
 
     it.each(["none", "primary", "companion", "restart"])(
       "review late exact receipt confirms only the original submitted batch and preserves files: %s",
