@@ -1,5 +1,27 @@
 [
   {
+    "version": "0.35.1",
+    "date": "2026-10-10",
+    "notices": [],
+    "groups": [
+      {
+        "type": "changed",
+        "items": [
+          "The usage popover shows each limit of a provider, such as the 5-hour and weekly limits, and when each one resets.",
+          "A failed connection shows the reason and a short error code. Copy the code when you report a problem."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "The web app connects again by itself when a server comes back after an update or a restart. You no longer need to reload the page.",
+          "A hosted server no longer stays at \"Starting\" with \"Too many active remote connections.\"",
+          "A server that lost its remote connection for good reports an error, and a cloud server connects again by itself."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.35.0",
     "date": "2026-10-10",
     "notices": [],

@@ -6,6 +6,23 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.35.1] - 2026-10-10
+
+### Changed
+
+- The usage popover now shows each limit that a provider reports, such as the 5-hour limit and the weekly limit. Each limit has a bar, the percent left, and the time until it resets. Before, the popover showed only the limit with the least left.
+- A failed connection to a server, the web app or a hosted server now shows a specific reason, for example when the server is busy, an invitation was already used or a firewall blocks the direct connection. Before, most of these failures showed "The connection failed."
+- Error messages and error notifications show a short error code with a copy button. Send this code when you report a problem, so we can find the cause.
+
+### Fixed
+
+- A hosted server no longer stays at "Starting" with "Too many active remote connections." Before, the phones, browsers and desktops of an account could use all of its remote connections, and the server could not connect. Now only device connections count toward the account limit.
+- The server connection screen shows its errors in your language. Spanish now has the text of this screen.
+- The server menu on the sidebar title now shows all of its width while a server sleeps, wakes, or connects. Before, the loading screen of the server covered the part of the menu that went past the sidebar.
+- The web app connects again by itself when a server comes back after an update or a long restart. Before, the page could wait up to two minutes before it tried again, and you often had to reload it.
+- A device that was connected when its server restarted no longer stays at "Loading" until you reload.
+- A server that lost its remote connection for good no longer shows as online while no device can reach it. The server now reports an error, and a cloud server connects again by itself.
+
 ## [0.35.0] - 2026-10-10
 
 ### Added
