@@ -24,13 +24,15 @@ export const messages = defineMessages("provider", {
   "provider.status.downloadFailed": "Download failed",
   "provider.status.connected": "Connected",
   "provider.status.notDownloaded": "Not downloaded",
-  "provider.status.ready": "Ready",
+  "provider.status.ready": "Runtime installed",
   "provider.status.notConnected": "Not connected",
   "provider.status.notInstalled": "Not installed",
   "provider.status.updateRequired": "Update required",
   "provider.status.unavailable": "Unavailable",
   "provider.status.checking": "Checking",
   "provider.status.off": "Off",
+  "provider.gemini.hostSignIn":
+    "To connect Gemini, open OpenBot on the host and select Connect in Settings > Providers. Google sign-in needs a browser on that host. Remote sign-in is not supported.",
 
   // Which account tier the OpenCode row runs on. It shows only while it adds to the runtime
   // badge: a saved key leaves the runtime "Connected" to speak for the row.

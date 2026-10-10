@@ -37,7 +37,7 @@ export const messages = {
   "provider.status.downloadFailed": "Ошибка загрузки",
   "provider.status.connected": "Подключено",
   "provider.status.notDownloaded": "Не загружено",
-  "provider.status.ready": "Готово",
+  "provider.status.ready": "Среда выполнения установлена",
   "provider.status.notConnected": "Не подключено",
   "provider.status.notInstalled": "Не установлено",
   "provider.status.updateRequired": "Нужно обновление",

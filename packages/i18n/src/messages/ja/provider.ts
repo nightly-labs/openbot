@@ -23,7 +23,7 @@ export const messages = {
   "provider.status.downloadFailed": "ダウンロード失敗",
   "provider.status.connected": "接続済み",
   "provider.status.notDownloaded": "未ダウンロード",
-  "provider.status.ready": "使用可能",
+  "provider.status.ready": "ランタイムをインストール済み",
   "provider.status.notConnected": "未接続",
   "provider.status.notInstalled": "未インストール",
   "provider.status.updateRequired": "アップデートが必要",
