@@ -50,6 +50,13 @@ export function AppAccessGate() {
   const languageStep = createLanguageStep();
   // Only a settled sign-out: a code in flight or a retry keeps the sign-in screen it belongs to.
   const languageStepShown = () => auth.centralAuth().status === "signed_out" && !languageStep.done();
+  // A computer signed in before the wheel existed has its language already, so a later sign-out skips the wheel.
+  createEffect(
+    () => auth.centralAuth().status === "signed_in",
+    (signedIn) => {
+      if (signedIn && !languageStep.done()) languageStep.complete();
+    },
+  );
   // A startup mark for `dev:bench`: the first moment the app can leave the splash.
   createEffect(started, (ready) => {
     if (ready) performance.mark("openbot:app-started");

@@ -14,8 +14,8 @@ function read(storage: StepStorage | undefined): boolean {
 }
 
 /**
- * Whether this computer has passed the language wheel before sign-in. It shows once: a later
- * sign-out goes straight to the sign-in screen, and Settings keeps the language.
+ * Whether this computer has passed the language wheel before sign-in, or has been signed in. It
+ * shows once: a later sign-out goes straight to the sign-in screen, and Settings keeps the language.
  */
 export function createLanguageStep(storage?: StepStorage) {
   const [done, setDone] = createSignal(read(storage));

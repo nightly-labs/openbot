@@ -150,6 +150,11 @@ function LanguageWheelPicker(props: {
     }
     function onPointerMove(event: PointerEvent): void {
       if (event.pointerId !== pointerId) return;
+      // A press released outside the wheel before the drag captured the pointer sent no `pointerup` here.
+      if (event.buttons === 0) {
+        onPointerEnd(event);
+        return;
+      }
       const travel = startY - event.clientY;
       if (!dragged && Math.abs(travel) < DRAG_THRESHOLD_PX) return;
       if (!dragged) {
