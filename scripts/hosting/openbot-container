@@ -66,5 +66,11 @@ started=$(gnome-keyring-daemon --start --components=secrets)
 eval "$started"
 export GNOME_KEYRING_CONTROL
 
+# Chromium keeps its shared memory in /dev/shm. Some runtimes, such as AWS Fargate, cannot make it
+# larger than the 64 MB default. Below 1 GiB, Chromium keeps that memory in /tmp.
+chromium=()
+shm=$(df --output=size -k /dev/shm 2>/dev/null | tail -n 1 | tr -d ' ') || shm=0
+[ "${shm:-0}" -ge 1048576 ] 2>/dev/null || chromium+=(--disable-dev-shm-usage)
+
 export OPENBOT_SERVER=1
-exec /opt/OpenBot/app/openbot --password-store=gnome-libsecret
+exec /opt/OpenBot/app/openbot --password-store=gnome-libsecret "${chromium[@]}"

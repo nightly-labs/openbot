@@ -37,9 +37,11 @@ The options in both examples are necessary:
 | Option | Why |
 | --- | --- |
 | `seccomp=seccomp.json` | The Electron sandbox makes user namespaces. The default seccomp profile of Docker refuses them, and the container stops with a message. See [Security](#security). |
-| `--shm-size 1g` | Chromium uses shared memory. The Docker default of 64 MB is too small. |
+| `--shm-size 1g` | Chromium uses shared memory. The Docker default of 64 MB is too small. When `/dev/shm` is smaller than 1 GiB, Chromium uses `/tmp`, which is slower. |
 | `--stop-timeout 60` | OpenBot stops its agents and closes its database before it exits. |
 | `-v openbot-data:/data` | All data is in `/data`. Without a volume, it goes away with the container. |
+
+For Amazon ECS, see [AWS ECS](aws-ecs.md).
 
 The container publishes no port. OpenBot only connects out: to the account server, to the providers,
 and to Signal and TURN for remote use. The Team API listens on `127.0.0.1` in the container.
