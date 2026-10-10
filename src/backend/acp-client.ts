@@ -644,9 +644,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         error instanceof RequestError &&
         (method === "turn/start" ||
           method === "turn/steer" ||
-          ((method === "thread/start" || method === "thread/resume") &&
-            isRecord(error.data) &&
-            typeof error.data.details === "string"))
+          ((method === "thread/start" || method === "thread/resume") && failureDetail(error) !== null))
       ) {
         // Keep the protocol error type: details alone must never authorize session replacement.
         return yield* providerFailure(
@@ -2095,15 +2093,21 @@ function isSessionNotFound(error: unknown, sessionId: string, provider: AgentPro
 }
 
 /**
- * The text of a failed turn. When a handler in an ACP agent throws, the SDK answers `Internal error`
- * and puts the thrown message in `data.details`, which `String(error)` leaves out (#1193).
+ * The agent's explanation of a protocol error, which `String(error)` leaves out. When a handler in
+ * an ACP agent throws, the SDK puts the thrown message in `data.details` (#1193). Grok sends a string
+ * `data`, such as "session/resume does not support additionalDirectories" (#1729), or `data.detail`.
  */
+function failureDetail(error: RequestError): string | null {
+  const data = error.data;
+  const detail = typeof data === "string" ? data : isRecord(data) ? (data.details ?? data.detail) : undefined;
+  return typeof detail === "string" && detail ? detail : null;
+}
+
+/** The text of a failed request, with the agent's explanation. */
 function failureText(error: unknown): string {
-  if (!(error instanceof RequestError) || !isRecord(error.data)) return String(error);
-  const details = error.data.details;
-  return typeof details === "string" && details && !error.message.includes(details)
-    ? `${String(error)}: ${details}`
-    : String(error);
+  if (!(error instanceof RequestError)) return String(error);
+  const detail = failureDetail(error);
+  return detail && !error.message.includes(detail) ? `${String(error)}: ${detail}` : String(error);
 }
 
 /**
