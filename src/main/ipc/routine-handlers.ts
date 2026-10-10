@@ -106,7 +106,7 @@ export function routineIpcHandlers({
           ),
       }),
       listRoutineRuns: scopedHandler(parseListRoutineRuns, {
-        local: (parsed) => service.listRoutineRuns(parsed),
+        local: (parsed) => service.listRoutineRuns(parsed, true),
         remote: (parsed, serverId) =>
           runCauseEffect(
             remoteServers.request(

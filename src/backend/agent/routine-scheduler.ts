@@ -468,11 +468,11 @@ export class RoutineScheduler implements RoutineDueSource {
     return queued;
   }, Effect.uninterruptible);
 
-  listRuns(input: ListRoutineRunsInput): RoutineRun[] {
+  listRuns(input: ListRoutineRunsInput, withSkipped = false): RoutineRun[] {
     this.#conversation.requireKnownAgent(input.agentId);
     if (!this.#routines.getRecord(input.agentId, input.routineId))
       throw new RoutineInputError(sourceText("error.backend.routineGone"));
-    return this.#routines.listRuns(input.agentId, input.routineId, input.limit);
+    return this.#routines.listRuns(input.agentId, input.routineId, input.limit, withSkipped);
   }
 
   /**

@@ -137,7 +137,7 @@ export const messages = {
   "routine.history.ignored.filter": "Пропущено: фильтры не совпали",
   "routine.history.ignored.inactive": "Пропущено: регулярная задача приостановлена",
   "routine.history.skipped": {
-    one: "Пропущено: OpenBot был закрыт",
+    one: "Пропущено {count}: OpenBot был закрыт",
     few: "Пропущено {count}: OpenBot был закрыт",
     many: "Пропущено {count}: OpenBot был закрыт",
     other: "Пропущено {count}: OpenBot был закрыт",

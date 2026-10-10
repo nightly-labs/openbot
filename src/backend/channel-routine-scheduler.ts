@@ -126,8 +126,13 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
     return false;
   }
 
-  listRuns(input: ListChannelRoutineRunsInput): ChannelRoutineRun[] {
-    return this.#routines.listRuns(this.#requireChannel(input.channelId), input.routineId, input.limit ?? 50);
+  listRuns(input: ListChannelRoutineRunsInput, withSkipped = false): ChannelRoutineRun[] {
+    return this.#routines.listRuns(
+      this.#requireChannel(input.channelId),
+      input.routineId,
+      input.limit ?? 50,
+      withSkipped,
+    );
   }
 
   create(input: CreateChannelRoutineInput): ChannelRoutine {

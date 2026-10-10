@@ -542,14 +542,15 @@ export class RoutineStore {
     );
   }
 
-  protected listRunRows(ownerId: string, routineId: string, limit = 50): OwnedRoutineRun[] {
+  /** Skipped-run records only fill the local history, so other readers do not get them by default. */
+  protected listRunRows(ownerId: string, routineId: string, limit = 50, withSkipped = false): OwnedRoutineRun[] {
     const safeLimit = Math.max(1, Math.min(INPUT_LIMITS.routineRunsPage, limit));
     return databaseRows(
       this.database.connection
         .prepare(
           `SELECT ${this.runColumns}
            FROM ${this.tables.runTable}
-           WHERE routine_id = ? AND ${this.tables.ownerColumn} = ?
+           WHERE routine_id = ? AND ${this.tables.ownerColumn} = ?${withSkipped ? "" : " AND missed_count IS NULL"}
            ORDER BY created_at DESC, run_id DESC LIMIT ?`,
         )
         .all(routineId, ownerId, safeLimit),

@@ -50,12 +50,7 @@ export async function routeAgentRoutines(
     if (method === "GET" && routineAction === "runs") {
       const rawLimit = url.searchParams.get("limit");
       const limit = rawLimit === null ? 50 : Number(rawLimit);
-      // Released clients read a skipped-run record as a run that a person cancelled, so it stays local.
-      const runs = agents.listRoutineRuns(parseListRoutineRuns({ agentId, routineId, limit }));
-      return json(
-        200,
-        runs.filter((run) => !run.missed),
-      );
+      return json(200, agents.listRoutineRuns(parseListRoutineRuns({ agentId, routineId, limit })));
     }
   }
 

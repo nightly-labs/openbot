@@ -35,7 +35,7 @@ describe("AgentRoutineStore", () => {
 
     const run = routines.createRun(routine, routine.trigger.id, "scheduled", "2026-08-26T05:00:00.000Z");
     routines.update({ agentId: "chief", routineId: routine.id, name: "Changed name", instruction: "New text" });
-    expect(routines.listRuns("chief", routine.id, 10)[0]).toMatchObject({
+    expect(routines.listRuns("chief", routine.id, 10, true)[0]).toMatchObject({
       id: run.id,
       routineName: "Morning brief",
       instruction: "Prepare the daily brief.",
@@ -62,7 +62,7 @@ describe("AgentRoutineStore", () => {
     const first = routines.createRun(routine, triggerId, "scheduled", "2026-08-25T12:00:00.000Z");
     const second = routines.createRun(routine, triggerId, "scheduled", "2026-08-25T12:00:00.000Z");
     expect(second.id).toBe(first.id);
-    expect(routines.listRuns("chief", routine.id, 10)).toHaveLength(1);
+    expect(routines.listRuns("chief", routine.id, 10, true)).toHaveLength(1);
     database.close();
   });
 
@@ -88,11 +88,13 @@ describe("AgentRoutineStore", () => {
       scheduledFor: "2026-08-25T10:15:00.000Z",
       missed: { count: 8, until: "2026-08-25T12:00:00.000Z" },
     };
-    expect(routines.listRuns("chief", routine.id, 10)).toEqual([expect.objectContaining(skipped)]);
+    expect(routines.listRuns("chief", routine.id, 10, true)).toEqual([expect.objectContaining(skipped)]);
+    // Only the local history asks for the record; the Team API, the calendar and the flows do not get it.
+    expect(routines.listRuns("chief", routine.id, 10)).toEqual([]);
     expect(routines.pendingRuns()).toEqual([]);
     // A second start finds nothing missed and records nothing.
     routines.skipMissed(new Date("2026-08-25T12:10:00.000Z"));
-    expect(routines.listRuns("chief", routine.id, 10)).toEqual([expect.objectContaining(skipped)]);
+    expect(routines.listRuns("chief", routine.id, 10, true)).toEqual([expect.objectContaining(skipped)]);
     database.close();
   });
 
@@ -117,7 +119,7 @@ describe("AgentRoutineStore", () => {
       trigger: { nextRunAt: "2026-08-25T12:00:00.000Z" },
     });
     expect(routines.due(now).map((due) => due.nextRunAt)).toEqual(["2026-08-25T12:00:00.000Z"]);
-    expect(routines.listRuns("chief", routine.id, 10)).toEqual([
+    expect(routines.listRuns("chief", routine.id, 10, true)).toEqual([
       expect.objectContaining({
         status: "cancelled",
         scheduledFor: "2026-08-25T10:15:00.000Z",
@@ -143,7 +145,7 @@ describe("AgentRoutineStore", () => {
     );
     routines.skipMissed(new Date("2026-08-25T10:20:00.000Z"));
     expect(routines.get("chief", routine.id)?.trigger.nextRunAt).toBe("2026-08-25T10:15:00.000Z");
-    expect(routines.listRuns("chief", routine.id, 10)).toEqual([]);
+    expect(routines.listRuns("chief", routine.id, 10, true)).toEqual([]);
     database.close();
   });
 
@@ -165,7 +167,7 @@ describe("AgentRoutineStore", () => {
     routines.skipMissed(new Date("2026-08-25T10:50:00.000Z"));
     expect(routines.get("chief", routine.id)?.trigger.nextRunAt).toBe("2026-08-25T11:00:00.000Z");
     // Both rows have the same creation time, so the list order is not fixed.
-    const runs = routines.listRuns("chief", routine.id, 10);
+    const runs = routines.listRuns("chief", routine.id, 10, true);
     expect(runs).toHaveLength(2);
     expect(runs).toEqual(
       expect.arrayContaining([
@@ -191,12 +193,12 @@ describe("AgentRoutineStore", () => {
     );
     routines.skipMissed(now);
     expect(routines.get("chief", skip.id)?.trigger.nextRunAt).toBe("2026-09-04T10:05:00.000Z");
-    expect(routines.listRuns("chief", skip.id, 10)[0]?.missed).toEqual({
+    expect(routines.listRuns("chief", skip.id, 10, true)[0]?.missed).toEqual({
       count: ROUTINE_MISSED_COUNT_LIMIT + 1,
       until: "2026-09-04T10:00:00.000Z",
     });
     expect(routines.get("chief", once.id)?.trigger.nextRunAt).toBe("2026-09-04T10:00:00.000Z");
-    expect(routines.listRuns("chief", once.id, 10)[0]?.missed).toEqual({
+    expect(routines.listRuns("chief", once.id, 10, true)[0]?.missed).toEqual({
       count: ROUTINE_MISSED_COUNT_LIMIT + 1,
       until: "2026-09-04T09:55:00.000Z",
     });
@@ -280,7 +282,7 @@ describe("AgentRoutineStore", () => {
 
     expect(resumed.trigger.id).toBe(routine.trigger.id);
     expect(resumed.trigger.nextRunAt).toBe("2026-08-28T09:00:00.000Z");
-    expect(routines.listRuns("chief", routine.id, 10)).toEqual([]);
+    expect(routines.listRuns("chief", routine.id, 10, true)).toEqual([]);
     database.close();
   });
 
@@ -316,7 +318,7 @@ describe("AgentRoutineStore", () => {
         .prepare("SELECT COUNT(*) AS count FROM projection_routine_triggers WHERE routine_id = ?")
         .get(routine.id),
     ).toMatchObject({ count: 1 });
-    expect(routines.listRuns("chief", routine.id, 10)).toEqual([]);
+    expect(routines.listRuns("chief", routine.id, 10, true)).toEqual([]);
     database.close();
   });
 
@@ -364,7 +366,7 @@ describe("ChannelRoutineStore", () => {
 
     const run = routines.createRun(routine, routine.trigger.id, "scheduled", "2026-08-26T05:00:00.000Z");
     routines.update({ channelId: "channel-1", routineId: routine.id, name: "Changed name", instruction: "New text" });
-    expect(routines.listRuns("channel-1", routine.id, 10)[0]).toMatchObject({
+    expect(routines.listRuns("channel-1", routine.id, 10, true)[0]).toMatchObject({
       id: run.id,
       routineName: "Morning brief",
       instruction: "Prepare the daily brief.",
@@ -392,7 +394,7 @@ describe("ChannelRoutineStore", () => {
     const first = routines.createRun(routine, triggerId, "scheduled", "2026-08-25T12:00:00.000Z");
     const second = routines.createRun(routine, triggerId, "scheduled", "2026-08-25T12:00:00.000Z");
     expect(second.id).toBe(first.id);
-    expect(routines.listRuns("channel-1", routine.id, 10)).toHaveLength(1);
+    expect(routines.listRuns("channel-1", routine.id, 10, true)).toHaveLength(1);
     database.close();
   });
 
@@ -430,7 +432,7 @@ describe("ChannelRoutineStore", () => {
     );
     routines.skipMissed(new Date("2026-08-25T12:07:00.000Z"));
     expect(routines.get("channel-1", routine.id)?.trigger.nextRunAt).toBe("2026-08-25T12:15:00.000Z");
-    expect(routines.listRuns("channel-1", routine.id, 10)).toEqual([
+    expect(routines.listRuns("channel-1", routine.id, 10, true)).toEqual([
       expect.objectContaining({
         status: "cancelled",
         requestMessageId: null,
@@ -501,7 +503,7 @@ describe("ChannelRoutineStore", () => {
 
     expect(resumed.trigger.id).toBe(routine.trigger.id);
     expect(resumed.trigger.nextRunAt).toBe("2026-08-28T09:00:00.000Z");
-    expect(routines.listRuns("channel-1", routine.id, 10)).toEqual([]);
+    expect(routines.listRuns("channel-1", routine.id, 10, true)).toEqual([]);
     database.close();
   });
 
@@ -537,7 +539,7 @@ describe("ChannelRoutineStore", () => {
         .prepare("SELECT COUNT(*) AS count FROM projection_channel_routine_triggers WHERE routine_id = ?")
         .get(routine.id),
     ).toMatchObject({ count: 1 });
-    expect(routines.listRuns("channel-1", routine.id, 10)).toEqual([]);
+    expect(routines.listRuns("channel-1", routine.id, 10, true)).toEqual([]);
     database.close();
   });
 
@@ -554,7 +556,7 @@ describe("ChannelRoutineStore", () => {
     routines.createRun(routine, routine.trigger.id, "scheduled", "2026-08-26T07:00:00.000Z");
     database.connection.prepare("DELETE FROM projection_channels WHERE channel_id = ?").run("channel-1");
     expect(routines.list("channel-1")).toEqual([]);
-    expect(routines.listRuns("channel-1", routine.id, 10)).toEqual([]);
+    expect(routines.listRuns("channel-1", routine.id, 10, true)).toEqual([]);
     database.close();
   });
 });

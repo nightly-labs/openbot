@@ -13,7 +13,7 @@ import { StoredStateFailure } from "../backend/stored-state-effects";
 
 import { join } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { AgentMemory, AgentSummary, Routine, RoutineRun } from "@openbot/contracts/ipc";
+import type { AgentMemory, AgentSummary, ListRoutineRunsInput, Routine, RoutineRun } from "@openbot/contracts/ipc";
 import {
   TEAM_APP_VERSION_HEADER,
   TEAM_CAPABILITIES_HEADER,
@@ -929,10 +929,11 @@ describe("TeamApiServer agents", () => {
         deleteRoutine,
         testRoutine: vi.fn(() => Effect.sync(() => run)),
         // A released client would read a skipped-run record as a run that a person cancelled.
-        listRoutineRuns: vi.fn(() => [
-          run,
-          { ...run, id: "run-missed", status: "cancelled" as const, missed: { count: 3, until: null } },
-        ]),
+        listRoutineRuns: vi.fn((_input: ListRoutineRunsInput, withSkipped?: boolean) =>
+          withSkipped
+            ? [run, { ...run, id: "run-missed", status: "cancelled" as const, missed: { count: 3, until: null } }]
+            : [run],
+        ),
       }),
     });
 
