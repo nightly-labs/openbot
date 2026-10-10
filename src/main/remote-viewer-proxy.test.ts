@@ -24,7 +24,11 @@ describe("RemoteViewerProxy", () => {
     await once(socket, "open");
     const [streamId] = await opened;
     const closed = once(socket, "close");
-    transport.emit("desktopData", "host-1", encodeRemoteDesktopSignalControl({ type: "close", streamId, code }));
+    transport.emit(
+      "desktopData",
+      "host-1",
+      encodeRemoteDesktopSignalControl({ type: "close", streamId, ...(code === undefined ? {} : { code }) }),
+    );
     const [actual] = await closed;
     expect(actual).toBe(code === 1006 ? 1011 : 1000);
     await runCauseEffect(proxy.stop());
