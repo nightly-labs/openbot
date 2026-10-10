@@ -11,6 +11,7 @@ import * as KobalteSelect from "@kobalte/core/select";
 import * as TabsPrimitive from "@kobalte/core/tabs";
 import * as TooltipPrimitive from "@kobalte/core/tooltip";
 import type { ValidComponent } from "@solidjs/web";
+import { createContext, createEffect, merge, onCleanup, untrack, useContext } from "solid-js";
 import { useMenuMotion } from "./menu-motion";
 import { createPressedPopupCue } from "./utils";
 
@@ -46,6 +47,118 @@ function focusRestoreHandler(upstream: () => OpenChangeHandler | undefined): Ope
       window.requestAnimationFrame(() => window.requestAnimationFrame(() => target.focus()));
     }
   };
+}
+
+/** A menu may restore focus only while its closing surface still owns it. */
+function createMenuFocusRestore(props: { open?: boolean; defaultOpen?: boolean; onOpenChange?: OpenChangeHandler }) {
+  let target =
+    document.activeElement instanceof HTMLElement && document.activeElement !== document.body
+      ? document.activeElement
+      : null;
+  let content: HTMLElement | undefined;
+  let open = untrack(() => props.open ?? props.defaultOpen ?? false);
+  let epoch = 0;
+  let selection: (() => void) | undefined;
+  let handedOff = false;
+  const ownsFocus = () => {
+    const active = document.activeElement;
+    return active === document.body || active === target || (active != null && content?.contains(active) === true);
+  };
+  const canRestore = (closingEpoch: number) => !open && !handedOff && epoch === closingEpoch && ownsFocus();
+  onCleanup(() => {
+    epoch++;
+    selection = undefined;
+  });
+  function changeOpen(next: boolean, notify: boolean) {
+    if (next !== open) {
+      open = next;
+      if (next) {
+        epoch++;
+        selection = undefined;
+        handedOff = false;
+        target =
+          document.activeElement instanceof HTMLElement && document.activeElement !== document.body
+            ? document.activeElement
+            : null;
+      } else {
+        target =
+          Array.from(
+            document.querySelectorAll<HTMLElement>('[aria-haspopup][aria-expanded="true"][aria-controls]'),
+          ).find((element) => element.getAttribute("aria-controls") === content?.id) ?? target;
+      }
+      if (!next && selection) handedOff = true;
+    }
+    if (notify) props.onOpenChange?.(next);
+    const closingEpoch = epoch;
+    if (!next && target?.isConnected) {
+      const restoreTarget = target;
+      window.requestAnimationFrame(() =>
+        window.requestAnimationFrame(() => {
+          if (restoreTarget.isConnected && canRestore(closingEpoch)) restoreTarget.focus();
+        }),
+      );
+    }
+  }
+  createEffect(
+    () => props.open,
+    (controlled) => {
+      if (controlled !== undefined && controlled !== open) changeOpen(controlled, false);
+    },
+  );
+  return {
+    setContent: (element: HTMLElement) => {
+      content = element;
+    },
+    canRestoreContent: (element: HTMLElement | undefined) => element === content && !open && !handedOff && ownsFocus(),
+    canOpenFocus: () => open && !selection && ownsFocus(),
+    selectAfterClose: (action: () => void) => {
+      selection ??= action;
+    },
+    releaseContent(element: HTMLElement | undefined) {
+      if (open || content !== element || !selection) return;
+      const closingEpoch = epoch;
+      const action = selection;
+      selection = undefined;
+      // The portal's cleanup proves the surface has left; pending primitive focus work
+      // cannot focus its detached elements. Do not execute an action in a disposed owner.
+      queueMicrotask(() => {
+        if (open || epoch !== closingEpoch) return;
+        // Give a new dialog a connected return anchor before it claims focus.
+        if (target?.isConnected) target.focus();
+        if (!open && epoch === closingEpoch) action();
+      });
+    },
+    onOpenChange: (next: boolean) => {
+      // A controlled owner may decline a close; only its committed open value grants it.
+      if (props.open !== undefined) props.onOpenChange?.(next);
+      else changeOpen(next, true);
+    },
+  };
+}
+
+const MenuFocusContext = createContext<ReturnType<typeof createMenuFocusRestore> | null>(null);
+
+type MenuItemAfterCloseProps<T extends ValidComponent = "div"> = PolymorphicProps<
+  T,
+  DropdownMenuPrimitive.DropdownMenuItemProps<T>
+> & {
+  /** Hand focus to an editor or overlay after the normal Menu.Portal surface unmounts. */
+  onSelectAfterClose?: (() => void) | undefined;
+};
+
+function MenuItemAfterClose<T extends ValidComponent = "div">(props: MenuItemAfterCloseProps<T>) {
+  const focus = useContext(MenuFocusContext);
+  const forwarded = merge(props, {
+    onSelectAfterClose: undefined,
+    onSelect: () => {
+      props.onSelect?.();
+      const action = props.onSelectAfterClose;
+      if (!action) return;
+      if (focus && props.closeOnSelect !== false) focus.selectAfterClose(action);
+      else action();
+    },
+  });
+  return <DropdownMenuPrimitive.Item<T> data-cuelume-tap="" {...forwarded} />;
 }
 
 function SelectRootAdapter<Option, OptGroup = never, T extends ValidComponent = "div">(
@@ -134,7 +247,7 @@ interface DropdownMenuApi {
   Sub: typeof DropdownMenuPrimitive.Sub;
   SubTrigger: typeof DropdownMenuPrimitive.SubTrigger;
   SubContent: typeof DropdownMenuPrimitive.SubContent;
-  Item: typeof DropdownMenuPrimitive.Item;
+  Item: typeof MenuItemAfterClose;
   CheckboxItem: typeof DropdownMenuPrimitive.CheckboxItem;
   RadioGroup: typeof DropdownMenuPrimitive.RadioGroup;
   RadioItem: typeof DropdownMenuPrimitive.RadioItem;
@@ -142,9 +255,14 @@ interface DropdownMenuApi {
 }
 
 export const DropdownMenu: DropdownMenuApi = {
-  Root: (props) => (
-    <DropdownMenuPrimitive.Root {...props} onOpenChange={focusRestoreHandler(() => props.onOpenChange)} />
-  ),
+  Root: (props) => {
+    const focus = createMenuFocusRestore(props);
+    return (
+      <MenuFocusContext value={focus}>
+        <DropdownMenuPrimitive.Root {...props} onOpenChange={focus.onOpenChange} />
+      </MenuFocusContext>
+    );
+  },
   Portal: (props) => <DropdownMenuPrimitive.Portal {...props} />,
   Trigger: (props) => {
     const press = createPressedPopupCue();
@@ -159,10 +277,28 @@ export const DropdownMenu: DropdownMenuApi = {
   },
   Content: (props) => {
     const motion = useMenuMotion();
+    const focus = useContext(MenuFocusContext);
+    let content: HTMLElement | undefined;
+    onCleanup(() => focus?.releaseContent(content));
     return (
       <DropdownMenuPrimitive.Content
         {...props}
-        ref={[props.ref, motion]}
+        ref={[
+          props.ref,
+          motion,
+          (element) => {
+            content = element;
+            focus?.setContent(element);
+          },
+        ]}
+        onOpenAutoFocus={(event) => {
+          props.onOpenAutoFocus?.(event);
+          if (focus && !focus.canOpenFocus()) event.preventDefault();
+        }}
+        onCloseAutoFocus={(event) => {
+          props.onCloseAutoFocus?.(event);
+          if (focus && !focus.canRestoreContent(content)) event.preventDefault();
+        }}
         class={withBaseClass("ui-action-menu", props.class)}
       />
     );
@@ -173,7 +309,7 @@ export const DropdownMenu: DropdownMenuApi = {
     const motion = useMenuMotion();
     return <DropdownMenuPrimitive.SubContent {...props} ref={[props.ref, motion]} />;
   },
-  Item: (props) => <DropdownMenuPrimitive.Item data-cuelume-tap="" {...props} />,
+  Item: MenuItemAfterClose,
   CheckboxItem: (props) => <DropdownMenuPrimitive.CheckboxItem data-cuelume-toggle="" {...props} />,
   RadioGroup: (props) => <DropdownMenuPrimitive.RadioGroup {...props} />,
   RadioItem: (props) => <DropdownMenuPrimitive.RadioItem data-cuelume-select="" {...props} />,
@@ -188,24 +324,47 @@ interface ContextMenuApi {
   Sub: typeof ContextMenuPrimitive.Sub;
   SubTrigger: typeof ContextMenuPrimitive.SubTrigger;
   SubContent: typeof ContextMenuPrimitive.SubContent;
-  Item: typeof ContextMenuPrimitive.Item;
+  Item: typeof MenuItemAfterClose;
   RadioGroup: typeof ContextMenuPrimitive.RadioGroup;
   RadioItem: typeof ContextMenuPrimitive.RadioItem;
   Separator: typeof ContextMenuPrimitive.Separator;
 }
 
 export const ContextMenu: ContextMenuApi = {
-  Root: (props) => (
-    <ContextMenuPrimitive.Root {...props} onOpenChange={focusRestoreHandler(() => props.onOpenChange)} />
-  ),
+  Root: (props) => {
+    const focus = createMenuFocusRestore(props);
+    return (
+      <MenuFocusContext value={focus}>
+        <ContextMenuPrimitive.Root {...props} onOpenChange={focus.onOpenChange} />
+      </MenuFocusContext>
+    );
+  },
   Portal: (props) => <ContextMenuPrimitive.Portal {...props} />,
   Trigger: (props) => <ContextMenuPrimitive.Trigger {...props} />,
   Content: (props) => {
     const motion = useMenuMotion();
+    const focus = useContext(MenuFocusContext);
+    let content: HTMLElement | undefined;
+    onCleanup(() => focus?.releaseContent(content));
     return (
       <ContextMenuPrimitive.Content
         {...props}
-        ref={[props.ref, motion]}
+        ref={[
+          props.ref,
+          motion,
+          (element) => {
+            content = element;
+            focus?.setContent(element);
+          },
+        ]}
+        onOpenAutoFocus={(event) => {
+          props.onOpenAutoFocus?.(event);
+          if (focus && !focus.canOpenFocus()) event.preventDefault();
+        }}
+        onCloseAutoFocus={(event) => {
+          props.onCloseAutoFocus?.(event);
+          if (focus && !focus.canRestoreContent(content)) event.preventDefault();
+        }}
         class={withBaseClass("ui-action-menu", props.class)}
       />
     );
@@ -216,7 +375,7 @@ export const ContextMenu: ContextMenuApi = {
     const motion = useMenuMotion();
     return <ContextMenuPrimitive.SubContent {...props} ref={[props.ref, motion]} />;
   },
-  Item: (props) => <ContextMenuPrimitive.Item data-cuelume-tap="" {...props} />,
+  Item: MenuItemAfterClose,
   RadioGroup: (props) => <ContextMenuPrimitive.RadioGroup {...props} />,
   RadioItem: (props) => <ContextMenuPrimitive.RadioItem data-cuelume-select="" {...props} />,
   Separator: (props) => <ContextMenuPrimitive.Separator {...props} />,
