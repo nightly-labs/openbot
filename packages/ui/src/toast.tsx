@@ -10,7 +10,7 @@ import {
 } from "solid-sonner";
 import { ErrorReference } from "./error-reference";
 import { CircleCheck, Info, LoaderCircle, OctagonX, TriangleAlert } from "./icons";
-import { currentText, useText } from "./text";
+import { currentText } from "./text";
 import { cx } from "./utils";
 
 export type ToasterProps = ComponentProps<typeof Sonner> & {
@@ -94,7 +94,8 @@ export const TOAST_DURATION = 6_000;
 const [hasVisibleToasts, setHasVisibleToasts] = createSignal(false);
 
 export function Toaster(props: ToasterProps): JSX.Element {
-  const { t } = useText();
+  // The desktop app mounts the Toaster outside its text provider, so it follows the active locale.
+  const { t } = currentText();
   const notifications = useSonner();
   const sonnerProps = omit(props, "onToastShown");
   createEffect(
