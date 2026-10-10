@@ -1,3 +1,4 @@
+import { errorReference, referenceCarrierName } from "@openbot/user-errors";
 import { type IpcMainInvokeEvent, ipcMain } from "electron";
 import { isTrustedRendererUrl } from "./trusted-renderer";
 
@@ -92,6 +93,36 @@ function observeCall<Result>(channel: string, run: () => Result): Result {
   return result;
 }
 
+const RUNTIME_ERRORS = [TypeError, SyntaxError, ReferenceError, RangeError];
+
+// Electron sends a rejected handler's error to the renderer as `<name>: <message>` and drops every
+// other field, so a status or a protocol code that names the failure would be lost. The error is
+// renamed after its reference here, where the typed error still exists; the message stays the same,
+// byte for byte, so source text matching and comparisons do not change.
+function withReference(error: Error): Error {
+  // A runtime error keeps its name, so the renderer still shows the fallback and not its text.
+  if (RUNTIME_ERRORS.some((type) => error instanceof type)) return error;
+  const reference = errorReference(error);
+  if (!reference) return error;
+  const carried = new Error(error.message, { cause: error });
+  carried.name = referenceCarrierName(reference);
+  return carried;
+}
+
+function carryReference<Result>(run: () => Result): Result | Promise<Awaited<Result>> {
+  let result: Result;
+  try {
+    result = run();
+  } catch (error) {
+    throw error instanceof Error ? withReference(error) : error;
+  }
+  if (!(result instanceof Promise)) return result;
+  // The rejection is replaced, not observed beside it, so the renderer sees only the renamed error.
+  return result.catch((error: unknown) => {
+    throw error instanceof Error ? withReference(error) : error;
+  });
+}
+
 export function handleTrusted<Handler extends () => unknown>(
   channel: string,
   handler: Handler & TakesNoArguments<Handler>,
@@ -109,11 +140,13 @@ export function handleTrusted(channel: string, ...registration: TrustedRegistrat
     if (!isTrustedRendererUrl(event.senderFrame?.url)) {
       throw new Error("Rejected IPC request from an untrusted renderer.");
     }
-    return observeCall(channel, () => {
-      if (registration.length === 1) return registration[0]();
-      const [decode, handler] = registration;
-      return handler(decode(payload));
-    });
+    return carryReference(() =>
+      observeCall(channel, () => {
+        if (registration.length === 1) return registration[0]();
+        const [decode, handler] = registration;
+        return handler(decode(payload));
+      }),
+    );
   });
 }
 
@@ -141,15 +174,17 @@ export function handleTrustedWithEvent(channel: string, ...registration: Trusted
     if (!isTrustedRendererUrl(event.senderFrame?.url)) {
       throw new Error("Rejected IPC request from an untrusted renderer.");
     }
-    return observeCall(channel, () => {
-      if (registration.length === 1) return registration[0](event);
-      if (registration.length === 2) {
-        const [decode, handler] = registration;
+    return carryReference(() =>
+      observeCall(channel, () => {
+        if (registration.length === 1) return registration[0](event);
+        if (registration.length === 2) {
+          const [decode, handler] = registration;
+          return handler(event, decode(payload));
+        }
+        const [authorize, decode, handler] = registration;
+        authorize(event);
         return handler(event, decode(payload));
-      }
-      const [authorize, decode, handler] = registration;
-      authorize(event);
-      return handler(event, decode(payload));
-    });
+      }),
+    );
   });
 }

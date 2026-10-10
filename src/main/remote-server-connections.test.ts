@@ -22,7 +22,11 @@ describe("RemoteServerConnections", () => {
       tracker.setState("host", state);
       expect(tracker.statusFor("host")).toMatchObject({
         state,
-        issue: { message: "The host already has an active remote session.", retryable: true },
+        issue: {
+          message: "The host is busy with another connection. Try again in a moment.",
+          reference: "signal/host_busy",
+          retryable: true,
+        },
       });
     }
     tracker.markConnected("host");

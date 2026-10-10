@@ -28,6 +28,7 @@ import {
   type RemoteTicketClaims,
 } from "@openbot/contracts/signal-protocol/ticket";
 import { sourceText } from "@openbot/i18n/source";
+import { referenceFrom, safeReference } from "@openbot/user-errors";
 import { Deferred, Effect, type Layer, Result, Schema, Semaphore } from "effect";
 import { createLocalJWKSet, jwtVerify } from "jose";
 import { z } from "zod";
@@ -1617,14 +1618,21 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     if (error instanceof NetworkBlockedError) {
       return this.#setState({ status: "error", issue: { code: "auth_api_unavailable", message: error.message } });
     }
-    const apiError = error instanceof AuthApiError ? error : null;
-    const unavailable = !apiError || apiError.status >= 500;
+    if (error instanceof AuthApiError && error.status < 500) {
+      return this.#setState({ status: "error", issue: authApiIssue(error) });
+    }
+    // The renderer shows the retry screen for `auth_api_unavailable`. The message and the reference
+    // say which failure it was.
+    const unavailable = serviceUnavailableText(error);
     return this.#setState({
       status: "error",
       issue: {
-        code: unavailable ? "auth_api_unavailable" : apiError.code,
-        message: unavailable ? sourceText("error.auth.serviceUnavailable") : apiError.message,
-        ...(apiError?.retryAfterSeconds === undefined ? {} : { retryAfterSeconds: apiError.retryAfterSeconds }),
+        code: "auth_api_unavailable",
+        message: unavailable.message,
+        ...(unavailable.reference === null ? {} : { reference: unavailable.reference }),
+        ...(error instanceof AuthApiError && error.retryAfterSeconds !== undefined
+          ? { retryAfterSeconds: error.retryAfterSeconds }
+          : {}),
       },
     });
   }
@@ -1650,9 +1658,12 @@ class AuthApiError extends Schema.TaggedError<AuthApiError>()("AuthApiError", {
   code: Schema.String,
   message: Schema.String,
   retryAfterSeconds: Schema.optional(Schema.Number),
+  // The request reference that the account service logs, such as `auth/<16 hex>`. Older services
+  // send none.
+  reference: Schema.NullOr(Schema.String),
 }) {
-  constructor(status: number, code: string, message: string, retryAfterSeconds?: number) {
-    super({ status, code, message, retryAfterSeconds });
+  constructor(status: number, code: string, message: string, retryAfterSeconds?: number, reference?: string | null) {
+    super({ status, code, message, retryAfterSeconds, reference: reference ?? null });
   }
 
   static readonly fromResponseEffect = Effect.fn("CentralAuth.decodeError")(function* (response: Response) {
@@ -1664,7 +1675,13 @@ class AuthApiError extends Schema.TaggedError<AuthApiError>()("AuthApiError", {
       isString(value.error.code) &&
       isString(value.error.message)
     ) {
-      return new AuthApiError(response.status, value.error.code, value.error.message, retryAfterSeconds);
+      return new AuthApiError(
+        response.status,
+        value.error.code,
+        value.error.message,
+        retryAfterSeconds,
+        safeReference(value.error.reference),
+      );
     }
     return new AuthApiError(
       response.status,
@@ -1729,14 +1746,43 @@ function isInterceptedTlsError(error: unknown): boolean {
 
 function centralAuthIssue(error: unknown, fallbackCode: string, fallbackMessage: string): CentralAuthIssue {
   if (error instanceof NetworkBlockedError) return { code: "network_blocked", message: error.message };
+  if (error instanceof AuthApiError) return authApiIssue(error);
+  return { code: fallbackCode, message: errorMessage(error, fallbackMessage) };
+}
+
+/** The account service's answer. Its request reference wins, because its log has the same one. */
+function authApiIssue(error: AuthApiError): CentralAuthIssue {
+  const reference = error.reference ?? referenceFrom("auth", "http", error.status, error.code);
+  return {
+    code: error.code,
+    message: error.message,
+    ...(error.retryAfterSeconds === undefined ? {} : { retryAfterSeconds: error.retryAfterSeconds }),
+    ...(reference === null ? {} : { reference }),
+  };
+}
+
+/**
+ * Why the account service did not answer: no network, no answer in time, or a 5xx. The errno of a
+ * network failure is a fixed token, such as `ECONNREFUSED`, so it can go in the reference.
+ */
+function serviceUnavailableText(error: unknown): { message: string; reference: string | null } {
   if (error instanceof AuthApiError) {
     return {
-      code: error.code,
-      message: error.message,
-      ...(error.retryAfterSeconds === undefined ? {} : { retryAfterSeconds: error.retryAfterSeconds }),
+      message: sourceText("error.auth.serviceStatus", { status: error.status }),
+      reference: error.reference ?? referenceFrom("auth", "http", error.status, error.code),
     };
   }
-  return { code: fallbackCode, message: errorMessage(error, fallbackMessage) };
+  if (error instanceof DOMException && error.name === "TimeoutError") {
+    return { message: sourceText("error.auth.serviceTimeout"), reference: "auth/timeout" };
+  }
+  if (error instanceof TypeError) {
+    const cause = error.cause;
+    const errno =
+      isDynamicRecord(cause) && isString(cause.code) && /^E[A-Z0-9_]+$/u.test(cause.code) ? cause.code : null;
+    return { message: sourceText("error.auth.serviceUnreachable"), reference: referenceFrom("auth", "network", errno) };
+  }
+  // The startup retry window ended, or the answer could not be read.
+  return { message: sourceText("error.auth.serviceUnavailable"), reference: "auth/unavailable" };
 }
 
 function emailCodeRequestIssue(error: unknown): CentralAuthIssue {

@@ -37,7 +37,8 @@ export interface ComposerActionsDeps {
   submitting: () => boolean;
   setSubmitting: (submitting: boolean) => void;
   voicePhase: () => string;
-  setComposerError: (error: string | null, targetOverride?: ConversationTarget) => void;
+  /** `cause` is the failure behind `error`. The banner shows its code. */
+  setComposerError: (error: string | null, targetOverride?: ConversationTarget, cause?: unknown) => void;
   setComposerFocusRequest: (update: (current: number) => number) => void;
   setShowComposerActions: (show: boolean) => void;
   orderedQueuedDeliveries: () => QueueDelivery[];
@@ -244,10 +245,14 @@ export function createComposerActions(deps: ComposerActionsDeps) {
         setEditingDraft(original);
       }
     } catch (error) {
-      deps.setComposerError(errorMessage(error, t("composer.error.holdQueued")), {
-        agentId,
-        serverId,
-      });
+      deps.setComposerError(
+        errorMessage(error, t("composer.error.holdQueued")),
+        {
+          agentId,
+          serverId,
+        },
+        error,
+      );
       return;
     } finally {
       deps.setSubmitting(false);
@@ -280,7 +285,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
         );
       } catch (error) {
         if (!isQueueEditRejected(error)) {
-          deps.setComposerError(errorMessage(error, t("composer.error.cancelEdit")), target);
+          deps.setComposerError(errorMessage(error, t("composer.error.cancelEdit")), target, error);
           return false;
         }
       } finally {
@@ -385,10 +390,14 @@ export function createComposerActions(deps: ComposerActionsDeps) {
         }
       } catch (error) {
         deps.setSubmitting(false);
-        deps.setComposerError(errorMessage(error, t("composer.error.holdQueued")), {
-          agentId,
-          serverId,
-        });
+        deps.setComposerError(
+          errorMessage(error, t("composer.error.holdQueued")),
+          {
+            agentId,
+            serverId,
+          },
+          error,
+        );
         return false;
       }
       const pendingSave = {
@@ -415,10 +424,10 @@ export function createComposerActions(deps: ComposerActionsDeps) {
             pendingSave,
           }),
         );
-      } catch {
+      } catch (error) {
         deps.setEditingPendingSave(null);
         deps.setSubmitting(false);
-        deps.setComposerError(t("composer.error.saveEditTryAgain"), { agentId, serverId });
+        deps.setComposerError(t("composer.error.saveEditTryAgain"), { agentId, serverId }, error);
         return false;
       }
     }
@@ -438,10 +447,14 @@ export function createComposerActions(deps: ComposerActionsDeps) {
         });
       }
     } catch (error) {
-      deps.setComposerError(errorMessage(error, t("composer.error.updateQueued")), {
-        agentId,
-        serverId,
-      });
+      deps.setComposerError(
+        errorMessage(error, t("composer.error.updateQueued")),
+        {
+          agentId,
+          serverId,
+        },
+        error,
+      );
     } finally {
       deps.setSubmitting(false);
     }

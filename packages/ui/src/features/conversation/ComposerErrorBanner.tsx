@@ -15,6 +15,8 @@ import { ComposerNotice } from "./ComposerNotice";
  */
 export function ComposerErrorBanner(props: {
   message: string;
+  /** The code of the failure behind the message. */
+  reference?: string | null | undefined;
   onShown?: () => void;
   conversationKey?: string | null;
   onDismiss: () => void;
@@ -28,6 +30,7 @@ export function ComposerErrorBanner(props: {
     <ComposerNotice
       tone="danger"
       body={props.message}
+      reference={props.reference}
       conversationKey={props.conversationKey}
       action={props.action}
       onDismiss={() => props.onDismiss()}

@@ -33,6 +33,7 @@ import {
   createRemoteReadRefresh,
   createWorkspacePreferences,
   mergeRemoteUnreadIds,
+  type RemoteConnectionFailure,
   type RemoteRecoveryStatus,
   RemoteTeamDirectoryClient,
   type RemoteTeamHost,
@@ -294,6 +295,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             state: previous?.state ?? "unknown",
             initialConnectionPending: previous?.initialConnectionPending ?? true,
             connectionMessage: previous?.connectionMessage ?? null,
+            connectionFailure: previous?.connectionFailure,
             recoveryStatus: previous?.recoveryStatus,
             address: null,
             accent: serverAccent(host.hostId),
@@ -431,9 +433,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         try {
           const saved = reconcileChannelPins(preferenceStore, serverId, channels);
           setPreferences((current) => ({ ...current, [serverId]: saved }));
-        } catch {
+        } catch (error) {
           showFailureAlert(
-            undefined,
+            error,
             "settings",
             currentText().t("mobile.workspace.alert.preferencesTitle"),
             currentText().t("mobile.workspace.alert.preferencesBody"),
@@ -459,9 +461,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           const next = replaceEqualDeep(current[serverId], saved);
           return next === current[serverId] ? current : { ...current, [serverId]: next };
         });
-      } catch {
+      } catch (error) {
         showFailureAlert(
-          undefined,
+          error,
           "settings",
           currentText().t("mobile.workspace.alert.preferencesTitle"),
           currentText().t("mobile.workspace.alert.preferencesBody"),
@@ -629,9 +631,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   /** The last failed attempt of each server that asked for a wake. */
   const wakeAttempts = useRef(new Map<string, number>());
   const handleConnectionStatus = useCallback(
-    (hostId: string, status: RemoteRecoveryStatus, failure: string | null) => {
+    (hostId: string, status: RemoteRecoveryStatus, failure: RemoteConnectionFailure | null) => {
       setServers((current) =>
-        current.map((server) => (server.id === hostId ? applyServerRecovery(server, status, failure) : server)),
+        current.map((server) =>
+          server.id === hostId ? applyServerRecovery(server, status, failure?.message ?? null, failure) : server,
+        ),
       );
       // The status repeats each second while it waits, so each failed attempt asks once.
       if (status.phase === "online") wakeAttempts.current.delete(hostId);
@@ -975,10 +979,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         );
         return;
       }
-      void writeAgentRead(agentId, visibleMessageId, serverId ?? undefined).catch(() => {
+      void writeAgentRead(agentId, visibleMessageId, serverId ?? undefined).catch((error: unknown) => {
         if (visibleMessageId === null)
           showFailureAlert(
-            undefined,
+            error,
             "settings",
             currentText().t("mobile.workspace.alert.markUnreadTitle"),
             currentText().t("mobile.workspace.alert.markUnreadBody"),
@@ -1024,9 +1028,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         preferenceStore.write(serverId, next);
         setPreferences((current) => ({ ...current, [serverId]: next }));
         return next;
-      } catch {
+      } catch (error) {
         showFailureAlert(
-          undefined,
+          error,
           "settings",
           currentText().t("mobile.workspace.alert.preferencesTitle"),
           currentText().t("mobile.workspace.alert.preferencesBody"),
@@ -1174,9 +1178,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           });
           setSavedServerOrder({ key: orderKey, ids: serverIds });
           return true;
-        } catch {
+        } catch (error) {
           showFailureAlert(
-            undefined,
+            error,
             "settings",
             currentText().t("mobile.workspace.alert.serverOrderTitle"),
             currentText().t("mobile.workspace.alert.serverOrderBody"),

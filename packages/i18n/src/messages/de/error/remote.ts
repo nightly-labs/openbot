@@ -168,6 +168,32 @@ export const messages = {
   "error.remote.signalFrameUnreadable": "Signal hat einen Frame gesendet, den diese Gegenstelle nicht lesen kann.",
   "error.remote.webRtcCommandFailed": "Der WebRTC-Befehl ist fehlgeschlagen.",
   "error.remote.dataChannelFailed": "Der Kanal {kind} ist fehlgeschlagen.",
+  "error.remote.hostBusy": "Der Host ist mit einer anderen Verbindung beschäftigt. Versuche es gleich noch einmal.",
+  "error.remote.signalPermissionDenied":
+    "Dein Konto hat keinen Zugriff auf diesen Host. Bitte den Eigentümer um Zugriff.",
+  "error.remote.signalRateLimited": "Zu viele Verbindungsversuche. OpenBot versucht es in {seconds} Sekunden erneut.",
+  "error.remote.signalProtocolError":
+    "Signal und diese App verwenden kein gemeinsames Verbindungsprotokoll. Aktualisiere OpenBot und versuche es erneut.",
+  "error.remote.signalRefused": "Signal hat die Verbindung abgelehnt.",
+  "error.remote.signalClosed": "Die Verbindung zu Signal wurde geschlossen, bevor der Host geantwortet hat.",
+  "error.remote.relayUnavailable":
+    "Signal hat für diese Verbindung keine Relay-Server gesendet. Versuche es später erneut.",
+  "error.remote.iceFailed":
+    "Es konnte keine direkte Verbindung zum Host hergestellt werden. Eine Firewall, ein VPN oder ein Proxy kann sie blockieren.",
+  "error.remote.iceDisconnected": "Die direkte Verbindung zum Host wurde unterbrochen.",
+  "error.remote.directoryUnreachable": "OpenBot konnte den OpenBot-Dienst nicht erreichen. Prüfe deine Verbindung.",
+  "error.remote.directoryTimeout": "Der OpenBot-Dienst hat nicht rechtzeitig geantwortet. Versuche es erneut.",
+  "error.remote.inviteAlreadyUsed": "Diese Einladung wurde bereits verwendet. Bitte um eine neue Einladung.",
+  "error.remote.inviteNotFound": "Diese Einladung existiert nicht oder ist abgelaufen. Bitte um eine neue Einladung.",
+  "error.remote.memberLimitReached":
+    "Dieser Host hat sein Mitgliederlimit erreicht. Bitte den Eigentümer, Platz zu schaffen.",
+  "error.remote.hostNotRegistered": "Dieser Host ist nicht mehr beim OpenBot-Dienst registriert.",
+  "error.remote.membershipEnded":
+    "Du bist kein Mitglied dieses Hosts mehr. Bitte den Eigentümer um eine neue Einladung.",
+  "error.remote.accountSessionInactive": "Deine Anmeldung ist nicht mehr aktiv. Melde dich erneut an.",
+  "error.remote.hostOtherAccount": "Dieser Host gehört zu einem anderen Konto.",
+  "error.remote.remoteNotConfigured": "Remote-Verbindungen sind für diesen OpenBot-Dienst nicht eingerichtet.",
+  "error.remote.hostRefused": "Der Host hat die Anfrage abgelehnt ({status}).",
   "error.remote.formUnavailable": "Dieses Formular ist nicht mehr verfügbar.",
   "error.remote.channelsUnsupported": "Aktualisiere diesen Desktop-Server, um Kanäle zu verwenden.",
   "error.remote.channelDeleteUnsupported": "Aktualisiere diesen Desktop-Server, um Kanäle zu löschen.",

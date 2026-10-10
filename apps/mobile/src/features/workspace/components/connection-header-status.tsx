@@ -7,6 +7,7 @@ import { AnimatedCounter } from "@/features/workspace/components/connection-coun
 import { ConnectionStatusReveal } from "@/features/workspace/components/connection-status-reveal";
 import { recoveryAttempt, recoveryCountdown, serverStatusLabel } from "@/features/workspace/model/server-status";
 import type { MobileServer } from "@/features/workspace/model/workspace-types";
+import { ErrorReference } from "@/shared/components/error-reference";
 import { useText } from "@/shared/lib/text";
 
 function StatusText({ server }: { server: MobileServer }) {
@@ -18,6 +19,8 @@ function StatusText({ server }: { server: MobileServer }) {
     ? t("mobile.workspace.status.attempt", { attempt: recoveryAttempt(recovery), limit: REMOTE_RETRY_LIMIT })
     : server.connectionMessage && sourceText(server.connectionMessage);
   const remainingSeconds = reconnecting ? recoveryCountdown(recovery) : null;
+  const failure = server.connectionFailure;
+  const reference = failure?.reference ?? null;
 
   return (
     <View
@@ -28,6 +31,8 @@ function StatusText({ server }: { server: MobileServer }) {
         remainingSeconds !== null && remainingSeconds > 0
           ? t("mobile.workspace.status.retryIn", { seconds: remainingSeconds })
           : null,
+        reconnecting && failure ? sourceText(failure.message) : null,
+        reference ? t("error.reference.label", { code: reference }) : null,
       ]
         .filter(Boolean)
         .join(". ")}
@@ -46,6 +51,9 @@ function StatusText({ server }: { server: MobileServer }) {
               /{REMOTE_RETRY_LIMIT}
             </Typography.Paragraph>
           </>
+        ) : reference ? (
+          // The slot has room for one short line, and the message is cut there. The code is short.
+          <ErrorReference reference={reference} numberOfLines={1} />
         ) : detail ? (
           <Typography.Paragraph
             type="body-xs"

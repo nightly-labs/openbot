@@ -30,6 +30,7 @@ import {
 import type { McpConnectFlow } from "@openbot/ui/features/settings/mcp-connect-auth";
 import type { PluginUninstallPlan } from "@openbot/ui/features/settings/PluginUninstallDialog";
 import { useText } from "@openbot/ui/text";
+import { errorReference } from "@openbot/user-errors";
 import { createEffect, createMemo, createSignal, createStore, onCleanup, untrack } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { writeClipboardText } from "../../clipboard";
@@ -99,7 +100,13 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
   const calls = () => props.calls ?? desktopMarketplaceCalls();
   const skillCalls = () => calls().agentSkills(props.hostServerId);
 
-  const [error, setError] = createSignal<string | null>(null);
+  const [error, setErrorText] = createSignal<string | null>(null);
+  const [errorCode, setErrorCode] = createSignal<string | null>(null);
+  /** Shows `message`, with the code of `cause` when a failure gave one. */
+  const setError = (message: string | null, cause?: unknown) => {
+    setErrorText(message);
+    setErrorCode(cause === undefined ? null : errorReference(cause));
+  };
   const [notice, setNotice] = createSignal("");
   /** The actions in flight: `agent:<listing>`, `skill:<skill>` and `app:<app id>`. */
   const [busy, setBusy] = createStore<Record<string, true>>({});
@@ -114,7 +121,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     try {
       return await work();
     } catch (cause) {
-      setError(marketplaceErrorMessage(cause));
+      setError(marketplaceErrorMessage(cause), cause);
       return undefined;
     }
   }
@@ -225,7 +232,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
       setSkills((draft) => {
         draft.read[agentId] = "failed";
       });
-      setError(marketplaceErrorMessage(cause));
+      setError(marketplaceErrorMessage(cause), cause);
     }
   }
 
@@ -269,6 +276,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     setError(null);
     const failed: string[] = [];
     let reason = "";
+    let lastCause: unknown;
     for (const agentId of agentIds) {
       const action = on ? (installedSkill(agentId, skill.id) ? "update" : "install") : "uninstall";
       const analytics = desktopAnalytics.scope();
@@ -284,6 +292,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
       } catch (cause) {
         failed.push(agentName(agentId));
         reason = marketplaceErrorMessage(cause);
+        lastCause = cause;
         analytics.track("marketplace_action", {
           entity: "skill",
           action,
@@ -303,9 +312,12 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
           count: changed,
         }),
       );
-    if (failed.length === 1 && agentIds.length === 1) setError(reason);
+    if (failed.length === 1 && agentIds.length === 1) setError(reason, lastCause);
     else if (failed.length > 0)
-      setError(t("marketplace.error.skillPartial", { name: skill.name, agents: format.list(failed), reason }));
+      setError(
+        t("marketplace.error.skillPartial", { name: skill.name, agents: format.list(failed), reason }),
+        lastCause,
+      );
   }
 
   async function loadSkill(id: string) {
@@ -610,6 +622,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     setError(null);
     const analytics = desktopAnalytics.scope();
     const failures: string[] = [];
+    let lastCause: unknown;
     for (const app of plugin.apps) {
       const config = heldApp(app);
       if (!config) continue;
@@ -617,6 +630,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
         setServers(await calls().mcp.removeMcpServer({ mcpServerId: config.id }, serverId));
       } catch (cause) {
         failures.push(`${app.name}: ${marketplaceErrorMessage(cause)}`);
+        lastCause = cause;
       }
     }
     if (agentId) {
@@ -626,6 +640,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
           await skillCalls().uninstall({ agentId, skillId: skill.id });
         } catch (cause) {
           failures.push(`${skill.slug}: ${marketplaceErrorMessage(cause)}`);
+          lastCause = cause;
         }
       }
     }
@@ -643,7 +658,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     if (agentId && plugin.skills.length > 0) await readInstalled(agentId);
     mark(key, false);
     if (failures.length > 0)
-      setError(t("marketplace.error.uninstallPartial", { name: plugin.name, failures: failures.join(" ") }));
+      setError(t("marketplace.error.uninstallPartial", { name: plugin.name, failures: failures.join(" ") }), lastCause);
     else setNotice(t("marketplace.notice.appDisconnected", { name: plugin.name }));
   }
 
@@ -666,14 +681,14 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     if (!safe) return;
     void calls()
       .openUrl(safe)
-      .catch(() => setError(t("marketplace.error.openLink")));
+      .catch((cause) => setError(t("marketplace.error.openLink"), cause));
   }
 
   /* The address is built from the slug rather than read from `shareUrl`, so what is copied is what the route answers. */
   function copyLink(slug: string) {
     void Promise.resolve()
       .then(() => writeClipboardText(createPluginShareUrl(slug)))
-      .catch(() => setError(t("marketplace.error.copyLink")));
+      .catch((cause) => setError(t("marketplace.error.copyLink"), cause));
   }
 
   /* The connect step and the confirmation are siblings of the window. Closing the window stops them. */
@@ -758,6 +773,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     },
 
     error,
+    errorReference: errorCode,
     clearError: () => setError(null),
     notice,
   };

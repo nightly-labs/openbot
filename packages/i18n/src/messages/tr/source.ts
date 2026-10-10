@@ -13,6 +13,7 @@ import { messages as errorMarketplace } from "./error/marketplace";
 import { messages as errorMcp } from "./error/mcp";
 import { messages as errorMessaging } from "./error/messaging";
 import { messages as errorProvider } from "./error/provider";
+import { messages as errorReference } from "./error/reference";
 import { messages as errorRemote } from "./error/remote";
 import { messages as errorSite } from "./error/site";
 import { messages as errorSkill } from "./error/skill";
@@ -31,6 +32,7 @@ import { messages as statusUpdate } from "./status/update";
 /** Text the main process, a host or the team client sends as English and a screen translates. */
 export const source = {
   ...errorKind,
+  ...errorReference,
   ...errorApp,
   ...errorTeam,
   ...errorAuth,

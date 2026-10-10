@@ -322,9 +322,8 @@ const Servers = createSimpleContext({
         pendingCompatibilityRetryServerId = null;
         const text = currentText();
         actionToast.error(text.t("server.connection.failedTitle"), {
-          ...{
-            description: text.errorMessage(error, text.t("server.connection.failedDescription")),
-          },
+          error,
+          fallback: text.t("server.connection.failedDescription"),
           report: { operation: "team", source: "action", cause_code: classifyFailure(error) },
         });
       }
@@ -341,9 +340,8 @@ const Servers = createSimpleContext({
       } catch (error) {
         const text = currentText();
         actionToast.error(text.t("server.notifications.changeFailedTitle"), {
-          ...{
-            description: text.errorMessage(error, text.t("server.notifications.changeFailedDescription")),
-          },
+          error,
+          fallback: text.t("server.notifications.changeFailedDescription"),
           report: { operation: "team", source: "action", cause_code: classifyFailure(error) },
         });
       }
@@ -355,9 +353,8 @@ const Servers = createSimpleContext({
       } catch (error) {
         const text = currentText();
         actionToast.error(text.t("server.notifications.changeFailedTitle"), {
-          ...{
-            description: text.errorMessage(error, text.t("server.notifications.changeFailedDescription")),
-          },
+          error,
+          fallback: text.t("server.notifications.changeFailedDescription"),
           report: { operation: "team", source: "action", cause_code: classifyFailure(error) },
         });
       }

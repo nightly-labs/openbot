@@ -1,5 +1,6 @@
 import { env, waitUntil } from "cloudflare:workers";
 import { HOSTING_DEVELOPER_KEY_HEADER } from "@openbot/contracts/hosted-servers";
+import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
 import { adminTokenMatches } from "./admin-token";
 import { AgentMarketplace, AgentMarketplaceError } from "./agent-marketplace";
@@ -360,7 +361,19 @@ export function authErrorResponse(error: unknown): Response {
     }
     return response;
   }
-  return apiError(500, "internal_error", "The account service could not complete the request.");
+  // The reference is random, so it holds no user data. The log line shows the same value, so a code
+  // that a user copies identifies this log line. The log shows only the error type, not its message.
+  const reference = `auth/${crypto.randomUUID().replaceAll("-", "").slice(0, 16)}`;
+  console.error("Account service request failed:", reference, errorType(error));
+  return json(
+    { error: { code: "internal_error", message: "The account service could not complete the request.", reference } },
+    500,
+  );
+}
+
+function errorType(error: unknown): string {
+  if (isDynamicRecord(error) && isString(error._tag)) return error._tag;
+  return error instanceof Error ? error.name : typeof error;
 }
 
 /** Starts background work in the active Worker invocation. */

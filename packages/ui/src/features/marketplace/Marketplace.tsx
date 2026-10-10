@@ -1,4 +1,4 @@
-import { Button, ChevronRight, Dialog, IconButton, X } from "@openbot/ui";
+import { Button, ChevronRight, Dialog, ErrorReference, IconButton, X } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
 import { useText } from "@openbot/ui/text";
 import { createEffect, For, Match, onCleanup, Show, Switch } from "solid-js";
@@ -177,7 +177,10 @@ function MarketplaceWindow(props: MarketplaceProps) {
         <Show when={props.model.error()}>
           {(message) => (
             <div class="skills-marketplace-error">
-              <span>{message()}</span>
+              <span>
+                {message()}
+                <ErrorReference reference={props.model.errorReference?.()} />
+              </span>
               <IconButton label={t("common.close")} variant="ghost" size="icon-sm" onClick={props.model.clearError}>
                 <X />
               </IconButton>

@@ -28,6 +28,7 @@ import {
   type DynamicIslandNotchSize,
   type DynamicIslandStateChangeReason,
   type DynamicIslandViewState,
+  ErrorReference,
   ExternalLink,
   IconButton,
   Input,
@@ -39,6 +40,7 @@ import {
 } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { prefersReducedMotion } from "@openbot/ui/utils";
+import type { UserErrorDetails } from "@openbot/user-errors";
 import { Dynamic, type JSX } from "@solidjs/web";
 import {
   createEffect,
@@ -88,7 +90,7 @@ export interface OpenBotDynamicIslandProps {
   /** Resolves `false` when the action failed, so a reply field keeps its draft. */
   onAction: (action: DynamicIslandAction) => Promise<boolean> | undefined;
   /** Shown next to the actions of an attention panel when the last action failed. */
-  actionError?: string | undefined;
+  actionError?: UserErrorDetails | undefined;
   onHaptic?: () => void;
   /** Lets the user reply to, answer and stop an agent on the island, so the main window stays where it is. */
   inlineReply?: boolean | undefined;
@@ -967,7 +969,7 @@ function ExpandedContent(props: {
   displayMode?: "notch" | "island";
   inlineReply?: boolean | undefined;
   onAction: (action: DynamicIslandAction) => Promise<boolean> | undefined;
-  actionError?: string | undefined;
+  actionError?: UserErrorDetails | undefined;
   onHaptic?: () => void;
   onClose: () => void;
 }): JSX.Element {
@@ -1137,7 +1139,7 @@ function ExpandedContent(props: {
 function FailureContent(props: {
   item: DynamicIslandFailureItem;
   serverId: string;
-  actionError?: string | undefined;
+  actionError?: UserErrorDetails | undefined;
   onAction: (action: DynamicIslandAction) => Promise<boolean> | undefined;
 }): JSX.Element {
   const { t } = useText();
@@ -1186,7 +1188,7 @@ function FailureContent(props: {
 function TakeoverContent(props: {
   item: DynamicIslandTakeoverItem;
   serverId: string;
-  actionError?: string | undefined;
+  actionError?: UserErrorDetails | undefined;
   onAction: (action: DynamicIslandAction) => Promise<boolean> | undefined;
 }): JSX.Element {
   const { t } = useText();
@@ -1221,7 +1223,7 @@ function NotificationContent(props: {
   name: string;
   status: string;
   description: string;
-  actionError?: string | undefined;
+  actionError?: UserErrorDetails | undefined;
   action: JSX.Element;
 }): JSX.Element {
   return (
@@ -1242,7 +1244,7 @@ export function ApprovalContent(props: {
   serverId: string;
   remainingCount: number;
   allowDesktopReview?: boolean;
-  actionError?: string | undefined;
+  actionError?: UserErrorDetails | undefined;
   onAction: (action: DynamicIslandAction) => Promise<boolean> | undefined;
 }): JSX.Element {
   const { t, sourceText } = useText();
@@ -1307,7 +1309,7 @@ function QuestionContent(props: {
   serverId: string;
   remainingCount: number;
   inlineReply?: boolean | undefined;
-  actionError?: string | undefined;
+  actionError?: UserErrorDetails | undefined;
   onAction: (action: DynamicIslandAction) => Promise<boolean> | undefined;
   onHaptic?: () => void;
   onClose: () => void;
@@ -1571,12 +1573,13 @@ function IslandReplyField(props: {
   );
 }
 
-function IslandActionError(props: { message: string | undefined }): JSX.Element {
+function IslandActionError(props: { message: UserErrorDetails | undefined }): JSX.Element {
   return (
     <Show when={props.message}>
-      {(message) => (
+      {(failure) => (
         <p class="dynamic-island-surface-action-error" role="alert">
-          {message()}
+          {failure().message}
+          <ErrorReference reference={failure().reference} />
         </p>
       )}
     </Show>

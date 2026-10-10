@@ -84,10 +84,13 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
   );
 
   const remote = () => activeServer()?.kind === "remote";
-  // Signal and the host send English source text. Show it in the reader's language.
-  const issueDetail = () => {
-    const message = activeServer()?.issue?.message;
-    return message ? sourceText(message) : null;
+  // The transport failure comes first: a workspace load fails when the transport fails. Signal and
+  // the host send English source text, so show the issue in the reader's language. The scope failure
+  // is already translated.
+  const connectionFailure = () => {
+    const issue = activeServer()?.issue;
+    if (issue) return { message: sourceText(issue.message), reference: issue.reference ?? null };
+    return scope.connection.failed ? scope.connection.failure : null;
   };
   const retry = () => {
     const server = activeServer();
@@ -143,7 +146,8 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
               name={activeServer()?.name ?? ""}
               initial={!scope.connection.hasContent}
               issue={activeServer()?.hostedIssue ?? null}
-              detail={issueDetail()}
+              detail={connectionFailure()?.message ?? null}
+              reference={connectionFailure()?.reference ?? null}
               phase={
                 activeServer()?.hostedSleep ??
                 (serversLoadFailed()

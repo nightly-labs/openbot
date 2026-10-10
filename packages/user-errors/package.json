@@ -4,12 +4,14 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./reference": "./src/reference.ts"
   },
   "scripts": {
     "typecheck": "bun ../../node_modules/typescript/bin/tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@openbot/contracts": "workspace:*",
     "@openbot/i18n": "workspace:*",
     "@openbot/logging": "workspace:*"
   },

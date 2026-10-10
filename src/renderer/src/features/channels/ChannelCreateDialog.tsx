@@ -5,6 +5,7 @@ import {
   Button,
   Checkbox,
   Dialog,
+  ErrorReference,
   Field,
   IconButton,
   Input,
@@ -84,7 +85,10 @@ export function ChannelCreateDialog() {
               <Show when={channels.state.error}>
                 {(message) => (
                   <Alert tone="danger" role="alert">
-                    <AlertDescription>{sourceText(message())}</AlertDescription>
+                    <AlertDescription>
+                      {sourceText(message())}
+                      <ErrorReference reference={channels.state.errorReference} />
+                    </AlertDescription>
                   </Alert>
                 )}
               </Show>

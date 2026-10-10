@@ -4,6 +4,7 @@ import type {
   McpServerConfig,
   SkillCategory,
 } from "@openbot/contracts/ipc";
+import { errorReference } from "@openbot/user-errors";
 import { createStore, onCleanup, onSettled, untrack } from "solid-js";
 import type { MarketplaceListing } from "./marketplace-listing";
 import type { MarketplaceApp, MarketplaceModel } from "./marketplace-model";
@@ -130,9 +131,14 @@ export function appGroups(
  * closes before the answer drops it.
  */
 export function createDetail<T>(load: () => Promise<T | undefined>) {
-  const [state, setState] = createStore<{ value: T | undefined; status: "loading" | "loaded" | "failed" }>({
+  const [state, setState] = createStore<{
+    value: T | undefined;
+    status: "loading" | "loaded" | "failed";
+    reference: string | null;
+  }>({
     value: undefined,
     status: "loading",
+    reference: null,
   });
   let alive = true;
   onCleanup(() => {
@@ -141,6 +147,7 @@ export function createDetail<T>(load: () => Promise<T | undefined>) {
   const run = () => {
     setState((draft) => {
       draft.status = "loading";
+      draft.reference = null;
     });
     // A page belongs to one listing, so a later change of the props does not load again.
     void untrack(load).then(
@@ -151,15 +158,16 @@ export function createDetail<T>(load: () => Promise<T | undefined>) {
           draft.status = value ? "loaded" : "failed";
         });
       },
-      () => {
+      (error) => {
         if (alive)
           setState((draft) => {
             draft.status = "failed";
+            draft.reference = errorReference(error);
           });
       },
     );
   };
   // `load` can write the owner's state, such as an error, and a component body refuses writes.
   onSettled(() => run());
-  return { value: () => state.value, status: () => state.status, retry: run };
+  return { value: () => state.value, status: () => state.status, reference: () => state.reference, retry: run };
 }

@@ -5,6 +5,10 @@ const native = vi.hoisted(() => ({ files: new Map<string, string>(), alert: vi.f
 vi.mock("react-native", () => ({ Platform: { OS: "ios" }, Alert: { alert: native.alert } }));
 vi.mock("expo-application", () => ({ nativeApplicationVersion: "1.2.0" }));
 vi.mock("expo-crypto", () => ({ randomUUID: () => crypto.randomUUID() }));
+vi.mock("@/shared/lib/text", async () => {
+  const { textFor } = await import("../../shared/lib/text-value");
+  return { currentText: () => textFor("en") };
+});
 vi.mock("expo-file-system", () => ({
   Paths: { document: "test-documents" },
   File: class {

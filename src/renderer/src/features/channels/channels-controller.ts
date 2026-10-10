@@ -1,4 +1,5 @@
 import type { ChannelCommand, ChannelPage, ChannelSummary } from "@openbot/contracts/ipc";
+import type { AppTextKey } from "@openbot/i18n";
 import type { AgentProfile } from "@openbot/ui/data";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createStore, flush, onSettled, reconcile, untrack } from "solid-js";
@@ -25,6 +26,8 @@ interface ChannelsState {
   loading: boolean;
   pending: boolean;
   error: string | null;
+  /** The code of the failure in `error`. It shows only while `error` is set. */
+  errorReference: string | null;
   editing: "create" | "settings" | null;
   archived: boolean;
   collapsed: boolean;
@@ -54,6 +57,12 @@ export interface ChannelsEnvironment {
 
 export type ChannelsController = ReturnType<typeof createChannelsController>;
 
+/** The localized and redacted sentence for a failure, and its code. */
+function failure(error: unknown, fallback: AppTextKey): Pick<ChannelsState, "error" | "errorReference"> {
+  const details = currentText().errorDetails(error, currentText().t(fallback));
+  return { error: details.message, errorReference: details.reference };
+}
+
 export function createChannelsController(env: ChannelsEnvironment) {
   const [state, setState] = createStore<ChannelsState>({
     channels: [],
@@ -62,6 +71,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
     loading: false,
     pending: false,
     error: null,
+    errorReference: null,
     editing: null,
     archived: false,
     collapsed: false,
@@ -170,7 +180,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
       if (!disposed && account === env.scopeKey() && id === refreshId)
         setState((state) => {
           Object.assign(state, {
-            error: error instanceof Error ? error.message : currentText().t("channel.error.load"),
+            ...failure(error, "channel.error.load"),
             loading: false,
           });
         });
@@ -195,7 +205,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
     } catch (error) {
       if (!disposed && account === env.scopeKey())
         setState((state) => {
-          state.error = error instanceof Error ? error.message : currentText().t("channel.error.action");
+          Object.assign(state, failure(error, "channel.error.action"));
         });
       return false;
     }
@@ -254,9 +264,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
       if (!disposed && account === env.scopeKey()) {
         failedCommand = attempt;
         setState((state) => {
-          Object.assign(state, {
-            error: error instanceof Error ? error.message : currentText().t("channel.error.update"),
-          });
+          Object.assign(state, failure(error, "channel.error.update"));
         });
       }
       return false;
@@ -286,7 +294,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
     } catch (error) {
       if (!disposed && account === env.scopeKey() && state.selectedId === channelId)
         setState((state) => {
-          state.error = error instanceof Error ? error.message : currentText().t("channel.error.loadOlder");
+          Object.assign(state, failure(error, "channel.error.loadOlder"));
         });
     }
   }

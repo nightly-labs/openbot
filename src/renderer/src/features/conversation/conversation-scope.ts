@@ -1,5 +1,6 @@
 import type { UpdateAgentInput } from "@openbot/contracts/ipc";
 import { currentText } from "@openbot/ui/text";
+import { errorReference } from "@openbot/user-errors";
 import {
   createContext,
   createEffect,
@@ -68,6 +69,8 @@ export function createConversationViewScope(props: ConversationProps) {
     setAttachmentBusy,
     composerErrors,
     setComposerErrors,
+    composerErrorReferences,
+    setComposerErrorReferences,
     conversationErrors,
     setConversationErrors,
     voicePhase,
@@ -141,11 +144,20 @@ export function createConversationViewScope(props: ConversationProps) {
    * Async completions must pass an explicit target captured at operation start;
    * reading `currentConversationTarget(props)` at completion time would
    * attribute the failure to whichever chat the user has since opened.
+   *
+   * `cause` is the failure behind the sentence. The banner shows its code.
    */
-  const setScopedComposerError = (error: string | null, targetOverride?: ConversationTarget): void => {
+  const setScopedComposerError = (error: string | null, targetOverride?: ConversationTarget, cause?: unknown): void => {
     const target = targetOverride ?? currentConversationTarget(props);
     if (!target) return;
     const key = composerDraftKey(target);
+    const reference = error === null || cause === undefined ? null : errorReference(cause);
+    setComposerErrorReferences((current) => {
+      if (reference && error) return { ...current, [key]: { message: error, reference } };
+      if (!(key in current)) return current;
+      const { [key]: _removed, ...next } = current;
+      return next;
+    });
     if (error === null) {
       setComposerErrors((current) => {
         if (!(key in current)) return current;
@@ -243,6 +255,14 @@ export function createConversationViewScope(props: ConversationProps) {
     setComposerErrorForTarget,
     clearChatErrors,
   } = composer;
+  /** The code of the shown composer error. A later sentence without a cause shows no code. */
+  const currentChatErrorReference = createMemo(() => {
+    const target = currentTarget();
+    const message = currentComposerError();
+    if (!target || !message) return null;
+    const entry = composerErrorReferences()[composerDraftKey(target)];
+    return entry?.message === message ? entry.reference : null;
+  });
   const queue = createQueueStore({ props, hiddenAwaitingReplyIds });
   const { activeDeliveries, awaitingReplies, orderedQueuedDeliveries, presentedQueueDeliveries, queuePanelVisible } =
     queue;
@@ -1033,8 +1053,8 @@ export function createConversationViewScope(props: ConversationProps) {
     const target = currentTarget();
     try {
       await conversationRuntime(props).openUrl(url);
-    } catch {
-      setScopedComposerError(currentText().t("composer.error.openLink"), target);
+    } catch (error) {
+      setScopedComposerError(currentText().t("composer.error.openLink"), target, error);
     }
   }
 
@@ -1137,6 +1157,7 @@ export function createConversationViewScope(props: ConversationProps) {
     composerError: currentComposerError,
     currentComposerError,
     currentChatError,
+    currentChatErrorReference,
     currentChatConversationKey,
     dismissCurrentChatErrors,
     dismissAwaitingReplies,

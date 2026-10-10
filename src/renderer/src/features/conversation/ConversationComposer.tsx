@@ -55,6 +55,7 @@ export function ConversationComposer() {
     composerHasContent,
     currentChatConversationKey,
     currentChatError,
+    currentChatErrorReference,
     currentDraft,
     dismissCurrentChatErrors,
     installedSkills,
@@ -376,6 +377,7 @@ export function ConversationComposer() {
         {(message) => (
           <ComposerErrorBanner
             message={message()}
+            reference={currentChatErrorReference()}
             onShown={() => reportErrorBanner(message(), "turn")}
             conversationKey={currentChatConversationKey()}
             onDismiss={() => {

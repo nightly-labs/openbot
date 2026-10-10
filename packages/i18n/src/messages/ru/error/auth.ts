@@ -13,6 +13,10 @@ export const messages = {
   "error.auth.hostCredentialUnavailable": "Учётные данные удалённого хоста недоступны. Зарегистрируйте хост заново.",
   "error.auth.codeNotVerified": "Не удалось проверить код входа.",
   "error.auth.serviceError": "Служба аккаунтов вернула ошибку.",
+  "error.auth.serviceUnreachable":
+    "OpenBot не смог связаться со службой аккаунтов. Проверьте подключение и повторите попытку.",
+  "error.auth.serviceTimeout": "Служба аккаунтов не ответила вовремя. Повторите попытку.",
+  "error.auth.serviceStatus": "Служба аккаунтов вернула ошибку ({status}). Повторите попытку позже.",
   "error.auth.invalidHostedServer": "Служба аккаунтов вернула некорректный облачный сервер.",
   "error.auth.codeNotSent": "OpenBot не смог отправить код входа.",
   "error.auth.deliveryTimeout":

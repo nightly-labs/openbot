@@ -161,6 +161,30 @@ export const messages = defineMessages("error.remote", {
   "error.remote.signalFrameUnreadable": "Signal sent a frame this peer cannot read.",
   "error.remote.webRtcCommandFailed": "The WebRTC command failed.",
   "error.remote.dataChannelFailed": "{kind} channel failed.",
+  // Signal refusals, by the code in the Signal error frame. The client maps the code, not the text.
+  "error.remote.hostBusy": "The host is busy with another connection. Try again in a moment.",
+  "error.remote.signalPermissionDenied": "Your account does not have access to this host. Ask the owner for access.",
+  "error.remote.signalRateLimited": "Too many connection attempts. OpenBot tries again in {seconds} seconds.",
+  "error.remote.signalProtocolError":
+    "Signal and this app do not agree on the connection protocol. Update OpenBot, then try again.",
+  "error.remote.signalRefused": "Signal refused the connection.",
+  "error.remote.signalClosed": "The connection to Signal closed before the host answered.",
+  "error.remote.relayUnavailable": "Signal sent no relay servers for this connection. Try again later.",
+  // How a direct (WebRTC) connection ended.
+  "error.remote.iceFailed": "A direct connection to the host could not be made. A firewall, VPN or proxy can block it.",
+  "error.remote.iceDisconnected": "The direct connection to the host was lost.",
+  // Account service (control plane) refusals, by their error code.
+  "error.remote.directoryUnreachable": "OpenBot could not reach the OpenBot service. Check your connection.",
+  "error.remote.directoryTimeout": "The OpenBot service did not answer in time. Try again.",
+  "error.remote.inviteAlreadyUsed": "This invitation was already used. Ask for a new invitation.",
+  "error.remote.inviteNotFound": "This invitation does not exist or has expired. Ask for a new invitation.",
+  "error.remote.memberLimitReached": "This host has reached its member limit. Ask the owner to make space.",
+  "error.remote.hostNotRegistered": "This host is no longer registered with the OpenBot service.",
+  "error.remote.membershipEnded": "You are no longer a member of this host. Ask the owner for a new invitation.",
+  "error.remote.accountSessionInactive": "Your sign-in is no longer active. Sign in again.",
+  "error.remote.hostOtherAccount": "This host belongs to another account.",
+  "error.remote.remoteNotConfigured": "Remote connections are not set up on this OpenBot service.",
+  "error.remote.hostRefused": "The host refused the request ({status}).",
   // Channel actions on mobile.
   "error.remote.formUnavailable": "This form is no longer available.",
   "error.remote.hostedServerRemoval": "Use Billing to delete a hosted server.",

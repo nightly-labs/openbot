@@ -270,10 +270,10 @@ export function ServerMembersScreen() {
                           setCopied(true);
                           void haptics.notification("success");
                         })
-                        .catch(() => {
+                        .catch((error: unknown) => {
                           void haptics.notification("error");
                           showFailureAlert(
-                            undefined,
+                            error,
                             "other",
                             t("mobile.server.members.copyFailed"),
                             t("mobile.server.members.copyFailedBody"),

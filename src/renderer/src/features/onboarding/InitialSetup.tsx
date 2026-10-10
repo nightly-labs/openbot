@@ -9,7 +9,7 @@ import {
   type InvitePreview,
   type JoinServerInput,
 } from "@openbot/contracts/ipc";
-import { Button, Dialog, Textarea } from "@openbot/ui";
+import { Button, Dialog, ErrorReference, Textarea } from "@openbot/ui";
 import { InvitePreviewCard } from "@openbot/ui/features/servers/JoinServerDialog";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onSettled, Show, untrack } from "solid-js";
@@ -111,7 +111,7 @@ export function InitialSetup(props: InitialSetupProps) {
         providers.customSelected() ? providers.customModel() : savedModelIsEndpoint ? null : undefined,
       );
     } catch (cause) {
-      setError(errorMessage(cause, t("onboarding.setup.saveFailed")));
+      setError(errorMessage(cause, t("onboarding.setup.saveFailed")), cause);
       setSaving(false);
     }
   }
@@ -125,7 +125,7 @@ export function InitialSetup(props: InitialSetupProps) {
       return true;
     } catch (cause) {
       setInvitePreview(null);
-      setError(errorMessage(cause, t("onboarding.setup.verifyFailed")));
+      setError(errorMessage(cause, t("onboarding.setup.verifyFailed")), cause);
       return false;
     } finally {
       setSaving(false);
@@ -144,7 +144,7 @@ export function InitialSetup(props: InitialSetupProps) {
     try {
       await props.onJoinRemote({ inviteUrl: inviteUrl().trim() }, provider);
     } catch (cause) {
-      setError(errorMessage(cause, t("onboarding.setup.connectFailed")));
+      setError(errorMessage(cause, t("onboarding.setup.connectFailed")), cause);
       setSaving(false);
     }
   }
@@ -344,6 +344,7 @@ export function InitialSetup(props: InitialSetupProps) {
           <Show when={error()}>
             <p class="initial-setup-error" role="alert">
               {error()}
+              <ErrorReference reference={providers.errorReference()} />
             </p>
           </Show>
 

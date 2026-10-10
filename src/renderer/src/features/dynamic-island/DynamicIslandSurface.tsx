@@ -8,6 +8,7 @@ import { DEFAULT_DYNAMIC_ISLAND_PREFERENCE, IDLE_DYNAMIC_ISLAND_PRESENTATION } f
 import type { DynamicIslandNotchSize, DynamicIslandStateChangeReason, DynamicIslandViewState } from "@openbot/ui";
 import { OpenBotDynamicIsland } from "@openbot/ui/features/dynamic-island/OpenBotDynamicIsland";
 import { useText } from "@openbot/ui/text";
+import { errorReference, type UserErrorDetails } from "@openbot/user-errors";
 import { createSignal, onSettled, Show } from "solid-js";
 import { dynamicIslandPort } from "./dynamic-island-port";
 
@@ -37,7 +38,7 @@ export function DynamicIslandSurface() {
   const [viewState, setViewState] = createSignal<DynamicIslandViewState>("compact");
   // A failed action keeps the panel open with this message, so an Approve that did not reach the
   // agent does not look like it worked.
-  const [actionError, setActionError] = createSignal<string>();
+  const [actionError, setActionError] = createSignal<UserErrorDetails>();
   // Each action and each clear starts a new generation, so a late failure does not show on another panel.
   let actionGeneration = 0;
   let pointerInside = false;
@@ -173,8 +174,9 @@ export function DynamicIslandSurface() {
     const generation = clearActionError();
     try {
       await dynamicIslandPort().dynamicIsland.performAction(action);
-    } catch {
-      if (generation === actionGeneration) setActionError(t("island.action.failed"));
+    } catch (error) {
+      if (generation === actionGeneration)
+        setActionError({ message: t("island.action.failed"), reference: errorReference(error) });
       return false;
     }
     pointerInside = false;

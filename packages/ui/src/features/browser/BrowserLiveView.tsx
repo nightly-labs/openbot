@@ -3,8 +3,9 @@ import {
   type BrowserDesktopApi,
   type BrowserLiveViewInput,
 } from "@openbot/contracts/ipc";
-import { toast } from "@openbot/ui";
+import { ErrorReference, toast } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
+import { errorReference } from "@openbot/user-errors";
 import { createEffect, createSignal, createStore, onCleanup, Show } from "solid-js";
 
 /** CDP's modifier bitmap, which is what the host dispatches the event with. */
@@ -49,9 +50,11 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
   const runtime = props.runtime;
   const { t, errorMessage, sourceText } = useText();
   // `message` is null while the view connects, and otherwise text from the host or an error.
-  const [state, setState] = createStore<{ live: boolean; message: string | null }>({
+  // `reference` is the code of a failed start.
+  const [state, setState] = createStore<{ live: boolean; message: string | null; reference: string | null }>({
     live: false,
     message: null,
+    reference: null,
   });
   const [canvas, setCanvas] = createSignal<HTMLCanvasElement>();
   /**
@@ -151,10 +154,10 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
     if (event.type === "stopped") {
       settleCopy(null);
       abandonStream();
-      setState(() => ({ live: false, message: sourceText(event.reason) }));
+      setState(() => ({ live: false, message: sourceText(event.reason), reference: null }));
       return;
     }
-    if (!state.live) setState(() => ({ live: true, message: "" }));
+    if (!state.live) setState(() => ({ live: true, message: "", reference: null }));
     // One frame decodes at a time, and the newest of the rest waits behind it.
     if (pendingFrame) {
       queuedFrame = event;
@@ -169,12 +172,14 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
     ({ tabId, active }) => {
       if (!active) return;
       abandonStream();
-      setState(() => ({ live: false, message: null }));
-      void runtime
-        .startLiveView(tabId)
-        .catch((error: unknown) =>
-          setState(() => ({ live: false, message: errorMessage(error, t("browser.liveView.failed")) })),
-        );
+      setState(() => ({ live: false, message: null, reference: null }));
+      void runtime.startLiveView(tabId).catch((error: unknown) =>
+        setState(() => ({
+          live: false,
+          message: errorMessage(error, t("browser.liveView.failed")),
+          reference: errorReference(error),
+        })),
+      );
       onCleanup(() => void runtime.stopLiveView().catch(() => undefined));
     },
   );
@@ -265,9 +270,9 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
       () => {
         if (cut) send({ type: "cut", text: copied });
       },
-      () => {
+      (error) => {
         if (failure === "tooLarge") toast.error(t("browser.liveView.copyTooLarge"));
-        else if (failure !== "empty") toast.error(t("browser.liveView.copyFailed"));
+        else if (failure !== "empty") toast.error(t("browser.liveView.copyFailed"), { error });
       },
     );
   };
@@ -348,6 +353,7 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
       <Show when={!state.live}>
         <div class="browser-empty-state">
           <span>{state.message ?? t("browser.liveView.connecting")}</span>
+          <ErrorReference reference={state.reference} />
         </div>
       </Show>
     </div>

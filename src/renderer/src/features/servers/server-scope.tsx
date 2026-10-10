@@ -1,4 +1,6 @@
 import { createRemoteConnectionRecovery, type RemoteRecoveryStatus } from "@openbot/team-client/remote-recovery";
+import { currentText } from "@openbot/ui/text";
+import type { UserErrorDetails } from "@openbot/user-errors";
 import { createEffect, createSignal, createStore, flush, getOwner, isDisposed, onSettled, untrack } from "solid-js";
 import { isGlobalSearchShortcut } from "../../global-search-shortcut";
 import { useNavigation } from "../../navigation";
@@ -71,6 +73,8 @@ const ServerScope = createSimpleContext({
       loading: boolean;
       sequence: number | undefined;
       failed: boolean;
+      /** Why the last load failed, for the connection notice. Null when `failed` is false. */
+      failure: UserErrorDetails | null;
       panelsFailed: boolean;
       panelsLoading: boolean;
       recovery: RemoteRecoveryStatus;
@@ -79,6 +83,7 @@ const ServerScope = createSimpleContext({
       loading: true,
       sequence: undefined,
       failed: false,
+      failure: null,
       panelsFailed: false,
       panelsLoading: false,
       recovery: { phase: "connecting", attempt: 0, remainingSeconds: 0 },
@@ -93,12 +98,15 @@ const ServerScope = createSimpleContext({
       transportReady();
     const recovery = createRemoteConnectionRecovery(
       loadWorkspace,
-      () => {
-        if (scopeIsCurrent())
-          setConnection((draft) => {
-            draft.failed = true;
-            draft.loading = false;
-          });
+      (error) => {
+        if (!scopeIsCurrent()) return;
+        const text = currentText();
+        const failure = text.errorDetails(error, text.t("server.connection.failedDescription"));
+        setConnection((draft) => {
+          draft.failed = true;
+          draft.failure = failure;
+          draft.loading = false;
+        });
       },
       (status) => {
         if (scopeIsCurrent())
@@ -122,6 +130,7 @@ const ServerScope = createSimpleContext({
       if (!isCurrent() || !transportReady()) return;
       setConnection((draft) => {
         draft.failed = false;
+        draft.failure = null;
         draft.loading = true;
       });
       const [status, models, agents, reads] = await Promise.all([

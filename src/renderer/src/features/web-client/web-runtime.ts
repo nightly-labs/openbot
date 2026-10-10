@@ -105,9 +105,15 @@ import {
 } from "@openbot/team-client/team-api-requests";
 import type { BrowserViewRuntime } from "@openbot/ui/features/browser/BrowserLiveView";
 import { currentText } from "@openbot/ui/text";
+import { referenceFrom } from "@openbot/user-errors";
 import { Effect } from "effect";
 import type { ServerAdminPort } from "../servers/servers-port";
-import { createWebHostConnections, type WebHostConnections, type WebHostNotice } from "./web-host-connections";
+import {
+  createWebHostConnections,
+  type WebHostConnections,
+  type WebHostNotice,
+  WebHostRequestError,
+} from "./web-host-connections";
 import {
   acquireOpenedWebHostLock,
   acquireWebHostLock,
@@ -241,10 +247,17 @@ export class WebHostIncompatibleError extends Error {
 }
 
 export class WebHostConnectionError extends Error {
-  constructor(readonly code: "identity_changed" | "authentication_required" | "access_ended") {
+  /** The code a user can copy, such as `http/401`. */
+  readonly reference: string | null;
+
+  constructor(
+    readonly code: "identity_changed" | "authentication_required" | "access_ended",
+    reference: string | null = null,
+  ) {
     super(
       currentText().t(code === "identity_changed" ? "webClient.error.identityChanged" : "webClient.error.accessEnded"),
     );
+    this.reference = reference;
   }
 }
 
@@ -290,8 +303,15 @@ export function createWebWorkspaceRuntime(
       try {
         return await runTeamEffect(directory.createBootstrap(id, key, sessionId));
       } catch (error) {
+        // The reference keeps 401 apart from 403 and names the account service code, such as `session_inactive`.
         if (error instanceof RemoteDirectoryError && (error.status === 401 || error.status === 403))
-          events.connection({ hostId: id, state: "offline", message: null, code: "session_revoked" });
+          events.connection({
+            hostId: id,
+            state: "offline",
+            message: null,
+            code: "session_revoked",
+            ...(error.reference ? { reference: error.reference } : {}),
+          });
         throw error;
       }
     },
@@ -430,12 +450,18 @@ export function createWebWorkspaceRuntime(
       if (disposed || generation !== current) throw new Error(currentText().t("webClient.error.hostChanged"));
     }
     if (result.status === 401 || (result.status === 403 && membershipRead)) {
-      const error = new WebHostConnectionError(result.status === 401 ? "authentication_required" : "access_ended");
+      const error = new WebHostConnectionError(
+        result.status === 401 ? "authentication_required" : "access_ended",
+        referenceFrom("http", result.status),
+      );
       if (requestHostId) events.accessDenied?.(requestHostId, error);
       throw error;
     }
     if (!result.ok || (result.status ?? 500) >= 400)
-      throw new Error(hostRefusal(result.status, result.body) ?? currentText().t("webClient.error.requestIncomplete"));
+      throw new WebHostRequestError(
+        hostRefusal(result.status, result.body) ?? currentText().t("webClient.error.requestIncomplete"),
+        result.status === undefined ? (result.reference ?? null) : referenceFrom("http", result.status),
+      );
     return result.body;
   }
   // The shared Team API requests decode their own responses. A declaration, like `request`, so the
@@ -568,7 +594,10 @@ export function createWebWorkspaceRuntime(
         hostPublicKey: host.devicePublicKey,
       });
       if (!result.ok || disposed || current !== generation)
-        throw new Error(currentText().t("webClient.error.connectionUnavailable"));
+        throw new WebHostRequestError(
+          currentText().t("webClient.error.connectionUnavailable"),
+          result.ok ? null : (result.reference ?? null),
+        );
       const support = decodeTeamProtocolSupportV7Base(await request("GET", TEAM_API_ROUTES.compatibility));
       const updateDirection = teamProtocolUpdateDirection(
         { minimum: TEAM_PROTOCOL_V3, maximum: TEAM_PROTOCOL_V3 },

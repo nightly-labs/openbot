@@ -7,7 +7,12 @@ describe("classifyRemoteConnectionError", () => {
   it("tells an out-of-date end from a wire this app cannot read", () => {
     expect(classifyRemoteConnectionError(new RemoteProtocolError("client_update_required", "Update OpenBot."))).toEqual(
       {
-        issue: { code: "client_update_required", message: "Update OpenBot.", retryable: true },
+        issue: {
+          code: "client_update_required",
+          message: "Update OpenBot.",
+          retryable: true,
+          reference: "protocol/client_update_required",
+        },
         state: "incompatible",
         suspendReconnect: true,
         hostSupport: null,
@@ -30,6 +35,7 @@ describe("classifyRemoteConnectionError", () => {
       code: "authentication_required",
       message: "Sign in to this host again.",
       retryable: true,
+      reference: "http/401",
     });
     expect(outcome.suspendReconnect).toBe(true);
   });
@@ -57,12 +63,45 @@ describe("classifyRemoteConnectionError", () => {
   it("says nothing about a failure it does not recognise", () => {
     expect(classifyRemoteConnectionError(new Error("boom")).issue).toBeNull();
   });
+
+  it.each([
+    [
+      new RemoteRequestError(426, "Upgrade.", "client_update_required"),
+      "http/426/client_update_required",
+      "Update this OpenBot app before connecting to the host.",
+    ],
+    [
+      new RemoteRequestError(400, "Bad headers.", "protocol_error"),
+      "http/400/protocol_error",
+      "The host refused the request (400).",
+    ],
+    [
+      new RemoteRequestError(502, "Bad body.", "protocol_error"),
+      "http/502/protocol_error",
+      "The host returned invalid data.",
+    ],
+    [new RemoteRequestError(401, "Sign in again.", null, "http/403"), "http/403", "Sign in to this host again."],
+    [
+      new RemoteProtocolError("protocol_error", "The host returned invalid data."),
+      "protocol/protocol_error",
+      "The host returned invalid data.",
+    ],
+    [new SyntaxError("Unexpected token <"), "protocol/invalid_json", "The host returned invalid data."],
+    [new TypeError("fetch failed"), "network/fetch", "The host is not reachable."],
+  ])("gives %o the reference %s", (error, reference, message) => {
+    expect(classifyRemoteConnectionError(error).issue).toMatchObject({ reference, message });
+  });
 });
 
 describe("classifyTransportError", () => {
   it("reports a revoked session as needing a sign-in, and stops reconnecting", () => {
     expect(classifyTransportError("session_revoked", "Session revoked.")).toEqual({
-      issue: { code: "authentication_required", message: "Session revoked.", retryable: false },
+      issue: {
+        code: "authentication_required",
+        message: "Session revoked.",
+        retryable: false,
+        reference: "signal/session_revoked",
+      },
       state: "error",
       suspendReconnect: true,
       hostSupport: null,
@@ -70,7 +109,9 @@ describe("classifyTransportError", () => {
   });
 
   it("agrees with the HTTP path that a protocol error is incompatibility, not a retryable blip", () => {
+    // The bridge uses this code for its own failures too, so its message stays.
     const outcome = classifyTransportError("protocol_error", "Unsupported frame.");
+    expect(outcome.issue).toMatchObject({ message: "Unsupported frame.", reference: "transport/protocol_error" });
     expect(outcome.state).toBe("incompatible");
     expect(outcome.issue?.retryable).toBe(false);
     expect(outcome.suspendReconnect).toBe(true);
@@ -78,10 +119,40 @@ describe("classifyTransportError", () => {
 
   it("keeps retrying anything else", () => {
     expect(classifyTransportError("ice_failed", "The connection dropped.")).toEqual({
-      issue: { code: "network_unavailable", message: "The connection dropped.", retryable: true },
+      issue: {
+        code: "network_unavailable",
+        message: "The connection dropped.",
+        retryable: true,
+        reference: "transport/ice_failed",
+      },
       state: "error",
       suspendReconnect: false,
       hostSupport: null,
     });
+  });
+
+  // The Signal text is for a developer, so each released Signal code gets its own sentence.
+  it.each([
+    ["host_unavailable", "network_unavailable", "The host is offline."],
+    ["host_busy", "network_unavailable", "The host is busy with another connection. Try again in a moment."],
+    [
+      "permission_denied",
+      "network_unavailable",
+      "Your account does not have access to this host. Ask the owner for access.",
+    ],
+    ["rate_limited", "network_unavailable", "Too many connection attempts. OpenBot tries again in 60 seconds."],
+    ["invalid_message", "network_unavailable", "Signal returned an invalid message."],
+    ["authentication_required", "network_unavailable", "Remote ticket is invalid or expired."],
+    ["session_revoked", "authentication_required", "Remote access was revoked."],
+  ])("maps Signal %s to its own sentence and reference", (code, issueCode, message) => {
+    expect(classifyTransportError(code, "Remote access was revoked.").issue).toMatchObject({
+      code: issueCode,
+      message,
+      reference: `signal/${code}`,
+    });
+  });
+
+  it("gives no reference for a code that is not an identifier", () => {
+    expect(classifyTransportError("bad code/../x", "WebRTC failed.").issue).not.toHaveProperty("reference");
   });
 });

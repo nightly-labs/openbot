@@ -185,12 +185,14 @@ function decodeCentralAuthUser(value: unknown): CentralAuthUser {
 
 function decodeCentralAuthIssue(value: unknown): CentralAuthIssue {
   const issue = decodeRecord(value, "account issue");
-  const { retryAfterSeconds } = issue;
+  const { retryAfterSeconds, reference } = issue;
   if (retryAfterSeconds !== undefined && !isNumber(retryAfterSeconds)) throw new Error("Invalid retryAfterSeconds.");
+  if (reference !== undefined && !isString(reference)) throw new Error("Invalid reference.");
   return {
     code: requiredString(issue, "code"),
     message: requiredString(issue, "message"),
     ...(retryAfterSeconds === undefined ? {} : { retryAfterSeconds }),
+    ...(reference === undefined ? {} : { reference }),
   };
 }
 

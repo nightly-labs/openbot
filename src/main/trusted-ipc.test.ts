@@ -150,6 +150,34 @@ describe("trusted IPC wrappers", () => {
   });
 });
 
+// Electron sends only `<name>: <message>` to the renderer. The name carries the failure's code; the
+// message must not change, and a secret in it must never become the code.
+describe("trusted IPC error references", () => {
+  it("keeps the message and names the error after its reference", async () => {
+    handleTrusted("test:refused", () =>
+      Promise.reject(Object.assign(new Error("The host is busy."), { reference: "signal/host_busy" })),
+    );
+    handleTrusted("test:secret", () => Promise.reject(new Error("Request failed with apiKey=sk-secret-value.")));
+
+    const refused = await Promise.resolve(registrations.get("test:refused")?.(TRUSTED_EVENT)).catch((error) => error);
+    expect(String(refused)).toBe("Error[ref:signal/host_busy]: The host is busy.");
+    const secret = await Promise.resolve(registrations.get("test:secret")?.(TRUSTED_EVENT)).catch((error) => error);
+    expect(String(secret)).toBe("Error: Request failed with apiKey=sk-secret-value.");
+  });
+
+  it("still rejects an untrusted renderer before the handler runs", () => {
+    let handled = 0;
+    handleTrusted("test:refused-untrusted", () => {
+      handled += 1;
+      return Promise.reject(Object.assign(new Error("Busy."), { reference: "signal/host_busy" }));
+    });
+    expect(() => registrations.get("test:refused-untrusted")?.(UNTRUSTED_EVENT)).toThrow(
+      "Rejected IPC request from an untrusted renderer.",
+    );
+    expect(handled).toBe(0);
+  });
+});
+
 // The observer feeds the local trace file. It must not change what the renderer receives, and it
 // sees the channel name only: a payload or a result could carry a secret into the file.
 describe("trusted IPC call observer", () => {

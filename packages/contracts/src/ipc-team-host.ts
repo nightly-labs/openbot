@@ -21,6 +21,8 @@ export interface ServerConnectionIssue {
   code: ServerConnectionIssueCode;
   message: string;
   retryable: boolean;
+  /** A short code a user can copy into a report, such as `signal/host_busy`. */
+  reference?: string;
 }
 
 export interface ServerCompatibility {

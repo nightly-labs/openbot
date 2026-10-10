@@ -1,8 +1,9 @@
 import type { BrowserPreview, BrowserTakeoverRequest, RespondToBrowserSecretInput } from "@openbot/contracts/ipc";
-import { Button, Input, Maximize2, Monitor } from "@openbot/ui";
+import { Button, ErrorReference, Input, Maximize2, Monitor } from "@openbot/ui";
 import { OtpInput } from "@openbot/ui/features/account/OtpInput";
 import { BrowserTakeoverPreview } from "@openbot/ui/features/conversation/BrowserTakeoverPreview";
 import { useText } from "@openbot/ui/text";
+import { errorReference } from "@openbot/user-errors";
 import { createEffect, createSignal, onCleanup, Show } from "solid-js";
 
 export function BrowserSecretCard(props: {
@@ -18,6 +19,9 @@ export function BrowserSecretCard(props: {
   const [value, setValue] = createSignal("");
   const [pending, setPending] = createSignal(false);
   const [error, setError] = createSignal("");
+  /** The code of the failed answer. It shows only while `error` does. */
+  const [failureCode, setFailureCode] = createSignal<string | null>(null);
+  const shownCode = () => (error() ? failureCode() : null);
   const method = () => props.request.secret?.method;
   const digits = () => props.request.secret?.digits ?? 6;
   const password = () => method() === "password";
@@ -75,7 +79,8 @@ export function BrowserSecretCard(props: {
     setValue("");
     try {
       await props.onRespond(input);
-    } catch {
+    } catch (cause) {
+      setFailureCode(errorReference(cause));
       setError(t("browser.secret.failed"));
     } finally {
       if (input.decision === "submit") input.secret = "";
@@ -127,6 +132,7 @@ export function BrowserSecretCard(props: {
                   setError("");
                 }}
               />
+              <ErrorReference reference={shownCode()} />
             </div>
           </Show>
         }
@@ -152,6 +158,7 @@ export function BrowserSecretCard(props: {
         <Show when={error()}>
           <p class="browser-secret-error" role="alert">
             {error()}
+            <ErrorReference reference={shownCode()} />
           </p>
         </Show>
       </Show>

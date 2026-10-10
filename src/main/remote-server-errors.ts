@@ -16,9 +16,12 @@ export class RemoteRequestError extends Schema.TaggedError<RemoteRequestError>()
   status: Schema.Number,
   code: Schema.NullOr(Schema.String),
   message: Schema.String,
+  // Set only when the failure the user sees is not this status, such as an event socket that a
+  // 403 refused. Otherwise the reference is `http/<status>/<code>`.
+  reference: Schema.NullOr(Schema.String),
 }) {
-  constructor(status: number, message: string, code: string | null = null) {
-    super({ status, message, code });
+  constructor(status: number, message: string, code: string | null = null, reference: string | null = null) {
+    super({ status, message, code, reference });
   }
 }
 

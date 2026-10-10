@@ -2,7 +2,8 @@ import { AppLogo } from "@openbot/brand";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AppVariant, CentralAuthIssue, CentralAuthState } from "@openbot/contracts/ipc";
 import { normalizeEmailAddress, normalizeOneTimeCode } from "@openbot/contracts/validation";
-import { ArrowLeft, Button, Input, Lock, RefreshCw } from "@openbot/ui";
+import { ArrowLeft, Button, ErrorReference, Input, Lock, RefreshCw } from "@openbot/ui";
+import { errorReference, type UserErrorDetails } from "@openbot/user-errors";
 import { createEffect, createMemo, createSignal, onCleanup, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import { OtpInput, type OtpInputStatus } from "./OtpInput";
@@ -45,7 +46,7 @@ export function AccountLogin(props: AccountLoginProps) {
   const [emailErrorActive, setEmailErrorActive] = createSignal(false);
   const [emailShaking, setEmailShaking] = createSignal(false);
   const [codeError, setCodeError] = createSignal<string | null>(null);
-  const [localError, setLocalError] = createSignal<string | null>(null);
+  const [localError, setLocalError] = createSignal<UserErrorDetails | null>(null);
   const [pendingAction, setPendingAction] = createSignal<PendingAction | null>(null);
   const [issueVisible, setIssueVisible] = createSignal(true);
   const [issueBlockedUntil, setIssueBlockedUntil] = createSignal(0);
@@ -244,6 +245,15 @@ export function AccountLogin(props: AccountLoginProps) {
     }, shakeDuration + motionDuration("--revert-hold", 3_000));
   }
 
+  /**
+   * Show a failed action with the code of its cause. When the action already gave a typed issue,
+   * that issue explains the failure, so a general sentence does not replace it.
+   */
+  function showActionError(error: unknown, message: string, keepIssue: boolean): void {
+    if (keepIssue && displayedIssue()) return;
+    setLocalError({ message, reference: errorReference(error) });
+  }
+
   function handleEmailInput(value: string): void {
     setEmail(value);
     setIssueVisible(false);
@@ -275,8 +285,8 @@ export function AccountLogin(props: AccountLoginProps) {
     setPendingAction(action);
     try {
       await props.onRequestEmailCode(normalizedEmail);
-    } catch {
-      setLocalError(t("account.login.sendFailed"));
+    } catch (error) {
+      showActionError(error, t("account.login.sendFailed"), true);
     } finally {
       setPendingAction(null);
     }
@@ -295,8 +305,8 @@ export function AccountLogin(props: AccountLoginProps) {
     setPendingAction("verify");
     try {
       await props.onVerifyEmailCode(props.state.challengeId, formatCode(normalizedCode));
-    } catch {
-      setLocalError(t("account.login.verifyFailed"));
+    } catch (error) {
+      showActionError(error, t("account.login.verifyFailed"), true);
     } finally {
       setPendingAction(null);
     }
@@ -309,8 +319,8 @@ export function AccountLogin(props: AccountLoginProps) {
     setPendingAction("resend");
     try {
       await props.onRequestEmailCode(props.state.email);
-    } catch {
-      setLocalError(t("account.login.resendFailed"));
+    } catch (error) {
+      showActionError(error, t("account.login.resendFailed"), true);
     } finally {
       setPendingAction(null);
     }
@@ -322,8 +332,8 @@ export function AccountLogin(props: AccountLoginProps) {
     setLocalError(null);
     try {
       await props.onRetry();
-    } catch {
-      setLocalError(t("account.login.stillUnreachable"));
+    } catch (error) {
+      showActionError(error, t("account.login.stillUnreachable"), false);
     } finally {
       setPendingAction(null);
     }
@@ -338,8 +348,8 @@ export function AccountLogin(props: AccountLoginProps) {
       setCode("");
       setCodeError(null);
       setIssueVisible(false);
-    } catch {
-      setLocalError(t("account.login.resetFailed"));
+    } catch (error) {
+      showActionError(error, t("account.login.resetFailed"), false);
     } finally {
       setPendingAction(null);
     }
@@ -402,25 +412,31 @@ export function AccountLogin(props: AccountLoginProps) {
           </Show>
 
           <Show when={unavailableIssue()}>
-            <Show when={localError()}>
-              {(message) => (
-                <p class="account-login-error" role="alert">
-                  {message()}
-                </p>
-              )}
-            </Show>
-            <Button
-              variant="default"
-              type="button"
-              class="account-login-primary"
-              disabled={pendingAction() === "retry"}
-              onClick={() => void retryConnection()}
-            >
-              <Show when={pendingAction() === "retry"} fallback={t("common.tryAgain")}>
-                <span class="account-login-button-spinner" aria-hidden="true" />
-                {t("common.connecting")}
-              </Show>
-            </Button>
+            {(issue) => (
+              <>
+                <ErrorReference reference={issue().reference} />
+                <Show when={localError()}>
+                  {(failure) => (
+                    <p class="account-login-error" role="alert">
+                      {failure().message}
+                      <ErrorReference reference={failure().reference} />
+                    </p>
+                  )}
+                </Show>
+                <Button
+                  variant="default"
+                  type="button"
+                  class="account-login-primary"
+                  disabled={pendingAction() === "retry"}
+                  onClick={() => void retryConnection()}
+                >
+                  <Show when={pendingAction() === "retry"} fallback={t("common.tryAgain")}>
+                    <span class="account-login-button-spinner" aria-hidden="true" />
+                    {t("common.connecting")}
+                  </Show>
+                </Button>
+              </>
+            )}
           </Show>
 
           <Show when={!connecting() && !unavailable()}>
@@ -477,13 +493,15 @@ export function AccountLogin(props: AccountLoginProps) {
                     {(issue) => (
                       <p class="account-login-error" role="alert">
                         {sourceText(issue().message)}
+                        <ErrorReference reference={issue().reference} />
                       </p>
                     )}
                   </Show>
                   <Show when={localError()}>
-                    {(message) => (
+                    {(failure) => (
                       <p class="account-login-error" role="alert">
-                        {message()}
+                        {failure().message}
+                        <ErrorReference reference={failure().reference} />
                       </p>
                     )}
                   </Show>
@@ -537,13 +555,15 @@ export function AccountLogin(props: AccountLoginProps) {
                   {(issue) => (
                     <p class="account-login-error" role="alert">
                       {sourceText(issue().message)}
+                      <ErrorReference reference={issue().reference} />
                     </p>
                   )}
                 </Show>
                 <Show when={localError()}>
-                  {(message) => (
+                  {(failure) => (
                     <p class="account-login-error" role="alert">
-                      {message()}
+                      {failure().message}
+                      <ErrorReference reference={failure().reference} />
                     </p>
                   )}
                 </Show>

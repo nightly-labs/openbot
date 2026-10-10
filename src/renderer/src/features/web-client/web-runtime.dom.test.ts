@@ -71,6 +71,7 @@ describe("browser workspace runtime", () => {
         state: "offline",
         message: null,
         code: "session_revoked",
+        reference: `http/${status}`,
       });
     await runtime.dispose();
   });

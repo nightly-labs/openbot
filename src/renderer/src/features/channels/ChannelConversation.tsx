@@ -8,7 +8,7 @@ import {
   canPreviewAttachment,
   type FilePreview,
 } from "@openbot/contracts/ipc";
-import { ArrowUp, Button, Plus, X } from "@openbot/ui";
+import { ArrowUp, Button, ErrorReference, Plus, X } from "@openbot/ui";
 import { QuestionPromptBubble } from "@openbot/ui/components/QuestionPromptBubble";
 import {
   SettingsPanel,
@@ -52,6 +52,7 @@ import {
   unreadMessagesDividerIsVisible,
 } from "@openbot/ui/features/conversation/UnreadMessages";
 import { useText } from "@openbot/ui/text";
+import { errorReference, type UserErrorDetails } from "@openbot/user-errors";
 import type { VirtualItem } from "@tanstack/virtual-core";
 import {
   createEffect,
@@ -217,7 +218,7 @@ export function ChannelConversation(props: ChannelConversationProps) {
     if (importAttachments && canImportFiles() && files.length > 0) addAttachments(() => importAttachments(files));
   };
   const [dropActive, setDropActive] = createSignal(false);
-  const [copyError, setCopyError] = createSignal<string | null>(null);
+  const [copyError, setCopyError] = createSignal<UserErrorDetails | null>(null);
   createEffect(
     () => channels.state.selectedId,
     () => {
@@ -435,8 +436,8 @@ export function ChannelConversation(props: ChannelConversationProps) {
     setCopyError(null);
     try {
       await writeClipboardText(text);
-    } catch {
-      setCopyError(t("chat.actions.copyFailed"));
+    } catch (error) {
+      setCopyError({ message: t("chat.actions.copyFailed"), reference: errorReference(error) });
       return;
     }
     setCopiedMessageId(message.id);
@@ -620,6 +621,7 @@ export function ChannelConversation(props: ChannelConversationProps) {
       <Show when={channels.state.error}>
         <p role="alert">
           {sourceText(channels.state.error ?? "")}
+          <ErrorReference reference={channels.state.errorReference} />
           <Button
             variant="ghost"
             onClick={() =>
@@ -632,7 +634,14 @@ export function ChannelConversation(props: ChannelConversationProps) {
           </Button>
         </p>
       </Show>
-      <Show when={copyError()}>{(message) => <p role="alert">{message()}</p>}</Show>
+      <Show when={copyError()}>
+        {(failure) => (
+          <p role="alert">
+            {failure().message}
+            <ErrorReference reference={failure().reference} />
+          </p>
+        )}
+      </Show>
 
       <Show when={channels.state.page} fallback={<p>{t("channel.conversation.loading")}</p>}>
         {(page) => (

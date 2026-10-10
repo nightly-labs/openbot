@@ -57,7 +57,7 @@ import type {
   WebhookSecret,
 } from "@openbot/contracts/ipc-events";
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
-import type { RemoteRecoveryStatus, RemoteTeamDirectoryClient } from "@openbot/team-client";
+import type { RemoteConnectionFailure, RemoteRecoveryStatus, RemoteTeamDirectoryClient } from "@openbot/team-client";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import type { MobileBrowserTab } from "@/features/browser/model/browser-tabs";
 import type { BrowserViewBridgeEvent, RemoteBrowserViewSession } from "@/features/browser/model/browser-view-bridge";
@@ -78,6 +78,8 @@ export interface MobileServer {
   state: MobileServerState;
   initialConnectionPending: boolean;
   connectionMessage: string | null;
+  /** The last failed connection step and its code, until the server is online again. */
+  connectionFailure?: RemoteConnectionFailure | null;
   recoveryStatus?: RemoteRecoveryStatus;
   address: string | null;
   accent: string;

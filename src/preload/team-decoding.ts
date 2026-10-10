@@ -335,10 +335,13 @@ function protocolRange(value: unknown): { minimum: number; maximum: number } {
 function serverIssue(value: unknown): ServerConnectionIssue {
   const issue = decodeRecord(value, "server connection issue");
   if (!isOneOf(SERVER_ISSUE_CODES, issue.code)) throw new Error("Invalid code.");
+  const { reference } = issue;
+  if (reference !== undefined && !isString(reference)) throw new Error("Invalid reference.");
   return {
     code: issue.code,
     message: requiredString(issue, "message"),
     retryable: requiredBoolean(issue, "retryable"),
+    ...(reference === undefined ? {} : { reference }),
   };
 }
 

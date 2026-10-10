@@ -176,8 +176,8 @@ export class RemoteServerConnections {
 
   // A connection that never got through, with no error object worth classifying. Silent, so the
   // caller can fold it into one emission with whatever else the failure changed.
-  reportUnreachable(serverId: string): void {
-    this.#apply(serverId, hostUnreachable(), null);
+  reportUnreachable(serverId: string, reference?: string): void {
+    this.#apply(serverId, hostUnreachable(reference), null);
   }
 
   forget(serverId: string): void {
@@ -238,7 +238,12 @@ export class RemoteServerConnections {
 }
 
 function sameIssue(left: ServerConnectionIssue | null, right: ServerConnectionIssue): boolean {
-  return left?.code === right.code && left?.message === right.message && left?.retryable === right.retryable;
+  return (
+    left?.code === right.code &&
+    left?.message === right.message &&
+    left?.retryable === right.retryable &&
+    left?.reference === right.reference
+  );
 }
 
 function sameCompatibility(left: ServerCompatibility | null, right: ServerCompatibility): boolean {

@@ -1636,6 +1636,22 @@
   text-wrap: pretty;
 }
 
+.ui-error-reference {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  margin-top: var(--openbot-space-0-5);
+  color: var(--openbot-text-muted);
+}
+
+.ui-error-reference-code {
+  font-family: var(--openbot-font-mono);
+  font-size: var(--openbot-text-xs);
+  line-height: var(--openbot-leading-sm);
+  user-select: text;
+  overflow-wrap: anywhere;
+}
+
 .ui-toaster [data-sonner-toast][data-type="success"] {
   --ui-toast-tone: var(--openbot-success);
 }

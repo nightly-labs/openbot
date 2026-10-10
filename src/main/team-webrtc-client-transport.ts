@@ -37,6 +37,7 @@ import type {
   RemoteMemberRecord,
 } from "./central-auth-records";
 import type { RemoteConnectTrace } from "./remote-connect-trace";
+import { transportFailure } from "./remote-server-connection-status";
 import { RemoteWorkflowError, remoteDecode, toRemoteWorkflowError } from "./remote-service-effects";
 import type { RemoteSessionCache } from "./remote-session-cache";
 import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
@@ -879,10 +880,10 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         cleanup();
         resolve();
       };
-      const onError = (failedHostId: string, _code: string, message: string) => {
+      const onError = (failedHostId: string, code: string, message: string) => {
         if (failedHostId !== hostId) return;
         cleanup();
-        reject(new Error(message));
+        reject(new TeamWebRtcConnectError(code, message));
       };
       this.on("connected", onConnected);
       this.on("error", onError);
@@ -1326,6 +1327,18 @@ export class TeamWebRtcRequestError extends Schema.TaggedError<TeamWebRtcRequest
 }) {
   constructor(status: number, code: string, message: string) {
     super({ status, code, message });
+  }
+}
+
+/** The connection failed before the host answered. The code is the Signal or the bridge code. */
+class TeamWebRtcConnectError extends Schema.TaggedError<TeamWebRtcConnectError>()("TeamWebRtcConnectError", {
+  code: Schema.String,
+  message: Schema.String,
+  reference: Schema.NullOr(Schema.String),
+}) {
+  constructor(code: string, message: string) {
+    const failure = transportFailure(code, message);
+    super({ code, message: failure.message, reference: failure.reference });
   }
 }
 

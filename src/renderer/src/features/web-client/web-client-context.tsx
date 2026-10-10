@@ -23,9 +23,14 @@ import type {
 } from "@openbot/contracts/ipc";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
 import type { RemoteTeamHost } from "@openbot/team-client/remote-directory";
-import { createRemoteConnectionRecovery, type RemoteRecoveryStatus } from "@openbot/team-client/remote-recovery";
+import {
+  createRemoteConnectionRecovery,
+  isSafeConnectionError,
+  type RemoteRecoveryStatus,
+} from "@openbot/team-client/remote-recovery";
 import { reconcilePendingRequests } from "@openbot/team-client/runtime-attention";
 import { currentText } from "@openbot/ui/text";
+import { errorReference, type UserErrorDetails } from "@openbot/user-errors";
 import { createEffect, createMemo, createSignal, createStore, onSettled } from "solid-js";
 import { toAgentProfile } from "../../app-message-projection";
 import { mergeConversationPage } from "../conversation/conversation-merge";
@@ -80,7 +85,8 @@ interface WebWorkspaceState {
    */
   hostedSleep: HostedServerSleep | null;
   hostedIssue: HostedServerIssue | null;
-  connectionError: string | null;
+  /** The last connection failure, with its code. Shown while the workspace reconnects. */
+  connectionError: UserErrorDetails | null;
   recovery: RemoteRecoveryStatus | null;
   workspaceLoaded: boolean;
   panelsFailed: boolean;
@@ -101,9 +107,9 @@ interface WebWorkspaceState {
   } | null;
   hostsLoaded: boolean;
   hostsLoading: boolean;
-  hostsError: string | null;
+  hostsError: UserErrorDetails | null;
   revocationRevision: number;
-  error: string | null;
+  error: UserErrorDetails | null;
   busy: boolean;
   uploading: boolean;
   hiddenIds: string[];
@@ -213,7 +219,7 @@ export function createWebWorkspace(
         await attemptConnection(host);
         if (state.status !== "online") throw new Error(currentText().t("webClient.notice.connecting"));
       },
-      () => {},
+      noteConnectionFailure,
       (status) => {
         if (!disposed)
           setState((draft) => {
@@ -221,6 +227,20 @@ export function createWebWorkspace(
           });
       },
     );
+  }
+  /**
+   * Keeps a failed attempt that nothing else recorded. `connectWorkspace` and the connection updates
+   * record their own failures; an error without a code adds nothing to them.
+   */
+  function noteConnectionFailure(error: unknown) {
+    if (disposed || state.connectionError || !errorReference(error)) return;
+    const text = currentText();
+    setState((draft) => {
+      draft.connectionError = text.errorDetails(
+        error,
+        text.t("server.connection.reconnecting", { name: draft.host?.name ?? "" }),
+      );
+    });
   }
   function recover() {
     if (disposed || !hostId || recoveryBlocked) return;
@@ -276,15 +296,32 @@ export function createWebWorkspace(
           (update.state === "offline" || update.hostOffline === true) && !update.code && !state.hostRestart;
         setState((draft) => {
           if (update.state !== "online") draft.status = update.state;
-          if (update.state !== "online")
-            draft.connectionError = currentText().t("server.connection.reconnecting", { name: draft.host?.name ?? "" });
+          const text = currentText();
+          const reference = update.reference ?? null;
+          // An update without a reason keeps the last failure on screen. A working connection clears it.
+          if (update.state === "online") draft.connectionError = null;
+          else if (update.message || reference) {
+            const reconnecting = text.t("server.connection.reconnecting", { name: draft.host?.name ?? "" });
+            draft.connectionError = {
+              // Browser and peer text, such as a WebRTC exception, is not for the user.
+              message:
+                update.message && isSafeConnectionError(update.message)
+                  ? text.errorMessage(update.message, reconnecting)
+                  : reconnecting,
+              reference,
+            };
+          }
           // The lifecycle shows the message of an unavailable host only when the host does not sleep or wake.
+          // The text of a refusal or a broken frame is not for the user; its code says which it was.
           if (update.code)
-            draft.connectionError = currentText().t(
-              update.code === "session_revoked"
-                ? "webClient.error.accessEnded"
-                : "server.compatibility.unsafeDataDescription",
-            );
+            draft.connectionError = {
+              message: text.t(
+                update.code === "session_revoked"
+                  ? "webClient.error.accessEnded"
+                  : "server.compatibility.unsafeDataDescription",
+              ),
+              reference,
+            };
           if (update.state !== "online") {
             draft.approvals = [];
             draft.prompts = [];
@@ -473,7 +510,7 @@ export function createWebWorkspace(
   function report(error: unknown) {
     if (!disposed)
       setState((draft) => {
-        draft.error = error instanceof Error ? error.message : currentText().t("webClient.error.requestFailed");
+        draft.error = currentText().errorDetails(error, currentText().t("webClient.error.requestFailed"));
       });
   }
   async function run(action: () => Promise<void>) {
@@ -574,7 +611,9 @@ export function createWebWorkspace(
             draft.duplicatingAgentIds = [];
             draft.capabilities = [];
             draft.status = "offline";
-            draft.error = leftHostIds.has(refreshHostId) ? null : currentText().t("webClient.error.accessEnded");
+            draft.error = leftHostIds.has(refreshHostId)
+              ? null
+              : { message: currentText().t("webClient.error.accessEnded"), reference: null };
           });
           // First, so the host that left does not get a status connection when it stops being open.
           runtime.hosts?.setHosts(hosts);
@@ -602,9 +641,9 @@ export function createWebWorkspace(
         if (!disposed) runtime.hosts?.setHosts(hosts);
       } catch (error) {
         if (!disposed) {
-          const message = error instanceof Error ? error.message : currentText().t("webClient.error.hostsFailed");
+          const failure = currentText().errorDetails(error, currentText().t("webClient.error.hostsFailed"));
           setState((draft) => {
-            draft.hostsError = message;
+            draft.hostsError = failure;
           });
         }
         throw error;
@@ -697,9 +736,10 @@ export function createWebWorkspace(
     hostLifecycle.endSleep();
     recoveryBlocked = true;
     recovery.suspend();
+    const failure = { message: error.message, reference: errorReference(error) };
     setState((draft) => {
       draft.status = "offline";
-      draft.connectionError = error.message;
+      draft.connectionError = failure;
     });
     return true;
   }
@@ -733,7 +773,8 @@ export function createWebWorkspace(
     if (!connectionPromise || connectionPromise.hostId !== host.hostId) hostLifecycle.endSleep();
     try {
       await attemptConnection(host, true);
-    } catch {
+    } catch (error) {
+      if (!disposed && hostId === host.hostId) noteConnectionFailure(error);
       if (!disposed && hostId === host.hostId && state.recovery?.phase !== "suspended") recover();
     }
   }
@@ -758,7 +799,8 @@ export function createWebWorkspace(
     setState((draft) => {
       draft.host = host;
       draft.recovery = null;
-      draft.connectionError = null;
+      // A retry keeps the last failure on screen until it ends.
+      if (!sameHost) draft.connectionError = null;
       if (!sameHost) {
         draft.workspaceLoaded = false;
         draft.agentStatus = null;
@@ -868,12 +910,15 @@ export function createWebWorkspace(
         hostLifecycle.endSleep();
         recoveryBlocked = true;
         recovery.suspend();
+        const failure = { message: error.message, reference: errorReference(error) };
         setState((draft) => {
-          draft.connectionError = error.message;
+          draft.connectionError = failure;
         });
       } else {
+        const text = currentText();
+        const failure = text.errorDetails(error, text.t("server.connection.reconnecting", { name: host.name }));
         setState((draft) => {
-          draft.connectionError = currentText().t("server.connection.reconnecting", { name: host.name });
+          draft.connectionError = failure;
         });
         await hostLifecycle.hostUnavailable(host.hostId, opened);
       }

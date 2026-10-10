@@ -142,7 +142,8 @@ function AddServerSession(
       const text = currentText();
       const title = text.t("settings.hostedServers.loadFailed");
       actionToast.error(title, {
-        ...{ description: text.errorMessage(error, title) },
+        error,
+        fallback: title,
         report: { operation: "team", source: "action", cause_code: classifyFailure(error) },
       });
       if (resume) props.onPendingResume(resume);
@@ -271,7 +272,8 @@ function AddServerSession(
       const text = currentText();
       const title = text.t("settings.hostedServers.wakeFailed");
       actionToast.error(title, {
-        ...{ description: text.errorMessage(error, title) },
+        error,
+        fallback: title,
         report: { operation: "team", source: "action", cause_code: classifyFailure(error) },
       });
     }
