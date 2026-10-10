@@ -2,6 +2,10 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/agent";
 
 export const messages = {
+  "error.agent.historyUnavailable":
+    "El historial no está disponible para esta solicitud. Vuelve a leer el historial reciente o usa channel_history para el trabajo en canales.",
+  "error.agent.toolRequestInvalid":
+    "Los argumentos de descubrimiento de herramientas no son válidos. Usa el esquema declarado y un nombre de herramienta cualificado original.",
   "error.agent.approvalWhileDeleting": "No se puede conceder la aprobación mientras se elimina el agente.",
   "error.agent.accessLocalOnly": "El acceso del agente solo se puede cambiar en el equipo que lo ejecuta.",
   "error.agent.duplicateCleanupFailed": "No se pudo duplicar el agente ni eliminar la copia incompleta.",

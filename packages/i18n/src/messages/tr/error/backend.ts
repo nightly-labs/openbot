@@ -2,6 +2,11 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/backend";
 
 export const messages = {
+  "error.backend.eventsUnavailable": "Bu ana makinede etkinlikler kullanılamıyor.",
+  "error.backend.webhookRouteLimit": "Bir ana makinede en fazla {limit} webhook rutini olabilir.",
+  "error.backend.webhookSettingsInvalid": "Webhook ayarlarını kontrol edin ve tekrar deneyin.",
+  "error.backend.webhookRouteUnavailable":
+    "Herkese açık webhook yolu hazır değil. Ana makine bağlantısını kontrol edin ve tekrar deneyin.",
   // Errors that the backend services send: channels, messages, routines, memories, MCP, browser and remote desktop.
   "error.backend.browserViewRemoteOnly": "Canlı tarayıcı görünümü yalnızca uzak bir ana makine içindir.",
   "error.backend.browserViewUnsupported": "Bu uzak ana makine canlı tarayıcı görünümünü desteklemiyor.",
@@ -63,6 +68,13 @@ export const messages = {
   "error.backend.channelAssigneeUnavailable": "Atanan ajan kullanılamıyor.",
   "error.backend.channelAssignmentChanged": "Bu kanal ataması değişti.",
   "error.backend.channelMemberRequired": "Bu kanalın kullanılabilir bir üyesini seçin.",
+  "error.backend.memoryEssentialBudget":
+    "Temel bellekler istem sınırını aşıyor. Bir girdiyi gerektiğinde aranacak şekilde ayarlayın, ardından tekrar deneyin.",
+  "error.backend.memorySelectionConflict": "Bellek değişti. Yeniden yükleyin ve tekrar deneyin.",
+  "error.backend.memorySelectionUserControlled":
+    "Bu bellek seçimini kullanıcı yönetiyor. Kullanıcının seçimini koruyun.",
+  "error.backend.memorySearchQuery": "En fazla 256 karakterden oluşan bir veya daha fazla arama sözcüğü girin.",
+  "error.backend.memoryOperationFailed": "Bellek işlemi başarısız oldu. Tekrar deneyin.",
   "error.backend.memoryGone": "Bu bellek artık mevcut değil.",
   "error.backend.routineGone": "Bu rutin artık mevcut değil.",
   "error.backend.channelMemoryLimit": "Bir kanal en fazla {limit} belleğe sahip olabilir.",
@@ -135,6 +147,16 @@ export const messages = {
   "error.backend.memoryTextRequired": "Bellek metni gereklidir.",
   "error.backend.memoryTextTooLong": "Bellek metni çok uzun.",
   "error.backend.mcpServerGone": "Bu MCP sunucusu artık mevcut değil.",
+  "error.backend.routineFlowLinkGone": "Bu bağlantı artık yok.",
+  "error.backend.routineFlowSameAgent": "Bir ajan işi kendisine devredemez.",
+  "error.backend.routineFlowIntoOwner": "Rutin kendi ajanıyla başlıyor, bu nedenle o ajan başka bir ajandan iş alamaz.",
+  "error.backend.routineFlowNotOnPath": "Bu ajan henüz rutinin bir parçası değil. Önce onu rutine bağlayın.",
+  "error.backend.routineFlowDuplicate": "Bu ajanlar bu rutinde zaten bağlı.",
+  "error.backend.routineFlowCycle": "Bu bağlantı bir döngü oluşturur.",
+  "error.backend.routineFlowLinkLimit": "Bir rutinde en fazla {limit} bağlantı olabilir.",
+  "error.backend.routineFlowHandoffFailed": "Rutin işi bu ajana aktaramadı.",
+  "error.backend.routineFlowRemoteUnsupported":
+    "Rutin akışları yalnızca bu bilgisayardaki ajanlar için kullanılabilir.",
   "error.backend.mcpServerLimit": "OpenBot en fazla {limit} MCP sunucusu tutar.",
   "error.backend.mcpServerNameTaken": "{name} adında bir MCP sunucusu zaten mevcut.",
   "error.backend.mcpServerNoAnswer": "Sunucu {seconds} saniye içinde yanıt vermedi.",
@@ -192,6 +214,7 @@ export const messages = {
   "error.backend.editSavedDifferent": "Bu düzenleme zaten farklı içerikle kaydedildi. Değişiklikleriniz kaydedilmedi.",
   "error.backend.useChannelTaskControlsWork": "Kanal çalışması için kanal görevi kontrollerini kullanın.",
   "error.backend.steerTurnChanged": "Bu mesaj yönlendirilmeden önce etkin tur değişti.",
+  "error.backend.steerUnsupported": "Bu sağlayıcı çalışan bir turu yönlendiremez. Mesajınız kuyrukta kalır.",
   "error.backend.steerQueuedOnly": "Yalnızca kuyruğa alınmış mesajlar yönlendirilebilir.",
   "error.backend.promptInactive": "Bu istem artık etkin değil.",
   "error.backend.promptAnswerMismatch": "Bir istem yanıtı etkin bir soruyla eşleşmiyor.",

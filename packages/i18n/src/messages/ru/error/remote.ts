@@ -189,6 +189,7 @@ export const messages = {
   "error.remote.remoteNotConfigured": "Удалённые подключения не настроены в этой службе OpenBot.",
   "error.remote.hostRefused": "Хост отклонил запрос ({status}).",
   "error.remote.formUnavailable": "Эта форма больше недоступна.",
+  "error.remote.hostedServerRemoval": "Чтобы удалить размещённый сервер, используйте раздел «Оплата».",
   "error.remote.channelsUnsupported": "Обновите этот сервер на компьютере, чтобы использовать каналы.",
   "error.remote.channelDeleteUnsupported": "Обновите этот сервер на компьютере, чтобы удалять каналы.",
   "error.remote.attachmentUploadCancelled": "Отправка вложения отменена.",

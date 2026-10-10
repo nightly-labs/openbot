@@ -31,4 +31,13 @@ export const messages = {
   "memory.updateFailed": "No se pudo actualizar el recuerdo.",
   "memory.deleteFailed": "No se pudo eliminar el recuerdo.",
   "memory.clearFailed": "No se pudieron borrar los recuerdos.",
+  "memory.inclusion.label": "Uso de la memoria",
+  "memory.inclusion.essential": "Incluir siempre",
+  "memory.inclusion.searchable": "Buscar cuando sea necesario",
+  "memory.inclusion.automatic": "Que decida el agente",
+  "memory.inclusion.userControlled": "Seleccionado por ti",
+  "memory.inclusion.agentControlled": "El agente puede cambiarlo",
+  "memory.inclusion.explanation":
+    "Todos los recuerdos se conservan. Solo los recuerdos esenciales entran en cada prompt. El agente puede buscar los demás.",
+  "memory.inclusion.capacity": "Capacidad de memoria esencial: {used} de {total}",
 } as const satisfies PartialTranslation<typeof source>;

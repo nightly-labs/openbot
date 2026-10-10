@@ -2,6 +2,10 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/agent";
 
 export const messages = {
+  "error.agent.historyUnavailable":
+    "История недоступна для этого запроса. Прочитайте недавнюю историю ещё раз или используйте channel_history для работы с каналом.",
+  "error.agent.toolRequestInvalid":
+    "Некорректные аргументы поиска инструментов. Используйте объявленную схему и исходное полное имя инструмента.",
   "error.agent.approvalWhileDeleting": "Нельзя дать подтверждение, пока агент удаляется.",
   "error.agent.accessLocalOnly": "Доступ агента можно изменить только на компьютере, где он работает.",
   "error.agent.duplicateCleanupFailed": "Не удалось дублировать агента, а неполную копию удалить не получилось.",

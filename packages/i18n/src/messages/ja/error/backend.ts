@@ -2,6 +2,11 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/backend";
 
 export const messages = {
+  "error.backend.eventsUnavailable": "このホストではイベントを利用できません。",
+  "error.backend.webhookRouteLimit": "1 つのホストの Webhook ルーティンは最大 {limit} 個です。",
+  "error.backend.webhookSettingsInvalid": "Webhook の設定を確認して、もう一度お試しください。",
+  "error.backend.webhookRouteUnavailable":
+    "公開 Webhook ルートの準備ができていません。ホストの接続を確認して、もう一度お試しください。",
   "error.backend.browserViewRemoteOnly": "ライブブラウザービューはリモートホスト専用です。",
   "error.backend.browserViewUnsupported": "このリモートホストはライブブラウザービューに対応していません。",
   "error.backend.browserViewLimit": "このホストで開いているブラウザービューが多すぎます。",
@@ -65,6 +70,13 @@ export const messages = {
   "error.backend.channelAssigneeUnavailable": "割り当てられたエージェントを使用できません。",
   "error.backend.channelAssignmentChanged": "このチャンネルの割り当ては変更されました。",
   "error.backend.channelMemberRequired": "このチャンネルの使用可能なメンバーを選択してください。",
+  "error.backend.memoryEssentialBudget":
+    "必須メモリーがプロンプトの上限を超えています。エントリーを「必要なときに検索」に設定してから、もう一度お試しください。",
+  "error.backend.memorySelectionConflict": "メモリーが変更されました。再読み込みして、もう一度お試しください。",
+  "error.backend.memorySelectionUserControlled":
+    "このメモリーの選択はユーザーが管理しています。ユーザーの選択を維持してください。",
+  "error.backend.memorySearchQuery": "検索語を 1 つ以上、256 文字以内で入力してください。",
+  "error.backend.memoryOperationFailed": "メモリーの操作に失敗しました。もう一度お試しください。",
   "error.backend.memoryGone": "このメモリーはもう存在しません。",
   "error.backend.routineGone": "このルーティンはもう存在しません。",
   "error.backend.channelMemoryLimit": "1 つのチャンネルに置けるメモリーは {limit} 個までです。",
@@ -140,6 +152,18 @@ export const messages = {
   "error.backend.memoryTextRequired": "メモリーのテキストが必要です。",
   "error.backend.memoryTextTooLong": "メモリーのテキストが長すぎます。",
   "error.backend.mcpServerGone": "この MCP サーバーはもう存在しません。",
+  "error.backend.routineFlowLinkGone": "この接続はもう存在しません。",
+  "error.backend.routineFlowSameAgent": "エージェントは自分自身に作業を渡せません。",
+  "error.backend.routineFlowIntoOwner":
+    "このルーティンは自身のエージェントから始まるため、そのエージェントは別のエージェントから作業を受け取れません。",
+  "error.backend.routineFlowNotOnPath":
+    "このエージェントはまだルーティンに含まれていません。先にルーティンに接続してください。",
+  "error.backend.routineFlowDuplicate": "これらのエージェントはこのルーティンですでに接続されています。",
+  "error.backend.routineFlowCycle": "この接続はループになります。",
+  "error.backend.routineFlowLinkLimit": "1 つのルーティンの接続は最大 {limit} 個です。",
+  "error.backend.routineFlowHandoffFailed": "ルーティンはこのエージェントに作業を渡せませんでした。",
+  "error.backend.routineFlowRemoteUnsupported":
+    "ルーティンのフローは、このコンピュータ上のエージェントでのみ利用できます。",
   "error.backend.mcpServerLimit": "OpenBot に保存できる MCP サーバーは {limit} 個までです。",
   "error.backend.mcpServerNameTaken": "{name} という名前の MCP サーバーはすでに存在します。",
   "error.backend.mcpServerNoAnswer": "サーバーは {seconds} 秒以内に応答しませんでした。",
@@ -200,6 +224,8 @@ export const messages = {
   "error.backend.editSavedDifferent": "この編集は別の内容ですでに保存されています。変更は保存されませんでした。",
   "error.backend.useChannelTaskControlsWork": "チャンネルの作業にはチャンネルのタスク操作を使用してください。",
   "error.backend.steerTurnChanged": "このメッセージで方向を変える前に、実行中のターンが変わりました。",
+  "error.backend.steerUnsupported":
+    "このプロバイダーは実行中のターンの方向を修正できません。メッセージはキューに残ります。",
   "error.backend.steerQueuedOnly": "ターンの方向を変えられるのはキュー内のメッセージだけです。",
   "error.backend.promptInactive": "この質問はもう有効ではありません。",
   "error.backend.promptAnswerMismatch": "回答が有効な質問と一致しません。",

@@ -2,6 +2,26 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/server";
 
 export const messages = {
+  "server.connection.planEnded": "{name} için plan sona erdi",
+  "server.connection.wakeFailed": "{name} başlatılamadı",
+  "server.connection.startTimeout": "{name} zamanında başlamadı",
+  "server.connection.sleeping": "{name} uyku modunda",
+  "server.connection.waking": "{name} başlatılıyor",
+  "server.connection.loading": "{name} yükleniyor",
+  "server.connection.connecting": "{name} sunucusuna bağlanılıyor",
+  "server.connection.reconnecting": "{name} sunucusuna yeniden bağlanılıyor",
+  "server.connection.blocked": "{name} ilginizi bekliyor",
+  "server.connection.nextRetry": "Sonraki deneme {seconds} saniye içinde.",
+  "server.connection.wakeHint": "Sunucuyu başlatmak için bu çalışma alanını kullanın veya Tekrar dene'yi seçin.",
+  "server.connection.planHint": "Sunucu planını kontrol etmek için hesap ayarlarını açın.",
+  "server.connection.loadingHint": "Bu sunucu yüklenirken başka bir sunucu seçebilirsiniz.",
+  "server.connection.cachedHint":
+    "Yüklenen içerik ve taslaklar korunur. Sunucu işlemleri yeniden bağlandıktan sonra devam eder.",
+  "server.connection.conversationFailed": "Konuşma yüklenemedi. Tekrar deneyin.",
+  "server.connection.panelsFailed": "Bazı çalışma alanı panelleri yüklenemedi. Tekrar deneyin.",
+  "server.connection.retry": "Tekrar dene",
+  "server.connection.manage": "Ayarları aç",
+  "server.connection.restored": "{name} ile bağlantı yeniden kuruldu",
   "server.compatibility.updateClientTitle": "Bu OpenBot uygulamasını güncelleyin",
   "server.compatibility.updateHostTitle": "{name} üzerindeki OpenBot'u güncelleyin",
   "server.compatibility.unsafeDataTitle": "Ana makine güvenli olmayan veri döndürdü",
@@ -184,6 +204,22 @@ export const messages = {
   "server.settings.importDescription": "Ajanlarınızı Grok Bot'tan bu sunucuya taşıyın.",
   "server.settings.connectorsTitle": "Bağlayıcılar",
   "server.settings.connectorsDescription": "Bu sunucudaki her ajanın kullanabileceği hesapları bağlayın.",
+  "server.settings.routinesTitle": "Rutinler",
+  "server.settings.routinesDescription": "Bu bilgisayarın rutin programını bir takvim uygulamasında gösterin.",
+  "server.routineFeed.title": "Takvim akışı",
+  "server.routineFeed.offTitle": "Takvim akışı kapalı",
+  "server.routineFeed.offDescription":
+    "Özel bir URL oluşturun, ardından Apple Takvim'de (Mac'imde) veya bu bilgisayarda onu okuyan başka bir takvim uygulamasında bu URL'ye abone olun. Sonraki 30 gündeki her çalıştırma bir etkinlik olarak gösterilir. Duraklatılmış rutinler gösterilmez.",
+  "server.routineFeed.create": "Akış URL'si oluştur",
+  "server.routineFeed.urlLabel": "Akış URL'si",
+  "server.routineFeed.agentLabel": "Ajan filtresi",
+  "server.routineFeed.allAgents": "Tüm ajanlar ve kanallar",
+  "server.routineFeed.copy": "URL'yi kopyala",
+  "server.routineFeed.privacy":
+    "Bu URL'ye sahip olan herkes rutin adlarını ve çalıştırma zamanlarını okuyabilir. URL yalnızca bu bilgisayarda çalışır, bu nedenle Google Takvim ve iCloud onu okuyamaz.",
+  "server.routineFeed.regenerate": "Yeni URL",
+  "server.routineFeed.regenerateLabel": "Yeni bir URL oluşturun. Eski URL çalışmayı durdurur.",
+  "server.routineFeed.turnOff": "Kapat",
   "server.settings.nameTooShort": "En az {limit} karakter girin.",
   "server.settings.nameTooLong": "En fazla {limit} karakter kullanın.",
   "server.settings.actionFailedTitle": "Sunucu eylemi başarısız oldu",
@@ -361,6 +397,23 @@ export const messages = {
   "server.update.status.downloadFailed": "{name} güncellemeyi indiremedi. Tekrar deneyin.",
   "server.update.status.installFailed":
     "{name} güncellemeyi yükleyemedi. O bilgisayarın başka hiçbir kullanıcısının OpenBot çalıştırmadığından emin olun, ardından tekrar deneyin.",
+  "server.update.releaseCheckFailed":
+    "{name} sürüm akışını okuyamadı. Ana makinenin ağ bağlantısını kontrol edin, ardından tekrar deneyin.",
+  "server.update.releaseUnavailable":
+    "Bu derleme için sürüm denetimleri kullanılamıyor. Ana makine yöneticisinden uyumlu bir sürümü kontrol etmesini isteyin.",
+  "server.update.externalTitle": "Kurulumu ana makine yönetir",
+  "server.update.path.hostManager":
+    "OpenBot Host Manager, tüm kullanıcılar boştayken güncellemeleri yükler. Bir güncelleme başlamazsa ana makine yöneticisinden Host Manager durumunu kontrol etmesini isteyin.",
+  "server.update.path.hosted":
+    "Barındırılan hizmet güncellemeleri arka planda indirir. İndirilen bir güncelleme, sunucu bir sonraki başlatılışında başlar. Sunucuyu durdurup sürdürmeden önce etkin çalışmanın bitmesini bekleyin. Sunucu eski bir sürümde kalırsa ana makine yöneticisiyle iletişime geçin.",
+  "server.update.path.system":
+    "En son sürümü yüklemek için ana makinede sudo openbot update komutunu çalıştırın. Bu komut OpenBot'u durdurur. Önce etkin çalışmanın bitmesini bekleyin. Otomatik indirmeler bir sonraki önyüklemede yüklenir.",
+  "server.update.path.container":
+    "Docker ana makinesinde yeni OpenBot görüntüsünü çekin ve kapsayıcıyı aynı veri birimleriyle yeniden oluşturun. Önce etkin çalışmanın bitmesini bekleyin. Verilerinizi korumak için mevcut birimleri saklayın.",
+  "server.update.path.manual":
+    "Bu kurulum kendini değiştiremez. Ana makine yöneticisinden uyumlu sürümü github.com/nightly-labs/openbot/releases adresinden yüklemesini isteyin. Mevcut OpenBot verilerini saklayın.",
+  "server.update.path.unavailable":
+    "Bu bir geliştirme derlemesidir. Güncellemeleri kontrol etmek için yüklü bir OpenBot sürümü kullanın.",
   "server.update.check": "Güncellemeleri kontrol et",
   "server.update.start": "Boşta olduğunda güncelle",
   "server.update.restartNow": "Şimdi yeniden başlat",

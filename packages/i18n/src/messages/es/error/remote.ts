@@ -191,6 +191,7 @@ export const messages = {
   "error.remote.remoteNotConfigured": "Las conexiones remotas no están configuradas en este servicio de OpenBot.",
   "error.remote.hostRefused": "El host rechazó la solicitud ({status}).",
   "error.remote.formUnavailable": "Este formulario ya no está disponible.",
+  "error.remote.hostedServerRemoval": "Usa Facturación para eliminar un servidor alojado.",
   "error.remote.channelsUnsupported": "Actualiza este servidor de escritorio para usar canales.",
   "error.remote.channelDeleteUnsupported": "Actualiza este servidor de escritorio para eliminar canales.",
   "error.remote.attachmentUploadCancelled": "Carga del archivo adjunto cancelada.",

@@ -13,6 +13,10 @@ export const messages = {
     "A credencial do computador anfitrião remoto está indisponível. Registre o computador anfitrião novamente.",
   "error.auth.codeNotVerified": "Não foi possível verificar o código de acesso.",
   "error.auth.serviceError": "O serviço de contas retornou um erro.",
+  "error.auth.serviceUnreachable":
+    "O OpenBot não conseguiu acessar o serviço de contas. Verifique sua conexão e tente novamente.",
+  "error.auth.serviceTimeout": "O serviço de contas não respondeu a tempo. Tente novamente.",
+  "error.auth.serviceStatus": "O serviço de contas retornou um erro ({status}). Tente novamente mais tarde.",
   "error.auth.invalidHostedServer": "O serviço de contas retornou um servidor hospedado inválido.",
   "error.auth.codeNotSent": "O OpenBot não conseguiu enviar o código de acesso.",
   "error.auth.deliveryTimeout":

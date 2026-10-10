@@ -19,6 +19,7 @@ export const messages = {
   "prompt.customPlaceholder": "Saisissez votre propre réponse",
   "prompt.question.customAnswerFor": "Réponse personnalisée pour : {question}",
   "prompt.question.skip": "Ignorer",
+  "prompt.question.submitAnswer": "Envoyer la réponse",
   "prompt.question.emptyTitle": "Aucune question en attente.",
   "prompt.question.emptyBody": "L’agent continuera quand il aura besoin d’une autre décision.",
   "prompt.choice.hint": "Choisissez ce qui convient, ou saisissez votre propre réponse.",

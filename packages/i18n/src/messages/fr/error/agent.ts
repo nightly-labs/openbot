@@ -2,10 +2,15 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/agent";
 
 export const messages = {
+  "error.agent.historyUnavailable":
+    "L’historique n’est pas disponible pour cette demande. Relisez l’historique récent, ou utilisez channel_history pour le travail dans un canal.",
+  "error.agent.toolRequestInvalid":
+    "Arguments de découverte d’outils non valides. Utilisez le schéma déclaré et un nom d’outil qualifié d’origine.",
   "error.agent.approvalWhileDeleting": "Impossible d’accorder l’approbation pendant la suppression de l’agent.",
   "error.agent.accessLocalOnly": "L’accès à l’agent ne peut être modifié que sur l’ordinateur qui exécute l’agent.",
   "error.agent.duplicateCleanupFailed":
     "La duplication de l’agent a échoué et la copie incomplète n’a pas pu être supprimée.",
+  "error.agent.commitEffectsFailed": "La transaction a été validée, mais ses effets enregistrés ont échoué.",
   "error.agent.settingsLocalOnly":
     "Les réglages de l’agent ne peuvent être modifiés que sur l’ordinateur qui exécute l’agent.",
   "error.agent.skillsLocalOnly": "Les compétences ne peuvent être modifiées que sur l’ordinateur qui exécute l’agent.",
@@ -87,6 +92,17 @@ export const messages = {
     "Le profil d’agent enregistré {id} a une valeur « {field} » illisible ; mettez à jour les données avant de démarrer OpenBot.",
   "error.agent.queueEditRejected": "Modification de la file d’attente refusée : {reason}",
   "error.agent.computerUseLocalOnly": "Computer Use ne peut être modifié que sur l’ordinateur qui exécute l’agent.",
+  "error.agent.automationLocalOnly":
+    "Les scripts locaux ne peuvent être autorisés que sur l’ordinateur qui exécute l’agent.",
+  "error.agent.busyMessageModeLocalOnly":
+    "Le comportement des messages pendant le travail de l’agent ne peut être réglé que sur l’ordinateur qui exécute l’agent.",
+  "error.agent.localScriptsOff": "Cet agent n’autorise pas les scripts locaux.",
+  "error.agent.localScriptsRateLimited":
+    "Des scripts locaux ont envoyé à cet agent {limit} demandes de message ou de routine au cours de la dernière heure. Réessayez plus tard.",
+  "error.agent.automationOff": "Cet agent n’autorise pas les scripts locaux à exécuter ses routines.",
+  "error.agent.automationPayloadTooLong": "Les données envoyées dépassent {limit} caractères.",
+  "error.agent.automationRateLimited":
+    "Des scripts locaux ont exécuté les routines de cet agent {limit} fois au cours de la dernière heure. Réessayez plus tard.",
   "error.agent.workspaceOnlyMacOnly":
     "« Espace de travail uniquement » n’est disponible pour ce fournisseur que sur macOS. Choisissez « Accès complet » dans les réglages de l’agent.",
   "error.agent.lowMemory":

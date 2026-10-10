@@ -14,6 +14,10 @@ export const messages = {
     "Uzak ana makine kimlik bilgisi kullanılamıyor. Ana makineyi tekrar kaydedin.",
   "error.auth.codeNotVerified": "Giriş kodu doğrulanamadı.",
   "error.auth.serviceError": "Hesap servisi bir hata döndürdü.",
+  "error.auth.serviceUnreachable":
+    "OpenBot hesap hizmetine ulaşamadı. Bağlantınızı kontrol edin, ardından tekrar deneyin.",
+  "error.auth.serviceTimeout": "Hesap hizmeti zamanında yanıt vermedi. Tekrar deneyin.",
+  "error.auth.serviceStatus": "Hesap hizmeti bir hata döndürdü ({status}). Daha sonra tekrar deneyin.",
   "error.auth.invalidHostedServer": "Hesap servisi geçersiz bir barındırılan sunucu döndürdü.",
   "error.auth.codeNotSent": "OpenBot giriş kodunu gönderemedi.",
   "error.auth.deliveryTimeout":

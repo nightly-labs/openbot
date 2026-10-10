@@ -14,6 +14,11 @@ export const messages = {
     "L’identifiant de l’hôte distant n’est pas disponible. Enregistrez à nouveau l’hôte.",
   "error.auth.codeNotVerified": "Impossible de vérifier le code de connexion.",
   "error.auth.serviceError": "Le service de compte a renvoyé une erreur.",
+  "error.auth.serviceUnreachable":
+    "OpenBot n’a pas pu joindre le service de compte. Vérifiez votre connexion, puis réessayez.",
+  "error.auth.serviceTimeout": "Le service de compte n’a pas répondu à temps. Réessayez.",
+  "error.auth.serviceStatus": "Le service de compte a renvoyé une erreur ({status}). Réessayez plus tard.",
+  "error.auth.invalidHostedServer": "Le service de compte a renvoyé un serveur hébergé invalide.",
   "error.auth.codeNotSent": "OpenBot n’a pas pu envoyer le code de connexion.",
   "error.auth.deliveryTimeout":
     "OpenBot n’a pas pu confirmer l’envoi à temps. Le code peut encore arriver ; vérifiez sa réception avant de le renvoyer.",

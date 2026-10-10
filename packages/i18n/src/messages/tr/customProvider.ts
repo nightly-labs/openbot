@@ -2,6 +2,16 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/customProvider";
 
 export const messages = {
+  "customProvider.registry.title": "ACP kayıt defteri",
+  "customProvider.registry.description":
+    "Bu ana makineye ajan yükleyin. Çalışma zamanını kaldırmak ajan ayarlarını, kimlik bilgilerini ve konuşmaları korur.",
+  "customProvider.registry.search": "Kayıt defterinde ara",
+  "customProvider.registry.empty": "Bu aramayla eşleşen ajan yok.",
+  "customProvider.registry.agentId": "Özel ajan kimliği",
+  "customProvider.registry.install": "Yükle",
+  "customProvider.registry.update": "Güncelle",
+  "customProvider.registry.remove": "Çalışma zamanını kaldır",
+  "customProvider.registry.failed": "Kayıt defteri işlemi başarısız oldu.",
   // Form doğrulama. Her mesaj özel sağlayıcı formunun bir alanını adlandırır.
   "customProvider.error.providerIdRequired": "Bir sağlayıcı kimliği girin.",
   "customProvider.error.providerIdPattern":

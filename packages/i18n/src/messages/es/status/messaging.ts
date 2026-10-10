@@ -33,4 +33,10 @@ export const messages = {
   "status.messaging.integrationsSection": "Integraciones",
   "status.messaging.signInReceived": "OpenBot recibió la instalación de Slack. Puedes cerrar esta pestaña.",
   "status.messaging.signInUnknown": "OpenBot no inició esta instalación de Slack. Iníciala de nuevo en OpenBot.",
+  "status.messaging.telegramNoAgent":
+    "Aún no hay ningún agente que pueda responder aquí. Añade el Orquestador de Telegram en OpenBot.",
+  "status.messaging.telegramLinked":
+    "OpenBot está conectado a este chat. Menciona a {bot} o responde a un mensaje de OpenBot para consultar a los agentes.",
+  "status.messaging.telegramOrchestratorName": "Orquestador de Telegram",
+  "status.messaging.telegramOrchestratorTitle": "Responde en Telegram y consulta al equipo",
 } as const satisfies PartialTranslation<typeof source>;

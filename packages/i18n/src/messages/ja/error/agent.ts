@@ -2,10 +2,15 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/agent";
 
 export const messages = {
+  "error.agent.historyUnavailable":
+    "このリクエストでは履歴を利用できません。最近の履歴をもう一度読み取るか、チャンネルの作業には channel_history を使用してください。",
+  "error.agent.toolRequestInvalid":
+    "ツール検出の引数が無効です。宣言されたスキーマと、元の修飾されたツール名を使用してください。",
   "error.agent.approvalWhileDeleting": "エージェントの削除中は承認できません。",
   "error.agent.accessLocalOnly":
     "エージェントへのアクセスは、そのエージェントを実行しているコンピューターでのみ変更できます。",
   "error.agent.duplicateCleanupFailed": "エージェントの複製に失敗し、不完全なコピーを削除できませんでした。",
+  "error.agent.commitEffectsFailed": "トランザクションはコミットされましたが、保存された効果の適用に失敗しました。",
   "error.agent.settingsLocalOnly":
     "エージェントの設定は、そのエージェントを実行しているコンピューターでのみ変更できます。",
   "error.agent.skillsLocalOnly": "スキルは、エージェントを実行しているコンピューターでのみ変更できます。",
@@ -84,6 +89,16 @@ export const messages = {
     "保存されたエージェントのプロフィール {id} に読み取れない「{field}」の値があります。OpenBot を起動する前にデータを更新してください。",
   "error.agent.queueEditRejected": "キューの編集が拒否されました: {reason}",
   "error.agent.computerUseLocalOnly": "Computer Use は、エージェントを実行しているコンピューターでのみ変更できます。",
+  "error.agent.automationLocalOnly": "ローカルスクリプトは、エージェントを実行しているコンピュータでのみ許可できます。",
+  "error.agent.busyMessageModeLocalOnly":
+    "エージェントの作業中のメッセージの扱いは、エージェントを実行しているコンピュータでのみ設定できます。",
+  "error.agent.localScriptsOff": "このエージェントはローカルスクリプトを許可していません。",
+  "error.agent.localScriptsRateLimited":
+    "過去 1 時間に、ローカルスクリプトがこのエージェントに {limit} 件のメッセージまたはルーティンのリクエストを送信しました。後でもう一度お試しください。",
+  "error.agent.automationOff": "このエージェントは、ローカルスクリプトによるルーティンの実行を許可していません。",
+  "error.agent.automationPayloadTooLong": "ペイロードが {limit} 文字を超えています。",
+  "error.agent.automationRateLimited":
+    "過去 1 時間に、ローカルスクリプトがこのエージェントのルーティンを {limit} 回実行しました。後でもう一度お試しください。",
   "error.agent.workspaceOnlyMacOnly":
     "このプロバイダーの「ワークスペースのみ」は macOS でのみ利用できます。エージェントの設定で「フルアクセス」を選んでください。",
   "error.agent.lowMemory":
