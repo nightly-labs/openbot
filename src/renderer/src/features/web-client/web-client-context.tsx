@@ -803,7 +803,16 @@ export function createWebWorkspace(
       if (disposed || current !== generation) return;
       revokedReconnect = false;
       hostLifecycle.endSleep();
+      // Signal can bring a held attempt online after the lifecycle suspended recovery for a sleeping
+      // or ended server, for example when another device wakes it.
+      const unblocked = recoveryBlocked;
+      if (unblocked) {
+        recoveryBlocked = false;
+        recovery.dispose();
+        recovery = makeRecovery();
+      }
       setState((draft) => {
+        if (unblocked) draft.recovery = null;
         draft.capabilities = capabilities;
         draft.agents = agents;
         draft.agentsLoaded = true;
