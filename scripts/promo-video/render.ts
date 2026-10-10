@@ -19,7 +19,7 @@ import { createOpenBotLogger } from "@openbot/logging";
 import { chromium } from "playwright-core";
 import { createServer } from "vite";
 import { z } from "zod";
-import type { Music } from "./composition/team/music";
+import type { Music } from "./composition/music";
 import { FPS, STAGE_HEIGHT, STAGE_WIDTH } from "./composition/timeline";
 import { VIDEOS } from "./composition/videos";
 
@@ -40,7 +40,7 @@ const { values } = parseArgs({
   },
 });
 
-const videoName = z.enum(["promo", "team"]).parse(values.video);
+const videoName = z.enum(["promo", "team", "everywhere"]).parse(values.video);
 const video = VIDEOS[videoName];
 const duration = video.duration;
 

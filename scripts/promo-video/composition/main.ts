@@ -11,14 +11,10 @@ import { createPrice } from "./scenes/price";
 import { createPromise } from "./scenes/promise";
 import { createTeam } from "./scenes/team";
 import { createStage, drawGridPulse, moveCamera, registerPromo, splitColor } from "./stage";
-import { beatPulse, clamp, DURATION, decay, spring } from "./timeline";
+import { beatPulse, clamp, DURATION, decay, decaySum, spring } from "./timeline";
 
 /** Grid pulses: a bright ring runs out from the middle. */
 const GRID_PULSES = [CUE.slam, CUE.price, CUE.outro] as const;
-
-function sum(times: readonly number[], length: number, t: number): number {
-  return times.reduce((total, at) => total + decay(t, at, length), 0);
-}
 
 async function build(): Promise<(t: number) => void> {
   const stage = await createStage((context) => [
@@ -50,7 +46,7 @@ async function build(): Promise<(t: number) => void> {
       16 * decay(t, CUE.price, 0.25) +
       24 * decay(t, CUE.outro, 0.35) +
       8 * decay(t, CUE.lock, 0.15) +
-      5 * sum(PROMISE_WORDS, 0.12, t);
+      5 * decaySum(PROMISE_WORDS, 0.12, t);
     moveCamera(stage, t, shake, 1 + 0.014 * beatPulse(t, 1.5, 14.5, 0.16));
 
     // The color split on the hits.
@@ -58,9 +54,9 @@ async function build(): Promise<(t: number) => void> {
       stage,
       16 * decay(t, CUE.slam, 0.35) +
         12 * decay(t, CUE.outro, 0.3) +
-        8 * sum(TRANSITIONS, 0.15, t) +
+        8 * decaySum(TRANSITIONS, 0.15, t) +
         6 * decay(t, CUE.price, 0.2) +
-        4 * sum(PROVIDER_SWAPS.slice(1), 0.08, t),
+        4 * decaySum(PROVIDER_SWAPS.slice(1), 0.08, t),
     );
 
     flash.style.opacity = String(

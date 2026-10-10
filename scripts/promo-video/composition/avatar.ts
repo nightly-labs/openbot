@@ -5,6 +5,8 @@ import { nextId, svg } from "./dom";
 
 export interface Avatar {
   element: SVGSVGElement;
+  /** The body color. The iPhone app tints the agent's Live Activity with it (`getBloubAvatarColor`). */
+  color: string;
   /** Draws the idle motion at time `t`. The engine is pure, so any `t` gives the same frame. */
   render(t: number): void;
 }
@@ -65,5 +67,5 @@ export function createAvatar(parent: Element, seed: string, hue: AvatarHue, size
     }
   };
 
-  return { element, render };
+  return { element, color, render };
 }

@@ -69,3 +69,47 @@ export function punchIn(
   const blur = 22 * (1 - eased);
   element.style.filter = blur > 0.05 ? `blur(${blur}px)` : "";
 }
+
+/**
+ * The big hit where a logo lands: a white ring and a wider lilac ring, lilac streaks and white
+ * dots. The two bursts use `seed` and `seed + 1`.
+ */
+export function impact(context: SceneContext, at: number, x: number, y: number, seed: number) {
+  const { palette } = context;
+  context.rings.push(
+    { at, x, y, radius: 1200, life: 0.8, width: 22, color: palette.white },
+    { at: at + 0.05, x, y, radius: 1600, life: 1, width: 10, color: palette.lilac },
+  );
+  context.bursts.push(
+    {
+      at,
+      x,
+      y,
+      count: 80,
+      speed: 2400,
+      life: 1,
+      size: 7,
+      color: palette.lilac,
+      seed,
+      shape: "streak",
+      drag: 3.4,
+    },
+    { at, x, y, count: 30, speed: 1400, life: 0.9, size: 5, color: palette.white, seed: seed + 1, shape: "dot" },
+  );
+}
+
+/** The lilac pill of a call to action or a URL. */
+export function lilacPill(parent: HTMLElement, fontSize: number, padding: number, text?: string): HTMLElement {
+  const pill = html("div", "text pill", parent, text);
+  Object.assign(pill.style, {
+    height: "112px",
+    padding: `0 ${padding}px`,
+    background: "var(--promo-lilac)",
+    color: "var(--promo-eye)",
+    fontSize: `${fontSize}px`,
+    fontWeight: "700",
+    letterSpacing: "-0.02em",
+    boxShadow: "0 0 80px var(--promo-glow)",
+  });
+  return pill;
+}

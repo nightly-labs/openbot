@@ -1,8 +1,9 @@
-// The song for the team video. It is not in the repository: render.ts downloads it from the source
-// into .openbot-build/promo-video/music/ and checks the hash. The licence needs the credit line.
+// The song for the team video. The licence needs the credit line.
 //
 // `bpm` and `start` were measured one time from the decoded audio (onset autocorrelation). `start`
 // is the first beat of the drop at bar 17, so beat 0 of the video is the drop.
+
+import type { Music } from "../music";
 
 export const MUSIC = {
   title: "Laserpack",
@@ -21,6 +22,4 @@ export const MUSIC = {
   ].join("\n"),
   bpm: 128,
   start: 30.03,
-} as const;
-
-export type Music = typeof MUSIC;
+} as const satisfies Music;

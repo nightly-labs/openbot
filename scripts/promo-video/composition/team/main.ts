@@ -3,7 +3,7 @@
 // it with the song, after one render has downloaded it.
 
 import { createStage, drawGridPulse, moveCamera, registerPromo, splitColor } from "../stage";
-import { beatPulse, clamp, decay } from "../timeline";
+import { beatPulse, clamp, decay, decaySum } from "../timeline";
 import { BEAT, CUE, TEAM_DURATION, TURNS } from "./cues";
 import { MUSIC } from "./music";
 import { createChannel } from "./scenes/channel";
@@ -13,10 +13,6 @@ import { camera } from "./shot";
 
 const GRID_PULSES = [CUE.mention, CUE.shipped, CUE.logo] as const;
 const MESSAGES = TURNS.map((turn) => turn.message);
-
-function sum(times: readonly number[], length: number, t: number): number {
-  return times.reduce((total, at) => total + decay(t, at, length), 0);
-}
 
 async function build(): Promise<(t: number) => void> {
   const stage = await createStage((context) => [createHook(context), createChannel(context), createOutro(context)]);
@@ -37,7 +33,7 @@ async function build(): Promise<(t: number) => void> {
       26 * decay(t, CUE.line, 0.4) +
       10 * decay(t, CUE.line2, 0.2) +
       26 * decay(t, CUE.mention, 0.35) +
-      5 * sum(MESSAGES, 0.15, t) +
+      5 * decaySum(MESSAGES, 0.15, t) +
       22 * decay(t, CUE.shipped, 0.3) +
       26 * decay(t, CUE.logo, 0.35);
     moveCamera(stage, t, shake, 1 + 0.012 * beatPulse(t, TURNS[0]?.typing ?? 0, CUE.fold, 0.16, BEAT));
@@ -48,7 +44,7 @@ async function build(): Promise<(t: number) => void> {
         8 * decay(t, CUE.line2, 0.2) +
         14 * decay(t, CUE.mention, 0.35) +
         10 * decay(t, CUE.pull, 0.3) +
-        4 * sum(MESSAGES, 0.12, t) +
+        4 * decaySum(MESSAGES, 0.12, t) +
         10 * decay(t, CUE.shipped, 0.3) +
         12 * decay(t, CUE.logo, 0.3),
     );

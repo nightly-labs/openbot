@@ -243,7 +243,7 @@ See [web client delivery](docs/web-client.md) for the release gate and focused c
 | `bun run dev:api` | Start the TanStack Start API and its local D1 database on `127.0.0.1:3100`. |
 | `bun run api:start` | Build and preview the Cloudflare Worker locally. |
 | `bun run api:images` | Draw the article artwork into `apps/auth-api/content-art/` after you add an article or change a title. Commit the result; the site build fails until it matches. Needs Electron and a GPU, so run it on your own machine. |
-| `bun run promo:render` | Render the 18 s promo video, with its synthesized soundtrack, into `.openbot-build/promo-video/`. Needs Google Chrome and ffmpeg. `--draft` renders 960×540 at 30 fps, `--still=<seconds>` writes single frames, and `--serve` prints a URL; open it with `?play` to watch with sound. `--video=team` renders the 8 s team video instead; its first run downloads the song into `.openbot-build/promo-video/music/`. |
+| `bun run promo:render` | Render the 18 s promo video, with its synthesized soundtrack, into `.openbot-build/promo-video/`. Needs Google Chrome and ffmpeg. `--draft` renders 960×540 at 30 fps, `--still=<seconds>` writes single frames, and `--serve` prints a URL; open it with `?play` to watch with sound. `--video=team` renders the 8 s team video instead, and `--video=everywhere` the 14 s video that goes from the desktop app to the web app to the iPhone; the first run of each downloads its song into `.openbot-build/promo-video/music/`. |
 | `bun run api:migrate:local` | Apply D1 migrations to the local development database. |
 | `bun run api:migrate:remote` | Apply D1 migrations to the configured remote database. |
 | `bun run api:deploy` | Build and deploy the account API to Cloudflare Workers. |

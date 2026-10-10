@@ -4,7 +4,7 @@ import { COPY } from "../copy";
 import { CUE } from "../cues";
 import { html, show } from "../dom";
 import { createLogo, RESTING_POSE } from "../logo";
-import { punchIn, type RenderScene, type SceneContext, sceneLayer } from "../scene";
+import { impact, lilacPill, punchIn, type RenderScene, type SceneContext, sceneLayer } from "../scene";
 import { bump, clamp, ease, keys, lerp, progress, spring } from "../timeline";
 
 const LOGO_SIZE = 360;
@@ -22,17 +22,7 @@ export function createOutro(context: SceneContext): RenderScene {
   const tagline = html("div", "text secondary", root, COPY.tagline);
   Object.assign(tagline.style, { fontSize: "54px", fontWeight: "500", letterSpacing: "-0.025em" });
 
-  const cta = html("div", "text pill", root);
-  Object.assign(cta.style, {
-    height: "112px",
-    padding: "0 56px",
-    background: "var(--promo-lilac)",
-    color: "var(--promo-eye)",
-    fontSize: "46px",
-    fontWeight: "700",
-    letterSpacing: "-0.02em",
-    boxShadow: "0 0 80px var(--promo-glow)",
-  });
+  const cta = lilacPill(root, 46, 56);
   html("span", "", cta, COPY.cta);
   const dot = html("span", "", cta, "·");
   dot.style.opacity = "0.5";
@@ -42,37 +32,7 @@ export function createOutro(context: SceneContext): RenderScene {
   const logoX = 960 - total / 2 + LOCKUP_SIZE / 2;
   const wordmarkX = 960 - total / 2 + LOCKUP_SIZE + GAP + wordmark.offsetWidth / 2;
 
-  context.rings.push(
-    { at: CUE.outro, x: 960, y: 540, radius: 1200, life: 0.8, width: 22, color: context.palette.white },
-    { at: CUE.outro + 0.05, x: 960, y: 540, radius: 1600, life: 1, width: 10, color: context.palette.lilac },
-  );
-  context.bursts.push(
-    {
-      at: CUE.outro,
-      x: 960,
-      y: 540,
-      count: 80,
-      speed: 2400,
-      life: 1,
-      size: 7,
-      color: context.palette.lilac,
-      seed: 81,
-      shape: "streak",
-      drag: 3.4,
-    },
-    {
-      at: CUE.outro,
-      x: 960,
-      y: 540,
-      count: 30,
-      speed: 1400,
-      life: 0.9,
-      size: 5,
-      color: context.palette.white,
-      seed: 82,
-      shape: "dot",
-    },
-  );
+  impact(context, CUE.outro, 960, 540, 81);
 
   return (t) => {
     if (!show(root, t >= CUE.outro)) return;

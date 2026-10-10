@@ -62,6 +62,11 @@ export function decay(t: number, at: number, length: number): number {
   return (1 - (t - at) / length) ** 3;
 }
 
+/** The sum of a `decay` of `length` at each of `times`. */
+export function decaySum(times: readonly number[], length: number, t: number): number {
+  return times.reduce((total, at) => total + decay(t, at, length), 0);
+}
+
 /** The sum of a short `decay` on every beat from `from` up to and including `to`. */
 export function beatPulse(t: number, from: number, to: number, length = 0.14, beat = BEAT): number {
   if (t < from || t > to + length) return 0;
