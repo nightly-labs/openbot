@@ -1,3 +1,4 @@
+import { sourceText } from "@openbot/i18n/source";
 import { Effect, Schema } from "effect";
 // Team API requests that the web client and the mobile app send in the same way.
 //
@@ -12,6 +13,7 @@ import {
   BROWSER_SECRET_RESPONSE_PATH,
   type CancelQueuedMessageInput,
   decodeChannel,
+  decodeChannelAudienceResult,
   decodeChannelMemories,
   decodeChannelMemory,
   decodeChannelPage,
@@ -21,6 +23,7 @@ import {
   decodeChannelRoutines,
   decodeChannelSummaries,
   decodeInstalledSkills,
+  decodeOptionalChannelAudienceResult,
   decodeRemoteAgentImportPreview,
   decodeRemoteAgentImportResult,
   type InstalledSkill,
@@ -36,6 +39,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_IMPORT_ROUTES, AGENT_IMPORT_UPLOAD_BYTES } from "@openbot/contracts/team-protocol/agent-import-v1";
+import { CHANNEL_AUDIENCE_ROUTES } from "@openbot/contracts/team-protocol/channels-audience-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { CONTEXT_RESET_ROUTES } from "@openbot/contracts/team-protocol/context-reset-v1";
 import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
@@ -207,6 +211,8 @@ export type TeamChannelsApi = Pick<
   | "listChannels"
   | "readChannel"
   | "channelCommand"
+  | "channelAudienceCommand"
+  | "channelAudienceReceipt"
   | "listChannelMemories"
   | "createChannelMemory"
   | "updateChannelMemory"
@@ -221,13 +227,27 @@ export type TeamChannelsApi = Pick<
 >;
 
 /** Every channel route is a POST with the channel in the body, except the list. */
-export function teamChannelsApi(request: TeamApiRequest): TeamChannelsApi {
+export function teamChannelsApi(
+  request: TeamApiRequest,
+  audienceSupported: () => boolean = () => false,
+): TeamChannelsApi {
   const post = <T>(path: string, decode: (value: unknown) => T, body: unknown) =>
     request("POST", path, decode, decodeTeamProtocolV2Json(body));
   return {
     listChannels: () => request("GET", CHANNEL_ROUTES.list, decodeChannelSummaries),
-    readChannel: (input) => post(CHANNEL_ROUTES.read, decodeChannelPage, input),
+    readChannel: (input) =>
+      post(audienceSupported() ? CHANNEL_AUDIENCE_ROUTES.read : CHANNEL_ROUTES.read, decodeChannelPage, input),
     channelCommand: (command) => post(CHANNEL_ROUTES.command, decodeChannel, command),
+    channelAudienceCommand: (input) => {
+      if (!audienceSupported())
+        return Promise.reject(new Error(sourceText("error.backend.channelAudienceUnsupported")));
+      return post(CHANNEL_AUDIENCE_ROUTES.command, decodeChannelAudienceResult, input);
+    },
+    channelAudienceReceipt: (input) => {
+      if (!audienceSupported())
+        return Promise.reject(new Error(sourceText("error.backend.channelAudienceUnsupported")));
+      return post(CHANNEL_AUDIENCE_ROUTES.receipt, decodeOptionalChannelAudienceResult, input);
+    },
     listChannelMemories: (channelId) => post(CHANNEL_ROUTES.memories, decodeChannelMemories, { channelId }),
     createChannelMemory: (input) => post(CHANNEL_ROUTES.memoryCreate, decodeChannelMemory, input),
     updateChannelMemory: (input) => post(CHANNEL_ROUTES.memoryUpdate, decodeChannelMemory, input),

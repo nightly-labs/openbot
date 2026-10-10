@@ -9,6 +9,7 @@ import {
   type ChannelTask,
   channelRoutingConversationEvent,
   channelRoutingConversationEventItemType,
+  parseChannelCommand,
 } from "@openbot/contracts/ipc";
 import { validateProfileName } from "@openbot/contracts/validation";
 import { Effect } from "effect";
@@ -97,6 +98,77 @@ async function send(text: string, recipientAgentId: string | null = "agent-a") {
   return required(service.store.tasks("channel-1")[0]);
 }
 describe("shared channel coordination", () => {
+  it("channel audience checkpoint: persists the observed first-member command once across a cold restart", async () => {
+    for (const id of ["chief", "sales-outbound", "reviewer"]) await runChannel(data.store.getOrCreate(id));
+    await runChannel(
+      service.command(
+        {
+          type: "save",
+          channelId: "audience-room",
+          operationId: "create-audience",
+          draft: {
+            ...draft,
+            members: [{ agentId: "chief" }, { agentId: "sales-outbound" }, { agentId: "reviewer" }],
+            leadAgentId: "chief",
+          },
+        },
+        actor,
+      ),
+    );
+    busy.mockReturnValue(true);
+    const text =
+      "@[Chief](agent:chief) @[Sales Outbound](agent:sales-outbound) @[Reviewer](agent:reviewer) Review the report";
+    // This is the command observed from the real component's one Send gesture. The decoder has
+    // no audience field: the durable service cannot reconstruct intent from incidental text.
+    const command = parseChannelCommand({
+      type: "send",
+      channelId: "audience-room",
+      operationId: "audience-input",
+      text,
+      recipientAgentId: "chief",
+      replyToMessageId: null,
+      attachmentDraftIds: [],
+    });
+    await runChannel(service.command(command, actor));
+    const first = service.store.page("audience-room");
+    expect(first.messages).toHaveLength(1);
+    expect(first.messages[0]?.message.text).toBe(text);
+    expect(first.tasks.map((task) => task.ownerAgentId)).toEqual(["chief"]);
+    expect(service.store.assignments("audience-room")).toEqual([]);
+    await runChannel(service.command(command, actor));
+    expect(service.store.page("audience-room")).toEqual(first);
+
+    await runChannel(service.stop());
+    data.store.database.close();
+    data = stores(root);
+    await runChannel(data.store.initialize());
+    await runChannel(data.mailbox.initialize());
+    service = new ChannelService(data.store.database, data.mailbox, {
+      agents: () => data.store.list(),
+      generate,
+      schedule,
+      interrupt,
+      busy,
+      usageLimited: (agentId) => limited.has(agentId),
+      changed,
+      queueHoldChanged,
+      error: (error) => {
+        throw error;
+      },
+    });
+    await runChannel(service.command(command, actor));
+    expect(service.store.page("audience-room")).toEqual(first);
+    busy.mockReturnValue(false);
+    await runChannel(service.wake("audience-room"));
+    await vi.waitFor(() =>
+      expect(service.store.assignments("audience-room").some((item) => item.deliveryId)).toBe(true),
+    );
+    expect(service.store.assignments("audience-room").map((assignment) => assignment.agentId)).toEqual(["chief"]);
+    expect(data.mailbox.nextQueued("sales-outbound")).toBeNull();
+    expect(data.mailbox.nextQueued("reviewer")).toBeNull();
+    expect(service.store.tasks("audience-room").map((task) => task.id)).toEqual(first.tasks.map((task) => task.id));
+  });
+
   it("gives a task back to the queue at a spent plan, so it reserves nothing until the agent runs again", async () => {
     const task = await send("Prepare the report");
     const first = required(service.store.assignments("channel-1")[0]);

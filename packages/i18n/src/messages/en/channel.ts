@@ -1,6 +1,20 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("channel", {
+  "channel.audience.pending": "Channel acceptance is unconfirmed. Check the saved request before retrying.",
+  "channel.audience.retry": "Retry saved request",
+  "channel.audience.check": "Check channel acceptance",
+  "channel.audience.targets": "Accepted channel targets",
+  "channel.audience.stop": "Stop work for {name}",
+  "channel.audience.stopGroup": "Stop this group",
+  "channel.audience.state.queued": "Queued",
+  "channel.audience.state.waiting": "Waiting",
+  "channel.audience.state.running": "Working",
+  "channel.audience.state.completed": "Completed",
+  "channel.audience.state.cancelled": "Cancelled",
+  "channel.audience.state.paused": "Stopped",
+  "channel.audience.state.failed": "Failed",
+  "channel.audience.state.unavailable": "Status unavailable",
   "channel.activity.one": "{name} is working",
   "channel.activity.many": "{names} and {last} are working",
   "channel.activity.status": "{sentence}: {label}",

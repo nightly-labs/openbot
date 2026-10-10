@@ -1,4 +1,4 @@
-import { CHANNEL_CHATS_CAPABILITY } from "@openbot/contracts/ipc";
+import { CHANNEL_AUDIENCE_CAPABILITY, CHANNEL_CHATS_CAPABILITY } from "@openbot/contracts/ipc";
 import { createContext, type ParentProps, untrack, useContext } from "solid-js";
 import { useAuth } from "../account/account-context";
 import { useAgents } from "../agents/agents-context";
@@ -52,6 +52,9 @@ export function ChannelsProvider(props: ParentProps) {
       }
     },
     supported: () => activeServerSupportsCapability(CHANNEL_CHATS_CAPABILITY),
+    audienceSupported: () =>
+      activeServer()?.kind === "local" || activeServerSupportsCapability(CHANNEL_AUDIENCE_CAPABILITY),
+    audienceScope: () => JSON.stringify([accountKey(), selectionServerId]),
     deletionSupported: () => activeServer()?.kind !== "remote" || serverRoleCanAdminister(activeServer()),
     beforeOpen: () => {
       setAgentSetupOpen(false);

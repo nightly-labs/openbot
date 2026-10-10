@@ -42,6 +42,7 @@ import type {
   WorkspaceDirectory,
 } from "@openbot/contracts/ipc";
 import {
+  CHANNEL_AUDIENCE_CAPABILITY,
   decodeWorkspaceDirectory,
   isAccountUsage,
   isAgentModelOption,
@@ -499,7 +500,7 @@ export function createWebWorkspaceRuntime(
       revokeInvite: (inviteId) => runTeamEffect(directory.revokeInvite(inviteId)),
     },
   };
-  const channels = teamChannelsApi(teamApi);
+  const channels = teamChannelsApi(teamApi, () => capabilities.includes(CHANNEL_AUDIENCE_CAPABILITY));
   const browserView = createRemoteBrowserView(
     (data) => peer.sendHostStreamData(data),
     request,

@@ -12,7 +12,7 @@ export interface StoredQueueAttachment {
   fileName: string;
 }
 
-function isStoredQueueAttachment(value: unknown): value is StoredQueueAttachment {
+export function isStoredQueueAttachment(value: unknown): value is StoredQueueAttachment {
   return (
     isDynamicRecord(value) &&
     isString(value.id) &&

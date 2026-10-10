@@ -12,16 +12,21 @@ import {
   assertAnalyticsScope,
   assertHostAnalyticsScope,
   BROWSER_SECRET_RESPONSE_PATH,
+  CHANNEL_AUDIENCE_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
   decodeAgentProfileDraft,
   decodeChannel,
+  decodeChannelAudienceResult,
   decodeChannelPage,
   decodeChannelSummaries,
+  decodeOptionalChannelAudienceResult,
   decodeSaveAgentProfileResult,
   hostAnalyticsQuery,
   isAgentModelOption,
   parseAgentAnalyticsInput,
   parseBrowserSecretResponse,
+  parseChannelAudienceInput,
+  parseChannelAudienceReceiptInput,
   parseChannelCommand,
   parseChannelRead,
   parseGenerateAgentProfile,
@@ -32,6 +37,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { CHANNEL_AUDIENCE_ROUTES } from "@openbot/contracts/team-protocol/channels-audience-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { CONTEXT_RESET_CAPABILITY, CONTEXT_RESET_ROUTES } from "@openbot/contracts/team-protocol/context-reset-v1";
 import { sourceText } from "@openbot/i18n/source";
@@ -241,7 +247,14 @@ export function agentIpcHandlers({
         local: (input) => service.channels.store.page(input.channelId, input.beforeSequence),
         remote: (input, serverId) =>
           runCauseEffect(
-            remoteServers.request(serverId, CHANNEL_ROUTES.read, decodeChannelPage, { method: "POST", body: input }),
+            remoteServers.request(
+              serverId,
+              remoteServers.supportsCapability(serverId, CHANNEL_AUDIENCE_CAPABILITY)
+                ? CHANNEL_AUDIENCE_ROUTES.read
+                : CHANNEL_ROUTES.read,
+              decodeChannelPage,
+              { method: "POST", body: input },
+            ),
           ),
       }),
       channelCommand: scopedHandler(parseChannelCommand, {
@@ -250,6 +263,32 @@ export function agentIpcHandlers({
           runCauseEffect(
             remoteServers.request(serverId, CHANNEL_ROUTES.command, decodeChannel, { method: "POST", body: input }),
           ),
+      }),
+      channelAudienceCommand: scopedHandler(parseChannelAudienceInput, {
+        local: (input) => runCauseEffect(service.channels.audiences.send(input, host.channelActor())),
+        remote: (input, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, CHANNEL_AUDIENCE_CAPABILITY))
+            throw new Error(sourceText("error.backend.channelAudienceUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, CHANNEL_AUDIENCE_ROUTES.command, decodeChannelAudienceResult, {
+              method: "POST",
+              body: input,
+            }),
+          );
+        },
+      }),
+      channelAudienceReceipt: scopedHandler(parseChannelAudienceReceiptInput, {
+        local: (input) => service.channels.audiences.receipt(input, host.channelActor().id),
+        remote: (input, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, CHANNEL_AUDIENCE_CAPABILITY))
+            throw new Error(sourceText("error.backend.channelAudienceUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, CHANNEL_AUDIENCE_ROUTES.receipt, decodeOptionalChannelAudienceResult, {
+              method: "POST",
+              body: input,
+            }),
+          );
+        },
       }),
       deleteChannel: scopedHandler(parseChannelId, {
         local: (channelId) => runCauseEffect(service.deleteChannel(channelId)),

@@ -7,6 +7,7 @@ import {
   type AgentStatus,
   type AppInfo,
   type BrowserTakeoverRequest,
+  CHANNEL_AUDIENCE_CAPABILITY,
   CHANNEL_CHATS_CAPABILITY,
   decodeAgentHostSettings,
   type ServerConnectionState,
@@ -762,6 +763,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       if (hostId) writeChannelSelection(props.accountId, hostId, channelId);
     },
     supported: channelsSupported,
+    audienceSupported: () => workspace.state.capabilities.includes(CHANNEL_AUDIENCE_CAPABILITY),
+    audienceScope: () => JSON.stringify([props.accountId, workspace.state.host?.hostId]),
     deletionSupported: () => workspace.state.host?.role === "owner" || workspace.state.host?.role === "admin",
     beforeOpen: () => {
       setCreating(false);

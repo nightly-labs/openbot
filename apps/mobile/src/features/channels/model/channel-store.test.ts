@@ -1,4 +1,5 @@
 import {
+  CHANNEL_AUDIENCE_CAPABILITY,
   CHANNEL_CHATS_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
   type ChannelPage,
@@ -6,6 +7,7 @@ import {
   type ChannelTask,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { CHANNEL_AUDIENCE_ROUTES } from "@openbot/contracts/team-protocol/channels-audience-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { createWorkspacePreferences } from "@openbot/team-client";
@@ -1007,3 +1009,71 @@ it("shows each active channel task and clears activity when work pauses or finis
   assert(superseded);
   expect(superseded.turnId).toBeNull();
 });
+
+it.each(["@all Review", "@[One](agent:agent-one) @[Two](agent:agent-two) Review"])(
+  "mobile plural audience stays explicitly unsupported before upload: %s",
+  async (text) => {
+    const { store, calls } = fixture(async () => {
+      throw new Error("Must not submit or upload");
+    });
+    const sender = new ChannelSend(store, "host-one", channel.id, () => "send");
+    const file = { id: "file", name: "note.txt", mimeType: "text/plain", size: 1, base64: "eA==" };
+    await expect(sender.send(text, [file], null, channel.members)).rejects.toThrow("does not support");
+    expect(calls).not.toHaveBeenCalled();
+    expect(file.base64).toBe("eA==");
+    sender.dispose();
+  },
+);
+
+it.each([false, true])(
+  "keeps channel history and audience capability while marking all read: audience=%s",
+  async (audience) => {
+    let unread = 1;
+    const history = page(1, 3);
+    const commands: TeamProtocolV2Json[] = [];
+    const { store, calls } = fixture(async (path, body) => {
+      if (path === CHANNEL_ROUTES.list) return [{ ...channel, unreadCount: unread }];
+      if (path === CHANNEL_ROUTES.read || path === CHANNEL_AUDIENCE_ROUTES.read) return history;
+      if (path === CHANNEL_ROUTES.command) {
+        commands.push(body ?? null);
+        unread = 0;
+        return channel;
+      }
+      if (path === CHANNEL_AUDIENCE_ROUTES.receipt) return null;
+      throw new Error("Unexpected request");
+    });
+    store.configure("host-one", [CHANNEL_CHATS_CAPABILITY, ...(audience ? [CHANNEL_AUDIENCE_CAPABILITY] : [])]);
+    const release = store.observe("host-one", channel.id);
+    try {
+      await store.refresh("host-one");
+      const before = store.get("host-one").pages.get(channel.id);
+      assert(before);
+      await store.markAllRead("host-one", () => "mark-read-operation");
+      expect(commands).toEqual([
+        { type: "read", operationId: "mark-read-operation", channelId: channel.id, throughSequence: 3 },
+      ]);
+      expect(store.get("host-one").channels[0]?.unreadCount).toBe(0);
+      expect(
+        store
+          .get("host-one")
+          .pages.get(channel.id)
+          ?.messages.map((message) => message.id),
+      ).toEqual(before.messages.map((message) => message.id));
+      expect(store.get("host-one").canAudience).toBe(audience);
+      if (audience) {
+        expect(calls.mock.calls.some(([path]) => path === CHANNEL_AUDIENCE_ROUTES.read)).toBe(true);
+        await expect(store.audienceReceipt("host-one", channel.id, "audience-operation")).resolves.toBeNull();
+        expect(calls).toHaveBeenCalledWith(
+          CHANNEL_AUDIENCE_ROUTES.receipt,
+          { channelId: channel.id, operationId: "audience-operation" },
+          "host-one",
+        );
+      } else {
+        expect(calls.mock.calls.every(([path]) => path !== CHANNEL_AUDIENCE_ROUTES.read)).toBe(true);
+        expect(() => store.audienceReceipt("host-one", channel.id, "audience-operation")).toThrow("does not support");
+      }
+    } finally {
+      release();
+    }
+  },
+);

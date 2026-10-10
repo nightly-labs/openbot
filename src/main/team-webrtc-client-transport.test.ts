@@ -806,6 +806,44 @@ describe("TeamWebRtcClientTransport", () => {
       }),
     );
     expect(await pending).toEqual(channels);
+    const audiencePath = "/v1/channels/audience/commands";
+    const audienceInput = {
+      operationId: "selected",
+      channelId: "channel-1",
+      text: "Review",
+      audience: { kind: "members", agentIds: ["a", "b"] },
+      replyToMessageId: null,
+      attachmentDraftIds: [],
+    };
+    const previousRequest = sentRequestId(authentication.send);
+    const selected = runCauseEffect(transport.request("host-1", audiencePath, { method: "POST", body: audienceInput }));
+    await vi.waitFor(() => expect(sentRequestId(authentication.send)).not.toBe(previousRequest));
+    const requestId = sentRequestId(authentication.send);
+    const sent = authentication.send.mock.calls.findLast(
+      (call) => typeof call[2] === "string" && call[2].includes(audiencePath),
+    );
+    expect(sent).toBeDefined();
+    if (typeof sent?.[2] !== "string") throw new Error("Missing audience frame.");
+    expect(JSON.parse(sent[2]).payload.body.audience).toEqual(audienceInput.audience);
+    const receipt = {
+      channel: channels[0],
+      requestMessageId: "request",
+      targets: [
+        { agentId: "a", taskId: "task-a" },
+        { agentId: "b", taskId: "task-b" },
+      ],
+    };
+    bridge.emit(
+      "data",
+      "host-1",
+      "rpc",
+      JSON.stringify({ version: 2, type: "response", requestId, result: { status: 200, body: receipt } }),
+    );
+    expect(await selected).toMatchObject({
+      requestMessageId: receipt.requestMessageId,
+      targets: receipt.targets,
+      channel: { id: "channel-1" },
+    });
     const event = vi.fn();
     transport.on("event", event);
     bridge.emit(

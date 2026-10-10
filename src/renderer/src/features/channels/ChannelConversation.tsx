@@ -1,10 +1,12 @@
 import { expandAttachmentReferences } from "@openbot/contracts/attachment-references";
-import { chatTagReferences, expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
+import { channelAudienceSelection } from "@openbot/contracts/channel-audience-selection";
+import { expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
 import {
   type AgentApproval,
   type AttachmentSummary,
   type BrowserTab,
   type BrowserTakeoverRequest,
+  type ChannelAudienceInput,
   canPreviewAttachment,
   type FilePreview,
 } from "@openbot/contracts/ipc";
@@ -83,6 +85,16 @@ import { channelRoutinesPort, eventRoutinesPort } from "../conversation/routines
 import { ChannelEditor } from "./ChannelEditor";
 import { channelTimelineEntries, firstUnreadChannelMessageId } from "./channel-timeline";
 import { useChannels } from "./channels-context";
+
+const AUDIENCE_STATE_KEYS = {
+  queued: "channel.audience.state.queued",
+  waiting: "channel.audience.state.waiting",
+  running: "channel.audience.state.running",
+  completed: "channel.audience.state.completed",
+  cancelled: "channel.audience.state.cancelled",
+  paused: "channel.audience.state.paused",
+  failed: "channel.audience.state.failed",
+} as const;
 
 const ChannelFilePreviewPanel = lazy(() => import("../conversation/FilePreviewPanel"));
 
@@ -231,6 +243,30 @@ export function ChannelConversation(props: ChannelConversationProps) {
   );
   const clearSent = (channelId: string, text: string) =>
     updateDraft(channelId, (draft) => (draft.text === text ? EMPTY_DRAFT : draft));
+  const clearAudienceDraft = (input: ChannelAudienceInput) => {
+    let cleared = false;
+    updateDraft(input.channelId, (draft) => {
+      if (
+        expandComposerMentions(draft.text) !== input.text ||
+        draft.replyToMessageId !== input.replyToMessageId ||
+        draft.attachments.length !== input.attachmentDraftIds.length ||
+        !draft.attachments.every((attachment, index) => attachment.id === input.attachmentDraftIds[index])
+      )
+        return draft;
+      cleared = true;
+      return EMPTY_DRAFT;
+    });
+    if (cleared) {
+      const agent = runtime().agent; // The accepted view owns this host; no later scope lookup.
+      void Promise.allSettled(input.attachmentDraftIds.map((id) => agent.discardDraftAttachment(id)));
+    }
+  };
+  createEffect(
+    () => channels.state.acceptedAudience,
+    (input) => {
+      if (input) clearAudienceDraft(input);
+    },
+  );
   let messageList: HTMLElement | undefined;
   let virtualRoot: HTMLElement | undefined;
   let unreadMessagesDivider: HTMLElement | undefined;
@@ -568,23 +604,31 @@ export function ChannelConversation(props: ChannelConversationProps) {
     if (
       props.connectionReady === false ||
       channels.state.pending ||
+      channels.state.pendingAudience ||
       (!text.trim() && !attachments.length) ||
       !channelId
     )
       return;
     const expanded = expandComposerMentions(text);
-    // A request that opens with a member is addressed to that member, the way a reader writes it.
-    // A mention later in the text is what it reads as: a reference the owner of the work can see.
-    const mention = chatTagReferences(expanded).find(
-      (reference) => reference.kind === "agent" && !expanded.slice(0, reference.start).trim(),
-    );
+    const audience = channelAudienceSelection(expanded);
+    if (audience?.kind === "all" || (audience?.kind === "members" && audience.agentIds.length > 1)) {
+      void channels.audienceCommand({
+        operationId: crypto.randomUUID(),
+        channelId,
+        text: expanded,
+        audience,
+        replyToMessageId,
+        attachmentDraftIds: attachments.map((attachment) => attachment.id),
+      });
+      return;
+    }
     void channels.command(
       {
         type: "send",
         operationId: crypto.randomUUID(),
         channelId,
         text: expanded,
-        recipientAgentId: mention?.id ?? null,
+        recipientAgentId: audience?.kind === "members" ? (audience.agentIds[0] ?? null) : null,
         replyToMessageId,
         attachmentDraftIds: attachments.map((attachment) => attachment.id),
       },
@@ -623,14 +667,30 @@ export function ChannelConversation(props: ChannelConversationProps) {
           <Button
             variant="ghost"
             onClick={() =>
-              void channels.retry((sent) => {
-                if (sent.type === "send") clearSent(sent.channelId, sent.text);
-              })
+              void (channels.state.pendingAudience
+                ? channels.retryAudience()
+                : channels.retry((sent) => {
+                    if (sent.type === "send") clearSent(sent.channelId, sent.text);
+                  }))
             }
           >
             {t("common.retry")}
           </Button>
         </p>
+      </Show>
+      <Show when={channels.state.pendingAudience}>
+        {(input) => (
+          <div role="status">
+            <p>{t("channel.audience.pending")}</p>
+            <p>{expandChatTagReferences(input().text)}</p>
+            <Button variant="ghost" disabled={channels.state.pending} onClick={() => void channels.checkAudience()}>
+              {t("channel.audience.check")}
+            </Button>
+            <Button variant="ghost" disabled={channels.state.pending} onClick={() => void channels.retryAudience()}>
+              {t("channel.audience.retry")}
+            </Button>
+          </div>
+        )}
       </Show>
       <Show when={copyError()}>{(message) => <p role="alert">{message()}</p>}</Show>
 
@@ -846,6 +906,58 @@ export function ChannelConversation(props: ChannelConversationProps) {
                                   />
                                 )}
                               </Show>
+                              <Show when={page().messages.find((message) => message.id === initialEntry.id)?.audience}>
+                                {(audience) => (
+                                  <section aria-label={t("channel.audience.targets")}>
+                                    <For each={audience()}>
+                                      {(target) => {
+                                        const task = () => page().tasks.find((task) => task.id === target.taskId);
+                                        const active = () =>
+                                          task() &&
+                                          task()?.state !== "completed" &&
+                                          task()?.state !== "cancelled" &&
+                                          task()?.state !== "paused";
+                                        return (
+                                          <p>
+                                            {agentList().find((agent) => agent.id === target.agentId)?.name ??
+                                              target.agentId}
+                                            :{" "}
+                                            {task()
+                                              ? t(AUDIENCE_STATE_KEYS[task()?.state ?? "queued"])
+                                              : t("channel.audience.state.unavailable")}
+                                            <Show when={active()}>
+                                              <Button
+                                                variant="ghost"
+                                                onClick={() =>
+                                                  void channels.command({
+                                                    type: "stop",
+                                                    operationId: crypto.randomUUID(),
+                                                    channelId: page().channel.id,
+                                                    taskId: target.taskId,
+                                                    recipientAgentId: null,
+                                                  })
+                                                }
+                                              >
+                                                {t("channel.audience.stop", {
+                                                  name:
+                                                    agentList().find((agent) => agent.id === target.agentId)?.name ??
+                                                    target.agentId,
+                                                })}
+                                              </Button>
+                                            </Show>
+                                          </p>
+                                        );
+                                      }}
+                                    </For>
+                                    <Button
+                                      variant="ghost"
+                                      onClick={() => void channels.stopAudience(page().channel.id, audience())}
+                                    >
+                                      {t("channel.audience.stopGroup")}
+                                    </Button>
+                                  </section>
+                                )}
+                              </Show>
                             </ChatMessageRow>
                           )}
                         </ChatRowBoundary>
@@ -1007,6 +1119,7 @@ export function ChannelConversation(props: ChannelConversationProps) {
                   </Show>
                   <div class="composer-input-label">
                     <ComposerEditor
+                      channelAudience={true}
                       agentId={undefined}
                       agents={agentList().filter((agent) =>
                         page().channel.members.some((member) => member.agentId === agent.id),

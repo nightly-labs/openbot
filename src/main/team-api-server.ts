@@ -32,6 +32,7 @@ import {
   AGENT_INSTALL_CAPABILITY,
   AGENT_PUBLISH_CAPABILITY,
   AGENT_UPDATE_CAPABILITY,
+  CHANNEL_AUDIENCE_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
   EVENTS_CAPABILITY,
   HOST_ADMIN_CAPABILITY,
@@ -1460,7 +1461,11 @@ export class TeamApiServer {
       protocol: { minimum: TEAM_PROTOCOL_V1, maximum: TEAM_PROTOCOL_V7 },
       capabilities: TEAM_CURRENT_CAPABILITIES.filter((capability) => {
         if (!expanded && !legacyTeamCapabilities([capability]).length) return false;
-        if (capability === "channel-chats-v1" || capability === CHANNEL_DELETE_CAPABILITY)
+        if (
+          capability === "channel-chats-v1" ||
+          capability === CHANNEL_DELETE_CAPABILITY ||
+          capability === CHANNEL_AUDIENCE_CAPABILITY
+        )
           return this.#options.channels !== undefined;
         // Advertised only when this host can serve it: a client that negotiated it gets a route,
         // and one that did not never shows the panel.

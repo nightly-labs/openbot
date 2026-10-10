@@ -58,6 +58,8 @@ export function createWebChannelsPort(
       listChannels: channels?.listChannels ?? unavailable,
       readChannel: channels?.readChannel ?? unavailable,
       channelCommand: channels?.channelCommand ?? unavailable,
+      channelAudienceCommand: channels?.channelAudienceCommand ?? unavailable,
+      channelAudienceReceipt: channels?.channelAudienceReceipt ?? unavailable,
       listChannelMemories: channels?.listChannelMemories ?? unavailable,
       createChannelMemory: channels?.createChannelMemory ?? unavailable,
       updateChannelMemory: channels?.updateChannelMemory ?? unavailable,
@@ -74,6 +76,7 @@ export function createWebChannelsPort(
           if (event.type === "channel-memories-changed" || event.type === "channel-routines-changed") listener(event);
         }),
       chooseAttachments: async () => importAttachments(await chooseFiles()),
+      discardDraftAttachment: (id) => remote.discard(id),
       openAttachment: ({ attachmentId }) => files.download(attachmentId),
       respondToApproval: (input) => remote.approve(input),
       respondToPrompt: (input) => remote.answer(input),

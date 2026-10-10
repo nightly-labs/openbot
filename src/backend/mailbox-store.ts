@@ -25,6 +25,7 @@ import {
   AGENT_RUNTIME_ATTENTION_LIMIT,
   AGENT_RUNTIME_TEXT_LIMIT,
   AGENT_RUNTIME_WORKING_ITEMS_LIMIT,
+  isAttachmentSummary,
   isConversationMessageSender,
   isMessageReaction,
   QUEUE_STEER_FALLBACKS,
@@ -525,9 +526,27 @@ export class MailboxStore {
       messageId: string;
       text: string;
       draftIds: string[];
+      /** Only the channel audience owner supplies this host-generated preparation identity. */
+      preparation?: { operationKey: string; fingerprint: string };
     },
   ): Effect.fn.Return<{ text: string; attachments: AttachmentSummary[] }, StoredStateFailure> {
     try {
+      const prepared = input.preparation
+        ? this.#database.commandResult(`${input.preparation.operationKey}:files`)
+        : undefined;
+      if (prepared !== undefined) {
+        if (
+          !isRecord(prepared) ||
+          prepared.channelId !== input.channelId ||
+          prepared.messageId !== input.messageId ||
+          prepared.fingerprint !== input.preparation?.fingerprint ||
+          !isString(prepared.text) ||
+          !Array.isArray(prepared.attachments) ||
+          !prepared.attachments.every(isAttachmentSummary)
+        )
+          throw new Error(sourceText("error.backend.channelAudienceConflict"));
+        return { text: prepared.text, attachments: prepared.attachments };
+      }
       const ids = new Set(input.draftIds);
       if (ids.size !== input.draftIds.length) throw new Error("Duplicate attachment drafts.");
       const drafts = input.draftIds.map((id) => {
@@ -564,21 +583,55 @@ export class MailboxStore {
         createdAt,
       };
       this.#state.messages.push(message);
-      this.#state.drafts = this.#state.drafts.filter((draft) => !ids.has(draft.id));
+      if (input.preparation) {
+        // Keep the user's original draft references until tasks are accepted. A terminal validation
+        // refusal can then be corrected under a new operation, including after restart.
+        this.#state.drafts = this.#state.drafts.map((draft) =>
+          ids.has(draft.id) ? { ...draft, preserveOnRestart: true } : draft,
+        );
+      } else this.#state.drafts = this.#state.drafts.filter((draft) => !ids.has(draft.id));
       try {
-        this.#persist("channel.attachments-committed", `mailbox:channel-attachments:${input.messageId}`);
+        const persist = () =>
+          this.#persist("channel.attachments-committed", `mailbox:channel-attachments:${input.messageId}`);
+        if (input.preparation) {
+          const preparation = input.preparation;
+          // The outer dispatch owns the transaction. Mailbox persistence nests in it; its receipt
+          // and retained original drafts cannot commit without the narrow recovery association.
+          this.#database.dispatch(
+            `${preparation.operationKey}:files`,
+            [
+              {
+                aggregateType: "channel",
+                aggregateId: input.channelId,
+                eventType: "channel.audience-files-prepared",
+                payload: { messageId: input.messageId, fingerprint: preparation.fingerprint },
+              },
+            ],
+            () => {
+              persist();
+              return {
+                channelId: input.channelId,
+                messageId: input.messageId,
+                fingerprint: preparation.fingerprint,
+                text: message.text,
+                attachments: attachments.map(toAttachmentSummary),
+              };
+            },
+          );
+        } else persist();
       } catch (error) {
         this.#state.messages = this.#state.messages.filter((candidate) => candidate !== message);
-        for (const draft of drafts)
-          if (!this.#state.drafts.some((candidate) => candidate.id === draft.id)) this.#state.drafts.push(draft);
+        this.#state.drafts = this.#state.drafts.filter((draft) => !ids.has(draft.id));
+        this.#state.drafts.push(...drafts);
         yield* this.#files
           .remove(this.#files.transferRoot(input.messageId))
           .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
         throw error;
       }
-      yield* this.#files
-        .removeAttachmentDirectories(drafts.map((draft) => draft.path))
-        .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
+      if (!input.preparation)
+        yield* this.#files
+          .removeAttachmentDirectories(drafts.map((draft) => draft.path))
+          .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
       return { text: message.text, attachments: attachments.map(toAttachmentSummary) };
     } catch (cause) {
       return yield* new StoredStateFailure({ cause });

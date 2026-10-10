@@ -107,6 +107,7 @@ interface ChatComposerProps {
   /** Replaces "Ask {name}", such as while the composer answers a question. */
   placeholder?: string;
   mentionAgents: MobileAgent[];
+  channelAll?: boolean;
   bottomInset: number;
   disabled: boolean;
   draft: string;
@@ -171,6 +172,7 @@ export function ChatComposer({
   agentName,
   placeholder,
   mentionAgents,
+  channelAll = false,
   bottomInset,
   disabled,
   draft,
@@ -212,6 +214,7 @@ export function ChatComposer({
         )
         .slice(0, 8)
     : [];
+  const allSuggestion = Boolean(channelAll && query && "all".includes(query.query.trim()));
   const hasDraft = Boolean(draft.trim()) || attachments.items.length > 0;
   // What the bar has to stay open for. Attachments drop out of it the moment a
   // send starts: they are waiting for their upload then, and the bar already
@@ -508,19 +511,24 @@ export function ChatComposer({
     }
   }, [disabled, sendGate]);
 
-  const suggestionsVisible = Boolean(focused && query && suggestions.length > 0 && !disabled);
+  const suggestionsVisible = Boolean(focused && query && (suggestions.length > 0 || allSuggestion) && !disabled);
+  const suggestionCount = suggestions.length + Number(allSuggestion);
   const announcedSuggestions = useRef("");
   useEffect(() => {
     // The list opens and closes under the keyboard with no focus change, so a
     // screen reader gets no event. Announce the count, once per distinct query.
-    const announcement = suggestionsVisible ? `${suggestions.length}:${query?.query ?? ""}` : "";
+    const announcement = suggestionsVisible ? `${suggestionCount}:${query?.query ?? ""}` : "";
     if (announcedSuggestions.current === announcement) return;
     announcedSuggestions.current = announcement;
     if (!suggestionsVisible) return;
     AccessibilityInfo.announceForAccessibility(
-      suggestions.length === 1 ? "1 teammate suggestion" : `${suggestions.length} teammate suggestions`,
+      channelAll
+        ? t("mobile.channel.audience.suggestions", { count: suggestionCount })
+        : suggestions.length === 1
+          ? "1 teammate suggestion"
+          : `${suggestions.length} teammate suggestions`,
     );
-  }, [suggestionsVisible, suggestions.length, query?.query]);
+  }, [suggestionsVisible, suggestions.length, suggestionCount, channelAll, query?.query, t]);
 
   // The draft clears the moment a send starts, so the control must not read
   // its appearance from the draft alone: it would flip to an empty state
@@ -624,6 +632,27 @@ export function ChatComposer({
           }}
         >
           <ScrollView keyboardShouldPersistTaps="always" style={{ flexGrow: 0 }}>
+            {allSuggestion && query ? (
+              <Button
+                variant="ghost"
+                className="min-h-12 justify-start rounded-none px-4"
+                accessibilityLabel={t("mobile.channel.audience.mentionAll")}
+                onPress={() => {
+                  const previous = mentionDraft(latestTextRef.current);
+                  // All is plain text, never a fabricated agent identity.
+                  const nextText = `${previous.text.slice(0, query.start)}@all ${previous.text.slice(query.end)}`;
+                  const next = editMentionDraft(latestTextRef.current, nextText);
+                  latestTextRef.current = next;
+                  onChangeDraft(next);
+                  const position = query.start + 5;
+                  setCursor(position);
+                  pendingCursor.current = position;
+                  inputRef.current?.focus();
+                }}
+              >
+                <Button.Label>{t("mobile.channel.audience.all")}</Button.Label>
+              </Button>
+            ) : null}
             {suggestions.map((agent) => (
               <Button
                 key={agent.id}

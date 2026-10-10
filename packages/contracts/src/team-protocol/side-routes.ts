@@ -6,6 +6,7 @@
 //
 // The route sets compare `url.pathname` for equality and share no path, so the order of the checks
 // below does not change which codec a route gets.
+import { channelAudienceRequest, channelAudienceResponse, isChannelAudienceRoute } from "./channels-audience-v1";
 import { channelRequest, channelResponse, isChannelRoute } from "./channels-v1";
 import { isMcpRoute, mcpRequest, mcpResponse } from "./mcp-v1";
 import { optionalRouteCodec } from "./optional-routes";
@@ -23,6 +24,7 @@ const STORAGE_CODEC: TeamSideRouteCodec = { request: storageRequest, response: s
 
 /** The side-protocol codec that owns `path`, or `null` when the negotiated protocol's adapter does. */
 export function teamSideRouteCodec(path: string): TeamSideRouteCodec | null {
+  if (isChannelAudienceRoute(path)) return { request: channelAudienceRequest, response: channelAudienceResponse };
   if (isChannelRoute(path)) return CHANNEL_CODEC;
   if (isMcpRoute(path)) return MCP_CODEC;
   if (isStorageRoute(path)) return STORAGE_CODEC;

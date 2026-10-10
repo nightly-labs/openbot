@@ -1,20 +1,25 @@
 import {
+  CHANNEL_AUDIENCE_CAPABILITY,
   CHANNEL_CHATS_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
+  type ChannelAudienceInput,
   type ChannelCommand,
   type ChannelPage,
   type ChannelSummary,
   type CreateChannelRoutineInput,
   decodeChannel,
+  decodeChannelAudienceResult,
   decodeChannelMemories,
   decodeChannelPage,
   decodeChannelRoutines,
   decodeChannelSummaries,
+  decodeOptionalChannelAudienceResult,
   isAttachmentSummary,
   type RespondToPromptInput,
   type UpdateChannelRoutineInput,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { CHANNEL_AUDIENCE_ROUTES } from "@openbot/contracts/team-protocol/channels-audience-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { sourceText } from "@openbot/i18n/source";
@@ -36,6 +41,7 @@ export interface ChannelState {
   pages: ReadonlyMap<string, ChannelPage>;
   supported: boolean;
   canDelete: boolean;
+  canAudience: boolean;
   loading: boolean;
   /** The last load failure. A screen renders it in the interface language. */
   error: { cause: unknown } | null;
@@ -45,6 +51,7 @@ const EMPTY: ChannelState = {
   pages: new Map(),
   supported: false,
   canDelete: false,
+  canAudience: false,
   loading: false,
   error: null,
 };
@@ -117,6 +124,7 @@ export class MobileChannelStore {
       next.pages === entry.state.pages &&
       next.supported === entry.state.supported &&
       next.canDelete === entry.state.canDelete &&
+      next.canAudience === entry.state.canAudience &&
       next.loading === entry.state.loading &&
       next.error === entry.state.error
     )
@@ -129,6 +137,7 @@ export class MobileChannelStore {
     this.publish(entry, {
       supported: capabilities.includes(CHANNEL_CHATS_CAPABILITY),
       canDelete: capabilities.includes(CHANNEL_DELETE_CAPABILITY),
+      canAudience: capabilities.includes(CHANNEL_AUDIENCE_CAPABILITY),
     });
   }
   remove(serverId: string) {
@@ -214,7 +223,7 @@ export class MobileChannelStore {
           const read = async (id: string) => {
             const page = await this.request(
               "POST",
-              CHANNEL_ROUTES.read,
+              entry.state.canAudience ? CHANNEL_AUDIENCE_ROUTES.read : CHANNEL_ROUTES.read,
               decodeChannelPage,
               { channelId: id },
               serverId,
@@ -294,7 +303,7 @@ export class MobileChannelStore {
     if (current?.olderCursor == null) return;
     const page = await this.request(
       "POST",
-      CHANNEL_ROUTES.read,
+      entry.state.canAudience ? CHANNEL_AUDIENCE_ROUTES.read : CHANNEL_ROUTES.read,
       decodeChannelPage,
       { channelId, beforeSequence: current.olderCursor },
       serverId,
@@ -404,6 +413,30 @@ export class MobileChannelStore {
       }
     }
     return result;
+  }
+  audience(serverId: string, input: ChannelAudienceInput) {
+    const entry = this.entry(serverId);
+    if (!entry.valid || !entry.state.canAudience)
+      throw new Error(sourceText("error.backend.channelAudienceUnsupported"));
+    return this.request(
+      "POST",
+      CHANNEL_AUDIENCE_ROUTES.command,
+      decodeChannelAudienceResult,
+      decodeTeamProtocolV2Json(input),
+      serverId,
+    );
+  }
+  audienceReceipt(serverId: string, channelId: string, operationId: string) {
+    const entry = this.entry(serverId);
+    if (!entry.valid || !entry.state.canAudience)
+      throw new Error(sourceText("error.backend.channelAudienceUnsupported"));
+    return this.request(
+      "POST",
+      CHANNEL_AUDIENCE_ROUTES.receipt,
+      decodeOptionalChannelAudienceResult,
+      { channelId, operationId },
+      serverId,
+    );
   }
   /** Reads each unread channel's latest page for its boundary, since a summary has no sequence. */
   async markAllRead(serverId: string, operationId: () => string) {

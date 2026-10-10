@@ -1,11 +1,19 @@
 import {
+  CHANNEL_AUDIENCE_CAPABILITY,
   CHANNEL_CHATS_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
   type ChannelCommand,
+  parseChannelAudienceInput,
+  parseChannelAudienceReceiptInput,
   parseChannelCommand,
   parseChannelRead,
 } from "@openbot/contracts/ipc";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
+import {
+  CHANNEL_AUDIENCE_ROUTES,
+  channelAudienceRequest,
+  isChannelAudienceRoute,
+} from "@openbot/contracts/team-protocol/channels-audience-v1";
 import { CHANNEL_ROUTES, channelRequest, isChannelSettingsRoute } from "@openbot/contracts/team-protocol/channels-v1";
 import { sourceText } from "@openbot/i18n/source";
 import type { ChannelService } from "../../backend/channel-service";
@@ -59,9 +67,27 @@ export async function routeChannels(
   // Every settings route is a POST that names its channel in the body, so one test covers all
   // eleven of them and an unknown method on a known path stays a 404 rather than a 400.
   const settings = method === "POST" && isChannelSettingsRoute(url.pathname);
-  if (!list && !read && !command && !remove && !settings) return "unmatched";
+  const audience = method === "POST" && isChannelAudienceRoute(url.pathname);
+  if (!list && !read && !command && !remove && !settings && !audience) return "unmatched";
   if (!channels || !capabilities.has(CHANNEL_CHATS_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.channelsUnsupported"));
+  if (audience) {
+    if (!capabilities.has(CHANNEL_AUDIENCE_CAPABILITY))
+      throw new HttpError(400, sourceText("error.backend.channelAudienceUnsupported"));
+    const body = channelAudienceRequest(url.pathname, await readJson(request));
+    if (url.pathname === CHANNEL_AUDIENCE_ROUTES.read) {
+      const input = parseChannelRead(body);
+      return json(200, channels.store.page(input.channelId, input.beforeSequence));
+    }
+    if (url.pathname === CHANNEL_AUDIENCE_ROUTES.receipt)
+      return json(200, channels.audiences.receipt(parseChannelAudienceReceiptInput(body), member.id));
+    return json(
+      200,
+      await runCauseEffect(
+        channels.audiences.send(parseChannelAudienceInput(body), { id: member.id, name: member.name ?? "Team member" }),
+      ),
+    );
+  }
   if (list) return json(200, channels.store.list(member.id));
   if (read) {
     const input = parseChannelRead(channelRequest(url.pathname, await readJson(request)));

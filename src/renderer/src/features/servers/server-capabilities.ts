@@ -20,6 +20,7 @@ export function serverSupportsCapability(
   if (
     (capability === "remote-desktop-setup" ||
       capability === "channel-chats-v1" ||
+      capability === "channel-audience-v1" ||
       capability === "channel-delete-v1" ||
       capability === "agent-duplication" ||
       capability === "model-scoped-usage" ||

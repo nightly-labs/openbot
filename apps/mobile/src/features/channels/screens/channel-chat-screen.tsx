@@ -1,23 +1,40 @@
 import * as Crypto from "expo-crypto";
 import { useLocalSearchParams, usePreventZoomTransitionDismissal } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import * as SecureStore from "expo-secure-store";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { ChatView } from "@/features/chat/components/chat-view";
 import { useQuestionPrompt } from "@/features/chat/components/use-question-prompt";
 import { projectChannelMessages } from "@/features/chat/model/chat-messages";
+import {
+  readQueueAttachment,
+  removeQueueAttachment,
+  writeQueueAttachment,
+} from "@/features/chat/model/queue-edit-attachment-files";
 import { useApprovalRequests } from "@/features/workspace/components/use-live-workspace";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { useText } from "@/shared/lib/text";
 import { useChannels } from "../components/use-channels";
+import { NativeChannelAudience } from "../model/channel-audience-send";
 import { ChannelSend } from "../model/channel-send";
 import { channelTaskActivities, channelTasksNeedingAction } from "../model/channel-task-actions";
 
 export function ChannelChatScreen() {
   usePreventZoomTransitionDismissal({ unstable_dismissalBoundsRect: { minX: 0, maxX: 24 } });
   const { channelId, serverId } = useLocalSearchParams<{ channelId: string; serverId: string }>();
-  return <ChannelChat key={`${serverId}:${channelId}`} channelId={channelId} serverId={serverId} />;
+  const { session, sessionScope } = useMobileSession();
+  const scope = JSON.stringify([session?.apiUrl, session?.user.id, serverId]);
+  return (
+    <ChannelChat
+      key={`${scope}:${sessionScope}:${channelId}`}
+      scope={scope}
+      channelId={channelId}
+      serverId={serverId}
+    />
+  );
 }
 
-function ChannelChat({ channelId, serverId }: { channelId: string; serverId: string }) {
+function ChannelChat({ channelId, serverId, scope }: { channelId: string; serverId: string; scope: string }) {
   const { t } = useText();
   const { agents, servers } = useMobileWorkspace();
   // A sheet removes focus, but the chat remains mounted behind it. Release history
@@ -54,7 +71,25 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
     );
     return serverApprovals.filter((approval) => workers.has(approval.agentId));
   }, [serverApprovals, channel?.archived, page?.tasks]);
-  const [sender] = useState(() => new ChannelSend(state.store, serverId, channelId, Crypto.randomUUID));
+  const [audience] = useState(
+    () =>
+      new NativeChannelAudience(
+        state.store,
+        scope,
+        serverId,
+        channelId,
+        Crypto.randomUUID,
+        {
+          get: SecureStore.getItem,
+          set: (key, value) =>
+            SecureStore.setItem(key, value, { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY }),
+        },
+        { write: writeQueueAttachment, read: readQueueAttachment, remove: removeQueueAttachment },
+      ),
+  );
+  const audienceState = useSyncExternalStore(audience.subscribe, audience.get);
+  useEffect(() => () => audience.dispose(), [audience]);
+  const [sender] = useState(() => new ChannelSend(state.store, serverId, channelId, Crypto.randomUUID, audience));
   useEffect(() => () => sender.dispose(), [sender]);
   const [olderLoading, setOlderLoading] = useState(false);
   const [olderError, setOlderError] = useState(false);
@@ -89,6 +124,15 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
         name: channel?.name ?? t("mobile.channel.chat.fallbackName"),
         members,
       }}
+      channelAudience={{
+        state: audienceState,
+        check: audience.check,
+        retry: audience.retry,
+        close: audience.close,
+        cancelPreparation: audience.cancelPreparation,
+        stop: audience.stop,
+      }}
+      channelTasks={page?.tasks ?? []}
       agents={members}
       mentionAgents={members}
       projectedMessages={messages}

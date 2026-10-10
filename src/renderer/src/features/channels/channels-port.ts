@@ -13,7 +13,10 @@ export interface ChannelsPort {
   agent: Pick<
     OpenBotDesktopApi["agent"],
     | "channelCommand"
+    | "channelAudienceCommand"
+    | "channelAudienceReceipt"
     | "chooseAttachments"
+    | "discardDraftAttachment"
     | "listChannels"
     | "openAttachment"
     | "readChannel"

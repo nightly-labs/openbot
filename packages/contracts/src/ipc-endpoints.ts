@@ -155,7 +155,16 @@ import type {
   TestChannelRoutineInput,
   UpdateChannelRoutineInput,
 } from "./ipc-channel-routines";
-import type { Channel, ChannelCommand, ChannelPage, ChannelReadInput, ChannelSummary } from "./ipc-chat-channels";
+import type {
+  Channel,
+  ChannelAudienceInput,
+  ChannelAudienceReceiptInput,
+  ChannelAudienceResult,
+  ChannelCommand,
+  ChannelPage,
+  ChannelReadInput,
+  ChannelSummary,
+} from "./ipc-chat-channels";
 import type {
   ConversationFileSearchPage,
   ConversationPage,
@@ -854,6 +863,12 @@ export const IPC_ENDPOINTS = {
     listChannels: scopedQuery<ChannelSummary[]>()("agent:channels:list"),
     readChannel: scopedRequest<ChannelReadInput, ChannelPage>()("agent:channels:read"),
     channelCommand: scopedRequest<ChannelCommand, Channel>()("agent:channels:command"),
+    channelAudienceCommand: scopedRequest<ChannelAudienceInput, ChannelAudienceResult>()(
+      "agent:channels:audience-command",
+    ),
+    channelAudienceReceipt: scopedRequest<ChannelAudienceReceiptInput, ChannelAudienceResult | null>()(
+      "agent:channels:audience-receipt",
+    ),
     deleteChannel: scopedRequest<string, void>()("agent:channels:delete"),
     getSidebarLayout: scopedQuery<SidebarLayoutSnapshot>()("agent:get-sidebar-layout"),
     mutateSidebarLayout: scopedRequest<SidebarLayoutAction, SidebarLayoutSnapshot>()("agent:mutate-sidebar-layout"),

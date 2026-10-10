@@ -1,7 +1,9 @@
+import { channelAudienceSelection } from "@openbot/contracts/channel-audience-selection";
 import type { ChannelCommand, ChannelMember } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import type { ChatAttachment } from "@/features/chat/components/use-chat-attachments";
 import type { ChatHistoryReceipt } from "../../chat/model/chat-messages";
+import type { NativeChannelAudience } from "./channel-audience-send";
 import { channelRecipient } from "./channel-draft";
 import { ChannelHistoryRefreshError, type MobileChannelStore } from "./channel-store";
 
@@ -23,6 +25,7 @@ export class ChannelSend {
     private serverId: string,
     private channelId: string,
     private operationId: () => string,
+    private audience?: NativeChannelAudience,
   ) {}
 
   async send(
@@ -48,6 +51,13 @@ export class ChannelSend {
     members: ChannelMember[],
     upload?: UploadControl,
   ): Promise<ChatHistoryReceipt | null> {
+    // Plural work belongs to the persistent audience owner; singular protocol stays unchanged.
+    const audience = channelAudienceSelection(text);
+    if (audience?.kind === "all" || (audience?.kind === "members" && audience.agentIds.length > 1)) {
+      if (!this.audience) throw new Error(sourceText("error.backend.channelAudienceUnsupported"));
+      await this.audience.send(text, files, replyToMessageId, upload);
+      return null;
+    }
     const recipientAgentId = channelRecipient(text, members);
     const previous = this.failed;
     const sameOperation =

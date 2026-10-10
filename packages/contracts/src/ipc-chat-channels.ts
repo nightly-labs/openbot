@@ -5,6 +5,7 @@ import { optionalHistoryExtent } from "./ipc-decoding";
 import { type DynamicRecord, isDynamicRecord, isOneOf, isString } from "./runtime-values";
 
 export const CHANNEL_CHATS_CAPABILITY = "channel-chats-v1";
+export const CHANNEL_AUDIENCE_CAPABILITY = "channel-audience-v1";
 export const CHANNEL_DELETE_CAPABILITY = "channel-delete-v1";
 /**
  * The id a channel row carries for the reader, and for its own author, while no account is signed
@@ -61,6 +62,8 @@ export interface ChannelMessage {
   sequence: number;
   author: { kind: "member" | "agent" | "coordinator"; id: string; name: string };
   taskId: string | null;
+  /** Immutable host-accepted targets; omitted by the released channels-v1 projection. */
+  audience?: ChannelAudienceTarget[];
   superseded: boolean;
   message: ConversationMessage;
 }
@@ -240,6 +243,7 @@ export function isChannelMessage(value: unknown): value is ChannelMessage {
     // by the agent name. A name this validator refuses is a stored message no read can decode.
     isBoundedString(value.author.name, INPUT_LIMITS.accountName) &&
     (value.taskId === null || isIdentifier(value.taskId)) &&
+    (value.audience === undefined || isChannelAudienceTargets(value.audience)) &&
     typeof value.superseded === "boolean" &&
     isConversationMessage(value.message)
   );
@@ -373,4 +377,97 @@ export function parseChannelCommand(value: unknown): ChannelCommand {
     };
   }
   throw new Error("Provide a valid channel command.");
+}
+
+export type ChannelAudience = { kind: "members"; agentIds: string[] } | { kind: "all" };
+export interface ChannelAudienceInput {
+  operationId: string;
+  channelId: string;
+  text: string;
+  audience: ChannelAudience;
+  replyToMessageId: string | null;
+  attachmentDraftIds: string[];
+}
+export interface ChannelAudienceTarget {
+  agentId: string;
+  taskId: string;
+}
+export interface ChannelAudienceReceipt {
+  channel: Channel;
+  requestMessageId: string;
+  targets: ChannelAudienceTarget[];
+}
+/** A host-persisted terminal refusal. No task was accepted, including on later replay. */
+export interface ChannelAudienceRejection {
+  status: "not-accepted";
+  channelId: string;
+  operationId: string;
+  reason: "validation";
+}
+export type ChannelAudienceResult = ChannelAudienceReceipt | ChannelAudienceRejection;
+export interface ChannelAudienceReceiptInput {
+  operationId: string;
+  channelId: string;
+}
+
+export function isChannelAudienceTargets(value: unknown): value is ChannelAudienceTarget[] {
+  return (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.length <= 100 &&
+    value.every((target) => isDynamicRecord(target) && isIdentifier(target.agentId) && isIdentifier(target.taskId)) &&
+    new Set(value.map((target) => target.agentId)).size === value.length &&
+    new Set(value.map((target) => target.taskId)).size === value.length
+  );
+}
+export function parseChannelAudienceReceiptInput(value: unknown): ChannelAudienceReceiptInput {
+  if (!isDynamicRecord(value) || !isIdentifier(value.operationId) || !isIdentifier(value.channelId))
+    throw new Error("Provide a valid channel audience operation.");
+  return { operationId: value.operationId, channelId: value.channelId };
+}
+export function parseChannelAudienceInput(value: unknown): ChannelAudienceInput {
+  const common = parseChannelAudienceReceiptInput(value);
+  if (
+    !isDynamicRecord(value) ||
+    !isBoundedString(value.text, INPUT_LIMITS.messageText) ||
+    !(value.replyToMessageId === null || isIdentifier(value.replyToMessageId)) ||
+    !identifiers(value.attachmentDraftIds) ||
+    value.attachmentDraftIds.length > INPUT_LIMITS.attachments ||
+    (!value.text.trim() && !value.attachmentDraftIds.length) ||
+    !isDynamicRecord(value.audience)
+  )
+    throw new Error("Provide a valid channel audience input.");
+  let audience: ChannelAudience;
+  if (value.audience.kind === "all") audience = { kind: "all" };
+  else if (value.audience.kind === "members" && identifiers(value.audience.agentIds) && value.audience.agentIds.length)
+    audience = { kind: "members", agentIds: value.audience.agentIds };
+  else throw new Error("Provide a valid channel audience.");
+  return {
+    ...common,
+    text: value.text,
+    audience,
+    replyToMessageId: value.replyToMessageId,
+    attachmentDraftIds: value.attachmentDraftIds,
+  };
+}
+export function decodeChannelAudienceReceipt(value: unknown): ChannelAudienceReceipt {
+  if (!isDynamicRecord(value) || !isIdentifier(value.requestMessageId) || !isChannelAudienceTargets(value.targets))
+    throw new Error("Invalid channel audience receipt.");
+  return { channel: decodeChannel(value.channel), requestMessageId: value.requestMessageId, targets: value.targets };
+}
+export function decodeOptionalChannelAudienceReceipt(value: unknown): ChannelAudienceReceipt | null {
+  return value === null ? null : decodeChannelAudienceReceipt(value);
+}
+
+export function decodeChannelAudienceResult(value: unknown): ChannelAudienceResult {
+  if (isDynamicRecord(value) && value.status !== undefined) {
+    if (value.status !== "not-accepted") throw new Error("Invalid audience result status.");
+    const input = parseChannelAudienceReceiptInput(value);
+    if (value.reason !== "validation") throw new Error("Invalid audience refusal.");
+    return { ...input, status: "not-accepted", reason: "validation" };
+  }
+  return decodeChannelAudienceReceipt(value);
+}
+export function decodeOptionalChannelAudienceResult(value: unknown): ChannelAudienceResult | null {
+  return value === null ? null : decodeChannelAudienceResult(value);
 }

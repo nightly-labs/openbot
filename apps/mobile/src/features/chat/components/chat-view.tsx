@@ -1,3 +1,5 @@
+import { channelAudienceSelection } from "@openbot/contracts/channel-audience-selection";
+import type { ChannelTask } from "@openbot/contracts/ipc";
 import { type CauseCode, classifyFailure, type FailureProperties } from "@openbot/telemetry";
 import { useQueryClient } from "@tanstack/react-query";
 import { isLiquidGlassAvailable } from "expo-glass-effect";
@@ -17,6 +19,11 @@ import { MobileConversationAnalytics } from "@/features/analytics/conversation";
 import { reportMobileNotification } from "@/features/analytics/failure-reports";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { useBrowserFeature } from "@/features/browser/components/use-browser-feature";
+import {
+  ChannelAudienceStatus,
+  type NativeAudienceControls,
+} from "@/features/channels/components/channel-audience-status";
+import { useChannelAudienceDraft } from "@/features/channels/components/use-channel-audience-draft";
 import { ChatComposer, VOICE_BUTTON_SIZE } from "@/features/chat/components/chat-composer";
 import { ChatGlassIconButton } from "@/features/chat/components/chat-glass-icon-button";
 import { ChatHeader } from "@/features/chat/components/chat-header";
@@ -52,8 +59,7 @@ import type { ChatQueueController } from "./use-chat-queue";
 import { useVoiceMode } from "./use-voice-mode";
 import { VoiceOverlay } from "./voice-overlay";
 
-export interface ChatViewProps {
-  target: ChatTarget;
+interface ChatViewBaseProps {
   queue?: ChatQueueController;
   agents: MobileAgent[];
   mentionAgents: MobileAgent[];
@@ -93,6 +99,16 @@ export interface ChatViewProps {
   notice?: string;
 }
 
+export type ChatViewProps = ChatViewBaseProps &
+  (
+    | { target: Extract<ChatTarget, { kind: "agent" }>; channelAudience?: never; channelTasks?: never }
+    | {
+        target: Extract<ChatTarget, { kind: "channel" }>;
+        channelAudience?: NativeAudienceControls;
+        channelTasks?: readonly ChannelTask[];
+      }
+  );
+
 const CHAT_BACK_EDGE_WIDTH = 24;
 
 function leaveConversation(): void {
@@ -103,6 +119,8 @@ function leaveConversation(): void {
 
 export function ChatView({
   target,
+  channelAudience,
+  channelTasks = [],
   queue,
   agents: serverAgents,
   mentionAgents,
@@ -186,6 +204,23 @@ export function ChatView({
   const queryClient = useQueryClient();
   const composerAttachments = useChatAttachments([], undefined, () => attachmentSupport(target.serverId));
   const attachments = composerAttachments;
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+  useChannelAudienceDraft(
+    target.kind === "channel" ? (channelAudience?.state.pending ?? null) : null,
+    { text: draft, files: attachments.items, replyToMessageId: replyTarget?.id ?? null },
+    () => {
+      setDraft("");
+      setReplyTarget(null);
+      attachments.clear();
+    },
+    channelAudience?.state.draftOwnerOperationId ?? null,
+  );
   const submittedFiles = useRef<ChatAttachment[]>([]);
   const [pendingMessage, setPendingMessage] = useState<PendingChatMessage | null>(null);
   const [messageAliases, setMessageAliases] = useState<ReadonlyMap<string, string>>(new Map());
@@ -427,7 +462,15 @@ export function ChatView({
   }, [stopTurn, activeTurnId, target.id, errorMessage, t, failureContext]);
 
   function sendMessage(value: string): void {
-    if (!serverOnline || !canSend || sendingRef.current || pendingMessage) return;
+    if (
+      !serverOnline ||
+      !canSend ||
+      sendingRef.current ||
+      pendingMessage ||
+      channelAudience?.state.busy ||
+      (channelAudience?.state.pending && !channelAudience.state.pending.result)
+    )
+      return;
     const body = value.trim();
     if (!body && attachments.items.length === 0) return;
     // While the agent asks a question, the composer text is the answer. Files still go as a message.
@@ -440,6 +483,31 @@ export function ChatView({
       return;
     }
 
+    const selected = target.kind === "channel" ? channelAudienceSelection(body) : null;
+    if (
+      channelAudience &&
+      (selected?.kind === "all" || (selected?.kind === "members" && selected.agentIds.length > 1))
+    ) {
+      sendingRef.current = true;
+      setSending(true);
+      setSendError(null);
+      void send(body, attachments.items, replyTarget?.id ?? null)
+        .catch((error: unknown) => {
+          if (alive.current)
+            setSendError({
+              cause: classifyFailure(error),
+              context: failureContext,
+              agentId: target.id,
+              message: errorMessage(error, t("mobile.chat.composer.sendFailed")),
+            });
+        })
+        .finally(() => {
+          if (!alive.current) return;
+          sendingRef.current = false;
+          setSending(false);
+        });
+      return;
+    }
     setSendError(null);
     const queueSend = Boolean(queue && (activeTurnId || queue.queued.length || queue.replies.length));
     setPendingInQueue(queueSend);
@@ -733,6 +801,14 @@ export function ChatView({
                   </Button>
                 </View>
               ) : null}
+              {target.kind === "channel" && channelAudience ? (
+                <ChannelAudienceStatus
+                  controls={channelAudience}
+                  members={target.members}
+                  tasks={channelTasks}
+                  online={Boolean(serverOnline)}
+                />
+              ) : null}
               {notice ? (
                 <Typography.Paragraph align="center" className="bg-background px-4 py-2 text-muted">
                   {notice}
@@ -755,13 +831,19 @@ export function ChatView({
                   handoffFocusVersion={handoffFocusVersion}
                   onCancelReply={() => setReplyTarget(null)}
                   mentionAgents={mentionAgents}
+                  channelAll={target.kind === "channel" && Boolean(channelAudience)}
                   key={target.id}
                   action={action}
                   actionForeground={actionForeground}
                   agentName={target.name}
                   placeholder={answersQuestion ? t("mobile.chat.question.answerPlaceholder") : undefined}
                   bottomInset={insets.bottom}
-                  disabled={!serverOnline || !canSend}
+                  disabled={
+                    !serverOnline ||
+                    !canSend ||
+                    Boolean(channelAudience?.state.busy) ||
+                    Boolean(channelAudience?.state.pending && !channelAudience.state.pending.result)
+                  }
                   sending={sending || Boolean(pendingMessage)}
                   attachments={attachments}
                   draft={draft}

@@ -1,6 +1,20 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.backend", {
+  "error.backend.channelAudienceStorageInvalid":
+    "Saved channel delivery evidence is invalid. Keep it and resolve it before sending another audience request.",
+  "error.backend.channelAudienceStorageFull":
+    "There is no room to retain another unconfirmed channel request. Resolve an existing request first.",
+  "error.backend.channelAudiencePending":
+    "This channel has an unconfirmed audience request. Check its receipt or retry the original request first.",
+  "error.backend.channelAudienceReceiptInvalid":
+    "The host returned an invalid channel acceptance receipt. Keep the saved request and check again.",
+  "error.backend.channelAudienceConflict":
+    "This channel operation has different saved input. Keep the original request and retry it.",
+  "error.backend.channelAudienceRejected":
+    "The host did not accept this channel request. Correct the draft and send it again.",
+  "error.backend.channelAudienceUnsupported":
+    "This host does not support selected channel audiences. Your draft is retained.",
   "error.backend.eventsUnavailable": "Events are not available on this host.",
   "error.backend.webhookRouteLimit": "A host can have at most {limit} webhook routines.",
   "error.backend.webhookSettingsInvalid": "Check the webhook settings and try again.",

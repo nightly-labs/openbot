@@ -56,6 +56,8 @@ import { isSendShortcutKey, type SendShortcut } from "./send-shortcut";
 interface ComposerEditorProps {
   agentId: string | undefined;
   agents: AgentProfile[];
+  /** Enables the channel-only all-members audience option. */
+  channelAudience?: boolean;
   skills?: InstalledSkill[];
   /** The host's MCP servers, offered by the same `$` the skills answer. */
   mcpServers?: McpServerConfig[];
@@ -170,6 +172,10 @@ export function ComposerEditor(props: ComposerEditorProps) {
       ];
     if (trigger !== "@") return [];
     return [
+      ...(props.channelAudience &&
+      (!mention()?.query.trim() || "all".startsWith(mention()?.query.trim().toLocaleLowerCase() ?? ""))
+        ? [{ type: "channel-all" as const }]
+        : []),
       ...matchingAgents().map((agent) => ({ type: "agent" as const, agent })),
       ...matchingAttachments().map((attachment) => ({
         type: "attachment" as const,
@@ -477,13 +483,15 @@ export function ComposerEditor(props: ComposerEditorProps) {
     if (!range) return;
     range.deleteContents();
     const token =
-      option.type === "agent"
-        ? createMentionToken(option.agent)
-        : option.type === "skill"
-          ? createSkillToken(option.skill)
-          : option.type === "mcp"
-            ? createMcpToken(option.server)
-            : createAttachmentToken(option.attachment, attachmentTokenActions);
+      option.type === "channel-all"
+        ? document.createTextNode("@all")
+        : option.type === "agent"
+          ? createMentionToken(option.agent)
+          : option.type === "skill"
+            ? createSkillToken(option.skill)
+            : option.type === "mcp"
+              ? createMcpToken(option.server)
+              : createAttachmentToken(option.attachment, attachmentTokenActions);
     const trailingSpace = document.createTextNode(" ");
     range.insertNode(trailingSpace);
     range.insertNode(token);
@@ -796,7 +804,9 @@ export function ComposerEditor(props: ComposerEditorProps) {
                       }}
                       onMouseEnter={() => setActiveOption(optionIndex())}
                     >
-                      {option.type === "agent" ? (
+                      {option.type === "channel-all" ? (
+                        <span>{t("composer.picker.channelAllTag")}</span>
+                      ) : option.type === "agent" ? (
                         <AgentAvatar agent={option.agent} />
                       ) : option.type === "skill" ? (
                         <span class="mention-picker-skill-icon" aria-hidden="true">

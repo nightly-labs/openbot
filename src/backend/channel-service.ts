@@ -8,6 +8,7 @@ import {
   CHANNEL_ASSIGNMENT_LIMIT,
   CHANNEL_PARALLEL_LIMIT,
   type Channel,
+  type ChannelAudienceResult,
   type ChannelCommand,
   type ChannelMemory,
   type ChannelMessage,
@@ -23,6 +24,7 @@ import {
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Exit, Fiber, Result, Schema, Scope } from "effect";
+import { ChannelAudienceCommands } from "./channel-audience";
 import { type ChannelOperationError, channelFailure, channelResult, channelSync } from "./channel-effects";
 import { ChannelHistory, type ChannelTextModel } from "./channel-history";
 import { ChannelMemoryStore } from "./channel-memory-store";
@@ -98,11 +100,12 @@ const decodeRoutingDecision = Schema.decodeUnknownResult(RoutingDecision, { onEx
 export class ChannelService {
   readonly store: ChannelStore;
   readonly memories: ChannelMemoryStore;
+  readonly audiences: ChannelAudienceCommands;
   readonly #history: ChannelHistory;
   #scope = Scope.makeUnsafe();
   readonly #pumps = new Map<string, Fiber.Fiber<void>>();
   readonly #commands = new Map<string, Deferred.Deferred<void>>();
-  readonly #commandFibers = new Set<Fiber.Fiber<Channel | void, ChannelOperationError>>();
+  readonly #commandFibers = new Set<Fiber.Fiber<Channel | ChannelAudienceResult | void, ChannelOperationError>>();
   readonly #interrupts = new Set<Fiber.Fiber<void>>();
   readonly #events = new Set<Fiber.Fiber<void>>();
   #stopped = false;
@@ -120,6 +123,16 @@ export class ChannelService {
     this.store = new ChannelStore(database);
     this.memories = new ChannelMemoryStore(database);
     this.#history = new ChannelHistory(this.store, hooks.generate, this.memories);
+    this.audiences = new ChannelAudienceCommands({
+      store: this.store,
+      mailbox,
+      requireMember: (channel, id) => this.requireMember(channel, id),
+      task: (channelId, requestId, text, agentId) => this.newTask(channelId, requestId, text, agentId),
+      message: (channelId, taskId, author, text, id) => this.message(channelId, taskId, author, text, id),
+      serialize: (channelId, operation) => this.#serialize(channelId, operation),
+      publish: (channelId) => this.publish(channelId),
+      wake: (channelId) => this.wake(channelId),
+    });
   }
 
   /**
@@ -150,7 +163,10 @@ export class ChannelService {
   );
 
   readonly #serialize = Effect.fn("ChannelService.serialize")(
-    <A extends Channel | void>(channelId: string, operation: Effect.Effect<A, ChannelOperationError>) =>
+    <A extends Channel | ChannelAudienceResult | void>(
+      channelId: string,
+      operation: Effect.Effect<A, ChannelOperationError>,
+    ) =>
       Effect.uninterruptibleMask((restore) =>
         Effect.gen({ self: this }, function* () {
           const prior = this.#commands.get(channelId);
@@ -882,7 +898,8 @@ export class ChannelService {
       // those drafts into attachments and rewrites the stored request. Every other dispatch -
       // a resume, or a hand-off to another task - re-sends the committed copies instead.
       const request = yield* channelSync(() => this.store.message(channelId, task.requestMessageId));
-      const ownsRequest = request?.taskId === task.id;
+      const ownsRequest =
+        request?.taskId === task.id || request?.audience?.some((target) => target.taskId === task.id) === true;
       const committing = ownsRequest && task.attachmentDraftIds.length > 0;
       try {
         const sourcePaths =

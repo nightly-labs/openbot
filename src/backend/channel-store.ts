@@ -1,15 +1,20 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import {
   CHANNEL_PREVIEW_LIMIT,
   CHANNEL_ROUTING_EVENT_ITEM_TYPE_PREFIX,
   type Channel,
+  type ChannelAudienceReceipt,
+  type ChannelAudienceReceiptInput,
+  type ChannelAudienceResult,
   type ChannelDraft,
   type ChannelMessage,
   type ChannelPage,
   type ChannelSummary,
   type ChannelTask,
   decodeChannel,
+  decodeChannelAudienceReceipt,
+  decodeChannelAudienceResult,
   isChannelMessage,
   isChannelTask,
   SIGNED_OUT_CHANNEL_MEMBER_ID,
@@ -344,6 +349,68 @@ export class ChannelStore {
     );
   }
 
+  audienceReceipt(input: ChannelAudienceReceiptInput, actorId: string): ChannelAudienceResult | null {
+    const saved = this.database.commandResult(channelAudienceOperationKey(input, actorId));
+    if (saved === undefined) return null;
+    const receipt = decodeChannelAudienceResult(saved);
+    if (
+      "status" in receipt
+        ? receipt.channelId !== input.channelId || receipt.operationId !== input.operationId
+        : receipt.channel.id !== input.channelId
+    )
+      throw new Error("Invalid channel audience receipt scope.");
+    return receipt;
+  }
+
+  rejectAudience(input: ChannelAudienceReceiptInput, actorId: string): ChannelAudienceResult {
+    const previous = this.audienceReceipt(input, actorId);
+    if (previous) return previous;
+    const result = decodeChannelAudienceResult({ ...input, status: "not-accepted", reason: "validation" });
+    return this.database.dispatch(
+      channelAudienceOperationKey(input, actorId),
+      [
+        {
+          aggregateType: "channel",
+          aggregateId: input.channelId,
+          eventType: "channel.audience-rejected",
+          payload: result,
+        },
+      ],
+      () => result,
+    );
+  }
+
+  commitAudience(
+    input: ChannelAudienceReceiptInput,
+    actorId: string,
+    change: ChannelChange,
+    requestMessageId: string,
+  ): ChannelAudienceReceipt {
+    const previous = this.audienceReceipt(input, actorId);
+    if (previous) {
+      if ("status" in previous) throw new Error("A refused audience operation cannot be accepted.");
+      return previous;
+    }
+    if (!change.tasks.every(isChannelTask) || !change.messages.every(isChannelMessage))
+      throw new Error("Invalid channel audience change.");
+    const channel = { ...change.channel, revision: change.channel.revision + 1 };
+    const payload = { ...change, channel };
+    const receipt = {
+      channel,
+      requestMessageId,
+      targets: change.tasks.map((task) => ({ agentId: task.ownerAgentId, taskId: task.id })),
+    };
+    const validated = decodeChannelAudienceReceipt(receipt);
+    return this.database.dispatch(
+      channelAudienceOperationKey(input, actorId),
+      [{ aggregateType: "channel", aggregateId: channel.id, eventType: "channel.changed", payload }],
+      (db) => {
+        this.project(db, payload);
+        return validated;
+      },
+    );
+  }
+
   private project(db: DatabaseSync, change: ChannelChange): void {
     db.prepare(
       "INSERT INTO projection_channels VALUES (?, ?) ON CONFLICT(channel_id) DO UPDATE SET channel_json = excluded.channel_json",
@@ -647,6 +714,17 @@ export class ChannelStore {
         const value = JSON.parse(requiredStringColumn(event, "payload_json"));
         if (!isDynamicRecord(value)) throw new Error("Invalid channel event.");
         switch (event.event_type) {
+          case "channel.audience-files-prepared": {
+            if (!isString(value.messageId) || !isString(value.fingerprint))
+              throw new Error("Invalid audience preparation event.");
+            break; // Recovery evidence owns no channel projection rows.
+          }
+          case "channel.audience-rejected": {
+            const result = decodeChannelAudienceResult(value);
+            if (!("status" in result) || result.channelId !== channelId)
+              throw new Error("Invalid audience refusal event.");
+            break;
+          }
           case "channel.changed": {
             if (
               !Array.isArray(value.messages) ||
@@ -828,4 +906,11 @@ function decodeAssignment(value: unknown): ChannelAssignment {
     turnId: value.turnId,
     state: value.state,
   };
+}
+
+/** Trusted host identity for one actor's immutable audience operation, including its channel. */
+export function channelAudienceOperationKey(input: ChannelAudienceReceiptInput, actorId: string): string {
+  return `channel-audience:${createHash("sha256")
+    .update(JSON.stringify([actorId, input.channelId, input.operationId]))
+    .digest("hex")}`;
 }

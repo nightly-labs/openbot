@@ -1,7 +1,15 @@
-import type { ChannelCommand, ChannelPage, ChannelSummary } from "@openbot/contracts/ipc";
+import type {
+  ChannelAudienceInput,
+  ChannelAudienceResult,
+  ChannelAudienceTarget,
+  ChannelCommand,
+  ChannelPage,
+  ChannelSummary,
+} from "@openbot/contracts/ipc";
 import type { AgentProfile } from "@openbot/ui/data";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createStore, flush, onSettled, reconcile, untrack } from "solid-js";
+import { clearChannelAudience, pendingChannelAudience, saveChannelAudience } from "./channel-audience-pending";
 import { mergeChannelPage } from "./channel-page-merge";
 
 /**
@@ -24,6 +32,8 @@ interface ChannelsState {
   page: ChannelPage | null;
   loading: boolean;
   pending: boolean;
+  pendingAudience: ChannelAudienceInput | null;
+  acceptedAudience: ChannelAudienceInput | null;
   error: string | null;
   editing: "create" | "settings" | null;
   archived: boolean;
@@ -44,12 +54,26 @@ export interface ChannelsEnvironment {
   readSelection: (scope: string) => string | null;
   writeSelection: (channelId: string | null) => void;
   supported: () => boolean;
+  audienceSupported?: () => boolean;
+  audienceScope?: () => string;
   /** Whether this reader may delete a channel; `supported()` is checked as well. */
   deletionSupported: () => boolean;
   /** Clears whatever else covers the workspace, because a channel is about to cover it. */
   beforeOpen: () => void;
   /** Whether a message that arrives now is in front of the reader. */
   canMarkRead: () => boolean;
+}
+
+function copyAudience(input: ChannelAudienceInput): ChannelAudienceInput {
+  return {
+    operationId: input.operationId,
+    channelId: input.channelId,
+    text: input.text,
+    replyToMessageId: input.replyToMessageId,
+    attachmentDraftIds: [...input.attachmentDraftIds],
+    audience:
+      input.audience.kind === "all" ? { kind: "all" } : { kind: "members", agentIds: [...input.audience.agentIds] },
+  };
 }
 
 export type ChannelsController = ReturnType<typeof createChannelsController>;
@@ -61,6 +85,8 @@ export function createChannelsController(env: ChannelsEnvironment) {
     page: null,
     loading: false,
     pending: false,
+    pendingAudience: null,
+    acceptedAudience: null,
     error: null,
     editing: null,
     archived: false,
@@ -149,7 +175,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
           if (merged.takeFetchedCursor) takeOlderWindow(state.page, page);
         } else state.page = page;
         state.loading = false;
-        if (!failedCommand) state.error = null;
+        if (!failedCommand && !state.pendingAudience) state.error = null;
       });
       if (selected && !selectedExists) env.writeSelection(null);
       if (selected && page && env.canMarkRead() && page.throughSequence > (readThrough.get(selected) ?? 0)) {
@@ -264,10 +290,242 @@ export function createChannelsController(env: ChannelsEnvironment) {
       if (!disposed && account === env.scopeKey())
         setState((state) => {
           pendingCommands -= 1;
-          state.pending = pendingCommands > 0;
+          state.pending = pendingInView();
         });
     }
   }
+  const audienceScope = () => env.audienceScope?.() ?? env.scopeKey();
+  let audienceGeneration = 0;
+  // UI ownership changes synchronously. Solid may publish its corresponding store draft later.
+  let currentAudience: ChannelAudienceInput | null = null;
+  let sendingAudience: number | null = null;
+  let stoppingAudience: number | null = null;
+  function pendingInView(): boolean {
+    return pendingCommands > 0 || sendingAudience === audienceGeneration || stoppingAudience === audienceGeneration;
+  }
+  const audienceChecks = new Set<number>();
+  function audienceOwner(input: ChannelAudienceInput) {
+    const account = env.scopeKey();
+    const scope = audienceScope();
+    const generation = audienceGeneration;
+    const viewCurrent = () =>
+      !disposed &&
+      account === env.scopeKey() &&
+      scope === audienceScope() &&
+      generation === audienceGeneration &&
+      state.selectedId === input.channelId;
+    return {
+      scope,
+      generation,
+      viewCurrent,
+      current: () =>
+        viewCurrent() &&
+        currentAudience?.channelId === input.channelId &&
+        currentAudience.operationId === input.operationId,
+    };
+  }
+  async function settleAudience(
+    result: ChannelAudienceResult,
+    input: ChannelAudienceInput,
+    owner: ReturnType<typeof audienceOwner>,
+    onAccepted?: (accepted: ChannelAudienceInput) => void,
+  ): Promise<boolean> {
+    if (
+      "status" in result
+        ? result.channelId !== input.channelId || result.operationId !== input.operationId
+        : result.channel.id !== input.channelId
+    )
+      throw new Error(currentText().t("error.backend.channelAudienceReceiptInvalid"));
+    // An old response may settle its own durable envelope, but never the current view or draft.
+    clearChannelAudience(owner.scope, input);
+    if (!owner.current()) return false;
+    currentAudience = null;
+    if ("status" in result) {
+      flush(() =>
+        setState((state) => {
+          state.pendingAudience = null;
+          state.error = currentText().t("error.backend.channelAudienceRejected");
+        }),
+      );
+      return false;
+    }
+    flush(() =>
+      setState((state) => {
+        state.pendingAudience = null;
+        state.acceptedAudience = input;
+        state.error = null;
+      }),
+    );
+    onAccepted?.(input);
+    await refreshAfter();
+    return owner.viewCurrent();
+  }
+  async function audienceCommand(
+    input: ChannelAudienceInput,
+    onAccepted?: (accepted: ChannelAudienceInput) => void,
+    retry = false,
+  ): Promise<boolean> {
+    input = copyAudience(input);
+    const scope = audienceScope();
+    if (state.pending || state.selectedId !== input.channelId) return false;
+    if (!env.audienceSupported?.()) {
+      setState((state) => {
+        state.error = currentText().t("error.backend.channelAudienceUnsupported");
+      });
+      return false;
+    }
+    let owner: ReturnType<typeof audienceOwner> | undefined;
+    try {
+      if (!retry) saveChannelAudience(scope, input);
+      currentAudience = input;
+      sendingAudience = audienceGeneration;
+      flush(() =>
+        setState((state) => {
+          state.pendingAudience = input;
+          state.error = null;
+          state.pending = true;
+        }),
+      );
+      owner = audienceOwner(input);
+      const result = await env.port().agent.channelAudienceCommand(input);
+      return await settleAudience(result, input, owner, onAccepted);
+    } catch (error) {
+      if (owner?.current())
+        setState((state) => {
+          state.error = error instanceof Error ? error.message : currentText().t("channel.error.update");
+        });
+      // Preflight storage failures have no in-flight owner and no pending envelope.
+      else if (!owner && !disposed && scope === audienceScope() && state.selectedId === input.channelId)
+        setState((state) => {
+          state.error = error instanceof Error ? error.message : currentText().t("channel.error.update");
+        });
+      return false;
+    } finally {
+      // A settled result cleared this operation; the view generation still owns its pending flag.
+      if (owner?.viewCurrent() && (!currentAudience || currentAudience.operationId === input.operationId)) {
+        sendingAudience = null;
+        setState((state) => {
+          state.pending = pendingInView();
+        });
+      }
+    }
+  }
+  async function checkAudience(
+    onAccepted?: (accepted: ChannelAudienceInput) => void,
+    restored?: ChannelAudienceInput,
+  ): Promise<boolean> {
+    const pending = restored ?? state.pendingAudience;
+    const input = pending ? copyAudience(pending) : null;
+    if (!input || sendingAudience === audienceGeneration || !env.audienceSupported?.()) return false;
+    const owner = audienceOwner(input);
+    if (!owner.current() || audienceChecks.has(owner.generation)) return false;
+    audienceChecks.add(owner.generation);
+    try {
+      const result = await env
+        .port()
+        .agent.channelAudienceReceipt({ channelId: input.channelId, operationId: input.operationId });
+      if (!result) return false; // A miss is not rejection; no replay follows.
+      return await settleAudience(result, input, owner, onAccepted);
+    } catch (error) {
+      if (owner.current())
+        setState((state) => {
+          state.error = error instanceof Error ? error.message : currentText().t("channel.error.update");
+        });
+      return false;
+    } finally {
+      audienceChecks.delete(owner.generation);
+    }
+  }
+  createEffect(
+    () => [env.scopeKey(), audienceScope(), state.selectedId, supported()] as const,
+    ([, , channelId, online]) => {
+      audienceGeneration += 1;
+      currentAudience = null;
+      sendingAudience = null;
+      stoppingAudience = null;
+      flush(() =>
+        setState((state) => {
+          state.pendingAudience = null;
+          state.acceptedAudience = null;
+          state.error = null;
+          state.pending = pendingInView();
+        }),
+      );
+      try {
+        const input = channelId ? pendingChannelAudience(audienceScope(), channelId) : null;
+        currentAudience = input;
+        flush(() =>
+          setState((state) => {
+            state.pendingAudience = input;
+          }),
+        );
+        if (input && online) void checkAudience(undefined, input);
+      } catch (error) {
+        setState((state) => {
+          state.error = error instanceof Error ? error.message : currentText().t("channel.error.update");
+        });
+      }
+    },
+  );
+
+  async function stopAudience(channelId: string, targets: readonly ChannelAudienceTarget[]): Promise<boolean> {
+    if (stoppingAudience === audienceGeneration) return false;
+    const account = env.scopeKey();
+    const scope = audienceScope();
+    const generation = audienceGeneration;
+    const current = () =>
+      !disposed &&
+      account === env.scopeKey() &&
+      scope === audienceScope() &&
+      generation === audienceGeneration &&
+      state.page?.channel.id === channelId;
+    const ids = targets.map((target) => target.taskId);
+    if (!current()) return false;
+    stoppingAudience = generation;
+    flush(() =>
+      setState((state) => {
+        state.pending = true;
+        state.error = null;
+      }),
+    );
+    try {
+      for (const taskId of ids) {
+        if (!current()) return false;
+        const task = state.page?.tasks.find((task) => task.id === taskId);
+        if (!task || task.state === "completed" || task.state === "cancelled" || task.state === "paused") continue;
+        const input: ChannelCommand = {
+          type: "stop",
+          operationId: crypto.randomUUID(),
+          channelId,
+          taskId,
+          recipientAgentId: null,
+        };
+        try {
+          await env.port().agent.channelCommand(input);
+        } catch (error) {
+          if (current()) {
+            failedCommand = input; // Existing manual Retry uses this exact per-root operation.
+            setState((state) => {
+              state.error = error instanceof Error ? error.message : currentText().t("channel.error.update");
+            });
+          }
+          return false; // No claim that this root or the remaining peers stopped.
+        }
+        if (!current()) return false;
+        failedCommand = null;
+        await refreshAfter();
+      }
+      return current();
+    } finally {
+      if (current()) {
+        stoppingAudience = null;
+        setState((state) => {
+          state.pending = pendingInView();
+        });
+      }
+    }
+  }
+
   async function loadOlder() {
     const channelId = state.selectedId;
     const beforeSequence = state.page?.olderCursor;
@@ -306,6 +564,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
               selectedId: selected,
               page: null,
               pending: false,
+              acceptedAudience: null,
               error: null,
               editing: null,
             });
@@ -375,6 +634,12 @@ export function createChannelsController(env: ChannelsEnvironment) {
     hasUnread: () => state.channels.some((channel) => channel.unreadCount > 0),
     markAllRead,
     agents: env.agents,
+    audienceCommand,
+    stopAudience,
+    retryAudience: (onAccepted?: (accepted: ChannelAudienceInput) => void) =>
+      state.pendingAudience ? audienceCommand(state.pendingAudience, onAccepted, true) : Promise.resolve(false),
+    checkAudience,
+    audienceSupported: () => env.audienceSupported?.() === true,
     supported,
     deletionSupported: () => supported() && env.deletionSupported(),
     refresh,

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { assert, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import { App } from "./App";
-import { emitAgentEvent, installOpenbotStub, testServer } from "./app-test-harness";
+import { AGENTS, emitAgentEvent, installOpenbotStub, testServer } from "./app-test-harness";
 import { CHANNEL_SELECTION_STORAGE_KEY } from "./features/channels/channel-selection";
 import { AccountDock } from "./lazy-views";
 
@@ -911,4 +911,217 @@ it("keeps the working indicator while the coordinator chooses an owner", async (
   // The lead is the coordinator. Its routing turn holds the task and posts nothing until it
   // decides, so the indicator is the only sign that the request is alive.
   expect(await within(chat).findByRole("status", { name: /^Chief is working: / })).toBeInTheDocument();
+});
+
+/** Uses the actual channel pane and shared composer, with three selectable channel members. */
+async function openAudienceChannel() {
+  vi.spyOn(window.openbot.agent, "listAgents").mockResolvedValue([
+    ...AGENTS,
+    { ...AGENTS[1], id: "reviewer", name: "Reviewer", title: "Reviewer", workspacePath: "/tmp/reviewer" },
+  ]);
+  await window.openbot.agent.channelCommand({
+    type: "save",
+    operationId: "create-audience",
+    channelId: "audience-room",
+    draft: {
+      name: "Audience room",
+      title: "",
+      instructions: "Review the report",
+      members: [{ agentId: "chief" }, { agentId: "sales-outbound" }, { agentId: "reviewer" }],
+      leadAgentId: "chief",
+    },
+  });
+  const view = render(() => <App />);
+  await screen.findByRole("button", { name: /Open account (actions|menu)/ });
+  await fireEvent.click(await screen.findByRole("button", { name: /Audience room/ }));
+  const chat = await screen.findByRole("main", { name: "Channel conversation" });
+  await within(chat).findByRole("heading", { name: "Audience room", level: 1 });
+  return { chat, view, editor: within(chat).getByRole("textbox", { name: "Message to channel" }) };
+}
+
+/** Places the caret after input, then lets the actual picker insert its member token. */
+async function selectAudienceMember(editor: HTMLElement, name: string) {
+  editor.focus();
+  editor.append(document.createTextNode(`@${name}`));
+  const range = document.createRange();
+  range.selectNodeContents(editor);
+  range.collapse(false);
+  window.getSelection()?.removeAllRanges();
+  window.getSelection()?.addRange(range);
+  await fireEvent.input(editor);
+  await screen.findByRole("option", { name: `${name} Agent` });
+  await fireEvent.keyDown(editor, { key: "Enter" });
+  await waitFor(() => expect(screen.queryByRole("listbox")).not.toBeInTheDocument());
+}
+
+it("channel audience checkpoint: one submitted leading member cluster reaches each selected member", async () => {
+  const { chat, editor } = await openAudienceChannel();
+  const command = vi.spyOn(window.openbot.agent, "channelAudienceCommand");
+  for (const name of ["Chief", "Sales Outbound", "Reviewer"]) await selectAudienceMember(editor, name);
+  editor.append(document.createTextNode("Review the report"));
+  await fireEvent.input(editor);
+  await fireEvent.click(within(chat).getByRole("button", { name: "Send message" }));
+  await within(chat).findByRole("article", { name: "Message from You" });
+  expect(command.mock.calls).toHaveLength(1);
+  expect(command).toHaveBeenCalledWith(
+    expect.objectContaining({
+      audience: { kind: "members", agentIds: ["chief", "sales-outbound", "reviewer"] },
+      text: "@[Chief](agent:chief) @[Sales Outbound](agent:sales-outbound) @[Reviewer](agent:reviewer) Review the report",
+    }),
+  );
+  const page = await window.openbot.agent.readChannel({ channelId: "audience-room" });
+  expect(page.messages.filter((message) => message.author.kind === "member")).toHaveLength(1);
+  expect(page.tasks.map((task) => task.ownerAgentId)).toEqual(["chief", "sales-outbound", "reviewer"]);
+});
+
+it.each([
+  ["single", "@[Sales Outbound](agent:sales-outbound) Review the report", "sales-outbound"],
+  ["incidental", "Ask @[Sales Outbound](agent:sales-outbound) about the report", null],
+  ["quoted", "> @[Sales Outbound](agent:sales-outbound)\nReview this quotation", null],
+  [
+    "duplicate",
+    "@[Sales Outbound](agent:sales-outbound) @[Sales Outbound](agent:sales-outbound) Review the report",
+    "sales-outbound",
+  ],
+])("channel audience checkpoint control: %s keeps one logical request", async (_label, text, recipientAgentId) => {
+  const { chat, editor } = await openAudienceChannel();
+  const command = vi.spyOn(window.openbot.agent, "channelCommand");
+  editor.textContent = text;
+  await fireEvent.input(editor);
+  await fireEvent.click(within(chat).getByRole("button", { name: "Send message" }));
+  await within(chat).findByRole("article", { name: "Message from You" });
+  expect(command.mock.calls.filter(([input]) => input.type === "send")).toHaveLength(1);
+  expect(command).toHaveBeenCalledWith(expect.objectContaining({ type: "send", text, recipientAgentId }));
+  const page = await window.openbot.agent.readChannel({ channelId: "audience-room" });
+  expect(page.tasks).toHaveLength(1);
+  expect(page.messages.filter((message) => message.author.kind === "member")).toHaveLength(1);
+});
+
+it("channel audience production: all picker accepts only current members including lead", async () => {
+  const { chat, editor } = await openAudienceChannel();
+  editor.focus();
+  editor.textContent = "@all";
+  const range = document.createRange();
+  range.selectNodeContents(editor);
+  range.collapse(false);
+  window.getSelection()?.removeAllRanges();
+  window.getSelection()?.addRange(range);
+  await fireEvent.input(editor);
+  await screen.findByRole("option", { name: "All channel members" });
+  await fireEvent.keyDown(editor, { key: "Enter" });
+  await waitFor(() => expect(screen.queryByRole("listbox")).not.toBeInTheDocument());
+  editor.append(document.createTextNode("Review"));
+  await fireEvent.input(editor);
+  const send = vi.spyOn(window.openbot.agent, "channelAudienceCommand");
+  await fireEvent.click(within(chat).getByRole("button", { name: "Send message" }));
+  await within(chat).findByRole("article", { name: "Message from You" });
+  expect(send).toHaveBeenCalledOnce();
+  expect(send).toHaveBeenCalledWith(expect.objectContaining({ audience: { kind: "all" } }));
+  const page = await window.openbot.agent.readChannel({ channelId: "audience-room" });
+  expect(page.tasks.map((task) => task.ownerAgentId)).toEqual(["chief", "sales-outbound", "reviewer"]);
+  expect(within(chat).getByLabelText("Accepted channel targets")).toHaveTextContent("Reviewer: Queued");
+});
+
+it("channel audience production: subset deduplicates and group stop keeps distinct root operations", async () => {
+  const { chat, editor } = await openAudienceChannel();
+  editor.textContent = "@[Reviewer](agent:reviewer) @[Chief](agent:chief) @[Reviewer](agent:reviewer) Review";
+  await fireEvent.input(editor);
+  await fireEvent.click(within(chat).getByRole("button", { name: "Send message" }));
+  await within(chat).findByRole("article", { name: "Message from You" });
+  const page = await window.openbot.agent.readChannel({ channelId: "audience-room" });
+  expect(page.tasks.map((task) => task.ownerAgentId)).toEqual(["reviewer", "chief"]);
+  const stop = vi.spyOn(window.openbot.agent, "channelCommand");
+  await fireEvent.click(within(chat).getByRole("button", { name: "Stop this group" }));
+  await waitFor(async () =>
+    expect(
+      (await window.openbot.agent.readChannel({ channelId: "audience-room" })).tasks.map((task) => task.state),
+    ).toEqual(["paused", "paused"]),
+  );
+  const stopped = stop.mock.calls.map(([input]) => input).filter((input) => input.type === "stop");
+  expect(stopped).toHaveLength(2);
+  expect(new Set(stopped.map((input) => input.operationId)).size).toBe(2);
+});
+
+it("channel audience production: missing receipt keeps original envelope and a newer draft; manual retry uses the exact saved input", async () => {
+  const { chat, editor } = await openAudienceChannel();
+  const original = window.openbot.agent.channelAudienceCommand;
+  const send = vi
+    .spyOn(window.openbot.agent, "channelAudienceCommand")
+    .mockRejectedValueOnce(new Error("Connection lost"));
+  const lookup = vi.spyOn(window.openbot.agent, "channelAudienceReceipt");
+  editor.textContent = "@[Chief](agent:chief) @[Reviewer](agent:reviewer) Original";
+  await fireEvent.input(editor);
+  await fireEvent.click(within(chat).getByRole("button", { name: "Send message" }));
+  await within(chat).findByRole("alert");
+  const first = send.mock.calls[0]?.[0];
+  assert(first);
+  editor.textContent = "New unsent draft";
+  await fireEvent.input(editor);
+  await fireEvent.click(within(chat).getByRole("button", { name: "Check channel acceptance" }));
+  await waitFor(() => expect(lookup).toHaveBeenCalledOnce());
+  expect(send).toHaveBeenCalledOnce();
+  expect(editor).toHaveTextContent("New unsent draft");
+  await fireEvent.click(within(chat).getByRole("button", { name: "Send message" }));
+  expect(send).toHaveBeenCalledOnce();
+  send.mockImplementation(original);
+  await fireEvent.click(within(chat).getByRole("button", { name: "Retry saved request" }));
+  await within(chat).findByRole("article", { name: "Message from You" });
+  expect(send.mock.calls[1]?.[0]).toEqual(first);
+  expect(editor).toHaveTextContent("New unsent draft");
+  expect(await window.openbot.agent.readChannel({ channelId: "audience-room" })).toMatchObject({
+    tasks: [{ instruction: first.text }, { instruction: first.text }],
+  });
+});
+
+it("channel audience production: cold positive receipt recovers accepted targets with zero resend", async () => {
+  const { chat, editor, view } = await openAudienceChannel();
+  const original = window.openbot.agent.channelAudienceCommand;
+  const send = vi.spyOn(window.openbot.agent, "channelAudienceCommand").mockImplementationOnce(async (input) => {
+    await original(input);
+    throw new Error("Response lost after commit");
+  });
+  editor.textContent = "@[Chief](agent:chief) @[Reviewer](agent:reviewer) Review";
+  await fireEvent.input(editor);
+  await fireEvent.click(within(chat).getByRole("button", { name: "Send message" }));
+  await within(chat).findByRole("alert");
+  view.unmount();
+  const lookup = vi.spyOn(window.openbot.agent, "channelAudienceReceipt");
+  render(() => <App />);
+  const recovered = await screen.findByRole("main", { name: "Channel conversation" });
+  await within(recovered).findByRole("article", { name: "Message from You" });
+  await waitFor(() => expect(lookup).toHaveBeenCalledOnce());
+  await waitFor(() =>
+    expect(within(recovered).getByRole("textbox", { name: "Message to channel" }).textContent).toBe(""),
+  );
+  expect(lookup).toHaveBeenCalledOnce();
+  expect(send).toHaveBeenCalledOnce();
+  expect((await window.openbot.agent.readChannel({ channelId: "audience-room" })).tasks).toHaveLength(2);
+  expect(within(recovered).queryByRole("button", { name: "Check channel acceptance" })).not.toBeInTheDocument();
+});
+
+it("channel audience production: a host without capability keeps the complete draft and submits nobody", async () => {
+  vi.mocked(window.openbot.servers.list).mockResolvedValue([
+    {
+      ...testServer("remote-1", true),
+      compatibility: {
+        localAppVersion: "0.4.0",
+        hostAppVersion: "0.4.0",
+        localProtocol: { minimum: 3, maximum: 3 },
+        hostProtocol: { minimum: 3, maximum: 3 },
+        negotiatedProtocol: 3,
+        capabilities: ["channel-chats-v1"],
+      },
+    },
+  ]);
+  const { chat, editor } = await openAudienceChannel();
+  const plural = vi.spyOn(window.openbot.agent, "channelAudienceCommand");
+  const singular = vi.spyOn(window.openbot.agent, "channelCommand");
+  editor.textContent = "@[Chief](agent:chief) @[Reviewer](agent:reviewer) Review";
+  await fireEvent.input(editor);
+  await fireEvent.click(within(chat).getByRole("button", { name: "Send message" }));
+  expect(await within(chat).findByRole("alert")).toHaveTextContent("does not support");
+  expect(plural).not.toHaveBeenCalled();
+  expect(singular.mock.calls.some(([input]) => input.type === "send")).toBe(false);
+  expect(editor).toHaveTextContent("Review");
+  expect((await window.openbot.agent.readChannel({ channelId: "audience-room" })).tasks).toEqual([]);
 });

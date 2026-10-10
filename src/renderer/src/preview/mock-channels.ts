@@ -1,6 +1,9 @@
 import type {
   AgentEvent,
   Channel,
+  ChannelAudienceInput,
+  ChannelAudienceReceiptInput,
+  ChannelAudienceResult,
   ChannelCommand,
   ChannelMemory,
   ChannelMessage,
@@ -28,6 +31,8 @@ export function createMockChannels(emit: (event: AgentEvent) => void, agentName:
   const messages = new Map<string, ChannelMessage[]>();
   const tasks = new Map<string, ChannelTask[]>();
   const receipts = new Map<string, Channel>();
+  const audienceReceipts = new Map<string, ChannelAudienceResult>();
+  const audienceKey = (input: ChannelAudienceReceiptInput) => JSON.stringify([input.channelId, input.operationId]);
   const memories = new Map<string, ChannelMemory[]>();
   const routines = new Map<string, ChannelRoutine[]>();
   const routineRuns = new Map<string, ChannelRoutineRun[]>();
@@ -61,6 +66,78 @@ export function createMockChannels(emit: (event: AgentEvent) => void, agentName:
       olderCursor: null,
       throughSequence: messages.get(channelId)?.length ?? 0,
     }),
+    channelAudienceReceipt: async (input: ChannelAudienceReceiptInput): Promise<ChannelAudienceResult | null> =>
+      structuredClone(audienceReceipts.get(audienceKey(input)) ?? null),
+    channelAudienceCommand: async (input: ChannelAudienceInput): Promise<ChannelAudienceResult> => {
+      const saved = audienceReceipts.get(audienceKey(input));
+      if (saved) return structuredClone(saved);
+      const original = requireChannel(input.channelId);
+      const ids =
+        input.audience.kind === "all" ? original.members.map((member) => member.agentId) : input.audience.agentIds;
+      if (
+        original.archived ||
+        !ids.length ||
+        new Set(ids).size !== ids.length ||
+        ids.some((id) => !original.members.some((member) => member.agentId === id))
+      ) {
+        const rejection: ChannelAudienceResult = {
+          status: "not-accepted",
+          channelId: input.channelId,
+          operationId: input.operationId,
+          reason: "validation",
+        };
+        audienceReceipts.set(audienceKey(input), rejection);
+        return structuredClone(rejection);
+      }
+      const channel = { ...original, revision: original.revision + 1 };
+      const list = messages.get(channel.id) ?? [];
+      const work = tasks.get(channel.id) ?? [];
+      const requestMessageId = crypto.randomUUID();
+      const targets = ids.map((agentId) => ({ agentId, taskId: crypto.randomUUID() }));
+      for (const target of targets)
+        work.push({
+          id: target.taskId,
+          channelId: channel.id,
+          rootTaskId: target.taskId,
+          parentTaskId: null,
+          ownerAgentId: target.agentId,
+          requestMessageId,
+          instruction: input.text,
+          attachmentDraftIds: input.attachmentDraftIds,
+          expectedResult: "Complete the requested work and report the result.",
+          sourceMessageIds: [requestMessageId],
+          dependencies: [],
+          resources: ["host"],
+          state: "queued",
+          revision: 0,
+          assignmentCount: 0,
+          error: null,
+        });
+      list.push({
+        id: requestMessageId,
+        channelId: channel.id,
+        sequence: list.length + 1,
+        author: { kind: "member", id: "preview", name: "You" },
+        taskId: null,
+        audience: targets,
+        superseded: false,
+        message: {
+          id: requestMessageId,
+          author: "user",
+          text: input.text,
+          status: "completed",
+          createdAt: new Date().toISOString(),
+          replyToMessageId: input.replyToMessageId,
+        },
+      });
+      messages.set(channel.id, list);
+      tasks.set(channel.id, work);
+      channels.set(channel.id, structuredClone(channel));
+      const receipt = { channel, requestMessageId, targets };
+      audienceReceipts.set(audienceKey(input), structuredClone(receipt));
+      changed(channel.id, channel.revision);
+      return structuredClone(receipt);
+    },
     channelCommand: async (input: ChannelCommand): Promise<Channel> => {
       const receipt = receipts.get(input.operationId);
       if (receipt) return structuredClone(receipt);
