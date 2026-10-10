@@ -1331,7 +1331,7 @@ export class TeamWebRtcRequestError extends Schema.TaggedError<TeamWebRtcRequest
 }
 
 /** The connection failed before the host answered. The code is the Signal or the bridge code. */
-export class TeamWebRtcConnectError extends Schema.TaggedError<TeamWebRtcConnectError>()("TeamWebRtcConnectError", {
+class TeamWebRtcConnectError extends Schema.TaggedError<TeamWebRtcConnectError>()("TeamWebRtcConnectError", {
   code: Schema.String,
   message: Schema.String,
   reference: Schema.NullOr(Schema.String),
