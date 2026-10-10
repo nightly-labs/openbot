@@ -19,8 +19,8 @@ export interface BootRecoveryHooks {
   executionThreads?(): Array<{ id: string; threadId: string }>;
   deliveryThreadId?(deliveryId: string): string | null;
   /**
-   * Whether this routine delivery can have ended quiet: a scheduled run, or a run of a deleted
-   * routine, whose record is gone. A Test, script or webhook run cannot.
+   * Whether this routine delivery can have ended quiet: a scheduled or webhook run, or a run of a
+   * deleted routine, whose record is gone. A Test or script run cannot.
    */
   quietRoutineDelivery(deliveryId: string): boolean;
   emitError(code: string, error: unknown, agentId?: string): void;

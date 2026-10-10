@@ -57,8 +57,8 @@ export interface ProviderHistoryImportInput {
   findDelivery(deliveryId: string): DeliveryContext | null;
   findMessageDelivery(messageId: string): DeliveryContext | null;
   /**
-   * Whether this routine delivery can have ended quiet: a scheduled run, or a run of a deleted
-   * routine, whose record is gone. A Test, script or webhook run cannot.
+   * Whether this routine delivery can have ended quiet: a scheduled or webhook run, or a run of a
+   * deleted routine, whose record is gone. A Test or script run cannot.
    */
   quietRoutineDelivery(deliveryId: string): boolean;
 }
@@ -258,10 +258,10 @@ function importCompletedTurn(
 }
 
 /**
- * How a turn that a scheduled routine run started answered: `quiet` when each answer is only the
- * no-update marker, so the turn completion dropped all of them with the turn's thinking, `answered`
- * for any other such turn, and `none` for a turn that no scheduled routine run started. A Test,
- * script or webhook run keeps its answers, as the turn completion does. Decided from the staged
+ * How a turn that a scheduled or webhook routine run started answered: `quiet` when each answer is
+ * only the no-update marker, so the turn completion dropped all of them with the turn's thinking,
+ * `answered` for any other such turn, and `none` for a turn that no such run started. A Test or
+ * script run keeps its answers, as the turn completion does. Decided from the staged
  * items alone, one bounded page at a time, so it needs no stored state.
  */
 type RoutineTurnAnswers = "none" | "answered" | "quiet";
@@ -280,8 +280,8 @@ function routineTurnAnswers(
         input.database.stagedProviderHistoryItems({ sessionId: input.sessionId, turnId, afterIndex, limit: 50 }),
       );
       for (const { item } of page) {
-        // Every delivery of the turn must be a scheduled run, as at the turn completion: a message
-        // steered into the turn waits for the answer.
+        // Every delivery of the turn must be a scheduled or webhook run, as at the turn completion: a
+        // message steered into the turn waits for the answer.
         if (routine !== false && item.type === "userMessage" && typeof item.clientId === "string")
           routine =
             input.findDelivery(item.clientId)?.delivery.sender.kind === "routine" &&

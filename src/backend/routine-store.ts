@@ -24,7 +24,7 @@ import {
   requiredStringColumn,
 } from "./database/database-rows";
 import type { OpenBotDatabase } from "./openbot-database";
-import { hasWebhookReceipt, insertWebhookReceipt, revokeRoutineWebhooks } from "./webhook-route-store";
+import { hasWebhookReceipt, insertWebhookReceipt, isWebhookRun, revokeRoutineWebhooks } from "./webhook-route-store";
 import { parseEventFilters, validateWebhookTrigger, webhookMismatch, webhookRunInstruction } from "./webhook-trigger";
 
 /**
@@ -499,6 +499,11 @@ export class RoutineStore {
         return { kind: "started", run: this.#requireRun(runId) };
       },
     );
+  }
+
+  /** Whether a webhook request started this run, not a Test, a script or a schedule. */
+  startedByWebhook(runId: string): boolean {
+    return isWebhookRun(this.database.connection, this.tables.ownerKind, runId);
   }
 
   delete(ownerId: string, routineId: string): void {
