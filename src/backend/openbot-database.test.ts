@@ -699,7 +699,17 @@ describe("OpenBotDatabase", () => {
     sortConversationMessages(messages);
     const expected = messages.map(({ id }) => id);
     database.persistConversation(
-      { agentId: agent.id, threadId: agent.threadId, activeTurnId: null, revision: 0, messages },
+      {
+        agentId: agent.id,
+        threadId: agent.threadId,
+        activeTurnId: null,
+        revision: 0,
+        messages: messages.map((item) =>
+          item.id === "steer"
+            ? { ...item, createdAt: at(2_000), delivery: { id: "steer", status: "queued", position: 1 } }
+            : item,
+        ),
+      },
       "conversation.acp-order",
     );
 
@@ -707,13 +717,6 @@ describe("OpenBotDatabase", () => {
     // event replay must both replace the original queue time before SQL pages are read.
     const steer = messages.find((item) => item.id === "steer");
     if (!steer || !agent.threadId) throw new Error("The steered message needs a thread.");
-    database.persistConversationChanges({
-      agentId: agent.id,
-      threadId: agent.threadId,
-      activeTurnId: "steered",
-      changedMessages: [{ ...steer, createdAt: at(2_000), delivery: { id: "steer", status: "queued", position: 1 } }],
-      eventType: "queue.message-added",
-    });
     database.persistConversationChanges({
       agentId: agent.id,
       threadId: agent.threadId,
