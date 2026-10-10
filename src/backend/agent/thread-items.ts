@@ -4,7 +4,15 @@ import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values"
 import { sourceText } from "@openbot/i18n/source";
 import { type AgentProvider, RequestTimeoutError } from "../agent-client";
 import { AppServerError } from "../app-server-client";
-import { type DynamicToolCallParams, getString, isRecord, reasoningText, type ThreadItem } from "../protocol";
+import {
+  bridgedToolName,
+  type DynamicToolCallParams,
+  getString,
+  isRecord,
+  reasoningText,
+  type ThreadItem,
+} from "../protocol";
+import { BUILTIN_TOOL_CATALOG } from "./tool-catalog";
 
 export function isNonActionableCodexWarning(message: string): boolean {
   return message.startsWith("Skill descriptions were shortened to fit");
@@ -152,6 +160,8 @@ const ACP_TOOL_KINDS = new Map<string, ToolUsageKind>([
 export function toolUsage(item: ThreadItem): ToolUsage | null {
   const status = getString(item, "status");
   const failed = status === "failed" || status === "declined";
+  const bridged = bridgedTool(item);
+  if (bridged) return { kind: "mcp", server: bridged.namespace, tool: bridged.tool, failed };
   const codexKind = CODEX_ITEM_KINDS.get(item.type);
   if (codexKind) return { kind: codexKind, failed };
   if (item.type === "mcpToolCall") {
@@ -180,6 +190,12 @@ export function toolUsage(item: ThreadItem): ToolUsage | null {
   return { kind: "mcp", server: mcp[1], tool: mcp[2], failed };
 }
 
+/** The built-in tool that a `tool_call` bridge item calls. A name outside the catalog is model text and stays out. */
+function bridgedTool(item: ThreadItem) {
+  const name = bridgedToolName(item);
+  return name ? BUILTIN_TOOL_CATALOG.find((entry) => entry.name === name) : undefined;
+}
+
 export function toolProgressText(item: ThreadItem, completed: boolean): string | null {
   const type = item.type.toLowerCase();
   if (!/(tool.*call|commandexecution|filechange|websearch|computeraction)/u.test(type)) return null;
@@ -187,7 +203,13 @@ export function toolProgressText(item: ThreadItem, completed: boolean): string |
     return "A tool step failed; reviewing the result and deciding what to try next…";
   }
 
-  const descriptor = [item.type, getString(item, "name"), getString(item, "title"), getString(item, "tool")]
+  const descriptor = [
+    item.type,
+    getString(item, "name"),
+    getString(item, "title"),
+    getString(item, "tool"),
+    bridgedTool(item)?.name,
+  ]
     .filter(isString)
     .join(" ")
     .toLowerCase();

@@ -22,7 +22,6 @@ import { STORY_AGENT, STORY_AGENTS } from "./fixtures";
  *   to compact at 80% (`context-compaction.ts`) and holds the queue until it ends.
  * - Claude supplies local context estimates and native compaction events. Its compacted-message
  *   count excludes system/tools, so it cannot supply a full-context before/after comparison.
- *   The category breakdown below is a design fixture; the desktop uses summary mode.
  * - ACP agents can send `usage_update` (`used`, `size`) and `compaction` updates, both unstable in
  *   the protocol. An agent that sends neither shows no ring.
  */
@@ -45,12 +44,6 @@ const CLAUDE: ContextUsageView = {
   nativeManaged: true,
   estimated: true,
   compacting: false,
-  categories: [
-    { category: "system", tokens: 14_300 },
-    { category: "tools", tokens: 21_900 },
-    { category: "memory", tokens: 6_200 },
-    { category: "messages", tokens: 99_400 },
-  ],
 };
 
 const ACP_NO_SUMMARY: ContextUsageView = {
@@ -61,14 +54,14 @@ const ACP_NO_SUMMARY: ContextUsageView = {
 };
 
 /** The composer's toolbar row: the ring sits with the voice and send controls, away from "+". */
-function ComposerToolbar(props: { usage: ContextUsageView; onCompact?: (() => void) | undefined }) {
+function ComposerToolbar(props: { usage: ContextUsageView }) {
   return (
     <div class="composer-toolbar">
       <Button type="button" variant="ghost" class="composer-button" aria-label="Add">
         <Plus aria-hidden="true" />
       </Button>
       <div class="composer-primary-actions">
-        <ContextUsageMeter usage={props.usage} onCompact={props.onCompact} />
+        <ContextUsageMeter usage={props.usage} />
         <Button type="button" variant="ghost" class="dictation-button" aria-label="Dictate">
           <Mic aria-hidden="true" />
         </Button>
@@ -80,12 +73,7 @@ function ComposerToolbar(props: { usage: ContextUsageView; onCompact?: (() => vo
   );
 }
 
-function Composer(props: {
-  usage: ContextUsageView;
-  onCompact?: (() => void) | undefined;
-  notice?: JSX.Element;
-  width?: string;
-}) {
+function Composer(props: { usage: ContextUsageView; notice?: JSX.Element; width?: string }) {
   const [draft, setDraft] = createSignal("");
   return (
     <div class="composer-wrap" style={{ width: props.width ?? "560px", "max-width": "calc(100vw - 32px)" }}>
@@ -103,7 +91,7 @@ function Composer(props: {
             onValueChange={setDraft}
           />
         </div>
-        <ComposerToolbar usage={props.usage} onCompact={props.onCompact} />
+        <ComposerToolbar usage={props.usage} />
       </form>
     </div>
   );
@@ -121,7 +109,7 @@ function Row(props: { label: string; children: JSX.Element }) {
 const meta = {
   title: "Conversation/ContextUsage",
   component: ContextUsageMeter,
-  args: { usage: CODEX, onCompact: fn() },
+  args: { usage: CODEX },
   parameters: { layout: "centered" },
 } satisfies Meta<typeof ContextUsageMeter>;
 
@@ -130,7 +118,7 @@ type Story = StoryObj<typeof meta>;
 
 /** Open the ring to see the popover. The args drive one composer. */
 export const Playground: Story = {
-  render: (args) => <Composer usage={args.usage} onCompact={args.onCompact} />,
+  render: (args) => <Composer usage={args.usage} />,
 };
 
 /** The ring through a thread's life: quiet, visible, near the compaction point, compacting, and full. */
@@ -141,13 +129,13 @@ export const RingStates: Story = {
         <Composer usage={{ ...CODEX, usedTokens: 49_000, lastCompaction: undefined }} />
       </Row>
       <Row label="62% — visible, no action needed">
-        <Composer usage={CODEX} onCompact={fn()} />
+        <Composer usage={CODEX} />
       </Row>
       <Row label="76% — the next turns reach the 80% compaction point">
-        <Composer usage={{ ...CODEX, usedTokens: 206_700 }} onCompact={fn()} />
+        <Composer usage={{ ...CODEX, usedTokens: 206_700 }} />
       </Row>
       <Row label="Compacting — the queue waits">
-        <Composer usage={COMPACTING} onCompact={fn()} />
+        <Composer usage={COMPACTING} />
       </Row>
       <Row label="94% — nothing compacts this agent">
         <Composer usage={ACP_NO_SUMMARY} />
@@ -156,24 +144,21 @@ export const RingStates: Story = {
   ),
 };
 
-/**
- * Claude counts tokens per category, so the bar splits. It compacts on its own near 92%, and OpenBot
- * cannot ask it to compact, so the popover has no button.
- */
-export const ClaudeBreakdown: Story = {
-  args: { usage: CLAUDE, onCompact: undefined },
+/** Claude reports an estimate. It compacts on its own near 92%. */
+export const ClaudeEstimate: Story = {
+  args: { usage: CLAUDE },
   render: (args) => <Composer usage={args.usage} />,
 };
 
 /** Codex reports one total. OpenBot compacts at 80% and remembers the last result. */
 export const CodexTotal: Story = {
   args: { usage: { ...CODEX, usedTokens: 206_700 } },
-  render: (args) => <Composer usage={args.usage} onCompact={args.onCompact} />,
+  render: (args) => <Composer usage={args.usage} />,
 };
 
-/** An ACP agent that reports usage but cannot compact: no button, and the ring turns red near full. */
+/** An ACP agent that reports usage but cannot compact: the ring turns red near full. */
 export const NoSummary: Story = {
-  args: { usage: ACP_NO_SUMMARY, onCompact: undefined },
+  args: { usage: ACP_NO_SUMMARY },
   render: (args) => <Composer usage={args.usage} />,
 };
 
@@ -189,36 +174,27 @@ export const CompactingNotice: Story = {
         <Row label="Running — the estimate climbs over the agent's last 20 s duration">
           <Composer
             usage={COMPACTING}
-            onCompact={fn()}
             notice={<ComposerCompactionNotice startedAt={startedAt} expectedMs={20_000} />}
           />
         </Row>
-        <Row label="Slower than twice the last run — it shows the elapsed time, with two messages held">
+        <Row label="Slower than twice the last run — it shows the elapsed time">
           <Composer
             usage={COMPACTING}
-            onCompact={fn()}
-            notice={<ComposerCompactionNotice startedAt={startedAt - 60_000} expectedMs={20_000} heldMessages={2} />}
+            notice={<ComposerCompactionNotice startedAt={startedAt - 60_000} expectedMs={20_000} />}
           />
         </Row>
         <Row label="Done — the provider reported the end">
           <Composer
             usage={{ ...CODEX, usedTokens: 41_200 }}
-            onCompact={fn()}
             notice={<ComposerCompactionNotice startedAt={startedAt} status="completed" />}
           />
         </Row>
         <Row label="Failed — it stays until dismissed, and the queue continues">
           <Composer
             usage={{ ...CODEX, usedTokens: 221_400 }}
-            onCompact={fn()}
             notice={
               <Show when={failedShown()}>
-                <ComposerCompactionNotice
-                  startedAt={startedAt}
-                  status="failed"
-                  heldMessages={2}
-                  onDone={() => setFailedShown(false)}
-                />
+                <ComposerCompactionNotice startedAt={startedAt} status="failed" onDone={() => setFailedShown(false)} />
               </Show>
             }
           />
@@ -229,8 +205,8 @@ export const CompactingNotice: Story = {
 };
 
 /**
- * The whole cycle: open the ring and press "Compact now". The fake provider ends after 6 s, against
- * a 5 s estimate, and the finished notice goes away 2 s later.
+ * The whole cycle: press the button. The fake provider ends after 6 s, against a 5 s estimate, and
+ * the finished notice goes away 2 s later.
  */
 export const CompactionCycle: Story = {
   render: () => {
@@ -242,52 +218,41 @@ export const CompactionCycle: Story = {
       window.setTimeout(() => setCompleted(true), 6_000);
     };
     return (
-      <Composer
-        usage={{
-          ...CODEX,
-          usedTokens: completed() ? 41_200 : 219_000,
-          compacting: startedAt() !== null && !completed(),
-        }}
-        onCompact={compact}
-        notice={
-          <Show when={startedAt()}>
-            {(started) => (
-              <ComposerCompactionNotice
-                startedAt={started()}
-                expectedMs={5_000}
-                status={completed() ? "completed" : "running"}
-                onDone={() => setStartedAt(null)}
-              />
-            )}
-          </Show>
-        }
-      />
+      <div style={{ display: "grid", gap: "12px", "justify-items": "start" }}>
+        <Button type="button" variant="secondary" disabled={startedAt() !== null} onClick={compact}>
+          Start compaction
+        </Button>
+        <Composer
+          usage={{
+            ...CODEX,
+            usedTokens: completed() ? 41_200 : 219_000,
+            compacting: startedAt() !== null && !completed(),
+          }}
+          notice={
+            <Show when={startedAt()}>
+              {(started) => (
+                <ComposerCompactionNotice
+                  startedAt={started()}
+                  expectedMs={5_000}
+                  status={completed() ? "completed" : "running"}
+                  onDone={() => setStartedAt(null)}
+                />
+              )}
+            </Show>
+          }
+        />
+      </div>
     );
   },
 };
 
-const SUMMARY =
-  "The user is preparing the Q4 launch. Done: pricing page copy (approved), changelog draft in docs/launch.md, " +
-  "three hero image options in ~/OpenBot/Agents/chief/launch/. Open: pick a hero image, confirm the launch date " +
-  "with Maya, and send the press kit to the two outlets in contacts.md. The user prefers short status updates.";
-
 const MARKERS: { label: string; compaction: ContextCompactionView }[] = [
   {
-    label: "Running, with held queue",
-    compaction: { status: "running", timestamp: minutesAgo(0), beforeTokens: 219_000, heldMessages: 2 },
+    label: "Running",
+    compaction: { status: "running", timestamp: minutesAgo(0), beforeTokens: 219_000 },
   },
   {
-    label: "Completed, with the provider's summary",
-    compaction: {
-      status: "completed",
-      timestamp: minutesAgo(42),
-      beforeTokens: 219_000,
-      afterTokens: 41_200,
-      summary: SUMMARY,
-    },
-  },
-  {
-    label: "Completed, no summary reported",
+    label: "Completed",
     compaction: { status: "completed", timestamp: minutesAgo(180), beforeTokens: 184_300, afterTokens: 22_900 },
   },
   {
@@ -365,7 +330,6 @@ export const InConversation: Story = {
                 timestamp: minutesAgo(1),
                 beforeTokens: 219_000,
                 afterTokens: 41_200,
-                summary: SUMMARY,
               }}
             />
           </div>
@@ -383,7 +347,7 @@ export const InConversation: Story = {
         </div>
       </section>
       <div style={{ display: "flex", "justify-content": "center", padding: "0 16px 16px" }}>
-        <Composer usage={{ ...CODEX, usedTokens: 44_800 }} onCompact={fn()} width="720px" />
+        <Composer usage={{ ...CODEX, usedTokens: 44_800 }} width="720px" />
       </div>
     </main>
   ),

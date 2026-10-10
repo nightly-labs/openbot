@@ -18,6 +18,8 @@ interface ThreadContextBudget {
 
 const CONTEXT_COMPACTION_THRESHOLD = 0.8;
 const CONTEXT_COMPACTION_TIMEOUT_MS = 120_000;
+/** Usage arrives after each model step; one runtime snapshot carries the latest value of a burst. */
+const USAGE_CHANGE_DELAY_MS = 250;
 
 export interface ContextCompactionOptions {
   store: AgentStore;
@@ -49,6 +51,7 @@ export class ContextCompaction {
   readonly #durations = new Map<string, number>();
   readonly #changed: () => void;
   readonly #timers = new Map<string, NodeJS.Timeout>();
+  #usageTimer: NodeJS.Timeout | null = null;
 
   constructor(options: ContextCompactionOptions) {
     this.#changed = options.changed ?? (() => {});
@@ -79,10 +82,25 @@ export class ContextCompaction {
   ): void {
     if (!Number.isFinite(usedTokens) || usedTokens < 0 || !Number.isFinite(windowTokens) || windowTokens <= 0) return;
     const display = this.#display.get(threadId) ?? { usage: null, compaction: null };
+    const previous = display.usage;
     display.usage = { usedTokens, windowTokens, nativeManaged, autoCompactAt, estimated };
-    if (display.compaction?.status === "completed" && this.#awaitingPostCompaction.delete(threadId))
-      display.compaction.afterTokens = usedTokens;
+    const after = display.compaction?.status === "completed" && this.#awaitingPostCompaction.delete(threadId);
+    if (after && display.compaction) display.compaction.afterTokens = usedTokens;
     this.#display.set(threadId, display);
+    if (after || JSON.stringify(previous) !== JSON.stringify(display.usage)) this.#scheduleUsageChange();
+  }
+
+  #scheduleUsageChange(): void {
+    this.#usageTimer ??= setTimeout(() => {
+      this.#usageTimer = null;
+      this.#changed();
+    }, USAGE_CHANGE_DELAY_MS);
+  }
+
+  /** A snapshot sent now also carries any pending usage. */
+  #emitChanged(): void {
+    if (this.#usageTimer) clearTimeout(this.#usageTimer);
+    this.#usageTimer = null;
     this.#changed();
   }
 
@@ -121,7 +139,7 @@ export class ContextCompaction {
     if (status === "completed" && previous?.status === "running")
       this.#durations.set(threadId, Math.max(1, Date.now() - startedAt));
     this.#display.set(threadId, display);
-    this.#changed();
+    this.#emitChanged();
   }
 
   /** Ends a running compaction whose provider stopped before it reported the result. */
@@ -292,10 +310,10 @@ export class ContextCompaction {
   /** Drops a retired provider thread's budget. The agent keeps compacting until `forgetAgent`. */
   forgetThread(threadId: string): void {
     this.#budgets.delete(threadId);
-    this.#display.delete(threadId);
+    const displayed = this.#display.delete(threadId);
     this.#durations.delete(threadId);
     this.#awaitingPostCompaction.delete(threadId);
-    this.#changed();
+    if (displayed) this.#emitChanged();
     this.#clearTimer(threadId);
   }
 
@@ -304,6 +322,8 @@ export class ContextCompaction {
   }
 
   dispose(): void {
+    if (this.#usageTimer) clearTimeout(this.#usageTimer);
+    this.#usageTimer = null;
     for (const timer of this.#timers.values()) clearTimeout(timer);
     this.#timers.clear();
     this.#compactingAgents.clear();

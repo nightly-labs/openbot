@@ -106,13 +106,5 @@ export const messages = defineMessages("composer", {
   "composer.compaction.estimated": "Estimated progress",
   "composer.context.noAuto": "This agent does not compact its context.",
   "composer.context.lastCompaction": "Last compaction: {before} → {after} tokens",
-  "composer.context.compact": "Compact now",
-  "composer.context.compacting": "Compacting…",
-  "composer.context.category.system": "Instructions",
-  "composer.context.category.tools": "Tools",
-  "composer.context.category.memory": "Memory",
-  "composer.context.category.messages": "Messages",
-  "composer.context.category.free": "Free",
-  "composer.context.breakdown": "Context breakdown",
   "composer.compaction.elapsed": "{minutes}:{seconds}",
 });

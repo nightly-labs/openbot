@@ -23,6 +23,7 @@ const DIRECT_NAMES = new Set([
   "list_agents",
   "send_message",
   "search_memories",
+  "routine_no_update",
   "remember",
   "forget_memory",
   "react_to_user_message",

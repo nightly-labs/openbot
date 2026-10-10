@@ -1,25 +1,20 @@
 import type { AppTextKey } from "@openbot/i18n";
 import {
   Button,
-  ChevronDown,
   CircleCheck,
   LoaderCircle,
   Marker,
   MarkerContent,
-  Minimize2,
   Popover,
   RadialProgress,
   type RadialProgressTone,
   TriangleAlert,
 } from "@openbot/ui";
 import { ContentExitMotion } from "@openbot/ui/menu-motion";
-import { createEffect, createSignal, createUniqueId, For, Match, Show, Switch } from "solid-js";
+import { createEffect, createSignal, Match, Show, Switch } from "solid-js";
 import { useText } from "../../text";
 import { CloseIcon } from "./ConversationIcons";
 import { formatChatTimestamp } from "./chat-timestamp";
-
-/** Where the tokens in a provider thread go. Only providers that count them per category report this. */
-export type ContextUsageCategory = "system" | "tools" | "memory" | "messages";
 
 export interface ContextUsageView {
   usedTokens: number;
@@ -29,20 +24,11 @@ export interface ContextUsageView {
    * Null when nothing compacts this thread on its own.
    */
   autoCompactAt: number | null;
-  /** Ordered as the provider reports them. The sum stays at or below `usedTokens`. */
-  categories?: readonly { category: ContextUsageCategory; tokens: number }[] | undefined;
   nativeManaged?: boolean;
   estimated?: boolean;
   compacting: boolean;
   lastCompaction?: { beforeTokens: number; afterTokens: number } | undefined;
 }
-
-const CATEGORY_LABELS = {
-  system: "composer.context.category.system",
-  tools: "composer.context.category.tools",
-  memory: "composer.context.category.memory",
-  messages: "composer.context.category.messages",
-} as const satisfies Record<ContextUsageCategory, AppTextKey>;
 
 function usedShare(usage: ContextUsageView): number {
   return usage.windowTokens > 0 ? Math.min(1, Math.max(0, usage.usedTokens / usage.windowTokens)) : 0;
@@ -62,10 +48,9 @@ function meterLevel(usage: ContextUsageView): "quiet" | "normal" | RadialProgres
 
 /**
  * The composer's context ring and the popover it opens. It shows how full the agent's provider
- * thread is, what fills it, and when it compacts. `onCompact` adds the manual compaction action;
- * leave it out for a provider that cannot compact on request.
+ * thread is and when it compacts.
  */
-export function ContextUsageMeter(props: { usage: ContextUsageView; onCompact?: (() => void) | undefined }) {
+export function ContextUsageMeter(props: { usage: ContextUsageView }) {
   const { t, format } = useText();
   const percent = () => format.percent(usedShare(props.usage), { maximumFractionDigits: 0 });
   const level = () => meterLevel(props.usage);
@@ -111,9 +96,6 @@ export function ContextUsageMeter(props: { usage: ContextUsageView; onCompact?: 
               total: format.compact(props.usage.windowTokens),
             })}
           </p>
-          <Show when={props.usage.categories?.length}>
-            <ContextUsageLegend usage={props.usage} />
-          </Show>
           <Popover.Description class="context-meter-note">
             <Show
               when={props.usage.autoCompactAt}
@@ -135,79 +117,24 @@ export function ContextUsageMeter(props: { usage: ContextUsageView; onCompact?: 
               )}
             </Show>
           </Popover.Description>
-          <Show when={props.onCompact}>
-            {(compact) => (
-              <footer class="context-meter-footer">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  class="context-meter-action"
-                  disabled={props.usage.compacting}
-                  onClick={() => compact()()}
-                >
-                  <Show when={props.usage.compacting} fallback={<Minimize2 aria-hidden="true" />}>
-                    <LoaderCircle class="composer-spinner" aria-hidden="true" />
-                  </Show>
-                  {props.usage.compacting ? t("composer.context.compacting") : t("composer.context.compact")}
-                </Button>
-              </footer>
-            )}
-          </Show>
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
   );
 }
 
-/** One segment per reported category, then free space, with a tick where the automatic compaction runs. */
+/** The used share, then free space, with a tick where the automatic compaction runs. */
 function ContextUsageBar(props: { usage: ContextUsageView }) {
-  const categorized = () => props.usage.categories?.reduce((sum, entry) => sum + entry.tokens, 0) ?? 0;
-  const segments = () => {
-    const window = Math.max(1, props.usage.windowTokens);
-    const reported = props.usage.categories ?? [];
-    const rest = Math.max(0, props.usage.usedTokens - categorized());
-    return [
-      ...reported.map((entry) => ({ key: entry.category, share: entry.tokens / window })),
-      ...(rest > 0 || reported.length === 0 ? [{ key: "used" as const, share: rest / window }] : []),
-    ].filter((segment) => segment.share > 0);
-  };
   return (
     <div class="context-usage-bar" aria-hidden="true">
-      <For each={segments()}>
-        {(segment) => (
-          <span class="context-usage-segment" data-category={segment.key} style={{ "flex-grow": segment.share }} />
-        )}
-      </For>
+      <Show when={usedShare(props.usage) > 0}>
+        <span class="context-usage-segment" data-category="used" style={{ "flex-grow": usedShare(props.usage) }} />
+      </Show>
       <span class="context-usage-segment" data-category="free" style={{ "flex-grow": 1 - usedShare(props.usage) }} />
       <Show when={props.usage.autoCompactAt}>
         {(at) => <span class="context-usage-threshold" style={{ left: `${at() * 100}%` }} />}
       </Show>
     </div>
-  );
-}
-
-function ContextUsageLegend(props: { usage: ContextUsageView }) {
-  const { t, format } = useText();
-  return (
-    <ul class="context-usage-legend" aria-label={t("composer.context.breakdown")}>
-      <For each={props.usage.categories ?? []}>
-        {(entry) => (
-          <li class="context-usage-legend-row" data-category={entry.category}>
-            <span class="context-usage-swatch" aria-hidden="true" />
-            <span>{t(CATEGORY_LABELS[entry.category])}</span>
-            <span class="context-usage-legend-value">{format.compact(entry.tokens)}</span>
-          </li>
-        )}
-      </For>
-      <li class="context-usage-legend-row" data-category="free">
-        <span class="context-usage-swatch" aria-hidden="true" />
-        <span>{t("composer.context.category.free")}</span>
-        <span class="context-usage-legend-value">
-          {format.compact(Math.max(0, props.usage.windowTokens - props.usage.usedTokens))}
-        </span>
-      </li>
-    </ul>
   );
 }
 
@@ -244,7 +171,6 @@ export function ComposerCompactionNotice(props: {
   startedAt: number;
   expectedMs?: number | undefined;
   status?: ContextCompactionView["status"] | undefined;
-  heldMessages?: number | undefined;
   onDone?: (() => void) | undefined;
 }) {
   const { t, format } = useText();
@@ -303,14 +229,7 @@ export function ComposerCompactionNotice(props: {
       </Switch>
       <p class="context-compaction-notice-copy">
         <strong>{t(COMPACTION_LABELS[status()])}</strong>
-        <Show
-          when={status() === "failed"}
-          fallback={
-            <Show when={props.heldMessages}>
-              {(count) => <span> · {t("chat.compaction.held", { count: count() })}</span>}
-            </Show>
-          }
-        >
+        <Show when={status() === "failed"}>
           <span> · {t("chat.compaction.continues")}</span>
         </Show>
       </p>
@@ -348,10 +267,6 @@ export interface ContextCompactionView {
   timestamp: string;
   beforeTokens?: number | undefined;
   afterTokens?: number | undefined;
-  /** Queued messages that wait for the compaction to finish. Only meaningful while it runs. */
-  heldMessages?: number | undefined;
-  /** The text the provider kept in place of the earlier messages, when it reports one. */
-  summary?: string | undefined;
 }
 
 const COMPACTION_LABELS = {
@@ -363,8 +278,6 @@ const COMPACTION_LABELS = {
 /** The conversation row where a provider thread was compacted. It reads like the other action markers. */
 export function ContextCompactionMarker(props: { compaction: ContextCompactionView }) {
   const { t, format } = useText();
-  const [expanded, setExpanded] = createSignal(false);
-  const summaryId = createUniqueId();
   return (
     <Marker
       class="chat-action-marker context-compaction-marker"
@@ -396,39 +309,13 @@ export function ContextCompactionMarker(props: { compaction: ContextCompactionVi
               })}
             </span>
           </Show>
-          <Show when={props.compaction.status === "running" && props.compaction.heldMessages}>
-            {(count) => (
-              <span class="context-compaction-detail">· {t("chat.compaction.held", { count: count() })}</span>
-            )}
-          </Show>
           <Show when={props.compaction.status === "failed"}>
             <span class="context-compaction-detail">· {t("chat.compaction.continues")}</span>
           </Show>
           <time class="chat-action-marker-time" datetime={props.compaction.timestamp}>
             {formatChatTimestamp(new Date(props.compaction.timestamp), format)}
           </time>
-          <Show when={props.compaction.status === "completed" && props.compaction.summary}>
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              type="button"
-              class="context-compaction-toggle"
-              aria-expanded={expanded() ? "true" : "false"}
-              aria-controls={summaryId}
-              aria-label={expanded() ? t("chat.compaction.hideSummary") : t("chat.compaction.showSummary")}
-              onClick={() => setExpanded((open) => !open)}
-            >
-              <ChevronDown aria-hidden="true" />
-            </Button>
-          </Show>
         </MarkerContent>
-        <Show when={expanded() && props.compaction.summary}>
-          {(summary) => (
-            <section id={summaryId} class="context-compaction-summary" aria-label={t("chat.compaction.summary")}>
-              {summary()}
-            </section>
-          )}
-        </Show>
       </div>
     </Marker>
   );
