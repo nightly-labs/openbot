@@ -1,9 +1,12 @@
 import { ProviderLogo } from "@openbot/brand";
 import { Button, Gauge, RefreshCw } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { For, Show } from "solid-js";
+import { createSignal, For, onCleanup, Show } from "solid-js";
 import { useText } from "../../text";
-import { type AccountUsageProviderRow, accountUsageRowLabel } from "./account-usage-view";
+import { type AccountUsageProviderRow, accountUsageRowLabel, formatUsageResetIn } from "./account-usage-view";
+
+/** The reset countdown shows minutes, so a half-minute tick keeps it current. */
+const RESET_CLOCK_MS = 30_000;
 
 export function AccountUsageDetails(props: {
   rows: AccountUsageProviderRow[];
@@ -17,6 +20,9 @@ export function AccountUsageDetails(props: {
   const text = useText();
   const { t } = text;
   const empty = () => !props.loading && props.rows.length === 0;
+  const [now, setNow] = createSignal(Date.now());
+  const clock = window.setInterval(() => setNow(Date.now()), RESET_CLOCK_MS);
+  onCleanup(() => window.clearInterval(clock));
   return (
     <>
       <header class="account-usage-popover-header">
@@ -63,27 +69,60 @@ export function AccountUsageDetails(props: {
                 aria-label={accountUsageRowLabel(row, text, props.loading)}
               >
                 <ProviderLogo provider={row.provider} class="account-usage-provider-logo" />
-                <span class="account-usage-provider-copy">
+                <Show
+                  when={row.windows.length > 0}
+                  fallback={
+                    <>
+                      <span class="account-usage-provider-copy">
+                        <strong class="account-usage-provider-name">{row.name}</strong>
+                        <span class="account-usage-provider-meta">
+                          {!row.reportsUsage
+                            ? t("account.usage.providerNotReported")
+                            : props.loading
+                              ? t("account.usage.window.limit")
+                              : t("account.usage.notReported")}
+                        </span>
+                      </span>
+                      <strong class="account-usage-provider-remaining">
+                        {!row.reportsUsage
+                          ? t("account.usage.value.notReported")
+                          : props.loading
+                            ? t("account.usage.value.loading")
+                            : t("account.usage.value.unavailable")}
+                      </strong>
+                    </>
+                  }
+                >
                   <strong class="account-usage-provider-name">{row.name}</strong>
-                  <span class="account-usage-provider-meta">
-                    {row.windowLabel ??
-                      (!row.reportsUsage
-                        ? t("account.usage.providerNotReported")
-                        : props.loading
-                          ? t("account.usage.window.limit")
-                          : t("account.usage.notReported"))}
-                    <Show when={row.resetsAtLabel}>{(label) => <> · {label()}</>}</Show>
+                  <span class="account-usage-windows">
+                    <For each={row.windows}>
+                      {(usageWindow) => (
+                        <span class="account-usage-window" data-usage-tone={usageWindow.tone}>
+                          <span class="account-usage-window-label">{usageWindow.label}</span>
+                          <span class="account-usage-window-bar" aria-hidden="true">
+                            <span
+                              class="account-usage-window-fill"
+                              style={{ "inline-size": `${usageWindow.remainingPercent}%` }}
+                            />
+                          </span>
+                          <strong class="account-usage-window-remaining">
+                            {text.format.percent(usageWindow.remainingPercent / 100)}
+                          </strong>
+                          <span
+                            class="account-usage-window-reset"
+                            title={
+                              usageWindow.resetsAtLabel
+                                ? t("account.usage.resetsAt", { time: usageWindow.resetsAtLabel })
+                                : undefined
+                            }
+                          >
+                            {formatUsageResetIn(usageWindow.resetsAt, now(), text)}
+                          </span>
+                        </span>
+                      )}
+                    </For>
                   </span>
-                </span>
-                <strong class="account-usage-provider-remaining">
-                  {row.remainingPercent !== null
-                    ? t("account.usage.percentLeft", { percent: row.remainingPercent })
-                    : !row.reportsUsage
-                      ? t("account.usage.value.notReported")
-                      : props.loading
-                        ? t("account.usage.value.loading")
-                        : t("account.usage.value.unavailable")}
-                </strong>
+                </Show>
               </li>
             )}
           </For>

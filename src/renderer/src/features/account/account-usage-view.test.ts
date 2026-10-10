@@ -6,7 +6,7 @@ import {
 import { assert, describe, expect, it } from "vitest";
 
 describe("account usage view", () => {
-  it("keeps one named row per provider and warns from the tightest window", () => {
+  it("keeps every reported window per provider and warns from the tightest one", () => {
     const rows = accountUsageProviderRows({
       limits: [
         {
@@ -31,19 +31,22 @@ describe("account usage view", () => {
     expect(rows[0]).toMatchObject({
       name: "Claude",
       remainingPercent: 0,
-      windowLabel: "5-hour",
       tone: "critical",
     });
+    expect(rows[0]?.windows).toMatchObject([
+      { label: "5-hour", remainingPercent: 0, tone: "critical", resetsAt: 1_786_563_600 },
+      { label: "Weekly", remainingPercent: 36, tone: "neutral", resetsAt: 1_787_040_000 },
+    ]);
     expect(rows[1]).toMatchObject({
       name: "ChatGPT",
       remainingPercent: 72,
-      windowLabel: "5-hour",
       tone: "neutral",
     });
+    expect(rows[1]?.windows.map((window) => window.label)).toEqual(["5-hour", "Weekly"]);
     expect(accountUsageSummary(rows)).toMatchObject({ provider: "claude", remainingPercent: 0 });
     const [claudeRow] = rows;
     assert(claudeRow);
-    expect(accountUsageRowLabel(claudeRow)).toContain("Claude, 0% left");
+    expect(accountUsageRowLabel(claudeRow)).toContain("Claude, 5-hour 0% left");
   });
 
   it("summarizes only the active agent's provider", () => {

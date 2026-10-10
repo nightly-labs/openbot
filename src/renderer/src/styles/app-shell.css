@@ -3288,7 +3288,7 @@ textarea {
   position: relative;
   z-index: 80;
   display: grid;
-  width: min(260px, calc(100vw - var(--openbot-space-4)));
+  width: min(300px, calc(100vw - var(--openbot-space-4)));
   max-height: min(60vh, 420px);
   overflow: auto;
   padding: var(--openbot-space-2);
@@ -3339,11 +3339,15 @@ textarea {
   line-height: var(--openbot-leading-md);
 }
 
+/* Columns: logo, window label, bar, percent left, reset countdown. Each provider row and each
+   window row is a subgrid, so the bars line up across providers. */
 .account-usage-providers {
   display: grid;
   margin: 0;
   padding: 0;
-  gap: var(--openbot-space-1);
+  grid-template-columns: auto max-content minmax(0, 1fr) max-content max-content;
+  column-gap: var(--openbot-space-2);
+  row-gap: var(--openbot-space-1);
   list-style: none;
 }
 
@@ -3353,8 +3357,13 @@ textarea {
   align-items: center;
   border-radius: var(--openbot-radius-md);
   padding: var(--openbot-space-1);
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: var(--openbot-space-2);
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  row-gap: var(--openbot-space-1);
+}
+
+.account-usage-provider > .account-usage-provider-name {
+  grid-column: 2 / -1;
 }
 
 .account-usage-provider-logo {
@@ -3368,6 +3377,7 @@ textarea {
 .account-usage-provider-copy {
   display: grid;
   min-width: 0;
+  grid-column: 2 / 4;
 }
 
 .account-usage-provider-name {
@@ -3390,6 +3400,8 @@ textarea {
 }
 
 .account-usage-provider-remaining {
+  grid-column: 4 / -1;
+  justify-self: end;
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-semibold);
@@ -3404,6 +3416,71 @@ textarea {
 
 .account-usage-provider[data-usage-tone="critical"] .account-usage-provider-remaining {
   color: var(--openbot-danger);
+}
+
+.account-usage-windows,
+.account-usage-window {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: subgrid;
+}
+
+.account-usage-windows {
+  grid-column: 2 / -1;
+  row-gap: var(--openbot-space-1);
+}
+
+.account-usage-window {
+  --account-usage-window-tone: var(--openbot-text-secondary);
+
+  align-items: center;
+  grid-column: 1 / -1;
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.account-usage-window[data-usage-tone="warning"] {
+  --account-usage-window-tone: var(--openbot-warning);
+}
+
+.account-usage-window[data-usage-tone="critical"] {
+  --account-usage-window-tone: var(--openbot-danger);
+}
+
+.account-usage-window-label,
+.account-usage-window-reset {
+  color: var(--openbot-text-muted);
+  white-space: nowrap;
+}
+
+.account-usage-window-reset {
+  text-align: right;
+}
+
+.account-usage-window-bar {
+  display: block;
+  height: 4px;
+  overflow: hidden;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-border);
+}
+
+.account-usage-window-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--account-usage-window-tone);
+}
+
+.account-usage-window-remaining {
+  color: var(--openbot-text-primary);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--openbot-weight-semibold);
+  text-align: right;
+}
+
+.account-usage-window:not([data-usage-tone="neutral"]) .account-usage-window-remaining {
+  color: var(--account-usage-window-tone);
 }
 
 .account-usage-empty {

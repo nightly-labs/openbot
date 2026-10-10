@@ -14,13 +14,24 @@ type UsageText = Pick<TextValue, "t" | "format">;
 
 export type AccountUsageTone = "neutral" | "warning" | "critical";
 
+/** One limit window that a provider reported, such as its 5-hour or its weekly window. */
+export interface AccountUsageWindowRow {
+  label: string;
+  remainingPercent: number;
+  tone: AccountUsageTone;
+  /** Unix seconds. */
+  resetsAt: number | null;
+  resetsAtLabel: string | null;
+}
+
 export interface AccountUsageProviderRow {
   provider: AgentProviderId;
   name: string;
+  /** The window that stops work first. The dock chip shows it. */
   remainingPercent: number | null;
-  windowLabel: string | null;
-  resetsAtLabel: string | null;
   tone: AccountUsageTone;
+  /** Every reported window, the shortest first, so a weekly limit does not hide the 5-hour one. */
+  windows: AccountUsageWindowRow[];
   /** `false` for a provider that has no usage reading, so a missing amount is not a failure. */
   reportsUsage: boolean;
 }
@@ -65,15 +76,28 @@ function usageRow(
   limit: AccountUsageLimit | null,
   text: UsageText,
 ): AccountUsageProviderRow {
-  const window = limit ? mostConstrainedWindow(limit) : null;
-  const remainingPercent = window ? usageRemainingPercent(window.usedPercent) : null;
+  const windows = (limit ? reportedWindows(limit) : []).map((window): AccountUsageWindowRow => {
+    const remainingPercent = usageRemainingPercent(window.usedPercent);
+    return {
+      label: usageWindowLabel(window.windowDurationMins, text),
+      remainingPercent,
+      tone: usageTone(remainingPercent),
+      resetsAt: window.resetsAt,
+      resetsAtLabel: formatUsageReset(window.resetsAt, text),
+    };
+  });
+  // The shortest window comes first, so on a tie the shorter window stops work first.
+  const binding = windows.reduce<AccountUsageWindowRow | null>(
+    (lowest, window) => (lowest === null || window.remainingPercent < lowest.remainingPercent ? window : lowest),
+    null,
+  );
+  const remainingPercent = binding?.remainingPercent ?? null;
   return {
     provider,
     name: agentProviderName(provider),
     remainingPercent,
-    windowLabel: window ? usageWindowLabel(window.windowDurationMins, text) : null,
-    resetsAtLabel: window ? formatUsageReset(window.resetsAt, text) : null,
     tone: usageTone(remainingPercent),
+    windows,
     reportsUsage: agentProviderDescriptor(provider).reportsUsage,
   };
 }
@@ -126,6 +150,23 @@ export function formatUsageReset(resetsAt: number | null, text: UsageText = curr
   });
 }
 
+/** Time until a window resets, in short units: "38m", "1h 12m", "5d 2h". */
+export function formatUsageResetIn(
+  resetsAt: number | null,
+  nowMs: number,
+  text: UsageText = currentText(),
+): string | null {
+  if (resetsAt === null) return null;
+  const totalMinutes = Math.max(1, Math.ceil((resetsAt * 1_000 - nowMs) / 60_000));
+  if (!Number.isFinite(totalMinutes)) return null;
+  const days = Math.floor(totalMinutes / 1_440);
+  const hours = Math.floor((totalMinutes % 1_440) / 60);
+  const minutes = totalMinutes % 60;
+  if (days > 0) return text.t("account.usage.resetIn.days", { days, hours });
+  if (hours > 0) return text.t("account.usage.resetIn.hours", { hours, minutes });
+  return text.t("account.usage.resetIn.minutes", { minutes });
+}
+
 export function accountUsageRowLabel(
   row: AccountUsageProviderRow,
   text: UsageText = currentText(),
@@ -135,21 +176,21 @@ export function accountUsageRowLabel(
   if (!row.reportsUsage) return t("account.usage.row.notReported", { name: row.name });
   if (row.remainingPercent === null)
     return t(loading ? "account.usage.row.loading" : "account.usage.row.unavailable", { name: row.name });
-  const parts = [t("account.usage.row.left", { name: row.name, percent: row.remainingPercent })];
-  if (row.windowLabel) parts.push(row.windowLabel);
-  if (row.resetsAtLabel) parts.push(t("account.usage.row.resets", { time: row.resetsAtLabel }));
+  const parts = [row.name];
+  for (const window of row.windows) {
+    parts.push(t("account.usage.row.window", { window: window.label, percent: window.remainingPercent }));
+    if (window.resetsAtLabel) parts.push(t("account.usage.row.resets", { time: window.resetsAtLabel }));
+  }
   return parts.join(", ");
 }
 
-function mostConstrainedWindow(limit: AccountUsageLimit): AccountUsageWindow | null {
-  const windows = [limit.primary, limit.secondary].filter((window): window is AccountUsageWindow => window !== null);
-  if (windows.length === 0) return null;
-  return windows.reduce((worst, window) => {
-    if (window.usedPercent !== worst.usedPercent) return window.usedPercent > worst.usedPercent ? window : worst;
-    const windowMins = window.windowDurationMins ?? Number.POSITIVE_INFINITY;
-    const worstMins = worst.windowDurationMins ?? Number.POSITIVE_INFINITY;
-    return windowMins < worstMins ? window : worst;
-  });
+function reportedWindows(limit: AccountUsageLimit): AccountUsageWindow[] {
+  return [limit.primary, limit.secondary]
+    .filter((window): window is AccountUsageWindow => window !== null)
+    .sort(
+      (left, right) =>
+        (left.windowDurationMins ?? Number.POSITIVE_INFINITY) - (right.windowDurationMins ?? Number.POSITIVE_INFINITY),
+    );
 }
 
 function nearDuration(durationMins: number, targetMins: number): boolean {

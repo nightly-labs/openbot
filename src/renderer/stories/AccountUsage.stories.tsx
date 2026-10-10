@@ -6,22 +6,26 @@ import {
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 
+const nowSeconds = Math.floor(Date.now() / 1_000);
+const fiveHourReset = nowSeconds + 2 * 3_600 + 14 * 60;
+const weeklyReset = nowSeconds + 4 * 86_400 + 6 * 3_600;
+
 const mixedRows = accountUsageProviderRows({
   limits: [
     {
       id: "codex",
-      primary: { usedPercent: 28, windowDurationMins: 300, resetsAt: 1_786_563_600 },
-      secondary: { usedPercent: 15, windowDurationMins: 10_080, resetsAt: 1_787_040_000 },
+      primary: { usedPercent: 28, windowDurationMins: 300, resetsAt: fiveHourReset },
+      secondary: { usedPercent: 15, windowDurationMins: 10_080, resetsAt: weeklyReset },
     },
     {
       id: "claude",
-      primary: { usedPercent: 100, windowDurationMins: 300, resetsAt: 1_786_563_600 },
-      secondary: { usedPercent: 64, windowDurationMins: 10_080, resetsAt: 1_787_040_000 },
+      primary: { usedPercent: 100, windowDurationMins: 300, resetsAt: fiveHourReset },
+      secondary: { usedPercent: 64, windowDurationMins: 10_080, resetsAt: weeklyReset },
     },
     {
       id: "grok",
       primary: null,
-      secondary: { usedPercent: 22, windowDurationMins: 10_080, resetsAt: 1_787_040_000 },
+      secondary: { usedPercent: 22, windowDurationMins: 10_080, resetsAt: weeklyReset },
     },
   ],
 });
@@ -33,7 +37,7 @@ const unreportedRows = accountUsageProviderRows(
       {
         id: "codex",
         primary: null,
-        secondary: { usedPercent: 42, windowDurationMins: 10_080, resetsAt: 1_787_040_000 },
+        secondary: { usedPercent: 42, windowDurationMins: 10_080, resetsAt: weeklyReset },
       },
     ],
   },
@@ -42,9 +46,15 @@ const unreportedRows = accountUsageProviderRows(
     { id: "antigravity", state: "available" },
   ],
 );
-const warningRows: AccountUsageProviderRow[] = mixedRows.map((row) =>
-  row.provider === "claude" ? { ...row, remainingPercent: 29, windowLabel: "Weekly", tone: "warning" } : row,
-);
+const warningRows = accountUsageProviderRows({
+  limits: [
+    {
+      id: "claude",
+      primary: { usedPercent: 40, windowDurationMins: 300, resetsAt: fiveHourReset },
+      secondary: { usedPercent: 71, windowDurationMins: 10_080, resetsAt: weeklyReset },
+    },
+  ],
+});
 
 function UsagePopover(props: { rows: AccountUsageProviderRow[]; loading?: boolean; error?: string | null }) {
   return (
