@@ -32,7 +32,7 @@ interface DragSlot {
 }
 
 export function QueuePanel(props: QueuePanelProps) {
-  const { t } = useText();
+  const { t, errorMessage } = useText();
   const [deleteHeldId, setDeleteHeldId] = createSignal<string | null>(null);
   const [draggedId, setDraggedId] = createSignal<string | null>(null);
   const [dragOverId, setDragOverId] = createSignal<string | null>(null);
@@ -498,6 +498,14 @@ export function QueuePanel(props: QueuePanelProps) {
                       {messagePreview(delivery)}
                     </span>
                     <div class="agent-queue-actions">
+                      <Show when={delivery.status === "starting" && delivery.error}>
+                        {(error) => (
+                          <span class="agent-queue-editing-badge" title={errorMessage(error(), error())}>
+                            {t("queue.item.unconfirmed")}
+                            <span class="sr-only"> {errorMessage(error(), error())}</span>
+                          </span>
+                        )}
+                      </Show>
                       <Show when={editing}>
                         <span class="agent-queue-editing-badge">{t("queue.item.editing")}</span>
                       </Show>
@@ -535,7 +543,9 @@ export function QueuePanel(props: QueuePanelProps) {
                         variant="destructive-ghost"
                         type="button"
                         class="agent-queue-icon-button agent-queue-delete"
-                        disabled={delivery.status !== "queued"}
+                        disabled={
+                          delivery.status !== "queued" && !(delivery.status === "starting" && delivery.error !== null)
+                        }
                         data-cuelume-tap="close"
                         aria-describedby={actionTooltipId}
                         aria-label={t("queue.item.deleteLabel", { position: delivery.position ?? "" })}
