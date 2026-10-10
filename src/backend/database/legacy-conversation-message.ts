@@ -17,8 +17,9 @@ import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contrac
  *
  * Only key names and the `kind` discriminant move. Message text is never touched.
  *
- * Released builds also stored an agent's blank `replyToMessageId` as `""`. The guard rejects it, because
- * an id is never empty, so it fails the read in the same way. It refers to no message and reads as `null`.
+ * Released builds also stored an agent's `replyToMessageId: ""` on the message and its `exchange`. The
+ * guard rejects an empty id, so it fails the read in the same way. It refers to no message and reads as
+ * `null`.
  */
 const LEGACY_MESSAGE_KEYS: Readonly<Record<string, string>> = {
   botId: "agentId",
@@ -33,8 +34,20 @@ export function currentConversationMessage(value: unknown): ConversationMessage 
   // the one released key the guard accepts as it stands -- as an unknown extra -- so it is asked for by
   // name; every other one already fails the guard and takes the branch below.
   if (isDynamicRecord(value) && value.senderBotId === undefined && isConversationMessage(value)) return value;
-  const current = toCurrentKeys(value);
+  const current = withoutEmptyReplyIds(toCurrentKeys(value));
   return isConversationMessage(current) ? current : null;
+}
+
+function withoutEmptyReplyIds(value: JsonValue): JsonValue {
+  if (!isDynamicRecord(value)) return value;
+  const { exchange } = value;
+  return {
+    ...value,
+    ...(value.replyToMessageId === "" ? { replyToMessageId: null } : {}),
+    ...(isDynamicRecord(exchange) && exchange.replyToMessageId === ""
+      ? { exchange: { ...exchange, replyToMessageId: null } }
+      : {}),
+  };
 }
 
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
@@ -48,12 +61,7 @@ function toCurrentKeys(value: unknown): JsonValue {
       // A message holding both spellings is one the current build wrote beside a released leftover; the
       // spelling the app writes today wins.
       if (current !== key && value[current] !== undefined) continue;
-      result[current] =
-        key === "kind" && entry === "bot"
-          ? "agent"
-          : key === "replyToMessageId" && entry === ""
-            ? null
-            : toCurrentKeys(entry);
+      result[current] = key === "kind" && entry === "bot" ? "agent" : toCurrentKeys(entry);
     }
     return result;
   }

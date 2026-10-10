@@ -974,21 +974,9 @@ describe("MailboxStore", () => {
     ).toEqual({ "Kraków turned rainy.": false, "Which city next?": undefined });
   });
 
-  // A blank reply id refers to no message. Kept as `""`, it failed every read of the conversations
-  // that showed the message, for the sender and for the recipient.
-  it("stores a blank reply id as no reply, also from a released mailbox", async () => {
-    const receipt = await runCauseEffect(
-      store.enqueue({
-        sender: { kind: "agent", agentId: "weather" },
-        recipientAgentIds: ["researcher"],
-        text: "Done.",
-        replyToMessageId: "",
-      }),
-    );
-    expect(store.conversationMessages("weather")).toEqual([
-      expect.objectContaining({ exchange: expect.objectContaining({ replyToMessageId: null }) }),
-    ]);
-
+  // Released builds kept an agent's `replyToMessageId: ""`. Every conversation that showed the message
+  // then failed to read, for the sender and for the recipient.
+  it("reads a released mailbox message with an empty reply id as no reply", async () => {
     const userData = join(root, "blank-reply-user-data");
     await mkdir(userData, { recursive: true });
     await writeFile(
@@ -997,7 +985,7 @@ describe("MailboxStore", () => {
         version: 3,
         messages: [
           {
-            id: receipt.messageId,
+            id: "message-1",
             sender: { kind: "agent", agentId: "weather" },
             text: "Done.",
             attachments: [],

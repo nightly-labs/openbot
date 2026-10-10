@@ -1280,6 +1280,37 @@ describe.sequential("AgentService: queue", () => {
     expect(mailbox.hasAgentMessageFromTurnTo("chief", "provider-turn", "worker")).toBe(true);
   });
 
+  // An agent can send `replyToMessageId: ""`. Stored as it came, it failed every read of the sender's
+  // and the recipient's conversations, and the recipient's queue stopped.
+  it("queues an agent message with an empty reply id as no reply", async () => {
+    const {
+      service: agentService,
+      client,
+      store,
+    } = await startService(root, { provider: "codex", autoComplete: false });
+    service = agentService;
+    await Promise.all([runCauseEffect(store.getOrCreate("chief")), runCauseEffect(store.getOrCreate("worker"))]);
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Coordinate the report." }));
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "running");
+    const chiefThreadId = store.activeProviderSession("chief")?.externalSessionId;
+    assert(chiefThreadId);
+
+    await callOpenBotTool(client, chiefThreadId, "send_message", {
+      recipientAgentIds: ["worker"],
+      text: "Report sent.",
+      replyToMessageId: "",
+      expectsReply: false,
+    });
+    await waitForQueue(service, "worker", (queue) => queue.deliveries.length > 0);
+    expect(service.listQueue("worker").deliveries).toEqual([
+      expect.objectContaining({ text: "Report sent.", replyToMessageId: null }),
+    ]);
+    const page = await runCauseEffect(service.readConversationPageFor("worker", "user", { type: "latest" }, 50));
+    expect(page.messages).toContainEqual(
+      expect.objectContaining({ exchange: expect.objectContaining({ replyToMessageId: null }) }),
+    );
+  });
+
   it("lets an agent stop the turn its own message started and drops its queued follow-up", async () => {
     const {
       service: agentService,

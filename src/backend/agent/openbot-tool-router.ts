@@ -995,7 +995,11 @@ export class OpenBotToolRouter {
         throw new Error("paths must be an array of local file paths.");
       }
       const replyToMessageId = params.arguments.replyToMessageId;
-      if (replyToMessageId !== undefined && replyToMessageId !== null && !isString(replyToMessageId)) {
+      if (
+        replyToMessageId !== undefined &&
+        replyToMessageId !== null &&
+        (!isString(replyToMessageId) || replyToMessageId.length > INPUT_LIMITS.identifier)
+      ) {
         throw new Error("replyToMessageId must be a message id.");
       }
       if (!isString(params.arguments.text)) throw new Error("text is required.");
@@ -1016,7 +1020,8 @@ export class OpenBotToolRouter {
           recipientAgentIds: recipientValues,
           text,
           sourcePaths: paths,
-          replyToMessageId: replyToMessageId ?? null,
+          // An agent can send "" for no reply. Every reader rejects an empty id.
+          replyToMessageId: replyToMessageId?.trim() || null,
           expectsReply,
           ...(messagingReturn ? { messagingReturn } : {}),
           idempotencyKey: toolCallIdempotencyKey(params),

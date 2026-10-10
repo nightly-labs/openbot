@@ -475,7 +475,7 @@ export class MailboxStore {
           return attachment ? { attachmentId: attachment.id, name: attachment.name } : null;
         }),
         attachments,
-        replyToMessageId: messageReference(input.replyToMessageId),
+        replyToMessageId: input.replyToMessageId ?? null,
         ...(input.expectsReply === false ? { expectsReply: false as const } : {}),
         createdAt,
       };
@@ -2281,15 +2281,10 @@ function toCurrentMailboxMessage(value: unknown): DynamicRecord | null {
     ...message,
     sender: toCurrentMailboxActor(value.sender),
     ...(isConversationMessageSender(senderMember) ? { senderMember } : {}),
-    // Released builds kept an agent's blank `replyToMessageId` as it came, and every conversation that
-    // showed the message then failed to read.
-    ...(isString(message.replyToMessageId) ? { replyToMessageId: messageReference(message.replyToMessageId) } : {}),
+    // Released builds kept an agent's `replyToMessageId: ""`, which refers to no message, and every
+    // conversation that showed the message then failed to read.
+    ...(message.replyToMessageId === "" ? { replyToMessageId: null } : {}),
   };
-}
-
-/** A blank id refers to no message. */
-function messageReference(id: string | null | undefined): string | null {
-  return id?.trim() ? id : null;
 }
 
 function toCurrentMailboxReaction(value: unknown): DynamicRecord | null {
