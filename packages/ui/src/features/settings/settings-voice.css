@@ -1,0 +1,36 @@
+/* Voice tab: the speech model card. */
+.settings-voice-model-icon {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-control);
+  color: var(--openbot-text-secondary);
+}
+
+.settings-voice-model-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.settings-voice-model-title {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.settings-voice-progress {
+  display: grid;
+  gap: var(--openbot-space-1);
+  padding-top: var(--openbot-space-2);
+}
+
+.settings-voice-error {
+  color: var(--openbot-danger-text);
+}
+
+.ui-item-description.settings-voice-location {
+  font-family: var(--openbot-font-mono);
+  white-space: nowrap;
+}

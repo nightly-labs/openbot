@@ -50,6 +50,7 @@
 @import "@openbot/ui/features/marketplace/marketplace.css";
 @import "@openbot/ui/features/settings/logo-color-picker.css";
 @import "@openbot/ui/features/settings/sound-theme-picker.css";
+@import "@openbot/ui/features/settings/settings-voice.css";
 @import "./features/settings/mcp-connect-dialog.css";
 @import "./features/provider-updates/provider-updates.css";
 @import "@openbot/ui/features/custom-providers/custom-providers.css";
