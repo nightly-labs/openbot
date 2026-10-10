@@ -638,10 +638,6 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       peer = state;
       const connected = Deferred.makeUnsafe<void, RemotePeerError>();
       state.connected = connected;
-      state.connectedTimer = setTimeout(
-        () => failPeer(state, new Error(sourceText("error.remote.desktopDidNotConnect")), actions),
-        30_000,
-      );
       try {
         openSignal(state, actions);
       } catch (error) {
@@ -656,6 +652,12 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     if (Date.now() < signalRetryAt) {
       scheduleReconnect(state, actions);
       return;
+    }
+    if (state.connected && state.connectedTimer === null) {
+      state.connectedTimer = setTimeout(
+        () => failPeer(state, new Error(sourceText("error.remote.desktopDidNotConnect")), actions),
+        30_000,
+      );
     }
     const socket = new WebSocket(state.signalUrl);
     state.socket = socket;
@@ -1344,6 +1346,11 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
 
   function scheduleReconnect(state: PeerState, actions: ActionsRef): void {
     if (!active || state.reconnectTimer !== null) return;
+    // The connection deadline measures an active attempt, not the service's rate-limit wait.
+    if (Date.now() < signalRetryAt && state.connectedTimer !== null) {
+      clearTimeout(state.connectedTimer);
+      state.connectedTimer = null;
+    }
     // A signaling-only interruption can resume inside Signal's grace window while
     // the data channels stay online. A peer that recovers its ICE path needs Signal
     // for the restart. The recovery owner replaces dead peers.
