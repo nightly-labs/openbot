@@ -2,6 +2,10 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/provider";
 
 export const messages = {
+  "error.provider.mcpConfig":
+    "OpenBot は Codex の設定に MCP サーバーを登録できませんでした。Codex の config.toml が有効で書き込み可能であることを確認してから、OpenBot を再起動してください。",
+  "error.provider.computerUseConfig":
+    "OpenBot は Codex の設定に Computer Use を登録できませんでした。Codex の config.toml が有効で書き込み可能であることを確認してから、OpenBot を再起動してください。Computer Use なしで続行するには、チームメイトの設定で Computer Use をオフにできます。",
   "error.provider.endpointsReadOnly":
     "保存されたエンドポイントは新しいバージョンの OpenBot で書き込まれたか、ファイルを読み取れません。変更するには OpenBot を更新してください。",
   "error.provider.endpointNoSecureStorage":
@@ -168,6 +172,8 @@ export const messages = {
     "モデルプロバイダーがレート制限のためリクエストを拒否しました。数分待つか別のモデルを選んでから、もう一度お試しください。\n{detail}",
   "error.provider.opencodeBilling":
     "モデルプロバイダーがアカウントの請求の問題のためリクエストを拒否しました。待っても解決しません。プロバイダーのアカウントに支払い方法または残高を追加するか、別のモデルを選んでください。\n{detail}",
+  "error.provider.opencodeInvalidUpload":
+    "OpenCode のモデルプロバイダーが無効なアップロードリクエストを報告しました。別のモデルを選択して続行してください。ルーティンをもう一度作成する前に、保存済みのルーティンを確認してください。\n{detail}",
   "error.provider.opencodeProviderFailed":
     "モデルプロバイダー側で障害が発生しました。お使いの接続は原因ではありません。後でもう一度試すか、別のモデルを選んでください。\n{detail}",
   "error.provider.opencodeNetwork":
@@ -213,11 +219,14 @@ export const messages = {
   "error.provider.clineNotStarted": "Cline を起動できませんでした。ターミナルで `cline --version` を実行してください。",
   "error.provider.clineVersionUnreadable": "Cline CLI のバージョンを読み取れません。",
   "error.provider.clineSignIn": "Cline を使うには Cline でサインインするか、CLINE_API_KEY を設定してください。",
+  "error.provider.usageLimitReached": "アカウントが使用量の上限に達しました。",
   "error.provider.foreignReasoning":
     "別のアカウントまたは API キーが受け取ったため、{provider} はこのチャットの以前の推論を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
   "error.provider.grokSignIn": "Grok を使うには `grok login` を実行するか、XAI_API_KEY を設定してください。",
   "error.provider.acpSignInTimedOut": "サインインがタイムアウトしました。",
   "error.provider.acpSignInStopped": "サインインが完了する前に停止しました。",
+  "error.provider.geminiBrowserUnavailable":
+    "Gemini はサインインページを開けませんでした。ブラウザーと xdg-utils をインストールしてから、このホストのデスクトップセッションで接続してください。デスクトップのないサーバーではこのサインインを完了できません。",
   "error.provider.acpSignInFailed": "サインインが完了しませんでした。",
   "error.provider.messageTooLarge":
     "{limit} MB を超えるメッセージを送信したため、OpenBot は {provider} を停止しました。",
@@ -250,4 +259,79 @@ export const messages = {
     "このカスタムエージェントは保存されていません。一覧を更新して、もう一度お試しください。",
   "error.provider.customAgentTooMany": "保存できるカスタムエージェントは最大 {count} 個です。",
   "error.provider.customAgentEnvValueMissing": "{name} の値を入力してください。",
+  "error.provider.off": "{provider} は OpenBot でオフになっています。まずプロバイダーの設定でオンにしてください。",
+  "error.provider.inUse":
+    "エージェントが {provider} を使用しています。このプロバイダーをオフにする前に、そのエージェントのモデルを変更してください。",
+  "error.provider.useBusy": "プロバイダーの確認またはサインインが終わるまで待ってから、もう一度お試しください。",
+  "error.provider.useSettingsReadOnly":
+    "保存されたプロバイダーの設定を読み取れません。変更する前に OpenBot を更新してください。",
+  "error.provider.useChangeFailed": "OpenBot はプロバイダーの設定を変更できませんでした。",
+  "error.provider.sessionSettingUnavailable": "この設定は現在のプロバイダーセッションでは利用できません。",
+  "error.provider.sessionSettingInvalid": "この値はこの設定では利用できません。",
+  "error.provider.sessionSettingsBusy": "セッションの設定を変更する前に、現在のターンが終わるまでお待ちください。",
+  "error.provider.piOutdated":
+    "Pi {version} は古すぎます。ネイティブ RPC と MCP に対応するには、Pi 1.1.0 以降をインストールしてください。",
+  "error.provider.nativeMissing": "{provider} CLI がインストールされていません。設定でダウンロードしてください。",
+  "error.provider.nativeNotStarted": "{provider} CLI を起動できませんでした。",
+  "error.provider.nativeVersionUnreadable": "{provider} CLI のバージョンを読み取れませんでした。",
+  "error.provider.piSessionBusy": "現在の Pi のターンが終わるまでお待ちください。",
+  "error.provider.piStopped": "Pi が実行されていません。Pi を接続してもう一度お試しください。",
+  "error.provider.piSessionMissing": "Pi のセッションファイルがこのコンピューターにありません。",
+  "error.provider.piResumeCancelled": "Pi がセッションの再開をキャンセルしました。もう一度お試しください。",
+  "error.provider.piSessionIdentity": "Pi が別のセッションを返しました。保存されたセッションは置き換えられていません。",
+  "error.provider.piModelInvalid": "プロバイダーを含む Pi のモデルを選択してください。",
+  "error.provider.piToolInvalid": "ツールが無効な結果を返しました。",
+  "error.provider.piSignIn":
+    "ホストコンピューターの Pi で /login を使用してください。サインインが完了したら Pi を閉じてください。",
+  "error.provider.museBusy": "Muse のセッションはビジー状態です。",
+  "error.provider.museStopped": "Muse クライアントが実行されていません。",
+  "error.provider.museUnexpectedProvider": "Muse が予期しないモデルプロバイダーを返しました。",
+  "error.provider.museNoActiveTurn": "Muse には方向を修正できる実行中のターンがありません。",
+  "error.provider.museInvalidProtocol": "Muse が無効なプロトコル応答を返しました。",
+  "error.provider.museNotStarted": "Muse が起動しませんでした。",
+  "error.provider.museNativeWindows": "Windows では Muse にネイティブの実行ファイルが必要です。",
+  "error.provider.museStartTimeout": "Muse の初期化がタイムアウトしました。",
+  "error.provider.museStartStopped": "Muse が初期化中に停止しました。",
+  "error.provider.museProtocolVersion": "この Muse のプロトコルバージョンには対応していません。",
+  "error.provider.museHistoryRequired": "Muse はセッション履歴を保持する必要があります。",
+  "error.provider.museRequestUnsupported": "この Muse サーバーのリクエストには対応していません。",
+  "error.provider.museConnectionFailed":
+    "Muse への接続に失敗しました。保存された履歴を復元するには、会話を再開してください。",
+  "error.provider.museUnknownSession": "不明な Muse セッションです。",
+  "error.provider.museInvalidToolResult": "OpenBot ツールの結果が無効です。",
+  "error.provider.museMcpRequired": "Muse はセッションの MCP サーバーに対応している必要があります。",
+  "error.provider.museSessionMismatch": "Muse が別のセッションを返しました。",
+  "error.provider.museCompactRejected": "Muse が圧縮を受け付けませんでした。",
+  "error.provider.museTurnMismatch": "Muse が別のターンを返しました。",
+  "error.provider.museHistoryMismatch": "Muse の履歴が複数のセッションにまたがっています。",
+  "error.provider.museRecoveryFailed": "Muse は欠落したイベントを復元できませんでした。",
+  "error.provider.museHistoryStalled": "Muse の履歴カーソルが進みませんでした。",
+  "error.provider.museApprovalUnavailable": "Muse はこの承認の応答を提示していません。",
+  "error.provider.museHistoryOwner": "Muse の履歴は別のセッションのものです。",
+  "error.provider.museHistoryMissing": "Muse がセッション履歴を返しませんでした。",
+  "error.provider.museEmptyInput": "Muse にはテキストまたは画像が必要です。",
+  "error.provider.museMethodUnsupported": "Muse は {method} に対応していません。",
+  "error.provider.museTurnFailed": "Muse のターンに失敗しました。",
+  "error.provider.museProfileUnsupported":
+    "Muse は外部ツールにアクセスできないため、プロフィールを生成できません。別のプロバイダーでプロフィールを生成してから、エージェントに Muse を選択してください。",
+  "error.provider.museAuthUnverified":
+    "Muse の認証が確認されていません。ホストコンピューターで接続するか、Meta API キーを設定してください。",
+  "error.provider.museSignIn": "続行するには、ホストコンピューターで Muse にサインインしてください。",
+  "error.provider.terminalLoginFailed":
+    "サインイン用のターミナルを開けませんでした。このホストでプロバイダーの CLI を開いてサインインしてから、プロバイダーを更新してください。",
+  "error.provider.nativeArchiveInvalid": "プロバイダーのダウンロードに有効なインストールが含まれていません。",
+  "error.provider.nativeChecksum": "プロバイダーのインストールが整合性チェックに合格しませんでした。",
+  "error.provider.registryUnavailable": "ACP レジストリを利用できません。もう一度お試しください。",
+  "error.provider.registryInvalid": "ACP レジストリが無効なデータを返しました。",
+  "error.provider.registryMissing": "このエージェントは ACP レジストリにありません。",
+  "error.provider.registryBusy": "このエージェントのインストールはすでに進行中です。",
+  "error.provider.registryCancelled": "エージェントのインストールがキャンセルされました。",
+  "error.provider.registryPrerequisite":
+    "このエージェントをインストールする前に、ホストに {tool} をインストールしてください。",
+  "error.provider.registryBindingChanged":
+    "インストール中にカスタムエージェントが変更されました。もう一度お試しください。",
+  "error.provider.registryInstallFailed":
+    "エージェントのインストールに失敗しました。以前のインストールは変更されていません。",
+  "error.provider.registryRemoveBusy":
+    "削除する前に、エージェントのインストールと実行中の ACP の作業が終わるまでお待ちください。",
 } as const satisfies PartialTranslation<typeof source>;

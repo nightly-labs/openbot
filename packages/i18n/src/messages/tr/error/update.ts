@@ -21,6 +21,8 @@ export const messages = {
     "Bu Mac üzerindeki güncellemeler ana makine tarafından yüklenir. Güncelleme, ana makinenin bakımı çalışana kadar hazır kalır.",
   "error.update.siblingSession":
     "Bu uygulamadan çalışan başka bir OpenBot oturumu var. Önce diğer tüm macOS kullanıcı hesaplarında OpenBot'u durdurun, ardından güncellemeyi tekrar yükleyin.",
+  "error.update.siblingSessionSameAccount":
+    "Bu kullanıcı hesabında başka bir OpenBot işlemi hâlâ çalışıyor. Ondan çıkın, ardından güncellemeyi tekrar yükleyin.",
   "error.update.siblingCheckFailed": "Diğer OpenBot oturumları doğrulanamadı. Yüklemeden önce tekrar deneyin.",
   // Katılınan bir sunucunun yöneticisi bunları ana makineden okur.
   "error.update.remoteDisabled": "Sunucu yöneticilerinden gelen güncellemeler bu bilgisayarda kapalı.",

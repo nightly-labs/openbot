@@ -2,6 +2,10 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/provider";
 
 export const messages = {
+  "error.provider.mcpConfig":
+    "OpenBot n’a pas pu enregistrer les serveurs MCP dans la configuration de Codex. Vérifiez que votre fichier config.toml de Codex est valide et accessible en écriture, puis redémarrez OpenBot.",
+  "error.provider.computerUseConfig":
+    "OpenBot n’a pas pu enregistrer Computer Use dans la configuration de Codex. Vérifiez que votre fichier config.toml de Codex est valide et accessible en écriture, puis redémarrez OpenBot. Vous pouvez désactiver Computer Use dans les réglages du coéquipier pour continuer sans.",
   "error.provider.endpointsReadOnly":
     "Les points de terminaison enregistrés ont été écrits par une version plus récente d’OpenBot, ou le fichier est illisible. Mettez à jour OpenBot pour les modifier.",
   "error.provider.endpointNoSecureStorage":
@@ -180,6 +184,8 @@ export const messages = {
     "Le fournisseur du modèle a refusé la requête à cause de sa limite de débit. Attendez quelques minutes ou choisissez un autre modèle, puis réessayez.\n{detail}",
   "error.provider.opencodeBilling":
     "Le fournisseur du modèle a refusé la requête à cause de la facturation du compte. Attendre ne corrige pas ce problème. Ajoutez un moyen de paiement ou des fonds dans le compte du fournisseur, ou choisissez un autre modèle.\n{detail}",
+  "error.provider.opencodeInvalidUpload":
+    "Le fournisseur de modèles d’OpenCode a signalé une demande d’envoi non valide. Choisissez un autre modèle et continuez. Vérifiez les routines enregistrées avant de les créer à nouveau.\n{detail}",
   "error.provider.opencodeProviderFailed":
     "Le fournisseur du modèle a échoué de son côté. Votre connexion n’en est pas la cause. Réessayez plus tard ou choisissez un autre modèle.\n{detail}",
   "error.provider.opencodeNetwork":
@@ -226,11 +232,14 @@ export const messages = {
   "error.provider.clineNotStarted": "Cline n’a pas pu démarrer. Exécutez `cline --version` dans un terminal.",
   "error.provider.clineVersionUnreadable": "Impossible de lire la version de la CLI Cline.",
   "error.provider.clineSignIn": "Connectez-vous avec Cline ou définissez CLINE_API_KEY pour utiliser Cline.",
+  "error.provider.usageLimitReached": "Le compte a atteint sa limite d’utilisation.",
   "error.provider.foreignReasoning":
     "{provider} n’a pas accepté le raisonnement précédent de cette conversation, car un autre compte ou une autre clé API l’a reçu. OpenBot a ouvert une nouvelle session {provider} avec l’historique de la conversation. Réessayez.",
   "error.provider.grokSignIn": "Exécutez `grok login` ou définissez XAI_API_KEY pour utiliser Grok.",
   "error.provider.acpSignInTimedOut": "La connexion a expiré.",
   "error.provider.acpSignInStopped": "La connexion s’est arrêtée avant la fin.",
+  "error.provider.geminiBrowserUnavailable":
+    "Gemini n’a pas pu ouvrir la page de connexion. Installez un navigateur et xdg-utils, puis connectez-vous depuis une session de bureau sur cet hôte. Un serveur sans bureau ne peut pas terminer cette connexion.",
   "error.provider.acpSignInFailed": "La connexion n’a pas abouti.",
   "error.provider.messageTooLarge": "OpenBot a arrêté {provider}, car il a envoyé un message de plus de {limit} Mo.",
   "error.provider.customAgentIdInvalid":
@@ -262,4 +271,76 @@ export const messages = {
     "Cet agent personnalisé n’est pas enregistré. Actualisez la liste et réessayez.",
   "error.provider.customAgentTooMany": "Vous pouvez enregistrer au plus {count} agents personnalisés.",
   "error.provider.customAgentEnvValueMissing": "Saisissez une valeur pour {name}.",
+  "error.provider.off": "{provider} est désactivé dans OpenBot. Activez-le d’abord dans les réglages des fournisseurs.",
+  "error.provider.inUse": "Un agent utilise {provider}. Changez son modèle avant de désactiver ce fournisseur.",
+  "error.provider.useBusy": "Attendez la fin de la vérification du fournisseur ou de la connexion, puis réessayez.",
+  "error.provider.useSettingsReadOnly":
+    "Les réglages enregistrés du fournisseur sont illisibles. Mettez à jour OpenBot avant de les modifier.",
+  "error.provider.useChangeFailed": "OpenBot n’a pas pu modifier le réglage du fournisseur.",
+  "error.provider.sessionSettingUnavailable":
+    "Ce réglage n’est pas disponible dans la session actuelle du fournisseur.",
+  "error.provider.sessionSettingInvalid": "Cette valeur n’est pas disponible pour ce réglage.",
+  "error.provider.sessionSettingsBusy": "Attendez la fin du tour en cours avant de modifier un réglage de session.",
+  "error.provider.piOutdated":
+    "Pi {version} est trop ancien. Installez Pi 1.1.0 ou une version ultérieure pour la prise en charge native de RPC et MCP.",
+  "error.provider.nativeMissing": "La CLI {provider} n’est pas installée. Téléchargez-la dans les Réglages.",
+  "error.provider.nativeNotStarted": "La CLI {provider} n’a pas pu démarrer.",
+  "error.provider.nativeVersionUnreadable": "Impossible de lire la version de la CLI {provider}.",
+  "error.provider.piSessionBusy": "Attendez la fin du tour Pi en cours.",
+  "error.provider.piStopped": "Pi n’est pas en cours d’exécution. Connectez Pi et réessayez.",
+  "error.provider.piSessionMissing": "Le fichier de session Pi n’est pas disponible sur cet ordinateur.",
+  "error.provider.piResumeCancelled": "Pi a annulé la reprise de la session. Réessayez.",
+  "error.provider.piSessionIdentity": "Pi a renvoyé une autre session. La session enregistrée n’a pas été remplacée.",
+  "error.provider.piModelInvalid": "Sélectionnez un modèle Pi qui inclut son fournisseur.",
+  "error.provider.piToolInvalid": "L’outil a renvoyé un résultat non valide.",
+  "error.provider.piSignIn": "Utilisez /login dans Pi sur l’ordinateur hôte. Fermez Pi une fois la connexion terminée.",
+  "error.provider.museBusy": "La session Muse est occupée.",
+  "error.provider.museStopped": "Le client Muse n’est pas en cours d’exécution.",
+  "error.provider.museUnexpectedProvider": "Muse a renvoyé un fournisseur de modèles inattendu.",
+  "error.provider.museNoActiveTurn": "Muse n’a aucun tour actif à orienter.",
+  "error.provider.museInvalidProtocol": "Muse a renvoyé une réponse de protocole non valide.",
+  "error.provider.museNotStarted": "Muse n’a pas démarré.",
+  "error.provider.museNativeWindows": "Muse nécessite un exécutable natif sous Windows.",
+  "error.provider.museStartTimeout": "L’initialisation de Muse a expiré.",
+  "error.provider.museStartStopped": "Muse s’est arrêté pendant l’initialisation.",
+  "error.provider.museProtocolVersion": "Version du protocole Muse non prise en charge.",
+  "error.provider.museHistoryRequired": "Muse doit conserver l’historique de session.",
+  "error.provider.museRequestUnsupported": "Requête du serveur Muse non prise en charge.",
+  "error.provider.museConnectionFailed":
+    "La connexion à Muse a échoué. Reprenez la conversation pour récupérer son historique enregistré.",
+  "error.provider.museUnknownSession": "Session Muse inconnue.",
+  "error.provider.museInvalidToolResult": "Résultat d’outil OpenBot non valide.",
+  "error.provider.museMcpRequired": "Muse doit prendre en charge les serveurs MCP de session.",
+  "error.provider.museSessionMismatch": "Muse a renvoyé une autre session.",
+  "error.provider.museCompactRejected": "Muse n’a pas accepté le compactage.",
+  "error.provider.museTurnMismatch": "Muse a renvoyé un autre tour.",
+  "error.provider.museHistoryMismatch": "L’historique Muse mélange plusieurs sessions.",
+  "error.provider.museRecoveryFailed": "Muse n’a pas pu récupérer les événements manquants.",
+  "error.provider.museHistoryStalled": "Le curseur de l’historique Muse n’a pas avancé.",
+  "error.provider.museApprovalUnavailable": "Muse n’a pas proposé cette réponse d’approbation.",
+  "error.provider.museHistoryOwner": "L’historique Muse appartient à une autre session.",
+  "error.provider.museHistoryMissing": "Muse n’a pas renvoyé l’historique de session.",
+  "error.provider.museEmptyInput": "Muse a besoin d’un texte ou d’une image.",
+  "error.provider.museMethodUnsupported": "Muse ne prend pas en charge {method}.",
+  "error.provider.museTurnFailed": "Le tour Muse a échoué.",
+  "error.provider.museProfileUnsupported":
+    "Muse ne peut pas générer de profil sans accès à des outils externes. Utilisez un autre fournisseur pour générer le profil, puis sélectionnez Muse pour l’agent.",
+  "error.provider.museAuthUnverified":
+    "L’authentification Muse n’est pas vérifiée. Connectez-vous sur l’ordinateur hôte, ou définissez une clé d’API Meta.",
+  "error.provider.museSignIn": "Connectez-vous à Muse sur l’ordinateur hôte pour continuer.",
+  "error.provider.terminalLoginFailed":
+    "Le terminal de connexion n’a pas pu s’ouvrir. Ouvrez la CLI du fournisseur sur cet hôte et connectez-vous-y, puis actualisez les fournisseurs.",
+  "error.provider.nativeArchiveInvalid": "Le téléchargement du fournisseur ne contient pas d’installation valide.",
+  "error.provider.nativeChecksum": "L’installation du fournisseur a échoué au contrôle d’intégrité.",
+  "error.provider.registryUnavailable": "Le registre ACP n’est pas disponible. Réessayez.",
+  "error.provider.registryInvalid": "Le registre ACP a renvoyé des données non valides.",
+  "error.provider.registryMissing": "Cet agent n’est pas dans le registre ACP.",
+  "error.provider.registryBusy": "Une installation est déjà en cours pour cet agent.",
+  "error.provider.registryCancelled": "L’installation de l’agent a été annulée.",
+  "error.provider.registryPrerequisite": "Installez {tool} sur l’hôte avant d’installer cet agent.",
+  "error.provider.registryBindingChanged": "L’agent personnalisé a changé pendant l’installation. Réessayez.",
+  "error.provider.registryInstallFailed":
+    "L’installation de l’agent a échoué. L’installation précédente n’a pas changé.",
+  "error.provider.registryRemoveBusy":
+    "Attendez la fin de l’installation de l’agent et du travail ACP en cours avant de le supprimer.",
 } as const satisfies PartialTranslation<typeof source>;

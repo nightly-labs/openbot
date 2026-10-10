@@ -32,11 +32,19 @@ export const messages = {
   "settings.externalLinks.description": "Konuşmalardaki bağlantıların nerede açılacağını seçin.",
   "settings.externalLinks.defaultBrowser": "Varsayılan tarayıcı",
   "settings.externalLinks.openbot": "OpenBot",
+  "settings.sendShortcut.title": "Gönderme kısayolu",
+  "settings.sendShortcut.description": "Bu cihazda ve tarayıcıda mesaj gönderen tuşları seçin.",
+  "settings.sendShortcut.enter": "Göndermek için Enter",
+  "settings.sendShortcut.modEnterMac": "Göndermek için ⌘Enter",
+  "settings.sendShortcut.modEnterWin": "Göndermek için Ctrl+Enter",
   "settings.busyMessage.title": "Ajanları çalışırken yönlendir",
   "settings.busyMessage.description":
     "Yeni mesajlar kuyruğa değil, ajanın mevcut işine eklenir. ChatGPT ve Claude ile çalışır.",
   "settings.agentMemoryLimit.title": "Ajan başına bellek",
   "settings.agentMemoryLimit.description": "Bu bilgisayardaki her ajanın tutabileceği bellek sayısı.",
+  "settings.keepRemoteSessions.title": "Sunuculara hızlı bağlantı",
+  "settings.keepRemoteSessions.description":
+    "Katıldığınız sunuculara olan bağlantıyı açılışlar arasında koruyun. OpenBot yaklaşık bir saniye daha hızlı başlar. OpenBot'tan çıktığınızda OpenBot hizmeti bağlantıyı kapatmaz.",
   "settings.permissions.title": "İzinler",
   "settings.turbo.title": "Turbo modu",
   "settings.turbo.description":
@@ -93,6 +101,9 @@ export const messages = {
   "settings.analytics.title": "Ürün analizlerini paylaş",
   "settings.analytics.description":
     "Hesap kimliğiniz ve e-postanız ile birlikte kullanım ve güvenilirlik meta verilerini OpenBot'un kendi barındırdığı analizlerine gönderin.",
+  "settings.analytics.webTitle": "Hata raporlarını paylaş",
+  "settings.analytics.webDescription":
+    "Hata ve uyarı kodlarını hesap kimliğinizle birlikte OpenBot’un analiz hizmetine gönderin. Bu ayar bu tarayıcı için geçerlidir.",
   "settings.tab.general.title": "Genel",
   "settings.tab.general.description": "OpenBot'un bu bilgisayarda nasıl davranacağını kontrol edin.",
   "settings.tab.notifications.title": "Bildirimler",
@@ -283,6 +294,7 @@ export const messages = {
   "settings.hostedServers.usageNote":
     "Bir sunucu son mesajdan veya değişiklikten yaklaşık 15 dakika sonra durur, bir uygulama açık olsa bile. Uygulamada bir tuşa basmak veya tıklamak, bir mesaj ya da zamanlanmış bir rutin onu tekrar başlatır. Ajanları ve rutinleri bu bilgisayar kapalıyken çalışır.",
   "settings.hostedServers.empty": "Henüz barındırılan bir sunucunuz yok.",
+  "settings.hostedServers.loading": "Barındırılan sunucular yükleniyor…",
   "settings.hostedServers.state.awaitingPayment": "Ödeme bekleniyor",
   "settings.hostedServers.state.planEnded": "Plan sona erdi",
   "settings.hostedServers.state.creating": "Oluşturuluyor",

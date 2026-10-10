@@ -44,6 +44,8 @@ export const messages = {
   "provider.status.unavailable": "Недоступно",
   "provider.status.checking": "Проверка",
   "provider.status.off": "Выключено",
+  "provider.gemini.hostSignIn":
+    "Чтобы подключить Gemini, откройте OpenBot на хосте и нажмите «Подключить» в разделе «Настройки» > «Провайдеры». Для входа в Google на этом хосте нужен браузер. Удалённый вход не поддерживается.",
 
   "provider.key.free": "Бесплатно",
 
@@ -129,6 +131,9 @@ export const messages = {
   "provider.effort.high": "Высокое",
   "provider.effort.xhigh": "Очень высокое",
   "provider.effort.max": "Максимальное",
+  "provider.museKey.title": "Ключ API Meta для Muse",
+  "provider.museKey.description": "Сохраните ключ API Meta на хосте или войдите через CLI Muse.",
+  "provider.museKey.label": "Ключ API Meta",
 
   "provider.openCodeKey.title": "Вход в OpenCode Go",
   "provider.openCodeKey.description": "Бесплатным моделям аккаунт не нужен. Ключ открывает платные модели Go.",

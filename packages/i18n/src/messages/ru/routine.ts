@@ -278,6 +278,8 @@ export const messages = {
   "routine.settings.instruction": "Инструкция",
   "routine.settings.instructionPlaceholderAgent": "Опишите, что должен делать этот агент.",
   "routine.settings.instructionPlaceholderChannel": "Опишите, что должен делать этот канал.",
+  "routine.settings.instructionNoUpdateHint":
+    "Чтобы агент молчал, когда сообщать нечего, попросите его отвечать [[no-update]].",
   "routine.settings.limitPolicy": "Если аккаунт достиг лимита",
   "routine.settings.limitPolicy.wait": "Подождать и запустить после сброса",
   "routine.settings.limitPolicy.skip": "Пропустить этот запуск",

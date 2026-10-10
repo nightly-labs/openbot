@@ -35,6 +35,9 @@ export const messages = {
   "provider.status.unavailable": "Indisponible",
   "provider.status.checking": "Vérification",
 
+  "provider.status.off": "Désactivé",
+  "provider.gemini.hostSignIn":
+    "Pour connecter Gemini, ouvrez OpenBot sur l’hôte et sélectionnez Connecter dans Réglages > Fournisseurs. La connexion Google nécessite un navigateur sur cet hôte. La connexion à distance n’est pas prise en charge.",
   // Which account tier the OpenCode row runs on. It shows only while it adds to the runtime
   // badge: a saved key leaves the runtime "Connected" to speak for the row.
   "provider.key.free": "Gratuit",
@@ -48,6 +51,8 @@ export const messages = {
   "provider.action.checkForUpdates": "Rechercher des mises à jour",
   "provider.lastError": "Dernière erreur : {detail}",
   "provider.action.copyDiagnostics": "Copier les diagnostics",
+  "provider.action.cancelRestart": "Annuler le redémarrage",
+  "provider.restartPending": "Redémarre après l’arrêt des tâches en cours",
   "provider.action.install": "Installer",
   "provider.action.signIn": "Se connecter",
   "provider.action.signInWithCode": "Se connecter avec un code",
@@ -61,6 +66,11 @@ export const messages = {
   "provider.aria.signIn": "Se connecter à {name}",
   "provider.aria.moreActions": "Autres actions pour {name}",
 
+  "provider.aria.use": "Utiliser {name} dans OpenBot",
+  "provider.use.inUse": {
+    one: "{agents} utilise {name}. Changez le modèle de cet agent, puis désactivez {name}.",
+    other: "{agents} utilisent {name}. Changez le modèle de ces agents, puis désactivez {name}.",
+  },
   "provider.codeLogin.title": "Se connecter à {name} avec un code",
   "provider.codeLogin.description": "Terminez sur votre téléphone ou dans un autre navigateur. OpenBot attend ici.",
   "provider.codeLogin.starting": "Obtention d’un code auprès de {name}…",
@@ -114,6 +124,10 @@ export const messages = {
   "provider.effort.xhigh": "Très élevé",
   "provider.effort.max": "Max",
 
+  "provider.museKey.title": "Clé d’API Meta pour Muse",
+  "provider.museKey.description":
+    "Enregistrez une clé d’API Meta sur l’hôte, ou utilisez la CLI Muse pour vous connecter.",
+  "provider.museKey.label": "Clé d’API Meta",
   "provider.openCodeKey.title": "Se connecter à OpenCode Go",
   "provider.openCodeKey.description":
     "Les modèles gratuits ne demandent pas de compte. Une clé donne accès aux modèles Go payants.",

@@ -69,6 +69,13 @@ export const messages = {
   "error.backend.channelAssigneeUnavailable": "El agente asignado no está disponible.",
   "error.backend.channelAssignmentChanged": "Esta asignación del canal cambió.",
   "error.backend.channelMemberRequired": "Selecciona un miembro disponible de este canal.",
+  "error.backend.memoryEssentialBudget":
+    "Los recuerdos esenciales superan el límite del prompt. Configura una entrada para buscarla cuando sea necesario e inténtalo de nuevo.",
+  "error.backend.memorySelectionConflict": "El recuerdo cambió. Vuelve a cargarlo e inténtalo de nuevo.",
+  "error.backend.memorySelectionUserControlled":
+    "El usuario controla esta selección de memoria. Respeta la elección del usuario.",
+  "error.backend.memorySearchQuery": "Escribe una o más palabras de búsqueda, hasta 256 caracteres.",
+  "error.backend.memoryOperationFailed": "Falló la operación de memoria. Inténtalo de nuevo.",
   "error.backend.memoryGone": "Este recuerdo ya no existe.",
   "error.backend.routineGone": "Esta rutina ya no existe.",
   "error.backend.channelMemoryLimit": "Un canal puede tener hasta {limit} recuerdos.",
@@ -216,6 +223,7 @@ export const messages = {
   "error.backend.editSavedDifferent": "Esta edición ya se guardó con otro contenido. Tus cambios no se guardaron.",
   "error.backend.useChannelTaskControlsWork": "Usa los controles de tareas del canal para el trabajo del canal.",
   "error.backend.steerTurnChanged": "El turno activo cambió antes de que se pudiera incorporar este mensaje.",
+  "error.backend.steerUnsupported": "Este proveedor no puede orientar un turno en curso. Tu mensaje sigue en la cola.",
   "error.backend.steerQueuedOnly": "Solo se pueden incorporar mensajes en cola al turno activo.",
   "error.backend.promptInactive": "Esta pregunta ya no está activa.",
   "error.backend.promptAnswerMismatch": "Una respuesta no coincide con ninguna pregunta activa.",

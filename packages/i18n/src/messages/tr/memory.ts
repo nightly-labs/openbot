@@ -31,4 +31,13 @@ export const messages = {
   "memory.updateFailed": "Bellek güncellenemedi.",
   "memory.deleteFailed": "Bellek silinemedi.",
   "memory.clearFailed": "Bellekler temizlenemedi.",
+  "memory.inclusion.label": "Bellek kullanımı",
+  "memory.inclusion.essential": "Her zaman dahil",
+  "memory.inclusion.searchable": "Gerektiğinde ara",
+  "memory.inclusion.automatic": "Ajan karar versin",
+  "memory.inclusion.userControlled": "Sizin seçiminiz",
+  "memory.inclusion.agentControlled": "Ajan bunu değiştirebilir",
+  "memory.inclusion.explanation":
+    "Tüm bellekler kayıtlı kalır. Yalnızca temel bellekler her isteme girer. Ajan diğerlerinde arama yapabilir.",
+  "memory.inclusion.capacity": "Temel bellek kapasitesi: {used} / {total}",
 } as const satisfies PartialTranslation<typeof source>;

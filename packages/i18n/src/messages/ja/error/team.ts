@@ -69,6 +69,7 @@ export const messages = {
   "error.team.queueEditUnsupported": "このクライアントはキューの編集に対応していません。",
   "error.team.skillsUnsupported": "この接続ではスキルを利用できません。",
   "error.team.hostIdentityUnsupported": "この接続ではサーバーの ID を変更できません。",
+  "error.team.hostUpdateUnsupported": "この接続ではホストのアップデートに対応していません。",
   "error.team.attachmentNameRequired": "安全な添付ファイル名が必要です。",
   "error.team.attachmentNotFound": "添付ファイルが見つかりません。",
   "error.team.sharedFileTooLarge": "共有ファイルが 100 MB の上限を超えています。",

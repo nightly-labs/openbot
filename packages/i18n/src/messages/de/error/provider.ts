@@ -2,6 +2,8 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/provider";
 
 export const messages = {
+  "error.provider.mcpConfig":
+    "OpenBot konnte die MCP-Server nicht in der Codex-Konfiguration registrieren. Prüfe, ob deine Codex-Datei config.toml gültig und beschreibbar ist, und starte OpenBot neu.",
   "error.provider.computerUseConfig":
     "OpenBot konnte die Computersteuerung nicht in der Codex-Konfiguration registrieren. Prüfe, ob deine Codex-Datei config.toml gültig und beschreibbar ist, und starte OpenBot neu. Du kannst die Computersteuerung in den Einstellungen des Teamkollegen ausschalten, um ohne sie fortzufahren.",
   "error.provider.endpointsReadOnly":
@@ -228,6 +230,8 @@ export const messages = {
   "error.provider.grokSignIn": "Führe `grok login` aus oder setze XAI_API_KEY, um Grok zu verwenden.",
   "error.provider.acpSignInTimedOut": "Die Zeit für die Anmeldung ist abgelaufen.",
   "error.provider.acpSignInStopped": "Die Anmeldung wurde vor dem Abschluss gestoppt.",
+  "error.provider.geminiBrowserUnavailable":
+    "Gemini konnte die Anmeldeseite nicht öffnen. Installiere einen Browser und xdg-utils und verbinde dich dann aus einer Desktop-Sitzung auf diesem Host. Ein Server ohne Desktop kann diese Anmeldung nicht abschließen.",
   "error.provider.acpSignInFailed": "Die Anmeldung wurde nicht abgeschlossen.",
   "error.provider.messageTooLarge":
     "OpenBot hat {provider} gestoppt, da eine Nachricht mit mehr als {limit} MB gesendet wurde.",
@@ -269,4 +273,73 @@ export const messages = {
   "error.provider.useSettingsReadOnly":
     "Die gespeicherten Anbietereinstellungen können nicht gelesen werden. Aktualisiere OpenBot, bevor du sie änderst.",
   "error.provider.useChangeFailed": "OpenBot konnte die Anbietereinstellung nicht ändern.",
+  "error.provider.sessionSettingUnavailable": "Diese Einstellung ist in der aktuellen Anbietersitzung nicht verfügbar.",
+  "error.provider.sessionSettingInvalid": "Dieser Wert ist für die Einstellung nicht verfügbar.",
+  "error.provider.sessionSettingsBusy":
+    "Warte, bis der aktuelle Durchgang endet, bevor du eine Sitzungseinstellung änderst.",
+  "error.provider.piOutdated":
+    "Pi {version} ist zu alt. Installiere Pi 1.1.0 oder neuer für native RPC- und MCP-Unterstützung.",
+  "error.provider.nativeMissing": "Die {provider} CLI ist nicht installiert. Lade sie in den Einstellungen herunter.",
+  "error.provider.nativeNotStarted": "Die {provider} CLI konnte nicht starten.",
+  "error.provider.nativeVersionUnreadable": "Die Version der {provider} CLI konnte nicht gelesen werden.",
+  "error.provider.piSessionBusy": "Warte, bis der aktuelle Pi-Durchgang endet.",
+  "error.provider.piStopped": "Pi läuft nicht. Verbinde Pi und versuche es erneut.",
+  "error.provider.piSessionMissing": "Die Pi-Sitzungsdatei ist auf diesem Computer nicht verfügbar.",
+  "error.provider.piResumeCancelled": "Pi hat das Fortsetzen der Sitzung abgebrochen. Versuche es erneut.",
+  "error.provider.piSessionIdentity":
+    "Pi hat eine andere Sitzung zurückgegeben. Die gespeicherte Sitzung wurde nicht ersetzt.",
+  "error.provider.piModelInvalid": "Wähle ein Pi-Modell, das seinen Anbieter enthält.",
+  "error.provider.piToolInvalid": "Das Werkzeug hat ein ungültiges Ergebnis zurückgegeben.",
+  "error.provider.piSignIn":
+    "Verwende /login in Pi auf dem Host-Computer. Schließe Pi, wenn die Anmeldung abgeschlossen ist.",
+  "error.provider.museBusy": "Die Muse-Sitzung ist beschäftigt.",
+  "error.provider.museStopped": "Der Muse-Client läuft nicht.",
+  "error.provider.museUnexpectedProvider": "Muse hat einen unerwarteten Modellanbieter zurückgegeben.",
+  "error.provider.museNoActiveTurn": "Muse hat keinen aktiven Durchgang zum Steuern.",
+  "error.provider.museInvalidProtocol": "Muse hat eine ungültige Protokollantwort zurückgegeben.",
+  "error.provider.museNotStarted": "Muse wurde nicht gestartet.",
+  "error.provider.museNativeWindows": "Muse benötigt unter Windows eine native ausführbare Datei.",
+  "error.provider.museStartTimeout": "Die Initialisierung von Muse hat zu lange gedauert.",
+  "error.provider.museStartStopped": "Muse wurde während der Initialisierung beendet.",
+  "error.provider.museProtocolVersion": "Nicht unterstützte Muse-Protokollversion.",
+  "error.provider.museHistoryRequired": "Muse muss den Sitzungsverlauf behalten.",
+  "error.provider.museRequestUnsupported": "Nicht unterstützte Muse-Serveranfrage.",
+  "error.provider.museConnectionFailed":
+    "Die Verbindung zu Muse ist fehlgeschlagen. Setze die Unterhaltung fort, um ihren gespeicherten Verlauf wiederherzustellen.",
+  "error.provider.museUnknownSession": "Unbekannte Muse-Sitzung.",
+  "error.provider.museInvalidToolResult": "Ungültiges OpenBot-Werkzeugergebnis.",
+  "error.provider.museMcpRequired": "Muse muss MCP-Server pro Sitzung unterstützen.",
+  "error.provider.museSessionMismatch": "Muse hat eine andere Sitzung zurückgegeben.",
+  "error.provider.museCompactRejected": "Muse hat die Komprimierung nicht akzeptiert.",
+  "error.provider.museTurnMismatch": "Muse hat einen anderen Durchgang zurückgegeben.",
+  "error.provider.museHistoryMismatch": "Der Muse-Verlauf hat Sitzungen überschritten.",
+  "error.provider.museRecoveryFailed": "Muse konnte die fehlenden Ereignisse nicht wiederherstellen.",
+  "error.provider.museHistoryStalled": "Der Muse-Verlaufscursor ist nicht weitergerückt.",
+  "error.provider.museApprovalUnavailable": "Muse hat diese Genehmigungsantwort nicht angeboten.",
+  "error.provider.museHistoryOwner": "Der Muse-Verlauf gehört zu einer anderen Sitzung.",
+  "error.provider.museHistoryMissing": "Muse hat keinen Sitzungsverlauf zurückgegeben.",
+  "error.provider.museEmptyInput": "Muse benötigt Text oder ein Bild.",
+  "error.provider.museMethodUnsupported": "Muse unterstützt {method} nicht.",
+  "error.provider.museTurnFailed": "Der Muse-Durchgang ist fehlgeschlagen.",
+  "error.provider.museProfileUnsupported":
+    "Muse kann ohne Zugriff auf externe Werkzeuge kein Profil erstellen. Verwende einen anderen Anbieter, um das Profil zu erstellen, und wähle dann Muse für den Agenten.",
+  "error.provider.museAuthUnverified":
+    "Die Muse-Authentifizierung ist nicht bestätigt. Verbinde dich auf dem Host-Computer oder lege einen Meta-API-Schlüssel fest.",
+  "error.provider.museSignIn": "Melde dich auf dem Host-Computer bei Muse an, um fortzufahren.",
+  "error.provider.terminalLoginFailed":
+    "Das Anmeldeterminal konnte nicht geöffnet werden. Öffne die Anbieter-CLI auf diesem Host, melde dich dort an und aktualisiere dann die Anbieter.",
+  "error.provider.nativeArchiveInvalid": "Der Anbieter-Download enthält keine gültige Installation.",
+  "error.provider.nativeChecksum": "Die Anbieterinstallation hat die Integritätsprüfung nicht bestanden.",
+  "error.provider.registryUnavailable": "Die ACP-Registry ist nicht verfügbar. Versuche es erneut.",
+  "error.provider.registryInvalid": "Die ACP-Registry hat ungültige Daten zurückgegeben.",
+  "error.provider.registryMissing": "Dieser Agent ist nicht in der ACP-Registry.",
+  "error.provider.registryBusy": "Für diesen Agenten läuft bereits eine Installation.",
+  "error.provider.registryCancelled": "Die Installation des Agenten wurde abgebrochen.",
+  "error.provider.registryPrerequisite": "Installiere {tool} auf dem Host, bevor du diesen Agenten installierst.",
+  "error.provider.registryBindingChanged":
+    "Der benutzerdefinierte Agent hat sich während der Installation geändert. Versuche es erneut.",
+  "error.provider.registryInstallFailed":
+    "Die Installation des Agenten ist fehlgeschlagen. Die vorherige Installation ist unverändert.",
+  "error.provider.registryRemoveBusy":
+    "Warte, bis die Installation des Agenten und laufende ACP-Arbeit abgeschlossen sind, bevor du ihn entfernst.",
 } as const satisfies PartialTranslation<typeof source>;

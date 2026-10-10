@@ -2,6 +2,16 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/customProvider";
 
 export const messages = {
+  "customProvider.registry.title": "Реестр ACP",
+  "customProvider.registry.description":
+    "Устанавливайте агентов на этот хост. При удалении среды выполнения настройки агента, учётные данные и диалоги сохраняются.",
+  "customProvider.registry.search": "Поиск в реестре",
+  "customProvider.registry.empty": "Нет агентов, подходящих под запрос.",
+  "customProvider.registry.agentId": "ID пользовательского агента",
+  "customProvider.registry.install": "Установить",
+  "customProvider.registry.update": "Обновить",
+  "customProvider.registry.remove": "Удалить среду выполнения",
+  "customProvider.registry.failed": "Операция с реестром не удалась.",
   "customProvider.error.providerIdRequired": "Введите ID провайдера.",
   "customProvider.error.providerIdPattern":
     "Используйте строчные буквы, цифры, дефисы или подчёркивания; начинаться ID должен с буквы или цифры.",

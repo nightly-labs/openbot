@@ -32,4 +32,13 @@ export const messages = {
   "memory.updateFailed": "Impossible de mettre à jour le souvenir.",
   "memory.deleteFailed": "Impossible de supprimer le souvenir.",
   "memory.clearFailed": "Impossible d’effacer les souvenirs.",
+  "memory.inclusion.label": "Utilisation du souvenir",
+  "memory.inclusion.essential": "Toujours inclus",
+  "memory.inclusion.searchable": "Rechercher au besoin",
+  "memory.inclusion.automatic": "Laisser l’agent décider",
+  "memory.inclusion.userControlled": "Sélectionné par vous",
+  "memory.inclusion.agentControlled": "L’agent peut modifier ce choix",
+  "memory.inclusion.explanation":
+    "Tous les souvenirs restent enregistrés. Seuls les souvenirs essentiels entrent dans chaque prompt. L’agent peut rechercher les autres.",
+  "memory.inclusion.capacity": "Capacité des souvenirs essentiels : {used} sur {total}",
 } as const satisfies PartialTranslation<typeof source>;

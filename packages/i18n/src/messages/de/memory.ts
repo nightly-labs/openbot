@@ -31,4 +31,13 @@ export const messages = {
   "memory.updateFailed": "Die Erinnerung konnte nicht aktualisiert werden.",
   "memory.deleteFailed": "Die Erinnerung konnte nicht gelöscht werden.",
   "memory.clearFailed": "Die Erinnerungen konnten nicht gelöscht werden.",
+  "memory.inclusion.label": "Verwendung der Erinnerung",
+  "memory.inclusion.essential": "Immer einbezogen",
+  "memory.inclusion.searchable": "Bei Bedarf suchen",
+  "memory.inclusion.automatic": "Agent entscheidet",
+  "memory.inclusion.userControlled": "Von dir ausgewählt",
+  "memory.inclusion.agentControlled": "Agent kann dies ändern",
+  "memory.inclusion.explanation":
+    "Alle Erinnerungen bleiben gespeichert. Nur wesentliche Erinnerungen gelangen in jeden Prompt. Der Agent kann die anderen durchsuchen.",
+  "memory.inclusion.capacity": "Kapazität für wesentliche Erinnerungen: {used} von {total}",
 } as const satisfies PartialTranslation<typeof source>;

@@ -2,6 +2,14 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/mobile/agent";
 
 export const messages = {
+  "mobile.agent.session.title": "Настройки провайдера",
+  "mobile.agent.session.failed": "Не удалось изменить настройки провайдера.",
+  "mobile.agent.session.readFailed": "Не удалось прочитать настройки провайдера.",
+  "mobile.agent.session.unsupported": "Этот хост не поддерживает настройки провайдера.",
+  "mobile.agent.session.reset": "Сбросить {name}",
+  "mobile.agent.session.unavailable":
+    "Сохранённое значение {value} недоступно. Выберите другое значение или сбросьте его.",
+  "mobile.agent.session.pending": "Изменения вступят в силу на следующем ходе.",
   "mobile.agent.pin.pin": "Закрепить",
   "mobile.agent.pin.unpin": "Открепить",
   "mobile.agent.pin.pinNamed": "Закрепить: {name}",
@@ -515,4 +523,13 @@ export const messages = {
   "mobile.agent.home.markAllRead": "Отметить все прочитанными",
   "mobile.agent.route.appearance": "Внешний вид",
   "mobile.agent.route.cropPhoto": "Перемещение и масштаб",
+  "mobile.agent.info.memory.inclusion.label": "Использование памяти",
+  "mobile.agent.info.memory.inclusion.essential": "Всегда включать",
+  "mobile.agent.info.memory.inclusion.searchable": "Искать при необходимости",
+  "mobile.agent.info.memory.inclusion.automatic": "Решает агент",
+  "mobile.agent.info.memory.inclusion.userControlled": "Выбрано вами",
+  "mobile.agent.info.memory.inclusion.agentControlled": "Агент может это изменить",
+  "mobile.agent.info.memory.inclusion.explanation":
+    "Все записи памяти сохраняются. В каждый промпт попадают только важные записи. Остальные агент может найти поиском.",
+  "mobile.agent.info.memory.inclusion.capacity": "Объём важной памяти: {used} из {total}",
 } as const satisfies PartialTranslation<typeof source>;

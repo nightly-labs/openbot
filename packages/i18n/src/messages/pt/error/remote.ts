@@ -170,6 +170,32 @@ export const messages = {
   "error.remote.signalFrameUnreadable": "O Signal enviou um quadro que este par não consegue ler.",
   "error.remote.webRtcCommandFailed": "O comando WebRTC falhou.",
   "error.remote.dataChannelFailed": "O canal {kind} falhou.",
+  "error.remote.hostBusy": "O computador anfitrião está ocupado com outra conexão. Tente novamente em instantes.",
+  "error.remote.signalPermissionDenied":
+    "Sua conta não tem acesso a este computador anfitrião. Peça acesso ao proprietário.",
+  "error.remote.signalRateLimited": "Muitas tentativas de conexão. O OpenBot tenta novamente em {seconds} segundos.",
+  "error.remote.signalProtocolError":
+    "O Signal e este aplicativo não concordam sobre o protocolo de conexão. Atualize o OpenBot e tente novamente.",
+  "error.remote.signalRefused": "O Signal recusou a conexão.",
+  "error.remote.signalClosed": "A conexão com o Signal foi fechada antes de o computador anfitrião responder.",
+  "error.remote.relayUnavailable":
+    "O Signal não enviou servidores de retransmissão para esta conexão. Tente novamente mais tarde.",
+  "error.remote.iceFailed":
+    "Não foi possível estabelecer uma conexão direta com o computador anfitrião. Um firewall, VPN ou proxy pode bloqueá-la.",
+  "error.remote.iceDisconnected": "A conexão direta com o computador anfitrião foi perdida.",
+  "error.remote.directoryUnreachable": "O OpenBot não conseguiu acessar o serviço do OpenBot. Verifique sua conexão.",
+  "error.remote.directoryTimeout": "O serviço do OpenBot não respondeu a tempo. Tente novamente.",
+  "error.remote.inviteAlreadyUsed": "Este convite já foi usado. Peça um novo convite.",
+  "error.remote.inviteNotFound": "Este convite não existe ou expirou. Peça um novo convite.",
+  "error.remote.memberLimitReached":
+    "Este computador anfitrião atingiu o limite de membros. Peça ao proprietário para liberar espaço.",
+  "error.remote.hostNotRegistered": "Este computador anfitrião não está mais registrado no serviço do OpenBot.",
+  "error.remote.membershipEnded":
+    "Você não é mais membro deste computador anfitrião. Peça um novo convite ao proprietário.",
+  "error.remote.accountSessionInactive": "Seu login não está mais ativo. Entre novamente.",
+  "error.remote.hostOtherAccount": "Este computador anfitrião pertence a outra conta.",
+  "error.remote.remoteNotConfigured": "As conexões remotas não estão configuradas neste serviço do OpenBot.",
+  "error.remote.hostRefused": "O computador anfitrião recusou a solicitação ({status}).",
   "error.remote.formUnavailable": "Este formulário não está mais disponível.",
   "error.remote.hostedServerRemoval": "Use a seção Cobrança para excluir um servidor hospedado.",
   "error.remote.channelsUnsupported": "Atualize este servidor no computador para usar canais.",

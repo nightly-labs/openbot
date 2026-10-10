@@ -13,6 +13,11 @@ export const messages = {
   "error.auth.hostCredentialUnavailable": "リモートホストの認証情報を利用できません。ホストを再登録してください。",
   "error.auth.codeNotVerified": "サインインコードを確認できませんでした。",
   "error.auth.serviceError": "アカウントサービスがエラーを返しました。",
+  "error.auth.serviceUnreachable":
+    "OpenBot はアカウントサービスに接続できませんでした。接続を確認してから、もう一度お試しください。",
+  "error.auth.serviceTimeout": "アカウントサービスが時間内に応答しませんでした。もう一度お試しください。",
+  "error.auth.serviceStatus": "アカウントサービスがエラー ({status}) を返しました。後でもう一度お試しください。",
+  "error.auth.invalidHostedServer": "アカウントサービスが無効なホスト型サーバーを返しました。",
   "error.auth.codeNotSent": "OpenBot がサインインコードを送信できませんでした。",
   "error.auth.deliveryTimeout":
     "OpenBot が時間内に配信を確認できませんでした。コードが後で届く場合があります。再送信する前に配信を確認してください。",

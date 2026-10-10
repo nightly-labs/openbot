@@ -29,6 +29,7 @@ export const messages = {
   "app.provider.codeExpiredDescription": "Personne ne l’a saisi à temps. Ce code ne fonctionne plus.",
   "app.provider.connectFailed": "Impossible de connecter {name}",
   "app.provider.connectFailedRetry": "OpenBot n’a pas pu connecter {name}. Réessayez.",
+  "app.provider.restartFailed": "Impossible de redémarrer {name}",
   "app.provider.included": "{name} est inclus avec OpenBot.",
   "app.clipboard.copyFailed": "Impossible de copier le texte.",
   "app.voice.tooLong": "Les enregistrements vocaux sont limités à deux minutes.",

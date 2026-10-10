@@ -2,6 +2,14 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/agentSettings";
 
 export const messages = {
+  "agentSettings.session.title": "Ajustes del proveedor",
+  "agentSettings.session.readFailed": "No se pudieron leer los ajustes del proveedor.",
+  "agentSettings.session.pending": "Los cambios guardados se aplican antes del siguiente turno.",
+  "agentSettings.session.unavailable":
+    "El valor guardado {value} no está disponible. Selecciona otro valor o restablécelo.",
+  "agentSettings.session.effective": "Valor actual del proveedor: {value}",
+  "agentSettings.session.reset": "Restablecer ajuste",
+  "agentSettings.session.resetNamed": "Restablecer {name}",
   "agentSettings.label": "Ajustes del agente",
   "agentSettings.title": "Ajustes",
   "agentSettings.backToDetails": "Volver a detalles",

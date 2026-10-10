@@ -2,6 +2,14 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/agentSettings";
 
 export const messages = {
+  "agentSettings.session.title": "Anbietereinstellungen",
+  "agentSettings.session.readFailed": "Die Anbietereinstellungen konnten nicht gelesen werden.",
+  "agentSettings.session.pending": "Gespeicherte Änderungen gelten vor dem nächsten Durchgang.",
+  "agentSettings.session.unavailable":
+    "Der gespeicherte Wert {value} ist nicht verfügbar. Wähle einen anderen Wert oder setze ihn zurück.",
+  "agentSettings.session.effective": "Aktueller Wert des Anbieters: {value}",
+  "agentSettings.session.reset": "Einstellung zurücksetzen",
+  "agentSettings.session.resetNamed": "{name} zurücksetzen",
   "agentSettings.label": "Agenteneinstellungen",
   "agentSettings.title": "Einstellungen",
   "agentSettings.backToDetails": "Zurück zu den Details",

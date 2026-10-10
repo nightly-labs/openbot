@@ -32,4 +32,13 @@ export const messages = {
   "memory.updateFailed": "メモリーを更新できませんでした。",
   "memory.deleteFailed": "メモリーを削除できませんでした。",
   "memory.clearFailed": "メモリーを消去できませんでした。",
+  "memory.inclusion.label": "メモリーの使い方",
+  "memory.inclusion.essential": "常に含める",
+  "memory.inclusion.searchable": "必要なときに検索",
+  "memory.inclusion.automatic": "エージェントに任せる",
+  "memory.inclusion.userControlled": "あなたが選択",
+  "memory.inclusion.agentControlled": "エージェントが変更可能",
+  "memory.inclusion.explanation":
+    "すべてのメモリーは保存されたままです。毎回のプロンプトに含まれるのは必須メモリーだけです。エージェントはそれ以外を検索できます。",
+  "memory.inclusion.capacity": "必須メモリーの容量: {used} / {total}",
 } as const satisfies PartialTranslation<typeof source>;

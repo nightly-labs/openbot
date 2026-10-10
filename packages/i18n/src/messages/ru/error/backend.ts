@@ -69,6 +69,12 @@ export const messages = {
   "error.backend.channelAssigneeUnavailable": "Назначенный агент недоступен.",
   "error.backend.channelAssignmentChanged": "Это назначение в канале изменилось.",
   "error.backend.channelMemberRequired": "Выберите доступного участника этого канала.",
+  "error.backend.memoryEssentialBudget":
+    "Важные записи памяти превышают лимит промпта. Переведите какую-либо запись в режим «Искать при необходимости» и повторите попытку.",
+  "error.backend.memorySelectionConflict": "Память изменилась. Перезагрузите её и повторите попытку.",
+  "error.backend.memorySelectionUserControlled": "Этот выбор памяти задаёт пользователь. Сохраните выбор пользователя.",
+  "error.backend.memorySearchQuery": "Введите одно или несколько слов для поиска, не более 256 символов.",
+  "error.backend.memoryOperationFailed": "Операция с памятью не удалась. Повторите попытку.",
   "error.backend.memoryGone": "Этой записи памяти больше нет.",
   "error.backend.routineGone": "Этой регулярной задачи больше нет.",
   "error.backend.channelMemoryLimit": "В канале может быть не более {limit} записей памяти.",
@@ -209,6 +215,8 @@ export const messages = {
   "error.backend.editSavedDifferent": "Это изменение уже сохранено с другим содержимым. Ваши правки не сохранены.",
   "error.backend.useChannelTaskControlsWork": "Для работы в канале используйте элементы управления задачами канала.",
   "error.backend.steerTurnChanged": "Активный ход изменился, прежде чем это сообщение удалось направить.",
+  "error.backend.steerUnsupported":
+    "Этот провайдер не умеет направлять выполняемый ход. Ваше сообщение остаётся в очереди.",
   "error.backend.steerQueuedOnly": "Направлять можно только сообщения в очереди.",
   "error.backend.promptInactive": "Этот запрос больше не активен.",
   "error.backend.promptAnswerMismatch": "Ответ не соответствует активному вопросу.",
