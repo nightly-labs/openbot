@@ -1,6 +1,8 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("composer", {
+  "composer.queueEdit.body": "You are editing a queued message. Save or cancel the edit to let it run.",
+  "composer.queueEdit.cancel": "Cancel edit",
   "composer.notice.dismiss": "Dismiss error",
   "composer.signIn.title": "Sign in required",
   "composer.signIn.body": "Sign in to {provider} to send messages.",

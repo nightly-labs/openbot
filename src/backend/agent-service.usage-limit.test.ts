@@ -179,6 +179,17 @@ describe.sequential("AgentService: usage limit", () => {
     expect(isPlanLimitDiagnostic(SESSION_LIMIT)).toBe(true);
     expect(isPlanLimitDiagnostic("You've hit your weekly limit · resets Oct 9")).toBe(true);
     expect(isPlanLimitDiagnostic("You've hit your usage limit. Try again at 10:34 AM.")).toBe(true);
+    // Codex Plus and Pro offer credits next to the reset.
+    expect(
+      isPlanLimitDiagnostic(
+        "You’ve hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro), visit https://chatgpt.com/settings/usage to purchase more credits or try again at 3:00 PM.",
+      ),
+    ).toBe(true);
+    expect(
+      isPlanLimitDiagnostic(
+        "You’ve hit your usage limit. Visit https://chatgpt.com/settings/usage to purchase more credits or try again at Oct 12th, 2026 9:00 AM.",
+      ),
+    ).toBe(true);
     expect(isUsageLimitDiagnostic("You've hit your rate limit. Try again in 20 seconds.")).toBe(false);
     expect(isUsageLimitDiagnostic("429 Rate limit reached for requests")).toBe(false);
     // A balance does not come back by waiting, so the turn fails with the provider's reason.
@@ -190,5 +201,6 @@ describe.sequential("AgentService: usage limit", () => {
       expect(isUsageLimitDiagnostic(balance)).toBe(true);
       expect(isPlanLimitDiagnostic(balance)).toBe(false);
     }
+    expect(isPlanLimitDiagnostic("Your workspace is out of credits. Add credits to continue.")).toBe(false);
   });
 });

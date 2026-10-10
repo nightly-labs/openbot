@@ -3,6 +3,7 @@ import { defineMessages } from "../../message";
 export const messages = defineMessages("preview", {
   "preview.panel.label": "File preview",
   "preview.panel.resize": "Resize file preview",
+  "preview.panel.copy": "Copy file text",
   "preview.panel.openExternally": "Open file externally",
   "preview.panel.download": "Download file",
   "preview.panel.reveal": "Show file in Finder",
@@ -10,6 +11,7 @@ export const messages = defineMessages("preview", {
   "preview.panel.back": "Back",
   "preview.panel.rawMarkdown": "Show Markdown source",
   "preview.panel.rawHtml": "Show HTML source",
+  "preview.panel.wrapLines": "Wrap long lines",
   "preview.folder.empty": "This folder is empty.",
   "preview.folder.truncated": "Only the first {limit} items are shown.",
   "preview.truncated": "Preview truncated after {limit} characters.",

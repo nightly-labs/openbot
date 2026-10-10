@@ -47,17 +47,11 @@ export function queuedDeliveriesInOrder(snapshot: QueueSnapshot | undefined): Qu
  * The queue panel's contents: what is waiting, then anything steering the turn
  * that is running.
  *
- * Empty between turns. A queue with nothing running is work the user has
- * already seen land in the transcript, so showing it again would be a panel
- * that never goes away. Two more things drop out: a delivery already rendered
+ * Keep waiting work visible even when no turn runs, so the user can edit or cancel
+ * a message that has not started. Two things drop out: a delivery already rendered
  * as a message, which the transcript is showing, and a queued delivery that
  * belongs to the running turn, which the activity line above is showing. An answer from another
  * agent goes too: the waiting block above the panel shows it with the question it answers.
- *
- * Two exceptions keep the panel open with nothing running. A held queue waits on
- * a channel turn on another thread, and a queue whose head is being edited on
- * another device waits on that edit. Neither gives this agent something running,
- * and closing the panel would take every waiting message off the screen.
  */
 export function presentQueueDeliveries(input: {
   snapshot: QueueSnapshot | undefined;
@@ -66,8 +60,6 @@ export function presentQueueDeliveries(input: {
 }): QueueDelivery[] {
   const snapshot = input.snapshot;
   if (!snapshot) return [];
-  const editHold = snapshot.deliveries.some((delivery) => delivery.status === "queued" && delivery.editing);
-  if (!snapshot.hold && !editHold && activeQueueDeliveries(snapshot, input.activeTurnId).length === 0) return [];
   const queued = queuedDeliveriesInOrder(snapshot).filter(
     (delivery) =>
       (!input.activeTurnId || delivery.turnId !== input.activeTurnId) &&

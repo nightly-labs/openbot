@@ -225,6 +225,12 @@ function handle(message) {
     return;
   }
   if (message.method === "session/resume") {
+    // Grok's answer: it does not advertise additionalDirectories and refuses them on resume.
+    if (message.params.additionalDirectories?.length) {
+      write({ jsonrpc: "2.0", id: message.id, error: { code: -32602, message: "Invalid params",
+        data: "session/resume does not support additionalDirectories" } });
+      return;
+    }
     write({ jsonrpc: "2.0", id: message.id, result: {} });
     return;
   }
@@ -1205,7 +1211,11 @@ describe("OpenCode ACP session loading", () => {
 
     await expect(
       runCauseEffect(
-        client.request("thread/resume", { threadId: "ses_resume_only", cwd: fake.directory }, decodeRecordResponse),
+        client.request(
+          "thread/resume",
+          { threadId: "ses_resume_only", cwd: fake.directory, runtimeWorkspaceRoots: [fake.directory] },
+          decodeRecordResponse,
+        ),
       ),
     ).resolves.toEqual(expect.any(Object));
     expect(client.canReleaseProcess?.()).toBe(true);

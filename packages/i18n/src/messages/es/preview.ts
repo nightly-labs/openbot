@@ -4,6 +4,7 @@ import type { messages as source } from "../en/preview";
 export const messages = {
   "preview.panel.label": "Vista previa del archivo",
   "preview.panel.resize": "Cambiar tamaño de la vista previa",
+  "preview.panel.copy": "Copiar el texto del archivo",
   "preview.panel.openExternally": "Abrir archivo externamente",
   "preview.panel.download": "Descargar archivo",
   "preview.panel.reveal": "Mostrar archivo en Finder",
@@ -11,6 +12,7 @@ export const messages = {
   "preview.panel.back": "Atrás",
   "preview.panel.rawMarkdown": "Mostrar código fuente de Markdown",
   "preview.panel.rawHtml": "Mostrar código fuente de HTML",
+  "preview.panel.wrapLines": "Ajustar líneas largas",
   "preview.folder.empty": "Esta carpeta está vacía.",
   "preview.folder.truncated": "Solo se muestran los primeros {limit} elementos.",
   "preview.truncated": "Vista previa truncada después de {limit} caracteres.",

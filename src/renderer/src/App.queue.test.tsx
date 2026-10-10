@@ -235,6 +235,31 @@ describe("OpenBot connected desktop shell", () => {
     );
   });
 
+  it("keeps a direct message draft when presence changes", async () => {
+    render(() => <App peopleEnabled />);
+    await screen.findByRole("heading", { name: "Chief" });
+    const members = [
+      presenceMember("member-self", "person@example.com", "Person"),
+      presenceMember("member-alice", "alice@example.com", "Alice"),
+      presenceMember("member-bob", "bob@example.com", "Bob"),
+    ];
+    emitPresence?.({ serverId: "server-1", updatedAt: "2026-08-19T10:00:00.000Z", members });
+    await fireEvent.click(await screen.findByRole("button", { name: /Alice/ }));
+    const input = await screen.findByRole("textbox", { name: "Message Alice" });
+    await fireEvent.input(input, { target: { value: "Draft for Alice" } });
+
+    // Someone starts typing to an agent: the host sends a new snapshot with the same members.
+    emitPresence?.({
+      serverId: "server-1",
+      updatedAt: "2026-08-19T10:01:00.000Z",
+      members: members.map((member) => ({ ...member, typingAgentId: member.id === "member-self" ? null : "chief" })),
+    });
+
+    await waitFor(() => expect(screen.getByRole("textbox", { name: "Message Alice" })).toHaveValue("Draft for Alice"));
+    await fireEvent.click(screen.getByRole("button", { name: /Bob/ }));
+    expect(await screen.findByRole("textbox", { name: "Message Bob" })).toHaveValue("");
+  });
+
   it("does not expose team conversations when the signed-in account is not a member", async () => {
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
@@ -559,7 +584,7 @@ describe("OpenBot connected desktop shell", () => {
     );
   });
 
-  it("keeps foreground starts out of Queue and hides waiting work between turns", async () => {
+  it("keeps foreground starts out of Queue and shows waiting work between turns", async () => {
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
     const firstStarting = queuedDelivery("delivery-starting", "Current work", null, { status: "starting" });
@@ -616,7 +641,8 @@ describe("OpenBot connected desktop shell", () => {
         ],
       },
     });
-    await waitFor(() => expect(screen.queryByRole("region", { name: "Message queue" })).not.toBeInTheDocument());
+    await screen.findByRole("group", { name: "Queued message 1: Next work" });
+    expect(screen.getByRole("button", { name: "Delete queued message 1" })).toBeEnabled();
 
     const secondStarting = { ...second, status: "starting" as const, position: null, turnId: "turn-next" };
     emitAgentEvent?.({
@@ -1277,7 +1303,7 @@ describe("queue edit", () => {
     // Save confirms the hold with the same identity first, so the second hold is calls[3].
     const secondBegin = vi.mocked(window.openbot.agent.editQueuedMessage).mock.calls[3]?.[0];
     assert(secondBegin);
-    await fireEvent.keyDown(document, { key: "Escape" });
+    await fireEvent.click(screen.getByRole("button", { name: "Cancel edit" }));
     await waitFor(() =>
       expect(window.openbot.agent.editQueuedMessage).toHaveBeenCalledWith(
         { agentId: "chief", deliveryId: delivery.id, editId: secondBegin.editId, action: "cancel" },

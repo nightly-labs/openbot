@@ -260,7 +260,8 @@ export function isUsageLimitDiagnostic(message: string): boolean {
  * forever and hide the provider's reason. A short request-rate throttle says "rate limit".
  */
 export function isPlanLimitDiagnostic(message: string): boolean {
-  if (isBalanceDiagnostic(message)) return false;
+  // Codex offers credits next to the reset on Plus and Pro: "… to purchase more credits or try again at 3:00 PM."
+  if (isBalanceDiagnostic(message) && !/\btry again at\b/iu.test(message)) return false;
   return (
     /\bhit your (?:(?:session|weekly|usage|plan|opus|sonnet) )*limit\b/iu.test(message) ||
     /\b(?:session|weekly) (?:usage )?limit\b.{0,80}\b(?:reached|resets?)\b/iu.test(message)

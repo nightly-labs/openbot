@@ -6,6 +6,7 @@ import { access, mkdir, mkdtemp, open, readdir, readFile, rename, rm, symlink, w
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
+import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   AGENT_RUNTIME_TEXT_LIMIT,
@@ -598,6 +599,31 @@ describe("MailboxStore", () => {
         },
       ],
     });
+  });
+
+  it("keeps both files when two attachment names differ only in case", async () => {
+    const first = join(root, "a", "Report.txt");
+    const second = join(root, "b", "report.txt");
+    await mkdir(join(root, "a"));
+    await mkdir(join(root, "b"));
+    await writeFile(first, "first");
+    await writeFile(second, "second");
+    const drafts = await runCauseEffect(store.prepareAttachments([first, second]));
+    const receipt = await runCauseEffect(
+      store.enqueue({
+        sender: { kind: "user" },
+        recipientAgentIds: ["chief"],
+        text: "Compare these",
+        draftIds: drafts.map((draft) => draft.id),
+      }),
+    );
+
+    const managed = store.getDelivery(required(receipt.deliveries[0]).id)?.managedAttachments ?? [];
+    expect(managed.map((attachment) => attachment.name)).toEqual(["Report.txt", "report-2.txt"]);
+    await expect(Promise.all(managed.map((attachment) => readFile(attachment.path, "utf8")))).resolves.toEqual([
+      "first",
+      "second",
+    ]);
   });
 
   it("rejects managed attachments after their contents change without changing size", async () => {
@@ -1483,6 +1509,91 @@ describe("MailboxStore", () => {
     expect(restored.conversationMessages("chief")[0]?.exchange?.deliveries).toEqual(
       expect.arrayContaining([expect.objectContaining({ status: "running" })]),
     );
+  });
+
+  it("keeps a delayed steer after commentary across restart without changing the send time", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(new Date("2026-10-01T10:00:00.000Z"));
+      const first = await runCauseEffect(
+        store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Start" }),
+      );
+      const firstId = required(first.deliveries[0]).id;
+      await runCauseEffect(store.markStarting(firstId));
+      await runCauseEffect(store.markRunning(firstId, "turn-1"));
+      vi.setSystemTime(new Date("2026-10-01T10:01:00.000Z"));
+      const receipt = await runCauseEffect(
+        store.enqueue({
+          sender: { kind: "agent", agentId: "research" },
+          recipientAgentIds: ["chief", "sales"],
+          text: "Steer",
+        }),
+      );
+      const id = required(receipt.deliveries[0]).id;
+      const sentAt = required(store.getDelivery(id)).delivery.createdAt;
+      vi.setSystemTime(new Date("2026-10-01T10:06:00.000Z"));
+      await runCauseEffect(store.markSteering(id, "turn-1"));
+      await runCauseEffect(store.markRunning(id, "turn-1"));
+      await runCauseEffect(store.markTerminal(id, "completed"));
+      const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
+      await runCauseEffect(restored.initialize());
+      const messages = sortConversationMessages([
+        ...restored.conversationMessages("chief"),
+        {
+          id: "commentary",
+          turnId: "turn-1",
+          author: "assistant",
+          itemType: "commentary",
+          text: "Still working",
+          createdAt: "2026-10-01T10:05:00.000Z",
+          status: "completed",
+        },
+      ]);
+      expect(messages.map((message) => message.id)).toEqual([firstId, "commentary", id]);
+      expect(messages[2]?.createdAt).toBe("2026-10-01T10:06:00.000Z");
+      expect(
+        restored
+          .conversationMessages("chief", { fromCreatedAt: "2026-10-01T10:05:00.000Z" })
+          .map((message) => message.id),
+      ).toContain(id);
+      expect(restored.getDelivery(id)?.delivery.createdAt).toBe(sentAt);
+      expect(restored.getDelivery(id)?.delivery).not.toHaveProperty("steeredAt");
+      expect(restored.conversationMessages("research")[0]?.createdAt).toBe(sentAt);
+      expect(restored.conversationMessages("sales")[0]?.createdAt).toBe(sentAt);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("restores the send time after a refused steer and uses the time of a later retry", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(new Date("2026-10-01T10:00:00.000Z"));
+      const receipt = await runCauseEffect(
+        store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Steer" }),
+      );
+      const id = required(receipt.deliveries[0]).id;
+      const sentAt = required(store.getDelivery(id)).delivery.createdAt;
+      await runCauseEffect(store.markSteering(id, "turn-1"));
+      expect(store.conversationMessages("chief")[0]?.createdAt).toBe(sentAt);
+      await runCauseEffect(store.restoreUnsteered(id, "turn-1"));
+      expect(store.conversationMessages("chief")[0]).toMatchObject({
+        createdAt: sentAt,
+        delivery: { status: "queued" },
+      });
+      vi.setSystemTime(new Date("2026-10-01T10:06:00.000Z"));
+      await runCauseEffect(store.markSteering(id, "turn-2"));
+      expect(store.conversationMessages("chief")[0]?.createdAt).toBe("2026-10-01T10:06:00.000Z");
+      await runCauseEffect(store.restoreUnsteered(id, "turn-2"));
+      const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
+      await runCauseEffect(restored.initialize());
+      expect(restored.conversationMessages("chief")[0]).toMatchObject({
+        createdAt: sentAt,
+        delivery: { status: "queued" },
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("filters mailbox history per agent and keeps old active deliveries with attachments", async () => {

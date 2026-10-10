@@ -6,6 +6,113 @@ import { RemoteTokenError } from "../src/tokens";
 import { runSignal } from "./signal-runtime";
 
 describe("SignalService", () => {
+  it("replaces a waiting client at the quota without closing another device", async () => {
+    const service = new SignalService(fakeTokens(), 2);
+    const host = socket("host");
+    const phone = socket("phone");
+    let client = socket("client");
+    await hello(service, host, "host-ticket", "host");
+    await hello(service, phone, "second-client-ticket", "client");
+    await hello(service, client, "client-ticket", "client");
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const ready = JSON.parse(client.messages.at(-1) ?? "{}");
+      await runSignal(
+        service,
+        service.receive(host, JSON.stringify({ type: "disconnect", version: 1, connectionId: ready.connectionId })),
+      );
+      const replacement = socket(`replacement-${attempt}`);
+      await hello(service, replacement, "resume-client", "client");
+      expect(replacement.messages.at(-1)).toContain('"type":"ready"');
+      expect(client.closed).toBe(true);
+      await runSignal(service, service.disconnect(client));
+      client = replacement;
+      expect(phone.closed).toBe(false);
+      expect(service.metrics().activePeerConnections).toBe(2);
+    }
+
+    await runSignal(service, service.disconnect(host));
+    const resumedHost = socket("resumed-host");
+    await hello(service, resumedHost, "resume-host", "host");
+    expect(service.metrics().activePeerConnections).toBe(2);
+    expect(phone.closed).toBe(false);
+    expect(client.closed).toBe(false);
+  });
+
+  it("admits concurrent replacements at the quota after token signing completes", async () => {
+    const tokens = fakeTokens();
+    const service = new SignalService(tokens, 1);
+    const host = socket("host");
+    const client = socket("client");
+    await hello(service, host, "host-ticket", "host");
+    await hello(service, client, "client-ticket", "client");
+    const signing = deferred();
+    const issueResumeToken = tokens.issueResumeToken;
+    tokens.issueResumeToken = vi.fn((claims) =>
+      Effect.promise(() => signing.promise).pipe(Effect.flatMap(() => issueResumeToken(claims))),
+    );
+    const first = socket("first-replacement");
+    const second = socket("second-replacement");
+    const pendingFirst = hello(service, first, "resume-client", "client");
+    const pendingSecond = hello(service, second, "resume-client", "client");
+    signing.resolve();
+    await Promise.all([pendingFirst, pendingSecond]);
+    expect(first.messages.some((message) => message.includes('"type":"ready"'))).toBe(true);
+    expect(second.messages.at(-1)).toContain('"type":"ready"');
+    expect(client.closed).toBe(true);
+    expect(first.closed).toBe(true);
+    expect(service.metrics().activePeerConnections).toBe(1);
+    const overflow = socket("overflow");
+    await hello(service, overflow, "second-client-ticket", "client");
+    expect(overflow.messages.at(-1)).toContain('"code":"rate_limited"');
+    expect(second.closed).toBe(false);
+  });
+
+  it("keeps no quota slot when resume token signing fails", async () => {
+    const tokens = fakeTokens();
+    const service = new SignalService(
+      {
+        ...tokens,
+        issueResumeToken: (claims) =>
+          claims.jti === "client-jti"
+            ? Effect.fail(new RemoteTokenError({ message: "Signing failed." }))
+            : tokens.issueResumeToken(claims),
+      },
+      1,
+    );
+    const host = socket("host");
+    await hello(service, host, "host-ticket", "host");
+    const failed = socket("failed");
+    await hello(service, failed, "client-ticket", "client");
+    expect(failed.closed).toBe(true);
+    expect(failed.messages.at(-1)).toContain('"code":"authentication_required"');
+    const client = socket("client");
+    await hello(service, client, "second-client-ticket", "client");
+    expect(client.messages.at(-1)).toContain('"type":"ready"');
+  });
+
+  it.each(["session", "host"] as const)("checks %s revocation after token signing", async (scope) => {
+    const tokens = fakeTokens();
+    const signing = deferred();
+    const service = new SignalService(
+      {
+        ...tokens,
+        issueResumeToken: (claims) =>
+          Effect.promise(() => signing.promise).pipe(Effect.flatMap(() => tokens.issueResumeToken(claims))),
+      },
+      1,
+    );
+    const client = socket("client");
+    const pending = hello(service, client, "client-ticket", "client");
+    if (scope === "session") service.revokeSession("client-session");
+    else service.revoke("host-1", 2);
+    signing.resolve();
+    await pending;
+    expect(client.messages.at(-1)).toContain('"code":"authentication_required"');
+    expect(client.closed).toBe(true);
+    expect(service.metrics().acceptedConnections).toBe(0);
+  });
+
   it("removes an interrupted Slack delivery before accepting a late response", async () => {
     const service = new SignalService(
       {

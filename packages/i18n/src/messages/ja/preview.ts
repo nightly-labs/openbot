@@ -4,6 +4,7 @@ import type { messages as source } from "../en/preview";
 export const messages = {
   "preview.panel.label": "ファイルのプレビュー",
   "preview.panel.resize": "ファイルのプレビューのサイズを変更",
+  "preview.panel.copy": "ファイルのテキストをコピー",
   "preview.panel.openExternally": "ファイルを外部アプリで開く",
   "preview.panel.download": "ファイルをダウンロード",
   "preview.panel.reveal": "ファイルを Finder で表示",
@@ -11,6 +12,7 @@ export const messages = {
   "preview.panel.back": "戻る",
   "preview.panel.rawMarkdown": "Markdown のソースを表示",
   "preview.panel.rawHtml": "HTML のソースを表示",
+  "preview.panel.wrapLines": "長い行を折り返す",
   "preview.folder.empty": "このフォルダは空です。",
   "preview.folder.truncated": "最初の {limit} 件だけを表示しています。",
   "preview.truncated": "プレビューは {limit} 文字までです。",

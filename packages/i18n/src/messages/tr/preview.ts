@@ -4,6 +4,7 @@ import type { messages as source } from "../en/preview";
 export const messages = {
   "preview.panel.label": "Dosya önizlemesi",
   "preview.panel.resize": "Dosya önizlemesini yeniden boyutlandır",
+  "preview.panel.copy": "Dosya metnini kopyala",
   "preview.panel.openExternally": "Dosyayı harici uygulamada aç",
   "preview.panel.download": "Dosyayı indir",
   "preview.panel.reveal": "Dosyayı Finder'da göster",
@@ -11,6 +12,7 @@ export const messages = {
   "preview.panel.back": "Geri",
   "preview.panel.rawMarkdown": "Markdown kaynağını göster",
   "preview.panel.rawHtml": "HTML kaynağını göster",
+  "preview.panel.wrapLines": "Uzun satırları kaydır",
   "preview.folder.empty": "Bu klasör boş.",
   "preview.folder.truncated": "Yalnızca ilk {limit} öğe gösteriliyor.",
   "preview.truncated": "Önizleme {limit} karakterden sonra kesildi.",
