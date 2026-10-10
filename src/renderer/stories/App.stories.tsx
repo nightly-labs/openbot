@@ -190,22 +190,41 @@ export const UsageLimitReached: Story = {
         agents: STORY_AGENT_SUMMARIES.map((agent, index) =>
           index === 0 ? { ...agent, provider: "claude", model: "claude-opus-5" } : agent,
         ),
-        usage: {
-          limits: [
-            {
-              id: "claude",
-              primary: { usedPercent: 100, windowDurationMins: 300, resetsAt: null },
-              secondary: { usedPercent: 15, windowDurationMins: 10_080, resetsAt: null },
-            },
-          ],
+        usageByProvider: {
+          claude: {
+            limits: [
+              {
+                id: "claude",
+                primary: { usedPercent: 100, windowDurationMins: 300, resetsAt: null },
+                secondary: { usedPercent: 15, windowDurationMins: 10_080, resetsAt: null },
+              },
+            ],
+          },
+          codex: {
+            limits: [
+              {
+                id: "codex",
+                primary: { usedPercent: 28, windowDurationMins: 300, resetsAt: 1_786_563_600 },
+                secondary: { usedPercent: 41, windowDurationMins: 10_080, resetsAt: 1_787_040_000 },
+              },
+            ],
+          },
         },
       }}
     />
   ),
   play: async ({ canvas, canvasElement, userEvent }) => {
-    await userEvent.click(await canvas.findByRole("button", { name: "Claude weekly usage, 85% left" }));
-    const dialog = await within(canvasElement.ownerDocument.body).findByRole("dialog", { name: "Claude usage" });
-    await expect(within(dialog).getByRole("region", { name: "5-hour limit" })).toHaveTextContent("0% left");
+    await userEvent.click(
+      await canvas.findByRole("button", { name: "Usage for 3 connected providers. A provider limit is critical." }),
+    );
+    const dialog = await within(canvasElement.ownerDocument.body).findByRole("dialog", { name: "Usage" });
+    const claudeRow = within(dialog).getByRole("region", { name: "Claude usage" });
+    await expect(claudeRow).toHaveTextContent("5h reached");
+    await expect(within(claudeRow).getByRole("progressbar", { name: "Claude weekly usage remaining" })).toHaveAttribute(
+      "aria-valuenow",
+      "85",
+    );
+    await expect(within(dialog).getByRole("region", { name: "ChatGPT usage" })).toHaveTextContent("59%");
   },
 };
 
@@ -214,7 +233,7 @@ export const AccountMenu: Story = {
   play: async ({ canvas, canvasElement, userEvent }) => {
     await canvas.findByRole("heading", { name: "Chief" });
     const trigger = await canvas.findByRole("button", { name: "Open account actions" });
-    const usageTrigger = await canvas.findByRole("button", { name: /ChatGPT weekly usage/ });
+    const usageTrigger = await canvas.findByRole("button", { name: /Usage for \d+ connected providers/ });
     const settingsTrigger = await canvas.findByRole("button", { name: "Settings" });
     const dock = canvasElement.querySelector<HTMLElement>(".account-dock");
     const rail = canvasElement.querySelector<HTMLElement>(".server-rail");
@@ -229,7 +248,7 @@ export const AccountMenu: Story = {
 
     await userEvent.click(usageTrigger);
     const usagePopover = await within(canvasElement.ownerDocument.body).findByRole("dialog", {
-      name: "ChatGPT usage",
+      name: "Usage",
     });
     await expect(within(usagePopover).getByRole("button", { name: "Refresh" })).toBeInTheDocument();
     await userEvent.keyboard("{Escape}");

@@ -128,6 +128,11 @@ export interface MockOpenBotOptions {
   setupState?: AppSetupState;
   agentStatus?: AgentStatus;
   usage?: AccountUsage;
+  /**
+   * Per-provider usage for the dock's provider list. When present, every agent on a listed
+   * provider reports that provider's entry instead of the single `usage` target key.
+   */
+  usageByProvider?: Partial<Record<AgentProviderId, AccountUsage>>;
   agents?: AgentSummary[];
   models?: AgentModelOption[];
   snapshots?: Record<string, ConversationSnapshot>;
@@ -1173,7 +1178,10 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
       getUsage: async (agentId) => {
         const agent = agents.find((candidate) => candidate.id === agentId);
-        return clone(agent && `${agent.provider}:${agent.model}` === usageTargetKey ? usage : { limits: [] });
+        const providerUsage = agent ? options.usageByProvider?.[agent.provider] : undefined;
+        return clone(
+          providerUsage ?? (agent && `${agent.provider}:${agent.model}` === usageTargetKey ? usage : { limits: [] }),
+        );
       },
       // A saved endpoint's models are composed here, not stored, so a removal drops them the way a
       // respawned OpenCode would: it lists what its config names and nothing else.

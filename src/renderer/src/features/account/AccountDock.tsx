@@ -1,21 +1,18 @@
 import type {
   AccountUsage,
   AccountUsageWindow,
-  AgentStatus,
-  AgentSummary,
+  AgentProviderId,
   AppInfo,
   CentralAuthUser,
   ExternalDestination,
   UpdateStatus,
 } from "@openbot/contracts/ipc";
 import { agentProviderName } from "@openbot/contracts/ipc";
-import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
-import { TypingDots } from "../../components/TypingDots";
+import { createEffect, createMemo, createSignal, Index, onCleanup, Show } from "solid-js";
 import {
   Badge,
   Button,
   buttonVariants,
-  CalendarClock,
   ChevronUp,
   CircleArrowDown,
   Gauge,
@@ -23,8 +20,8 @@ import {
   Mail,
   Megaphone,
   Popover,
+  Progress,
   Puzzle,
-  RadialProgress,
   RefreshCw,
   Settings,
   ShieldCheck,
@@ -35,19 +32,23 @@ import { errorMessage } from "../../error-message";
 import { presentUpdateStatus } from "../updates/update-status";
 import { AccountUpdateIsland } from "./AccountUpdateIsland";
 
+interface AccountProviderUsage {
+  provider: AgentProviderId;
+  usages: AccountUsage[];
+}
+
+type UsageTone = "neutral" | "warning" | "critical";
+
 interface AccountDockProps {
   account: CentralAuthUser;
   appInfo: AppInfo | null;
-  agentStatus: AgentStatus;
-  accountUsage: AccountUsage | null;
-  usageAgent: Pick<AgentSummary, "name" | "provider" | "model"> | null;
+  usageProviders: readonly AgentProviderId[];
   usageTargetKey: string | null;
   usageRefreshRevision: number;
-  usageReady: boolean;
   updateStatus: UpdateStatus;
   compact: boolean;
   withServerRail: boolean;
-  onRefreshUsage: () => Promise<AccountUsage>;
+  onRefreshUsage: () => Promise<AccountProviderUsage[]>;
   onUpdateAction: () => Promise<void>;
   onLogout?: () => Promise<void>;
   onOpenExternal: (destination: ExternalDestination) => Promise<void>;
@@ -56,47 +57,13 @@ interface AccountDockProps {
   onOpenSkills: () => void;
 }
 
-function AnimatedUsagePercentage(props: { value: number | null }) {
-  let digitGroup: HTMLSpanElement | undefined;
-  const characters = () => (props.value === null ? ["—"] : `${props.value}%`.split(""));
-
-  createEffect(
-    () => props.value,
-    (value) => {
-      if (value === null || !digitGroup) return;
-
-      digitGroup.classList.remove("is-animating");
-      void digitGroup.offsetHeight;
-      digitGroup.classList.add("is-animating");
-    },
-  );
-
-  return (
-    <span ref={digitGroup} class="t-digit-group" aria-hidden="true">
-      <For each={characters()}>
-        {(character, index) => {
-          const stagger = () => {
-            if (index() === characters().length - 2) return "1";
-            if (index() === characters().length - 1) return "2";
-            return undefined;
-          };
-          return (
-            <span class="t-digit" data-stagger={stagger()}>
-              {character}
-            </span>
-          );
-        }}
-      </For>
-    </span>
-  );
-}
-
 export function AccountDock(props: AccountDockProps) {
   const [menuOpen, setMenuOpen] = createSignal(false);
   const [usageOpen, setUsageOpen] = createSignal(false);
   const [usageTooltipOpen, setUsageTooltipOpen] = createSignal(false);
   const [usageLoading, setUsageLoading] = createSignal(false);
   const [usageRefreshAcknowledging, setUsageRefreshAcknowledging] = createSignal(false);
+  const [providerUsage, setProviderUsage] = createSignal<AccountProviderUsage[]>([]);
   const [usageError, setUsageError] = createSignal<string | null>(null);
   const [menuError, setMenuError] = createSignal<string | null>(null);
   const [updateError, setUpdateError] = createSignal<string | null>(null);
@@ -114,55 +81,26 @@ export function AccountDock(props: AccountDockProps) {
   const accountName = createMemo(
     () => props.account.name?.trim() || props.account.email.split("@")[0] || props.account.email,
   );
-  const usageProviderName = createMemo(() =>
-    props.usageAgent ? agentProviderName(props.usageAgent.provider) : "Provider",
-  );
-  const usageTitle = createMemo(() => `${usageProviderName()} usage`);
-  const weeklyUsage = createMemo(() => {
-    for (const limit of props.accountUsage?.limits ?? []) {
-      const weekly = [limit.primary, limit.secondary].find((window) => isWeeklyWindow(window?.windowDurationMins));
-      if (weekly) return weekly;
-    }
-    return null;
-  });
-  const weeklyUsageRemaining = createMemo(() => {
-    const usage = weeklyUsage();
-    return usage ? Math.max(0, Math.round(100 - usage.usedPercent)) : null;
-  });
-  const usageValue = createMemo(() => weeklyUsageRemaining() ?? 0);
-  const usageTone = createMemo(() => {
-    const remaining = weeklyUsageRemaining();
-    if (remaining === null || remaining >= 30) return "neutral";
-    return remaining < 10 ? "critical" : "warning";
-  });
-  const usageRadialTone = createMemo(() => {
-    const tone = usageTone();
-    if (tone === "critical") return "danger";
-    return tone === "warning" ? "warning" : "accent";
-  });
-  const usageButtonLabel = createMemo(() => {
-    const label = `${usageProviderName()} weekly usage`;
-    if (usageLoading() && weeklyUsageRemaining() === null) return `${label} is loading`;
-    if (weeklyUsageRemaining() === null) return `${label} unavailable`;
-    return `${label}, ${weeklyUsageRemaining()}% left`;
-  });
-  const usageRefreshActive = createMemo(() => usageLoading() || usageRefreshAcknowledging());
-  const usageRefreshDisabled = createMemo(() => usageRefreshActive() || !props.usageReady || !props.usageTargetKey);
-  const weeklyUsageReset = createMemo(() => formatUsageReset(weeklyUsage()?.resetsAt));
-  const otherUsageWindows = createMemo(() =>
-    (props.accountUsage?.limits ?? []).flatMap((limit) =>
-      [limit.primary, limit.secondary]
-        .filter((window): window is AccountUsageWindow => window !== null && window !== weeklyUsage())
-        .map((window) => ({
-          label:
-            props.accountUsage && props.accountUsage.limits.length > 1
-              ? `${limit.id} · ${usageWindowLabel(window.windowDurationMins)}`
-              : usageWindowLabel(window.windowDurationMins),
-          remaining: Math.max(0, Math.round(100 - window.usedPercent)),
-          reset: formatUsageReset(window.resetsAt),
-        })),
+  const providerRows = createMemo(() =>
+    props.usageProviders.map((provider) =>
+      summarizeProviderUsage(
+        provider,
+        providerUsage().find((candidate) => candidate.provider === provider)?.usages ?? [],
+      ),
     ),
   );
+  const usageTone = createMemo<UsageTone>(() => {
+    if (providerRows().some((row) => row.tone === "critical")) return "critical";
+    return providerRows().some((row) => row.tone === "warning") ? "warning" : "neutral";
+  });
+  const usageButtonLabel = createMemo(() => {
+    const count = props.usageProviders.length;
+    const base = `Usage for ${count} connected ${count === 1 ? "provider" : "providers"}`;
+    if (usageTone() === "critical") return `${base}. A provider limit is critical.`;
+    return usageTone() === "warning" ? `${base}. A provider limit is low.` : base;
+  });
+  const usageRefreshActive = createMemo(() => usageLoading() || usageRefreshAcknowledging());
+  const usageRefreshDisabled = createMemo(() => usageRefreshActive() || !props.usageTargetKey);
   const updatePresentation = createMemo(() => presentUpdateStatus(props.updateStatus));
   const accountMenuError = createMemo(
     () =>
@@ -178,24 +116,18 @@ export function AccountDock(props: AccountDockProps) {
   });
 
   createEffect(
-    () =>
-      [
-        props.usageTargetKey,
-        props.usageReady,
-        props.usageRefreshRevision,
-        hybridLayout(),
-        menuOpen(),
-        usageOpen(),
-      ] as const,
-    ([targetKey, ready, revision, hybrid, menu, usage]) => {
-      if (!targetKey || !ready) {
+    () => [props.usageTargetKey, props.usageRefreshRevision, hybridLayout(), menuOpen(), usageOpen()] as const,
+    ([targetKey, revision, hybrid, menu, usage]) => {
+      if (!targetKey) {
         usageRequestGeneration += 1;
         usageRequestTargetKey = null;
         usageRequestRevision = -1;
+        setProviderUsage([]);
         setUsageLoading(false);
         setUsageError(null);
         return;
       }
+      if (usageRequestTargetKey !== targetKey) setProviderUsage([]);
       if (!hybrid && !menu && !usage) return;
       if (usageRequestTargetKey === targetKey && usageRequestRevision === revision) return;
       void refreshUsage();
@@ -222,11 +154,7 @@ export function AccountDock(props: AccountDockProps) {
   async function refreshUsage() {
     const targetKey = props.usageTargetKey;
     const revision = props.usageRefreshRevision;
-    if (
-      !targetKey ||
-      !props.usageReady ||
-      (usageLoading() && usageRequestTargetKey === targetKey && usageRequestRevision === revision)
-    )
+    if (!targetKey || (usageLoading() && usageRequestTargetKey === targetKey && usageRequestRevision === revision))
       return;
     const generation = ++usageRequestGeneration;
     usageRequestTargetKey = targetKey;
@@ -234,7 +162,8 @@ export function AccountDock(props: AccountDockProps) {
     setUsageLoading(true);
     setUsageError(null);
     try {
-      await props.onRefreshUsage();
+      const usage = await props.onRefreshUsage();
+      if (generation === usageRequestGeneration && props.usageTargetKey === targetKey) setProviderUsage(usage);
     } catch (cause) {
       if (generation === usageRequestGeneration && props.usageTargetKey === targetKey) {
         setUsageError(errorMessage(cause, "Usage is unavailable."));
@@ -294,47 +223,38 @@ export function AccountDock(props: AccountDockProps) {
 
   function usageDetails() {
     return (
-      <>
-        <div class="account-usage-popover-meter">
-          <RadialProgress
-            value={usageValue()}
-            tone={usageRadialTone()}
-            aria-label={`${usageProviderName()} weekly usage remaining`}
-            aria-valuetext={
-              usageLoading() && weeklyUsageRemaining() === null
-                ? "Loading"
-                : weeklyUsageRemaining() === null
-                  ? "Unavailable"
-                  : `${weeklyUsageRemaining()}% left`
-            }
-          >
-            <strong>
-              {usageLoading() && weeklyUsageRemaining() === null
-                ? "…"
-                : weeklyUsageRemaining() === null
-                  ? "—"
-                  : `${weeklyUsageRemaining()}%`}
-            </strong>
-          </RadialProgress>
-          <span class="account-usage-description">left this week</span>
-        </div>
-        <div class="account-usage-popover-reset">
-          <CalendarClock aria-hidden="true" />
-          <span>Weekly reset</span>
-          <strong>{weeklyUsageReset() ? weeklyUsageReset() : usageLoading() ? "Checking…" : "Unavailable"}</strong>
-        </div>
-        <For each={otherUsageWindows()}>
-          {(window) => (
-            <section class="account-usage-window" aria-label={window.label}>
-              <div class="account-usage-window-summary">
-                <span>{window.label}</span>
-                <strong>{window.remaining}% left</strong>
-              </div>
-              <span class="account-usage-description">Resets {window.reset ?? "at an unknown time"}</span>
-            </section>
-          )}
-        </For>
-      </>
+      <section class="account-usage-provider-list" aria-label="Weekly usage by provider">
+        <Index each={providerRows()}>
+          {(row) => {
+            const loading = () => usageLoading() && row().weeklyRemaining === null;
+            const valueText = () =>
+              loading() ? "Loading" : row().weeklyRemaining === null ? "Unavailable" : `${row().weeklyRemaining}% left`;
+            return (
+              <section class="account-usage-provider-row" aria-label={`${row().name} usage`} data-usage-tone={row().tone}>
+                <strong>{row().name}</strong>
+                <Progress
+                  class="account-usage-provider-bar"
+                  value={row().weeklyRemaining ?? 0}
+                  indeterminate={loading()}
+                  aria-label={`${row().name} weekly usage remaining`}
+                  getValueLabel={() => valueText()}
+                  data-usage-tone={row().tone}
+                />
+                <span class="account-usage-provider-value">
+                  {loading() ? "…" : row().weeklyRemaining === null ? "—" : `${row().weeklyRemaining}%`}
+                </span>
+                <Show when={row().blocker}>
+                  {(blocker) => (
+                    <span class="account-usage-provider-blocker">
+                      {blocker().label} {blocker().remaining === 0 ? "reached" : `${blocker().remaining}% left`}
+                    </span>
+                  )}
+                </Show>
+              </section>
+            );
+          }}
+        </Index>
+      </section>
     );
   }
 
@@ -343,19 +263,23 @@ export function AccountDock(props: AccountDockProps) {
       <>
         <Show when={includeDockActions}>
           <section class="account-menu-group" aria-label="Account">
-            <Button
-              variant="ghost"
-              type="button"
-              class="account-menu-row"
-              aria-label={usageButtonLabel()}
-              onClick={refreshUsageWithFeedback}
-              disabled={usageRefreshDisabled()}
-            >
-              <Gauge class="account-menu-icon" aria-hidden="true" />
-              <span>{usageProviderName()} weekly usage</span>
-              <small>{weeklyUsageRemaining() === null ? "—" : `${weeklyUsageRemaining()}% left`}</small>
-            </Button>
-            {usageDetails()}
+            <Show when={props.usageTargetKey !== null}>
+              <Button
+                variant="ghost"
+                type="button"
+                class="account-menu-row"
+                aria-label={usageButtonLabel()}
+                onClick={refreshUsageWithFeedback}
+                disabled={usageRefreshDisabled()}
+              >
+                <Gauge class="account-menu-icon" aria-hidden="true" />
+                <span>Usage</span>
+                <small>
+                  {props.usageProviders.length === 1 ? "1 provider" : `${props.usageProviders.length} providers`}
+                </small>
+              </Button>
+              {usageDetails()}
+            </Show>
             <Button
               variant="ghost"
               type="button"
@@ -465,7 +389,7 @@ export function AccountDock(props: AccountDockProps) {
           setMenuOpen(nextOpen);
           if (nextOpen) {
             setMenuError(null);
-            if (!props.accountUsage && !usageLoading()) void refreshUsage();
+            if (providerUsage().length === 0 && !usageLoading()) void refreshUsage();
           } else {
             restoreFocusWhenDockIsIdle(legacyTrigger);
           }
@@ -564,87 +488,86 @@ export function AccountDock(props: AccountDockProps) {
           </Popover.Portal>
         </Popover.Root>
 
-        <Tooltip.Root
-          open={usageTooltipOpen()}
-          onOpenChange={(nextOpen) => setUsageTooltipOpen(usageOpen() ? false : nextOpen)}
-          openDelay={250}
-          closeDelay={75}
-          placement="top"
-          gutter={8}
-        >
-          <Tooltip.Trigger as="div" class="account-dock-tooltip-trigger">
-            <Popover.Root
-              open={usageOpen()}
-              onOpenChange={(nextOpen) => {
-                setUsageOpen(nextOpen);
-                if (nextOpen) {
-                  setUsageTooltipOpen(false);
-                  setMenuOpen(false);
-                  if (!props.accountUsage && !usageLoading()) void refreshUsage();
-                } else {
-                  restoreFocusWhenDockIsIdle(usageTrigger);
-                }
-              }}
-              placement="top-end"
-              gutter={10}
-            >
-              <Popover.Trigger
-                ref={(element) => (usageTrigger = element)}
-                as="button"
-                type="button"
-                class={buttonVariants({ variant: "ghost", class: "account-dock-usage-trigger" })}
-                aria-label={usageButtonLabel()}
-                aria-expanded={usageOpen() ? "true" : "false"}
-                data-usage-tone={usageTone()}
+        <Show when={props.usageTargetKey !== null}>
+          <Tooltip.Root
+            open={usageTooltipOpen()}
+            onOpenChange={(nextOpen) => setUsageTooltipOpen(usageOpen() ? false : nextOpen)}
+            openDelay={250}
+            closeDelay={75}
+            placement="top"
+            gutter={8}
+          >
+            <Tooltip.Trigger as="div" class="account-dock-tooltip-trigger">
+              <Popover.Root
+                open={usageOpen()}
+                onOpenChange={(nextOpen) => {
+                  setUsageOpen(nextOpen);
+                  if (nextOpen) {
+                    setUsageTooltipOpen(false);
+                    setMenuOpen(false);
+                    if (providerUsage().length === 0 && !usageLoading()) void refreshUsage();
+                  } else {
+                    restoreFocusWhenDockIsIdle(usageTrigger);
+                  }
+                }}
+                placement="top-end"
+                gutter={10}
               >
-                <span class="account-dock-usage-chip">
-                  <Gauge aria-hidden="true" />
-                  <strong>
-                    <Show
-                      when={usageLoading() && weeklyUsageRemaining() === null}
-                      fallback={<AnimatedUsagePercentage value={weeklyUsageRemaining()} />}
-                    >
-                      <TypingDots class="account-dock-usage-loading" />
-                    </Show>
-                  </strong>
-                </span>
-              </Popover.Trigger>
-              <Popover.Portal>
-                <Popover.Content
-                  class="ui-popover-menu-surface account-usage-popover"
-                  aria-hidden={usageOpen() ? undefined : "true"}
+                <Popover.Trigger
+                  ref={(element) => (usageTrigger = element)}
+                  as="button"
+                  type="button"
+                  class={buttonVariants({ variant: "ghost", class: "account-dock-usage-trigger" })}
+                  aria-label={usageButtonLabel()}
+                  aria-expanded={usageOpen() ? "true" : "false"}
+                  data-usage-tone={usageTone()}
                 >
-                  <header class="account-usage-popover-header">
-                    <div class="account-usage-popover-heading">
-                      <Gauge aria-hidden="true" />
-                      <Popover.Title class="account-usage-popover-title">{usageTitle()}</Popover.Title>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      type="button"
-                      size="icon-sm"
-                      class="account-usage-refresh"
-                      aria-label={usageRefreshActive() ? "Refreshing" : usageError() ? "Try again" : "Refresh"}
-                      title="Refresh usage"
-                      onClick={refreshUsageWithFeedback}
-                      disabled={usageRefreshDisabled()}
-                    >
-                      <RefreshCw
-                        class={usageRefreshActive() ? "account-menu-icon-spinning" : undefined}
-                        aria-hidden="true"
-                      />
-                    </Button>
-                  </header>
-                  {usageDetails()}
-                  <Show when={usageError()}>{(message) => <p class="account-usage-popover-error">{message()}</p>}</Show>
-                </Popover.Content>
-              </Popover.Portal>
-            </Popover.Root>
-          </Tooltip.Trigger>
-          <Tooltip.Portal>
-            <Tooltip.Content class="ui-tooltip">{usageButtonLabel()}</Tooltip.Content>
-          </Tooltip.Portal>
-        </Tooltip.Root>
+                  <span class="account-dock-usage-chip">
+                    <Gauge aria-hidden="true" />
+                    <Show when={usageTone() !== "neutral"}>
+                      <span class="account-dock-usage-status" aria-hidden="true" />
+                    </Show>
+                  </span>
+                </Popover.Trigger>
+                <Popover.Portal>
+                  <Popover.Content
+                    class="ui-popover-menu-surface account-usage-popover"
+                    aria-hidden={usageOpen() ? undefined : "true"}
+                  >
+                    <header class="account-usage-popover-header">
+                      <div class="account-usage-popover-heading">
+                        <Gauge aria-hidden="true" />
+                        <Popover.Title class="account-usage-popover-title">Usage</Popover.Title>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        type="button"
+                        size="icon-sm"
+                        class="account-usage-refresh"
+                        aria-label={usageRefreshActive() ? "Refreshing" : usageError() ? "Try again" : "Refresh"}
+                        title="Refresh usage"
+                        onClick={refreshUsageWithFeedback}
+                        disabled={usageRefreshDisabled()}
+                      >
+                        <RefreshCw
+                          class={usageRefreshActive() ? "account-menu-icon-spinning" : undefined}
+                          aria-hidden="true"
+                        />
+                      </Button>
+                    </header>
+                    {usageDetails()}
+                    <Show when={usageError()}>
+                      {(message) => <p class="account-usage-popover-error">{message()}</p>}
+                    </Show>
+                  </Popover.Content>
+                </Popover.Portal>
+              </Popover.Root>
+            </Tooltip.Trigger>
+            <Tooltip.Portal>
+              <Tooltip.Content class="ui-tooltip">{usageButtonLabel()}</Tooltip.Content>
+            </Tooltip.Portal>
+          </Tooltip.Root>
+        </Show>
 
         <Tooltip.Root openDelay={250} closeDelay={75} placement="top" gutter={8}>
           <Tooltip.Trigger as="div" class="account-dock-tooltip-trigger">
@@ -694,24 +617,38 @@ export function AccountDock(props: AccountDockProps) {
   );
 }
 
-function formatUsageReset(resetsAt: number | null | undefined): string | null {
-  if (resetsAt === null || resetsAt === undefined) return null;
-  const date = new Date(resetsAt * 1_000);
-  if (Number.isNaN(date.getTime())) return null;
-  return new Intl.DateTimeFormat(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(date);
+function summarizeProviderUsage(provider: AgentProviderId, usages: AccountUsage[]) {
+  const windows = usages.flatMap((usage) =>
+    usage.limits.flatMap((limit) =>
+      [limit.primary, limit.secondary].filter((window): window is AccountUsageWindow => window !== null),
+    ),
+  );
+  const weeklyValues = windows.filter((window) => isWeeklyWindow(window.windowDurationMins)).map(usageRemaining);
+  const weeklyRemaining = weeklyValues.length > 0 ? Math.min(...weeklyValues) : null;
+  const blockers = windows
+    .filter((window) => !isWeeklyWindow(window.windowDurationMins))
+    .map((window) => ({ label: compactUsageDuration(window.windowDurationMins), remaining: usageRemaining(window) }))
+    .filter((window) => window.remaining < 10)
+    .sort((left, right) => left.remaining - right.remaining);
+  const blocker = blockers[0] ?? null;
+  const tone: UsageTone =
+    blocker || (weeklyRemaining !== null && weeklyRemaining < 10)
+      ? "critical"
+      : weeklyRemaining !== null && weeklyRemaining < 30
+        ? "warning"
+        : "neutral";
+  return { provider, name: agentProviderName(provider), weeklyRemaining, blocker, tone };
 }
 
-function usageWindowLabel(durationMins: number | null): string {
-  if (isWeeklyWindow(durationMins)) return "Weekly limit";
-  if (durationMins === null || durationMins <= 0) return "Other limit";
-  if (durationMins % 1_440 === 0) return `${durationMins / 1_440}-day limit`;
-  if (durationMins % 60 === 0) return `${durationMins / 60}-hour limit`;
-  return `${durationMins}-minute limit`;
+function usageRemaining(window: AccountUsageWindow): number {
+  return Math.min(100, Math.max(0, Math.round(100 - window.usedPercent)));
+}
+
+function compactUsageDuration(durationMins: number | null): string {
+  if (durationMins === null || durationMins <= 0) return "Limit";
+  if (durationMins % 1_440 === 0) return `${durationMins / 1_440}d`;
+  if (durationMins % 60 === 0) return `${durationMins / 60}h`;
+  return `${durationMins}m`;
 }
 
 function isWeeklyWindow(durationMins: number | null | undefined): boolean {

@@ -317,7 +317,7 @@ export const WeeklyUsageWarning: Story = {
   parameters: {
     docs: {
       description: {
-        story: "Warning state: below 30% remaining, the gauge and percentage use the warning color.",
+        story: "Warning state: below 30% remaining, the dock status dot and the provider bar use the warning color.",
       },
     },
   },
@@ -330,7 +330,8 @@ export const WeeklyUsageCritical: Story = {
   parameters: {
     docs: {
       description: {
-        story: "Critical state: below 10% remaining, the gauge and percentage use the danger color.",
+        story:
+          "Critical state: below 10% remaining or a shorter limit spent, the status dot and bar use the danger color.",
       },
     },
   },
