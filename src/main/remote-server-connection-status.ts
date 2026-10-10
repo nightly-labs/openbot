@@ -199,8 +199,9 @@ export function transportFailure(code: string, message: string): { message: stri
   return { message, reference: referenceFrom("transport", code) };
 }
 
-// The sentence for each Signal error code. Null for a code that is not Signal's, and for
-// `session_revoked`.
+// The sentence for each Signal error code. Null for a code that is not Signal's, for
+// `session_revoked`, and for `protocol_error`: the bridge also uses that code for its own failures,
+// such as a host that failed end-to-end authentication, and its message says which.
 function signalIssueText(code: string): string | null {
   switch (code) {
     case "host_unavailable":
@@ -212,8 +213,6 @@ function signalIssueText(code: string): string | null {
     case "rate_limited":
       // The Signal frame has no wait. The bridge waits 60 seconds before it opens Signal again.
       return sourceText("error.remote.signalRateLimited", { seconds: 60 });
-    case "protocol_error":
-      return sourceText("error.remote.signalProtocolError");
     case "invalid_message":
       return sourceText("error.remote.signalInvalidMessage");
     case "authentication_required":

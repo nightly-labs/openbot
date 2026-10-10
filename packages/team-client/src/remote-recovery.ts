@@ -125,7 +125,8 @@ const SAFE_NUMBER_CONNECTION_ERRORS = [
   numberTemplate(sourceText("error.remote.requestFailedStatus", { status: NUMBER_MARK })),
 ];
 
-function isSafeConnectionError(message: string): boolean {
+/** Whether a connection message is one of our fixed sentences, and not text from a peer or the browser. */
+export function isSafeConnectionError(message: string): boolean {
   return SAFE_CONNECTION_ERRORS.has(message) || SAFE_NUMBER_CONNECTION_ERRORS.some((pattern) => pattern.test(message));
 }
 

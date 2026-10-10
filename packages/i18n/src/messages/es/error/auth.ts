@@ -14,6 +14,10 @@ export const messages = {
     "La credencial del host remoto no está disponible. Registra el host de nuevo.",
   "error.auth.codeNotVerified": "No se pudo verificar el código de inicio de sesión.",
   "error.auth.serviceError": "El servicio de cuentas devolvió un error.",
+  "error.auth.serviceUnreachable":
+    "OpenBot no pudo acceder al servicio de cuentas. Comprueba tu conexión e inténtalo de nuevo.",
+  "error.auth.serviceTimeout": "El servicio de cuentas no respondió a tiempo. Inténtalo de nuevo.",
+  "error.auth.serviceStatus": "El servicio de cuentas devolvió un error ({status}). Inténtalo de nuevo más tarde.",
   "error.auth.invalidHostedServer": "El servicio de cuentas devolvió un servidor alojado no válido.",
   "error.auth.codeNotSent": "OpenBot no pudo enviar el código de inicio de sesión.",
   "error.auth.deliveryTimeout":

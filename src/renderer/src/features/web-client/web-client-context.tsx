@@ -23,7 +23,11 @@ import type {
 } from "@openbot/contracts/ipc";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
 import type { RemoteTeamHost } from "@openbot/team-client/remote-directory";
-import { createRemoteConnectionRecovery, type RemoteRecoveryStatus } from "@openbot/team-client/remote-recovery";
+import {
+  createRemoteConnectionRecovery,
+  isSafeConnectionError,
+  type RemoteRecoveryStatus,
+} from "@openbot/team-client/remote-recovery";
 import { reconcilePendingRequests } from "@openbot/team-client/runtime-attention";
 import { currentText } from "@openbot/ui/text";
 import { errorReference, type UserErrorDetails } from "@openbot/user-errors";
@@ -297,7 +301,11 @@ export function createWebWorkspace(
           else if (update.message || reference) {
             const reconnecting = text.t("server.connection.reconnecting", { name: draft.host?.name ?? "" });
             draft.connectionError = {
-              message: update.message ? text.errorMessage(update.message, reconnecting) : reconnecting,
+              // Browser and peer text, such as a WebRTC exception, is not for the user.
+              message:
+                update.message && isSafeConnectionError(update.message)
+                  ? text.errorMessage(update.message, reconnecting)
+                  : reconnecting,
               reference,
             };
           }

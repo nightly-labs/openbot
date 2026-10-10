@@ -109,7 +109,9 @@ describe("classifyTransportError", () => {
   });
 
   it("agrees with the HTTP path that a protocol error is incompatibility, not a retryable blip", () => {
+    // The bridge uses this code for its own failures too, so its message stays.
     const outcome = classifyTransportError("protocol_error", "Unsupported frame.");
+    expect(outcome.issue).toMatchObject({ message: "Unsupported frame.", reference: "transport/protocol_error" });
     expect(outcome.state).toBe("incompatible");
     expect(outcome.issue?.retryable).toBe(false);
     expect(outcome.suspendReconnect).toBe(true);
@@ -139,11 +141,6 @@ describe("classifyTransportError", () => {
       "Your account does not have access to this host. Ask the owner for access.",
     ],
     ["rate_limited", "network_unavailable", "Too many connection attempts. OpenBot tries again in 60 seconds."],
-    [
-      "protocol_error",
-      "protocol_error",
-      "Signal and this app do not agree on the connection protocol. Update OpenBot, then try again.",
-    ],
     ["invalid_message", "network_unavailable", "Signal returned an invalid message."],
     ["authentication_required", "network_unavailable", "Remote ticket is invalid or expired."],
     ["session_revoked", "authentication_required", "Remote access was revoked."],

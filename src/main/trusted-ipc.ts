@@ -93,11 +93,15 @@ function observeCall<Result>(channel: string, run: () => Result): Result {
   return result;
 }
 
+const RUNTIME_ERRORS = [TypeError, SyntaxError, ReferenceError, RangeError];
+
 // Electron sends a rejected handler's error to the renderer as `<name>: <message>` and drops every
 // other field, so a status or a protocol code that names the failure would be lost. The error is
 // renamed after its reference here, where the typed error still exists; the message stays the same,
 // byte for byte, so source text matching and comparisons do not change.
 function withReference(error: Error): Error {
+  // A runtime error keeps its name, so the renderer still shows the fallback and not its text.
+  if (RUNTIME_ERRORS.some((type) => error instanceof type)) return error;
   const reference = errorReference(error);
   if (!reference) return error;
   const carried = new Error(error.message, { cause: error });
