@@ -1055,6 +1055,38 @@ describe("shared channel coordination", () => {
     expect(late.text.length).toBeLessThanOrEqual(120_000);
   });
 
+  it("asks for a shorter summary when the model returns one over the limit", async () => {
+    const task = await send("Apply the shared decision");
+    const messages: ChannelMessage[] = Array.from({ length: 150 }, (_, index) => ({
+      id: `history-${index}`,
+      channelId: "channel-1",
+      sequence: 0,
+      author: { kind: "member", ...actor },
+      taskId: task.id,
+      superseded: false,
+      message: {
+        id: `history-${index}`,
+        author: "user",
+        text: `context ${"detail ".repeat(100)}`,
+        status: "completed",
+        createdAt: "2026-09-07T12:00:00.000Z",
+      },
+    }));
+    service.store.update(service.store.get("channel-1"), { messages });
+    const model = vi
+      .fn<ChannelTextModel>()
+      .mockReturnValueOnce(Effect.succeed("x".repeat(12_001)))
+      .mockReturnValue(Effect.succeed("DECISION_A applies. Source: history-0."));
+    const history = new ChannelHistory(service.store, model, service.memories);
+    const agents = data.store.list();
+
+    const prepared = await runChannel(history.prepare(task, required(agents[0]), required(agents[0])));
+
+    expect(prepared.text).toContain("DECISION_A applies");
+    expect(service.store.summary("channel-1").text).toBe("DECISION_A applies. Source: history-0.");
+    expect(model.mock.calls[1]?.[1]).toContain("x".repeat(12_001));
+  });
+
   it("summarizes a message larger than one summary input instead of blocking the channel", async () => {
     const task = await send("Apply the shared decision");
     // The command contract accepts 100000 characters, and half the context budget is the largest
