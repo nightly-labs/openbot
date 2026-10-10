@@ -1111,11 +1111,10 @@ export class SignalService {
         }
         if (message.peer === "host") {
           // A host that changed network or restarted can leave its old socket open until the idle
-          // timeout. The new socket replaces it, and `#restoreWaitingClients` moves its clients here.
-          for (const socketId of [...(this.#hosts.get(claims.hostId) ?? [])]) {
-            const previous = this.#peers.get(socketId);
-            if (previous) this.#replaceHostPeer(previous);
-          }
+          // timeout. `#restoreWaitingClients` moves the clients of the older sockets here. The older
+          // sockets stay registered and are not closed: a host treats code 4000 as final, and when
+          // two instances overlap, the other one takes the clients again when this socket closes.
+          for (const socketId of this.#hosts.get(claims.hostId) ?? []) this.#releaseHostClients(socketId);
           const hostSockets = this.#hosts.get(claims.hostId) ?? new Set<string>();
           hostSockets.add(socket.id);
           this.#hosts.set(claims.hostId, hostSockets);
@@ -1184,8 +1183,8 @@ export class SignalService {
   );
 
   /**
-   * The host socket that said hello last. A new host hello replaces the older sockets of its host,
-   * such as the socket of a hosted server that its provider stopped with no close.
+   * The host socket that said hello last. A new host hello takes the clients of the older sockets of
+   * its host, such as the socket of a hosted server that its provider stopped with no close.
    */
   #currentHost(hostId: string): AuthenticatedPeer | null {
     let current: AuthenticatedPeer | null = null;
@@ -1273,21 +1272,15 @@ export class SignalService {
     peer.socket.close(4000, "Remote session resumed");
   }
 
-  #replaceHostPeer(peer: AuthenticatedPeer): void {
-    this.#peers.delete(peer.socket.id);
-    this.#clearPeerExpiration(peer.socket.id);
-    const hostSockets = this.#hosts.get(peer.claims.hostId);
-    hostSockets?.delete(peer.socket.id);
-    if (hostSockets?.size === 0) this.#hosts.delete(peer.claims.hostId);
+  #releaseHostClients(hostSocketId: string): void {
     for (const connection of [...this.#connections.values()]) {
-      if (connection.host.id !== peer.socket.id) continue;
+      if (connection.host.id !== hostSocketId) continue;
       this.#clearConnectionDrop(connection.id);
       this.#connections.delete(connection.id);
       const clientPeer = this.#peers.get(connection.client.id);
       if (clientPeer) clientPeer.connectionId = null;
     }
     this.#metrics.activePeerConnections = this.#connections.size;
-    peer.socket.close(4000, "Remote session resumed");
   }
 
   #dropConnection(connectionId: string, sourceSocketId: string): void {

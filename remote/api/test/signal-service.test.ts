@@ -332,7 +332,7 @@ describe("SignalService", () => {
     expect(client.closed).toBe(false);
   });
 
-  it("replaces a host socket that did not close and moves its clients to the new one", async () => {
+  it("moves the clients of a host socket that did not close to the new one", async () => {
     const service = new SignalService(fakeTokens(), 8);
     const stopped = socket("host-stopped");
     await hello(service, stopped, "host-ticket", "host");
@@ -341,7 +341,7 @@ describe("SignalService", () => {
     const restarted = socket("host-restarted");
     await hello(service, restarted, "resume-host", "host");
 
-    expect(stopped.closed).toBe(true);
+    expect(stopped.closed).toBe(false);
     expect(restarted.messages.at(-1)).toContain('"type":"peer-ready"');
     const connectionId = JSON.parse(client.messages.at(-1) ?? "{}").connectionId;
     await runSignal(
@@ -351,12 +351,28 @@ describe("SignalService", () => {
     expect(restarted.messages.at(-1)).toContain('"type":"ice-restart"');
     expect(stopped.messages.some((message) => message.includes('"type":"ice-restart"'))).toBe(false);
 
-    // The close of the replaced socket arrives later. It must not take the clients from the new host.
+    // The close of the older socket arrives later. It must not take the clients from the new host.
     await runSignal(service, service.disconnect(stopped));
     const phone = socket("phone");
     await hello(service, phone, "second-client-ticket", "client");
     expect(restarted.messages.at(-1)).toContain('"type":"peer-ready"');
     expect(service.metrics().activePeerConnections).toBe(2);
+  });
+
+  it("gives the clients back to the older host socket when the newer one closes", async () => {
+    // Two instances of a hosted server overlap during a restart, and the older one says hello last.
+    const service = new SignalService(fakeTokens(), 8);
+    const replacement = socket("host-replacement");
+    await hello(service, replacement, "host-ticket", "host");
+    const client = socket("client");
+    await hello(service, client, "client-ticket", "client");
+    const old = socket("host-old");
+    await hello(service, old, "resume-host", "host");
+    expect(replacement.closed).toBe(false);
+
+    await runSignal(service, service.disconnect(old));
+    expect(replacement.messages.at(-1)).toContain('"type":"peer-ready"');
+    expect(service.metrics().activePeerConnections).toBe(1);
   });
 
   it("does not let the owner's devices keep its host from registering", async () => {
