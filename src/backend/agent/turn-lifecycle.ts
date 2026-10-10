@@ -17,7 +17,9 @@ import { classifyFailure } from "@openbot/telemetry";
 import { Deferred, Effect, Exit, Schema, Scope } from "effect";
 import type { AgentClient } from "../agent-client";
 import type { AgentStore } from "../agent-store";
+import { codexActivityStatus } from "../app-server-client";
 import type { BrowserOperationError } from "../browser-effects";
+import type { ChannelOperationError } from "../channel-effects";
 import { newAssistantMessage, normalizeCompletionStatus } from "../conversation-snapshots";
 import { causeHelpers } from "../effect-boundary";
 import type { DeliveryContext, MailboxStore } from "../mailbox-store";
@@ -102,6 +104,10 @@ export interface TurnHooks {
    * Null after a restart or for any other delivery.
    */
   takeRoutinePreview(deliveryId: string): { previous: string; shown: string } | null;
+  /** The public thread that owns this input, when it is an execution delivery. */
+  deliveryThreadId(deliveryId: string): string | null;
+  /** Publishes exact input receipt through the channel owner, including its Stop/revision guard. */
+  inputAccepted(deliveryId: string, sessionId: string, turnId: string): Effect.Effect<void, ChannelOperationError>;
 }
 
 export interface TurnLifecycleOptions {
@@ -318,12 +324,20 @@ export class TurnLifecycle {
         yield* this.#providers.completeCodexLogin(params, source, decodeAccountLoginCompletedResult);
         return;
       }
+      case "thread/status/changed": {
+        if (!threadId || !agentId || source.provider !== "codex") return;
+        const status = codexActivityStatus(params);
+        if (status) this.#compaction.observeStatus(agentId, threadId, status, source);
+        return;
+      }
       case "turn/started": {
         if (!threadId || !agentId) return;
         const turn = getRecord(params, "turn");
         const turnId = getString(turn, "id");
         if (!turnId) return;
-        if (this.#compaction.claimTurn(agentId, threadId, turnId)) return;
+        this.#compaction.observeStarted(agentId, threadId, turnId, source);
+        const inputAssociation = this.#compaction.inputAssociation(agentId, threadId, source);
+        if (this.#compaction.claimTurn(agentId, threadId, turnId, source)) return;
         this.#compaction.beginTurn(threadId);
         const starting = this.#mailbox.startingDeliveryForAgent(agentId)?.delivery;
         const sentAt = starting ? Date.parse(starting.createdAt) : Number.NaN;
@@ -345,7 +359,11 @@ export class TurnLifecycle {
         const association = Deferred.makeUnsafe<void, TurnOperationFailed>();
         this.#turnAssociations.set(turnId, association);
         yield* Effect.gen({ self: this }, function* () {
-          const exit = yield* Effect.exit(this.#associateStartedTurn(agentId, turnId, snapshot));
+          const exit = yield* Effect.exit(
+            Effect.gen({ self: this }, function* () {
+              if (yield* inputAssociation) yield* this.#associateStartedTurn(agentId, turnId, snapshot);
+            }),
+          );
           yield* Deferred.done(association, exit);
           if (this.#turnAssociations.get(turnId) === association) this.#turnAssociations.delete(turnId);
         }).pipe(Effect.forkIn(this.#scope, { startImmediately: true }));
@@ -371,13 +389,13 @@ export class TurnLifecycle {
           if (this.#conversation.loadedClientFor(threadId) !== source) return;
           if (notification.method === "item/started") this.#observedCompactions.set(threadId, turnId);
           else this.#observedCompactions.delete(threadId);
-          if (!this.#compaction.isCompactionTurn(threadId, turnId))
+          if (!this.#compaction.isCompactionTurn(threadId, turnId, source))
             this.#compaction.observeCompaction(
               threadId,
               notification.method === "item/completed" ? "completed" : "running",
             );
           if (notification.method === "item/completed") {
-            this.#compaction.markCompacted(threadId);
+            this.#compaction.markCompacted(threadId, turnId, source);
           }
           return;
         }
@@ -386,6 +404,90 @@ export class TurnLifecycle {
         }
         const threadItem = toThreadItem(item);
         if (!threadItem) return;
+        if (
+          threadItem.type === "userMessage" &&
+          threadItem.clientId &&
+          this.#conversation.loadedClientFor(threadId) === source
+        ) {
+          const agent = this.#store.list().find((candidate) => candidate.id === agentId);
+          const publicThreadId = this.#conversation.publicThreadId(agentId, threadId);
+          const session = agent ? this.#store.database.activeProviderSession(publicThreadId, agent.provider) : null;
+          const running = this.#runningTurns.get(turnId);
+          const snapshot = this.#conversation.isExecutionThread(publicThreadId)
+            ? this.#conversation.loadedExecutionSnapshot(publicThreadId)
+            : this.#conversation.snapshotToUpdate(agentId);
+          const delivery = this.#mailbox.getDelivery(threadItem.clientId)?.delivery;
+          const batch = delivery?.turnId === null ? this.#mailbox.submittedInputBatch(delivery.id) : null;
+          if (
+            agent &&
+            this.#providers.clientForAgent(agent) === source &&
+            session?.externalSessionId === threadId &&
+            running?.client === source &&
+            running.threadId === threadId &&
+            running.agentId === agentId &&
+            snapshot?.activeTurnId === turnId &&
+            delivery?.recipientAgentId === agentId &&
+            (this.#hooks.deliveryThreadId(delivery.id) ?? agent.threadId) === publicThreadId &&
+            (delivery.status === "starting" || (delivery.status === "cancelled" && batch !== null)) &&
+            (!batch ||
+              (batch.provider === source.provider &&
+                batch.threadId === publicThreadId &&
+                batch.sessionId === threadId)) &&
+            (delivery.turnId === null || delivery.turnId === turnId)
+          ) {
+            // Completion must wait for this exact receipt and its channel ownership update.
+            // Once completion already removed the running turn, late items stay unconfirmed.
+            yield* Effect.gen({ self: this }, function* () {
+              const previous = this.#turnAssociations.get(turnId);
+              const association = Deferred.makeUnsafe<void, TurnOperationFailed>();
+              this.#turnAssociations.set(turnId, association);
+              const exit = yield* Effect.exit(
+                Effect.gen({ self: this }, function* () {
+                  if (previous) yield* Deferred.await(previous);
+                  const currentAgent = this.#store.list().find((candidate) => candidate.id === agentId);
+                  const currentSession = currentAgent
+                    ? this.#store.database.activeProviderSession(publicThreadId, currentAgent.provider)
+                    : null;
+                  if (
+                    !currentAgent ||
+                    this.#providers.clientForAgent(currentAgent) !== source ||
+                    this.#conversation.loadedClientFor(threadId) !== source ||
+                    currentSession?.externalSessionId !== threadId ||
+                    this.#runningTurns.get(turnId) !== running ||
+                    snapshot.activeTurnId !== turnId
+                  )
+                    return;
+                  const ids = delivery.turnId === null && batch ? batch.deliveryIds : [delivery.id];
+                  for (const id of ids) {
+                    const pending = this.#mailbox.getDelivery(id)?.delivery;
+                    if (
+                      pending?.status !== "starting" ||
+                      pending.recipientAgentId !== agentId ||
+                      (this.#hooks.deliveryThreadId(id) ?? agent.threadId) !== publicThreadId ||
+                      (pending.turnId !== null && pending.turnId !== turnId)
+                    )
+                      continue;
+                    if (pending.turnId === null)
+                      yield* this.#mailbox.markRunning(id, turnId).pipe(
+                        Effect.tapError(() => Effect.sync(() => this.#mailbox.restorePersistedState())),
+                        toTurnOperationFailed,
+                      );
+                    else yield* this.#mailbox.confirmSteered(id, turnId).pipe(toTurnOperationFailed);
+                    const confirmed = this.#mailbox.getDelivery(id)?.delivery;
+                    if (confirmed?.status === "running" && confirmed.turnId === turnId)
+                      yield* this.#hooks
+                        .inputAccepted(id, session.externalSessionId, turnId)
+                        .pipe(toTurnOperationFailed);
+                  }
+                  this.#mailboxSync.emitQueue(agentId);
+                }),
+              );
+              yield* Deferred.done(association, exit);
+              if (this.#turnAssociations.get(turnId) === association) this.#turnAssociations.delete(turnId);
+              yield* exit;
+            }).pipe(Effect.uninterruptible);
+          }
+        }
         yield* this.#applyItem(agentId, threadId, turnId, threadItem, notification.method === "item/completed");
         return;
       }
@@ -449,6 +551,16 @@ export class TurnLifecycle {
         const turnId = getString(turn, "id");
         if (!turnId) return;
         const status = getString(turn, "status") ?? "completed";
+        const running = this.#runningTurns.get(turnId);
+        const owned = this.#compaction.isCompactionTurn(threadId, turnId, source);
+        if (!owned && running && (running.client !== source || running.threadId !== threadId)) return;
+        if (!owned && !running) {
+          const snapshot = this.#conversation.snapshotToUpdate(agentId);
+          if (this.#conversation.loadedClientFor(threadId) !== source || snapshot?.activeTurnId !== turnId) return;
+        }
+        if (["completed", "interrupted", "failed"].includes(status)) {
+          this.#compaction.observeCompleted(agentId, threadId, turnId, source);
+        }
         if (status === "failed" && !this.#turnErrors.has(turnId)) {
           this.#hooks.emitFailure?.({
             code: "agent_error",
@@ -464,8 +576,8 @@ export class TurnLifecycle {
           this.#observedCompactions.delete(threadId);
           this.#compaction.observeCompaction(threadId, status === "completed" ? "completed" : "failed");
         }
-        if (this.#compaction.isCompactionTurn(threadId, turnId)) {
-          this.#compaction.finish(agentId, threadId, status);
+        if (this.#compaction.isCompactionTurn(threadId, turnId, source)) {
+          this.#compaction.finish(agentId, threadId, turnId, status, source);
           return;
         }
         yield* this.#completeTurn(agentId, threadId, turnId, status).pipe(
@@ -640,11 +752,19 @@ export class TurnLifecycle {
     this.#memories.finishTurn(turnId, status);
     // A refused session is closed below, and a spent plan would refuse the summary turn too, so
     // neither is compacted.
-    const shouldCompact = !refused && !limited && this.#compaction.reserve(agentId, threadId);
-    this.#browser.endControl(this.#conversation.publicThreadId(agentId, threadId), turnId);
     const snapshot = this.#conversation.ensureSnapshot(agentId, threadId);
-    snapshot.activeTurnId = null;
-    const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
+    const shouldCompact =
+      !refused &&
+      !limited &&
+      (snapshot.activeTurnId === null || snapshot.activeTurnId === turnId) &&
+      this.#compaction.reserve(agentId, threadId);
+    this.#browser.endControl(this.#conversation.publicThreadId(agentId, threadId), turnId);
+    if (snapshot.activeTurnId === turnId) snapshot.activeTurnId = null;
+    // A starting steer names its target turn, not proof that this input entered it. Only
+    // accepted inputs may inherit its completion, plan refusal, or automatic retry.
+    const deliveries = this.#mailbox
+      .findDeliveriesByTurn(agentId, turnId)
+      .filter(({ delivery }) => delivery.status === "running");
     // A channel task is not run again: an unfinished turn pauses it, and its Resume opens the new session.
     const retry =
       refused &&

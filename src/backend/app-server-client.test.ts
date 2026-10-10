@@ -6,7 +6,17 @@ import { join } from "node:path";
 import { isString } from "@openbot/contracts/runtime-values";
 import { Effect, Fiber } from "effect";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { CodexAppServerClient } from "./app-server-client";
+import { InputNotAcceptedError, RequestTimeoutError } from "./agent-client";
+import {
+  AppServerError,
+  CodexAppServerClient,
+  codexActivityStatus,
+  decodeSteerReceipt,
+  isCodexCompactInputRefusal,
+  isCodexCompactionStartRejected,
+  isCodexInputRejected,
+  isInputRejected,
+} from "./app-server-client";
 import { runCauseEffect } from "./effect-boundary";
 import { type AppServerRequest, decodeRecordResponse, isRecord } from "./protocol";
 import type { ProviderHistoryFragment } from "./provider-history";
@@ -20,6 +30,69 @@ afterEach(async () => {
 });
 
 describe("CodexAppServerClient", () => {
+  it("requires definite Codex rejection and an exact steer receipt", () => {
+    for (const code of [-32600, -32601, -32602])
+      expect(isCodexInputRejected(new AppServerError("no active turn to steer", code))).toBe(true);
+    for (const error of [
+      new AppServerError("Internal failure", -32603),
+      new Error("Rejected"),
+      new RequestTimeoutError("Codex", "turn/steer"),
+      { code: -32600 },
+    ])
+      expect(isCodexInputRejected(error)).toBe(false);
+    expect(() => decodeSteerReceipt({ turnId: "turn-1" }, "turn-1")).not.toThrow();
+    for (const value of [null, {}, { turnId: "turn-2" }, { turnId: 1 }])
+      expect(() => decodeSteerReceipt(value, "turn-1")).toThrow();
+    expect(
+      isInputRejected("claude", new InputNotAcceptedError("turn/steer", "Rejected before submission"), "turn/steer"),
+    ).toBe(true);
+    expect(
+      isInputRejected("claude", new InputNotAcceptedError("turn/start", "Rejected before submission"), "turn/steer"),
+    ).toBe(false);
+    expect(isInputRejected("claude", new AppServerError("Rejected", -32600), "turn/steer")).toBe(false);
+  });
+  it("recognizes only the pinned turn/start Compact non-acceptance response", () => {
+    const message = "failed to submit turn input: ActiveTurnNotSteerable { turn_kind: Compact }";
+    expect(isCodexCompactInputRefusal(new AppServerError(message, -32603))).toBe(true);
+    expect(isCodexCompactInputRefusal(new AppServerError(message, -32603, null))).toBe(true);
+    for (const error of [
+      new Error(message),
+      { code: -32603, message },
+      new AppServerError(message, -32600),
+      new AppServerError(message, -32603, { unrelated: true }),
+      new AppServerError(`${message} after unknown work`, -32603),
+      new AppServerError(message.replace("Compact", "Review"), -32603),
+      new AppServerError("cannot steer a compact turn", -32603, { turnKind: "compact" }),
+      new RequestTimeoutError("Codex", "turn/start"),
+    ])
+      expect(isCodexCompactInputRefusal(error)).toBe(false);
+  });
+
+  it("distinguishes a rejected compact RPC from an unconfirmed submission", () => {
+    for (const code of [-32600, -32601, -32602]) {
+      expect(isCodexCompactionStartRejected(new AppServerError("Rejected request", code))).toBe(true);
+    }
+    expect(isCodexCompactionStartRejected(new AppServerError("Unknown internal failure", -32603))).toBe(false);
+    expect(isCodexCompactionStartRejected(new RequestTimeoutError("Codex", "thread/compact/start"))).toBe(false);
+    expect(isCodexCompactionStartRejected({ code: -32601 })).toBe(false);
+  });
+
+  it("accepts only pinned activity status evidence", () => {
+    expect(codexActivityStatus({ status: { type: "idle" } })).toBe("idle");
+    expect(
+      codexActivityStatus({ status: { type: "active", activeFlags: ["waitingOnApproval", "waitingOnUserInput"] } }),
+    ).toBe("active");
+    for (const status of [
+      undefined,
+      "idle",
+      { type: "notLoaded" },
+      { type: "systemError" },
+      { type: "active" },
+      { type: "active", activeFlags: ["invalid"] },
+    ])
+      expect(codexActivityStatus({ status })).toBeNull();
+  });
+
   it("matches responses and receives notifications over stdio", async () => {
     const executable = await createFakeCodex();
     const client = createClient(executable, 5_000);

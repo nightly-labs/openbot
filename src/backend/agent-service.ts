@@ -147,7 +147,7 @@ import { buildRuntimeSnapshot } from "./agent/runtime-snapshot";
 import { SessionSettings } from "./agent/session-settings";
 import type { AgentSidebar } from "./agent/sidebar-tools";
 import type { LocalSkillTools } from "./agent/skill-tools";
-import { isRequestTimeout, providerForAgent, providerLabel, type ToolUsageSignal } from "./agent/thread-items";
+import { providerForAgent, providerLabel, type ToolUsageSignal } from "./agent/thread-items";
 import { ThreadLifecycle } from "./agent/thread-lifecycle";
 import { toToolOperationFailed } from "./agent/tool-operation";
 import { type AgentBrowserHost, TurnLifecycle } from "./agent/turn-lifecycle";
@@ -155,6 +155,7 @@ import { toUsageReadFailed, UsageLimitGate } from "./agent/usage-limit-gate";
 import type { AgentProvider } from "./agent-client";
 import type { AgentTables } from "./agent-data/agent-tables";
 import type { AgentStore } from "./agent-store";
+import { decodeSteerReceipt, isInputRejected } from "./app-server-client";
 import { automationRunCommand } from "./automation-command";
 import { toChannelOperationError } from "./channel-effects";
 import { ChannelRoutineScheduler } from "./channel-routine-scheduler";
@@ -491,21 +492,23 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           }).pipe(toProviderOperationFailed),
         onProviderLost: (client) => {
           this.#boot.orphanDeliveriesOf(client.provider, (agentId) => this.#providers.runsOnOwnProcess(agentId));
-          this.#compaction.dispose();
+          this.#compaction.clientEnded(client);
           this.#attention.clearPrompts(client);
           this.#attention.clearBrowserTakeovers(client);
           this.#attention.clearApprovals(client);
           this.#browser.clearControls();
         },
-        onClientStopped: (client) =>
+        onClientStopped: (client, stopped) =>
           Effect.gen({ self: this }, function* () {
             this.#attention.clearPrompts(client);
             this.#attention.clearBrowserTakeovers(client);
             this.#attention.clearApprovals(client);
             yield* this.#turn.interruptTurnsOf(client);
+            if (stopped) this.#compaction.clientEnded(client);
           }),
         onAgentClientLost: (agentId, client) =>
           Effect.gen({ self: this }, function* () {
+            this.#compaction.clientEnded(client);
             this.#attention.clearPrompts(client);
             this.#attention.clearBrowserTakeovers(client);
             this.#attention.clearApprovals(client);
@@ -798,13 +801,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
                 clientUserMessageId: messageId,
                 input: [{ type: "text", text }],
               },
-              decodeRecordResponse,
+              (value) => decodeSteerReceipt(value, turnId),
             )
             .pipe(
               Effect.match({
                 onSuccess: () => "accepted" as const,
                 onFailure: (failure) =>
-                  isRequestTimeout(failure.cause, "turn/steer") ? ("uncertain" as const) : ("rejected" as const),
+                  isInputRejected(client.provider, failure.cause, "turn/steer")
+                    ? ("rejected" as const)
+                    : ("uncertain" as const),
               }),
             );
         }),
@@ -969,6 +974,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         requeueChannelDelivery: (deliveryId) => this.#requeueChannelDelivery(deliveryId),
         quietRoutineDelivery: (deliveryId) => this.#routines.quietRunForDelivery(deliveryId),
         takeRoutinePreview: (deliveryId) => this.#routines.takePreviewBeforeRun(deliveryId),
+        deliveryThreadId: (deliveryId) => {
+          const assignment = this.channels.store.assignmentForDelivery(deliveryId);
+          return assignment
+            ? this.channels.store.context(assignment.channelId, assignment.agentId).threadId
+            : this.messaging.threadForDelivery(deliveryId);
+        },
+        inputAccepted: (deliveryId, sessionId, turnId) => this.channels.accepted(deliveryId, sessionId, turnId),
       },
     });
     this.#removal = new AgentRemoval({

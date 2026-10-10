@@ -9,7 +9,7 @@ import { registerSecretValue } from "@openbot/logging";
 import { Effect } from "effect";
 import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEVELOPMENT_DEFAULT_MODEL, DEVELOPMENT_DEFAULT_REASONING_EFFORT } from "./agent/development-defaults";
-import type { AgentProvider } from "./agent-client";
+import { type AgentProvider, RequestTimeoutError } from "./agent-client";
 import type { AgentService } from "./agent-service";
 import {
   CREATE_AGENT_INPUT,
@@ -32,6 +32,7 @@ import {
   waitFor,
   waitForQueue,
 } from "./agent-service-test-harness";
+import { AppServerError } from "./app-server-client";
 import { runCauseEffect } from "./effect-boundary";
 import { MailboxStore } from "./mailbox-store";
 import { getString } from "./protocol";
@@ -53,6 +54,367 @@ afterEach(async () => {
 });
 
 describe.sequential("AgentService: queue", () => {
+  describe("review recovery", () => {
+    async function restartStartingInput(
+      history: "missing" | "interrupted" | "completed" | "failed" | "inProgress" | "omitted",
+      identity?: "provider" | "thread" | "session",
+    ) {
+      const started = await startService(root, { provider: "codex" });
+      service = started.service;
+      await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Seed session" }));
+      await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "completed");
+      const sessionId = started.store.activeProviderSession("chief")?.externalSessionId;
+      assert(sessionId);
+      await runCauseEffect(service.stop());
+      const pending = await runCauseEffect(
+        started.mailbox.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Crash input" }),
+      );
+      const id = pending.deliveries[0]?.id;
+      assert(id);
+      await runCauseEffect(started.mailbox.markStarting(id));
+      if (identity) {
+        const threadId = started.store.list().find((item) => item.id === "chief")?.threadId;
+        assert(threadId);
+        await runCauseEffect(
+          started.mailbox.recordInputBatch(id, {
+            deliveryIds: [id],
+            provider: identity === "provider" ? "claude" : "codex",
+            threadId: identity === "thread" ? "another-public-thread" : threadId,
+            sessionId: identity === "session" ? "another-session" : sessionId,
+          }),
+        );
+      }
+      expect(started.mailbox.getDelivery(id)?.delivery.error).toBeNull();
+      const restored = stores(root);
+      const client = new FakeAgentClient("codex", "DONE", false);
+      client.threadRead = () => ({
+        thread: {
+          id: sessionId,
+          turns:
+            history === "missing"
+              ? []
+              : [
+                  {
+                    id: "recovered-interrupted",
+                    ...(history === "omitted" ? {} : { status: history }),
+                    items: [{ type: "userMessage", id: "receipt", clientId: id, content: [] }],
+                  },
+                ],
+        },
+      });
+      service = createTestService({ ...restored, preferredProvider: "codex", clientFactory: () => client });
+      await runCauseEffect(service.initialize());
+      return { ...restored, client, id };
+    }
+
+    it("review crash keeps unknown input visible and cancellable without replay", async () => {
+      const recovered = await restartStartingInput("missing");
+      assert(service);
+      expect(service.listQueue("chief").deliveries.find((item) => item.id === recovered.id)).toMatchObject({
+        status: "starting",
+        error: expect.any(String),
+      });
+      expect(recovered.client.requests.filter((item) => item.method === "turn/start")).toHaveLength(0);
+      await runCauseEffect(service.cancelQueuedMessage("chief", recovered.id));
+      expect(recovered.mailbox.getDelivery(recovered.id)?.delivery.status).toBe("cancelled");
+      await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Next input" }));
+      await waitForQueue(service, "chief", (queue) =>
+        queue.deliveries.some((item) => item.text === "Next input" && item.status === "running"),
+      );
+      expect(recovered.client.requests.filter((item) => item.method === "turn/start")).toHaveLength(1);
+    });
+
+    it("review cancellation wakes a channel waiting on unknown input without a turn ending", async () => {
+      const recovered = await restartStartingInput("missing");
+      assert(service);
+      recovered.client.sessionIdPrefix = "review-restarted";
+      const checkedBusy = vi.spyOn(service.channels.hooks, "busy");
+      const actor = { id: "human", name: "Alex" };
+      await runCauseEffect(
+        service.channels.command(
+          {
+            type: "save",
+            channelId: "review-channel",
+            operationId: "create",
+            draft: {
+              name: "Review",
+              title: "",
+              instructions: "Shared work",
+              members: [{ agentId: "chief" }],
+              leadAgentId: "chief",
+            },
+          },
+          actor,
+        ),
+      );
+      await runCauseEffect(
+        service.channels.command(
+          {
+            type: "send",
+            channelId: "review-channel",
+            operationId: "send",
+            text: "Channel work",
+            recipientAgentId: "chief",
+            replyToMessageId: null,
+            attachmentDraftIds: [],
+          },
+          actor,
+        ),
+      );
+      await vi.waitFor(() => expect(checkedBusy).toHaveBeenCalledWith("chief"));
+      expect(service.channels.store.tasks("review-channel")[0]?.state).toBe("queued");
+      expect(service.channels.store.assignments("review-channel")).toHaveLength(0);
+      expect(recovered.client.requests.filter((item) => item.method === "turn/start")).toHaveLength(0);
+      await runCauseEffect(service.cancelQueuedMessage("chief", recovered.id));
+      await waitFor(() => service?.channels.store.assignments("review-channel").some((item) => item.turnId));
+      expect(recovered.mailbox.getDelivery(recovered.id)?.delivery.status).toBe("cancelled");
+      expect(recovered.client.requests.filter((item) => item.method === "turn/start")).toHaveLength(1);
+    });
+
+    it.each(["provider", "thread", "session"] as const)(
+      "review recovery does not apply another %s identity",
+      async (identity) => {
+        const recovered = await restartStartingInput("interrupted", identity);
+        assert(service);
+        expect(recovered.mailbox.getDelivery(recovered.id)?.delivery).toMatchObject({
+          status: "starting",
+          turnId: null,
+          error: expect.any(String),
+        });
+        expect(recovered.client.requests.filter((item) => item.method === "turn/start")).toHaveLength(0);
+        await runCauseEffect(service.cancelQueuedMessage("chief", recovered.id));
+        expect(recovered.mailbox.getDelivery(recovered.id)?.delivery.status).toBe("cancelled");
+      },
+    );
+
+    it("review exact interrupted history settles the recovered input", async () => {
+      const recovered = await restartStartingInput("interrupted");
+      assert(service);
+      expect(recovered.mailbox.getDelivery(recovered.id)?.delivery).toMatchObject({
+        status: "interrupted",
+        turnId: "recovered-interrupted",
+      });
+      expect(recovered.client.requests.filter((item) => item.method === "turn/start")).toHaveLength(0);
+      await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Next input" }));
+      await waitForQueue(service, "chief", (queue) =>
+        queue.deliveries.some((item) => item.text === "Next input" && item.status === "running"),
+      );
+    });
+
+    it.each(["inProgress", "omitted", "completed", "failed"] as const)(
+      "review accepted restart input settles without replay or an orphan owner: %s",
+      async (history) => {
+        const recovered = await restartStartingInput(history);
+        assert(service);
+        const terminal = history === "completed" || history === "failed" ? history : "interrupted";
+        expect(recovered.mailbox.getDelivery(recovered.id)?.delivery).toMatchObject({
+          status: terminal,
+          turnId: "recovered-interrupted",
+        });
+        expect((await runCauseEffect(service.readConversation("chief"))).activeTurnId).toBeNull();
+        expect(service.getRuntimeSnapshot().activeTurns).toHaveLength(0);
+        expect(recovered.client.requests.filter((item) => item.method === "turn/start")).toHaveLength(0);
+        await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Next input" }));
+        await waitForQueue(service, "chief", (queue) =>
+          queue.deliveries.some((item) => item.text === "Next input" && item.status === "running"),
+        );
+        expect(recovered.client.requests.filter((item) => item.method === "turn/start")).toHaveLength(1);
+        expect(recovered.mailbox.getDelivery(recovered.id)?.delivery.status).toBe(terminal);
+      },
+    );
+
+    it.each(["none", "primary", "companion", "restart"])(
+      "review late exact receipt confirms only the original submitted batch and preserves files: %s",
+      async (cancel) => {
+        const { store, mailbox } = stores(root);
+        const client = new FakeAgentClient("codex", "DONE", false, true, {}, async (method) => {
+          if (method === "turn/start") throw new RequestTimeoutError("Codex", method);
+        });
+        const foreign = new FakeAgentClient("claude", "DONE", false);
+        service = createTestService({
+          store,
+          mailbox,
+          clientFactory: (provider) => (provider === "codex" ? client : foreign),
+        });
+        const events: AgentEvent[] = [];
+        service.on("event", (event) => events.push(event));
+        await runCauseEffect(service.initialize());
+        await runCauseEffect(store.getOrCreate("chief"));
+        const request = await runCauseEffect(
+          mailbox.enqueue({
+            sender: { kind: "agent", agentId: "chief" },
+            recipientAgentIds: ["sales-outbound", "inbox-manager"],
+            text: "Report",
+          }),
+        );
+        const reply = await runCauseEffect(
+          mailbox.enqueue({
+            sender: { kind: "agent", agentId: "sales-outbound" },
+            recipientAgentIds: ["chief"],
+            text: "Original reply",
+            replyToMessageId: request.messageId,
+            expectsReply: false,
+          }),
+        );
+        const file = join(root, "original.txt");
+        await writeFile(file, "Original file bytes");
+        const [draft] = await runCauseEffect(mailbox.prepareImportedAttachments([file], []));
+        assert(draft);
+        const sent = await runCauseEffect(
+          service.sendMessage({ agentId: "chief", text: "Original input", attachmentDraftIds: [draft.id] }),
+        );
+        const id = sent.deliveries[0]?.id;
+        assert(id);
+        await waitForQueue(
+          service,
+          "chief",
+          (queue) =>
+            queue.deliveries.length === 2 &&
+            queue.deliveries.every((item) => item.status === "starting" && item.error !== null),
+        );
+        const original = service.listQueue("chief").deliveries;
+        expect(original.map((item) => item.id)).toEqual([reply.deliveries[0]?.id, id]);
+        const sessionId = store.activeProviderSession("chief")?.externalSessionId;
+        assert(sessionId);
+        const submitted = () =>
+          client.requests.filter(
+            (item) => item.method === "turn/start" && getString(item.params, "threadId") === sessionId,
+          );
+        await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Later input" }));
+        const cancelledId = cancel === "primary" ? id : cancel === "companion" ? reply.deliveries[0]?.id : undefined;
+        if (cancelledId) await runCauseEffect(service.cancelQueuedMessage("chief", cancelledId));
+        if (cancel === "restart") {
+          await runCauseEffect(service.stop());
+          const restored = stores(root);
+          const restoredClient = new FakeAgentClient("codex", "DONE", false);
+          restoredClient.threadRead = () => ({
+            thread: {
+              id: sessionId,
+              turns: [
+                {
+                  id: "recovered-batch",
+                  status: "interrupted",
+                  items: [{ id: "receipt", type: "userMessage", clientId: id, content: [] }],
+                },
+              ],
+            },
+          });
+          service = createTestService({ ...restored, preferredProvider: "codex", clientFactory: () => restoredClient });
+          await runCauseEffect(service.initialize());
+          await waitForQueue(service, "chief", (queue) => queue.deliveries[2]?.status === "running");
+          expect(service.listQueue("chief").deliveries.map((item) => item.status)).toEqual([
+            "interrupted",
+            "interrupted",
+            "running",
+          ]);
+          expect(restoredClient.requests.filter((item) => item.method === "turn/start")).toHaveLength(1);
+          expect(
+            firstInputText(restoredClient.requests.find((item) => item.method === "turn/start")?.params),
+          ).toContain("Later input");
+          return;
+        }
+        client.emit("notification", notification("turn/started", { threadId: sessionId, turn: { id: "late-turn" } }));
+        await waitFor(() => events.some((event) => event.type === "turn-started" && event.turnId === "late-turn"));
+        process.env.OPENBOT_CLAUDE_PATH = await fakeClaudeCli();
+        await runCauseEffect(service.ensureProvider("claude"));
+        foreign.emit(
+          "notification",
+          notification("item/started", {
+            threadId: sessionId,
+            turnId: "late-turn",
+            item: { id: "foreign-receipt", type: "userMessage", clientId: id, content: [] },
+          }),
+        );
+        for (const [threadId, turnId, clientId] of [
+          ["another-session", "late-turn", id],
+          [sessionId, "another-turn", id],
+          [sessionId, "late-turn", "later-input-id"],
+        ]) {
+          client.emit(
+            "notification",
+            notification("item/started", {
+              threadId,
+              turnId,
+              item: { id: "wrong-receipt", type: "userMessage", clientId, content: [] },
+            }),
+          );
+        }
+        await runCauseEffect(service.sendMessage({ agentId: "chief", text: "FIFO tail" }));
+        expect(
+          service
+            .listQueue("chief")
+            .deliveries.slice(0, 2)
+            .map((item) => item.status),
+        ).toEqual(original.map((item) => (item.id === cancelledId ? "cancelled" : "starting")));
+        client.emit(
+          "notification",
+          notification("item/started", {
+            threadId: sessionId,
+            turnId: "late-turn",
+            item: { id: "exact-receipt", type: "userMessage", clientId: id, content: [] },
+          }),
+        );
+        await waitForQueue(
+          service,
+          "chief",
+          (queue) =>
+            queue.deliveries.find((item) => item.id === (cancel === "primary" ? reply.deliveries[0]?.id : id))
+              ?.status === "running",
+        );
+        expect(service.listQueue("chief").deliveries.map((item) => item.status)).toEqual([
+          ...original.map((item) => (item.id === cancelledId ? "cancelled" : "running")),
+          "queued",
+          "queued",
+        ]);
+        expect(
+          service
+            .listQueue("chief")
+            .deliveries.slice(0, 2)
+            .filter((item) => item.id !== cancelledId)
+            .map((item) => ({ id: item.id, text: item.text, attachments: item.attachments })),
+        ).toEqual(
+          original
+            .filter((item) => item.id !== cancelledId)
+            .map((item) => ({ id: item.id, text: item.text, attachments: item.attachments })),
+        );
+        const exported = await runCauseEffect(mailbox.listExportAttachments());
+        if (cancel !== "primary") {
+          expect(exported).toHaveLength(1);
+          const [originalFile] = exported;
+          assert(originalFile);
+          expect(await readFile(originalFile.sourcePath, "utf8")).toBe("Original file bytes");
+        }
+        expect(submitted()).toHaveLength(1);
+        await expect(
+          runCauseEffect(
+            service.cancelQueuedMessage("chief", cancel === "primary" ? (reply.deliveries[0]?.id ?? "") : id),
+          ),
+        ).rejects.toThrow();
+        client.emit(
+          "notification",
+          notification("turn/completed", { threadId: sessionId, turn: { id: "late-turn", status: "completed" } }),
+        );
+        await waitForQueue(
+          service,
+          "chief",
+          (queue) =>
+            queue.deliveries.slice(0, 2).every((item) => ["completed", "cancelled"].includes(item.status)) &&
+            queue.deliveries[2]?.status === "starting" &&
+            queue.deliveries[2]?.error !== null,
+        );
+        expect(service.listQueue("chief").deliveries.map((item) => item.status)).toEqual([
+          ...original.map((item) => (item.id === cancelledId ? "cancelled" : "completed")),
+          "starting",
+          "queued",
+        ]);
+        const next = submitted();
+        expect(next).toHaveLength(2);
+        expect(firstInputText(next[1]?.params)).toContain("Later input");
+        expect(firstInputText(next[1]?.params)).not.toContain("Original input");
+      },
+    );
+  });
+
   it("sends an edited delivery once after a repeated save and drains past a deleted hold", async () => {
     const { service: agentService, client, store, mailbox } = await startService(root, { provider: "codex" });
     service = agentService;
@@ -1443,11 +1805,348 @@ describe.sequential("AgentService: queue", () => {
           "notification",
           notification("turn/completed", { threadId, turn: { id: active.turnId, status: "completed" } }),
         );
-      return { ...started, client, turnId: active.turnId, completeTurn };
+      return { ...started, client, threadId, turnId: active.turnId, completeTurn };
     }
 
     const turnStarts = (client: FakeAgentClient) =>
       client.requests.filter((request) => request.method === "turn/start").length;
+
+    it.each(["accepted", "rejected", "uncertain"])(
+      "uses the same steer acceptance outcome for channel correction: %s",
+      async (outcome) => {
+        const busy = await startBusyAgent("codex", async (method) => {
+          if (method !== "turn/steer" || outcome === "accepted") return;
+          if (outcome === "rejected") throw new AppServerError("no active turn to steer", -32600);
+          throw new Error("Connection lost after submission.");
+        });
+        const agent = busy.store.list().find((candidate) => candidate.id === "chief");
+        assert(agent);
+        assert(agent.threadId);
+        assert(busy.service.channels.hooks.steer);
+        expect(
+          await runCauseEffect(
+            busy.service.channels.hooks.steer(
+              "chief",
+              agent.threadId,
+              busy.turnId,
+              "correction-input",
+              "Current correction",
+            ),
+          ),
+        ).toBe(outcome);
+        expect(busy.client.requests.filter((request) => request.method === "turn/steer")).toHaveLength(1);
+      },
+    );
+
+    it.each([
+      ["timeout", new RequestTimeoutError("Codex", "turn/steer")],
+      ["transport loss", new Error("The connection ended before its response.")],
+      ["response decode", new Error("Invalid provider response.")],
+    ])("keeps an unconfirmed steer after %s out of automatic drain and turn completion", async (_name, failure) => {
+      const busy = await startBusyAgent("codex", async (method) => {
+        if (method === "turn/steer") throw failure;
+      });
+      await runCauseEffect(busy.service.updateAgent({ agentId: "chief", busyMessageMode: "queue" }));
+      const receipt = await runCauseEffect(busy.service.sendMessage({ agentId: "chief", text: "Use staging" }));
+      const id = receipt.deliveries[0]?.id;
+      assert(id);
+      await expect(
+        runCauseEffect(
+          busy.service.steerQueuedMessage({
+            agentId: "chief",
+            deliveryId: id,
+            expectedTurnId: busy.turnId,
+          }),
+        ),
+      ).rejects.toThrow();
+      expect(busy.service.listQueue("chief").deliveries[1]).toMatchObject({
+        id,
+        text: "Use staging",
+        status: "starting",
+        turnId: busy.turnId,
+        error: expect.stringContaining("not confirmed"),
+      });
+      busy.completeTurn();
+      await waitForQueue(busy.service, "chief", (queue) => queue.deliveries[0]?.status === "completed");
+      await runCauseEffect(busy.service.sendMessage({ agentId: "chief", text: "Later" }));
+      expect(busy.service.listQueue("chief").deliveries.map((delivery) => delivery.status)).toEqual([
+        "completed",
+        "starting",
+        "queued",
+      ]);
+      expect(turnStarts(busy.client)).toBe(1);
+    });
+
+    it("does not claim an unconfirmed steer when completion precedes its error", async () => {
+      let complete = async () => {};
+      const busy = await startBusyAgent("codex", async (method) => {
+        if (method !== "turn/steer") return;
+        await complete();
+        throw new RequestTimeoutError("Codex", "turn/steer");
+      });
+      complete = async () => {
+        busy.completeTurn();
+        await waitForQueue(busy.service, "chief", (queue) => queue.deliveries[0]?.status === "completed");
+      };
+      await runCauseEffect(busy.service.updateAgent({ agentId: "chief", busyMessageMode: "queue" }));
+      const receipt = await runCauseEffect(busy.service.sendMessage({ agentId: "chief", text: "Use staging" }));
+      const id = receipt.deliveries[0]?.id;
+      assert(id);
+      await expect(
+        runCauseEffect(
+          busy.service.steerQueuedMessage({
+            agentId: "chief",
+            deliveryId: id,
+            expectedTurnId: busy.turnId,
+          }),
+        ),
+      ).rejects.toThrow();
+      expect(busy.service.listQueue("chief").deliveries[1]).toMatchObject({
+        id,
+        status: "starting",
+        turnId: busy.turnId,
+      });
+      expect(turnStarts(busy.client)).toBe(1);
+    });
+
+    it("confirms an uncertain steer only from its exact live input identity and keeps attachments", async () => {
+      const busy = await startBusyAgent("codex", async (method) => {
+        if (method === "turn/steer") throw new RequestTimeoutError("Codex", "turn/steer");
+      });
+      await runCauseEffect(busy.service.updateAgent({ agentId: "chief", busyMessageMode: "queue" }));
+      const file = join(root, "steer-input.txt");
+      await writeFile(file, "Attachment bytes");
+      const [draft] = await runCauseEffect(busy.mailbox.prepareImportedAttachments([file], []));
+      assert(draft);
+      const receipt = await runCauseEffect(
+        busy.service.sendMessage({ agentId: "chief", text: "Use staging", attachmentDraftIds: [draft.id] }),
+      );
+      const id = receipt.deliveries[0]?.id;
+      assert(id);
+      const before = busy.service.listQueue("chief").deliveries[1];
+      await expect(
+        runCauseEffect(
+          busy.service.steerQueuedMessage({ agentId: "chief", deliveryId: id, expectedTurnId: busy.turnId }),
+        ),
+      ).rejects.toThrow();
+      for (const [threadId, turnId, clientId] of [
+        [busy.threadId, busy.turnId, "another-input"],
+        [busy.threadId, "another-turn", id],
+        ["another-thread", busy.turnId, id],
+      ])
+        busy.client.emit(
+          "notification",
+          notification("item/started", {
+            threadId,
+            turnId,
+            item: { id: "unmatched-input", type: "userMessage", clientId, content: [] },
+          }),
+        );
+      // The request below yields through the same service boundary, after notifications were dispatched.
+      await runCauseEffect(busy.service.sendMessage({ agentId: "chief", text: "Later" }));
+      expect(busy.service.listQueue("chief").deliveries[1]?.status).toBe("starting");
+      busy.client.emit(
+        "notification",
+        notification("item/started", {
+          threadId: busy.threadId,
+          turnId: busy.turnId,
+          item: {
+            id: "accepted-input",
+            type: "userMessage",
+            clientId: id,
+            content: [{ type: "text", text: "Use staging" }],
+          },
+        }),
+      );
+      await waitForQueue(busy.service, "chief", (queue) => queue.deliveries[1]?.status === "running");
+      expect(busy.service.listQueue("chief").deliveries[1]).toMatchObject({
+        id,
+        text: "Use staging",
+        attachments: before?.attachments,
+        error: null,
+      });
+      expect(busy.client.requests.filter((request) => request.method === "turn/steer")).toHaveLength(1);
+    });
+
+    it("confirms a delayed steer receipt after its target turn completed without sending it again", async () => {
+      let complete = async () => {};
+      const busy = await startBusyAgent("codex", async (method) => {
+        if (method === "turn/steer") await complete();
+      });
+      complete = async () => {
+        busy.completeTurn();
+        await waitForQueue(busy.service, "chief", (queue) => queue.deliveries[0]?.status === "completed");
+        expect(busy.service.listQueue("chief").deliveries[1]?.status).toBe("starting");
+      };
+      await runCauseEffect(busy.service.updateAgent({ agentId: "chief", busyMessageMode: "queue" }));
+      const receipt = await runCauseEffect(busy.service.sendMessage({ agentId: "chief", text: "Use staging" }));
+      const id = receipt.deliveries[0]?.id;
+      assert(id);
+      await runCauseEffect(
+        busy.service.steerQueuedMessage({ agentId: "chief", deliveryId: id, expectedTurnId: busy.turnId }),
+      );
+      expect(busy.service.listQueue("chief").deliveries[1]).toMatchObject({ id, status: "completed", error: null });
+      expect(turnStarts(busy.client)).toBe(1);
+    });
+
+    it("keeps cancellation final when the steer receipt arrives later", async () => {
+      let cancel = async () => {};
+      const busy = await startBusyAgent("codex", async (method) => {
+        if (method === "turn/steer") await cancel();
+      });
+      await runCauseEffect(busy.service.updateAgent({ agentId: "chief", busyMessageMode: "queue" }));
+      const receipt = await runCauseEffect(busy.service.sendMessage({ agentId: "chief", text: "Use staging" }));
+      const id = receipt.deliveries[0]?.id;
+      assert(id);
+      cancel = () => runCauseEffect(busy.service.cancelQueuedMessage("chief", id));
+      await runCauseEffect(
+        busy.service.steerQueuedMessage({ agentId: "chief", deliveryId: id, expectedTurnId: busy.turnId }),
+      );
+      busy.completeTurn();
+      await waitForQueue(busy.service, "chief", (queue) => queue.deliveries[0]?.status === "completed");
+      expect(busy.service.listQueue("chief").deliveries[1]).toMatchObject({ id, status: "cancelled" });
+      expect(turnStarts(busy.client)).toBe(1);
+    });
+
+    it("reconciles an accepted steer locally after a mailbox write failure without a second RPC", async () => {
+      let failWrite = () => {};
+      const busy = await startBusyAgent("codex", async (method) => {
+        if (method === "turn/steer") failWrite();
+      });
+      await runCauseEffect(busy.service.updateAgent({ agentId: "chief", busyMessageMode: "queue" }));
+      const receipt = await runCauseEffect(busy.service.sendMessage({ agentId: "chief", text: "Use staging" }));
+      const id = receipt.deliveries[0]?.id;
+      assert(id);
+      const replace = busy.store.database.replaceMailboxState.bind(busy.store.database);
+      failWrite = () => {
+        vi.spyOn(busy.store.database, "replaceMailboxState")
+          .mockImplementationOnce(() => {
+            throw new Error("Local write failed.");
+          })
+          .mockImplementation(replace);
+      };
+      await expect(
+        runCauseEffect(
+          busy.service.steerQueuedMessage({ agentId: "chief", deliveryId: id, expectedTurnId: busy.turnId }),
+        ),
+      ).rejects.toThrow("Local write failed");
+      await waitForQueue(busy.service, "chief", (queue) => queue.deliveries[1]?.status === "running");
+      expect(busy.client.requests.filter((request) => request.method === "turn/steer")).toHaveLength(1);
+      expect(turnStarts(busy.client)).toBe(1);
+    });
+
+    it("keeps the refused steer's original FIFO slot while later queued work is reordered", async () => {
+      let reorder = async () => {};
+      const busy = await startBusyAgent("codex", async (method) => {
+        if (method !== "turn/steer") return;
+        await reorder();
+        throw new AppServerError("no active turn to steer", -32600);
+      });
+      await runCauseEffect(busy.service.updateAgent({ agentId: "chief", busyMessageMode: "queue" }));
+      const first = await runCauseEffect(busy.service.sendMessage({ agentId: "chief", text: "Use staging" }));
+      const second = await runCauseEffect(busy.service.sendMessage({ agentId: "chief", text: "Later work" }));
+      const firstId = first.deliveries[0]?.id;
+      const secondId = second.deliveries[0]?.id;
+      assert(firstId && secondId);
+      reorder = () => runCauseEffect(busy.service.reorderQueue({ agentId: "chief", deliveryIds: [secondId] }));
+      await expect(
+        runCauseEffect(
+          busy.service.steerQueuedMessage({ agentId: "chief", deliveryId: firstId, expectedTurnId: busy.turnId }),
+        ),
+      ).rejects.toThrow("no active turn to steer");
+      expect(
+        busy.service.listQueue("chief").deliveries.filter((delivery) => delivery.status === "queued"),
+      ).toMatchObject([
+        { id: firstId, text: "Use staging", position: 1 },
+        { id: secondId, text: "Later work", position: 2 },
+      ]);
+    });
+
+    it("does not submit a steer when its durable reservation write fails", async () => {
+      const busy = await startBusyAgent("codex");
+      await runCauseEffect(busy.service.updateAgent({ agentId: "chief", busyMessageMode: "queue" }));
+      const receipt = await runCauseEffect(busy.service.sendMessage({ agentId: "chief", text: "Use staging" }));
+      const id = receipt.deliveries[0]?.id;
+      assert(id);
+      vi.spyOn(busy.store.database, "replaceMailboxState").mockImplementationOnce(() => {
+        throw new Error("Reservation failed.");
+      });
+      await expect(
+        runCauseEffect(
+          busy.service.steerQueuedMessage({ agentId: "chief", deliveryId: id, expectedTurnId: busy.turnId }),
+        ),
+      ).rejects.toThrow("Reservation failed");
+      expect(busy.service.listQueue("chief").deliveries[1]).toMatchObject({
+        id,
+        status: "queued",
+        turnId: null,
+        position: 1,
+      });
+      expect(busy.client.requests.filter((request) => request.method === "turn/steer")).toHaveLength(0);
+    });
+
+    it.each(["missing", "wrong input", "wrong turn", "accepted"])(
+      "recovers an unconfirmed steer only from exact input history: %s",
+      async (evidence) => {
+        const busy = await startBusyAgent("codex", async (method) => {
+          if (method === "turn/steer") throw new RequestTimeoutError("Codex", "turn/steer");
+        });
+        await runCauseEffect(busy.service.updateAgent({ agentId: "chief", busyMessageMode: "queue" }));
+        const receipt = await runCauseEffect(busy.service.sendMessage({ agentId: "chief", text: "Use staging" }));
+        const id = receipt.deliveries[0]?.id;
+        assert(id);
+        await expect(
+          runCauseEffect(
+            busy.service.steerQueuedMessage({ agentId: "chief", deliveryId: id, expectedTurnId: busy.turnId }),
+          ),
+        ).rejects.toThrow();
+        await runCauseEffect(busy.service.stop());
+        const restored = stores(root);
+        const client = new FakeAgentClient("codex", "DONE", false);
+        client.threadRead = () => ({
+          thread: {
+            id: busy.threadId,
+            turns: [
+              {
+                id: busy.turnId,
+                status: "completed",
+                items:
+                  evidence === "missing" || evidence === "wrong turn"
+                    ? []
+                    : [
+                        {
+                          type: "userMessage",
+                          id: "provider-input",
+                          clientId: evidence === "accepted" ? id : "another-input",
+                          content: [{ type: "text", text: "Use staging" }],
+                        },
+                      ],
+              },
+              ...(evidence === "wrong turn"
+                ? [
+                    {
+                      id: "another-turn",
+                      status: "completed",
+                      items: [{ type: "userMessage", clientId: id, content: [] }],
+                    },
+                  ]
+                : []),
+            ],
+          },
+        });
+        service = createTestService({ ...restored, preferredProvider: "codex", clientFactory: () => client });
+        await runCauseEffect(service.initialize());
+        expect(service.listQueue("chief").deliveries[1]).toMatchObject({
+          id,
+          text: "Use staging",
+          status: evidence === "accepted" ? "completed" : "starting",
+          turnId: busy.turnId,
+        });
+        expect(
+          client.requests.filter((request) => request.method === "turn/start" || request.method === "turn/steer"),
+        ).toHaveLength(0);
+      },
+    );
 
     it("joins the running turn on a provider that steers", async () => {
       const { service: agentService, client, turnId } = await startBusyAgent("codex");
@@ -1507,17 +2206,35 @@ describe.sequential("AgentService: queue", () => {
         service: agentService,
         client,
         completeTurn,
+        mailbox,
       } = await startBusyAgent("codex", async (method) => {
-        if (method === "turn/steer") throw new Error("The provider refused the steer.");
+        if (method === "turn/steer") throw new AppServerError("no active turn to steer", -32600);
       });
-      await runCauseEffect(agentService.sendMessage({ agentId: "chief", text: "Use staging" }));
+      const file = join(root, "refused-input.txt");
+      await writeFile(file, "Keep the attachment");
+      const [draft] = await runCauseEffect(mailbox.prepareImportedAttachments([file], []));
+      assert(draft);
+      const receipt = await runCauseEffect(
+        agentService.sendMessage({ agentId: "chief", text: "Use staging", attachmentDraftIds: [draft.id] }),
+      );
 
       await waitForQueue(agentService, "chief", (queue) => queue.deliveries[1]?.steerFallback === "steer-failed");
-      expect(agentService.listQueue("chief").deliveries[1]).toMatchObject({ text: "Use staging", status: "queued" });
+      const input = agentService.listQueue("chief").deliveries[1];
+      expect(input).toMatchObject({
+        id: receipt.deliveries[0]?.id,
+        text: "Use staging",
+        status: "queued",
+        position: 1,
+        attachments: [expect.objectContaining({ name: "refused-input.txt" })],
+      });
 
       completeTurn();
       await waitFor(() => turnStarts(client) === 2);
-      expect(agentService.listQueue("chief").deliveries[1]?.status).toBe("running");
+      expect(agentService.listQueue("chief").deliveries[1]).toMatchObject({
+        id: input?.id,
+        status: "running",
+        attachments: input?.attachments,
+      });
     });
 
     it.each([false, true])(
@@ -1549,9 +2266,9 @@ describe.sequential("AgentService: queue", () => {
         expect(busy.service.listQueue("chief").deliveries[1]?.status).toBe("starting");
         if (endTurn) {
           busy.completeTurn();
-          await waitForQueue(busy.service, "chief", (queue) => queue.deliveries[1]?.status === "completed");
+          await waitForQueue(busy.service, "chief", (queue) => queue.deliveries[0]?.status === "completed");
         }
-        refuse(new Error("Steer refused."));
+        refuse(new AppServerError("Steer refused.", -32600));
         await refused;
         if (!endTurn) {
           expect(busy.service.listQueue("chief").deliveries[1]).toMatchObject({ id: queued.id, status: "queued" });
@@ -1584,12 +2301,12 @@ describe.sequential("AgentService: queue", () => {
       const busy = await startBusyAgent("codex", async (method) => {
         if (method !== "turn/steer") return;
         await endTurnDuringSteer();
-        throw new Error("The turn ended before the steer.");
+        throw new AppServerError("no active turn to steer", -32600);
       });
       endTurnDuringSteer = async () => {
         busy.completeTurn();
         // The end of the turn stamps every delivery of that turn, the one being steered too.
-        await waitForQueue(busy.service, "chief", (queue) => queue.deliveries[1]?.status === "completed");
+        await waitForQueue(busy.service, "chief", (queue) => queue.deliveries[0]?.status === "completed");
       };
       await runCauseEffect(busy.service.sendMessage({ agentId: "chief", text: "Use staging" }));
 
@@ -2938,6 +3655,9 @@ describe.sequential("AgentService: queue", () => {
       client: (provider) => new FakeAgentClient(provider, "", false),
     });
     service = started.service;
+    await runCauseEffect(started.store.getOrCreate("chief"));
+    await runCauseEffect(service.updateAgent({ agentId: "chief", provider: "grok", model: "grok-4.5" }));
+    expect(started.store.list().find((agent) => agent.id === "chief")?.provider).toBe("grok");
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
     const turnStarts = () => events.filter((event) => event.type === "turn-started");

@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { type AgentProviderId, isAgentProvider } from "@openbot/contracts/agent-providers";
 import { rewriteAttachmentReferences } from "@openbot/contracts/attachment-references";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
@@ -100,7 +101,16 @@ interface StoredFinishedEdit {
   saveHash?: string;
 }
 
+/** The exact inputs sent in one start request. Private mailbox data, not a queue contract. */
+export interface SubmittedInputBatch {
+  deliveryIds: string[];
+  provider: AgentProviderId;
+  threadId: string;
+  sessionId: string;
+}
+
 interface StoredDelivery {
+  inputBatch?: SubmittedInputBatch;
   editId?: string;
   finishedEditOutcomes?: Record<string, StoredFinishedEdit>;
   id: string;
@@ -1272,6 +1282,67 @@ export class MailboxStore {
     }
   }, Effect.uninterruptible).bind(this);
 
+  markInputUnconfirmed = Effect.fn("MailboxStore.markInputUnconfirmed")(function* (
+    this: MailboxStore,
+    deliveryId: string,
+  ): Effect.fn.Return<void, StoredStateFailure> {
+    yield* this.#updateDeliveryEffect(deliveryId, ["starting"], {
+      error: sourceText("error.agent.inputUnconfirmed"),
+    });
+  }, Effect.uninterruptible).bind(this);
+
+  recordInputBatch = Effect.fn("MailboxStore.recordInputBatch")(function* (
+    this: MailboxStore,
+    primaryId: string,
+    batch: SubmittedInputBatch,
+  ): Effect.fn.Return<void, StoredStateFailure> {
+    const primary = this.#state.deliveries.find((item) => item.id === primaryId);
+    if (!primary || !batch.deliveryIds.includes(primaryId))
+      return yield* new StoredStateFailure({ cause: new Error("The submitted batch has no primary input.") });
+    if (
+      batch.deliveryIds.some((id) => {
+        const item = this.#state.deliveries.find((candidate) => candidate.id === id);
+        return item?.status !== "starting" || item.recipientAgentId !== primary.recipientAgentId;
+      })
+    )
+      return yield* new StoredStateFailure({ cause: new Error("The submitted batch is no longer reserved.") });
+    for (const item of this.#state.deliveries) {
+      if (item.inputBatch?.deliveryIds.some((id) => batch.deliveryIds.includes(id))) delete item.inputBatch;
+    }
+    yield* this.#updateDeliveryEffect(primaryId, ["starting"], { inputBatch: structuredClone(batch) }).pipe(
+      Effect.tapError(() => Effect.sync(() => this.restorePersistedState())),
+    );
+  }, Effect.uninterruptible).bind(this);
+
+  /** Includes a cancelled primary as a receipt anchor, but never changes its terminal state. */
+  submittedInputBatch(deliveryId: string): SubmittedInputBatch | null {
+    const primary = this.#state.deliveries.find((item) => item.inputBatch?.deliveryIds.includes(deliveryId));
+    return primary?.inputBatch ? structuredClone(primary.inputBatch) : null;
+  }
+
+  /** Confirm only this steer attempt; a late receipt cannot revive a cancelled or requeued input. */
+  confirmSteered = Effect.fn("MailboxStore.confirmSteered")(function* (
+    this: MailboxStore,
+    deliveryId: string,
+    turnId: string,
+  ): Effect.fn.Return<void, StoredStateFailure> {
+    const delivery = this.getDelivery(deliveryId)?.delivery;
+    if (delivery?.status !== "starting" || delivery.turnId !== turnId) return;
+    yield* this.markRunning(deliveryId, turnId).pipe(
+      Effect.tapError(() => Effect.sync(() => this.restorePersistedState())),
+    );
+    // The matching turn may already have ended while the receipt was in flight. Its outcome
+    // becomes applicable only now, after this exact input has an acceptance receipt.
+    const terminal = this.#state.deliveries.find(
+      (candidate) =>
+        candidate.recipientAgentId === delivery.recipientAgentId &&
+        candidate.turnId === turnId &&
+        ["completed", "failed", "interrupted"].includes(candidate.status),
+    );
+    if (terminal?.status === "completed" || terminal?.status === "failed" || terminal?.status === "interrupted")
+      yield* this.markTerminal(deliveryId, terminal.status, terminal.error);
+  }, Effect.uninterruptible).bind(this);
+
   markTerminal = Effect.fn("MailboxStore.markTerminal")(function* (
     this: MailboxStore,
     deliveryId: string,
@@ -1309,7 +1380,8 @@ export class MailboxStore {
       (candidate) => candidate.id === deliveryId && candidate.recipientAgentId === agentId,
     );
     if (!delivery) throw new Error(sourceText("error.backend.queuedMessageNotFound"));
-    if (delivery.status !== "queued") throw new Error(sourceText("error.backend.cancelQueuedOnly"));
+    if (delivery.status !== "queued" && !(delivery.status === "starting" && delivery.error !== null))
+      throw new Error(sourceText("error.backend.cancelQueuedOnly"));
     this.#finishCancellation(delivery, true);
   }
 
@@ -1611,8 +1683,8 @@ export class MailboxStore {
   }, Effect.uninterruptible);
 
   /**
-   * A held delivery keeps its place. `listQueue` reports it now, so a caller may send its id with
-   * the rest; both that list and one without it are accepted, and neither moves the held message.
+   * An edit hold or an unconfirmed submission keeps its queue slot. Callers reorder queued
+   * deliveries only; an edit-held id may be included, but a submitted id is not reorderable.
    */
 
   reorderQueue = Effect.fn("MailboxStore.reorderQueue")(function* (
@@ -1622,11 +1694,12 @@ export class MailboxStore {
   ): Effect.fn.Return<void, StoredStateFailure> {
     try {
       const allQueued = this.#state.deliveries.filter(
-        (delivery) => delivery.recipientAgentId === agentId && delivery.status === "queued",
+        (delivery) =>
+          delivery.recipientAgentId === agentId && (delivery.status === "queued" || delivery.status === "starting"),
       );
       const heldIds = new Set(allQueued.filter((delivery) => delivery.editId).map((delivery) => delivery.id));
       const requested = deliveryIds.filter((deliveryId) => !heldIds.has(deliveryId));
-      const queued = allQueued.filter((delivery) => !delivery.editId);
+      const queued = allQueued.filter((delivery) => delivery.status === "queued" && !delivery.editId);
       const expected = new Set(queued.map((delivery) => delivery.id));
       if (
         requested.length !== queued.length ||
@@ -1638,7 +1711,9 @@ export class MailboxStore {
       let nextVisible = 0;
       const orderedIds = [...allQueued]
         .sort(compareQueueOrder)
-        .map((delivery) => (delivery.editId ? delivery.id : requested[nextVisible++]));
+        .map((delivery) =>
+          delivery.editId || delivery.status === "starting" ? delivery.id : requested[nextVisible++],
+        );
       const orders = new Map(orderedIds.map((deliveryId, index) => [deliveryId, index]));
       for (const delivery of allQueued) {
         delivery.queueOrder = orders.get(delivery.id) ?? delivery.queueOrder;
@@ -1661,7 +1736,7 @@ export class MailboxStore {
         status: "starting",
         turnId,
         steeredAt: new Date().toISOString(),
-        error: null,
+        error: sourceText("error.agent.inputUnconfirmed"),
       });
     } catch (cause) {
       return yield* new StoredStateFailure({ cause });
@@ -2082,6 +2157,7 @@ export class MailboxStore {
     message = this.#requireMessage(delivery.messageId),
   ): QueueDelivery {
     const {
+      inputBatch: _inputBatch,
       editId: _editId,
       finishedEditOutcomes: _finishedEditOutcomes,
       steeredAt: _steeredAt,
@@ -2414,6 +2490,13 @@ function isStoredDelivery(value: unknown): value is StoredDelivery {
     isString(value.messageId) &&
     isString(value.recipientAgentId) &&
     (value.editId === undefined || isString(value.editId)) &&
+    (value.inputBatch === undefined ||
+      (isRecord(value.inputBatch) &&
+        Array.isArray(value.inputBatch.deliveryIds) &&
+        value.inputBatch.deliveryIds.every(isString) &&
+        isAgentProvider(value.inputBatch.provider) &&
+        isString(value.inputBatch.threadId) &&
+        isString(value.inputBatch.sessionId))) &&
     (value.finishedEditOutcomes === undefined || isFinishedEditOutcomes(value.finishedEditOutcomes)) &&
     (value.queueOrder === undefined || (isNumber(value.queueOrder) && Number.isFinite(value.queueOrder))) &&
     (value.status === "queued" ||

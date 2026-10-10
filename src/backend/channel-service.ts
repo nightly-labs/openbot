@@ -1452,7 +1452,9 @@ export class ChannelService {
         .find((item) => item.agentId === event.agentId && activeAssignment(item));
       const agent = this.hooks.agents().find((item) => item.id === event.agentId);
       const session = agent ? this.store.database.activeProviderSession(event.threadId, agent.provider) : null;
-      if (assignment?.deliveryId && session)
+      const delivery = assignment?.deliveryId ? this.mailbox.getDelivery(assignment.deliveryId)?.delivery : null;
+      // A started turn identifies activity, not the input it accepted. The mailbox receipt owns that association.
+      if (assignment?.deliveryId && session && delivery?.status === "running" && delivery.turnId === event.turnId)
         this.#dispatchEvent(this.accepted(assignment.deliveryId, session.externalSessionId, event.turnId));
       return true;
     }
