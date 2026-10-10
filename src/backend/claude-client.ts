@@ -857,9 +857,12 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       method: "turn/started",
       params: { threadId, turn: { id: turnId, status: "inProgress" } },
     });
-    // A block of its own, so that history readers can tell it from the text of the turn.
+    // A block of its own, so that history readers can tell it from the text of the turn. A slash
+    // command gets none: the CLI can drop the blocks before it, and `/clear` empties the context,
+    // so the next turn sends the full block.
     const memory = this.#memoryContexts.get(threadId);
-    const memoryText = memory ? memoryContextUpdate(memory.delivered, memory.current) : null;
+    const command = text.startsWith("/");
+    const memoryText = memory && !command ? memoryContextUpdate(memory.delivered, memory.current) : null;
     runtime.input.push({
       type: "user",
       message: {
@@ -875,7 +878,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       uuid: turnId,
       session_id: threadId,
     });
-    if (memory) memory.delivered = memory.current;
+    if (memory) memory.delivered = command ? null : memory.current;
     return { turn: { id: turnId, status: "inProgress" } };
   });
 
