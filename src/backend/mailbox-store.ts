@@ -1662,7 +1662,6 @@ export class MailboxStore {
       yield* this.#updateDeliveryEffect(deliveryId, ["starting"], {
         status: "queued",
         turnId: null,
-        steeredAt: undefined,
         error: null,
       });
     } catch (cause) {
@@ -1680,7 +1679,6 @@ export class MailboxStore {
       yield* this.#updateDeliveryEffect(deliveryId, ["starting", "running"], {
         status: "queued",
         turnId: null,
-        steeredAt: undefined,
         error: null,
       });
     } catch (cause) {
@@ -2100,6 +2098,7 @@ export class MailboxStore {
       if (!delivery) throw new Error(`Unknown delivery: ${id}`);
       if (!allowed.includes(delivery.status)) return;
       Object.assign(delivery, patch);
+      if (patch.status === "queued") delete delivery.steeredAt;
       this.#persist("delivery.updated");
     } catch (cause) {
       return yield* new StoredStateFailure({ cause });
