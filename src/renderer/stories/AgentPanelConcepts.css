@@ -1,0 +1,598 @@
+/* Concept only: Concepts/Agent Panel. Tokens from @openbot/brand; no literal colours. */
+
+.apc-canvas {
+  min-height: 100vh;
+  padding: var(--openbot-space-8);
+  background: var(--openbot-bg-sidebar);
+  color: var(--openbot-text-primary);
+}
+
+.apc-gallery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--openbot-space-8);
+  align-items: flex-start;
+}
+
+.apc-card {
+  display: grid;
+  width: 296px;
+  margin: 0;
+  gap: var(--openbot-space-3);
+}
+
+.apc-card figcaption {
+  display: grid;
+  gap: var(--openbot-space-1);
+  font-size: var(--openbot-text-sm);
+  line-height: 1.4;
+}
+
+.apc-card figcaption span {
+  color: var(--openbot-text-muted);
+}
+
+.apc-card-stage {
+  position: relative;
+  height: 720px;
+  overflow: hidden;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-canvas);
+}
+
+/* The shipped panel is absolutely placed in the chat; the stage gives it a box. */
+.apc-card-stage .settings-panel {
+  border-left: 0;
+}
+
+/* ------------------------------------------------ panel shell */
+
+.apc-panel {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  background: var(--openbot-bg-canvas);
+  color: var(--openbot-text-primary);
+}
+
+.apc-header {
+  display: grid;
+  height: 39px;
+  flex: 0 0 auto;
+  grid-template-columns: 32px 1fr auto;
+  align-items: center;
+  border-bottom: 1px solid var(--openbot-border);
+  padding: 0 10px;
+}
+
+.apc-header h2 {
+  margin: 0;
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-semibold);
+  text-align: center;
+}
+
+.apc-header-actions {
+  display: flex;
+  min-width: 32px;
+  justify-content: flex-end;
+  gap: 2px;
+}
+
+.apc-nav {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  padding: 0;
+  color: var(--openbot-text-secondary);
+}
+
+.apc-nav > svg {
+  width: 16px;
+  height: 16px;
+}
+
+.apc-body {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--openbot-space-4);
+  overflow-y: auto;
+  padding: var(--openbot-space-4) 15px var(--openbot-space-6);
+}
+
+.apc-body-flush {
+  padding: 0;
+}
+
+.apc-body .settings-field {
+  margin: 0;
+}
+
+/* ------------------------------------------------ rows and groups */
+
+.apc-group {
+  display: grid;
+  gap: var(--openbot-space-1-5);
+}
+
+.apc-group-heading,
+.apc-label {
+  margin: 0 0 0 var(--openbot-space-1);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.apc-label {
+  margin-bottom: calc(var(--openbot-space-2) * -1);
+}
+
+.apc-group-rows {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-surface);
+}
+
+.apc-row {
+  display: flex;
+  width: 100%;
+  min-height: 40px;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  border-radius: 0;
+  padding: var(--openbot-space-1-5) var(--openbot-space-3);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-regular);
+  text-align: left;
+}
+
+.apc-row + .apc-row {
+  border-top: 1px solid var(--openbot-border);
+}
+
+.apc-row-icon {
+  display: grid;
+  width: 16px;
+  flex: 0 0 auto;
+  place-items: center;
+  color: var(--openbot-text-secondary);
+}
+
+.apc-row-icon svg,
+.apc-row-value svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+.apc-row-label {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 auto;
+  gap: 1px;
+}
+
+.apc-row-label small {
+  overflow: hidden;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.apc-row-value {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  overflow: hidden;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.apc-row-static {
+  cursor: default;
+}
+
+/* ------------------------------------------------ identity */
+
+.apc-profile-card,
+.apc-identity {
+  display: flex;
+  width: 100%;
+  height: auto;
+  align-items: center;
+  gap: var(--openbot-space-3);
+  padding: var(--openbot-space-2);
+  text-align: left;
+}
+
+.apc-profile-card {
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-surface);
+  padding: var(--openbot-space-3);
+}
+
+.apc-profile-card > svg {
+  width: var(--openbot-icon-sm);
+  color: var(--openbot-text-muted);
+}
+
+.apc-identity {
+  padding: 0;
+}
+
+.apc-profile-text {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.apc-profile-text strong {
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.apc-profile-text small {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
+.apc-avatar-sm {
+  width: 28px;
+  height: 28px;
+  margin-bottom: var(--openbot-space-2);
+}
+
+.apc-avatar-md {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+}
+
+.apc-avatar-lg {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 auto;
+}
+
+.apc-avatar-xl {
+  width: 76px;
+  height: 76px;
+}
+
+.apc-hero {
+  display: grid;
+  justify-items: center;
+  gap: var(--openbot-space-1);
+  padding-top: var(--openbot-space-2);
+  text-align: center;
+}
+
+.apc-hero-name {
+  margin-top: var(--openbot-space-2);
+  font-size: var(--openbot-text-xl);
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.apc-hero-title {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-md);
+}
+
+.apc-chip {
+  display: inline-flex;
+  height: 26px;
+  margin-top: var(--openbot-space-2);
+  align-items: center;
+  gap: var(--openbot-space-1-5);
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-pill);
+  padding: 0 var(--openbot-space-3);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+}
+
+.apc-chip svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* ------------------------------------------------ instructions preview */
+
+.apc-quote {
+  display: grid;
+  width: 100%;
+  height: auto;
+  justify-items: start;
+  gap: var(--openbot-space-1);
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-surface);
+  padding: var(--openbot-space-3);
+  text-align: left;
+  white-space: normal;
+}
+
+.apc-quote-label {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.apc-quote-text {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-regular);
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+/* ------------------------------------------------ overview */
+
+.apc-quick {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--openbot-space-2);
+}
+
+.apc-quick-action {
+  display: grid;
+  height: auto;
+  justify-items: center;
+  gap: var(--openbot-space-1);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-surface);
+  padding: var(--openbot-space-2) 0;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+}
+
+.apc-quick-action[aria-pressed="true"] {
+  color: var(--openbot-text-muted);
+}
+
+.apc-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--openbot-space-2);
+}
+
+.apc-tile {
+  display: grid;
+  height: auto;
+  justify-items: start;
+  gap: 2px;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-md);
+  padding: var(--openbot-space-2) 10px;
+  text-align: left;
+}
+
+.apc-tile strong {
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-lg);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.apc-tile small {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
+.apc-tile-icon {
+  color: var(--openbot-text-muted);
+}
+
+.apc-tile-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ------------------------------------------------ choices */
+
+.apc-stack {
+  display: grid;
+  gap: var(--openbot-space-2);
+}
+
+.apc-choice {
+  display: flex;
+  width: 100%;
+  height: auto;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-md);
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+  text-align: left;
+  white-space: normal;
+}
+
+.apc-choice[aria-pressed="true"] {
+  border-color: var(--openbot-border-focus);
+  background: var(--openbot-bg-surface);
+}
+
+.apc-choice > svg {
+  width: var(--openbot-icon-sm);
+  color: var(--openbot-text-primary);
+}
+
+.apc-choice-text {
+  display: grid;
+  flex: 1 1 auto;
+  gap: 2px;
+}
+
+.apc-choice-text strong {
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.apc-choice-text small {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-regular);
+}
+
+.apc-segmented {
+  width: 100%;
+}
+
+.apc-segmented > .ui-sliding-tabs-trigger {
+  flex: 1 1 0;
+}
+
+.apc-tabs {
+  margin-top: var(--openbot-space-1);
+}
+
+.apc-tab-slot {
+  margin-top: var(--openbot-space-4);
+}
+
+.apc-tab-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-4);
+}
+
+.apc-path {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-md);
+  padding: var(--openbot-space-1) var(--openbot-space-1) var(--openbot-space-1) var(--openbot-space-3);
+  color: var(--openbot-text-secondary);
+  font-family: var(--openbot-font-mono);
+  font-size: var(--openbot-text-sm);
+}
+
+.apc-path-text {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.apc-new-chat {
+  gap: var(--openbot-space-2);
+  margin-top: auto;
+}
+
+.apc-new-chat svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+/* ------------------------------------------------ folds */
+
+.apc-fold {
+  border-top: 1px solid var(--openbot-border);
+}
+
+.apc-fold-trigger {
+  display: flex;
+  width: 100%;
+  height: auto;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  border-radius: 0;
+  padding: var(--openbot-space-3) var(--openbot-space-1);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-medium);
+  text-align: left;
+}
+
+.apc-fold-chevron {
+  width: var(--openbot-icon-sm);
+  color: var(--openbot-text-muted);
+  transition: transform var(--openbot-duration-hover) ease;
+}
+
+.apc-fold[data-open] .apc-fold-chevron {
+  transform: rotate(180deg);
+}
+
+.apc-fold-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-3);
+  padding: 0 0 var(--openbot-space-4);
+}
+
+/* ------------------------------------------------ icon rail */
+
+.apc-rail-layout {
+  display: flex;
+  height: 100%;
+}
+
+.apc-rail {
+  display: flex;
+  width: 48px;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  border-right: 1px solid var(--openbot-border);
+  padding: var(--openbot-space-3) 0;
+}
+
+.apc-rail-item {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--openbot-radius-md);
+  background: transparent;
+  color: var(--openbot-text-muted);
+  cursor: pointer;
+}
+
+.apc-rail-item svg {
+  width: 17px;
+  height: 17px;
+}
+
+.apc-rail-item:hover {
+  background: var(--openbot-hover);
+  color: var(--openbot-text-primary);
+}
+
+.apc-rail-item[data-selected] {
+  background: var(--openbot-bg-control-active);
+  color: var(--openbot-text-primary);
+}
+
+.apc-rail-content {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: var(--openbot-space-4) var(--openbot-space-3) var(--openbot-space-6);
+}
+
+.apc-rail-content > [role="tabpanel"] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-4);
+}
