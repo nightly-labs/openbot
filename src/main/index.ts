@@ -1164,11 +1164,20 @@ if (!hasSingleInstanceLock) {
       });
     })
     .catch((error) => {
+      // A quit during the start, such as `docker stop`, closes the window that is still loading.
+      // The quit is already running: an error box would block it, and the shutdown deadline with it.
+      if (isQuitting) {
+        logger.info("The quit stopped the start:", toLogValue(error));
+        return;
+      }
       const message = error instanceof Error ? error.message : String(error);
       logger.error("OpenBot failed to start:", toLogValue(error));
-      // The services, and with them the saved language, may not exist yet. Then the system language applies.
-      const translate = services?.language.translate ?? translateFor(resolveLocale("system", app.getLocale()));
-      dialog.showErrorBox(translate("startup.failedTitle"), translate("startup.failedBody", { message }));
+      // A server has nobody at its virtual display to close the box, and the box blocks the quit.
+      if (!serverMode && !hostedServer) {
+        // The services, and with them the saved language, may not exist yet. Then the system language applies.
+        const translate = services?.language.translate ?? translateFor(resolveLocale("system", app.getLocale()));
+        dialog.showErrorBox(translate("startup.failedTitle"), translate("startup.failedBody", { message }));
+      }
       app.quit();
     });
 }
