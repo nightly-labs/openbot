@@ -359,6 +359,7 @@ export class HostEventsService implements HostEventsApi {
           timezone: input.timezone,
           trigger: recordTrigger,
           ...(input.limitPolicy === undefined ? {} : { limitPolicy: input.limitPolicy }),
+          ...(input.missedPolicy === undefined ? {} : { missedPolicy: input.missedPolicy }),
         }),
       );
       return { saved, secret };

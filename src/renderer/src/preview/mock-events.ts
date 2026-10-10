@@ -46,6 +46,7 @@ export function createMockEvents(): OpenBotDesktopApi["events"] {
             ? { ...clone(input.trigger), url: `https://hooks.example.test/openbot/${id}` }
             : clone(input.trigger),
         ...(input.limitPolicy === undefined ? {} : { limitPolicy: input.limitPolicy }),
+        ...(input.missedPolicy === undefined ? {} : { missedPolicy: input.missedPolicy }),
         createdAt: existing?.createdAt ?? now,
         updatedAt: now,
       };

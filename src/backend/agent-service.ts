@@ -1325,8 +1325,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (!agent || !agentAutomationAllowed(agent)) throw new Error(sourceText("error.agent.automationOff"));
   }
 
-  listRoutineRuns(input: ListRoutineRunsInput): RoutineRun[] {
-    return this.#routines.listRuns(input);
+  /** `withSkipped` adds the skipped-run records, which only the local history shows. */
+  listRoutineRuns(input: ListRoutineRunsInput, withSkipped = false): RoutineRun[] {
+    return this.#routines.listRuns(input, withSkipped);
   }
 
   listChannelMemories(channelId: string): ChannelMemory[] {
@@ -1375,8 +1376,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
   }
 
-  listChannelRoutineRuns(input: ListChannelRoutineRunsInput): ChannelRoutineRun[] {
-    return this.#channelRoutines.listRuns(input);
+  listChannelRoutineRuns(input: ListChannelRoutineRunsInput, withSkipped = false): ChannelRoutineRun[] {
+    return this.#channelRoutines.listRuns(input, withSkipped);
   }
 
   /**

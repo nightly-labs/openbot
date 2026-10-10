@@ -52,8 +52,8 @@ export class ChannelRoutineStore extends RoutineStore {
     return toChannelRoutine(this.updateRoutine(channelId, fields, now));
   }
 
-  listRuns(channelId: string, routineId: string, limit = 50): ChannelRoutineRun[] {
-    return this.listRunRows(channelId, routineId, limit).map(toChannelRun);
+  listRuns(channelId: string, routineId: string, limit = 50, withSkipped = false): ChannelRoutineRun[] {
+    return this.listRunRows(channelId, routineId, limit, withSkipped).map(toChannelRun);
   }
 
   pendingRuns(): ChannelRoutineRun[] {

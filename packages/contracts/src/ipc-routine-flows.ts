@@ -1,7 +1,7 @@
 import { INPUT_LIMITS } from "./input-limits";
 import { isBoundedString, isFiniteNumber, isIdentifier } from "./ipc-bounded-values";
 import { type EventRoutine, isEventRoutineTrigger } from "./ipc-events";
-import { isRoutineRun, type RoutineRun } from "./ipc-routines";
+import { isRoutineRun, ROUTINE_MISSED_POLICIES, type RoutineRun } from "./ipc-routines";
 import { isBoolean, isDynamicRecord, isOneOf, isString } from "./runtime-values";
 
 /**
@@ -170,6 +170,7 @@ function isRoutineFlowRoutineInfo(value: unknown): value is RoutineFlowRoutineIn
     isString(value.timezone) &&
     isEventRoutineTrigger(value.trigger) &&
     (value.limitPolicy === undefined || value.limitPolicy === "wait" || value.limitPolicy === "skip") &&
+    (value.missedPolicy === undefined || isOneOf(ROUTINE_MISSED_POLICIES, value.missedPolicy)) &&
     isString(value.createdAt) &&
     isString(value.updatedAt)
   );

@@ -383,6 +383,7 @@
 
 .agent-routine-run-list {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0;
   margin-top: 0;
 }
@@ -406,12 +407,13 @@
   cursor: pointer;
 }
 
-/* An ignored webhook request: the time, then a muted note. */
+/* The time, then a muted note: an ignored webhook request, skipped runs, or a late start. */
 .agent-routine-run-text {
   display: flex;
   min-width: 0;
   flex: 1;
-  gap: var(--openbot-space-2);
+  flex-wrap: wrap;
+  gap: 0 var(--openbot-space-2);
   white-space: nowrap;
 }
 

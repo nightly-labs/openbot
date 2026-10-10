@@ -84,7 +84,7 @@ export function channelRoutineIpcHandlers({
           ),
       }),
       listChannelRoutineRuns: scopedHandler(parseListChannelRoutineRuns, {
-        local: (parsed) => service.listChannelRoutineRuns(parsed),
+        local: (parsed) => service.listChannelRoutineRuns(parsed, true),
         remote: (parsed, serverId) =>
           runCauseEffect(
             remoteServers.request(serverId, CHANNEL_ROUTES.routineRuns, decodeChannelRoutineRuns, {

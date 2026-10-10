@@ -384,6 +384,16 @@ const V28_PROVIDER_SESSIONS_COLUMN_SQL = `provider TEXT NOT NULL,`;
 // schema puts it last as well. Both routine tables end with a column, not a table constraint.
 const V27_ROUTINE_LIMIT_POLICY_COLUMN_SQL = `limit_policy TEXT NOT NULL DEFAULT 'wait' CHECK(limit_policy IN ('wait', 'skip'))`;
 
+// Migration 33 adds what a routine does with the occurrences that came due while OpenBot was closed, and
+// the run columns that record those occurrences on one cancelled run. Frozen with the migration. The policy
+// goes after the migration 27 column. ADD COLUMN puts a run column before the UNIQUE constraint that ends
+// the run tables, so the latest schema puts the two run columns there as well.
+const V33_ROUTINE_MISSED_POLICY_COLUMN_SQL = `missed_policy TEXT NOT NULL DEFAULT 'skip' CHECK(missed_policy IN ('skip', 'run-once'))`;
+const V33_ROUTINE_RUN_MISSED_COLUMNS_SQL = [
+  "missed_count INTEGER CHECK(missed_count IS NULL OR missed_count >= 1)",
+  "missed_until TEXT",
+] as const;
+
 const BASELINE_AGENT_ROUTINES_END_SQL = `    last_event_sequence INTEGER NOT NULL
   );
   CREATE INDEX IF NOT EXISTS agent_routines_agent`;
@@ -391,6 +401,16 @@ const BASELINE_AGENT_ROUTINES_END_SQL = `    last_event_sequence INTEGER NOT NUL
 const V19_CHANNEL_ROUTINES_END_SQL = `    last_event_sequence INTEGER NOT NULL
   );
   CREATE INDEX IF NOT EXISTS channel_routines_channel`;
+
+const BASELINE_ROUTINE_RUNS_END_SQL = `    last_event_sequence INTEGER NOT NULL,
+    UNIQUE(trigger_id, scheduled_for)
+  );
+  CREATE INDEX IF NOT EXISTS routine_runs_routine`;
+
+const V19_CHANNEL_ROUTINE_RUNS_END_SQL = `    last_event_sequence INTEGER NOT NULL,
+    UNIQUE(trigger_id, scheduled_for)
+  );
+  CREATE INDEX IF NOT EXISTS channel_routine_runs_routine`;
 
 // IF NOT EXISTS throughout, because this text is both migration 15 and the tail of the latest
 // schema. A database built from the latest schema and then replayed forward - which is how a
@@ -447,20 +467,28 @@ const ANALYTICS_DATE_INDEX_SQL = `
 const LATEST_SCHEMA_SQL =
   substituteOnce(
     substituteOnce(
-      substituteOnce(BASELINE_V8_SCHEMA_SQL, BASELINE_REACTIONS_TABLE_SQL, V12_REACTIONS_TABLE_SQL),
-      BASELINE_PROVIDER_SESSIONS_CHECK_SQL,
-      V28_PROVIDER_SESSIONS_COLUMN_SQL,
+      substituteOnce(
+        substituteOnce(BASELINE_V8_SCHEMA_SQL, BASELINE_REACTIONS_TABLE_SQL, V12_REACTIONS_TABLE_SQL),
+        BASELINE_PROVIDER_SESSIONS_CHECK_SQL,
+        V28_PROVIDER_SESSIONS_COLUMN_SQL,
+      ),
+      BASELINE_AGENT_ROUTINES_END_SQL,
+      withRoutinePolicies(BASELINE_AGENT_ROUTINES_END_SQL),
     ),
-    BASELINE_AGENT_ROUTINES_END_SQL,
-    withRoutineLimitPolicy(BASELINE_AGENT_ROUTINES_END_SQL),
+    BASELINE_ROUTINE_RUNS_END_SQL,
+    withRunMissedColumns(BASELINE_ROUTINE_RUNS_END_SQL),
   ) +
   ANALYTICS_SCHEMA_SQL +
   ANALYTICS_DATE_INDEX_SQL +
   CHANNEL_SCHEMA_SQL +
   substituteOnce(
-    CHANNEL_SETTINGS_SCHEMA_SQL,
-    V19_CHANNEL_ROUTINES_END_SQL,
-    withRoutineLimitPolicy(V19_CHANNEL_ROUTINES_END_SQL),
+    substituteOnce(
+      CHANNEL_SETTINGS_SCHEMA_SQL,
+      V19_CHANNEL_ROUTINES_END_SQL,
+      withRoutinePolicies(V19_CHANNEL_ROUTINES_END_SQL),
+    ),
+    V19_CHANNEL_ROUTINE_RUNS_END_SQL,
+    withRunMissedColumns(V19_CHANNEL_ROUTINE_RUNS_END_SQL),
   ) +
   MCP_SERVERS_SCHEMA_SQL +
   MESSAGING_SCHEMA_SQL +
@@ -469,11 +497,19 @@ const LATEST_SCHEMA_SQL =
   ROUTINE_FLOW_SCHEMA_SQL +
   AGENT_MEMORY_SELECTION_SCHEMA_SQL;
 
-/** The end of a routine table with the migration 27 column after its last one. */
-function withRoutineLimitPolicy(tableEnd: string): string {
+/** The end of a routine table with the migration 27 and 33 columns after its last one. */
+function withRoutinePolicies(tableEnd: string): string {
   return tableEnd.replace(
     "last_event_sequence INTEGER NOT NULL\n",
-    `last_event_sequence INTEGER NOT NULL,\n    ${V27_ROUTINE_LIMIT_POLICY_COLUMN_SQL}\n`,
+    `last_event_sequence INTEGER NOT NULL,\n    ${V27_ROUTINE_LIMIT_POLICY_COLUMN_SQL},\n    ${V33_ROUTINE_MISSED_POLICY_COLUMN_SQL}\n`,
+  );
+}
+
+/** The end of a routine run table with the migration 33 columns before its UNIQUE constraint. */
+function withRunMissedColumns(tableEnd: string): string {
+  return tableEnd.replace(
+    "last_event_sequence INTEGER NOT NULL,\n",
+    `last_event_sequence INTEGER NOT NULL,\n${V33_ROUTINE_RUN_MISSED_COLUMNS_SQL.map((column) => `    ${column},\n`).join("")}`,
   );
 }
 
@@ -630,6 +666,13 @@ const MIGRATIONS: readonly OpenBotMigration[] = [
   {
     version: 32,
     up: migrateAgentMemorySelection,
+  },
+  {
+    version: 33,
+    // Adds columns with a constant default or none to four tables: no rebuild, so no foreign-key pause and
+    // no vacuum. Every existing routine keeps skipping the occurrences it missed, which is what it did
+    // before, and every existing run records no missed occurrence.
+    up: addRoutineMissedRuns,
   },
 ];
 
@@ -915,6 +958,25 @@ function addRoutineLimitPolicy(db: DatabaseSync): void {
     const columns = db.prepare(`PRAGMA table_info(${table})`).all();
     if (columns.some((column) => isDynamicRecord(column) && column.name === "limit_policy")) continue;
     db.exec(`ALTER TABLE ${table} ADD COLUMN ${V27_ROUTINE_LIMIT_POLICY_COLUMN_SQL}`);
+  }
+}
+
+// Migration 33 adds the missed-run policy to the routine tables and the missed-run record to the run tables.
+function addRoutineMissedRuns(db: DatabaseSync): void {
+  const additions: readonly (readonly [string, string, string])[] = [
+    ["projection_agent_routines", "missed_policy", V33_ROUTINE_MISSED_POLICY_COLUMN_SQL],
+    ["projection_channel_routines", "missed_policy", V33_ROUTINE_MISSED_POLICY_COLUMN_SQL],
+    ...["projection_routine_runs", "projection_channel_routine_runs"].flatMap((table) =>
+      V33_ROUTINE_RUN_MISSED_COLUMNS_SQL.map(
+        (column) => [table, column.slice(0, column.indexOf(" ")), column] as const,
+      ),
+    ),
+  ];
+  for (const [table, name, column] of additions) {
+    // A development profile that ran this version before it shipped has the column already.
+    const columns = db.prepare(`PRAGMA table_info(${table})`).all();
+    if (columns.some((existing) => isDynamicRecord(existing) && existing.name === name)) continue;
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column}`);
   }
 }
 

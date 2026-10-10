@@ -236,6 +236,7 @@ export function WorkspaceRoutineFlows(props: { port?: RoutineFlowsPort }) {
         active: routine.active,
         timezone: routine.timezone,
         ...(routine.limitPolicy ? { limitPolicy: routine.limitPolicy } : {}),
+        ...(routine.missedPolicy ? { missedPolicy: routine.missedPolicy } : {}),
         trigger: {
           kind: "webhook",
           eventType: change.eventType === undefined ? webhook.eventType : change.eventType,
