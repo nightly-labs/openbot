@@ -1025,9 +1025,11 @@ export class SignalService {
         // A reconnect replaces the old client even when its host has disconnected and the peer has
         // no connection record. Admission and replacement must have no asynchronous gap.
         const replaced = message.peer === "client" ? this.#clientForSession(claims) : null;
+        // Only clients count. Host tickets carry the owner's account, so its own devices must not keep
+        // its server from registering.
         if (
-          message.peer !== "ingress" &&
-          this.#userConnectionCount(claims.userId, replaced?.socket.id) >= this.#maximumConnectionsPerUser
+          message.peer === "client" &&
+          this.#userClientCount(claims.userId, replaced?.socket.id) >= this.#maximumConnectionsPerUser
         ) {
           this.#fail(socket, "rate_limited", "Too many active remote connections.", 1008);
           return;
@@ -1108,6 +1110,12 @@ export class SignalService {
           return;
         }
         if (message.peer === "host") {
+          // A host that changed network or restarted can leave its old socket open until the idle
+          // timeout. The new socket replaces it, and `#restoreWaitingClients` moves its clients here.
+          for (const socketId of [...(this.#hosts.get(claims.hostId) ?? [])]) {
+            const previous = this.#peers.get(socketId);
+            if (previous) this.#replaceHostPeer(previous);
+          }
           const hostSockets = this.#hosts.get(claims.hostId) ?? new Set<string>();
           hostSockets.add(socket.id);
           this.#hosts.set(claims.hostId, hostSockets);
@@ -1176,9 +1184,8 @@ export class SignalService {
   );
 
   /**
-   * The host socket that said hello last. A host that stops with no close, such as a hosted server
-   * that its provider stops, keeps its old socket until the idle timeout. Its new socket is the one
-   * that answers.
+   * The host socket that said hello last. A new host hello replaces the older sockets of its host,
+   * such as the socket of a hosted server that its provider stopped with no close.
    */
   #currentHost(hostId: string): AuthenticatedPeer | null {
     let current: AuthenticatedPeer | null = null;
@@ -1266,6 +1273,23 @@ export class SignalService {
     peer.socket.close(4000, "Remote session resumed");
   }
 
+  #replaceHostPeer(peer: AuthenticatedPeer): void {
+    this.#peers.delete(peer.socket.id);
+    this.#clearPeerExpiration(peer.socket.id);
+    const hostSockets = this.#hosts.get(peer.claims.hostId);
+    hostSockets?.delete(peer.socket.id);
+    if (hostSockets?.size === 0) this.#hosts.delete(peer.claims.hostId);
+    for (const connection of [...this.#connections.values()]) {
+      if (connection.host.id !== peer.socket.id) continue;
+      this.#clearConnectionDrop(connection.id);
+      this.#connections.delete(connection.id);
+      const clientPeer = this.#peers.get(connection.client.id);
+      if (clientPeer) clientPeer.connectionId = null;
+    }
+    this.#metrics.activePeerConnections = this.#connections.size;
+    peer.socket.close(4000, "Remote session resumed");
+  }
+
   #dropConnection(connectionId: string, sourceSocketId: string): void {
     const connection = this.#connections.get(connectionId);
     if (!connection) return;
@@ -1328,10 +1352,10 @@ export class SignalService {
     return Boolean(connection && (connection.client.id === peer.socket.id || connection.host.id === peer.socket.id));
   }
 
-  #userConnectionCount(userId: string, exceptSocketId?: string): number {
+  #userClientCount(userId: string, exceptSocketId?: string): number {
     let total = 0;
     for (const peer of this.#peers.values()) {
-      if (peer.peer !== "ingress" && peer.claims.userId === userId && peer.socket.id !== exceptSocketId) total += 1;
+      if (peer.peer === "client" && peer.claims.userId === userId && peer.socket.id !== exceptSocketId) total += 1;
     }
     return total;
   }

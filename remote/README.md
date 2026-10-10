@@ -171,9 +171,10 @@ Reconnecting one session replaces only that session's Signal socket. Disconnecti
 must not end another device's session. Legacy hosts that omit `multiplex` keep the one-client limit:
 a second session receives `host_busy` without interrupting the first.
 
-`REMOTE_MAX_CONNECTIONS_PER_USER` (default 32) limits the authenticated Signal sockets of one account.
-Published hosts and clients share it. Each open desktop, phone, or browser keeps a socket for each
-saved host. A reconnect of the same session does not count its old socket. Change the value on the
+`REMOTE_MAX_CONNECTIONS_PER_USER` (default 32) limits the authenticated client Signal sockets of one
+account. Each open desktop, phone, or browser keeps a socket for each saved host. A reconnect of the
+same session does not count its old socket. Host sockets do not count, and the limit never refuses a
+host: a host hello replaces the older sockets of the same host and moves their clients to it. Change the value on the
 Signal server: a desktop environment does not change it.
 This also applies when the old client socket waits for its host to reconnect. Token signing finishes
 before Signal admits the new socket, so concurrent reconnects do not hold extra account slots.

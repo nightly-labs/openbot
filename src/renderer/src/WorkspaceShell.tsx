@@ -1,5 +1,6 @@
 import type { CentralAuthUser } from "@openbot/contracts/ipc";
 import { ServerConnectionNotice, ServerPanelLoadNotice } from "@openbot/ui/features/servers/ServerConnectionNotice";
+import { useText } from "@openbot/ui/text";
 import { createMemo, Loading, Show } from "solid-js";
 import { WorkspaceAccountDock } from "./features/account/WorkspaceAccountDock";
 import { useAgents } from "./features/agents/agents-context";
@@ -48,6 +49,7 @@ import { WorkspaceOverlays } from "./WorkspaceOverlays";
  */
 export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
   const platform = usePlatform();
+  const { sourceText } = useText();
   const scope = useServerScope();
   const settings = useSettings();
   const channels = useChannels();
@@ -82,6 +84,11 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
   );
 
   const remote = () => activeServer()?.kind === "remote";
+  // Signal and the host send English source text. Show it in the reader's language.
+  const issueDetail = () => {
+    const message = activeServer()?.issue?.message;
+    return message ? sourceText(message) : null;
+  };
   const retry = () => {
     const server = activeServer();
     if (!serversLoaded()) {
@@ -136,7 +143,7 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
               name={activeServer()?.name ?? ""}
               initial={!scope.connection.hasContent}
               issue={activeServer()?.hostedIssue ?? null}
-              detail={activeServer()?.issue?.message ?? null}
+              detail={issueDetail()}
               phase={
                 activeServer()?.hostedSleep ??
                 (serversLoadFailed()

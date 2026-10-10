@@ -332,17 +332,49 @@ describe("SignalService", () => {
     expect(client.closed).toBe(false);
   });
 
-  it("sends a new client to the host socket that said hello last while the old socket is not closed", async () => {
+  it("replaces a host socket that did not close and moves its clients to the new one", async () => {
     const service = new SignalService(fakeTokens(), 8);
     const stopped = socket("host-stopped");
     await hello(service, stopped, "host-ticket", "host");
-    const restarted = socket("host-restarted");
-    await hello(service, restarted, "resume-host", "host");
     const client = socket("client");
     await hello(service, client, "client-ticket", "client");
+    const restarted = socket("host-restarted");
+    await hello(service, restarted, "resume-host", "host");
 
-    expect(restarted.messages.some((message) => message.includes('"type":"peer-ready"'))).toBe(true);
-    expect(stopped.messages.some((message) => message.includes('"type":"peer-ready"'))).toBe(false);
+    expect(stopped.closed).toBe(true);
+    expect(restarted.messages.at(-1)).toContain('"type":"peer-ready"');
+    const connectionId = JSON.parse(client.messages.at(-1) ?? "{}").connectionId;
+    await runSignal(
+      service,
+      service.receive(client, JSON.stringify({ type: "ice-restart", version: 1, connectionId, channel: "team" })),
+    );
+    expect(restarted.messages.at(-1)).toContain('"type":"ice-restart"');
+    expect(stopped.messages.some((message) => message.includes('"type":"ice-restart"'))).toBe(false);
+
+    // The close of the replaced socket arrives later. It must not take the clients from the new host.
+    await runSignal(service, service.disconnect(stopped));
+    const phone = socket("phone");
+    await hello(service, phone, "second-client-ticket", "client");
+    expect(restarted.messages.at(-1)).toContain('"type":"peer-ready"');
+    expect(service.metrics().activePeerConnections).toBe(2);
+  });
+
+  it("does not let the owner's devices keep its host from registering", async () => {
+    // One client socket per account. Host tickets carry the owner's account too.
+    const service = new SignalService(fakeTokens(), 1);
+    const host = socket("owner-host");
+    await hello(service, host, "owner-host-ticket", "host");
+    const client = socket("client");
+    await hello(service, client, "client-ticket", "client");
+    expect(client.messages.at(-1)).toContain('"type":"ready"');
+    const phone = socket("phone");
+    await hello(service, phone, "second-client-ticket", "client");
+    expect(phone.messages.at(-1)).toContain('"code":"rate_limited"');
+
+    const restarted = socket("owner-host-restarted");
+    await hello(service, restarted, "resume-owner-host", "host");
+    expect(restarted.messages.some((message) => message.includes('"type":"ready"'))).toBe(true);
+    expect(restarted.closed).toBe(false);
   });
 
   it("notifies the host when an interrupted client does not reconnect", async () => {
@@ -586,6 +618,7 @@ function fakeTokens() {
         if (token === "fresh-client-ticket") return claims("member", "fresh-client-jti");
         if (token === "second-client-ticket") return claims("member", "second-client-jti", "second-client-session");
         if (token === "owner-ticket") return claims("owner", "owner-jti");
+        if (token === "owner-host-ticket") return { ...claims("host", "owner-host-jti"), userId: "user-1" };
         if (token === "current-host-ticket") return claims("host", "current-host-jti", "host-session", 2);
         if (token === "current-client-ticket") return claims("member", "current-client-jti", "client-session", 2);
         return yield* new RemoteTokenError({ message: "not an initial ticket" });
@@ -594,6 +627,7 @@ function fakeTokens() {
       Effect.gen(function* () {
         if (token === "resume-client") return claims("member", "resume-jti");
         if (token === "resume-host") return claims("host", "resume-host-jti");
+        if (token === "resume-owner-host") return { ...claims("host", "resume-owner-host-jti"), userId: "user-1" };
         return yield* new RemoteTokenError({ message: "not a resume token" });
       }),
     validateClaims: () => Effect.succeed(true),

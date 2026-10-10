@@ -2,6 +2,26 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/server";
 
 export const messages = {
+  "server.connection.planEnded": "El plan de {name} terminó",
+  "server.connection.wakeFailed": "No se pudo iniciar {name}",
+  "server.connection.startTimeout": "{name} no se inició a tiempo",
+  "server.connection.sleeping": "{name} está en reposo",
+  "server.connection.waking": "Iniciando {name}",
+  "server.connection.loading": "Cargando {name}",
+  "server.connection.connecting": "Conectando con {name}",
+  "server.connection.reconnecting": "Reconectando con {name}",
+  "server.connection.blocked": "{name} necesita tu atención",
+  "server.connection.nextRetry": "Próximo intento en {seconds} segundos.",
+  "server.connection.wakeHint": "Usa este espacio de trabajo o selecciona Reintentar para iniciar el servidor.",
+  "server.connection.planHint": "Abre la configuración de la cuenta para revisar el plan del servidor.",
+  "server.connection.loadingHint": "Puedes seleccionar otro servidor mientras este se carga.",
+  "server.connection.cachedHint":
+    "El contenido cargado y los borradores se conservan. Las acciones del servidor se reanudarán tras la reconexión.",
+  "server.connection.conversationFailed": "No se pudo cargar la conversación. Inténtalo de nuevo.",
+  "server.connection.panelsFailed": "Algunos paneles del espacio de trabajo no se pudieron cargar. Inténtalo de nuevo.",
+  "server.connection.retry": "Reintentar",
+  "server.connection.manage": "Abrir configuración",
+  "server.connection.restored": "Conexión con {name} restablecida",
   "server.compatibility.updateClientTitle": "Actualiza esta aplicación de OpenBot",
   "server.compatibility.updateHostTitle": "Actualiza OpenBot en {name}",
   "server.compatibility.unsafeDataTitle": "El host devolvió datos no seguros",
