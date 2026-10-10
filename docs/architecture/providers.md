@@ -144,7 +144,8 @@ failure as well as after a success.
 
 ## OpenCode and ACP
 
-`src/backend/acp-client.ts` owns ACP process transport, model discovery, session start/load,
+`src/backend/acp-connection.ts` owns ACP process transport. `acp-configuration.ts` owns
+configuration and model discovery. `src/backend/acp-client.ts` owns session start/load,
 streamed messages, permissions, tool bridging, and cancellation. `grok-client.ts` supplies xAI
 login and billing hooks. The OpenCode driver starts `opencode acp` on the runtime OpenBot pins and
 downloads, or on a CLI the user installed. Profile clients deny tool permissions.
@@ -213,6 +214,18 @@ not start Gemini, the dock says usage is not reported, and a limit failure is sh
 instead of waiting for a usage notice. `GEMINI_REQUEST_FAILURES` in `src/backend/acp-client.ts`
 names a rate limit or quota, an unavailable model, and a service failure from Google's status
 text. Antigravity does not document these texts.
+
+Antigravity 1.3.0 keeps `session/prompt` open until its harness reports
+`STATE_FULLY_IDLE`. A background task can thus keep a turn open after answer text
+arrives. The adapter streams that text at once. A later tool or thought changes
+the same message to commentary. It does not use a quiet period or a usage update
+as proof that the turn ended.
+
+Stop sends `session/cancel`, ends the local turn, and saves unfinished tool calls
+as interrupted. Before the next message, `session/resume` rebuilds the harness
+with the same session ID and saved history. A failed restore keeps that session
+available for another attempt. This does not change Antigravity's task database
+or provide early turn completion while its background tasks continue to run.
 
 Team API v1–v4 do not know `antigravity`. The host hides Gemini agents, models, status, and
 sign-in state from peers on those versions, and the `providers-v1` routes omit it. Team API v5
@@ -345,3 +358,70 @@ skips their executable version checks. Turning a provider on checks it again.
 the change while an agent uses the provider. New model assignments use the same lock.
 The switch is local IPC only; released Team API adapters stay unchanged. Remote
 clients receive the host's filtered model list.
+
+
+## Provider settings and the ACP registry
+
+`AgentClient` remains the provider boundary. ACP session ownership, history replay, and turn
+completion stay together. Boolean and select settings can include grouped choices. The client
+processes configuration notifications while idle. Model and reasoning continue to use their
+existing fields. Permission, access, and approval settings remain under OpenBot controls.
+
+Additional overrides are stored in validated agent JSON, by provider identity. A custom ACP
+identity includes its custom agent ID. Saved overrides are separate from the current descriptors
+and effective values. Missing choices remain saved and have a reset action. Changes made during
+a turn apply before the next turn. Reset has a durable refresh marker, so restart cannot restore
+the old provider value. No SQL migration is required.
+
+The ACP registry uses `https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json`.
+Registry installation records are separate from saved custom-agent configuration. Native and npm
+distributions use staged installation and published integrity data. A `uvx` entry requires `uvx`
+on the host. An ACP initialization check runs before activation. Failed or cancelled preparation
+keeps the previous command. Removal stops the idle ACP runtime and removes managed files only;
+it keeps saved agent IDs, settings, secrets, workspaces, and conversations. Manual commands remain
+available. Installation always targets the selected host.
+
+## Pi
+
+Pi uses its native `--mode rpc` interface. It does not use an ACP wrapper. Requests have IDs;
+`agent_settled` completes a turn. A successful `prompt` response only accepts the prompt. Cancellation
+clears queued work before abort. Session paths and the active conversation branch are preserved.
+Models come from the running CLI. A small extension uses Pi's `registerMcpServer` interface to
+register configured MCP servers and OpenBot tools. Secrets are supplied through process state,
+not copied into the extension source.
+
+Managed Pi archives come from official GitHub releases and use the published SHA-256 digest.
+Sign-in opens Pi in a host terminal. Close Pi after sign-in to refresh models in OpenBot.
+Remote clients must complete sign-in on the host. There is no separate Pi account screen.
+
+## Muse
+
+Muse uses the official `@muse-code/sdk` to run `muse serve` over MSP. The SDK is pinned to `1.4.2`;
+newer SDK versions must meet the three-day dependency rule before adoption. The native integration
+supplies `sessionMcp`, preserves native session identity, and reads durable items to recover missed
+events before completion. A cached model list does not prove authentication. Setup can run CLI
+login; an explicit Meta API key uses OpenBot's encrypted credential store.
+
+Muse profile generation fails before the CLI starts. The pinned native host still starts inherited
+MCP servers with `--disable-shell`, `--disable-write`, empty hooks, and session `mcpServers: {}`.
+It cannot meet the tool-free profile requirement. Generate the profile with another provider,
+then select Muse for the agent. The local echo test and synthetic MCP marker record this limit in
+`.openbot-build/muse-check/profile-mcp.mjs` and `profile-mcp-report.json`; this is not a live model
+authentication test.
+
+Managed Muse downloads use the official stable-channel manifest and artifact SHA-256 values.
+The CLI remains an optional download, outside the OpenBot package. OpenBot does not overwrite
+provider account files or run upstream self-updaters against managed installations. Both Pi and
+Muse use the existing process confinement boundary. Workspace-only mode fails closed on hosts
+without confinement support.
+
+## Protocol compatibility
+
+Team API v7 adds Pi and Muse provider values. Released v1–v6 adapters remain unchanged. Older
+clients do not receive providers they cannot decode. Custom agents already named `pi` or `muse`
+remain valid; the names are reserved only for new custom-agent creation.
+
+Optional `providers-v5` routes include the new runtimes and write-only provider keys.
+`agent-session-settings-v1` adds read, set, reset, and an agent-ID-only invalidation event.
+`acp-registry-v1` adds registry administration. Each administrative route checks the host role;
+clients hide unsupported controls. MCP-over-ACP transport is outside this change.

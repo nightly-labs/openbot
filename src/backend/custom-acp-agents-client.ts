@@ -18,7 +18,7 @@
 import { createHash } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { CUSTOM_AGENT_DEFAULT_MODEL, customAgentIdOfModel } from "@openbot/contracts/agent-providers";
-import { isAgentModel } from "@openbot/contracts/ipc";
+import { type AgentSessionSettingsSnapshot, type AgentSessionSettingValue, isAgentModel } from "@openbot/contracts/ipc";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Exit } from "effect";
@@ -242,6 +242,32 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
     const held = this.#sessions.get(externalThreadId);
     const release = held?.child.releaseThread?.bind(held.child);
     if (held && release) yield* release(held.sessionId).pipe(toProviderClientOperationError);
+  });
+
+  readonly readSessionSettings = Effect.fn("CustomAcp.readSessionSettings")(function* (
+    this: CustomAcpAgentsClient,
+    externalThreadId: string,
+  ): Effect.fn.Return<AgentSessionSettingsSnapshot, ProviderClientOperationError> {
+    const held = this.#sessions.get(externalThreadId);
+    if (!held?.child.readSessionSettings)
+      return yield* new ProviderClientOperationError({
+        cause: new Error(sourceText("error.provider.sessionSettingUnavailable")),
+      });
+    return yield* held.child.readSessionSettings(held.sessionId);
+  });
+
+  readonly setSessionSetting = Effect.fn("CustomAcp.setSessionSetting")(function* (
+    this: CustomAcpAgentsClient,
+    externalThreadId: string,
+    configId: string,
+    value: AgentSessionSettingValue,
+  ): Effect.fn.Return<AgentSessionSettingsSnapshot, ProviderClientOperationError> {
+    const held = this.#sessions.get(externalThreadId);
+    if (!held?.child.setSessionSetting)
+      return yield* new ProviderClientOperationError({
+        cause: new Error(sourceText("error.provider.sessionSettingUnavailable")),
+      });
+    return yield* held.child.setSessionSetting(held.sessionId, configId, value);
   });
 
   readonly request = Effect.fn("CustomAcp.request")(

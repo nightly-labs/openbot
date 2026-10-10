@@ -4,6 +4,7 @@ import type { messages as source } from "../en/preview";
 export const messages = {
   "preview.panel.label": "Dosya önizlemesi",
   "preview.panel.resize": "Dosya önizlemesini yeniden boyutlandır",
+  "preview.panel.copy": "Dosya metnini kopyala",
   "preview.panel.openExternally": "Dosyayı harici uygulamada aç",
   "preview.panel.download": "Dosyayı indir",
   "preview.panel.reveal": "Dosyayı Finder'da göster",

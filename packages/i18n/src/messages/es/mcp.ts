@@ -25,6 +25,7 @@ export const messages = {
     "Inicia sesión en tu cuenta de {name}. OpenBot obtiene las herramientas a las que puede acceder esa cuenta, pero no la contraseña.",
   "mcp.signIn.waiting": "Esperando al navegador…",
   "mcp.signIn.continue": "Continuar a {name}",
+  "mcp.signIn.pageDescription": "Esta página está abierta en el navegador de {host}. Inicia sesión aquí.",
   "mcp.server.loadFailed": "No se pudieron cargar los servidores MCP.",
   "mcp.test.connected": {
     one: "Conectado · {count} herramienta",
@@ -115,5 +116,9 @@ export const messages = {
   "mcp.panel.signInWaiting": {
     one: "Completa el inicio de sesión en tu navegador. OpenBot deja de esperar después de {count} minuto.",
     other: "Completa el inicio de sesión en tu navegador. OpenBot deja de esperar después de {count} minutos.",
+  },
+  "mcp.panel.signInWaitingOn": {
+    one: "Abriendo la página de inicio de sesión en {host}. OpenBot deja de esperar después de {count} minuto.",
+    other: "Abriendo la página de inicio de sesión en {host}. OpenBot deja de esperar después de {count} minutos.",
   },
 } as const satisfies PartialTranslation<typeof source>;

@@ -2,6 +2,7 @@ import { serializeAttachmentReference } from "@openbot/contracts/attachment-refe
 import type { AgentEvent, AttachmentSummary, DraftAttachment, QueueSnapshot } from "@openbot/contracts/ipc";
 import type { AgentMessage as RendererAgentMessage, RoutineRunMarkerModel } from "@openbot/ui/data";
 import { BrowserTakeoverCard } from "@openbot/ui/features/conversation/ConversationPrompts";
+import { currentText } from "@openbot/ui/text";
 import { Portal } from "@solidjs/web";
 import { createEffect, createSignal, onCleanup, onSettled, Show } from "solid-js";
 import { fn } from "storybook/test";
@@ -11,6 +12,7 @@ import { Conversation, createConversationController } from "../src/features/conv
 import { ConversationView } from "../src/features/conversation/ConversationView";
 import { ConversationControllerProvider } from "../src/features/conversation/conversation-controller-context";
 import { composerDraftKey } from "../src/features/conversation/conversation-keys";
+import type { VoicePhase } from "../src/features/conversation/voice-status";
 import browserTakeoverPreviewUrl from "./assets/browser-takeover-preview.svg";
 import {
   CONVERSATION_STORY_ARGS,
@@ -827,11 +829,57 @@ const referenceQueue: QueueSnapshot = {
   ],
 };
 
+const LIVE_DICTATION =
+  "Can you check the release notes for 2.18 and tell me which fixes still need a changelog entry before Friday?";
+
+/**
+ * Live dictation as the app shows it: a partial pass about once a second, a few words longer each
+ * time, then the final pass (darker text) and the transcript in the draft. The animated story loops.
+ */
+function playLiveDictation(
+  controller: ReturnType<typeof createConversationController>,
+  target: { agentId: string; serverId: string },
+  options: { draft: string; animate: boolean },
+): () => void {
+  const setDraft = (text: string) =>
+    controller.setDrafts({ [target.agentId]: { text, attachments: [], replyToMessageId: null } });
+  setDraft(options.draft);
+  controller.setVoicePhase("recording");
+  if (!options.animate) {
+    controller.setVoiceElapsedSeconds(7);
+    controller.setVoiceLiveTranscript({ ...target, text: LIVE_DICTATION });
+    return () => undefined;
+  }
+  const words = LIVE_DICTATION.split(" ");
+  const recordingTicks = Math.ceil(words.length / 3);
+  let tick = 0;
+  const timer = window.setInterval(() => {
+    tick = tick >= recordingTicks + 3 ? 0 : tick + 1;
+    if (tick === 0) {
+      setDraft(options.draft);
+      controller.setVoiceLiveTranscript(null);
+      controller.setVoicePhase("recording");
+    } else if (tick <= recordingTicks) {
+      controller.setVoiceLiveTranscript({ ...target, text: words.slice(0, tick * 3).join(" ") });
+    } else if (tick === recordingTicks + 1) {
+      controller.setVoicePhase("transcribing");
+    } else if (tick === recordingTicks + 2) {
+      controller.setVoiceLiveTranscript(null);
+      controller.setVoicePhase("idle");
+      setDraft(options.draft ? `${options.draft} ${LIVE_DICTATION}` : LIVE_DICTATION);
+    }
+    controller.setVoiceElapsedSeconds(Math.min(tick, recordingTicks));
+  }, 1_000);
+  return () => window.clearInterval(timer);
+}
+
 function MockedConversation(props: {
   args: Parameters<typeof Conversation>[0];
   messages?: RendererAgentMessage[];
   initialAttachments?: DraftAttachment[];
   voiceModelProgress?: number;
+  voiceLive?: { draft: string; animate: boolean };
+  voicePhase?: VoicePhase;
   takeoverStateGallery?: boolean;
   conversationError?: string;
 }) {
@@ -853,6 +901,18 @@ function MockedConversation(props: {
     onSettled(() => {
       controller.setVoicePhase("preparing");
       controller.setVoiceModelProgress(props.voiceModelProgress ?? null);
+    });
+  }
+  const voiceLive = props.voiceLive;
+  if (initialAgentId && voiceLive) {
+    onSettled(() =>
+      playLiveDictation(controller, { agentId: initialAgentId, serverId: props.args.server?.id ?? "local" }, voiceLive),
+    );
+  }
+  const voicePhase = props.voicePhase;
+  if (voicePhase) {
+    onSettled(() => {
+      controller.setVoicePhase(voicePhase);
     });
   }
   // The same keyed entry `agent-event-bridge` writes when a provider reports an error, so the
@@ -1068,6 +1128,43 @@ export const AllAgentMessageTypes: Story = {
 export const VoiceRecording: Story = {
   name: "Voice recording",
   render: (storyArgs) => <RecordingConversation args={storyArgs} />,
+};
+
+export const VoiceLiveTranscription: Story = {
+  name: "Voice live transcription",
+  render: (storyArgs) => <MockedConversation args={storyArgs} voiceLive={{ draft: "", animate: true }} />,
+};
+
+export const VoiceLiveTranscriptionAfterDraft: Story = {
+  name: "Voice live transcription after a draft",
+  render: (storyArgs) => (
+    <MockedConversation args={storyArgs} voiceLive={{ draft: "Quick question about the release.", animate: false }} />
+  ),
+};
+
+export const VoiceRequestingMicrophone: Story = {
+  name: "Voice requesting microphone",
+  render: (storyArgs) => <MockedConversation args={storyArgs} voicePhase="requesting" />,
+};
+
+/** After Stop: the last live text shows in full colour until the final pass replaces the draft. */
+export const VoiceTranscribing: Story = {
+  name: "Voice transcribing",
+  render: (storyArgs) => (
+    <MockedConversation args={storyArgs} voiceLive={{ draft: "", animate: false }} voicePhase="transcribing" />
+  ),
+};
+
+export const VoiceWhileAgentStarts: Story = {
+  name: "Voice while the agent starts",
+  args: { agentStatus: { ...STORY_AGENT_STATUS, phase: "starting" } },
+};
+
+export const VoiceMicrophoneBlocked: Story = {
+  name: "Voice microphone blocked",
+  render: (storyArgs) => (
+    <MockedConversation args={storyArgs} conversationError={currentText().t("composer.voice.blocked")} />
+  ),
 };
 
 export const VoiceModelDownload: Story = {

@@ -1,15 +1,25 @@
-import type { HostReleaseStatus, HostStatus, HostUpdateStatus } from "@openbot/contracts/ipc";
-import { createSignal, onSettled, snapshot } from "solid-js";
+import type {
+  HostReleaseStatus,
+  HostStatus,
+  HostUpdateStatus,
+  McpServerConfig,
+  McpTestResult,
+} from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
+import { createSignal, createStore, onSettled, snapshot } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
+import type { McpPanelSignIn } from "../src/features/servers/ServerMcpPanel";
 import { ServerSettingsModal, type ServerSettingsModalProps } from "../src/features/servers/ServerSettingsModal";
 import {
   STORY_HOST_STATUS,
   STORY_HOSTED_SITES,
   STORY_INVITES,
+  STORY_MCP_SERVERS,
   STORY_PRESENCE,
   STORY_SERVERS,
 } from "../src/preview/fixtures";
+import { createSignInHost } from "./mcp-sign-in-host";
 import { createMockOpenBot } from "./mock-openbot";
 
 const localServer = STORY_SERVERS.find((server) => server.kind === "local") ?? STORY_SERVERS[0];
@@ -160,6 +170,89 @@ export const RemoteMember: Story = {
     invites: [],
   },
 };
+
+/**
+ * A joined server's MCP list. Granola asks for a sign-in on Test connection; Linear is signed in
+ * already. Sign in shows the server's page from the host's browser: Allow finishes the sign-in, and
+ * Cancel sign-in stops it.
+ */
+const REMOTE_MCP_SERVERS: McpServerConfig[] = [
+  {
+    id: "mcp-granola",
+    name: "Granola",
+    transport: "http",
+    enabled: true,
+    command: "",
+    args: [],
+    env: [],
+    envPassthrough: [],
+    workingDirectory: "",
+    url: "https://mcp.granola.ai/mcp",
+    headers: [],
+  },
+  ...STORY_MCP_SERVERS.filter((config) => config.id === "mcp-linear" || config.id === "mcp-sqlite").map((config) => ({
+    ...config,
+    headers: [],
+  })),
+];
+
+export const RemoteMcpSignIn: Story = {
+  args: {
+    server: { ...remoteServer, role: "admin" },
+    hostStatus: null,
+    initialSection: "mcp",
+    mcpServers: REMOTE_MCP_SERVERS,
+  },
+  render: (args) => <RemoteMcpStory settings={args} />,
+};
+
+export const RemoteMcpMember: Story = {
+  args: {
+    server: { ...remoteServer, role: "member" },
+    hostStatus: null,
+    invites: [],
+    initialSection: "mcp",
+    mcpServers: REMOTE_MCP_SERVERS,
+  },
+  render: (args) => <RemoteMcpStory settings={args} />,
+};
+
+function RemoteMcpStory(props: { settings: ServerSettingsModalProps }) {
+  const [signedIn, setSignedIn] = createStore<Record<string, boolean>>({ "mcp-linear": true });
+  const host = createSignInHost();
+  const waiting = new Map<string, (result: McpTestResult) => void>();
+  const finish = (url: string, result: McpTestResult) => {
+    host.close(url);
+    waiting.get(url)?.(result);
+    waiting.delete(url);
+  };
+  const signIn: McpPanelSignIn = {
+    signedIn,
+    remote: { hostName: props.settings.server.name, runtime: host.runtime, clipboard: true, pages: host.pages },
+    start: (config) =>
+      new Promise((resolve) => {
+        waiting.set(config.url, (result) => {
+          if (!result.error)
+            setSignedIn((current) => {
+              current[config.id] = true;
+            });
+          resolve(result);
+        });
+        host.open(config.url, config.name, () => finish(config.url, { toolCount: 6, error: null }));
+      }),
+    cancel: async (url) => finish(url, { toolCount: 0, error: sourceText("error.backend.mcpSignInCancelled") }),
+    signOut: async (id) =>
+      setSignedIn((current) => {
+        delete current[id];
+      }),
+  };
+  const test = async (config: McpServerConfig): Promise<McpTestResult> => {
+    if (config.transport === "http" && !signedIn[config.id])
+      return { toolCount: 0, error: sourceText("error.backend.mcpSignInRequired") };
+    return { toolCount: 6, error: null };
+  };
+  return <RemoteSetupStory settings={{ ...props.settings, mcpSignIn: signIn, onTestMcpServer: test }} />;
+}
 
 /** A Starter server with one site of its own and one unlinked site from before it was registered. */
 export const Sites: Story = {

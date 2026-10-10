@@ -21,7 +21,9 @@ const config: KnipConfig = {
   },
   // Host tools that scripts and tests call. They are not npm packages.
   ignoreBinaries: [
-    // Builds whisper.cpp and the remote desktop runtime.
+    // Opens the interactive provider sign-in CLI on Linux.
+    "xterm",
+    // Builds the remote desktop runtime.
     "cmake",
     // Rewrite and inspect macOS dylib load paths.
     "otool",
@@ -41,6 +43,7 @@ const config: KnipConfig = {
         // electron-vite inputs in electron.vite.config.ts.
         "src/main/index.ts",
         "src/backend/agent-data/agent-database-host.ts",
+        "src/main/voice-transcription-host.ts",
         "src/preload/index.ts",
         "src/preload/team-webrtc.ts",
         // Modules that the renderer HTML pages load with <script type="module">.

@@ -55,6 +55,7 @@
     "./team-protocol": "./src/team-protocol/index.ts",
     "./team-protocol/queue-edit-v1": "./src/team-protocol/queue-edit-v1.ts",
     "./team-protocol/browser-view-v1": "./src/team-protocol/browser-view-v1.ts",
+    "./team-protocol/mcp-sign-in-v1": "./src/team-protocol/mcp-sign-in-v1.ts",
     "./team-protocol/current": "./src/team-protocol/current.ts",
     "./team-protocol/http-codecs": "./src/team-protocol/http-codecs.ts",
     "./team-protocol/side-routes": "./src/team-protocol/side-routes.ts",
@@ -98,6 +99,9 @@
     "./team-protocol/providers-v2": "./src/team-protocol/providers-v2.ts",
     "./team-protocol/providers-v3": "./src/team-protocol/providers-v3.ts",
     "./team-protocol/providers-v4": "./src/team-protocol/providers-v4.ts",
+    "./team-protocol/acp-registry-v1": "./src/team-protocol/acp-registry-v1.ts",
+    "./team-protocol/agent-session-settings-v1": "./src/team-protocol/agent-session-settings-v1.ts",
+    "./team-protocol/providers-v5": "./src/team-protocol/providers-v5.ts",
     "./team-protocol/host-admin-v1": "./src/team-protocol/host-admin-v1.ts",
     "./team-protocol/hosted-sites-v1": "./src/team-protocol/hosted-sites-v1.ts",
     "./team-protocol/host-release-v1": "./src/team-protocol/host-release-v1.ts",
@@ -107,7 +111,12 @@
     "./team-protocol/skills-admin-v1": "./src/team-protocol/skills-admin-v1.ts",
     "./team-protocol/skills-events-v1": "./src/team-protocol/skills-events-v1.ts",
     "./team-protocol/optional-routes": "./src/team-protocol/optional-routes.ts",
-    "./team-protocol/remote-stream-v1": "./src/team-protocol/remote-stream-v1.ts"
+    "./team-protocol/remote-stream-v1": "./src/team-protocol/remote-stream-v1.ts",
+    "./team-protocol/v7-base": "./src/team-protocol/v7-base.ts",
+    "./team-protocol/v7": "./src/team-protocol/v7.ts",
+    "./team-protocol/v7-adapter": "./src/team-protocol/v7-adapter.ts",
+    "./team-protocol/v7-base-adapter": "./src/team-protocol/v7-base-adapter.ts",
+    "./team-protocol/v7-webrtc-adapter": "./src/team-protocol/v7-webrtc-adapter.ts"
   },
   "scripts": {
     "typecheck": "bun ../../node_modules/typescript/bin/tsc --noEmit -p tsconfig.json",

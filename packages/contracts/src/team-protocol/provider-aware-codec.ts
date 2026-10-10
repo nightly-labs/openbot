@@ -14,6 +14,7 @@ export interface ProviderAwareProfile {
   readonly authKinds: readonly string[];
   /** The charset and length of an agent summary `model`. It must not have the `g` or `y` flag. */
   readonly agentModel: RegExp;
+  readonly maximumCapabilities?: number;
 }
 
 /** Binds the codec entry points that read the profile; the other exports do not depend on it. */
@@ -1054,7 +1055,10 @@ export interface TeamProtocolSupportProviderAware {
   capabilities: string[];
 }
 
-export function decodeTeamProtocolSupportProviderAware(value: unknown): TeamProtocolSupportProviderAware {
+export function decodeTeamProtocolSupportProviderAware(
+  value: unknown,
+  maximumCapabilities = 64,
+): TeamProtocolSupportProviderAware {
   if (!isDynamicRecord(value) || !isString(value.appVersion) || value.appVersion.length > 64) {
     throw new Error("Invalid Team API compatibility response.");
   }
@@ -1065,7 +1069,7 @@ export function decodeTeamProtocolSupportProviderAware(value: unknown): TeamProt
     !isProtocolVersion(protocol.maximum) ||
     protocol.minimum > protocol.maximum ||
     !Array.isArray(value.capabilities) ||
-    value.capabilities.length > 64 ||
+    value.capabilities.length > maximumCapabilities ||
     !value.capabilities.every(isCapability)
   ) {
     throw new Error("Invalid Team API compatibility response.");
@@ -2288,7 +2292,7 @@ function validateTeamProtocolProviderAwareHttpResponse(
   switch (route) {
     case "GET compatibility":
       try {
-        decodeTeamProtocolSupportProviderAware(value);
+        decodeTeamProtocolSupportProviderAware(value, profile.maximumCapabilities);
         valid = true;
       } catch {
         valid = false;

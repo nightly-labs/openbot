@@ -25,6 +25,7 @@ export const messages = {
     "Entre na sua conta de {name}. O OpenBot obtém as ferramentas que essa conta pode acessar, sem receber sua senha.",
   "mcp.signIn.waiting": "Aguardando o navegador…",
   "mcp.signIn.continue": "Continuar para {name}",
+  "mcp.signIn.pageDescription": "Esta página está aberta no navegador de {host}. Autentique-se aqui.",
   "mcp.server.loadFailed": "Não foi possível carregar os servidores MCP.",
   "mcp.test.connected": { one: "Conectado · {count} ferramenta", other: "Conectado · {count} ferramentas" },
   "mcp.status.testing": "Testando…",
@@ -112,5 +113,9 @@ export const messages = {
   "mcp.panel.signInWaiting": {
     one: "Conclua a autenticação no navegador. O OpenBot para de esperar após {count} minuto.",
     other: "Conclua a autenticação no navegador. O OpenBot para de esperar após {count} minutos.",
+  },
+  "mcp.panel.signInWaitingOn": {
+    one: "Abrindo a página de autenticação em {host}. O OpenBot para de esperar após {count} minuto.",
+    other: "Abrindo a página de autenticação em {host}. O OpenBot para de esperar após {count} minutos.",
   },
 } as const satisfies PartialTranslation<typeof source>;

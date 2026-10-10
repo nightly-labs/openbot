@@ -1,6 +1,13 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("mobile.agent", {
+  "mobile.agent.session.title": "Provider settings",
+  "mobile.agent.session.failed": "Could not change provider settings.",
+  "mobile.agent.session.readFailed": "Could not read provider settings.",
+  "mobile.agent.session.unsupported": "This host does not support provider settings.",
+  "mobile.agent.session.reset": "Reset {name}",
+  "mobile.agent.session.unavailable": "Saved value {value} is not available. Select another value or reset it.",
+  "mobile.agent.session.pending": "Changes apply on the next turn.",
   "mobile.agent.pin.pin": "Pin",
   "mobile.agent.pin.unpin": "Unpin",
   "mobile.agent.pin.pinNamed": "Pin {name}",
@@ -277,7 +284,8 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.host.computerUse": "Computer Use",
   "mobile.agent.host.computerUseFooter": "Let this agent control apps on the host computer.",
   "mobile.agent.host.automation": "Local scripts",
-  "mobile.agent.host.automationFooter": "Let scripts on the host computer run this agent's routines.",
+  "mobile.agent.host.automationFooter":
+    "Let scripts on the host send messages, run routines, answer questions, and accept or decline approvals",
   "mobile.agent.host.failed": "Could not change this setting.",
   "mobile.agent.host.unsupported": "This host cannot change these settings from a remote device.",
   "mobile.agent.busyMessage.label": "While working",

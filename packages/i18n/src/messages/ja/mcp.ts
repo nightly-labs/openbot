@@ -25,6 +25,7 @@ export const messages = {
     "{name} アカウントにサインインしてください。OpenBot はそのアカウントで使えるツールを取得し、パスワードは取得しません。",
   "mcp.signIn.waiting": "ブラウザーを待っています…",
   "mcp.signIn.continue": "{name} に進む",
+  "mcp.signIn.pageDescription": "このページは {host} のブラウザーで開いています。ここでサインインしてください。",
   "mcp.server.loadFailed": "MCP サーバーを読み込めませんでした。",
   "mcp.test.connected": { other: "接続済み · ツール {count} 個" },
   "mcp.status.testing": "テストしています…",
@@ -109,5 +110,8 @@ export const messages = {
   "mcp.panel.cancelSignInTo": "{name} へのサインインをキャンセル",
   "mcp.panel.signInWaiting": {
     other: "ブラウザーでサインインを完了してください。OpenBot は {count} 分後に待機をやめます。",
+  },
+  "mcp.panel.signInWaitingOn": {
+    other: "{host} でサインインページを開いています。OpenBot は {count} 分後に待機をやめます。",
   },
 } as const satisfies PartialTranslation<typeof source>;

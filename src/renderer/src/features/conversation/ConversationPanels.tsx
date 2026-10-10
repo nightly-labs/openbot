@@ -276,6 +276,8 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
           <Loading>
             <AgentSettingsPanel
               remoteClient={Boolean(props.runtime)}
+              localHost={props.server?.kind === "local"}
+              sessionSettingsEditable={serverCanAdminister(props.server, "agent-session-settings-v1")}
               adminCalls={props.runtime?.admin}
               skillsMarketplaceOpen={props.skillsMarketplaceOpen}
               onAddFromMarketplace={
@@ -299,7 +301,10 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
               }
               accessEditable={props.server?.kind === "local" || serverCanAdministerAgents(props.server)}
               computerUseEditable={props.server?.kind === "local"}
-              automationEditable={props.server?.kind === "local"}
+              automationEditable={
+                props.server?.kind === "local" ||
+                (serverCanAdminister(props.server, "agent-host-settings-v1") && agent().allowAutomation !== undefined)
+              }
               busyMessageModeEditable={props.server?.kind === "local"}
               defaultBusyMessageMode={props.defaultBusyMessageMode}
               memoryLimit={props.server?.kind === "local" ? props.agentMemoryLimit : undefined}

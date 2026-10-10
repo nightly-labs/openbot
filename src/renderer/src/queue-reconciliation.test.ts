@@ -96,13 +96,13 @@ describe("presentQueueDeliveries", () => {
   const present = (queue: QueueSnapshot | undefined, activeTurnId: string | null, rendered: string[] = []) =>
     ids(presentQueueDeliveries({ snapshot: queue, activeTurnId, renderedMessageIds: new Set(rendered) }));
 
-  it("shows nothing between turns, however much is waiting", () => {
+  it("keeps pending messages visible between turns", () => {
     const queue = snapshot(
       delivery({ id: "waiting", status: "queued", position: 1 }),
       delivery({ id: "done", status: "completed" }),
     );
 
-    expect(present(queue, null)).toEqual([]);
+    expect(present(queue, null)).toEqual(["waiting"]);
   });
 
   it("stays open when an edit on another device stops the queue", () => {

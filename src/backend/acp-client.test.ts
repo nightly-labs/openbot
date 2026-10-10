@@ -22,7 +22,7 @@ import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
-import { ACP_IDLE_SESSION_LIMIT, type AcpHistoryPersistence } from "./acp-client";
+import { ACP_IDLE_SESSION_LIMIT, AcpAgentClient, type AcpHistoryPersistence } from "./acp-client";
 import { isMissingProviderSessionError } from "./agent/thread-items";
 import { type AgentClient, AgentProcessExitError } from "./agent-client";
 import type { OpencodeCliInfo } from "./cli";
@@ -82,12 +82,26 @@ let selected = CONFIG_MODELS[0];
 let sessionCount = 0;
 let discoveryCount = 0;
 let loadCount = 0;
+let compact = false;
+const additionalOptions = () => process.env.OPENBOT_FAKE_ACP_SETTINGS === "1" ? [
+  { id: "compact", name: "Compact replies", type: "boolean", currentValue: compact },
+  { id: "tone", name: "Tone", category: "model_config", type: "select", currentValue: "short", options: [
+    { group: "style", name: "Style", options: [{ value: "short", name: "Short" }, { value: "full", name: "Full" }] },
+  ] },
+  { id: "approval", name: "Approval policy", type: "boolean", currentValue: false },
+  { id: "session_mode", name: "Mode", type: "select", currentValue: "default", options: [{ value: "default", name: "Default" }] },
+  { id: "autoApprove", name: "Auto approve", type: "boolean", currentValue: false },
+  { id: "behavior", name: "Behavior", type: "select", currentValue: "normal", options: [{ value: "normal", name: "Normal" }, { value: "bypassPermissions", name: "Fast" }] },
+  { id: "execution", name: "Execution", type: "select", currentValue: "ask", options: [{ group: "execution", name: "Execution", options: [{ value: "ask", name: "Ask" }, { value: "yolo", name: "Automatic" }] }] },
+  { id: "operating", name: "Operating mode", category: "mode", type: "select", currentValue: "ask", options: [{value: "ask", name: "Ask"}, {value: "auto", name: "Auto"}] },
+] : [];
 const SERVICE_FAILURE = {
   code: -32603,
   message: "Internal error: OpenCode service failure",
   data: { service: "session" },
 };
 const configOptions = () => [
+  ...additionalOptions(),
   {
     id: "model",
     name: "Model",
@@ -211,18 +225,33 @@ function handle(message) {
     return;
   }
   if (message.method === "session/resume") {
+    // Grok's answer: it does not advertise additionalDirectories and refuses them on resume.
+    if (message.params.additionalDirectories?.length) {
+      write({ jsonrpc: "2.0", id: message.id, error: { code: -32602, message: "Invalid params",
+        data: "session/resume does not support additionalDirectories" } });
+      return;
+    }
     write({ jsonrpc: "2.0", id: message.id, result: {} });
     return;
   }
   if (message.method === "session/close") {
+    if (process.env.OPENBOT_FAKE_ACP_IGNORE_CLOSE === "1") return;
     const closeLog = process.env.OPENBOT_FAKE_ACP_CLOSE_LOG;
     if (closeLog) fs.appendFileSync(closeLog, JSON.stringify(message.params) + NL);
     write({ jsonrpc: "2.0", id: message.id, result: {} });
     return;
   }
+  if (message.method === "session/prompt" && process.env.OPENBOT_FAKE_ACP_PROMPT_LOG)
+    fs.appendFileSync(process.env.OPENBOT_FAKE_ACP_PROMPT_LOG, JSON.stringify(message.params) + NL);
+  const failureFile = process.env.OPENBOT_FAKE_ACP_FAILURE_FILE;
+  if (failureFile && fs.existsSync(failureFile)) {
+    const failure = JSON.parse(fs.readFileSync(failureFile, "utf8"));
+    if (message.method === failure.method) {
+      write({ jsonrpc: "2.0", id: message.id, error: failure.error });
+      return;
+    }
+  }
   if (message.method === "session/prompt") {
-    const promptLog = process.env.OPENBOT_FAKE_ACP_PROMPT_LOG;
-    if (promptLog) fs.appendFileSync(promptLog, JSON.stringify(message.params) + NL);
     if (process.env.OPENBOT_FAKE_ACP_PROMPT_TOOL) {
       write({
         jsonrpc: "2.0",
@@ -283,7 +312,13 @@ function handle(message) {
       return;
     }
     if (message.params.configId === "model") selected = message.params.value;
+    if (message.params.configId === "compact") compact = message.params.value;
     write({ jsonrpc: "2.0", id: message.id, result: { configOptions: configOptions() } });
+    if (message.params.configId === "compact") {
+      compact = false;
+      write({ jsonrpc: "2.0", method: "session/update", params: { sessionId: message.params.sessionId,
+        update: { sessionUpdate: "config_option_update", configOptions: configOptions() } } });
+    }
     return;
   }
   if (message.method === "session/new") {
@@ -667,6 +702,118 @@ describe("OpenCode ACP environment", () => {
   });
 });
 
+describe("ACP session settings", () => {
+  // Failure mode: a saved option removed by a provider update prevents all future prompts.
+  it("applies only available saved settings without blocking the next prompt", async () => {
+    const fake = await createFakeOpencodeAgent("system");
+    vi.stubEnv("OPENBOT_FAKE_ACP_CONFIG_MODELS", "1");
+    vi.stubEnv("OPENBOT_FAKE_ACP_SETTINGS", "1");
+    vi.stubEnv("OPENBOT_FAKE_ACP_CONFIG_LOG", fake.configLog);
+    vi.stubEnv("OPENBOT_FAKE_ACP_PROMPT_LOG", fake.promptLog);
+    const client = startOpencode(fake.cli, () => null, fake.envLog);
+    const { thread } = await runCauseEffect(
+      client.request("thread/start", { cwd: fake.directory }, decodeThreadResponse),
+    );
+    await runCauseEffect(
+      client.request(
+        "turn/start",
+        {
+          threadId: thread.id,
+          clientUserMessageId: "saved-options",
+          input: [{ type: "inputText", text: "Continue" }],
+          sessionSettings: { removed: true, tone: "removed-choice", compact: true },
+        },
+        decodeRecordResponse,
+      ),
+    );
+    await vi.waitFor(async () => expect(await fake.readPrompts()).toHaveLength(1));
+    const changes = await fake.readConfigCalls();
+    expect(changes).toContainEqual(expect.objectContaining({ configId: "compact", value: true }));
+    expect(changes.some((change) => change.configId === "removed" || change.configId === "tone")).toBe(false);
+  });
+
+  // Failure modes: a setting bypasses approval, an invalid choice reaches the agent, or an idle
+  // option update is lost. This test uses the real ACP process and stream for all three paths.
+  it("keeps permission controls private and accepts configuration updates while idle", async () => {
+    const fake = await createFakeOpencodeAgent("system");
+    vi.stubEnv("OPENBOT_FAKE_ACP_CONFIG_MODELS", "1");
+    vi.stubEnv("OPENBOT_FAKE_ACP_SETTINGS", "1");
+    vi.stubEnv("OPENBOT_FAKE_ACP_CONFIG_LOG", fake.configLog);
+    const client = startOpencode(fake.cli, () => null, fake.envLog);
+    const { thread } = await runCauseEffect(
+      client.request("thread/start", { cwd: fake.directory }, decodeThreadResponse),
+    );
+    if (!client.readSessionSettings || !client.setSessionSetting) throw new Error("ACP settings are unavailable.");
+    const snapshot = await runCauseEffect(client.readSessionSettings(thread.id));
+    expect(snapshot.options).toEqual([
+      { id: "compact", name: "Compact replies", type: "boolean", currentValue: false },
+      {
+        id: "tone",
+        name: "Tone",
+        category: "model_config",
+        type: "select",
+        currentValue: "short",
+        options: [
+          { value: "short", name: "Short", group: "Style" },
+          { value: "full", name: "Full", group: "Style" },
+        ],
+      },
+    ]);
+    await expect(runCauseEffect(client.setSessionSetting(thread.id, "approval", true))).rejects.toThrow(
+      sourceText("error.provider.sessionSettingUnavailable"),
+    );
+    await expect(runCauseEffect(client.setSessionSetting(thread.id, "operating", "auto"))).rejects.toThrow(
+      sourceText("error.provider.sessionSettingUnavailable"),
+    );
+    for (const [id, value] of [
+      ["session_mode", "default"],
+      ["autoApprove", true],
+      ["behavior", "bypassPermissions"],
+      ["execution", "yolo"],
+    ] as const) {
+      await expect(runCauseEffect(client.setSessionSetting(thread.id, id, value))).rejects.toThrow(
+        sourceText("error.provider.sessionSettingUnavailable"),
+      );
+    }
+    await expect(runCauseEffect(client.setSessionSetting(thread.id, "tone", "invalid"))).rejects.toThrow(
+      sourceText("error.provider.sessionSettingInvalid"),
+    );
+    await expect(runCauseEffect(client.setSessionSetting(thread.id, "compact", "true"))).rejects.toThrow(
+      sourceText("error.provider.sessionSettingInvalid"),
+    );
+    const idleUpdate = new Promise<void>((resolve) => {
+      const onNotification = (notification: import("./protocol").AppServerNotification) => {
+        if (notification.method !== "openbot/sessionSettings/updated") return;
+        const params = notification.params;
+        if (!isDynamicRecord(params) || !Array.isArray(params.options)) return;
+        if (
+          params.options.some(
+            (option) => isDynamicRecord(option) && option.id === "compact" && option.currentValue === false,
+          )
+        ) {
+          client.off("notification", onNotification);
+          resolve();
+        }
+      };
+      client.on("notification", onNotification);
+    });
+    await runCauseEffect(client.setSessionSetting(thread.id, "compact", true));
+    await idleUpdate;
+    expect(
+      (await runCauseEffect(client.readSessionSettings(thread.id))).options.find((option) => option.id === "compact")
+        ?.currentValue,
+    ).toBe(false);
+    const calls = await fake.readConfigCalls();
+    expect(
+      calls.filter((call) =>
+        ["approval", "operating", "tone", "session_mode", "autoApprove", "behavior", "execution"].includes(
+          call.configId,
+        ),
+      ),
+    ).toEqual([]);
+  });
+});
+
 describe("OpenCode ACP reasoning efforts", () => {
   it("reports the efforts of each model, not the efforts of the model the session opened on", async () => {
     const fake = await createFakeOpencodeAgent("system");
@@ -892,6 +1039,120 @@ describe("OpenCode MCP sign-in", () => {
 });
 
 describe("ACP missing session errors", () => {
+  it("does not replay a failed prompt and reloads for the next input", async () => {
+    const fake = await createFakeOpencodeAgent();
+    const failureFile = join(fake.directory, "failure.json");
+    vi.stubEnv("OPENBOT_FAKE_ACP_FAILURE_FILE", failureFile);
+    vi.stubEnv("OPENBOT_FAKE_ACP_IGNORE_CLOSE", "1");
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_SESSION", "1");
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_LOG", fake.loadLog);
+    vi.stubEnv("OPENBOT_FAKE_ACP_PROMPT_LOG", fake.promptLog);
+    const client = new AcpAgentClient(fake.cli, 10_000, {
+      provider: "acp",
+      argv: [],
+      env: {},
+      signInMessage: "Sign in",
+    });
+    started.push(client);
+    client.start();
+    const response = await runCauseEffect(
+      client.request("thread/start", { cwd: fake.directory }, decodeThreadResponse),
+    );
+    const threadId = response.thread.id;
+    await writeFile(
+      failureFile,
+      JSON.stringify({
+        method: "session/prompt",
+        error: { code: -32603, message: "Internal error", data: { details: `Unsupported ACP session: ${threadId}` } },
+      }),
+    );
+    const completed: unknown[] = [];
+    client.on("notification", (notification) => {
+      if (notification.method === "turn/completed") completed.push(notification.params);
+    });
+    await runCauseEffect(
+      client.request("turn/start", { threadId, input: [{ type: "text", text: "Old input" }] }, decodeRecordResponse),
+    );
+    await vi.waitFor(() => expect(completed).toHaveLength(1));
+    expect(completed[0]).toMatchObject({ turn: { status: "failed" } });
+    await rm(failureFile);
+    await runCauseEffect(client.request("thread/resume", { threadId, cwd: fake.directory }, decodeRecordResponse));
+    expect(await fake.readLoadedSessions()).toHaveLength(1);
+    await runCauseEffect(
+      client.request("turn/start", { threadId, input: [{ type: "text", text: "New input" }] }, decodeRecordResponse),
+    );
+    await vi.waitFor(() => expect(completed).toHaveLength(2));
+    expect(completed[1]).toMatchObject({ turn: { status: "completed" } });
+    const prompts = await fake.readPrompts();
+    expect(prompts.map((prompt) => JSON.parse(prompt))).toMatchObject([
+      { prompt: [{ type: "text", text: "Old input" }] },
+      { prompt: [{ type: "text", text: "New input" }] },
+    ]);
+    expect(prompts).toHaveLength(2);
+  });
+
+  it.each([
+    { code: -32002, data: { uri: "session-1" }, missing: true },
+    { code: -32603, data: { details: "Unsupported ACP session: session-1" }, missing: true },
+    { code: -32603, data: { details: "Unsupported ACP session: another-session" }, missing: false },
+    { code: -32603, data: { details: "Upstream session not found; credential=private-value" }, missing: false },
+  ])("recovers only confirmed startup session failures: $data", async ({ code, data, missing }) => {
+    const fake = await createFakeOpencodeAgent();
+    const failureFile = join(fake.directory, "failure.json");
+    vi.stubEnv("OPENBOT_FAKE_ACP_FAILURE_FILE", failureFile);
+    vi.stubEnv("OPENBOT_FAKE_ACP_IGNORE_CLOSE", "1");
+    vi.stubEnv("OPENBOT_FAKE_ACP_CONFIG_MODELS", "1");
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_SESSION", "1");
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_LOG", fake.loadLog);
+    vi.stubEnv("OPENBOT_FAKE_ACP_PROMPT_LOG", fake.promptLog);
+    const client = new AcpAgentClient(fake.cli, 10_000, {
+      provider: "acp",
+      argv: [],
+      env: {},
+      signInMessage: "Sign in",
+      redactValues: () => ["private-value"],
+    });
+    started.push(client);
+    client.start();
+    const response = await runCauseEffect(
+      client.request("thread/start", { cwd: fake.directory }, decodeThreadResponse),
+    );
+    const threadId = response.thread.id;
+    await writeFile(
+      failureFile,
+      JSON.stringify({ method: "session/set_config_option", error: { code, message: "Internal error", data } }),
+    );
+    const notifications: string[] = [];
+    client.on("notification", (notification) => notifications.push(notification.method));
+    const error = await runCauseEffect(
+      client.request(
+        "turn/start",
+        { threadId, model: "agent/thinker", input: [{ type: "text", text: "Continue" }] },
+        decodeRecordResponse,
+      ),
+    ).catch((reason: unknown) => reason);
+    expect(isMissingProviderSessionError(error, "acp")).toBe(missing);
+    expect(notifications).not.toContain("turn/started");
+    expect(await fake.readPrompts()).toEqual([]);
+    if (!missing) {
+      expect(String(error)).toContain(data.details?.replace("private-value", "[redacted]"));
+      expect(String(error)).not.toContain("private-value");
+    }
+    await rm(failureFile);
+    await runCauseEffect(client.request("thread/resume", { threadId, cwd: fake.directory }, decodeRecordResponse));
+    expect(await fake.readLoadedSessions()).toHaveLength(missing ? 1 : 0);
+    await runCauseEffect(
+      client.request("turn/start", { threadId, input: [{ type: "text", text: "Continue" }] }, decodeRecordResponse),
+    );
+    await vi.waitFor(() => expect(notifications).toContain("turn/completed"));
+    const prompts = await fake.readPrompts();
+    expect(prompts).toHaveLength(1);
+    expect(JSON.parse(prompts[0] ?? "{}")).toMatchObject({
+      sessionId: threadId,
+      prompt: [{ type: "text", text: "Continue" }],
+    });
+  });
+
   it.each([
     { provider: "cursor", code: -32602, data: { message: 'Session "ses_stored" not found' }, missing: true },
     { provider: "cursor", code: -32602, data: { message: 'Session "ses_other" not found' }, missing: false },
@@ -950,7 +1211,11 @@ describe("OpenCode ACP session loading", () => {
 
     await expect(
       runCauseEffect(
-        client.request("thread/resume", { threadId: "ses_resume_only", cwd: fake.directory }, decodeRecordResponse),
+        client.request(
+          "thread/resume",
+          { threadId: "ses_resume_only", cwd: fake.directory, runtimeWorkspaceRoots: [fake.directory] },
+          decodeRecordResponse,
+        ),
       ),
     ).resolves.toEqual(expect.any(Object));
     expect(client.canReleaseProcess?.()).toBe(true);

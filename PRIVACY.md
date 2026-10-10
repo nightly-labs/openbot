@@ -49,6 +49,23 @@ currency, the amount that Stripe reports, the server size, the start reason and 
 no email, name, Stripe ID or server ID. The desktop analytics setting does not stop these events,
 because the account service sends them and not your computer.
 
+The account service also records a return from Checkout without payment and later payment
+recovery. Verified paid invoices produce a revenue event in USD, with the original amount,
+currency, and dated exchange rate. Daily totals contain recurring revenue, overdue recurring
+revenue, paid accounts, paid servers, and scheduled cancellations. These totals have no account ID.
+The service stores payment facts and a delivery ledger in D1 to prevent duplicate revenue events.
+It does not send Stripe identifiers, server identifiers, or Checkout return tokens to OpenPanel.
+An account deletion clears its profile reference and stops pending account event delivery.
+
+## Local scripts
+
+Local scripts is off by default for each agent. When enabled, scripts that run as the same OS user
+on the host can read a local token and use the loopback API. They can send messages, run routines,
+read pending questions and approvals, and submit answers or approval decisions. OpenBot redacts
+secrets in API responses. Secret questions and browser takeovers return notices only and must be
+completed in OpenBot. OpenBot does not send these API responses to the account service or analytics.
+A script can send the data elsewhere under its own configuration.
+
 ## Agent and host usage
 
 The Usage view stores numeric token counts, activity counts, provider and model identifiers,
@@ -426,6 +443,9 @@ is not included in analytics; provider output uses the application's secret reda
 
 Attachments copied into OpenBot remain in managed storage after their original file is moved or
 deleted. All agents share the embedded browser profile, including cookies and website sessions.
+Websites receive the browser's Chromium user agent. HTTPS sites and local loopback HTTP sites also
+receive basic client hints with the Chromium major version, operating-system name, and desktop flag.
+Google account requests retain the Electron version token for sign-in compatibility.
 
 ## Remote Team API
 
@@ -970,3 +990,22 @@ release manifest from GitHub for its operating system and architecture. The requ
 account data, chats, files, commands, or credentials. GitHub receives the host IP address as part
 of the connection. Connected administrators receive the installed version, release version,
 check status, and installation method.
+
+
+## Pi, Muse, and ACP registry setup
+
+Pi and Muse run on the host selected for the agent. They receive the conversation input, attached
+images, tool definitions, and enabled MCP server configuration needed for a turn. Provider account
+files remain under each provider's control. An explicit Meta API key is encrypted in OpenBot's
+existing provider credential store. Settings responses and settings-change events contain no
+provider credentials; the event carries only the agent ID.
+
+ACP registry search fetches the catalog from `cdn.agentclientprotocol.com`; search text is matched
+on the host. Installation downloads the selected distribution from its published source. Pi update
+checks use `api.github.com`. Muse update checks use `api.meta.ai`, and manifests and binaries come
+from `lookaside.facebook.com`. Download requests reveal the host IP address and requested artifact.
+Registry install records remain on the host, separate from conversations and credentials.
+
+An authorized remote administrator can install, update, cancel, or remove a registry runtime on
+the host through the encrypted Team connection. Removal does not delete agent configuration,
+credentials, or conversations. The existing cloud service does not store those files.

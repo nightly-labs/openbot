@@ -25,6 +25,7 @@ export const messages = {
     "Connectez-vous à votre compte {name}. OpenBot obtient les outils accessibles à ce compte, sans mot de passe.",
   "mcp.signIn.waiting": "En attente du navigateur…",
   "mcp.signIn.continue": "Continuer vers {name}",
+  "mcp.signIn.pageDescription": "Cette page est ouverte dans le navigateur de {host}. Connectez-vous ici.",
   "mcp.server.loadFailed": "Impossible de charger les serveurs MCP.",
   "mcp.test.connected": { one: "Connecté · {count} outil", other: "Connecté · {count} outils" },
   "mcp.status.testing": "Test…",
@@ -112,5 +113,9 @@ export const messages = {
   "mcp.panel.signInWaiting": {
     one: "Terminez la connexion dans votre navigateur. OpenBot cesse d’attendre après {count} minute.",
     other: "Terminez la connexion dans votre navigateur. OpenBot cesse d’attendre après {count} minutes.",
+  },
+  "mcp.panel.signInWaitingOn": {
+    one: "Ouverture de la page de connexion sur {host}. OpenBot cesse d’attendre après {count} minute.",
+    other: "Ouverture de la page de connexion sur {host}. OpenBot cesse d’attendre après {count} minutes.",
   },
 } as const satisfies PartialTranslation<typeof source>;

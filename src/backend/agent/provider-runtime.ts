@@ -44,6 +44,7 @@ import {
   requireProviderDriver,
   savedCustomAgents,
 } from "./../provider-drivers";
+import { startProviderTerminalLogin } from "../provider-terminal-login";
 import { recordRestartActivity } from "../restart-activity";
 import { shortenDiagnostic } from "./../stderr-diagnostics";
 import { stopProcessTree } from "../windows-process-tree";
@@ -305,6 +306,7 @@ export class ProviderRuntime implements ProviderPort {
   readonly #providerStarts = new Map<AgentProvider, Deferred.Deferred<void, ProviderOperationFailed>>();
   readonly #providerConnectionCommands = new Map<AgentProvider, Deferred.Deferred<void, ProviderOperationFailed>>();
   readonly #replacingCli = new Set<AgentProvider>();
+  #removingCustomRuntime = false;
   /**
    * Providers whose idle process was stopped to give its memory back. Each one keeps its status,
    * account and models, so every view reads it as connected; `ensureProvider` starts it again.
@@ -452,8 +454,13 @@ export class ProviderRuntime implements ProviderPort {
         if (this.#off.has(row.id)) return { id: row.id, state: "not-started", version: null, message: null, off: true };
         const source = this.#cli.get(row.id)?.source ?? this.#cliSources.get(row.id);
         const lastError = this.#lastErrors.get(row.id);
+        const unverified =
+          row.id === "muse" && row.state === "available" && this.#accounts.get(row.id)?.type === "muse-unverified";
         const withSource = {
           ...row,
+          ...(unverified
+            ? { state: "sign-in-required" as const, message: sourceText("error.provider.museAuthUnverified") }
+            : {}),
           ...(source ? { cliSource: source } : {}),
           ...(lastError ? { lastError: lastError.message, lastErrorAt: lastError.at } : {}),
         };
@@ -670,6 +677,8 @@ export class ProviderRuntime implements ProviderPort {
 
   createProfileClient(provider: AgentProvider): AgentClient {
     this.requireProviderOn(provider);
+    if (provider === "acp" && this.#removingCustomRuntime)
+      throw new Error(sourceText("error.provider.registryRemoveBusy"));
     const cli = this.#cli.get(provider);
     if (!cli || !this.#clients.has(provider)) throw new Error(sourceText("error.provider.connectBeforeProfile"));
     if (this.#clientFactory) return this.#clientFactory(provider, cli);
@@ -808,6 +817,8 @@ export class ProviderRuntime implements ProviderPort {
     this: ProviderRuntime,
     provider: AgentProvider,
   ) {
+    if (provider === "acp" && this.#removingCustomRuntime)
+      return yield* new ProviderOperationFailed({ cause: new Error(sourceText("error.provider.registryRemoveBusy")) });
     yield* providerStep(() => this.requireProviderOn(provider));
     this.#lastUsed.set(provider, Date.now());
     if (this.#clients.has(provider)) return;
@@ -849,7 +860,7 @@ export class ProviderRuntime implements ProviderPort {
     options: { notifyReady?: boolean; preserveCheckErrors?: boolean; refreshRuntimeInBackground?: boolean },
     phase: "starting" | "restarting" = "starting",
   ) {
-    if (this.#off.has(provider)) return;
+    if (this.#off.has(provider) || (provider === "acp" && this.#removingCustomRuntime)) return;
     const pending = this.#providerStarts.get(provider);
     if (pending) return yield* Deferred.await(pending);
     const completion = Deferred.makeUnsafe<void, ProviderOperationFailed>();
@@ -933,6 +944,12 @@ export class ProviderRuntime implements ProviderPort {
         return this.status();
       case "external":
         return yield* this.#reprobeProvider(provider);
+      case "terminal":
+        yield* this.#cancelCliLogin(provider);
+        yield* this.#cliLogin
+          .start(provider, (cli) => startProviderTerminalLogin(cli, signIn.timeoutMs))
+          .pipe(toProviderOperationFailed);
+        return this.status();
     }
   });
 
@@ -1103,6 +1120,41 @@ export class ProviderRuntime implements ProviderPort {
     return "restarted";
   }, Effect.uninterruptible);
 
+  /** Holds ACP process ownership while managed executable files are removed. */
+  withCustomAgentRuntimeRemoval<T>(
+    operation: () => Effect.Effect<T, ProviderOperationFailed>,
+  ): Effect.Effect<T, ProviderOperationFailed> {
+    return this.#runProviderConnectionCommand(
+      "acp",
+      () =>
+        Effect.gen({ self: this }, function* () {
+          this.#removingCustomRuntime = true;
+          this.#replacingCli.add("acp");
+          recordRestartActivity();
+          return yield* Effect.gen({ self: this }, function* () {
+            const start = this.#providerStarts.get("acp");
+            if (start) yield* Deferred.await(start).pipe(Effect.ignore);
+            for (const pending of this.#confinedStarts.values()) yield* Deferred.await(pending).pipe(Effect.ignore);
+            if (this.#hooks.isProviderBusy("acp"))
+              return yield* new ProviderOperationFailed({
+                cause: new Error(sourceText("error.provider.registryRemoveBusy")),
+              });
+            yield* this.#stopProviderClient("acp");
+            return yield* operation();
+          }).pipe(
+            Effect.ensuring(
+              Effect.sync(() => {
+                this.#removingCustomRuntime = false;
+                this.#replacingCli.delete("acp");
+                this.#hooks.onProviderResumed("acp");
+              }),
+            ),
+          );
+        }),
+      false,
+    );
+  }
+
   /** Stops a provider's shared process and every Workspace only process of it, with no restart. */
   readonly #stopProviderClient = Effect.fn("ProviderRuntime.stopProviderClient")(function* (
     this: ProviderRuntime,
@@ -1258,6 +1310,8 @@ export class ProviderRuntime implements ProviderPort {
    */
   requireReadyClientForAgent(agent: AgentSummary): AgentClient {
     const provider = providerForAgent(agent);
+    if (provider === "acp" && this.#removingCustomRuntime)
+      throw new Error(sourceText("error.provider.registryRemoveBusy"));
     if (!this.#confined.has(agent.id) && !this.#confinementFor(agent)) return this.requireReadyClient(provider);
     const client = this.clientForAgent(agent);
     if (!client) throw new Error(sourceText("error.provider.noAgentProcess", { provider: providerLabel(provider) }));
@@ -1279,6 +1333,8 @@ export class ProviderRuntime implements ProviderPort {
       const currentStart = pending;
       yield* Deferred.await(currentStart).pipe(Effect.ignore);
     }
+    if (provider === "acp" && this.#removingCustomRuntime)
+      return yield* new ProviderOperationFailed({ cause: new Error(sourceText("error.provider.registryRemoveBusy")) });
     const confinement = this.#confinementFor(agent);
     const current = this.#confined.get(agent.id);
     const key = confinement ? this.#confinedKey(provider, confinement) : null;
@@ -1464,6 +1520,8 @@ export class ProviderRuntime implements ProviderPort {
   }
 
   requireReadyClient(provider: AgentProvider): AgentClient {
+    if (provider === "acp" && this.#removingCustomRuntime)
+      throw new Error(sourceText("error.provider.registryRemoveBusy"));
     const client = this.clientFor(provider);
     if (!client || this.#status.phase !== "ready") {
       throw new Error(
@@ -1554,8 +1612,9 @@ export class ProviderRuntime implements ProviderPort {
     this: ProviderRuntime,
     provider: AgentProvider,
     command: () => Effect.Effect<T, ProviderOperationFailed>,
+    requireOn = true,
   ) {
-    yield* providerStep(() => this.requireProviderOn(provider));
+    if (requireOn) yield* providerStep(() => this.requireProviderOn(provider));
     const previous = this.#providerConnectionCommands.get(provider);
     const completion = Deferred.makeUnsafe<void, ProviderOperationFailed>();
     this.#providerConnectionCommands.set(provider, completion);
@@ -1563,7 +1622,7 @@ export class ProviderRuntime implements ProviderPort {
     if (previous) yield* Deferred.await(previous).pipe(Effect.ignore);
     const exit = yield* Effect.exit(
       Effect.gen({ self: this }, function* () {
-        yield* providerStep(() => this.requireProviderOn(provider));
+        if (requireOn) yield* providerStep(() => this.requireProviderOn(provider));
         return yield* Effect.suspend(command);
       }),
     );
@@ -2068,7 +2127,12 @@ export class ProviderRuntime implements ProviderPort {
             .pipe(toProviderOperationFailed);
           if (!account.account) {
             const message =
-              this.#customProviderSignInMessage(provider) ?? agentProviderDescriptor(provider).signInMessage;
+              this.#customProviderSignInMessage(provider) ??
+              (provider === "pi"
+                ? sourceText("error.provider.piSignIn")
+                : provider === "muse"
+                  ? sourceText("error.provider.museSignIn")
+                  : agentProviderDescriptor(provider).signInMessage);
             yield* candidate.stop().pipe(Effect.catch(() => Effect.void));
             this.#setStatus({
               providers: updateProviderStatus(this.#status.providers, provider, {

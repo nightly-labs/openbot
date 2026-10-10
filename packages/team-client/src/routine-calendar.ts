@@ -12,7 +12,7 @@ import {
   type RoutineFields,
   type RoutineRunFields,
 } from "@openbot/contracts/ipc";
-import { nextValidRoutineOccurrence, validateRoutineSchedule } from "./routine-schedule";
+import { nextValidRoutineOccurrence, validateStoredRoutineSchedule } from "./routine-schedule";
 
 /** A remote host gets one request for each owner and each routine; this many run at the same time. */
 const PARALLEL_REQUESTS = 8;
@@ -83,7 +83,7 @@ function routineRuns(
   }
   // A paused routine keeps its place: the calendar shows the runs it would make if it resumed.
   try {
-    validateRoutineSchedule(routine.trigger.schedule, routine.timezone);
+    validateStoredRoutineSchedule(routine.trigger.schedule, routine.timezone);
   } catch {
     // A stored schedule that no longer validates fires nothing either; its past runs still show.
     return runs;

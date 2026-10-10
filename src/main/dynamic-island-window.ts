@@ -16,6 +16,7 @@ import { createOpenBotLogger, type Logger, toLogValue } from "@openbot/logging";
 import { Deferred, Effect, Schema, Semaphore } from "effect";
 import type { BrowserWindow, Display, Rectangle } from "electron";
 import { causeHelpers } from "../backend/effect-boundary";
+import type { CriticalAction } from "./dynamic-island-actions";
 import { readDynamicIslandPreference, writeDynamicIslandPreference } from "./dynamic-island-preference-store";
 import { sendToRenderer } from "./renderer-ipc";
 
@@ -45,8 +46,6 @@ export class DynamicIslandFailed extends Schema.TaggedError<DynamicIslandFailed>
 }) {}
 
 export const { rewrap: toDynamicIslandFailed } = causeHelpers(DynamicIslandFailed);
-
-type CriticalAction = Extract<DynamicIslandAction, { type: "answer-prompt" | "respond-approval" }>;
 
 export interface DynamicIslandWindowControllerOptions {
   platform: NodeJS.Platform;
@@ -138,7 +137,7 @@ export class DynamicIslandWindowController {
     }
   }
 
-  setInteractive(rendererId: number, interactive: boolean): void {
+  setInteractive(rendererId: number, interactive: boolean, keyboard = false): void {
     const entry = [...this.#windows].find(
       ([, candidate]) => !candidate.isDestroyed() && candidate.webContents.id === rendererId,
     );
@@ -150,9 +149,13 @@ export class DynamicIslandWindowController {
     const bounds = display ? dynamicIslandWindowBounds(display) : undefined;
     this.#cancelCollapse(displayId);
     if (interactive && bounds) window.setBounds(bounds, false);
-    // On macOS, focusability also allows the panel to become a main window in AltTab.
-    // Keep it non-focusable; mouse interaction does not require keyboard focus.
     window.setIgnoreMouseEvents(!interactive, { forward: true });
+    // On macOS, focusability also allows the panel to become a main window in AltTab. The panel is
+    // focusable only while a text field on it needs key input. A panel becomes key without
+    // activating the app, so the main window stays where it is.
+    const wantsKeyboard = interactive && keyboard;
+    window.setFocusable(wantsKeyboard);
+    if (wantsKeyboard && !window.isFocused()) window.focus();
     if (interactive || !bounds) return;
     this.#collapseTimers.set(
       displayId,
@@ -190,7 +193,12 @@ export class DynamicIslandWindowController {
 
   performAction(action: DynamicIslandAction): Effect.Effect<void, DynamicIslandFailed> {
     return Effect.suspend(() => {
-      if (action.type === "answer-prompt" || action.type === "respond-approval") {
+      if (
+        action.type === "answer-prompt" ||
+        action.type === "respond-approval" ||
+        action.type === "send-message" ||
+        action.type === "stop-agent"
+      ) {
         return this.#performCriticalAction(action);
       }
       return Effect.gen({ self: this }, function* () {
@@ -213,9 +221,12 @@ export class DynamicIslandWindowController {
     const done = Deferred.makeUnsafe<void, DynamicIslandFailed>();
     this.#criticalActions.set(key, done);
     return Effect.gen({ self: this }, function* () {
-      const window = yield* this.#ensureMainWindow();
+      // The main renderer clears an answered request at once. A reply or a stop changes only the
+      // agent: its events reach the main window by themselves, so the island does not need it.
+      const window =
+        action.type === "answer-prompt" || action.type === "respond-approval" ? yield* this.#ensureMainWindow() : null;
       yield* this.#options.performCriticalAction(action);
-      sendToRenderer(window, IPC_ENDPOINTS.dynamicIsland.action, action);
+      if (window) sendToRenderer(window, IPC_ENDPOINTS.dynamicIsland.action, action);
     }).pipe(
       Effect.onExit((exit) => {
         if (this.#criticalActions.get(key) === done) this.#criticalActions.delete(key);
@@ -417,7 +428,13 @@ function notchSizeChanged(
 }
 
 function criticalActionKey(action: CriticalAction): string {
-  return [action.type, action.serverId, action.agentId, String(action.requestId)].join("\u0000");
+  const id =
+    action.type === "send-message"
+      ? action.clientMessageId
+      : action.type === "stop-agent"
+        ? action.turnId
+        : String(action.requestId);
+  return [action.type, action.serverId, action.agentId, id].join("\u0000");
 }
 
 function dynamicIslandWindowBounds(display: Pick<Display, "bounds">): Rectangle {

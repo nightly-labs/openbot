@@ -27,6 +27,7 @@ import {
 import { AGENT_INSTALL_CAPABILITY } from "@openbot/contracts/team-protocol/agent-install-v1";
 import { AGENT_MEMORIES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-memories-v1";
 import { AGENT_PUBLISH_CAPABILITY } from "@openbot/contracts/team-protocol/agent-publish-v1";
+import { AGENT_SESSION_SETTINGS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-session-settings-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { CONTEXT_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/context-reset-v1";
 import {
@@ -53,8 +54,11 @@ import {
   listSharedTables,
   previewAgentTemplate,
   publishAgentTemplate,
+  readAgentSessionSettings,
+  resetAgentSessionSetting,
   rotateEventRoutineSecret,
   saveEventRoutine,
+  setAgentSessionSetting,
   setAgentSkillEnabled,
   testEventRoutine,
   uninstallAgentSkill,
@@ -121,6 +125,9 @@ type HostRequestActions = Pick<
   | "updateAgentHostSettings"
   | "canStartNewChat"
   | "startNewChat"
+  | "loadAgentSessionSettings"
+  | "setAgentSessionSetting"
+  | "resetAgentSessionSetting"
   | "listSharedTables"
   | "deleteSharedTable"
   | "loadAgentTemplatePreview"
@@ -192,7 +199,20 @@ export function createHostRequestActions({
         catch: (cause) => new TeamRequestError({ cause }),
       });
   }
+  function sessionSettingsAdmin(serverId: string): TeamApiRequest {
+    if (!capabilities.get(serverId)?.includes(AGENT_SESSION_SETTINGS_CAPABILITY))
+      throw new Error(currentText().t("mobile.agent.session.unsupported"));
+    return teamApi(serverId);
+  }
   return {
+    loadAgentSessionSettings: async (agentId, serverId) =>
+      capabilities.get(serverId)?.includes(AGENT_SESSION_SETTINGS_CAPABILITY)
+        ? runTeamRequest(readAgentSessionSettings(sessionSettingsAdmin(serverId), agentId))
+        : null,
+    setAgentSessionSetting: async (input, serverId) =>
+      runTeamRequest(setAgentSessionSetting(sessionSettingsAdmin(serverId), input)),
+    resetAgentSessionSetting: async (input, serverId) =>
+      runTeamRequest(resetAgentSessionSetting(sessionSettingsAdmin(serverId), input)),
     listEventRoutines: (owner, serverId) => runTeamRequest(listEventRoutines(eventsAdmin(serverId), { owner })),
     saveEventRoutine: (input, serverId) => runTeamRequest(saveEventRoutine(eventsAdmin(serverId), input)),
     deleteEventRoutine: (input, serverId) => runTeamRequest(deleteEventRoutine(eventsAdmin(serverId), input)),

@@ -8,14 +8,17 @@ import {
   type AppInfo,
   type BrowserTakeoverRequest,
   CHANNEL_CHATS_CAPABILITY,
+  decodeAgentHostSettings,
   type ServerConnectionState,
   type ServerSummary,
 } from "@openbot/contracts/ipc";
+import { AGENT_HOST_SETTINGS_ROUTES } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
 import { AGENT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-import-v1";
 import { CONTEXT_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/context-reset-v1";
 import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
 import { HOST_RELEASE_CAPABILITY } from "@openbot/contracts/team-protocol/host-release-v1";
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
+import { MCP_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import {
   cancelHostUpdate,
@@ -524,14 +527,21 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     workspace.runtime.admin ? () => hostRequest() : undefined,
     workspace.onHostEvent,
     eventsEnabled,
+    () =>
+      workspace.state.capabilities.includes("agent-session-settings-v1") &&
+      (workspace.state.host?.role === "owner" || workspace.state.host?.role === "admin"),
   );
   const remoteAgentAdmin = createRemoteAgentAdmin(
     () => {
       const current = server();
       const agent = workspace.selected();
-      return current && agent ? { server: current, agentId: agent.id } : null;
+      return current && agent ? { server: current, agentId: agent.id, updatedAt: agent.updatedAt ?? null } : null;
     },
     () => ({
+      getAgentHostSettings: (agentId, serverId) =>
+        hostRequest(serverId)("POST", AGENT_HOST_SETTINGS_ROUTES.settings, decodeAgentHostSettings, { agentId }),
+      updateAgentHostSettings: (input, serverId) =>
+        hostRequest(serverId)("POST", AGENT_HOST_SETTINGS_ROUTES.update, decodeAgentHostSettings, { ...input }),
       getAgentAdminSettings: (agentId, serverId) =>
         runTeamEffect(
           getAgentAdminSettings(hostRequest(serverId), agentId).pipe(Effect.mapError((error) => error.cause)),
@@ -546,7 +556,14 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const conversationAgent = createMemo(() => {
     const agent = workspace.selected();
     const settings = remoteAgentAdmin.settings();
-    return agent && settings ? { ...agent, access: settings.access } : agent;
+    const automation = remoteAgentAdmin.automation();
+    return agent
+      ? {
+          ...agent,
+          ...(settings ? { access: settings.access } : {}),
+          ...(automation === undefined ? {} : { allowAutomation: automation }),
+        }
+      : agent;
   });
   const serverSettings = createWebServerSettings({
     server,
@@ -871,6 +888,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       workspace.state.capabilities.includes("browser-control") &&
       workspace.state.capabilities.includes("browser-view"),
   );
+  /** The host opens an MCP sign-in page in its own browser, and the live view shows it here. */
+  const mcpSignInSupported = () =>
+    workspace.state.capabilities.includes(MCP_SIGN_IN_CAPABILITY) &&
+    workspace.state.capabilities.includes("browser-view");
   const browserTakeover = createMemo(() => {
     const agent = workspace.selected();
     if (!agent) return undefined;
@@ -1338,12 +1359,36 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                     onRecheckScreenRecording={unavailable}
                     mcpServers={serverSettings.state.mcp}
                     mcpLoadError={serverSettings.state.mcpError}
-                    onMcpSectionShown={() => void serverSettings.refreshMcp()}
+                    onMcpSectionShown={() => {
+                      void serverSettings.refreshMcp();
+                      if (mcpSignInSupported()) void serverSettings.refreshMcpSignIns().catch(() => undefined);
+                    }}
                     onRetryMcpServers={() => void serverSettings.refreshMcp()}
-                    onSaveMcpServer={serverSettings.saveMcpServer}
+                    onSaveMcpServer={async (config) => {
+                      await serverSettings.saveMcpServer(config);
+                      // A saved row can name an address the host is already signed in to.
+                      if (mcpSignInSupported()) void serverSettings.refreshMcpSignIns().catch(() => undefined);
+                    }}
                     onRemoveMcpServer={serverSettings.removeMcpServer}
                     onSetMcpServerEnabled={serverSettings.setMcpServerEnabled}
                     onTestMcpServer={serverSettings.testMcpServer}
+                    // The host opens the sign-in page in its own browser, and the live view shows it here.
+                    mcpSignIn={
+                      mcpSignInSupported()
+                        ? {
+                            signedIn: serverSettings.state.mcpSignIns,
+                            remote: {
+                              hostName: target().name,
+                              runtime: workspace.runtime.browser,
+                              clipboard: workspace.state.capabilities.includes("browser-view-clipboard"),
+                              pages: serverSettings.state.mcpSignInPages,
+                            },
+                            start: serverSettings.signInMcpServer,
+                            cancel: serverSettings.cancelMcpSignIn,
+                            signOut: serverSettings.signOutMcpServer,
+                          }
+                        : undefined
+                    }
                     storage={{
                       hostName: target().name,
                       calls: storageCalls,

@@ -133,9 +133,15 @@ export interface McpSignIn {
 /**
  * What a hand-off and a test ask of OAuth. `AgentService` holds one of these and nothing else does.
  */
+/**
+ * Opens the authorization page of one sign-in somewhere other than this computer's own browser: a
+ * private tab of this host's browser, for an administrator who signs in from another computer.
+ */
+export type McpSignInOpener = (url: string) => Promise<void>;
+
 export interface McpOAuthAuthority {
   accessToken: (url: string) => Effect.Effect<string | null, McpOperationError>;
-  signIn: (url: string) => McpSignIn | null;
+  signIn: (url: string, open?: McpSignInOpener) => McpSignIn | null;
   /** Ends the sign-in waiting for this URL's browser, if one is. Answers whether one was. */
   cancelSignIn: (url: string) => boolean;
   /** Whether this computer holds a token for this URL. Never the token itself. */
@@ -153,6 +159,8 @@ export class McpOAuth implements McpOAuthAuthority {
    * `openbot://mcp-auth` link do nothing.
    */
   readonly #waiting = new Map<string, (code: string) => void>();
+  /** The waiting sign-ins whose page an opener of their own showed, not the user's browser. */
+  readonly #openedElsewhere = new Set<string>();
   /**
    * The cancel of the sign-in still running for each server. A user who presses Cancel names the
    * server, not the `state`, and one attempt per server is kept: a second Sign in replaces the
@@ -260,13 +268,14 @@ export class McpOAuth implements McpOAuthAuthority {
         Effect.sync(() => {
           for (const cancel of [...this.#attempts.values()]) cancel();
           this.#waiting.clear();
+          this.#openedElsewhere.clear();
         }),
       ),
     ),
   );
 
   /** A sign-in the user asked for, or `null` when the URL is not one this can sign in to. */
-  signIn(url: string): McpSignIn | null {
+  signIn(url: string, open?: McpSignInOpener): McpSignIn | null {
     const resource = normalizeResource(url);
     if (!resource) return null;
     this.#attempts.get(resource)?.();
@@ -275,14 +284,16 @@ export class McpOAuth implements McpOAuthAuthority {
     this.#waiting.set(state, (code) => {
       Deferred.doneUnsafe(grant, Effect.succeed(code));
     });
+    if (open) this.#openedElsewhere.add(state);
     // Set when the probe moves on: a discovery slow enough to outlast it must neither open a
     // browser afterwards nor wait out a grant nobody will answer.
     let abandoned = false;
     let cancelled = false;
-    const provider = this.#provider(resource, state, () => abandoned);
+    const provider = this.#provider(resource, state, () => abandoned, open);
     const abandon = () => {
       abandoned = true;
       this.#waiting.delete(state);
+      this.#openedElsewhere.delete(state);
       if (this.#attempts.get(resource) === cancel) this.#attempts.delete(resource);
     };
     // The user said stop: the wait ends now rather than at its deadline, with its own sentence.
@@ -356,6 +367,14 @@ export class McpOAuth implements McpOAuthAuthority {
     return true;
   }
 
+  /**
+   * Whether the sign-in waiting for this `state` showed its page in its own opener. Its return
+   * raises no window here: the person who signed in is at another computer.
+   */
+  openedElsewhere(state: string): boolean {
+    return this.#openedElsewhere.has(state);
+  }
+
   cancelSignIn(url: string): boolean {
     const resource = normalizeResource(url);
     const cancel = resource ? this.#attempts.get(resource) : undefined;
@@ -377,7 +396,12 @@ export class McpOAuth implements McpOAuthAuthority {
   }).bind(this);
 
   /** A `state` makes the provider interactive; `null` keeps it silent. */
-  #provider(resource: string, state: string | null, isAbandoned: () => boolean = () => false): McpOAuthClientProvider {
+  #provider(
+    resource: string,
+    state: string | null,
+    isAbandoned: () => boolean = () => false,
+    open?: McpSignInOpener,
+  ): McpOAuthClientProvider {
     const generation = this.#generations.get(resource) ?? 0;
     const storage = this.#options.storage;
     const stored = storage.read(resource);
@@ -410,7 +434,7 @@ export class McpOAuth implements McpOAuthAuthority {
       state,
       storage: guarded,
       redirectUrl: this.#options.redirectUrl,
-      openExternal: this.#options.openExternal,
+      openExternal: open ?? this.#options.openExternal,
       isAbandoned,
       legacyIssuer: legacyIssuer(stored),
       hasUnboundCredentials: hasUnboundCredentials(stored),
@@ -591,7 +615,10 @@ class McpOAuthClientProvider implements OAuthClientProvider {
    *
    * An embedded window would be OpenBot standing between the user and their password manager, their
    * existing session and the address bar that proves which site is asking - which is the whole
-   * reason RFC 8252 says a native app must not do it.
+   * reason RFC 8252 says a native app must not do it. The one other opener is a sign-in an
+   * administrator started from another computer: nobody is at this one, and only a browser here
+   * reaches the loopback address the grant comes back to, so the page opens in a private tab of this
+   * host's browser that the administrator watches.
    */
   redirectToAuthorization(authorizationUrl: URL): Promise<void> {
     return runCauseEffect(

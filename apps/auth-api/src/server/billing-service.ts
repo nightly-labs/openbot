@@ -22,6 +22,7 @@ import { isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-v
 import { sourceText } from "@openbot/i18n/source";
 import { Context, Effect, Layer, Schema } from "effect";
 import { type AccountAnalytics, type BillingAction, NO_ACCOUNT_ANALYTICS } from "./account-analytics";
+import type { BillingSales } from "./billing-sales";
 import type { HostedFailure } from "./hosted-server-service";
 import type { RemoteFailure } from "./remote-control-plane";
 import type { StripeTransportError } from "./stripe-client";
@@ -131,6 +132,7 @@ export interface BillingServiceOptions {
    */
   onSubscriptionSynced?: (sync: SubscriptionSync) => Effect.Effect<void, HostedFailure | RemoteFailure>;
   analytics?: AccountAnalytics;
+  sales?: BillingSales;
 }
 
 /** The stored state of a subscription before a sync, to find the change that the sync made. */
@@ -176,6 +178,7 @@ export class BillingService {
   readonly #secretKey: string;
   readonly #webhookSecret: string | null;
   readonly #analytics: AccountAnalytics;
+  readonly #sales: BillingSales | null;
 
   constructor(options: BillingServiceOptions) {
     const database = options.database;
@@ -185,6 +188,7 @@ export class BillingService {
     const now = options.now ?? Date.now;
     const onSubscriptionSynced = options.onSubscriptionSynced ?? null;
     this.#analytics = options.analytics ?? NO_ACCOUNT_ANALYTICS;
+    this.#sales = options.sales ?? null;
     this.#layer = Layer.succeed(BillingDependencies, {
       database,
       stripe,
@@ -282,6 +286,7 @@ export class BillingService {
       if (!price || amount === null) return yield* plansUnavailable();
       const customerId = yield* this.ensureCustomer(request.user);
       const returnUrl = checkoutReturnUrl(request.origin, request.target, request.serverId);
+      const returnToken = this.#sales ? crypto.randomUUID() : null;
       const session = yield* this.#stripeCall(() =>
         dependencies.stripe.createCheckoutSession({
           customerId,
@@ -290,18 +295,38 @@ export class BillingService {
           userId: request.user.id,
           serverId: request.serverId,
           successUrl: returnUrl,
-          cancelUrl: `${returnUrl}${returnUrl.includes("?") ? "&" : "?"}cancelled=1`,
+          cancelUrl: returnToken
+            ? `${request.origin}/billing/checkout-return?token=${encodeURIComponent(returnToken)}`
+            : `${returnUrl}${returnUrl.includes("?") ? "&" : "?"}cancelled=1`,
           nowSeconds: Math.floor(dependencies.now() / 1_000),
         }),
       );
-      dependencies.analytics.track(request.user.id, {
-        name: "billing_action",
-        action: "checkout_started",
-        plan: request.plan,
-        interval: request.interval,
-        currency: request.currency,
-        amount,
-      });
+      if (this.#sales && returnToken) {
+        const destination = new URL(returnUrl);
+        destination.searchParams.set("cancelled", "1");
+        yield* this.#sales
+          .checkout({
+            sessionId: session.id,
+            returnToken,
+            userId: request.user.id,
+            serverId: request.serverId,
+            plan: request.plan,
+            interval: request.interval,
+            currency: request.currency,
+            amount,
+            returnUrl: `${destination.pathname}${destination.search}`,
+            createdAt: dependencies.now(),
+          })
+          .pipe(Effect.mapError(() => new BillingOperationError({})));
+      } else
+        dependencies.analytics.track(request.user.id, {
+          name: "billing_action",
+          action: "checkout_started",
+          plan: request.plan,
+          interval: request.interval,
+          currency: request.currency,
+          amount,
+        });
       return { sessionId: session.id, url: session.url };
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
@@ -654,6 +679,9 @@ export class BillingService {
       if (seen) return;
       const subscriptionId = eventSubscriptionId(event);
       const synced = subscriptionId ? yield* this.#syncSubscription(subscriptionId) : null;
+      if (this.#sales) {
+        yield* this.#sales.webhook(event, synced).pipe(Effect.mapError(() => new BillingOperationError({})));
+      }
       // The event is recorded only after it is applied, so a failed event is applied again on retry.
       yield* billingCall(() =>
         dependencies.database.batch([
@@ -665,7 +693,7 @@ export class BillingService {
             .bind(now - WEBHOOK_EVENT_RETENTION_MS),
         ]),
       );
-      yield* this.#trackEvent(event, synced);
+      if (!this.#sales) yield* this.#trackEvent(event, synced);
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);

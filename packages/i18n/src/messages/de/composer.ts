@@ -2,6 +2,9 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/composer";
 
 export const messages = {
+  "composer.queueEdit.body":
+    "Du bearbeitest eine Nachricht in der Warteschlange. Speichere die Änderung oder brich sie ab, damit die Nachricht ausgeführt werden kann.",
+  "composer.queueEdit.cancel": "Bearbeitung abbrechen",
   "composer.notice.dismiss": "Fehler ausblenden",
   "composer.signIn.title": "Anmeldung erforderlich",
   "composer.signIn.body": "Melde dich bei {provider} an, um Nachrichten zu senden.",
@@ -39,6 +42,7 @@ export const messages = {
   "composer.token.unavailableSkill": "Nicht verfügbare Fähigkeit {name}",
   "composer.token.unavailableMcp": "Nicht verfügbarer MCP-Server {name}",
   "composer.voice.stop": "Sprachaufnahme stoppen",
+  "composer.voice.cancel": "Sprachaufnahme abbrechen",
   "composer.voice.preparing": "Sprachmodell wird heruntergeladen",
   "composer.voice.requesting": "Mikrofonzugriff wird angefordert",
   "composer.voice.transcribing": "Sprachanweisung wird transkribiert",

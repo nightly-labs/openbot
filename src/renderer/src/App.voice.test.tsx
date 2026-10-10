@@ -36,7 +36,7 @@ describe("OpenBot connected desktop shell", () => {
     await fireEvent.click(screen.getByRole("button", { name: "Create prompt with voice" }));
 
     const status = await screen.findByRole("group", { name: "Voice recording" });
-    expect(within(status).getByText("0:00")).toBeVisible();
+    expect(within(status).getByText("0:00")).toBeInTheDocument();
     expect(within(status).getByRole("button", { name: "Stop voice recording" })).toBeVisible();
     expect(screen.queryByRole("button", { name: "Create prompt with voice" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Send voice message" })).toBeInTheDocument();
@@ -338,7 +338,7 @@ describe("OpenBot connected desktop shell", () => {
     expect(screen.getByRole("textbox", { name: "Message Chief" })).toHaveTextContent("Later local draft");
   });
 
-  // The Linux package carries no whisper binary, so the composer must not offer a control that
+  // The Linux package carries no voice runtime, so the composer must not offer a control that
   // always fails. Everything else about the window, the server rail included, stays the same.
   it("offers no microphone on Linux and still draws the server rail", async () => {
     vi.mocked(window.openbot.getAppInfo).mockResolvedValue({

@@ -11,6 +11,7 @@ import type {
   AgentModelOption,
   AgentProviderId,
   AgentReasoningEffort,
+  AgentSessionSettings,
   AgentTemplatePreview,
   AgentTemplatePublication,
   AvatarHue,
@@ -25,6 +26,7 @@ import type {
   InstallAgentTemplateInput,
   InstalledSkill,
   QueueSnapshot,
+  ResetAgentSessionSettingInput,
   RespondToApprovalInput,
   RespondToBrowserSecretInput,
   RespondToPromptInput,
@@ -32,6 +34,7 @@ import type {
   RoutineCalendar,
   RoutineCalendarInput,
   SetAgentMemoryInclusionInput,
+  SetAgentSessionSettingInput,
   SetEnabledSkillInput,
   SharedTable,
   SidebarLayoutAction,
@@ -187,6 +190,8 @@ export interface MobileWorkspaceContextValue {
   liveState: LiveWorkspaceStore;
   selectServer: (serverId: string) => void;
   leaveServer: (serverId: string) => Promise<void>;
+  /** Removes a server that this account owns from the account service. The host can be offline. */
+  removeServer: (serverId: string) => Promise<void>;
   refreshServers: () => Promise<void>;
   refreshServer: (serverId: string) => Promise<void>;
   /** An owner or admin of an online host that serves `host-admin-v1`. The host checks the role again. */
@@ -262,6 +267,9 @@ export interface MobileWorkspaceContextValue {
   /** True when the host advertises `context-reset-v1`. Any member can start a new chat. */
   canStartNewChat: (serverId: string) => boolean;
   /** The agent forgets the messages before it. The host refuses while the agent works. */
+  loadAgentSessionSettings: (agentId: string, serverId: string) => Promise<AgentSessionSettings | null>;
+  setAgentSessionSetting: (input: SetAgentSessionSettingInput, serverId: string) => Promise<AgentSessionSettings>;
+  resetAgentSessionSetting: (input: ResetAgentSessionSettingInput, serverId: string) => Promise<AgentSessionSettings>;
   startNewChat: (agentId: string, serverId: string) => Promise<void>;
   /** An owner or admin of an online host that serves `shared-tables-v1`. The host checks the role again. */
   canManageSharedTables: (serverId: string) => boolean;
@@ -285,8 +293,8 @@ export interface MobileWorkspaceContextValue {
   deleteStoredFile: (fileId: string, serverId: string) => Promise<void>;
   /** Searches message text in the server's agent chats, one page from `cursor` or from the newest match. */
   searchMessages: (query: string, serverId: string, cursor?: string) => Promise<ConversationSearchPage>;
-  loadConversation: (agentId: string) => Promise<ConversationSnapshot>;
-  loadOlderMessages: (agentId: string) => Promise<void>;
+  loadConversation: (agentId: string, serverId?: string) => Promise<ConversationSnapshot>;
+  loadOlderMessages: (agentId: string, serverId?: string) => Promise<void>;
   respondToPrompt: (agentId: string, input: RespondToPromptInput) => Promise<void>;
   sendMessage: (
     agentId: string,
@@ -306,7 +314,7 @@ export interface MobileWorkspaceContextValue {
   discardAttachment: (agentId: string, attachmentId: string, serverId?: string) => Promise<void>;
   hideAgent: (agentId: string) => void;
   unhideAgent: (agentId: string) => void;
-  markAgentRead: (agentId: string, throughMessageId?: string) => void;
+  markAgentRead: (agentId: string, throughMessageId?: string, serverId?: string) => void;
   markAgentUnread: (agentId: string) => void;
   /** Marks every unread chat of the active server read. It rejects when a chat stays unread. */
   markAllRead: () => Promise<void>;

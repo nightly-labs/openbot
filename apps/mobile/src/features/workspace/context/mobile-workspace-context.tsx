@@ -24,9 +24,9 @@ import { HOST_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/host-adm
 import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "@openbot/contracts/team-protocol/live-activity-push-v1";
 import { SHARED_TABLES_CAPABILITY } from "@openbot/contracts/team-protocol/shared-tables-v1";
 import { SKILLS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/skills-admin-v1";
-import { decodeTeamProtocolSupportV1 } from "@openbot/contracts/team-protocol/v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
+import { decodeTeamProtocolSupportV7Base } from "@openbot/contracts/team-protocol/v7-base";
 import { sourceText } from "@openbot/i18n/source";
 import {
   createRemoteAccountRefresh,
@@ -496,7 +496,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       await client.connect(serverId, publicKey);
       if (!context.isCurrent()) return;
       context.stage = "compatibility";
-      const compatibility = await client.request("GET", TEAM_API_ROUTES.compatibility, decodeTeamProtocolSupportV1);
+      const compatibility = await client.request("GET", TEAM_API_ROUTES.compatibility, decodeTeamProtocolSupportV7Base);
       if (!context.isCurrent()) return;
       supportLog.add(
         "info",
@@ -679,9 +679,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     [request, conversationStore],
   );
   const loadOlderMessages = useCallback(
-    async (agentId: string) => {
+    async (agentId: string, serverId = activeServerIdRef.current) => {
       const generation = loadGeneration.current;
-      const serverId = activeServerIdRef.current;
       await conversationStore.loadOlder(
         agentId,
         (cursor) =>
@@ -843,13 +842,19 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           queryKey: ["agent-info", session.apiUrl, session.user.id, sessionScope, serverId, event.agentId],
         });
       }
+      if (event.type === "agent-session-settings-changed") {
+        void queryClient.invalidateQueries({
+          queryKey: ["agent-info", session.apiUrl, session.user.id, sessionScope, serverId, event.agentId],
+          predicate: (query) => query.queryKey.at(-1) === "session-settings",
+        });
+      }
       if (event.type === "agents-changed") {
         replaceServerAgents(serverId, event.agents);
         // The admin and host settings of an agent are not in the agent summary. The host sends this event
         // when one of them changes, so an open settings page reads them again.
         void queryClient.invalidateQueries({
           queryKey: ["agent-info", session.apiUrl, session.user.id, sessionScope, serverId],
-          predicate: (query) => query.queryKey.at(-1) === "admin" || query.queryKey.at(-1) === "host",
+          predicate: (query) => ["admin", "host", "session-settings"].includes(String(query.queryKey.at(-1))),
         });
       } else if (event.type === "conversation") {
         const knownIds = serverAgentIds.current.get(serverId) ?? new Set<string>();
@@ -957,11 +962,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   );
 
   const markAgentRead = useCallback(
-    (agentId: string, visibleMessageId?: string | null) => {
+    (agentId: string, visibleMessageId?: string | null, targetServerId?: string) => {
+      const serverId = targetServerId ?? activeServerId;
       if (
         visibleMessageId === null &&
-        (!activeServerId ||
-          !serverCapabilities.current.get(activeServerId)?.includes(TEAM_CONVERSATION_UNREAD_CAPABILITY))
+        (!serverId || !serverCapabilities.current.get(serverId)?.includes(TEAM_CONVERSATION_UNREAD_CAPABILITY))
       ) {
         showWarningAlert(
           "team",
@@ -970,7 +975,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         );
         return;
       }
-      void writeAgentRead(agentId, visibleMessageId).catch(() => {
+      void writeAgentRead(agentId, visibleMessageId, serverId ?? undefined).catch(() => {
         if (visibleMessageId === null)
           showFailureAlert(
             undefined,
@@ -1043,6 +1048,37 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           (server.role === "owner" || server.role === "admin") &&
           serverCapabilities.current.get(serverId)?.includes(capability),
       );
+    };
+    /** Drops a server that this account left or removed, and its local state. */
+    const forgetServer = (serverId: string) => {
+      removedServers.current.add(serverId);
+      readRefresh.invalidate(serverId);
+      directoryGeneration.current += 1;
+      directoryRefresh.invalidate();
+      setServerDirectoryState("ready");
+      setServerDirectoryError(null);
+      const removedIds = serverAgentIds.current.get(serverId) ?? new Set<string>();
+      serverAgentIds.current.delete(serverId);
+      if (activeServerId === serverId) {
+        loadGeneration.current += 1;
+        setActiveServerId(session.host?.hostId ?? null);
+      }
+      setServers((current) => current.filter((candidate) => candidate.id !== serverId));
+      setSidebarByServer((current) => Object.fromEntries(Object.entries(current).filter(([id]) => id !== serverId)));
+      setAgents((current) => current.filter((agent) => agent.serverId !== serverId));
+      liveState.update("activityByServer", (current) => {
+        const next = { ...current };
+        delete next[serverId];
+        return next;
+      });
+      liveState.update("approvalRequests", (current) => {
+        const next = { ...current };
+        delete next[serverId];
+        return next;
+      });
+      for (const id of removedIds) conversationStore.remove(id);
+      updatePreferences(serverId, () => ({ hidden: [], pinned: [] }));
+      liveState.update("unreadAgentIds", (current) => current.filter((id) => !removedIds.has(id)));
     };
     const workspace: MobileWorkspaceContextValue = {
       browserViewSupport: (serverId) => {
@@ -1205,34 +1241,13 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         if (!server || server.role === "owner")
           throw new Error(currentText().t("mobile.workspace.error.leaveOwnServer"));
         await runTeamEffect(directory.leaveHost(server.id, server.membershipId));
-        removedServers.current.add(serverId);
-        readRefresh.invalidate(serverId);
-        directoryGeneration.current += 1;
-        directoryRefresh.invalidate();
-        setServerDirectoryState("ready");
-        setServerDirectoryError(null);
-        const removedIds = serverAgentIds.current.get(serverId) ?? new Set<string>();
-        serverAgentIds.current.delete(serverId);
-        if (activeServerId === serverId) {
-          loadGeneration.current += 1;
-          setActiveServerId(session.host?.hostId ?? null);
-        }
-        setServers((current) => current.filter((candidate) => candidate.id !== serverId));
-        setSidebarByServer((current) => Object.fromEntries(Object.entries(current).filter(([id]) => id !== serverId)));
-        setAgents((current) => current.filter((agent) => agent.serverId !== serverId));
-        liveState.update("activityByServer", (current) => {
-          const next = { ...current };
-          delete next[serverId];
-          return next;
-        });
-        liveState.update("approvalRequests", (current) => {
-          const next = { ...current };
-          delete next[serverId];
-          return next;
-        });
-        for (const id of removedIds) conversationStore.remove(id);
-        updatePreferences(serverId, () => ({ hidden: [], pinned: [] }));
-        liveState.update("unreadAgentIds", (current) => current.filter((id) => !removedIds.has(id)));
+        forgetServer(serverId);
+      },
+      removeServer: async (serverId) => {
+        const server = serversRef.current.find((candidate) => candidate.id === serverId);
+        if (server?.role !== "owner") throw new Error(currentText().t("mobile.workspace.error.removeOwnedServerOnly"));
+        await runTeamEffect(directory.removeOwnedHost(server.id));
+        forgetServer(serverId);
       },
       refreshServer: async (serverId) => {
         connections.current.get(serverId)?.refresh();

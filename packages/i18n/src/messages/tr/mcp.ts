@@ -25,6 +25,7 @@ export const messages = {
     "{name} hesabınıza giriş yapın. OpenBot, bu hesabın erişebildiği araçları alır ve şifre almaz.",
   "mcp.signIn.waiting": "Tarayıcı bekleniyor…",
   "mcp.signIn.continue": "{name} ile devam et",
+  "mcp.signIn.pageDescription": "Bu sayfa {host} üzerindeki tarayıcıda açık. Burada oturum açın.",
   "mcp.server.loadFailed": "MCP sunucuları yüklenemedi.",
   "mcp.test.connected": { one: "Bağlandı · {count} araç", other: "Bağlandı · {count} araç" },
   "mcp.status.testing": "Test ediliyor…",
@@ -110,5 +111,9 @@ export const messages = {
   "mcp.panel.signInWaiting": {
     one: "Oturum açmayı tarayıcınızda tamamlayın. OpenBot {count} dakika sonra beklemeyi bırakır.",
     other: "Oturum açmayı tarayıcınızda tamamlayın. OpenBot {count} dakika sonra beklemeyi bırakır.",
+  },
+  "mcp.panel.signInWaitingOn": {
+    one: "Oturum açma sayfası {host} üzerinde açılıyor. OpenBot {count} dakika sonra beklemeyi bırakır.",
+    other: "Oturum açma sayfası {host} üzerinde açılıyor. OpenBot {count} dakika sonra beklemeyi bırakır.",
   },
 } as const satisfies PartialTranslation<typeof source>;

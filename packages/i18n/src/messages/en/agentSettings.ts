@@ -1,6 +1,13 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("agentSettings", {
+  "agentSettings.session.title": "Provider settings",
+  "agentSettings.session.readFailed": "Could not read provider settings.",
+  "agentSettings.session.pending": "Saved changes apply before the next turn.",
+  "agentSettings.session.unavailable": "Saved value {value} is not available. Select another value or reset it.",
+  "agentSettings.session.effective": "Current provider value: {value}",
+  "agentSettings.session.reset": "Reset setting",
+  "agentSettings.session.resetNamed": "Reset {name}",
   "agentSettings.label": "Agent settings",
   "agentSettings.title": "Settings",
   "agentSettings.backToDetails": "Back to details",
@@ -111,7 +118,8 @@ export const messages = defineMessages("agentSettings", {
   "agentSettings.computerUse.title": "Computer Use",
   "agentSettings.computerUse.description": "Let this agent control apps on this computer",
   "agentSettings.automation.title": "Local scripts",
-  "agentSettings.automation.description": "Let scripts on this computer run this agent's routines",
+  "agentSettings.automation.description":
+    "Let scripts on the host send messages, run routines, answer questions, and accept or decline approvals",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "The whole {provider} process runs in a sandbox, so a write outside fails. Available on macOS only.",
 });

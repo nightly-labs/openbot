@@ -1,6 +1,8 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("composer", {
+  "composer.queueEdit.body": "You are editing a queued message. Save or cancel the edit to let it run.",
+  "composer.queueEdit.cancel": "Cancel edit",
   "composer.notice.dismiss": "Dismiss error",
   "composer.signIn.title": "Sign in required",
   "composer.signIn.body": "Sign in to {provider} to send messages.",
@@ -37,6 +39,7 @@ export const messages = defineMessages("composer", {
   "composer.token.unavailableSkill": "Unavailable skill {name}",
   "composer.token.unavailableMcp": "Unavailable MCP server {name}",
   "composer.voice.stop": "Stop voice recording",
+  "composer.voice.cancel": "Cancel voice recording",
   "composer.voice.preparing": "Downloading voice model",
   "composer.voice.requesting": "Requesting microphone access",
   "composer.voice.transcribing": "Transcribing voice prompt",

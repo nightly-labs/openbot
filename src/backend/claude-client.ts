@@ -927,6 +927,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           return;
         }
       }
+      // The CLI's own report of a failed request, such as "Invalid API key · Please run /login", is not
+      // an answer. The result after it carries the same text and fails the turn.
+      if (message.error && message.error !== "max_output_tokens") return;
       const thinking = messageThinking(message.message);
       /* The deltas never announced this block, so its own order is all there is to say what came
          before it. Text the message placed there is narration, and only that much may go. */
@@ -1005,6 +1008,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       message.terminal_reason === "aborted_streaming" ||
       message.terminal_reason === "aborted_tools" ||
       errors.some((error) => /interrupt|abort/i.test(error));
+    // "success" with `is_error` is a turn that ended on an API error, and `result` holds its text.
+    const apiError = message.subtype === "success" && message.is_error === true;
     const turn = runtime.activeTurn;
     if (turn) {
       for (const [toolCallId, name] of turn.toolCalls) {
@@ -1017,7 +1022,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       if (
         limit &&
         !interrupted &&
-        (limit.text !== null || (message.subtype === "success" && message.is_error === true)) &&
+        (limit.text !== null || apiError) &&
         !isBalanceDiagnostic(limit.text ?? `${errors.join("\n")}\n${fallback}`)
       ) {
         this.emit("notification", {
@@ -1033,10 +1038,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         return;
       }
       this.#reconcileText(runtime, [...turn.assistantMessages.values()].join(""));
-      if (!turn.seenText && fallback) this.#bufferText(runtime, fallback);
+      if (!turn.seenText && fallback && !apiError) this.#bufferText(runtime, fallback);
     }
-    const status = interrupted ? "interrupted" : message.subtype === "success" ? "completed" : "failed";
-    yield* this.#completeTurn(runtime, status, errors.length > 0 ? errors.join("\n") : null);
+    const status = interrupted ? "interrupted" : message.subtype === "success" && !apiError ? "completed" : "failed";
+    yield* this.#completeTurn(runtime, status, errors.length > 0 ? errors.join("\n") : apiError ? fallback : null);
   });
 
   #emitToolCall(runtime: ThreadRuntime, id: string, name: string, completed: boolean, input?: unknown): void {

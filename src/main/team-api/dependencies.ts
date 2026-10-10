@@ -1,5 +1,6 @@
 import type { Effect } from "effect";
 import type { ChannelService } from "../../backend/channel-service";
+import type { AcpRegistry } from "../acp-registry";
 import type { AgentAdminSettingsService } from "../agent-admin-settings";
 import type { AgentHostSettingsService } from "../agent-host-settings";
 import type { AgentMarketplaceService } from "../agent-marketplace-service";
@@ -42,6 +43,7 @@ import type { BrowserViewGateway } from "../browser-view-gateway";
 import type { HostedSiteDesktopService } from "../hosted-site-service";
 import type { McpToolRuntimePreparation } from "../ipc/mcp-server-handlers";
 import type { LiveActivityPushService } from "../live-activity-push";
+import type { McpHostSignIns } from "../mcp-host-sign-ins";
 import type { RemoteScreenGateway } from "../remote-screen-gateway";
 import type { TeamStore } from "../team-store";
 
@@ -134,6 +136,9 @@ export type TeamApiMcpServers = Pick<
   "listMcpServers" | "saveMcpServer" | "removeMcpServer" | "setMcpServerEnabled" | "testMcpServer"
 >;
 
+/** Its presence, beside `mcpServers`, is what `#protocolSupport` advertises `mcp-sign-in-v1` on. */
+export type TeamApiMcpSignIns = Pick<McpHostSignIns, "start" | "status" | "cancel" | "signOut" | "list">;
+
 /** Its presence is what `#protocolSupport` advertises `storage-v1` on. */
 export type TeamApiStorage = Pick<StorageUsageService, "usage" | "deleteFile" | "clear">;
 /** `hosted-sites-v1`: the openbot.site sites of this server. Members list; only admins delete. */
@@ -147,12 +152,21 @@ export type TeamApiAgentImport = Pick<AgentImportService, "stageUpload" | "apply
  * `#protocolSupport` advertises its capability on; every route behind it requires an owner or admin.
  */
 export interface TeamApiAdmin {
+  acpRegistry?: {
+    [Method in "search" | "listInstalled" | "status" | "install" | "cancel" | "uninstall"]: OmitThisParameter<
+      AcpRegistry[Method]
+    >;
+  };
   /** Read-only release discovery, independent of permission to install. */
   release?: Pick<HostReleaseService, "snapshot" | "check">;
   /** `agent-admin-v1`: access and auto-approve of one agent. */
   agents?: AgentAdminSettingsService;
   /** `agent-host-settings-v1`: Computer Use, local scripts and the busy-message mode of one agent. */
   agentHost?: AgentHostSettingsService;
+  sessionSettings?: Pick<
+    AgentService,
+    "readAgentSessionSettings" | "setAgentSessionSetting" | "resetAgentSessionSetting"
+  >;
   /** `skills-admin-v1`: list, install, remove and enable the skills of one agent. */
   skills?: Pick<SkillMarketplaceService, "listInstalled" | "install" | "uninstall" | "setEnabled">;
   /** `shared-tables-v1`: list and delete the tables the agents share. */
@@ -212,6 +226,7 @@ export type TeamApiBrowser = Pick<
   | "setVisible"
   | "getDisplayState"
   | "loadUrl"
+  | "isPrivate"
   // The live view, behind `browser-view`. `browser-view-gateway.ts` is what reaches these; a route
   // cannot, because frames outlive the request that asked for them.
   | "startView"
@@ -243,6 +258,7 @@ export interface TeamApiOptions {
   events?: HostEventsApi;
   channels?: ChannelService;
   mcpServers?: TeamApiMcpServers;
+  mcpSignIns?: TeamApiMcpSignIns;
   /** Starts and waits for the managed tool runtimes behind the MCP save, enable, and test routes. */
   mcpToolRuntimePreparation?: McpToolRuntimePreparation;
   storage?: TeamApiStorage;

@@ -657,17 +657,18 @@ function safeArchiveSegment(value: string): string {
   );
 }
 
+/** `used` holds lower-case names: macOS and Windows see "Report.txt" and "report.txt" as one file. */
 function uniqueName(name: string, used: Set<string>): string {
-  if (!used.has(name)) {
-    used.add(name);
+  if (!used.has(name.toLowerCase())) {
+    used.add(name.toLowerCase());
     return name;
   }
   const extension = extname(name);
   const stem = name.slice(0, -extension.length || undefined);
   let index = 2;
-  while (used.has(`${stem}-${index}${extension}`)) index += 1;
+  while (used.has(`${stem}-${index}${extension}`.toLowerCase())) index += 1;
   const result = `${stem}-${index}${extension}`;
-  used.add(result);
+  used.add(result.toLowerCase());
   return result;
 }
 

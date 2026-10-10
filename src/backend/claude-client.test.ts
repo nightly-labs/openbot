@@ -43,6 +43,7 @@ type TestStreamMessage =
       parent_tool_use_id: string | null;
       session_id: string;
       uuid: string;
+      error?: string;
       message: {
         content: Array<{
           type: string;
@@ -76,6 +77,7 @@ type TestStreamMessage =
       >;
       total_cost_usd?: number;
       subtype: "success";
+      is_error?: boolean;
       result: string;
       terminal_reason: "completed";
       errors: string[];
@@ -839,6 +841,41 @@ fi
     expect(answerText(notifications)).toBe("Visible without a refresh");
     expect(narrationTexts(notifications)).toEqual([]);
     expect(JSON.stringify(notifications)).not.toContain("Hidden child response");
+    await runCauseEffect(client.stop());
+  });
+
+  it("fails a turn that ended on an API error instead of answering with the error", async () => {
+    const { client, notifications, output, threadId } = await createHarness();
+    const turnId = "11111111-1111-4111-8111-111111111111";
+    await startTurn(client, threadId, turnId);
+
+    const failure = "Invalid API key · Please run /login";
+    output.push({
+      type: "assistant",
+      parent_tool_use_id: null,
+      session_id: threadId,
+      uuid: "error-message",
+      error: "authentication_failed",
+      message: { content: [{ type: "text", text: failure }] },
+    });
+    output.push({
+      type: "result",
+      subtype: "success",
+      is_error: true,
+      result: failure,
+      terminal_reason: "completed",
+      errors: [],
+      session_id: threadId,
+      uuid: turnId,
+    });
+    await waitFor(() => notifications.some((event) => event.method === "turn/completed"));
+
+    expect(answerText(notifications)).toBe("");
+    expect(notifications).toContainEqual({ method: "error", params: { threadId, turnId, message: failure } });
+    expect(notifications).toContainEqual({
+      method: "turn/completed",
+      params: { threadId, turn: { id: turnId, status: "failed" } },
+    });
     await runCauseEffect(client.stop());
   });
 

@@ -27,9 +27,11 @@ export function serverSupportsCapability(
       capability === "browser-view" ||
       capability === "browser-view-clipboard" ||
       capability === "mcp-servers-v1" ||
+      capability === "mcp-sign-in-v1" ||
       capability === "storage-v1" ||
       capability === "hosted-sites-v1" ||
       capability === "agent-admin-v1" ||
+      capability === "agent-host-settings-v1" ||
       capability === "skills-admin-v1" ||
       capability === "shared-tables-v1" ||
       capability === "agent-install-v1" ||
@@ -38,6 +40,9 @@ export function serverSupportsCapability(
       capability === "providers-v2" ||
       capability === "providers-v3" ||
       capability === "providers-v4" ||
+      capability === "providers-v5" ||
+      capability === "agent-session-settings-v1" ||
+      capability === "acp-registry-v1" ||
       capability === "host-admin-v1" ||
       capability === "host-update-v1" ||
       capability === "host-member-update-v1" ||
@@ -50,6 +55,19 @@ export function serverSupportsCapability(
     return server.compatibility?.capabilities.includes(capability) === true;
   }
   return server?.kind !== "remote" || !server.compatibility || server.compatibility.capabilities.includes(capability);
+}
+
+/**
+ * Whether a joined server signs in to an MCP server for this computer: the host opens the page in
+ * its own browser, and the live view shows it. The live view streams the active server only.
+ */
+export function remoteMcpSignIn(server: ServerSummary | undefined): boolean {
+  return (
+    server?.kind === "remote" &&
+    server.active &&
+    serverSupportsCapability(server, "mcp-sign-in-v1") &&
+    serverSupportsCapability(server, "browser-view")
+  );
 }
 
 /** An owner or admin of a joined server. This computer is always its own administrator. */

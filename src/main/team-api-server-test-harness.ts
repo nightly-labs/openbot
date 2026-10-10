@@ -162,6 +162,7 @@ export function createBrowser(overrides: Partial<TeamApiBrowser> = {}): TeamApiB
     setVisible: unimplemented,
     getDisplayState: unimplemented,
     loadUrl: unimplemented,
+    isPrivate: () => false,
     startView: unimplemented,
     dispatchViewInput: unimplemented,
     copyViewSelection: unimplemented,

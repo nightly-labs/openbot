@@ -54,7 +54,7 @@ export function requestCapabilities(request: IncomingMessage): Set<string> {
   const value = Array.isArray(header) ? header.join(",") : header;
   if (!value || value.length > 4_096) return new Set();
   const capabilities = value.split(",").map((capability) => capability.trim());
-  if (capabilities.length > 64) return new Set();
+  if (capabilities.length > (requestProtocol(request) >= 7 ? 128 : 64)) return new Set();
   return new Set(capabilities.filter(isTeamCurrentCapability));
 }
 

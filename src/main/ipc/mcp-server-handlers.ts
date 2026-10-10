@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Duration, Effect } from "effect";
 import type { RemoteWorkflowError } from "../remote-service-effects";
 // MCP servers: the model-context servers an agent on this server may use.
 //
@@ -8,11 +8,15 @@ import type { RemoteWorkflowError } from "../remote-service-effects";
 
 import {
   decodeMcpServerConfigs,
+  decodeMcpSignInStates,
+  decodeMcpSignInStatus,
   decodeMcpTestResult,
   MCP_SERVERS_CAPABILITY,
   type McpServerConfig,
+  type TestMcpServerInput,
 } from "@openbot/contracts/ipc";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
+import { MCP_SIGN_IN_CAPABILITY, MCP_SIGN_IN_ROUTES } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
 import { MCP_ROUTES } from "@openbot/contracts/team-protocol/mcp-v1";
 import { sourceText } from "@openbot/i18n/source";
 import type { AgentService } from "../../backend/agent-service";
@@ -136,6 +140,45 @@ export function mcpServerIpcHandlers({
     return runCauseEffect(remoteServers.request(serverId, path, decodeMcpServerConfigs, { method: "POST", body }));
   }
 
+  /** A host without `mcp-sign-in-v1` cannot open a sign-in page for a client. */
+  function requireRemoteSignIn(serverId: string): void {
+    requireRemoteSupport(serverId);
+    if (!remoteServers.supportsCapability(serverId, MCP_SIGN_IN_CAPABILITY)) signInOnHost();
+  }
+
+  /** The host tab of each remote sign-in that waits, by server and address, for the panel's live view. */
+  const remotePages = new Map<string, string | null>();
+
+  /**
+   * A sign-in on a joined server. The host runs it and opens the page in its own browser; this
+   * computer reads `status` until it ends, because one request cannot wait for a person to sign in.
+   */
+  const signInRemotely = Effect.fn("Mcp.signInRemotely")(function* (serverId: string, input: TestMcpServerInput) {
+    const key = remotePageKey(serverId, input.config.url);
+    const body = { url: input.config.url };
+    yield* remoteServers.request(serverId, MCP_SIGN_IN_ROUTES.start, () => undefined, { method: "POST", body: input });
+    remotePages.set(key, null);
+    return yield* Effect.gen(function* () {
+      while (true) {
+        const status = yield* remoteServers.request(serverId, MCP_SIGN_IN_ROUTES.status, decodeMcpSignInStatus, {
+          method: "POST",
+          body,
+        });
+        if (status.result) return status.result;
+        remotePages.set(key, status.tabId);
+        yield* Effect.sleep(REMOTE_SIGN_IN_POLL);
+      }
+    }).pipe(
+      // Nobody watches the page any more, so it must not stay open on the host for the full timeout.
+      Effect.onError(() =>
+        remoteServers
+          .request(serverId, MCP_SIGN_IN_ROUTES.cancel, () => undefined, { method: "POST", body })
+          .pipe(Effect.ignore),
+      ),
+      Effect.ensuring(Effect.sync(() => remotePages.delete(key))),
+    );
+  });
+
   return {
     mcpServers: {
       listMcpServers: scopedQueryHandler({
@@ -192,28 +235,67 @@ export function mcpServerIpcHandlers({
           );
         },
       }),
-      // A sign-in opens the browser of the computer that runs OpenBot, so it exists on that computer
-      // only. A remote host has no Team API route for it: nobody sits in front of the host's browser.
+      // A sign-in opens the browser of the computer that runs OpenBot. On a joined server that is the
+      // host's browser, which the panel shows through the live view of the tab `mcpSignInPage` names.
       signInMcpServer: scopedHandler(parseTestMcpServer, {
         local: (parsed) => runCauseEffect(service.signInMcpServer(parsed)),
-        remote: () => signInOnHost(),
+        remote: (parsed, serverId) => {
+          requireRemoteSignIn(serverId);
+          return runCauseEffect(signInRemotely(serverId, parsed));
+        },
+      }),
+      // This computer's browser is the user's own, so a local sign-in shows no page here.
+      mcpSignInPage: scopedHandler(parseCancelMcpSignIn, {
+        local: () => null,
+        remote: (parsed, serverId) => remotePages.get(remotePageKey(serverId, parsed.url)) ?? null,
       }),
       cancelMcpSignIn: scopedHandler(parseCancelMcpSignIn, {
         local: (parsed) => service.cancelMcpSignIn(parsed),
-        remote: () => signInOnHost(),
+        remote: (parsed, serverId) => {
+          requireRemoteSignIn(serverId);
+          return runCauseEffect(
+            remoteServers.request(serverId, MCP_SIGN_IN_ROUTES.cancel, () => undefined, {
+              method: "POST",
+              body: parsed,
+            }),
+          );
+        },
       }),
       // A sign-out names its row the way a removal does, so it is read by the same parser.
       signOutMcpServer: scopedHandler(parseRemoveMcpServer, {
         local: (parsed) => runCauseEffect(service.signOutMcpServer(parsed)),
-        remote: () => signInOnHost(),
+        remote: (parsed, serverId) => {
+          requireRemoteSignIn(serverId);
+          return runCauseEffect(
+            remoteServers.request(serverId, MCP_SIGN_IN_ROUTES.signOut, decodeMcpSignInStates, {
+              method: "POST",
+              body: parsed,
+            }),
+          );
+        },
       }),
-      // A remote list holds no sign-in state to show, which is not an error.
+      // A host without `mcp-sign-in-v1` holds no sign-in state to show, which is not an error.
       listMcpSignIns: scopedQueryHandler({
         local: () => service.listMcpSignIns(),
-        remote: () => [],
+        remote: (serverId) => {
+          if (!remoteServers.supportsCapability(serverId, MCP_SIGN_IN_CAPABILITY)) return [];
+          return runCauseEffect(
+            remoteServers.request(serverId, MCP_SIGN_IN_ROUTES.list, decodeMcpSignInStates, {
+              method: "POST",
+              body: {},
+            }),
+          );
+        },
       }),
     },
   };
+}
+
+/** How often a remote sign-in asks the host whether it ended. */
+const REMOTE_SIGN_IN_POLL = Duration.seconds(1);
+
+function remotePageKey(serverId: string, url: string): string {
+  return `${serverId}\n${url}`;
 }
 
 function signInOnHost(): never {

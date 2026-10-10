@@ -1,5 +1,6 @@
 import { Effect } from "effect";
 import { createAccountAnalytics } from "./account-analytics";
+import { BillingSales } from "./billing-sales";
 import { BillingService } from "./billing-service";
 import {
   type HostedServerBindings,
@@ -37,6 +38,15 @@ export function createHostedBilling(
     schedule: options.schedule,
   });
   const secretKey = bindings.STRIPE_SECRET_KEY?.trim();
+  const sales =
+    bindings.OPENPANEL_CLIENT_ID?.trim() && bindings.OPENPANEL_CLIENT_SECRET?.trim()
+      ? new BillingSales({
+          database: bindings.DB,
+          clientId: bindings.OPENPANEL_CLIENT_ID,
+          clientSecret: bindings.OPENPANEL_CLIENT_SECRET,
+          fetch: (input, init) => fetch(input, init),
+        })
+      : undefined;
   const billing = secretKey
     ? new BillingService({
         database: bindings.DB,
@@ -44,6 +54,7 @@ export function createHostedBilling(
         webhookSecret: bindings.STRIPE_WEBHOOK_SECRET?.trim() || null,
         fetch: (input, init) => fetch(input, init),
         analytics,
+        ...(sales ? { sales } : {}),
         onSubscriptionSynced: (sync) =>
           hosting.onSubscriptionSynced(sync).pipe(Effect.andThen(() => options.planChanged(sync.serverId))),
       })

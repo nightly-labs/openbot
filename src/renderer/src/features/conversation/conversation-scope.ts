@@ -76,6 +76,10 @@ export function createConversationViewScope(props: ConversationProps) {
     setVoiceModelProgress,
     voiceElapsedSeconds,
     setVoiceElapsedSeconds,
+    voiceLiveTranscript,
+    setVoiceLiveTranscript,
+    voiceLevels,
+    setVoiceLevels,
     markingRead,
     setMarkingRead,
     submitting,
@@ -387,6 +391,8 @@ export function createConversationViewScope(props: ConversationProps) {
     setVoiceModelProgress,
     voiceElapsedSeconds,
     setVoiceElapsedSeconds,
+    setVoiceLiveTranscript,
+    setVoiceLevels,
     drafts,
     setDrafts,
     setConversationErrors,
@@ -401,7 +407,12 @@ export function createConversationViewScope(props: ConversationProps) {
       restoreTranscript: (...args) => composer.restoreVoiceTranscript(...args),
     },
   });
-  const { startVoiceRecording, stopVoiceRecording } = voice;
+  const { startVoiceRecording, stopVoiceRecording, cancelVoiceRecording } = voice;
+  // Live text belongs to the conversation it is dictated into, not to whichever one is open.
+  const voiceLiveText = () => {
+    const live = voiceLiveTranscript();
+    return live && live.agentId === props.agent?.id && live.serverId === (props.server?.id ?? "local") ? live.text : "";
+  };
   const actions = createComposerActions({
     props,
     attachmentBusy,
@@ -1144,6 +1155,7 @@ export function createConversationViewScope(props: ConversationProps) {
     dropActive,
     editQueuedMessage,
     editingDeliveryId: currentEditingDeliveryId,
+    cancelQueuedMessageEdit,
     editingPendingSave,
     expandedEmojiMessageId,
     scrollFades,
@@ -1234,6 +1246,7 @@ export function createConversationViewScope(props: ConversationProps) {
     showScrollToLatest,
     startVoiceRecording,
     stopVoiceRecording,
+    cancelVoiceRecording,
     submitComposer,
     submitting,
     unreadDividerVisible,
@@ -1243,6 +1256,8 @@ export function createConversationViewScope(props: ConversationProps) {
     updateTeamTyping,
     updateUnreadDividerVisibility,
     voiceElapsedSeconds,
+    voiceLevels,
+    voiceLiveText,
     voicePhase,
     voiceModelProgress,
   };

@@ -322,7 +322,7 @@ function truncatedApprovalPresentation(): Extract<DynamicIslandPresentation, { m
 function renderControlledIsland(
   initialPresentation: DynamicIslandPresentation,
   initialState: DynamicIslandViewState,
-  onAction: (action: DynamicIslandAction) => void = () => undefined,
+  onAction: (action: DynamicIslandAction) => Promise<boolean> | undefined = () => undefined,
   onHaptic: () => void = () => undefined,
 ) {
   render(() => {

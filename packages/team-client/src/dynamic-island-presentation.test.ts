@@ -78,7 +78,11 @@ describe("createDynamicIslandPresentation", () => {
         unreadCount: 1,
         message: { agent: identity, messageId: "message-1", text: "Ready", createdAt: "now" },
       },
-      { serverId: "working", mode: "working", working: [{ agent: identity, task: "Running checks" }] },
+      {
+        serverId: "working",
+        mode: "working",
+        working: [{ agent: identity, task: "Running checks", turnId: "turn-1" }],
+      },
       {
         serverId: "failed",
         mode: "failed",
