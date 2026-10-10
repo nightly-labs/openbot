@@ -1,5 +1,5 @@
 // Appends the `AGENTS.md` files and the domain review fragments for the directories the PR diff
-// touches, so one `codex exec` call carries the base instructions plus only the repository and
+// touches, so one reviewer call carries the base instructions plus only the repository and
 // domain knowledge this diff needs.
 //
 // Fragments are read from the base commit, never from the working tree, for the same reason the

@@ -56,13 +56,9 @@ commit them.
    change touches. Fill `## Verification` with the checks you ran and the
    checks you left to CI. Remove the sections the template says to remove.
 3. State the model and harness in the body.
-4. Choose the reviewer level from the riskiest file, with the table in
-   `CONTRIBUTING.md#choosing-the-reviewer-for-one-pull-request`. Add a
-   `NorbiAI-Model:` line in an HTML comment only when you need a level
-   other than the default.
-5. Create the PR: `gh pr create --base main --title "<title>" --body-file <file>`.
+4. Create the PR: `gh pr create --base main --title "<title>" --body-file <file>`.
    Write the title as one imperative sentence, as recent `main` commits do.
-6. When the `link_pull_request` tool is available, link the PR URL.
+5. When the `link_pull_request` tool is available, link the PR URL.
 
 ## Gate 3 — Babysit the NorbiAI review
 
