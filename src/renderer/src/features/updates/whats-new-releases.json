@@ -1,5 +1,41 @@
 [
   {
+    "version": "0.35.0",
+    "date": "2026-10-10",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "On macOS, reply to an agent, answer its question or stop its work from the Dynamic Island.",
+          "The file preview panel highlights code, can wrap long lines and has a Copy button.",
+          "Choose which agent memories are always in the prompt. Agents can search the other saved memories.",
+          "Add Cobrain from the Apps catalog. Agents can load, search and save notes in your Cobrain memory.",
+          "See the release notes after an update. Open them again in Settings > Updates."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Voice input uses a new speech model and shows the words while you speak. The first recording downloads approximately 670 MB. Japanese, Chinese and Korean dictation is no longer available.",
+          "Agents use less context. A ring near the message box shows how much context the agent uses.",
+          "Agent settings show the face, name, title and instructions at the top. Click the face to change the image or color.",
+          "Local scripts can now send messages and answer questions and approvals. Agents that already allow Local scripts get this change."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Grok agents answer again after their Grok CLI restarts.",
+          "A Codex agent on a Plus or Pro plan waits for its usage limit to reset. Before, each queued message failed.",
+          "The owner of a server can remove it from the account, also when its computer is offline or gone.",
+          "A paste into a remote desktop now pastes your own clipboard.",
+          "Two attachments whose names differ only in case now both arrive."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.34.1",
     "date": "2026-10-09",
     "notices": [],

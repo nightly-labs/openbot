@@ -6,6 +6,112 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.35.0] - 2026-10-10
+
+### Added
+
+- An owner or admin can turn Computer Use and Local scripts on or off for an agent, and select what a message does while the agent works, from the OpenBot iPhone app.
+- On macOS, you can reply to an agent, answer its question and stop its work from the Dynamic Island. The main window stays where it is. "Open chat" still opens the conversation.
+- Add native Pi RPC and Muse MSP providers, managed runtime downloads, and host sign-in.
+- Add ACP provider settings with saved overrides, deferred changes, and reset.
+- Add ACP registry search, install, update, cancel, and runtime removal on the selected host.
+- Apps connected to a server that runs this version can manage its providers and ACP agents. Custom agents keep their IDs and sessions.
+- An owner or admin can sign in to an MCP server that uses OAuth on a joined server, from the desktop app or the web app. The sign-in page opens in a private tab of the host's browser and shows in the settings. The token stays on the host.
+- The file preview panel has a Copy button for text, code, Markdown and HTML files. It copies the full source of the file, also for Markdown and HTML that the panel shows rendered.
+- The file preview panel now highlights code files, such as JSON, TypeScript, Python, YAML and diff files, with the same colors as code in chat. Files larger than 200,000 characters, or with a line longer than 5,000 characters, stay as plain text.
+- The file preview panel has a wrap button for text files and source views. When it is on, long lines wrap to the panel width, so you do not have to scroll sideways. The app remembers your choice.
+- Agents can search saved memories and list them for maintenance. Essential memories use a fixed prompt budget.
+- You can choose which memories are always included, which need search, and which the agent can select.
+- Show selected release notes after a desktop update. Updates that skip versions show the selected notes together. Close the dialog to continue, or open it again from Settings > Updates. A new installation starts without the dialog.
+- Add Cobrain to the Apps catalog. Agents can load, search and save notes in your Cobrain memory
+  after you sign in to your Cobrain account.
+
+### Changed
+
+- The agent settings panel shows the face, name, title and instructions at the top of the list, as
+  the iPhone app does. You no longer open separate Profile and Instructions pages. Click the face to
+  change the image, the generated face or the color.
+- The right panel cannot be narrower than its default width, because a narrower panel breaks its
+  layout. A panel that you made narrower before opens at the default width.
+- The instructions field of an agent and of a channel has a fixed height. Long instructions scroll
+  inside the field. Before, the field grew and had a resize handle that did not match the field.
+- Voice input now uses NVIDIA Parakeet TDT 0.6B v3 in place of Whisper. The words show in the
+  message box while you speak, and the full text replaces them when you stop. Parakeet supports
+  25 European languages. Japanese, Chinese and Korean dictation is no longer available.
+- The first voice recording downloads a new model of approximately 670 MB. OpenBot deletes the
+  old Whisper files.
+- While you speak, the microphone button changes into a recording bar with a live waveform.
+  The waveform shows small dots in silence and taller bars when you speak.
+  ✓ puts the text in the message box, × discards the recording, and the send arrow sends it.
+  The message box no longer gets a yellow outline during a recording.
+- Local scripts can send messages, read pending questions and approvals, and submit responses. Agents with Local scripts already enabled get these operations after upgrade without a new opt-in. Browser takeovers and secret questions direct the user to OpenBot.
+- Owners and administrators can turn Local scripts on or off from a connected desktop or web client. Scripts run on the host, so a headless server needs no local screen.
+- Existing memories stay saved. During upgrade, recent manual memories receive priority for the essential prompt budget.
+- Remote memory selection uses bounded pages. Older hosts keep memory text editing without the new controls.
+- A scheduled routine run can now end without a message when the agent calls the new
+  `routine_no_update` tool. Before, the run stayed quiet only when the answer was exactly
+  `[[no-update]]`, and an answer such as "Nothing new." sent a notification. The marker still
+  works. A Test run still shows its answer.
+- Agents use less context. They load the details of most tools only when they need them. All tools stay available.
+- When an agent changes provider, it gets a shorter part of the conversation. It can still read the older messages of the same conversation. A context reset still hides earlier messages.
+- A change of the Claude model or reasoning effort no longer starts a new Claude session.
+- A ring near the message box shows how much context the agent uses. The conversation shows when the agent compacts its context. Claude values are estimates.
+
+### Fixed
+
+- A paste into a remote desktop now pastes your own clipboard on the host. Before, Cmd+V or Ctrl+V pasted the host's clipboard.
+- The embedded browser now removes the OpenBot and Electron user-agent tokens for sites such as X and LinkedIn, and sends basic client hints for its Chromium version and platform. Google account requests keep the compatibility token needed for sign-in.
+- The owner of a server can now remove it from the account with Remove server, in the server menu or in server settings, also when its computer is offline or gone. Before, an owner could not remove such a server, and it came back on each computer and after each reinstall. The removal applies to all members and all devices. Members lose access, and connected Slack, Discord, Telegram and webhook routes stop. If you add the server again, invite its members again and set up its connections again. Old webhook URLs do not work again. Files and chats on the server's computer stay.
+- Keep chat input focused while another agent uses the browser. Background browser actions could interrupt typing.
+- Keep chats at the latest message when switching agents. Measurements of routine cards and other messages could move the chat away from the bottom.
+- Custom ACP agents can recover from a closed session when you send a new message. Before, messages could repeatedly fail with `Internal error`. Startup errors now show provider details with secrets removed. Recovery keeps the conversation and does not repeat a failed prompt.
+- Codex now saves “Always allow” approvals for custom MCP server tools and applies saved approvals after a restart.
+- An agent whose provider says "You've reached your weekly usage limit" now waits for the limit to
+  reset, as it does for "You've hit your weekly limit". Before, each queued message and routine run
+  started a turn that failed.
+- Switch chats while OpenBot changes which queued message you edit, and each chat now keeps its own draft. Before, the first chat could get the other chat's draft and lose its own.
+- A voice message sent to one chat while you read another no longer scrolls the chat you read to its latest message.
+- Close the chat search or clear the query while a search is running, and a late result no longer opens an old match, possibly in another chat.
+- If a voice recording fails to start after the microphone opened, OpenBot now releases the microphone. Before, the microphone stayed in use.
+- A Stop that arrives after its turn ended no longer stops the next turn of the same agent.
+- A file or site folder whose name starts with two dots, such as `..notes.md`, now opens or publishes from the workspace. Before, OpenBot refused it as outside the workspace.
+- If saving the preview of a sent message fails, the message is still delivered. Before, it stayed in the queue until the next restart or queue event.
+- A routine set to repeat every 58 or 59 minutes is now refused when you save it, like every other schedule under the 3-minute minimum. Before, it ran twice within 1 or 2 minutes around each hour. Routines already saved this way keep running and can still be edited.
+- The sidebar section name field keeps focus after you choose New section or Rename. Before, the field could lose focus and the name was lost.
+- Remote Control keeps its stream when another server changes, for example when it goes offline or you mute it. Before, the view changed to "Remote access expired".
+- Text you type in a direct message stays when someone on the server starts typing to an agent or connects. Before, the message box cleared and the conversation scrolled back.
+- Deleting a routine now also removes the work it queued and nobody started yet, in agent chats and in channels. Before, that work could still run after the routine was gone. Channel work that already started keeps running and can be stopped as usual. Deleting an agent routine still stops its active turn.
+- Files attached to a channel message are no longer lost when the channel is archived while the message is being sent. You can send them again.
+- Stopping or reassigning a channel task while it was being handed to a member no longer gets undone when that hand-off fails.
+- Show Gemini replies as they arrive while Antigravity background tasks run. Stop now ends the local turn, saves unfinished tool calls as interrupted, and restores the same provider session before the next message.
+- A queued message now appears at the point where you select Steer, after the commentary sent while it waited. Its position stays the same after a restart.
+- Show when a queued message is held for editing, including after restart, and add a Cancel edit button.
+- Keep pending messages visible when no agent turn is active, so users can edit or cancel them.
+- Two attachments whose names differ only in case, such as `Report.txt` and `report.txt`, now both arrive. Before, on macOS and Windows the second file overwrote the first, and the first attachment could not be opened.
+- A Claude turn that ends on an API error, such as an expired sign-in, a low credit balance or an overloaded service, now fails and shows the error. Before, the error text was saved as the agent's answer and the message counted as delivered.
+- When an agent cannot attach a file to its answer, it now gets the reason, for example a file outside its workspace and the shared directory, and can correct the call. Before, Codex agents got only `dynamic tool request failed` and retried the same call.
+- A Codex agent on a Plus or Pro plan now waits for its usage limit to reset. Before, the limit message offered more credits, so OpenBot took it for a spent balance and started each queued message and routine run, and each one failed.
+- Grok agents answer again after their Grok CLI restarts. Before, every message to the agent failed with `Invalid params` after an idle stop, an OpenBot restart or an update.
+- Fix remote reconnects that report too many active connections when an old client socket waits for its host. Concurrent reconnects and failed authentication no longer hold extra account slots. Other device sessions stay connected.
+- Wait before reconnecting when Signal limits connection traffic. Before, repeated retries could keep all devices on an account disconnected.
+- Gemini shows its sign-in and start errors. Before, it could show Ready when it could not run.
+- Restart works while a Gemini sign-in waits. Before, the old sign-in could stop the next attempt.
+- On Linux, Gemini sign-in opens in the desktop browser. When no browser opens, OpenBot shows the setup steps. Before, it waited until the sign-in expired.
+- Remote provider settings explain that Gemini sign-in opens a browser on the server's computer.
+- The message box and its queue stay below an approval request or a browser takeover. A message that you send while an agent waits for your approval now shows in the queue. Before, the message box went away, and a queued message was not visible until the approval was done.
+- When an agent refuses a request, OpenBot now shows the reason that the agent sends. Before, a Grok agent showed only `Invalid params`, for example when Grok refused a session resume after its CLI restarted.
+- Messages stay in the queue when you try to steer a provider that does not support it. Custom ACP agents no longer receive a second prompt that can interrupt the running task or lose the queued message.
+- Recover the affected remote peer when a host data channel closes. Other connected clients stay connected.
+- Report failed Live View connections and invalid frames as failures. Close failed views so they can be opened again.
+- A queued channel task now starts when the agent or normal work that held it becomes free, also when that work ended without a turn, for example when a message failed to start or was cancelled. Before, the task could stay queued until the next channel command or a restart of OpenBot.
+- A message from an agent with an empty reply id no longer stops the sender's and the recipient's
+  conversations from loading or stalls the recipient's queue. Conversations that an earlier version
+  saved with such a message load again.
+
+### Security
+
+- The Bun runtime that OpenBot downloads to start MCP servers is now version 1.4.3, which has security fixes.
+
 ## [0.34.1] - 2026-10-09
 
 ### Changed
