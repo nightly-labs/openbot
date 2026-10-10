@@ -1,3 +1,4 @@
+import { agentProviderDescriptor } from "@openbot/contracts/agent-providers";
 import type {
   ConversationMessageSender,
   QueueSnapshot,
@@ -20,6 +21,7 @@ import { type DrainScheduler, REMOVED_ENDPOINT_MESSAGE } from "./drain-scheduler
 import type { MailboxSync } from "./mailbox-sync";
 import type { ProviderRuntime } from "./provider-runtime";
 import type { RoutineScheduler } from "./routine-scheduler";
+import { providerForAgent } from "./thread-items";
 
 export interface QueueControlsHooks {
   /** The channel task that owns a delivery. Read late: the channel service is built after this. */
@@ -229,6 +231,11 @@ export class QueueControls {
         throw new Error(REMOVED_ENDPOINT_MESSAGE);
       return { client, session, snapshot, context, turnId };
     });
+    if (agentProviderDescriptor(providerForAgent(agent)).steer !== "native") {
+      yield* this.#mailbox.markSteerFallback(input.deliveryId, "provider-unsupported").pipe(toQueueOperationFailed);
+      this.#mailboxSync.emitQueue(agent.id);
+      return yield* new QueueOperationFailed({ cause: new Error(sourceText("error.backend.steerUnsupported")) });
+    }
     yield* this.#mailbox.markSteering(input.deliveryId, turnId).pipe(toQueueOperationFailed);
     this.#mailboxSync.emitQueue(agent.id);
     yield* client

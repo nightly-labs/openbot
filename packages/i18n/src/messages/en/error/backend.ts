@@ -212,6 +212,7 @@ export const messages = defineMessages("error.backend", {
     "This edit was already saved with different contents. Your changes were not saved.",
   "error.backend.useChannelTaskControlsWork": "Use the channel task controls for channel work.",
   "error.backend.steerTurnChanged": "The active turn changed before this message could be steered.",
+  "error.backend.steerUnsupported": "This provider cannot steer a running turn. Your message stays in the queue.",
   "error.backend.steerQueuedOnly": "Only queued messages can be steered.",
   "error.backend.promptInactive": "This prompt is no longer active.",
   "error.backend.promptAnswerMismatch": "A prompt answer does not match an active question.",

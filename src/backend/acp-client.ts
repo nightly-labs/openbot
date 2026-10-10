@@ -120,9 +120,7 @@ interface AcpTurn {
   toolKinds: Map<string, string>;
   /** The latest durable shape of each tool call until ACP reports its terminal status. */
   toolItems: Map<string, ThreadItem>;
-  /** Steered prompts that the agent refused while this turn ran; sent when the running prompt ends. */
-  deferredPrompts: ContentBlock[][];
-  /** The user stopped the turn, so no deferred prompt is sent. */
+  /** The user stopped the turn. */
   stopped: boolean;
   completing: boolean;
   task: Fiber.Fiber<void, ProviderClientOperationError> | null;
@@ -781,13 +779,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         return yield* providerSync(() => decoder({ thread: { id: threadId, turns: [] } }));
       }
       case "turn/start": {
-        const response = yield* this.#startTurnEffect(params, false);
+        const response = yield* this.#startTurnEffect(params);
         return yield* providerSync(() => decoder(response));
       }
-      case "turn/steer": {
-        const response = yield* this.#startTurnEffect(params, true);
-        return yield* providerSync(() => decoder(response));
-      }
+      case "turn/steer":
+        // A second ACP prompt can cancel the active turn. Keep deferred input in the mailbox.
+        return yield* providerFailure(new Error(sourceText("error.backend.steerUnsupported")));
       case "turn/interrupt": {
         const threadId = yield* providerSync(() => requiredString(params, "threadId"));
         // A closed idle session has no turn to stop.
@@ -797,7 +794,6 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         const requestedTurnId = getString(params, "turnId");
         if (!turn || (requestedTurnId !== null && requestedTurnId !== turn.id))
           return yield* providerSync(() => decoder({}));
-        // A stop also stops the steers that wait for the running prompt, if that prompt ends anyway.
         turn.stopped = true;
         const cancel = providerCall(() => this.#requireConnection().cancel({ sessionId: thread.id }));
         if (this.provider === "antigravity") {
@@ -1405,11 +1401,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   readonly #startTurnEffect = Effect.fn("AcpAgentClient.startTurn")(function* (
     this: AcpAgentClient,
     params: unknown,
-    steer: boolean,
   ): Effect.fn.Return<{ turn: { id: string; status: string }; turnId?: string }, ProviderClientOperationError> {
     const threadId = yield* providerSync(() => requiredString(params, "threadId"));
     return yield* this.#threads
-      .startTurn(threadId, () => this.#openTurn(threadId, params, steer))
+      .startTurn(threadId, () => this.#openTurn(threadId, params))
       .pipe(toProviderClientOperationError);
   });
 
@@ -1417,11 +1412,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this: AcpAgentClient,
     threadId: string,
     params: unknown,
-    steer: boolean,
   ): Effect.fn.Return<{ turn: { id: string; status: string }; turnId?: string }, ProviderClientOperationError> {
     yield* this.#threads.wake(threadId).pipe(toProviderClientOperationError);
     let thread = yield* providerSync(() => this.#requireThread(threadId));
-    if (!steer && thread.needsResume && !thread.activeTurn) {
+    if (thread.needsResume && !thread.activeTurn) {
       yield* this.#startThread(
         {
           threadId,
@@ -1436,67 +1430,38 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       );
       thread = yield* providerSync(() => this.#requireThread(threadId));
     }
-    if (!steer && thread.activeTurn)
-      return yield* providerFailure(new Error("The ACP thread already has an active turn."));
-    if (steer && !thread.activeTurn)
-      return yield* providerFailure(new Error("The ACP thread has no active turn to steer."));
+    if (thread.activeTurn) return yield* providerFailure(new Error("The ACP thread already has an active turn."));
     yield* this.#configuration.applyConfig(
       thread,
       getString(params, "model"),
       getString(params, "effort"),
       this.#models,
     );
-    if (!steer) {
-      const overrides = getRecord(params, "sessionSettings");
-      for (const [configId, value] of Object.entries(overrides ?? {})) {
-        if (typeof value !== "boolean" && typeof value !== "string")
-          return yield* providerFailure(new Error(sourceText("error.provider.sessionSettingInvalid")));
-        const option = sessionSettingsSnapshot(thread.configOptions).options.find((entry) => entry.id === configId);
-        // A provider update can remove an option or choice. Keep the saved override in the
-        // store and report the effective value for correction, without blocking the prompt.
-        const available =
-          option?.type === "boolean"
-            ? typeof value === "boolean"
-            : option?.type === "select" &&
-              typeof value === "string" &&
-              option.options.some((choice) => choice.value === value);
-        if (available && option?.currentValue !== value) yield* this.#configuration.set(thread, configId, value);
-      }
+    const overrides = getRecord(params, "sessionSettings");
+    for (const [configId, value] of Object.entries(overrides ?? {})) {
+      if (typeof value !== "boolean" && typeof value !== "string")
+        return yield* providerFailure(new Error(sourceText("error.provider.sessionSettingInvalid")));
+      const option = sessionSettingsSnapshot(thread.configOptions).options.find((entry) => entry.id === configId);
+      // A provider update can remove an option or choice. Keep the saved override in the
+      // store and report the effective value for correction, without blocking the prompt.
+      const available =
+        option?.type === "boolean"
+          ? typeof value === "boolean"
+          : option?.type === "select" &&
+            typeof value === "string" &&
+            option.options.some((choice) => choice.value === value);
+      if (available && option?.currentValue !== value) yield* this.#configuration.set(thread, configId, value);
     }
     this.#publishSessionSettings(thread);
-    const activeTurn = thread.activeTurn;
-    const turnId = steer && activeTurn ? activeTurn.id : (getString(params, "clientUserMessageId") ?? randomUUID());
+    const turnId = getString(params, "clientUserMessageId") ?? randomUUID();
     const blocks = yield* promptBlocksEffect(params);
-    if (!steer && thread.developerInstructions) {
+    if (thread.developerInstructions) {
       blocks.unshift({
         type: "text",
         text: `<openbot-developer-instructions>\n${thread.developerInstructions}\n</openbot-developer-instructions>`,
       });
     }
     yield* providerSync(() => this.#requireServedModel(thread));
-    if (steer) {
-      // A steered message can want an answer, so an empty turn is again a failure to report.
-      if (activeTurn) activeTurn.answerOptional = false;
-      // ACP has no steer request, and an agent can refuse a second prompt while one runs. The turn
-      // then sends the refused prompt after the running one ends, so the message is not lost.
-      const connection = yield* providerSync(() => this.#requireConnection());
-      yield* Effect.forkIn(
-        providerCall(() => connection.prompt({ sessionId: thread.id, prompt: blocks })).pipe(
-          Effect.catch((failure) =>
-            Effect.sync(() => {
-              if (activeTurn && thread.activeTurn === activeTurn) {
-                activeTurn.deferredPrompts.push(blocks);
-                return;
-              }
-              this.emit("diagnostic", this.#redact(`ACP steer failed: ${String(failure.cause)}`));
-            }),
-          ),
-        ),
-        this.#scope,
-        { startImmediately: true },
-      );
-      return { turn: { id: turnId, status: "inProgress" }, turnId };
-    }
     const currentSecond = Date.now() / 1_000;
     const startedAt = Math.max(currentSecond, this.#lastTurnStartedAt + 0.001);
     this.#lastTurnStartedAt = startedAt;
@@ -1516,7 +1481,6 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       toolNames: new Map(),
       toolKinds: new Map(),
       toolItems: new Map(),
-      deferredPrompts: [],
       stopped: false,
       completing: false,
       task: null,
@@ -1549,40 +1513,15 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     prompt: ContentBlock[],
   ): Effect.fn.Return<void, ProviderClientOperationError> {
     try {
-      let response = providerResult(
+      const response = providerResult(
         yield* Effect.result(providerCall(() => this.#requireConnection().prompt({ sessionId: thread.id, prompt }))),
       );
-      for (;;) {
-        if (thread.activeTurn !== turn || turn.completing) return;
-        if (response.usage)
-          this.emit("notification", {
-            method: "openbot/usage",
-            params: { threadId: thread.id, turnId: turn.id, usage: response.usage },
-          });
-        const deferred = response.stopReason === "end_turn" && !turn.stopped ? turn.deferredPrompts.shift() : undefined;
-        if (!deferred) break;
-        // The reply to the earlier prompt is complete; the refused steer gets its own reply.
-        this.#completeThought(thread, turn);
-        this.#completeMessage(thread, turn, "final_answer");
-        const answered = turn.receivedOutput;
-        turn.receivedOutput = false;
-        const next = yield* providerCall(() =>
-          this.#requireConnection().prompt({ sessionId: thread.id, prompt: deferred }),
-        ).pipe(
-          Effect.catch((failure) =>
-            Effect.sync(() => {
-              // The agent refused the steer again, so the earlier reply ends the turn.
-              this.emit("diagnostic", this.#redact(`ACP steer failed: ${String(failure.cause)}`));
-              return null;
-            }),
-          ),
-        );
-        if (!next) {
-          turn.receivedOutput = answered;
-          break;
-        }
-        response = next;
-      }
+      if (thread.activeTurn !== turn || turn.completing) return;
+      if (response.usage)
+        this.emit("notification", {
+          method: "openbot/usage",
+          params: { threadId: thread.id, turnId: turn.id, usage: response.usage },
+        });
       // OpenCode can swallow provider errors and report a successful, empty ACP turn.
       // Do not invent the upstream cause or report that turn as a successful reply. A turn told not
       // to answer ends empty on purpose, and an error there costs no answer the user waits for.
