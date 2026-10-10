@@ -331,7 +331,8 @@ const roundWhole = (value: number | undefined) => (value === undefined ? undefin
 
 /** The flat, coarse properties of the `system_resources` event for one closed day. */
 export function resourceEventProperties(day: ResourceDay, device: DeviceClass): ResourceProperties {
-  const properties: ResourceProperties = {
+  // A metric with no samples is undefined here and left out of the result.
+  const properties: { [Name in ResourcePropertyName]?: string | number | boolean | undefined } = {
     total_rss_mb_p95: roundMb(percentile(day, METRIC.rss("total"), 0.95)),
     total_rss_mb_max: roundMb(day.peaks[METRIC.rss("total")]),
     total_cpu_pct_p95: roundWhole(percentile(day, METRIC.cpu("total"), 0.95)),
