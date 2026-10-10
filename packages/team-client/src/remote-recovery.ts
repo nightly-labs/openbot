@@ -145,10 +145,6 @@ export function remoteConnectionFailureDetails(stage: RemoteConnectionStage, err
   return { message: sourceText(CONNECTION_STAGES[stage], { reason }), reference: errorReference(error) };
 }
 
-export function remoteConnectionFailure(stage: RemoteConnectionStage, error: unknown): string {
-  return remoteConnectionFailureDetails(stage, error).message;
-}
-
 export function remoteRecoveryMessage(status: RemoteRecoveryStatus, failure?: string | null): string | null {
   if (status.phase === "online") return null;
   const detail = failure || null;

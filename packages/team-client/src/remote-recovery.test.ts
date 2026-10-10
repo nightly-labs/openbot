@@ -7,7 +7,6 @@ import {
   createRemoteConnectionRecovery,
   createRemoteReadRefresh,
   mergeRemoteUnreadIds,
-  remoteConnectionFailure,
   remoteConnectionFailureDetails,
   remoteRecoveryMessage,
   resyncRemoteConversations,
@@ -137,7 +136,7 @@ describe("remote connection recovery", () => {
     const recovery = createRemoteConnectionRecovery(
       async () => {},
       (error) => {
-        failure = remoteConnectionFailure("connection", error);
+        failure = remoteConnectionFailureDetails("connection", error).message;
       },
       (status) => {
         message = remoteRecoveryMessage(status, failure);
@@ -154,22 +153,22 @@ describe("remote connection recovery", () => {
 
   it("does not expose credentials or response contents in connection diagnostics", () => {
     const sensitive = "Bearer test-private-token; secret=private-value; conversation=private-message";
-    expect(remoteConnectionFailure("compatibility", new Error(sensitive))).toBe(
+    expect(remoteConnectionFailureDetails("compatibility", new Error(sensitive)).message).toBe(
       "Checking desktop compatibility: Could not complete this connection step.",
     );
-    expect(remoteConnectionFailure("preferences", new TypeError(sensitive))).toBe(
+    expect(remoteConnectionFailureDetails("preferences", new TypeError(sensitive)).message).toBe(
       "Loading local chat preferences: Could not complete this connection step.",
     );
-    expect(remoteConnectionFailure("agents", new SyntaxError(sensitive))).toBe(
+    expect(remoteConnectionFailureDetails("agents", new SyntaxError(sensitive)).message).toBe(
       "Loading agents: Could not complete this connection step.",
     );
-    expect(remoteConnectionFailure("reads", sensitive)).toBe(
+    expect(remoteConnectionFailureDetails("reads", sensitive).message).toBe(
       "Loading read status: Could not complete this connection step.",
     );
     expect(
       remoteRecoveryMessage(
         { phase: "cooldown", attempt: 5, remainingSeconds: 120 },
-        remoteConnectionFailure("connection", new Error("The desktop did not connect.")),
+        remoteConnectionFailureDetails("connection", new Error("The desktop did not connect.")).message,
       ),
     ).toContain("Connecting to the desktop: The desktop did not connect.");
   });
