@@ -66,6 +66,7 @@ import {
   readAgentToolSchema,
   updateProfileToolSchema,
 } from "./profile-tools";
+import { ROUTINE_NO_UPDATE_TOOL } from "./routine-quiet-runs";
 import type { RoutineScheduler } from "./routine-scheduler";
 import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from "./routine-tools";
 import { type AgentSidebar, handleSidebarTool } from "./sidebar-tools";
@@ -99,6 +100,8 @@ export interface OpenBotToolRouterHooks {
   interrupt(agentId: string, turnId: string, mayStop: () => boolean): Effect.Effect<boolean, ToolOperationFailed>;
   /** Epoch milliseconds from the turn lifecycle; null when this process has not seen the event. */
   turnActivity(agentId: string, turnId: string | null): { startedAt: number | null; lastEventAt: number | null };
+  /** Records a no-update tool call for the turn; null when no routine run started the turn. */
+  requestNoUpdate(agentId: string, threadId: string, turnId: string): "quiet" | "shown" | null;
 }
 
 export interface OpenBotToolRouterOptions {
@@ -594,6 +597,16 @@ export class OpenBotToolRouter {
     if (params.tool === "create_agent") return yield* this.#createAgent(params, senderAgentId);
 
     if (params.tool === "update_profile") return yield* this.#updateProfile(params, senderAgentId);
+
+    if (params.tool === ROUTINE_NO_UPDATE_TOOL) {
+      const outcome = this.#hooks.requestNoUpdate(senderAgentId, executionThreadId, params.turnId);
+      if (outcome === null) return openBotToolFailure("Use this tool only in a routine run.");
+      return openBotToolResult(
+        outcome === "quiet"
+          ? { status: "quiet", note: "This run ends without a message or a notification. End your turn now." }
+          : { status: "shown", note: "Someone waits for this answer. Report the result as usual." },
+      );
+    }
 
     const sidebarResult = yield* handleSidebarTool(
       params.tool,

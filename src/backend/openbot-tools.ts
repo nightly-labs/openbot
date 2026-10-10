@@ -15,6 +15,7 @@ import {
   readAgentToolSchema,
   updateProfileToolSchema,
 } from "./agent/profile-tools";
+import { ROUTINE_NO_UPDATE_TOOL } from "./agent/routine-quiet-runs";
 import {
   assignAgentSectionToolSchema,
   createSectionToolSchema,
@@ -245,6 +246,12 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
       agentId: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
       routineId: z.string().min(1).max(INPUT_LIMITS.identifier),
     },
+  },
+  {
+    name: ROUTINE_NO_UPDATE_TOOL,
+    description:
+      "Use only in a scheduled routine run, when the routine task gives nothing to report. OpenBot then removes your text answers of this run and sends no notification; the run history still shows the run. Do not call it when you report anything. In a manual Test run, the user sees your answer.",
+    shape: {},
   },
   ...MEMORY_RECALL_TOOL_DEFINITIONS,
   {
