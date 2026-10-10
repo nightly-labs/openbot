@@ -115,4 +115,8 @@ export const messages = {
   "account.otp.verifying": "確認しています…",
   "account.otp.entry": "ワンタイムコードの入力",
   "account.otp.label": "ワンタイムコード",
+  "account.language.title": "言語を選択してください",
+  "account.language.previous": "前の言語",
+  "account.language.next": "次の言語",
+  "account.language.continue": "続ける",
 } as const satisfies PartialTranslation<typeof source>;

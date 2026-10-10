@@ -75,6 +75,12 @@ function newOwnedServer(role: ServerSummary["role"]): AgentStatus {
   return hostStatus;
 }
 
+/** The language wheel comes before the first sign-in screen on this computer. */
+async function passLanguageStep() {
+  expect(await screen.findByRole("heading", { name: "Choose your language" })).toBeInTheDocument();
+  await fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+}
+
 describe("OpenBot connected desktop shell", () => {
   beforeEach(() => {
     installOpenbotStub();
@@ -424,8 +430,11 @@ describe("OpenBot connected desktop shell", () => {
     vi.mocked(window.openbot.auth.getState).mockResolvedValueOnce({ status: "signed_out" });
     render(() => <App />);
 
+    await passLanguageStep();
     expect(await screen.findByRole("heading", { name: "Sign in to OpenBot" })).toBeInTheDocument();
     expect(screen.queryByRole("radiogroup", { name: "Default provider" })).not.toBeInTheDocument();
+    // The language did not change, so the saved "system" setting stays.
+    expect(window.openbot.setAppLanguagePreference).not.toHaveBeenCalled();
 
     await fireEvent.input(screen.getByRole("textbox", { name: "Email" }), {
       target: { value: "person@example.com" },
@@ -443,6 +452,21 @@ describe("OpenBot connected desktop shell", () => {
     expect(await screen.findByRole("heading", { name: "Build your AI team." })).toBeInTheDocument();
   });
 
+  it("saves the language chosen on the wheel before sign-in", async () => {
+    vi.mocked(window.openbot.auth.getState).mockResolvedValueOnce({ status: "signed_out" });
+    render(() => <App />);
+
+    await screen.findByRole("heading", { name: "Choose your language" });
+    await fireEvent.click(screen.getByRole("radio", { name: "Polski" }));
+    // The screen redraws in the centred language before anything is saved.
+    expect(await screen.findByRole("heading", { name: "Wybierz język" })).toBeInTheDocument();
+    expect(window.openbot.setAppLanguagePreference).not.toHaveBeenCalled();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Dalej" }));
+    await waitFor(() => expect(window.openbot.setAppLanguagePreference).toHaveBeenCalledWith({ language: "pl" }));
+    expect(await screen.findByRole("textbox", { name: "E-mail" })).toBeInTheDocument();
+  });
+
   it("shows a soft loader until the account API becomes available", async () => {
     vi.mocked(window.openbot.auth.getState).mockResolvedValueOnce({ status: "loading" });
     render(() => <App />);
@@ -452,6 +476,7 @@ describe("OpenBot connected desktop shell", () => {
     expect(screen.queryByRole("textbox", { name: "Email" })).not.toBeInTheDocument();
 
     emitAuth?.({ status: "signed_out" });
+    await passLanguageStep();
     expect(await screen.findByRole("heading", { name: "Sign in to OpenBot" })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Email" })).toBeInTheDocument();
   });
@@ -462,6 +487,7 @@ describe("OpenBot connected desktop shell", () => {
     vi.mocked(window.openbot.servers.takePendingInvite).mockResolvedValueOnce(inviteUrl);
     render(() => <App />);
 
+    await passLanguageStep();
     expect(await screen.findByRole("heading", { name: "Sign in to OpenBot" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Chief" })).not.toBeInTheDocument();
     expect(screen.queryByRole("dialog", { name: "Join a server" })).not.toBeInTheDocument();

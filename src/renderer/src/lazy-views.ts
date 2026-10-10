@@ -45,6 +45,9 @@ export const JoinServerDialog = lazy(() =>
 export const FirstRunFlow = lazy(() =>
   import("./features/onboarding/FirstRunFlow").then((module) => ({ default: module.FirstRunFlow })),
 );
+export const LanguageStep = lazy(() =>
+  import("./features/onboarding/LanguageStep").then((module) => ({ default: module.LanguageStep })),
+);
 export const RemoteDesktopWorkspace = lazy(() =>
   import("@openbot/ui/features/remote-desktop/RemoteDesktopWorkspace").then((module) => ({
     default: module.RemoteDesktopWorkspace,

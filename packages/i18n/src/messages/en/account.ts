@@ -113,4 +113,8 @@ export const messages = defineMessages("account", {
   "account.otp.verifying": "Verifying…",
   "account.otp.entry": "One-time code entry",
   "account.otp.label": "One-time code",
+  "account.language.title": "Choose your language",
+  "account.language.previous": "Previous language",
+  "account.language.next": "Next language",
+  "account.language.continue": "Continue",
 });

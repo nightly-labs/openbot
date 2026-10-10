@@ -14,6 +14,7 @@
 @import "./styles/base.css";
 @import "@openbot/ui/features/account/auth.css";
 @import "@openbot/ui/features/account/app-loading-screen.css";
+@import "@openbot/ui/features/account/language-wheel.css";
 @import "./features/onboarding/onboarding.css";
 @import "./features/startup/startup-splash.css";
 @import "@openbot/ui/features/agents/first-agent-setup.css";

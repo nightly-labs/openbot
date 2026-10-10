@@ -115,4 +115,8 @@ export const messages = {
   "account.otp.verifying": "Doğrulanıyor…",
   "account.otp.entry": "Tek kullanımlık kod girişi",
   "account.otp.label": "Tek kullanımlık kod",
+  "account.language.title": "Dilinizi seçin",
+  "account.language.previous": "Önceki dil",
+  "account.language.next": "Sonraki dil",
+  "account.language.continue": "Devam et",
 } as const satisfies PartialTranslation<typeof source>;

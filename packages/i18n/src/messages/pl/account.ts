@@ -120,4 +120,8 @@ export const messages = {
   "account.otp.verifying": "Weryfikowanie…",
   "account.otp.entry": "Wpisywanie kodu jednorazowego",
   "account.otp.label": "Kod jednorazowy",
+  "account.language.title": "Wybierz język",
+  "account.language.previous": "Poprzedni język",
+  "account.language.next": "Następny język",
+  "account.language.continue": "Dalej",
 } as const satisfies PartialTranslation<typeof source>;

@@ -115,4 +115,8 @@ export const messages = {
   "account.otp.verifying": "Verificando…",
   "account.otp.entry": "Entrada de código de uso único",
   "account.otp.label": "Código de uso único",
+  "account.language.title": "Escolha seu idioma",
+  "account.language.previous": "Idioma anterior",
+  "account.language.next": "Próximo idioma",
+  "account.language.continue": "Continuar",
 } as const satisfies PartialTranslation<typeof source>;

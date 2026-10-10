@@ -1,0 +1,171 @@
+/* The language wheel: the first screen, before sign-in. It reuses the sign-in screen's frame. */
+
+.language-wheel-shell {
+  width: min(100%, 360px);
+  min-height: 100%;
+  margin-inline: auto;
+  padding: var(--openbot-space-8) var(--openbot-space-4);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--openbot-space-3);
+  -webkit-app-region: no-drag;
+}
+
+.language-wheel-shell .account-login-brand-lockup {
+  margin-bottom: var(--openbot-space-4);
+}
+
+.language-wheel-title {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.language-wheel-frame {
+  position: relative;
+  width: 100%;
+}
+
+/* To the right of the centre band, so the names stay centred over Continue. */
+.language-wheel-arrows {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + var(--openbot-space-2));
+  translate: 0 -50%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-1);
+}
+
+.language-wheel-arrows svg {
+  width: var(--openbot-icon-lg);
+  height: var(--openbot-icon-lg);
+}
+
+.language-wheel {
+  --row: 44px;
+  position: relative;
+  width: 100%;
+  height: calc(var(--row) * 5);
+  /* Not `hidden`: focus on a radio outside the band, as a screen reader moves it, would scroll the rows off the band. */
+  overflow: clip;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  mask-image: linear-gradient(
+    transparent,
+    var(--openbot-text-primary) 30%,
+    var(--openbot-text-primary) 70%,
+    transparent
+  );
+}
+
+.language-wheel[data-dragging] {
+  cursor: grabbing;
+}
+
+/* The centre band: where the selected language sits. */
+.language-wheel::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  top: calc(var(--row) * 2);
+  height: var(--row);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-grouped);
+}
+
+.language-wheel:has(:focus-visible)::before {
+  box-shadow:
+    inset 0 0 0 1px var(--openbot-border-focus),
+    var(--openbot-focus-ring);
+}
+
+.language-wheel-track {
+  position: relative;
+  height: 100%;
+}
+
+/* Each row sits at its own distance from the centre, so the loop needs no copies of the list. */
+.language-wheel-item {
+  position: absolute;
+  inset-inline: 0;
+  top: calc(var(--row) * 2);
+  height: var(--row);
+  translate: 0 calc(var(--offset) * var(--row));
+  /* Gone by the third row, where the row on the far side of the loop changes ends. */
+  opacity: max(0, 1 - var(--distance) * 0.35);
+  transition:
+    translate var(--openbot-duration-overlay) var(--openbot-ease-out),
+    opacity var(--openbot-duration-overlay) var(--openbot-ease-out);
+}
+
+/* The whole row selects its language, at every size. */
+.language-wheel-label {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-3xl);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: -0.03em;
+  line-height: 1;
+  cursor: inherit;
+}
+
+/* Rows shrink away from the centre. */
+.language-wheel-name {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  scale: max(0.6, 1 - var(--distance) * 0.2);
+  transition: scale var(--openbot-duration-overlay) var(--openbot-ease-out);
+}
+
+/* Following the pointer: no easing, or the wheel lags behind the finger. */
+.language-wheel[data-dragging] :is(.language-wheel-item, .language-wheel-name) {
+  transition: none;
+}
+
+.language-wheel-flag {
+  scale: 0.9;
+  letter-spacing: 0;
+}
+
+/* Continue: a full arrow that steps forward on hover, on a background that stays solid. */
+.language-wheel-continue {
+  width: min(100%, 288px);
+  min-height: 44px;
+  margin-top: var(--openbot-space-2);
+  border-radius: var(--openbot-radius-pill);
+}
+
+.language-wheel-continue svg {
+  width: var(--openbot-icon-lg);
+  height: var(--openbot-icon-lg);
+  transition: translate var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.language-wheel-continue:hover:not(:disabled) {
+  background: var(--openbot-surface-light);
+}
+
+.language-wheel-continue:is(:hover, :focus-visible):not(:disabled) svg {
+  translate: var(--openbot-space-1) 0;
+}
+
+.language-wheel-continue:active:not(:disabled) svg {
+  translate: var(--openbot-space-2) 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .language-wheel-item,
+  .language-wheel-name,
+  .language-wheel-continue svg {
+    transition: none;
+  }
+}
