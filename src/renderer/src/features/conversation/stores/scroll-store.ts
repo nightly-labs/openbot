@@ -78,12 +78,21 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     return deps.props.messages.slice(start).find((message) => drawn.has(message.id))?.id ?? null;
   });
   /* A group of agent messages or routine runs stops at the unread divider, so the divider keeps its row. */
-  const timelineMessages = createMemo(() =>
-    groupRoutineRunMarkers(
-      groupAgentMessageMarkers(drawnMessages(), unreadBoundaryMessageId()),
-      unreadBoundaryMessageId(),
-    ),
-  );
+  const timelineMessages = createMemo(() => {
+    const group = (messages: readonly AgentMessage[]) =>
+      groupRoutineRunMarkers(groupAgentMessageMarkers(messages, unreadBoundaryMessageId()), unreadBoundaryMessageId());
+    const state = deps.props.contextState;
+    const startedAt =
+      state?.agentId === deps.props.agent?.id && state?.threadId === deps.props.agent?.threadId
+        ? state?.compaction?.startedAt
+        : undefined;
+    const messages = drawnMessages();
+    const boundary =
+      startedAt === undefined
+        ? -1
+        : messages.findIndex((message) => message.createdAt && Date.parse(message.createdAt) > startedAt);
+    return boundary < 0 ? group(messages) : [...group(messages.slice(0, boundary)), ...group(messages.slice(boundary))];
+  });
   /*
    * A row finds its message by id. The virtualizer gives a row its new index one tick after the list
    * changes, so a lookup by index draws the neighbouring message in the row for that tick.

@@ -5,6 +5,7 @@ import { EXPECTED_SCHEMA_FINGERPRINT, spawnMspConnection } from "@muse-code/sdk"
 import { Effect } from "effect";
 import { afterEach, describe, expect, it } from "vitest";
 import { promptQuestions, promptResolution } from "./agent/prompts";
+import { VISIBLE_DYNAMIC_TOOLS } from "./agent/tool-catalog";
 import { runCauseEffect } from "./effect-boundary";
 import { MuseAgentClient, type MuseProviderOptions } from "./muse-client";
 import {
@@ -336,11 +337,7 @@ describe("Muse native MSP adapter", () => {
       { META_API_KEY: "fixture-inherited-key" },
     );
     await runCauseEffect(
-      client.request(
-        "thread/start",
-        { cwd: directory, dynamicTools: [{ type: "namespace", name: "openbot", tools: [] }] },
-        decodeThreadResponse,
-      ),
+      client.request("thread/start", { cwd: directory, dynamicTools: VISIBLE_DYNAMIC_TOOLS }, decodeThreadResponse),
     );
     expect(spawns[0]).toMatchObject({ command: "/test/sandbox", key: "fixture-explicit-key" });
     expect(spawns[0]?.args?.[0]).toBe("/test/muse");

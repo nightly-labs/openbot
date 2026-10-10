@@ -132,7 +132,57 @@ function isRuntimePathList(value: unknown): value is string[] {
   );
 }
 
+/** Local desktop context state. Frozen Team adapters do not carry this field. */
+export interface AgentContextState {
+  agentId: string;
+  threadId: string;
+  usage: {
+    usedTokens: number;
+    windowTokens: number;
+    autoCompactAt: number | null;
+    nativeManaged: boolean;
+    estimated?: boolean;
+  } | null;
+  compaction: {
+    id: string;
+    startedAt: number;
+    status: "running" | "completed" | "failed";
+    beforeTokens?: number;
+    afterTokens?: number;
+    expectedMs?: number;
+  } | null;
+}
+
+function isContextCount(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+function isAgentContextState(value: unknown): value is AgentContextState {
+  if (!isDynamicRecord(value) || !isIdentifier(value.agentId) || !isIdentifier(value.threadId)) return false;
+  const usage = value.usage;
+  const compaction = value.compaction;
+  return (
+    (usage === null ||
+      (isDynamicRecord(usage) &&
+        isContextCount(usage.usedTokens) &&
+        isContextCount(usage.windowTokens) &&
+        usage.windowTokens > 0 &&
+        isBoolean(usage.nativeManaged) &&
+        (usage.estimated === undefined || isBoolean(usage.estimated)) &&
+        (usage.autoCompactAt === null || (isContextCount(usage.autoCompactAt) && usage.autoCompactAt <= 1)))) &&
+    (compaction === null ||
+      (isDynamicRecord(compaction) &&
+        isIdentifier(compaction.id) &&
+        isContextCount(compaction.startedAt) &&
+        isOneOf(["running", "completed", "failed"] as const, compaction.status) &&
+        (compaction.beforeTokens === undefined || isContextCount(compaction.beforeTokens)) &&
+        (compaction.afterTokens === undefined || isContextCount(compaction.afterTokens)) &&
+        (compaction.expectedMs === undefined || isContextCount(compaction.expectedMs))))
+  );
+}
+
 export interface AgentRuntimeSnapshot {
+  contextStates?: AgentContextState[];
   agents: AgentRuntimeRosterEntry[];
   activeTurns: Array<{ agentId: string; threadId: string; turnId: string }>;
   work: AgentRuntimeWorkItem[];
@@ -158,6 +208,10 @@ export interface AgentRuntimeSnapshot {
 export function isAgentRuntimeSnapshot(value: unknown): value is AgentRuntimeSnapshot {
   if (!isDynamicRecord(value)) return false;
   return (
+    (value.contextStates === undefined ||
+      (Array.isArray(value.contextStates) &&
+        value.contextStates.length <= INPUT_LIMITS.agents &&
+        value.contextStates.every(isAgentContextState))) &&
     Array.isArray(value.agents) &&
     value.agents.length <= INPUT_LIMITS.agents &&
     value.agents.every(isAgentRuntimeRosterEntry) &&

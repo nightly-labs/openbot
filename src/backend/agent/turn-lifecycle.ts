@@ -145,6 +145,7 @@ export class TurnLifecycle {
   readonly #hooks: TurnHooks;
   readonly fileHistory = new ThreadFileHistory();
   readonly #failedTurns = new Map<string, string>();
+  readonly #observedCompactions = new Map<string, string>();
   readonly #itemTurns = new Map<string, string>();
   #scope = Scope.makeUnsafe();
   readonly #turnAssociations = new Map<string, Deferred.Deferred<void, TurnOperationFailed>>();
@@ -252,6 +253,7 @@ export class TurnLifecycle {
     this.#refusedRetries.clear();
     this.#lastEventAt.clear();
     this.#itemTurns.clear();
+    this.#observedCompactions.clear();
   }).bind(this);
 
   /**
@@ -317,6 +319,7 @@ export class TurnLifecycle {
         const turnId = getString(turn, "id");
         if (!turnId) return;
         if (this.#compaction.claimTurn(agentId, threadId, turnId)) return;
+        this.#compaction.beginTurn(threadId);
         const starting = this.#mailbox.startingDeliveryForAgent(agentId)?.delivery;
         const sentAt = starting ? Date.parse(starting.createdAt) : Number.NaN;
         this.#runningTurns.set(turnId, {
@@ -360,6 +363,14 @@ export class TurnLifecycle {
         if (itemId) this.#itemTurns.set(itemId, turnId);
         this.#markProduced(turnId, isRepeatedWork(item));
         if (item.type === "contextCompaction") {
+          if (this.#conversation.loadedClientFor(threadId) !== source) return;
+          if (notification.method === "item/started") this.#observedCompactions.set(threadId, turnId);
+          else this.#observedCompactions.delete(threadId);
+          if (!this.#compaction.isCompactionTurn(threadId, turnId))
+            this.#compaction.observeCompaction(
+              threadId,
+              notification.method === "item/completed" ? "completed" : "running",
+            );
           if (notification.method === "item/completed") {
             this.#compaction.markCompacted(threadId);
           }
@@ -444,6 +455,10 @@ export class TurnLifecycle {
           });
         }
         this.#attention.clearForTurn(threadId, turnId);
+        if (this.#observedCompactions.get(threadId) === turnId) {
+          this.#observedCompactions.delete(threadId);
+          this.#compaction.observeCompaction(threadId, status === "completed" ? "completed" : "failed");
+        }
         if (this.#compaction.isCompactionTurn(threadId, turnId)) {
           this.#compaction.finish(agentId, threadId, status);
           return;
@@ -457,7 +472,27 @@ export class TurnLifecycle {
       }
       case "thread/tokenUsage/updated": {
         if (!threadId || !agentId) return;
+        if (this.#conversation.loadedClientFor(threadId) !== source) return;
         this.#compaction.updateBudget(threadId, params);
+        const usage = getRecord(params, "tokenUsage");
+        const last = getRecord(usage, "last");
+        if (typeof last?.totalTokens === "number" && typeof usage?.modelContextWindow === "number")
+          this.#compaction.observeUsage(
+            threadId,
+            last.totalTokens,
+            usage.modelContextWindow,
+            source.contextCompaction === "native",
+            source.contextCompaction === "events" || source.contextCompaction === "request" ? 0.8 : null,
+            usage.estimated === true,
+          );
+        return;
+      }
+      case "openbot/context-compaction": {
+        if (!threadId || !agentId || this.#conversation.loadedClientFor(threadId) !== source) return;
+        const status = getString(params, "status");
+        if (status !== "running" && status !== "completed" && status !== "failed") return;
+        // Native Claude compaction does not report comparable full-context counts.
+        this.#compaction.observeCompaction(threadId, status, "none");
         return;
       }
       case "thread/archived": {

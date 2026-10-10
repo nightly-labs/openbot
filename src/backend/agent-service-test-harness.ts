@@ -130,6 +130,15 @@ export async function stopAgentTestFixture(root: string, service: AgentService |
 }
 
 export class FakeAgentClient extends EventEmitter implements AgentClient {
+  get contextCompaction(): "events" | "request" | "native" | "unsupported" {
+    return this.provider === "codex" || this.provider === "muse"
+      ? "events"
+      : this.provider === "pi"
+        ? "request"
+        : this.provider === "claude"
+          ? "native"
+          : "unsupported";
+  }
   readonly readHistory = Effect.fn("FakeAgentClient.readHistory")(function* (
     this: FakeAgentClient,
     input: ProviderHistoryRequest,

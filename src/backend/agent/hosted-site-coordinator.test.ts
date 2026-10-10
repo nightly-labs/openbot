@@ -18,6 +18,7 @@ import {
   waitFor,
 } from "../agent-service-test-harness";
 import { runCauseEffect } from "../effect-boundary";
+import type { DynamicToolCallParams } from "../protocol";
 import { HostedSiteOperationFailed } from "./hosted-site-coordinator";
 
 let root: string;
@@ -141,194 +142,197 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
     },
   );
 
-  it("requires user approval before an agent mutates hosted sites", async () => {
-    const clients = new Map<AgentProvider, FakeAgentClient>();
-    const { store, mailbox } = stores(root);
-    const hostedSite = {
-      id: "site-1",
-      hostname: "approved-public-site-for-students-k7m2q9tzab.openbot.site",
-      url: "http://approved-public-site-for-students-k7m2q9tzab.openbot.localhost:3100/",
-      title: "Approved public site",
-      description: "A public test site.",
-      framework: "vanilla" as const,
-      status: "active" as const,
-      fileCount: 1,
-      size: 20,
-      expiresAt: "2026-09-30T12:00:00.000Z",
-      updatedAt: "2026-08-31T12:00:00.000Z",
-      serverId: null,
-    };
-    const hostedSites = {
-      list: vi.fn(() => Effect.succeed({ sites: [hostedSite], limit: 1, used: 1 })),
-      publish: vi.fn(() => Effect.succeed(hostedSite)),
-      replace: vi.fn(() => Effect.succeed(hostedSite)),
-      delete: vi.fn(() => Effect.void),
-    };
-    service = createTestService({
-      store,
-      mailbox,
-      preferredProvider: "codex",
-      clientFactory: (provider) => {
-        const client = new FakeAgentClient(provider, "", false);
-        clients.set(provider, client);
-        return client;
-      },
-      prepareAgentWorkspace: () => Effect.void,
-      hostedSites,
-    });
-    const events: AgentEvent[] = [];
-    service.on("event", (event) => events.push(event));
-    await runCauseEffect(service.initialize());
-    const agent = await runCauseEffect(store.getOrCreate("chief"));
-    await runCauseEffect(service.sendMessage({ agentId: agent.id, text: "Publish my site." }));
-    await waitFor(() => events.some((event) => event.type === "turn-started"));
-    const client = clients.get("codex");
-    const threadId = store.activeProviderSession(agent.id)?.externalSessionId;
-    const turnId = events.find((event) => event.type === "turn-started")?.turnId;
-    if (!client || !threadId || !turnId) throw new Error("The hosted site approval turn did not start.");
-
-    client.emit("request", {
-      method: "item/tool/call",
-      id: "invalid-site-approval",
-      params: {
-        threadId,
-        turnId,
-        callId: "invalid-site-approval",
-        namespace: "openbot",
-        tool: "publish_site",
-        arguments: { title: "Hidden source", description: "This request has no source path." },
-      },
-    });
-    await waitFor(() => client.errors.some((response) => response.id === "invalid-site-approval"));
-    expect(service.getRuntimeSnapshot().pendingApprovals).toHaveLength(0);
-
-    client.emit("request", {
-      method: "item/tool/call",
-      id: "publish-site-approval",
-      params: {
-        threadId,
-        turnId,
-        callId: "publish-site-approval",
-        namespace: "openbot",
-        tool: "publish_site",
-        arguments: {
-          sourcePath: agent.workspacePath,
-          title: "Approved public site",
-          description: "A public test site.",
+  it.each([false, true])(
+    "requires user approval before an agent mutates hosted sites (deferred=%s)",
+    async (deferred) => {
+      const clients = new Map<AgentProvider, FakeAgentClient>();
+      const { store, mailbox } = stores(root);
+      const hostedSite = {
+        id: "site-1",
+        hostname: "approved-public-site-for-students-k7m2q9tzab.openbot.site",
+        url: "http://approved-public-site-for-students-k7m2q9tzab.openbot.localhost:3100/",
+        title: "Approved public site",
+        description: "A public test site.",
+        framework: "vanilla" as const,
+        status: "active" as const,
+        fileCount: 1,
+        size: 20,
+        expiresAt: "2026-09-30T12:00:00.000Z",
+        updatedAt: "2026-08-31T12:00:00.000Z",
+        serverId: null,
+      };
+      const hostedSites = {
+        list: vi.fn(() => Effect.succeed({ sites: [hostedSite], limit: 1, used: 1 })),
+        publish: vi.fn(() => Effect.succeed(hostedSite)),
+        replace: vi.fn(() => Effect.succeed(hostedSite)),
+        delete: vi.fn(() => Effect.void),
+      };
+      service = createTestService({
+        store,
+        mailbox,
+        preferredProvider: "codex",
+        clientFactory: (provider) => {
+          const client = new FakeAgentClient(provider, "", false);
+          clients.set(provider, client);
+          return client;
         },
-      },
-    });
-    await waitFor(() => events.some((event) => event.type === "approval"));
-    expect(hostedSites.publish).not.toHaveBeenCalled();
-    expect(client.responses).toHaveLength(0);
-    expect(events.find((event) => event.type === "approval")).toMatchObject({
-      approval: {
-        kind: "permissions",
-        reason: 'Publish "Approved public site" as a public site on openbot.site.',
-        permissions: { fileSystem: { read: [agent.workspacePath], write: [] }, network: true },
-      },
-    });
+        prepareAgentWorkspace: () => Effect.void,
+        hostedSites,
+      });
+      const events: AgentEvent[] = [];
+      service.on("event", (event) => events.push(event));
+      await runCauseEffect(service.initialize());
+      const agent = await runCauseEffect(store.getOrCreate("chief"));
+      await runCauseEffect(service.sendMessage({ agentId: agent.id, text: "Publish my site." }));
+      await waitFor(() => events.some((event) => event.type === "turn-started"));
+      const client = clients.get("codex");
+      const threadId = store.activeProviderSession(agent.id)?.externalSessionId;
+      const turnId = events.find((event) => event.type === "turn-started")?.turnId;
+      if (!client || !threadId || !turnId) throw new Error("The hosted site approval turn did not start.");
 
-    const appendConversationMessage = store.database.appendConversationMessage.bind(store.database);
-    let failedTerminalAppend = false;
-    let failRunningAppend = false;
-    vi.spyOn(store.database, "appendConversationMessage").mockImplementation((input) => {
-      if (failRunningAppend && input.message.itemType?.includes(":running:")) {
-        throw new Error("Persistent marker write failure.");
-      }
-      if (!failedTerminalAppend && input.message.itemType?.includes(":succeeded:")) {
-        failedTerminalAppend = true;
-        throw new Error("Temporary marker write failure.");
-      }
-      return appendConversationMessage(input);
-    });
-    const accepted = runCauseEffect(
-      service.respondToApproval({ requestId: "publish-site-approval", decision: "accept" }),
-    );
-    await expect(
-      runCauseEffect(service.respondToApproval({ requestId: "publish-site-approval", decision: "accept" })),
-    ).rejects.toThrow("no longer active");
-    await accepted;
-    expect(hostedSites.publish).toHaveBeenCalledTimes(1);
-    expect(openBotToolPayload(client.responses[0]?.result)).toMatchObject({ id: "site-1", status: "active" });
-    expect(
-      (await runCauseEffect(service.readConversation(agent.id))).messages.flatMap(
+      emitToolRequest(client, deferred, {
+        method: "item/tool/call",
+        id: "invalid-site-approval",
+        params: {
+          threadId,
+          turnId,
+          callId: "invalid-site-approval",
+          namespace: "openbot",
+          tool: "publish_site",
+          arguments: { title: "Hidden source", description: "This request has no source path." },
+        },
+      });
+      await waitFor(() => client.errors.some((response) => response.id === "invalid-site-approval"));
+      expect(service.getRuntimeSnapshot().pendingApprovals).toHaveLength(0);
+
+      emitToolRequest(client, deferred, {
+        method: "item/tool/call",
+        id: "publish-site-approval",
+        params: {
+          threadId,
+          turnId,
+          callId: "publish-site-approval",
+          namespace: "openbot",
+          tool: "publish_site",
+          arguments: {
+            sourcePath: agent.workspacePath,
+            title: "Approved public site",
+            description: "A public test site.",
+          },
+        },
+      });
+      await waitFor(() => events.some((event) => event.type === "approval"));
+      expect(hostedSites.publish).not.toHaveBeenCalled();
+      expect(client.responses).toHaveLength(0);
+      expect(events.find((event) => event.type === "approval")).toMatchObject({
+        approval: {
+          kind: "permissions",
+          reason: 'Publish "Approved public site" as a public site on openbot.site.',
+          permissions: { fileSystem: { read: [agent.workspacePath], write: [] }, network: true },
+        },
+      });
+
+      const appendConversationMessage = store.database.appendConversationMessage.bind(store.database);
+      let failedTerminalAppend = false;
+      let failRunningAppend = false;
+      vi.spyOn(store.database, "appendConversationMessage").mockImplementation((input) => {
+        if (failRunningAppend && input.message.itemType?.includes(":running:")) {
+          throw new Error("Persistent marker write failure.");
+        }
+        if (!failedTerminalAppend && input.message.itemType?.includes(":succeeded:")) {
+          failedTerminalAppend = true;
+          throw new Error("Temporary marker write failure.");
+        }
+        return appendConversationMessage(input);
+      });
+      const accepted = runCauseEffect(
+        service.respondToApproval({ requestId: "publish-site-approval", decision: "accept" }),
+      );
+      await expect(
+        runCauseEffect(service.respondToApproval({ requestId: "publish-site-approval", decision: "accept" })),
+      ).rejects.toThrow("no longer active");
+      await accepted;
+      expect(hostedSites.publish).toHaveBeenCalledTimes(1);
+      expect(openBotToolPayload(client.responses[0]?.result)).toMatchObject({ id: "site-1", status: "active" });
+      expect(
+        (await runCauseEffect(service.readConversation(agent.id))).messages.flatMap(
+          (message) => hostedSiteConversationEvent(message) ?? [],
+        ),
+      ).toEqual([
+        expect.objectContaining({ action: "publish", status: "running", title: hostedSite.title }),
+        expect.objectContaining({
+          action: "publish",
+          status: "succeeded",
+          siteId: hostedSite.id,
+          hostname: hostedSite.hostname,
+          url: hostedSite.url,
+        }),
+      ]);
+
+      emitToolRequest(client, deferred, {
+        method: "item/tool/call",
+        id: "publish-site-persistence-failure",
+        params: {
+          threadId,
+          turnId,
+          callId: "publish-site-persistence-failure",
+          namespace: "openbot",
+          tool: "publish_site",
+          arguments: {
+            sourcePath: agent.workspacePath,
+            title: "Unrecorded site",
+            description: "This deploy must not start.",
+          },
+        },
+      });
+      await waitFor(() => service?.getRuntimeSnapshot().pendingApprovals.length === 1);
+      failRunningAppend = true;
+      await runCauseEffect(
+        service.respondToApproval({ requestId: "publish-site-persistence-failure", decision: "accept" }),
+      );
+      failRunningAppend = false;
+      expect(hostedSites.publish).toHaveBeenCalledTimes(1);
+      expect(client.errors.at(-1)).toMatchObject({
+        id: "publish-site-persistence-failure",
+        error: { message: "The hosted site change could not be recorded." },
+      });
+
+      emitToolRequest(client, deferred, {
+        method: "item/tool/call",
+        id: "delete-site-approval",
+        params: {
+          threadId,
+          turnId,
+          callId: "delete-site-approval",
+          namespace: "openbot",
+          tool: "delete_site",
+          arguments: { siteId: "site-1" },
+        },
+      });
+      await waitFor(() => service?.getRuntimeSnapshot().pendingApprovals.length === 1);
+      expect(events.findLast((event) => event.type === "approval")).toMatchObject({
+        approval: { reason: `Delete ${hostedSite.hostname} from openbot.site.` },
+      });
+      await runCauseEffect(service.respondToApproval({ requestId: "delete-site-approval", decision: "decline" }));
+      expect(hostedSites.delete).not.toHaveBeenCalled();
+      expect(client.errors.at(-1)).toMatchObject({
+        id: "delete-site-approval",
+        error: { message: "The user declined this hosted site change." },
+      });
+      const markers = (await runCauseEffect(service.readConversation(agent.id))).messages.flatMap(
         (message) => hostedSiteConversationEvent(message) ?? [],
-      ),
-    ).toEqual([
-      expect.objectContaining({ action: "publish", status: "running", title: hostedSite.title }),
-      expect.objectContaining({
-        action: "publish",
-        status: "succeeded",
-        siteId: hostedSite.id,
-        hostname: hostedSite.hostname,
-        url: hostedSite.url,
-      }),
-    ]);
-
-    client.emit("request", {
-      method: "item/tool/call",
-      id: "publish-site-persistence-failure",
-      params: {
-        threadId,
-        turnId,
-        callId: "publish-site-persistence-failure",
-        namespace: "openbot",
-        tool: "publish_site",
-        arguments: {
-          sourcePath: agent.workspacePath,
-          title: "Unrecorded site",
-          description: "This deploy must not start.",
-        },
-      },
-    });
-    await waitFor(() => service?.getRuntimeSnapshot().pendingApprovals.length === 1);
-    failRunningAppend = true;
-    await runCauseEffect(
-      service.respondToApproval({ requestId: "publish-site-persistence-failure", decision: "accept" }),
-    );
-    failRunningAppend = false;
-    expect(hostedSites.publish).toHaveBeenCalledTimes(1);
-    expect(client.errors.at(-1)).toMatchObject({
-      id: "publish-site-persistence-failure",
-      error: { message: "The hosted site change could not be recorded." },
-    });
-
-    client.emit("request", {
-      method: "item/tool/call",
-      id: "delete-site-approval",
-      params: {
-        threadId,
-        turnId,
-        callId: "delete-site-approval",
-        namespace: "openbot",
-        tool: "delete_site",
-        arguments: { siteId: "site-1" },
-      },
-    });
-    await waitFor(() => service?.getRuntimeSnapshot().pendingApprovals.length === 1);
-    expect(events.findLast((event) => event.type === "approval")).toMatchObject({
-      approval: { reason: `Delete ${hostedSite.hostname} from openbot.site.` },
-    });
-    await runCauseEffect(service.respondToApproval({ requestId: "delete-site-approval", decision: "decline" }));
-    expect(hostedSites.delete).not.toHaveBeenCalled();
-    expect(client.errors.at(-1)).toMatchObject({
-      id: "delete-site-approval",
-      error: { message: "The user declined this hosted site change." },
-    });
-    const markers = (await runCauseEffect(service.readConversation(agent.id))).messages.flatMap(
-      (message) => hostedSiteConversationEvent(message) ?? [],
-    );
-    expect(markers.map(({ action, status }) => ({ action, status }))).toEqual([
-      { action: "publish", status: "running" },
-      { action: "publish", status: "succeeded" },
-      { action: "delete", status: "cancelled" },
-    ]);
-    expect((await runCauseEffect(service.readConversationPageFor(agent.id, "member-1"))).readState?.unreadCount).toBe(
-      0,
-    );
-    expect(service.searchConversationMessages(hostedSite.title, agent.id).total).toBe(0);
-  });
+      );
+      expect(markers.map(({ action, status }) => ({ action, status }))).toEqual([
+        { action: "publish", status: "running" },
+        { action: "publish", status: "succeeded" },
+        { action: "delete", status: "cancelled" },
+      ]);
+      expect((await runCauseEffect(service.readConversationPageFor(agent.id, "member-1"))).readState?.unreadCount).toBe(
+        0,
+      );
+      expect(service.searchConversationMessages(hostedSite.title, agent.id).total).toBe(0);
+    },
+  );
 
   it("records failed site updates and successful site deletions as separate transitions", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
@@ -725,3 +729,25 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
     ).toEqual(["running", "succeeded"]);
   });
 });
+
+function emitToolRequest(
+  client: FakeAgentClient,
+  deferred: boolean,
+  request: { id: string; method: string; params: DynamicToolCallParams },
+): void {
+  const { params } = request;
+  client.emit(
+    "request",
+    deferred
+      ? {
+          ...request,
+          params: {
+            ...params,
+            namespace: "openbot",
+            tool: "tool_call",
+            arguments: { name: `${params.namespace}.${params.tool}`, arguments: params.arguments },
+          },
+        }
+      : request,
+  );
+}

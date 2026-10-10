@@ -75,6 +75,7 @@ function fitRuntimeSnapshot(snapshot: AgentRuntimeSnapshot): AgentRuntimeSnapsho
   snapshot.agents = snapshot.agents.map((agent) => ({ ...agent, preview: "", avatarUrl: null }));
   if (runtimeSnapshotBytes(snapshot) <= AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT) return snapshot;
 
+  snapshot.contextStates = [];
   snapshot.work = [];
   if (runtimeSnapshotBytes(snapshot) <= AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT) return snapshot;
 
@@ -129,6 +130,7 @@ function runtimeSnapshotBytes(snapshot: AgentRuntimeSnapshot): number {
 }
 
 export interface RuntimeSnapshotSources {
+  contextStates?: AgentRuntimeSnapshot["contextStates"];
   agents: AgentSummary[];
   conversation: Pick<ConversationRuntime, "loadedSnapshot">;
   database: Pick<OpenBotDatabase, "readConversationRuntime">;
@@ -140,6 +142,7 @@ export interface RuntimeSnapshotSources {
 
 /** The runtime view of every agent: active turns, queued work, latest messages and attention. */
 export function buildRuntimeSnapshot({
+  contextStates,
   agents,
   conversation,
   database,
@@ -202,5 +205,6 @@ export function buildRuntimeSnapshot({
     ...attention.runtimeAttention(),
     failedTurns: [...turn.failedTurns()].map(([agentId, turnId]) => ({ agentId, turnId })),
     usageLimits: usageLimits.limitedAgents(),
+    ...(contextStates ? { contextStates } : {}),
   });
 }

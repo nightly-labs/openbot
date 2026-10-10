@@ -1,5 +1,95 @@
 # Providers
 
+## Built-in tool discovery
+
+`agent/tool-catalog.ts` exposes seven direct tools and three discovery tools to every adapter.
+Claude uses its native question tool instead of `ask_user`. The direct tools are `ask_user`,
+`attach_files_to_response`, `list_agents`, `send_message`, `remember`, `forget_memory`, and
+`react_to_user_message`. External plugin registration stays with each provider adapter.
+
+`tool_search` uses local keyword matching. Exact names come first, then word matches, with stable
+catalog order for ties. It returns five results by default and at most ten. `tool_describe` returns
+the original schemas for up to ten qualified names, plus guidance from `agent/tool-guidance.ts`.
+Identical guidance appears once per response. The initial catalog lists names without schemas.
+
+`tool_call` accepts `{ name: "namespace.tool", arguments: { ... } }`. The router resolves only
+original built-in names. It preserves the request, thread, turn, and call identifiers and the abort
+signal, then enters the same dispatch as a direct call. Existing decoders, secure browser input,
+approval cards, image results, cancellation, and message idempotency remain at their existing owners.
+A discovery tool cannot call another discovery tool. Old direct calls still reach their handlers.
+
+The visible definitions are part of the existing tool configuration fingerprint. A catalog change
+uses the existing session replacement or resume path; it does not reset the agent or its visible
+conversation. Claude builds its SDK MCP server from the same visible definitions. ACP, Pi, and Muse
+receive them through the local MCP bridge.
+
+`agent/developer-instructions.ts` puts stable rules first, profile and workspace settings next,
+and memories last. Detailed browser, administration, routine, hosting, data, and visual guidance
+loads through `tool_describe`. Essential secret handling and untrusted-content rules stay in the
+permanent instructions. ACP and Muse still insert these shorter instructions on each normal turn.
+Retention after compaction is not assumed. Compaction thresholds are unchanged.
+
+The default synthetic fixture measures 11,541 instruction characters and 8,382 characters for the
+serialized visible tool definitions, including the 1,912-character catalog. This is 19,923
+characters, or about 4,981 tokens at four characters per token, compared with the earlier 101,602
+characters (about 25,401 tokens). It is an 80.4% reduction in default application text. Schemas and
+guidance loaded later add context and can add model steps. Provider prompts, external plugins,
+caching, billing, and native model serialization are outside this measurement.
+
+## History retrieval and replacement sessions
+
+A replacement provider session receives a handoff of at most 32,000 characters, including headers
+and message identifiers. The budget reserves 24,000 for recent messages, 4,000 for older excerpts,
+2,000 for captured work steps, and 2,000 for instructions and references. Unused space can hold more
+recent text. Large latest user and assistant messages keep their start and end. Excerpts are not
+semantic summaries. Handoff construction stops reading pages when its packet is full and does not
+start old provider processes to get work steps. Existing stored conversations and summaries remain.
+
+Two deferred tools recover omitted text without model calls for search or summarization:
+
+- `history_search` searches the calling conversation, with five results by default and ten maximum.
+  Each excerpt is at most 400 characters. Its serialized tool result is at most 8,000 characters.
+- `history_read` returns recent messages, a named message, or a page before a returned cursor.
+  It returns ten messages by default and twenty maximum, within a 16,000-character serialized result.
+  `nextOffset` continues a large message. With `includeWorkSteps`, `nextWorkStepsOffset` can be passed
+  as `workStepsOffset` to continue a large or heavily escaped capture. Captures contain selected work
+  steps, not raw provider reasoning or full tool results. Missing or corrupt captures do not block chat.
+
+New captures use `provider-work-steps/v2` and the unique database session ID. Two providers can
+use the same native session and turn IDs without sharing captures. Legacy capture files have no
+ownership record. They remain on disk while their sessions remain recorded, but are not served as
+history or handoff evidence. A new capture restores work-step access; saved chat text is unchanged.
+
+The router requires an exact native-thread binding and the loaded client. It never falls back to
+the personal conversation. Database reads check thread ownership and canonical conversation order.
+The latest context-reset marker excludes earlier messages. Cursors name a stored anchor and the
+current reset; supplied ordering values are not trusted. File reads are followed by another check
+of reset, message existence, and message content. Channel history continues through `channel_history`
+and its assignment checks. Messaging history stays within the current link's execution thread.
+
+Claude model and effort changes use its live setters at the next turn, without replacing the
+native session or restarting its query. Standing instruction or access changes retain the existing
+refresh path. No-op profile saves do not unload sessions. Logs count provider-session starts by
+reason and Claude configuration restarts, without conversation text.
+
+Memory refresh behavior remains unchanged. The Codex fake-provider test proves that updated
+instructions are sent on resume; it does not prove native model adoption. Claude prompt snapshots
+stay off so they cannot freeze changed profile or memory text.
+
+## Compaction ownership
+
+Codex and Muse complete explicit compaction through turn events. Pi completes it through the request
+response. Claude manages compaction natively. ACP and custom ACP expose no explicit compaction
+operation to the OpenBot scheduler. Unsupported or native-managed clients cannot reserve its queue
+for a no-op request. Request completion clears the hold and keeps the minimum-growth guard.
+
+Codex retains the 80% threshold based on its last reported token usage and context-window size.
+Cumulative account usage is not context occupancy. A missing report is not zero usage. No fixed
+200,000-token context window, per-turn model summary, or new automatic model call is added.
+
+The design uses Hermes's on-demand discovery, stable instruction ordering, and bounded local
+history recall as references. OpenBot retains each native provider's session and compaction rules.
+
 ## Provider CLI updates
 
 The runtime manager offers the latest upstream release of each provider CLI. It checks at startup,
@@ -425,3 +515,28 @@ Optional `providers-v5` routes include the new runtimes and write-only provider 
 `agent-session-settings-v1` adds read, set, reset, and an agent-ID-only invalidation event.
 `acp-registry-v1` adds registry administration. Each administrative route checks the host role;
 clients hide unsupported controls. MCP-over-ACP transport is outside this change.
+
+## Local context indication
+
+The desktop uses the shared context design from PR #1786. Optional `contextStates` on the local
+runtime snapshot carries numeric context use and the latest compaction state. Released Team
+adapters omit this field. Remote web and mobile clients retain their current contracts.
+
+The snapshot includes only active personal provider sessions. Reset, session replacement and
+provider changes remove the old indication. A provider change publishes a runtime snapshot before
+the next turn, so retired counts do not remain on screen. Execution-thread data does not enter
+personal chat.
+Codex uses `tokenUsage.last.totalTokens` and its reported `modelContextWindow`. Claude reads the
+SDK `getContextUsage({ detail: "summary" })` result after a turn. This uses the previous response
+and local estimates; it avoids full per-category token-count requests. The read runs outside the
+stream consumer, has a two-second deadline, and cannot block the next turn. Old or unsupported
+reports stay absent. Claude counts carry an estimate flag, which the context ring and popover
+display. Native `status` and `compact_boundary` events drive Claude's compaction notice. Claude's
+`post_tokens` counts messages without the system prompt and tools, so its compaction marker omits
+the token comparison. Later local estimates do not restore that comparison.
+
+The progress percentage is an estimate based on elapsed time and the preceding compaction duration
+in this process. It never proves completion. Terminal provider events control success and failure.
+The latest marker and timing are runtime state, not new saved conversation messages. A provider
+summary is not copied into this state. The UI can render a breakdown or manual action, but this
+connection supplies neither: it adds no manual-compaction endpoint and makes no extra model turn.

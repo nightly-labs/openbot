@@ -3,6 +3,7 @@ import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentRemovalFailed } from "./agent/agent-removal";
 import type { FailureSignal } from "./agent/failure-signal";
+import { VISIBLE_DYNAMIC_TOOLS } from "./agent/tool-catalog";
 import type { AgentProvider } from "./agent-client";
 import type { AgentService } from "./agent-service";
 import {
@@ -137,10 +138,7 @@ describe.sequential("AgentService: restart", () => {
     // Codex fixes tools at session creation; resume ignores a dynamicTools field.
     const start = (await protocolMessages(logPath)).find((message) => message.method === "thread/start");
     expect(start?.params).toMatchObject({
-      dynamicTools: expect.arrayContaining([
-        expect.objectContaining({ type: "namespace", name: "openbot_browser" }),
-        expect.objectContaining({ type: "namespace", name: "openbot" }),
-      ]),
+      dynamicTools: VISIBLE_DYNAMIC_TOOLS,
     });
     expect((await runCauseEffect(store.getOrCreate("chief"))).threadId).toBe(threadId);
   });

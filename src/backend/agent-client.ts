@@ -13,6 +13,8 @@ export interface DiagnosticOrigin {
 
 export interface AgentClient {
   readonly provider: AgentProvider;
+  /** Explicit completion contract; missing capability means unsupported. */
+  readonly contextCompaction?: "events" | "request" | "native" | "unsupported";
   readonly running: boolean;
   readonly readHistory?: ReadProviderHistory;
   /** False when stopping this client would lose a live provider session with no recovery path. */

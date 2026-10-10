@@ -11,6 +11,7 @@ import type {
   ConversationSnapshot,
   HostedSiteConversationEventStatus,
 } from "@openbot/contracts/ipc";
+import { AgentHistoryQueries, type AgentHistorySelection } from "./database/agent-history-queries";
 import { type AgentModelChange, AgentRoster } from "./database/agent-roster";
 import { AgentUsage } from "./database/agent-usage";
 import { ConversationQueries } from "./database/conversation-queries";
@@ -70,6 +71,7 @@ export class OpenBotDatabase {
   readonly #hostedSiteEvents: HostedSiteEventLog;
   readonly #mailbox: MailboxProjection;
   readonly #sessions: ProviderSessions;
+  readonly #agentHistory: AgentHistoryQueries;
   readonly #providerHistory: ProviderHistoryStore;
   readonly #summaries: ThreadSummaries;
 
@@ -82,6 +84,7 @@ export class OpenBotDatabase {
     this.#replay = new ThreadReplay({ core: this.#core, conversations: this.#conversations });
     this.#hostedSiteEvents = new HostedSiteEventLog({ core: this.#core });
     this.#mailbox = new MailboxProjection({ core: this.#core });
+    this.#agentHistory = new AgentHistoryQueries(this.#core);
     this.#sessions = new ProviderSessions({ core: this.#core });
     this.#providerHistory = new ProviderHistoryStore({ core: this.#core });
     this.#summaries = new ThreadSummaries({ core: this.#core });
@@ -192,6 +195,10 @@ export class OpenBotDatabase {
     threadId: string | null,
   ): { activeTurnId: string | null; latestMessage: ConversationMessage | null } {
     return this.#conversations.readConversationRuntime(agentId, threadId);
+  }
+
+  readAgentHistory(agentId: string, threadId: string, selection: AgentHistorySelection) {
+    return this.#agentHistory.read(agentId, threadId, selection);
   }
 
   readConversationMessages(
@@ -405,6 +412,10 @@ export class OpenBotDatabase {
 
   listProviderSessions(threadId: string): ProviderSession[] {
     return this.#sessions.listProviderSessions(threadId);
+  }
+
+  listProviderSessionIds(externalSessionId?: string): string[] {
+    return this.#sessions.listProviderSessionIds(externalSessionId);
   }
 
   listExternalSessionIds(): string[] {

@@ -3,12 +3,25 @@ import { runMcp } from "./mcp-test-runtime";
 // @vitest-environment node
 
 import { request } from "node:http";
+import { createSdkMcpServer, tool } from "@anthropic-ai/claude-agent-sdk";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { ToolSchema } from "@modelcontextprotocol/sdk/types.js";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { afterEach, assert, describe, expect, it, vi } from "vitest";
+import { VISIBLE_DYNAMIC_TOOLS, VISIBLE_TOOL_DEFINITIONS } from "./agent/tool-catalog";
 import { type DynamicToolNamespace, LOCAL_MCP_PROGRESS_INTERVAL_MS, LocalMcpBridge } from "./local-mcp-bridge";
-import type { DynamicToolResult } from "./protocol";
+import type { DynamicToolCallParams, DynamicToolResult } from "./protocol";
+
+// Exercise the MCP input contract when constructing the local transport fixture.
+const VISIBLE_MCP_TOOLS = VISIBLE_DYNAMIC_TOOLS.map((namespace) => ({
+  ...namespace,
+  tools: namespace.tools.map((entry) => ({
+    ...entry,
+    inputSchema: ToolSchema.shape.inputSchema.parse(entry.inputSchema),
+  })),
+}));
 
 const TOOLS: DynamicToolNamespace[] = [
   {
@@ -39,6 +52,82 @@ afterEach(async () => {
 });
 
 describe("LocalMcpBridge", () => {
+  it("lists and validates the deferred envelope through the real Claude MCP SDK", async () => {
+    const definitions = VISIBLE_TOOL_DEFINITIONS.filter((definition) => definition.name !== "ask_user");
+    const server = createSdkMcpServer({
+      name: "openbot",
+      version: "0.1.0",
+      tools: definitions.map((definition) =>
+        tool(definition.name, definition.description, definition.shape, async (args) => ({
+          content: [{ type: "text", text: JSON.stringify(args) }],
+        })),
+      ),
+    });
+    const client = new Client({ name: "claude-catalog-check", version: "1.0.0" });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    try {
+      await server.instance.connect(serverTransport);
+      await client.connect(clientTransport);
+      expect((await client.listTools()).tools.map((entry) => entry.name)).toEqual(
+        definitions.map((entry) => entry.name),
+      );
+      const envelope = { name: "openbot.list_agents", arguments: { nested: [1, true, null, { text: "fixture" }] } };
+      expect(await client.callTool({ name: "tool_call", arguments: envelope })).toMatchObject({
+        content: [{ type: "text", text: JSON.stringify(envelope) }],
+      });
+      expect(
+        await client.callTool({ name: "tool_call", arguments: { ...envelope, arguments: "invalid" } }),
+      ).toMatchObject({ isError: true });
+    } finally {
+      await client.close();
+      await server.instance.close();
+    }
+  });
+
+  it("forwards deferred arguments and image results through the visible catalog", async () => {
+    const bridge = new LocalMcpBridge();
+    bridges.push(bridge);
+    const calls: DynamicToolCallParams[] = [];
+    const session = await runMcp(
+      bridge.createSession(
+        "thread-visible",
+        VISIBLE_MCP_TOOLS,
+        () => "turn-visible",
+        (call) =>
+          Effect.sync(() => {
+            calls.push(call);
+            return {
+              success: true,
+              contentItems: [{ type: "inputImage", imageUrl: "data:image/png;base64,aGVsbG8=" }],
+            };
+          }),
+      ),
+    );
+    const [server] = session.servers;
+    assert(server);
+    const client = await connect(server);
+    expect((await client.listTools()).tools.map((tool) => tool.name).toSorted()).toEqual(
+      VISIBLE_DYNAMIC_TOOLS.flatMap((namespace) => namespace.tools.map((tool) => tool.name)).toSorted(),
+    );
+    const arguments_ = {
+      name: "openbot_browser.screenshot",
+      arguments: { tabId: "tab-1", nested: { values: [1, true, null, "literal"] } },
+    };
+    expect(await client.callTool({ name: "tool_call", arguments: arguments_ })).toMatchObject({
+      content: [{ type: "image", mimeType: "image/png", data: "aGVsbG8=" }],
+    });
+    expect(calls).toEqual([
+      {
+        threadId: "thread-visible",
+        turnId: "turn-visible",
+        callId: expect.any(String),
+        namespace: "openbot",
+        tool: "tool_call",
+        arguments: arguments_,
+      },
+    ]);
+  });
+
   it("does not expose request parsing failures", async () => {
     const bridge = new LocalMcpBridge();
     bridges.push(bridge);
@@ -203,7 +292,7 @@ describe("LocalMcpBridge", () => {
     const session = await runMcp(
       bridge.createSession(
         "thread-1",
-        TOOLS,
+        VISIBLE_MCP_TOOLS,
         () => "turn-1",
         (_call, signal) =>
           Effect.promise(() => {
@@ -218,7 +307,11 @@ describe("LocalMcpBridge", () => {
     // An MCP client whose timeout ends sends `notifications/cancelled` on a new POST.
     const client = await connect(server);
     const cancel = new AbortController();
-    const cancelled = client.callTool({ name: "echo", arguments: {} }, undefined, { signal: cancel.signal });
+    const cancelled = client.callTool(
+      { name: "tool_call", arguments: { name: "openbot_browser.screenshot", arguments: { tabId: "tab-1" } } },
+      undefined,
+      { signal: cancel.signal },
+    );
     await vi.waitFor(() => expect(signals).toHaveLength(1));
     cancel.abort();
     await expect(cancelled).rejects.toThrow();
@@ -236,7 +329,14 @@ describe("LocalMcpBridge", () => {
       },
     });
     call.on("error", () => undefined);
-    call.end(JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "echo", arguments: {} } }));
+    call.end(
+      JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/call",
+        params: { name: "tool_call", arguments: { name: "openbot_browser.screenshot", arguments: { tabId: "tab-1" } } },
+      }),
+    );
     await vi.waitFor(() => expect(signals).toHaveLength(2));
     call.destroy();
     await vi.waitFor(() => expect(signals.map((signal) => signal.aborted)).toEqual([true, true]));

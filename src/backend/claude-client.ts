@@ -17,6 +17,7 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { defaultProviderModel } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger } from "@openbot/logging";
 import { Deferred, Effect, Exit, Fiber, Scope } from "effect";
 import {
   type ClaudePlanState,
@@ -28,9 +29,9 @@ import {
   startClaudePlanTurn,
 } from "./agent/plan-updates";
 import { isBalanceDiagnostic, isPlanLimitDiagnostic } from "./agent/provider-diagnostics";
+import { VISIBLE_TOOL_DEFINITIONS } from "./agent/tool-catalog";
 import { USAGE_LIMIT_METHOD } from "./agent/usage-limit-gate";
 import { type AgentProvider, RequestTimeoutError } from "./agent-client";
-import { BROWSER_TOOL_DEFINITIONS, OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
 import { type ClaudeHistoryOptions, claudeHistoryFromMessages, claudeHistoryReader } from "./claude-history";
 import {
   CLAUDE_WORKSPACE_MANAGED_SETTINGS,
@@ -58,7 +59,6 @@ import {
   type McpToolRuntimeSource,
   usableMcpServers,
 } from "./mcp-provider-shapes";
-import { OPENBOT_TOOL_DEFINITIONS } from "./openbot-tools";
 import { PendingServerRequests } from "./pending-server-requests";
 import {
   type AccountRateLimitsReadResult,
@@ -144,6 +144,8 @@ interface ThreadRuntime {
   id: string;
   usageCounterId: string;
   usageCost: number;
+  contextRequest: number;
+  compacting: boolean;
   config: ThreadConfig;
   appliedEffort?: string;
   input: AsyncMessageQueue;
@@ -181,6 +183,10 @@ interface ClaudeStreamMessage {
   errors?: string[];
   terminal_reason?: string;
   modelUsage?: unknown;
+  status?: unknown;
+  compact_result?: unknown;
+  compact_metadata?: unknown;
+  context_usage?: unknown;
   total_cost_usd?: number;
   /** The structured result of the tool a `user` message answers, such as the task a `TaskCreate` made. */
   tool_use_result?: unknown;
@@ -193,6 +199,7 @@ interface ClaudeStreamMessage {
 interface ClaudeQuery extends AsyncIterable<ClaudeStreamMessage> {
   interrupt(): Promise<unknown>;
   supportedModels(): Promise<ModelInfo[]>;
+  getContextUsage?(options: { detail: "summary" }): Promise<unknown>;
   setModel(model?: string): Promise<void>;
   applyFlagSettings(settings: { effortLevel?: ClaudeEffort | null }): Promise<void>;
   usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET?(): Promise<unknown>;
@@ -203,7 +210,11 @@ type QueryFactory = (params: Parameters<typeof query>[0]) => ClaudeQuery;
 type SessionHistoryReader = (sessionId: string, options?: { dir?: string }) => Promise<SessionMessage[]>;
 type ClaudeEffortCapability = { supported: ClaudeEffort[]; defaultEffort: ClaudeEffort } | null;
 
+const queryLogger = createOpenBotLogger("claude-query");
+
 export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
+  readonly contextCompaction = "native";
+  #queryRestarts = 0;
   readonly provider: AgentProvider = "claude";
   readonly #cli: ClaudeCliInfo;
   readonly #createQuery: QueryFactory;
@@ -603,6 +614,16 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       if (current && JSON.stringify(current.config) === JSON.stringify(config)) return;
       if (current) {
         if (current.activeTurn) return yield* providerFailure(new Error(sourceText("error.provider.claudeTurnActive")));
+        // Keep the applied model/effort until the live setters succeed at the next turn.
+        if (
+          JSON.stringify({ ...current.config, model: null, effort: null }) ===
+          JSON.stringify({ ...config, model: null, effort: null })
+        )
+          return;
+        queryLogger.info("Restarting a Claude query.", {
+          reason: "configuration-change",
+          count: ++this.#queryRestarts,
+        });
         yield* this.#threads.close(current).pipe(toProviderClientOperationError);
         continue;
       }
@@ -733,6 +754,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       id: threadId,
       usageCounterId: randomUUID(),
       usageCost: 0,
+      contextRequest: 0,
+      compacting: false,
       config,
       appliedEffort,
       input,
@@ -765,6 +788,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     yield* this.#threads.wake(threadId).pipe(toProviderClientOperationError);
     const runtime = yield* providerSync(() => this.#requireThread(threadId));
     if (runtime.activeTurn) return yield* providerFailure(new Error("The Claude thread already has an active turn."));
+    runtime.contextRequest += 1;
 
     const requestedModel = getString(params, "model");
     const modelChanged = Boolean(requestedModel && requestedModel !== runtime.config.model);
@@ -893,6 +917,35 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     runtime: ThreadRuntime,
     message: ClaudeStreamMessage,
   ) {
+    if (message.type === "system" && message.subtype === "status") {
+      const status =
+        message.status === "compacting"
+          ? "running"
+          : message.compact_result === "success"
+            ? "completed"
+            : message.compact_result === "failed"
+              ? "failed"
+              : null;
+      if (status) runtime.compacting = status === "running";
+      if (status)
+        this.emit("notification", { method: "openbot/context-compaction", params: { threadId: runtime.id, status } });
+      return;
+    }
+    if (message.type === "system" && message.subtype === "compact_boundary") {
+      runtime.compacting = false;
+      // Claude's post_tokens counts messages only, not the full context.
+      this.emit("notification", {
+        method: "openbot/context-compaction",
+        params: {
+          threadId: runtime.id,
+          status: "completed",
+        },
+      });
+      return;
+    }
+    if (message.context_usage && !message.parent_tool_use_id && isRecord(message.context_usage)) {
+      this.#emitContextUsage(runtime, message.context_usage.total_tokens, message.context_usage.raw_max_tokens);
+    }
     if (message.type === "rate_limit_event") {
       const info = message.rate_limit_info;
       const turn = runtime.activeTurn;
@@ -1042,7 +1095,49 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     }
     const status = interrupted ? "interrupted" : message.subtype === "success" && !apiError ? "completed" : "failed";
     yield* this.#completeTurn(runtime, status, errors.length > 0 ? errors.join("\n") : apiError ? fallback : null);
+    // A local SDK control request reads context; it does not send a user turn or call a model.
+    // Run outside the stream consumer so the result cannot block the queue or the SDK reader.
+    const contextRequest = ++runtime.contextRequest;
+    if (runtime.query.getContextUsage)
+      yield* Effect.forkIn(
+        providerCall(() => runtime.query.getContextUsage?.({ detail: "summary" })).pipe(
+          Effect.timeout("2 seconds"),
+          Effect.tap((usage) =>
+            Effect.sync(() => {
+              if (
+                this.#threads.get(runtime.id) !== runtime ||
+                runtime.contextRequest !== contextRequest ||
+                runtime.activeTurn ||
+                !isRecord(usage)
+              )
+                return;
+              this.#emitContextUsage(runtime, usage.totalTokens, usage.rawMaxTokens);
+            }),
+          ),
+          Effect.ignore,
+        ),
+        this.#scope,
+      );
   });
+
+  #emitContextUsage(runtime: ThreadRuntime, used: unknown, window: unknown): void {
+    if (
+      typeof used !== "number" ||
+      !Number.isFinite(used) ||
+      used < 0 ||
+      typeof window !== "number" ||
+      !Number.isFinite(window) ||
+      window <= 0
+    )
+      return;
+    this.emit("notification", {
+      method: "thread/tokenUsage/updated",
+      params: {
+        threadId: runtime.id,
+        tokenUsage: { last: { totalTokens: used }, modelContextWindow: window, estimated: true },
+      },
+    });
+  }
 
   #emitToolCall(runtime: ThreadRuntime, id: string, name: string, completed: boolean, input?: unknown): void {
     const turn = runtime.activeTurn;
@@ -1200,6 +1295,13 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   ) {
     const turn = runtime.activeTurn;
     if (!turn) return;
+    if (runtime.compacting && status !== "completed") {
+      runtime.compacting = false;
+      this.emit("notification", {
+        method: "openbot/context-compaction",
+        params: { threadId: runtime.id, status: "failed" },
+      });
+    }
     if (turn.thinkingStarted) {
       this.emit("notification", {
         method: "item/completed",
@@ -1367,20 +1469,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const call = (namespace: string, name: string, args: unknown) =>
       runCauseEffect(this.#callDynamicTool(threadId, namespace, name, args));
     return {
-      openbot_browser: createSdkMcpServer({
-        name: OPENBOT_BROWSER_NAMESPACE,
-        version: "0.2.0",
-        tools: BROWSER_TOOL_DEFINITIONS.map((definition) =>
-          tool(definition.name, definition.description, definition.shape, (args) =>
-            call(OPENBOT_BROWSER_NAMESPACE, definition.name, args),
-          ),
-        ),
-      }),
       openbot: createSdkMcpServer({
         name: "openbot",
         version: "0.1.0",
         // Claude uses the SDK's AskUserQuestion permission flow.
-        tools: OPENBOT_TOOL_DEFINITIONS.filter((definition) => definition.name !== "ask_user").map((definition) =>
+        tools: VISIBLE_TOOL_DEFINITIONS.filter((definition) => definition.name !== "ask_user").map((definition) =>
           tool(definition.name, definition.description, definition.shape, (args) =>
             call("openbot", definition.name, args),
           ),

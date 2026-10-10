@@ -888,7 +888,7 @@ describe.sequential("AgentService: queue", () => {
     };
 
     await runCauseEffect(service.updateAgent({ agentId: "chief", provider: "grok", model: "grok-4.5" }));
-    const stepsDirectory = join(started.store.database.userDataPath, "provider-work-steps");
+    const stepsDirectory = join(started.store.database.userDataPath, "provider-work-steps", "v2");
     const [capture] = await readdir(stepsDirectory);
     assert(capture, "The switch saved no work steps.");
     const saved = await readFile(join(stepsDirectory, capture), "utf8");
@@ -1016,7 +1016,7 @@ describe.sequential("AgentService: queue", () => {
     },
   );
 
-  it("stores a visible summary when a provider handoff exceeds its budget", async () => {
+  it("bounds a provider handoff and keeps the complete result in local history", async () => {
     process.env.OPENBOT_CLAUDE_PATH = await fakeClaudeCli();
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { service: agentService, store } = await startService(root, {
@@ -1038,12 +1038,14 @@ describe.sequential("AgentService: queue", () => {
     await waitForQueue(service, "chief", (queue) => queue.deliveries[1]?.status === "completed");
 
     const claudeTurn = clients.get("claude")?.requests.find((request) => request.method === "turn/start")?.params;
-    expect(firstInputText(claudeTurn)).toContain("oldest visible history was summarized");
+    expect(firstInputText(claudeTurn)).toContain("history_read");
+    expect((firstInputText(claudeTurn) ?? "").length).toBeLessThan(33_000);
     if (!publicThreadId) throw new Error("The public thread was not created.");
-    expect(store.database.latestThreadSummary(publicThreadId)).toMatchObject({
-      threadId: publicThreadId,
-      throughMessageId: expect.any(String),
-    });
+    expect(
+      store.database
+        .readAgentHistory("chief", publicThreadId, { author: "assistant", limit: 10 })
+        .messages.some((row) => row.message.text.length === 250_000),
+    ).toBe(true);
   });
 
   it("starts a new provider session without the history before a new chat", async () => {
@@ -1096,14 +1098,9 @@ describe.sequential("AgentService: queue", () => {
     const instructions = getString(start?.params, "developerInstructions") ?? "";
     expect(instructions).toContain('"title": "Research & writing"');
     expect(instructions).toContain('"description": "Researches topics and turns findings into clear writing."');
-    expect(instructions).toContain("Be pragmatic and direct");
-    expect(instructions).toContain("Give the shortest answer that is complete and useful");
-    expect(instructions).toContain("Do not add filler");
+    expect(instructions).toContain("Give the shortest complete answer");
     expect(instructions).toContain("openbot.ask_user");
-    expect(instructions).toContain("GitHub-flavored Markdown tables");
-    expect(instructions).toContain("at least three dashes per column");
-    expect(instructions).toContain("put exactly ✓ or — in every option cell");
-    expect(instructions).toContain("render that Markdown as a comparison table");
+    expect(instructions).toContain("openbot.tool_describe");
     expect(instructions).toContain("standing remit");
   });
 

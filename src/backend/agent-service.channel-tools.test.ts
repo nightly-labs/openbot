@@ -94,6 +94,15 @@ describe.sequential("AgentService: channel tools without assignment", () => {
       expect(error).toBeUndefined();
       expect(tool).toHaveBeenCalledWith("channel-1", "chief", turnId, expect.any(String), "channel_history", {});
       expect(result).toMatchObject({ success: true });
+      const history = await callOpenBotTool(
+        client,
+        threadId,
+        "tool_call",
+        { name: "openbot.history_read", arguments: {} },
+        turnId,
+      );
+      expect(history.result).toMatchObject({ success: false });
+      expect(tool).toHaveBeenCalledTimes(1);
     } finally {
       channelForThread.mockRestore();
       tool.mockRestore();

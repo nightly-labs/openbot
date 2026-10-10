@@ -1,5 +1,6 @@
 import type {
   AccountUsage,
+  AgentContextState,
   AgentEvent,
   AgentModelOption,
   AgentProviderId,
@@ -55,6 +56,7 @@ export interface VoiceLiveTranscript extends ConversationTarget {
 }
 
 export interface ConversationProps {
+  contextState?: AgentContextState | undefined;
   runtime?: ConversationRuntime;
   notice?: JSX.Element;
   onOpenUsage?: (trigger: HTMLButtonElement) => void;

@@ -20,7 +20,14 @@ import {
   CONVERSATION_STORY_MESSAGES,
   StoryAppProviders,
 } from "./conversation-story-support";
-import { STORY_AGENT_STATUS, STORY_AGENTS, STORY_ATTACHMENTS, STORY_PRESENCE, STORY_QUEUES } from "./fixtures";
+import {
+  requireFixture,
+  STORY_AGENT_STATUS,
+  STORY_AGENTS,
+  STORY_ATTACHMENTS,
+  STORY_PRESENCE,
+  STORY_QUEUES,
+} from "./fixtures";
 import { createMockOpenBot } from "./mock-openbot";
 
 const storyAttachment = CONVERSATION_STORY_ATTACHMENT;
@@ -1069,6 +1076,39 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const RichConversation: Story = {};
+
+const contextStoryAgent = requireFixture(args.agent, "Context story agent");
+
+/** The real conversation composer receives the same numeric snapshot as the desktop host. */
+export const ContextIndication: Story = {
+  args: {
+    contextState: {
+      agentId: contextStoryAgent.id,
+      threadId: contextStoryAgent.threadId ?? "story-context-thread",
+      usage: { usedTokens: 168400, windowTokens: 272000, autoCompactAt: 0.8, nativeManaged: false },
+      compaction: {
+        id: "story-context-compaction",
+        startedAt: Date.now() - 10000,
+        status: "running",
+        beforeTokens: 219000,
+      },
+    },
+  },
+};
+export const ContextCompactionFailed: Story = {
+  args: {
+    ...ContextIndication.args,
+    contextState: {
+      ...ContextIndication.args.contextState,
+      compaction: {
+        id: "story-context-failed",
+        startedAt: Date.now() - 10000,
+        status: "failed",
+        beforeTokens: 219000,
+      },
+    },
+  },
+};
 
 /** The real composer with a signed-out provider: the notice takes the queue's place above the input. */
 export const ProviderSignInRequired: Story = {

@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Effect } from "effect";
 import { afterEach, describe, expect, it } from "vitest";
+import { VISIBLE_DYNAMIC_TOOLS } from "./agent/tool-catalog";
 import { PiAgentClient } from "./pi-client";
 import { createPiMcpExtension } from "./pi-mcp";
 import { type AppServerNotification, decodeThreadResponse, decodeTurnResponse, getRecord, getString } from "./protocol";
@@ -25,7 +26,7 @@ process.stdin.on("data", chunk => {
   let line;
   while ((line = buffer.indexOf("\\n")) >= 0) {
     const command = JSON.parse(buffer.slice(0, line)); buffer = buffer.slice(line + 1);
-    fs.appendFileSync(path.join(process.cwd(), "commands.jsonl"), JSON.stringify(command) + "\\n");
+    fs.appendFileSync(path.join(process.cwd(), "commands.jsonl"), JSON.stringify({...command, mcpServers: JSON.parse(process.env.OPENBOT_PI_MCP_SERVERS || "[]")}) + "\\n");
     let data = {};
     if (command.type === "get_state") { fs.writeFileSync(session, "{}"); data = { sessionFile: session }; }
     if (command.type === "switch_session") session = command.sessionPath;
@@ -84,7 +85,9 @@ async function fixture() {
   cleanup.push(() => Effect.runPromise(client.stop()));
   const events: AppServerNotification[] = [];
   client.on("notification", (event) => events.push(event));
-  const started = await Effect.runPromise(client.request("thread/start", { cwd: directory }, decodeThreadResponse));
+  const started = await Effect.runPromise(
+    client.request("thread/start", { cwd: directory, dynamicTools: VISIBLE_DYNAMIC_TOOLS }, decodeThreadResponse),
+  );
   return { client, directory, persisted, events, id: started.thread.id };
 }
 
@@ -117,6 +120,15 @@ describe("Pi native sessions", () => {
     const usage = test.events
       .filter((event) => event.method === "openbot/usage")
       .map((event) => getRecord(event.params, "usage"));
+    const commands = (await readFile(join(test.directory, "commands.jsonl"), "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    expect(commands[0]?.mcpServers).toEqual([
+      expect.objectContaining({
+        config: expect.objectContaining({ exposure: "direct", url: expect.stringContaining("http://127.0.0.1:") }),
+      }),
+    ]);
     expect(usage).toEqual([
       { inputTokens: 60, outputTokens: 100, cachedReadTokens: 30, cachedWriteTokens: 10 },
       { inputTokens: 120, outputTokens: 180, cachedReadTokens: 60, cachedWriteTokens: 20 },

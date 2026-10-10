@@ -24,6 +24,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { ACP_IDLE_SESSION_LIMIT, AcpAgentClient, type AcpHistoryPersistence } from "./acp-client";
 import { isMissingProviderSessionError } from "./agent/thread-items";
+import { VISIBLE_DYNAMIC_TOOLS } from "./agent/tool-catalog";
 import { type AgentClient, AgentProcessExitError } from "./agent-client";
 import type { OpencodeCliInfo } from "./cli";
 import { runCauseEffect } from "./effect-boundary";
@@ -973,7 +974,11 @@ describe("OpenCode ACP MCP servers", () => {
     const client = startOpencode(fake.cli, () => null, fake.envLog, { mcpServers: () => configs });
     await runCauseEffect(client.request("initialize", {}, decodeRecordResponse));
     await runCauseEffect(
-      client.request("thread/start", { cwd: tmpdir(), runtimeWorkspaceRoots: [tmpdir()] }, decodeRecordResponse),
+      client.request(
+        "thread/start",
+        { cwd: tmpdir(), runtimeWorkspaceRoots: [tmpdir()], dynamicTools: VISIBLE_DYNAMIC_TOOLS },
+        decodeRecordResponse,
+      ),
     );
 
     const logged = (await readFile(sessionLog, "utf8")).split("\n").filter((line) => line.trim());
@@ -992,7 +997,7 @@ describe("OpenCode ACP MCP servers", () => {
     // user's server can never displace one. `Database` is not sent either: ACP carries no working
     // directory, and a server told to open `./data.db` somewhere else creates a second database
     // rather than reading the one the user named.
-    expect(params.mcpServers.map((server: { name: string }) => server.name)).toEqual(["Filesystem"]);
+    expect(params.mcpServers.map((server: { name: string }) => server.name)).toEqual(["Filesystem", "openbot"]);
   });
 });
 

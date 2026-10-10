@@ -155,7 +155,9 @@ export class AgentRemoval {
     let stage = "provider-files";
     yield* Effect.gen({ self: this }, function* () {
       for (const session of providerSessions)
-        yield* this.#threads.deleteProviderSessionFiles(session.externalSessionId).pipe(toAgentRemovalFailed);
+        yield* this.#threads
+          .deleteProviderSessionFiles(session.externalSessionId, session.id)
+          .pipe(toAgentRemovalFailed);
       stage = "messaging";
       yield* this.#messaging.deleteForAgent(agent.id).pipe(toAgentRemovalFailed);
       stage = "mailbox";

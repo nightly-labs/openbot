@@ -289,6 +289,7 @@ export interface AcpProviderOptions {
 }
 
 export class AcpAgentClient extends EventEmitter<ClientEvents> {
+  readonly contextCompaction = "unsupported";
   get provider(): AgentProvider {
     return this.options.provider;
   }

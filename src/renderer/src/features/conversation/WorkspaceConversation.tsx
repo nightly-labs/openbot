@@ -77,6 +77,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     setAgentAvatar,
   } = useAgents();
   const {
+    contextStates,
     activeQueue,
     activeRoutineIds,
     activeRoutines,
@@ -239,6 +240,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
 
   return (
     <Conversation
+      contextState={contextStates()[activeAgent()?.id ?? ""]}
       platform={platform.appInfo()?.platform}
       onOpenMarketplace={() => setSkillsMarketplaceOpen(true)}
       onOpenMarketplaceApp={(request) => {

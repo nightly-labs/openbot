@@ -126,6 +126,7 @@ function requiredCwd(params: unknown): string {
 }
 
 export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements AgentClient {
+  readonly contextCompaction = "unsupported";
   readonly provider = "acp" as const;
   readonly #source: CustomAgentSource;
   readonly #createChild: CustomAgentChildFactory;

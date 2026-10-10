@@ -19,9 +19,11 @@ import { SLACK_BOT_SCOPES } from "@openbot/contracts/slack-app";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { AgentService } from "../agent-service";
 import {
+  callOpenBotTool,
   type FakeAgentClient,
   inputRecords,
   notification,
+  openBotToolPayload,
   paramsRecord,
   startAgentTestFixture,
   startService,
@@ -361,6 +363,40 @@ describe.sequential("Slack messaging end to end", () => {
       [],
     );
     report.mention = { prompt: prompt.split("\n").slice(0, 3), reactions: reactions.length };
+  });
+
+  it("keeps history retrieval inside one messaging link", async () => {
+    const { agent, client, store } = await connected();
+    await slack.send("events_api", slack.mention("LINK_ONE_PRIVATE", "801.000"));
+    await waitFor(() => slack.of("chat.update").some((call) => call.params.text === "CODEX_DONE"));
+    await slack.send("events_api", slack.mention("LINK_TWO_PRIVATE", "802.000"));
+    await waitFor(() => slack.of("chat.update").filter((call) => call.params.text === "CODEX_DONE").length === 2);
+    const links = service?.messaging.store.links(agent.id) ?? [];
+    expect(links).toHaveLength(2);
+    const firstLink = links.find(
+      (link) =>
+        store.database.readAgentHistory(agent.id, link.threadId, { query: "LINK_ONE_PRIVATE", limit: 1 }).messages
+          .length > 0,
+    );
+    const secondLink = links.find((link) => link !== firstLink);
+    if (!firstLink || !secondLink) throw new Error("Missing messaging history");
+    const privateMessage = store.database.readAgentHistory(agent.id, firstLink.threadId, {
+      query: "LINK_ONE_PRIVATE",
+      limit: 1,
+    }).messages[0]?.message;
+    const session = store.database.listProviderSessions(secondLink.threadId).at(-1);
+    if (!privateMessage || !session) throw new Error("Missing messaging session");
+    const forged = await callOpenBotTool(client, session.externalSessionId, "tool_call", {
+      name: "openbot.history_read",
+      arguments: { messageId: privateMessage.id },
+    });
+    expect(forged.result).toMatchObject({ success: false });
+    const own = await callOpenBotTool(client, session.externalSessionId, "history_search", {
+      query: "LINK_TWO_PRIVATE",
+    });
+    expect(own.result).toMatchObject({ success: true });
+    expect(JSON.stringify(openBotToolPayload(own.result))).toContain("LINK_TWO_PRIVATE");
+    expect(JSON.stringify(openBotToolPayload(own.result))).not.toContain("LINK_ONE_PRIVATE");
   });
 
   it("runs a redelivered event once, and a reply without a mention only in a known thread", async () => {

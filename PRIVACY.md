@@ -57,6 +57,16 @@ The service stores payment facts and a delivery ledger in D1 to prevent duplicat
 It does not send Stripe identifiers, server identifiers, or Checkout return tokens to OpenPanel.
 An account deletion clears its profile reference and stops pending account event delivery.
 
+## AI conversation context
+
+When a provider session is replaced, OpenBot sends a bounded excerpt of the current conversation
+to the selected provider. The agent can request older messages from that same conversation through
+local history tools. Requested text and selected saved work steps are then sent to that provider.
+These tools exclude messages before the latest context reset and cannot search another conversation.
+Channel history keeps its existing membership and task checks. Messaging history stays within its
+current link. The full conversation stays in local SQLite storage. No history text is sent to the
+account service or analytics by these tools.
+
 ## Local scripts
 
 Local scripts is off by default for each agent. When enabled, scripts that run as the same OS user

@@ -596,6 +596,13 @@ export class ConversationRuntime {
     return this.#threadToAgent.get(externalThreadId);
   }
 
+  /** Model retrieval must never fall back to the agent's personal conversation. */
+  historyScope(externalThreadId: string, client: AgentClient) {
+    const agentId = this.#threadToAgent.get(externalThreadId);
+    const threadId = this.#publicThreads.get(externalThreadId);
+    return agentId && threadId && this.#loadedThreads.get(externalThreadId) === client ? { agentId, threadId } : null;
+  }
+
   bindThread(externalThreadId: string, agentId: string, publicThreadId?: string): void {
     if (publicThreadId) this.#publicThreads.set(externalThreadId, publicThreadId);
     this.#threadToAgent.set(externalThreadId, agentId);

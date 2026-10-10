@@ -8,12 +8,12 @@ import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+import { VISIBLE_DYNAMIC_TOOLS } from "./agent/tool-catalog";
 import { AgentStore } from "./agent-store";
 import { CLAUDE_IDLE_THREAD_LIMIT, CLAUDE_THREAD_IDLE_RELEASE_MS, ClaudeAgentClient } from "./claude-client";
 import { mergeProviderHistory, newAssistantMessage, snapshotFromThread } from "./conversation-snapshots";
 import { runCauseEffect } from "./effect-boundary";
 import { loginShellPath } from "./mcp-provider-shapes";
-import { OPENBOT_DYNAMIC_TOOLS } from "./openbot-tools";
 import { isPathInside } from "./path-containment";
 import {
   decodeAccountRateLimitsReadResult,
@@ -27,6 +27,13 @@ import {
 } from "./protocol";
 
 type TestStreamMessage =
+  | {
+      type: "system";
+      subtype: "status" | "compact_boundary";
+      status?: "compacting" | null;
+      compact_result?: "success" | "failed";
+      compact_metadata?: { pre_tokens: number; post_tokens?: number };
+    }
   | {
       type: "stream_event";
       parent_tool_use_id: null;
@@ -245,20 +252,15 @@ fi
       });
       const options: DynamicRecord | null = isDynamicRecord(params.options) ? params.options : null;
       const mcpServers: DynamicRecord | null = isDynamicRecord(options?.mcpServers) ? options.mcpServers : null;
-      const browserServer = mcpServers?.openbot_browser;
-      const browserServerInstance = isDynamicRecord(browserServer) ? browserServer.instance : null;
-      const registeredBrowserTools = isDynamicRecord(browserServerInstance)
-        ? browserServerInstance._registeredTools
-        : null;
-      expect(isDynamicRecord(registeredBrowserTools) ? Object.keys(registeredBrowserTools) : []).toEqual(
-        expect.arrayContaining(["evaluate", "request_takeover"]),
-      );
+      expect(mcpServers?.openbot_browser).toBeUndefined();
       const openbotServer = mcpServers?.openbot;
       const serverInstance = isDynamicRecord(openbotServer) ? openbotServer.instance : null;
       const registeredTools = isDynamicRecord(serverInstance) ? serverInstance._registeredTools : null;
       // Compare the declarations passed to the providers, including schema constraints and guidance.
       // Claude uses the SDK's AskUserQuestion instead of the ask_user MCP tool.
-      const expectedTools = OPENBOT_DYNAMIC_TOOLS.tools.filter((dynamicTool) => dynamicTool.name !== "ask_user");
+      const expectedTools = VISIBLE_DYNAMIC_TOOLS.flatMap((namespace) => namespace.tools).filter(
+        (dynamicTool) => dynamicTool.name !== "ask_user",
+      );
       expect((isDynamicRecord(registeredTools) ? Object.keys(registeredTools) : []).toSorted()).toEqual(
         expectedTools.map((dynamicTool) => dynamicTool.name).toSorted(),
       );
@@ -707,6 +709,87 @@ fi
     expect(clearingQuery.models).toEqual(["haiku"]);
     expect(clearingQuery.flagSettings).toEqual([{ effortLevel: null }]);
 
+    await runCauseEffect(client.stop());
+  });
+
+  it.each([
+    { model: "claude-opus-5-5", effort: "high", expectedModel: "claude-opus-5-5", expectedEffort: "high" },
+    { model: "claude-sonnet-5", effort: "max", expectedModel: null, expectedEffort: "max" },
+  ])(
+    "reuses a resumed query and applies live settings: $model/$effort",
+    async ({ model, effort, expectedModel, expectedEffort }) => {
+      root = await mkdtemp(join(tmpdir(), "openbot-claude-live-resume-"));
+      const queries: TestQuery[] = [];
+      const client = new ClaudeAgentClient({ executable: "/bin/true", version: "2.1.280" }, () => {
+        const query = new TestQuery(new TestQueue<TestStreamMessage>());
+        queries.push(query);
+        return query;
+      });
+      client.start();
+      const config = { cwd: root, model: "claude-sonnet-5", effort: "low", developerInstructions: "Stable rules" };
+      const thread = await runCauseEffect(client.request("thread/start", config, decodeThreadResponse));
+      await runCauseEffect(
+        client.request("thread/resume", { ...config, model, effort, threadId: thread.thread.id }, decodeThreadResponse),
+      );
+      await runCauseEffect(
+        client.request("turn/start", { threadId: thread.thread.id, model, effort, input: [] }, decodeTurnResponse),
+      );
+      expect(queries).toHaveLength(1);
+      expect(queries[0]?.models).toEqual(expectedModel ? [expectedModel] : []);
+      expect(queries[0]?.flagSettings).toEqual([{ effortLevel: expectedEffort }]);
+      await runCauseEffect(client.stop());
+    },
+  );
+
+  it("reports native compaction and reads local context without a model turn", async () => {
+    root = await mkdtemp(join(tmpdir(), "openbot-claude-context-"));
+    const output = new TestQueue<TestStreamMessage>();
+    const contextRead = vi.fn(async () => ({ totalTokens: 41000, rawMaxTokens: 200000 }));
+    class ContextQuery extends TestQuery {
+      getContextUsage = contextRead;
+    }
+    const client = new ClaudeAgentClient(
+      { executable: "/bin/true", version: "2.1.280" },
+      () => new ContextQuery(output),
+    );
+    const notifications: Array<{ method: string; params: unknown }> = [];
+    client.on("notification", (event) => notifications.push(event));
+    client.start();
+    const thread = await runCauseEffect(
+      client.request("thread/start", { cwd: root, model: "claude-sonnet-5" }, decodeThreadResponse),
+    );
+    await startTurn(client, thread.thread.id, "context-turn");
+    output.push({ type: "system", subtype: "status", status: "compacting" });
+    output.push({
+      type: "system",
+      subtype: "compact_boundary",
+      compact_metadata: { pre_tokens: 180000, post_tokens: 41000 },
+    });
+    output.push({
+      type: "result",
+      subtype: "success",
+      result: "Done",
+      errors: [],
+      terminal_reason: "completed",
+      session_id: thread.thread.id,
+      uuid: "context-result",
+    });
+    await vi.waitFor(() =>
+      expect(notifications.some((event) => event.method === "thread/tokenUsage/updated")).toBe(true),
+    );
+    expect(contextRead).toHaveBeenCalledTimes(1);
+    expect(contextRead).toHaveBeenCalledWith({ detail: "summary" });
+    expect(notifications.filter((event) => event.method === "turn/started")).toHaveLength(1);
+    expect(
+      notifications.filter((event) => event.method === "openbot/context-compaction").map((event) => event.params),
+    ).toEqual([
+      { threadId: thread.thread.id, status: "running" },
+      { threadId: thread.thread.id, status: "completed" },
+    ]);
+    expect(notifications.find((event) => event.method === "thread/tokenUsage/updated")?.params).toEqual({
+      threadId: thread.thread.id,
+      tokenUsage: { last: { totalTokens: 41000 }, modelContextWindow: 200000, estimated: true },
+    });
     await runCauseEffect(client.stop());
   });
 

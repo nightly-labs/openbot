@@ -1,4 +1,10 @@
-import type { AgentApproval, AgentEvent, QueueSnapshot, RoutineFields } from "@openbot/contracts/ipc";
+import type {
+  AgentApproval,
+  AgentContextState,
+  AgentEvent,
+  QueueSnapshot,
+  RoutineFields,
+} from "@openbot/contracts/ipc";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, untrack } from "solid-js";
 import { desktopAnalytics } from "./analytics";
@@ -73,6 +79,7 @@ const Turns = createSimpleContext({
     >(seed?.turnProgress ?? {});
     const [failedTurns, setFailedTurns] = createSignal<Record<string, string | undefined>>(seed?.failedTurns ?? {});
     // The agents whose queue waits for a provider plan to reset, in epoch seconds. Only a runtime snapshot of the local host carries it.
+    const [contextStates, setContextStates] = createSignal<Record<string, AgentContextState>>({});
     const [usageLimits, setUsageLimits] = createSignal<Record<string, number | null>>({});
     const [queues, setQueues] = createSignal<Record<string, QueueSnapshot>>(seed?.queues ?? {});
     const [routinesByConversation, setRoutinesByConversation] = createSignal<
@@ -379,6 +386,8 @@ const Turns = createSimpleContext({
       setTurnProgress,
       failedTurns,
       setFailedTurns,
+      contextStates,
+      setContextStates,
       usageLimits,
       setUsageLimits,
       queues,

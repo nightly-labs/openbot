@@ -10,6 +10,7 @@ import { ChatRowBoundary } from "@openbot/ui/features/conversation/ChatRowBounda
 import { ChatScrollRail, createChatScrollRail } from "@openbot/ui/features/conversation/ChatScrollRail";
 import { ChatSearch } from "@openbot/ui/features/conversation/ChatSearch";
 import { ChatVisual } from "@openbot/ui/features/conversation/ChatVisual";
+import { ContextCompactionMarker, type ContextCompactionView } from "@openbot/ui/features/conversation/ContextUsage";
 import { BrowserTakeoverCard } from "@openbot/ui/features/conversation/ConversationPrompts";
 import { dayMarkerLabel } from "@openbot/ui/features/conversation/chat-day-markers";
 import { ScrollToLatestButton } from "@openbot/ui/features/conversation/MessageNavigation";
@@ -141,6 +142,22 @@ export function ConversationTimeline() {
     setVirtualRootElement,
   } = useConversationViewScope();
   const { t, format } = useText();
+  const compaction = (): ContextCompactionView | null => {
+    const state = props.contextState;
+    if (state?.agentId !== props.agent?.id || state?.threadId !== props.agent?.threadId || !state?.compaction)
+      return null;
+    return { ...state.compaction, timestamp: new Date(state.compaction.startedAt).toISOString() };
+  };
+  const compactionBefore = () => {
+    const startedAt = props.contextState?.compaction?.startedAt;
+    return startedAt === undefined
+      ? undefined
+      : timelineMessages().find((message) => message.createdAt && Date.parse(message.createdAt) > startedAt)?.id;
+  };
+  const CompactionMarker = () => (
+    <Show when={compaction()}>{(state) => <ContextCompactionMarker compaction={state()} />}</Show>
+  );
+
   const runtime = conversationRuntime(props);
   /**
    * The other person who wrote a message. The reader's own message, an agent message, and a message
@@ -389,6 +406,9 @@ export function ConversationTimeline() {
                           : "none",
                       }}
                     >
+                      <Show when={message()?.id === compactionBefore()}>
+                        <CompactionMarker />
+                      </Show>
                       <Show when={dayMarker()}>
                         {(label) => (
                           <div class="time-marker">
@@ -502,6 +522,9 @@ export function ConversationTimeline() {
                           : "none",
                       }}
                     >
+                      <Show when={message()?.id === compactionBefore()}>
+                        <CompactionMarker />
+                      </Show>
                       <Show when={dayMarker()}>
                         {(label) => (
                           <div class="time-marker">
@@ -553,6 +576,9 @@ export function ConversationTimeline() {
                           : "none",
                       }}
                     >
+                      <Show when={message()?.id === compactionBefore()}>
+                        <CompactionMarker />
+                      </Show>
                       <Show when={dayMarker()}>
                         {(label) => (
                           <div class="time-marker">
@@ -609,6 +635,9 @@ export function ConversationTimeline() {
                         : "none",
                     }}
                   >
+                    <Show when={message()?.id === compactionBefore()}>
+                      <CompactionMarker />
+                    </Show>
                     <Show when={dayMarker()}>
                       {(label) => (
                         <div class="time-marker">
@@ -742,6 +771,9 @@ export function ConversationTimeline() {
               }}
             </For>
           </div>
+          <Show when={!compactionBefore()}>
+            <CompactionMarker />
+          </Show>
           <div
             class="agent-activity-slot"
             data-reserved={agentActivitySpaceReserved() ? "true" : "false"}
