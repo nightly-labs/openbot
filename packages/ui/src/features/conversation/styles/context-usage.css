@@ -1,0 +1,360 @@
+/*
+ * Context usage: the composer ring, its popover, and the conversation row where a thread was
+ * compacted. The breakdown hues reuse the chart palette in a fixed order, as the storage bar does.
+ */
+
+/* Ring ------------------------------------------------------------------- */
+
+.context-meter-trigger {
+  color: var(--openbot-text-muted);
+}
+
+.context-meter-ring {
+  width: var(--openbot-icon-md);
+}
+
+.context-meter-ring .ui-radial-progress-track,
+.context-meter-ring .ui-radial-progress-indicator {
+  stroke-width: 6;
+}
+
+.context-meter-ring[data-level="quiet"] {
+  --ui-radial-progress-color: var(--openbot-text-dim);
+}
+
+.context-meter-ring[data-level="normal"] {
+  --ui-radial-progress-color: var(--openbot-text-secondary);
+}
+
+/* The colour of the compaction notice above the input, so one state keeps one colour. */
+.context-meter-ring[data-compacting] {
+  --ui-radial-progress-color: var(--openbot-warning);
+}
+
+.context-meter-ring[data-compacting] .ui-radial-progress-chart {
+  animation: ui-spin 900ms linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .context-meter-ring[data-compacting] .ui-radial-progress-chart {
+    animation: none;
+  }
+}
+
+/* Popover ---------------------------------------------------------------- */
+
+.context-meter-popover {
+  z-index: var(--openbot-layer-popover);
+  display: flex;
+  width: 280px;
+  flex-direction: column;
+  gap: var(--openbot-space-3);
+  padding: var(--openbot-space-3) var(--openbot-space-4) var(--openbot-space-4);
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
+  transform-origin: var(--kb-popover-content-transform-origin);
+  animation: ui-menu-in var(--ui-menu-duration) var(--ui-menu-ease) both;
+}
+
+/* The copy that ContentExitMotion leaves in the place of the closed popover plays the exit. */
+.context-meter-popover:not([data-expanded]) {
+  animation: ui-menu-out var(--ui-menu-duration) var(--ui-menu-ease) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .context-meter-popover,
+  .context-meter-popover:not([data-expanded]) {
+    animation: none;
+  }
+}
+
+.context-meter-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--openbot-space-2);
+}
+
+.context-meter-title {
+  margin: 0;
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.context-meter-percent {
+  color: var(--openbot-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.context-meter-percent[data-level="warning"] {
+  color: var(--openbot-warning-text);
+}
+
+.context-meter-percent[data-level="danger"] {
+  color: var(--openbot-danger-text);
+}
+
+.context-meter-tokens,
+.context-meter-note {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.context-meter-tokens {
+  margin-top: calc(-1 * var(--openbot-space-2));
+  font-variant-numeric: tabular-nums;
+}
+
+/* The manual action closes the popover, on the end side, like the confirm action of a dialog. */
+.context-meter-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: var(--openbot-space-3);
+  border-top: 1px solid var(--openbot-border);
+}
+
+.context-meter-action {
+  gap: var(--openbot-space-1-5);
+}
+
+.context-meter-action svg {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+}
+
+/* Bar -------------------------------------------------------------------- */
+
+.context-usage-bar,
+.context-usage-legend {
+  --context-system: var(--openbot-chart-storage-app);
+  --context-tools: var(--openbot-chart-storage-downloads);
+  --context-memory: var(--openbot-chart-storage-files);
+  --context-messages: var(--openbot-chart-storage-workspaces);
+}
+
+.context-usage-bar {
+  position: relative;
+  display: flex;
+  height: var(--openbot-space-2);
+  gap: var(--openbot-space-0-5);
+}
+
+.context-usage-segment {
+  min-width: var(--openbot-space-1);
+  flex-basis: 0;
+  border-radius: var(--openbot-radius-xs);
+  background: var(--context-color);
+}
+
+.context-usage-segment[data-category="used"] {
+  --context-color: var(--openbot-text-secondary);
+}
+
+.context-meter-popover:has(.context-meter-percent[data-level="warning"]) [data-category="used"] {
+  --context-color: var(--openbot-warning);
+}
+
+.context-meter-popover:has(.context-meter-percent[data-level="danger"]) [data-category="used"] {
+  --context-color: var(--openbot-danger);
+}
+
+.context-usage-segment[data-category="free"] {
+  min-width: 0;
+  background: var(--openbot-border);
+}
+
+/* The automatic compaction point: a tick that stands just past the bar's edges. */
+.context-usage-threshold {
+  position: absolute;
+  top: calc(-1 * var(--openbot-space-1));
+  bottom: calc(-1 * var(--openbot-space-1));
+  width: var(--openbot-space-0-5);
+  border-radius: var(--openbot-radius-xs);
+  background: var(--openbot-text-primary);
+  transform: translateX(-50%);
+}
+
+:is(.context-usage-bar, .context-usage-legend) [data-category="system"] {
+  --context-color: var(--context-system);
+}
+
+:is(.context-usage-bar, .context-usage-legend) [data-category="tools"] {
+  --context-color: var(--context-tools);
+}
+
+:is(.context-usage-bar, .context-usage-legend) [data-category="memory"] {
+  --context-color: var(--context-memory);
+}
+
+:is(.context-usage-bar, .context-usage-legend) [data-category="messages"] {
+  --context-color: var(--context-messages);
+}
+
+.context-usage-legend {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.context-usage-legend-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  color: var(--openbot-text-secondary);
+}
+
+.context-usage-swatch {
+  width: var(--openbot-space-2);
+  height: var(--openbot-space-2);
+  border-radius: var(--openbot-radius-xs);
+  background: var(--context-color);
+}
+
+.context-usage-legend-row[data-category="free"] .context-usage-swatch {
+  background: var(--openbot-border-strong);
+}
+
+.context-usage-legend-value {
+  color: var(--openbot-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Composer notice ------------------------------------------------------- */
+
+/* The end is a result, not a wait, so it takes the tone the conversation row gives a completed compaction. */
+.context-compaction-notice[data-tone="success"] {
+  --notice-accent: var(--openbot-success-text);
+  --notice-surface: var(--openbot-success-soft);
+}
+
+/*
+ * The way out reverses the way in: the slab drops behind the composer, which stacks above it, so it
+ * reads as going back into the input. Reduced motion keeps a 1ms fade, because `onDone` waits for
+ * the animation to end.
+ */
+.context-compaction-notice[data-leaving] {
+  animation: context-compaction-notice-out var(--openbot-duration-toast-exit) var(--openbot-ease-in-out) forwards;
+}
+
+@keyframes context-compaction-notice-out {
+  to {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .context-compaction-notice[data-leaving] {
+    animation: context-compaction-notice-fade 1ms forwards;
+  }
+}
+
+@keyframes context-compaction-notice-fade {
+  to {
+    opacity: 0;
+  }
+}
+
+.context-compaction-notice .composer-notice-icon {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+}
+
+.context-compaction-notice-copy {
+  min-width: 0;
+  flex: 1;
+  margin: 0;
+  overflow: hidden;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.context-compaction-notice-copy strong {
+  color: var(--notice-accent);
+  font-weight: 600;
+}
+
+/*
+ * The failed state keeps the one-line height of the other states: the inset stays at the no-button
+ * value, and a smaller close button overhangs it rather than pushing the slab taller.
+ */
+.context-compaction-notice:has(.composer-notice-dismiss) {
+  --notice-inset: 8px;
+}
+
+.context-compaction-notice .composer-notice-dismiss {
+  width: var(--openbot-control-xs);
+  height: var(--openbot-control-xs);
+  min-height: 0;
+  margin-block: calc(-1 * var(--openbot-space-1));
+  padding: 0;
+  align-self: center;
+}
+
+.context-compaction-notice-percent {
+  flex: none;
+  color: var(--notice-accent);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.35;
+}
+
+/* Conversation row -------------------------------------------------------- */
+
+.context-compaction-body {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.context-compaction-icon {
+  display: inline-grid;
+  place-items: center;
+}
+
+.context-compaction-icon svg,
+.context-compaction-toggle svg {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+}
+
+.context-compaction-marker[data-status="completed"] .context-compaction-icon {
+  color: var(--openbot-success-text);
+}
+
+.context-compaction-marker[data-status="failed"] .context-compaction-icon {
+  color: var(--openbot-warning-text);
+}
+
+.context-compaction-detail {
+  white-space: nowrap;
+}
+
+.context-compaction-toggle[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+.context-compaction-summary {
+  box-sizing: border-box;
+  width: 100%;
+  padding: var(--openbot-space-3) var(--openbot-space-4);
+  border-radius: var(--openbot-radius-card);
+  background: var(--openbot-bg-surface);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
+  text-align: start;
+  white-space: pre-wrap;
+}
