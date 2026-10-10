@@ -402,6 +402,7 @@ export class DrainScheduler {
                 : "The messaging thread was removed before starting.",
             )
             .pipe(toDeliveryStartFailed);
+        this.#mailboxSync.emitQueue(agent.id);
         return;
       }
       let threadId = yield* this.#threads.ensureThread(agent, client, execution?.threadId).pipe(toDeliveryStartFailed);

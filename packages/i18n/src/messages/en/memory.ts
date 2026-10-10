@@ -31,4 +31,13 @@ export const messages = defineMessages("memory", {
   "memory.updateFailed": "Could not update the memory.",
   "memory.deleteFailed": "Could not delete the memory.",
   "memory.clearFailed": "Could not clear the memories.",
+  "memory.inclusion.label": "Memory use",
+  "memory.inclusion.essential": "Always included",
+  "memory.inclusion.searchable": "Search when needed",
+  "memory.inclusion.automatic": "Let the agent decide",
+  "memory.inclusion.userControlled": "Selected by you",
+  "memory.inclusion.agentControlled": "Agent can change this",
+  "memory.inclusion.explanation":
+    "All memories stay saved. Only essential memories enter every prompt. The agent can search the others.",
+  "memory.inclusion.capacity": "Essential memory capacity: {used} of {total}",
 });

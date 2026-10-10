@@ -42,8 +42,7 @@ export const messages = {
   "settings.busyMessage.description":
     "Новые сообщения присоединяются к текущей работе агента, а не встают в очередь. Работает с ChatGPT и Claude.",
   "settings.agentMemoryLimit.title": "Записей памяти на агента",
-  "settings.agentMemoryLimit.description":
-    "Сколько записей памяти может хранить каждый агент на этом компьютере. Чем больше число, тем длиннее каждый промпт.",
+  "settings.agentMemoryLimit.description": "Сколько записей памяти может хранить каждый агент на этом компьютере.",
   "settings.keepRemoteSessions.title": "Быстрое подключение к серверам",
   "settings.keepRemoteSessions.description":
     "Сохранять подключение к серверам между запусками. OpenBot запускается примерно на секунду быстрее. При выходе из OpenBot сервис OpenBot не закрывает подключение.",

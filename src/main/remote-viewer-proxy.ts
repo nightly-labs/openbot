@@ -33,7 +33,9 @@ const MAX_PENDING_SIGNAL_BYTES = 1024 * 1024;
 interface RemoteViewerTransport {
   sendDesktop(serverId: string, data: string | ArrayBuffer): Effect.Effect<void, RemoteWorkflowError>;
   on(event: "desktopData", listener: (serverId: string, data: string | ArrayBuffer) => void): unknown;
+  on(event: "disconnected", listener: (serverId: string) => void): unknown;
   off(event: "desktopData", listener: (serverId: string, data: string | ArrayBuffer) => void): unknown;
+  off(event: "disconnected", listener: (serverId: string) => void): unknown;
 }
 
 interface RemoteViewerProxyOptions {
@@ -64,6 +66,7 @@ export class RemoteViewerProxy {
   constructor(options: RemoteViewerProxyOptions) {
     this.#options = options;
     options.transport.on("desktopData", this.#onDesktopData);
+    options.transport.on("disconnected", this.#onDisconnected);
   }
 
   readonly viewerUrl = Effect.fn("RemoteViewerProxy.viewerUrl")(function* (
@@ -81,6 +84,7 @@ export class RemoteViewerProxy {
 
   readonly #stop = Effect.fn("RemoteViewerProxy.stop")(function* (this: RemoteViewerProxy) {
     this.#options.transport.off("desktopData", this.#onDesktopData);
+    this.#options.transport.off("disconnected", this.#onDisconnected);
     for (const stream of this.#streams.values()) stream.socket.close(1001, "Remote viewer stopped");
     this.#streams.clear();
     while (this.#operations.size)
@@ -223,7 +227,8 @@ export class RemoteViewerProxy {
       this.#queueFrame(streamId, stream, data, binary);
     });
     socket.once("close", (code, reason) => {
-      this.#streams.delete(streamId);
+      // A lost transport already removed the stream. Do not reconnect to send its close.
+      if (!this.#streams.delete(streamId)) return;
       void Effect.runPromise(
         this.#owned(
           this.#options.transport
@@ -273,7 +278,6 @@ export class RemoteViewerProxy {
     stream.forwardingBytes += bytes;
     if (stream.forwardingBytes > MAX_PENDING_SIGNAL_BYTES) {
       stream.forwardingBytes -= bytes;
-      this.#streams.delete(streamId);
       stream.socket.close(1009, "Remote desktop signal queue is too large");
       return;
     }
@@ -288,7 +292,6 @@ export class RemoteViewerProxy {
             Effect.catch(() =>
               Effect.sync(() => {
                 if (this.#streams.get(streamId) === stream) {
-                  this.#streams.delete(streamId);
                   stream.socket.close(1011, "Remote desktop signal failed");
                 }
               }),
@@ -303,6 +306,14 @@ export class RemoteViewerProxy {
       ),
     ).catch(() => undefined);
   }
+
+  readonly #onDisconnected = (serverId: string): void => {
+    for (const [streamId, stream] of this.#streams) {
+      if (stream.serverId !== serverId) continue;
+      this.#streams.delete(streamId);
+      stream.socket.close(1011, sourceText("error.remote.hostDisconnected"));
+    }
+  };
 
   readonly #onDesktopData = (serverId: string, data: string | ArrayBuffer): void => {
     try {

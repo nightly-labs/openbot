@@ -150,13 +150,6 @@ export function decodeAgentMemory(value: unknown): AgentMemory {
   return value;
 }
 
-export function decodeAgentMemories(value: unknown): AgentMemory[] {
-  if (!Array.isArray(value) || !value.every(isAgentMemory)) {
-    throw new Error("Invalid remote agent memories.");
-  }
-  return value;
-}
-
 export const decodeRoutine = guardedDecoder(isRoutine, "remote routine");
 export const decodeRoutines = guardedListDecoder(isRoutine, "remote routine list");
 export const decodeRoutineRun = guardedDecoder(isRoutineRun, "remote routine run");

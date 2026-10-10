@@ -8,6 +8,7 @@ import { type AgentSessionSettings, isAgentSessionSettings } from "@openbot/cont
 import {
   type AccountUsage,
   type AgentMemory,
+  type AgentMemorySelectionState,
   type AgentModelOption,
   type AgentStatus,
   type AgentSummary,
@@ -17,6 +18,7 @@ import {
   isAccountUsage,
   isAgentHostSettings,
   isAgentMemory,
+  isAgentMemorySelectionState,
   isAgentModelOption,
   isAgentProvider,
   isAgentStatus,
@@ -153,6 +155,14 @@ export function decodeHostAnalyticsFromMain(value: unknown) {
   return decodeOptionalHostAnalytics(value);
 }
 
+export function decodeMemorySelection(value: unknown): AgentMemorySelectionState {
+  if (!isAgentMemorySelectionState(value)) throw new Error("Invalid agent memory selection response.");
+  return value;
+}
+
+export function decodeOptionalMemorySelection(value: unknown): AgentMemorySelectionState | null {
+  return value === null ? null : decodeMemorySelection(value);
+}
 export function decodeAgentSessionSettingsFromMain(value: unknown): AgentSessionSettings {
   if (!isAgentSessionSettings(value)) throw new Error("Invalid session settings response.");
   return value;

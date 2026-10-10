@@ -68,6 +68,7 @@ export interface MessagingPromptContext {
 
 export interface MessagingThreadsHooks {
   schedule(agentId: string): void;
+  queueChanged(agentId: string): void;
   busy(agentId: string): boolean;
   interrupt(agentId: string, turnId: string, threadId: string): Effect.Effect<void, MessagingThreadFailed>;
   /** Removes live provider state for an execution thread before its rows are deleted. */
@@ -343,6 +344,7 @@ export class MessagingThreads {
       if (!origin || origin.authorId !== authorId) continue;
       if (context.delivery.status === "queued") {
         yield* this.#mailbox.cancel(link.agentId, context.delivery.id).pipe(toMessagingThreadFailed);
+        this.#hooks.queueChanged(link.agentId);
         this.#publish({ type: "cancelled", link, origin });
         stopped = true;
       } else if (context.delivery.status === "running" && context.delivery.turnId) {

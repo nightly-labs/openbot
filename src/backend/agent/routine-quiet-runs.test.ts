@@ -46,7 +46,7 @@ describe("settleQuietRoutineTurn", () => {
       message("earlier", ROUTINE_NO_UPDATE_MARKER, { turnId: "turn-0" }),
     ]);
 
-    expect(settleQuietRoutineTurn(value, "turn-1")).toBe(true);
+    expect(settleQuietRoutineTurn(value, "turn-1", false)).toBe(true);
     expect(ids(value)).toEqual(["routine-delivery", "earlier"]);
   });
 
@@ -57,7 +57,7 @@ describe("settleQuietRoutineTurn", () => {
       message("answer", ROUTINE_NO_UPDATE_MARKER),
     ]);
 
-    expect(settleQuietRoutineTurn(value, "turn-1")).toBe(false);
+    expect(settleQuietRoutineTurn(value, "turn-1", false)).toBe(false);
     expect(ids(value)).toEqual(["thinking", "report"]);
   });
 
@@ -81,15 +81,38 @@ describe("settleQuietRoutineTurn", () => {
       message("question", "", { itemType: "question_prompt" }),
     ]) {
       const value = snapshot([extra, message("answer", ROUTINE_NO_UPDATE_MARKER)]);
-      expect(settleQuietRoutineTurn(value, "turn-1")).toBe(false);
+      expect(settleQuietRoutineTurn(value, "turn-1", false)).toBe(false);
       expect(ids(value)).toEqual([extra.id]);
     }
+  });
+
+  it("drops each text answer after a no-update tool call, also when there is none", () => {
+    const answered = snapshot([
+      message("thinking", "Reading the queue.", { itemType: "commentary" }),
+      message("answer", "Nada acionável nesta varredura."),
+    ]);
+    expect(settleQuietRoutineTurn(answered, "turn-1", true)).toBe(true);
+    expect(ids(answered)).toEqual([]);
+
+    const silent = snapshot([message("thinking", "Reading the queue.", { itemType: "commentary" })]);
+    expect(settleQuietRoutineTurn(silent, "turn-1", true)).toBe(true);
+    expect(ids(silent)).toEqual([]);
+  });
+
+  it("is not quiet after a no-update tool call when the turn gave the user an image", () => {
+    const value = snapshot([
+      message("image", "", { imageGeneration: { resolution: "1024x1024", aspectRatio: "square" } }),
+      message("answer", "Nothing new."),
+    ]);
+
+    expect(settleQuietRoutineTurn(value, "turn-1", true)).toBe(false);
+    expect(ids(value)).toEqual(["image"]);
   });
 
   it("changes nothing when the turn has no marker answer", () => {
     const value = snapshot([message("answer", "No response requested.")]);
 
-    expect(settleQuietRoutineTurn(value, "turn-1")).toBe(false);
+    expect(settleQuietRoutineTurn(value, "turn-1", false)).toBe(false);
     expect(ids(value)).toEqual(["answer"]);
   });
 });

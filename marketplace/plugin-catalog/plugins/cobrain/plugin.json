@@ -1,0 +1,33 @@
+{
+  "slug": "cobrain",
+  "name": "Cobrain",
+  "tagline": "Shared memory for your AI agents",
+  "description": "Cobrain is a Markdown memory that every AI you connect can read and write. Agents load the context of a client or project before working, search past notes and decisions, and save what they learn so the next thread starts where the last one ended. Each user signs in to their own Cobrain account.",
+  "category": "productivity",
+  "creatorName": "cobrain.space",
+  "iconUrl": "https://cobrain.space/apple-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-start-session", "text": "Load my Cobrain context for this project before we start." },
+    { "id": "prompt-search-decision", "text": "Search my Cobrain notes for what we decided about pricing." },
+    { "id": "prompt-save-note", "text": "Save a note in Cobrain with what we did today and what is left." }
+  ],
+  "apps": [
+    {
+      "id": "app-cobrain-mcp",
+      "name": "Cobrain",
+      "description": "Read, search and write notes in your Cobrain brain over one MCP server.",
+      "iconUrl": "https://cobrain.space/apple-icon.png",
+      "server": {
+        "name": "cobrain",
+        "transport": "http",
+        "url": "https://cobrain.space/mcp",
+        "auth": [{ "id": "cobrain-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://cobrain.space",
+  "privacyPolicyUrl": "https://cobrain.space/privacy",
+  "termsUrl": "https://cobrain.space/terms"
+}

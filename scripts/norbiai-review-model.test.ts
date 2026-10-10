@@ -301,19 +301,18 @@ describe("NorbiAI reviewer selection", () => {
 
   // The shared default effort is the cheapest level, because the Codex model that reads it
   // may go no higher. A Claude review that asked for no effort would run at that level.
-  it("reviews on Codex by default, and on Claude Code at the Claude default effort unless asked", () => {
+  it("reviews on Claude Code by default, at the Claude default effort unless asked", () => {
     expect(resolve({ description: "Fixes a bug." })).toMatchObject({
-      cli: "codex",
-      effort: "low",
-      reviewer: "gpt-6-astra, reasoning effort low",
-    });
-    expect(resolve({ description: "NorbiAI-Model: claude-opus-5-5" })).toMatchObject({
       cli: "claude",
       effort: job.env.CLAUDE_DEFAULT_EFFORT,
       reviewer: `claude-opus-5-5, reasoning effort ${job.env.CLAUDE_DEFAULT_EFFORT}`,
     });
-    expect(resolve({ description: "NorbiAI-Model: claude-opus-5-5\nNorbiAI-Effort: low" })).toMatchObject({
+    expect(resolve({ description: "NorbiAI-Effort: low" })).toMatchObject({
       cli: "claude",
+      effort: "low",
+    });
+    expect(resolve({ description: "NorbiAI-Model: gpt-6-astra" })).toMatchObject({
+      cli: "codex",
       effort: "low",
     });
   });

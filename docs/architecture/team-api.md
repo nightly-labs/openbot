@@ -198,6 +198,36 @@ Each protocol has a frozen codec and adapter in `packages/contracts/src/team-pro
 
 Capabilities describe additive behavior. The client sends its capability list when it sets the event scope. The host sends optional events only when the client declared the related capability. A missing capability disables only that feature. An unknown optional event is ignored. A malformed known event closes the connection as `protocol_error` because the client cannot safely apply it.
 
+The optional `agent-memories-v1` capability adds three POST routes. `/v1/agent-memories/page`
+returns up to 256 memories. `/v1/agent-memories/selection` returns up to 256 selection records,
+the agent ID, and essential-memory byte usage. Both use ascending memory IDs and an `after`
+cursor (`null` for the first page). Clients validate owner and cursor order. Edits do not move IDs
+between pages. Reads across several pages are not an atomic snapshot; the next refresh sees
+concurrent changes. `/v1/agent-memories/inclusion` changes up to 25 selections with expected
+revisions and returns an empty acknowledgement; the client then reads selection pages again.
+Each route requires authentication and a visible agent. Selection writes use the same member
+access as existing memory writes. User choices override automatic selection.
+
+The released full-list GET route, memory shapes, and 2 MiB frame limit stay unchanged. A new
+client connected to an older host keeps text editing and hides selection controls. An older
+client can edit text on a new host without changing inclusion. Storage choices remain 64, 128,
+256, and 512. Lowering the setting never deletes existing entries.
+
+Only essential memories enter startup instructions, in a block limited to 8,192 UTF-8 bytes.
+Saved memories stay on the host in SQLite. Agents can use bounded local search and ID-paged
+listing to recall other entries. FTS5 uses `unicode61` and BM25. Queries match any literal term;
+equal scores use the newest update, then the memory ID. Search returns at most 10 entries,
+and maintenance pages return at most 25. Both responses are limited to 8,192 UTF-8 bytes.
+The search index stays local. Essential prompt text and requested tool results go to the active
+provider through the existing secret-redaction path.
+
+Selection metadata is separate from the released memory shape. Migration 32 preserves memory
+text, IDs, and dates, and selects recent manual entries before recent automatic entries. The same
+serializer checks the complete prompt block during migration, mutation, and prompt generation.
+Automatic text and selection changes stay pending until the turn completes successfully. Commit
+checks ownership, revisions, user choices, and capacity again. Agent tools cannot change or delete
+a user-controlled selection. The user can release that control without changing its inclusion.
+
 Team API failures use a JSON error envelope with `error` and a stable `code`. Compatibility codes are `client_update_required`, `host_update_required`, and `protocol_error`. Authentication and network failures are projected to `authentication_required` and `network_unavailable` in the desktop connection state. A confirmed compatibility or protocol error stops data-plane requests and automatic reconnect until the user selects `Retry`, restarts, or updates.
 
 Protocol support has no fixed time or release limit. Removal is an exceptional architecture decision. It requires a security issue, data-loss risk, semantics that cannot be kept, or technical cost that cannot be contained in an adapter. The decision must also include a changelog entry, update instructions, tests for old-client/new-host and new-client/old-host directions, and clear blocking UI.

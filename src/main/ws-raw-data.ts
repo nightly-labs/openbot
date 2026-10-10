@@ -20,10 +20,11 @@ export function rawDataBytes(data: Ws.RawData): Uint8Array {
  * such as 1005 (no status) or 1006 (abnormal closure), and `close()` throws for it.
  */
 export function sendableCloseCode(code: number | undefined): number {
-  if (code === undefined) return 1000;
+  if (code === undefined || code === 1005) return 1000;
   const valid =
     (code >= 1000 && code <= 1014 && code !== 1004 && code !== 1005 && code !== 1006) || (code >= 3000 && code <= 4999);
-  return valid ? code : 1000;
+  // Reserved codes cannot cross the socket, but an abnormal close must remain a failure.
+  return valid ? code : 1011;
 }
 
 export function rawDataText(data: Ws.RawData): string {

@@ -231,9 +231,19 @@ it("routes two phones independently and disconnects or resumes only the addresse
   await vi.waitFor(() => expect(posted("incoming-peer")).toHaveLength(3));
   expect(posted("incoming-peer").at(-1)?.peerId).toBe(second?.peerId);
   expect(PeerConnection.instances).toHaveLength(2);
-  await command({ type: "disconnect-peer", peerId: first?.peerId });
+  const desktop = channels[0]?.at(-1);
+  if (!desktop) throw new Error("The first peer needs a desktop channel.");
+  rtc1.connectionState = "connected";
+  desktop.readyState = "closed";
+  signal.send.mockClear();
+  desktop.onclose?.();
+  desktop.onclose?.();
   expect(rtc1.close).toHaveBeenCalledOnce();
   expect(rtc2.close).not.toHaveBeenCalled();
+  expect(signal.close).not.toHaveBeenCalled();
+  expect(signal.send.mock.calls.map(([data]) => JSON.parse(data))).toEqual([
+    { type: "disconnect", version: 1, connectionId: "connection-1" },
+  ]);
   await command({ type: "send", peerId: second?.peerId, channel: "rpc", data: "still-connected" });
   expect(channels[1]?.[0]?.send).toHaveBeenCalledExactlyOnceWith("still-connected");
   expect(posted("peer-disconnected").map((message) => message.peerId)).toEqual([first?.peerId]);
@@ -488,3 +498,91 @@ function requiredBinaryFrame(frames: Array<string | ArrayBuffer>, index: number)
   if (!(frame instanceof ArrayBuffer)) throw new Error("Expected a binary WebRTC frame.");
   return frame;
 }
+
+it("increases Signal retries until ready accepts the hello", async () => {
+  vi.useFakeTimers();
+  const { command, posted } = await startBridge();
+  await command({
+    type: "connect",
+    peerId: "host",
+    peer: "host",
+    signalUrl: "wss://signal.test",
+    token: "test",
+    iceTransportPolicy: "all",
+  });
+  const latest = () => {
+    const socket = SignalSocket.instances.at(-1);
+    if (!socket) throw new Error("No Signal socket");
+    socket.dispatchEvent(new Event("open"));
+    return socket;
+  };
+  latest().dispatchEvent(new Event("close"));
+  await vi.advanceTimersByTimeAsync(500);
+  expect(SignalSocket.instances).toHaveLength(2);
+  latest().dispatchEvent(new Event("close"));
+  await vi.advanceTimersByTimeAsync(500);
+  expect(SignalSocket.instances).toHaveLength(2);
+  await vi.advanceTimersByTimeAsync(500);
+  expect(SignalSocket.instances).toHaveLength(3);
+  latest().message({ type: "ready", version: 1, connectionId: null, resumeToken: "resume", iceServers: [] });
+  await vi.waitFor(() => expect(posted("signal-ready")).toHaveLength(1));
+  latest().dispatchEvent(new Event("close"));
+  await vi.advanceTimersByTimeAsync(500);
+  expect(SignalSocket.instances).toHaveLength(4);
+  await command({ type: "close", peerId: "all" });
+});
+
+it.each(["error", "close"])("waits a full Signal rate window after %s", async (kind) => {
+  vi.useFakeTimers();
+  const { command, posted } = await startBridge();
+  await command({
+    type: "connect",
+    peerId: "host",
+    peer: "host",
+    signalUrl: "wss://signal.test",
+    token: "test",
+    iceTransportPolicy: "all",
+  });
+  const socket = SignalSocket.instances[0];
+  if (!socket) throw new Error("No Signal socket");
+  socket.dispatchEvent(new Event("open"));
+  if (kind === "error") {
+    socket.message({ type: "error", version: 1, code: "rate_limited", message: "Too many signal messages." });
+    await vi.waitFor(() => expect(posted("peer-error")).toHaveLength(1));
+    socket.dispatchEvent(new Event("close"));
+  } else {
+    socket.dispatchEvent(Object.assign(new Event("close"), { code: 1008 }));
+  }
+  await command({ type: "restart-ice", peerId: "host" });
+  await vi.advanceTimersByTimeAsync(59_000);
+  expect(SignalSocket.instances).toHaveLength(1);
+  await vi.advanceTimersByTimeAsync(1_000);
+  expect(SignalSocket.instances).toHaveLength(2);
+  await command({ type: "close", peerId: "all" });
+});
+
+it("keeps the Signal rate wait when main replaces an initial peer", async () => {
+  vi.useFakeTimers();
+  const { command, posted } = await startBridge();
+  const connect = {
+    type: "connect",
+    peerId: "host",
+    peer: "host",
+    signalUrl: "wss://signal.test",
+    token: "test",
+    iceTransportPolicy: "all",
+  } as const;
+  await command(connect);
+  const socket = SignalSocket.instances[0];
+  if (!socket) throw new Error("No Signal socket");
+  socket.message({ type: "error", version: 1, code: "rate_limited", message: "Too many signal messages." });
+  await vi.waitFor(() => expect(posted("peer-error")).toHaveLength(1));
+  await command({ type: "disconnect", peerId: "host" });
+  await command({ type: "prepare-signal", peerId: "host", signalUrl: connect.signalUrl });
+  await command(connect);
+  await vi.advanceTimersByTimeAsync(59_000);
+  expect(SignalSocket.instances).toHaveLength(1);
+  await vi.advanceTimersByTimeAsync(1_000);
+  expect(SignalSocket.instances).toHaveLength(2);
+  await command({ type: "close", peerId: "all" });
+});

@@ -166,7 +166,9 @@ export class CliLoginFlow {
     yield* stopProcessTree(pending.child).pipe(toCliLoginFailed);
     yield* Scope.close(pending.scope, Exit.void);
     const task = pending.task;
-    if (task) yield* Fiber.join(task).pipe(Effect.ignore);
+    // Closing the login scope can interrupt its completion task. Wait for cleanup without
+    // propagating that expected interruption into Cancel or the next Connect command.
+    if (task) yield* Fiber.await(task);
     if (message) this.#options.setFailure(provider, new Error(message), pending.cli.version);
     else this.#options.clearConnectionState(provider);
   }, Effect.uninterruptible).bind(this);

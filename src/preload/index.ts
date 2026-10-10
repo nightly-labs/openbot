@@ -62,6 +62,8 @@ import {
   decodeHostAnalyticsFromMain,
   decodeMemories,
   decodeMemory,
+  decodeMemorySelection,
+  decodeOptionalMemorySelection,
   decodeProviderApiKeyState,
   decodeProviderCodeLoginStart,
   decodeRoutine,
@@ -738,6 +740,8 @@ const openbotApi: OpenBotDesktopApi = {
   agent: {
     ...agentGroup,
     ...bridgeGroup(IPC_ENDPOINTS.agentMemories, {
+      getMemorySelection: decodeOptionalMemorySelection,
+      setMemoryInclusion: decodeMemorySelection,
       listMemories: decodeMemories,
       createMemory: decodeMemory,
       updateMemory: decodeMemory,

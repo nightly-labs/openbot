@@ -2,6 +2,7 @@ import {
   type AgentAdminSettings,
   type AgentAnalytics,
   type AgentMemory,
+  type AgentMemorySelectionState,
   analyticsRange,
   CHANNEL_CHATS_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
@@ -12,6 +13,7 @@ import {
   type InstalledSkill,
   parseChannelCommand,
   type Routine,
+  type SetAgentMemoryInclusionInput,
   type SetEnabledSkillInput,
   type SidebarLayoutAction,
   type SidebarLayoutSnapshot,
@@ -228,6 +230,9 @@ const workspace = {
       supportedReasoningEfforts: ["medium", "high"],
     },
   ]),
+  loadAgentMemorySelection: vi.fn<() => Promise<AgentMemorySelectionState | null>>(async () => null),
+  setAgentMemoryInclusion:
+    vi.fn<(input: SetAgentMemoryInclusionInput, serverId: string) => Promise<AgentMemorySelectionState>>(),
   loadAgentMemories: vi.fn<() => Promise<AgentMemory[]>>(async () => []),
   loadAgentRoutines: vi.fn<() => Promise<Routine[]>>(async () => []),
   loadAgentAnalytics: vi.fn<() => Promise<AgentAnalytics | null>>(async () => null),
@@ -441,15 +446,23 @@ vi.mock("@/features/settings/components/settings-content", () => ({
     trailing,
     disabled,
     accessibilityLabel,
+    checked,
   }: PropsWithChildren<{
     onPress?: () => void;
     trailing?: import("react").ReactNode;
     disabled?: boolean;
     accessibilityLabel?: string;
+    checked?: boolean;
   }>) =>
     onPress ? (
       <div>
-        <button type="button" aria-label={accessibilityLabel} disabled={disabled} onClick={onPress}>
+        <button
+          type="button"
+          aria-label={accessibilityLabel}
+          aria-pressed={checked}
+          disabled={disabled}
+          onClick={onPress}
+        >
           {children}
         </button>
         {trailing}
@@ -697,6 +710,8 @@ beforeEach(() => {
   workspace.createAgentRoutine.mockClear();
   workspace.updateAgentRoutine.mockClear();
   workspace.deleteAgentRoutine.mockClear();
+  workspace.setAgentMemoryInclusion.mockReset();
+  workspace.loadAgentMemorySelection.mockReset().mockResolvedValue(null);
   workspace.loadAgentMemories.mockReset().mockResolvedValue([]);
   workspace.loadAgentRoutines.mockReset().mockResolvedValue([]);
   workspace.loadAgentAnalytics.mockReset().mockResolvedValue(null);
@@ -1398,6 +1413,79 @@ it("changes provider together with a compatible model and reasoning", async () =
     { agentId: original.id, provider: "claude", model: "claude-model", reasoningEffort: "medium" },
     host.id,
   );
+});
+
+it("sets essential memory and releases a user choice with the current host revision", async () => {
+  const memory: AgentMemory = {
+    id: "memory",
+    agentId: original.id,
+    text: "Uses metric units",
+    origin: "manual",
+    sourceTurnId: null,
+    createdAt: "",
+    updatedAt: "",
+  };
+  let selection: AgentMemorySelectionState = {
+    selections: [{ memoryId: memory.id, inclusion: "searchable", userControlled: false, revision: 1 }],
+    usedBytes: 0,
+    budgetBytes: 8192,
+  };
+  workspace.loadAgentMemories.mockResolvedValue([memory]);
+  workspace.loadAgentMemorySelection.mockImplementation(async () => selection);
+  workspace.setAgentMemoryInclusion.mockImplementation(async ({ changes }) => {
+    const previous = selection.selections[0];
+    const change = changes[0];
+    assert(change && previous);
+    expect(change.expectedRevision).toBe(previous.revision);
+    selection = {
+      ...selection,
+      selections: [
+        {
+          ...previous,
+          inclusion: change.inclusion === "automatic" ? previous.inclusion : change.inclusion,
+          userControlled: change.inclusion !== "automatic",
+          revision: previous.revision + 1,
+        },
+      ],
+    };
+    return selection;
+  });
+  mocks.recordId = memory.id;
+  await renderSheet("memory");
+  await screen.findByRole("button", { name: "Always included" });
+  await click("Always included");
+  await waitFor(() =>
+    expect(selection.selections[0]).toEqual({
+      memoryId: memory.id,
+      inclusion: "essential",
+      userControlled: true,
+      revision: 2,
+    }),
+  );
+  // A desktop changes the same memory before this client releases its override.
+  const beforeRemoteUpdate = selection.selections[0];
+  assert(beforeRemoteUpdate);
+  selection = { ...selection, selections: [{ ...beforeRemoteUpdate, inclusion: "searchable", revision: 5 }] };
+  await act(async () => {
+    await client.invalidateQueries({ queryKey: ["agent-info"] });
+  });
+  await act(async () => {
+    await screen.findByRole("button", { name: "Search when needed", pressed: true });
+  });
+  await click("Let the agent decide");
+  await waitFor(() =>
+    expect(workspace.setAgentMemoryInclusion).toHaveBeenLastCalledWith(
+      { agentId: original.id, changes: [{ memoryId: memory.id, inclusion: "automatic", expectedRevision: 5 }] },
+      host.id,
+    ),
+  );
+  expect(selection.selections[0]).toEqual({
+    memoryId: memory.id,
+    inclusion: "searchable",
+    userControlled: false,
+    revision: 6,
+  });
+  expect(workspace.saveAgentMemory).not.toHaveBeenCalled();
 });
 
 it("creates, edits, and deletes a memory on its host", async () => {

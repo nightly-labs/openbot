@@ -852,6 +852,8 @@ export function installOpenbotStub(): void {
       resetAgentSessionSetting: notStubbed("agent.resetAgentSessionSetting"),
       listInstalledSkills: vi.fn().mockResolvedValue([]),
       listMcpServers: vi.fn().mockResolvedValue([]),
+      getMemorySelection: vi.fn().mockResolvedValue(null),
+      setMemoryInclusion: notStubbed("agent.setMemoryInclusion"),
       listMemories: vi.fn().mockResolvedValue([]),
       listRoutines: vi.fn().mockResolvedValue([]),
       listRoutineRuns: vi.fn().mockResolvedValue([]),

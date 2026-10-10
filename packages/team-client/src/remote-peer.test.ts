@@ -945,6 +945,72 @@ describe("browser remote peer recovery", () => {
     await network.runtime.dispose();
   });
 
+  it.each(["error", "close"])("keeps the peer and waits after a Signal rate-limit %s", async (kind) => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    const network = await setupNetwork();
+    await network.connect();
+    const socket = network.socket();
+    if (kind === "error") {
+      socket.receive({ type: "error", version: 1, code: "rate_limited", message: "Too many signal messages." });
+      await vi.waitFor(() => expect(socket.readyState).toBe(3));
+    } else socket.close(1008);
+    network.runtime.setActive(false);
+    network.runtime.setActive(true);
+    await vi.advanceTimersByTimeAsync(59_000);
+    expect(network.sockets).toHaveLength(1);
+    expect(network.updates.filter((update) => update.state === "offline")).toEqual([]);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(network.sockets).toHaveLength(2);
+    expect(network.bootstraps()).toBe(1);
+    expect(network.connections).toHaveLength(1);
+    await network.runtime.dispose();
+  });
+
+  it.each(["initial", "replacement"])("excludes the rate wait from the %s connection timeout", async (kind) => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    let refuseHello = kind === "initial";
+    const network = await setupNetwork({ refuseHello: () => refuseHello });
+    if (kind === "replacement") {
+      await network.connect();
+      network.socket().close(1008);
+      const offline = deferred();
+      network.onOffline = () => offline.resolve();
+      network.connection().drop("closed");
+      await offline.promise;
+    }
+    const connecting = network.connect();
+    await vi.waitFor(() => expect(network.bootstraps()).toBe(kind === "initial" ? 1 : 2));
+    if (kind === "initial") await vi.waitFor(() => expect(network.socket().readyState).toBe(3));
+    network.updates.length = 0;
+    refuseHello = false;
+    await vi.advanceTimersByTimeAsync(59_000);
+    expect(network.sockets).toHaveLength(1);
+    expect(network.updates.filter((update) => update.state === "offline")).toEqual([]);
+    await vi.advanceTimersByTimeAsync(1_000);
+    await expect(connecting).resolves.toMatchObject({ ok: true });
+    expect(network.sockets).toHaveLength(2);
+    await network.runtime.dispose();
+  });
+
+  it("still times out an active connection attempt after 30 seconds", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    const offered = deferred();
+    const answer = deferred();
+    const network = await setupNetwork({
+      beforeAnswer: () => {
+        offered.resolve();
+        return answer.promise;
+      },
+    });
+    const connecting = network.connect();
+    await offered.promise;
+    await vi.advanceTimersByTimeAsync(30_000);
+    await expect(connecting).resolves.toMatchObject({ ok: false });
+    expect(network.updates.at(-1)?.state).toBe("offline");
+    answer.resolve();
+    await network.runtime.dispose();
+  });
+
   it("suspends Signal reconnects in the background and resumes healthy data channels without a new ticket", async () => {
     // Fake only timers: network and cryptographic callbacks still run as ordinary microtasks.
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
@@ -1066,6 +1132,7 @@ async function setupNetwork(
     endSession?: () => Promise<void>;
     beforeBootstrap?: (hostId: string) => Promise<void>;
     beforeAnswer?: () => Promise<void>;
+    refuseHello?: () => boolean;
     beforeResponse?: () => Promise<void>;
     responseBody?: TeamProtocolV2Json;
     responseFile?: TeamProtocolV2Json;
@@ -1098,7 +1165,7 @@ async function setupNetwork(
     readyState = 1;
     halfOpen = false;
     onopen: (() => void) | null = null;
-    onclose: (() => void) | null = null;
+    onclose: ((event?: { code: number }) => void) | null = null;
     onmessage: ((event: { data: string }) => void) | null = null;
     constructor() {
       sockets.push(this);
@@ -1110,6 +1177,10 @@ async function setupNetwork(
     send(data: string) {
       if (this.halfOpen) return;
       const message = JSON.parse(data);
+      if (message.type === "hello" && options.refuseHello?.()) {
+        queueMicrotask(() => this.close(1008));
+        return;
+      }
       if (message.type === "hello")
         queueMicrotask(() =>
           this.receive({
@@ -1132,9 +1203,9 @@ async function setupNetwork(
           });
         });
     }
-    close() {
+    close(code?: number) {
       this.readyState = 3;
-      this.onclose?.();
+      this.onclose?.(code === undefined ? undefined : { code });
     }
   }
 

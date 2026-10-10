@@ -41,8 +41,7 @@ export const messages = {
   "settings.busyMessage.description":
     "Les nouveaux messages rejoignent le travail en cours de l’agent, pas la file. Fonctionne avec ChatGPT et Claude.",
   "settings.agentMemoryLimit.title": "Souvenirs par agent",
-  "settings.agentMemoryLimit.description":
-    "Nombre de souvenirs que chaque agent de cet ordinateur peut garder. Un nombre plus élevé allonge chaque prompt.",
+  "settings.agentMemoryLimit.description": "Nombre de souvenirs que chaque agent de cet ordinateur peut garder.",
   "settings.permissions.title": "Autorisations",
   "settings.turbo.title": "Mode Turbo",
   "settings.turbo.description":

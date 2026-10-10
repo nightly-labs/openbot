@@ -474,4 +474,13 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.home.markAllRead": "Mark all as read",
   "mobile.agent.route.appearance": "Appearance",
   "mobile.agent.route.cropPhoto": "Move and Scale",
+  "mobile.agent.info.memory.inclusion.label": "Memory use",
+  "mobile.agent.info.memory.inclusion.essential": "Always included",
+  "mobile.agent.info.memory.inclusion.searchable": "Search when needed",
+  "mobile.agent.info.memory.inclusion.automatic": "Let the agent decide",
+  "mobile.agent.info.memory.inclusion.userControlled": "Selected by you",
+  "mobile.agent.info.memory.inclusion.agentControlled": "Agent can change this",
+  "mobile.agent.info.memory.inclusion.explanation":
+    "All memories stay saved. Only essential memories enter every prompt. The agent can search the others.",
+  "mobile.agent.info.memory.inclusion.capacity": "Essential memory capacity: {used} of {total}",
 });

@@ -16,6 +16,55 @@ import { runTeamEffect } from "./effect-boundary";
 const sessionId = "11111111-1111-4111-8111-111111111111";
 const tabId = "22222222-2222-4222-8222-222222222222";
 describe("remote browser view", () => {
+  it.each(["open", "input"] as const)("reports a failed %s send without transport secrets", async (stage) => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    const request = vi.fn().mockResolvedValue({ id: sessionId, tabId, streamPath: browserViewStreamPath(sessionId) });
+    const client = createRemoteBrowserView(
+      send,
+      request,
+      () => false,
+      () => false,
+    );
+    const ended = vi.fn();
+    const failure = new Error("transport credential=synthetic-secret");
+    if (stage === "open") {
+      send.mockRejectedValueOnce(failure);
+      await expect(runTeamEffect(client.open(tabId, vi.fn(), ended, vi.fn()))).rejects.toThrow(
+        "The live view of this page failed.",
+      );
+    } else {
+      const view = await runTeamEffect(client.open(tabId, vi.fn(), ended, vi.fn()));
+      const streamId = decodeRemoteDesktopSignalControl(send.mock.calls[0]?.[0]).streamId;
+      client.receive(encodeRemoteDesktopSignalControl({ type: "opened", streamId }));
+      send.mockRejectedValueOnce(failure);
+      await expect(
+        runTeamEffect(view.input({ type: "key", action: "down", key: "a", code: "KeyA", text: "", modifiers: 0 })),
+      ).rejects.toThrow("The live view of this page failed.");
+    }
+    expect(ended).toHaveBeenCalledExactlyOnceWith("The live view of this page failed.");
+    expect(request).toHaveBeenLastCalledWith("DELETE", `/v1/browser/view/sessions/${sessionId}`);
+    const reopened = await runTeamEffect(client.open(tabId, vi.fn(), vi.fn(), vi.fn()));
+    await runTeamEffect(reopened.close());
+  });
+
+  it("reports an invalid stream payload as a failure and releases its session", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    const request = vi.fn().mockResolvedValue({ id: sessionId, tabId, streamPath: browserViewStreamPath(sessionId) });
+    const client = createRemoteBrowserView(
+      send,
+      request,
+      () => false,
+      () => false,
+    );
+    const ended = vi.fn();
+    await runTeamEffect(client.open(tabId, vi.fn(), ended, vi.fn()));
+    client.receive("invalid stream payload");
+    await vi.waitFor(() =>
+      expect(request).toHaveBeenLastCalledWith("DELETE", `/v1/browser/view/sessions/${sessionId}`),
+    );
+    expect(ended).toHaveBeenCalledExactlyOnceWith("The live view of this page failed.");
+  });
+
   it.each([
     { type: "error", message: "The host stream socket failed." },
     { type: "close", code: 1011, reason: "The live view of this page failed." },

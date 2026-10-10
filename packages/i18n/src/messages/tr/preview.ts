@@ -12,6 +12,7 @@ export const messages = {
   "preview.panel.back": "Geri",
   "preview.panel.rawMarkdown": "Markdown kaynağını göster",
   "preview.panel.rawHtml": "HTML kaynağını göster",
+  "preview.panel.wrapLines": "Uzun satırları kaydır",
   "preview.folder.empty": "Bu klasör boş.",
   "preview.folder.truncated": "Yalnızca ilk {limit} öğe gösteriliyor.",
   "preview.truncated": "Önizleme {limit} karakterden sonra kesildi.",

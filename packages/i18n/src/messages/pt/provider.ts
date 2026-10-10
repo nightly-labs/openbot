@@ -21,7 +21,7 @@ export const messages = {
   "provider.status.downloadFailed": "Falha no download",
   "provider.status.connected": "Conectado",
   "provider.status.notDownloaded": "Não baixado",
-  "provider.status.ready": "Pronto",
+  "provider.status.ready": "Ambiente de execução instalado",
   "provider.status.notConnected": "Não conectado",
   "provider.status.notInstalled": "Não instalado",
   "provider.status.updateRequired": "Atualização necessária",

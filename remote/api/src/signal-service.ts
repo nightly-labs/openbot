@@ -933,11 +933,6 @@ export class SignalService {
             usedInitialTicket = false;
             claims = yield* tokens.verifyResumeToken(message.token);
           } else claims = initial.success;
-          if ((this.#revokedEpochs.get(claims.hostId) ?? 0) > claims.authEpoch) {
-            return yield* new RemoteTokenError({ message: "Revoked ticket." });
-          }
-          if (claims.role !== "host" && this.#revokedSessions.has(claims.sessionId))
-            return yield* new RemoteTokenError({ message: "Ended session." });
           if (message.peer !== "client" && claims.role !== "host")
             return yield* new RemoteTokenError({ message: "Host role required." });
           if (message.peer === "client" && claims.role === "host")
@@ -1003,10 +998,17 @@ export class SignalService {
               }
             }
           }
+          // Finish signing before admission. No quota slot is held while signing waits or fails.
+          const resumeToken = yield* tokens.issueResumeToken(claims);
+          if ((this.#revokedEpochs.get(claims.hostId) ?? 0) > claims.authEpoch) {
+            return yield* new RemoteTokenError({ message: "Revoked ticket." });
+          }
+          if (claims.role !== "host" && this.#revokedSessions.has(claims.sessionId))
+            return yield* new RemoteTokenError({ message: "Ended session." });
           this.#pruneReplayCache();
           if (usedInitialTicket && this.#usedTicketIds.has(claims.jti))
             return yield* new RemoteTokenError({ message: "Ticket was already used." });
-          return { claims, slackRoute, telegramRoute, discordRoute, webhookRoute };
+          return { claims, slackRoute, telegramRoute, discordRoute, webhookRoute, resumeToken };
         }).pipe(Effect.result);
         if (Result.isFailure(authentication)) {
           this.#metrics.authenticationFailures += 1;
@@ -1015,16 +1017,17 @@ export class SignalService {
         }
         // Verification may finish after disconnect removed the socket. Register nothing then.
         if (!this.#sockets.has(socket.id)) return;
-        const { claims, slackRoute, telegramRoute, discordRoute, webhookRoute } = authentication.success;
-        // A reconnect of the same logical session replaces its old socket below, so that socket does not
-        // count. A phone that changes network keeps a half-open socket until the idle timeout.
-        const replaced =
-          message.peer === "client"
-            ? this.#connectionForSession(claims.hostId, claims.sessionId)?.client.id
-            : undefined;
+        if (this.#peers.has(socket.id)) {
+          this.#fail(socket, "protocol_error", "This socket is already authenticated.", 1008);
+          return;
+        }
+        const { claims, slackRoute, telegramRoute, discordRoute, webhookRoute, resumeToken } = authentication.success;
+        // A reconnect replaces the old client even when its host has disconnected and the peer has
+        // no connection record. Admission and replacement must have no asynchronous gap.
+        const replaced = message.peer === "client" ? this.#clientForSession(claims) : null;
         if (
           message.peer !== "ingress" &&
-          this.#userConnectionCount(claims.userId, replaced) >= this.#maximumConnectionsPerUser
+          this.#userConnectionCount(claims.userId, replaced?.socket.id) >= this.#maximumConnectionsPerUser
         ) {
           this.#fail(socket, "rate_limited", "Too many active remote connections.", 1008);
           return;
@@ -1047,9 +1050,6 @@ export class SignalService {
         this.#schedulePeerExpiration(peer);
         this.#metrics.acceptedConnections += 1;
         this.#metrics.activeSockets = this.#sockets.size;
-        const resumeToken = yield* tokens.issueResumeToken(claims);
-        // Token signing is asynchronous too. Disconnect already removes the peer and timer.
-        if (!this.#sockets.has(socket.id)) return;
         if (message.peer === "ingress") {
           for (const team of slackRoute.teams) {
             const route = slackRouteKey(team.appId, team.id);
@@ -1143,6 +1143,7 @@ export class SignalService {
           return;
         }
         if (existing) this.#replaceClientSignal(existing);
+        if (replaced && this.#peers.has(replaced.socket.id)) this.#replaceClientPeer(replaced);
         const connectionId = randomIdentifier();
         peer.connectionId = connectionId;
         this.#connections.set(connectionId, {
@@ -1188,6 +1189,19 @@ export class SignalService {
   #connectionForSession(hostId: string, sessionId: string): ActiveConnection | null {
     for (const connection of this.#connections.values()) {
       if (connection.hostId === hostId && connection.sessionId === sessionId) return connection;
+    }
+    return null;
+  }
+
+  #clientForSession(claims: RemoteTicketClaims): AuthenticatedPeer | null {
+    for (const peer of this.#peers.values()) {
+      if (
+        peer.peer === "client" &&
+        peer.claims.userId === claims.userId &&
+        peer.claims.hostId === claims.hostId &&
+        peer.claims.sessionId === claims.sessionId
+      )
+        return peer;
     }
     return null;
   }
@@ -1243,11 +1257,13 @@ export class SignalService {
     this.#clearConnectionDrop(connection.id);
     this.#connections.delete(connection.id);
     const previous = this.#peers.get(connection.client.id);
-    if (previous) {
-      this.#peers.delete(connection.client.id);
-      this.#clearPeerExpiration(connection.client.id);
-      previous.socket.close(4000, "Remote session resumed");
-    }
+    if (previous) this.#replaceClientPeer(previous);
+  }
+
+  #replaceClientPeer(peer: AuthenticatedPeer): void {
+    this.#peers.delete(peer.socket.id);
+    this.#clearPeerExpiration(peer.socket.id);
+    peer.socket.close(4000, "Remote session resumed");
   }
 
   #dropConnection(connectionId: string, sourceSocketId: string): void {

@@ -22,7 +22,7 @@ export const messages = {
   "provider.status.downloadFailed": "İndirme başarısız",
   "provider.status.connected": "Bağlandı",
   "provider.status.notDownloaded": "İndirilmedi",
-  "provider.status.ready": "Hazır",
+  "provider.status.ready": "Çalışma zamanı yüklendi",
   "provider.status.notConnected": "Bağlı değil",
   "provider.status.notInstalled": "Yüklü değil",
   "provider.status.updateRequired": "Güncelleme gerekli",

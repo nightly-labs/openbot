@@ -1,0 +1,42 @@
+[
+  {
+    "version": "0.34.1",
+    "date": "2026-10-09",
+    "notices": [],
+    "groups": [
+      {
+        "type": "changed",
+        "items": [
+          "The sidebar now shows \"OpenBot for mobile\". Open \"How to install\" for the iPhone and Android setup steps."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": ["The message box stays at the bottom of the chat again. Before, it moved up in a short conversation."]
+      }
+    ]
+  },
+  {
+    "version": "0.34.0",
+    "date": "2026-10-09",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "See your routines on a canvas. Open an agent in Routines to see its next runs, past runs and results.",
+          "Connect agents in a routine. Each agent can pass its answer to the next agent in the flow.",
+          "Ask an agent to edit the routine canvas. Use the chat panel to add or change routines and their connections.",
+          "Use OpenBot in Russian, Spanish or German. Select the interface language in Settings."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Open joined servers faster after a restart. Fast connection to servers is on by default in Settings > General.",
+          "Manage notifications in their own Settings tab. Desktop notifications, sounds and the test notification are together."
+        ]
+      }
+    ]
+  }
+]

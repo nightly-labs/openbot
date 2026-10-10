@@ -292,9 +292,61 @@ The server has no `--version`, so staging writes `antigravity-package.json` and
 `PATH`, because the Antigravity editor installs an `antigravity` command that is not this server.
 
 Sign in is an ACP `authenticate` call with `oauth-personal`, in a separate process
-(`src/backend/acp-sign-in.ts`): the server opens the browser and waits, and a status probe must
-never wait for that. The serving client never calls `authenticate`. A signed-out server answers
-`session/new` with "Authentication required", which the client reports as sign-in required.
+(`src/backend/acp-sign-in.ts`). On Linux, OpenBot reads the Google sign-in link from the
+server and opens it with the desktop browser. The server browser launch is disabled for this
+process so the page opens once. A failed browser launch gives an actionable error; the OAuth
+link and browser error details are not logged. Other platforms let the server open the browser.
+A status probe must never call `authenticate`. The serving client does not call it.
+OpenBot checks authentication through model discovery (`session/new`), not the auth methods
+advertised by `initialize`. The runtime can answer "Authentication required", which OpenBot
+reports as sign-in required. In runtime 1.3.0, a saved OAuth method with no valid token can also
+start interactive authentication during `session/new`; this can leave the probe waiting until
+its existing deadline. Runtime installation alone does not confirm authentication.
+On Ubuntu 24.04, install a desktop browser and `xdg-utils` before sign-in. The Google
+callback uses `127.0.0.1` on the host, so complete sign-in in a desktop session on that same
+VM. A browser on another computer cannot complete this loopback callback. A server with no
+desktop can install and start Gemini, but cannot complete the interactive Google sign-in.
+
+The local Settings > Providers screen offers Connect for both a managed runtime and an
+external runtime. Remote-host settings do not offer this action: Gemini has no supported
+device-code flow or client-side OAuth callback forwarding. Open OpenBot in the host's desktop
+session to connect it. A runtime status of "Runtime installed" means only that the files are
+available; "Connected" requires a successful provider check. A known authentication or launch
+error takes priority over runtime readiness.
+
+#### Download and external runtime recovery
+
+Issue #1776 reports an HTTP 404 for the official 1.3.0 Linux archive from an OVH IPv6 pool,
+and HTTP 200 over IPv4. This cause is not confirmed: checks from another host on 2026-10-10
+returned HTTP 200 over both families. An HTTP failure occurs before archive extraction or
+ACP startup; it is separate from browser sign-in and missing runtime files. OpenBot keeps
+the download error and Retry action and does not change the host's network settings.
+
+For an affected host, an operator can compare bounded requests to the exact failing URL
+with `curl --ipv4 --head --connect-timeout 10 --max-time 30 <url>` and the corresponding
+`--ipv6` command. If IPv4 works, download that same official archive with
+`curl --ipv4 --fail --connect-timeout 10 --max-time 300 --output <new-archive-path> <url>`.
+Verify the archive against a trusted release checksum before extraction. This affects only
+that request. Do not disable IPv6. The report's claimed `::1` kernel requirement was not
+confirmed in the ACP Python source; a native harness requirement remains unverified.
+
+An external installation must preserve this layout (1.3.0 is an example):
+
+```text
+/var/lib/openbot/antigravity-acp-1.3.0/
+  antigravity-package.json    {"version":"1.3.0"}
+  bin/
+    agy_acp_server.par
+    localharness_external
+```
+
+Both programs must be executable by the OpenBot host user. Set
+`OPENBOT_ANTIGRAVITY_PATH=/var/lib/openbot/antigravity-acp-1.3.0/bin/agy_acp_server.par`
+in that process's environment and restart OpenBot. The variable names the executable, not
+the directory. OpenBot requires the version manifest two levels above it; extraction alone
+does not create that manifest. An invalid override remains an error: OpenBot does not replace
+it with the managed runtime. Managed updates do not change the explicit override.
+
 The server runs confined; `antigravityStatePaths` gives it `~/.gemini/antigravity-acp` and
 `~/.gemini/artifacts` and protects its settings files. Migration 22 adds `antigravity` to
 `projection_provider_sessions`.

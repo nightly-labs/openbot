@@ -84,6 +84,8 @@ const SIGNAL_RENEW_DELAY_MS = 8_000;
 const DISCONNECT_GRACE_MS = 15_000;
 
 const peers = new Map<string, PeerState>();
+// Main can replace a peer after an initial connection error. Keep the rate wait across that replacement.
+let signalRetryAt = 0;
 
 // A Signal socket opened while main waits for the ticket. Its TLS and WebSocket handshakes then do
 // not wait for the ticket. Nothing is sent on it before `connect` names the same address and adds
@@ -203,6 +205,7 @@ function prepareSignal(peerId: string, signalUrl: string): void {
   // A peer that is already connecting has its own socket.
   if (peers.has(peerId)) return;
   dropPreparedSignal(peerId);
+  if (Date.now() < signalRetryAt) return;
   const socket = new WebSocket(signalUrl);
   const listeners = new AbortController();
   const prepared: PreparedSignal = {
@@ -223,7 +226,14 @@ function prepareSignal(peerId: string, signalUrl: string): void {
     },
     { signal: listeners.signal },
   );
-  socket.addEventListener("close", drop, { signal: listeners.signal });
+  socket.addEventListener(
+    "close",
+    (event) => {
+      if (event.code === 1008) signalRetryAt = Date.now() + 60_000;
+      drop();
+    },
+    { signal: listeners.signal },
+  );
   socket.addEventListener("error", drop, { signal: listeners.signal });
   preparedSignals.set(peerId, prepared);
 }
@@ -253,10 +263,14 @@ function connectSignal(state: PeerState, prepared: WebSocket | null = null): voi
     prepared?.close(1000, "Peer stopped");
     return;
   }
+  if (Date.now() < signalRetryAt) {
+    prepared?.close(1000, "Signal retry pending");
+    scheduleSignalReconnect(state);
+    return;
+  }
   const socket = prepared ?? new WebSocket(state.signalUrl);
   state.socket = socket;
   const sendHello = () => {
-    state.reconnectAttempt = 0;
     const hello: SignalClientMessage = {
       type: "hello",
       version: SIGNAL_PROTOCOL_VERSION,
@@ -299,6 +313,7 @@ function connectSignal(state: PeerState, prepared: WebSocket | null = null): voi
       post({ type: "peer-disconnected", peerId: state.id });
       return;
     }
+    if (event.code === 1008) signalRetryAt = Date.now() + 60_000;
     if (!state.closed) scheduleSignalReconnect(state);
   });
   socket.addEventListener("error", () => socket.close());
@@ -327,6 +342,10 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
     return;
   }
   if (message.type === "error") {
+    if (message.code === "rate_limited") {
+      signalRetryAt = Date.now() + 60_000;
+      state.socket?.close();
+    }
     post({
       type: "peer-error",
       peerId: state.id,
@@ -349,6 +368,7 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
     return;
   }
   if (message.type === "ready") {
+    state.reconnectAttempt = 0;
     // The host replaces a connection after 10 ICE restarts, so a socket that comes back while the
     // path is still connected keeps the path. A TURN refresh still restarts ICE, so a relayed path
     // moves to the new credentials.
@@ -612,11 +632,10 @@ function bindDataChannel(
       code: "data_channel_error",
       message: sourceText("error.remote.dataChannelFailed", { kind }),
     });
-  // The host can close the connection while this computer sleeps. The path can still read
-  // `connected` and Signal does not tell this end, but the channels close. Without this, main reads
-  // the host as connected and each request fails on a closed channel.
+  // Either end can lose a channel while the path still reads `connected`. Release that peer so
+  // the client can connect again. A host child closes only its own peer, not the shared Signal socket.
   channel.onclose = () => {
-    if (state.closed || state.role !== "client" || state.channels[kind] !== channel) return;
+    if (state.closed || state.channels[kind] !== channel) return;
     dropConnection(state);
   };
 }
@@ -778,7 +797,6 @@ function replaceSignal(state: PeerState): void {
   if (state.closed) return;
   if (state.reconnectTimer !== null) clearTimeout(state.reconnectTimer);
   state.reconnectTimer = null;
-  state.reconnectAttempt = 0;
   state.restartIceOnReady = true;
   const socket = state.socket;
   state.socket = null;
@@ -788,7 +806,7 @@ function replaceSignal(state: PeerState): void {
 
 function scheduleSignalReconnect(state: PeerState): void {
   if (state.reconnectTimer !== null) return;
-  const delay = Math.min(30_000, 500 * 2 ** state.reconnectAttempt++);
+  const delay = Math.max(signalRetryAt - Date.now(), Math.min(30_000, 500 * 2 ** state.reconnectAttempt++));
   state.reconnectTimer = window.setTimeout(() => {
     state.reconnectTimer = null;
     connectSignal(state);

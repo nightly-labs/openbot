@@ -7,6 +7,7 @@ import { AGENT_ADMIN_CAPABILITY } from "./agent-admin-v1";
 import { AGENT_HOST_SETTINGS_CAPABILITY } from "./agent-host-settings-v1";
 import { AGENT_IMPORT_CAPABILITY } from "./agent-import-v1";
 import { AGENT_INSTALL_CAPABILITY } from "./agent-install-v1";
+import { AGENT_MEMORIES_CAPABILITY } from "./agent-memories-v1";
 import { AGENT_PUBLISH_CAPABILITY } from "./agent-publish-v1";
 import { AGENT_SESSION_SETTINGS_CAPABILITY } from "./agent-session-settings-v1";
 import { AGENT_UPDATE_CAPABILITY } from "./agent-update-v1";
@@ -68,6 +69,7 @@ export {
   AGENT_HOST_SETTINGS_CAPABILITY,
   AGENT_IMPORT_CAPABILITY,
   AGENT_INSTALL_CAPABILITY,
+  AGENT_MEMORIES_CAPABILITY,
   AGENT_PUBLISH_CAPABILITY,
   AGENT_SESSION_SETTINGS_CAPABILITY,
   AGENT_UPDATE_CAPABILITY,
@@ -130,6 +132,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   MCP_SERVERS_CAPABILITY,
   STORAGE_CAPABILITY,
   AGENT_ADMIN_CAPABILITY,
+  AGENT_MEMORIES_CAPABILITY,
   AGENT_SESSION_SETTINGS_CAPABILITY,
   ACP_REGISTRY_CAPABILITY,
   SKILLS_ADMIN_CAPABILITY,
@@ -226,6 +229,7 @@ export function isAgentMessageRoute(method: string, path: string): boolean {
 // host return the expanded list; older hosts ignore the marker and retain all old features.
 export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
   (capability) =>
+    capability !== AGENT_MEMORIES_CAPABILITY &&
     capability !== AGENT_SESSION_SETTINGS_CAPABILITY &&
     capability !== ACP_REGISTRY_CAPABILITY &&
     capability !== PROVIDERS_V5_CAPABILITY,
@@ -239,6 +243,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
   return capabilities.filter(
     (capability) =>
       capability !== "local-providers-v3" &&
+      capability !== AGENT_MEMORIES_CAPABILITY &&
       capability !== AGENT_SESSION_SETTINGS_CAPABILITY &&
       capability !== ACP_REGISTRY_CAPABILITY &&
       capability !== PROVIDERS_V5_CAPABILITY,

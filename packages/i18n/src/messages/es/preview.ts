@@ -12,6 +12,7 @@ export const messages = {
   "preview.panel.back": "Atrás",
   "preview.panel.rawMarkdown": "Mostrar código fuente de Markdown",
   "preview.panel.rawHtml": "Mostrar código fuente de HTML",
+  "preview.panel.wrapLines": "Ajustar líneas largas",
   "preview.folder.empty": "Esta carpeta está vacía.",
   "preview.folder.truncated": "Solo se muestran los primeros {limit} elementos.",
   "preview.truncated": "Vista previa truncada después de {limit} caracteres.",

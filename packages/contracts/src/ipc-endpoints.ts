@@ -51,8 +51,10 @@ import type { AgentImportPreview, AgentImportResult, ApplyAgentImportInput } fro
 import type {
   AgentMemory,
   AgentMemoryLimitPreference,
+  AgentMemorySelectionState,
   CreateAgentMemoryInput,
   DeleteAgentMemoryInput,
+  SetAgentMemoryInclusionInput,
   UpdateAgentMemoryInput,
 } from "./ipc-agent-memories";
 import type {
@@ -895,6 +897,10 @@ export const IPC_ENDPOINTS = {
     scopedEvent: event<ScopedAgentEvent>()("agent:event"),
   },
   agentMemories: {
+    getMemorySelection: scopedRequest<string, AgentMemorySelectionState | null>()("agent:get-memory-selection"),
+    setMemoryInclusion: scopedRequest<SetAgentMemoryInclusionInput, AgentMemorySelectionState>()(
+      "agent:set-memory-inclusion",
+    ),
     listMemories: scopedRequest<string, AgentMemory[]>()("agent:list-memories"),
     createMemory: scopedRequest<CreateAgentMemoryInput, AgentMemory>()("agent:create-memory"),
     updateMemory: scopedRequest<UpdateAgentMemoryInput, AgentMemory>()("agent:update-memory"),

@@ -30,7 +30,7 @@ export const messages = {
   "provider.status.downloadFailed": "Download fehlgeschlagen",
   "provider.status.connected": "Verbunden",
   "provider.status.notDownloaded": "Nicht heruntergeladen",
-  "provider.status.ready": "Bereit",
+  "provider.status.ready": "Laufzeit installiert",
   "provider.status.notConnected": "Nicht verbunden",
   "provider.status.notInstalled": "Nicht installiert",
   "provider.status.updateRequired": "Update erforderlich",

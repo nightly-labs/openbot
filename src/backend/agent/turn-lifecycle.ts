@@ -94,7 +94,7 @@ export interface TurnHooks {
   requeueChannelDelivery(deliveryId: string): Effect.Effect<boolean>;
   /**
    * Whether this delivery is a routine run that may end without a message: a scheduled run whose
-   * agent answers only the no-update marker.
+   * agent answers only the no-update marker or calls the no-update tool.
    */
   quietRoutineDelivery(deliveryId: string): boolean;
   /**
@@ -179,6 +179,8 @@ export class TurnLifecycle {
   readonly #limitedTurns = new Map<string, number | null>();
   /** The deliveries run again after a refused session history. Each one gets a single retry. */
   readonly #refusedRetries = new Set<string>();
+  /** Running turns whose agent called the no-update tool. The completion of the turn takes the entry. */
+  readonly #noUpdateTurns = new Set<string>();
   /**
    * The time of the last provider notification for each agent: a delta, a tool item, a usage
    * update. It is the only clock that moves while a turn works, and it is lost on restart.
@@ -250,6 +252,7 @@ export class TurnLifecycle {
     this.#turnErrors.clear();
     this.#limitedTurns.clear();
     this.#runningTurns.clear();
+    this.#noUpdateTurns.clear();
     this.#refusedRetries.clear();
     this.#lastEventAt.clear();
     this.#itemTurns.clear();
@@ -572,6 +575,30 @@ export class TurnLifecycle {
     }
   }).bind(this);
 
+  /**
+   * Records a call to the no-update tool. `quiet` when the turn runs only scheduled routine runs, so
+   * its completion drops the text answers; `shown` when a person waits for the answer, as in a Test
+   * run; null when no routine run started the turn. The completion decides again, because a message
+   * can join the turn after the call.
+   */
+  requestNoUpdate(agentId: string, threadId: string, turnId: string): "quiet" | "shown" | null {
+    const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
+    if (!deliveries.some(({ delivery }) => delivery.sender.kind === "routine")) return null;
+    this.#noUpdateTurns.add(turnId);
+    return this.#quietRoutineTurn(threadId, deliveries) ? "quiet" : "shown";
+  }
+
+  /** Only a turn that runs nothing but scheduled routine runs, outside a channel or messaging thread. */
+  #quietRoutineTurn(threadId: string | null, deliveries: readonly DeliveryContext[]): boolean {
+    return (
+      deliveries.length > 0 &&
+      !this.#conversation.isExecutionThread(threadId) &&
+      deliveries.every(
+        ({ delivery }) => delivery.sender.kind === "routine" && this.#hooks.quietRoutineDelivery(delivery.id),
+      )
+    );
+  }
+
   readonly #completeTurn = Effect.fn("TurnLifecycle.completeTurn")(function* (
     this: TurnLifecycle,
     agentId: string,
@@ -581,6 +608,7 @@ export class TurnLifecycle {
   ) {
     const running = this.#runningTurns.get(turnId);
     this.#runningTurns.delete(turnId);
+    const noUpdateCalled = this.#noUpdateTurns.delete(turnId);
     if (running) {
       // `waitMs` is OpenBot's part of a slow reply: the queue (a usage-limit hold included), the
       // provider start, the session and its settings. `firstOutputMs` is the provider's: the time
@@ -677,12 +705,8 @@ export class TurnLifecycle {
     // or who started a Test, script or webhook run, waits for the answer.
     const quiet =
       outcome === "completed" &&
-      deliveries.length > 0 &&
-      !this.#conversation.isExecutionThread(snapshot.threadId) &&
-      deliveries.every(
-        ({ delivery }) => delivery.sender.kind === "routine" && this.#hooks.quietRoutineDelivery(delivery.id),
-      ) &&
-      settleQuietRoutineTurn(snapshot, turnId);
+      this.#quietRoutineTurn(snapshot.threadId, deliveries) &&
+      settleQuietRoutineTurn(snapshot, turnId, noUpdateCalled);
     const latestAssistant = latestTurnAnswer(snapshot.messages, turnId);
     if (deliveries.length > 0) {
       const terminal = outcome === "failed" ? "failed" : outcome === "interrupted" ? "interrupted" : "completed";

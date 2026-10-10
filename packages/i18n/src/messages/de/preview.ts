@@ -12,6 +12,7 @@ export const messages = {
   "preview.panel.back": "Zurück",
   "preview.panel.rawMarkdown": "Markdown-Quelltext anzeigen",
   "preview.panel.rawHtml": "HTML-Quelltext anzeigen",
+  "preview.panel.wrapLines": "Lange Zeilen umbrechen",
   "preview.folder.empty": "Dieser Ordner ist leer.",
   "preview.folder.truncated": "Es werden nur die ersten {limit} Elemente angezeigt.",
   "preview.truncated": "Vorschau nach {limit} Zeichen gekürzt.",

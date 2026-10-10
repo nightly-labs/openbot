@@ -2,6 +2,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AcknowledgeFailedTurnInput,
   type AgentIpcRequest,
+  type AgentMemorySelectionChange,
   type CancelQueuedMessageInput,
   type ChooseAttachmentsInput,
   type CreateAgentInput,
@@ -45,6 +46,7 @@ import {
   type SearchConversationMessagesInput,
   type SendMessageInput,
   type SetAgentAvatarInput,
+  type SetAgentMemoryInclusionInput,
   type SetMessageReactionInput,
   type SidebarLayoutAction,
   type SteerQueuedMessageInput,
@@ -799,4 +801,27 @@ export function parseBrowserTakeoverResponse(value: unknown): RespondToBrowserTa
 export function parseQueueEdit(value: unknown): EditQueuedMessageInput {
   if (!isObject(value)) throw new Error("Invalid queue edit request.");
   return { agentId: parseAgentId(value.agentId), ...decodeQueueEditRequest(value) };
+}
+
+export function parseSetAgentMemoryInclusion(value: unknown): SetAgentMemoryInclusionInput {
+  if (!isObject(value) || !Array.isArray(value.changes) || value.changes.length === 0 || value.changes.length > 25)
+    throw new Error("Invalid memory inclusion request.");
+  const changes = value.changes.map((change): AgentMemorySelectionChange => {
+    if (
+      !isObject(change) ||
+      (change.inclusion !== "essential" && change.inclusion !== "searchable" && change.inclusion !== "automatic") ||
+      typeof change.expectedRevision !== "number" ||
+      !Number.isSafeInteger(change.expectedRevision) ||
+      change.expectedRevision < 0
+    )
+      throw new Error("Invalid memory inclusion change.");
+    return {
+      memoryId: requireString(change.memoryId, "memoryId", INPUT_LIMITS.identifier),
+      inclusion: change.inclusion,
+      expectedRevision: change.expectedRevision,
+    };
+  });
+  if (new Set(changes.map((change) => change.memoryId)).size !== changes.length)
+    throw new Error("Duplicate memory inclusion change.");
+  return { agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier), changes };
 }

@@ -41,8 +41,7 @@ export const messages = {
   "settings.busyMessage.description":
     "新しいメッセージはキューに入らず、エージェントの現在の作業に加わります。ChatGPT と Claude で使えます。",
   "settings.agentMemoryLimit.title": "エージェントごとのメモリー数",
-  "settings.agentMemoryLimit.description":
-    "このコンピューターの各エージェントが保存できるメモリーの数です。数を増やすと、各プロンプトが長くなります。",
+  "settings.agentMemoryLimit.description": "このコンピューターの各エージェントが保存できるメモリーの数です。",
   "settings.permissions.title": "権限",
   "settings.turbo.title": "ターボモード",
   "settings.turbo.description":

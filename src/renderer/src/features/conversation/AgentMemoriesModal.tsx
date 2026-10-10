@@ -1,10 +1,10 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { MemoryEntry } from "@openbot/contracts/ipc";
+import type { AgentMemorySelectionState, MemoryEntry, SetAgentMemoryInclusionInput } from "@openbot/contracts/ipc";
 import type { AppFormat, AppMessages, AppTextKey } from "@openbot/i18n";
 import { Button, ConfirmDialog, Dialog, IconButton, Plus, Textarea, Trash2, X } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createSignal, For, onSettled, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import type { MemoriesPort } from "./memories-port";
 
@@ -28,6 +28,8 @@ const EMPTY_TEXT = {
 
 export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
   const { t, format, errorMessage } = useText();
+  const [selection, setSelection] = createSignal<AgentMemorySelectionState | null>(null);
+  const selectionById = createMemo(() => new Map(selection()?.selections.map((entry) => [entry.memoryId, entry])));
   const [memories, setMemories] = createSignal<MemoryEntry[]>([]);
   const [loading, setLoading] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
@@ -55,7 +57,8 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
     if (showLoading) setLoading(true);
     setError(null);
     try {
-      const next = await props.port.list();
+      const [next, nextSelection] = await Promise.all([props.port.list(), props.port.selection?.read() ?? null]);
+      setSelection(nextSelection);
       setMemories(next);
       props.onCountChange(next.length);
     } catch (caught) {
@@ -69,6 +72,7 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
     () => [props.open, props.port.ownerId] as const,
     ([open]) => {
       if (!open) return;
+      setSelection(null);
       setEditingId(null);
       setAddOpen(false);
       setNewText("");
@@ -203,6 +207,26 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
     }
   }
 
+  async function changeInclusion(
+    memoryId: string,
+    inclusion: SetAgentMemoryInclusionInput["changes"][number]["inclusion"],
+  ): Promise<void> {
+    const current = selectionById().get(memoryId);
+    const port = props.port.selection;
+    if (!current || !port || savingId()) return;
+    setSavingId(memoryId);
+    setError(null);
+    try {
+      setSelection(await port.set([{ memoryId, inclusion, expectedRevision: current.revision }]));
+    } catch (caught) {
+      // Refresh revisions after another client changes the selection, but keep the error visible.
+      await loadMemories(false);
+      setError(errorMessage(caught, t("memory.updateFailed")));
+    } finally {
+      setSavingId(null);
+    }
+  }
+
   function cancelConfirmation(): void {
     setClearConfirmation(false);
     queueMicrotask(() => confirmationTrigger?.focus());
@@ -245,6 +269,19 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
             </header>
 
             <div class="agent-memories-body">
+              <Show when={selection()}>
+                {(state) => (
+                  <div class="agent-memory-limit">
+                    <p>{t("memory.inclusion.explanation")}</p>
+                    <p>
+                      {t("memory.inclusion.capacity", {
+                        used: format.fileSize(state().usedBytes),
+                        total: format.fileSize(state().budgetBytes),
+                      })}
+                    </p>
+                  </div>
+                )}
+              </Show>
               <Show when={addOpen()}>
                 <section class="agent-memory-composer" aria-label={t("memory.add")}>
                   <Textarea
@@ -310,33 +347,51 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
                     class={["agent-memory-list", scrollFades.classes()]}
                     onScroll={scrollFades.measure}
                   >
-                    <For each={memories()}>
+                    <For each={memories()} keyed={(memory) => memory.id}>
                       {(memory) => (
                         <li class="agent-memory-row">
                           <Show
-                            when={editingId() === memory.id}
+                            when={editingId() === memory().id}
                             fallback={
                               <>
                                 <Button
                                   type="button"
                                   class="agent-memory-row-main"
                                   variant="ghost"
-                                  aria-label={t("memory.editText", { text: memory.text })}
-                                  onClick={() => startEditing(memory)}
+                                  aria-label={t("memory.editText", { text: memory().text })}
+                                  onClick={() => startEditing(memory())}
                                 >
-                                  <span class="agent-memory-text">{memory.text}</span>
+                                  <span class="agent-memory-text">{memory().text}</span>
                                   <span class="agent-memory-meta">
-                                    {memory.origin === "automatic" ? t("memory.learned") : t("memory.manual")}
+                                    {memory().origin === "automatic" ? t("memory.learned") : t("memory.manual")}
                                     {" · "}
-                                    {formatMemoryDate(memory.updatedAt, t("memory.unknownDate"), format)}
+                                    {formatMemoryDate(memory().updatedAt, t("memory.unknownDate"), format)}
+                                    <Show when={selectionById().get(memory().id)}>
+                                      {(entry) => (
+                                        <>
+                                          {" · "}
+                                          {t(
+                                            entry().inclusion === "essential"
+                                              ? "memory.inclusion.essential"
+                                              : "memory.inclusion.searchable",
+                                          )}
+                                          {" · "}
+                                          {t(
+                                            entry().userControlled
+                                              ? "memory.inclusion.userControlled"
+                                              : "memory.inclusion.agentControlled",
+                                          )}
+                                        </>
+                                      )}
+                                    </Show>
                                   </span>
                                 </Button>
                                 <IconButton
                                   label={t("memory.delete")}
                                   class="agent-memory-delete-button"
                                   variant="destructive-ghost"
-                                  disabled={savingId() === memory.id}
-                                  onClick={() => void deleteMemory(memory)}
+                                  disabled={savingId() === memory().id}
+                                  onClick={() => void deleteMemory(memory())}
                                 >
                                   <Trash2 />
                                 </IconButton>
@@ -344,6 +399,71 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
                             }
                           >
                             <div class="agent-memory-editor">
+                              <Show when={selectionById().get(memory().id)}>
+                                {(entry) => (
+                                  <>
+                                    <p class="agent-memory-meta">
+                                      {t(
+                                        entry().inclusion === "essential"
+                                          ? "memory.inclusion.essential"
+                                          : "memory.inclusion.searchable",
+                                      )}
+                                    </p>
+                                    <fieldset
+                                      class="agent-memory-inclusion-actions"
+                                      aria-label={t("memory.inclusion.label")}
+                                    >
+                                      <Button
+                                        size="sm"
+                                        variant={
+                                          entry().userControlled && entry().inclusion === "essential"
+                                            ? "secondary"
+                                            : "ghost"
+                                        }
+                                        aria-pressed={
+                                          entry().userControlled && entry().inclusion === "essential" ? "true" : "false"
+                                        }
+                                        disabled={savingId() !== null}
+                                        onClick={() => void changeInclusion(memory().id, "essential")}
+                                      >
+                                        {t("memory.inclusion.essential")}
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant={
+                                          entry().userControlled && entry().inclusion === "searchable"
+                                            ? "secondary"
+                                            : "ghost"
+                                        }
+                                        aria-pressed={
+                                          entry().userControlled && entry().inclusion === "searchable"
+                                            ? "true"
+                                            : "false"
+                                        }
+                                        disabled={savingId() !== null}
+                                        onClick={() => void changeInclusion(memory().id, "searchable")}
+                                      >
+                                        {t("memory.inclusion.searchable")}
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant={!entry().userControlled ? "secondary" : "ghost"}
+                                        aria-label={t("memory.inclusion.automatic")}
+                                        title={t(
+                                          entry().inclusion === "essential"
+                                            ? "memory.inclusion.essential"
+                                            : "memory.inclusion.searchable",
+                                        )}
+                                        aria-pressed={!entry().userControlled ? "true" : "false"}
+                                        disabled={savingId() !== null}
+                                        onClick={() => void changeInclusion(memory().id, "automatic")}
+                                      >
+                                        {t("memory.inclusion.automatic")}
+                                      </Button>
+                                    </fieldset>
+                                  </>
+                                )}
+                              </Show>
                               <Textarea
                                 ref={(element) => (editingInput = element)}
                                 class="agent-memory-input"
@@ -367,8 +487,8 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
                                   size="sm"
                                   variant="default"
                                   disabled={!editingText().trim()}
-                                  loading={savingId() === memory.id}
-                                  onClick={() => void updateMemory(memory)}
+                                  loading={savingId() === memory().id}
+                                  onClick={() => void updateMemory(memory())}
                                 >
                                   {t("common.save")}
                                 </Button>

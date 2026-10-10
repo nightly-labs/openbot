@@ -175,6 +175,12 @@ a second session receives `host_busy` without interrupting the first.
 Published hosts and clients share it. Each open desktop, phone, or browser keeps a socket for each
 saved host. A reconnect of the same session does not count its old socket. Change the value on the
 Signal server: a desktop environment does not change it.
+This also applies when the old client socket waits for its host to reconnect. Token signing finishes
+before Signal admits the new socket, so concurrent reconnects do not hold extra account slots.
+
+Production deployments keep `/opt/openbot/remote/.env.production`. A value in that file overrides
+the default, even when a release changes the repository's environment file. Check the running
+container's effective limit after a configuration change and Signal restart.
 
 See [the issue #325 deployment procedure](../docs/remote-session-deployment.md) for the production evidence,
 a Signal-only update, rollback commands, and the required desktop/mobile checks.

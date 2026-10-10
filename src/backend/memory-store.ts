@@ -38,6 +38,15 @@ export interface SaveAutomaticMemory {
   commandId?: string;
 }
 
+export interface SaveMemoryInput {
+  memoryId?: string;
+  text: string;
+  origin: AgentMemoryOrigin;
+  sourceTurnId: string | null;
+  commandId?: string;
+  uncapped?: boolean;
+}
+
 export class MemoryStore {
   readonly #columns: string;
 
@@ -175,17 +184,7 @@ export class MemoryStore {
    * Validate, fold a duplicate, cap the owner, then keep `updatedAt` strictly increasing so the
    * `ORDER BY updated_at DESC` above is stable when two saves land in the same millisecond.
    */
-  protected save(
-    ownerId: string,
-    input: {
-      memoryId?: string;
-      text: string;
-      origin: AgentMemoryOrigin;
-      sourceTurnId: string | null;
-      commandId?: string;
-      uncapped?: boolean;
-    },
-  ): MemoryEntry {
+  protected save(ownerId: string, input: SaveMemoryInput): MemoryEntry {
     const text = validateMemoryText(input.text);
     const normalizedText = normalizeMemoryText(text);
     const duplicate = this.#findByNormalizedText(ownerId, normalizedText);

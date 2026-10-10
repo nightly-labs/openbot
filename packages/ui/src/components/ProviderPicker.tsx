@@ -532,6 +532,20 @@ export function ProviderPicker(props: ProviderPickerProps) {
                           {t("provider.restartPending")}
                         </small>
                       </Show>
+                      <Show
+                        when={
+                          !off() &&
+                          option().id === "antigravity" &&
+                          runtimeStatus()?.phase === "ready" &&
+                          !available() &&
+                          !connecting() &&
+                          !props.onConnectProvider
+                        }
+                      >
+                        <small class="provider-picker-email" role="status">
+                          {t("provider.gemini.hostSignIn")}
+                        </small>
+                      </Show>
                     </span>
                     {/* Version shares the badge column. */}
                     <span class="provider-picker-state">
@@ -932,11 +946,11 @@ function providerStatusLabel(
   if (runtimeStatus?.phase === "download-error") return translate("provider.status.downloadFailed");
   if (state === "available") return translate("provider.status.connected");
   if (runtimeStatus?.phase === "not-downloaded") return translate("provider.status.notDownloaded");
-  if (runtimeStatus?.phase === "ready") return translate("provider.status.ready");
   if (state === "sign-in-required") return translate("provider.status.notConnected");
-  if (state === "not-installed") return translate("provider.status.notInstalled");
   if (state === "outdated") return translate("provider.status.updateRequired");
   if (state === "error") return translate("provider.status.unavailable");
+  if (runtimeStatus?.phase === "ready") return translate("provider.status.ready");
+  if (state === "not-installed") return translate("provider.status.notInstalled");
   return translate("provider.status.checking");
 }
 
@@ -953,6 +967,8 @@ function providerVisualState(
   if (updatable) return "update-available";
   if (phase === "download-error") return phase;
   if (state === "available") return "available";
+  if (phase === "not-downloaded") return phase;
+  if (state === "sign-in-required" || state === "outdated" || state === "error") return state;
   return phase ?? state;
 }
 

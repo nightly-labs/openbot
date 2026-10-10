@@ -207,7 +207,11 @@ describe.sequential("AgentService: providers", () => {
 
     // The developer instructions are written when the session loads, so a memory the agent saved
     // after that reaches the channel only when the next turn loads the session again.
-    service.createMemory({ agentId: "chief", text: "The user prefers concise status updates." });
+    const memory = service.createMemory({ agentId: "chief", text: "The user prefers concise status updates." });
+    service.setMemoryInclusion({
+      agentId: "chief",
+      changes: [{ memoryId: memory.id, inclusion: "essential", expectedRevision: 0 }],
+    });
     await ask("second", "Continue the shared work.", 2);
     expect(lastChannelResume()).toContain("The user prefers concise status updates.");
 

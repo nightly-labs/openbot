@@ -7,6 +7,7 @@ import type {
   AgentAnalyticsInput,
   AgentEvent,
   AgentMemory,
+  AgentMemorySelectionState,
   AgentModelId,
   AgentModelOption,
   AgentRuntimeSnapshot,
@@ -65,6 +66,7 @@ import type {
   SaveAgentProfileResult,
   SaveMcpServerInput,
   SendMessageInput,
+  SetAgentMemoryInclusionInput,
   SetAgentSessionSettingInput,
   SetMcpServerEnabledInput,
   SetMessageReactionInput,
@@ -851,6 +853,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     });
     this.messaging = new MessagingThreads(store.database, mailbox, {
       schedule: (agentId) => this.#drain.scheduleDrain(agentId),
+      queueChanged: (agentId) => this.#mailboxSync.emitQueue(agentId),
       busy: (agentId) =>
         Boolean(this.#conversation.workingSnapshot(agentId)?.activeTurnId || this.#mailbox.nextQueued(agentId)),
       interrupt: (agentId, turnId, threadId) => this.interrupt(agentId, turnId, threadId).pipe(toMessagingThreadFailed),
@@ -1040,6 +1043,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           startedAt: turnId ? this.#turn.turnStartedAt(turnId) : null,
           lastEventAt: this.#turn.lastEventAt(agentId),
         }),
+        requestNoUpdate: (agentId, threadId, turnId) => this.#turn.requestNoUpdate(agentId, threadId, turnId),
       },
     });
   }
@@ -1155,6 +1159,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   listMemories(agentId: string): AgentMemory[] {
     return this.#memories.list(agentId);
+  }
+
+  getMemorySelection(agentId: string): AgentMemorySelectionState {
+    return this.#memories.selectionState(agentId);
+  }
+
+  setMemoryInclusion(input: SetAgentMemoryInclusionInput): AgentMemorySelectionState {
+    return this.#memories.setInclusions(input);
+  }
+
+  initializeMemorySelection(agentId: string): void {
+    this.#memories.initializeSelection(agentId);
   }
 
   /** How many memories one agent can hold now. */

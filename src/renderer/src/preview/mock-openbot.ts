@@ -1,9 +1,12 @@
+import { AGENT_MEMORY_CONTEXT_BUDGET_BYTES, essentialMemoryBytes } from "@openbot/contracts/agent-memory-context";
 import type { AcpRegistryEntry, AgentSessionSettings } from "@openbot/contracts/ipc";
 import {
   type AccountUsage,
   type AgentEvent,
   type AgentMemory,
   type AgentMemoryLimitPreference,
+  type AgentMemorySelection,
+  type AgentMemorySelectionState,
   type AgentModelOption,
   type AgentProviderId,
   type AgentStatus,
@@ -375,6 +378,46 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     agents.map((agent) => [agent.id, { agentId: agent.id, deliveries: queueSeeds[agent.id] ?? [] }]),
   );
   const memories = new Map<string, AgentMemory[]>(Object.entries(clone(options.memories ?? {})));
+  const memorySelections = new Map<string, AgentMemorySelection>();
+  for (const entries of memories.values()) {
+    const selected: AgentMemory[] = [];
+    for (const entry of [...entries].sort((left, right) => {
+      if (left.origin !== right.origin) return left.origin === "manual" ? -1 : 1;
+      return left.updatedAt !== right.updatedAt
+        ? left.updatedAt > right.updatedAt
+          ? -1
+          : 1
+        : left.id < right.id
+          ? -1
+          : left.id > right.id
+            ? 1
+            : 0;
+    })) {
+      const inclusion =
+        essentialMemoryBytes([...selected, entry]) <= AGENT_MEMORY_CONTEXT_BUDGET_BYTES ? "essential" : "searchable";
+      if (inclusion === "essential") selected.push(entry);
+      memorySelections.set(entry.id, { memoryId: entry.id, inclusion, userControlled: false, revision: 0 });
+    }
+  }
+  function getMemorySelection(agentId: string): AgentMemorySelectionState {
+    const entries = memories.get(agentId) ?? [];
+    return {
+      selections: entries.map(
+        (entry) =>
+          memorySelections.get(entry.id) ?? {
+            memoryId: entry.id,
+            inclusion: "searchable",
+            userControlled: false,
+            revision: 0,
+          },
+      ),
+      usedBytes: essentialMemoryBytes(
+        entries.filter((entry) => memorySelections.get(entry.id)?.inclusion === "essential"),
+      ),
+      budgetBytes: AGENT_MEMORY_CONTEXT_BUDGET_BYTES,
+    };
+  }
+
   let tables: SharedTable[] = clone(options.tables ?? STORY_SHARED_TABLES);
   const routines = new Map<string, Routine[]>(Object.entries(clone(options.routines ?? {})));
   const routineRuns = new Map<string, RoutineRun[]>();
@@ -1298,12 +1341,12 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         };
         memories.set(
           agent.id,
-          (memories.get(agentId) ?? []).map((memory) => ({
-            ...memory,
-            id: crypto.randomUUID(),
-            agentId: agent.id,
-            sourceTurnId: null,
-          })),
+          (memories.get(agentId) ?? []).map((memory) => {
+            const id = crypto.randomUUID();
+            const selection = memorySelections.get(memory.id);
+            if (selection) memorySelections.set(id, { ...selection, memoryId: id });
+            return { ...memory, id, agentId: agent.id, sourceTurnId: null };
+          }),
         );
         routines.set(
           agent.id,
@@ -1385,6 +1428,28 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         }
         emitAgentEvent({ type: "agents-changed", agents });
       },
+      getMemorySelection: async (agentId) => clone(getMemorySelection(agentId)),
+      setMemoryInclusion: async ({ agentId, changes }) => {
+        const state = getMemorySelection(agentId);
+        const next = state.selections.map((selection) => ({ ...selection }));
+        for (const change of changes) {
+          const selection = next.find((entry) => entry.memoryId === change.memoryId);
+          if (!selection || selection.revision !== change.expectedRevision)
+            throw new Error(sourceText("error.backend.memorySelectionConflict"));
+          if (change.inclusion !== "automatic") selection.inclusion = change.inclusion;
+          selection.userControlled = change.inclusion !== "automatic";
+          selection.revision += 1;
+        }
+        const ids = new Set(next.filter((entry) => entry.inclusion === "essential").map((entry) => entry.memoryId));
+        if (
+          essentialMemoryBytes((memories.get(agentId) ?? []).filter((entry) => ids.has(entry.id))) >
+          AGENT_MEMORY_CONTEXT_BUDGET_BYTES
+        )
+          throw new Error(sourceText("error.backend.memoryEssentialBudget"));
+        for (const selection of next) memorySelections.set(selection.memoryId, selection);
+        emitAgentEvent({ type: "memories-changed", agentId });
+        return clone(getMemorySelection(agentId));
+      },
       listMemories: async (agentId) => clone(memories.get(agentId) ?? []),
       createMemory: async (input) => {
         const now = new Date().toISOString();
@@ -1398,6 +1463,12 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           updatedAt: now,
         };
         memories.set(input.agentId, [...(memories.get(input.agentId) ?? []), memory]);
+        memorySelections.set(memory.id, {
+          memoryId: memory.id,
+          inclusion: "searchable",
+          userControlled: false,
+          revision: 0,
+        });
         emitAgentEvent({ type: "memories-changed", agentId: input.agentId });
         return clone(memory);
       },
@@ -1405,6 +1476,13 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         const current = memories.get(input.agentId)?.find((memory) => memory.id === input.memoryId);
         if (!current) throw new Error("Memory not found");
         const updated = { ...current, text: input.text.trim(), updatedAt: new Date().toISOString() };
+        const selected = (memories.get(input.agentId) ?? [])
+          .filter((entry) => memorySelections.get(entry.id)?.inclusion === "essential")
+          .map((entry) => (entry.id === input.memoryId ? updated : entry));
+        if (essentialMemoryBytes(selected) > AGENT_MEMORY_CONTEXT_BUDGET_BYTES)
+          throw new Error(sourceText("error.backend.memoryEssentialBudget"));
+        const selection = memorySelections.get(input.memoryId);
+        if (selection) memorySelections.set(input.memoryId, { ...selection, revision: selection.revision + 1 });
         memories.set(
           input.agentId,
           (memories.get(input.agentId) ?? []).map((memory) => (memory.id === input.memoryId ? updated : memory)),
@@ -1413,6 +1491,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         return clone(updated);
       },
       deleteMemory: async (input) => {
+        memorySelections.delete(input.memoryId);
         memories.set(
           input.agentId,
           (memories.get(input.agentId) ?? []).filter((memory) => memory.id !== input.memoryId),
@@ -1420,6 +1499,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         emitAgentEvent({ type: "memories-changed", agentId: input.agentId });
       },
       clearMemories: async (agentId) => {
+        for (const entry of memories.get(agentId) ?? []) memorySelections.delete(entry.id);
         memories.delete(agentId);
         emitAgentEvent({ type: "memories-changed", agentId });
       },
