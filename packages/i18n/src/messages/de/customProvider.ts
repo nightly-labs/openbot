@@ -2,6 +2,16 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/customProvider";
 
 export const messages = {
+  "customProvider.registry.title": "ACP-Registry",
+  "customProvider.registry.description":
+    "Installiere Agenten auf diesem Host. „Laufzeit entfernen“ behält Agenteneinstellungen, Zugangsdaten und Unterhaltungen.",
+  "customProvider.registry.search": "Registry durchsuchen",
+  "customProvider.registry.empty": "Keine Agenten entsprechen dieser Suche.",
+  "customProvider.registry.agentId": "ID des benutzerdefinierten Agenten",
+  "customProvider.registry.install": "Installieren",
+  "customProvider.registry.update": "Aktualisieren",
+  "customProvider.registry.remove": "Laufzeit entfernen",
+  "customProvider.registry.failed": "Der Registry-Vorgang ist fehlgeschlagen.",
   "customProvider.error.providerIdRequired": "Gib eine Anbieter-ID ein.",
   "customProvider.error.providerIdPattern":
     "Verwende Kleinbuchstaben, Zahlen, Bindestriche oder Unterstriche. Beginne mit einem Buchstaben oder einer Zahl.",

@@ -255,6 +255,8 @@ export const messages = {
   "routine.settings.instruction": "Anweisung",
   "routine.settings.instructionPlaceholderAgent": "Beschreibe, was dieser Agent tun soll.",
   "routine.settings.instructionPlaceholderChannel": "Beschreibe, was dieser Kanal tun soll.",
+  "routine.settings.instructionNoUpdateHint":
+    "Damit der Agent still bleibt, wenn es nichts zu berichten gibt, bitte ihn, mit [[no-update]] zu antworten.",
   "routine.settings.limitPolicy": "Wenn die Kontogrenze erreicht ist",
   "routine.settings.limitPolicy.wait": "Warten und nach dem Zurücksetzen ausführen",
   "routine.settings.limitPolicy.skip": "Diese Ausführung überspringen",

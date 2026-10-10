@@ -19,6 +19,7 @@ import { type DynamicRecord, isDynamicRecord, isNumber, isOneOf, isString } from
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Deferred, Effect, Exit, Fiber, Scope } from "effect";
+import { isMemoryContextBlock, type MemoryContext, memoryContextUpdate } from "./agent/developer-instructions";
 import {
   type ClaudePlanState,
   foldClaudePlanCall,
@@ -243,6 +244,13 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   readonly #serverRequests = new PendingServerRequests((request) => this.emit("request", request));
   readonly #modelEffortCapabilities = new Map<string, ClaudeEffortCapability>();
   readonly #modelSdkValues = new Map<string, string>();
+  /**
+   * Each thread's essential memories: the latest that OpenBot gave, and the last that a turn sent.
+   * They go with the turns, not in the system prompt, so a memory change keeps the cached prefix
+   * and restarts no query. Kept by thread, not by query: a restarted or reopened query resumes a
+   * conversation that already holds the memories it was sent.
+   */
+  readonly #memoryContexts = new Map<string, { current: MemoryContext; delivered: MemoryContext | null }>();
   /** Resumes of one thread run one after another: two at once would leave a query nobody closes. */
   readonly #threadResumes = new Map<string, Deferred.Deferred<void, ProviderClientOperationError>>();
   #running = false;
@@ -331,6 +339,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     threadId: string,
   ): Effect.fn.Return<void, ProviderClientOperationError> {
     this.#threads.forget(threadId);
+    this.#memoryContexts.delete(threadId);
     const runtime = this.#threads.get(threadId);
     if (!runtime) return;
     yield* this.#threads.close(runtime).pipe(toProviderClientOperationError);
@@ -376,11 +385,13 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       case "thread/start": {
         const threadId = randomUUID();
         yield* this.#startThread(threadId, readThreadConfig(params), false);
+        this.#setMemoryContext(threadId, params);
         return yield* providerSync(() => decoder({ thread: { id: threadId } }));
       }
       case "thread/resume": {
         const threadId = yield* providerSync(() => requiredString(params, "threadId"));
         const config = readThreadConfig(params);
+        this.#setMemoryContext(threadId, params);
         const previous = this.#threadResumes.get(threadId);
         const completion = Deferred.makeUnsafe<void, ProviderClientOperationError>();
         this.#threadResumes.set(threadId, completion);
@@ -600,6 +611,14 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       return yield* providerFailure(new RequestTimeoutError("Claude", "account/read"));
     return yield* providerFailure(failure ?? new Error("Claude returned an unreadable sign-in status."));
   });
+
+  #setMemoryContext(threadId: string, params: unknown): void {
+    const current = readMemoryContext(params);
+    if (!current) return;
+    const memory = this.#memoryContexts.get(threadId);
+    if (memory) memory.current = current;
+    else this.#memoryContexts.set(threadId, { current, delivered: null });
+  }
 
   readonly #resumeThread = Effect.fn("ClaudeAgentClient.resumeThread")(function* (
     this: ClaudeAgentClient,
@@ -838,13 +857,28 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       method: "turn/started",
       params: { threadId, turn: { id: turnId, status: "inProgress" } },
     });
+    // A block of its own, so that history readers can tell it from the text of the turn. A slash
+    // command gets none: the CLI can drop the blocks before it, and `/clear` empties the context,
+    // so the next turn sends the full block.
+    const memory = this.#memoryContexts.get(threadId);
+    const command = text.startsWith("/");
+    const memoryText = memory && !command ? memoryContextUpdate(memory.delivered, memory.current) : null;
     runtime.input.push({
       type: "user",
-      message: { role: "user", content: text },
+      message: {
+        role: "user",
+        content: memoryText
+          ? [
+              { type: "text", text: memoryText },
+              { type: "text", text },
+            ]
+          : text,
+      },
       parent_tool_use_id: null,
       uuid: turnId,
       session_id: threadId,
     });
+    if (memory) memory.delivered = command ? null : memory.current;
     return { turn: { id: turnId, status: "inProgress" } };
   });
 
@@ -933,6 +967,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     }
     if (message.type === "system" && message.subtype === "compact_boundary") {
       runtime.compacting = false;
+      // The summary can leave the memory blocks out, so the next turn sends the full block again.
+      const memory = this.#memoryContexts.get(runtime.id);
+      if (memory) memory.delivered = null;
       // Claude's post_tokens counts messages only, not the full context.
       this.emit("notification", {
         method: "openbot/context-compaction",
@@ -1697,6 +1734,20 @@ function readThreadConfig(params: unknown): ThreadConfig {
   };
 }
 
+function readMemoryContext(params: unknown): MemoryContext | null {
+  const context = isRecord(params) ? params.memoryContext : undefined;
+  if (!isRecord(context) || !Array.isArray(context.memories)) return null;
+  if (!isNumber(context.storedCount) || !isNumber(context.limit)) return null;
+  const memories = context.memories.filter(
+    (memory): memory is MemoryContext["memories"][number] =>
+      isRecord(memory) &&
+      isString(memory.id) &&
+      isString(memory.text) &&
+      isOneOf(["automatic", "manual"] as const, memory.origin),
+  );
+  return { memories, storedCount: context.storedCount, limit: context.limit };
+}
+
 function parseAuthStatus(stdout: unknown): DynamicRecord | null {
   if (!isString(stdout)) return null;
   try {
@@ -1722,7 +1773,13 @@ function messageText(message: unknown): string {
   if (!Array.isArray(message.content)) return "";
   return message.content
     .filter(isRecord)
-    .filter((block) => block.type === "text" && isString(block.text))
+    .filter(
+      (block) =>
+        block.type === "text" &&
+        isString(block.text) &&
+        // OpenBot's memory block is not text that the user wrote.
+        !(message.role === "user" && isMemoryContextBlock(block.text)),
+    )
     .map((block) => block.text)
     .join("\n");
 }

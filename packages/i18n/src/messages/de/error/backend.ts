@@ -70,6 +70,13 @@ export const messages = {
   "error.backend.channelAssigneeUnavailable": "Der zugewiesene Agent ist nicht verfügbar.",
   "error.backend.channelAssignmentChanged": "Dieser Kanalauftrag wurde geändert.",
   "error.backend.channelMemberRequired": "Wähle ein verfügbares Mitglied dieses Kanals.",
+  "error.backend.memoryEssentialBudget":
+    "Die wesentlichen Erinnerungen überschreiten das Prompt-Limit. Stelle einen Eintrag auf „Bei Bedarf suchen“ und versuche es erneut.",
+  "error.backend.memorySelectionConflict": "Die Erinnerung hat sich geändert. Lade sie neu und versuche es erneut.",
+  "error.backend.memorySelectionUserControlled":
+    "Der Nutzer steuert diese Auswahl der Erinnerung. Behalte die Wahl des Nutzers bei.",
+  "error.backend.memorySearchQuery": "Gib ein oder mehrere Suchwörter mit bis zu 256 Zeichen ein.",
+  "error.backend.memoryOperationFailed": "Der Vorgang für die Erinnerung ist fehlgeschlagen. Versuche es erneut.",
   "error.backend.memoryGone": "Diese Erinnerung existiert nicht mehr.",
   "error.backend.routineGone": "Diese Routine existiert nicht mehr.",
   "error.backend.channelMemoryLimit": "Ein Kanal kann bis zu {limit} Erinnerungen haben.",
@@ -225,6 +232,8 @@ export const messages = {
   "error.backend.useChannelTaskControlsWork": "Verwende für Kanalarbeit die Aufgabensteuerung des Kanals.",
   "error.backend.steerTurnChanged":
     "Der aktive Durchlauf wurde geändert, bevor diese Nachricht eingesteuert werden konnte.",
+  "error.backend.steerUnsupported":
+    "Dieser Anbieter kann einen laufenden Durchgang nicht steuern. Deine Nachricht bleibt in der Warteschlange.",
   "error.backend.steerQueuedOnly": "Nur Nachrichten in der Warteschlange können eingesteuert werden.",
   "error.backend.promptInactive": "Diese Rückfrage ist nicht mehr aktiv.",
   "error.backend.promptAnswerMismatch": "Eine Antwort passt zu keiner aktiven Frage.",

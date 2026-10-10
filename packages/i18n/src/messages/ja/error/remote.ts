@@ -167,7 +167,33 @@ export const messages = {
   "error.remote.signalFrameUnreadable": "Signal から、このピアが読み取れないフレームが送信されました。",
   "error.remote.webRtcCommandFailed": "WebRTC コマンドが失敗しました。",
   "error.remote.dataChannelFailed": "{kind} チャンネルが失敗しました。",
+  "error.remote.hostBusy": "ホストは別の接続を処理中です。しばらくしてからもう一度お試しください。",
+  "error.remote.signalPermissionDenied":
+    "あなたのアカウントにはこのホストへのアクセス権がありません。オーナーにアクセスを依頼してください。",
+  "error.remote.signalRateLimited": "接続の試行が多すぎます。OpenBot は {seconds} 秒後にもう一度試します。",
+  "error.remote.signalProtocolError":
+    "Signal とこのアプリの接続プロトコルが一致しません。OpenBot を更新してから、もう一度お試しください。",
+  "error.remote.signalRefused": "Signal が接続を拒否しました。",
+  "error.remote.signalClosed": "ホストが応答する前に Signal への接続が閉じました。",
+  "error.remote.relayUnavailable": "Signal はこの接続にリレーサーバーを送りませんでした。後でもう一度お試しください。",
+  "error.remote.iceFailed":
+    "ホストに直接接続できませんでした。ファイアウォール、VPN、プロキシが接続をブロックしている可能性があります。",
+  "error.remote.iceDisconnected": "ホストへの直接接続が切れました。",
+  "error.remote.directoryUnreachable": "OpenBot は OpenBot サービスに接続できませんでした。接続を確認してください。",
+  "error.remote.directoryTimeout": "OpenBot サービスが時間内に応答しませんでした。もう一度お試しください。",
+  "error.remote.inviteAlreadyUsed": "この招待はすでに使用されています。新しい招待を依頼してください。",
+  "error.remote.inviteNotFound": "この招待は存在しないか、期限が切れています。新しい招待を依頼してください。",
+  "error.remote.memberLimitReached":
+    "このホストはメンバーの上限に達しました。オーナーに空きを作るよう依頼してください。",
+  "error.remote.hostNotRegistered": "このホストは OpenBot サービスに登録されなくなりました。",
+  "error.remote.membershipEnded":
+    "あなたはこのホストのメンバーではなくなりました。オーナーに新しい招待を依頼してください。",
+  "error.remote.accountSessionInactive": "サインインが無効になりました。もう一度サインインしてください。",
+  "error.remote.hostOtherAccount": "このホストは別のアカウントのものです。",
+  "error.remote.remoteNotConfigured": "この OpenBot サービスではリモート接続が設定されていません。",
+  "error.remote.hostRefused": "ホストがリクエストを拒否しました ({status})。",
   "error.remote.formUnavailable": "このフォームは利用できなくなりました。",
+  "error.remote.hostedServerRemoval": "ホスト型サーバーを削除するには「お支払い」を使用してください。",
   "error.remote.channelsUnsupported": "チャンネルを使うには、このデスクトップサーバーを更新してください。",
   "error.remote.channelDeleteUnsupported": "チャンネルを削除するには、このデスクトップサーバーを更新してください。",
   "error.remote.attachmentUploadCancelled": "添付ファイルのアップロードをキャンセルしました。",

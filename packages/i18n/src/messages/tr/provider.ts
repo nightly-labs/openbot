@@ -29,6 +29,9 @@ export const messages = {
   "provider.status.unavailable": "Kullanılamıyor",
   "provider.status.checking": "Denetleniyor",
 
+  "provider.status.off": "Kapalı",
+  "provider.gemini.hostSignIn":
+    "Gemini'yi bağlamak için ana makinede OpenBot'u açın ve Ayarlar > Sağlayıcılar bölümünde Bağlan'ı seçin. Google ile oturum açmak için o ana makinede bir tarayıcı gerekir. Uzaktan oturum açma desteklenmez.",
   "provider.key.free": "Ücretsiz",
 
   "provider.action.connect": "Bağlan",
@@ -53,6 +56,11 @@ export const messages = {
   "provider.aria.signIn": "{name} giriş yap",
   "provider.aria.moreActions": "{name} için diğer eylemler",
 
+  "provider.aria.use": "OpenBot'ta {name} kullan",
+  "provider.use.inUse": {
+    one: "{agents}, {name} kullanıyor. Bu ajanın modelini değiştirin, ardından {name} sağlayıcısını kapatın.",
+    other: "{agents}, {name} kullanıyor. Bu ajanların modelini değiştirin, ardından {name} sağlayıcısını kapatın.",
+  },
   "provider.codeLogin.title": "Bir kod ile {name} hesabına giriş yapın",
   "provider.codeLogin.description": "Telefonunuzda veya başka bir tarayıcıda tamamlayın. OpenBot burada bekler.",
   "provider.codeLogin.starting": "{name} kaynağından bir kod alınıyor…",
@@ -106,6 +114,10 @@ export const messages = {
   "provider.effort.xhigh": "Ekstra yüksek",
   "provider.effort.max": "Maksimum",
 
+  "provider.museKey.title": "Muse için Meta API anahtarı",
+  "provider.museKey.description":
+    "Ana makineye bir Meta API anahtarı kaydedin veya oturum açmak için Muse CLI'yi kullanın.",
+  "provider.museKey.label": "Meta API anahtarı",
   "provider.openCodeKey.title": "OpenCode Go'ya giriş yapın",
   "provider.openCodeKey.description":
     "Ücretsiz modeller hesap gerektirmez. Bir anahtar, ücretli Go modellerinin kilidini açar.",

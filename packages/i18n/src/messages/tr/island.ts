@@ -36,6 +36,8 @@ export const messages = {
   "island.action.answerInOpenBot": "OpenBot'ta Yanıtla",
   "island.action.stopAgent": "Durdur: {name}",
   "island.action.failed": "Bu işlem başarısız oldu. Tekrar deneyin.",
+  "island.action.expand": "{label} ögesini genişlet",
+  "island.action.collapse": "{label} ögesini daralt",
   "island.failure.fallback": "Görev bitmeden durdu.",
   "island.failure.title": "Görev başarısız oldu",
   "island.failure.detail": "Görev bitmeden durdu. Tekrar denemek için konuşmayı açın.",

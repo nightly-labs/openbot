@@ -2,6 +2,14 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/agentSettings";
 
 export const messages = {
+  "agentSettings.session.title": "Sağlayıcı ayarları",
+  "agentSettings.session.readFailed": "Sağlayıcı ayarları okunamadı.",
+  "agentSettings.session.pending": "Kaydedilen değişiklikler sonraki turdan önce uygulanır.",
+  "agentSettings.session.unavailable":
+    "Kaydedilen {value} değeri kullanılamıyor. Başka bir değer seçin veya sıfırlayın.",
+  "agentSettings.session.effective": "Geçerli sağlayıcı değeri: {value}",
+  "agentSettings.session.reset": "Ayarı sıfırla",
+  "agentSettings.session.resetNamed": "{name} ayarını sıfırla",
   "agentSettings.label": "Ajan ayarları",
   "agentSettings.title": "Ayarlar",
   "agentSettings.backToDetails": "Ayrıntılara geri dön",

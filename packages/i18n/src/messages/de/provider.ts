@@ -37,6 +37,8 @@ export const messages = {
   "provider.status.unavailable": "Nicht verfügbar",
   "provider.status.checking": "Wird geprüft",
   "provider.status.off": "Aus",
+  "provider.gemini.hostSignIn":
+    "Um Gemini zu verbinden, öffne OpenBot auf dem Host und wähle „Verbinden“ unter Einstellungen > Anbieter. Die Google-Anmeldung benötigt einen Browser auf diesem Host. Eine Remote-Anmeldung wird nicht unterstützt.",
   "provider.key.free": "Kostenlos",
   "provider.action.connect": "Verbinden",
   "provider.action.reconnect": "Erneut verbinden",
@@ -116,6 +118,10 @@ export const messages = {
   "provider.effort.high": "Hoch",
   "provider.effort.xhigh": "Sehr hoch",
   "provider.effort.max": "Maximal",
+  "provider.museKey.title": "Meta-API-Schlüssel für Muse",
+  "provider.museKey.description":
+    "Speichere einen Meta-API-Schlüssel auf dem Host oder melde dich mit der Muse CLI an.",
+  "provider.museKey.label": "Meta-API-Schlüssel",
   "provider.openCodeKey.title": "Bei OpenCode Go anmelden",
   "provider.openCodeKey.description":
     "Kostenlose Modelle benötigen kein Konto. Ein Schlüssel schaltet die kostenpflichtigen Go-Modelle frei.",

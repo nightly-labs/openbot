@@ -37,6 +37,8 @@ export const messages = {
   "island.action.answerInOpenBot": "Répondre dans OpenBot",
   "island.action.stopAgent": "Arrêter {name}",
   "island.action.failed": "Cela n’a pas fonctionné. Réessayez.",
+  "island.action.expand": "Développer {label}",
+  "island.action.collapse": "Réduire {label}",
   "island.failure.fallback": "La tâche s’est arrêtée avant la fin.",
   "island.failure.title": "Échec de la tâche",
   "island.failure.detail": "La tâche s’est arrêtée avant la fin. Ouvrez la conversation pour réessayer.",

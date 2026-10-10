@@ -793,8 +793,109 @@ fi
     await runCauseEffect(client.stop());
   });
 
-  it("restarts an inactive session when resumed with updated memory instructions", async () => {
+  it("sends changed memories with the next turn and keeps the query and its system prompt", async () => {
     root = await mkdtemp(join(tmpdir(), "openbot-claude-memory-resume-"));
+    // Long enough that the change alone is shorter than the full block.
+    const saved = ["release", "deploy", "review"].map((topic) => ({
+      id: `memory-${topic}`,
+      text: `The ${topic} steps are written in the team handbook. `.repeat(8),
+      origin: "manual",
+    }));
+    const instructions: string[] = [];
+    const snapshots: unknown[] = [];
+    const output = new TestQueue<TestStreamMessage>();
+    const prompts: AsyncIterable<SDKUserMessage>[] = [];
+    const client = new ClaudeAgentClient({ executable: "/bin/true", version: "2.1.280" }, (params) => {
+      if (!isString(params.prompt)) prompts.push(params.prompt);
+      const options: DynamicRecord | null = isDynamicRecord(params.options) ? params.options : null;
+      const systemPrompt = options?.systemPrompt;
+      if (isDynamicRecord(systemPrompt) && isString(systemPrompt.append)) instructions.push(systemPrompt.append);
+      snapshots.push(options?.extraArgs);
+      return new TestQuery(output);
+    });
+    const notifications: Array<{ method: string; params: unknown }> = [];
+    client.on("notification", (notification) => notifications.push(notification));
+    client.start();
+    const config = {
+      cwd: root,
+      model: "claude-sonnet-5",
+      developerInstructions: "Be concise.",
+      memoryContext: { memories: saved, storedCount: 3, limit: 5 },
+      runtimeWorkspaceRoots: [root],
+    };
+    const thread = await runCauseEffect(client.request("thread/start", config, decodeThreadResponse));
+    const threadId = thread.thread.id;
+    const turns = prompts[0]?.[Symbol.asyncIterator]();
+    if (!turns) throw new Error("The Claude query received no prompt stream.");
+    const runTurn = async (turnId: string) => {
+      await startTurn(client, threadId, turnId);
+      const { value } = await turns.next();
+      output.push({
+        type: "result",
+        subtype: "success",
+        result: "Done",
+        errors: [],
+        terminal_reason: "completed",
+        session_id: threadId,
+        uuid: `${turnId}-result`,
+      });
+      await vi.waitFor(() =>
+        expect(
+          notifications.some(
+            (event) =>
+              event.method === "turn/completed" &&
+              isDynamicRecord(event.params) &&
+              isDynamicRecord(event.params.turn) &&
+              event.params.turn.id === turnId,
+          ),
+        ).toBe(true),
+      );
+      return value?.message.content;
+    };
+
+    expect(await runTurn("11111111-1111-4111-8111-111111111111")).toEqual([
+      {
+        type: "text",
+        text: expect.stringMatching(/^<openbot_saved_memories>\n[\s\S]*memory-review[\s\S]*You have 3 saved memories/),
+      },
+      { type: "text", text: "Hello" },
+    ]);
+    const memory = { id: "memory-1", text: "Uses metric units.", origin: "manual" };
+    await runCauseEffect(
+      client.request(
+        "thread/resume",
+        { ...config, threadId, memoryContext: { memories: [...saved.slice(1), memory], storedCount: 4, limit: 5 } },
+        decodeThreadResponse,
+      ),
+    );
+    expect(await runTurn("22222222-2222-4222-8222-222222222222")).toEqual([
+      {
+        type: "text",
+        text: expect.stringMatching(
+          /^<openbot_saved_memories_update>\n[\s\S]*Uses metric units\.[\s\S]*\["memory-release"\]\nYou have 4 saved memories/,
+        ),
+      },
+      { type: "text", text: "Hello" },
+    ]);
+    expect(await runTurn("33333333-3333-4333-8333-333333333333")).toBe("Hello");
+    // A compaction summary can drop the memory blocks, so the agent gets all of them again.
+    output.push({ type: "system", subtype: "compact_boundary", compact_metadata: { pre_tokens: 1, post_tokens: 1 } });
+    await vi.waitFor(() =>
+      expect(notifications.some((event) => event.method === "openbot/context-compaction")).toBe(true),
+    );
+    expect(await runTurn("44444444-4444-4444-8444-444444444444")).toEqual([
+      { type: "text", text: expect.stringMatching(/^<openbot_saved_memories>\n[\s\S]*Uses metric units\./) },
+      { type: "text", text: "Hello" },
+    ]);
+
+    // One query, one system prompt: a memory change must not change the cached prefix.
+    expect(instructions).toEqual(["Be concise."]);
+    expect(snapshots).toEqual([{ "system-prompt-snapshot": "off" }]);
+    await runCauseEffect(client.stop());
+  });
+
+  it("restarts an inactive session when resumed with an updated profile", async () => {
+    root = await mkdtemp(join(tmpdir(), "openbot-claude-profile-resume-"));
     const instructions: string[] = [];
     const snapshots: unknown[] = [];
     const client = new ClaudeAgentClient({ executable: "/bin/true", version: "2.1.280" }, (params) => {
@@ -808,26 +909,19 @@ fi
     const config = {
       cwd: root,
       model: "claude-sonnet-5",
-      developerInstructions: "<agent_memories>[]</agent_memories>",
+      developerInstructions: "<agent_profile>Writer</agent_profile>",
       runtimeWorkspaceRoots: [root],
     };
     const thread = await runCauseEffect(client.request("thread/start", config, decodeThreadResponse));
     await runCauseEffect(
       client.request(
         "thread/resume",
-        {
-          ...config,
-          threadId: thread.thread.id,
-          developerInstructions: '<agent_memories>[{"text":"Uses metric units."}]</agent_memories>',
-        },
+        { ...config, threadId: thread.thread.id, developerInstructions: "<agent_profile>Editor</agent_profile>" },
         decodeThreadResponse,
       ),
     );
 
-    expect(instructions).toEqual([
-      "<agent_memories>[]</agent_memories>",
-      '<agent_memories>[{"text":"Uses metric units."}]</agent_memories>',
-    ]);
+    expect(instructions).toEqual(["<agent_profile>Writer</agent_profile>", "<agent_profile>Editor</agent_profile>"]);
     // A CLI that records the first prompt would send it again on resume and drop the new text.
     const off = { "system-prompt-snapshot": "off" };
     expect(snapshots).toEqual([off, off]);

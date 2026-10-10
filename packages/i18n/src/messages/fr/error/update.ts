@@ -22,6 +22,11 @@ export const messages = {
     "Sur ce Mac, l’hôte installe les mises à jour. La mise à jour reste prête jusqu’à la maintenance de l’hôte.",
   "error.update.siblingSession":
     "Une autre session OpenBot utilise encore cette application. Quittez d’abord OpenBot dans tous les autres comptes utilisateur macOS, puis installez de nouveau la mise à jour.",
+  "error.update.siblingSessionSameAccount":
+    "Un autre processus OpenBot est toujours en cours d’exécution dans ce compte utilisateur. Quittez-le, puis installez à nouveau la mise à jour.",
   "error.update.siblingCheckFailed":
     "Impossible de vérifier les autres sessions OpenBot. Réessayez avant l’installation.",
+  "error.update.remoteDisabled": "Les mises à jour des administrateurs du serveur sont désactivées sur cet ordinateur.",
+  "error.update.restartStarted": "OpenBot redémarre déjà pour installer la mise à jour.",
+  "error.update.alreadyRestarting": "OpenBot redémarre déjà.",
 } as const satisfies PartialTranslation<typeof source>;

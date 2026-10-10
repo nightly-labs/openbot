@@ -43,7 +43,7 @@ import { readCodexMcpConfig } from "./codex-mcp-config";
 import type { ContextCompaction } from "./context-compaction";
 import type { ConversationRuntime } from "./conversation-runtime";
 import { agentNamesById } from "./delivery-content";
-import { developerInstructions } from "./developer-instructions";
+import { developerInstructions, memoryContext } from "./developer-instructions";
 import { readHandoffHistory, renderProviderHandoff } from "./handoff-history";
 import { decodeCapturedSteps, readCapturedSteps } from "./handoff-tool-steps";
 import { sessionSettingsIdentity } from "./session-settings";
@@ -413,7 +413,7 @@ export class ThreadLifecycle {
           sandbox: codexSandboxMode(agent),
           ...this.#workspaceOnlyParam(agent, client),
           ...this.#computerUseParam(agent, client),
-          developerInstructions: this.#instructions(agent),
+          ...this.#instructions(agent, client),
           ephemeral: false,
           serviceName: "openbot",
           dynamicTools: VISIBLE_DYNAMIC_TOOLS,
@@ -717,19 +717,28 @@ export class ThreadLifecycle {
     return stored.success === fingerprint;
   });
 
-  /** The developer instructions of a session start or resume, with what is connected now. */
-  #instructions(agent: AgentSummary): string {
-    return developerInstructions(
+  /**
+   * The developer instructions of a session start or resume, with what is connected now. Claude
+   * gets the memories apart, and its client sends them with the turns: see `memoriesInTurns`.
+   */
+  #instructions(agent: AgentSummary, client: AgentClient): DynamicRecord {
+    const memories = this.#memories.essentialFor(agent.id);
+    const options = {
+      passwordVault: this.#passwordVaultConnected(),
+      memoryLimit: this.#memories.limit(),
+      storedMemoryCount: this.#memories.listFor(agent.id).length,
+      memoriesInTurns: client.provider === "claude",
+    };
+    const instructions = developerInstructions(
       agent,
       this.#store.sharedRoot,
-      this.#memories.essentialFor(agent.id),
+      memories,
       this.#store.automationRoot,
-      {
-        passwordVault: this.#passwordVaultConnected(),
-        memoryLimit: this.#memories.limit(),
-        storedMemoryCount: this.#memories.listFor(agent.id).length,
-      },
+      options,
     );
+    return options.memoriesInTurns
+      ? { developerInstructions: instructions, memoryContext: memoryContext(memories, options) }
+      : { developerInstructions: instructions };
   }
 
   /**
@@ -756,7 +765,7 @@ export class ThreadLifecycle {
       sandbox: codexSandboxMode(agent),
       ...this.#workspaceOnlyParam(agent, client),
       ...this.#computerUseParam(agent, client),
-      developerInstructions: this.#instructions(agent),
+      ...this.#instructions(agent, client),
       ...(client.provider === "codex" ? {} : { dynamicTools: VISIBLE_DYNAMIC_TOOLS }),
       ...(yield* this.codexConfigEffect(
         agent,

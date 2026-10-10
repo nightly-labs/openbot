@@ -27,6 +27,14 @@ export const messages = {
   "error.remote.localTestListenerUnavailable": "Yerel test dinleyicisi kullanılamıyor.",
   "error.remote.localTestNotFound": "Yerel test oturumu bulunamadı.",
   "error.remote.runtimeUnavailable": "Uzak masaüstü çalışma zamanı kullanılamıyor.",
+  "error.remote.sunshineStartFailed":
+    "Sunshine ana makinede başlamadı. Ana makinedeki uzak masaüstü günlüklerini kontrol edin, ardından tekrar deneyin.",
+  "error.remote.moonlightStartFailed":
+    "Moonlight Web ana makinede başlamadı. Ana makinedeki uzak masaüstü günlüklerini kontrol edin, ardından tekrar deneyin.",
+  "error.remote.pairingFailed":
+    "Moonlight, ana makinedeki Sunshine ile eşleşemedi. Tekrar deneyin. Sorun devam ederse ana makinede OpenBot'u yeniden başlatın.",
+  "error.remote.runtimeStartFailed":
+    "Uzak masaüstü çalışma zamanı ana makinede başlamadı. Ana makinedeki uzak masaüstü günlüklerini kontrol edin, ardından tekrar deneyin.",
   "error.remote.hostUnreachable": "Ana makineye ulaşılamıyor.",
   "error.remote.signInToHostAgain": "Bu ana makinede tekrar oturum açın.",
   "error.remote.invalidData": "Ana makine geçersiz veri döndürdü.",
@@ -158,8 +166,31 @@ export const messages = {
   "error.remote.signalFrameUnreadable": "Sinyal bu eşin okuyamayacağı bir çerçeve gönderdi.",
   "error.remote.webRtcCommandFailed": "WebRTC komutu başarısız oldu.",
   "error.remote.dataChannelFailed": "{kind} kanalı başarısız oldu.",
+  "error.remote.hostBusy": "Ana makine başka bir bağlantıyla meşgul. Biraz sonra tekrar deneyin.",
+  "error.remote.signalPermissionDenied": "Hesabınızın bu ana makineye erişimi yok. Sahibinden erişim isteyin.",
+  "error.remote.signalRateLimited": "Çok fazla bağlantı denemesi. OpenBot {seconds} saniye içinde tekrar deneyecek.",
+  "error.remote.signalProtocolError":
+    "Signal ve bu uygulama bağlantı protokolünde uyuşmuyor. OpenBot'u güncelleyin, ardından tekrar deneyin.",
+  "error.remote.signalRefused": "Signal bağlantıyı reddetti.",
+  "error.remote.signalClosed": "Signal ile bağlantı, ana makine yanıt vermeden kapandı.",
+  "error.remote.relayUnavailable": "Signal bu bağlantı için aktarma sunucusu göndermedi. Daha sonra tekrar deneyin.",
+  "error.remote.iceFailed":
+    "Ana makineyle doğrudan bağlantı kurulamadı. Bir güvenlik duvarı, VPN veya proxy bunu engelleyebilir.",
+  "error.remote.iceDisconnected": "Ana makineyle doğrudan bağlantı kesildi.",
+  "error.remote.directoryUnreachable": "OpenBot, OpenBot hizmetine ulaşamadı. Bağlantınızı kontrol edin.",
+  "error.remote.directoryTimeout": "OpenBot hizmeti zamanında yanıt vermedi. Tekrar deneyin.",
+  "error.remote.inviteAlreadyUsed": "Bu davet zaten kullanıldı. Yeni bir davet isteyin.",
+  "error.remote.inviteNotFound": "Bu davet yok veya süresi doldu. Yeni bir davet isteyin.",
+  "error.remote.memberLimitReached": "Bu ana makine üye sınırına ulaştı. Sahibinden yer açmasını isteyin.",
+  "error.remote.hostNotRegistered": "Bu ana makine artık OpenBot hizmetine kayıtlı değil.",
+  "error.remote.membershipEnded": "Artık bu ana makinenin üyesi değilsiniz. Sahibinden yeni bir davet isteyin.",
+  "error.remote.accountSessionInactive": "Oturumunuz artık etkin değil. Tekrar giriş yapın.",
+  "error.remote.hostOtherAccount": "Bu ana makine başka bir hesaba ait.",
+  "error.remote.remoteNotConfigured": "Bu OpenBot hizmetinde uzak bağlantılar ayarlanmamış.",
+  "error.remote.hostRefused": "Ana makine isteği reddetti ({status}).",
   // Channel actions on mobile.
   "error.remote.formUnavailable": "Bu form artık kullanılamıyor.",
+  "error.remote.hostedServerRemoval": "Barındırılan bir sunucuyu silmek için Faturalandırma'yı kullanın.",
   "error.remote.channelsUnsupported": "Kanalları kullanmak için bu masaüstü sunucusunu güncelleyin.",
   "error.remote.channelDeleteUnsupported": "Kanalları silmek için bu masaüstü sunucusunu güncelleyin.",
   "error.remote.attachmentUploadCancelled": "Ek yükleme iptal edildi.",

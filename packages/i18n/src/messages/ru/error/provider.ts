@@ -2,6 +2,8 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/provider";
 
 export const messages = {
+  "error.provider.mcpConfig":
+    "OpenBot не удалось зарегистрировать серверы MCP в конфигурации Codex. Проверьте, что файл config.toml Codex корректен и доступен для записи, затем перезапустите OpenBot.",
   "error.provider.computerUseConfig":
     "OpenBot не смог зарегистрировать управление компьютером в конфигурации Codex. Убедитесь, что ваш config.toml для Codex корректен и доступен для записи, затем перезапустите OpenBot. Чтобы продолжить без него, отключите управление компьютером в настройках помощника.",
   "error.provider.endpointsReadOnly":
@@ -219,6 +221,8 @@ export const messages = {
   "error.provider.grokSignIn": "Выполните `grok login` или задайте XAI_API_KEY, чтобы использовать Grok.",
   "error.provider.acpSignInTimedOut": "Время входа истекло.",
   "error.provider.acpSignInStopped": "Вход прервался, не завершившись.",
+  "error.provider.geminiBrowserUnavailable":
+    "Gemini не удалось открыть страницу входа. Установите браузер и xdg-utils, затем подключитесь из сеанса рабочего стола на этом хосте. Сервер без рабочего стола не может завершить этот вход.",
   "error.provider.acpSignInFailed": "Вход не завершён.",
   "error.provider.messageTooLarge": "OpenBot остановил {provider}, потому что он отправил сообщение больше {limit} МБ.",
   "error.provider.customAgentIdInvalid":
@@ -254,4 +258,68 @@ export const messages = {
   "error.provider.useSettingsReadOnly":
     "Не удаётся прочитать сохранённые настройки провайдеров. Обновите OpenBot, прежде чем их менять.",
   "error.provider.useChangeFailed": "OpenBot не удалось изменить настройку провайдера.",
+  "error.provider.sessionSettingUnavailable": "Этот параметр недоступен в текущей сессии провайдера.",
+  "error.provider.sessionSettingInvalid": "Это значение недоступно для параметра.",
+  "error.provider.sessionSettingsBusy": "Дождитесь окончания текущего хода, прежде чем менять параметр сессии.",
+  "error.provider.piOutdated":
+    "Pi {version} слишком старый. Установите Pi 1.1.0 или новее для поддержки нативного RPC и MCP.",
+  "error.provider.nativeMissing": "CLI {provider} не установлен. Скачайте его в настройках.",
+  "error.provider.nativeNotStarted": "Не удалось запустить CLI {provider}.",
+  "error.provider.nativeVersionUnreadable": "Не удалось прочитать версию CLI {provider}.",
+  "error.provider.piSessionBusy": "Дождитесь окончания текущего хода Pi.",
+  "error.provider.piStopped": "Pi не запущен. Подключите Pi и повторите попытку.",
+  "error.provider.piSessionMissing": "Файл сессии Pi недоступен на этом компьютере.",
+  "error.provider.piResumeCancelled": "Pi отменил возобновление сессии. Повторите попытку.",
+  "error.provider.piSessionIdentity": "Pi вернул другую сессию. Сохранённая сессия не заменена.",
+  "error.provider.piModelInvalid": "Выберите модель Pi с указанием её провайдера.",
+  "error.provider.piToolInvalid": "Инструмент вернул некорректный результат.",
+  "error.provider.piSignIn": "Выполните /login в Pi на компьютере-хосте. Закройте Pi, когда вход завершится.",
+  "error.provider.museBusy": "Сессия Muse занята.",
+  "error.provider.museStopped": "Клиент Muse не запущен.",
+  "error.provider.museUnexpectedProvider": "Muse вернул неожиданного провайдера модели.",
+  "error.provider.museNoActiveTurn": "У Muse нет активного хода, который можно направить.",
+  "error.provider.museInvalidProtocol": "Muse вернул некорректный ответ протокола.",
+  "error.provider.museNotStarted": "Muse не запустился.",
+  "error.provider.museNativeWindows": "В Windows для Muse нужен нативный исполняемый файл.",
+  "error.provider.museStartTimeout": "Истекло время инициализации Muse.",
+  "error.provider.museStartStopped": "Muse остановился во время инициализации.",
+  "error.provider.museProtocolVersion": "Неподдерживаемая версия протокола Muse.",
+  "error.provider.museHistoryRequired": "Muse должен сохранять историю сессии.",
+  "error.provider.museRequestUnsupported": "Неподдерживаемый запрос сервера Muse.",
+  "error.provider.museConnectionFailed":
+    "Не удалось подключиться к Muse. Возобновите диалог, чтобы восстановить его сохранённую историю.",
+  "error.provider.museUnknownSession": "Неизвестная сессия Muse.",
+  "error.provider.museInvalidToolResult": "Некорректный результат инструмента OpenBot.",
+  "error.provider.museMcpRequired": "Muse должен поддерживать серверы MCP для сессии.",
+  "error.provider.museSessionMismatch": "Muse вернул другую сессию.",
+  "error.provider.museCompactRejected": "Muse не принял сжатие контекста.",
+  "error.provider.museTurnMismatch": "Muse вернул другой ход.",
+  "error.provider.museHistoryMismatch": "История Muse смешала разные сессии.",
+  "error.provider.museRecoveryFailed": "Muse не удалось восстановить пропущенные события.",
+  "error.provider.museHistoryStalled": "Курсор истории Muse не продвинулся.",
+  "error.provider.museApprovalUnavailable": "Muse не предложил такой ответ на подтверждение.",
+  "error.provider.museHistoryOwner": "История Muse принадлежит другой сессии.",
+  "error.provider.museHistoryMissing": "Muse не вернул историю сессии.",
+  "error.provider.museEmptyInput": "Muse нужен текст или изображение.",
+  "error.provider.museMethodUnsupported": "Muse не поддерживает {method}.",
+  "error.provider.museTurnFailed": "Ход Muse не удался.",
+  "error.provider.museProfileUnsupported":
+    "Muse не может создать профиль без доступа к внешним инструментам. Создайте профиль с другим провайдером, затем выберите Muse для агента.",
+  "error.provider.museAuthUnverified":
+    "Аутентификация Muse не подтверждена. Подключитесь на компьютере-хосте или задайте ключ API Meta.",
+  "error.provider.museSignIn": "Чтобы продолжить, войдите в Muse на компьютере-хосте.",
+  "error.provider.terminalLoginFailed":
+    "Не удалось открыть терминал для входа. Откройте CLI провайдера на этом хосте, войдите там, затем обновите список провайдеров.",
+  "error.provider.nativeArchiveInvalid": "Загруженный файл провайдера не содержит корректной установки.",
+  "error.provider.nativeChecksum": "Установка провайдера не прошла проверку целостности.",
+  "error.provider.registryUnavailable": "Реестр ACP недоступен. Повторите попытку.",
+  "error.provider.registryInvalid": "Реестр ACP вернул некорректные данные.",
+  "error.provider.registryMissing": "Этого агента нет в реестре ACP.",
+  "error.provider.registryBusy": "Для этого агента уже выполняется установка.",
+  "error.provider.registryCancelled": "Установка агента отменена.",
+  "error.provider.registryPrerequisite": "Установите {tool} на хост, прежде чем устанавливать этого агента.",
+  "error.provider.registryBindingChanged": "Пользовательский агент изменился во время установки. Повторите попытку.",
+  "error.provider.registryInstallFailed": "Не удалось установить агента. Предыдущая установка не изменена.",
+  "error.provider.registryRemoveBusy":
+    "Дождитесь окончания установки агента и активной работы ACP, прежде чем удалять его.",
 } as const satisfies PartialTranslation<typeof source>;

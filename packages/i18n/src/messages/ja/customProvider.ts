@@ -2,6 +2,16 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/customProvider";
 
 export const messages = {
+  "customProvider.registry.title": "ACP レジストリ",
+  "customProvider.registry.description":
+    "このホストにエージェントをインストールします。ランタイムを削除しても、エージェントの設定、認証情報、会話は残ります。",
+  "customProvider.registry.search": "レジストリを検索",
+  "customProvider.registry.empty": "この検索に一致するエージェントはありません。",
+  "customProvider.registry.agentId": "カスタムエージェント ID",
+  "customProvider.registry.install": "インストール",
+  "customProvider.registry.update": "アップデート",
+  "customProvider.registry.remove": "ランタイムを削除",
+  "customProvider.registry.failed": "レジストリの操作に失敗しました。",
   "customProvider.error.providerIdRequired": "プロバイダー ID を入力してください。",
   "customProvider.error.providerIdPattern":
     "小文字の英字、数字、ハイフン、アンダースコアを使い、英字か数字で始めてください。",
@@ -173,6 +183,9 @@ export const messages = {
   "customProvider.agents.description": "OpenBot がこのコンピュータで起動する ACP エージェントです。",
   "customProvider.agents.empty": "カスタムエージェントはまだありません。",
   "customProvider.agents.add": "エージェントを追加",
+  "customProvider.agents.restart": "エージェントを再起動",
+  "customProvider.agents.cancelRestart": "再起動をキャンセル",
+  "customProvider.agents.restartPending": "カスタムエージェントは現在のタスクが止まったあとで再起動します。",
   "customProvider.agents.commandMissing": "{command} · コマンドが見つかりません",
   "customProvider.agents.envCount": { other: "変数 {count} 個" },
   "customProvider.agents.editLabel": "{name} を編集",

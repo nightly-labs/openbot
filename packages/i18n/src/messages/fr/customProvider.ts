@@ -2,6 +2,16 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/customProvider";
 
 export const messages = {
+  "customProvider.registry.title": "Registre ACP",
+  "customProvider.registry.description":
+    "Installez des agents sur cet hôte. Supprimer l’environnement d’exécution conserve les réglages, les identifiants et les conversations de l’agent.",
+  "customProvider.registry.search": "Rechercher dans le registre",
+  "customProvider.registry.empty": "Aucun agent ne correspond à cette recherche.",
+  "customProvider.registry.agentId": "ID de l’agent personnalisé",
+  "customProvider.registry.install": "Installer",
+  "customProvider.registry.update": "Mettre à jour",
+  "customProvider.registry.remove": "Supprimer l’environnement d’exécution",
+  "customProvider.registry.failed": "L’opération sur le registre a échoué.",
   "customProvider.error.providerIdRequired": "Saisissez un ID de fournisseur.",
   "customProvider.error.providerIdPattern":
     "Utilisez des lettres minuscules, des chiffres, des tirets ou des traits de soulignement, en commençant par une lettre ou un chiffre.",
@@ -179,6 +189,9 @@ export const messages = {
   "customProvider.agents.description": "Les agents ACP qu’OpenBot démarre sur cet ordinateur.",
   "customProvider.agents.empty": "Aucun agent personnalisé pour l’instant.",
   "customProvider.agents.add": "Ajouter un agent",
+  "customProvider.agents.restart": "Redémarrer les agents",
+  "customProvider.agents.cancelRestart": "Annuler le redémarrage",
+  "customProvider.agents.restartPending": "Les agents personnalisés redémarrent quand les tâches en cours s’arrêtent.",
   "customProvider.agents.commandMissing": "{command} · Commande introuvable",
   "customProvider.agents.envCount": { one: "{count} variable", other: "{count} variables" },
   "customProvider.agents.editLabel": "Modifier {name}",

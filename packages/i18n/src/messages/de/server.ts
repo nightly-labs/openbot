@@ -2,6 +2,28 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/server";
 
 export const messages = {
+  "server.connection.planEnded": "Der Tarif für {name} ist beendet",
+  "server.connection.wakeFailed": "{name} konnte nicht gestartet werden",
+  "server.connection.startTimeout": "{name} wurde nicht rechtzeitig gestartet",
+  "server.connection.sleeping": "{name} ruht",
+  "server.connection.waking": "{name} wird gestartet",
+  "server.connection.loading": "{name} wird geladen",
+  "server.connection.connecting": "Verbindung mit {name} wird hergestellt",
+  "server.connection.reconnecting": "Verbindung mit {name} wird wiederhergestellt",
+  "server.connection.blocked": "{name} erfordert deine Aufmerksamkeit",
+  "server.connection.nextRetry": "Nächster Versuch in {seconds} Sekunden.",
+  "server.connection.wakeHint":
+    "Verwende diesen Arbeitsbereich oder wähle „Erneut versuchen“, um den Server zu starten.",
+  "server.connection.planHint": "Öffne die Kontoeinstellungen, um den Servertarif zu prüfen.",
+  "server.connection.loadingHint": "Du kannst einen anderen Server auswählen, während dieser geladen wird.",
+  "server.connection.cachedHint":
+    "Geladene Inhalte und Entwürfe bleiben erhalten. Serveraktionen werden nach dem erneuten Verbinden fortgesetzt.",
+  "server.connection.conversationFailed": "Die Unterhaltung konnte nicht geladen werden. Versuche es erneut.",
+  "server.connection.panelsFailed":
+    "Einige Bereiche des Arbeitsbereichs konnten nicht geladen werden. Versuche es erneut.",
+  "server.connection.retry": "Erneut versuchen",
+  "server.connection.manage": "Einstellungen öffnen",
+  "server.connection.restored": "Verbindung mit {name} wiederhergestellt",
   "server.compatibility.updateClientTitle": "Diese OpenBot-App aktualisieren",
   "server.compatibility.updateHostTitle": "OpenBot auf {name} aktualisieren",
   "server.compatibility.unsafeDataTitle": "Der Host hat unsichere Daten zurückgegeben",

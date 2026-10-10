@@ -19,6 +19,7 @@ export const messages = {
   "prompt.customPlaceholder": "Kendi yanıtınızı yazın",
   "prompt.question.customAnswerFor": "Şunun için özel yanıt: {question}",
   "prompt.question.skip": "Atla",
+  "prompt.question.submitAnswer": "Yanıtı gönder",
   "prompt.question.emptyTitle": "Bekleyen soru yok.",
   "prompt.question.emptyBody": "Ajan başka bir karara ihtiyaç duyduğunda devam edecektir.",
   "prompt.choice.hint": "Uygun olanı seçin veya kendinizinkini yazın.",

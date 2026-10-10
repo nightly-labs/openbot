@@ -2,6 +2,14 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/agentSettings";
 
 export const messages = {
+  "agentSettings.session.title": "Réglages du fournisseur",
+  "agentSettings.session.readFailed": "Impossible de lire les réglages du fournisseur.",
+  "agentSettings.session.pending": "Les modifications enregistrées s’appliquent avant le prochain tour.",
+  "agentSettings.session.unavailable":
+    "La valeur enregistrée {value} n’est pas disponible. Sélectionnez une autre valeur ou réinitialisez-la.",
+  "agentSettings.session.effective": "Valeur actuelle du fournisseur : {value}",
+  "agentSettings.session.reset": "Réinitialiser le réglage",
+  "agentSettings.session.resetNamed": "Réinitialiser {name}",
   "agentSettings.label": "Réglages de l’agent",
   "agentSettings.title": "Réglages",
   "agentSettings.backToDetails": "Retour aux détails",
@@ -111,6 +119,9 @@ export const messages = {
     "Computer Use et le navigateur OpenBot ne sont pas limités ; vous pouvez désactiver Computer Use ci-dessous.",
   "agentSettings.computerUse.title": "Computer Use",
   "agentSettings.computerUse.description": "Autoriser cet agent à contrôler les apps de cet ordinateur",
+  "agentSettings.automation.title": "Scripts locaux",
+  "agentSettings.automation.description":
+    "Autoriser les scripts de l’hôte à envoyer des messages, exécuter des routines, répondre aux questions et accepter ou refuser les approbations",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "Tout le processus {provider} s’exécute dans un bac à sable : une écriture à l’extérieur échoue donc. Disponible sur macOS uniquement.",
 } as const satisfies PartialTranslation<typeof source>;

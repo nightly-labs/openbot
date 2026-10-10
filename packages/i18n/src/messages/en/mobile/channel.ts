@@ -13,7 +13,7 @@ export const messages = defineMessages("mobile.channel", {
   "mobile.channel.list.deleteFailedBody": "Could not delete this channel. Try again.",
   "mobile.channel.list.open": "Open channel {name}",
   "mobile.channel.list.openWithTitle": "Open channel {name}, {title}",
-  "mobile.channel.list.unread": { one: "{count} unread messages", other: "{count} unread messages" },
+  "mobile.channel.list.unread": { one: "{count} unread message", other: "{count} unread messages" },
   "mobile.channel.list.noMessages": "No messages yet",
   "mobile.channel.task.task": "Task",
   "mobile.channel.task.failed": "Failed",

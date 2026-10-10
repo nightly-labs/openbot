@@ -2,6 +2,14 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/agentSettings";
 
 export const messages = {
+  "agentSettings.session.title": "Настройки провайдера",
+  "agentSettings.session.readFailed": "Не удалось прочитать настройки провайдера.",
+  "agentSettings.session.pending": "Сохранённые изменения вступят в силу перед следующим ходом.",
+  "agentSettings.session.unavailable":
+    "Сохранённое значение {value} недоступно. Выберите другое значение или сбросьте его.",
+  "agentSettings.session.effective": "Текущее значение у провайдера: {value}",
+  "agentSettings.session.reset": "Сбросить параметр",
+  "agentSettings.session.resetNamed": "Сбросить {name}",
   "agentSettings.label": "Настройки агента",
   "agentSettings.title": "Настройки",
   "agentSettings.backToDetails": "Назад к описанию",

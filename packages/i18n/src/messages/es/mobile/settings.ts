@@ -69,6 +69,22 @@ export const messages = {
   "mobile.settings.appearance.agentColorMessages": "Color del agente en mis mensajes",
   "mobile.settings.appearance.agentColorMessagesFooter":
     "Tus mensajes en el chat de un agente usan su color. Desactívalo si el texto es difícil de leer.",
+  "mobile.settings.animations.title": "Animaciones",
+  "mobile.settings.animations.footer":
+    "Desactiva Animaciones para reducir el movimiento en toda la aplicación. Cuando Reducir movimiento está activado en los ajustes de tu teléfono, la aplicación también reduce el movimiento. Las animaciones de abajo se mantienen desactivadas.",
+  "mobile.settings.animations.all": "Animaciones",
+  "mobile.settings.animations.chatZoom": "Ampliar los chats",
+  "mobile.settings.animations.chatZoomFooter":
+    "Un chat se abre desde su avatar en la lista y se cierra de vuelta en él. Si esta opción está desactivada, el chat se desliza desde el lado.",
+  "mobile.settings.animations.agentFaces": "Caras de agentes animadas",
+  "mobile.settings.animations.agentFacesFooter":
+    "Los avatares de los agentes mueven la cara mientras los agentes trabajan y descansan. Si esta opción está desactivada, las caras se quedan quietas.",
+  "mobile.settings.animations.composerResize": "Campo de mensaje compacto",
+  "mobile.settings.animations.composerResizeFooter":
+    "El campo de mensaje se convierte en una barra pequeña mientras el teclado está cerrado. Si esta opción está desactivada, el campo mantiene su tamaño completo.",
+  "mobile.settings.animations.textReveal": "Animar respuestas",
+  "mobile.settings.animations.textRevealFooter":
+    "Una respuesta se escribe palabra por palabra y su burbuja crece de forma fluida. Si esta opción está desactivada, el texto aparece a medida que llega.",
   "mobile.settings.feedback.footer": "Respuesta táctil para las acciones en la aplicación en este dispositivo.",
   "mobile.settings.feedback.haptics": "Respuesta háptica",
   "mobile.settings.feedback.retry": "Reintentar guardar el ajuste háptico",

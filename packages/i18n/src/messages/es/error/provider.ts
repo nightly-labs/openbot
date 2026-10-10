@@ -2,6 +2,8 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/provider";
 
 export const messages = {
+  "error.provider.mcpConfig":
+    "OpenBot no pudo registrar los servidores MCP en la configuración de Codex. Comprueba que tu config.toml de Codex sea válido y se pueda escribir, y reinicia OpenBot.",
   "error.provider.computerUseConfig":
     "OpenBot no pudo registrar el uso del equipo en la configuración de Codex. Comprueba que tu config.toml de Codex sea válido y se pueda escribir, y reinicia OpenBot. Puedes desactivar el uso del equipo en los ajustes del compañero para continuar sin él.",
   "error.provider.endpointsReadOnly":
@@ -224,6 +226,8 @@ export const messages = {
   "error.provider.grokSignIn": "Ejecuta `grok login` o define XAI_API_KEY para usar Grok.",
   "error.provider.acpSignInTimedOut": "Se agotó el tiempo del inicio de sesión.",
   "error.provider.acpSignInStopped": "El inicio de sesión se detuvo antes de completarse.",
+  "error.provider.geminiBrowserUnavailable":
+    "Gemini no pudo abrir la página de inicio de sesión. Instala un navegador y xdg-utils, y conéctate desde una sesión de escritorio en este host. Un servidor sin escritorio no puede completar este inicio de sesión.",
   "error.provider.acpSignInFailed": "El inicio de sesión no se completó.",
   "error.provider.messageTooLarge": "OpenBot detuvo {provider} porque envió un mensaje de más de {limit} MB.",
   "error.provider.customAgentIdInvalid":
@@ -261,4 +265,68 @@ export const messages = {
   "error.provider.useSettingsReadOnly":
     "No se pueden leer los ajustes guardados del proveedor. Actualiza OpenBot antes de cambiarlos.",
   "error.provider.useChangeFailed": "OpenBot no pudo cambiar el ajuste del proveedor.",
+  "error.provider.sessionSettingUnavailable": "Este ajuste no está disponible en la sesión actual del proveedor.",
+  "error.provider.sessionSettingInvalid": "Este valor no está disponible para el ajuste.",
+  "error.provider.sessionSettingsBusy": "Espera a que termine el turno actual antes de cambiar un ajuste de la sesión.",
+  "error.provider.piOutdated":
+    "Pi {version} es demasiado antiguo. Instala Pi 1.1.0 o posterior para la compatibilidad nativa con RPC y MCP.",
+  "error.provider.nativeMissing": "La CLI de {provider} no está instalada. Descárgala en Ajustes.",
+  "error.provider.nativeNotStarted": "La CLI de {provider} no pudo iniciarse.",
+  "error.provider.nativeVersionUnreadable": "No se pudo leer la versión de la CLI de {provider}.",
+  "error.provider.piSessionBusy": "Espera a que termine el turno actual de Pi.",
+  "error.provider.piStopped": "Pi no se está ejecutando. Conecta Pi e inténtalo de nuevo.",
+  "error.provider.piSessionMissing": "El archivo de sesión de Pi no está disponible en este equipo.",
+  "error.provider.piResumeCancelled": "Pi canceló la reanudación de la sesión. Inténtalo de nuevo.",
+  "error.provider.piSessionIdentity": "Pi devolvió una sesión diferente. La sesión guardada no se reemplazó.",
+  "error.provider.piModelInvalid": "Selecciona un modelo de Pi que incluya su proveedor.",
+  "error.provider.piToolInvalid": "La herramienta devolvió un resultado no válido.",
+  "error.provider.piSignIn": "Usa /login en Pi en el equipo anfitrión. Cierra Pi cuando termines de iniciar sesión.",
+  "error.provider.museBusy": "La sesión de Muse está ocupada.",
+  "error.provider.museStopped": "El cliente de Muse no se está ejecutando.",
+  "error.provider.museUnexpectedProvider": "Muse devolvió un proveedor de modelo inesperado.",
+  "error.provider.museNoActiveTurn": "Muse no tiene ningún turno activo que orientar.",
+  "error.provider.museInvalidProtocol": "Muse devolvió una respuesta de protocolo no válida.",
+  "error.provider.museNotStarted": "Muse no se inició.",
+  "error.provider.museNativeWindows": "Muse necesita un ejecutable nativo en Windows.",
+  "error.provider.museStartTimeout": "Se agotó el tiempo de inicialización de Muse.",
+  "error.provider.museStartStopped": "Muse se detuvo durante la inicialización.",
+  "error.provider.museProtocolVersion": "Versión del protocolo de Muse no admitida.",
+  "error.provider.museHistoryRequired": "Muse debe conservar el historial de la sesión.",
+  "error.provider.museRequestUnsupported": "Solicitud del servidor de Muse no admitida.",
+  "error.provider.museConnectionFailed":
+    "Falló la conexión con Muse. Reanuda la conversación para recuperar su historial guardado.",
+  "error.provider.museUnknownSession": "Sesión de Muse desconocida.",
+  "error.provider.museInvalidToolResult": "Resultado de herramienta de OpenBot no válido.",
+  "error.provider.museMcpRequired": "Muse debe admitir servidores MCP de sesión.",
+  "error.provider.museSessionMismatch": "Muse devolvió una sesión diferente.",
+  "error.provider.museCompactRejected": "Muse no aceptó la compactación.",
+  "error.provider.museTurnMismatch": "Muse devolvió un turno diferente.",
+  "error.provider.museHistoryMismatch": "El historial de Muse mezcló sesiones.",
+  "error.provider.museRecoveryFailed": "Muse no pudo recuperar los eventos que faltan.",
+  "error.provider.museHistoryStalled": "El cursor del historial de Muse no avanzó.",
+  "error.provider.museApprovalUnavailable": "Muse no ofreció esta respuesta de aprobación.",
+  "error.provider.museHistoryOwner": "El historial de Muse pertenece a otra sesión.",
+  "error.provider.museHistoryMissing": "Muse no devolvió el historial de la sesión.",
+  "error.provider.museEmptyInput": "Muse necesita texto o una imagen.",
+  "error.provider.museMethodUnsupported": "Muse no admite {method}.",
+  "error.provider.museTurnFailed": "Falló el turno de Muse.",
+  "error.provider.museProfileUnsupported":
+    "Muse no puede generar un perfil sin acceso a herramientas externas. Usa otro proveedor para generar el perfil y luego selecciona Muse para el agente.",
+  "error.provider.museAuthUnverified":
+    "La autenticación de Muse no está verificada. Conéctate en el equipo anfitrión o define una clave de API de Meta.",
+  "error.provider.museSignIn": "Inicia sesión en Muse en el equipo anfitrión para continuar.",
+  "error.provider.terminalLoginFailed":
+    "No se pudo abrir la terminal de inicio de sesión. Abre la CLI del proveedor en este host, inicia sesión allí y actualiza los proveedores.",
+  "error.provider.nativeArchiveInvalid": "La descarga del proveedor no contiene una instalación válida.",
+  "error.provider.nativeChecksum": "La instalación del proveedor no superó su comprobación de integridad.",
+  "error.provider.registryUnavailable": "El registro ACP no está disponible. Inténtalo de nuevo.",
+  "error.provider.registryInvalid": "El registro ACP devolvió datos no válidos.",
+  "error.provider.registryMissing": "Este agente no está en el registro ACP.",
+  "error.provider.registryBusy": "Ya hay una instalación en curso para este agente.",
+  "error.provider.registryCancelled": "Se canceló la instalación del agente.",
+  "error.provider.registryPrerequisite": "Instala {tool} en el host antes de instalar este agente.",
+  "error.provider.registryBindingChanged": "El agente personalizado cambió durante la instalación. Inténtalo de nuevo.",
+  "error.provider.registryInstallFailed": "Falló la instalación del agente. La instalación anterior no cambió.",
+  "error.provider.registryRemoveBusy":
+    "Espera a que terminen la instalación del agente y el trabajo ACP activo antes de quitarlo.",
 } as const satisfies PartialTranslation<typeof source>;

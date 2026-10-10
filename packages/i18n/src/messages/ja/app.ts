@@ -29,6 +29,7 @@ export const messages = {
   "app.provider.codeExpiredDescription": "時間内に入力されませんでした。このコードはもう使えません。",
   "app.provider.connectFailed": "{name} に接続できませんでした",
   "app.provider.connectFailedRetry": "OpenBot は {name} に接続できませんでした。もう一度お試しください。",
+  "app.provider.restartFailed": "{name} を再起動できませんでした",
   "app.provider.included": "{name} は OpenBot に含まれています。",
   "app.clipboard.copyFailed": "テキストをコピーできませんでした。",
   "app.voice.tooLong": "音声の録音は 2 分までです。",

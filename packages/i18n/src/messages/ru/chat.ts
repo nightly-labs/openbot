@@ -314,4 +314,9 @@ export const messages = {
   "chat.suggestion.undo": "Отменить",
   "chat.suggestion.githubLocalOnly": "Подключите GitHub на компьютере, на котором работает этот сервер.",
   "chat.suggestion.githubUnavailable": "Эта сборка OpenBot не может подключить GitHub.",
+  "chat.compaction.running": "Сжатие контекста",
+  "chat.compaction.completed": "Контекст сжат",
+  "chat.compaction.failed": "Не удалось сжать контекст",
+  "chat.compaction.tokens": "{before} → {after} токенов",
+  "chat.compaction.continues": "Сообщения в очереди продолжат отправляться.",
 } as const satisfies PartialTranslation<typeof source>;

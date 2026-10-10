@@ -69,6 +69,22 @@ export const messages = {
   "mobile.settings.appearance.agentColorMessages": "Agentenfarbe für meine Nachrichten",
   "mobile.settings.appearance.agentColorMessagesFooter":
     "Deine Nachrichten in einem Agentenchat verwenden dessen Farbe. Deaktiviere dies, wenn der Text schwer lesbar ist.",
+  "mobile.settings.animations.title": "Animationen",
+  "mobile.settings.animations.footer":
+    "Schalte Animationen aus, um Bewegungen in der ganzen App zu reduzieren. Wenn „Bewegung reduzieren“ in den Einstellungen deines Telefons aktiviert ist, reduziert die App die Bewegungen ebenfalls. Die Animationen unten bleiben dann aus.",
+  "mobile.settings.animations.all": "Animationen",
+  "mobile.settings.animations.chatZoom": "In Chats zoomen",
+  "mobile.settings.animations.chatZoomFooter":
+    "Ein Chat öffnet sich aus seinem Avatar in der Liste und schließt sich wieder in ihn. Wenn dies aus ist, gleitet ein Chat von der Seite herein.",
+  "mobile.settings.animations.agentFaces": "Animierte Agentengesichter",
+  "mobile.settings.animations.agentFacesFooter":
+    "Die Gesichter der Agenten-Avatare bewegen sich, während die Agenten arbeiten und ruhen. Wenn dies aus ist, bleiben die Gesichter still.",
+  "mobile.settings.animations.composerResize": "Kompaktes Nachrichtenfeld",
+  "mobile.settings.animations.composerResizeFooter":
+    "Das Nachrichtenfeld wird zu einer kleinen Leiste, solange die Tastatur geschlossen ist. Wenn dies aus ist, bleibt das Feld in voller Größe.",
+  "mobile.settings.animations.textReveal": "Antworten animieren",
+  "mobile.settings.animations.textRevealFooter":
+    "Eine Antwort erscheint Wort für Wort, und ihre Sprechblase wächst sanft mit. Wenn dies aus ist, wird der Text angezeigt, sobald er ankommt.",
   "mobile.settings.feedback.footer": "Haptisches Feedback für Aktionen in der App auf diesem Gerät.",
   "mobile.settings.feedback.haptics": "Haptik",
   "mobile.settings.feedback.retry": "Haptikeinstellung erneut speichern",

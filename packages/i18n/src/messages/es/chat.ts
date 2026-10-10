@@ -107,6 +107,24 @@ export const messages = {
   "chat.marker.run.failed": "Rutina fallida",
   "chat.marker.run.interrupted": "Rutina interrumpida",
   "chat.marker.run.cancelled": "Rutina cancelada",
+  "chat.marker.runGroup.count": {
+    one: "{count} ejecución",
+    other: "{count} ejecuciones",
+  },
+  "chat.marker.runGroup.timeRange": "{start}–{end}",
+  "chat.marker.runGroup.show": {
+    one: "Mostrar {count} ejecución de {name}",
+    other: "Mostrar {count} ejecuciones de {name}",
+  },
+  "chat.marker.runGroup.hide": {
+    one: "Ocultar {count} ejecución de {name}",
+    other: "Ocultar {count} ejecuciones de {name}",
+  },
+  "chat.marker.runGroup.runs": "Ejecuciones completadas",
+  "chat.marker.runGroup.accessible": {
+    one: "{name}, {count} ejecución completada, {time}",
+    other: "{name}, {count} ejecuciones completadas, {time}",
+  },
   "chat.marker.accessible.named": "{label}, {name}",
   "chat.marker.accessible.message": "{label} {agent}, {status}",
   "chat.marker.accessible.routing": "{label} {agent}",
@@ -271,4 +289,9 @@ export const messages = {
   "chat.suggestion.undo": "Deshacer",
   "chat.suggestion.githubLocalOnly": "Conecta GitHub en el equipo donde se ejecuta este servidor.",
   "chat.suggestion.githubUnavailable": "Esta compilación de OpenBot no puede conectar GitHub.",
+  "chat.compaction.running": "Compactando el contexto",
+  "chat.compaction.completed": "Contexto compactado",
+  "chat.compaction.failed": "No se pudo compactar el contexto",
+  "chat.compaction.tokens": "{before} → {after} tokens",
+  "chat.compaction.continues": "Los mensajes en cola continúan.",
 } as const satisfies PartialTranslation<typeof source>;
