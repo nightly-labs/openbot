@@ -8,7 +8,7 @@ import { registerSecretValue } from "@openbot/logging";
 import { Effect } from "effect";
 import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEVELOPMENT_DEFAULT_MODEL, DEVELOPMENT_DEFAULT_REASONING_EFFORT } from "./agent/development-defaults";
-import type { AgentProvider } from "./agent-client";
+import { type AgentProvider, RequestTimeoutError } from "./agent-client";
 import type { AgentService } from "./agent-service";
 import {
   CREATE_AGENT_INPUT,
@@ -31,6 +31,7 @@ import {
   waitFor,
   waitForQueue,
 } from "./agent-service-test-harness";
+import { AppServerError } from "./app-server-client";
 import { runCauseEffect } from "./effect-boundary";
 import { MailboxStore } from "./mailbox-store";
 import { getString } from "./protocol";
@@ -1400,11 +1401,348 @@ describe.sequential("AgentService: queue", () => {
           "notification",
           notification("turn/completed", { threadId, turn: { id: active.turnId, status: "completed" } }),
         );
-      return { ...started, client, turnId: active.turnId, completeTurn };
+      return { ...started, client, threadId, turnId: active.turnId, completeTurn };
     }
 
     const turnStarts = (client: FakeAgentClient) =>
       client.requests.filter((request) => request.method === "turn/start").length;
+
+    it.each(["accepted", "rejected", "uncertain"])(
+      "uses the same steer acceptance outcome for channel correction: %s",
+      async (outcome) => {
+        const busy = await startBusyAgent("codex", async (method) => {
+          if (method !== "turn/steer" || outcome === "accepted") return;
+          if (outcome === "rejected") throw new AppServerError("no active turn to steer", -32600);
+          throw new Error("Connection lost after submission.");
+        });
+        const agent = busy.store.list().find((candidate) => candidate.id === "chief");
+        assert(agent);
+        assert(agent.threadId);
+        assert(busy.service.channels.hooks.steer);
+        expect(
+          await runCauseEffect(
+            busy.service.channels.hooks.steer(
+              "chief",
+              agent.threadId,
+              busy.turnId,
+              "correction-input",
+              "Current correction",
+            ),
+          ),
+        ).toBe(outcome);
+        expect(busy.client.requests.filter((request) => request.method === "turn/steer")).toHaveLength(1);
+      },
+    );
+
+    it.each([
+      ["timeout", new RequestTimeoutError("Codex", "turn/steer")],
+      ["transport loss", new Error("The connection ended before its response.")],
+      ["response decode", new Error("Invalid provider response.")],
+    ])("keeps an unconfirmed steer after %s out of automatic drain and turn completion", async (_name, failure) => {
+      const busy = await startBusyAgent("codex", async (method) => {
+        if (method === "turn/steer") throw failure;
+      });
+      await runCauseEffect(busy.service.updateAgent({ agentId: "chief", busyMessageMode: "queue" }));
+      const receipt = await runCauseEffect(busy.service.sendMessage({ agentId: "chief", text: "Use staging" }));
+      const id = receipt.deliveries[0]?.id;
+      assert(id);
+      await expect(
+        runCauseEffect(
+          busy.service.steerQueuedMessage({
+            agentId: "chief",
+            deliveryId: id,
+            expectedTurnId: busy.turnId,
+          }),
+        ),
+      ).rejects.toThrow();
+      expect(busy.service.listQueue("chief").deliveries[1]).toMatchObject({
+        id,
+        text: "Use staging",
+        status: "starting",
+        turnId: busy.turnId,
+        error: expect.stringContaining("not confirmed"),
+      });
+      busy.completeTurn();
+      await waitForQueue(busy.service, "chief", (queue) => queue.deliveries[0]?.status === "completed");
+      await runCauseEffect(busy.service.sendMessage({ agentId: "chief", text: "Later" }));
+      expect(busy.service.listQueue("chief").deliveries.map((delivery) => delivery.status)).toEqual([
+        "completed",
+        "starting",
+        "queued",
+      ]);
+      expect(turnStarts(busy.client)).toBe(1);
+    });
+
+    it("does not claim an unconfirmed steer when completion precedes its error", async () => {
+      let complete = async () => {};
+      const busy = await startBusyAgent("codex", async (method) => {
+        if (method !== "turn/steer") return;
+        await complete();
+        throw new RequestTimeoutError("Codex", "turn/steer");
+      });
+      complete = async () => {
+        busy.completeTurn();
+        await waitForQueue(busy.service, "chief", (queue) => queue.deliveries[0]?.status === "completed");
+      };
+      await runCauseEffect(busy.service.updateAgent({ agentId: "chief", busyMessageMode: "queue" }));
+      const receipt = await runCauseEffect(busy.service.sendMessage({ agentId: "chief", text: "Use staging" }));
+      const id = receipt.deliveries[0]?.id;
+      assert(id);
+      await expect(
+        runCauseEffect(
+          busy.service.steerQueuedMessage({
+            agentId: "chief",
+            deliveryId: id,
+            expectedTurnId: busy.turnId,
+          }),
+        ),
+      ).rejects.toThrow();
+      expect(busy.service.listQueue("chief").deliveries[1]).toMatchObject({
+        id,
+        status: "starting",
+        turnId: busy.turnId,
+      });
+      expect(turnStarts(busy.client)).toBe(1);
+    });
+
+    it("confirms an uncertain steer only from its exact live input identity and keeps attachments", async () => {
+      const busy = await startBusyAgent("codex", async (method) => {
+        if (method === "turn/steer") throw new RequestTimeoutError("Codex", "turn/steer");
+      });
+      await runCauseEffect(busy.service.updateAgent({ agentId: "chief", busyMessageMode: "queue" }));
+      const file = join(root, "steer-input.txt");
+      await writeFile(file, "Attachment bytes");
+      const [draft] = await runCauseEffect(busy.mailbox.prepareImportedAttachments([file], []));
+      assert(draft);
+      const receipt = await runCauseEffect(
+        busy.service.sendMessage({ agentId: "chief", text: "Use staging", attachmentDraftIds: [draft.id] }),
+      );
+      const id = receipt.deliveries[0]?.id;
+      assert(id);
+      const before = busy.service.listQueue("chief").deliveries[1];
+      await expect(
+        runCauseEffect(
+          busy.service.steerQueuedMessage({ agentId: "chief", deliveryId: id, expectedTurnId: busy.turnId }),
+        ),
+      ).rejects.toThrow();
+      for (const [threadId, turnId, clientId] of [
+        [busy.threadId, busy.turnId, "another-input"],
+        [busy.threadId, "another-turn", id],
+        ["another-thread", busy.turnId, id],
+      ])
+        busy.client.emit(
+          "notification",
+          notification("item/started", {
+            threadId,
+            turnId,
+            item: { id: "unmatched-input", type: "userMessage", clientId, content: [] },
+          }),
+        );
+      // The request below yields through the same service boundary, after notifications were dispatched.
+      await runCauseEffect(busy.service.sendMessage({ agentId: "chief", text: "Later" }));
+      expect(busy.service.listQueue("chief").deliveries[1]?.status).toBe("starting");
+      busy.client.emit(
+        "notification",
+        notification("item/started", {
+          threadId: busy.threadId,
+          turnId: busy.turnId,
+          item: {
+            id: "accepted-input",
+            type: "userMessage",
+            clientId: id,
+            content: [{ type: "text", text: "Use staging" }],
+          },
+        }),
+      );
+      await waitForQueue(busy.service, "chief", (queue) => queue.deliveries[1]?.status === "running");
+      expect(busy.service.listQueue("chief").deliveries[1]).toMatchObject({
+        id,
+        text: "Use staging",
+        attachments: before?.attachments,
+        error: null,
+      });
+      expect(busy.client.requests.filter((request) => request.method === "turn/steer")).toHaveLength(1);
+    });
+
+    it("confirms a delayed steer receipt after its target turn completed without sending it again", async () => {
+      let complete = async () => {};
+      const busy = await startBusyAgent("codex", async (method) => {
+        if (method === "turn/steer") await complete();
+      });
+      complete = async () => {
+        busy.completeTurn();
+        await waitForQueue(busy.service, "chief", (queue) => queue.deliveries[0]?.status === "completed");
+        expect(busy.service.listQueue("chief").deliveries[1]?.status).toBe("starting");
+      };
+      await runCauseEffect(busy.service.updateAgent({ agentId: "chief", busyMessageMode: "queue" }));
+      const receipt = await runCauseEffect(busy.service.sendMessage({ agentId: "chief", text: "Use staging" }));
+      const id = receipt.deliveries[0]?.id;
+      assert(id);
+      await runCauseEffect(
+        busy.service.steerQueuedMessage({ agentId: "chief", deliveryId: id, expectedTurnId: busy.turnId }),
+      );
+      expect(busy.service.listQueue("chief").deliveries[1]).toMatchObject({ id, status: "completed", error: null });
+      expect(turnStarts(busy.client)).toBe(1);
+    });
+
+    it("keeps cancellation final when the steer receipt arrives later", async () => {
+      let cancel = async () => {};
+      const busy = await startBusyAgent("codex", async (method) => {
+        if (method === "turn/steer") await cancel();
+      });
+      await runCauseEffect(busy.service.updateAgent({ agentId: "chief", busyMessageMode: "queue" }));
+      const receipt = await runCauseEffect(busy.service.sendMessage({ agentId: "chief", text: "Use staging" }));
+      const id = receipt.deliveries[0]?.id;
+      assert(id);
+      cancel = () => runCauseEffect(busy.service.cancelQueuedMessage("chief", id));
+      await runCauseEffect(
+        busy.service.steerQueuedMessage({ agentId: "chief", deliveryId: id, expectedTurnId: busy.turnId }),
+      );
+      busy.completeTurn();
+      await waitForQueue(busy.service, "chief", (queue) => queue.deliveries[0]?.status === "completed");
+      expect(busy.service.listQueue("chief").deliveries[1]).toMatchObject({ id, status: "cancelled" });
+      expect(turnStarts(busy.client)).toBe(1);
+    });
+
+    it("reconciles an accepted steer locally after a mailbox write failure without a second RPC", async () => {
+      let failWrite = () => {};
+      const busy = await startBusyAgent("codex", async (method) => {
+        if (method === "turn/steer") failWrite();
+      });
+      await runCauseEffect(busy.service.updateAgent({ agentId: "chief", busyMessageMode: "queue" }));
+      const receipt = await runCauseEffect(busy.service.sendMessage({ agentId: "chief", text: "Use staging" }));
+      const id = receipt.deliveries[0]?.id;
+      assert(id);
+      const replace = busy.store.database.replaceMailboxState.bind(busy.store.database);
+      failWrite = () => {
+        vi.spyOn(busy.store.database, "replaceMailboxState")
+          .mockImplementationOnce(() => {
+            throw new Error("Local write failed.");
+          })
+          .mockImplementation(replace);
+      };
+      await expect(
+        runCauseEffect(
+          busy.service.steerQueuedMessage({ agentId: "chief", deliveryId: id, expectedTurnId: busy.turnId }),
+        ),
+      ).rejects.toThrow("Local write failed");
+      await waitForQueue(busy.service, "chief", (queue) => queue.deliveries[1]?.status === "running");
+      expect(busy.client.requests.filter((request) => request.method === "turn/steer")).toHaveLength(1);
+      expect(turnStarts(busy.client)).toBe(1);
+    });
+
+    it("keeps the refused steer's original FIFO slot while later queued work is reordered", async () => {
+      let reorder = async () => {};
+      const busy = await startBusyAgent("codex", async (method) => {
+        if (method !== "turn/steer") return;
+        await reorder();
+        throw new AppServerError("no active turn to steer", -32600);
+      });
+      await runCauseEffect(busy.service.updateAgent({ agentId: "chief", busyMessageMode: "queue" }));
+      const first = await runCauseEffect(busy.service.sendMessage({ agentId: "chief", text: "Use staging" }));
+      const second = await runCauseEffect(busy.service.sendMessage({ agentId: "chief", text: "Later work" }));
+      const firstId = first.deliveries[0]?.id;
+      const secondId = second.deliveries[0]?.id;
+      assert(firstId && secondId);
+      reorder = () => runCauseEffect(busy.service.reorderQueue({ agentId: "chief", deliveryIds: [secondId] }));
+      await expect(
+        runCauseEffect(
+          busy.service.steerQueuedMessage({ agentId: "chief", deliveryId: firstId, expectedTurnId: busy.turnId }),
+        ),
+      ).rejects.toThrow("no active turn to steer");
+      expect(
+        busy.service.listQueue("chief").deliveries.filter((delivery) => delivery.status === "queued"),
+      ).toMatchObject([
+        { id: firstId, text: "Use staging", position: 1 },
+        { id: secondId, text: "Later work", position: 2 },
+      ]);
+    });
+
+    it("does not submit a steer when its durable reservation write fails", async () => {
+      const busy = await startBusyAgent("codex");
+      await runCauseEffect(busy.service.updateAgent({ agentId: "chief", busyMessageMode: "queue" }));
+      const receipt = await runCauseEffect(busy.service.sendMessage({ agentId: "chief", text: "Use staging" }));
+      const id = receipt.deliveries[0]?.id;
+      assert(id);
+      vi.spyOn(busy.store.database, "replaceMailboxState").mockImplementationOnce(() => {
+        throw new Error("Reservation failed.");
+      });
+      await expect(
+        runCauseEffect(
+          busy.service.steerQueuedMessage({ agentId: "chief", deliveryId: id, expectedTurnId: busy.turnId }),
+        ),
+      ).rejects.toThrow("Reservation failed");
+      expect(busy.service.listQueue("chief").deliveries[1]).toMatchObject({
+        id,
+        status: "queued",
+        turnId: null,
+        position: 1,
+      });
+      expect(busy.client.requests.filter((request) => request.method === "turn/steer")).toHaveLength(0);
+    });
+
+    it.each(["missing", "wrong input", "wrong turn", "accepted"])(
+      "recovers an unconfirmed steer only from exact input history: %s",
+      async (evidence) => {
+        const busy = await startBusyAgent("codex", async (method) => {
+          if (method === "turn/steer") throw new RequestTimeoutError("Codex", "turn/steer");
+        });
+        await runCauseEffect(busy.service.updateAgent({ agentId: "chief", busyMessageMode: "queue" }));
+        const receipt = await runCauseEffect(busy.service.sendMessage({ agentId: "chief", text: "Use staging" }));
+        const id = receipt.deliveries[0]?.id;
+        assert(id);
+        await expect(
+          runCauseEffect(
+            busy.service.steerQueuedMessage({ agentId: "chief", deliveryId: id, expectedTurnId: busy.turnId }),
+          ),
+        ).rejects.toThrow();
+        await runCauseEffect(busy.service.stop());
+        const restored = stores(root);
+        const client = new FakeAgentClient("codex", "DONE", false);
+        client.threadRead = () => ({
+          thread: {
+            id: busy.threadId,
+            turns: [
+              {
+                id: busy.turnId,
+                status: "completed",
+                items:
+                  evidence === "missing" || evidence === "wrong turn"
+                    ? []
+                    : [
+                        {
+                          type: "userMessage",
+                          id: "provider-input",
+                          clientId: evidence === "accepted" ? id : "another-input",
+                          content: [{ type: "text", text: "Use staging" }],
+                        },
+                      ],
+              },
+              ...(evidence === "wrong turn"
+                ? [
+                    {
+                      id: "another-turn",
+                      status: "completed",
+                      items: [{ type: "userMessage", clientId: id, content: [] }],
+                    },
+                  ]
+                : []),
+            ],
+          },
+        });
+        service = createTestService({ ...restored, preferredProvider: "codex", clientFactory: () => client });
+        await runCauseEffect(service.initialize());
+        expect(service.listQueue("chief").deliveries[1]).toMatchObject({
+          id,
+          text: "Use staging",
+          status: evidence === "accepted" ? "completed" : "starting",
+          turnId: busy.turnId,
+        });
+        expect(
+          client.requests.filter((request) => request.method === "turn/start" || request.method === "turn/steer"),
+        ).toHaveLength(0);
+      },
+    );
 
     it("joins the running turn on a provider that steers", async () => {
       const { service: agentService, client, turnId } = await startBusyAgent("codex");
@@ -1435,17 +1773,35 @@ describe.sequential("AgentService: queue", () => {
         service: agentService,
         client,
         completeTurn,
+        mailbox,
       } = await startBusyAgent("codex", async (method) => {
-        if (method === "turn/steer") throw new Error("The provider refused the steer.");
+        if (method === "turn/steer") throw new AppServerError("no active turn to steer", -32600);
       });
-      await runCauseEffect(agentService.sendMessage({ agentId: "chief", text: "Use staging" }));
+      const file = join(root, "refused-input.txt");
+      await writeFile(file, "Keep the attachment");
+      const [draft] = await runCauseEffect(mailbox.prepareImportedAttachments([file], []));
+      assert(draft);
+      const receipt = await runCauseEffect(
+        agentService.sendMessage({ agentId: "chief", text: "Use staging", attachmentDraftIds: [draft.id] }),
+      );
 
       await waitForQueue(agentService, "chief", (queue) => queue.deliveries[1]?.steerFallback === "steer-failed");
-      expect(agentService.listQueue("chief").deliveries[1]).toMatchObject({ text: "Use staging", status: "queued" });
+      const input = agentService.listQueue("chief").deliveries[1];
+      expect(input).toMatchObject({
+        id: receipt.deliveries[0]?.id,
+        text: "Use staging",
+        status: "queued",
+        position: 1,
+        attachments: [expect.objectContaining({ name: "refused-input.txt" })],
+      });
 
       completeTurn();
       await waitFor(() => turnStarts(client) === 2);
-      expect(agentService.listQueue("chief").deliveries[1]?.status).toBe("running");
+      expect(agentService.listQueue("chief").deliveries[1]).toMatchObject({
+        id: input?.id,
+        status: "running",
+        attachments: input?.attachments,
+      });
     });
 
     it("follows the agent's own setting before the app default", async () => {
@@ -1467,12 +1823,12 @@ describe.sequential("AgentService: queue", () => {
       const busy = await startBusyAgent("codex", async (method) => {
         if (method !== "turn/steer") return;
         await endTurnDuringSteer();
-        throw new Error("The turn ended before the steer.");
+        throw new AppServerError("no active turn to steer", -32600);
       });
       endTurnDuringSteer = async () => {
         busy.completeTurn();
         // The end of the turn stamps every delivery of that turn, the one being steered too.
-        await waitForQueue(busy.service, "chief", (queue) => queue.deliveries[1]?.status === "completed");
+        await waitForQueue(busy.service, "chief", (queue) => queue.deliveries[0]?.status === "completed");
       };
       await runCauseEffect(busy.service.sendMessage({ agentId: "chief", text: "Use staging" }));
 

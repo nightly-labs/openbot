@@ -9,10 +9,10 @@ import { QueueEditRejectedError, type QueueEditRequest } from "@openbot/contract
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Schema } from "effect";
 import type { AgentStore } from "../agent-store";
+import { decodeSteerReceipt, isInputRejected } from "../app-server-client";
 import type { ChannelAssignment } from "../channel-store";
 import { causeHelpers } from "../effect-boundary";
 import type { MailboxStore } from "../mailbox-store";
-import { decodeRecordResponse } from "../protocol";
 import type { ConversationRuntime } from "./conversation-runtime";
 import type { CustomEndpoints } from "./custom-endpoints";
 import { agentNamesById, deliveryPromptInput } from "./delivery-content";
@@ -229,8 +229,13 @@ export class QueueControls {
         throw new Error(REMOVED_ENDPOINT_MESSAGE);
       return { client, session, snapshot, context, turnId };
     });
-    yield* this.#mailbox.markSteering(input.deliveryId, turnId).pipe(toQueueOperationFailed);
+    yield* this.#mailbox.markSteering(input.deliveryId, turnId).pipe(
+      Effect.tapError(() => queueStep(() => this.#mailbox.restorePersistedState())),
+      toQueueOperationFailed,
+    );
     this.#mailboxSync.emitQueue(agent.id);
+    const pending = this.#mailbox.getDelivery(input.deliveryId)?.delivery;
+    if (pending?.status !== "starting" || pending.turnId !== turnId) return;
     yield* client
       .request(
         "turn/steer",
@@ -245,30 +250,49 @@ export class QueueControls {
               context.delivery.sender.kind === "routine" ? this.#routines.runForDelivery(input.deliveryId) : null,
           }),
         },
-        decodeRecordResponse,
+        (value) => decodeSteerReceipt(value, turnId),
       )
       .pipe(
         toQueueOperationFailed,
         // The turn may have ended while the request was in flight, and found nothing else to start
         // with this message out of the queue, so the drain is asked again.
-        Effect.tapError(() =>
-          this.#mailbox.restoreUnsteered(input.deliveryId, turnId).pipe(
-            toQueueOperationFailed,
-            Effect.andThen(
-              queueStep(() => {
+        Effect.tapError((failure) =>
+          isInputRejected(client.provider, failure.cause, "turn/steer")
+            ? this.#mailbox.restoreUnsteered(input.deliveryId, turnId).pipe(
+                toQueueOperationFailed,
+                Effect.andThen(
+                  queueStep(() => {
+                    this.#mailboxSync.syncMailboxMessages(snapshot);
+                    this.#mailboxSync.emitQueue(agent.id);
+                    this.#drain.scheduleDrain(agent.id);
+                  }),
+                ),
+              )
+            : queueStep(() => {
                 this.#mailboxSync.syncMailboxMessages(snapshot);
                 this.#mailboxSync.emitQueue(agent.id);
-                this.#drain.scheduleDrain(agent.id);
               }),
-            ),
-          ),
         ),
       );
-    yield* this.#mailbox.markRunning(input.deliveryId, turnId).pipe(toQueueOperationFailed);
+    // This receipt belongs to the captured request. Do not associate it with a replacement
+    // client/session. A local write failure retains the reservation and never resends the RPC.
+    if (
+      this.#providers.clientForAgent(agent) !== client ||
+      this.#store.activeProviderSession(agent.id)?.externalSessionId !== session.externalSessionId
+    )
+      return;
+    yield* this.#mailbox.confirmSteered(input.deliveryId, turnId).pipe(
+      toQueueOperationFailed,
+      Effect.tapError(() =>
+        queueStep(() => this.#mailboxSync.retryDeliveryReconciliation(agent.id, turnId, [input.deliveryId], true)),
+      ),
+    );
+    if (this.#mailbox.getDelivery(input.deliveryId)?.delivery.status === "cancelled") return;
     yield* queueStep(() => {
       this.#mailboxSync.syncMailboxMessages(snapshot);
       this.#mailboxSync.emitQueue(agent.id);
       this.#conversation.emitConversation(snapshot, "queue.message-steered", { deliveryId: input.deliveryId });
+      this.#drain.scheduleDrain(agent.id);
     });
   }, Effect.uninterruptible);
 }

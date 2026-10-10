@@ -54,7 +54,8 @@ export function queuedDeliveriesInOrder(snapshot: QueueSnapshot | undefined): Qu
  * belongs to the running turn, which the activity line above is showing. An answer from another
  * agent goes too: the waiting block above the panel shows it with the question it answers.
  *
- * Two exceptions keep the panel open with nothing running. A held queue waits on
+ * Pending acceptance stays visible even if its target turn has ended or its body is rendered.
+ * Two other exceptions keep the panel open with nothing running. A held queue waits on
  * a channel turn on another thread, and a queue whose head is being edited on
  * another device waits on that edit. Neither gives this agent something running,
  * and closing the panel would take every waiting message off the screen.
@@ -77,9 +78,10 @@ export function presentQueueDeliveries(input: {
   const steering = snapshot.deliveries.filter(
     (delivery) =>
       delivery.status === "starting" &&
-      Boolean(input.activeTurnId) &&
-      delivery.turnId === input.activeTurnId &&
-      !input.renderedMessageIds.has(delivery.id),
+      (delivery.error !== null ||
+        (Boolean(input.activeTurnId) &&
+          delivery.turnId === input.activeTurnId &&
+          !input.renderedMessageIds.has(delivery.id))),
   );
   return [...queued, ...steering];
 }
@@ -101,6 +103,7 @@ export function queueAfterTurnCompleted(snapshot: QueueSnapshot, turnId: string)
     (delivery) =>
       !(
         (delivery.status === "starting" || delivery.status === "running") &&
+        !(delivery.status === "starting" && delivery.error !== null) &&
         (delivery.turnId === null || delivery.turnId === turnId)
       ),
   );

@@ -29,7 +29,7 @@ import {
 } from "./agent/plan-updates";
 import { isBalanceDiagnostic, isPlanLimitDiagnostic } from "./agent/provider-diagnostics";
 import { USAGE_LIMIT_METHOD } from "./agent/usage-limit-gate";
-import { type AgentProvider, RequestTimeoutError } from "./agent-client";
+import { type AgentProvider, InputNotAcceptedError, RequestTimeoutError } from "./agent-client";
 import { BROWSER_TOOL_DEFINITIONS, OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
 import { type ClaudeHistoryOptions, claudeHistoryFromMessages, claudeHistoryReader } from "./claude-history";
 import {
@@ -832,7 +832,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const runtime = yield* providerSync(() => this.#requireThread(threadId));
     const expectedTurnId = yield* providerSync(() => requiredString(params, "expectedTurnId"));
     if (!runtime.activeTurn || runtime.activeTurn.id !== expectedTurnId) {
-      return yield* providerFailure(new Error("The active Claude turn changed before steering was accepted."));
+      return yield* providerFailure(
+        new InputNotAcceptedError("turn/steer", "The active Claude turn changed before steering was accepted."),
+      );
     }
     const clientId = getString(params, "clientUserMessageId");
     const messageId = clientId && isUuid(clientId) ? clientId : randomUUID();

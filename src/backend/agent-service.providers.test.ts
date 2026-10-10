@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readdir, realpath, symlink, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, realpath, symlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
 import { serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
@@ -39,7 +39,9 @@ import {
   waitFor,
   waitForQueue,
 } from "./agent-service-test-harness";
+import { AppServerError } from "./app-server-client";
 import { runCauseEffect } from "./effect-boundary";
+import { LineTooLongError } from "./jsonl";
 import { loginShellPath, type McpToolRuntimes, NO_MCP_TOOL_RUNTIMES } from "./mcp-provider-shapes";
 import type { DynamicToolCallParams } from "./protocol";
 import { NO_PROVIDER_CREDENTIALS } from "./provider-drivers";
@@ -1331,6 +1333,52 @@ describe.sequential("AgentService: providers", () => {
   // The timeout branch of a turn start keeps the delivery waiting for lifecycle events instead of
   // sending the work again. Those events are the only way that delivery can end, and they arrive on
   // the routing a refresh removes.
+  it.each(["transport", "decode"])(
+    "keeps the input batch reserved after an unconfirmed start %s failure",
+    async (kind) => {
+      const { store, mailbox } = stores(root);
+      const client = new FakeAgentClient("codex", "DONE", false, true, {}, async (method) => {
+        if (method === "turn/start")
+          throw new Error(kind === "transport" ? "Provider connection lost." : "Invalid turn response.");
+      });
+      service = createTestService({ store, mailbox, preferredProvider: "codex", clientFactory: () => client });
+      await runCauseEffect(service.initialize());
+      const receipt = await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Start once." }));
+      await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.error !== null);
+      expect(service.listQueue("chief").deliveries[0]).toMatchObject({
+        id: receipt.deliveries[0]?.id,
+        status: "starting",
+        error: expect.stringContaining("not confirmed"),
+      });
+      await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Wait behind it." }));
+      expect(service.listQueue("chief").deliveries.map((delivery) => delivery.status)).toEqual(["starting", "queued"]);
+      expect(client.requests.filter((request) => request.method === "turn/start")).toHaveLength(1);
+    },
+  );
+
+  it.each(["unknown", "refused"])("does not use quota text as input acceptance evidence: %s", async (kind) => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex", "DONE", false, true, {}, async (method) => {
+      if (method === "turn/start")
+        throw new AppServerError(
+          "You've hit your session limit. Try again later.",
+          kind === "unknown" ? -32603 : -32600,
+        );
+    });
+    service = createTestService({ store, mailbox, preferredProvider: "codex", clientFactory: () => client });
+    await runCauseEffect(service.initialize());
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    const receipt = await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Start once." }));
+    await waitFor(() => events.some((event) => event.type === "usage-limit-reached"));
+    expect(service.listQueue("chief").deliveries[0]).toMatchObject({
+      id: receipt.deliveries[0]?.id,
+      text: "Start once.",
+      status: kind === "unknown" ? "starting" : "queued",
+    });
+    expect(client.requests.filter((request) => request.method === "turn/start")).toHaveLength(1);
+  });
+
   it("keeps a session routed while an unconfirmed turn start waits", async () => {
     const { store, mailbox } = stores(root);
     let timedOut = false;
@@ -1378,6 +1426,16 @@ describe.sequential("AgentService: providers", () => {
     // The turn the provider did start after all, reported the only way it can be: its events.
     const turnId = "turn-after-the-timeout";
     client.emit("notification", notification("turn/started", { threadId: session, turn: { id: turnId } }));
+    const id = service.listQueue("chief").deliveries[0]?.id;
+    assert(id);
+    client.emit(
+      "notification",
+      notification("item/started", {
+        threadId: session,
+        turnId,
+        item: { id: "accepted-input", type: "userMessage", clientId: id, content: [{ type: "text", text: "Start." }] },
+      }),
+    );
     client.emit(
       "notification",
       notification("turn/completed", { threadId: session, turn: { id: turnId, status: "completed" } }),
@@ -1386,6 +1444,186 @@ describe.sequential("AgentService: providers", () => {
     await waitForQueue(service, "chief", (queue) =>
       queue.deliveries.every((delivery) => delivery.status === "completed"),
     );
+  });
+
+  it("does not revive a cancelled unconfirmed start after late input evidence", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex", "DONE", false, true, {}, async (method) => {
+      if (method === "turn/start") throw new RequestTimeoutError("Codex", "turn/start");
+    });
+    service = createTestService({ store, mailbox, preferredProvider: "codex", clientFactory: () => client });
+    await runCauseEffect(service.initialize());
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    const receipt = await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Start once." }));
+    const id = receipt.deliveries[0]?.id;
+    assert(id);
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.error !== null);
+    await runCauseEffect(service.cancelQueuedMessage("chief", id));
+    const threadId = store.activeProviderSession("chief")?.externalSessionId;
+    assert(threadId);
+    client.emit("notification", notification("turn/started", { threadId, turn: { id: "late-turn" } }));
+    client.emit(
+      "notification",
+      notification("item/started", {
+        threadId,
+        turnId: "late-turn",
+        item: { id: "late-input", type: "userMessage", clientId: id, content: [] },
+      }),
+    );
+    client.emit(
+      "notification",
+      notification("turn/completed", { threadId, turn: { id: "late-turn", status: "completed" } }),
+    );
+    await waitFor(() => events.some((event) => event.type === "turn-completed" && event.turnId === "late-turn"));
+    expect(service.listQueue("chief").deliveries[0]).toMatchObject({ id, status: "cancelled" });
+    expect(client.requests.filter((request) => request.method === "turn/start")).toHaveLength(1);
+  });
+
+  it.each(["missing", "accepted", "active"])(
+    "keeps unconfirmed start recovery tied to its input identity: %s",
+    async (evidence) => {
+      const { store, mailbox } = stores(root);
+      const client = new FakeAgentClient("codex", "DONE", false, true, {}, async (method) => {
+        if (method === "turn/start") throw new RequestTimeoutError("Codex", "turn/start");
+      });
+      service = createTestService({ store, mailbox, preferredProvider: "codex", clientFactory: () => client });
+      await runCauseEffect(service.initialize());
+      const receipt = await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Start once." }));
+      const id = receipt.deliveries[0]?.id;
+      assert(id);
+      await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.error !== null);
+      const threadId = store.activeProviderSession("chief")?.externalSessionId;
+      assert(threadId);
+      await runCauseEffect(service.stop());
+      const restored = stores(root);
+      const next = new FakeAgentClient("codex", "DONE", false);
+      next.threadRead = () => ({
+        thread: {
+          id: threadId,
+          turns: [
+            {
+              id: "recovered-turn",
+              status: evidence === "active" ? "inProgress" : "completed",
+              items:
+                evidence === "missing"
+                  ? []
+                  : [
+                      {
+                        type: "userMessage",
+                        id: "recovered-input",
+                        clientId: id,
+                        content: [{ type: "text", text: "Start once." }],
+                      },
+                    ],
+            },
+          ],
+        },
+      });
+      service = createTestService({ ...restored, preferredProvider: "codex", clientFactory: () => next });
+      await runCauseEffect(service.initialize());
+      expect(service.listQueue("chief").deliveries[0]).toMatchObject({
+        id,
+        text: "Start once.",
+        status: evidence === "missing" ? "starting" : evidence === "active" ? "running" : "completed",
+      });
+      expect(next.requests.filter((request) => request.method === "turn/start")).toHaveLength(0);
+    },
+  );
+
+  it.each([
+    ["unavailable", "unconfirmed"],
+    ["oversized", "unconfirmed"],
+    ["empty", "unconfirmed"],
+    ["unavailable", "accepted"],
+    ["oversized", "accepted"],
+    ["empty", "accepted"],
+  ])("preserves a recovered batch with %s history and %s acceptance", async (history, acceptance) => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex", "DONE", false, true, {}, async (method) => {
+      if (method === "turn/start" && acceptance === "unconfirmed") throw new RequestTimeoutError("Codex", "turn/start");
+    });
+    service = createTestService({ store, mailbox, preferredProvider: "codex", clientFactory: () => client });
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(store.getOrCreate("chief"));
+    const request = await runCauseEffect(
+      mailbox.enqueue({
+        sender: { kind: "agent", agentId: "chief" },
+        recipientAgentIds: ["worker", "other-worker"],
+        text: "Report",
+        expectsReply: true,
+      }),
+    );
+    const reply = await runCauseEffect(
+      mailbox.enqueue({
+        sender: { kind: "agent", agentId: "worker" },
+        recipientAgentIds: ["chief"],
+        text: "Original reply",
+        replyToMessageId: request.messageId,
+        expectsReply: false,
+      }),
+    );
+    expect(mailbox.nextQueued("chief")).toBeNull();
+    const file = join(root, "recovery-input.txt");
+    await writeFile(file, "Original recovery attachment");
+    const [draft] = await runCauseEffect(mailbox.prepareImportedAttachments([file], []));
+    assert(draft);
+    const sent = await runCauseEffect(
+      service.sendMessage({
+        agentId: "chief",
+        text: "Original user input",
+        attachmentDraftIds: [draft.id],
+      }),
+    );
+    const ids = [reply.deliveries[0]?.id, sent.deliveries[0]?.id];
+    await waitForQueue(
+      service,
+      "chief",
+      (queue) =>
+        queue.deliveries.length === 2 &&
+        queue.deliveries.every((delivery) =>
+          acceptance === "unconfirmed"
+            ? delivery.status === "starting" && delivery.error !== null
+            : delivery.status === "running",
+        ),
+    );
+    const original = service
+      .listQueue("chief")
+      .deliveries.map(({ id, text, attachments }) => ({ id, text, attachments }));
+    expect(original.map((delivery) => delivery.id)).toEqual(ids);
+    expect(original.map((delivery) => delivery.text)).toEqual(["Original reply", "Original user input"]);
+    expect(client.requests.filter((entry) => entry.method === "turn/start")).toHaveLength(1);
+    const sentId = sent.deliveries[0]?.id;
+    assert(sentId);
+    const managed = mailbox.getDelivery(sentId)?.managedAttachments[0];
+    assert(managed);
+    await runCauseEffect(service.stop());
+    const restored = stores(root);
+    const next = new FakeAgentClient("codex", "DONE", false, true, {}, async (method) => {
+      if (method === "thread/read" && history === "oversized") throw new LineTooLongError("Codex");
+    });
+    if (history === "unavailable") Object.defineProperty(next, "readHistory", { value: undefined });
+    service = createTestService({ ...restored, preferredProvider: "codex", clientFactory: () => next });
+    await runCauseEffect(service.initialize());
+    const recovered = service.listQueue("chief").deliveries;
+    expect(recovered.map(({ id, text, attachments }) => ({ id, text, attachments }))).toEqual(original);
+    expect(recovered.map((delivery) => delivery.status)).toEqual(
+      acceptance === "unconfirmed" ? ["starting", "starting"] : ["interrupted", "interrupted"],
+    );
+    if (acceptance === "unconfirmed")
+      expect(recovered.map((delivery) => delivery.error)).toEqual([
+        sourceText("error.agent.inputUnconfirmed"),
+        sourceText("error.agent.inputUnconfirmed"),
+      ]);
+    expect(await readFile(managed.path, "utf8")).toBe("Original recovery attachment");
+    expect(restored.mailbox.getDelivery(sentId)?.managedAttachments[0]?.path).toBe(managed.path);
+    expect(
+      next.requests.filter((entry) => entry.method === "turn/start" || entry.method === "turn/steer"),
+    ).toHaveLength(0);
+    if (history !== "empty")
+      expect(next.requests.filter((entry) => entry.method === "thread/read")).toHaveLength(
+        history === "oversized" ? 1 : 0,
+      );
   });
 
   // The manifest is the only record that survives a restart, and the in-memory refresh mark does

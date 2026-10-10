@@ -1,7 +1,15 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.agent", {
+  "error.agent.inputUnconfirmed":
+    "Delivery of this input was not confirmed. OpenBot will keep it and will not resend it automatically. Cancelling this entry does not stop work already accepted by the provider.",
   // Agent errors that the main process and the backend send.
+  "error.agent.compactionStillRunning":
+    "Context compaction has not ended. Queued messages will wait for its completion or provider termination.",
+  "error.agent.compactionUnconfirmed":
+    "Context compaction was not confirmed. Queued messages will wait for lifecycle events or provider termination.",
+  "error.agent.compactionInputWaiting":
+    "The provider did not accept these messages during context compaction. They remain queued until matching activity ends or the provider stops.",
   "error.agent.approvalWhileDeleting": "Cannot grant approval while the agent is being deleted.",
   "error.agent.accessLocalOnly": "Agent access can only be changed on the computer that runs the agent.",
   "error.agent.duplicateCleanupFailed": "Agent duplication failed and the incomplete copy could not be removed.",

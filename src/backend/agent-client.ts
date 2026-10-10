@@ -79,6 +79,16 @@ export class RequestTimeoutError extends Error {
   }
 }
 
+/** An adapter rejected this operation before it submitted any input to the provider. */
+export class InputNotAcceptedError extends Error {
+  constructor(
+    readonly method: "turn/start" | "turn/steer",
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
 /** What of the CLI's last stderr line a status message carries. The full line is in the log. */
 const EXIT_DETAIL_LIMIT = 300;
 

@@ -25,6 +25,41 @@ describe("OpenBot connected desktop shell", () => {
     installOpenbotStub();
   });
 
+  it("shows an unconfirmed input after turn completion and lets the user cancel without resending", async () => {
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    const error =
+      "Delivery of this input was not confirmed. OpenBot will keep it and will not resend it automatically. Cancelling this entry does not stop work already accepted by the provider.";
+    const pending = queuedDelivery("unconfirmed-input", "Use staging", null, {
+      status: "starting",
+      turnId: "turn-live",
+      error,
+    });
+    emitAgentEvent?.({ type: "turn-started", agentId: "chief", threadId: "thread-chief", turnId: "turn-live" });
+    emitAgentEvent?.({ type: "queue-changed", snapshot: { agentId: "chief", deliveries: [pending] } });
+    const panel = await screen.findByRole("region", { name: "Message queue" });
+    expect(within(panel).getByText("Delivery unconfirmed")).toBeInTheDocument();
+    expect(within(panel).getByText(error)).toBeInTheDocument();
+    emitAgentEvent?.({
+      type: "turn-completed",
+      agentId: "chief",
+      threadId: "thread-chief",
+      turnId: "turn-live",
+      status: "completed",
+    });
+    expect(within(panel).getByText(error)).toBeInTheDocument();
+    expect(within(panel).getByRole("button", { name: /^Steer queued message/u })).toBeDisabled();
+    await fireEvent.click(within(panel).getByRole("button", { name: /^Delete queued message/u }));
+    await waitFor(() =>
+      expect(window.openbot.agent.cancelQueuedMessage).toHaveBeenCalledWith({
+        agentId: "chief",
+        deliveryId: pending.id,
+      }),
+    );
+    expect(window.openbot.agent.steerQueuedMessage).not.toHaveBeenCalled();
+    expect(window.openbot.agent.sendMessage).not.toHaveBeenCalled();
+  });
+
   it("keeps a failed send in the chat and retries it with the same client id", async () => {
     vi.mocked(window.openbot.agent.sendMessage).mockRejectedValueOnce(new Error("Mailbox unavailable"));
     render(() => <App />);

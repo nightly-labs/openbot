@@ -1,6 +1,7 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("queue", {
+  "queue.item.unconfirmed": "Delivery unconfirmed",
   "queue.label": "Message queue",
   "queue.moved": "Moved queued message to position {position} of {total}.",
   "queue.attachment": "Attachment",

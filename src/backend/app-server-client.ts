@@ -2,7 +2,7 @@ import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { type DynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
-import { type AgentProvider, RequestTimeoutError } from "./agent-client";
+import { type AgentProvider, InputNotAcceptedError, RequestTimeoutError } from "./agent-client";
 import { cliSpawnTarget } from "./cli";
 import { JsonLineDecoder, LineTooLongError } from "./jsonl";
 import {
@@ -25,6 +25,17 @@ import {
 } from "./provider-history";
 import { createDiagnosticStream } from "./stderr-diagnostics";
 
+/** Only the two pinned status shapes that can establish a live-to-idle boundary. */
+export function codexActivityStatus(params: unknown): "active" | "idle" | null {
+  if (!isRecord(params) || !isRecord(params.status)) return null;
+  const status = params.status;
+  if (status.type === "idle") return "idle";
+  if (status.type !== "active" || !Array.isArray(status.activeFlags)) return null;
+  return status.activeFlags.every((flag) => flag === "waitingOnApproval" || flag === "waitingOnUserInput")
+    ? "active"
+    : null;
+}
+
 interface PendingRequest {
   resolve: (value: unknown) => void;
   reject: (error: Error) => void;
@@ -46,6 +57,39 @@ export class AppServerError extends Error {
     super(message);
     this.name = "AppServerError";
   }
+}
+
+/** Codex rejects these JSON-RPC requests before it submits a compaction turn. */
+export function isCodexCompactionStartRejected(error: unknown): boolean {
+  return error instanceof AppServerError && [-32600, -32601, -32602].includes(error.code);
+}
+
+/** Pinned Codex turn/start NotSubmitted: no input entered the active Compact turn. */
+export function isCodexCompactInputRefusal(error: unknown): boolean {
+  return (
+    error instanceof AppServerError &&
+    error.code === -32603 &&
+    error.data == null &&
+    error.message === "failed to submit turn input: ActiveTurnNotSteerable { turn_kind: Compact }"
+  );
+}
+
+/** These Codex validation/dispatch responses precede input acceptance. Internal errors do not. */
+export function isCodexInputRejected(error: unknown): boolean {
+  return error instanceof AppServerError && [-32600, -32601, -32602].includes(error.code);
+}
+
+export function isInputRejected(provider: AgentProvider, error: unknown, method: "turn/start" | "turn/steer"): boolean {
+  return (
+    (error instanceof InputNotAcceptedError && error.method === method) ||
+    (provider === "codex" && isCodexInputRejected(error))
+  );
+}
+
+/** A steer receipt confirms this request only when it names the requested turn. */
+export function decodeSteerReceipt(value: unknown, expectedTurnId: string): void {
+  const response = decodeRecordResponse(value);
+  if (response.turnId !== expectedTurnId) throw new Error("The steer response did not confirm the requested turn.");
 }
 
 export class CodexAppServerClient extends EventEmitter<ClientEvents> {

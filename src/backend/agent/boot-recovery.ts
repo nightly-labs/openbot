@@ -44,7 +44,8 @@ export interface BootRecoveryOptions {
  *   interrupted.
  * - `reconcileUnresolvedDeliveries` runs once providers are ready: asks the
  *   provider what really happened to each orphaned delivery instead of
- *   assuming, and conservatively keeps `interrupted` on any doubt — never
+ *   assuming. Inputs without an acceptance receipt remain pending unless history identifies
+ *   their exact input; already accepted work uses the conservative `interrupted` fallback. Never
  *   repeats uncertain side effects. A delivery is orphaned when the process
  *   that ran it is gone: the previous OpenBot run, or a provider CLI that
  *   exited. Any other unsettled delivery is a live turn of this run.
@@ -137,6 +138,8 @@ export class BootRecovery {
     for (const context of unresolved) {
       const { delivery } = context;
       if (!this.#orphanedDeliveryIds.delete(delivery.id)) continue;
+      const unconfirmedInput = delivery.status === "starting";
+      const unconfirmedSteer = unconfirmedInput && delivery.turnId !== null;
       const interrupted = {
         terminal: "interrupted" as const,
         reason: "OpenBot restarted before this delivery reached a confirmed terminal state.",
@@ -152,8 +155,9 @@ export class BootRecovery {
         });
         if (agent && session && client) {
           const historyKey = `${session.provider}:${session.externalSessionId}`;
-          if (this.#oversizedHistory.has(historyKey)) return interrupted;
-          if (!client.readHistory) return interrupted;
+          if (this.#oversizedHistory.has(historyKey))
+            return unconfirmedInput ? { terminal: null, reason: null } : interrupted;
+          if (!client.readHistory) return unconfirmedInput ? { terminal: null, reason: null } : interrupted;
           const batchIds = delivery.turnId ? null : unconfirmedStarts.get(delivery.recipientAgentId);
           let recovered: { turnId: string; status?: string } | undefined;
           yield* client
@@ -161,16 +165,17 @@ export class BootRecovery {
               {
                 threadId: session.externalSessionId,
                 cwd: agent.workspacePath,
-                items: delivery.turnId ? "none" : "full",
+                items: delivery.turnId && !unconfirmedSteer ? "none" : "full",
               },
               (fragment) =>
                 providerSync(() => {
                   const matches =
-                    fragment.turnId === delivery.turnId ||
+                    (!unconfirmedSteer && fragment.turnId === delivery.turnId) ||
                     fragment.items.some(
                       (item) =>
                         item.type === "userMessage" &&
                         !!item.clientId &&
+                        (!unconfirmedSteer || fragment.turnId === delivery.turnId) &&
                         (item.clientId === delivery.id || batchIds?.has(item.clientId) === true),
                     );
                   if (matches) {
@@ -191,23 +196,27 @@ export class BootRecovery {
               toBootRecoveryFailed,
             );
           const turn = recovered ? { id: recovered.turnId, status: recovered.status } : undefined;
-          if (turn && !delivery.turnId) {
+          if (turn && (!delivery.turnId || unconfirmedSteer)) {
             yield* this.#mailbox.markRunning(delivery.id, turn.id).pipe(toBootRecoveryFailed);
           }
+          if (unconfirmedInput && (!turn || !["completed", "failed", "interrupted"].includes(turn.status ?? "")))
+            return { terminal: null, reason: null };
           if (turn?.status === "completed") {
             return { terminal: "completed" as const, reason: null };
           } else if (turn?.status === "failed") {
             return { terminal: "failed" as const, reason: "The recovered Codex turn failed." };
           }
         }
-        return interrupted;
-      }).pipe(Effect.catch(() => Effect.succeed(interrupted)));
-      // A failed provider read keeps the conservative interrupted result; never replay side effects.
-      yield* this.#mailbox.markTerminal(delivery.id, terminal, reason).pipe(toBootRecoveryFailed);
+        return unconfirmedInput ? { terminal: null, reason: null } : interrupted;
+      }).pipe(Effect.catch(() => Effect.succeed(unconfirmedInput ? { terminal: null, reason: null } : interrupted)));
+      // A failed read preserves pending acceptance; already accepted work keeps the interrupted
+      // fallback. Neither case authorizes replay of provider side effects.
+      if (terminal !== null)
+        yield* this.#mailbox.markTerminal(delivery.id, terminal, reason).pipe(toBootRecoveryFailed);
       yield* recoveryStep(() => {
         const agent = this.#store.list().find((candidate) => candidate.id === delivery.recipientAgentId);
         const threadId = this.#hooks.deliveryThreadId?.(delivery.id) ?? agent?.threadId;
-        if (agent && threadId) {
+        if (agent && threadId && terminal !== null) {
           const recoveryTurnId =
             delivery.turnId ?? this.#store.database.readConversationRuntime(agent.id, threadId).activeTurnId;
           const changedMessages = this.#store.database

@@ -175,7 +175,12 @@ export class MailboxSync {
     }
   }
 
-  retryDeliveryReconciliation(agentId: string, turnId?: string, deliveryIds: readonly string[] = []): void {
+  retryDeliveryReconciliation(
+    agentId: string,
+    turnId?: string,
+    deliveryIds: readonly string[] = [],
+    confirmedSteer = false,
+  ): void {
     queueMicrotask(() => {
       Effect.runFork(
         Effect.gen({ self: this }, function* () {
@@ -184,13 +189,18 @@ export class MailboxSync {
           // the turn id came from the provider, and it prevents a second drain from replaying it.
           // Check the active marker again so a delayed retry cannot claim a new turn's rows.
           const activeTurn = this.#conversation.workingSnapshot(agentId)?.activeTurnId;
-          if (turnId && activeTurn === turnId) {
+          if (turnId && (activeTurn === turnId || confirmedSteer)) {
             const accepted = new Set(deliveryIds);
             for (const deliveryId of accepted) {
               const current = this.#mailbox.getDelivery(deliveryId)?.delivery;
-              if (current?.recipientAgentId !== agentId || current.status !== "starting" || current.turnId !== null)
+              if (
+                current?.recipientAgentId !== agentId ||
+                current.status !== "starting" ||
+                (current.turnId !== null && current.turnId !== turnId)
+              )
                 continue;
-              yield* this.#mailbox.markRunning(deliveryId, turnId);
+              if (current.turnId === turnId) yield* this.#mailbox.confirmSteered(deliveryId, turnId);
+              else if (activeTurn === turnId) yield* this.#mailbox.markRunning(deliveryId, turnId);
             }
           }
           yield* Effect.sync(() => {

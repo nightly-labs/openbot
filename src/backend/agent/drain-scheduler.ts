@@ -1,14 +1,15 @@
 import { AGENT_PROVIDERS } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Result, Schema } from "effect";
-import type { AgentProvider } from "../agent-client";
+import type { AgentClient, AgentProvider } from "../agent-client";
 import type { AgentStore } from "../agent-store";
+import { isCodexCompactInputRefusal, isInputRejected } from "../app-server-client";
 import type { ChannelService } from "../channel-service";
 import { causeHelpers } from "../effect-boundary";
 import type { DeliveryContext, MailboxStore } from "../mailbox-store";
 import type { MessagingThreads } from "../messaging/messaging-threads";
 import { decodeTurnResponse } from "../protocol";
-import type { ContextCompaction } from "./context-compaction";
+import type { CompactionInputAttempt, ContextCompaction } from "./context-compaction";
 import type { ConversationRuntime } from "./conversation-runtime";
 import {
   agentNamesById,
@@ -347,6 +348,9 @@ export class DrainScheduler {
     // The model this start asks for. The agent can move to another one while `turn/start` waits, and
     // a plan limit belongs to the model the provider refused.
     let requestedModel: string | null = null;
+    let requestedThreadId: string | null = null;
+    let requestedClient: AgentClient | null = null;
+    let inputAttempt: CompactionInputAttempt | null = null;
     yield* Effect.gen({ self: this }, function* () {
       for (const item of batch) yield* this.#mailbox.markStarting(item.delivery.id).pipe(toDeliveryStartFailed);
       this.#mailboxSync.emitQueue(delivery.recipientAgentId);
@@ -404,13 +408,17 @@ export class DrainScheduler {
             .pipe(toDeliveryStartFailed);
         return;
       }
+      const existingThread = this.#store.activeProviderSession(agent.id)?.externalSessionId;
+      if (client.provider === "codex" && existingThread && !execution) {
+        inputAttempt = this.#compaction.beginInput(agent.id, existingThread, client);
+      }
       let threadId = yield* this.#threads.ensureThread(agent, client, execution?.threadId).pipe(toDeliveryStartFailed);
       const snapshot = this.#conversation.ensureSnapshot(agent.id, threadId);
       // A turn started on this thread while the provider and the thread were prepared. The user
       // cannot see that race, so the delivery goes back to the head of the queue rather than
       // failing: a message to a busy agent always waits. `drainAgent` reschedules it in its
       // `finally`, and `mayDrain` holds it there until the turn ends.
-      if (snapshot.activeTurnId) {
+      if (snapshot.activeTurnId || !this.#compaction.mayDrain(agent.id)) {
         for (const item of batch) yield* this.#mailbox.restoreQueued(item.delivery.id).pipe(toDeliveryStartFailed);
         this.#mailboxSync.emitQueue(agent.id);
         return;
@@ -468,6 +476,13 @@ export class DrainScheduler {
           // between, and an endpoint removed during that wait finds the process still running. The
           // retry below calls this as well, so the recovered thread is checked too.
           yield* drainStep(requireServedModel);
+          requestedThreadId = providerThreadId;
+          requestedClient = client;
+          if (client.provider === "codex") {
+            if (inputAttempt && inputAttempt.threadId !== providerThreadId)
+              this.#compaction.settleInput(inputAttempt, false);
+            inputAttempt = this.#compaction.beginInput(agent.id, providerThreadId, client);
+          }
           return yield* this.#threads
             .requestWithArchivedThreadRecovery(
               agent,
@@ -539,6 +554,11 @@ export class DrainScheduler {
       Effect.catch((failure) =>
         Effect.gen({ self: this }, function* () {
           const error = failure.cause;
+          if (inputAttempt && !(requestedClient?.provider === "codex" && isCodexCompactInputRefusal(error))) {
+            // A turn event cannot prove which input an uncertain request carried. Preserve the
+            // association only after a receipt; otherwise exact user-item evidence must confirm it.
+            this.#compaction.settleInput(inputAttempt, confirmedTurnId !== null);
+          }
           // The provider accepted the turn. Keep its active reservation even when a mailbox write
           // failed: restoring or replaying any delivery could submit the same provider turn twice.
           // The lifecycle association and the targeted mailbox retry finish rows left in starting.
@@ -553,7 +573,10 @@ export class DrainScheduler {
           }
           if (isRequestTimeout(error, "turn/start")) {
             turnMayRun = true;
+            for (const item of batch)
+              yield* this.#mailbox.markInputUnconfirmed(item.delivery.id).pipe(toDeliveryStartFailed);
             this.#channels?.deliveryUncertain(delivery.id);
+            this.#mailboxSync.emitQueue(delivery.recipientAgentId);
             this.#hooks.emitError(
               "delivery_start_unconfirmed",
               `${error.providerName} did not confirm the turn start in time. OpenBot will wait for lifecycle events instead of retrying potentially duplicated work.`,
@@ -561,7 +584,44 @@ export class DrainScheduler {
             );
             return;
           }
+          // This exact response proves that the entire batch was not accepted. Its attempt keeps
+          // the matching owner and observed lifecycle even if completion preceded the response.
+          // Without terminal evidence, hold the queue instead of guessing or polling.
+          if (
+            requestedClient?.provider === "codex" &&
+            requestedThreadId !== null &&
+            isCodexCompactInputRefusal(error) &&
+            inputAttempt !== null
+          ) {
+            this.#compaction.refuseInput(inputAttempt);
+            for (const item of batch) yield* this.#mailbox.restoreQueued(item.delivery.id).pipe(toDeliveryStartFailed);
+            this.#mailboxSync.emitQueue(delivery.recipientAgentId);
+            this.#hooks.emitError(
+              "delivery_compaction_waiting",
+              sourceText("error.agent.compactionInputWaiting"),
+              delivery.recipientAgentId,
+            );
+            return;
+          }
           const reason = this.#hooks.redactMcp(error instanceof Error ? error.message : String(error));
+          if (requestedClient && !isInputRejected(requestedClient.provider, error, "turn/start")) {
+            // A transport/internal/decode failure after the RPC can follow acceptance. Keep the
+            // whole batch reserved instead of failing its first input and replaying companions.
+            turnMayRun = true;
+            for (const item of batch)
+              yield* this.#mailbox.markInputUnconfirmed(item.delivery.id).pipe(toDeliveryStartFailed);
+            this.#channels?.deliveryUncertain(delivery.id);
+            // Quota text can still close the budget gate, but it cannot prove this input was not accepted.
+            if (!messagingDelivery && isPlanLimitDiagnostic(reason))
+              yield* this.#usageLimits.reached(delivery.recipientAgentId, null, requestedModel);
+            this.#mailboxSync.emitQueue(delivery.recipientAgentId);
+            this.#hooks.emitError(
+              "delivery_start_unconfirmed",
+              sourceText("error.agent.inputUnconfirmed"),
+              delivery.recipientAgentId,
+            );
+            return;
+          }
           // A spent plan window refused the start, so nothing ran. The messages wait for the reset, and
           // a channel task goes back to its channel, so that its assignment does not reserve the host.
           if (!messagingDelivery && isPlanLimitDiagnostic(reason)) {
@@ -601,6 +661,7 @@ export class DrainScheduler {
       ),
       Effect.ensuring(
         Effect.sync(() => {
+          if (inputAttempt) this.#compaction.settleInput(inputAttempt, requestedClient !== null);
           releaseRuntimeRefresh();
           if (!confirmedTurnId && !turnMayRun) releaseReservation();
           for (const provider of claimed) this.#startingDeliveries.set(provider, this.#starting(provider) - 1);

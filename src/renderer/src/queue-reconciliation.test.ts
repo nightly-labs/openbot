@@ -96,6 +96,17 @@ describe("presentQueueDeliveries", () => {
   const present = (queue: QueueSnapshot | undefined, activeTurnId: string | null, rendered: string[] = []) =>
     ids(presentQueueDeliveries({ snapshot: queue, activeTurnId, renderedMessageIds: new Set(rendered) }));
 
+  it("keeps unconfirmed inputs visible and intact when another turn completes", () => {
+    const pending = {
+      ...delivery({ id: "pending", status: "starting", turnId: "turn-1" }),
+      error: "Acceptance is unknown.",
+    };
+    const queue = snapshot(pending, delivery({ id: "waiting", status: "queued", position: 1 }));
+    expect(queueAfterTurnCompleted(queue, "turn-1")).toBe(queue);
+    expect(present(queue, null, ["pending"])).toEqual(["waiting", "pending"]);
+    expect(present(queue, "another-turn")).toEqual(["waiting", "pending"]);
+  });
+
   it("shows nothing between turns, however much is waiting", () => {
     const queue = snapshot(
       delivery({ id: "waiting", status: "queued", position: 1 }),

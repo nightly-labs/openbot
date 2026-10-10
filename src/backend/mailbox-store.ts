@@ -1221,6 +1221,38 @@ export class MailboxStore {
     }
   }, Effect.uninterruptible).bind(this);
 
+  markInputUnconfirmed = Effect.fn("MailboxStore.markInputUnconfirmed")(function* (
+    this: MailboxStore,
+    deliveryId: string,
+  ): Effect.fn.Return<void, StoredStateFailure> {
+    yield* this.#updateDeliveryEffect(deliveryId, ["starting"], {
+      error: sourceText("error.agent.inputUnconfirmed"),
+    });
+  }, Effect.uninterruptible).bind(this);
+
+  /** Confirm only this steer attempt; a late receipt cannot revive a cancelled or requeued input. */
+  confirmSteered = Effect.fn("MailboxStore.confirmSteered")(function* (
+    this: MailboxStore,
+    deliveryId: string,
+    turnId: string,
+  ): Effect.fn.Return<void, StoredStateFailure> {
+    const delivery = this.getDelivery(deliveryId)?.delivery;
+    if (delivery?.status !== "starting" || delivery.turnId !== turnId) return;
+    yield* this.markRunning(deliveryId, turnId).pipe(
+      Effect.tapError(() => Effect.sync(() => this.restorePersistedState())),
+    );
+    // The matching turn may already have ended while the receipt was in flight. Its outcome
+    // becomes applicable only now, after this exact input has an acceptance receipt.
+    const terminal = this.#state.deliveries.find(
+      (candidate) =>
+        candidate.recipientAgentId === delivery.recipientAgentId &&
+        candidate.turnId === turnId &&
+        ["completed", "failed", "interrupted"].includes(candidate.status),
+    );
+    if (terminal?.status === "completed" || terminal?.status === "failed" || terminal?.status === "interrupted")
+      yield* this.markTerminal(deliveryId, terminal.status, terminal.error);
+  }, Effect.uninterruptible).bind(this);
+
   markTerminal = Effect.fn("MailboxStore.markTerminal")(function* (
     this: MailboxStore,
     deliveryId: string,
@@ -1258,7 +1290,8 @@ export class MailboxStore {
       (candidate) => candidate.id === deliveryId && candidate.recipientAgentId === agentId,
     );
     if (!delivery) throw new Error(sourceText("error.backend.queuedMessageNotFound"));
-    if (delivery.status !== "queued") throw new Error(sourceText("error.backend.cancelQueuedOnly"));
+    if (delivery.status !== "queued" && !(delivery.status === "starting" && delivery.error !== null))
+      throw new Error(sourceText("error.backend.cancelQueuedOnly"));
     this.#finishCancellation(delivery, true);
   }
 
@@ -1560,8 +1593,8 @@ export class MailboxStore {
   }, Effect.uninterruptible);
 
   /**
-   * A held delivery keeps its place. `listQueue` reports it now, so a caller may send its id with
-   * the rest; both that list and one without it are accepted, and neither moves the held message.
+   * An edit hold or an unconfirmed submission keeps its queue slot. Callers reorder queued
+   * deliveries only; an edit-held id may be included, but a submitted id is not reorderable.
    */
 
   reorderQueue = Effect.fn("MailboxStore.reorderQueue")(function* (
@@ -1571,11 +1604,12 @@ export class MailboxStore {
   ): Effect.fn.Return<void, StoredStateFailure> {
     try {
       const allQueued = this.#state.deliveries.filter(
-        (delivery) => delivery.recipientAgentId === agentId && delivery.status === "queued",
+        (delivery) =>
+          delivery.recipientAgentId === agentId && (delivery.status === "queued" || delivery.status === "starting"),
       );
       const heldIds = new Set(allQueued.filter((delivery) => delivery.editId).map((delivery) => delivery.id));
       const requested = deliveryIds.filter((deliveryId) => !heldIds.has(deliveryId));
-      const queued = allQueued.filter((delivery) => !delivery.editId);
+      const queued = allQueued.filter((delivery) => delivery.status === "queued" && !delivery.editId);
       const expected = new Set(queued.map((delivery) => delivery.id));
       if (
         requested.length !== queued.length ||
@@ -1587,7 +1621,9 @@ export class MailboxStore {
       let nextVisible = 0;
       const orderedIds = [...allQueued]
         .sort(compareQueueOrder)
-        .map((delivery) => (delivery.editId ? delivery.id : requested[nextVisible++]));
+        .map((delivery) =>
+          delivery.editId || delivery.status === "starting" ? delivery.id : requested[nextVisible++],
+        );
       const orders = new Map(orderedIds.map((deliveryId, index) => [deliveryId, index]));
       for (const delivery of allQueued) {
         delivery.queueOrder = orders.get(delivery.id) ?? delivery.queueOrder;
@@ -1609,7 +1645,7 @@ export class MailboxStore {
       yield* this.#updateDeliveryEffect(deliveryId, ["queued"], {
         status: "starting",
         turnId,
-        error: null,
+        error: sourceText("error.agent.inputUnconfirmed"),
       });
     } catch (cause) {
       return yield* new StoredStateFailure({ cause });

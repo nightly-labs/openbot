@@ -8,6 +8,7 @@ import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+import { InputNotAcceptedError } from "./agent-client";
 import { AgentStore } from "./agent-store";
 import { CLAUDE_IDLE_THREAD_LIMIT, CLAUDE_THREAD_IDLE_RELEASE_MS, ClaudeAgentClient } from "./claude-client";
 import { mergeProviderHistory, newAssistantMessage, snapshotFromThread } from "./conversation-snapshots";
@@ -849,6 +850,20 @@ fi
     const iterator = prompt[Symbol.asyncIterator]();
     const first = await iterator.next();
     expect(first.value).toMatchObject({ uuid: turnId, message: { content: "Hello" } });
+
+    await expect(
+      runCauseEffect(
+        client.request(
+          "turn/steer",
+          {
+            threadId,
+            expectedTurnId: "another-turn",
+            input: [{ type: "text", text: "Must not enter the stream." }],
+          },
+          decodeRecordResponse,
+        ),
+      ),
+    ).rejects.toBeInstanceOf(InputNotAcceptedError);
 
     await expect(
       runCauseEffect(

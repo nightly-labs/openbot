@@ -176,9 +176,10 @@ export interface ProviderHooks {
    * a sign-out that an account refresh found, or a new client for the same provider. `#handleExit`
    * skips such a client, and it can never answer its pending prompts, approvals and browser
    * takeovers, or complete the turns it ran. It runs after the stop, so a request the process sent
-   * while it stopped is cleared too.
+   * while it stopped is cleared too. `stopped` confirms that stop() succeeded; a failed stop is
+   * not evidence that an owned provider operation ended.
    */
-  onClientStopped(client: AgentClient): Effect.Effect<void>;
+  onClientStopped(client: AgentClient, stopped: boolean): Effect.Effect<void>;
   /** True once stop() has begun, so a client exiting during shutdown does not trigger a restart. */
   isStopping(): boolean;
   /** True while a turn on this provider runs or starts, which replacing its CLI would cut short. */
@@ -650,8 +651,8 @@ export class ProviderRuntime implements ProviderPort {
       this.#released.add(provider);
       this.#conversation.unloadClientThreads(client);
       logger.info("Stopped an idle provider CLI.", { provider });
-      yield* client.stop().pipe(toProviderOperationFailed).pipe(Effect.ignore);
-      yield* this.#hooks.onClientStopped(client);
+      const stopped = yield* Effect.result(client.stop());
+      yield* this.#hooks.onClientStopped(client, Result.isSuccess(stopped));
     }
     for (const [agentId, confined] of this.#confined) {
       if (confined.client.canReleaseProcess?.() === false) {
@@ -1169,8 +1170,8 @@ export class ProviderRuntime implements ProviderPort {
         this.#accounts.delete(provider);
         this.#conversation.unloadClientThreads(client);
       });
-      yield* client.stop().pipe(Effect.catch(() => Effect.void));
-      yield* this.#hooks.onClientStopped(client);
+      const stopped = yield* Effect.result(client.stop());
+      yield* this.#hooks.onClientStopped(client, Result.isSuccess(stopped));
     }
     yield* Effect.forEach(
       [...this.#confined].filter(([, confined]) => confined.client.provider === provider),
@@ -1413,8 +1414,8 @@ export class ProviderRuntime implements ProviderPort {
       if (this.#confined.get(agentId) === confined) this.#confined.delete(agentId);
       this.#conversation.unloadClientThreads(confined.client);
     });
-    yield* confined.client.stop().pipe(Effect.catch(() => Effect.void));
-    yield* this.#hooks.onClientStopped(confined.client);
+    const stopped = yield* Effect.result(confined.client.stop());
+    yield* this.#hooks.onClientStopped(confined.client, Result.isSuccess(stopped));
   }, Effect.uninterruptible);
 
   /** True when `client` was an agent's own process. Its exit restarts nothing; see `onAgentClientLost`. */
@@ -1716,8 +1717,8 @@ export class ProviderRuntime implements ProviderPort {
         this.#clients.delete(provider);
         this.#cli.delete(provider);
         this.#accounts.delete(provider);
-        yield* client.stop().pipe(toProviderOperationFailed).pipe(Effect.ignore);
-        yield* this.#hooks.onClientStopped(client);
+        const stopped = yield* Effect.result(client.stop());
+        yield* this.#hooks.onClientStopped(client, Result.isSuccess(stopped));
         yield* Effect.forEach(
           [...this.#confined].filter(([, confined]) => confined.client.provider === provider),
           ([agentId, confined]) => this.#stopConfined(agentId, confined),
@@ -1881,8 +1882,8 @@ export class ProviderRuntime implements ProviderPort {
           return;
         }
         if (previousClient && previousClient !== client) {
-          yield* previousClient.stop().pipe(Effect.catch(() => Effect.void));
-          yield* this.#hooks.onClientStopped(previousClient);
+          const stopped = yield* Effect.result(previousClient.stop());
+          yield* this.#hooks.onClientStopped(previousClient, Result.isSuccess(stopped));
         }
         if (provider === "codex") yield* this.#refreshUsage(client).pipe(Effect.ignore, Effect.forkIn(this.#scope));
         if (notifyReady) yield* this.#hooks.onProvidersReady().pipe(toProviderOperationFailed);
