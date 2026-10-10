@@ -66,13 +66,13 @@ export const messages = {
   "agentSettings.runtime.workingDirectory": "Cartella di lavoro",
   "agentSettings.runtime.notAvailable": "Non ancora disponibile",
   "agentSettings.runtime.fullAccessNote":
-    "L'agente gira con accesso completo al computer dal suo spazio di lavoro e dalla cartella condivisa.",
+    "L'agente gira con accesso completo al computer dal suo workspace e dalla cartella condivisa.",
   "agentSettings.runtime.claudeApprovalNote":
     "Claude agisce senza chiedere approvazione, tranne per le domande che ti rivolge.",
   "agentSettings.runtime.providerApprovalNote":
     "A seconda del provider, i comandi sensibili possono chiedere prima l'approvazione.",
 
-  "agentSettings.access.workspace": "Solo spazio di lavoro",
+  "agentSettings.access.workspace": "Solo workspace",
   "agentSettings.access.full": "Accesso completo",
   "agentSettings.busyMessage.appDefaultQueue": "Predefinito dell'app (Coda)",
   "agentSettings.busyMessage.appDefaultSteer": "Predefinito dell'app (Indirizza)",
@@ -88,14 +88,14 @@ export const messages = {
   "agentSettings.newChat.button": "Inizia",
   "agentSettings.newChat.confirmTitle": "Iniziare una nuova chat con {name}?",
   "agentSettings.newChat.confirmDescription":
-    "L'agente dimentica questa chat. I messaggi restano visibili sopra un divisore. Istruzioni, modello, strumenti, memorie, spazio di lavoro e browser non cambiano.",
+    "L'agente dimentica questa chat. I messaggi restano visibili sopra un divisore. Istruzioni, modello, tool, memorie, workspace e browser non cambiano.",
   "agentSettings.newChat.confirm": "Inizia una nuova chat",
   "agentSettings.newChat.failed": "Impossibile iniziare una nuova chat.",
 
   "agentSettings.fullAccess.title": "Dare accesso completo a questo agente?",
   "agentSettings.fullAccess.description":
     "L'agente potrà leggere, modificare ed eliminare qualsiasi file raggiungibile dal tuo account utente, eseguire qualsiasi comando e usare la rete. Un'istruzione fraintesa o una pagina web malevola può arrivare ai tuoi file personali.",
-  "agentSettings.fullAccess.cancel": "Resta solo nello spazio di lavoro",
+  "agentSettings.fullAccess.cancel": "Resta solo nel workspace",
   "agentSettings.fullAccess.confirm": "Consenti l'accesso completo",
 
   "agentSettings.links.usage": "Utilizzo",
@@ -109,7 +109,7 @@ export const messages = {
   "agentSettings.links.routines": "Routine",
   "agentSettings.links.routinesCount": { one: "{count} configurata", other: "{count} configurate" },
   "agentSettings.runtime.workspaceNote":
-    "«Solo spazio di lavoro» limita le scritture allo spazio di lavoro di questo agente, alla cartella condivisa e alle cartelle temporanee. Lettura e rete restano disponibili.",
+    "«Solo workspace» limita le scritture al workspace di questo agente, alla cartella condivisa e alle cartelle temporanee. Lettura e rete restano disponibili.",
   "agentSettings.runtime.workspaceEnforcedCommand":
     "Un comando che deve scrivere all'esterno te lo chiede prima, anche con l'approvazione automatica attiva.",
   "agentSettings.runtime.workspaceEnforcedClaude":

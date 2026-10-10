@@ -127,7 +127,7 @@ export const messages = {
   "mobile.agent.info.filesUnsupported": "Questo host non supporta la gestione dei file. Aggiorna OpenBot sull'host.",
   "mobile.agent.info.memoryGone": "Questa memoria non è più disponibile.",
   "mobile.agent.info.routineGone": "Questa routine non è più disponibile.",
-  "mobile.agent.skill.workspaceFolder": "Cartella dello spazio di lavoro",
+  "mobile.agent.skill.workspaceFolder": "Cartella del workspace",
   "mobile.agent.skill.updateAvailable": "v{version} disponibile",
   "mobile.agent.skill.needsRepair": "Richiede riparazione",
   "mobile.agent.skill.modified": "Modificata",
@@ -138,7 +138,7 @@ export const messages = {
   "mobile.agent.skill.uninstallTitle": "Disinstallare {name}?",
   "mobile.agent.skill.uninstallBody": "OpenBot rimuoverà questa skill dall'agente. La cronologia delle chat resta.",
   "mobile.agent.skill.uninstallModifiedBody":
-    "Questa skill ha modifiche locali nello spazio di lavoro dell'agente. Disinstallando si eliminano quei file. La cronologia delle chat resta.",
+    "Questa skill ha modifiche locali nel workspace dell'agente. Disinstallando si eliminano quei file. La cronologia delle chat resta.",
   "mobile.agent.skill.uninstalling": "Disinstallazione…",
   "mobile.agent.skill.uninstallFailed": "Impossibile disinstallare {name}.",
   "mobile.agent.skill.enableFailed": "Impossibile attivare {name}.",
@@ -274,7 +274,7 @@ export const messages = {
   "mobile.agent.runtime.noModels": "Nessun modello disponibile per questo provider.",
   "mobile.agent.access.title": "Accesso",
   "mobile.agent.access.label": "Accesso dell'agente",
-  "mobile.agent.access.workspace": "Solo spazio di lavoro",
+  "mobile.agent.access.workspace": "Solo workspace",
   "mobile.agent.access.full": "Accesso completo",
   "mobile.agent.access.autoApprove": "Approvazione automatica",
   "mobile.agent.access.autoApproveNote": "L'host risponde da solo alle richieste di approvazione di questo agente.",
@@ -283,7 +283,7 @@ export const messages = {
   "mobile.agent.access.fullTitle": "Dare a questo agente l'accesso completo?",
   "mobile.agent.access.fullBody":
     "L'agente potrà leggere, modificare ed eliminare qualsiasi file raggiungibile dall'account utente dell'host, eseguire qualsiasi comando e usare la rete.",
-  "mobile.agent.access.fullCancel": "Mantieni solo lo spazio di lavoro",
+  "mobile.agent.access.fullCancel": "Mantieni solo il workspace",
   "mobile.agent.access.fullConfirm": "Consenti l'accesso completo",
   "mobile.agent.access.failed": "Impossibile modificare l'accesso dell'agente.",
   "mobile.agent.access.unsupported": "Questo host non può modificare l'accesso dell'agente da un dispositivo remoto.",
@@ -303,7 +303,7 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "Predefinita dell'host (Indirizza)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} non può indirizzare un turno in corso. I messaggi inviati mentre lavora restano in coda.",
-  "mobile.agent.workspace.title": "Cartella dello spazio di lavoro",
+  "mobile.agent.workspace.title": "Cartella del workspace",
   "mobile.agent.workspace.footer": "La cartella di questo agente sul computer host.",
   "mobile.agent.notifications.title": "Notifiche",
   "mobile.agent.notifications.footer": "Le notifiche sono le stesse per ogni membro di questo server.",
@@ -314,7 +314,7 @@ export const messages = {
   "mobile.agent.newChat.footer": "L'agente dimentica questa chat. La sua configurazione resta.",
   "mobile.agent.newChat.confirmTitle": "Iniziare una nuova chat con {name}?",
   "mobile.agent.newChat.confirmBody":
-    "L'agente dimentica questa chat. I messaggi restano visibili sopra un divisore. Istruzioni, modello, strumenti, memorie, spazio di lavoro e browser non cambiano.",
+    "L'agente dimentica questa chat. I messaggi restano visibili sopra un divisore. Istruzioni, modello, tool, memorie, workspace e browser non cambiano.",
   "mobile.agent.newChat.confirm": "Inizia nuova chat",
   "mobile.agent.newChat.failed": "Impossibile iniziare una nuova chat",
   "mobile.agent.newChat.failedBody": "L'host non ha potuto iniziare una nuova chat.",
@@ -403,7 +403,7 @@ export const messages = {
   "mobile.agent.usage.partial":
     "Dati parziali: {missingUsage} turni senza utilizzo, {incomplete} record incompleti, {unpriced} record senza stima del costo.",
   "mobile.agent.usage.costNote":
-    "Costo equivalente alle API in USD. Questa stima esclude i costi dell'abbonamento, degli strumenti e dei contenuti multimediali.",
+    "Costo equivalente alle API in USD. Questa stima esclude i costi dell'abbonamento, dei tool e dei contenuti multimediali.",
   "mobile.agent.usage.collection": "Raccolta iniziata {started}. Aggiornata {updated}.",
   "mobile.agent.usage.never": "mai",
   "mobile.agent.record.time": "Ora",

@@ -2,7 +2,7 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/files";
 
 export const messages = {
-  "files.category.workspaces": "Spazi di lavoro degli agenti",
+  "files.category.workspaces": "Workspace degli agenti",
   "files.category.attachments": "Allegati",
   "files.category.generated": "File degli agenti",
   "files.category.chats": "Cronologia delle chat",
@@ -10,7 +10,7 @@ export const messages = {
   "files.category.caches": "File del server in cache",
   "files.category.runtimes": "Runtime dei provider",
   "files.category.logs": "Log",
-  "files.group.workspaces": "Spazi di lavoro degli agenti",
+  "files.group.workspaces": "Workspace degli agenti",
   "files.group.files": "File delle chat",
   "files.group.chats": "Cronologia delle chat",
   "files.group.downloads": "Download",
@@ -68,7 +68,7 @@ export const messages = {
   "files.storage.byType": "Archiviazione per tipo",
   "files.storage.emptyTitle": "Ancora niente in archivio",
   "files.storage.emptyDescription":
-    "Gli spazi di lavoro degli agenti, i file e la cronologia delle chat compaiono qui quando inizi a usare OpenBot.",
+    "I workspace degli agenti, i file e la cronologia delle chat compaiono qui quando inizi a usare OpenBot.",
   "files.storage.agents": "Agenti",
   "files.storage.largestChats": "Chat più grandi",
   "files.storage.files": "File",
@@ -98,7 +98,7 @@ export const messages = {
   "files.agent.close": "Chiudi i dettagli",
   "files.agent.uses": "{name} usa",
   "files.agent.workspace": "Spazio di lavoro",
-  "files.agent.openWorkspace": "Apri la cartella dello spazio di lavoro",
+  "files.agent.openWorkspace": "Apri la cartella del workspace",
   "files.agent.chatsBySize": "Chat per dimensione",
   "files.agent.listLabel": "File di {name}",
   "files.agent.emptyDescription": "I file che invii a {name} e quelli che crea compaiono qui.",

@@ -129,7 +129,7 @@ export const messages = {
     "Trasforma queste note di rilascio in una presentazione Canva di sei slide.",
   "marketplace.plugin.linear.tagline": "Issue e triage dei progetti",
   "marketplace.plugin.linear.description":
-    "Linear permette agli agenti di elencare le issue assegnate, fare il triage del backlog, aggiornare gli stati e preparare nuove issue nello spazio di lavoro a cui appartiene l'account collegato. Ogni utente accede al proprio account Linear dal browser.",
+    "Linear permette agli agenti di elencare le issue assegnate, fare il triage del backlog, aggiornare gli stati e preparare nuove issue nel workspace a cui appartiene l'account collegato. Ogni utente accede al proprio account Linear dal browser.",
   "marketplace.plugin.linear.app":
     "Ricerca di issue, triage, aggiornamento degli stati e creazione di issue, tramite il server MCP di Linear con accesso dal browser.",
   "marketplace.plugin.linear.prompt.myWeek": "Cosa mi è stato assegnato questa settimana?",
@@ -139,9 +139,9 @@ export const messages = {
     "Apri una issue per il crash nella coda di sincronizzazione, con i passaggi per riprodurlo.",
   "marketplace.plugin.notion.tagline": "Documenti e knowledge base",
   "marketplace.plugin.notion.description":
-    "Notion permette agli agenti di leggere e scrivere pagine, cercare nello spazio di lavoro e tenere note di riunione e specifiche dove il team già lavora. Ogni utente accede al proprio account Notion dal browser.",
+    "Notion permette agli agenti di leggere e scrivere pagine, cercare nel workspace e tenere note di riunione e specifiche dove il team già lavora. Ogni utente accede al proprio account Notion dal browser.",
   "marketplace.plugin.notion.app":
-    "Ricerca, lettura e scrittura di pagine e navigazione nello spazio di lavoro, tramite il server MCP di Notion con accesso dal browser.",
+    "Ricerca, lettura e scrittura di pagine e navigazione nel workspace, tramite il server MCP di Notion con accesso dal browser.",
   "marketplace.plugin.notion.prompt.findSpec": "Trova le specifiche di lancio attuali e riassumi le questioni aperte.",
   "marketplace.plugin.notion.prompt.meetingNotes":
     "Trasforma questi punti in una nota di riunione strutturata nello spazio del mio team.",
@@ -158,7 +158,7 @@ export const messages = {
   "marketplace.plugin.figma.prompt.assets": "Estrai le icone di marketing a 2x per il bundle dell'app.",
   "marketplace.plugin.paper.tagline": "Tela di design basata su HTML e CSS",
   "marketplace.plugin.paper.description":
-    "Paper permette agli agenti di leggere e scrivere il file di design aperto in Paper Desktop: ispezionare artboard, selezioni, stili calcolati, JSX e token, e creare o modificare frame, testi e stili. Installa Paper Desktop, aprilo una volta e apri un file prima di iniziare. OpenBot avvia la CLI di Paper che Paper Desktop installa. Paper non richiede chiavi. Gli strumenti di scrittura modificano il file aperto, quindi controlla ogni scrittura prima di approvarla.",
+    "Paper permette agli agenti di leggere e scrivere il file di design aperto in Paper Desktop: ispezionare artboard, selezioni, stili calcolati, JSX e token, e creare o modificare frame, testi e stili. Installa Paper Desktop, aprilo una volta e apri un file prima di iniziare. OpenBot avvia la CLI di Paper che Paper Desktop installa. Paper non richiede chiavi. I tool di scrittura modificano il file aperto, quindi controlla ogni scrittura prima di approvarla.",
   "marketplace.plugin.paper.app":
     "Legge e scrive il file aperto in Paper Desktop, tramite il server MCP locale che la CLI di Paper inoltra. Richiede Paper Desktop con un file aperto.",
   "marketplace.plugin.paper.prompt.implement":

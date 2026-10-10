@@ -56,7 +56,7 @@ import { messages as window } from "./window";
  * Typography follows Italian convention: quoted words use «caporali», and the ellipsis is the
  * single character …. Plurals fill the one and other forms. Product names stay as they are, and so
  * do the English words an Italian user already reads in this kind of app: skill, routine, provider,
- * server, host, chat, plugin, prompt, token.
+ * server, host, chat, plugin, prompt, token, tool, workspace.
  *
  * This is the desktop catalog: shared keys, source text, and every desktop area.
  */

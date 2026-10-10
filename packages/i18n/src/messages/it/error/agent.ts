@@ -5,7 +5,7 @@ export const messages = {
   "error.agent.historyUnavailable":
     "La cronologia non è disponibile per questa richiesta. Rileggi la cronologia recente, oppure usa channel_history per il lavoro nei canali.",
   "error.agent.toolRequestInvalid":
-    "Argomenti di ricerca dello strumento non validi. Usa lo schema dichiarato e un nome di strumento qualificato originale.",
+    "Argomenti di ricerca del tool non validi. Usa lo schema dichiarato e un nome di tool qualificato originale.",
   "error.agent.approvalWhileDeleting": "Impossibile concedere l'approvazione mentre l'agente viene eliminato.",
   "error.agent.accessLocalOnly": "L'accesso dell'agente si può cambiare solo sul computer che lo esegue.",
   "error.agent.duplicateCleanupFailed":
@@ -69,7 +69,7 @@ export const messages = {
     "La sezione generata non è disponibile. Riprova o scegli una sezione a mano.",
   "error.agent.profileTimedOut": "La generazione del profilo è scaduta. Riprova.",
   "error.agent.profileDisconnected": "Il provider si è disconnesso durante la generazione del profilo.",
-  "error.agent.profileToolUse": "Il provider ha provato a usare uno strumento. Prova a rivedere il prompt.",
+  "error.agent.profileToolUse": "Il provider ha provato a usare un tool. Prova a rivedere il prompt.",
   "error.agent.profileFailed": "Il provider non è riuscito a generare un profilo. Riprova.",
   "error.agent.profileTooLarge": "Il profilo generato è troppo grande. Prova con un prompt più breve.",
   "error.agent.profileNotStarted": "Il provider non è riuscito ad avviare la generazione del profilo.",
@@ -98,9 +98,9 @@ export const messages = {
   "error.agent.automationRateLimited":
     "Gli script locali hanno eseguito le routine di questo agente {limit} volte nell'ultima ora. Riprova più tardi.",
   "error.agent.workspaceOnlyMacOnly":
-    "Solo spazio di lavoro è disponibile per questo provider solo su macOS. Scegli Accesso completo nelle impostazioni dell'agente.",
+    "Solo workspace è disponibile per questo provider solo su macOS. Scegli Accesso completo nelle impostazioni dell'agente.",
   "error.agent.lowMemory":
     "Questo server ha poca memoria. Il tuo messaggio resta in coda e parte quando si libera memoria. Un piano più grande dà più memoria al server.",
   "error.agent.workspaceOnlyToolMissing":
-    "Solo spazio di lavoro richiede {tool}, che OpenBot non ha trovato. Installalo, oppure scegli Accesso completo nelle impostazioni dell'agente.",
+    "Solo workspace richiede {tool}, che OpenBot non ha trovato. Installalo, oppure scegli Accesso completo nelle impostazioni dell'agente.",
 } as const satisfies PartialTranslation<typeof source>;

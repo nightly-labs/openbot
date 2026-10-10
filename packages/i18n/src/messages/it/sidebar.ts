@@ -84,7 +84,7 @@ export const messages = {
   "sidebar.delete.pending": "Eliminazione…",
   "sidebar.delete.title": "Eliminare {name}?",
   "sidebar.delete.agentDescription":
-    "Questo rimuove l'agente e la sua conversazione OpenBot dall'app. Coda, memorie, routine e spazio di lavoro vengono eliminati. La cronologia salvata separatamente dalla CLI del provider collegato non viene eliminata.",
+    "Questo rimuove l'agente e la sua conversazione OpenBot dall'app. Coda, memorie, routine e workspace vengono eliminati. La cronologia salvata separatamente dalla CLI del provider collegato non viene eliminata.",
   "sidebar.delete.channelDescription":
     "Questo interrompe il canale. La sua cronologia resta in Canali eliminati, solo per l'anteprima. Non puoi ripristinarlo. Gli agenti membri vengono mantenuti.",
   "sidebar.delete.sectionDescription":

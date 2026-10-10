@@ -11,7 +11,7 @@ export const messages = {
     "Incolla una credenziale del tuo account {name}. OpenBot si collega con quella e la conserva su {host}.",
   "mcp.connect.thisComputer": "questo computer",
   "mcp.connect.noCredentialDescription":
-    "{name} non richiede credenziali. OpenBot si collega una volta per vedere quali strumenti offre.",
+    "{name} non richiede credenziali. OpenBot si collega una volta per vedere quali tool offre.",
   "mcp.connect.connect": "Connetti",
   "mcp.connect.required": "Obbligatorio.",
   "mcp.connect.keptOn": "Conservata su {host}.",
@@ -22,12 +22,12 @@ export const messages = {
   "mcp.local.address": "Indirizzo",
   "mcp.local.docs": "Guida alla configurazione",
   "mcp.signIn.description":
-    "Accedi al tuo account {name}. OpenBot ottiene gli strumenti raggiungibili da quell'account, senza password.",
+    "Accedi al tuo account {name}. OpenBot ottiene i tool raggiungibili da quell'account, senza password.",
   "mcp.signIn.waiting": "In attesa del browser…",
   "mcp.signIn.continue": "Continua su {name}",
   "mcp.signIn.pageDescription": "Questa pagina è aperta nel browser su {host}. Accedi da lì.",
   "mcp.server.loadFailed": "Impossibile caricare i server MCP.",
-  "mcp.test.connected": { one: "Connesso · {count} strumento", other: "Connesso · {count} strumenti" },
+  "mcp.test.connected": { one: "Connesso · {count} tool", other: "Connesso · {count} tool" },
   "mcp.status.testing": "Test in corso…",
   "mcp.status.failed": "Non riuscito",
   "mcp.status.enabled": "Attivo",
@@ -55,7 +55,7 @@ export const messages = {
   "mcp.panel.changesNotSaved": "Modifiche non salvate",
   "mcp.panel.title": "Server MCP",
   "mcp.panel.description":
-    "I server Model Context Protocol danno agli agenti di questo server strumenti in più. Gli agenti Claude e Codex usano solo i server di questo elenco; gli agenti OpenCode e Grok possono avviare server anche dai propri file di configurazione.",
+    "I server Model Context Protocol danno agli agenti di questo server tool in più. Gli agenti Claude e Codex usano solo i server di questo elenco; gli agenti OpenCode e Grok possono avviare server anche dai propri file di configurazione.",
   "mcp.panel.connectCustom": "Connetti un MCP personalizzato",
   "mcp.panel.empty": "Ancora nessun server MCP.",
   "mcp.panel.enable": "Attiva {name}",
@@ -96,12 +96,12 @@ export const messages = {
   "mcp.panel.value": "Valore",
   "mcp.panel.testTitle": "Test",
   "mcp.panel.testDescription":
-    "Si collega una volta con queste impostazioni e riporta gli strumenti che offre. Non viene salvato né conservato nulla.",
+    "Si collega una volta con queste impostazioni e riporta i tool che offre. Non viene salvato né conservato nulla.",
   "mcp.panel.testConnection": "Prova la connessione",
   "mcp.panel.notTested": "Non ancora testato.",
   "mcp.panel.removeTitle": "Rimuovere {name}?",
   "mcp.panel.removeDescription":
-    "I suoi strumenti non verranno più offerti agli agenti di questo server. La configurazione non viene conservata.",
+    "I suoi tool non verranno più offerti agli agenti di questo server. La configurazione non viene conservata.",
   "mcp.panel.removeConfirm": "Rimuovi server MCP",
   "mcp.panel.actionsFor": "Azioni per {name}",
   "mcp.panel.testUnavailable": "Questo server non può essere testato qui.",

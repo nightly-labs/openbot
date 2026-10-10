@@ -56,7 +56,7 @@ export const messages = {
   "usage.updatedNever": "mai",
   "usage.about.title": "Informazioni su queste stime",
   "usage.about.body":
-    "Costo dei token equivalente all'API, in USD. È una stima, non un addebito dell'abbonamento. Le tariffe separate per strumenti e contenuti multimediali non sono calcolate. I prezzi sconosciuti e l'utilizzo incompleto restano non disponibili. Le quote usano solo gli importi noti; i dati parziali possono far sottostimare i totali.",
+    "Costo dei token equivalente all'API, in USD. È una stima, non un addebito dell'abbonamento. Le tariffe separate per tool e contenuti multimediali non sono calcolate. I prezzi sconosciuti e l'utilizzo incompleto restano non disponibili. Le quote usano solo gli importi noti; i dati parziali possono far sottostimare i totali.",
   "usage.panel.label": "Utilizzo dell'agente",
   "usage.panel.title": "Utilizzo",
   "usage.panel.allAgents": "Tutti gli agenti",

@@ -26,8 +26,7 @@ export const messages = {
   "import.guide.step2": "Invia questo messaggio all'agente",
   "import.guide.copyMessage": "Copia il messaggio",
   "import.guide.messageCopied": "Messaggio copiato",
-  "import.guide.messageNote":
-    "Ti chiede se può includere i file dello spazio di lavoro, poi salva il file .zip in Download.",
+  "import.guide.messageNote": "Ti chiede se può includere i file del workspace, poi salva il file .zip in Download.",
   "import.guide.step3": "Scegli il file .zip",
   "import.guide.reading": "Lettura dell'esportazione…",
   "import.guide.choose": "Scegli il file di esportazione",
@@ -35,7 +34,7 @@ export const messages = {
   "import.review.title": "Esportazione di {source}",
   "import.review.exported": "Esportato {date}",
   "import.review.fileSize": "{size} di file",
-  "import.review.noFiles": "Nessun file dello spazio di lavoro",
+  "import.review.noFiles": "Nessun file del workspace",
   "import.review.importAgents": "Importa {agents}",
   "import.review.importBoth": "Importa {agents} e {channels}",
   "import.review.reading": "Lettura…",

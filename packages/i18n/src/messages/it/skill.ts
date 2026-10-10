@@ -37,7 +37,7 @@ export const messages = {
   "skill.confirm.replaceBody":
     "L'aggiornamento di questa skill sostituisce i file locali con l'ultimo pacchetto della skill. Le tue modifiche nella cartella della skill andranno perse.",
   "skill.confirm.removeModifiedBody":
-    "Questa skill ha modifiche locali nello spazio di lavoro dell'agente. Rimuovi elimina quei file. I messaggi originali della chat restano.",
+    "Questa skill ha modifiche locali nel workspace dell'agente. Rimuovi elimina quei file. I messaggi originali della chat restano.",
   "skill.confirm.removeBody": "OpenBot rimuoverà questa skill dall'agente. La cronologia della chat resta.",
   "skill.confirm.replace": "Sostituisci skill",
   "skill.confirm.remove": "Rimuovi skill",

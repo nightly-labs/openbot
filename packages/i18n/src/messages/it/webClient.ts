@@ -13,7 +13,7 @@ export const messages = {
   "webClient.login.requestFailed": "La richiesta dell'account non è riuscita.",
   "webClient.login.sessionFailed": "Impossibile controllare questa sessione.",
   "webClient.login.wait": "Attendi prima di richiedere un altro codice.",
-  "webClient.pane.navigation": "Navigazione dello spazio di lavoro",
+  "webClient.pane.navigation": "Navigazione del workspace",
   "webClient.pane.chat": "Chat",
   "webClient.pane.workspace": "Spazio di lavoro",
   "webClient.notice.connecting": "Connessione al tuo computer",
@@ -30,7 +30,7 @@ export const messages = {
   "webClient.notice.refreshHosts": "Aggiorna gli host",
   "webClient.agent.modelsFailed": "Impossibile caricare i modelli dell'host.",
   "webClient.agent.refreshFailed":
-    "L'agente è stato creato, ma non è stato possibile aggiornare lo spazio di lavoro. Ricarica prima di riprovare.",
+    "L'agente è stato creato, ma non è stato possibile aggiornare il workspace. Ricarica prima di riprovare.",
   "webClient.agent.unconfirmed":
     "Il risultato non è confermato. Chiudi questo modulo e controlla l'host prima di riprovare.",
   "webClient.error.usageOffline": "Connettiti al tuo host per vedere l'utilizzo.",

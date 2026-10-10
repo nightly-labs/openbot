@@ -12,13 +12,13 @@ export const messages = {
   "server.connection.reconnecting": "Riconnessione a {name}",
   "server.connection.blocked": "{name} richiede la tua attenzione",
   "server.connection.nextRetry": "Prossimo tentativo tra {seconds} secondi.",
-  "server.connection.wakeHint": "Usa questo spazio di lavoro o seleziona Riprova per avviare il server.",
+  "server.connection.wakeHint": "Usa questo workspace o seleziona Riprova per avviare il server.",
   "server.connection.planHint": "Apri le impostazioni dell'account per controllare il piano del server.",
   "server.connection.loadingHint": "Puoi selezionare un altro server mentre questo si carica.",
   "server.connection.cachedHint":
     "I contenuti caricati e le bozze vengono conservati. Le azioni sul server riprenderanno dopo la riconnessione.",
   "server.connection.conversationFailed": "Impossibile caricare la conversazione. Riprova.",
-  "server.connection.panelsFailed": "Impossibile caricare alcuni pannelli dello spazio di lavoro. Riprova.",
+  "server.connection.panelsFailed": "Impossibile caricare alcuni pannelli del workspace. Riprova.",
   "server.connection.retry": "Riprova",
   "server.connection.manage": "Apri le impostazioni",
   "server.connection.restored": "Connessione a {name} ripristinata",
@@ -32,7 +32,7 @@ export const messages = {
   "server.compatibility.updateHostDescription":
     "L'host supporta solo protocolli più vecchi di quelli di questa app. Aggiorna l'host, poi riprova.",
   "server.compatibility.unsafeDataDescription":
-    "OpenBot ha interrotto questa connessione perché un payload noto non era valido. I dati attuali del tuo spazio di lavoro non sono stati modificati.",
+    "OpenBot ha interrotto questa connessione perché un payload noto non era valido. I dati attuali del tuo workspace non sono stati modificati.",
   "server.compatibility.clientVersion": "Versione del client",
   "server.compatibility.hostVersion": "Versione dell'host",
   "server.compatibility.negotiatedProtocol": "Protocollo negoziato",

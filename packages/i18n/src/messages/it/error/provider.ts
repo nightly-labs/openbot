@@ -277,7 +277,7 @@ export const messages = {
   "error.provider.piSessionIdentity":
     "Pi ha restituito una sessione diversa. La sessione salvata non è stata sostituita.",
   "error.provider.piModelInvalid": "Seleziona un modello di Pi che includa il suo provider.",
-  "error.provider.piToolInvalid": "Lo strumento ha restituito un risultato non valido.",
+  "error.provider.piToolInvalid": "Il tool ha restituito un risultato non valido.",
   "error.provider.piSignIn": "Usa /login in Pi sul computer host. Chiudi Pi quando l'accesso è completato.",
   "error.provider.museBusy": "La sessione di Muse è occupata.",
   "error.provider.museStopped": "Il client di Muse non è in esecuzione.",
@@ -294,7 +294,7 @@ export const messages = {
   "error.provider.museConnectionFailed":
     "Connessione a Muse non riuscita. Riprendi la conversazione per recuperare la sua cronologia salvata.",
   "error.provider.museUnknownSession": "Sessione di Muse sconosciuta.",
-  "error.provider.museInvalidToolResult": "Risultato dello strumento di OpenBot non valido.",
+  "error.provider.museInvalidToolResult": "Risultato del tool di OpenBot non valido.",
   "error.provider.museMcpRequired": "Muse deve supportare i server MCP di sessione.",
   "error.provider.museSessionMismatch": "Muse ha restituito una sessione diversa.",
   "error.provider.museCompactRejected": "Muse non ha accettato la compattazione.",
@@ -309,7 +309,7 @@ export const messages = {
   "error.provider.museMethodUnsupported": "Muse non supporta {method}.",
   "error.provider.museTurnFailed": "Turno di Muse non riuscito.",
   "error.provider.museProfileUnsupported":
-    "Muse non può generare un profilo senza accesso a strumenti esterni. Usa un altro provider per generare il profilo, poi seleziona Muse per l'agente.",
+    "Muse non può generare un profilo senza accesso a tool esterni. Usa un altro provider per generare il profilo, poi seleziona Muse per l'agente.",
   "error.provider.museAuthUnverified":
     "L'autenticazione di Muse non è verificata. Collegati sul computer host, oppure imposta una chiave API di Meta.",
   "error.provider.museSignIn": "Per continuare, accedi a Muse sul computer host.",

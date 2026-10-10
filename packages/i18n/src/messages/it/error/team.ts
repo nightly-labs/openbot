@@ -78,7 +78,7 @@ export const messages = {
   "error.team.attachmentNameRequired": "Serve un nome di allegato sicuro.",
   "error.team.attachmentNotFound": "Allegato non trovato.",
   "error.team.sharedFileTooLarge": "Il file condiviso supera il limite di 100 MB.",
-  "error.team.workspaceFileTooLarge": "Il file dello spazio di lavoro supera il limite di 100 MB.",
+  "error.team.workspaceFileTooLarge": "Il file del workspace supera il limite di 100 MB.",
   "error.team.browserViewUnavailable": "La vista dal vivo del browser non è disponibile.",
   "error.team.browserSessionNotFound": "Sessione della vista del browser non trovata.",
   "error.team.mcpUnsupported": "I server MCP non sono supportati da questa connessione.",

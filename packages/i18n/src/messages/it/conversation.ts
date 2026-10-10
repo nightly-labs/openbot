@@ -55,7 +55,7 @@ export const messages = {
   "conversation.header.grantFailed": "Impossibile salvare l'approvazione permanente per {name}. Riprova.",
   "conversation.header.modelsBusy": "Aspetta che il lavoro in corso finisca prima di cambiare modello.",
   "conversation.header.modelsUnavailable": "I modelli sono disponibili dopo che una CLI dell'agente si è connessa.",
-  "conversation.panels.openWorkspaceFailed": "Impossibile aprire la cartella dello spazio di lavoro",
+  "conversation.panels.openWorkspaceFailed": "Impossibile aprire la cartella del workspace",
   "conversation.panels.tryAgain": "Riprova.",
   "conversation.view.label": "Conversazione",
   "conversation.view.drop": "Rilascia i file per allegarli",
