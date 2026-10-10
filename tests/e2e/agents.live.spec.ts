@@ -107,7 +107,7 @@ test("live-switch preserves an agent and its files across provider changes", asy
 });
 
 for (const provider of providers) {
-  test(`live-${provider} creates a child, delegates browser work, and generates files`, async ({
+  test(`live-${provider === "antigravity" ? "gemini" : provider} creates a child, delegates browser work, and generates files`, async ({
     app,
     owner,
   }, testInfo) => {
@@ -200,11 +200,12 @@ for (const provider of providers) {
 }
 
 test("live-group routes Codex to Claude to OpenCode within a group", async ({ app }, testInfo) => {
+  const groupProviders = ["codex", "claude", "opencode"] as const;
   testInfo.annotations.push(
-    ...providers.map((provider) => ({ type: "model", description: `${provider}:${modelFor(provider)}` })),
+    ...groupProviders.map((provider) => ({ type: "model", description: `${provider}:${modelFor(provider)}` })),
   );
   const agents = await app.page.evaluate(() => window.openbot.agent.listAgents());
-  const members = providers.map((provider) => {
+  const members = groupProviders.map((provider) => {
     const agent = agents.find((item) => item.id === `release-${provider}`);
     if (!agent) throw new Error(`Missing ${provider} test agent.`);
     return agent;
@@ -229,7 +230,7 @@ test("live-group routes Codex to Claude to OpenCode within a group", async ({ ap
         app.page
           .evaluate((channelId) => window.openbot.agent.readChannel({ channelId }), group.id)
           .then((page) =>
-            providers.every((provider) =>
+            groupProviders.every((provider) =>
               page.tasks.some((task) => task.ownerAgentId === `release-${provider}` && task.state === "completed"),
             ),
           ),

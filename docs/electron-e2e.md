@@ -26,7 +26,7 @@ not measure a network between two physical computers, TURN relay operation, or h
 | Generated content | Markdown, PDF, spreadsheet, PNG, and interactive HTML; open/reopen previews, download and compare file bytes, upload an attachment |
 | Browser | Agent opens a real local page, fills a form, submits it, and checks the result; user opens the live page, reloads it, and returns control |
 | User decisions | Accept/deny a command request and answer an agent question |
-| Real providers | Codex, Claude, and OpenCode each create a child, delegate browser work, receive its reply, and generate an attached file and interactive HTML |
+| Real providers | Codex, Claude, OpenCode, Grok, and Gemini each create a child, delegate browser work, receive its reply, and generate an attached file and interactive HTML |
 | Mixed providers | Codex assigns Claude, Claude assigns OpenCode, and results return through the group task chain |
 
 Assertions check saved messages, task owners and parent links, unique replies, exact file bytes,
@@ -36,8 +36,8 @@ Approval cases disable auto-approval for their test agent and check the exact pr
 the fixture performs a real workspace receipt write only after acceptance and checks that denial leaves no file. PDF coverage checks opening/reopening the
 viewer and exact downloaded bytes; it does not inspect Chromium's native PDF rendering.
 
-There are 22 scripted scenarios and five live scenarios per mode, plus three host-only scenarios:
-57 required macOS cases. Linux runs the 47 scripted cases. The scripted CLI implements the Codex subprocess protocol.
+There are 22 scripted scenarios and seven live scenarios per mode, plus three host-only scenarios:
+61 required macOS cases. Linux runs the 47 scripted cases. The scripted CLI implements the Codex subprocess protocol.
 It scripts model decisions; the app still executes tools, stores messages, schedules routines,
 transfers files, and controls the embedded browser. Authentication and agent seed data use
 supported application APIs. Host setup creates and accepts its invitation directly through the
@@ -63,13 +63,23 @@ Set these repository variables:
 | `OPENBOT_E2E_CODEX_MODEL` | Optional override; defaults to `gpt-6-luna` |
 | `OPENBOT_E2E_CLAUDE_MODEL` | Optional override; defaults to `claude-haiku-5-5` |
 | `OPENBOT_E2E_OPENCODE_MODEL` | Optional override; defaults to `opencode/muse-spark-1.3-contributor-free` |
+| `OPENBOT_E2E_GROK_MODEL` | Optional override; defaults to `grok-4.6` |
+| `OPENBOT_E2E_ANTIGRAVITY_MODEL` | Required Gemini model ID from the signed-in account's model list; no fallback |
 
 Set these in the runner service environment:
 
-- `OPENBOT_CODEX_PATH`, `OPENBOT_CLAUDE_PATH`, and `OPENBOT_OPENCODE_PATH`: optional absolute
+- `OPENBOT_CODEX_PATH`, `OPENBOT_CLAUDE_PATH`, `OPENBOT_OPENCODE_PATH`, and `OPENBOT_GROK_PATH`: optional absolute
   paths to executable provider runtimes. The suite uses the app's installed CLI discovery by
   default. In CI, versions must match `native-runtime.lock.json` at the tested commit. Update
   this provisioned runtime cache when the lock changes. Local runs use the installed versions.
+- `OPENBOT_ANTIGRAVITY_PATH`: required absolute path to Google's `agy_acp_server.par`.
+  Keep the complete runtime bundle, including its harness, with the executable in `bin/` and
+  `antigravity-package.json` (containing `version`) in the parent directory. The Antigravity
+  editor command and Gemini CLI are not substitutes. The private test profile has no managed runtime.
+- Dedicated Grok login state (`grok login`) or `XAI_API_KEY`, and completed Google sign-in for
+  the Antigravity ACP server. Gemini uses the internal provider ID `antigravity`; the report
+  names its case `live-gemini`. Both new providers run in local and host modes. Gemini host
+  access requires Team API protocol 5 or later, which the current test apps support.
 - Dedicated Codex and Claude login state, accessible to the runner account. `CODEX_HOME` and
   `CLAUDE_CONFIG_DIR` can point to the dedicated credential directories where supported by the
   provider. Complete login before starting the suite.

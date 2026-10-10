@@ -207,7 +207,15 @@ it.each(["release", "scripted"] as const)("rejects missing, skipped, failed, and
     })),
   );
   expect(releaseCoverage(complete, 600_000, suite).passed).toBe(true);
-  expect(releaseCoverage(complete.slice(1), 1, suite).passed).toBe(false);
+  for (const required of complete) {
+    const partial = releaseCoverage(
+      complete.filter((entry) => entry.id !== required.id || entry.mode !== required.mode),
+      1,
+      suite,
+    );
+    expect(partial.passed).toBe(false);
+    expect(partial.missing).toEqual([`${required.mode}/${required.id}`]);
+  }
   expect(
     releaseCoverage(
       complete.filter((entry) => entry.id !== "host-revoke"),

@@ -17,9 +17,15 @@ import { findAvailablePort, stopOwnedProcesses } from "../../../scripts/dev-serv
 import { developmentChildEnvironment, loadDevelopmentEnvironment } from "../../../scripts/development-environment";
 import { createDevelopmentDefaults, ensureDevelopmentState } from "../../../scripts/development-secrets";
 import { withoutElectronRuntimeFlags } from "../../../scripts/electron-spawn-env";
-import { resolveClaudeCli, resolveCodexCli, resolveOpencodeCli } from "../../../src/backend/cli";
+import {
+  resolveAntigravityCli,
+  resolveClaudeCli,
+  resolveCodexCli,
+  resolveGrokCli,
+  resolveOpencodeCli,
+} from "../../../src/backend/cli";
 import { runCauseEffect } from "../../../src/backend/effect-boundary";
-import { output, providers, root } from "./settings";
+import { modelFor, output, providers, root } from "./settings";
 import { startSite } from "./site";
 
 const logger = createOpenBotLogger("e2e-services");
@@ -49,8 +55,15 @@ export default async function setup() {
   if (process.env.OPENBOT_E2E_SUITE === "release" || process.env.OPENBOT_E2E_SUITE === "live") {
     const lock = await loadAgentRuntimeLock(root);
     const versions: Record<string, string> = {};
-    const resolvers = { codex: resolveCodexCli, claude: resolveClaudeCli, opencode: resolveOpencodeCli };
+    const resolvers = {
+      codex: resolveCodexCli,
+      claude: resolveClaudeCli,
+      opencode: resolveOpencodeCli,
+      grok: resolveGrokCli,
+      antigravity: resolveAntigravityCli,
+    };
     for (const provider of providers) {
+      modelFor(provider);
       const runtime = await runCauseEffect(resolvers[provider]({ bundledExecutable: null }));
       if (process.env.CI && runtime.version !== lock[provider].version)
         throw new Error(`${provider} must use pinned runtime ${lock[provider].version}.`);

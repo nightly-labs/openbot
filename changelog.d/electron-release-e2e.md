@@ -1,5 +1,7 @@
 ### Added
 
+- Require Grok and Gemini agent creation, delegation, browser, file preview, and interactive HTML checks in local and host modes.
+
 - Add release checks for chat, routines, file previews, browser control, and agent delegation in local and remote-host modes.
 - Cover interrupted delegation, provider switches and failures, conversation and host isolation, attachment use, host access removal, setup, and long chat history.
 - Compare six fixed Storybook layouts against reviewed visual baselines before release.

@@ -23,7 +23,15 @@ export const scriptedCases = [
   "history",
 ] as const;
 export const hostCases = ["host-isolation", "host-reconnect", "host-revoke"] as const;
-export const liveCases = ["live-codex", "live-claude", "live-opencode", "live-group", "live-switch"] as const;
+export const liveCases = [
+  "live-codex",
+  "live-claude",
+  "live-opencode",
+  "live-grok",
+  "live-gemini",
+  "live-group",
+  "live-switch",
+] as const;
 
 export function releaseCoverage(
   results: readonly { id: string; mode: string; status: string }[],
