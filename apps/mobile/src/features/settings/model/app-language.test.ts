@@ -26,7 +26,7 @@ it("restores the chosen language after restart", async () => {
 });
 
 it("ignores a stored language this build does not ship", async () => {
-  native.stored = "pl";
+  native.stored = "tlh";
   await loadAppLanguage();
   expect(useAppLanguage.getState()).toMatchObject({ value: "system", ready: true });
 });
