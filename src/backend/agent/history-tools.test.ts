@@ -82,6 +82,36 @@ describe.sequential("scoped history tools", () => {
     expect(snapshot.messages.length).toBeGreaterThan(0);
   });
 
+  it("does not let search hits reveal a redacted secret", async () => {
+    const { store, client, session } = await start();
+    const secret = "synthetic-search-secret-0987654321";
+    registerSecretValue(secret);
+    store.database.persistConversationChanges({
+      agentId: "chief",
+      threadId: session.threadId,
+      activeTurnId: null,
+      changedMessages: [
+        {
+          id: "secret-request",
+          turnId: "secret-turn",
+          author: "user",
+          status: "completed",
+          text: `Deploy key ${secret} for VISIBLE-MARKER`,
+          createdAt: "2099-01-01T00:00:00.000Z",
+        },
+      ],
+      eventType: "test.history",
+    });
+    const search = async (query: string) =>
+      openBotToolPayload(
+        (await callOpenBotTool(client, session.externalSessionId, "history_search", { query })).result,
+      );
+    expect(await search(secret.slice(0, 26))).toEqual(await search("absent-synthetic-text"));
+    const visible = await search("visible-marker");
+    expect(getArray(visible, "messages").map((row) => getString(row, "messageId"))).toEqual(["secret-request"]);
+    expect(JSON.stringify(visible)).not.toContain(secret);
+  });
+
   it("keeps chat readable with a corrupt capture and pages large escaped work steps", async () => {
     const { store, client, session } = await start();
     const row = store.database.readAgentHistory("chief", session.threadId, { author: "assistant", limit: 1 })
@@ -158,6 +188,25 @@ describe.sequential("scoped history tools", () => {
     expect(response.result).toMatchObject({ success: true });
     expect(JSON.stringify(openBotToolPayload(response.result))).toContain("Captured work steps are unavailable");
     expect(JSON.stringify(response.result)).not.toContain("PRIVATE_CAPTURE");
+  });
+
+  it("reads a pre-v2 capture that only this session can own", async () => {
+    const { store, client, session } = await start();
+    const row = store.database.readAgentHistory("chief", session.threadId, { author: "assistant", limit: 1 })
+      .messages[0];
+    if (!row?.message.turnId) throw new Error("Missing test turn");
+    const directory = join(store.database.userDataPath, "provider-work-steps");
+    await mkdir(directory, { recursive: true });
+    await writeFile(
+      join(directory, createHash("sha256").update(session.externalSessionId).digest("hex")),
+      JSON.stringify({ [row.message.turnId]: "LEGACY_CAPTURE_STEPS" }),
+      { mode: 0o600 },
+    );
+    const response = await callOpenBotTool(client, session.externalSessionId, "history_read", {
+      messageId: row.message.id,
+      includeWorkSteps: true,
+    });
+    expect(JSON.stringify(openBotToolPayload(response.result))).toContain("LEGACY_CAPTURE_STEPS");
   });
 
   it("rejects a reset that occurs during a capture read", async () => {

@@ -12,7 +12,6 @@ import {
 export interface AgentHistorySelection {
   before?: string;
   messageId?: string;
-  query?: string;
   author?: string;
   limit: number;
 }
@@ -63,7 +62,6 @@ export class AgentHistoryQueries {
         AND (? IS NULL OR author = ?)
         AND (? IS NULL OR message_id = ?)
         AND (? IS NULL OR (${ORDER_KEY_COLUMNS}) < (SELECT ${ORDER_KEY_COLUMNS} FROM allowed WHERE message_id = ?))
-        AND (? IS NULL OR instr(lower(json_extract(message_json, '$.text')), lower(?)) > 0)
       ORDER BY ${ORDER_KEY_DESC} LIMIT ?`)
         .all(
           ...bindings,
@@ -74,8 +72,6 @@ export class AgentHistoryQueries {
           selection.messageId ?? null,
           selection.before ?? null,
           selection.before ?? null,
-          selection.query ?? null,
-          selection.query ?? null,
           selection.limit,
         ),
     );

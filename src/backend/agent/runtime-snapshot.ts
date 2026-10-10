@@ -72,10 +72,15 @@ export function compactRuntimeApproval(approval: AgentApproval): AgentRuntimeSna
 function fitRuntimeSnapshot(snapshot: AgentRuntimeSnapshot): AgentRuntimeSnapshot {
   if (runtimeSnapshotBytes(snapshot) <= AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT) return snapshot;
 
+  // Local-only context goes first, so it never costs Team clients a field they had before.
+  if (snapshot.contextStates?.length) {
+    snapshot.contextStates = [];
+    if (runtimeSnapshotBytes(snapshot) <= AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT) return snapshot;
+  }
+
   snapshot.agents = snapshot.agents.map((agent) => ({ ...agent, preview: "", avatarUrl: null }));
   if (runtimeSnapshotBytes(snapshot) <= AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT) return snapshot;
 
-  snapshot.contextStates = [];
   snapshot.work = [];
   if (runtimeSnapshotBytes(snapshot) <= AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT) return snapshot;
 

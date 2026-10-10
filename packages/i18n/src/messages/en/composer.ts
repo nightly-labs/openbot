@@ -103,7 +103,6 @@ export const messages = defineMessages("composer", {
   "composer.context.tokensEstimated": "Estimated: {used} of {total} tokens",
   "composer.context.autoAt": "Context compacts automatically at {percent}.",
   "composer.context.nativeAuto": "The provider manages automatic compaction.",
-  "composer.context.autoUnknown": "The provider has not reported an automatic compaction point.",
   "composer.compaction.estimated": "Estimated progress",
   "composer.context.noAuto": "This agent does not compact its context.",
   "composer.context.lastCompaction": "Last compaction: {before} → {after} tokens",

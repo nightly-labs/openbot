@@ -122,6 +122,11 @@ export class ContextCompaction {
     this.#changed();
   }
 
+  /** Ends a running compaction whose provider stopped before it reported the result. */
+  abandonCompaction(threadId: string): void {
+    if (this.#display.get(threadId)?.compaction?.status === "running") this.observeCompaction(threadId, "failed");
+  }
+
   beginTurn(threadId: string): void {
     this.#awaitingPostCompaction.delete(threadId);
   }

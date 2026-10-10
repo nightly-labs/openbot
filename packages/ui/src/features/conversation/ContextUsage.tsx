@@ -117,7 +117,7 @@ export function ContextUsageMeter(props: { usage: ContextUsageView; onCompact?: 
           <Popover.Description class="context-meter-note">
             <Show
               when={props.usage.autoCompactAt}
-              fallback={t(props.usage.nativeManaged ? "composer.context.nativeAuto" : "composer.context.autoUnknown")}
+              fallback={t(props.usage.nativeManaged ? "composer.context.nativeAuto" : "composer.context.noAuto")}
             >
               {(at) => (
                 <>{t("composer.context.autoAt", { percent: format.percent(at(), { maximumFractionDigits: 0 }) })}</>

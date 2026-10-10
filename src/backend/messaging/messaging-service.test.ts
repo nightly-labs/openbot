@@ -373,17 +373,14 @@ describe.sequential("Slack messaging end to end", () => {
     await waitFor(() => slack.of("chat.update").filter((call) => call.params.text === "CODEX_DONE").length === 2);
     const links = service?.messaging.store.links(agent.id) ?? [];
     expect(links).toHaveLength(2);
-    const firstLink = links.find(
-      (link) =>
-        store.database.readAgentHistory(agent.id, link.threadId, { query: "LINK_ONE_PRIVATE", limit: 1 }).messages
-          .length > 0,
-    );
+    const privateIn = (threadId: string) =>
+      store.database
+        .readAgentHistory(agent.id, threadId, { limit: 50 })
+        .messages.find((row) => row.message.text.includes("LINK_ONE_PRIVATE"))?.message;
+    const firstLink = links.find((link) => privateIn(link.threadId));
     const secondLink = links.find((link) => link !== firstLink);
     if (!firstLink || !secondLink) throw new Error("Missing messaging history");
-    const privateMessage = store.database.readAgentHistory(agent.id, firstLink.threadId, {
-      query: "LINK_ONE_PRIVATE",
-      limit: 1,
-    }).messages[0]?.message;
+    const privateMessage = privateIn(firstLink.threadId);
     const session = store.database.listProviderSessions(secondLink.threadId).at(-1);
     if (!privateMessage || !session) throw new Error("Missing messaging session");
     const forged = await callOpenBotTool(client, session.externalSessionId, "tool_call", {

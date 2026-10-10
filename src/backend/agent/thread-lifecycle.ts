@@ -253,16 +253,7 @@ export class ThreadLifecycle {
     if (databaseSessionId) yield* threadIo(() => rm(this.workStepsPath(databaseSessionId), { force: true }));
     // Unattributed legacy captures stay until no recorded session uses the external identifier.
     if (!this.#store.database.listProviderSessionIds(sessionId).some((id) => id !== databaseSessionId))
-      yield* threadIo(() =>
-        rm(
-          join(
-            this.#store.database.userDataPath,
-            "provider-work-steps",
-            createHash("sha256").update(sessionId).digest("hex"),
-          ),
-          { force: true },
-        ),
-      );
+      yield* threadIo(() => rm(this.legacyWorkStepsPath(sessionId), { force: true }));
     this.#pendingHandoffs.delete(sessionId);
   }, Effect.uninterruptible).bind(this);
 
@@ -514,6 +505,15 @@ export class ThreadLifecycle {
       "provider-work-steps",
       "v2",
       createHash("sha256").update(sessionId).digest("hex"),
+    );
+  }
+
+  /** Captures saved before v2, keyed by the external identifier that two providers can share. */
+  private legacyWorkStepsPath(externalSessionId: string): string {
+    return join(
+      this.#store.database.userDataPath,
+      "provider-work-steps",
+      createHash("sha256").update(externalSessionId).digest("hex"),
     );
   }
 
@@ -960,7 +960,16 @@ export class ThreadLifecycle {
     this: ThreadLifecycle,
     session: ProviderSession,
   ) {
-    const text = yield* Effect.result(threadIo(() => readFile(this.workStepsPath(session.id), "utf8")));
+    let text = yield* Effect.result(threadIo(() => readFile(this.workStepsPath(session.id), "utf8")));
+    // A pre-v2 capture belongs to this session only when no other session uses its external identifier.
+    if (
+      Result.isFailure(text) &&
+      missingSessionFile(text.failure.cause) &&
+      this.#store.database.listProviderSessionIds(session.externalSessionId).every((id) => id === session.id)
+    )
+      text = yield* Effect.result(
+        threadIo(() => readFile(this.legacyWorkStepsPath(session.externalSessionId), "utf8")),
+      );
     if (Result.isFailure(text)) {
       if (missingSessionFile(text.failure.cause)) return null;
       this.#hooks.logHandoffReadFailure(session.provider, text.failure.cause);

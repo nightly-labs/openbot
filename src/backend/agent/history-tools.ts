@@ -9,6 +9,8 @@ import { type ToolOperationFailed, toolStep } from "./tool-operation";
 
 const id = z.string().min(1).max(512);
 const cursorText = z.string().min(1).max(4096);
+/** Messages one search call reads before it returns a cursor, whether or not they match. */
+const SEARCH_SCAN_ROWS = 200;
 const searchShape = {
   query: z.string().trim().min(1).max(200),
   cursor: cursorText.optional(),
@@ -100,11 +102,13 @@ export class HistoryTools {
       : null;
     if (cursor && (cursor.threadId !== threadId || cursor.query !== (query ?? null)))
       throw new Error(sourceText("error.agent.historyUnavailable"));
+    // Search matches redacted text in fixed scan batches. A SQL match on stored text would let
+    // hits and misses reveal a redacted secret one character at a time.
+    const scanLimit = search ? SEARCH_SCAN_ROWS : limit;
     const selection = {
-      limit: read?.messageId ? 1 : limit + 1,
+      limit: read?.messageId ? 1 : scanLimit + 1,
       ...(cursor ? { before: cursor.anchorMessageId } : {}),
       ...(read?.messageId ? { messageId: read.messageId } : {}),
-      ...(query ? { query } : {}),
     };
     const page = yield* toolStep(() => store.database.readAgentHistory(agentId, threadId, selection));
     if (cursor && cursor.resetMessageId !== page.resetMessageId)
@@ -127,12 +131,22 @@ export class HistoryTools {
     const maximum = search ? 8000 : 16000;
     const sessions = read?.includeWorkSteps ? store.database.listProviderSessions(threadId) : [];
     const captures = new Map<string, Map<string, string> | null>();
-    for (const row of page.messages.slice(0, limit)) {
+    let more = page.messages.length > scanLimit;
+    for (const row of page.messages.slice(0, scanLimit)) {
+      if (result.messages.length === limit) {
+        more = true;
+        break;
+      }
       const message = row.message;
       const text = redact(message.text);
+      const match = search ? text.toLowerCase().indexOf(search.query.toLowerCase()) : 0;
+      if (match < 0) {
+        result.nextCursor = nextCursor(message.id);
+        continue;
+      }
       let offset = read?.offset ?? 0;
       if (offset > text.length) throw new Error(sourceText("error.agent.historyUnavailable"));
-      if (search) offset = Math.max(0, text.toLowerCase().indexOf(search.query.toLowerCase()) - 100);
+      if (search) offset = Math.max(0, match - 100);
       const excerpt = text.slice(offset, offset + (search ? 400 : 12000));
       const entry: HistoryEntry = {
         messageId: message.id,
@@ -173,6 +187,7 @@ export class HistoryTools {
         if (result.messages.length > 1) {
           result.messages.pop();
           result.nextCursor = nextCursor(result.messages.at(-1)?.messageId ?? message.id);
+          more = true;
           break;
         }
         // Even a single large message must be readable. Cut only after whole-value redaction.
@@ -192,7 +207,7 @@ export class HistoryTools {
         entry.nextOffset = offset + low < text.length ? offset + low : null;
       }
     }
-    if (page.messages.length <= result.messages.length) result.nextCursor = null;
+    if (!more) result.nextCursor = null;
     // File reads yield. Recheck reset and message existence before any content leaves the process.
     for (const entry of result.messages) {
       const checked = yield* toolStep(() =>

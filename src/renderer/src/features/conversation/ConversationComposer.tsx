@@ -39,6 +39,9 @@ import { deviceSendShortcut, sendShortcutAriaKey, sendShortcutHintKey } from "..
 import { useConversationViewScope } from "./conversation-scope";
 import { voiceButtonLabel, voiceSupported } from "./voice-status";
 
+// Module scope: the composer remounts on navigation, and a dismissed notice must stay dismissed.
+const [dismissedCompactions, setDismissedCompactions] = createSignal<Record<string, string>>({});
+
 /** @internal Stable HMR boundary for conversation composer. */
 export function ConversationComposer() {
   const {
@@ -104,7 +107,6 @@ export function ConversationComposer() {
   const awaitingVisible = () => awaitingReplies().length > 0 && !pickerOpen();
   const slotOpen = () => queueVisible() || awaitingVisible();
   const voiceAvailable = () => !props.runtime && voiceSupported(props.platform);
-  const [dismissedCompactions, setDismissedCompactions] = createSignal<Record<string, string>>({});
   const context = () =>
     props.contextState?.agentId === props.agent?.id && props.contextState?.threadId === props.agent?.threadId
       ? props.contextState

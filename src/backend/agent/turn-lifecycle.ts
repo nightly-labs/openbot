@@ -270,6 +270,8 @@ export class TurnLifecycle {
       if (turn.client !== client) continue;
       this.#runningTurns.delete(turnId);
       this.#attention.clearForTurn(turn.threadId, turnId);
+      if (this.#observedCompactions.get(turn.threadId) === turnId) this.#observedCompactions.delete(turn.threadId);
+      this.#compaction.abandonCompaction(turn.threadId);
       yield* this.#completeTurn(turn.agentId, turn.threadId, turnId, "interrupted").pipe(
         Effect.catch((failure) =>
           Effect.sync(() => this.#hooks.emitError("turn_completion_failed", failure.cause, turn.agentId)),
