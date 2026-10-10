@@ -326,7 +326,9 @@ export function createWebWorkspaceRuntime(
       current: {
         ...sessionActions,
         onConnectionUpdate: async (update) => {
-          waitingHostId = update.hostOffline ? update.hostId : null;
+          // A `connecting` update without `hostOffline`, such as a `rate_limited` reply, does not end the hold.
+          if (update.hostOffline) waitingHostId = update.hostId;
+          else if (update.state !== "connecting") waitingHostId = null;
           if (update.state !== "online") {
             browserView.disconnect(update.message ?? undefined);
             const releaseGeneration = liveViewGeneration + 1;
