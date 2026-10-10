@@ -279,18 +279,27 @@ export class AgentMemories {
           return openBotToolFailure(sourceText(key, { saved, limit }));
         }
       }
-      this.#stage(params.turnId, {
-        callId: params.callId,
-        type: "remember",
-        agentId: senderAgentId,
-        epoch: this.#epoch(senderAgentId),
-        ...(memoryId ? { memoryId } : {}),
-        text,
-        sourceTurnId: params.turnId,
-        ...(memoryId ? { expectedUpdatedAt: current?.updatedAt ?? null } : {}),
-        ...(current && selection ? { expectedSelectionRevision: selection.revision } : {}),
-        inclusion,
-      });
+      if (duplicate && selection && !selection.userControlled) {
+        this.#stage(params.turnId, {
+          callId: params.callId,
+          type: "selection",
+          agentId: senderAgentId,
+          epoch: this.#epoch(senderAgentId),
+          changes: [{ memoryId: duplicate.id, inclusion, expectedRevision: selection.revision }],
+        });
+      } else
+        this.#stage(params.turnId, {
+          callId: params.callId,
+          type: "remember",
+          agentId: senderAgentId,
+          epoch: this.#epoch(senderAgentId),
+          ...(memoryId ? { memoryId } : {}),
+          text,
+          sourceTurnId: params.turnId,
+          ...(memoryId ? { expectedUpdatedAt: current?.updatedAt ?? null } : {}),
+          ...(current && selection ? { expectedSelectionRevision: selection.revision } : {}),
+          inclusion,
+        });
       return openBotToolResult({
         status: "staged",
         memoryId: memoryId ?? null,
