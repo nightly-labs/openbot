@@ -478,6 +478,14 @@ export class DrainScheduler {
           yield* drainStep(requireServedModel);
           requestedThreadId = providerThreadId;
           requestedClient = client;
+          yield* this.#mailbox
+            .recordInputBatch(delivery.id, {
+              deliveryIds: batch.map((item) => item.delivery.id),
+              provider: client.provider,
+              threadId: this.#conversation.publicThreadId(agent.id, providerThreadId),
+              sessionId: providerThreadId,
+            })
+            .pipe(toDeliveryStartFailed);
           if (client.provider === "codex") {
             if (inputAttempt && inputAttempt.threadId !== providerThreadId)
               this.#compaction.settleInput(inputAttempt, false);

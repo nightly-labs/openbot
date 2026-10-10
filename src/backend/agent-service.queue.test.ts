@@ -52,6 +52,298 @@ afterEach(async () => {
 });
 
 describe.sequential("AgentService: queue", () => {
+  describe("review recovery", () => {
+    async function restartStartingInput(
+      history: "missing" | "interrupted",
+      identity?: "provider" | "thread" | "session",
+    ) {
+      const started = await startService(root, { provider: "codex" });
+      service = started.service;
+      await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Seed session" }));
+      await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "completed");
+      const sessionId = started.store.activeProviderSession("chief")?.externalSessionId;
+      assert(sessionId);
+      await runCauseEffect(service.stop());
+      const pending = await runCauseEffect(
+        started.mailbox.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Crash input" }),
+      );
+      const id = pending.deliveries[0]?.id;
+      assert(id);
+      await runCauseEffect(started.mailbox.markStarting(id));
+      if (identity) {
+        const threadId = started.store.list().find((item) => item.id === "chief")?.threadId;
+        assert(threadId);
+        await runCauseEffect(
+          started.mailbox.recordInputBatch(id, {
+            deliveryIds: [id],
+            provider: identity === "provider" ? "claude" : "codex",
+            threadId: identity === "thread" ? "another-public-thread" : threadId,
+            sessionId: identity === "session" ? "another-session" : sessionId,
+          }),
+        );
+      }
+      expect(started.mailbox.getDelivery(id)?.delivery.error).toBeNull();
+      const restored = stores(root);
+      const client = new FakeAgentClient("codex", "DONE", false);
+      client.threadRead = () => ({
+        thread: {
+          id: sessionId,
+          turns:
+            history === "missing"
+              ? []
+              : [
+                  {
+                    id: "recovered-interrupted",
+                    status: "interrupted",
+                    items: [{ type: "userMessage", id: "receipt", clientId: id, content: [] }],
+                  },
+                ],
+        },
+      });
+      service = createTestService({ ...restored, preferredProvider: "codex", clientFactory: () => client });
+      await runCauseEffect(service.initialize());
+      return { ...restored, client, id };
+    }
+
+    it("review crash keeps unknown input visible and cancellable without replay", async () => {
+      const recovered = await restartStartingInput("missing");
+      assert(service);
+      expect(service.listQueue("chief").deliveries.find((item) => item.id === recovered.id)).toMatchObject({
+        status: "starting",
+        error: expect.any(String),
+      });
+      expect(recovered.client.requests.filter((item) => item.method === "turn/start")).toHaveLength(0);
+      await runCauseEffect(service.cancelQueuedMessage("chief", recovered.id));
+      expect(recovered.mailbox.getDelivery(recovered.id)?.delivery.status).toBe("cancelled");
+      await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Next input" }));
+      await waitForQueue(service, "chief", (queue) =>
+        queue.deliveries.some((item) => item.text === "Next input" && item.status === "running"),
+      );
+      expect(recovered.client.requests.filter((item) => item.method === "turn/start")).toHaveLength(1);
+    });
+
+    it.each(["provider", "thread", "session"] as const)(
+      "review recovery does not apply another %s identity",
+      async (identity) => {
+        const recovered = await restartStartingInput("interrupted", identity);
+        assert(service);
+        expect(recovered.mailbox.getDelivery(recovered.id)?.delivery).toMatchObject({
+          status: "starting",
+          turnId: null,
+          error: expect.any(String),
+        });
+        expect(recovered.client.requests.filter((item) => item.method === "turn/start")).toHaveLength(0);
+        await runCauseEffect(service.cancelQueuedMessage("chief", recovered.id));
+        expect(recovered.mailbox.getDelivery(recovered.id)?.delivery.status).toBe("cancelled");
+      },
+    );
+
+    it("review exact interrupted history settles the recovered input", async () => {
+      const recovered = await restartStartingInput("interrupted");
+      assert(service);
+      expect(recovered.mailbox.getDelivery(recovered.id)?.delivery).toMatchObject({
+        status: "interrupted",
+        turnId: "recovered-interrupted",
+      });
+      expect(recovered.client.requests.filter((item) => item.method === "turn/start")).toHaveLength(0);
+      await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Next input" }));
+      await waitForQueue(service, "chief", (queue) =>
+        queue.deliveries.some((item) => item.text === "Next input" && item.status === "running"),
+      );
+    });
+
+    it.each(["none", "primary", "companion", "restart"])(
+      "review late exact receipt confirms only the original submitted batch and preserves files: %s",
+      async (cancel) => {
+        const { store, mailbox } = stores(root);
+        const client = new FakeAgentClient("codex", "DONE", false, true, {}, async (method) => {
+          if (method === "turn/start") throw new RequestTimeoutError("Codex", method);
+        });
+        const foreign = new FakeAgentClient("claude", "DONE", false);
+        service = createTestService({
+          store,
+          mailbox,
+          clientFactory: (provider) => (provider === "codex" ? client : foreign),
+        });
+        const events: AgentEvent[] = [];
+        service.on("event", (event) => events.push(event));
+        await runCauseEffect(service.initialize());
+        await runCauseEffect(store.getOrCreate("chief"));
+        const request = await runCauseEffect(
+          mailbox.enqueue({
+            sender: { kind: "agent", agentId: "chief" },
+            recipientAgentIds: ["sales-outbound", "inbox-manager"],
+            text: "Report",
+          }),
+        );
+        const reply = await runCauseEffect(
+          mailbox.enqueue({
+            sender: { kind: "agent", agentId: "sales-outbound" },
+            recipientAgentIds: ["chief"],
+            text: "Original reply",
+            replyToMessageId: request.messageId,
+            expectsReply: false,
+          }),
+        );
+        const file = join(root, "original.txt");
+        await writeFile(file, "Original file bytes");
+        const [draft] = await runCauseEffect(mailbox.prepareImportedAttachments([file], []));
+        assert(draft);
+        const sent = await runCauseEffect(
+          service.sendMessage({ agentId: "chief", text: "Original input", attachmentDraftIds: [draft.id] }),
+        );
+        const id = sent.deliveries[0]?.id;
+        assert(id);
+        await waitForQueue(
+          service,
+          "chief",
+          (queue) =>
+            queue.deliveries.length === 2 &&
+            queue.deliveries.every((item) => item.status === "starting" && item.error !== null),
+        );
+        const original = service.listQueue("chief").deliveries;
+        expect(original.map((item) => item.id)).toEqual([reply.deliveries[0]?.id, id]);
+        const sessionId = store.activeProviderSession("chief")?.externalSessionId;
+        assert(sessionId);
+        const submitted = () =>
+          client.requests.filter(
+            (item) => item.method === "turn/start" && getString(item.params, "threadId") === sessionId,
+          );
+        await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Later input" }));
+        const cancelledId = cancel === "primary" ? id : cancel === "companion" ? reply.deliveries[0]?.id : undefined;
+        if (cancelledId) await runCauseEffect(service.cancelQueuedMessage("chief", cancelledId));
+        if (cancel === "restart") {
+          await runCauseEffect(service.stop());
+          const restored = stores(root);
+          const restoredClient = new FakeAgentClient("codex", "DONE", false);
+          restoredClient.threadRead = () => ({
+            thread: {
+              id: sessionId,
+              turns: [
+                {
+                  id: "recovered-batch",
+                  status: "interrupted",
+                  items: [{ id: "receipt", type: "userMessage", clientId: id, content: [] }],
+                },
+              ],
+            },
+          });
+          service = createTestService({ ...restored, preferredProvider: "codex", clientFactory: () => restoredClient });
+          await runCauseEffect(service.initialize());
+          await waitForQueue(service, "chief", (queue) => queue.deliveries[2]?.status === "running");
+          expect(service.listQueue("chief").deliveries.map((item) => item.status)).toEqual([
+            "interrupted",
+            "interrupted",
+            "running",
+          ]);
+          expect(restoredClient.requests.filter((item) => item.method === "turn/start")).toHaveLength(1);
+          expect(
+            firstInputText(restoredClient.requests.find((item) => item.method === "turn/start")?.params),
+          ).toContain("Later input");
+          return;
+        }
+        client.emit("notification", notification("turn/started", { threadId: sessionId, turn: { id: "late-turn" } }));
+        await waitFor(() => events.some((event) => event.type === "turn-started" && event.turnId === "late-turn"));
+        process.env.OPENBOT_CLAUDE_PATH = await fakeClaudeCli();
+        await runCauseEffect(service.ensureProvider("claude"));
+        foreign.emit(
+          "notification",
+          notification("item/started", {
+            threadId: sessionId,
+            turnId: "late-turn",
+            item: { id: "foreign-receipt", type: "userMessage", clientId: id, content: [] },
+          }),
+        );
+        for (const [threadId, turnId, clientId] of [
+          ["another-session", "late-turn", id],
+          [sessionId, "another-turn", id],
+          [sessionId, "late-turn", "later-input-id"],
+        ]) {
+          client.emit(
+            "notification",
+            notification("item/started", {
+              threadId,
+              turnId,
+              item: { id: "wrong-receipt", type: "userMessage", clientId, content: [] },
+            }),
+          );
+        }
+        await runCauseEffect(service.sendMessage({ agentId: "chief", text: "FIFO tail" }));
+        expect(
+          service
+            .listQueue("chief")
+            .deliveries.slice(0, 2)
+            .map((item) => item.status),
+        ).toEqual(original.map((item) => (item.id === cancelledId ? "cancelled" : "starting")));
+        client.emit(
+          "notification",
+          notification("item/started", {
+            threadId: sessionId,
+            turnId: "late-turn",
+            item: { id: "exact-receipt", type: "userMessage", clientId: id, content: [] },
+          }),
+        );
+        await waitForQueue(
+          service,
+          "chief",
+          (queue) =>
+            queue.deliveries.find((item) => item.id === (cancel === "primary" ? reply.deliveries[0]?.id : id))
+              ?.status === "running",
+        );
+        expect(service.listQueue("chief").deliveries.map((item) => item.status)).toEqual([
+          ...original.map((item) => (item.id === cancelledId ? "cancelled" : "running")),
+          "queued",
+          "queued",
+        ]);
+        expect(
+          service
+            .listQueue("chief")
+            .deliveries.slice(0, 2)
+            .filter((item) => item.id !== cancelledId)
+            .map((item) => ({ id: item.id, text: item.text, attachments: item.attachments })),
+        ).toEqual(
+          original
+            .filter((item) => item.id !== cancelledId)
+            .map((item) => ({ id: item.id, text: item.text, attachments: item.attachments })),
+        );
+        const exported = await runCauseEffect(mailbox.listExportAttachments());
+        if (cancel !== "primary") {
+          expect(exported).toHaveLength(1);
+          const [originalFile] = exported;
+          assert(originalFile);
+          expect(await readFile(originalFile.sourcePath, "utf8")).toBe("Original file bytes");
+        }
+        expect(submitted()).toHaveLength(1);
+        await expect(
+          runCauseEffect(
+            service.cancelQueuedMessage("chief", cancel === "primary" ? (reply.deliveries[0]?.id ?? "") : id),
+          ),
+        ).rejects.toThrow();
+        client.emit(
+          "notification",
+          notification("turn/completed", { threadId: sessionId, turn: { id: "late-turn", status: "completed" } }),
+        );
+        await waitForQueue(
+          service,
+          "chief",
+          (queue) =>
+            queue.deliveries.slice(0, 2).every((item) => ["completed", "cancelled"].includes(item.status)) &&
+            queue.deliveries[2]?.status === "starting" &&
+            queue.deliveries[2]?.error !== null,
+        );
+        expect(service.listQueue("chief").deliveries.map((item) => item.status)).toEqual([
+          ...original.map((item) => (item.id === cancelledId ? "cancelled" : "completed")),
+          "starting",
+          "queued",
+        ]);
+        const next = submitted();
+        expect(next).toHaveLength(2);
+        expect(firstInputText(next[1]?.params)).toContain("Later input");
+        expect(firstInputText(next[1]?.params)).not.toContain("Original input");
+      },
+    );
+  });
+
   it("sends an edited delivery once after a repeated save and drains past a deleted hold", async () => {
     const { service: agentService, client, store, mailbox } = await startService(root, { provider: "codex" });
     service = agentService;

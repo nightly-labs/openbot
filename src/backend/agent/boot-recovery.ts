@@ -127,14 +127,6 @@ export class BootRecovery {
     for (const id of this.#orphanedDeliveryIds) {
       if (!unresolvedIds.has(id)) this.#orphanedDeliveryIds.delete(id);
     }
-    // An agent starts one turn at a time, so its unconfirmed deliveries are one batch. The turn names
-    // only the first of them as its client id, and the others ran in that same turn.
-    const unconfirmedStarts = new Map<string, Set<string>>();
-    for (const { delivery } of unresolved) {
-      if (delivery.status !== "starting" || delivery.turnId) continue;
-      const ids = unconfirmedStarts.get(delivery.recipientAgentId) ?? new Set<string>();
-      unconfirmedStarts.set(delivery.recipientAgentId, ids.add(delivery.id));
-    }
     for (const context of unresolved) {
       const { delivery } = context;
       if (!this.#orphanedDeliveryIds.delete(delivery.id)) continue;
@@ -158,7 +150,23 @@ export class BootRecovery {
           if (this.#oversizedHistory.has(historyKey))
             return unconfirmedInput ? { terminal: null, reason: null } : interrupted;
           if (!client.readHistory) return unconfirmedInput ? { terminal: null, reason: null } : interrupted;
-          const batchIds = delivery.turnId ? null : unconfirmedStarts.get(delivery.recipientAgentId);
+          const batch = delivery.turnId === null ? this.#mailbox.submittedInputBatch(delivery.id) : null;
+          if (
+            unconfirmedInput &&
+            batch &&
+            (batch.provider !== session.provider ||
+              batch.threadId !== session.threadId ||
+              batch.sessionId !== session.externalSessionId)
+          )
+            return { terminal: null, reason: null };
+          const batchIds = new Set(
+            !delivery.turnId &&
+              batch?.provider === session.provider &&
+              batch.threadId === session.threadId &&
+              batch.sessionId === session.externalSessionId
+              ? batch.deliveryIds
+              : [delivery.id],
+          );
           let recovered: { turnId: string; status?: string } | undefined;
           yield* client
             .readHistory(
@@ -205,6 +213,8 @@ export class BootRecovery {
             return { terminal: "completed" as const, reason: null };
           } else if (turn?.status === "failed") {
             return { terminal: "failed" as const, reason: "The recovered Codex turn failed." };
+          } else if (turn?.status === "interrupted") {
+            return interrupted;
           }
         }
         return unconfirmedInput ? { terminal: null, reason: null } : interrupted;
@@ -213,12 +223,15 @@ export class BootRecovery {
       // fallback. Neither case authorizes replay of provider side effects.
       if (terminal !== null)
         yield* this.#mailbox.markTerminal(delivery.id, terminal, reason).pipe(toBootRecoveryFailed);
+      else if (this.#mailbox.getDelivery(delivery.id)?.delivery.status === "starting")
+        yield* this.#mailbox.markInputUnconfirmed(delivery.id).pipe(toBootRecoveryFailed);
       yield* recoveryStep(() => {
         const agent = this.#store.list().find((candidate) => candidate.id === delivery.recipientAgentId);
         const threadId = this.#hooks.deliveryThreadId?.(delivery.id) ?? agent?.threadId;
         if (agent && threadId && terminal !== null) {
           const recoveryTurnId =
-            delivery.turnId ?? this.#store.database.readConversationRuntime(agent.id, threadId).activeTurnId;
+            this.#mailbox.getDelivery(delivery.id)?.delivery.turnId ??
+            this.#store.database.readConversationRuntime(agent.id, threadId).activeTurnId;
           const changedMessages = this.#store.database
             .readConversationRecoveryMessages(agent.id, threadId, recoveryTurnId)
             .filter((message) => message.turnId === recoveryTurnId && message.status === "streaming")

@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { type AgentProviderId, isAgentProvider } from "@openbot/contracts/agent-providers";
 import { rewriteAttachmentReferences } from "@openbot/contracts/attachment-references";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
@@ -100,7 +101,16 @@ interface StoredFinishedEdit {
   saveHash?: string;
 }
 
+/** The exact inputs sent in one start request. Private mailbox data, not a queue contract. */
+export interface SubmittedInputBatch {
+  deliveryIds: string[];
+  provider: AgentProviderId;
+  threadId: string;
+  sessionId: string;
+}
+
 interface StoredDelivery {
+  inputBatch?: SubmittedInputBatch;
   editId?: string;
   finishedEditOutcomes?: Record<string, StoredFinishedEdit>;
   id: string;
@@ -1230,6 +1240,35 @@ export class MailboxStore {
     });
   }, Effect.uninterruptible).bind(this);
 
+  recordInputBatch = Effect.fn("MailboxStore.recordInputBatch")(function* (
+    this: MailboxStore,
+    primaryId: string,
+    batch: SubmittedInputBatch,
+  ): Effect.fn.Return<void, StoredStateFailure> {
+    const primary = this.#state.deliveries.find((item) => item.id === primaryId);
+    if (!primary || !batch.deliveryIds.includes(primaryId))
+      return yield* new StoredStateFailure({ cause: new Error("The submitted batch has no primary input.") });
+    if (
+      batch.deliveryIds.some((id) => {
+        const item = this.#state.deliveries.find((candidate) => candidate.id === id);
+        return item?.status !== "starting" || item.recipientAgentId !== primary.recipientAgentId;
+      })
+    )
+      return yield* new StoredStateFailure({ cause: new Error("The submitted batch is no longer reserved.") });
+    for (const item of this.#state.deliveries) {
+      if (item.inputBatch?.deliveryIds.some((id) => batch.deliveryIds.includes(id))) delete item.inputBatch;
+    }
+    yield* this.#updateDeliveryEffect(primaryId, ["starting"], { inputBatch: structuredClone(batch) }).pipe(
+      Effect.tapError(() => Effect.sync(() => this.restorePersistedState())),
+    );
+  }, Effect.uninterruptible).bind(this);
+
+  /** Includes a cancelled primary as a receipt anchor, but never changes its terminal state. */
+  submittedInputBatch(deliveryId: string): SubmittedInputBatch | null {
+    const primary = this.#state.deliveries.find((item) => item.inputBatch?.deliveryIds.includes(deliveryId));
+    return primary?.inputBatch ? structuredClone(primary.inputBatch) : null;
+  }
+
   /** Confirm only this steer attempt; a late receipt cannot revive a cancelled or requeued input. */
   confirmSteered = Effect.fn("MailboxStore.confirmSteered")(function* (
     this: MailboxStore,
@@ -2064,7 +2103,13 @@ export class MailboxStore {
     positions = this.#queuedPositions(),
     message = this.#requireMessage(delivery.messageId),
   ): QueueDelivery {
-    const { editId: _editId, finishedEditOutcomes: _finishedEditOutcomes, steerFallback, ...publicDelivery } = delivery;
+    const {
+      inputBatch: _inputBatch,
+      editId: _editId,
+      finishedEditOutcomes: _finishedEditOutcomes,
+      steerFallback,
+      ...publicDelivery
+    } = delivery;
     return {
       ...publicDelivery,
       ...(steerFallback && delivery.status === "queued" ? { steerFallback } : {}),
@@ -2387,6 +2432,13 @@ function isStoredDelivery(value: unknown): value is StoredDelivery {
     isString(value.messageId) &&
     isString(value.recipientAgentId) &&
     (value.editId === undefined || isString(value.editId)) &&
+    (value.inputBatch === undefined ||
+      (isRecord(value.inputBatch) &&
+        Array.isArray(value.inputBatch.deliveryIds) &&
+        value.inputBatch.deliveryIds.every(isString) &&
+        isAgentProvider(value.inputBatch.provider) &&
+        isString(value.inputBatch.threadId) &&
+        isString(value.inputBatch.sessionId))) &&
     (value.finishedEditOutcomes === undefined || isFinishedEditOutcomes(value.finishedEditOutcomes)) &&
     (value.queueOrder === undefined || (isNumber(value.queueOrder) && Number.isFinite(value.queueOrder))) &&
     (value.status === "queued" ||

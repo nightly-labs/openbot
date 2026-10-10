@@ -401,6 +401,7 @@ export class TurnLifecycle {
             ? this.#conversation.loadedExecutionSnapshot(publicThreadId)
             : this.#conversation.snapshotToUpdate(agentId);
           const delivery = this.#mailbox.getDelivery(threadItem.clientId)?.delivery;
+          const batch = delivery?.turnId === null ? this.#mailbox.submittedInputBatch(delivery.id) : null;
           if (
             agent &&
             this.#providers.clientForAgent(agent) === source &&
@@ -411,7 +412,11 @@ export class TurnLifecycle {
             snapshot?.activeTurnId === turnId &&
             delivery?.recipientAgentId === agentId &&
             (this.#hooks.deliveryThreadId(delivery.id) ?? agent.threadId) === publicThreadId &&
-            delivery.status === "starting" &&
+            (delivery.status === "starting" || (delivery.status === "cancelled" && batch !== null)) &&
+            (!batch ||
+              (batch.provider === source.provider &&
+                batch.threadId === publicThreadId &&
+                batch.sessionId === threadId)) &&
             (delivery.turnId === null || delivery.turnId === turnId)
           ) {
             // Completion must wait for this exact receipt and its channel ownership update.
@@ -423,17 +428,41 @@ export class TurnLifecycle {
               const exit = yield* Effect.exit(
                 Effect.gen({ self: this }, function* () {
                   if (previous) yield* Deferred.await(previous);
-                  if (delivery.turnId === null)
-                    yield* this.#mailbox.markRunning(delivery.id, turnId).pipe(
-                      Effect.tapError(() => Effect.sync(() => this.#mailbox.restorePersistedState())),
-                      toTurnOperationFailed,
-                    );
-                  else yield* this.#mailbox.confirmSteered(delivery.id, turnId).pipe(toTurnOperationFailed);
-                  const confirmed = this.#mailbox.getDelivery(delivery.id)?.delivery;
-                  if (confirmed?.status === "running" && confirmed.turnId === turnId)
-                    yield* this.#hooks
-                      .inputAccepted(delivery.id, session.externalSessionId, turnId)
-                      .pipe(toTurnOperationFailed);
+                  const currentAgent = this.#store.list().find((candidate) => candidate.id === agentId);
+                  const currentSession = currentAgent
+                    ? this.#store.database.activeProviderSession(publicThreadId, currentAgent.provider)
+                    : null;
+                  if (
+                    !currentAgent ||
+                    this.#providers.clientForAgent(currentAgent) !== source ||
+                    this.#conversation.loadedClientFor(threadId) !== source ||
+                    currentSession?.externalSessionId !== threadId ||
+                    this.#runningTurns.get(turnId) !== running ||
+                    snapshot.activeTurnId !== turnId
+                  )
+                    return;
+                  const ids = delivery.turnId === null && batch ? batch.deliveryIds : [delivery.id];
+                  for (const id of ids) {
+                    const pending = this.#mailbox.getDelivery(id)?.delivery;
+                    if (
+                      pending?.status !== "starting" ||
+                      pending.recipientAgentId !== agentId ||
+                      (this.#hooks.deliveryThreadId(id) ?? agent.threadId) !== publicThreadId ||
+                      (pending.turnId !== null && pending.turnId !== turnId)
+                    )
+                      continue;
+                    if (pending.turnId === null)
+                      yield* this.#mailbox.markRunning(id, turnId).pipe(
+                        Effect.tapError(() => Effect.sync(() => this.#mailbox.restorePersistedState())),
+                        toTurnOperationFailed,
+                      );
+                    else yield* this.#mailbox.confirmSteered(id, turnId).pipe(toTurnOperationFailed);
+                    const confirmed = this.#mailbox.getDelivery(id)?.delivery;
+                    if (confirmed?.status === "running" && confirmed.turnId === turnId)
+                      yield* this.#hooks
+                        .inputAccepted(id, session.externalSessionId, turnId)
+                        .pipe(toTurnOperationFailed);
+                  }
                   this.#mailboxSync.emitQueue(agentId);
                 }),
               );
