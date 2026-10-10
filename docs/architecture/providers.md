@@ -202,9 +202,17 @@ The server has no `--version`, so staging writes `antigravity-package.json` and
 `PATH`, because the Antigravity editor installs an `antigravity` command that is not this server.
 
 Sign in is an ACP `authenticate` call with `oauth-personal`, in a separate process
-(`src/backend/acp-sign-in.ts`): the server opens the browser and waits, and a status probe must
-never wait for that. The serving client never calls `authenticate`. A signed-out server answers
+(`src/backend/acp-sign-in.ts`). On Linux, OpenBot reads the Google sign-in link from the
+server and opens it with the desktop browser. The server browser launch is disabled for this
+process so the page opens once. A failed browser launch gives an actionable error; the OAuth
+link and browser error details are not logged. Other platforms let the server open the browser.
+A status probe must never wait for sign-in. The serving client never calls `authenticate`. A signed-out server answers
 `session/new` with "Authentication required", which the client reports as sign-in required.
+On Ubuntu 24.04, install a desktop browser and `xdg-utils` before sign-in. The Google
+callback uses `127.0.0.1` on the host, so complete sign-in in a desktop session on that same
+VM. A browser on another computer cannot complete this loopback callback. A server with no
+desktop can install and start Gemini, but cannot complete the interactive Google sign-in.
+
 The server runs confined; `antigravityStatePaths` gives it `~/.gemini/antigravity-acp` and
 `~/.gemini/artifacts` and protects its settings files. Migration 22 adds `antigravity` to
 `projection_provider_sessions`.

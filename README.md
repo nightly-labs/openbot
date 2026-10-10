@@ -74,6 +74,11 @@ a plugin listing - open the app and gives the launcher an icon that stays after 
 Voice prompts are not available on Linux. Remote desktop works on Linux x64 in an X11 session,
 such as Xorg or Xvfb. It does not work under Wayland, and the arm64 AppImage does not include it.
 
+For Gemini sign-in, install a desktop browser and `xdg-utils`. Open the sign-in page in a
+desktop session on the same host or VM. Google sends the callback to that host through
+`127.0.0.1`; a server with no desktop cannot complete this sign-in. See
+[Gemini setup](docs/architecture/providers.md#gemini).
+
 #### Linux server with no screen
 
 To run OpenBot as an always-on server of your account on a VPS or home server (Ubuntu 24.04 with

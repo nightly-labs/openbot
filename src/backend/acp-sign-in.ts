@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
+import { registerSecretValue } from "@openbot/logging";
 import { Effect, Fiber } from "effect";
 import { cliSpawnTarget } from "./cli";
 import { type ProviderClientOperationError, providerFailure } from "./provider-client-effects";
@@ -28,6 +29,8 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
   env: Record<string, string>;
   methodId: string;
   timeoutMs: number;
+  /** Linux Gemini delegates its browser launch to the desktop so failure is visible. */
+  openGoogleSignIn?: (url: string) => Promise<void>;
 }) {
   // Cursor's Windows launcher is a `.cmd` file, which starts only through `cmd.exe`.
   const target = cliSpawnTarget(options.executable, options.argv);
@@ -36,10 +39,10 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
       try: () =>
         spawn(target.command, target.args, {
           cwd: process.cwd(),
-          env: { ...process.env, ...options.env },
+          env: { ...process.env, ...options.env, ...(options.openGoogleSignIn ? { BROWSER: "true" } : {}) },
           windowsVerbatimArguments: target.windowsVerbatimArguments,
-          // The server prints the sign-in URL on stderr. It opens the browser itself, so nothing reads it.
-          stdio: ["pipe", "pipe", "ignore"],
+          // Only Gemini on Linux delegates the browser launch. Other servers still open it themselves.
+          stdio: ["pipe", "pipe", "pipe"],
           shell: false,
           windowsHide: process.platform === "win32",
         }),
@@ -47,6 +50,7 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
     }),
     (child) => stopProcessTree(child).pipe(Effect.orDie),
   );
+  if (!options.openGoogleSignIn) child.stderr.resume();
   const done = yield* Effect.forkScoped(
     Effect.callback<void, ProviderClientOperationError>((resume) => {
       let settled = false;
@@ -56,6 +60,35 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
         resume(error ? Effect.fail(providerFailure(error)) : Effect.void);
       };
       const fail = (error: Error) => settle(error);
+      const openGoogleSignIn = options.openGoogleSignIn;
+      let output = "";
+      let opened = false;
+      const browserFailed = () => fail(new Error(sourceText("error.provider.geminiBrowserUnavailable")));
+      const readSignInLink = (chunk: Buffer) => {
+        if (settled || opened || !openGoogleSignIn) return;
+        output += chunk.toString("utf8");
+        // Sign-in output contains OAuth state. Keep it bounded and never log it.
+        if (output.length > 64 * 1024) return browserFailed();
+        const match = /^Open the following link to authenticate the ACP server: (\S+)\r?\n/mu.exec(output);
+        if (!match?.[1]) return;
+        const url = URL.parse(match[1]);
+        if (
+          url?.origin !== "https://accounts.google.com" ||
+          url.pathname !== "/o/oauth2/v2/auth" ||
+          url.username ||
+          url.password
+        )
+          return browserFailed();
+        opened = true;
+        output = "";
+        registerSecretValue(url.toString());
+        void Promise.resolve()
+          .then(() => {
+            if (!settled) return openGoogleSignIn(url.toString());
+          })
+          .catch(browserFailed);
+      };
+      child.stderr?.on("data", readSignInLink);
       const timer = setTimeout(
         () => fail(new Error(sourceText("error.provider.acpSignInTimedOut"))),
         options.timeoutMs,
@@ -99,6 +132,9 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
       });
       return Effect.sync(() => {
         clearTimeout(timer);
+        settled = true;
+        output = "";
+        child.stderr?.removeListener("data", readSignInLink);
         lines.close();
         child.removeListener("exit", exited);
         child.stdin.end();

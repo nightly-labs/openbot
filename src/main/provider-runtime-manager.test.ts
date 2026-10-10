@@ -1108,35 +1108,38 @@ describe("ProviderRuntimeManager", () => {
    * from its own folder. The server has no `--version`, so the version comes from the layout file
    * staging writes. Any other file in the zip is refused, so no name in it can reach the disk.
    */
-  it("stages the Gemini server beside its harness, and refuses a zip with another file", async () => {
-    const root = await temporaryRoot();
-    const fixture = antigravityFixture();
-    const manager = antigravityManager(root, fixture.lock, fixture.archive);
-    await runCauseEffect(manager.initialize());
+  it.each(["darwin-arm64", "linux-x64", "linux-arm64"] as const)(
+    "stages Gemini on %s and refuses a zip with another file",
+    async (target) => {
+      const root = await temporaryRoot();
+      const fixture = antigravityFixture([], target);
+      const manager = antigravityManager(root, fixture.lock, fixture.archive, target);
+      await runCauseEffect(manager.initialize());
 
-    await runCauseEffect(manager.downloadAndWait("antigravity"));
+      await runCauseEffect(manager.downloadAndWait("antigravity"));
 
-    const version = fixture.lock.antigravity.version;
-    expect(manager.getStatus().providers.antigravity).toMatchObject({ phase: "ready", version });
-    const installed = join(root, "antigravity", "darwin-arm64", version);
-    expect(await readFile(join(installed, "bin", "agy_acp_server.par"), "utf8")).toBe(fixture.serverText);
-    expect(await readFile(join(installed, "bin", "localharness_external"), "utf8")).toBe(fixture.harnessText);
-    expect(JSON.parse(await readFile(join(installed, "antigravity-package.json"), "utf8"))).toMatchObject({
-      layoutVersion: 1,
-      version,
-      executable: "bin/agy_acp_server.par",
-      harness: "bin/localharness_external",
-    });
+      const version = fixture.lock.antigravity.version;
+      expect(manager.getStatus().providers.antigravity).toMatchObject({ phase: "ready", version });
+      const installed = join(root, "antigravity", target, version);
+      expect(await readFile(join(installed, "bin", "agy_acp_server.par"), "utf8")).toBe(fixture.serverText);
+      expect(await readFile(join(installed, "bin", "localharness_external"), "utf8")).toBe(fixture.harnessText);
+      expect(JSON.parse(await readFile(join(installed, "antigravity-package.json"), "utf8"))).toMatchObject({
+        layoutVersion: 1,
+        version,
+        executable: "bin/agy_acp_server.par",
+        harness: "bin/localharness_external",
+      });
 
-    const otherRoot = await temporaryRoot();
-    const extra = antigravityFixture([["../outside", "x"]]);
-    const refused = antigravityManager(otherRoot, extra.lock, extra.archive);
-    await runCauseEffect(refused.initialize());
-    await expect(runCauseEffect(refused.downloadAndWait("antigravity"))).rejects.toThrow(
-      "The Gemini archive has an unexpected file.",
-    );
-    await expect(access(join(otherRoot, "outside"))).rejects.toThrow();
-  });
+      const otherRoot = await temporaryRoot();
+      const extra = antigravityFixture([["../outside", "x"]], target);
+      const refused = antigravityManager(otherRoot, extra.lock, extra.archive, target);
+      await runCauseEffect(refused.initialize());
+      await expect(runCauseEffect(refused.downloadAndWait("antigravity"))).rejects.toThrow(
+        "The Gemini archive has an unexpected file.",
+      );
+      await expect(access(join(otherRoot, "outside"))).rejects.toThrow();
+    },
+  );
 
   /*
    * Cursor ships its Windows CLI as a zip of one folder with subfolders, and OpenBot unpacks it
@@ -1368,9 +1371,12 @@ async function bunFixture(): Promise<OpencodeFixture> {
 }
 
 /** A served Gemini zip with the lock rewritten to match it. `extra` adds files the zip must not hold. */
-function antigravityFixture(extra: [string, string][] = []) {
+function antigravityFixture(
+  extra: [string, string][] = [],
+  target: "darwin-arm64" | "linux-x64" | "linux-arm64" = "darwin-arm64",
+) {
   const lock = parseAgentRuntimeLock(structuredClone(lockValue));
-  const artifact = lock.antigravity.artifacts["darwin-arm64"];
+  const artifact = lock.antigravity.artifacts[target];
   const serverText = "#!/bin/sh\necho server\n";
   const harnessText = "#!/bin/sh\necho harness\n";
   const archive = zipArchive([[artifact.executable, serverText], [artifact.harness, harnessText], ...extra]);
@@ -1386,11 +1392,12 @@ function antigravityManager(
   root: string,
   lock: ReturnType<typeof parseAgentRuntimeLock>,
   archive: Uint8Array,
+  target: "darwin-arm64" | "linux-x64" | "linux-arm64",
 ): ProviderRuntimeManager {
   return new ProviderRuntimeManager({
     root,
-    platform: "darwin",
-    architecture: "arm64",
+    platform: target === "darwin-arm64" ? "darwin" : "linux",
+    architecture: target === "linux-x64" ? "x64" : "arm64",
     lock,
     fetchImpl: async () => chunkedResponse(archive, 4_096),
   });
