@@ -550,3 +550,29 @@ it.each(["error", "close"])("waits a full Signal rate window after %s", async (k
   expect(SignalSocket.instances).toHaveLength(2);
   await command({ type: "close", peerId: "all" });
 });
+
+it("keeps the Signal rate wait when main replaces an initial peer", async () => {
+  vi.useFakeTimers();
+  const { command, posted } = await startBridge();
+  const connect = {
+    type: "connect",
+    peerId: "host",
+    peer: "host",
+    signalUrl: "wss://signal.test",
+    token: "test",
+    iceTransportPolicy: "all",
+  } as const;
+  await command(connect);
+  const socket = SignalSocket.instances[0];
+  if (!socket) throw new Error("No Signal socket");
+  socket.message({ type: "error", version: 1, code: "rate_limited", message: "Too many signal messages." });
+  await vi.waitFor(() => expect(posted("peer-error")).toHaveLength(1));
+  await command({ type: "disconnect", peerId: "host" });
+  await command({ type: "prepare-signal", peerId: "host", signalUrl: connect.signalUrl });
+  await command(connect);
+  await vi.advanceTimersByTimeAsync(59_000);
+  expect(SignalSocket.instances).toHaveLength(1);
+  await vi.advanceTimersByTimeAsync(1_000);
+  expect(SignalSocket.instances).toHaveLength(2);
+  await command({ type: "close", peerId: "all" });
+});

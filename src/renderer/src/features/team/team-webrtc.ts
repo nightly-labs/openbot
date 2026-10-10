@@ -59,7 +59,6 @@ interface PeerState {
   channels: Partial<Record<"rpc" | "events" | "files" | "desktop", RTCDataChannel>>;
   payloadDecoders: Partial<Record<"rpc" | "events" | "files" | "desktop", TeamWebRtcPayloadDecoder>>;
   reconnectAttempt: number;
-  signalRetryAt: number;
   reconnectTimer: number | null;
   turnRefreshTimer: number | null;
   /** When the credentials of the current path must be renewed. */
@@ -85,6 +84,8 @@ const SIGNAL_RENEW_DELAY_MS = 8_000;
 const DISCONNECT_GRACE_MS = 15_000;
 
 const peers = new Map<string, PeerState>();
+// Main can replace a peer after an initial connection error. Keep the rate wait across that replacement.
+let signalRetryAt = 0;
 
 // A Signal socket opened while main waits for the ticket. Its TLS and WebSocket handshakes then do
 // not wait for the ticket. Nothing is sent on it before `connect` names the same address and adds
@@ -155,7 +156,6 @@ async function handleCommand(command: BridgeCommand): Promise<void> {
         channels: {},
         payloadDecoders: {},
         reconnectAttempt: 0,
-        signalRetryAt: 0,
         reconnectTimer: null,
         turnRefreshTimer: null,
         turnRefreshDueAt: 0,
@@ -205,6 +205,7 @@ function prepareSignal(peerId: string, signalUrl: string): void {
   // A peer that is already connecting has its own socket.
   if (peers.has(peerId)) return;
   dropPreparedSignal(peerId);
+  if (Date.now() < signalRetryAt) return;
   const socket = new WebSocket(signalUrl);
   const listeners = new AbortController();
   const prepared: PreparedSignal = {
@@ -225,7 +226,14 @@ function prepareSignal(peerId: string, signalUrl: string): void {
     },
     { signal: listeners.signal },
   );
-  socket.addEventListener("close", drop, { signal: listeners.signal });
+  socket.addEventListener(
+    "close",
+    (event) => {
+      if (event.code === 1008) signalRetryAt = Date.now() + 60_000;
+      drop();
+    },
+    { signal: listeners.signal },
+  );
   socket.addEventListener("error", drop, { signal: listeners.signal });
   preparedSignals.set(peerId, prepared);
 }
@@ -255,7 +263,7 @@ function connectSignal(state: PeerState, prepared: WebSocket | null = null): voi
     prepared?.close(1000, "Peer stopped");
     return;
   }
-  if (Date.now() < state.signalRetryAt) {
+  if (Date.now() < signalRetryAt) {
     prepared?.close(1000, "Signal retry pending");
     scheduleSignalReconnect(state);
     return;
@@ -305,7 +313,7 @@ function connectSignal(state: PeerState, prepared: WebSocket | null = null): voi
       post({ type: "peer-disconnected", peerId: state.id });
       return;
     }
-    if (event.code === 1008) state.signalRetryAt = Date.now() + 60_000;
+    if (event.code === 1008) signalRetryAt = Date.now() + 60_000;
     if (!state.closed) scheduleSignalReconnect(state);
   });
   socket.addEventListener("error", () => socket.close());
@@ -335,7 +343,7 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
   }
   if (message.type === "error") {
     if (message.code === "rate_limited") {
-      state.signalRetryAt = Date.now() + 60_000;
+      signalRetryAt = Date.now() + 60_000;
       state.socket?.close();
     }
     post({
@@ -799,7 +807,7 @@ function replaceSignal(state: PeerState): void {
 
 function scheduleSignalReconnect(state: PeerState): void {
   if (state.reconnectTimer !== null) return;
-  const delay = Math.max(state.signalRetryAt - Date.now(), Math.min(30_000, 500 * 2 ** state.reconnectAttempt++));
+  const delay = Math.max(signalRetryAt - Date.now(), Math.min(30_000, 500 * 2 ** state.reconnectAttempt++));
   state.reconnectTimer = window.setTimeout(() => {
     state.reconnectTimer = null;
     connectSignal(state);
