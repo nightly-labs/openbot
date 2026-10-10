@@ -1215,6 +1215,39 @@ describe("OpenBot connected desktop shell", () => {
     });
   });
 
+  it("changes the model of the same provider while the agent works, and keeps other providers locked", async () => {
+    vi.mocked(window.openbot.agent.readConversation).mockImplementation(async (agentId) => ({
+      agentId,
+      threadId: `thread-${agentId}`,
+      activeTurnId: agentId === "chief" ? "turn-live" : null,
+      revision: 1,
+      messages: [],
+    }));
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+
+    await fireEvent.click(screen.getByRole("button", { name: "Agent model: GPT-5.6 Luna · Medium" }));
+    const dialog = screen.getByRole("dialog", { name: "Choose agent model" });
+    const sol = within(dialog).getByRole("option", { name: "GPT-5.6 Sol" });
+    expect(sol).toBeEnabled();
+    await fireEvent.click(sol);
+    await waitFor(() =>
+      expect(window.openbot.agent.updateAgent).toHaveBeenCalledWith(
+        expect.objectContaining({ agentId: "chief", provider: "codex", model: "gpt-5.6-sol" }),
+      ),
+    );
+    expect(within(dialog).getByText("Applies after this reply.")).toBeInTheDocument();
+    // The running reply keeps its model, and the list says which one that is.
+    const luna = within(dialog).getByRole("option", { name: /^GPT-5\.6 Luna/ });
+    await waitFor(() => expect(within(luna).getByText("current reply")).toBeInTheDocument());
+
+    await fireEvent.click(within(dialog).getByRole("tab", { name: /^Claude:/ }));
+    expect(within(dialog).getByRole("option", { name: "Claude Opus 5" })).toBeDisabled();
+    expect(
+      within(dialog).getByText("Wait for the current work to finish before changing providers."),
+    ).toBeInTheDocument();
+  });
+
   it("states an agent's error once above the composer, not in the transcript", async () => {
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });

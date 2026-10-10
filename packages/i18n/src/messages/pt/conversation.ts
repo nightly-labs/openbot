@@ -53,7 +53,6 @@ export const messages = {
   "conversation.header.openComputer": "Abrir computador",
   "conversation.header.thisAgent": "Este agente",
   "conversation.header.grantFailed": "Não foi possível salvar a aprovação permanente para {name}. Tente novamente.",
-  "conversation.header.modelsBusy": "Aguarde o trabalho atual terminar antes de mudar de modelo.",
   "conversation.header.modelsUnavailable": "Os modelos ficam disponíveis após a conexão de uma CLI de agente.",
   "conversation.panels.openWorkspaceFailed": "Não foi possível abrir a pasta do espaço de trabalho",
   "conversation.panels.tryAgain": "Tente novamente.",

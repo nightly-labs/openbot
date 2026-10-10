@@ -857,7 +857,7 @@ describe("OpenBot connected desktop shell", () => {
     expect(screen.getByLabelText("Message Chief")).toHaveAttribute("contenteditable", "true");
   });
 
-  it("permits approval revocation during active work while locking model and effort changes", async () => {
+  it("permits approval revocation during active work and keeps model and effort changes for the next reply", async () => {
     vi.mocked(window.openbot.getApprovalAutomation).mockResolvedValue({
       turbo: false,
       defaultAutoApprove: false,
@@ -876,10 +876,11 @@ describe("OpenBot connected desktop shell", () => {
       threadId: "thread-chief",
       turnId: "turn-1",
     });
-    await waitFor(() => expect(screen.getByRole("option", { name: "GPT-5.6 Sol" })).toBeDisabled());
+    expect(await screen.findByText("Applies after this reply.")).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "GPT-5.6 Sol" })).toBeEnabled();
     expect(trigger).toBeEnabled();
     const effort = () => within(screen.getByRole("radiogroup", { name: "Agent reasoning effort" }));
-    expect(effort().getByRole("radio", { name: "Medium" })).toBeDisabled();
+    expect(effort().getByRole("radio", { name: "Medium" })).toBeEnabled();
     const approval = screen.getByRole("switch", { name: "Auto approve this agent's actions" });
     expect(approval).toBeChecked();
     await fireEvent.click(approval);
@@ -893,7 +894,8 @@ describe("OpenBot connected desktop shell", () => {
       turnId: "turn-1",
       status: "completed",
     });
-    await waitFor(() => expect(screen.getByRole("option", { name: "GPT-5.6 Sol" })).toBeEnabled());
+    await waitFor(() => expect(screen.queryByText("Applies after this reply.")).not.toBeInTheDocument());
+    expect(screen.getByRole("option", { name: "GPT-5.6 Sol" })).toBeEnabled();
     expect(effort().getByRole("radio", { name: "Medium" })).toBeEnabled();
     expect(trackAnalytics).not.toHaveBeenCalledWith("system_turn_started", expect.anything());
     expect(trackAnalytics).not.toHaveBeenCalledWith("system_turn_completed", expect.anything());

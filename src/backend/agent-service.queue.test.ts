@@ -1409,11 +1409,15 @@ describe.sequential("AgentService: queue", () => {
         busyMessageMode: () => "steer",
         credentials: {
           ...NO_PROVIDER_CREDENTIALS,
-          customAgents: () => [{ id: "fixture", name: "Fixture", command: "fixture", args: [], env: [] }],
+          customAgents: () => [
+            { id: "fixture", name: "Fixture", command: "fixture", args: [], env: [] },
+            { id: "spare", name: "Spare", command: "spare", args: [], env: [] },
+          ],
         },
         client: (requested) => {
           const client = new FakeAgentClient(requested, "DONE", false, true, {}, requestHook);
-          if (requested === "acp") client.modelList = () => ({ data: [{ model: "fixture/default" }] });
+          if (requested === "acp")
+            client.modelList = () => ({ data: [{ model: "fixture/default" }, { model: "spare/default" }] });
           return client;
         },
       });
@@ -1448,6 +1452,42 @@ describe.sequential("AgentService: queue", () => {
 
     const turnStarts = (client: FakeAgentClient) =>
       client.requests.filter((request) => request.method === "turn/start").length;
+
+    // The provider gets nothing while the turn runs: the choice is saved on the agent and is read when
+    // the next turn starts. For a custom agent, that next turn opens a session of the other agent.
+    it.each([
+      { provider: "codex", from: "gpt-6-luna", to: "gpt-5.6-sol" },
+      { provider: "acp", from: "fixture/default", to: "spare/default" },
+    ] as const)(
+      "keeps a $provider turn on its model and starts the next turn on the model chosen during it",
+      async ({ provider, from, to }) => {
+        // The log line of a finished turn names the model that turn ran on.
+        const finished: unknown[] = [];
+        vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+          const line = String(chunk);
+          if (line.includes("A turn finished.")) finished.push(JSON.parse(line.slice(line.indexOf("{"))).model);
+          return true;
+        });
+        const { service: agentService, client, completeTurn } = await startBusyAgent(provider);
+        const requestsBefore = client.requests.length;
+
+        await expect(
+          runCauseEffect(agentService.updateAgent({ agentId: "chief", provider, model: to, reasoningEffort: "high" })),
+        ).resolves.toMatchObject({ provider, model: to, reasoningEffort: "high" });
+        expect(client.requests.slice(requestsBefore)).toEqual([]);
+        expect(agentService.listQueue("chief").deliveries[0]?.status).toBe("running");
+
+        completeTurn();
+        await waitForQueue(agentService, "chief", (queue) => queue.deliveries[0]?.status === "completed");
+        // The turn that ran during the change finished on the model it started with.
+        expect(finished).toEqual([from]);
+        await runCauseEffect(agentService.sendMessage({ agentId: "chief", text: "Next request" }));
+        await waitFor(() => client.requests.filter((request) => request.method === "turn/start").length === 2);
+        const starts = client.requests.filter((request) => request.method === "turn/start");
+        expect(starts.map((request) => getString(request.params, "model"))).toEqual([from, to]);
+        expect(starts[1]?.params).toMatchObject({ effort: "high" });
+      },
+    );
 
     it("joins the running turn on a provider that steers", async () => {
       const { service: agentService, client, turnId } = await startBusyAgent("codex");

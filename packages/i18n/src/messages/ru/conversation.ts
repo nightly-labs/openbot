@@ -53,7 +53,6 @@ export const messages = {
   "conversation.header.openComputer": "Открыть компьютер",
   "conversation.header.thisAgent": "Этот агент",
   "conversation.header.grantFailed": "Не удалось сохранить постоянное подтверждение для {name}. Повторите.",
-  "conversation.header.modelsBusy": "Дождитесь завершения текущей работы, прежде чем менять модель.",
   "conversation.header.modelsUnavailable": "Модели станут доступны после подключения CLI агента.",
   "conversation.panels.openWorkspaceFailed": "Не удалось открыть рабочую папку",
   "conversation.panels.tryAgain": "Повторите.",

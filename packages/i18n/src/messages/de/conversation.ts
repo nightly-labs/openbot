@@ -54,7 +54,6 @@ export const messages = {
   "conversation.header.thisAgent": "Dieser Agent",
   "conversation.header.grantFailed":
     "Die dauerhafte Genehmigung für {name} konnte nicht gespeichert werden. Versuche es erneut.",
-  "conversation.header.modelsBusy": "Warte, bis die aktuelle Arbeit abgeschlossen ist, bevor du das Modell wechselst.",
   "conversation.header.modelsUnavailable": "Modelle sind verfügbar, sobald eine Agenten-CLI verbunden ist.",
   "conversation.panels.openWorkspaceFailed": "Der Arbeitsbereichsordner konnte nicht geöffnet werden",
   "conversation.panels.tryAgain": "Versuche es erneut.",

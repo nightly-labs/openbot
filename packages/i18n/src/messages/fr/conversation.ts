@@ -53,7 +53,6 @@ export const messages = {
   "conversation.header.openComputer": "Ouvrir l’ordinateur",
   "conversation.header.thisAgent": "Cet agent",
   "conversation.header.grantFailed": "Impossible d’enregistrer l’autorisation permanente pour {name}. Réessayez.",
-  "conversation.header.modelsBusy": "Attendez la fin du travail en cours avant de changer de modèle.",
   "conversation.header.modelsUnavailable": "Les modèles sont disponibles après la connexion d’une CLI d’agent.",
   "conversation.panels.openWorkspaceFailed": "Impossible d’ouvrir le dossier de l’espace de travail",
   "conversation.panels.tryAgain": "Réessayez.",

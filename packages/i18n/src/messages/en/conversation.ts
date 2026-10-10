@@ -52,7 +52,6 @@ export const messages = defineMessages("conversation", {
   "conversation.header.openComputer": "Open computer",
   "conversation.header.thisAgent": "This agent",
   "conversation.header.grantFailed": "Could not save the standing approval for {name}. Try again.",
-  "conversation.header.modelsBusy": "Wait for the current work to finish before changing models.",
   "conversation.header.modelsUnavailable": "Models are available after an agent CLI connects.",
   "conversation.panels.openWorkspaceFailed": "Could not open the workspace folder",
   "conversation.panels.tryAgain": "Try again.",

@@ -449,6 +449,15 @@
   white-space: nowrap;
 }
 
+/* While a turn runs: when a change applies, or why another provider waits. */
+.provider-model-hint {
+  margin: 0 0 var(--ui-menu-padding);
+  padding: 0 var(--ui-menu-inset);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: 16px;
+}
+
 /* The runtime status: a filled block with no border, as the search field. */
 .provider-model-empty {
   display: grid;

@@ -53,7 +53,6 @@ export const messages = {
   "conversation.header.openComputer": "Otwórz komputer",
   "conversation.header.thisAgent": "Ten agent",
   "conversation.header.grantFailed": "Nie udało się zapisać stałego zatwierdzenia dla: {name}. Spróbuj ponownie.",
-  "conversation.header.modelsBusy": "Poczekaj na zakończenie bieżącej pracy, zanim zmienisz model.",
   "conversation.header.modelsUnavailable": "Modele będą dostępne po połączeniu CLI agenta.",
   "conversation.panels.openWorkspaceFailed": "Nie udało się otworzyć folderu obszaru roboczego",
   "conversation.panels.tryAgain": "Spróbuj ponownie.",

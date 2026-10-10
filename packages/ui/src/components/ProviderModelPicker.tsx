@@ -67,8 +67,13 @@ interface ProviderModelPickerProps {
   reasoningEffort?: AgentReasoningEffort;
   onReasoningEffortChange?: (effort: AgentReasoningEffort) => void;
   disabled?: boolean;
-  /** Keep approval controls available while model and effort changes are locked. */
-  modelChangesDisabled?: boolean;
+  /**
+   * A turn is running. The model and effort of the current provider can still change, and apply after
+   * this reply; another provider waits until the turn ends.
+   */
+  providerChangesLocked?: boolean;
+  /** The model the running reply uses. While another model is chosen, it keeps a mark. */
+  replyModel?: AgentModelId;
   disabledReason?: string;
   runtimeStatuses?: Partial<Record<AgentProviderId, ProviderRuntimeStatus>>;
   onDownloadProvider?: (provider: AgentProviderId) => void | Promise<void>;
@@ -221,6 +226,17 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   };
   const modelAvailable = (model: PickerModel): boolean =>
     providerAvailability(props.agentStatus, props.modelOptions, model.provider, t).state === "available";
+  /**
+   * While a turn runs, only a model of the provider it runs on. The turn keeps its model, and the
+   * choice applies after the reply. Another provider moves the conversation, so it waits.
+   */
+  const changeAllowed = (model: PickerModel): boolean =>
+    !props.providerChangesLocked || model.provider === props.provider;
+  /** The model of the running reply, marked only when another model is chosen. */
+  const isReplyModel = (model: PickerModel): boolean =>
+    props.providerChangesLocked === true &&
+    model.provider === props.provider &&
+    (model.id === props.replyModel || model.variants.some((variant) => variant.id === props.replyModel));
   const railSummary = (rail: RailId, status: AgentProviderStatus): string =>
     rail === CUSTOM_RAIL ? customSummary() : providerSummary(rail, status, text);
   const railHeadingSummary = (rail: RailId, status: AgentProviderStatus): string => {
@@ -271,7 +287,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   }
 
   function selectModel(option: PickerModel): void {
-    if (props.disabled || props.modelChangesDisabled || !modelAvailable(option)) return;
+    if (props.disabled || !changeAllowed(option) || !modelAvailable(option)) return;
     if (!showsReasoningEffort() && !option.variants.length) setOpen(false);
     props.onChange(option.id, option.provider);
   }
@@ -316,11 +332,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
           class={["provider-model-trigger", { "provider-model-trigger-field": field() }]}
           aria-label={`${props.ariaLabel ?? t("provider.picker.agentModel")}: ${triggerSummary()}`}
           disabled={props.disabled}
-          title={
-            props.disabled || props.modelChangesDisabled
-              ? props.disabledReason
-              : `${railName(activeProvider(), t)} · ${triggerSummary()}`
-          }
+          title={props.disabled ? props.disabledReason : `${railName(activeProvider(), t)} · ${triggerSummary()}`}
           onKeyDown={(event: KeyboardEvent) => {
             if (event.key !== "ArrowDown") return;
             event.preventDefault();
@@ -479,9 +491,8 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                   () => fades.remeasure(),
                 );
                 const available = () => status().state === "available";
-                const effortLocked = () => !available() || props.modelChangesDisabled === true;
                 function chooseEffort(id: string): void {
-                  if (props.disabled || effortLocked() || id === effortValue()) return;
+                  if (props.disabled || !available() || id === effortValue()) return;
                   const model = selected();
                   if (model?.variants.length) props.onChange(id, model.provider);
                   else {
@@ -552,6 +563,13 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                         </Button>
                       </Show>
                     </div>
+                    <Show when={props.providerChangesLocked && available()}>
+                      <p class="provider-model-hint">
+                        {t(
+                          provider === activeProvider() ? "provider.picker.nextReply" : "provider.picker.providerBusy",
+                        )}
+                      </p>
+                    </Show>
                     <Show when={!available()}>
                       <div class="provider-model-empty" role="status">
                         <span>{runtimeMessage()}</span>
@@ -619,7 +637,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                           )}
                           optionValue={pickerModelKey}
                           optionTextValue={(model) => displayModelName(model.name, model.id)}
-                          optionDisabled={(model) => !modelAvailable(model) || props.modelChangesDisabled === true}
+                          optionDisabled={(model) => !modelAvailable(model) || !changeAllowed(model)}
                           value={[selectedKey()]}
                           selectionMode="single"
                           disallowEmptySelection
@@ -640,7 +658,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                                       })
                                     : displayModelName(model.name, model.id)
                                 }
-                                disabled={!modelAvailable(model) || props.modelChangesDisabled}
+                                disabled={!modelAvailable(model) || !changeAllowed(model)}
                                 onClick={() => {
                                   if (!isSelected()) selectModel(model);
                                 }}
@@ -652,6 +670,9 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                                   </Show>
                                   <Show when={model.id === railDefaultModel(provider)}>
                                     <small>{t("provider.model.default")}</small>
+                                  </Show>
+                                  <Show when={!isSelected() && isReplyModel(model)}>
+                                    <small>{t("provider.picker.currentReply")}</small>
                                   </Show>
                                 </span>
                                 <Show when={isSelected()}>
@@ -687,7 +708,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                               <SelectTrigger
                                 size="sm"
                                 aria-label={t("provider.picker.effortLabel")}
-                                disabled={effortLocked()}
+                                disabled={!available()}
                               >
                                 <SelectValue<{ id: string; name: string }>>
                                   {(state) => state.selectedOption()?.name ?? t("provider.picker.selectEffort")}
@@ -701,7 +722,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                             label={t("provider.picker.effortLabel")}
                             options={effortOptions()}
                             value={effortValue()}
-                            disabled={effortLocked()}
+                            disabled={!available()}
                             onChange={chooseEffort}
                           />
                         </Show>

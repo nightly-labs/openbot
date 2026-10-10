@@ -5,7 +5,7 @@ import { useConversationViewScope } from "./conversation-scope";
 const loadAgentSettingsPanel = () => import("./AgentSettingsPanel");
 
 import { useText } from "@openbot/ui/text";
-import { createMemo } from "solid-js";
+import { createMemo, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { serverHasStorage } from "../files/storage-usage";
 
@@ -29,6 +29,11 @@ export function ConversationHeader() {
     filesOpen,
     toggleFilesPanel,
   } = useConversationViewScope();
+  const working = () => agentActivity() === "Working";
+  // The model is read once per agent and turn: a model chosen during the turn applies from the next
+  // reply, and this one keeps the reply that runs now.
+  const replyTurn = createMemo(() => (working() ? `${props.agent?.id}:${props.activeTurnId}` : null));
+  const replyModel = createMemo(() => (replyTurn() ? untrack(() => props.agent?.model) : undefined));
   const changeAutoApprove = createMemo(() => {
     const save = props.onSetAgentAutoApprove;
     const name = props.agent?.name ?? t("conversation.header.thisAgent");
@@ -62,11 +67,9 @@ export function ConversationHeader() {
         onCancelProviderDownload: props.onCancelProviderDownload,
         onConnectProvider: props.onConnectProvider,
         onAddCustomProvider: props.onManageProviders,
-        modelChangesDisabled: agentActivity() === "Working",
-        disabledReason:
-          agentActivity() === "Working"
-            ? t("conversation.header.modelsBusy")
-            : t("conversation.header.modelsUnavailable"),
+        providerChangesLocked: working(),
+        replyModel: replyModel(),
+        disabledReason: t("conversation.header.modelsUnavailable"),
         onChange: (model, provider) => void selectAndConfirmModel(model, provider),
         onReasoningEffortChange: (effort) => void selectAndConfirmReasoning(effort),
         autoApprove: props.agentAutoApproves,
