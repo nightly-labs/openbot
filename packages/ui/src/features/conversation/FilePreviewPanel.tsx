@@ -1,5 +1,5 @@
 import type { FilePreview, WorkspaceDirectory, WorkspaceDirectoryEntry } from "@openbot/contracts/ipc";
-import { ArrowLeft, Button, Code, Download, ExternalLink, File, Folder, FolderOpen, X } from "@openbot/ui";
+import { ArrowLeft, Button, Code, CopyButton, Download, ExternalLink, File, Folder, FolderOpen, X } from "@openbot/ui";
 import { PanelResizer } from "@openbot/ui/components/PanelResizer";
 import type { AgentProfile } from "@openbot/ui/data";
 import { ChatVisual } from "@openbot/ui/features/conversation/ChatVisual";
@@ -62,14 +62,13 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
   const previewKind = () => file()?.previewKind;
   const pageUrl = () => (previewKind() === "text" ? props.pageUrl : null) ?? null;
   const title = () => props.directory?.name ?? props.preview?.name ?? "";
-  const text = createMemo(() => {
+  /** The whole text of a text or Markdown file. Copy takes all of it; the view shows up to `TEXT_LIMIT`. */
+  const source = createMemo(() => {
     const preview = file();
-    if (!preview?.bytes || (preview.previewKind !== "text" && preview.previewKind !== "markdown")) {
-      return { value: "", truncated: false };
-    }
-    const value = new TextDecoder().decode(preview.bytes);
-    return { value: value.slice(0, TEXT_LIMIT), truncated: value.length > TEXT_LIMIT };
+    if (!preview?.bytes || (preview.previewKind !== "text" && preview.previewKind !== "markdown")) return "";
+    return new TextDecoder().decode(preview.bytes);
   });
+  const text = createMemo(() => ({ value: source().slice(0, TEXT_LIMIT), truncated: source().length > TEXT_LIMIT }));
   const openEntry = (entry: WorkspaceDirectoryEntry) => {
     if (entry.kind === "directory") props.onOpenWorkspaceFolder?.(entry.path);
     else props.onOpenWorkspaceFile(entry.path);
@@ -189,6 +188,16 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
           >
             <Code class="browser-toolbar-icon" />
           </Button>
+        </Show>
+        <Show when={source()}>
+          {(value) => (
+            <CopyButton
+              class="browser-toolbar-button file-preview-copy"
+              value={value()}
+              label={t("preview.panel.copy")}
+              iconOnly
+            />
+          )}
         </Show>
         <Show when={file() && props.allowExternalOpen !== false}>
           <Button

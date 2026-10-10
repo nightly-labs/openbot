@@ -74,10 +74,10 @@ export function MobileChatView({ agent }: { agent: MobileAgent }) {
     if (!online) return;
     const id = ++request.current;
     setHistoryLoadFailed(false);
-    void loadConversation(agent.id).catch(() => {
+    void loadConversation(agent.id, agent.serverId).catch(() => {
       if (request.current === id) setHistoryLoadFailed(true);
     });
-  }, [agent.id, online, loadConversation]);
+  }, [agent.id, agent.serverId, online, loadConversation]);
   useEffect(() => {
     fetchHistory();
     return () => {
@@ -87,8 +87,8 @@ export function MobileChatView({ agent }: { agent: MobileAgent }) {
   const latest = latestReadableMessage(conversation?.messages ?? []);
   const latestId = latest?.id;
   const markRead = useCallback(() => {
-    if (latestId) markAgentRead(agent.id, latestId);
-  }, [agent.id, latestId, markAgentRead]);
+    if (latestId) markAgentRead(agent.id, latestId, agent.serverId);
+  }, [agent.id, agent.serverId, latestId, markAgentRead]);
   const activePrompt = messages.findLast(
     (message) =>
       message.kind === "question" &&
@@ -125,7 +125,7 @@ export function MobileChatView({ agent }: { agent: MobileAgent }) {
       olderLoading={conversation?.olderLoading ?? false}
       olderError={conversation?.olderError ?? false}
       loadOlder={() => {
-        void loadOlderMessages(agent.id);
+        void loadOlderMessages(agent.id, agent.serverId);
       }}
       send={(body, files, replyToMessageId, upload) =>
         uploadChatAttachments(files, {

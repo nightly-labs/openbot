@@ -183,6 +183,17 @@ const EMPTY_STATE: StoredState = {
   reactions: [],
 };
 
+/**
+ * Files a channel request holds before the channel stores it. Run `accept` once the channel stored
+ * the request, or `revert` when it refused it: until then the drafts can still be restored.
+ */
+export interface CommittedChannelAttachments {
+  text: string;
+  attachments: AttachmentSummary[];
+  accept: Effect.Effect<void>;
+  revert: Effect.Effect<void, StoredStateFailure>;
+}
+
 export class MailboxStore {
   readonly #statePath: string;
   readonly #files: AttachmentFiles;
@@ -501,9 +512,9 @@ export class MailboxStore {
           .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
         throw error;
       }
-      yield* this.#files
-        .removeAttachmentDirectories(drafts.map((draft) => draft.path))
-        .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
+      // The message is saved: failing now would hide a delivery that runs from its caller. A draft
+      // folder left behind holds copies only, and a restart clears it with the other drafts.
+      yield* this.#files.removeAttachmentDirectories(drafts.map((draft) => draft.path)).pipe(Effect.ignore);
       return this.#receipt(messageId);
     } catch (cause) {
       return yield* new StoredStateFailure({ cause });
@@ -525,8 +536,10 @@ export class MailboxStore {
       messageId: string;
       text: string;
       draftIds: string[];
+      /** Throws when the channel can no longer take the request; runs after the copy. */
+      assertOpen?: () => void;
     },
-  ): Effect.fn.Return<{ text: string; attachments: AttachmentSummary[] }, StoredStateFailure> {
+  ): Effect.fn.Return<CommittedChannelAttachments, StoredStateFailure> {
     try {
       const ids = new Set(input.draftIds);
       if (ids.size !== input.draftIds.length) throw new Error("Duplicate attachment drafts.");
@@ -550,6 +563,20 @@ export class MailboxStore {
           drafts.map((draft) => draft.path),
         )
         .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
+      // The channel can be archived or deleted during the copy. Refuse before the drafts are
+      // consumed, so the composer can send the same files again.
+      let refusal: unknown = null;
+      try {
+        input.assertOpen?.();
+      } catch (error) {
+        refusal = error;
+      }
+      if (refusal !== null) {
+        yield* this.#files
+          .remove(this.#files.transferRoot(input.messageId))
+          .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
+        throw refusal;
+      }
       const committedByDraftId = new Map(drafts.map((draft, index) => [draft.id, attachments[index]] as const));
       const message: StoredMessage = {
         channelId: input.channelId,
@@ -576,10 +603,29 @@ export class MailboxStore {
           .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
         throw error;
       }
-      yield* this.#files
-        .removeAttachmentDirectories(drafts.map((draft) => draft.path))
-        .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
-      return { text: message.text, attachments: attachments.map(toAttachmentSummary) };
+      // The draft folders stay until the channel accepts the request. A send the channel refuses
+      // after this point (archived meanwhile, a reply target gone, a failed write) reverts, and the
+      // composer can send the same drafts again.
+      const accept = this.#files.removeAttachmentDirectories(drafts.map((draft) => draft.path)).pipe(Effect.ignore);
+      const revert = Effect.gen({ self: this }, function* () {
+        const before = { messages: this.#state.messages, drafts: this.#state.drafts };
+        this.#state.messages = before.messages.filter((candidate) => candidate !== message);
+        this.#state.drafts = [
+          ...before.drafts,
+          ...drafts.filter((draft) => !before.drafts.some((candidate) => candidate.id === draft.id)),
+        ];
+        try {
+          this.#persist("channel.attachments-reverted", `mailbox:channel-attachments-reverted:${input.messageId}`);
+        } catch (cause) {
+          // The database still holds the committed request. Memory must say the same, or the drafts
+          // would show as restored now and be gone after a restart.
+          this.#state.messages = before.messages;
+          this.#state.drafts = before.drafts;
+          return yield* new StoredStateFailure({ cause });
+        }
+        yield* this.#files.remove(this.#files.transferRoot(input.messageId)).pipe(Effect.ignore);
+      }).pipe(Effect.uninterruptible);
+      return { text: message.text, attachments: attachments.map(toAttachmentSummary), accept, revert };
     } catch (cause) {
       return yield* new StoredStateFailure({ cause });
     }

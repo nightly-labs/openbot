@@ -754,24 +754,27 @@ function RemoteDesktop() {
   } = useRemoteDesktop();
 
   return (
-    <Show when={!platform.landingPreview && remoteDesktopWorkspaceServer()} keyed>
-      {(server) => (
-        <Loading>
-          <RemoteDesktopWorkspace
-            visible={remoteDesktopWorkspaceVisible()}
-            platform={platform.appInfo()?.platform ?? "darwin"}
-            server={server}
-            session={remoteDesktopWorkspaceSession()}
-            connecting={remoteDesktopConnectingServerId() === server.id}
-            connectionError={remoteDesktopConnectionError()}
-            connectionErrorCode={remoteDesktopConnectionErrorCode()}
-            onHide={hideRemoteDesktopWorkspace}
-            onDisconnect={() => disconnectRemoteDesktopWorkspace()}
-            onRetry={retryRemoteDesktopWorkspace}
-            onSelectDisplay={selectRemoteDesktopDisplay}
-          />
-        </Loading>
-      )}
+    // Keyed by id: each server list update is a new object, and a new viewer frame cannot reuse the one-time grant.
+    <Show when={!platform.landingPreview && remoteDesktopWorkspaceServer()?.id} keyed>
+      <Show when={remoteDesktopWorkspaceServer()}>
+        {(server) => (
+          <Loading>
+            <RemoteDesktopWorkspace
+              visible={remoteDesktopWorkspaceVisible()}
+              platform={platform.appInfo()?.platform ?? "darwin"}
+              server={server()}
+              session={remoteDesktopWorkspaceSession()}
+              connecting={remoteDesktopConnectingServerId() === server().id}
+              connectionError={remoteDesktopConnectionError()}
+              connectionErrorCode={remoteDesktopConnectionErrorCode()}
+              onHide={hideRemoteDesktopWorkspace}
+              onDisconnect={() => disconnectRemoteDesktopWorkspace()}
+              onRetry={retryRemoteDesktopWorkspace}
+              onSelectDisplay={selectRemoteDesktopDisplay}
+            />
+          </Loading>
+        )}
+      </Show>
     </Show>
   );
 }

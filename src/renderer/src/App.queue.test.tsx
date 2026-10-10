@@ -235,6 +235,31 @@ describe("OpenBot connected desktop shell", () => {
     );
   });
 
+  it("keeps a direct message draft when presence changes", async () => {
+    render(() => <App peopleEnabled />);
+    await screen.findByRole("heading", { name: "Chief" });
+    const members = [
+      presenceMember("member-self", "person@example.com", "Person"),
+      presenceMember("member-alice", "alice@example.com", "Alice"),
+      presenceMember("member-bob", "bob@example.com", "Bob"),
+    ];
+    emitPresence?.({ serverId: "server-1", updatedAt: "2026-08-19T10:00:00.000Z", members });
+    await fireEvent.click(await screen.findByRole("button", { name: /Alice/ }));
+    const input = await screen.findByRole("textbox", { name: "Message Alice" });
+    await fireEvent.input(input, { target: { value: "Draft for Alice" } });
+
+    // Someone starts typing to an agent: the host sends a new snapshot with the same members.
+    emitPresence?.({
+      serverId: "server-1",
+      updatedAt: "2026-08-19T10:01:00.000Z",
+      members: members.map((member) => ({ ...member, typingAgentId: member.id === "member-self" ? null : "chief" })),
+    });
+
+    await waitFor(() => expect(screen.getByRole("textbox", { name: "Message Alice" })).toHaveValue("Draft for Alice"));
+    await fireEvent.click(screen.getByRole("button", { name: /Bob/ }));
+    expect(await screen.findByRole("textbox", { name: "Message Bob" })).toHaveValue("");
+  });
+
   it("does not expose team conversations when the signed-in account is not a member", async () => {
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });

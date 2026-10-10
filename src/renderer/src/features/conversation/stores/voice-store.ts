@@ -98,6 +98,7 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
     const generation = ++resources.voiceRequestGeneration;
     deps.setVoicePhase("preparing");
     deps.setVoiceModelProgress(0);
+    let stream: MediaStream | undefined;
     try {
       const modelStatus = await conversationRuntime(deps.props).voice.prepareModel();
       if (resources.voiceDisposed || resources.voiceRequestGeneration !== generation) return;
@@ -117,7 +118,7 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
       }
       deps.setVoicePhase("requesting");
       deps.setVoiceModelProgress(null);
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
       if (resources.voiceDisposed || !deps.viewIsMounted() || resources.voiceRequestGeneration !== generation) {
         for (const track of stream.getTracks()) track.stop();
         if (!resources.voiceDisposed && resources.voiceRequestGeneration === generation) deps.setVoicePhase("idle");
@@ -150,6 +151,14 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
       deps.setVoicePhase("recording");
       resources.voiceRecordingTimer = setTimeout(stopVoiceRecording, VOICE_AUDIO_LIMITS.maximumSeconds * 1_000);
     } catch (error) {
+      // The recorder failed after the microphone opened: release it, or the OS keeps it in use.
+      if (stream) {
+        for (const track of stream.getTracks()) track.stop();
+        if (resources.voiceStream === stream) {
+          resources.voiceStream = undefined;
+          resources.voiceRecorder = undefined;
+        }
+      }
       if (resources.voiceRequestGeneration === generation) deps.setVoicePhase("idle");
       deps.setConversationError(target, voiceCaptureError(error));
     }

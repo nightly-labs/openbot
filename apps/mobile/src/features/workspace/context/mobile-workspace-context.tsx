@@ -679,9 +679,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     [request, conversationStore],
   );
   const loadOlderMessages = useCallback(
-    async (agentId: string) => {
+    async (agentId: string, serverId = activeServerIdRef.current) => {
       const generation = loadGeneration.current;
-      const serverId = activeServerIdRef.current;
       await conversationStore.loadOlder(
         agentId,
         (cursor) =>
@@ -963,11 +962,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   );
 
   const markAgentRead = useCallback(
-    (agentId: string, visibleMessageId?: string | null) => {
+    (agentId: string, visibleMessageId?: string | null, targetServerId?: string) => {
+      const serverId = targetServerId ?? activeServerId;
       if (
         visibleMessageId === null &&
-        (!activeServerId ||
-          !serverCapabilities.current.get(activeServerId)?.includes(TEAM_CONVERSATION_UNREAD_CAPABILITY))
+        (!serverId || !serverCapabilities.current.get(serverId)?.includes(TEAM_CONVERSATION_UNREAD_CAPABILITY))
       ) {
         showWarningAlert(
           "team",
@@ -976,7 +975,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         );
         return;
       }
-      void writeAgentRead(agentId, visibleMessageId).catch(() => {
+      void writeAgentRead(agentId, visibleMessageId, serverId ?? undefined).catch(() => {
         if (visibleMessageId === null)
           showFailureAlert(
             undefined,
